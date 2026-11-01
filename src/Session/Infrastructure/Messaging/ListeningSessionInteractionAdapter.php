@@ -14,8 +14,25 @@ use Symfony\Component\Messenger\Stamp\HandledStamp;
 
 final readonly class ListeningSessionInteractionAdapter implements ListeningSessionInteractionInterface
 {
-    public function __construct(private MessageBusInterface $bus)
+    public function __construct(private MessageBusInterface $bus, private \App\Session\Application\Port\PlaybackCoordinationInterface $coordination, private \App\Session\Application\Port\PlaybackConnectionsInterface $relay) {}
+
+    /**
+     * @param array<string,mixed> $input
+     * @return array<string,mixed>
+     */
+    public function coordinate(Uuid $userId, string $operation, array $input, ?string $endpointCapability = null): array
     {
+        return $this->coordination->execute($userId, \App\Session\Application\Port\PlaybackOperation::from($operation), $input, $endpointCapability);
+    }
+
+    public function bindPlayback(int $connectionId, Uuid $userId, ?string $incarnationId = null, ?string $endpointCapability = null): void
+    {
+        $this->relay->bind($connectionId, $userId, $incarnationId, $endpointCapability);
+    }
+
+    public function disconnectPlayback(int $connectionId): void
+    {
+        $this->relay->unbind($connectionId);
     }
 
     public function join(Uuid $userId, Uuid $deviceId): mixed
@@ -36,7 +53,13 @@ final readonly class ListeningSessionInteractionAdapter implements ListeningSess
         ?string $playbackState = null,
     ): mixed {
         $envelope = $this->bus->dispatch(new SessionPlaybackCommand(
-            $userId, $deviceId, $action, $position, $queue, $currentTrackIndex, $playbackState,
+            $userId,
+            $deviceId,
+            $action,
+            $position,
+            $queue,
+            $currentTrackIndex,
+            $playbackState,
         ));
 
         return $envelope->last(HandledStamp::class)?->getResult() ?? [];
@@ -52,7 +75,12 @@ final readonly class ListeningSessionInteractionAdapter implements ListeningSess
         string $playbackState,
     ): mixed {
         $envelope = $this->bus->dispatch(new SyncSessionCommand(
-            $userId, $deviceId, $queue, $currentTrackIndex, $position, $playbackState,
+            $userId,
+            $deviceId,
+            $queue,
+            $currentTrackIndex,
+            $position,
+            $playbackState,
         ));
 
         return $envelope->last(HandledStamp::class)?->getResult() ?? [];

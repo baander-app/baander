@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Session;
 
-use App\Session\Application\Port\SessionUserPublicIdentityInterface;
-use App\Session\Application\Port\SessionPortInterface;
+use App\Session\Application\Port\PlaybackCoordinationInterface;
+use App\Session\Application\Port\PlaybackOperation;
 use App\Session\Domain\Event\SessionClaimed;
 use App\Session\Domain\Event\SessionUpdated;
 use App\Session\Infrastructure\Swoole\SessionEventSubscriber;
@@ -18,38 +18,27 @@ use Symfony\Component\Serializer\Encoder\JsonEncoder;
 
 final class SessionEventPublicIdentityTest extends TestCase
 {
-    public function testPublicMessagesProjectRelationshipsAndKeepQueuePublicIds(): void
+    public function testPublicMessagesCarryTheCompleteSnapshotWithoutPrivateEndpointAuthority(): void
     {
-        if (!extension_loaded('swoole')) {
-            self::markTestSkipped('The real connection registry requires Swoole.');
-        }
         $owner = new Uuid();
-        $browserToken = new Uuid();
-        $userPublicId = new PublicId();
-        $devicePublicId = new PublicId();
-        $songPublicId = new PublicId();
-        $sessions = $this->createMock(SessionPortInterface::class);
-        $sessions->expects(self::once())->method('devicePublicId')->with($owner, $browserToken)->willReturn($devicePublicId);
-        $users = $this->createMock(SessionUserPublicIdentityInterface::class);
-        $users->expects(self::exactly(2))->method('publicIdByUserId')->with($owner)->willReturn($userPublicId);
+        $browser = new Uuid();
+        $snapshot = ['schemaVersion' => 1, 'publicId' => new PublicId()->toString(), 'revision' => 5, 'media' => null,
+            'queue' => [new PublicId()->toString()], 'currentTrackIndex' => 0, 'position' => 42.5, 'playbackState' => 'paused',
+            'desiredState' => 'paused', 'observedState' => 'unknown', 'selectedDestinationId' => null, 'activeDestinationId' => null,
+            'activeIncarnationId' => null, 'transfer' => null, 'destinations' => [], 'commands' => []];
+        $playback = $this->createMock(PlaybackCoordinationInterface::class);
+        $playback->expects(self::exactly(2))->method('execute')->with($owner, PlaybackOperation::Snapshot, [])->willReturn($snapshot);
         $messages = [];
         $encoder = $this->createMock(JsonEncoder::class);
         $encoder->expects(self::exactly(2))->method('encode')->willReturnCallback(static function (mixed $message) use (&$messages): string {
             $messages[] = $message;
-
             return json_encode($message, JSON_THROW_ON_ERROR);
         });
-        $subscriber = new SessionEventSubscriber(new WebSocketPusher(WebSocketConnectionRegistry::create(64, 64), $encoder), $sessions, $users);
-
-        $subscriber->onSessionClaimed(new SessionClaimed($owner, $browserToken, new \DateTimeImmutable()));
-        $subscriber->onSessionUpdated(new SessionUpdated($owner, $browserToken, [$songPublicId->toString()], new \DateTimeImmutable()));
-
-        self::assertSame([
-            ['type' => 'session.claimed', 'data' => ['deviceId' => $devicePublicId->toString(), 'userId' => $userPublicId->toString()]],
-            ['type' => 'session.state', 'data' => ['userId' => $userPublicId->toString(), 'queue' => [$songPublicId->toString()]]],
-        ], $messages);
-        $json = json_encode($messages, JSON_THROW_ON_ERROR);
-        self::assertStringNotContainsString($owner->toString(), $json);
-        self::assertStringNotContainsString($browserToken->toString(), $json);
+        $subscriber = new SessionEventSubscriber(new WebSocketPusher(WebSocketConnectionRegistry::create(64, 64), $encoder), $playback);
+        $subscriber->onSessionClaimed(new SessionClaimed($owner, $browser, new \DateTimeImmutable()));
+        $subscriber->onSessionUpdated(new SessionUpdated($owner, $browser, $snapshot['queue'], new \DateTimeImmutable()));
+        self::assertSame([['type' => 'session.snapshot', 'data' => $snapshot], ['type' => 'session.snapshot', 'data' => $snapshot]], $messages);
+        self::assertStringNotContainsString($owner->toString(), json_encode($messages, JSON_THROW_ON_ERROR));
+        self::assertStringNotContainsString($browser->toString(), json_encode($messages, JSON_THROW_ON_ERROR));
     }
 }

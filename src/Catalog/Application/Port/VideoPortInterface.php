@@ -7,10 +7,13 @@ namespace App\Catalog\Application\Port;
 use App\Catalog\Domain\Model\Video;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\ValueObject\LibraryReadScope;
 
 interface VideoPortInterface
 {
     public function findByPublicId(PublicId $publicId): ?Video;
+
+    public function isVisibleByPublicId(PublicId $publicId, LibraryReadScope $scope): bool;
 
     public function findByUuid(Uuid $id): ?Video;
 }

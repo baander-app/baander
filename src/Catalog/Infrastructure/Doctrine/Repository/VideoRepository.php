@@ -11,6 +11,7 @@ use App\Catalog\Infrastructure\Doctrine\Entity\MovieVideoEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\VideoEntity;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\ValueObject\LibraryReadScope;
 use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\ORM\EntityManagerInterface;
 
@@ -21,8 +22,7 @@ final class VideoRepository implements VideoRepositoryInterface
 {
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
-    ) {
-    }
+    ) {}
 
     public function save(Video $video): void
     {
@@ -50,6 +50,30 @@ final class VideoRepository implements VideoRepositoryInterface
         return $entity !== null ? $this->toDomain($entity) : null;
     }
 
+    public function isVisibleByPublicId(PublicId $publicId, LibraryReadScope $scope): bool
+    {
+        if (!$scope->isUnrestricted() && $scope->getLibraryIds() === []) {
+            return false;
+        }
+
+        $sql = 'SELECT 1 FROM videos v WHERE v.public_id = :public_id';
+        $parameters = ['public_id' => $publicId->toString()];
+        $types = [];
+        if (!$scope->isUnrestricted()) {
+            $sql .= <<<'SQL'
+                 AND EXISTS (
+                    SELECT 1 FROM movie_video mv
+                    JOIN movies m ON m.id = mv.movie_id
+                    WHERE mv.video_id = v.id AND m.library_id IN (:library_ids)
+                )
+                SQL;
+            $parameters['library_ids'] = $scope->getLibraryIds();
+            $types['library_ids'] = ArrayParameterType::STRING;
+        }
+
+        return $this->entityManager->getConnection()->fetchOne($sql . ' LIMIT 1', $parameters, $types) !== false;
+    }
+
     public function findByHash(string $hash): ?Video
     {
         $entity = $this->entityManager
@@ -72,7 +96,7 @@ final class VideoRepository implements VideoRepositoryInterface
             );
 
         return array_map(
-            fn (MovieVideoEntity $mve) => $this->toDomain($mve->getVideo()),
+            fn(MovieVideoEntity $mve) => $this->toDomain($mve->getVideo()),
             $movieVideoEntities,
         );
     }
@@ -92,7 +116,7 @@ final class VideoRepository implements VideoRepositoryInterface
 
         return (int) $this->entityManager->getConnection()->executeStatement(
             'DELETE FROM videos v WHERE v.id IN (:ids) AND NOT EXISTS (SELECT 1 FROM movie_video mv WHERE mv.video_id = v.id)',
-            ['ids' => array_map(static fn (Uuid $id): string => $id->toString(), $videoIds)],
+            ['ids' => array_map(static fn(Uuid $id): string => $id->toString(), $videoIds)],
             ['ids' => ArrayParameterType::STRING],
         );
     }

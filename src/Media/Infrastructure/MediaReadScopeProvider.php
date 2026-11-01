@@ -16,7 +16,11 @@ final readonly class MediaReadScopeProvider implements MediaReadScopeProviderInt
     public function __construct(
         private Security $security,
         private LibraryReadScopeProviderInterface $libraries,
-    ) {
+    ) {}
+
+    public function forUser(Uuid $userId): MediaReadScope
+    {
+        return MediaReadScope::authenticated($userId, $this->libraries->forUser($userId));
     }
 
     public function current(): MediaReadScope

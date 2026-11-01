@@ -706,6 +706,9 @@ services:
     App\Media\Application\Port\MediaReadScopeProviderInterface:
         alias: App\Media\Infrastructure\MediaReadScopeProvider
 
+    App\Media\Application\Port\PlaybackMediaAccessInterface:
+        alias: App\Media\Application\Service\PlaybackMediaAccess
+
     App\Media\Application\Port\ImageConversionPortInterface:
         alias: App\Media\Infrastructure\Converter\GdImageConverter
 
@@ -864,6 +867,15 @@ services:
     # --- Session Application Port Aliases ---
     App\Session\Application\Port\SessionPortInterface:
         alias: App\Session\Infrastructure\SessionAdapter
+
+    App\Session\Application\Port\PlaybackCoordinationInterface:
+        alias: App\Session\Application\Service\PlaybackCoordinator
+
+    App\Session\Application\Port\PlaybackStoreInterface:
+        alias: App\Session\Infrastructure\Doctrine\PlaybackStore
+
+    App\Session\Application\Port\PlaybackConnectionsInterface:
+        alias: App\Session\Infrastructure\Swoole\PlaybackCommandRelay
 
     # --- Session WebSocket Events ---
     App\Session\Infrastructure\Swoole\SessionEventSubscriber:

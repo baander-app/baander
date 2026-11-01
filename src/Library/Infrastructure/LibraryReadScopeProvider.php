@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Library\Infrastructure;
 
 use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
+use App\Auth\Application\Port\CurrentUserAuthorityReader;
 use App\Library\Application\Port\LibraryAccessPortInterface;
 use App\Library\Application\Port\LibraryReadScopeProviderInterface;
 use App\Shared\Domain\Model\Uuid;
@@ -13,8 +14,23 @@ use Symfony\Bundle\SecurityBundle\Security;
 
 final readonly class LibraryReadScopeProvider implements LibraryReadScopeProviderInterface
 {
-    public function __construct(private Security $security, private LibraryAccessPortInterface $access)
+    public function __construct(
+        private Security $security,
+        private LibraryAccessPortInterface $access,
+        private CurrentUserAuthorityReader $authorities,
+    ) {}
+
+    public function forUser(Uuid $userId): LibraryReadScope
     {
+        $authority = $this->authorities->read($userId);
+        if ($authority === null || $authority->disabled) {
+            return LibraryReadScope::none();
+        }
+        if ($authority->isAdministrator()) {
+            return LibraryReadScope::unrestricted();
+        }
+
+        return LibraryReadScope::restricted(array_map(Uuid::fromString(...), $this->access->getUserLibraryIds($userId)));
     }
 
     public function current(): LibraryReadScope

@@ -31,6 +31,11 @@ final class ListeningSessionState
         public readonly DateTimeImmutable $createdAt,
         public DateTimeImmutable $updatedAt,
         public ?DateTimeImmutable $lastUsedAt = null,
-    ) {
-    }
+        public int $revision = 0,
+        public ?\App\Session\Domain\Model\Playback\PlaybackMedia $media = null,
+        public \App\Session\Domain\Model\Playback\PlaybackState $desiredState = \App\Session\Domain\Model\Playback\PlaybackState::Stopped,
+        public \App\Session\Domain\Model\Playback\ObservedPlaybackState $observedState = \App\Session\Domain\Model\Playback\ObservedPlaybackState::Unknown,
+        public ?Uuid $selectedDestinationId = null,
+        public ?Uuid $activeIncarnationId = null,
+    ) {}
 }

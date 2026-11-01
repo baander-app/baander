@@ -828,6 +828,152 @@ export interface RenameDeviceRequest {
   name: string;
 }
 
+export interface RegisterPlaybackEndpointRequest {
+  deviceId: string;
+  endpointId: string;
+  /**
+     * @minLength 1
+     * @maxLength 128
+     */
+  name?: string;
+  /**
+     * @minItems 1
+     * @maxItems 3
+     */
+  capabilities?: string[];
+}
+
+export interface TransferPlaybackRequest {
+  requestId: string;
+  /** @minimum 0 */
+  expectedRevision: number;
+  targetIncarnationId: string;
+}
+
+export type AcknowledgePlaybackRequestOutcome = typeof AcknowledgePlaybackRequestOutcome[keyof typeof AcknowledgePlaybackRequestOutcome];
+
+
+export const AcknowledgePlaybackRequestOutcome = {
+  prepared: 'prepared',
+  quiesced: 'quiesced',
+  started: 'started',
+  stopped: 'stopped',
+  playing: 'playing',
+  paused: 'paused',
+  applied: 'applied',
+  rejected: 'rejected',
+} as const;
+
+export interface AcknowledgePlaybackRequest {
+  commandId: string;
+  attemptId: string;
+  /** @minimum 0 */
+  revision: number;
+  incarnationId: string;
+  /** @exclusiveMinimum 0 */
+  epoch: number;
+  outcome: AcknowledgePlaybackRequestOutcome;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  position?: number | null;
+  /**
+     * @minimum 0
+     * @maximum 1
+     * @nullable
+     */
+  volume?: number | null;
+}
+
+export type ObservePlaybackRequestObservedState = typeof ObservePlaybackRequestObservedState[keyof typeof ObservePlaybackRequestObservedState];
+
+
+export const ObservePlaybackRequestObservedState = {
+  playing: 'playing',
+  paused: 'paused',
+  stopped: 'stopped',
+  unknown: 'unknown',
+} as const;
+
+export interface ObservePlaybackRequest {
+  incarnationId: string;
+  /** @minimum 0 */
+  expectedRevision: number;
+  observedState: ObservePlaybackRequestObservedState;
+  /** @minimum 0 */
+  position: number;
+  /**
+     * @minimum 0
+     * @maximum 1
+     * @nullable
+     */
+  volume?: number | null;
+}
+
+export type ControlPlaybackRequestAction = typeof ControlPlaybackRequestAction[keyof typeof ControlPlaybackRequestAction];
+
+
+export const ControlPlaybackRequestAction = {
+  play: 'play',
+  pause: 'pause',
+  seek: 'seek',
+  load: 'load',
+  stop: 'stop',
+  volume: 'volume',
+} as const;
+
+/**
+ * @nullable
+ */
+export type ControlPlaybackRequestMedia = {[key: string]: string} | null;
+
+/**
+ * @nullable
+ */
+export type ControlPlaybackRequestDesiredState = typeof ControlPlaybackRequestDesiredState[keyof typeof ControlPlaybackRequestDesiredState] | null;
+
+
+export const ControlPlaybackRequestDesiredState = {
+  playing: 'playing',
+  paused: 'paused',
+  stopped: 'stopped',
+} as const;
+
+export interface ControlPlaybackRequest {
+  requestId: string;
+  /** @minimum 0 */
+  expectedRevision: number;
+  action: ControlPlaybackRequestAction;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  position?: number | null;
+  /** @nullable */
+  media?: ControlPlaybackRequestMedia;
+  /** @nullable */
+  queue?: string[] | null;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  currentTrackIndex?: number | null;
+  /** @nullable */
+  desiredState?: ControlPlaybackRequestDesiredState;
+  /**
+     * @minimum 0
+     * @maximum 1
+     * @nullable
+     */
+  volume?: number | null;
+}
+
+export interface ReconcilePlaybackRequest {
+  /** @minimum 0 */
+  expectedRevision: number;
+}
+
 export type SyncSessionRequestPlaybackState = typeof SyncSessionRequestPlaybackState[keyof typeof SyncSessionRequestPlaybackState];
 
 
@@ -2652,6 +2798,233 @@ export interface ScheduledJobResource {
   createdAt: string;
   /** Last update timestamp */
   updatedAt: string;
+}
+
+export type PlaybackMediaResourceKind = typeof PlaybackMediaResourceKind[keyof typeof PlaybackMediaResourceKind];
+
+
+export const PlaybackMediaResourceKind = {
+  song: 'song',
+  video: 'video',
+} as const;
+
+export interface PlaybackMediaResource {
+  kind: PlaybackMediaResourceKind;
+  publicId: string;
+}
+
+export type PlaybackTransferResourceState = typeof PlaybackTransferResourceState[keyof typeof PlaybackTransferResourceState];
+
+
+export const PlaybackTransferResourceState = {
+  preparing: 'preparing',
+  quiescing: 'quiescing',
+  starting: 'starting',
+  uncertain: 'uncertain',
+} as const;
+
+export type PlaybackTransferResourceDesiredState = typeof PlaybackTransferResourceDesiredState[keyof typeof PlaybackTransferResourceDesiredState];
+
+
+export const PlaybackTransferResourceDesiredState = {
+  playing: 'playing',
+  paused: 'paused',
+  stopped: 'stopped',
+} as const;
+
+export interface PlaybackTransferResource {
+  attemptId: string;
+  state: PlaybackTransferResourceState;
+  /** @nullable */
+  sourceIncarnationId: string | null;
+  targetIncarnationId: string;
+  /** @minimum 0 */
+  position: number;
+  desiredState: PlaybackTransferResourceDesiredState;
+}
+
+export type PlaybackDestinationResourceKind = typeof PlaybackDestinationResourceKind[keyof typeof PlaybackDestinationResourceKind];
+
+
+export const PlaybackDestinationResourceKind = {
+  browser: 'browser',
+} as const;
+
+export type PlaybackDestinationResourceCapabilitiesItem = typeof PlaybackDestinationResourceCapabilitiesItem[keyof typeof PlaybackDestinationResourceCapabilitiesItem];
+
+
+export const PlaybackDestinationResourceCapabilitiesItem = {
+  song: 'song',
+  video: 'video',
+  volume: 'volume',
+} as const;
+
+/**
+ * @nullable
+ */
+export type PlaybackDestinationResourceObservedState = typeof PlaybackDestinationResourceObservedState[keyof typeof PlaybackDestinationResourceObservedState] | null;
+
+
+export const PlaybackDestinationResourceObservedState = {
+  playing: 'playing',
+  paused: 'paused',
+  stopped: 'stopped',
+  unknown: 'unknown',
+} as const;
+
+export interface PlaybackDestinationResource {
+  destinationId: string;
+  name: string;
+  kind: PlaybackDestinationResourceKind;
+  capabilities: PlaybackDestinationResourceCapabilitiesItem[];
+  /** @nullable */
+  incarnationId: string | null;
+  /**
+     * @minimum 1
+     * @nullable
+     */
+  epoch: number | null;
+  /** @nullable */
+  observedState: PlaybackDestinationResourceObservedState;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  position: number | null;
+  /**
+     * @minimum 0
+     * @maximum 1
+     * @nullable
+     */
+  observedVolume: number | null;
+  available: boolean;
+}
+
+export type PlaybackCommandResourceType = typeof PlaybackCommandResourceType[keyof typeof PlaybackCommandResourceType];
+
+
+export const PlaybackCommandResourceType = {
+  prepare: 'prepare',
+  quiesce: 'quiesce',
+  start: 'start',
+  stop: 'stop',
+  play: 'play',
+  pause: 'pause',
+  seek: 'seek',
+  load: 'load',
+  observe: 'observe',
+  volume: 'volume',
+} as const;
+
+export type PlaybackCommandResourcePayloadDesiredState = typeof PlaybackCommandResourcePayloadDesiredState[keyof typeof PlaybackCommandResourcePayloadDesiredState];
+
+
+export const PlaybackCommandResourcePayloadDesiredState = {
+  playing: 'playing',
+  paused: 'paused',
+  stopped: 'stopped',
+} as const;
+
+export type PlaybackCommandResourcePayload = {
+  media: PlaybackMediaResource | null;
+  queue: string[];
+  /** @minimum 0 */
+  currentTrackIndex: number;
+  /** @minimum 0 */
+  position: number;
+  desiredState: PlaybackCommandResourcePayloadDesiredState;
+  /**
+     * @minimum 0
+     * @maximum 1
+     * @nullable
+     */
+  volume?: number | null;
+};
+
+export interface PlaybackCommandResource {
+  id: string;
+  attemptId: string;
+  /** @minimum 0 */
+  revision: number;
+  incarnationId: string;
+  /** @minimum 1 */
+  epoch: number;
+  type: PlaybackCommandResourceType;
+  payload: PlaybackCommandResourcePayload;
+  expiresAt: string;
+}
+
+export interface PlaybackEndpointResource {
+  destinationId: string;
+  incarnationId: string;
+  /** @minimum 1 */
+  epoch: number;
+  /**
+     * Returned only to the HTTP registration caller; keep in tab memory.
+     * @nullable
+     */
+  capability?: string | null;
+}
+
+export type PlaybackSnapshotResourceSchemaVersion = typeof PlaybackSnapshotResourceSchemaVersion[keyof typeof PlaybackSnapshotResourceSchemaVersion];
+
+
+export const PlaybackSnapshotResourceSchemaVersion = {
+  NUMBER_1: 1,
+} as const;
+
+export type PlaybackSnapshotResourcePlaybackState = typeof PlaybackSnapshotResourcePlaybackState[keyof typeof PlaybackSnapshotResourcePlaybackState];
+
+
+export const PlaybackSnapshotResourcePlaybackState = {
+  playing: 'playing',
+  paused: 'paused',
+  stopped: 'stopped',
+} as const;
+
+export type PlaybackSnapshotResourceDesiredState = typeof PlaybackSnapshotResourceDesiredState[keyof typeof PlaybackSnapshotResourceDesiredState];
+
+
+export const PlaybackSnapshotResourceDesiredState = {
+  playing: 'playing',
+  paused: 'paused',
+  stopped: 'stopped',
+} as const;
+
+export type PlaybackSnapshotResourceObservedState = typeof PlaybackSnapshotResourceObservedState[keyof typeof PlaybackSnapshotResourceObservedState];
+
+
+export const PlaybackSnapshotResourceObservedState = {
+  playing: 'playing',
+  paused: 'paused',
+  stopped: 'stopped',
+  unknown: 'unknown',
+} as const;
+
+export interface PlaybackSnapshotResource {
+  schemaVersion: PlaybackSnapshotResourceSchemaVersion;
+  publicId: string;
+  /** @minimum 0 */
+  revision: number;
+  media: PlaybackMediaResource | null;
+  queue: string[];
+  /** @minimum 0 */
+  currentTrackIndex: number;
+  /** @minimum 0 */
+  position: number;
+  playbackState: PlaybackSnapshotResourcePlaybackState;
+  desiredState: PlaybackSnapshotResourceDesiredState;
+  observedState: PlaybackSnapshotResourceObservedState;
+  /** @nullable */
+  selectedDestinationId: string | null;
+  /** @nullable */
+  activeDestinationId: string | null;
+  /** @nullable */
+  activeIncarnationId: string | null;
+  transfer: PlaybackTransferResource | null;
+  destinations: PlaybackDestinationResource[];
+  commands: PlaybackCommandResource[];
+  endpoint?: PlaybackEndpointResource | null;
 }
 
 export interface SystemSettingResource {
@@ -6158,6 +6531,38 @@ export type DeleteDeviceForget200Data = {
 
 export type DeleteDeviceForget200 = {
   data?: DeleteDeviceForget200Data;
+};
+
+export type PostPlaybackEndpoint200 = {
+  data: PlaybackSnapshotResource;
+};
+
+export type PostPlaybackTransfer200 = {
+  data: PlaybackSnapshotResource;
+};
+
+export type PostPlaybackAck200 = {
+  data: PlaybackSnapshotResource;
+};
+
+export type PostPlaybackObserve200 = {
+  data: PlaybackSnapshotResource;
+};
+
+export type PostPlaybackControl200 = {
+  data: PlaybackSnapshotResource;
+};
+
+export type PostPlaybackReconcile200 = {
+  data: PlaybackSnapshotResource;
+};
+
+export type GetPlaybackSnapshotParams = {
+  incarnationId?: string;
+};
+
+export type GetPlaybackSnapshot200 = {
+  data: PlaybackSnapshotResource;
 };
 
 export type GetSessionGet200Data = {
@@ -28709,6 +29114,642 @@ export const useDeleteDeviceForget = <TError = ErrorType<ApiError>,
       > => {
       return useMutation(getDeleteDeviceForgetMutationOptions(options), queryClient);
     }
+
+export const getPostPlaybackEndpointUrl = () => {
+
+
+
+
+  return `/api/session/endpoints`
+}
+
+/**
+ * @summary Register a fresh playback endpoint incarnation
+ */
+export const postPlaybackEndpoint = async (registerPlaybackEndpointRequest: RegisterPlaybackEndpointRequest, options?: Parameters<typeof customInstance>[1]): Promise<PostPlaybackEndpoint200> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customInstance<PostPlaybackEndpoint200>(getPostPlaybackEndpointUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(registerPlaybackEndpointRequest)
+  }
+);}
+
+
+
+
+
+export const getPostPlaybackEndpointMutationKey = () => ['postPlaybackEndpoint'] as const;
+
+export const getPostPlaybackEndpointMutationOptions = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPlaybackEndpoint>>, TError,PostPlaybackEndpointMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof postPlaybackEndpoint>>, TError,PostPlaybackEndpointMutationVariables, TContext> => {
+
+const mutationKey = getPostPlaybackEndpointMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postPlaybackEndpoint>>, PostPlaybackEndpointMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  postPlaybackEndpoint(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostPlaybackEndpointMutationResult = NonNullable<Awaited<ReturnType<typeof postPlaybackEndpoint>>>
+    export type PostPlaybackEndpointMutationBody = BodyType<RegisterPlaybackEndpointRequest>
+    export type PostPlaybackEndpointMutationError = ErrorType<ApiError>
+    export type PostPlaybackEndpointMutationVariables = {data: BodyType<RegisterPlaybackEndpointRequest>}
+
+    /**
+ * @summary Register a fresh playback endpoint incarnation
+ */
+export const usePostPlaybackEndpoint = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPlaybackEndpoint>>, TError,PostPlaybackEndpointMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof postPlaybackEndpoint>>,
+        TError,
+        PostPlaybackEndpointMutationVariables,
+        TContext
+      > => {
+      return useMutation(getPostPlaybackEndpointMutationOptions(options), queryClient);
+    }
+
+export const getPostPlaybackTransferUrl = () => {
+
+
+
+
+  return `/api/session/transfer`
+}
+
+/**
+ * @summary Begin an acknowledged playback transfer
+ */
+export const postPlaybackTransfer = async (transferPlaybackRequest: TransferPlaybackRequest, options?: Parameters<typeof customInstance>[1]): Promise<PostPlaybackTransfer200> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customInstance<PostPlaybackTransfer200>(getPostPlaybackTransferUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(transferPlaybackRequest)
+  }
+);}
+
+
+
+
+
+export const getPostPlaybackTransferMutationKey = () => ['postPlaybackTransfer'] as const;
+
+export const getPostPlaybackTransferMutationOptions = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPlaybackTransfer>>, TError,PostPlaybackTransferMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof postPlaybackTransfer>>, TError,PostPlaybackTransferMutationVariables, TContext> => {
+
+const mutationKey = getPostPlaybackTransferMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postPlaybackTransfer>>, PostPlaybackTransferMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  postPlaybackTransfer(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostPlaybackTransferMutationResult = NonNullable<Awaited<ReturnType<typeof postPlaybackTransfer>>>
+    export type PostPlaybackTransferMutationBody = BodyType<TransferPlaybackRequest>
+    export type PostPlaybackTransferMutationError = ErrorType<ApiError>
+    export type PostPlaybackTransferMutationVariables = {data: BodyType<TransferPlaybackRequest>}
+
+    /**
+ * @summary Begin an acknowledged playback transfer
+ */
+export const usePostPlaybackTransfer = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPlaybackTransfer>>, TError,PostPlaybackTransferMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof postPlaybackTransfer>>,
+        TError,
+        PostPlaybackTransferMutationVariables,
+        TContext
+      > => {
+      return useMutation(getPostPlaybackTransferMutationOptions(options), queryClient);
+    }
+
+export const getPostPlaybackAckUrl = () => {
+
+
+
+
+  return `/api/session/ack`
+}
+
+/**
+ * @summary Acknowledge an owned endpoint command
+ */
+export const postPlaybackAck = async (acknowledgePlaybackRequest: AcknowledgePlaybackRequest, options?: Parameters<typeof customInstance>[1]): Promise<PostPlaybackAck200> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customInstance<PostPlaybackAck200>(getPostPlaybackAckUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(acknowledgePlaybackRequest)
+  }
+);}
+
+
+
+
+
+export const getPostPlaybackAckMutationKey = () => ['postPlaybackAck'] as const;
+
+export const getPostPlaybackAckMutationOptions = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPlaybackAck>>, TError,PostPlaybackAckMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof postPlaybackAck>>, TError,PostPlaybackAckMutationVariables, TContext> => {
+
+const mutationKey = getPostPlaybackAckMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postPlaybackAck>>, PostPlaybackAckMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  postPlaybackAck(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostPlaybackAckMutationResult = NonNullable<Awaited<ReturnType<typeof postPlaybackAck>>>
+    export type PostPlaybackAckMutationBody = BodyType<AcknowledgePlaybackRequest>
+    export type PostPlaybackAckMutationError = ErrorType<ApiError>
+    export type PostPlaybackAckMutationVariables = {data: BodyType<AcknowledgePlaybackRequest>}
+
+    /**
+ * @summary Acknowledge an owned endpoint command
+ */
+export const usePostPlaybackAck = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPlaybackAck>>, TError,PostPlaybackAckMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof postPlaybackAck>>,
+        TError,
+        PostPlaybackAckMutationVariables,
+        TContext
+      > => {
+      return useMutation(getPostPlaybackAckMutationOptions(options), queryClient);
+    }
+
+export const getPostPlaybackObserveUrl = () => {
+
+
+
+
+  return `/api/session/observe`
+}
+
+/**
+ * @summary Renew endpoint presence and report observed playback
+ */
+export const postPlaybackObserve = async (observePlaybackRequest: ObservePlaybackRequest, options?: Parameters<typeof customInstance>[1]): Promise<PostPlaybackObserve200> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customInstance<PostPlaybackObserve200>(getPostPlaybackObserveUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(observePlaybackRequest)
+  }
+);}
+
+
+
+
+
+export const getPostPlaybackObserveMutationKey = () => ['postPlaybackObserve'] as const;
+
+export const getPostPlaybackObserveMutationOptions = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPlaybackObserve>>, TError,PostPlaybackObserveMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof postPlaybackObserve>>, TError,PostPlaybackObserveMutationVariables, TContext> => {
+
+const mutationKey = getPostPlaybackObserveMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postPlaybackObserve>>, PostPlaybackObserveMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  postPlaybackObserve(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostPlaybackObserveMutationResult = NonNullable<Awaited<ReturnType<typeof postPlaybackObserve>>>
+    export type PostPlaybackObserveMutationBody = BodyType<ObservePlaybackRequest>
+    export type PostPlaybackObserveMutationError = ErrorType<ApiError>
+    export type PostPlaybackObserveMutationVariables = {data: BodyType<ObservePlaybackRequest>}
+
+    /**
+ * @summary Renew endpoint presence and report observed playback
+ */
+export const usePostPlaybackObserve = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPlaybackObserve>>, TError,PostPlaybackObserveMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof postPlaybackObserve>>,
+        TError,
+        PostPlaybackObserveMutationVariables,
+        TContext
+      > => {
+      return useMutation(getPostPlaybackObserveMutationOptions(options), queryClient);
+    }
+
+export const getPostPlaybackControlUrl = () => {
+
+
+
+
+  return `/api/session/control`
+}
+
+/**
+ * @summary Control the committed playback runner
+ */
+export const postPlaybackControl = async (controlPlaybackRequest: ControlPlaybackRequest, options?: Parameters<typeof customInstance>[1]): Promise<PostPlaybackControl200> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customInstance<PostPlaybackControl200>(getPostPlaybackControlUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(controlPlaybackRequest)
+  }
+);}
+
+
+
+
+
+export const getPostPlaybackControlMutationKey = () => ['postPlaybackControl'] as const;
+
+export const getPostPlaybackControlMutationOptions = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPlaybackControl>>, TError,PostPlaybackControlMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof postPlaybackControl>>, TError,PostPlaybackControlMutationVariables, TContext> => {
+
+const mutationKey = getPostPlaybackControlMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postPlaybackControl>>, PostPlaybackControlMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  postPlaybackControl(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostPlaybackControlMutationResult = NonNullable<Awaited<ReturnType<typeof postPlaybackControl>>>
+    export type PostPlaybackControlMutationBody = BodyType<ControlPlaybackRequest>
+    export type PostPlaybackControlMutationError = ErrorType<ApiError>
+    export type PostPlaybackControlMutationVariables = {data: BodyType<ControlPlaybackRequest>}
+
+    /**
+ * @summary Control the committed playback runner
+ */
+export const usePostPlaybackControl = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPlaybackControl>>, TError,PostPlaybackControlMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof postPlaybackControl>>,
+        TError,
+        PostPlaybackControlMutationVariables,
+        TContext
+      > => {
+      return useMutation(getPostPlaybackControlMutationOptions(options), queryClient);
+    }
+
+export const getPostPlaybackReconcileUrl = () => {
+
+
+
+
+  return `/api/session/reconcile`
+}
+
+/**
+ * @summary Stop an uncertain transfer target
+ */
+export const postPlaybackReconcile = async (reconcilePlaybackRequest: ReconcilePlaybackRequest, options?: Parameters<typeof customInstance>[1]): Promise<PostPlaybackReconcile200> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customInstance<PostPlaybackReconcile200>(getPostPlaybackReconcileUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(reconcilePlaybackRequest)
+  }
+);}
+
+
+
+
+
+export const getPostPlaybackReconcileMutationKey = () => ['postPlaybackReconcile'] as const;
+
+export const getPostPlaybackReconcileMutationOptions = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPlaybackReconcile>>, TError,PostPlaybackReconcileMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof postPlaybackReconcile>>, TError,PostPlaybackReconcileMutationVariables, TContext> => {
+
+const mutationKey = getPostPlaybackReconcileMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postPlaybackReconcile>>, PostPlaybackReconcileMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  postPlaybackReconcile(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostPlaybackReconcileMutationResult = NonNullable<Awaited<ReturnType<typeof postPlaybackReconcile>>>
+    export type PostPlaybackReconcileMutationBody = BodyType<ReconcilePlaybackRequest>
+    export type PostPlaybackReconcileMutationError = ErrorType<ApiError>
+    export type PostPlaybackReconcileMutationVariables = {data: BodyType<ReconcilePlaybackRequest>}
+
+    /**
+ * @summary Stop an uncertain transfer target
+ */
+export const usePostPlaybackReconcile = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPlaybackReconcile>>, TError,PostPlaybackReconcileMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof postPlaybackReconcile>>,
+        TError,
+        PostPlaybackReconcileMutationVariables,
+        TContext
+      > => {
+      return useMutation(getPostPlaybackReconcileMutationOptions(options), queryClient);
+    }
+
+export const getGetPlaybackSnapshotUrl = (params?: GetPlaybackSnapshotParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/session/snapshot?${stringifiedParams}` : `/api/session/snapshot`
+}
+
+/**
+ * @summary Recover the complete playback snapshot
+ */
+export const getPlaybackSnapshot = async (params?: GetPlaybackSnapshotParams, options?: Parameters<typeof customInstance>[1]): Promise<GetPlaybackSnapshot200> => {
+
+  return customInstance<GetPlaybackSnapshot200>(getGetPlaybackSnapshotUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPlaybackSnapshotQueryKey = (params?: GetPlaybackSnapshotParams,) => {
+    return [
+    `/api/session/snapshot`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetPlaybackSnapshotQueryOptions = <TData = Awaited<ReturnType<typeof getPlaybackSnapshot>>, TError = ErrorType<ApiError>>(params?: GetPlaybackSnapshotParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPlaybackSnapshot>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPlaybackSnapshotQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPlaybackSnapshot>>> = ({ signal }) => getPlaybackSnapshot(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPlaybackSnapshot>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetPlaybackSnapshotQueryResult = NonNullable<Awaited<ReturnType<typeof getPlaybackSnapshot>>>
+export type GetPlaybackSnapshotQueryError = ErrorType<ApiError>
+
+
+export function useGetPlaybackSnapshot<TData = Awaited<ReturnType<typeof getPlaybackSnapshot>>, TError = ErrorType<ApiError>>(
+ params: undefined |  GetPlaybackSnapshotParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPlaybackSnapshot>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getPlaybackSnapshot>>,
+          TError,
+          Awaited<ReturnType<typeof getPlaybackSnapshot>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetPlaybackSnapshot<TData = Awaited<ReturnType<typeof getPlaybackSnapshot>>, TError = ErrorType<ApiError>>(
+ params?: GetPlaybackSnapshotParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPlaybackSnapshot>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getPlaybackSnapshot>>,
+          TError,
+          Awaited<ReturnType<typeof getPlaybackSnapshot>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetPlaybackSnapshot<TData = Awaited<ReturnType<typeof getPlaybackSnapshot>>, TError = ErrorType<ApiError>>(
+ params?: GetPlaybackSnapshotParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPlaybackSnapshot>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Recover the complete playback snapshot
+ */
+
+export function useGetPlaybackSnapshot<TData = Awaited<ReturnType<typeof getPlaybackSnapshot>>, TError = ErrorType<ApiError>>(
+ params?: GetPlaybackSnapshotParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPlaybackSnapshot>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetPlaybackSnapshotQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getGetSessionGetUrl = () => {
 

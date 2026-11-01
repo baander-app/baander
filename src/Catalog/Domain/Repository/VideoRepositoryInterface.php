@@ -7,6 +7,7 @@ namespace App\Catalog\Domain\Repository;
 use App\Catalog\Domain\Model\Video;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\ValueObject\LibraryReadScope;
 
 interface VideoRepositoryInterface
 {
@@ -15,6 +16,8 @@ interface VideoRepositoryInterface
     public function findByUuid(Uuid $uuid): ?Video;
 
     public function findByPublicId(PublicId $publicId): ?Video;
+
+    public function isVisibleByPublicId(PublicId $publicId, LibraryReadScope $scope): bool;
 
     public function findByHash(string $hash): ?Video;
 

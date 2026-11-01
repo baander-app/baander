@@ -31,11 +31,11 @@ deptrac:
         Shared: ['Shared Domain', 'Shared Application', 'Shared Infrastructure', 'Shared Live Snapshot Infrastructure', 'Shared Interface']
         Activity: ['Activity Domain', 'Activity Application', 'Activity Infrastructure', 'Activity Resources', 'Activity Interface']
         Auth: ['Auth Live Authority Contract', 'Auth Domain', 'Auth Identity Contract', 'Auth User Identifier Contract', 'Auth Device Approval Event Contract', 'Auth WebSocket Contract', 'Auth Application', 'Auth Infrastructure', 'Auth Resources', 'Auth Interface']
-        Catalog: ['Catalog Song Availability Contract', 'Catalog Song Lookup Contract', 'Catalog Domain', 'Catalog Application', 'Catalog Infrastructure', 'Catalog Resources', 'Catalog Interface']
+        Catalog: ['Catalog Video Contract', 'Catalog Song Availability Contract', 'Catalog Song Lookup Contract', 'Catalog Domain', 'Catalog Application', 'Catalog Infrastructure', 'Catalog Resources', 'Catalog Interface']
         Filesystem: ['Filesystem Infrastructure', 'Filesystem Application', 'Filesystem Command', 'Filesystem Mime', 'Filesystem Watcher']
         Library: ['Library Live Audience Contract', 'Library File Availability Contract', 'Library Read Scope Contract', 'Library Content Stats Contract', 'Library Files Discovered Contract', 'Library Provisioning Contract', 'Library Media Files Contract', 'Library Domain', 'Library Application', 'Library Infrastructure', 'Library Resources', 'Library Interface']
         Lyrics: ['Lyrics Fetch Request Contract', 'Lyrics Domain', 'Lyrics Application', 'Lyrics Infrastructure', 'Lyrics Resources', 'Lyrics Interface']
-        Media: ['Media Image Contract', 'Media Domain', 'Media Application', 'Media Infrastructure', 'Media Resources', 'Media Interface']
+        Media: ['Media Playback Access Contract', 'Media Image Contract', 'Media Domain', 'Media Application', 'Media Infrastructure', 'Media Resources', 'Media Interface']
         Metadata: ['Metadata Album Sync Request Contract', 'Metadata Domain', 'Metadata Application', 'Metadata Infrastructure', 'Metadata Interface']
         Notification: ['Notification Domain', 'Notification Application', 'Notification Infrastructure', 'Notification Resources', 'Notification Interface']
         Party: ['Party Domain', 'Party Application', 'Party Infrastructure', 'Party Resources', 'Party Interface']
@@ -215,6 +215,11 @@ deptrac:
         - type: classLike
           value: '^App\\Catalog\\Application\\Port\\SongAvailabilityPortInterface$'
 
+    - name: 'Catalog Video Contract'
+      collectors:
+        - type: classLike
+          value: '^App\\Catalog\\Application\\Port\\VideoPortInterface$'
+
     - name: 'Catalog Application'
       collectors:
         - type: bool
@@ -222,6 +227,8 @@ deptrac:
             - type: classLike
               value: '^App\\Catalog\\Application\\'
           must_not:
+            - type: classLike
+              value: '^App\\Catalog\\Application\\Port\\VideoPortInterface$'
             - type: classLike
               value: '^App\\Catalog\\Application\\Port\\SongAvailabilityPortInterface$'
             - type: classLike
@@ -396,6 +403,11 @@ deptrac:
             - type: classLike
               value: '^App\\Media\\(Application\\Port\\(ImagePortInterface|StoragePortInterface)|Domain\\Model\\(Image|ImageState|StoredFile)|Domain\\ReadModel\\ImageReadView)$'
 
+    - name: 'Media Playback Access Contract'
+      collectors:
+        - type: classLike
+          value: '^App\\Media\\Application\\Port\\PlaybackMediaAccessInterface$'
+
     - name: 'Media Application'
       collectors:
         - type: bool
@@ -403,6 +415,8 @@ deptrac:
             - type: classLike
               value: '^App\\Media\\Application\\'
           must_not:
+            - type: classLike
+              value: '^App\\Media\\Application\\Port\\PlaybackMediaAccessInterface$'
             - type: classLike
               value: '^App\\Media\\(Application\\Port\\(ImagePortInterface|StoragePortInterface)|Domain\\Model\\(Image|ImageState|StoredFile)|Domain\\ReadModel\\ImageReadView)$'
 
@@ -1092,6 +1106,9 @@ deptrac:
       - 'Shared Interface'
 
     # --- Catalog ---
+    'Catalog Video Contract':
+      - 'Shared Domain'
+      - 'Catalog Domain'
     'Catalog Song Availability Contract':
       - 'Shared Domain'
       - 'Catalog Domain'
@@ -1100,6 +1117,7 @@ deptrac:
     'Catalog Domain':
       - 'Shared Domain'
     'Catalog Application':
+      - 'Catalog Video Contract'
       - 'Media Image Contract'
       - 'Filesystem MIME Contract'
       - 'Playlist Deletion Preview Contract'
@@ -1113,6 +1131,7 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Application'
     'Catalog Infrastructure':
+      - 'Catalog Video Contract'
       - 'Catalog Song Availability Contract'
       - 'Library File Availability Contract'
       - 'Auth Identity Contract'
@@ -1130,6 +1149,7 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Interface'
     'Catalog Interface':
+      - 'Catalog Video Contract'
       - 'Catalog Song Availability Contract'
       - 'Library Read Scope Contract'
       - 'Catalog Resources'
@@ -1183,6 +1203,7 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Application'
     'Library Infrastructure':
+      - 'Auth Live Authority Contract'
       - 'Library Live Audience Contract'
       - 'Library File Availability Contract'
       - 'Library Media Files Contract'
@@ -1222,12 +1243,16 @@ deptrac:
       - 'Shared Infrastructure'
 
     # --- Media ---
+    'Media Playback Access Contract':
+      - 'Shared Domain'
     'Media Image Contract':
       - 'Shared Domain'
     'Media Domain':
       - 'Media Image Contract'
       - 'Shared Domain'
     'Media Application':
+      - 'Media Playback Access Contract'
+      - 'Catalog Video Contract'
       - 'Media Image Contract'
       - 'Scheduler Schedulable Contract'
       - 'Media Domain'
@@ -1603,6 +1628,7 @@ deptrac:
       - 'Shared Domain'
 
     'Session Application':
+      - 'Media Playback Access Contract'
       - 'Session Domain'
       - 'Shared Domain'
       - 'Shared Application'

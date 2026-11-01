@@ -18,6 +18,29 @@ use Symfony\Component\Messenger\Stamp\HandledStamp;
 
 final class ListeningSessionInteractionAdapterTest extends TestCase
 {
+    public function testCoordinationLeavesEndpointBindingToTheTransportFence(): void
+    {
+        $owner = new Uuid();
+        $coordination = $this->createMock(\App\Session\Application\Port\PlaybackCoordinationInterface::class);
+        $coordination->expects(self::once())->method('execute')->with($owner, \App\Session\Application\Port\PlaybackOperation::Snapshot, [], null)->willReturn(['revision' => 1]);
+        $connections = $this->createMock(\App\Session\Application\Port\PlaybackConnectionsInterface::class);
+        $connections->expects(self::never())->method('bind');
+        $adapter = new ListeningSessionInteractionAdapter($this->createStub(MessageBusInterface::class), $coordination, $connections);
+        self::assertSame(['revision' => 1], $adapter->coordinate($owner, 'snapshot', []));
+    }
+
+    public function testExplicitBindingAndDisconnectDelegateOnlyTheChosenConnection(): void
+    {
+        $owner = new Uuid();
+        $incarnation = new Uuid()->toString();
+        $connections = $this->createMock(\App\Session\Application\Port\PlaybackConnectionsInterface::class);
+        $connections->expects(self::once())->method('bind')->with(7, $owner, $incarnation, 'private-capability');
+        $connections->expects(self::once())->method('unbind')->with(7);
+        $adapter = new ListeningSessionInteractionAdapter($this->createStub(MessageBusInterface::class), $this->createStub(\App\Session\Application\Port\PlaybackCoordinationInterface::class), $connections);
+        $adapter->bindPlayback(7, $owner, $incarnation, 'private-capability');
+        $adapter->disconnectPlayback(7);
+    }
+
     #[DataProvider('operations')]
     public function testDispatchesExactCommandAndReturnsLastHandledResult(string $operation, string $commandClass): void
     {
@@ -45,7 +68,7 @@ final class ListeningSessionInteractionAdapterTest extends TestCase
                 ]);
             },
         );
-        $adapter = new ListeningSessionInteractionAdapter($bus);
+        $adapter = new ListeningSessionInteractionAdapter($bus, $this->createStub(\App\Session\Application\Port\PlaybackCoordinationInterface::class), $this->createStub(\App\Session\Application\Port\PlaybackConnectionsInterface::class));
 
         self::assertSame(
             ['operation' => $operation],
@@ -57,10 +80,11 @@ final class ListeningSessionInteractionAdapterTest extends TestCase
     public function testPreservesHandledResultAndFallback(string $operation, bool $hasStamp, mixed $result, mixed $expected): void
     {
         $bus = $this->createStub(MessageBusInterface::class);
-        $bus->method('dispatch')->willReturnCallback(static fn (object $command): Envelope => new Envelope(
-            $command, $hasStamp ? [new HandledStamp($result, 'handler')] : [],
+        $bus->method('dispatch')->willReturnCallback(static fn(object $command): Envelope => new Envelope(
+            $command,
+            $hasStamp ? [new HandledStamp($result, 'handler')] : [],
         ));
-        $adapter = new ListeningSessionInteractionAdapter($bus);
+        $adapter = new ListeningSessionInteractionAdapter($bus, $this->createStub(\App\Session\Application\Port\PlaybackCoordinationInterface::class), $this->createStub(\App\Session\Application\Port\PlaybackConnectionsInterface::class));
 
         self::assertSame(
             $expected,
@@ -74,7 +98,7 @@ final class ListeningSessionInteractionAdapterTest extends TestCase
         $failure = new HandlerFailedException(new Envelope(new \stdClass()), [new \RuntimeException('denied')]);
         $bus = $this->createMock(MessageBusInterface::class);
         $bus->expects(self::once())->method('dispatch')->willThrowException($failure);
-        $adapter = new ListeningSessionInteractionAdapter($bus);
+        $adapter = new ListeningSessionInteractionAdapter($bus, $this->createStub(\App\Session\Application\Port\PlaybackCoordinationInterface::class), $this->createStub(\App\Session\Application\Port\PlaybackConnectionsInterface::class));
 
         try {
             $this->invoke($adapter, $operation, Uuid::generate(), Uuid::generate());
@@ -109,8 +133,7 @@ final class ListeningSessionInteractionAdapterTest extends TestCase
         string $operation,
         Uuid $userId,
         Uuid $deviceId,
-    ): mixed
-    {
+    ): mixed {
         return match ($operation) {
             'join' => $adapter->join($userId, $deviceId),
             'playback' => $adapter->playback($userId, $deviceId, 'seek', 12.5, ['track-1'], 2, 'playing'),

@@ -31,6 +31,7 @@ use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
 use Symfony\Component\Serializer\Exception\NotEncodableValueException;
 use Throwable;
+
 use function count;
 use function is_array;
 use function is_string;
@@ -41,6 +42,10 @@ final class WebSocketController extends AbstractWebSocketController
 
     /** @var array<int, string> FD => userId (populated on open, cleared on close) */
     private array $fdUsers = [];
+
+    /** @var array<int, int> */
+    private array $connectionGenerations = [];
+    private int $nextConnectionGeneration = 0;
 
     /** @var array<int, list<float>> FD => list of microsecond timestamps */
     private array $rateLimitWindows = [];
@@ -54,9 +59,7 @@ final class WebSocketController extends AbstractWebSocketController
         private readonly WebSocketIdentityLookupInterface $identities,
         private readonly LiveSubscriptions $liveSubscriptions,
         private readonly ?LoggerInterface $logger = null,
-    )
-    {
-    }
+    ) {}
 
     public function onOpen(int $fd, string $userId, string $accessTokenId): void
     {
@@ -78,7 +81,7 @@ final class WebSocketController extends AbstractWebSocketController
         try {
             $this->registry->addConnection($fd, $userId, $this->registry->getWorkerId(), $accessTokenId);
         } catch (WebSocketRegistrationRefused $refused) {
-            unset($this->fdUsers[$fd]);
+            unset($this->fdUsers[$fd], $this->connectionGenerations[$fd], $this->playbackEndpoints[$fd]);
             $this->logger?->warning('WebSocket connection refused', [
                 'fd' => $fd, 'userId' => $userId, 'reason' => $refused->getMessage(),
             ]);
@@ -87,6 +90,8 @@ final class WebSocketController extends AbstractWebSocketController
             return false;
         }
         $this->fdUsers[$fd] = $userId;
+        $this->connectionGenerations[$fd] = ++$this->nextConnectionGeneration;
+        unset($this->playbackEndpoints[$fd]);
 
         return true;
     }
@@ -104,7 +109,7 @@ final class WebSocketController extends AbstractWebSocketController
                 'fd' => $fd, 'userId' => $userId, 'room' => $room, 'reason' => $refused->getMessage(),
             ]);
             $this->pusher->pushToConnection($fd, [
-                'type'    => 'error',
+                'type' => 'error',
                 'message' => 'Room limit reached; try again later',
             ]);
 
@@ -122,7 +127,7 @@ final class WebSocketController extends AbstractWebSocketController
             $this->logger?->warning('WebSocket rate limited', ['fd' => $fd]);
 
             $this->pusher->pushToConnection($fd, [
-                'type'    => 'error',
+                'type' => 'error',
                 'message' => 'Rate limit exceeded',
             ]);
 
@@ -138,7 +143,7 @@ final class WebSocketController extends AbstractWebSocketController
             $this->logger?->warning('WebSocket message from unauthenticated connection', ['fd' => $fd]);
 
             $this->pusher->pushToConnection($fd, [
-                'type'    => 'error',
+                'type' => 'error',
                 'message' => 'Not authenticated',
             ]);
 
@@ -157,12 +162,19 @@ final class WebSocketController extends AbstractWebSocketController
             'party.leave' => $this->handlePartyLeave($fd, $userId, $payload),
             'party.playback' => $this->handlePartyPlayback($fd, $userId, $payload),
             'party.sync' => $this->handlePartySync($fd, $userId, $payload),
+            'session.endpoint' => $this->handlePlaybackCoordination($fd, $userId, $payload, 'endpoint'),
+            'session.transfer' => $this->handlePlaybackCoordination($fd, $userId, $payload, 'transfer'),
+            'session.ack' => $this->handlePlaybackCoordination($fd, $userId, $payload, 'ack'),
+            'session.control' => $this->handlePlaybackCoordination($fd, $userId, $payload, 'control'),
+            'session.observe' => $this->handlePlaybackCoordination($fd, $userId, $payload, 'observe'),
+            'session.reconcile' => $this->handlePlaybackCoordination($fd, $userId, $payload, 'reconcile'),
+            'session.snapshot' => $this->handlePlaybackCoordination($fd, $userId, $payload, 'snapshot'),
             'session.join' => $this->handleSessionJoin($fd, $userId, $payload),
             'session.playback' => $this->handleSessionPlayback($fd, $userId, $payload),
             'session.sync' => $this->handleSessionSync($fd, $userId, $payload),
             'transcode.position' => $this->handleTranscodePosition($fd, $userId, $payload),
             default => $this->pusher->pushToConnection($fd, [
-                'type'    => 'error',
+                'type' => 'error',
                 'message' => sprintf('Unknown message type: "%s"', $type),
             ]),
         };
@@ -175,7 +187,7 @@ final class WebSocketController extends AbstractWebSocketController
             $payload = $this->jsonEncoder->decode($data, 'json');
         } catch (NotEncodableValueException) {
             $this->pusher->pushToConnection($fd, [
-                'type'    => 'error',
+                'type' => 'error',
                 'message' => 'Invalid JSON',
             ]);
 
@@ -184,7 +196,7 @@ final class WebSocketController extends AbstractWebSocketController
 
         if (!is_array($payload) || !isset($payload['type']) || !is_string($payload['type']) || $payload['type'] === '') {
             $this->pusher->pushToConnection($fd, [
-                'type'    => 'error',
+                'type' => 'error',
                 'message' => 'Invalid message format: must be JSON with a "type" field',
             ]);
 
@@ -223,7 +235,7 @@ final class WebSocketController extends AbstractWebSocketController
         $room = $payload['room'] ?? null;
         if (!is_string($room) || $room === '') {
             $this->pusher->pushToConnection($fd, [
-                'type'    => 'error',
+                'type' => 'error',
                 'message' => 'room.join requires a non-empty "room" field',
             ]);
 
@@ -237,7 +249,7 @@ final class WebSocketController extends AbstractWebSocketController
             'fd' => $fd, 'userId' => $userId, 'room' => $room, 'reason' => $refusal,
         ]);
         $this->pusher->pushToConnection($fd, [
-            'type'    => 'error',
+            'type' => 'error',
             'message' => $refusal,
         ]);
     }
@@ -248,7 +260,7 @@ final class WebSocketController extends AbstractWebSocketController
         $room = $payload['room'] ?? null;
         if (!is_string($room) || $room === '') {
             $this->pusher->pushToConnection($fd, [
-                'type'    => 'error',
+                'type' => 'error',
                 'message' => 'room.leave requires a non-empty "room" field',
             ]);
 
@@ -280,7 +292,7 @@ final class WebSocketController extends AbstractWebSocketController
         $sessionId = $payload['sessionId'] ?? null;
         if (!is_string($sessionId) || $sessionId === '') {
             $this->pusher->pushToConnection($fd, [
-                'type'    => 'error',
+                'type' => 'error',
                 'message' => 'party.join requires a "sessionId" field',
             ]);
 
@@ -293,7 +305,7 @@ final class WebSocketController extends AbstractWebSocketController
             $userPublicId = $this->identities->userPublicId($userUuid) ?? throw new \UnexpectedValueException('User not found.');
         } catch (InvalidArgumentException $e) {
             $this->pusher->pushToConnection($fd, [
-                'type'    => 'error',
+                'type' => 'error',
                 'message' => 'Invalid public identity',
             ]);
 
@@ -316,7 +328,7 @@ final class WebSocketController extends AbstractWebSocketController
                 ?? throw new \UnexpectedValueException('The join handler result carries no PartyMemberResultStamp.');
         } catch (HandlerFailedException $e) {
             $this->pusher->pushToConnection($fd, [
-                'type'    => 'error',
+                'type' => 'error',
                 'message' => 'Party operation refused',
             ]);
 
@@ -324,7 +336,7 @@ final class WebSocketController extends AbstractWebSocketController
         } catch (Throwable $e) {
             $this->logger?->error('Party join failed', ['fd' => $fd, 'userId' => $userId, 'sessionId' => $sessionId, 'exception' => $e]);
             $this->pusher->pushToConnection($fd, [
-                'type'    => 'error',
+                'type' => 'error',
                 'message' => 'Failed to join party session',
             ]);
 
@@ -341,18 +353,18 @@ final class WebSocketController extends AbstractWebSocketController
         $this->logger?->info('Party joined', ['fd' => $fd, 'userId' => $userId, 'sessionId' => $sessionId, 'role' => $member->getRole()->value]);
 
         $this->pusher->pushToConnection($fd, [
-            'type'      => 'party.joined',
+            'type' => 'party.joined',
             'sessionId' => $sessionId,
-            'role'      => $member->getRole()->value,
+            'role' => $member->getRole()->value,
         ]);
 
         // Broadcast member event to room
         $this->pusher->broadcast($room, [
-            'type'      => 'party.member_event',
+            'type' => 'party.member_event',
             'sessionId' => $sessionId,
-            'action'    => 'join',
-            'userId'    => $userPublicId->toString(),
-            'role'      => $member->getRole()->value,
+            'action' => 'join',
+            'userId' => $userPublicId->toString(),
+            'role' => $member->getRole()->value,
         ]);
     }
 
@@ -362,7 +374,7 @@ final class WebSocketController extends AbstractWebSocketController
         $sessionId = $payload['sessionId'] ?? null;
         if (!is_string($sessionId) || $sessionId === '') {
             $this->pusher->pushToConnection($fd, [
-                'type'    => 'error',
+                'type' => 'error',
                 'message' => 'party.leave requires a "sessionId" field',
             ]);
 
@@ -374,7 +386,7 @@ final class WebSocketController extends AbstractWebSocketController
             $userUuid = Uuid::fromString($userId);
         } catch (InvalidArgumentException) {
             $this->pusher->pushToConnection($fd, [
-                'type'    => 'error',
+                'type' => 'error',
                 'message' => 'Invalid public identity',
             ]);
 
@@ -394,14 +406,14 @@ final class WebSocketController extends AbstractWebSocketController
             );
         } catch (HandlerFailedException $e) {
             $this->pusher->pushToConnection($fd, [
-                'type'    => 'error',
+                'type' => 'error',
                 'message' => 'Party operation refused',
             ]);
 
             return;
         } catch (Throwable) {
             $this->pusher->pushToConnection($fd, [
-                'type'    => 'error',
+                'type' => 'error',
                 'message' => 'Failed to leave party session',
             ]);
 
@@ -421,7 +433,7 @@ final class WebSocketController extends AbstractWebSocketController
 
         if (!is_string($sessionId) || $sessionId === '') {
             $this->pusher->pushToConnection($fd, [
-                'type'    => 'error',
+                'type' => 'error',
                 'message' => 'party.playback requires a "sessionId" field',
             ]);
 
@@ -433,7 +445,7 @@ final class WebSocketController extends AbstractWebSocketController
             $playbackAction = PlaybackAction::from($action ?? '');
         } catch (InvalidArgumentException) {
             $this->pusher->pushToConnection($fd, [
-                'type'    => 'error',
+                'type' => 'error',
                 'message' => 'Invalid sessionId or action',
             ]);
 
@@ -481,14 +493,14 @@ final class WebSocketController extends AbstractWebSocketController
             }
         } catch (HandlerFailedException $e) {
             $this->pusher->pushToConnection($fd, [
-                'type'    => 'error',
+                'type' => 'error',
                 'message' => 'Party operation refused',
             ]);
 
             return;
         } catch (Throwable) {
             $this->pusher->pushToConnection($fd, [
-                'type'    => 'error',
+                'type' => 'error',
                 'message' => 'Playback action failed',
             ]);
 
@@ -510,7 +522,7 @@ final class WebSocketController extends AbstractWebSocketController
 
         if (!is_string($sessionId) || $sessionId === '') {
             $this->pusher->pushToConnection($fd, [
-                'type'    => 'error',
+                'type' => 'error',
                 'message' => 'party.sync requires a "sessionId" field',
             ]);
 
@@ -539,7 +551,7 @@ final class WebSocketController extends AbstractWebSocketController
             $sessionUuid = $this->partyId($sessionId);
         } catch (InvalidArgumentException) {
             $this->pusher->pushToConnection($fd, [
-                'type'    => 'error',
+                'type' => 'error',
                 'message' => 'Invalid sessionId format',
             ]);
 
@@ -572,7 +584,7 @@ final class WebSocketController extends AbstractWebSocketController
             }
         } catch (Throwable) {
             $this->pusher->pushToConnection($fd, [
-                'type'    => 'error',
+                'type' => 'error',
                 'message' => 'Sync failed',
             ]);
 
@@ -580,8 +592,8 @@ final class WebSocketController extends AbstractWebSocketController
         }
 
         $this->pusher->pushToConnection($fd, [
-            'type'           => 'party.sync_response',
-            'sessionId'      => $sessionId,
+            'type' => 'party.sync_response',
+            'sessionId' => $sessionId,
             'serverPosition' => $serverPosition,
         ]);
     }
@@ -592,7 +604,7 @@ final class WebSocketController extends AbstractWebSocketController
         $deviceId = $payload['deviceId'] ?? null;
         if (!is_string($deviceId) || $deviceId === '') {
             $this->pusher->pushToConnection($fd, [
-                'type'    => 'error',
+                'type' => 'error',
                 'message' => 'session.join requires a "deviceId" field',
             ]);
 
@@ -630,7 +642,7 @@ final class WebSocketController extends AbstractWebSocketController
 
         if (!is_string($deviceId) || $deviceId === '' || !is_string($action) || $action === '') {
             $this->pusher->pushToConnection($fd, [
-                'type'    => 'error',
+                'type' => 'error',
                 'message' => 'session.playback requires "deviceId" and "action" fields',
             ]);
 
@@ -675,7 +687,7 @@ final class WebSocketController extends AbstractWebSocketController
 
         if (!is_string($deviceId) || $deviceId === '') {
             $this->pusher->pushToConnection($fd, [
-                'type'    => 'error',
+                'type' => 'error',
                 'message' => 'session.sync requires a "deviceId" field',
             ]);
 
@@ -712,12 +724,55 @@ final class WebSocketController extends AbstractWebSocketController
         ]);
     }
 
+    /** @var array<int,array{incarnationId:string,capability:string}> */
+    private array $playbackEndpoints = [];
+
+    /** @param array<array-key,mixed> $payload */
+    private function handlePlaybackCoordination(int $fd, string $userId, array $payload, string $operation): void
+    {
+        $generation = $this->connectionGenerations[$fd] ?? null;
+        try {
+            $bound = $this->playbackEndpoints[$fd] ?? null;
+            if (in_array($operation, ['ack', 'observe', 'snapshot'], true) && $bound !== null) {
+                if (isset($payload['incarnationId']) && $payload['incarnationId'] !== $bound['incarnationId']) {
+                    throw new \DomainException('This connection does not own the endpoint.');
+                }
+                $payload['incarnationId'] = $bound['incarnationId'];
+            }
+            if (in_array($operation, ['ack', 'observe'], true) && $bound === null) {
+                throw new \DomainException('Register an endpoint on this connection first.');
+            }
+            $owner = Uuid::fromString($userId);
+            $result = $this->listeningSessions->coordinate($owner, $operation, $payload, $bound['capability'] ?? null);
+            if (!$this->isCurrentConnection($fd, $generation)) {
+                return;
+            }
+            if ($operation === 'endpoint' && isset($result['endpoint'])) {
+                $this->playbackEndpoints[$fd] = ['incarnationId' => $result['endpoint']['incarnationId'], 'capability' => $result['endpoint']['capability']];
+            }
+            $endpoint = $this->playbackEndpoints[$fd] ?? null;
+            $this->listeningSessions->bindPlayback($fd, $owner, $endpoint['incarnationId'] ?? null, $endpoint['capability'] ?? null);
+            $this->pusher->pushToConnection($fd, ['type' => 'session.snapshot', 'data' => $result]);
+        } catch (\Throwable $error) {
+            if (!$this->isCurrentConnection($fd, $generation)) {
+                return;
+            }
+            $this->pusher->pushToConnection($fd, ['type' => 'session.error', 'message' => $error instanceof \App\Shared\Application\Exception\ConflictException || $error instanceof \App\Shared\Application\Exception\InvalidInputException || $error instanceof \DomainException || $error instanceof \InvalidArgumentException ? $error->getMessage() : 'Playback coordination failed.']);
+        }
+    }
+
+    private function isCurrentConnection(int $fd, ?int $generation): bool
+    {
+        return $generation !== null && ($this->connectionGenerations[$fd] ?? null) === $generation;
+    }
+
     public function onClose(int $fd): void
     {
         $userId = $this->fdUsers[$fd] ?? null;
         $this->liveSubscriptions->unsubscribe($fd);
+        $this->listeningSessions->disconnectPlayback($fd);
         $this->registry->removeConnection($fd);
-        unset($this->fdUsers[$fd], $this->rateLimitWindows[$fd]);
+        unset($this->fdUsers[$fd], $this->rateLimitWindows[$fd], $this->playbackEndpoints[$fd], $this->connectionGenerations[$fd]);
 
         $this->logger?->debug('WebSocket closed', ['fd' => $fd, 'userId' => $userId]);
     }
@@ -731,7 +786,7 @@ final class WebSocketController extends AbstractWebSocketController
 
         if (!is_string($sessionId) || $sessionId === '') {
             $this->pusher->pushToConnection($fd, [
-                'type'    => 'error',
+                'type' => 'error',
                 'message' => 'transcode.position requires a "sessionId" field',
             ]);
 
@@ -746,7 +801,7 @@ final class WebSocketController extends AbstractWebSocketController
             $sessionUuid = $session;
         } catch (InvalidArgumentException) {
             $this->pusher->pushToConnection($fd, [
-                'type'    => 'error',
+                'type' => 'error',
                 'message' => 'Invalid sessionId format',
             ]);
 
@@ -816,7 +871,7 @@ final class WebSocketController extends AbstractWebSocketController
             ));
         } catch (Throwable) {
             $this->pusher->pushToConnection($fd, [
-                'type'    => 'error',
+                'type' => 'error',
                 'message' => 'Failed to update transcode position',
             ]);
 

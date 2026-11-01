@@ -12,6 +12,16 @@ use App\Shared\Domain\Model\Uuid;
  */
 interface ListeningSessionInteractionInterface
 {
+    /**
+     * @param array<string,mixed> $input
+     * @return array<string,mixed>
+     */
+    public function coordinate(Uuid $userId, string $operation, array $input, ?string $endpointCapability = null): array;
+
+    public function bindPlayback(int $connectionId, Uuid $userId, ?string $incarnationId = null, ?string $endpointCapability = null): void;
+
+    public function disconnectPlayback(int $connectionId): void;
+
     public function join(Uuid $userId, Uuid $deviceId): mixed;
 
     /** @param array<array-key, mixed>|null $queue */

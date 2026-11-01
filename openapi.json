@@ -15996,6 +15996,517 @@
                 }
             }
         },
+        "/api/session/endpoints": {
+            "post": {
+                "tags": [
+                    "Session"
+                ],
+                "summary": "Register a fresh playback endpoint incarnation",
+                "operationId": "post_playback_endpoint",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RegisterPlaybackEndpointRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Complete playback snapshot",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "required": [
+                                        "data"
+                                    ],
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/PlaybackSnapshotResource"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Invalid playback request",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Not authenticated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Playback authority or revision conflict",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/session/transfer": {
+            "post": {
+                "tags": [
+                    "Session"
+                ],
+                "summary": "Begin an acknowledged playback transfer",
+                "operationId": "post_playback_transfer",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/TransferPlaybackRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Complete playback snapshot",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "required": [
+                                        "data"
+                                    ],
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/PlaybackSnapshotResource"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Invalid playback request",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Not authenticated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Playback authority or revision conflict",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/session/ack": {
+            "post": {
+                "tags": [
+                    "Session"
+                ],
+                "summary": "Acknowledge an owned endpoint command",
+                "operationId": "post_playback_ack",
+                "parameters": [
+                    {
+                        "name": "X-Baander-Playback-Endpoint",
+                        "in": "header",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AcknowledgePlaybackRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Complete playback snapshot",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "required": [
+                                        "data"
+                                    ],
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/PlaybackSnapshotResource"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Invalid playback request",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Not authenticated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Playback authority or revision conflict",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/session/observe": {
+            "post": {
+                "tags": [
+                    "Session"
+                ],
+                "summary": "Renew endpoint presence and report observed playback",
+                "operationId": "post_playback_observe",
+                "parameters": [
+                    {
+                        "name": "X-Baander-Playback-Endpoint",
+                        "in": "header",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ObservePlaybackRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Complete playback snapshot",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "required": [
+                                        "data"
+                                    ],
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/PlaybackSnapshotResource"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Invalid playback request",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Not authenticated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Playback authority or revision conflict",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/session/control": {
+            "post": {
+                "tags": [
+                    "Session"
+                ],
+                "summary": "Control the committed playback runner",
+                "operationId": "post_playback_control",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ControlPlaybackRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Complete playback snapshot",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "required": [
+                                        "data"
+                                    ],
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/PlaybackSnapshotResource"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Invalid playback request",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Not authenticated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Playback authority or revision conflict",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/session/reconcile": {
+            "post": {
+                "tags": [
+                    "Session"
+                ],
+                "summary": "Stop an uncertain transfer target",
+                "operationId": "post_playback_reconcile",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ReconcilePlaybackRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Complete playback snapshot",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "required": [
+                                        "data"
+                                    ],
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/PlaybackSnapshotResource"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Invalid playback request",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Not authenticated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Playback authority or revision conflict",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/session/snapshot": {
+            "get": {
+                "tags": [
+                    "Session"
+                ],
+                "summary": "Recover the complete playback snapshot",
+                "operationId": "get_playback_snapshot",
+                "parameters": [
+                    {
+                        "name": "incarnationId",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    },
+                    {
+                        "name": "X-Baander-Playback-Endpoint",
+                        "in": "header",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Complete playback snapshot",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "required": [
+                                        "data"
+                                    ],
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/PlaybackSnapshotResource"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Invalid playback request",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Not authenticated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Playback authority or revision conflict",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/session": {
             "get": {
                 "tags": [
@@ -23360,6 +23871,245 @@
                 },
                 "type": "object"
             },
+            "RegisterPlaybackEndpointRequest": {
+                "required": [
+                    "deviceId",
+                    "endpointId"
+                ],
+                "properties": {
+                    "deviceId": {
+                        "type": "string"
+                    },
+                    "endpointId": {
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string",
+                        "default": "Browser",
+                        "maxLength": 128,
+                        "minLength": 1
+                    },
+                    "capabilities": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "default": [
+                            "song",
+                            "video"
+                        ],
+                        "maxItems": 3,
+                        "minItems": 1
+                    }
+                },
+                "type": "object"
+            },
+            "TransferPlaybackRequest": {
+                "required": [
+                    "requestId",
+                    "expectedRevision",
+                    "targetIncarnationId"
+                ],
+                "properties": {
+                    "requestId": {
+                        "type": "string"
+                    },
+                    "expectedRevision": {
+                        "type": "integer",
+                        "minimum": 0
+                    },
+                    "targetIncarnationId": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "AcknowledgePlaybackRequest": {
+                "required": [
+                    "commandId",
+                    "attemptId",
+                    "revision",
+                    "incarnationId",
+                    "epoch",
+                    "outcome"
+                ],
+                "properties": {
+                    "commandId": {
+                        "type": "string"
+                    },
+                    "attemptId": {
+                        "type": "string"
+                    },
+                    "revision": {
+                        "type": "integer",
+                        "minimum": 0
+                    },
+                    "incarnationId": {
+                        "type": "string"
+                    },
+                    "epoch": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "exclusiveMinimum": true
+                    },
+                    "outcome": {
+                        "type": "string",
+                        "enum": [
+                            "prepared",
+                            "quiesced",
+                            "started",
+                            "stopped",
+                            "playing",
+                            "paused",
+                            "applied",
+                            "rejected"
+                        ]
+                    },
+                    "position": {
+                        "type": "number",
+                        "format": "float",
+                        "nullable": true,
+                        "default": null,
+                        "minimum": 0
+                    },
+                    "volume": {
+                        "type": "number",
+                        "format": "float",
+                        "nullable": true,
+                        "default": null,
+                        "maximum": 1,
+                        "minimum": 0
+                    }
+                },
+                "type": "object"
+            },
+            "ObservePlaybackRequest": {
+                "required": [
+                    "incarnationId",
+                    "expectedRevision",
+                    "observedState",
+                    "position"
+                ],
+                "properties": {
+                    "incarnationId": {
+                        "type": "string"
+                    },
+                    "expectedRevision": {
+                        "type": "integer",
+                        "minimum": 0
+                    },
+                    "observedState": {
+                        "type": "string",
+                        "enum": [
+                            "playing",
+                            "paused",
+                            "stopped",
+                            "unknown"
+                        ]
+                    },
+                    "position": {
+                        "type": "number",
+                        "format": "float",
+                        "minimum": 0
+                    },
+                    "volume": {
+                        "type": "number",
+                        "format": "float",
+                        "nullable": true,
+                        "default": null,
+                        "maximum": 1,
+                        "minimum": 0
+                    }
+                },
+                "type": "object"
+            },
+            "ControlPlaybackRequest": {
+                "required": [
+                    "requestId",
+                    "expectedRevision",
+                    "action"
+                ],
+                "properties": {
+                    "requestId": {
+                        "type": "string"
+                    },
+                    "expectedRevision": {
+                        "type": "integer",
+                        "minimum": 0
+                    },
+                    "action": {
+                        "type": "string",
+                        "enum": [
+                            "play",
+                            "pause",
+                            "seek",
+                            "load",
+                            "stop",
+                            "volume"
+                        ]
+                    },
+                    "position": {
+                        "type": "number",
+                        "format": "float",
+                        "nullable": true,
+                        "default": null,
+                        "minimum": 0
+                    },
+                    "media": {
+                        "type": "object",
+                        "nullable": true,
+                        "default": null,
+                        "additionalProperties": {
+                            "type": "string"
+                        }
+                    },
+                    "queue": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "nullable": true,
+                        "default": null
+                    },
+                    "currentTrackIndex": {
+                        "type": "integer",
+                        "nullable": true,
+                        "default": null,
+                        "minimum": 0
+                    },
+                    "desiredState": {
+                        "type": "string",
+                        "nullable": true,
+                        "default": null,
+                        "enum": [
+                            "playing",
+                            "paused",
+                            "stopped"
+                        ]
+                    },
+                    "volume": {
+                        "type": "number",
+                        "format": "float",
+                        "nullable": true,
+                        "default": null,
+                        "maximum": 1,
+                        "minimum": 0
+                    }
+                },
+                "type": "object"
+            },
+            "ReconcilePlaybackRequest": {
+                "required": [
+                    "expectedRevision"
+                ],
+                "properties": {
+                    "expectedRevision": {
+                        "type": "integer",
+                        "minimum": 0
+                    }
+                },
+                "type": "object"
+            },
             "SyncSessionRequest": {
                 "required": [
                     "queue",
@@ -26244,6 +26994,422 @@
                         "description": "Last update timestamp",
                         "type": "string",
                         "format": "date-time"
+                    }
+                },
+                "type": "object"
+            },
+            "PlaybackMediaResource": {
+                "required": [
+                    "kind",
+                    "publicId"
+                ],
+                "properties": {
+                    "kind": {
+                        "type": "string",
+                        "enum": [
+                            "song",
+                            "video"
+                        ]
+                    },
+                    "publicId": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "PlaybackTransferResource": {
+                "required": [
+                    "attemptId",
+                    "state",
+                    "sourceIncarnationId",
+                    "targetIncarnationId",
+                    "position",
+                    "desiredState"
+                ],
+                "properties": {
+                    "attemptId": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "state": {
+                        "type": "string",
+                        "enum": [
+                            "preparing",
+                            "quiescing",
+                            "starting",
+                            "uncertain"
+                        ]
+                    },
+                    "sourceIncarnationId": {
+                        "type": "string",
+                        "format": "uuid",
+                        "nullable": true
+                    },
+                    "targetIncarnationId": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "position": {
+                        "type": "number",
+                        "minimum": 0
+                    },
+                    "desiredState": {
+                        "type": "string",
+                        "enum": [
+                            "playing",
+                            "paused",
+                            "stopped"
+                        ]
+                    }
+                },
+                "type": "object"
+            },
+            "PlaybackDestinationResource": {
+                "required": [
+                    "destinationId",
+                    "name",
+                    "kind",
+                    "capabilities",
+                    "incarnationId",
+                    "epoch",
+                    "observedState",
+                    "position",
+                    "observedVolume",
+                    "available"
+                ],
+                "properties": {
+                    "destinationId": {
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "kind": {
+                        "type": "string",
+                        "enum": [
+                            "browser"
+                        ]
+                    },
+                    "capabilities": {
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "enum": [
+                                "song",
+                                "video",
+                                "volume"
+                            ]
+                        }
+                    },
+                    "incarnationId": {
+                        "type": "string",
+                        "format": "uuid",
+                        "nullable": true
+                    },
+                    "epoch": {
+                        "type": "integer",
+                        "nullable": true,
+                        "minimum": 1
+                    },
+                    "observedState": {
+                        "type": "string",
+                        "nullable": true,
+                        "enum": [
+                            "playing",
+                            "paused",
+                            "stopped",
+                            "unknown"
+                        ]
+                    },
+                    "position": {
+                        "type": "number",
+                        "nullable": true,
+                        "minimum": 0
+                    },
+                    "observedVolume": {
+                        "type": "number",
+                        "nullable": true,
+                        "maximum": 1,
+                        "minimum": 0
+                    },
+                    "available": {
+                        "type": "boolean"
+                    }
+                },
+                "type": "object"
+            },
+            "PlaybackCommandResource": {
+                "required": [
+                    "id",
+                    "attemptId",
+                    "revision",
+                    "incarnationId",
+                    "epoch",
+                    "type",
+                    "payload",
+                    "expiresAt"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "attemptId": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "revision": {
+                        "type": "integer",
+                        "minimum": 0
+                    },
+                    "incarnationId": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "epoch": {
+                        "type": "integer",
+                        "minimum": 1
+                    },
+                    "type": {
+                        "type": "string",
+                        "enum": [
+                            "prepare",
+                            "quiesce",
+                            "start",
+                            "stop",
+                            "play",
+                            "pause",
+                            "seek",
+                            "load",
+                            "observe",
+                            "volume"
+                        ]
+                    },
+                    "payload": {
+                        "required": [
+                            "media",
+                            "queue",
+                            "currentTrackIndex",
+                            "position",
+                            "desiredState"
+                        ],
+                        "properties": {
+                            "media": {
+                                "oneOf": [
+                                    {
+                                        "$ref": "#/components/schemas/PlaybackMediaResource"
+                                    },
+                                    {
+                                        "type": "object",
+                                        "nullable": true,
+                                        "enum": [
+                                            null
+                                        ]
+                                    }
+                                ]
+                            },
+                            "queue": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            },
+                            "currentTrackIndex": {
+                                "type": "integer",
+                                "minimum": 0
+                            },
+                            "position": {
+                                "type": "number",
+                                "minimum": 0
+                            },
+                            "desiredState": {
+                                "type": "string",
+                                "enum": [
+                                    "playing",
+                                    "paused",
+                                    "stopped"
+                                ]
+                            },
+                            "volume": {
+                                "type": "number",
+                                "nullable": true,
+                                "maximum": 1,
+                                "minimum": 0
+                            }
+                        },
+                        "type": "object"
+                    },
+                    "expiresAt": {
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                },
+                "type": "object"
+            },
+            "PlaybackEndpointResource": {
+                "required": [
+                    "destinationId",
+                    "incarnationId",
+                    "epoch"
+                ],
+                "properties": {
+                    "destinationId": {
+                        "type": "string"
+                    },
+                    "incarnationId": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "epoch": {
+                        "type": "integer",
+                        "minimum": 1
+                    },
+                    "capability": {
+                        "description": "Returned only to the HTTP registration caller; keep in tab memory.",
+                        "type": "string",
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "PlaybackSnapshotResource": {
+                "required": [
+                    "schemaVersion",
+                    "publicId",
+                    "revision",
+                    "media",
+                    "queue",
+                    "currentTrackIndex",
+                    "position",
+                    "playbackState",
+                    "desiredState",
+                    "observedState",
+                    "selectedDestinationId",
+                    "activeDestinationId",
+                    "activeIncarnationId",
+                    "transfer",
+                    "destinations",
+                    "commands"
+                ],
+                "properties": {
+                    "schemaVersion": {
+                        "type": "integer",
+                        "enum": [
+                            1
+                        ]
+                    },
+                    "publicId": {
+                        "type": "string"
+                    },
+                    "revision": {
+                        "type": "integer",
+                        "minimum": 0
+                    },
+                    "media": {
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/PlaybackMediaResource"
+                            },
+                            {
+                                "type": "object",
+                                "nullable": true,
+                                "enum": [
+                                    null
+                                ]
+                            }
+                        ]
+                    },
+                    "queue": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "currentTrackIndex": {
+                        "type": "integer",
+                        "minimum": 0
+                    },
+                    "position": {
+                        "type": "number",
+                        "minimum": 0
+                    },
+                    "playbackState": {
+                        "type": "string",
+                        "enum": [
+                            "playing",
+                            "paused",
+                            "stopped"
+                        ]
+                    },
+                    "desiredState": {
+                        "type": "string",
+                        "enum": [
+                            "playing",
+                            "paused",
+                            "stopped"
+                        ]
+                    },
+                    "observedState": {
+                        "type": "string",
+                        "enum": [
+                            "playing",
+                            "paused",
+                            "stopped",
+                            "unknown"
+                        ]
+                    },
+                    "selectedDestinationId": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "activeDestinationId": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "activeIncarnationId": {
+                        "type": "string",
+                        "format": "uuid",
+                        "nullable": true
+                    },
+                    "transfer": {
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/PlaybackTransferResource"
+                            },
+                            {
+                                "type": "object",
+                                "nullable": true,
+                                "enum": [
+                                    null
+                                ]
+                            }
+                        ]
+                    },
+                    "destinations": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/PlaybackDestinationResource"
+                        }
+                    },
+                    "commands": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/PlaybackCommandResource"
+                        }
+                    },
+                    "endpoint": {
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/PlaybackEndpointResource"
+                            },
+                            {
+                                "type": "object",
+                                "nullable": true,
+                                "enum": [
+                                    null
+                                ]
+                            }
+                        ]
                     }
                 },
                 "type": "object"

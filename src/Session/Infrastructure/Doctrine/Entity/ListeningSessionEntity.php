@@ -10,8 +10,11 @@ use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'listening_sessions')]
+#[ORM\Index(name: 'idx_playback_selected_destination', columns: ['selected_destination_id', 'user_id'])]
+#[ORM\Index(name: 'idx_playback_active_incarnation', columns: ['active_incarnation_id', 'user_id'])]
 #[ORM\UniqueConstraint(name: 'uniq_listening_sessions_public_id', columns: ['public_id'])]
 #[ORM\UniqueConstraint(name: 'uniq_listening_sessions_user_id', columns: ['user_id'])]
+#[ORM\UniqueConstraint(name: 'uniq_playback_session_owner', columns: ['id', 'user_id'])]
 class ListeningSessionEntity
 {
     #[ORM\Id]
@@ -51,6 +54,25 @@ class ListeningSessionEntity
 
     #[ORM\Column(type: 'datetime_immutable', nullable: true)]
     private ?\DateTimeImmutable $lastUsedAt = null;
+
+    #[ORM\Column(type: 'integer', options: ['default' => 0])]
+    private int $revision = 0;
+
+    /** @var array<string,mixed>|null */
+    #[ORM\Column(type: 'json', nullable: true, options: ['jsonb' => true])]
+    private ?array $media = null;
+
+    #[ORM\Column(type: 'text', options: ['default' => 'stopped'])]
+    private string $desiredState = 'stopped';
+
+    #[ORM\Column(type: 'text', options: ['default' => 'unknown'])]
+    private string $observedState = 'unknown';
+
+    #[ORM\Column(type: 'uuid', nullable: true)]
+    private ?Uuid $selectedDestinationId = null;
+
+    #[ORM\Column(type: 'uuid', nullable: true)]
+    private ?Uuid $activeIncarnationId = null;
 
     /**
      * @param array<array-key, mixed> $queue
@@ -180,4 +202,55 @@ class ListeningSessionEntity
         $this->lastUsedAt = new \DateTimeImmutable();
         $this->updatedAt = new \DateTimeImmutable();
     }
+    public function getRevision(): int
+    {
+        return $this->revision;
+    }
+    public function setRevision(int $value): void
+    {
+        $this->revision = $value;
+    }
+    /** @return array<string,mixed>|null */
+    public function getMedia(): ?array
+    {
+        return $this->media;
+    }
+    /** @param array<string,mixed>|null $value */
+    public function setMedia(?array $value): void
+    {
+        $this->media = $value;
+    }
+    public function getDesiredState(): string
+    {
+        return $this->desiredState;
+    }
+    public function setDesiredState(string $value): void
+    {
+        $this->desiredState = $value;
+    }
+    public function getObservedState(): string
+    {
+        return $this->observedState;
+    }
+    public function setObservedState(string $value): void
+    {
+        $this->observedState = $value;
+    }
+    public function getSelectedDestinationId(): ?Uuid
+    {
+        return $this->selectedDestinationId;
+    }
+    public function setSelectedDestinationId(?Uuid $value): void
+    {
+        $this->selectedDestinationId = $value;
+    }
+    public function getActiveIncarnationId(): ?Uuid
+    {
+        return $this->activeIncarnationId;
+    }
+    public function setActiveIncarnationId(?Uuid $value): void
+    {
+        $this->activeIncarnationId = $value;
+    }
+
 }

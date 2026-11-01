@@ -45,6 +45,30 @@ Available hardware is now confirmed as an iPhone 13 and Apple TV 4K, alongside
 Linux. AirPlay hardware qualification remains outstanding; physical Chromecast
 and DLNA receiver checks remain open because suitable receivers have not been identified.
 
+Playback coordination checkpoint, 2026-11-01 (U2): Session now owns typed music
+and video state, destination incarnations and durable commands. Transfers prepare
+the target, pause the source and commit only after the target acknowledges startup.
+Expired controls require a confirmed stop before another transfer; volume commands
+require advertised support and record the destination's actual volume. Media
+authorization reads the playback owner's current account and library access.
+Socket registration and command replay reject results for replaced connections.
+
+Verification: the disposable CI image passed 242 tests with 4,933 assertions:
+93 unit tests, 101 native WebSocket tests, 30 schema tests and 18 committed
+PostgreSQL transfer tests. The 18 transfer tests passed again after simplification.
+A final host Session/WebSocket run passed 177 tests with 4,373 assertions,
+including rejection of conflicting transport-state overrides. The web protocol
+parser passed 12 tests. Web typecheck passed; lint retained eight existing warnings
+and no errors. Deptrac reported zero new violations against its unchanged baseline.
+Full PHPStan analysis passed in the disposable CI image.
+The generated API now describes complete playback snapshots and endpoint authority.
+
+The legacy claim/sync entrypoints remain until the browser execution cutover in
+U3. Receiver grants, the companion, casting adapters and hardware qualification
+remain open. Queue authorization currently checks tracks individually; the receiver
+authorization work will assess a bounded Catalog batch contract without weakening
+per-item access checks.
+
 ## Learning and plan maintenance
 
 Checkpoint, 2026-10-31: reviewed all eight documents in `docs/solutions/` against

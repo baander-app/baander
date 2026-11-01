@@ -23,8 +23,7 @@ final class SessionAdapter implements SessionPortInterface
         private readonly DeviceRepositoryInterface $deviceRepository,
         private readonly EventDispatcherInterface $eventDispatcher,
         private readonly SessionUserPublicIdentityInterface $userIdentifiers,
-    ) {
-    }
+    ) {}
 
     public function getSession(Uuid $userId): ?array
     {
@@ -77,7 +76,11 @@ final class SessionAdapter implements SessionPortInterface
         $queue = $this->publicQueue($queue);
         $existing = $this->sessionRepository->findByUserId($userId);
         if ($existing !== null) {
-            $this->sessionRepository->remove($existing);
+            $existing->updatePlayback($queue, $currentTrackIndex, $position, $existing->getPlaybackState());
+            $existing->markUsed();
+            $this->sessionRepository->save($existing);
+            $this->dispatchEvents($existing);
+            return $this->sessionToArray($existing);
         }
 
         $session = ListeningSession::create($userId, $queue, $currentTrackIndex, $position);

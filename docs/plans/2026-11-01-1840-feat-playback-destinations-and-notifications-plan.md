@@ -129,7 +129,7 @@ flowchart LR
 
 ### Dependencies / Assumptions
 
-- The user works on Linux and has an iPhone, but has no Android device available for verification.
+- The user works on Linux and has an iPhone 13 and Apple TV 4K, but has no Android device available for verification. These devices are available for AirPlay qualification; no physical receiver checks have been completed.
 - Specific AirPlay, Chromecast and DLNA receiver models and their availability have not been established. Their absence limits qualification, not the agreed protocol scope.
 - Receiver access to playable media, platform permissions and any provider registration requirements must be established during planning; a remote server alone is not assumed to discover the home network.
 - Native platform selection dialogs are acceptable where required by the casting platform; R4 defines where the user enters the flow, not a promise of identical dialogs on every platform.
@@ -255,7 +255,7 @@ The relevant captured lessons are `docs/solutions/architecture-patterns/state-se
 
 ### Deferred Execution Checkpoints
 
-- **Hardware qualification:** Identify available receiver models/firmware before claiming protocol success. Linux and iPhone checks can proceed without Android hardware; missing receiver tests remain explicitly open under R20–R21.
+- **Hardware qualification:** The available AirPlay pair is an iPhone 13 and Apple TV 4K. Record OS and receiver firmware before claiming protocol success. Linux and iPhone checks can proceed without Android hardware; physical Chromecast and DLNA receivers remain unidentified, and their tests remain open under R20–R21.
 - **Cast deployment:** Obtain the owner's Cast application ID, registered test-device access and HTTPS receiver hosting before the real custom-app test. Plan the receiver as `ui/cast-receiver`, with its own build; deploying it or registering the application requires the user's external-account authorization.
 - **Protocol proof:** Before expanding each adapter, prove one real music/video load as applicable, status/control round trip and authorized media fetch. A failure triggers a bounded correction within the chosen adapter; a change to confirmed scope returns to the user.
 - **Delivery compatibility:** Validate LAN address advertisement, certificate trust, Range/HLS behavior, long-play renewal and Safari background behavior against actual devices. Publish only the matrix proved by those checks.

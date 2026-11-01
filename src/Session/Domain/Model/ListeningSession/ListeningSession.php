@@ -7,6 +7,9 @@ namespace App\Session\Domain\Model\ListeningSession;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Domain\Model\PublicId;
 use DateTimeImmutable;
+use App\Session\Domain\Model\Playback\PlaybackMedia;
+use App\Session\Domain\Model\Playback\PlaybackState;
+use App\Session\Domain\Model\Playback\ObservedPlaybackState;
 use InvalidArgumentException;
 
 final class ListeningSession
@@ -18,8 +21,7 @@ final class ListeningSession
 
     private function __construct(
         private ListeningSessionState $state,
-    ) {
-    }
+    ) {}
 
     /**
      * Create a new ListeningSession.
@@ -170,6 +172,150 @@ final class ListeningSession
         $this->pendingEvents = [];
 
         return $events;
+    }
+
+    /** @param list<string>|null $queue */
+    public function control(
+        string $action,
+        ?PlaybackMedia $media,
+        ?array $queue,
+        ?int $index,
+        ?float $position,
+        ?PlaybackState $desired,
+        ?float $volume = null,
+    ): void {
+        if (!in_array($action, ['load', 'play', 'pause', 'seek', 'stop', 'volume'], true)) {
+            throw new InvalidArgumentException('Invalid playback action.');
+        }
+        if ($action === 'volume') {
+            if ($volume === null || !is_finite($volume) || $volume < 0 || $volume > 1) {
+                throw new InvalidArgumentException('Volume must be finite and between zero and one.');
+            }
+            if ($media !== null || $queue !== null || $index !== null || $position !== null || $desired !== null) {
+                throw new InvalidArgumentException('Volume commands cannot change media, queue, position or playback state.');
+            }
+            $this->advanceRevision();
+            return;
+        }
+        if ($volume !== null) {
+            throw new InvalidArgumentException('Volume requires the volume action.');
+        }
+        if ($action !== 'load' && $desired !== null) {
+            throw new InvalidArgumentException('Only loading media may supply a desired playback state.');
+        }
+        if ($action === 'stop'
+            && ($media !== null || $queue !== null || $index !== null || $position !== null)
+        ) {
+            throw new InvalidArgumentException('Stop retains the current media, queue and cursor.');
+        }
+        $nextQueue = $queue ?? $this->state->queue;
+        $nextIndex = $index ?? $this->state->currentTrackIndex;
+        if ($nextIndex < 0 || ($nextQueue === [] ? $nextIndex !== 0 : $nextIndex >= count($nextQueue))) {
+            throw new InvalidArgumentException('The queue cursor must refer to an existing queue item.');
+        }
+        foreach ($nextQueue as $id) {
+            PublicId::fromString($id);
+        }
+        if ($position !== null && (!is_finite($position) || $position < 0)) {
+            throw new InvalidArgumentException('Position must be finite and nonnegative.');
+        }
+        $this->state->queue = $nextQueue;
+        $this->state->currentTrackIndex = $nextIndex;
+        if ($media !== null) {
+            $this->state->media = $media;
+        }
+        if ($position !== null) {
+            $this->state->position = $position;
+        }
+        $this->state->desiredState = $desired ?? match ($action) {
+            'play' => PlaybackState::Playing,
+            'pause' => PlaybackState::Paused,
+            'stop' => PlaybackState::Stopped,
+            default => $this->state->desiredState,
+        };
+        $this->advanceRevision();
+    }
+
+    public function selectDestination(Uuid $destinationId): void
+    {
+        $this->state->selectedDestinationId = $destinationId;
+        $this->advanceRevision();
+    }
+
+    public function confirmQuiescence(float $position): void
+    {
+        if (!is_finite($position) || $position < 0) {
+            throw new InvalidArgumentException('Invalid source cursor.');
+        }
+        $this->state->position = $position;
+        $this->state->desiredState = PlaybackState::Paused;
+        $this->state->observedState = ObservedPlaybackState::Paused;
+    }
+
+    public function commitDestination(Uuid $incarnationId, Uuid $destinationId, PlaybackState $desired, float $position): void
+    {
+        $this->state->activeIncarnationId = $incarnationId;
+        $this->state->selectedDestinationId = $destinationId;
+        $this->state->desiredState = $desired;
+        $this->state->observedState = ObservedPlaybackState::from($desired->value);
+        $this->state->position = $position;
+    }
+
+    public function retainUncertainRunner(): void
+    {
+        $this->state->desiredState = PlaybackState::Paused;
+        $this->state->observedState = ObservedPlaybackState::Unknown;
+    }
+
+    public function restoreSelection(?Uuid $destinationId): void
+    {
+        $this->state->selectedDestinationId = $destinationId;
+    }
+
+    public function observePlayback(ObservedPlaybackState $observed, float $position): void
+    {
+        if (!is_finite($position) || $position < 0) {
+            throw new InvalidArgumentException('Invalid observed cursor.');
+        }
+        $this->state->observedState = $observed;
+        $this->state->position = $position;
+    }
+
+    public function confirmControl(bool $rejected, ?float $position): void
+    {
+        $this->observePlayback($rejected ? ObservedPlaybackState::Unknown : ObservedPlaybackState::from($this->state->desiredState->value), $position ?? $this->state->position);
+    }
+
+    public function advanceRevision(): void
+    {
+        ++$this->state->revision;
+        $this->state->playbackState = $this->state->desiredState->value;
+        $this->markUsed();
+    }
+
+    public function revision(): int
+    {
+        return $this->state->revision;
+    }
+    public function media(): ?PlaybackMedia
+    {
+        return $this->state->media;
+    }
+    public function desiredState(): PlaybackState
+    {
+        return $this->state->desiredState;
+    }
+    public function observedState(): ObservedPlaybackState
+    {
+        return $this->state->observedState;
+    }
+    public function selectedDestinationId(): ?Uuid
+    {
+        return $this->state->selectedDestinationId;
+    }
+    public function activeIncarnationId(): ?Uuid
+    {
+        return $this->state->activeIncarnationId;
     }
 
     public function getId(): Uuid

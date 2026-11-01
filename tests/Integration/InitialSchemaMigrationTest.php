@@ -108,10 +108,10 @@ final class InitialSchemaMigrationTest extends TestCase
         }
         $factory = $this->factory();
         $factory->getMetadataStorage()->ensureInitialized();
-        self::assertCount(9, $factory->getMigrationRepository()->getMigrations());
+        self::assertCount(10, $factory->getMigrationRepository()->getMigrations());
         self::assertSame(0, $this->migrate($factory));
-        self::assertSame(['DoctrineMigrations\\Version20261017000000', 'DoctrineMigrations\\Version20261017130000', 'DoctrineMigrations\\Version20261017150000', 'DoctrineMigrations\\Version20261017160000', 'DoctrineMigrations\\Version20261017170000', 'DoctrineMigrations\\Version20261018130000', 'DoctrineMigrations\\Version20261021120000', 'DoctrineMigrations\\Version20261030210000', 'DoctrineMigrations\\Version20261031120000'], $this->connection->fetchFirstColumn('SELECT version FROM doctrine_migration_versions ORDER BY version'));
-        self::assertSame(86, (int) $this->connection->fetchOne("SELECT count(*) FROM pg_tables WHERE schemaname = 'public' AND tablename <> 'doctrine_migration_versions'"));
+        self::assertSame(['DoctrineMigrations\\Version20261017000000', 'DoctrineMigrations\\Version20261017130000', 'DoctrineMigrations\\Version20261017150000', 'DoctrineMigrations\\Version20261017160000', 'DoctrineMigrations\\Version20261017170000', 'DoctrineMigrations\\Version20261018130000', 'DoctrineMigrations\\Version20261021120000', 'DoctrineMigrations\\Version20261030210000', 'DoctrineMigrations\\Version20261031120000', 'DoctrineMigrations\\Version20261101190000'], $this->connection->fetchFirstColumn('SELECT version FROM doctrine_migration_versions ORDER BY version'));
+        self::assertSame(90, (int) $this->connection->fetchOne("SELECT count(*) FROM pg_tables WHERE schemaname = 'public' AND tablename <> 'doctrine_migration_versions'"));
         $this->assertSchedules();
         $this->assertIdentitiesAllocate();
         $catalog = $this->catalog('public');
@@ -123,13 +123,13 @@ final class InitialSchemaMigrationTest extends TestCase
         self::assertSame($history, $this->connection->fetchAllAssociative('SELECT * FROM doctrine_migration_versions'));
 
         $failure = $this->refused($this->factory(), '0');
-        self::assertStringContainsString('Captured changes and revision tombstones cannot be reconstructed.', $failure);
+        self::assertStringContainsString('Playback coordination history and endpoint acknowledgements cannot be reconstructed after removal.', $failure);
         self::assertSame($catalog, $this->catalog('public'));
         self::assertSame($seeds, $this->connection->fetchAllAssociative('SELECT * FROM scheduled_jobs ORDER BY id'));
         self::assertSame($history, $this->connection->fetchAllAssociative('SELECT * FROM doctrine_migration_versions'));
 
         self::assertSame(0, $this->migrate($this->factory(true)));
-        self::assertSame(10, (int) $this->connection->fetchOne('SELECT count(*) FROM doctrine_migration_versions'));
+        self::assertSame(11, (int) $this->connection->fetchOne('SELECT count(*) FROM doctrine_migration_versions'));
         self::assertSame('future_migration_probe', $this->connection->fetchOne("SELECT to_regclass('future_migration_probe')::text"));
     }
 
@@ -197,8 +197,14 @@ final class InitialSchemaMigrationTest extends TestCase
         self::assertSame($history, array_slice($afterHistory, 0, count($history)));
         self::assertSame('DoctrineMigrations\\Version20261031120000', $afterHistory[count($history)]['version']);
         $afterCatalog = $this->catalog('public');
-        self::assertSame($catalog['relations'], $afterCatalog['relations']);
-        self::assertSame($catalog['types'], $afterCatalog['types']);
+        self::assertSame($catalog['relations'], array_values(array_filter(
+            $afterCatalog['relations'],
+            static fn(array $relation): bool => preg_match('/^(?:playback_|uniq_playback_|idx_playback_)/', $relation['relname']) !== 1,
+        )), 'The additive playback relations must preserve every pre-existing relation OID and file node.');
+        self::assertSame($catalog['types'], array_values(array_filter(
+            $afterCatalog['types'],
+            static fn(array $type): bool => preg_match('/^_?playback_/', $type['typname']) !== 1,
+        )));
         self::assertSame(array_column($catalog['routines'], 'oid'), array_column($afterCatalog['routines'], 'oid'));
         $changed = [];
         foreach ($catalog['routines'] as $index => $routine) {
@@ -337,7 +343,7 @@ SQL, [$jobs[0], $runtimeSession, $desired, str_repeat('a', 32)]);
         $before = $snapshot();
 
         self::assertSame(0, $this->migrate($this->factory()));
-        self::assertSame(9, (int) $this->connection->fetchOne('SELECT count(*) FROM doctrine_migration_versions'));
+        self::assertSame(10, (int) $this->connection->fetchOne('SELECT count(*) FROM doctrine_migration_versions'));
         $after = $snapshot();
         self::assertSame(0, (int) $after['playlists'][0]['persistence_version']);
         $withoutVersion = $after;

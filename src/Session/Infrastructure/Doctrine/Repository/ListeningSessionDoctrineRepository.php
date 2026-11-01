@@ -15,8 +15,7 @@ final class ListeningSessionDoctrineRepository implements ListeningSessionReposi
 {
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
-    ) {
-    }
+    ) {}
 
     public function findByUserId(Uuid $userId): ?ListeningSession
     {
@@ -81,6 +80,12 @@ final class ListeningSessionDoctrineRepository implements ListeningSessionReposi
             createdAt: $entity->getCreatedAt(),
             updatedAt: $entity->getUpdatedAt(),
             lastUsedAt: $entity->getLastUsedAt(),
+            revision: $entity->getRevision(),
+            media: $entity->getMedia() === null ? null : new \App\Session\Domain\Model\Playback\PlaybackMedia($entity->getMedia()['kind'], \App\Shared\Domain\Model\PublicId::fromString($entity->getMedia()['publicId'])),
+            desiredState: \App\Session\Domain\Model\Playback\PlaybackState::from($entity->getDesiredState()),
+            observedState: \App\Session\Domain\Model\Playback\ObservedPlaybackState::from($entity->getObservedState()),
+            selectedDestinationId: $entity->getSelectedDestinationId(),
+            activeIncarnationId: $entity->getActiveIncarnationId(),
         ));
     }
 
@@ -94,5 +99,11 @@ final class ListeningSessionDoctrineRepository implements ListeningSessionReposi
         $entity->setPlaybackState($state->playbackState);
         $entity->setUpdatedAt($state->updatedAt);
         $entity->setLastUsedAt($state->lastUsedAt);
+        $entity->setRevision($state->revision);
+        $entity->setMedia($state->media?->toArray());
+        $entity->setDesiredState($state->desiredState->value);
+        $entity->setObservedState($state->observedState->value);
+        $entity->setSelectedDestinationId($state->selectedDestinationId);
+        $entity->setActiveIncarnationId($state->activeIncarnationId);
     }
 }
