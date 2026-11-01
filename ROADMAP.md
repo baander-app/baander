@@ -37,6 +37,9 @@ against the isolated preview at 390px and 1280px, covering dark/light contrast,
 popover containment, collapsed/expanded navigation and focus restoration.
 The browser checks caught and verified fixes for collapsed utility-link visibility
 and popover overflow. Playback transfer implementation remains in progress.
+The simplification review removed a duplicate open-state subscription, leaving
+Radix responsible for the trigger's expanded state. All 10 sidebar tests,
+typecheck and lint passed again; lint retained the same eight warnings.
 
 Available hardware is now confirmed as an iPhone 13 and Apple TV 4K, alongside
 Linux. AirPlay hardware qualification remains outstanding; physical Chromecast

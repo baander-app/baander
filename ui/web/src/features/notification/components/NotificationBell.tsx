@@ -45,13 +45,11 @@ const UnreadBadge = styled.span`
 
 export function NotificationBell(props: React.ComponentProps<typeof Button>) {
   const unreadCount = useNotificationStore((s) => s.unreadCount)
-  const isPopoutOpen = useNotificationStore((s) => s.isPopoutOpen)
 
   return (
     <BellButton
       {...props}
       aria-label={`${unreadCount} unread notifications`}
-      aria-expanded={isPopoutOpen}
     >
       <Bell size={16} />
       {unreadCount > 0 && (
