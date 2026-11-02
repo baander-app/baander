@@ -251,6 +251,12 @@ uses this index to advertise available media. Public fragment indexes are
 zero-based ordinals within each generation and track; native file sequence numbers
 remain separate.
 
+### Copy presentation
+
+A proposed media presentation produced by repackaging selected source streams without audio or video re-encoding.
+Its identity includes the selected streams and output container, and its timing comes from the copied media rather than an encoder's fixed keyframe schedule.
+It uses the same execution ownership and publication guarantees as other presentations.
+
 ### Canonical audio track
 
 The primary playback job's audio track shared by the video representations in a
@@ -321,6 +327,12 @@ The fixed control and execution containers admitted together under one deploymen
 namespace and boot identity. Each has its own memory, CPU and PID ceilings and a
 disjoint CPU set. Control owns the lease and coordination; execution observes the
 lease and owns native processes. A private IPC volume connects the pair.
+
+### Small-host household profile
+
+A proposed deployment profile for household playback and ordinary library maintenance with bounded resource use.
+It permits original-file playback and remuxing but no server-side audio or video re-encoding.
+Its supported host capacity comes from whole-stack qualification; Raspberry Pi support is a separate hardware qualification.
 
 ### Ordinary admission target
 

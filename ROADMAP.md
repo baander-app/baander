@@ -4,6 +4,27 @@ Updated: 2026-11-02. This roadmap selects future work and records unresolved
 acceptance. Current operating contracts belong in the linked guides; completed
 milestones and their verification evidence remain in Git history.
 
+## Small-host household deployment
+
+Requirements checkpoint, 2026-11-02: the user confirmed the
+[small-host household deployment plan](docs/plans/2026-11-02-1819-feat-small-host-household-deployment-plan.md).
+It defines a separate profile for 2,000 songs, 50 movies and 250 TV episodes, with 1–2 simultaneous streams alongside normal scanning and metadata updates.
+Playback permits original delivery and remuxing without audio or video re-encoding; the full transcoding profile remains available.
+Whole-stack measurement and corrected deployment guidance are required, while 4 GB and Raspberry Pi qualification remain stretch goals.
+
+The contract contains 12 requirements, two flows and six acceptance examples.
+Independent source verification and the completeness, consistency, focus and planning-usability checks passed.
+Plan metadata, identifiers, source paths, prose preservation and whitespace checks passed.
+Implementation planning and runtime qualification remain open; no application tests or performance measurements were run for this requirements checkpoint.
+
+Implementation planning checkpoint, 2026-11-02: the same plan now defines eight implementation units covering the startup profile, worker capacity, delivery decisions, owned remux execution, player integration, deployment configuration, qualification and operator guidance.
+It preserves all 12 requirements and the existing actor, flow and acceptance identifiers.
+Compatible completed media remains reusable; newly admitted and recovered work must follow the active profile's encoding restrictions.
+
+All seven document-review lenses completed with no actionable findings; cross-model review was disabled by repository configuration.
+The confidence check, contract-preservation check, plan structure, source-path checks, prose preservation and whitespace checks passed.
+Runtime implementation and memory qualification remain open; no application tests or benchmarks were run during planning.
+
 ## Playback destinations and notifications
 
 Requirements checkpoint, 2026-11-01: the user confirmed the
