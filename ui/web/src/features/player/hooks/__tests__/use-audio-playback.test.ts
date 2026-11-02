@@ -411,6 +411,81 @@ describe('useAudioPlayback', () => {
     expect((await task).observedState).toBe('playing')
   })
 
+  it.each(['load', 'start'] as const)('adopts duration metadata received before %s activates the source', async type => {
+    seedQueue(0, 1)
+    usePlayerStore.setState({ playbackExecutionActive: false })
+    renderHook(() => useAudioPlayback())
+    const [audio] = capturedAudioElements
+    audio.readyState = 0
+    const command = { ...loadCommand(), type }
+    const adapter = getPlaybackAdapter('song')!
+    const preparation = adapter.prepare(command.payload, new AbortController().signal)
+    await act(async () => { await Promise.resolve() })
+    await act(async () => {
+      audio.duration = 183
+      audio.dispatchEvent(new Event('loadedmetadata'))
+      audio.dispatchEvent(new Event('durationchange'))
+      audio.readyState = 3
+      audio.dispatchEvent(new Event('canplay'))
+      await preparation
+    })
+    expect(usePlayerStore.getState().duration).toBe(0)
+
+    await act(async () => { await adapter.execute(command, new AbortController().signal) })
+
+    expect(usePlayerStore.getState().duration).toBe(183)
+  })
+
+  it.each([[217, 217], [NaN, 0], [Infinity, 0], [0, 0]])('replaces the previous duration when adopting native duration %s', async (duration, expected) => {
+    seedQueue(0, 2)
+    renderHook(() => useAudioPlayback())
+    const [outgoing, incoming] = capturedAudioElements
+    outgoing.src = '/api/stream/track?id=t0'
+    outgoing.duration = 91
+    usePlayerStore.getState().runtimeActions.setDuration(91)
+    incoming.readyState = 0
+    const command = loadCommand()
+    command.payload = { ...command.payload, media: { kind: 'song', publicId: 't1' }, queue: ['t0', 't1'], currentTrackIndex: 1 }
+    const adapter = getPlaybackAdapter('song')!
+    const preparation = adapter.prepare(command.payload, new AbortController().signal)
+    await act(async () => { await Promise.resolve() })
+    await act(async () => {
+      incoming.duration = duration
+      incoming.dispatchEvent(new Event('loadedmetadata'))
+      incoming.dispatchEvent(new Event('durationchange'))
+      incoming.readyState = 3
+      incoming.dispatchEvent(new Event('canplay'))
+      await preparation
+    })
+    expect(usePlayerStore.getState().duration).toBe(91)
+
+    await act(async () => { await adapter.execute(command, new AbortController().signal) })
+
+    expect(usePlayerStore.getState().duration).toBe(expected)
+    act(() => {
+      outgoing.duration = 999
+      outgoing.dispatchEvent(new Event('durationchange'))
+    })
+    expect(usePlayerStore.getState().duration).toBe(expected)
+  })
+
+  it.each([0, 27])('publishes the actual cursor when a paused start already sits at %s', async position => {
+    seedQueue(0, 1)
+    renderHook(() => useAudioPlayback())
+    const [audio] = capturedAudioElements
+    audio.src = '/api/stream/track?id=t0'
+    audio.currentTime = position
+    updateTime(86)
+    const command = loadCommand()
+    command.type = 'start'
+    command.payload = { ...command.payload, position, desiredState: 'paused' }
+
+    await act(async () => { await getPlaybackAdapter('song')!.execute(command, new AbortController().signal) })
+
+    expect(getCurrentTime()).toBe(position)
+    expect(audio.play).not.toHaveBeenCalled()
+  })
+
   it('propagates native autoplay refusal without acknowledging success', async () => {
     seedQueue(0, 1)
     renderHook(() => useAudioPlayback())

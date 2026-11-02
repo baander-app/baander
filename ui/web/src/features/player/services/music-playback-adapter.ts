@@ -163,7 +163,10 @@ export function createMusicPlaybackAdapter(runtime: Runtime): PlaybackExecutionA
   }
   const seek = async (audio: HTMLAudioElement, position: number, signal: AbortSignal, token: number) => {
     check(signal, token)
-    if (Math.abs(audio.currentTime - position) < 0.01) return
+    if (Math.abs(audio.currentTime - position) < 0.01) {
+      updateTime(audio.currentTime)
+      return
+    }
     if (!canSeekStream(audio)) throw new Error('Seeking is not available for this stream yet.')
     await new Promise<void>((resolve, reject) => {
       const cleanup = () => {
@@ -266,6 +269,8 @@ export function createMusicPlaybackAdapter(runtime: Runtime): PlaybackExecutionA
         const oldAudio = state.audioElement
         state.runtimeActions.setAudioElement(next.audio)
         state.runtimeActions.applyQueueSnapshot(next.queue, payload.currentTrackIndex)
+        state.runtimeActions.setDuration(Number.isFinite(next.audio.duration) && next.audio.duration > 0 ? next.audio.duration : 0)
+        updateTime(next.audio.currentTime)
         audioService.getProcessor()?.resetProgramme()
         if (oldAudio !== next.audio) audioService.getProcessor()?.instantSwap()
         prepared = undefined

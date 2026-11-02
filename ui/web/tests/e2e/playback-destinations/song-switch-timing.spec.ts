@@ -14,9 +14,11 @@ interface TimingEvent {
 async function instrument(page: Page) {
   const store = await loadedRuntimeModule(page, '/src/features/player/stores/player-store.ts')
   const execution = await loadedRuntimeModule(page, '/src/features/session/services/playback-execution.ts')
-  if (!store || !execution) throw new Error('The application music runtime has not loaded.')
-  await page.evaluate(async ({ store, execution }) => {
+  const clock = await loadedRuntimeModule(page, '/src/features/player/stores/player-time-tracker.ts')
+  if (!store || !execution || !clock) throw new Error('The application music runtime has not loaded.')
+  await page.evaluate(async ({ store, execution, clock }) => {
     const { usePlayerStore } = await import(/* @vite-ignore */ store)
+    const { getCurrentTime } = await import(/* @vite-ignore */ clock)
     const { getPlaybackAdapter } = await import(/* @vite-ignore */ execution) as {
       getPlaybackAdapter(kind: 'song'): PlaybackExecutionAdapter | undefined
     }
@@ -29,9 +31,13 @@ async function instrument(page: Page) {
       sample: 'warmup', events,
       state: () => {
         const state = usePlayerStore.getState()
+        const row = document.querySelector('[aria-label="Seek"]')?.closest('[data-slot="slider"]')?.parentElement
         return { title: state.currentTrack?.title, publicId: state.currentTrack?.publicId,
           queueLength: state.queue.length, paused: state.audioElement?.paused ?? true,
           position: state.audioElement?.currentTime ?? 0,
+          nativeDuration: Number.isFinite(state.audioElement?.duration) ? state.audioElement.duration : null,
+          catalogueDuration: state.currentTrack?.duration, storeDuration: state.duration, clockPosition: getCurrentTime(),
+          elapsedLabel: row?.firstElementChild?.textContent, durationLabel: row?.lastElementChild?.textContent,
           crossfadeEnabled: state.crossfadeEnabled, crossfadeDuration: state.crossfadeDuration }
       },
     }
@@ -73,7 +79,7 @@ async function instrument(page: Page) {
       try { return await execute.call(this, command, signal) }
       finally { record('adapter', 'execute-end', { command: command.id, type: command.type }) }
     }
-  }, { store, execution })
+  }, { store, execution, clock })
 }
 
 test('measure changing songs through selection and Next while music is playing', async ({ browser, baseURL }, testInfo) => {
@@ -82,11 +88,12 @@ test('measure changing songs through selection and Next while music is playing',
   const context = await browser.newContext({ baseURL, ignoreHTTPSErrors: true })
   const events: TimingEvent[] = []
   const samples: object[] = []
+  const footerSamples: object[] = []
   let sample = 'warmup'
   let measuredPage: Page | undefined
   try {
     const manifest = (await fixture.request<FixtureManifest>({ op: 'create' })).receipt
-    await fixture.request({ op: 'catalog', albums: 1, songs: 77 })
+    await fixture.request({ op: 'catalog', albums: 1, songs: 77, durations: [60, 45, 90] })
     const page = await context.newPage()
     measuredPage = page
     const relevant = (path: string) => path.startsWith('/api/session/') || path.includes('/songs') || path.startsWith('/api/stream')
@@ -129,10 +136,28 @@ test('measure changing songs through selection and Next while music is playing',
     await page.goto('/music/songs')
     await instrument(page)
     const state = () => page.evaluate(() => (window as typeof window & {
-      __songTiming: { state(): { title: string; publicId: string; queueLength: number; paused: boolean; position: number; crossfadeEnabled: boolean; crossfadeDuration: number } }
+      __songTiming: { state(): { title: string; publicId: string; queueLength: number; paused: boolean; position: number;
+        nativeDuration: number | null; catalogueDuration: number; storeDuration: number; clockPosition: number;
+        elapsedLabel: string; durationLabel: string; crossfadeEnabled: boolean; crossfadeDuration: number } }
     }).__songTiming.state())
+    const assertFooterTime = async (stage: string) => {
+      const current = await state()
+      footerSamples.push({ stage, ...current })
+      console.log(`SONG_FOOTER_TIME ${JSON.stringify({ stage, ...current })}`)
+      expect(current.nativeDuration).not.toBeNull()
+      expect(current.nativeDuration!).toBeGreaterThan(0)
+      expect(current.catalogueDuration).toBeCloseTo(current.nativeDuration!, 0)
+      expect(current.storeDuration).toBeCloseTo(current.nativeDuration!, 1)
+      const minutes = Math.floor(current.nativeDuration! / 60)
+      const seconds = Math.floor(current.nativeDuration! % 60).toString().padStart(2, '0')
+      expect(current.durationLabel).toBe(`${minutes}:${seconds}`)
+      expect(Math.abs(current.clockPosition - current.position)).toBeLessThan(1)
+      const elapsed = current.elapsedLabel.split(':').map(Number)
+      expect(elapsed[0] * 60 + elapsed[1]).toBe(Math.floor(current.clockPosition))
+    }
     await page.getByText('Live song 00000', { exact: true }).dblclick()
     await expect.poll(async () => (await state()).position, { timeout: 30_000 }).toBeGreaterThan(0.2)
+    await assertFooterTime('initial')
     for (const mode of ['dblclick', 'next'] as const) {
       for (let index = 0; index < 3; index++) {
         sample = `${mode}-${index + 1}`
@@ -146,6 +171,7 @@ test('measure changing songs through selection and Next while music is playing',
         }, { timeout: 30_000 }).toBe(true)
         await expect.poll(() => events.some(event => event.sample === sample && event.kind === 'http-response'
           && event.name === '/api/session/control' && ['applied', 'playing'].includes(String(event.outcome))), { timeout: 15_000 }).toBe(true)
+        await assertFooterTime(sample)
         const native = await page.evaluate(() => (window as typeof window & { __songTiming: { events: TimingEvent[] } }).__songTiming.events)
         const measured = [...events, ...native].filter(event => event.sample === sample).sort((a, b) => a.at - b.at)
         const input = measured.find(event => event.kind === 'input')?.at ?? 0
@@ -171,6 +197,7 @@ test('measure changing songs through selection and Next while music is playing',
     const native = await page.evaluate(() => (window as typeof window & { __songTiming: { events: TimingEvent[] } }).__songTiming.events)
     await testInfo.attach('song-switch-timings', { body: JSON.stringify({ samples, events: [...events, ...native].sort((a, b) => a.at - b.at) }, null, 2), contentType: 'application/json' })
   } finally {
+    await testInfo.attach('song-footer-time-observations', { body: JSON.stringify(footerSamples, null, 2), contentType: 'application/json' })
     const native = await measuredPage?.evaluate(() => (window as typeof window & { __songTiming?: { events: TimingEvent[] } }).__songTiming?.events ?? []).catch(() => []) ?? []
     await testInfo.attach('song-switch-partial-timings', { body: JSON.stringify({ samples, events: [...events, ...native].sort((a, b) => a.at - b.at) }, null, 2), contentType: 'application/json' })
     await context.close()

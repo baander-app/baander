@@ -15,6 +15,9 @@ async function nativeAudio(page: Page) {
     return {
       paused: audio?.paused ?? true,
       time: audio?.currentTime ?? 0,
+      nativeDuration: audio?.duration ?? 0,
+      storeDuration: state.duration,
+      durationLabel: document.querySelector('[aria-label="Seek"]')?.closest('[data-slot="slider"]')?.parentElement?.lastElementChild?.textContent,
       readyState: audio?.readyState ?? 0,
       src: audio?.currentSrc ?? '',
       queue: state.queue.map((track: { publicId: string }) => track.publicId),
@@ -63,6 +66,7 @@ test('music transfers between real browsers and remains remotely controllable', 
     await source.getByText('Live song 00000', { exact: true }).dblclick()
     await expect.poll(async () => (await nativeAudio(source)).paused, { timeout: 25_000 }).toBe(false)
     await expect.poll(async () => (await nativeAudio(source)).time).toBeGreaterThan(1)
+    expect(await nativeAudio(source)).toMatchObject({ nativeDuration: 60, storeDuration: 60, durationLabel: '1:00' })
     expect((await nativeAudio(target)).paused).toBe(true)
     const sourceId = (await snapshot(source)).activeIncarnationId
 
@@ -104,6 +108,7 @@ test('music transfers between real browsers and remains remotely controllable', 
     await expect.poll(async () => (await nativeAudio(target)).paused, { timeout: 25_000 }).toBe(false)
     await expect.poll(async () => (await snapshot(source)).transfer).toBeNull()
     const after = await nativeAudio(target)
+    expect(after).toMatchObject({ nativeDuration: 60, storeDuration: 60, durationLabel: '1:00' })
     expect(after.time).toBeGreaterThanOrEqual(before - 0.25)
     expect(after.time).toBeLessThan(before + 12)
     expect(after.queue).toEqual([manifest.song.publicId])
@@ -121,6 +126,7 @@ test('music transfers between real browsers and remains remotely controllable', 
     await expect.poll(async () => (await snapshot(source)).activeIncarnationId).toBe(sourceId)
     expect((await nativeAudio(source)).paused).toBe(true)
     expect((await nativeAudio(target)).paused).toBe(true)
+    expect(await nativeAudio(source)).toMatchObject({ nativeDuration: 60, storeDuration: 60, durationLabel: '1:00' })
     await expect(source.getByRole('main').getByText('Live song 00000', { exact: true })).toBeVisible()
     await source.screenshot({ path: testInfo.outputPath('music-returned-paused.png'), animations: 'disabled' })
     await source.setViewportSize({ width: 390, height: 844 })

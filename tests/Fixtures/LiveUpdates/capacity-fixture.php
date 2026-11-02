@@ -63,7 +63,7 @@ final class LiveCapacityFixture
             'ordinary' => $this->produce(32, 0, (int) ($command['sequence'] ?? 1), $progress),
             'observer-notification' => $this->produce(1, 0, (int) ($command['sequence'] ?? 1), $progress, [$this->manifest['observer']]),
             'burst' => $this->produce((int) ($command['count'] ?? 10_000), (int) ($command['durationMs'] ?? 10_000), (int) ($command['sequence'] ?? 1), $progress),
-            'catalog' => $this->catalog((int) ($command['albums'] ?? 10_000), (int) ($command['songs'] ?? 1000)),
+            'catalog' => $this->catalog((int) ($command['albums'] ?? 10_000), (int) ($command['songs'] ?? 1000), (array) ($command['durations'] ?? [])),
             'change' => $this->change($command),
             'authority' => $this->authority($command),
             'projector' => $this->projector((bool) ($command['hold'] ?? false)),
@@ -174,10 +174,10 @@ final class LiveCapacityFixture
         }
     }
 
-    public static function wave(): string
+    public static function wave(int $duration = 60): string
     {
-        // Sixty seconds, mono PCM, 8 kHz: enough for a real playback continuity check.
-        $samples = str_repeat(pack('v', 0), 8000 * 60);
+        // Mono PCM, 8 kHz: enough for a real playback continuity check.
+        $samples = str_repeat(pack('v', 0), 8000 * $duration);
         return 'RIFF' . pack('V', 36 + strlen($samples)) . 'WAVEfmt ' . pack('VvvVVvv', 16, 1, 1, 8000, 16_000, 2, 16)
             . 'data' . pack('V', strlen($samples)) . $samples;
     }
@@ -262,12 +262,38 @@ final class LiveCapacityFixture
     }
 
     /**
+     * @param array<array-key, mixed> $durationValues
      * @return array<string, mixed>
      */
-    private function catalog(int $albums, int $songs): array
+    private function catalog(int $albums, int $songs, array $durationValues = []): array
     {
         if ($albums < 1 || $songs < 1 || $this->manifest['albums'] !== [] || $this->manifest['songs'] !== []) {
             throw new InvalidArgumentException('Catalog needs positive totals and may be populated once.');
+        }
+        if (!array_is_list($durationValues)) {
+            throw new InvalidArgumentException('Fixture durations must be a list.');
+        }
+        $durations = [];
+        foreach ($durationValues as $duration) {
+            if (!is_int($duration) || $duration < 1 || $duration > 300) {
+                throw new InvalidArgumentException('Fixture durations must be integer seconds between 1 and 300.');
+            }
+            $durations[] = $duration;
+        }
+        foreach (array_unique($durations) as $duration) {
+            if ($duration === 60) {
+                continue;
+            }
+            $path = $this->manifest['mediaDirectory'] . '/duration-' . $duration . '.wav';
+            $this->manifest['audioVariants'][$duration] = ['id' => (string) new Uuid(), 'path' => $path];
+        }
+        $this->save();
+        foreach ($this->manifest['audioVariants'] ?? [] as $duration => $source) {
+            $wave = self::wave((int) $duration);
+            if (file_put_contents($source['path'], $wave) !== strlen($wave) || !chmod($source['path'], 0644)) {
+                throw new RuntimeException('Cannot write worker-readable fixture duration variant.');
+            }
+            $this->manifest['audioVariants'][$duration] = $source + ['hash' => hash_file('xxh3', $source['path']), 'size' => strlen($wave), 'modifiedAt' => filemtime($source['path'])];
         }
         for ($i = 1; $i < $albums; ++$i) {
             $this->manifest['albums'][] = $this->identity();
@@ -277,12 +303,16 @@ final class LiveCapacityFixture
         }
         $this->save();
         $start = microtime(true) * 1000;
-        $this->connection->transactional(function (): void {
+        $this->connection->transactional(function () use ($durations): void {
             foreach ($this->manifest['albums'] as $i => $album) {
                 $this->insertAlbum($album, $i + 1);
             }
             foreach ($this->manifest['songs'] as $i => $song) {
-                $this->insertSong($song, $i + 1);
+                $duration = $durations === [] ? 60 : $durations[($i + 1) % count($durations)];
+                $this->insertSong($song, $i + 1, $duration);
+            }
+            foreach ($this->manifest['audioVariants'] ?? [] as $source) {
+                $this->connection->insert('library_file_index', ['id' => $source['id'], 'library_id' => $this->manifest['library']['id'], 'path' => $source['path'], 'hash' => $source['hash'], 'size' => $source['size'], 'extension' => 'wav', 'modified_at' => $source['modifiedAt'], 'discovered_at' => $this->now(), 'available' => 'true']);
             }
         });
         return ['albums' => $albums, 'songs' => $songs, 'library' => $this->manifest['library'], 'album' => $this->manifest['album'], 'song' => $this->manifest['song'], 'commitStartEpochMs' => $start, 'commitEndEpochMs' => microtime(true) * 1000];
@@ -516,6 +546,11 @@ final class LiveCapacityFixture
         if (isset($this->manifest['scan'])) {
             $this->scan->removeFiles($this->manifest);
         }
+        foreach ($this->manifest['audioVariants'] ?? [] as $source) {
+            if (is_file($source['path']) && !unlink($source['path'])) {
+                throw new RuntimeException('Cannot remove owned fixture duration variant.');
+            }
+        }
         if (is_file($this->manifest['song']['path'])) {
             if (!unlink($this->manifest['song']['path'])) {
                 throw new RuntimeException('Cannot remove owned WAV; ownership manifest retained.');
@@ -565,9 +600,10 @@ final class LiveCapacityFixture
     }
 
     /** @param array{id: string, publicId: string} $identity */
-    private function insertSong(array $identity, int $index): void
+    private function insertSong(array $identity, int $index, int $duration = 60): void
     {
-        $this->insert('songs', $identity, ['album_id' => $this->manifest['album']['id'], 'title' => sprintf('Live song %05d', $index), 'path' => $this->manifest['song']['path'], 'hash' => $this->manifest['song']['hash'], 'size' => filesize($this->manifest['song']['path']), 'mime_type' => 'audio/wav', 'length' => 60, 'sample_rate' => 8000, 'channels' => 1, 'bitrate' => 128_000, 'codec' => 'pcm_s16le', 'track' => $index + 1, 'disc' => 1]);
+        $source = $this->manifest['audioVariants'][$duration] ?? $this->manifest['song'];
+        $this->insert('songs', $identity, ['album_id' => $this->manifest['album']['id'], 'title' => sprintf('Live song %05d', $index), 'path' => $source['path'], 'hash' => $source['hash'], 'size' => filesize($source['path']), 'mime_type' => 'audio/wav', 'length' => $duration, 'sample_rate' => 8000, 'channels' => 1, 'bitrate' => 128_000, 'codec' => 'pcm_s16le', 'track' => $index + 1, 'disc' => 1]);
     }
 
     /** @return list<string> */

@@ -151,6 +151,28 @@ The timing trace contained no HTTP errors. The video check rejected one stale
 observation during Pause with HTTP 409; transfer, recovery and final Stop still
 completed. Review and simplification left no outstanding findings.
 
+Footer timing checkpoint, 2026-11-02 (U3): activating a prepared music source now
+copies its native duration and current time into the player. Metadata received
+before activation no longer leaves the footer showing zero or the previous
+song's duration. A seek that already sits at the requested position also updates
+the clock. Inactive audio events remain ignored; unknown or infinite native
+duration resets to zero rather than retaining the previous value.
+
+Verification: eight new cases failed before the fix; all 117 audio-playback hook
+tests and all 3,124 web tests then passed. The production build, web and browser
+typechecks, fixture PHPStan and syntax checks passed. Lint retained eight existing
+warnings with no errors. The browser fixture now uses 60-, 45- and 90-second audio;
+native duration, catalogue length, player state and the footer label agree through
+initial playback and six song changes. Transfer and expired-presence recovery
+checks also passed with duration assertions. Review and simplification found no
+remaining issues in the timing change.
+
+The first reload-recovery run retained the correct duration but did not resume
+after Play. One instrumented rerun passed reload, tab-close and renderer-crash
+recovery with the duration assertions. The first failure remains an unexplained
+intermittent resume issue; the rerun does not establish its cause, and this change
+does not alter recovery coordination.
+
 Follow-up: the separate retry path can retain a pending control after a network
 failure followed by a rejected retry. Initial rejected requests are cleared; the
 retry-after-network-failure case remains outside this recovery check.

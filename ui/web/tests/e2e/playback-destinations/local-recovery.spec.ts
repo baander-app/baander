@@ -14,6 +14,9 @@ async function nativePlayback(page: Page) {
     return {
       paused: state.audioElement?.paused ?? true,
       position: state.audioElement?.currentTime ?? 0,
+      nativeDuration: state.audioElement?.duration ?? 0,
+      storeDuration: state.duration,
+      durationLabel: document.querySelector('[aria-label="Seek"]')?.closest('[data-slot="slider"]')?.parentElement?.lastElementChild?.textContent,
       queue: state.queue.map((track: { publicId: string }) => track.publicId),
     }
   })
@@ -38,6 +41,7 @@ test('local music recovers paused after reload, tab close and renderer destructi
     await page.goto('/music/songs')
     await page.getByText('Live song 00000', { exact: true }).dblclick()
     await expect.poll(async () => (await nativePlayback(page)).position, { timeout: 25_000 }).toBeGreaterThan(2)
+    expect(await nativePlayback(page)).toMatchObject({ nativeDuration: 60, storeDuration: 60, durationLabel: '1:00' })
     const queue = (await nativePlayback(page)).queue
     const media = (await snapshot(page)).media
 
@@ -89,6 +93,7 @@ test('local music recovers paused after reload, tab close and renderer destructi
       await expect.poll(async () => (await snapshot(page)).activeIncarnationId).not.toBeNull()
       expect((await snapshot(page)).activeIncarnationId).not.toBe(oldIncarnation)
       await expect.poll(async () => (await nativePlayback(page)).position).toBeGreaterThan(1)
+      expect(await nativePlayback(page)).toMatchObject({ nativeDuration: 60, storeDuration: 60, durationLabel: '1:00' })
     }
   } finally {
     await testInfo.attach('local-recovery-results', { body: JSON.stringify(recoveries), contentType: 'application/json' })
@@ -147,6 +152,7 @@ test('paused local music resumes through fresh registration after its presence e
     expect(resumed.media).toEqual(paused.media)
     expect((await nativePlayback(page)).queue).toEqual(queue)
     await expect.poll(async () => (await nativePlayback(page)).position).toBeGreaterThan(paused.position + 1)
+    expect(await nativePlayback(page)).toMatchObject({ nativeDuration: 60, storeDuration: 60, durationLabel: '1:00' })
     expect(rejectedControls).toEqual([])
   } finally {
     await testInfo.attach('rejected-playback-controls', { body: JSON.stringify(rejectedControls), contentType: 'application/json' })
