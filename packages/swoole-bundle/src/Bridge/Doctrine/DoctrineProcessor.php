@@ -22,7 +22,7 @@ use UnexpectedValueException;
 final class DoctrineProcessor implements CompileProcessor
 {
     /**
-     * @param array{global_limit?: int, limits?: array<string, int>} $config
+     * @param array{global_limit?: int|string, limits?: array<string, int>} $config
      */
     public function __construct(private array $config = []) {}
 
@@ -133,7 +133,7 @@ final class DoctrineProcessor implements CompileProcessor
         }
     }
 
-    private function getLimitFromEntityManagerConnection(ContainerBuilder $container, Definition $emDef): ?int
+    private function getLimitFromEntityManagerConnection(ContainerBuilder $container, Definition $emDef): int|string|null
     {
         $connRef = $emDef->getArgument(0);
         Assertion::isInstanceOf($connRef, Reference::class);
@@ -200,7 +200,7 @@ final class DoctrineProcessor implements CompileProcessor
         $configuratorDef->setMethodCalls($methodCalls);
     }
 
-    private function getGlobalConnectionLimit(): ?int
+    private function getGlobalConnectionLimit(): int|string|null
     {
         if (!isset($this->config['global_limit'])) {
             return null;

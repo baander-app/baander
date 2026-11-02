@@ -45,9 +45,9 @@ final readonly class DeploymentReadiness
                 || ($running['running'] ?? null) !== true || ($running['restarting'] ?? null) !== false) {
                 throw new RuntimeException('Admitted worker container is unavailable.');
             }
-            $code = 'require $argv[6] . "/vendor/autoload.php"; echo json_encode(\\App\\Shared\\Infrastructure\\Worker\\WorkerReadinessObservation::observe($argv[1], $argv[2], (int) $argv[3], $argv[4], $argv[5], $argv[6]), JSON_THROW_ON_ERROR);';
+            $code = 'require $argv[6] . "/vendor/autoload.php"; echo json_encode(\\App\\Shared\\Infrastructure\\Worker\\WorkerReadinessObservation::observe($argv[1], $argv[2], (int) $argv[3], $argv[4], $argv[5], $argv[6], $argv[7]), JSON_THROW_ON_ERROR);';
             $roles = json_decode($execute(['exec', $binding->containerId, '/usr/local/bin/php', '-d', 'memory_limit=64M', '-r', $code,
-                $manifest->namespace, $manifest->bootId, (string) $epoch, $state->unit->value, $manifest->autoscaling->toJson(), $manifest->appHome]), true, 8, JSON_THROW_ON_ERROR);
+                $manifest->namespace, $manifest->bootId, (string) $epoch, $state->unit->value, $manifest->autoscaling->toJson(), $manifest->appHome, $manifest->deploymentProfile->toJson()]), true, 8, JSON_THROW_ON_ERROR);
             if (!is_array($roles) || $roles === []) {
                 throw new RuntimeException('Worker readiness observation was not confirmed.');
             }

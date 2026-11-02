@@ -10,6 +10,7 @@ $exitCode = 0;
 $stopping = false;
 try {
     require dirname(__DIR__) . '/vendor/autoload.php';
+    \App\Shared\Application\DTO\DeploymentProfile::fromEnvironment();
     $arguments = $_SERVER['argv'] ?? [];
     if (PHP_SAPI !== 'cli' || count($arguments) !== 3 || !in_array($arguments[1], ['video', 'audio'], true)) {
         throw new RuntimeException('Media job requires private manager admission.');

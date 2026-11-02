@@ -16,6 +16,7 @@ final class Command
     private readonly Resources $resources;
     private readonly string $image;
     private readonly string $profile;
+    private readonly string $deploymentProfile;
     /** @var list<string> */
     private array $common = [];
     private string $uid;
@@ -27,6 +28,7 @@ final class Command
         $this->resources = new Resources($this->runtime, 'worker-command');
         $this->image = $this->runtime->image('application')->id;
         $this->profile = file_get_contents($root . '/tests/Fixtures/Worker/autoscaling-profile.json');
+        $this->deploymentProfile = trim(file_get_contents($root . '/tests/Fixtures/Worker/deployment-profile.json'));
     }
 
     /** @param list<string> $arguments */
@@ -308,7 +310,7 @@ final class Command
                     mkdir -m 700 /tmp/baander-worker-locks
                     exec php -d memory_limit=256M bin/console app:worker --deployment="$1" --boot-id="$2" \
                         --unit="$3" --memory-mib="$4" --pids-limit="$5" --scheduled-console-mib="$6" \
-                        --autoscaling-profile="$7" --lock-dir=/tmp/baander-worker-locks --ipc-dir=/run/baander-worker --no-interaction
+                        --autoscaling-profile="$7" --deployment-profile="$8" --lock-dir=/tmp/baander-worker-locks --ipc-dir=/run/baander-worker --no-interaction
                     SH,
                 'worker-unit',
                 $namespace,
@@ -318,6 +320,7 @@ final class Command
                 $pids,
                 $console,
                 $this->profile,
+                $this->deploymentProfile,
             ]);
             if (!$denied) {
                 $this->journal('register-unit', [$namespace, $boot, $unit, $identity]);
@@ -528,6 +531,7 @@ final class Command
                 '--pids-limit=129',
                 '--scheduled-console-mib=0',
                 '--autoscaling-profile=' . $this->profile,
+                '--deployment-profile=' . $this->deploymentProfile,
                 '--ipc-dir=/run/baander-worker',
                 '--lock-dir=/tmp/baander-invalid-lock',
                 '--no-interaction',

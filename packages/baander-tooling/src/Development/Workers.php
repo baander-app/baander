@@ -48,7 +48,7 @@ class Workers
             'php',
             $release['images']['worker_image']['resolvedId'],
             '-r',
-            'require "vendor/autoload.php"; echo (new \\App\\Shared\\Application\\DTO\\WorkerAutoscalingProfile())->toJson();',
+            'require "vendor/autoload.php"; echo json_encode(["autoscaling" => json_decode((new \\App\\Shared\\Application\\DTO\\WorkerAutoscalingProfile())->toJson()), "deployment" => json_decode((new \\App\\Shared\\Application\\DTO\\DeploymentProfile())->toJson())]);',
         ], $this->connections->environment(), $cleanupSeconds)->stdout
             |> (static fn(string $output): mixed => json_decode($output, true, flags: JSON_THROW_ON_ERROR)));
         $mounts = [];
@@ -104,7 +104,7 @@ class Workers
         }
         $ipc = $instance['project'] . '-ipc-' . $boot;
         $manifest = [
-            'version' => 5,
+            'version' => 6,
             'sourceMountPolicy' => 'local-development',
             'namespace' => $instance['project'],
             'bootId' => $boot,
@@ -121,7 +121,8 @@ class Workers
             'executionCpuSet' => [1],
             'controlPidsLimit' => 129,
             'executionPidsLimit' => 256,
-            'autoscaling' => $profile,
+            'autoscaling' => $profile['autoscaling'],
+            'deploymentProfile' => $profile['deployment'],
             'scheduledConsoleMiB' => 320,
             'ipcVolume' => $ipc,
             'mediaMounts' => $mounts,

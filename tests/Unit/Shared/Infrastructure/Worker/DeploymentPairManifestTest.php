@@ -63,17 +63,40 @@ final class DeploymentPairManifestTest extends TestCase
         DeploymentOperatorManifest::fromJson(json_encode($fields, JSON_THROW_ON_ERROR), '/var/www/html');
     }
 
+    public function testDeploymentProfileChangesBothRecipeFingerprints(): void
+    {
+        $fields = self::fields();
+        $full = DeploymentOperatorManifest::fromJson(json_encode($fields, JSON_THROW_ON_ERROR), '/var/www/html');
+        $fields['deploymentProfile'] = json_decode((new \App\Shared\Application\DTO\DeploymentProfile('household'))->toJson(), true, flags: JSON_THROW_ON_ERROR);
+        $household = DeploymentOperatorManifest::fromJson(json_encode($fields, JSON_THROW_ON_ERROR), '/var/www/html');
+        $environment = new DeploymentRuntimeEnvironment();
+        foreach (DeploymentUnit::cases() as $unit) {
+            self::assertNotSame($full->recipe($unit, $environment)->fingerprint(), $household->recipe($unit, new DeploymentRuntimeEnvironment(['BAANDER_DEPLOYMENT_PROFILE' => 'household']))->fingerprint());
+        }
+        $this->expectException(\InvalidArgumentException::class);
+        $household->recipe(DeploymentUnit::Control, new DeploymentRuntimeEnvironment(['BAANDER_DEPLOYMENT_PROFILE' => 'full']));
+    }
+
+    public function testPreviousManifestVersionIsRejected(): void
+    {
+        $fields = self::fields();
+        $fields['version'] = 5;
+        $this->expectException(\InvalidArgumentException::class);
+        DeploymentOperatorManifest::fromJson(json_encode($fields, JSON_THROW_ON_ERROR), '/var/www/html');
+    }
+
     /** @return array<string,mixed> */
     public static function fields(): array
     {
         return [
-            'version' => 5, 'sourceMountPolicy' => 'production', 'namespace' => 'operator.baander.app', 'bootId' => str_repeat('a', 32),
+            'version' => 6, 'sourceMountPolicy' => 'production', 'namespace' => 'operator.baander.app', 'bootId' => str_repeat('a', 32),
             'daemonId' => 'docker-daemon', 'imageId' => 'sha256:' . str_repeat('b', 64), 'network' => 'none',
             'dockerBinary' => '/usr/bin/docker', 'dockerEndpoint' => 'unix:///var/run/docker.sock',
             'controlMemoryMiB' => 2944, 'executionMemoryMiB' => 4480,
             'controlNanoCpus' => 1000000000, 'executionNanoCpus' => 2000000000,
             'controlCpuSet' => [0], 'executionCpuSet' => [1, 2],
             'controlPidsLimit' => 129, 'executionPidsLimit' => 256,
+            'deploymentProfile' => json_decode((new \App\Shared\Application\DTO\DeploymentProfile())->toJson(), true, flags: JSON_THROW_ON_ERROR),
             'autoscaling' => json_decode((new \App\Shared\Application\DTO\WorkerAutoscalingProfile())->toJson(), true, flags: JSON_THROW_ON_ERROR),
             'scheduledConsoleMiB' => 320, 'ipcVolume' => 'worker-ipc',
             'mediaMounts' => [

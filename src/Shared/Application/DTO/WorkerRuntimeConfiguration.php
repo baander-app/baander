@@ -22,6 +22,7 @@ final readonly class WorkerRuntimeConfiguration
         public string $lockDirectory,
         public string $ipcDirectory,
         public WorkerAutoscalingProfile $autoscaling = new WorkerAutoscalingProfile(),
+        public DeploymentProfile $deploymentProfile = new DeploymentProfile(),
     ) {
         // Management covers a 256 MiB supervisor, a 64 MiB lease helper and 64 MiB
         // of native headroom. Execution also reserves its 3136 MiB native process envelope.
@@ -30,6 +31,7 @@ final readonly class WorkerRuntimeConfiguration
         if (preg_match('/\A[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}\z/D', $namespace) !== 1
             || preg_match('/\A[0-9a-f]{32}\z/D', $bootId) !== 1
             || !in_array($unit, ['control', 'execution'], true)
+            || $autoscaling->maximumConcurrency > $deploymentProfile->ordinaryConsumerLimit
             || $memoryLimitBytes < $minimum || $memoryLimitBytes > 1024 ** 4
             || $pidsLimit < $autoscaling->minimumPids($unit) || $pidsLimit > 4096
             || $scheduledConsoleReservationBytes < 0

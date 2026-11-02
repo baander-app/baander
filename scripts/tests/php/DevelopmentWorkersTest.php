@@ -469,7 +469,10 @@ final class DevelopmentWorkersTest extends DevDataTestCase
             if (in_array('volume', $arguments, true) && in_array('create', $arguments, true)) {
                 return $arguments[array_key_last($arguments)];
             }
-            return '{}';
+            return json_encode([
+                'autoscaling' => AtomicFile::readJson(dirname(__DIR__, 3) . '/tests/Fixtures/Worker/autoscaling-profile.json'),
+                'deployment' => AtomicFile::readJson(dirname(__DIR__, 3) . '/tests/Fixtures/Worker/deployment-profile.json'),
+            ], JSON_THROW_ON_ERROR);
         });
     }
 

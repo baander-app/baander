@@ -454,7 +454,7 @@ final readonly class OperatorProvisioning
         $maximum = (int) $value;
         $profile['maximumConcurrency'] = $maximum;
         $manifest = [
-            'version' => 5,
+            'version' => 6,
             'sourceMountPolicy' => $this->qualification->configuration->developmentSource ? 'local-development' : 'production',
             'namespace' => $s->namespace,
             'bootId' => $s->boot,
@@ -472,6 +472,7 @@ final readonly class OperatorProvisioning
             'controlCpuSet' => array_slice($cpus, 0, 1),
             'executionCpuSet' => array_slice($cpus, 1, 2),
             'autoscaling' => $profile,
+            'deploymentProfile' => OperatorConfiguration::json($this->qualification->root . '/tests/Fixtures/Worker/deployment-profile.json'),
             'scheduledConsoleMiB' => 320,
             'ipcVolume' => $s->ipcVolume,
             'mediaMounts' => [

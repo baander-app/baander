@@ -23,6 +23,7 @@ use Symfony\Component\DependencyInjection\Attribute\Exclude;
 final readonly class DeploymentRuntimeEnvironment implements JsonSerializable
 {
     private const array ALLOWED_KEYS = [
+        'BAANDER_DEPLOYMENT_PROFILE', 'BAANDER_DEPLOYMENT_PROFILE_JSON',
         'APP_ENV', 'APP_DEBUG', 'APP_SECRET', 'DATABASE_URL', 'REDIS_URL',
         'REDIS_PASSWORD', 'MESSENGER_TRANSPORT_DSN', 'MAILER_DSN',
         'CONVERT_STORAGE_PATH', 'MEDIA_STORAGE_PATH',

@@ -159,7 +159,8 @@ try {
         }
     }
     $response = ['success' => $success, 'action' => $action, 'result' => [
-        'namespace' => $manifest->namespace, 'bootId' => $manifest->bootId, 'units' => $units, ...$result,
+        'namespace' => $manifest->namespace, 'bootId' => $manifest->bootId, 'units' => $units,
+        'deploymentProfile' => json_decode($manifest->deploymentProfile->toJson(), true, flags: JSON_THROW_ON_ERROR), ...$result,
     ]];
     $exitCode = $success ? 0 : 3;
 } catch (Throwable) {

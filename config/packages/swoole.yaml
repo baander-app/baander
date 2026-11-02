@@ -54,10 +54,8 @@ swoole:
             buffer_output_size: 8388608
             # 16MB max request body
             package_max_length: 16777216
-            # Explicitly set 4 workers — the bundle defaults to 2 * cpuCores but
-            # the container only sees 1 CPU, yielding just 1 worker. With coroutines
-            # enabled, 4 workers give enough headroom for concurrent SSE + API traffic.
-            worker_count: 4
+            # The deployment profile bounds web processes and their database pools together.
+            worker_count: '%env(baander_web_workers:BAANDER_DEPLOYMENT_PROFILE)%'
             reactor_count: 2
             # Bound async file I/O threads independently of the host CPU count.
             aio_core_worker_num: 1
@@ -119,5 +117,5 @@ swoole:
             compile_processors:
                 - App\Shared\Infrastructure\Swoole\TagInterfaceServicesProcessor
             doctrine_processor_config:
-                global_limit: 10
+                global_limit: '%env(baander_doctrine_slots:BAANDER_DEPLOYMENT_PROFILE)%'
                 limits: [ ]

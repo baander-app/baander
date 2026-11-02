@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Shared\Infrastructure\Worker;
 
+use App\Shared\Application\DTO\DeploymentProfile;
 use App\Shared\Application\DTO\DeploymentUnit;
 use InvalidArgumentException;
 use Symfony\Component\DependencyInjection\Attribute\Exclude;
@@ -43,6 +44,7 @@ final readonly class DeploymentContainerRecipe
         public DeploymentRuntimeEnvironment $runtimeEnvironment = new DeploymentRuntimeEnvironment(),
         array $mediaMounts = [],
         public string $sourceMountPolicy = 'production',
+        public DeploymentProfile $deploymentProfile = new DeploymentProfile(),
     ) {
         DeploymentLease::validateIdentity($namespace, $bootId);
         if (strlen($appHome) > 4096 || preg_match('~\A/(?:[A-Za-z0-9_.-]+/)*[A-Za-z0-9_.-]+\z~D', $appHome) !== 1
@@ -93,7 +95,7 @@ final readonly class DeploymentContainerRecipe
             'imageId' => $this->imageId, 'appHome' => $this->appHome, 'command' => $this->command, 'network' => $this->network,
             'memoryBytes' => $this->memoryBytes, 'nanoCpus' => $this->nanoCpus, 'pidsLimit' => $this->pidsLimit,
             'unit' => $this->unit->value, 'cpuSet' => $this->cpuSet, 'ipcVolume' => $this->ipcVolume,
-            'sourceMountPolicy' => $this->sourceMountPolicy,
+            'sourceMountPolicy' => $this->sourceMountPolicy, 'deploymentProfile' => $this->deploymentProfile->toJson(),
             'runtimeEnvironment' => $this->runtimeEnvironment->variables, 'mediaMounts' => $this->mediaMounts,
         ], JSON_THROW_ON_ERROR));
     }
@@ -118,6 +120,8 @@ final readonly class DeploymentContainerRecipe
             '--label', 'app.baander.worker.boot-id=' . $this->bootId, '--label', 'app.baander.worker.role=' . $this->unit->value,
             '--env', 'BAANDER_WORKER_NAMESPACE=' . $this->namespace, '--env', 'BAANDER_WORKER_BOOT_ID=' . $this->bootId,
             '--env', 'BAANDER_WORKER_UNIT=' . $this->unit->value,
+            '--env', 'BAANDER_DEPLOYMENT_PROFILE=' . $this->deploymentProfile->identifier,
+            '--env', 'BAANDER_DEPLOYMENT_PROFILE_JSON=' . $this->deploymentProfile->toJson(),
             ...($environmentFile === null ? [] : ['--env-file', $environmentFile]),
             ...$this->mountArguments(),
             '--mount', 'type=volume,src=' . $this->ipcVolume . ',dst=/run/baander-worker,volume-nocopy',

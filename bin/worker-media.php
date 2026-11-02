@@ -11,6 +11,7 @@ $kernel = null;
 $exitCode = 0;
 try {
     require dirname(__DIR__) . '/vendor/autoload.php';
+    \App\Shared\Application\DTO\DeploymentProfile::fromEnvironment();
     if (PHP_SAPI !== 'cli' || count($_SERVER['argv'] ?? []) !== 1) {
         throw new RuntimeException('Media requires private supervisor admission.');
     }

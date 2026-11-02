@@ -20,6 +20,15 @@ final class WorkerRuntimeConfigurationTest extends TestCase
         self::assertSame(3520 * 1024 * 1024, $execution->managementReservationBytes);
     }
 
+    public function testHouseholdRejectsMoreThanOneOrdinaryConsumer(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        new WorkerRuntimeConfiguration('worker.baander.app', str_repeat('a', 32), 'execution', 4480 * 1024 * 1024,
+            257, 0, '/tmp/locks', '/run/baander-worker',
+            new \App\Shared\Application\DTO\WorkerAutoscalingProfile(maximumConcurrency: 2),
+            new \App\Shared\Application\DTO\DeploymentProfile('household'));
+    }
+
     public function testWeakerUnitMemoryIsRejected(): void
     {
         $this->expectException(\InvalidArgumentException::class);

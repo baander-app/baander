@@ -25,6 +25,12 @@ All seven document-review lenses completed with no actionable findings; cross-mo
 The confidence check, contract-preservation check, plan structure, source-path checks, prose preservation and whitespace checks passed.
 Runtime implementation and memory qualification remain open; no application tests or benchmarks were run during planning.
 
+Deployment profile checkpoint, 2026-11-02 (U1): one immutable profile now supplies web capacity, worker commands, manifest fingerprints, child-process configuration and readiness checks. The full profile retains its existing values. Household selection starts with two web workers and four Doctrine slots per worker; the worker budget and media restrictions remain for the following units.
+
+Verification: 439 distinct configuration and bootstrap tests passed across focused CI runs after fixing a child startup ordering error. The final focused run passed 192 tests with 263 assertions. The tooling unit run passed 51 tests with 161 assertions and skipped six live qualification cases. The disposable worker command drill passed startup, claim/projection recovery, transport handoff, consumer acknowledgement recovery, replay and lifecycle checks; cleanup confirmed no remaining resources.
+
+Backend and tooling PHPStan, both dependency-boundary checks, tooling source policy, container compilation for both profiles and whitespace checks passed. A focused source/consumer review found no actionable issues. Reduced worker budgets, media delivery policy, copy execution, player integration and whole-stack qualification remain open.
+
 ## Playback destinations and notifications
 
 Requirements checkpoint, 2026-11-01: the user confirmed the

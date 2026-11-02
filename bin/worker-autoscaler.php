@@ -11,6 +11,7 @@ $kernel = null;
 $exitCode = 0;
 try {
     require dirname(__DIR__) . '/vendor/autoload.php';
+    \App\Shared\Application\DTO\DeploymentProfile::fromEnvironment();
     if (PHP_SAPI !== 'cli' || count($_SERVER['argv'] ?? []) !== 1 || getenv('BAANDER_WORKER_ID') !== 'autoscaler'
         || getenv('BAANDER_WORKER_UNIT') !== 'control'
     ) {

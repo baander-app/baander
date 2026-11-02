@@ -40,7 +40,7 @@ final class WorkerReadinessObservationTest extends TestCase
 
     public function testMissingDuplicateForeignStaleAndReparentedChildrenAreRejected(): void
     {
-        foreach (['missing', 'duplicate', 'foreign', 'epoch', 'unit', 'profile', 'transport', 'reparented', 'zombie', 'consumer-name'] as $kind) {
+        foreach (['missing', 'duplicate', 'foreign', 'epoch', 'unit', 'profile', 'deployment-profile', 'deployment-settings', 'transport', 'reparented', 'zombie', 'consumer-name'] as $kind) {
             $processes = self::processes('execution');
             match ($kind) {
                 'missing' => array_pop($processes),
@@ -49,6 +49,8 @@ final class WorkerReadinessObservationTest extends TestCase
                 'epoch' => $processes[0]['environment'] = str_replace('LEASE_EPOCH=3', 'LEASE_EPOCH=2', $processes[0]['environment']),
                 'unit' => $processes[0]['environment'] = str_replace('UNIT=execution', 'UNIT=control', $processes[0]['environment']),
                 'profile' => $processes[0]['environment'] = str_replace('AUTOSCALING_PROFILE=', 'UNRECOGNIZED_PROFILE=', $processes[0]['environment']),
+                'deployment-profile' => $processes[0]['environment'] = str_replace('BAANDER_DEPLOYMENT_PROFILE=full', 'BAANDER_DEPLOYMENT_PROFILE=household', $processes[0]['environment']),
+                'deployment-settings' => $processes[0]['environment'] = str_replace('BAANDER_DEPLOYMENT_PROFILE_JSON=', 'MISSING_PROFILE_JSON=', $processes[0]['environment']),
                 'transport' => $processes[0]['command'][] = 'scheduler',
                 'reparented' => $processes[0]['status'] = "PPid:\t22\nState:\tS (sleeping)\n",
                 'zombie' => $processes[0]['status'] = "PPid:\t1\nState:\tZ (zombie)\n",
@@ -75,6 +77,8 @@ final class WorkerReadinessObservationTest extends TestCase
             $lease = self::lease();
             $environment = ['BAANDER_WORKER_NAMESPACE=' . $lease->namespace, 'BAANDER_WORKER_BOOT_ID=' . $lease->bootId,
                 'BAANDER_WORKER_LEASE_EPOCH=3', 'BAANDER_WORKER_UNIT=' . $unit, 'BAANDER_WORKER_ID=' . $role,
+                'BAANDER_DEPLOYMENT_PROFILE=full',
+                'BAANDER_DEPLOYMENT_PROFILE_JSON=' . (new \App\Shared\Application\DTO\DeploymentProfile())->toJson(),
                 'BAANDER_WORKER_GENERATION=2', 'BAANDER_WORKER_AUTOSCALING_PROFILE=' . (new WorkerAutoscalingProfile())->toJson()];
             if ($role !== 'native') {
                 $environment[] = 'MESSENGER_CONSUMER_NAME=worker-' . substr(hash('sha256', $lease->namespace), 0, 16) . '-' . $lease->bootId . '-' . $role . '-2';

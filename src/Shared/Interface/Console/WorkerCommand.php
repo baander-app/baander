@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Shared\Interface\Console;
 
 use App\Shared\Application\DTO\WorkerRuntimeConfiguration;
+use App\Shared\Application\DTO\DeploymentProfile;
 use App\Shared\Application\DTO\WorkerAutoscalingProfile;
 use App\Shared\Application\Exception\WorkerTransportConfigurationException;
 use App\Shared\Application\Port\WorkerSupervisorRunnerInterface;
@@ -30,6 +31,7 @@ final class WorkerCommand extends Command
             ->addOption('memory-mib', null, InputOption::VALUE_REQUIRED, 'Required total admission ceiling in MiB.')
             ->addOption('unit', null, InputOption::VALUE_REQUIRED, 'Worker unit: control or execution.')
             ->addOption('pids-limit', null, InputOption::VALUE_REQUIRED, 'Enforced unit PID capacity.')
+            ->addOption('deployment-profile', null, InputOption::VALUE_REQUIRED, 'Complete deployment startup profile as JSON.')
             ->addOption('autoscaling-profile', null, InputOption::VALUE_REQUIRED, 'Complete admitted ordinary autoscaling profile as JSON.')
             ->addOption('scheduled-console-mib', null, InputOption::VALUE_REQUIRED, 'Execution reservation for one scheduled console child (0 disables).', '0')
             ->addOption('lock-dir', null, InputOption::VALUE_REQUIRED, 'Private unit lock directory.', '/tmp/baander-worker-locks')
@@ -49,6 +51,7 @@ final class WorkerCommand extends Command
                 $input->getOption('scheduled-console-mib') === '0' ? 0 : $this->bytes($input, 'scheduled-console-mib'),
                 $this->stringOption($input, 'lock-dir'), $this->stringOption($input, 'ipc-dir'),
                 WorkerAutoscalingProfile::fromJson($this->stringOption($input, 'autoscaling-profile')),
+                $this->deploymentProfile($input),
             );
         } catch (\InvalidArgumentException $error) {
             $io->error($error->getMessage());
@@ -64,6 +67,16 @@ final class WorkerCommand extends Command
             $io->error('Worker supervisor failed; the deployment must be reconciled before replacement.');
             return Command::FAILURE;
         }
+    }
+
+    private function deploymentProfile(InputInterface $input): DeploymentProfile
+    {
+        $profile = $this->stringOption($input, 'deployment-profile') |> DeploymentProfile::fromJson(...);
+        $configured = DeploymentProfile::fromEnvironment();
+        if ($profile != $configured) {
+            throw new \InvalidArgumentException('Worker profile must match the web deployment profile.');
+        }
+        return $profile;
     }
 
     private function pids(InputInterface $input): int

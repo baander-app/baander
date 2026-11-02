@@ -77,6 +77,7 @@ final class DeploymentOperatorManifestTest extends TestCase
             '--deployment=operator.baander.app', '--boot-id=' . str_repeat('a', 32), '--unit=control',
             '--memory-mib=2944', '--pids-limit=129', '--scheduled-console-mib=0',
             '--autoscaling-profile=' . $manifest->autoscaling->toJson(),
+            '--deployment-profile=' . $manifest->deploymentProfile->toJson(),
             '--lock-dir=/tmp/baander-worker-locks', '--ipc-dir=/run/baander-worker',
         ], $recipe->command);
         self::assertSame(2944 * 1024 * 1024, $recipe->memoryBytes);
@@ -139,10 +140,10 @@ final class DeploymentOperatorManifestTest extends TestCase
     {
         $mounts = self::mounts();
         $mounts[0] = ['source' => '/tmp', 'target' => '/media/library', 'readOnly' => true, 'role' => 'source'];
-        $manifest = DeploymentOperatorManifest::fromJson($this->json(['version' => 5, 'sourceMountPolicy' => 'local-development', 'mediaMounts' => $mounts]), '/var/www/html');
+        $manifest = DeploymentOperatorManifest::fromJson($this->json(['version' => 6, 'sourceMountPolicy' => 'local-development', 'mediaMounts' => $mounts]), '/var/www/html');
         self::assertContains('type=bind,src=/tmp,dst=/media/library,readonly,bind-propagation=rprivate,bind-recursive=readonly', $manifest->recipe(DeploymentUnit::Control, new DeploymentRuntimeEnvironment())->createArguments());
         $this->expectException(InvalidArgumentException::class);
-        DeploymentOperatorManifest::fromJson($this->json(['version' => 5, 'sourceMountPolicy' => 'production', 'mediaMounts' => $mounts]), '/var/www/html');
+        DeploymentOperatorManifest::fromJson($this->json(['version' => 6, 'sourceMountPolicy' => 'production', 'mediaMounts' => $mounts]), '/var/www/html');
     }
 
     /** @return list<array{volume:string,target:string,readOnly:bool,role:string}> */
@@ -258,7 +259,7 @@ final class DeploymentOperatorManifestTest extends TestCase
         yield 'null' => ['null'];
         yield 'oversized' => [str_repeat(' ', 8193)];
         yield 'excess depth' => [str_repeat('[', 9) . '0' . str_repeat(']', 9)];
-        yield 'numeric overflow' => [str_replace('"version":5', '"version":9223372036854775808', json_encode(self::fields(), JSON_THROW_ON_ERROR))];
+        yield 'numeric overflow' => [str_replace('"version":6', '"version":9223372036854775808', json_encode(self::fields(), JSON_THROW_ON_ERROR))];
     }
 
     /** @param array<string,mixed> $overrides */

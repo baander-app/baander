@@ -54,6 +54,8 @@ final readonly class WorkerSupervisorRunner implements WorkerSupervisorRunnerInt
             $peer = new WorkerPeerHandshake($configuration->ipcDirectory, $configuration->namespace, $configuration->bootId, $configuration->unit, $startedAt);
             $environment['BAANDER_NATIVE_SOCKET'] = $peer->socketPath();
             $environment['BAANDER_WORKER_UNIT'] = $configuration->unit;
+            $environment['BAANDER_DEPLOYMENT_PROFILE'] = $configuration->deploymentProfile->identifier;
+            $environment['BAANDER_DEPLOYMENT_PROFILE_JSON'] = $configuration->deploymentProfile->toJson();
             $environment['BAANDER_WORKER_AUTOSCALING_PROFILE'] = $configuration->autoscaling->toJson();
             $environment['BAANDER_WORKER_IPC_DIRECTORY'] = $configuration->ipcDirectory;
             $native = null;

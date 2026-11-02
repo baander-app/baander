@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Shared\Infrastructure\Worker;
 
 use App\Shared\Application\DTO\WorkerAutoscalingProfile;
+use App\Shared\Application\DTO\DeploymentProfile;
 use App\Shared\Infrastructure\Messaging\WorkerTransportConfiguration;
 use Redis;
 use RuntimeException;
@@ -15,7 +16,7 @@ use Symfony\Component\DependencyInjection\Attribute\Exclude;
 final class WorkerReadinessObservation
 {
     /** @return array<string,int> Role to current generation. */
-    public static function observe(string $namespace, string $bootId, int $epoch, string $unit, string $profileJson, string $appHome): array
+    public static function observe(string $namespace, string $bootId, int $epoch, string $unit, string $profileJson, string $appHome, string $deploymentProfileJson): array
     {
         $lease = new DeploymentLease($namespace, $bootId, $epoch);
         $profile = WorkerAutoscalingProfile::fromJson($profileJson);
@@ -32,7 +33,7 @@ final class WorkerReadinessObservation
                 $processes[] = ['command' => explode("\0", rtrim($command, "\0")), 'status' => $status, 'environment' => $environment];
             }
         }
-        $roles = self::verifyProcesses($processes, $lease, $unit, $profile, $appHome);
+        $roles = self::verifyProcesses($processes, $lease, $unit, $profile, $appHome, DeploymentProfile::fromJson($deploymentProfileJson));
         $environment = ['REDIS_URL' => getenv('REDIS_URL'), 'MESSENGER_TRANSPORT_DSN' => getenv('MESSENGER_TRANSPORT_DSN')];
         WorkerTransportConfiguration::validate($environment, true);
         foreach (['REDIS_URL' => 'scheduler_occurrences', 'MESSENGER_TRANSPORT_DSN' => 'messages'] as $key => $stream) {
@@ -72,7 +73,7 @@ final class WorkerReadinessObservation
      * @param list<array{command:list<string>,status:string,environment:string}> $processes
      * @return array<string,int>
      */
-    public static function verifyProcesses(array $processes, DeploymentLease $lease, string $unit, WorkerAutoscalingProfile $profile, string $appHome): array
+    public static function verifyProcesses(array $processes, DeploymentLease $lease, string $unit, WorkerAutoscalingProfile $profile, string $appHome, DeploymentProfile $deploymentProfile = new DeploymentProfile()): array
     {
         $roles = [];
         foreach ($processes as $process) {
@@ -117,7 +118,9 @@ final class WorkerReadinessObservation
             }
             $expected = ['BAANDER_WORKER_NAMESPACE' => $lease->namespace, 'BAANDER_WORKER_BOOT_ID' => $lease->bootId,
                 'BAANDER_WORKER_LEASE_EPOCH' => (string) $lease->epoch, 'BAANDER_WORKER_UNIT' => $unit,
-                'BAANDER_WORKER_ID' => $role, 'BAANDER_WORKER_AUTOSCALING_PROFILE' => $profile->toJson()];
+                'BAANDER_WORKER_ID' => $role, 'BAANDER_WORKER_AUTOSCALING_PROFILE' => $profile->toJson(),
+                'BAANDER_DEPLOYMENT_PROFILE' => $deploymentProfile->identifier,
+                'BAANDER_DEPLOYMENT_PROFILE_JSON' => $deploymentProfile->toJson()];
             if ($role !== 'native') {
                 $expected['MESSENGER_CONSUMER_NAME'] = self::consumerName($lease, $role, (int) $generation);
             }
