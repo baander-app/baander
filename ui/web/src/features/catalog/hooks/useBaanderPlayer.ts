@@ -2,15 +2,31 @@ import { useEffect, useRef, useCallback, useState } from 'react'
 import { isAxiosError, isCancel } from 'axios'
 import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
 import { attachHlsPlayback, type SubtitlePreference } from './hls-playback'
+import type { PlaybackObservation } from '@/features/session/services/playback-execution'
 import type { PostTranscodeSessionPosition200 } from '@/shared/api-client/gen/endpoints'
 
 interface UseBaanderPlayerOptions {
   videoId: string
   containerRef: React.RefObject<HTMLDivElement | null>
   autoPlay?: boolean
+  coordinated?: boolean
   onTimeUpdate?: (currentTime: number, duration: number) => void
   onStateChange?: (state: string) => void
   onError?: (error: MediaError | null) => void
+}
+
+type VideoExecutionAction = 'play' | 'pause' | 'seek' | 'volume' | 'stop'
+
+interface VideoExecution {
+  localRecovery: {
+    readonly eligible: boolean
+    fence(): PlaybackObservation | null
+    rearmAfterRegistration(): void
+  }
+  ready(signal: AbortSignal): Promise<void>
+  execute(action: VideoExecutionAction, value: number | undefined, signal: AbortSignal): Promise<PlaybackObservation>
+  quiesce(signal: AbortSignal): Promise<PlaybackObservation>
+  observe(): PlaybackObservation
 }
 
 interface PlaybackSnapshot {
@@ -80,7 +96,17 @@ function playbackCapability(url: string): PlaybackCapability | null {
   return { expiresAt, renewAt: expiresAt - Math.min(30000, Math.max(0, expiresAt - Date.now()) / 4) }
 }
 
-export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, onTimeUpdate, onStateChange, onError }: UseBaanderPlayerOptions) {
+function supportsLocalVideoRecovery(): boolean {
+  const video = document.createElement('video')
+  return /Linux/.test(navigator.userAgent) && /(?:Chrome|Chromium)\//.test(navigator.userAgent)
+    && !/Android/.test(navigator.userAgent) && 'disableRemotePlayback' in video
+    && 'disablePictureInPicture' in video && 'remote' in video
+}
+
+export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, coordinated = false, onTimeUpdate, onStateChange, onError }: UseBaanderPlayerOptions) {
+  const recoveryFenced = useRef(false)
+  const [recoverySupported] = useState(supportsLocalVideoRecovery)
+  const executionRef = useRef<VideoExecution | null>(null)
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const cleanupRef = useRef<(() => void) | null>(null)
   const playRef = useRef<(() => void) | null>(null)
@@ -102,7 +128,13 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, onTi
     const video = document.createElement('video')
     video.style.width = '100%'
     video.style.height = '100%'
-    video.controls = true
+    video.controls = !coordinated
+    if (coordinated) {
+      video.disableRemotePlayback = true
+      video.disablePictureInPicture = true
+      video.setAttribute('x-webkit-airplay', 'deny')
+      video.setAttribute('controlsList', 'noremoteplayback')
+    }
     container.appendChild(video)
     videoRef.current = video
     const abort = new AbortController()
@@ -119,6 +151,13 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, onTi
     let deferredStatusRevision: number | null = null
     let statusReconciliation: StatusReconciliation | null = null
     let playbackStarted = autoPlay
+    let executionPermitted = !recoveryFenced.current && (!coordinated || autoPlay)
+    let executionEpoch = 0
+    let nativePlayRevision = 0
+    let nativePlayPending = false
+    let nativePlay: Promise<void> = Promise.resolve()
+    let nativePlayError: unknown = null
+    let controlError: unknown = null
     let controls = Promise.resolve()
     let pendingControls = 0
     let progressPosition: number | null = null
@@ -204,11 +243,21 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, onTi
       } else fail()
     }
     const playVideo = () => {
-      if (terminal || retiringPlayback?.attachment === attachmentRevision) return
+      if (recoveryFenced.current || (coordinated && !executionPermitted) || terminal || retiringPlayback?.attachment === attachmentRevision) return
       if (!attachmentReady) { playbackStarted = true; return }
       const revision = attachmentRevision
-      video.play().catch(() => {
-        if (revision === attachmentRevision) failAttachment()
+      const epoch = executionEpoch
+      const playRevision = ++nativePlayRevision
+      nativePlayPending = true
+      nativePlay = video.play().then(() => {
+        if (!active() || epoch !== executionEpoch || revision !== attachmentRevision || !playbackStarted) video.pause()
+      }).catch(error => {
+        if (epoch === executionEpoch) {
+          nativePlayError = error
+          if (revision === attachmentRevision) failAttachment()
+        }
+      }).finally(() => {
+        if (playRevision === nativePlayRevision) nativePlayPending = false
       })
     }
     const desiredStatus = () => localStatus ?? snapshot?.status
@@ -216,12 +265,12 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, onTi
       && localStatusOwner?.sessionId === snapshot?.sessionId && localStatusOwner?.jobId === snapshot?.jobId)
     const applyPlayback = () => {
       if (!active() || terminal) return
-      if (completed() || retiringPlayback?.attachment === attachmentRevision || !playbackStarted || desiredStatus() !== 'running') video.pause()
+      if (recoveryFenced.current || (coordinated && !executionPermitted) || completed() || retiringPlayback?.attachment === attachmentRevision || !playbackStarted || desiredStatus() !== 'running') video.pause()
       else if (video.paused) playVideo()
     }
 
     const refresh = async (initial = false) => {
-      if (!active() || terminal) return
+      if (!active() || terminal || recoveryFenced.current) return
       const revision = ++requestRevision
       try {
         const { data } = await AXIOS_INSTANCE.post<PlaybackSnapshot>('/api/stream/sign', {
@@ -502,6 +551,7 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, onTi
         if (action === 'progress' && snapshot?.generation === current.generation) progressPosition = position
         if (!chain) await refresh()
       }).catch(async error => {
+        controlError = error
         if ((action === 'progress' || statusRevision !== null) && isTransientControlFailure(error)) {
           if (statusRevision === null) return
           if (!active() || terminal || snapshot?.sessionId !== sessionId || snapshot.jobId !== current.jobId
@@ -651,6 +701,7 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, onTi
     })
     video.addEventListener('play', () => {
       if (video.paused) return
+      if (recoveryFenced.current || (coordinated && !executionPermitted)) { video.pause(); return }
       if (replay()) return
       if (retiringPlayback?.attachment === attachmentRevision) {
         retiringPlayback.suppressPause = true
@@ -704,7 +755,8 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, onTi
       enqueueSeek(position)
     }
     const requestPlay = () => {
-      if (!active() || terminal) return
+      if (!active() || terminal || recoveryFenced.current) return
+      executionPermitted = true
       if (replay()) return
       playbackStarted = true
       if (canControlStatus() && desiredStatus() === 'paused') control('resume')
@@ -712,6 +764,7 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, onTi
     }
     const requestPause = () => {
       if (!active() || terminal) return
+      executionPermitted = false
       playbackStarted = false
       if (canControlStatus() && desiredStatus() === 'running') control('pause')
       video.pause()
@@ -727,14 +780,117 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, onTi
     video.addEventListener('error', () => {
       if (attachmentReady) failAttachment(nativeFailure())
     })
+    const observe = (): PlaybackObservation => ({
+      observedState: terminal ? 'unknown' : video.paused ? 'paused' : 'playing',
+      position: playbackPosition(),
+      volume: video.volume,
+    })
+    const waitFor = async (condition: () => boolean, signal: AbortSignal, epoch = executionEpoch) => {
+      while (true) {
+        signal.throwIfAborted()
+        if (!active() || recoveryFenced.current || epoch !== executionEpoch) throw new DOMException('Video execution was replaced.', 'AbortError')
+        if (nativePlayError) throw nativePlayError
+        if (controlError) throw controlError
+        if (terminal) throw new Error('Video source could not be prepared.')
+        if (condition()) return
+        await new Promise<void>(resolve => window.setTimeout(resolve, 20))
+      }
+    }
+    const ready = async (signal: AbortSignal) => {
+      await waitFor(() => {
+        restorePendingLoad()
+        return attachmentReady && attachmentRestored && !pendingLoad && !seekChain && sourceSeekPosition === null && !video.seeking
+      }, signal)
+    }
+    const locallyControlled = () => recoverySupported && coordinated && video.disableRemotePlayback
+      && video.disablePictureInPicture && !video.controls && video.getAttribute('x-webkit-airplay') === 'deny'
+      && video.remote?.state === 'disconnected'
+    const fence = (): PlaybackObservation | null => {
+      recoveryFenced.current = true
+      executionEpoch++
+      executionPermitted = false
+      playbackStarted = false
+      const position = playbackPosition()
+      video.pause()
+      return video.paused && locallyControlled() ? { observedState: 'stopped', position, volume: video.volume } : null
+    }
+    const execution: VideoExecution = {
+      localRecovery: {
+        get eligible() { return locallyControlled() },
+        fence,
+        rearmAfterRegistration: () => {
+          recoveryFenced.current = false
+          if (!snapshot) refresh(true).catch(() => fail())
+        },
+      },
+      ready,
+      observe,
+      execute: async (action, value, signal) => {
+        signal.throwIfAborted()
+        const epoch = executionEpoch
+        controlError = null
+        nativePlayError = null
+        if (action === 'stop') {
+          const observation = await execution.quiesce(signal)
+          cleanup()
+          return { ...observation, observedState: 'stopped' }
+        }
+        await ready(signal)
+        const cancel = () => {
+          executionEpoch++
+          executionPermitted = false
+          playbackStarted = false
+          video.pause()
+        }
+        signal.addEventListener('abort', cancel, { once: true })
+        try {
+          if (action === 'play') requestPlay()
+          else if (action === 'pause') requestPause()
+          else if (action === 'seek') {
+            if (value === undefined || !Number.isFinite(value)) throw new Error('Video seek position is invalid.')
+            seek(value)
+          } else if (action === 'volume') {
+            if (value === undefined || !Number.isFinite(value) || value < 0 || value > 1) throw new Error('Video volume is invalid.')
+            video.volume = value
+          }
+          await waitFor(() => pendingControls === 0 && statusReconciliation === null && !seekReconciliation, signal, epoch)
+          if (action === 'seek') await ready(signal)
+          await waitFor(() => !nativePlayPending, signal, epoch)
+          await nativePlay
+          await waitFor(() => action === 'play' ? !video.paused : action === 'pause' ? video.paused : true, signal, epoch)
+          return observe()
+        } finally {
+          signal.removeEventListener('abort', cancel)
+        }
+      },
+      quiesce: async signal => {
+        signal.throwIfAborted()
+        executionEpoch++
+        executionPermitted = false
+        playbackStarted = false
+        video.pause()
+        while (pendingControls > 0) {
+          signal.throwIfAborted()
+          if (!active()) throw new DOMException('Video execution was replaced.', 'AbortError')
+          await new Promise<void>(resolve => window.setTimeout(resolve, 20))
+        }
+        signal.throwIfAborted()
+        video.pause()
+        return observe()
+      },
+    }
+    executionRef.current = execution
+    window.addEventListener('pagehide', fence)
     refresh(true).catch(() => fail())
     const timer = window.setInterval(() => {
+      if (recoveryFenced.current) return
       control('progress')
       refresh().catch(() => fail())
     }, 1000)
     const cleanup = () => {
       if (abort.signal.aborted) return
       window.clearInterval(timer)
+      window.removeEventListener('pagehide', fence)
       statusReconciliation = null
       cancelSeekReconciliation()
       canonicalSeekRecovery = null
@@ -751,15 +907,34 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, onTi
       if (seekRef.current === seek) seekRef.current = null
       if (playRef.current === requestPlay) playRef.current = null
       if (pauseRef.current === requestPause) pauseRef.current = null
+      if (executionRef.current === execution) executionRef.current = null
       if (cleanupRef.current === cleanup) cleanupRef.current = null
     }
     cleanupRef.current = cleanup
     return cleanup
-  }, [videoId, containerRef, autoPlay])
+  }, [videoId, containerRef, autoPlay, coordinated, recoverySupported])
 
   const play = useCallback(() => { playRef.current?.() }, [])
   const pause = useCallback(() => { pauseRef.current?.() }, [])
   const seekTo = useCallback((time: number) => { seekRef.current?.(time) }, [])
   const destroy = useCallback(() => { cleanupRef.current?.() }, [])
-  return { play, pause, seekTo, destroy, state, duration, currentTime, pendingSeekPosition }
+  const [execution] = useState<VideoExecution>(() => ({
+    localRecovery: {
+      get eligible() { return executionRef.current?.localRecovery.eligible ?? (recoverySupported && coordinated) },
+      fence: () => {
+        recoveryFenced.current = true
+        const current = executionRef.current
+        return current ? current.localRecovery.fence() : recoverySupported && coordinated ? { observedState: 'stopped', position: 0 } : null
+      },
+      rearmAfterRegistration: () => {
+        recoveryFenced.current = false
+        executionRef.current?.localRecovery.rearmAfterRegistration()
+      },
+    },
+    ready: signal => executionRef.current?.ready(signal) ?? Promise.reject(new Error('Video runtime is unavailable.')),
+    execute: (action, value, signal) => executionRef.current?.execute(action, value, signal) ?? Promise.reject(new Error('Video runtime is unavailable.')),
+    quiesce: signal => executionRef.current?.quiesce(signal) ?? Promise.resolve({ observedState: 'stopped', position: 0 }),
+    observe: () => executionRef.current?.observe() ?? { observedState: 'stopped', position: 0 },
+  }))
+  return { execution, play, pause, seekTo, destroy, state, duration, currentTime, pendingSeekPosition }
 }

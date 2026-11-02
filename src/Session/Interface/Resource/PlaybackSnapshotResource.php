@@ -34,6 +34,16 @@ use OpenApi\Attributes as OA;
         new OA\Property(property: 'destinations', type: 'array', items: new OA\Items(ref: new Model(type: PlaybackDestinationResource::class))),
         new OA\Property(property: 'commands', type: 'array', items: new OA\Items(ref: new Model(type: PlaybackCommandResource::class))),
         new OA\Property(property: 'endpoint', ref: new Model(type: PlaybackEndpointResource::class), nullable: true),
+        new OA\Property(property: 'recoveryResult', required: ['incarnationId', 'outcome', 'revision'], properties: [
+            new OA\Property(property: 'incarnationId', type: 'string', format: 'uuid'),
+            new OA\Property(property: 'outcome', type: 'string', enum: ['recovered']),
+            new OA\Property(property: 'revision', type: 'integer', minimum: 0),
+        ], type: 'object', nullable: true),
+        new OA\Property(property: 'requestResult', required: ['requestId', 'commandId', 'outcome'], properties: [
+            new OA\Property(property: 'requestId', type: 'string', format: 'uuid'),
+            new OA\Property(property: 'commandId', type: 'string', format: 'uuid'),
+            new OA\Property(property: 'outcome', type: 'string', nullable: true),
+        ], type: 'object', nullable: true),
     ],
 )]
 final class PlaybackSnapshotResource extends AbstractResource
@@ -63,7 +73,21 @@ final class PlaybackSnapshotResource extends AbstractResource
         if (isset($source['endpoint'])) {
             $result['endpoint'] = PlaybackEndpointResource::from($source['endpoint']);
         }
+        if (isset($source['requestResult'])) {
+            $result['requestResult'] = [
+                'requestId' => $source['requestResult']['requestId'],
+                'commandId' => $source['requestResult']['commandId'],
+                'outcome' => $source['requestResult']['outcome'],
+            ];
+        }
 
+        if (isset($source['recoveryResult'])) {
+            $result['recoveryResult'] = [
+                'incarnationId' => $source['recoveryResult']['incarnationId'],
+                'outcome' => $source['recoveryResult']['outcome'],
+                'revision' => $source['recoveryResult']['revision'],
+            ];
+        }
         return $result;
     }
 }

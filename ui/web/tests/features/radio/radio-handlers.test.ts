@@ -1,3 +1,4 @@
+import { pausePlaybackForRadio } from '@/features/session/services/playback-session-coordinator'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { mediator } from '@/shared/lib/mediator/bus'
 import { PLAYER_ACTIONS } from '@/features/player/player-actions'
@@ -6,6 +7,7 @@ import { useRadioStore } from '@/features/radio/stores/radio-store'
 import { registerRadioHandlers } from '@/features/radio/stores/radio-handlers'
 import type { RadioStation } from '@/features/radio/api/radio-api'
 
+vi.mock('@/features/session/services/playback-session-coordinator', () => ({ pausePlaybackForRadio: vi.fn(async () => {}) }))
 const station: RadioStation = {
   publicId: 'radio-1', sourceId: 'source-1', externalId: 'radio-1', name: 'Radio', country: 'DK', language: null,
   genres: [], tags: [], logo: null, website: null, lastCheckedAt: null, createdAt: '', updatedAt: '',
@@ -17,6 +19,7 @@ const station: RadioStation = {
 
 registerRadioHandlers()
 beforeEach(() => {
+  vi.mocked(pausePlaybackForRadio).mockReset().mockResolvedValue(undefined)
   useRadioStore.getState().stopRadio()
   useRadioStore.getState().setAudioElement(null)
 })
@@ -34,7 +37,7 @@ describe('music takes ownership from radio', () => {
     const pause = vi.fn()
     const audio = { src: '', play, pause } as unknown as HTMLAudioElement
     useRadioStore.getState().setAudioElement(audio)
-    useRadioStore.getState().startStation(station, station.streams[0].url)
+    await useRadioStore.getState().startStation(station, station.streams[0].url)
     if (observedPaused) useRadioStore.getState().observePlaying(false)
 
     mediator.dispatch(action, {}, 'test-music-owner')

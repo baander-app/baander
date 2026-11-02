@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import styled from 'styled-components'
 import { Slider } from '@/shared/components/ui/slider'
 import { usePlayerStore } from '@/features/player/stores/player-store'
@@ -29,6 +30,7 @@ const TimeLabel = styled.span`
 
 export function ProgressBar() {
   const currentTime = useCurrentTime()
+  const [draft, setDraft] = useState<number | null>(null)
   const duration = usePlayerStore((s) => s.duration)
   const seekTo = usePlayerStore((s) => s.seekTo)
   const canSeek = Number.isFinite(duration) && duration > 0
@@ -39,18 +41,21 @@ export function ProgressBar() {
   return (
     <ProgressRow>
       <TimeLabel>
-        <PlaybackClock format={formatTime} />
+        {draft === null ? <PlaybackClock format={formatTime} /> : formatTime(draft)}
       </TimeLabel>
       <Slider
         aria-label="Seek"
         min={0}
         max={canSeek ? duration : 1}
         step={1}
-        value={[position]}
+        value={[draft ?? position]}
         disabled={!canSeek}
-        onValueChange={([value]) => {
+        onValueChange={([value]) => setDraft(value)}
+        onValueCommit={([value]) => {
+          setDraft(null)
           if (canSeek) seekTo(value)
         }}
+        onPointerCancel={() => setDraft(null)}
       />
       <TimeLabel>{formatTime(duration)}</TimeLabel>
     </ProgressRow>

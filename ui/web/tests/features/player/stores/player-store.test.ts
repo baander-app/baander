@@ -38,17 +38,17 @@ beforeEach(() => {
   })
 })
 
-describe('player-store', () => {
+describe('player runtime store', () => {
   describe('playTrack', () => {
     it('sets current track and starts playing', () => {
-      usePlayerStore.getState().playTrack(mockTrack)
+      usePlayerStore.getState().runtimeActions.playTrack(mockTrack)
       const state = usePlayerStore.getState()
       expect(state.currentTrack).toEqual(mockTrack)
       expect(state.isPlaying).toBe(true)
     })
 
     it('replaces queue when queue is provided', () => {
-      usePlayerStore.getState().playTrack(mockTrack, [mockTrack, mockTrack2])
+      usePlayerStore.getState().runtimeActions.playTrack(mockTrack, [mockTrack, mockTrack2])
       const state = usePlayerStore.getState()
       expect(state.queue).toHaveLength(2)
       expect(state.currentIndex).toBe(0)
@@ -57,7 +57,7 @@ describe('player-store', () => {
 
     it('finds track in existing queue', () => {
       usePlayerStore.setState({ queue: [mockTrack, mockTrack2] })
-      usePlayerStore.getState().playTrack(mockTrack2)
+      usePlayerStore.getState().runtimeActions.playTrack(mockTrack2)
       const state = usePlayerStore.getState()
       expect(state.queue).toHaveLength(2)
       expect(state.currentIndex).toBe(1)
@@ -65,8 +65,8 @@ describe('player-store', () => {
     })
 
     it('appends track to queue if not present and no queue provided', () => {
-      usePlayerStore.getState().playTrack(mockTrack)
-      usePlayerStore.getState().playTrack(mockTrack2)
+      usePlayerStore.getState().runtimeActions.playTrack(mockTrack)
+      usePlayerStore.getState().runtimeActions.playTrack(mockTrack2)
       const state = usePlayerStore.getState()
       expect(state.queue).toHaveLength(2)
       expect(state.currentIndex).toBe(1)
@@ -75,7 +75,7 @@ describe('player-store', () => {
 
   describe('addToQueue', () => {
     it('adds track to queue without starting playback', () => {
-      usePlayerStore.getState().addToQueue(mockTrack)
+      usePlayerStore.getState().runtimeActions.addToQueue(mockTrack)
       const state = usePlayerStore.getState()
       expect(state.queue).toHaveLength(1)
       expect(state.isPlaying).toBe(false)
@@ -84,7 +84,7 @@ describe('player-store', () => {
 
     it('does not add duplicate tracks', () => {
       usePlayerStore.setState({ queue: [mockTrack] })
-      usePlayerStore.getState().addToQueue(mockTrack)
+      usePlayerStore.getState().runtimeActions.addToQueue(mockTrack)
       expect(usePlayerStore.getState().queue).toHaveLength(1)
     })
   })
@@ -92,7 +92,7 @@ describe('player-store', () => {
   describe('playNext', () => {
     it('advances to next track in queue', () => {
       usePlayerStore.setState({ queue: [mockTrack, mockTrack2], currentIndex: 0, currentTrack: mockTrack })
-      usePlayerStore.getState().playNext()
+      usePlayerStore.getState().runtimeActions.playNext()
       const state = usePlayerStore.getState()
       expect(state.currentIndex).toBe(1)
       expect(state.currentTrack).toEqual(mockTrack2)
@@ -100,13 +100,13 @@ describe('player-store', () => {
 
     it('stops at end of queue when repeat is off', () => {
       usePlayerStore.setState({ queue: [mockTrack, mockTrack2], currentIndex: 1, currentTrack: mockTrack2, repeat: 'off' as const })
-      usePlayerStore.getState().playNext()
+      usePlayerStore.getState().runtimeActions.playNext()
       expect(usePlayerStore.getState().isPlaying).toBe(false)
     })
 
     it('loops to start when repeat is all', () => {
       usePlayerStore.setState({ queue: [mockTrack, mockTrack2], currentIndex: 1, currentTrack: mockTrack2, repeat: 'all' as const })
-      usePlayerStore.getState().playNext()
+      usePlayerStore.getState().runtimeActions.playNext()
       const state = usePlayerStore.getState()
       expect(state.currentIndex).toBe(0)
       expect(state.isPlaying).toBe(true)
@@ -116,7 +116,7 @@ describe('player-store', () => {
   describe('playPrevious', () => {
     it('goes to previous track', () => {
       usePlayerStore.setState({ queue: [mockTrack, mockTrack2], currentIndex: 1, currentTrack: mockTrack2 })
-      usePlayerStore.getState().playPrevious()
+      usePlayerStore.getState().runtimeActions.playPrevious()
       const state = usePlayerStore.getState()
       expect(state.currentIndex).toBe(0)
       expect(state.currentTrack).toEqual(mockTrack)
@@ -125,7 +125,7 @@ describe('player-store', () => {
     it('restarts current track if past 3 seconds', () => {
       updateTime(5)
       usePlayerStore.setState({ queue: [mockTrack, mockTrack2], currentIndex: 1, currentTrack: mockTrack2 })
-      usePlayerStore.getState().playPrevious()
+      usePlayerStore.getState().runtimeActions.playPrevious()
       const state = usePlayerStore.getState()
       expect(state.currentIndex).toBe(1)
       expect(getCurrentTime()).toBe(0)
@@ -133,7 +133,7 @@ describe('player-store', () => {
 
     it('wraps to last track if at start of queue', () => {
       usePlayerStore.setState({ queue: [mockTrack, mockTrack2], currentIndex: 0, currentTrack: mockTrack })
-      usePlayerStore.getState().playPrevious()
+      usePlayerStore.getState().runtimeActions.playPrevious()
       expect(usePlayerStore.getState().currentIndex).toBe(1)
     })
   })
@@ -141,7 +141,7 @@ describe('player-store', () => {
   describe('removeFromQueue', () => {
     it('removes track and adjusts current index', () => {
       usePlayerStore.setState({ queue: [mockTrack, mockTrack2], currentIndex: 0, currentTrack: mockTrack })
-      usePlayerStore.getState().removeFromQueue(0)
+      usePlayerStore.getState().runtimeActions.removeFromQueue(0)
       const state = usePlayerStore.getState()
       expect(state.queue).toHaveLength(1)
       expect(state.queue[0]).toEqual(mockTrack2)
@@ -155,7 +155,7 @@ describe('player-store', () => {
         queue: [mockTrack, mockTrack2], currentIndex: 1, currentTrack: mockTrack2,
         isPlaying: true, duration: 180,
       })
-      usePlayerStore.getState().clearQueue()
+      usePlayerStore.getState().runtimeActions.clearQueue()
       const state = usePlayerStore.getState()
       expect(state.queue).toHaveLength(0)
       expect(state.currentTrack).toBeNull()
@@ -167,17 +167,17 @@ describe('player-store', () => {
 
   describe('volume', () => {
     it('clamps volume to 0-100', () => {
-      usePlayerStore.getState().setVolume(150)
+      usePlayerStore.getState().runtimeActions.setVolume(150)
       expect(usePlayerStore.getState().volume).toBe(100)
-      usePlayerStore.getState().setVolume(-10)
+      usePlayerStore.getState().runtimeActions.setVolume(-10)
       expect(usePlayerStore.getState().volume).toBe(0)
     })
 
     it('toggles mute', () => {
       expect(usePlayerStore.getState().muted).toBe(false)
-      usePlayerStore.getState().toggleMute()
+      usePlayerStore.getState().runtimeActions.toggleMute()
       expect(usePlayerStore.getState().muted).toBe(true)
-      usePlayerStore.getState().toggleMute()
+      usePlayerStore.getState().runtimeActions.toggleMute()
       expect(usePlayerStore.getState().muted).toBe(false)
     })
   })

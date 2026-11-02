@@ -45,6 +45,178 @@ describe('useBaanderPlayer authorization', () => {
   })
   afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks() })
 
+  it('prepares an acknowledged source without starting native playback', async () => {
+    loader.ready = false
+    post.mockResolvedValue({ data: { url: '/manifest', jobId: 'job', renditionSet: 'set', sessionId: 'owned-session', generation: 1, revision: 1, ready: true, startTime: 24, duration: 180, position: 42, status: 'running' } })
+    const containerRef = { current: document.createElement('div') }
+    const { result } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef, coordinated: true }))
+    await act(async () => {})
+    const prepared = vi.fn()
+    const readiness = result.current.execution.ready(new AbortController().signal).then(prepared)
+    await act(async () => {})
+    expect(prepared).not.toHaveBeenCalled()
+    await act(async () => {
+      attachments[0].onReady()
+      containerRef.current.querySelector('video')!.dispatchEvent(new Event('loadedmetadata'))
+      await readiness
+    })
+    expect(prepared).toHaveBeenCalledOnce()
+    expect(containerRef.current.querySelector('video')!.controls).toBe(false)
+    expect(HTMLMediaElement.prototype.play).not.toHaveBeenCalled()
+    expect(result.current.execution.observe().position).toBe(42)
+  })
+
+  it('rejects native play failure instead of acknowledging playback', async () => {
+    post.mockResolvedValue({ data: { url: '/manifest', jobId: 'job', renditionSet: 'set', sessionId: 'owned-session', generation: 1, revision: 1, ready: true, startTime: 0, duration: 180, position: 0, status: 'running' } })
+    const containerRef = { current: document.createElement('div') }
+    const { result } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef, coordinated: true }))
+    await act(async () => {})
+    vi.mocked(HTMLMediaElement.prototype.play).mockRejectedValueOnce(new Error('Playback blocked'))
+    await act(async () => {
+      await expect(result.current.execution.execute('play', undefined, new AbortController().signal)).rejects.toThrow('Playback blocked')
+    })
+  })
+
+  it('keeps a page-hidden video fenced through BFCache restoration until registration rearms it', async () => {
+    post.mockResolvedValue({ data: { url: '/manifest', jobId: 'job', renditionSet: 'set', sessionId: 'owned-session', generation: 1, revision: 1, ready: true, startTime: 0, duration: 180, position: 0, status: 'running' } })
+    const containerRef = { current: document.createElement('div') }
+    const { result } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef, coordinated: true }))
+    await act(async () => {})
+    const video = containerRef.current.querySelector('video')!
+    let paused = true
+    Object.defineProperty(video, 'paused', { get: () => paused })
+    vi.mocked(video.pause).mockImplementation(() => { paused = true })
+    vi.mocked(video.play).mockImplementation(async () => { paused = false })
+    await act(async () => { await result.current.execution.execute('play', undefined, new AbortController().signal) })
+    expect(paused).toBe(false)
+    act(() => window.dispatchEvent(new Event('pagehide')))
+    expect(paused).toBe(true)
+    act(() => window.dispatchEvent(new Event('pageshow')))
+    await expect(result.current.execution.execute('play', undefined, new AbortController().signal)).rejects.toMatchObject({ name: 'AbortError' })
+    expect(paused).toBe(true)
+    act(() => result.current.execution.localRecovery.rearmAfterRegistration())
+    expect(paused).toBe(true)
+    await act(async () => { await result.current.execution.execute('play', undefined, new AbortController().signal) })
+    expect(paused).toBe(false)
+  })
+
+  it('rejects a late native start after the synchronous recovery fence', async () => {
+    post.mockResolvedValue({ data: { url: '/manifest', jobId: 'job', renditionSet: 'set', sessionId: 'owned-session', generation: 1, revision: 1, ready: true, startTime: 0, duration: 180, position: 0, status: 'running' } })
+    const containerRef = { current: document.createElement('div') }
+    const { result } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef, coordinated: true }))
+    await act(async () => {})
+    const video = containerRef.current.querySelector('video')!
+    let paused = true
+    let finishPlay!: () => void
+    Object.defineProperty(video, 'paused', { get: () => paused })
+    vi.mocked(video.pause).mockImplementation(() => { paused = true })
+    vi.mocked(video.play).mockImplementation(() => new Promise<void>(resolve => {
+      finishPlay = () => { paused = false; video.dispatchEvent(new Event('play')); resolve() }
+    }))
+    const playing = result.current.execution.execute('play', undefined, new AbortController().signal)
+    const rejected = expect(playing).rejects.toMatchObject({ name: 'AbortError' })
+    await waitFor(() => expect(finishPlay).toBeTypeOf('function'))
+    expect(result.current.execution.localRecovery.eligible).toBe(false)
+    expect(result.current.execution.localRecovery.fence()).toBeNull()
+    expect(paused).toBe(true)
+    await act(async () => { finishPlay(); await rejected })
+    expect(paused).toBe(true)
+  })
+
+  it('requires preventive local routing controls for a recoverable stopped proof', async () => {
+    const properties = [
+      [HTMLMediaElement.prototype, 'disableRemotePlayback'],
+      [HTMLMediaElement.prototype, 'remote'],
+      [HTMLVideoElement.prototype, 'disablePictureInPicture'],
+    ] as const
+    const descriptors = properties.map(([target, key]) => Object.getOwnPropertyDescriptor(target, key))
+    const route = { state: 'disconnected' }
+    Object.defineProperty(HTMLMediaElement.prototype, 'disableRemotePlayback', { configurable: true, writable: true, value: false })
+    Object.defineProperty(HTMLVideoElement.prototype, 'disablePictureInPicture', { configurable: true, writable: true, value: false })
+    Object.defineProperty(HTMLMediaElement.prototype, 'remote', { configurable: true, value: route })
+    vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue('Mozilla/5.0 (X11; Linux x86_64) Chrome/130.0.0.0')
+    try {
+      post.mockResolvedValue({ data: { url: '/manifest', jobId: 'job', renditionSet: 'set', sessionId: 'owned-session', generation: 1, revision: 1, ready: true, startTime: 0, duration: 180, position: 0, status: 'running' } })
+      const containerRef = { current: document.createElement('div') }
+      const { result, unmount } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef, coordinated: true }))
+      await act(async () => {})
+      const video = containerRef.current.querySelector('video')!
+      expect(video.disableRemotePlayback).toBe(true)
+      expect(video.disablePictureInPicture).toBe(true)
+      expect(video.getAttribute('x-webkit-airplay')).toBe('deny')
+      expect(result.current.execution.localRecovery.eligible).toBe(true)
+      expect(result.current.execution.localRecovery.fence()).toMatchObject({ observedState: 'stopped', position: 0 })
+      route.state = 'connected'
+      expect(result.current.execution.localRecovery.eligible).toBe(false)
+      expect(result.current.execution.localRecovery.fence()).toBeNull()
+      unmount()
+    } finally {
+      properties.forEach(([target, key], index) => {
+        const descriptor = descriptors[index]
+        if (descriptor) Object.defineProperty(target, key, descriptor)
+        else Reflect.deleteProperty(target, key)
+      })
+    }
+  })
+
+  it('stops native execution and releases its source while preserving the acknowledged cursor', async () => {
+    post.mockResolvedValue({ data: { url: '/manifest', jobId: 'job', renditionSet: 'set', sessionId: 'owned-session', generation: 1, revision: 1, ready: true, startTime: 24, duration: 180, position: 42, status: 'paused' } })
+    const containerRef = { current: document.createElement('div') }
+    const { result } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef, coordinated: true }))
+    await act(async () => {})
+    await act(async () => { await result.current.execution.ready(new AbortController().signal) })
+    const video = containerRef.current.querySelector('video')!
+    const source = video.src
+    Object.defineProperty(video, 'src', {
+      configurable: true,
+      get: () => source,
+      set: (value: string) => { if (value === '') video.currentTime = 0 },
+    })
+    await act(async () => {
+      await expect(result.current.execution.execute('stop', undefined, new AbortController().signal))
+        .resolves.toMatchObject({ observedState: 'stopped', position: 42 })
+    })
+    expect(containerRef.current.querySelector('video')).toBeNull()
+    expect(attachments[0].dispose).toHaveBeenCalledOnce()
+    expect(HTMLMediaElement.prototype.play).not.toHaveBeenCalled()
+  })
+
+  it('quiesces a pending native play and fences its late completion', async () => {
+    post.mockResolvedValue({ data: { url: '/manifest', jobId: 'job', renditionSet: 'set', sessionId: 'owned-session', generation: 1, revision: 1, ready: true, startTime: 24, duration: 180, position: 42, status: 'running' } })
+    const containerRef = { current: document.createElement('div') }
+    const { result } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef, coordinated: true }))
+    await act(async () => {})
+    const video = containerRef.current.querySelector('video')!
+    let paused = true
+    let finishPlay!: () => void
+    Object.defineProperty(video, 'paused', { get: () => paused })
+    vi.mocked(video.pause).mockImplementation(() => { paused = true })
+    vi.mocked(video.play).mockImplementation(() => new Promise<void>(resolve => {
+      finishPlay = () => { paused = false; video.dispatchEvent(new Event('play')); resolve() }
+    }))
+    const playing = result.current.execution.execute('play', undefined, new AbortController().signal)
+    const rejected = expect(playing).rejects.toMatchObject({ name: 'AbortError' })
+    await waitFor(() => expect(finishPlay).toBeTypeOf('function'))
+    const observed = await result.current.execution.quiesce(new AbortController().signal)
+    expect(observed).toMatchObject({ observedState: 'paused', position: 42 })
+    await act(async () => { finishPlay(); await rejected })
+    expect(video.paused).toBe(true)
+  })
+
+  it('cancels readiness without admitting a stale attachment', async () => {
+    loader.ready = false
+    post.mockResolvedValue({ data: { url: '/manifest', jobId: 'job', renditionSet: 'set', sessionId: 'owned-session', generation: 1, revision: 1, ready: true, startTime: 0, duration: 180, position: 0, status: 'running' } })
+    const containerRef = { current: document.createElement('div') }
+    const { result } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef, coordinated: true }))
+    await act(async () => {})
+    const abort = new AbortController()
+    const ready = result.current.execution.ready(abort.signal)
+    abort.abort()
+    await expect(ready).rejects.toMatchObject({ name: 'AbortError' })
+    await act(async () => attachments[0].onReady())
+    expect(HTMLMediaElement.prototype.play).not.toHaveBeenCalled()
+  })
+
   it.each([
     { position: 0, startTime: 0, status: 'running', nativeTime: 0, shouldSeek: false },
     { position: 0, startTime: 0, status: 'running', nativeTime: 0.002, shouldSeek: false },

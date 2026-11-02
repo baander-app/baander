@@ -841,6 +841,9 @@ export interface RegisterPlaybackEndpointRequest {
      * @maxItems 3
      */
   capabilities?: string[];
+  /** @nullable */
+  tabId?: string | null;
+  localRecoveryEligible?: boolean;
 }
 
 export interface TransferPlaybackRequest {
@@ -921,6 +924,7 @@ export const ControlPlaybackRequestAction = {
   load: 'load',
   stop: 'stop',
   volume: 'volume',
+  queue: 'queue',
 } as const;
 
 /**
@@ -974,67 +978,13 @@ export interface ReconcilePlaybackRequest {
   expectedRevision: number;
 }
 
-export type SyncSessionRequestPlaybackState = typeof SyncSessionRequestPlaybackState[keyof typeof SyncSessionRequestPlaybackState];
+export type RecoverLocalPlaybackRequestCheckpoint = {[key: string]: {[key: string]: string} | number | null};
 
-
-export const SyncSessionRequestPlaybackState = {
-  playing: 'playing',
-  paused: 'paused',
-  stopped: 'stopped',
-} as const;
-
-export interface SyncSessionRequest {
-  /**
-     * Ordered list of track IDs
-     * @items.minLength 21
-     * @items.maxLength 21
-     * @items.pattern ^[0-9a-zA-Z_-]{21}$
-     */
-  queue: string[];
-  /** @minimum 0 */
-  currentTrackIndex: number;
-  /** @minimum 0 */
-  position: number;
-  playbackState: SyncSessionRequestPlaybackState;
-}
-
-export interface ClaimSessionRequest {
-  /** Browser-generated device token claiming the session; distinct from device publicId */
-  deviceId: string;
-  /**
-     * Optional queue to bring from local device
-     * @nullable
-     * @items.minLength 21
-     * @items.maxLength 21
-     * @items.pattern ^[0-9a-zA-Z_-]{21}$
-     */
-  queue?: string[] | null;
-  /**
-     * Optional current track index
-     * @minimum 0
-     * @nullable
-     */
-  currentTrackIndex?: number | null;
-  /**
-     * Optional playback position
-     * @minimum 0
-     * @nullable
-     */
-  position?: number | null;
-}
-
-export interface CreateSessionRequest {
-  /**
-     * Ordered list of track IDs
-     * @items.minLength 21
-     * @items.maxLength 21
-     * @items.pattern ^[0-9a-zA-Z_-]{21}$
-     */
-  queue: string[];
-  /** @minimum 0 */
-  currentTrackIndex: number;
-  /** @minimum 0 */
-  position: number;
+export interface RecoverLocalPlaybackRequest {
+  incarnationId: string;
+  tabId: string;
+  recoveryCredential: string;
+  checkpoint: RecoverLocalPlaybackRequestCheckpoint;
 }
 
 /**
@@ -2914,6 +2864,7 @@ export const PlaybackCommandResourceType = {
   load: 'load',
   observe: 'observe',
   volume: 'volume',
+  queue: 'queue',
 } as const;
 
 export type PlaybackCommandResourcePayloadDesiredState = typeof PlaybackCommandResourcePayloadDesiredState[keyof typeof PlaybackCommandResourcePayloadDesiredState];
@@ -2960,6 +2911,15 @@ export interface PlaybackEndpointResource {
   /** @minimum 1 */
   epoch: number;
   /**
+     * Private stop-only recovery credential for durable local storage.
+     * @nullable
+     */
+  recoveryCredential?: string | null;
+  /** @nullable */
+  recoveryExpiresAt?: string | null;
+  /** @nullable */
+  recoveryTabId?: string | null;
+  /**
      * Returned only to the HTTP registration caller; keep in tab memory.
      * @nullable
      */
@@ -3001,6 +2961,33 @@ export const PlaybackSnapshotResourceObservedState = {
   unknown: 'unknown',
 } as const;
 
+export type PlaybackSnapshotResourceRecoveryResultOutcome = typeof PlaybackSnapshotResourceRecoveryResultOutcome[keyof typeof PlaybackSnapshotResourceRecoveryResultOutcome];
+
+
+export const PlaybackSnapshotResourceRecoveryResultOutcome = {
+  recovered: 'recovered',
+} as const;
+
+/**
+ * @nullable
+ */
+export type PlaybackSnapshotResourceRecoveryResult = {
+  incarnationId: string;
+  outcome: PlaybackSnapshotResourceRecoveryResultOutcome;
+  /** @minimum 0 */
+  revision: number;
+} | null;
+
+/**
+ * @nullable
+ */
+export type PlaybackSnapshotResourceRequestResult = {
+  requestId: string;
+  commandId: string;
+  /** @nullable */
+  outcome: string | null;
+} | null;
+
 export interface PlaybackSnapshotResource {
   schemaVersion: PlaybackSnapshotResourceSchemaVersion;
   publicId: string;
@@ -3025,6 +3012,10 @@ export interface PlaybackSnapshotResource {
   destinations: PlaybackDestinationResource[];
   commands: PlaybackCommandResource[];
   endpoint?: PlaybackEndpointResource | null;
+  /** @nullable */
+  recoveryResult?: PlaybackSnapshotResourceRecoveryResult;
+  /** @nullable */
+  requestResult?: PlaybackSnapshotResourceRequestResult;
 }
 
 export interface SystemSettingResource {
@@ -6557,207 +6548,16 @@ export type PostPlaybackReconcile200 = {
   data: PlaybackSnapshotResource;
 };
 
+export type PostPlaybackRecoverLocal200 = {
+  data?: PlaybackSnapshotResource;
+};
+
 export type GetPlaybackSnapshotParams = {
   incarnationId?: string;
 };
 
 export type GetPlaybackSnapshot200 = {
   data: PlaybackSnapshotResource;
-};
-
-export type GetSessionGet200Data = {
-  /**
-     * @minLength 21
-     * @maxLength 21
-     * @pattern ^[0-9a-zA-Z_-]{21}$
-     */
-  publicId?: string;
-  /**
-     * @minLength 21
-     * @maxLength 21
-     * @pattern ^[0-9a-zA-Z_-]{21}$
-     */
-  userId?: string;
-  /**
-     * @minLength 21
-     * @maxLength 21
-     * @nullable
-     * @pattern ^[0-9a-zA-Z_-]{21}$
-     */
-  activeDeviceId?: string | null;
-  /**
-     * @items.minLength 21
-     * @items.maxLength 21
-     * @items.pattern ^[0-9a-zA-Z_-]{21}$
-     */
-  queue?: string[];
-  currentTrackIndex?: number;
-  position?: number;
-  playbackState?: string;
-  createdAt?: string;
-  updatedAt?: string;
-  /** @nullable */
-  lastUsedAt?: string | null;
-};
-
-export type GetSessionGet200 = {
-  data?: GetSessionGet200Data;
-};
-
-export type PutSessionSyncBodyPlaybackState = typeof PutSessionSyncBodyPlaybackState[keyof typeof PutSessionSyncBodyPlaybackState];
-
-
-export const PutSessionSyncBodyPlaybackState = {
-  playing: 'playing',
-  paused: 'paused',
-  stopped: 'stopped',
-} as const;
-
-export type PutSessionSyncBody = {
-  /**
-     * @items.minLength 21
-     * @items.maxLength 21
-     * @items.pattern ^[0-9a-zA-Z_-]{21}$
-     */
-  queue: string[];
-  /** @minimum 0 */
-  currentTrackIndex: number;
-  /** @minimum 0 */
-  position: number;
-  playbackState: PutSessionSyncBodyPlaybackState;
-};
-
-export type PutSessionSync200Data = {
-  /**
-     * @minLength 21
-     * @maxLength 21
-     * @pattern ^[0-9a-zA-Z_-]{21}$
-     */
-  publicId?: string;
-  /**
-     * @minLength 21
-     * @maxLength 21
-     * @pattern ^[0-9a-zA-Z_-]{21}$
-     */
-  userId?: string;
-  /**
-     * @minLength 21
-     * @maxLength 21
-     * @nullable
-     * @pattern ^[0-9a-zA-Z_-]{21}$
-     */
-  activeDeviceId?: string | null;
-  /**
-     * @items.minLength 21
-     * @items.maxLength 21
-     * @items.pattern ^[0-9a-zA-Z_-]{21}$
-     */
-  queue?: string[];
-  currentTrackIndex?: number;
-  position?: number;
-  playbackState?: string;
-  createdAt?: string;
-  updatedAt?: string;
-  /** @nullable */
-  lastUsedAt?: string | null;
-};
-
-export type PutSessionSync200 = {
-  data?: PutSessionSync200Data;
-};
-
-export type PostSessionClaimBody = {
-  deviceId: string;
-};
-
-export type PostSessionClaim200Data = {
-  /**
-     * @minLength 21
-     * @maxLength 21
-     * @pattern ^[0-9a-zA-Z_-]{21}$
-     */
-  publicId?: string;
-  /**
-     * @minLength 21
-     * @maxLength 21
-     * @pattern ^[0-9a-zA-Z_-]{21}$
-     */
-  userId?: string;
-  /**
-     * @minLength 21
-     * @maxLength 21
-     * @pattern ^[0-9a-zA-Z_-]{21}$
-     */
-  activeDeviceId?: string;
-  /**
-     * @items.minLength 21
-     * @items.maxLength 21
-     * @items.pattern ^[0-9a-zA-Z_-]{21}$
-     */
-  queue?: string[];
-  currentTrackIndex?: number;
-  position?: number;
-  playbackState?: string;
-  createdAt?: string;
-  updatedAt?: string;
-  /** @nullable */
-  lastUsedAt?: string | null;
-};
-
-export type PostSessionClaim200 = {
-  data?: PostSessionClaim200Data;
-};
-
-export type PostSessionNewBody = {
-  /**
-     * @items.minLength 21
-     * @items.maxLength 21
-     * @items.pattern ^[0-9a-zA-Z_-]{21}$
-     */
-  queue: string[];
-  /** @minimum 0 */
-  currentTrackIndex: number;
-  /** @minimum 0 */
-  position: number;
-};
-
-export type PostSessionNew201Data = {
-  /**
-     * @minLength 21
-     * @maxLength 21
-     * @pattern ^[0-9a-zA-Z_-]{21}$
-     */
-  publicId?: string;
-  /**
-     * @minLength 21
-     * @maxLength 21
-     * @pattern ^[0-9a-zA-Z_-]{21}$
-     */
-  userId?: string;
-  /**
-     * @minLength 21
-     * @maxLength 21
-     * @nullable
-     * @pattern ^[0-9a-zA-Z_-]{21}$
-     */
-  activeDeviceId?: string | null;
-  /**
-     * @items.minLength 21
-     * @items.maxLength 21
-     * @items.pattern ^[0-9a-zA-Z_-]{21}$
-     */
-  queue?: string[];
-  currentTrackIndex?: number;
-  position?: number;
-  playbackState?: string;
-  createdAt?: string;
-  updatedAt?: string;
-  /** @nullable */
-  lastUsedAt?: string | null;
-};
-
-export type PostSessionNew201 = {
-  data?: PostSessionNew201Data;
 };
 
 export type GetDebugConfigCheck200DataResultsItem = { [key: string]: unknown };
@@ -29643,6 +29443,94 @@ export const usePostPlaybackReconcile = <TError = ErrorType<ApiError>,
       return useMutation(getPostPlaybackReconcileMutationOptions(options), queryClient);
     }
 
+export const getPostPlaybackRecoverLocalUrl = () => {
+
+
+
+
+  return `/api/session/recover-local`
+}
+
+/**
+ * @summary Recover a proven stopped local browser incarnation
+ */
+export const postPlaybackRecoverLocal = async (recoverLocalPlaybackRequest: RecoverLocalPlaybackRequest, options?: Parameters<typeof customInstance>[1]): Promise<PostPlaybackRecoverLocal200> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customInstance<PostPlaybackRecoverLocal200>(getPostPlaybackRecoverLocalUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(recoverLocalPlaybackRequest)
+  }
+);}
+
+
+
+
+
+export const getPostPlaybackRecoverLocalMutationKey = () => ['postPlaybackRecoverLocal'] as const;
+
+export const getPostPlaybackRecoverLocalMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPlaybackRecoverLocal>>, TError,PostPlaybackRecoverLocalMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof postPlaybackRecoverLocal>>, TError,PostPlaybackRecoverLocalMutationVariables, TContext> => {
+
+const mutationKey = getPostPlaybackRecoverLocalMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postPlaybackRecoverLocal>>, PostPlaybackRecoverLocalMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  postPlaybackRecoverLocal(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostPlaybackRecoverLocalMutationResult = NonNullable<Awaited<ReturnType<typeof postPlaybackRecoverLocal>>>
+    export type PostPlaybackRecoverLocalMutationBody = BodyType<RecoverLocalPlaybackRequest>
+    export type PostPlaybackRecoverLocalMutationError = ErrorType<void>
+    export type PostPlaybackRecoverLocalMutationVariables = {data: BodyType<RecoverLocalPlaybackRequest>}
+
+    /**
+ * @summary Recover a proven stopped local browser incarnation
+ */
+export const usePostPlaybackRecoverLocal = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPlaybackRecoverLocal>>, TError,PostPlaybackRecoverLocalMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof postPlaybackRecoverLocal>>,
+        TError,
+        PostPlaybackRecoverLocalMutationVariables,
+        TContext
+      > => {
+      return useMutation(getPostPlaybackRecoverLocalMutationOptions(options), queryClient);
+    }
+
 export const getGetPlaybackSnapshotUrl = (params?: GetPlaybackSnapshotParams,) => {
   const normalizedParams = new URLSearchParams();
 
@@ -29750,371 +29638,6 @@ export function useGetPlaybackSnapshot<TData = Awaited<ReturnType<typeof getPlay
 
 
 
-
-export const getGetSessionGetUrl = () => {
-
-
-
-
-  return `/api/session`
-}
-
-/**
- * @summary Get the current listening session
- */
-export const getSessionGet = async ( options?: Parameters<typeof customInstance>[1]): Promise<GetSessionGet200> => {
-
-  return customInstance<GetSessionGet200>(getGetSessionGetUrl(),
-  {
-    ...options,
-    method: 'GET'
-
-
-  }
-);}
-
-
-
-
-
-export const getGetSessionGetQueryKey = () => {
-    return [
-    `/api/session`
-    ] as const;
-    }
-
-
-export const getGetSessionGetQueryOptions = <TData = Awaited<ReturnType<typeof getSessionGet>>, TError = ErrorType<ApiError>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSessionGet>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  queryOptions?.queryKey ?? getGetSessionGetQueryKey();
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getSessionGet>>> = ({ signal }) => getSessionGet({ signal, ...requestOptions });
-
-
-
-
-
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getSessionGet>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
-}
-
-export type GetSessionGetQueryResult = NonNullable<Awaited<ReturnType<typeof getSessionGet>>>
-export type GetSessionGetQueryError = ErrorType<ApiError>
-
-
-export function useGetSessionGet<TData = Awaited<ReturnType<typeof getSessionGet>>, TError = ErrorType<ApiError>>(
-  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSessionGet>>, TError, TData>> & Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getSessionGet>>,
-          TError,
-          Awaited<ReturnType<typeof getSessionGet>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetSessionGet<TData = Awaited<ReturnType<typeof getSessionGet>>, TError = ErrorType<ApiError>>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSessionGet>>, TError, TData>> & Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getSessionGet>>,
-          TError,
-          Awaited<ReturnType<typeof getSessionGet>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetSessionGet<TData = Awaited<ReturnType<typeof getSessionGet>>, TError = ErrorType<ApiError>>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSessionGet>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Get the current listening session
- */
-
-export function useGetSessionGet<TData = Awaited<ReturnType<typeof getSessionGet>>, TError = ErrorType<ApiError>>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSessionGet>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-
-  const queryOptions = getGetSessionGetQueryOptions(options)
-
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return withQueryKey(query, queryOptions.queryKey);
-}
-
-
-
-
-
-
-
-export const getPutSessionSyncUrl = () => {
-
-
-
-
-  return `/api/session`
-}
-
-/**
- * @summary Sync playback state (position, queue, playback state)
- */
-export const putSessionSync = async (putSessionSyncBody: PutSessionSyncBody, options?: Parameters<typeof customInstance>[1]): Promise<PutSessionSync200> => {
-
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PutSessionSync200>(getPutSessionSyncUrl(),
-  {
-    ...options,
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
-    body: JSON.stringify(putSessionSyncBody)
-  }
-);}
-
-
-
-
-
-export const getPutSessionSyncMutationKey = () => ['putSessionSync'] as const;
-
-export const getPutSessionSyncMutationOptions = <TError = ErrorType<ApiError | ValidationError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putSessionSync>>, TError,PutSessionSyncMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
-): UseMutationOptions<Awaited<ReturnType<typeof putSessionSync>>, TError,PutSessionSyncMutationVariables, TContext> => {
-
-const mutationKey = getPutSessionSyncMutationKey();
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof putSessionSync>>, PutSessionSyncMutationVariables> = (props) => {
-          const {data} = props ?? {};
-
-          return  putSessionSync(data,requestOptions)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type PutSessionSyncMutationResult = NonNullable<Awaited<ReturnType<typeof putSessionSync>>>
-    export type PutSessionSyncMutationBody = BodyType<PutSessionSyncBody>
-    export type PutSessionSyncMutationError = ErrorType<ApiError | ValidationError>
-    export type PutSessionSyncMutationVariables = {data: BodyType<PutSessionSyncBody>}
-
-    /**
- * @summary Sync playback state (position, queue, playback state)
- */
-export const usePutSessionSync = <TError = ErrorType<ApiError | ValidationError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putSessionSync>>, TError,PutSessionSyncMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof putSessionSync>>,
-        TError,
-        PutSessionSyncMutationVariables,
-        TContext
-      > => {
-      return useMutation(getPutSessionSyncMutationOptions(options), queryClient);
-    }
-
-export const getPostSessionClaimUrl = () => {
-
-
-
-
-  return `/api/session/claim`
-}
-
-/**
- * @summary Claim the session for a specific device
- */
-export const postSessionClaim = async (postSessionClaimBody: PostSessionClaimBody, options?: Parameters<typeof customInstance>[1]): Promise<PostSessionClaim200> => {
-
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PostSessionClaim200>(getPostSessionClaimUrl(),
-  {
-    ...options,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
-    body: JSON.stringify(postSessionClaimBody)
-  }
-);}
-
-
-
-
-
-export const getPostSessionClaimMutationKey = () => ['postSessionClaim'] as const;
-
-export const getPostSessionClaimMutationOptions = <TError = ErrorType<ApiError | ValidationError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postSessionClaim>>, TError,PostSessionClaimMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
-): UseMutationOptions<Awaited<ReturnType<typeof postSessionClaim>>, TError,PostSessionClaimMutationVariables, TContext> => {
-
-const mutationKey = getPostSessionClaimMutationKey();
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postSessionClaim>>, PostSessionClaimMutationVariables> = (props) => {
-          const {data} = props ?? {};
-
-          return  postSessionClaim(data,requestOptions)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type PostSessionClaimMutationResult = NonNullable<Awaited<ReturnType<typeof postSessionClaim>>>
-    export type PostSessionClaimMutationBody = BodyType<PostSessionClaimBody>
-    export type PostSessionClaimMutationError = ErrorType<ApiError | ValidationError>
-    export type PostSessionClaimMutationVariables = {data: BodyType<PostSessionClaimBody>}
-
-    /**
- * @summary Claim the session for a specific device
- */
-export const usePostSessionClaim = <TError = ErrorType<ApiError | ValidationError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postSessionClaim>>, TError,PostSessionClaimMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof postSessionClaim>>,
-        TError,
-        PostSessionClaimMutationVariables,
-        TContext
-      > => {
-      return useMutation(getPostSessionClaimMutationOptions(options), queryClient);
-    }
-
-export const getPostSessionNewUrl = () => {
-
-
-
-
-  return `/api/session/new`
-}
-
-/**
- * @summary Start a new listening session
- */
-export const postSessionNew = async (postSessionNewBody: PostSessionNewBody, options?: Parameters<typeof customInstance>[1]): Promise<PostSessionNew201> => {
-
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PostSessionNew201>(getPostSessionNewUrl(),
-  {
-    ...options,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
-    body: JSON.stringify(postSessionNewBody)
-  }
-);}
-
-
-
-
-
-export const getPostSessionNewMutationKey = () => ['postSessionNew'] as const;
-
-export const getPostSessionNewMutationOptions = <TError = ErrorType<ApiError | ValidationError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postSessionNew>>, TError,PostSessionNewMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
-): UseMutationOptions<Awaited<ReturnType<typeof postSessionNew>>, TError,PostSessionNewMutationVariables, TContext> => {
-
-const mutationKey = getPostSessionNewMutationKey();
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postSessionNew>>, PostSessionNewMutationVariables> = (props) => {
-          const {data} = props ?? {};
-
-          return  postSessionNew(data,requestOptions)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type PostSessionNewMutationResult = NonNullable<Awaited<ReturnType<typeof postSessionNew>>>
-    export type PostSessionNewMutationBody = BodyType<PostSessionNewBody>
-    export type PostSessionNewMutationError = ErrorType<ApiError | ValidationError>
-    export type PostSessionNewMutationVariables = {data: BodyType<PostSessionNewBody>}
-
-    /**
- * @summary Start a new listening session
- */
-export const usePostSessionNew = <TError = ErrorType<ApiError | ValidationError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postSessionNew>>, TError,PostSessionNewMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof postSessionNew>>,
-        TError,
-        PostSessionNewMutationVariables,
-        TContext
-      > => {
-      return useMutation(getPostSessionNewMutationOptions(options), queryClient);
-    }
 
 export const getGetDebugConfigCheckUrl = () => {
 

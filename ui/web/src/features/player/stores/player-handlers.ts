@@ -1,3 +1,6 @@
+import { toast } from 'sonner'
+import { invalidatePlaybackSelection } from './player-playback-runtime'
+import { getPlaybackAdapter } from '@/features/session/services/playback-execution'
 import { mediator } from '@/shared/lib/mediator/bus'
 import { usePlayerStore } from './player-store'
 import { PLAYER_ACTIONS, SETTINGS_PLAYER_ACTIONS } from '../player-actions'
@@ -12,13 +15,18 @@ import { RADIO_ACTIONS } from '@/features/radio/radio-actions'
 import { CATALOG_ACTIONS } from '@/features/catalog/catalog-actions'
 import type { CatalogPlayTrackPayload } from '@/features/catalog/catalog-actions'
 
-function pausePlayer() {
-  usePlayerStore.getState().setIsPlaying(false)
+function pausePlayer(submit = true) {
+  invalidatePlaybackSelection()
+  getPlaybackAdapter('song')?.quiesce(new AbortController().signal).catch((error: unknown) => {
+    toast.error('Music could not be paused', { description: error instanceof Error ? error.message : undefined })
+  })
+  if (submit) usePlayerStore.getState().setIsPlaying(false)
 }
 
 export function registerPlayerHandlers() {
-  mediator.on(PLAYER_ACTIONS.PAUSE, function playerPauseHandler() {
-    pausePlayer()
+  mediator.on(PLAYER_ACTIONS.PAUSE, function playerPauseHandler(payload: unknown) {
+    const reason = typeof payload === 'object' && payload !== null && 'reason' in payload ? payload.reason : undefined
+    pausePlayer(reason !== 'radio-started')
   })
 
   mediator.on(PLAYER_ACTIONS.PLAY, function playerPlayHandler(payload: unknown) {
@@ -54,6 +62,6 @@ export function registerPlayerHandlers() {
 
   mediator.on(SETTINGS_PLAYER_ACTIONS.APPLY, function playerApplySettingsHandler(payload: unknown) {
     const p = payload as SettingsApplyPlayerPayload
-    usePlayerStore.getState().applyPreferences(p)
+    usePlayerStore.getState().runtimeActions.applyPreferences(p)
   })
 }

@@ -17,7 +17,7 @@ use OpenApi\Attributes as OA;
         new OA\Property(property: 'revision', type: 'integer', minimum: 0),
         new OA\Property(property: 'incarnationId', type: 'string', format: 'uuid'),
         new OA\Property(property: 'epoch', type: 'integer', minimum: 1),
-        new OA\Property(property: 'type', type: 'string', enum: ['prepare', 'quiesce', 'start', 'stop', 'play', 'pause', 'seek', 'load', 'observe', 'volume']),
+        new OA\Property(property: 'type', type: 'string', enum: ['prepare', 'quiesce', 'start', 'stop', 'play', 'pause', 'seek', 'load', 'observe', 'volume', 'queue']),
         new OA\Property(property: 'payload', required: ['media', 'queue', 'currentTrackIndex', 'position', 'desiredState'], properties: [
             new OA\Property(property: 'media', ref: new Model(type: PlaybackMediaResource::class), nullable: true),
             new OA\Property(property: 'queue', type: 'array', items: new OA\Items(type: 'string')),

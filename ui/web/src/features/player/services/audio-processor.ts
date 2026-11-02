@@ -101,6 +101,7 @@ export class AudioProcessor {
   private normalizationGainDb = 0
   private volume = 1
   private muted = false
+  private outputFenced = false
   private rebuildGain!: GainNode
   private analysisSink!: GainNode
   private rebuildTimer: ReturnType<typeof setTimeout> | null = null
@@ -827,6 +828,17 @@ export class AudioProcessor {
     }
   }
 
+  /** Silence output without discarding processing or listening preferences. */
+  fenceOutput(): void {
+    this.outputFenced = true
+    if (!this.destroyed) this.applyOutputGain()
+  }
+
+  rearmOutput(): void {
+    this.outputFenced = false
+    if (!this.destroyed && !this.passiveMode) this.applyOutputGain()
+  }
+
   setVolume(volume: number) {
     if (!Number.isFinite(volume)) return
     this.volume = Math.max(0, Math.min(1, volume))
@@ -843,9 +855,9 @@ export class AudioProcessor {
   private applyOutputGain(): void {
     const gain = this.gainNode.gain
     const now = this.audioContext.currentTime
-    if (!this.isConnected || this.muted) {
+    if (!this.isConnected || this.muted || this.outputFenced) {
       gain.cancelScheduledValues(now)
-      gain.setValueAtTime(this.muted ? 0 : this.volume, now)
+      gain.setValueAtTime(this.muted || this.outputFenced ? 0 : this.volume, now)
     } else {
       gain.setTargetAtTime(this.volume, now, 0.05)
     }

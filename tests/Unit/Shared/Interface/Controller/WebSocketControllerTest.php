@@ -360,122 +360,31 @@ final class WebSocketControllerTest extends TestCase
         }
     }
 
-    #[DataProvider('listeningSessionResponses')]
-    public function testListeningSessionResponsePreservesUserAndPayload(string $type, string $method, string $responseType): void
-    {
-        $userId = Uuid::generate();
-        $deviceId = Uuid::generate();
-        $received = [];
-        $this->listeningSessions->method($method)->willReturnCallback(
-            function (...$arguments) use (&$received): array {
-                $received = $arguments;
 
-                return ['sessionId' => 'session-1', 'active' => false];
-            },
-        );
-        $this->controller->onOpen(1, $userId->toString(), 'token-1');
-        $this->controller->onMessage(1, json_encode([
-            'type' => $type,
-            'deviceId' => $deviceId->toString(),
-            'userId' => Uuid::generate()->toString(),
-            'action' => 'seek',
-            'position' => 12.5,
-            'queue' => ['track-1'],
-            'currentTrackIndex' => 2,
-            'playbackState' => 'playing',
-        ], JSON_THROW_ON_ERROR));
 
-        self::assertSame($userId->toString(), $received[0]->toString());
-        self::assertSame($deviceId->toString(), $received[1]->toString());
-        if ($method === 'playback') {
-            self::assertSame(['seek', 12.5, ['track-1'], 2, 'playing'], array_slice($received, 2));
-        } elseif ($method === 'sync') {
-            self::assertSame([['track-1'], 2, 12.5, 'playing'], array_slice($received, 2));
-        }
-        self::assertSame(
-            ['type' => $responseType, 'data' => ['sessionId' => 'session-1', 'active' => false]],
-            $this->lastPushedPayload(),
-        );
-    }
 
-    /** @return iterable<string, array{string, string, string}> */
-    public static function listeningSessionResponses(): iterable
-    {
-        yield 'join' => ['session.join', 'join', 'session.joined'];
-        yield 'playback' => ['session.playback', 'playback', 'session.playback_result'];
-        yield 'sync' => ['session.sync', 'sync', 'session.sync_result'];
-    }
 
-    #[DataProvider('listeningSessionFailures')]
-    public function testListeningSessionFailureUsesExistingError(string $type, string $method, string $error): void
-    {
-        $this->listeningSessions->method($method)->willThrowException(new HandlerFailedException(
-            new Envelope(new \stdClass()),
-            [new \RuntimeException('Private handler detail')],
-        ));
-        $this->controller->onOpen(1, Uuid::generate()->toString(), 'token-1');
-        $this->controller->onMessage(1, json_encode([
-            'type' => $type,
-            'deviceId' => Uuid::generate()->toString(),
-            'action' => 'pause',
-        ], JSON_THROW_ON_ERROR));
 
-        self::assertSame(['type' => 'error', 'message' => $error], $this->lastPushedPayload());
-    }
 
-    /** @return iterable<string, array{string, string, string}> */
-    public static function listeningSessionFailures(): iterable
-    {
-        yield 'join' => ['session.join', 'join', 'Failed to join session'];
-        yield 'playback' => ['session.playback', 'playback', 'Playback action failed'];
-        yield 'sync' => ['session.sync', 'sync', 'Sync failed'];
-    }
 
-    public function testListeningSessionPlaybackDefaultsRemainNullable(): void
-    {
-        $received = [];
-        $this->listeningSessions->method('playback')->willReturnCallback(
-            function (...$arguments) use (&$received): array {
-                $received = $arguments;
 
-                return [];
-            },
-        );
-        $this->controller->onOpen(1, Uuid::generate()->toString(), 'token-1');
-        $this->controller->onMessage(1, json_encode([
-            'type' => 'session.playback', 'deviceId' => Uuid::generate()->toString(), 'action' => 'pause',
-        ], JSON_THROW_ON_ERROR));
 
-        self::assertSame(['pause', null, null, null, null], array_slice($received, 2));
-        self::assertSame(
-            ['type' => 'session.playback_result', 'data' => []],
-            $this->lastPushedPayload(),
-        );
-    }
 
-    public function testListeningSessionSyncDefaultsRemainExplicit(): void
-    {
-        $received = [];
-        $this->listeningSessions->method('sync')->willReturnCallback(
-            function (...$arguments) use (&$received): array {
-                $received = $arguments;
 
-                return [];
-            },
-        );
-        $this->controller->onOpen(1, Uuid::generate()->toString(), 'token-1');
-        $this->controller->onMessage(1, json_encode([
-            'type' => 'session.sync', 'deviceId' => Uuid::generate()->toString(),
-        ], JSON_THROW_ON_ERROR));
-
-        self::assertSame([[], 0, 0.0, 'paused'], array_slice($received, 2));
-        self::assertSame(
-            ['type' => 'session.sync_result', 'data' => []],
-            $this->lastPushedPayload(),
-        );
-    }
 
     // --- onOpen ---
+
+    public function testLegacyPlaybackMessagesCannotBypassAcknowledgedCoordination(): void
+    {
+        $this->listeningSessions = $this->createMock(ListeningSessionInteractionInterface::class);
+        $this->listeningSessions->expects(self::never())->method('coordinate');
+        $controller = new WebSocketController($this->registry, $this->pusher, $this->bus, new JsonEncoder(), $this->listeningSessions, $this->identities, $this->createStub(LiveSubscriptions::class));
+        $controller->onOpen(1, new Uuid()->toString(), 'token');
+        foreach (['session.join', 'session.playback', 'session.sync'] as $type) {
+            $controller->onMessage(1, json_encode(['type' => $type, 'deviceId' => new Uuid()->toString(), 'action' => 'play'], JSON_THROW_ON_ERROR));
+            self::assertSame(['type' => 'error', 'message' => 'Unknown message type: "' . $type . '"'], $this->lastPushedPayload());
+        }
+    }
 
     public function testOnOpenStoresConnectionInRegistry(): void
     {

@@ -100,6 +100,7 @@ type ProcessorInspection = {
   audioContext: MockContext
   analyzerNode: MockNode
   analysisSink: MockNode
+  gainNode: MockNode
   wasmSpectrumReady: boolean
   leftMeterAnalyzer: MockNode
   rightMeterAnalyzer: MockNode
@@ -135,6 +136,21 @@ afterEach(() => {
 
 const connect = () => processor.connectDualAudioElements(elementA, elementB)
 const worklet = (name: string) => MockWorklet.instances.filter((node) => node.name === name).at(-1)!
+
+it('keeps output fenced through preference and connection changes until explicitly rearmed', async () => {
+  await processor.connectDualAudioElements(elementA, elementB)
+  processor.setVolume(0.4)
+  processor.fenceOutput()
+  expect(graph.gainNode.gain.setValueAtTime).toHaveBeenLastCalledWith(0, graph.audioContext.currentTime)
+  graph.gainNode.gain.setTargetAtTime.mockClear()
+  processor.setVolume(0.8)
+  processor.setMuted(false)
+  await processor.connectDualAudioElements(elementB, elementA)
+  expect(graph.gainNode.gain.setValueAtTime).toHaveBeenLastCalledWith(0, graph.audioContext.currentTime)
+  expect(graph.gainNode.gain.setTargetAtTime).not.toHaveBeenCalled()
+  processor.rearmOutput()
+  expect(graph.gainNode.gain.setTargetAtTime).toHaveBeenLastCalledWith(0.8, graph.audioContext.currentTime, 0.05)
+})
 
 describe('AudioProcessor asynchronous analysis lifecycle', () => {
 

@@ -1,4 +1,13 @@
 import { useEffect, useRef } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
+import { PLAYBACK_SESSION_KEY } from '@/features/session/services/playback-session-coordinator'
+import { toast } from 'sonner'
+import { getSongIndex } from '@/shared/api-client/gen/endpoints'
+import { readTrackResource } from '../stores/player-availability'
+import type { Track } from '../stores/player-types'
+import { usePlaybackSession } from '@/features/session/hooks/use-playback-session'
+import { registerPlaybackAdapter, requestPlayback } from '@/features/session/services/playback-execution'
+import { createMusicPlaybackAdapter } from '../services/music-playback-adapter'
 import { audioService } from '@/features/player/services/audio-service'
 import { usePlayerStore, resolveNextIndex, buildStreamUrl, syncPlaybackVolume, getPlaybackSelectionGeneration } from '@/features/player/stores/player-store'
 import { updateTime } from '@/features/player/stores/player-time-tracker'
@@ -9,6 +18,7 @@ import {
   isUnsupportedOriginalStream,
   notifyPlaybackFailure,
 } from '@/features/player/stores/player-playback-runtime'
+import { musicNavigation } from '../stores/player-intent-actions'
 import { isRecoveringPlayback } from '@/features/player/stores/player-playback-recovery'
 import { createLogger } from '@/shared/lib/logger'
 
@@ -22,14 +32,69 @@ const STALL_TIMEOUT_MS = 10_000
 
 /** Owns persistent dual audio elements, including transition and teardown work. */
 export function useAudioPlayback() {
+  const queryClient = useQueryClient()
+  const { snapshot, endpoint, connected } = usePlaybackSession()
+  useEffect(() => {
+    if (!snapshot || snapshot.activeIncarnationId === endpoint?.incarnationId) return
+    const state = usePlayerStore.getState()
+    const known = new Map(state.queue.map(track => [track.publicId, track]))
+    const sameQueue = state.queue.length === snapshot.queue.length
+      && state.queue.every((track, index) => track.publicId === snapshot.queue[index])
+    const queue = sameQueue ? state.queue : snapshot.queue.map(id => known.get(id) ?? { publicId: id, title: id })
+    const currentIndex = queue.length ? snapshot.currentTrackIndex : -1
+    const selectedDuration = (track: Track | undefined) => snapshot.media?.kind === 'song'
+      && track?.duration !== undefined && Number.isFinite(track.duration) && track.duration > 0 ? track.duration : 0
+    state.runtimeActions.observePlaybackState({ queue, currentIndex, currentTrack: queue[currentIndex] ?? null,
+      duration: selectedDuration(queue[currentIndex]),
+      isPlaying: snapshot.media?.kind === 'song' && snapshot.observedState === 'playing' })
+    updateTime(snapshot.position)
+    const destination = snapshot.destinations.find(item => item.destinationId === snapshot.activeDestinationId)
+    if (destination?.observedVolume !== null && destination?.observedVolume !== undefined) {
+      state.runtimeActions.observeListeningVolume(destination.observedVolume * 100)
+    }
+    const missing = queue.filter(track => track.available === undefined || track.duration === undefined).map(track => track.publicId)
+    const controller = new AbortController()
+    const observedAt = performance.now()
+    const tick = () => {
+      const current = usePlayerStore.getState()
+      if (current.playbackExecutionActive || queryClient.getQueryData(PLAYBACK_SESSION_KEY) !== snapshot) return
+      const projected = snapshot.position + (performance.now() - observedAt) / 1000
+      updateTime(current.duration > 0 ? Math.min(projected, current.duration) : projected)
+    }
+    const timer = connected && destination?.available !== false && snapshot.activeIncarnationId
+      && snapshot.media?.kind === 'song' && snapshot.observedState === 'playing'
+      ? setInterval(tick, 250) : undefined
+    if (missing.length) {
+      const batches: string[][] = []
+      for (let offset = 0; offset < missing.length; offset += 100) batches.push(missing.slice(offset, offset + 100))
+      Promise.all(batches.map(ids => getSongIndex({ publicIds: ids.join(','), limit: ids.length }, { signal: controller.signal }))).then(responses => {
+        if (controller.signal.aborted || queryClient.getQueryData(PLAYBACK_SESSION_KEY) !== snapshot
+          || usePlayerStore.getState().playbackExecutionActive) return
+        const tracks = new Map<string, Track>()
+        for (const entry of responses.flatMap(response => response.data ?? [])) {
+          const track = readTrackResource(entry)
+          if (track) tracks.set(track.publicId, track)
+        }
+        const hydrated = queue.map(track => tracks.get(track.publicId) ?? track)
+        usePlayerStore.getState().runtimeActions.observePlaybackState({ queue: hydrated, currentTrack: hydrated[currentIndex] ?? null,
+          duration: selectedDuration(hydrated[currentIndex]) })
+      }).catch(error => {
+        if (!controller.signal.aborted) logger.warn('Queue details could not be loaded:', error)
+      })
+    }
+    return () => {
+      controller.abort()
+      if (timer !== undefined) clearInterval(timer)
+    }
+  }, [snapshot, endpoint?.incarnationId, connected, queryClient])
   const audioRefA = useRef<HTMLAudioElement | null>(null)
   const audioRefB = useRef<HTMLAudioElement | null>(null)
-  const lifetimeRef = useRef<{ active: boolean } | null>(null)
+  const lifetimeRef = useRef<{ active: boolean; executionOwned: boolean } | null>(null)
   const setAudioElement = usePlayerStore((s) => s.setAudioElement)
-  const setIsPlaying = usePlayerStore((s) => s.setIsPlaying)
+  const setIsPlaying = usePlayerStore((s) => s.runtimeActions.setIsPlaying)
 
   useEffect(() => {
-    const lifetime = { active: true }
+    const lifetime = { active: true, executionOwned: usePlayerStore.getState().playbackExecutionActive }
     lifetimeRef.current = lifetime
     const audioA = new Audio()
     const audioB = new Audio()
@@ -54,7 +119,7 @@ export function useAudioPlayback() {
               invalidate()
               audioA.pause()
               audioB.pause()
-              usePlayerStore.getState().setIsPlaying(false)
+              usePlayerStore.getState().runtimeActions.setIsPlaying(false)
               audioService.setPlayingState(false)
             }
           }
@@ -86,10 +151,12 @@ export function useAudioPlayback() {
     }
     let candidate: Candidate | undefined
     let transitionPending = false
+    let navigationPending = false
     let generation = 0
     let adopting = false
     let fadeTimer: ReturnType<typeof setTimeout> | undefined
     let removeReadyListeners: (() => void) | undefined
+    const clearStallTimers = new Set<() => void>()
     const active = () => usePlayerStore.getState().audioElement
     const inactive = () => active() === audioA ? audioB : audioA
     const syncVolume = () => {
@@ -100,6 +167,7 @@ export function useAudioPlayback() {
 
     const invalidate = () => {
       generation++
+      for (const clear of clearStallTimers) clear()
       transitionPending = false
       removeReadyListeners?.()
       candidate = undefined
@@ -111,12 +179,23 @@ export function useAudioPlayback() {
     const valid = (next: Candidate) => {
       const state = usePlayerStore.getState()
       const index = resolveNextIndex(state.queue, state.currentIndex, state.shuffle, state.repeat, state.shuffleBag)
-      return lifetime.active && candidate === next && active() === next.owner
+      return lifetime.active && lifetime.executionOwned && candidate === next && active() === next.owner
         && next.owner.src === next.ownerSrc && next.audio.src === next.src
         && state.currentTrack?.publicId === next.currentId && state.repeat !== 'one'
         && index !== null && state.queue[index]?.publicId === next.nextId
     }
-    const handoff = async (fade: boolean) => {
+    const handoff = async (fade: boolean, executing = false) => {
+      if (!executing) {
+        if (navigationPending || !candidate?.ready || !valid(candidate)) return
+        navigationPending = true
+        try { await requestPlayback({ action: 'next', navigation: musicNavigation(usePlayerStore.getState()) }) }
+        catch (error) {
+          logger.warn('Queue advance failed:', error)
+          toast.error('Playback request failed', { id: 'player-playback-request', description: error instanceof Error ? error.message : undefined })
+        }
+        finally { navigationPending = false }
+        return
+      }
       const next = candidate
       if (!next?.ready || transitionPending || !valid(next)) return
       const token = generation
@@ -168,7 +247,7 @@ export function useAudioPlayback() {
         if (token !== generation || !lifetime.active) return
         logger.warn('Preloaded playback failed:', err)
         invalidate()
-        if (next.owner.ended) usePlayerStore.getState().playNext()
+        throw err
       } finally {
         adopting = false
         if (generation === token) transitionPending = false
@@ -177,11 +256,11 @@ export function useAudioPlayback() {
     const maybeFade = () => {
       const state = usePlayerStore.getState()
       const audio = active()
-      if (audio && state.isPlaying && state.crossfadeEnabled && state.crossfadeDuration > 0
+      if (lifetime.executionOwned && audio && state.isPlaying && state.crossfadeEnabled && state.crossfadeDuration > 0
         && audio.duration - audio.currentTime <= state.crossfadeDuration) handoff(true)
     }
     const schedulePreload = (audio: HTMLAudioElement) => {
-      if (candidate || transitionPending || fadeTimer !== undefined || !Number.isFinite(audio.duration) || audio.duration <= 0) return
+      if (!lifetime.executionOwned || candidate || transitionPending || fadeTimer !== undefined || !Number.isFinite(audio.duration) || audio.duration <= 0) return
       const processor = audioService.getProcessor()
       if (!processor || processor.passive) return
       const state = usePlayerStore.getState()
@@ -225,7 +304,7 @@ export function useAudioPlayback() {
       nextAudio.load()
     }
     const removers = [audioA, audioB].map((audio) => {
-      const owned = () => lifetime.active && active() === audio
+      const owned = () => lifetime.active && lifetime.executionOwned && active() === audio
       const recovering = () => isRecoveringPlayback(audio)
       // Error wins: Firefox reports a cut stream as an error, then plays its buffer and fires ended.
       let loadFailed = false
@@ -235,6 +314,7 @@ export function useAudioPlayback() {
         if (stallTimer !== undefined) clearTimeout(stallTimer)
         stallTimer = undefined
       }
+      clearStallTimers.add(clearStall)
       /** The current track's own stream can be retried; any other source fails as before. */
       const playsCurrentTrack = () => {
         const track = usePlayerStore.getState().currentTrack
@@ -250,13 +330,13 @@ export function useAudioPlayback() {
         }
         logger.warn('Active audio playback failed:', audio.error)
         audio.pause()
-        state.setIsPlaying(false)
+        state.runtimeActions.setIsPlaying(false)
         audioService.setPlayingState(false)
         notifyPlaybackFailure(isTranscodedStream(audio.src))
       }
       const onPlay = () => {
         if (!owned() || audio.paused || audio.ended) return
-        usePlayerStore.getState().setIsPlaying(true)
+        usePlayerStore.getState().runtimeActions.setIsPlaying(true)
         audioService.setPlayingState(true)
         if (audio.src) connect().catch((err) => {
           if (owned()) logger.warn('Dual audio connection failed:', err)
@@ -266,7 +346,7 @@ export function useAudioPlayback() {
         if (!owned() || audio.ended || !audio.paused) return
         clearStall()
         if (recovering()) return
-        usePlayerStore.getState().setIsPlaying(false)
+        usePlayerStore.getState().runtimeActions.setIsPlaying(false)
         audioService.setPlayingState(false)
       }
       const onError = () => {
@@ -312,7 +392,6 @@ export function useAudioPlayback() {
         if (!owned() || !audio.ended || transitionPending || loadFailed || recovering()) return
         const state = usePlayerStore.getState()
         if (state.repeat === 'one' && state.currentTrack) {
-          audioService.getProcessor()?.resetProgramme()
           state.replayCurrentTrack()
         } else if (candidate?.ready && valid(candidate)) {
           handoff(false)
@@ -338,9 +417,41 @@ export function useAudioPlayback() {
       for (const [name, listener] of Object.entries(listeners)) audio.addEventListener(name, listener)
       return () => {
         clearStall()
+        clearStallTimers.delete(clearStall)
         for (const [name, listener] of Object.entries(listeners)) audio.removeEventListener(name, listener)
       }
     })
+    const unregisterAdapter = registerPlaybackAdapter(createMusicPlaybackAdapter({
+      elements: [audioA, audioB], invalidate, connect,
+      preparedAudio: id => candidate?.ready && candidate.nextId === id && valid(candidate) ? candidate.audio : undefined,
+      transition: async (id, signal) => {
+        const next = candidate
+        if (!next?.ready || next.nextId !== id || !valid(next)) return false
+        const state = usePlayerStore.getState()
+        const cancel = () => {
+          invalidate()
+          audioA.pause()
+          audioB.pause()
+          lifetime.executionOwned = false
+          usePlayerStore.getState().runtimeActions.setPlaybackExecutionActive(false)
+          usePlayerStore.getState().runtimeActions.setIsPlaying(false)
+          audioService.setPlayingState(false)
+        }
+        signal.addEventListener('abort', cancel, { once: true })
+        try {
+          if (signal.aborted) { cancel(); return false }
+          await handoff(state.crossfadeEnabled && !next.owner.ended, true)
+          return !signal.aborted && active() === next.audio
+        } finally {
+          signal.removeEventListener('abort', cancel)
+        }
+      },
+      isAlive: () => lifetime.active,
+      setExecutionOwned: owned => {
+        lifetime.executionOwned = owned
+        usePlayerStore.getState().runtimeActions.setPlaybackExecutionActive(owned)
+      },
+    }))
     const unsubscribe = usePlayerStore.subscribe((state, previous) => {
       if (state.volume !== previous.volume || state.muted !== previous.muted) syncVolume()
       if (!adopting && (state.queue !== previous.queue || state.currentTrack !== previous.currentTrack
@@ -351,6 +462,7 @@ export function useAudioPlayback() {
     })
     return () => {
       lifetime.active = false
+      unregisterAdapter()
       lifetimeRef.current = null
       unsubscribe()
       invalidate()
@@ -373,19 +485,22 @@ export function useAudioPlayback() {
     const generation = getPlaybackSelectionGeneration()
     let cancelled = false
     const lifetime = lifetimeRef.current
-    const isActive = () => !cancelled && lifetime?.active === true
+    const isActive = () => !cancelled && lifetime?.active === true && lifetime.executionOwned
       && getPlaybackSelectionGeneration() === generation
       && usePlayerStore.getState().audioElement === audio && audio.src === src
       && usePlayerStore.getState().currentTrack === track
-    if (isPlaying && audio.paused && !isRecoveringPlayback(audio)) {
+    if (lifetime?.executionOwned && isPlaying && audio.paused && !isRecoveringPlayback(audio)) {
       audioService.resumeContextIfNeeded().then(async () => {
-        if (isActive() && usePlayerStore.getState().isPlaying) await audio.play()
+        if (isActive() && usePlayerStore.getState().isPlaying) {
+          await audio.play()
+          if ((!isActive() || !usePlayerStore.getState().isPlaying) && audio.src === src) audio.pause()
+        }
       }).catch((err) => {
         if (!isActive()) return
         logger.warn('Playback resume failed:', err)
         setIsPlaying(false)
       })
-    } else if (!isPlaying) {
+    } else if (lifetime?.executionOwned && !isPlaying) {
       audio.pause()
       audioService.setPlayingState(false)
     }

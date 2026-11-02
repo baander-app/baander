@@ -13,4 +13,5 @@ enum PlaybackOperation: string
     case Control = 'control';
     case Reconcile = 'reconcile';
     case Snapshot = 'snapshot';
+    case RecoverLocal = 'recover-local';
 }

@@ -16430,6 +16430,51 @@
                 }
             }
         },
+        "/api/session/recover-local": {
+            "post": {
+                "tags": [
+                    "Session"
+                ],
+                "summary": "Recover a proven stopped local browser incarnation",
+                "operationId": "post_playback_recover_local",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RecoverLocalPlaybackRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Capability-free snapshot and recorded recovery result",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/PlaybackSnapshotResource"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Not authenticated"
+                    },
+                    "409": {
+                        "description": "Recovery authority refused"
+                    },
+                    "422": {
+                        "description": "Invalid recovery request"
+                    }
+                }
+            }
+        },
         "/api/session/snapshot": {
             "get": {
                 "tags": [
@@ -16500,481 +16545,6 @@
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/ApiError"
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/api/session": {
-            "get": {
-                "tags": [
-                    "Session"
-                ],
-                "summary": "Get the current listening session",
-                "operationId": "get_session_get",
-                "responses": {
-                    "200": {
-                        "description": "Current session data",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "data": {
-                                            "properties": {
-                                                "publicId": {
-                                                    "type": "string",
-                                                    "pattern": "^[0-9a-zA-Z_-]{21}$",
-                                                    "maxLength": 21,
-                                                    "minLength": 21
-                                                },
-                                                "userId": {
-                                                    "type": "string",
-                                                    "pattern": "^[0-9a-zA-Z_-]{21}$",
-                                                    "maxLength": 21,
-                                                    "minLength": 21
-                                                },
-                                                "activeDeviceId": {
-                                                    "type": "string",
-                                                    "pattern": "^[0-9a-zA-Z_-]{21}$",
-                                                    "nullable": true,
-                                                    "maxLength": 21,
-                                                    "minLength": 21
-                                                },
-                                                "queue": {
-                                                    "type": "array",
-                                                    "items": {
-                                                        "type": "string",
-                                                        "pattern": "^[0-9a-zA-Z_-]{21}$",
-                                                        "maxLength": 21,
-                                                        "minLength": 21
-                                                    }
-                                                },
-                                                "currentTrackIndex": {
-                                                    "type": "integer"
-                                                },
-                                                "position": {
-                                                    "type": "number"
-                                                },
-                                                "playbackState": {
-                                                    "type": "string"
-                                                },
-                                                "createdAt": {
-                                                    "type": "string",
-                                                    "format": "date-time"
-                                                },
-                                                "updatedAt": {
-                                                    "type": "string",
-                                                    "format": "date-time"
-                                                },
-                                                "lastUsedAt": {
-                                                    "type": "string",
-                                                    "format": "date-time",
-                                                    "nullable": true
-                                                }
-                                            },
-                                            "type": "object"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Not authenticated",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/ApiError"
-                                }
-                            }
-                        }
-                    }
-                }
-            },
-            "put": {
-                "tags": [
-                    "Session"
-                ],
-                "summary": "Sync playback state (position, queue, playback state)",
-                "operationId": "put_session_sync",
-                "requestBody": {
-                    "required": true,
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "required": [
-                                    "queue",
-                                    "currentTrackIndex",
-                                    "position",
-                                    "playbackState"
-                                ],
-                                "properties": {
-                                    "queue": {
-                                        "type": "array",
-                                        "items": {
-                                            "type": "string",
-                                            "pattern": "^[0-9a-zA-Z_-]{21}$",
-                                            "maxLength": 21,
-                                            "minLength": 21
-                                        }
-                                    },
-                                    "currentTrackIndex": {
-                                        "type": "integer",
-                                        "minimum": 0
-                                    },
-                                    "position": {
-                                        "type": "number",
-                                        "minimum": 0
-                                    },
-                                    "playbackState": {
-                                        "type": "string",
-                                        "enum": [
-                                            "playing",
-                                            "paused",
-                                            "stopped"
-                                        ]
-                                    }
-                                },
-                                "type": "object"
-                            }
-                        }
-                    }
-                },
-                "responses": {
-                    "200": {
-                        "description": "Session synced",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "data": {
-                                            "properties": {
-                                                "publicId": {
-                                                    "type": "string",
-                                                    "pattern": "^[0-9a-zA-Z_-]{21}$",
-                                                    "maxLength": 21,
-                                                    "minLength": 21
-                                                },
-                                                "userId": {
-                                                    "type": "string",
-                                                    "pattern": "^[0-9a-zA-Z_-]{21}$",
-                                                    "maxLength": 21,
-                                                    "minLength": 21
-                                                },
-                                                "activeDeviceId": {
-                                                    "type": "string",
-                                                    "pattern": "^[0-9a-zA-Z_-]{21}$",
-                                                    "nullable": true,
-                                                    "maxLength": 21,
-                                                    "minLength": 21
-                                                },
-                                                "queue": {
-                                                    "type": "array",
-                                                    "items": {
-                                                        "type": "string",
-                                                        "pattern": "^[0-9a-zA-Z_-]{21}$",
-                                                        "maxLength": 21,
-                                                        "minLength": 21
-                                                    }
-                                                },
-                                                "currentTrackIndex": {
-                                                    "type": "integer"
-                                                },
-                                                "position": {
-                                                    "type": "number"
-                                                },
-                                                "playbackState": {
-                                                    "type": "string"
-                                                },
-                                                "createdAt": {
-                                                    "type": "string",
-                                                    "format": "date-time"
-                                                },
-                                                "updatedAt": {
-                                                    "type": "string",
-                                                    "format": "date-time"
-                                                },
-                                                "lastUsedAt": {
-                                                    "type": "string",
-                                                    "format": "date-time",
-                                                    "nullable": true
-                                                }
-                                            },
-                                            "type": "object"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Not authenticated",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/ApiError"
-                                }
-                            }
-                        }
-                    },
-                    "422": {
-                        "description": "Validation error or missing X-Baander-Device-Id header",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/ValidationError"
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/api/session/claim": {
-            "post": {
-                "tags": [
-                    "Session"
-                ],
-                "summary": "Claim the session for a specific device",
-                "operationId": "post_session_claim",
-                "requestBody": {
-                    "required": true,
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "required": [
-                                    "deviceId"
-                                ],
-                                "properties": {
-                                    "deviceId": {
-                                        "type": "string",
-                                        "format": "uuid"
-                                    }
-                                },
-                                "type": "object"
-                            }
-                        }
-                    }
-                },
-                "responses": {
-                    "200": {
-                        "description": "Session claimed",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "data": {
-                                            "properties": {
-                                                "publicId": {
-                                                    "type": "string",
-                                                    "pattern": "^[0-9a-zA-Z_-]{21}$",
-                                                    "maxLength": 21,
-                                                    "minLength": 21
-                                                },
-                                                "userId": {
-                                                    "type": "string",
-                                                    "pattern": "^[0-9a-zA-Z_-]{21}$",
-                                                    "maxLength": 21,
-                                                    "minLength": 21
-                                                },
-                                                "activeDeviceId": {
-                                                    "type": "string",
-                                                    "pattern": "^[0-9a-zA-Z_-]{21}$",
-                                                    "maxLength": 21,
-                                                    "minLength": 21
-                                                },
-                                                "queue": {
-                                                    "type": "array",
-                                                    "items": {
-                                                        "type": "string",
-                                                        "pattern": "^[0-9a-zA-Z_-]{21}$",
-                                                        "maxLength": 21,
-                                                        "minLength": 21
-                                                    }
-                                                },
-                                                "currentTrackIndex": {
-                                                    "type": "integer"
-                                                },
-                                                "position": {
-                                                    "type": "number"
-                                                },
-                                                "playbackState": {
-                                                    "type": "string"
-                                                },
-                                                "createdAt": {
-                                                    "type": "string",
-                                                    "format": "date-time"
-                                                },
-                                                "updatedAt": {
-                                                    "type": "string",
-                                                    "format": "date-time"
-                                                },
-                                                "lastUsedAt": {
-                                                    "type": "string",
-                                                    "format": "date-time",
-                                                    "nullable": true
-                                                }
-                                            },
-                                            "type": "object"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Not authenticated",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/ApiError"
-                                }
-                            }
-                        }
-                    },
-                    "422": {
-                        "description": "Validation error",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/ValidationError"
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/api/session/new": {
-            "post": {
-                "tags": [
-                    "Session"
-                ],
-                "summary": "Start a new listening session",
-                "operationId": "post_session_new",
-                "requestBody": {
-                    "required": true,
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "required": [
-                                    "queue",
-                                    "currentTrackIndex",
-                                    "position"
-                                ],
-                                "properties": {
-                                    "queue": {
-                                        "type": "array",
-                                        "items": {
-                                            "type": "string",
-                                            "pattern": "^[0-9a-zA-Z_-]{21}$",
-                                            "maxLength": 21,
-                                            "minLength": 21
-                                        }
-                                    },
-                                    "currentTrackIndex": {
-                                        "type": "integer",
-                                        "minimum": 0
-                                    },
-                                    "position": {
-                                        "type": "number",
-                                        "minimum": 0
-                                    }
-                                },
-                                "type": "object"
-                            }
-                        }
-                    }
-                },
-                "responses": {
-                    "201": {
-                        "description": "Session created",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "data": {
-                                            "properties": {
-                                                "publicId": {
-                                                    "type": "string",
-                                                    "pattern": "^[0-9a-zA-Z_-]{21}$",
-                                                    "maxLength": 21,
-                                                    "minLength": 21
-                                                },
-                                                "userId": {
-                                                    "type": "string",
-                                                    "pattern": "^[0-9a-zA-Z_-]{21}$",
-                                                    "maxLength": 21,
-                                                    "minLength": 21
-                                                },
-                                                "activeDeviceId": {
-                                                    "type": "string",
-                                                    "pattern": "^[0-9a-zA-Z_-]{21}$",
-                                                    "nullable": true,
-                                                    "maxLength": 21,
-                                                    "minLength": 21
-                                                },
-                                                "queue": {
-                                                    "type": "array",
-                                                    "items": {
-                                                        "type": "string",
-                                                        "pattern": "^[0-9a-zA-Z_-]{21}$",
-                                                        "maxLength": 21,
-                                                        "minLength": 21
-                                                    }
-                                                },
-                                                "currentTrackIndex": {
-                                                    "type": "integer"
-                                                },
-                                                "position": {
-                                                    "type": "number"
-                                                },
-                                                "playbackState": {
-                                                    "type": "string"
-                                                },
-                                                "createdAt": {
-                                                    "type": "string",
-                                                    "format": "date-time"
-                                                },
-                                                "updatedAt": {
-                                                    "type": "string",
-                                                    "format": "date-time"
-                                                },
-                                                "lastUsedAt": {
-                                                    "type": "string",
-                                                    "format": "date-time",
-                                                    "nullable": true
-                                                }
-                                            },
-                                            "type": "object"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Not authenticated",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/ApiError"
-                                }
-                            }
-                        }
-                    },
-                    "422": {
-                        "description": "Validation error",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/ValidationError"
                                 }
                             }
                         }
@@ -23900,6 +23470,15 @@
                         ],
                         "maxItems": 3,
                         "minItems": 1
+                    },
+                    "tabId": {
+                        "type": "string",
+                        "nullable": true,
+                        "default": null
+                    },
+                    "localRecoveryEligible": {
+                        "type": "boolean",
+                        "default": false
                     }
                 },
                 "type": "object"
@@ -24045,7 +23624,8 @@
                             "seek",
                             "load",
                             "stop",
-                            "volume"
+                            "volume",
+                            "queue"
                         ]
                     },
                     "position": {
@@ -24110,119 +23690,49 @@
                 },
                 "type": "object"
             },
-            "SyncSessionRequest": {
+            "RecoverLocalPlaybackRequest": {
                 "required": [
-                    "queue",
-                    "currentTrackIndex",
-                    "position",
-                    "playbackState"
+                    "incarnationId",
+                    "tabId",
+                    "recoveryCredential",
+                    "checkpoint"
                 ],
                 "properties": {
-                    "queue": {
-                        "description": "Ordered list of track IDs",
-                        "type": "array",
-                        "items": {
-                            "type": "string",
-                            "pattern": "^[0-9a-zA-Z_-]{21}$",
-                            "maxLength": 21,
-                            "minLength": 21
-                        },
-                        "default": []
+                    "incarnationId": {
+                        "type": "string"
                     },
-                    "currentTrackIndex": {
-                        "type": "integer",
-                        "example": 0,
-                        "default": 0,
-                        "minimum": 0
+                    "tabId": {
+                        "type": "string"
                     },
-                    "position": {
-                        "type": "number",
-                        "example": 45.2,
-                        "default": 0,
-                        "minimum": 0
+                    "recoveryCredential": {
+                        "type": "string"
                     },
-                    "playbackState": {
-                        "type": "string",
-                        "example": "playing",
-                        "default": "stopped",
-                        "enum": [
-                            "playing",
-                            "paused",
-                            "stopped"
-                        ]
-                    }
-                },
-                "type": "object"
-            },
-            "ClaimSessionRequest": {
-                "required": [
-                    "deviceId"
-                ],
-                "properties": {
-                    "deviceId": {
-                        "description": "Browser-generated device token claiming the session; distinct from device publicId",
-                        "type": "string",
-                        "format": "uuid",
-                        "default": ""
-                    },
-                    "queue": {
-                        "description": "Optional queue to bring from local device",
-                        "type": "array",
-                        "items": {
-                            "type": "string",
-                            "pattern": "^[0-9a-zA-Z_-]{21}$",
-                            "maxLength": 21,
-                            "minLength": 21
-                        },
-                        "nullable": true,
-                        "default": null
-                    },
-                    "currentTrackIndex": {
-                        "description": "Optional current track index",
-                        "type": "integer",
-                        "nullable": true,
-                        "default": null,
-                        "minimum": 0
-                    },
-                    "position": {
-                        "description": "Optional playback position",
-                        "type": "number",
-                        "nullable": true,
-                        "default": null,
-                        "minimum": 0
-                    }
-                },
-                "type": "object"
-            },
-            "CreateSessionRequest": {
-                "required": [
-                    "queue",
-                    "currentTrackIndex",
-                    "position"
-                ],
-                "properties": {
-                    "queue": {
-                        "description": "Ordered list of track IDs",
-                        "type": "array",
-                        "items": {
-                            "type": "string",
-                            "pattern": "^[0-9a-zA-Z_-]{21}$",
-                            "maxLength": 21,
-                            "minLength": 21
-                        },
-                        "default": []
-                    },
-                    "currentTrackIndex": {
-                        "type": "integer",
-                        "example": 0,
-                        "default": 0,
-                        "minimum": 0
-                    },
-                    "position": {
-                        "type": "number",
-                        "example": 0,
-                        "default": 0,
-                        "minimum": 0
+                    "checkpoint": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "oneOf": [
+                                {
+                                    "type": "object",
+                                    "additionalProperties": {
+                                        "type": "string"
+                                    }
+                                },
+                                {
+                                    "type": "number",
+                                    "format": "float"
+                                },
+                                {
+                                    "type": "integer"
+                                },
+                                {
+                                    "type": "object",
+                                    "nullable": true,
+                                    "enum": [
+                                        null
+                                    ]
+                                }
+                            ]
+                        }
                     }
                 },
                 "type": "object"
@@ -27182,7 +26692,8 @@
                             "seek",
                             "load",
                             "observe",
-                            "volume"
+                            "volume",
+                            "queue"
                         ]
                     },
                     "payload": {
@@ -27263,6 +26774,21 @@
                     "epoch": {
                         "type": "integer",
                         "minimum": 1
+                    },
+                    "recoveryCredential": {
+                        "description": "Private stop-only recovery credential for durable local storage.",
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "recoveryExpiresAt": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
+                    },
+                    "recoveryTabId": {
+                        "type": "string",
+                        "format": "uuid",
+                        "nullable": true
                     },
                     "capability": {
                         "description": "Returned only to the HTTP registration caller; keep in tab memory.",
@@ -27410,6 +26936,54 @@
                                 ]
                             }
                         ]
+                    },
+                    "recoveryResult": {
+                        "required": [
+                            "incarnationId",
+                            "outcome",
+                            "revision"
+                        ],
+                        "properties": {
+                            "incarnationId": {
+                                "type": "string",
+                                "format": "uuid"
+                            },
+                            "outcome": {
+                                "type": "string",
+                                "enum": [
+                                    "recovered"
+                                ]
+                            },
+                            "revision": {
+                                "type": "integer",
+                                "minimum": 0
+                            }
+                        },
+                        "type": "object",
+                        "nullable": true
+                    },
+                    "requestResult": {
+                        "required": [
+                            "requestId",
+                            "commandId",
+                            "outcome"
+                        ],
+                        "properties": {
+                            "requestId": {
+                                "type": "string",
+                                "format": "uuid"
+                            },
+                            "commandId": {
+                                "type": "string",
+                                "format": "uuid"
+                            },
+                            "outcome": {
+                                "type": "string",
+                                "nullable": true
+                            }
+                        },
+                        "type": "object",
+                        "nullable": true
                     }
                 },
                 "type": "object"

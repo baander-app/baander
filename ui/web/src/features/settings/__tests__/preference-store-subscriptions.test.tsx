@@ -110,7 +110,7 @@ describe('PreferenceSyncProvider store persistence', () => {
   it('ignores playback and local panel state that are absent from the server payload', async () => {
     await mountProvider()
     act(() => {
-      usePlayerStore.getState().setIsPlaying(true)
+      usePlayerStore.getState().runtimeActions.setIsPlaying(true)
       usePlayerStore.getState().setDuration(180)
       useEqBandsStore.getState().toggleSystemPanel()
     })

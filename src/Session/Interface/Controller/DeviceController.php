@@ -6,7 +6,7 @@ namespace App\Session\Interface\Controller;
 
 use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
 use App\Session\Application\Exception\DeviceNotFound;
-use App\Session\Application\Port\SessionPortInterface;
+use App\Session\Application\Port\DevicePortInterface;
 use App\Session\Interface\Request\RegisterDeviceRequest;
 use App\Session\Interface\Request\RenameDeviceRequest;
 use App\Shared\Domain\Model\Uuid;
@@ -27,9 +27,8 @@ final class DeviceController
 
     public function __construct(
         private readonly Security $security,
-        private readonly SessionPortInterface $sessionPort,
-    ) {
-    }
+        private readonly DevicePortInterface $devicePort,
+    ) {}
 
     #[OA\Post(
         path: '/api/devices',
@@ -44,11 +43,13 @@ final class DeviceController
                 description: 'Device registered',
                 content: new OA\JsonContent(
                     properties: [
-                        new OA\Property(property: 'data', type: 'object',
-                        properties: [
-                            new OA\Property(property: 'message', type: 'string', example: 'Device registered.'),
-                        ]
-                    ),
+                        new OA\Property(
+                            property: 'data',
+                            type: 'object',
+                            properties: [
+                                new OA\Property(property: 'message', type: 'string', example: 'Device registered.'),
+                            ],
+                        ),
                     ],
                 ),
             ),
@@ -67,7 +68,7 @@ final class DeviceController
 
         $deviceId = Uuid::fromString($request->deviceId);
         $userId = Uuid::fromString($user->getId());
-        $this->sessionPort->registerDevice($userId, $deviceId, $request->name);
+        $this->devicePort->registerDevice($userId, $deviceId, $request->name);
 
         return $this->successResponse(['message' => 'Device registered.']);
     }
@@ -104,7 +105,7 @@ final class DeviceController
         }
 
         $userId = Uuid::fromString($user->getId());
-        $devices = $this->sessionPort->getDevices($userId);
+        $devices = $this->devicePort->getDevices($userId);
 
         return $this->successResponse($devices);
     }
@@ -158,7 +159,7 @@ final class DeviceController
         }
 
         try {
-            $this->sessionPort->renameDevice($userId, $devicePublicId, $payload->name);
+            $this->devicePort->renameDevice($userId, $devicePublicId, $payload->name);
         } catch (DeviceNotFound) {
             return $this->notFound('Device not found.');
         }
@@ -203,7 +204,7 @@ final class DeviceController
             return $this->errorResponse('Invalid device ID.');
         }
 
-        $this->sessionPort->forgetDevice($userId, $devicePublicId);
+        $this->devicePort->forgetDevice($userId, $devicePublicId);
 
         return $this->successResponse(['message' => 'Device forgotten.']);
     }

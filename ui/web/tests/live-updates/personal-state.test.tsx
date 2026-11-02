@@ -1,4 +1,4 @@
-import { act, cleanup, renderHook, waitFor, render, screen } from '@testing-library/react'
+import { act, cleanup, renderHook, waitFor } from '@testing-library/react'
 import { QueryClientProvider } from '@tanstack/react-query'
 import MockAdapter from 'axios-mock-adapter'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -6,15 +6,9 @@ import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
 import { OwnedQueryClient } from '@/shared/live/query-client'
 import { LiveQueryCoordinator } from '@/shared/live/query-coordinator'
 import { LiveCoordinatorContext } from '@/shared/live/context'
-import userEvent from '@testing-library/user-event'
-import { StrictMode } from 'react'
 import { ThemeProvider } from 'styled-components'
 import { resolveTheme } from '@/shared/theme/resolve-theme'
-import { DevicePicker } from '@/features/session/components/DevicePicker'
-import { useSession } from '@/features/session/hooks/use-session'
 import { getDeviceId } from '@/features/session/utils/device-id'
-import { usePlayerStore } from '@/features/player/stores/player-store'
-import { mediator } from '@/shared/lib/mediator/bus'
 import { notificationLiveDescriptors } from '@/features/notification/live-descriptors'
 import { sessionLiveDescriptors } from '@/features/session/live-descriptors'
 import { useNotifications } from '@/features/notification/hooks/use-notifications'
@@ -30,13 +24,6 @@ vi.mock('@/features/auth/stores/auth-store', () => ({
 vi.mock('@/shared/crypto/dpop-store', () => ({
   getDpopKeyPair: () => null, getDpopNonce: () => null, setDpopNonce: vi.fn(),
 }))
-
-vi.mock('@/features/session/services/SessionSyncBus', () => ({ SessionSyncBus: class {
-  connect = async () => {}
-  disconnect = () => {}
-  isConnected = () => false
-  sendSync = () => {}
-} }))
 
 const notification = (publicId: string, isRead = false) => ({
   publicId, isRead, category: 'security', eventType: 'security.alert', title: publicId,
@@ -75,95 +62,35 @@ afterEach(() => {
   synchronizeOwnership(null)
 })
 
+import { PlaybackSessionCoordinator, PLAYBACK_SESSION_KEY } from '@/features/session/services/playback-session-coordinator'
+import { usePlaybackSession } from '@/features/session/hooks/use-playback-session'
+import { registerPlaybackAdapter } from '@/features/session/services/playback-execution'
+import type { PlaybackSnapshotResource } from '@/shared/api-client/gen/endpoints'
+import type { LiveTransportListener, SharedLiveTransport } from '@/shared/live/transport'
+
+function playbackSnapshot(overrides: Partial<PlaybackSnapshotResource> = {}): PlaybackSnapshotResource {
+  return { schemaVersion: 1, publicId: 'session', revision: 1,
+    media: null, queue: [], currentTrackIndex: 0, position: 0,
+    playbackState: 'stopped', desiredState: 'stopped', observedState: 'unknown',
+    selectedDestinationId: null, activeDestinationId: null, activeIncarnationId: null,
+    transfer: null, destinations: [], commands: [], ...overrides }
+}
+
+function playbackRuntime(client: OwnedQueryClient) {
+  let listener: LiveTransportListener = {}
+  const transport = {
+    subscribe: (value: LiveTransportListener) => { listener = value; return () => { listener = {} } },
+    retain: () => () => {}, isConnected: () => true, send: vi.fn(),
+  }
+  mock.onPost('/api/devices').reply(200, {})
+  const runtime = new PlaybackSessionCoordinator(client, transport as unknown as SharedLiveTransport)
+  disposers.push(runtime.start())
+  return { runtime, receive: (snapshot: PlaybackSnapshotResource) => {
+    act(() => listener.onMessage?.({ type: 'session.snapshot', data: snapshot }))
+  } }
+}
+
 describe('personal state through owned queries and HTTP', () => {
-  it.each(['claimWithQueue', 'newSession', 'automatic'] as const)('protects the confirmed session from a late read during %s', async action => {
-    const original = usePlayerStore.getState()
-    const queue = [{ publicId: 'local-song', title: 'Local', available: true }]
-    usePlayerStore.setState({ queue, currentTrack: null, currentIndex: 0, isPlaying: false })
-    const dispatch = vi.spyOn(mediator, 'dispatch')
-    const oldSession = { publicId: 'previous', activeDeviceId: 'local', queue: ['local-song'], currentTrackIndex: 0, position: 20 }
-    const confirmedSession = { ...oldSession, publicId: 'confirmed' }
-    let serverSession: typeof oldSession | null = action === 'automatic' ? null : oldSession
-    let holdRead = false
-    let finishRead: ((value: [number, unknown]) => void) | undefined
-    let finishWrite: ((value: [number, unknown]) => void) | undefined
-    mock.onGet('/api/devices').reply(200, { data: [{ publicId: 'local', deviceId: getDeviceId(), name: 'Here' }] })
-    mock.onPost('/api/devices').reply(200, {})
-    mock.onGet('/api/session').reply(() => {
-      if (!holdRead) return serverSession ? [200, { data: serverSession }] : [404, {}]
-      holdRead = false
-      return new Promise(resolve => { finishRead = resolve })
-    })
-    const endpoint = action === 'claimWithQueue' ? '/api/session/claim' : '/api/session/new'
-    mock.onPost(endpoint).reply(() => new Promise(resolve => { finishWrite = resolve }))
-    const { client, coordinator, wrapper } = setup()
-    const hook = renderHook(useSession, { wrapper })
-    try {
-      await waitFor(() => expect(hook.result.current.session).toEqual(serverSession))
-      holdRead = true
-      act(() => coordinator.hint(['sessions']))
-      await waitFor(() => expect(finishRead).toBeDefined())
-      const oldRequest = mock.history.get.filter(request => request.url === '/api/session').at(-1)!
-      act(() => {
-        if (action === 'automatic') usePlayerStore.setState({ isPlaying: true })
-        else hook.result.current[action]()
-      })
-      await waitFor(() => expect(finishWrite).toBeDefined())
-      expect(oldRequest.signal?.aborted).toBe(true)
-      const readsBeforeHold = mock.history.get.filter(request => request.url === '/api/session').length
-      act(() => coordinator.hint(['sessions']))
-      await new Promise(resolve => setTimeout(resolve, 600))
-      expect(mock.history.get.filter(request => request.url === '/api/session')).toHaveLength(readsBeforeHold)
-      serverSession = confirmedSession
-      await act(async () => { finishWrite?.([200, { data: confirmedSession }]) })
-      await waitFor(() => expect(hook.result.current.session?.publicId).toBe('confirmed'))
-      await act(async () => { finishRead?.([200, { data: oldSession }]) })
-      await waitFor(() => expect(mock.history.get.filter(request => request.url === '/api/session').length).toBeGreaterThan(readsBeforeHold))
-      expect(client.getQueryData(['session', 'current'])).toEqual(confirmedSession)
-      expect(usePlayerStore.getState().queue).toEqual(queue)
-      expect(dispatch).not.toHaveBeenCalled()
-    } finally {
-      finishWrite?.([200, { data: confirmedSession }])
-      finishRead?.([200, { data: oldSession }])
-      hook.unmount()
-      dispatch.mockRestore()
-      usePlayerStore.setState(original)
-    }
-  })
-
-  it.each(['failed write', 'account replacement'] as const)('releases a session write safely after %s', async outcome => {
-    const original = usePlayerStore.getState()
-    usePlayerStore.setState({ queue: [{ publicId: 'local-song', title: 'Local', available: true }], currentTrack: null, isPlaying: false })
-    const session = { publicId: 'previous', activeDeviceId: 'local', queue: ['local-song'], currentTrackIndex: 0, position: 20 }
-    let finish: ((value: [number, unknown]) => void) | undefined
-    mock.onGet('/api/devices').reply(200, { data: [{ publicId: 'local', deviceId: getDeviceId(), name: 'Here' }] })
-    mock.onPost('/api/devices').reply(200, {})
-    mock.onGet('/api/session').reply(200, { data: session })
-    mock.onPost('/api/session/new').reply(() => new Promise(resolve => { finish = resolve }))
-    const { client, coordinator, wrapper } = setup()
-    const hook = renderHook(useSession, { wrapper })
-    try {
-      await waitFor(() => expect(hook.result.current.session?.publicId).toBe('previous'))
-      act(() => hook.result.current.newSession())
-      await waitFor(() => expect(finish).toBeDefined())
-      if (outcome === 'account replacement') act(() => synchronizeOwnership('personal-b'))
-      await act(async () => { finish?.(outcome === 'failed write' ? [503, {}] : [200, { data: { ...session, publicId: 'late' } }]) })
-      await waitFor(() => expect(hook.result.current.isCreating).toBe(false))
-      if (outcome === 'account replacement') {
-        expect(client.getQueryData(['session', 'current'])).toBeUndefined()
-      } else {
-        const reads = mock.history.get.filter(request => request.url === '/api/session').length
-        act(() => coordinator.hint(['sessions']))
-        await waitFor(() => expect(mock.history.get.filter(request => request.url === '/api/session').length).toBeGreaterThan(reads))
-        expect(client.getQueryData(['session', 'current'])).toEqual(session)
-      }
-    } finally {
-      finish?.([503, {}])
-      hook.unmount()
-      usePlayerStore.setState(original)
-    }
-  })
-
   it('keeps list and count current after remote creation, read and deletion', async () => {
     let rows = [notification('first')]
     mock.onGet('/api/notifications/').reply(() => [200, { data: rows, nextCursor: null }])
@@ -230,115 +157,78 @@ describe('personal state through owned queries and HTTP', () => {
     expect(useNotificationStore.getState().unreadCount).toBe(0)
   })
 
-  it('refreshes the generated device key without invoking session commands', async () => {
+  it('refreshes the generated device key independently of playback destinations', async () => {
     let name = 'Office'
-    mock.onGet('/api/devices').reply(() => [200, { data: [{ publicId: 'device', name }, { publicId: 'local', deviceId: getDeviceId(), name: 'Here' }] }])
-    mock.onGet('/api/session').reply(200, { data: { activeDeviceId: 'device' } })
+    mock.onGet('/api/devices').reply(() => [200, { data: [
+      { publicId: 'device', name }, { publicId: 'local', deviceId: getDeviceId(), name: 'Here' },
+    ] }])
     const { client, coordinator, wrapper } = setup()
+    const destination = playbackSnapshot({ activeDestinationId: 'remote-browser', position: 32 })
+    client.setQueryData(PLAYBACK_SESSION_KEY, destination)
     const hook = renderHook(() => useGetDeviceList(), { wrapper })
-    render(<DevicePicker />, { wrapper })
-    await screen.findByRole('button', { name: 'Office' })
+    await waitFor(() => expect(hook.result.current.data?.data?.[0].name).toBe('Office'))
     name = 'Living room'
     act(() => coordinator.hint(['devices']))
-    await screen.findByRole('button', { name: 'Living room' })
-    expect(hook.result.current.data?.data?.[0].name).toBe('Living room')
+    await waitFor(() => expect(hook.result.current.data?.data?.[0].name).toBe('Living room'))
     expect(client.getQueryCache().getAll().filter(query => query.queryKey[0] === '/api/devices').map(query => query.queryKey)).toEqual([getGetDeviceListQueryKey()])
+    expect(client.getQueryData(PLAYBACK_SESSION_KEY)).toEqual(destination)
     expect(mock.history.post).toHaveLength(0)
   })
-  it('does not restore or claim playback when a session refresh arrives after the local queue was cleared', async () => {
-    const original = usePlayerStore.getState()
-    usePlayerStore.setState({ queue: [], currentTrack: null, currentIndex: 0, isPlaying: false })
-    const dispatch = vi.spyOn(mediator, 'dispatch')
-    let queue: string[] = []
-    mock.onGet('/api/devices').reply(200, { data: [{ publicId: 'local', deviceId: getDeviceId(), name: 'Here' }] })
-    mock.onPost('/api/devices').reply(200, {})
-    mock.onGet('/api/session').reply(() => [200, { data: { publicId: 'session', activeDeviceId: 'local', queue, currentTrackIndex: 0, position: 20 } }])
-    mock.onGet('/api/songs/').reply(200, { data: [{ publicId: 'remote-song', title: 'Remote', available: true }] })
-    const { coordinator, wrapper } = setup()
-    const hook = renderHook(useSession, { wrapper })
-    await waitFor(() => expect(hook.result.current.session?.queue).toEqual([]))
-    await waitFor(() => expect(mock.history.get.some(request => request.url === '/api/devices')).toBe(true))
-    queue = ['remote-song']
+
+  it('adopts live snapshots without independently executing or claiming playback', async () => {
+    const execute = vi.fn()
+    const prepare = vi.fn()
+    disposers.push(registerPlaybackAdapter({ kind: 'song', supportsVolume: true, prepare, execute,
+      quiesce: vi.fn(async () => ({ observedState: 'stopped' as const, position: 0 })),
+      observe: () => ({ observedState: 'stopped', position: 0 }),
+    }))
+    const { client, coordinator, wrapper } = setup()
+    const playback = playbackRuntime(client)
+    const hook = renderHook(usePlaybackSession, { wrapper })
+    playback.receive(playbackSnapshot())
+    await waitFor(() => expect(hook.result.current.snapshot?.queue).toEqual([]))
+    playback.receive(playbackSnapshot({ revision: 2, media: { kind: 'song', publicId: 'remote-song' },
+      queue: ['remote-song'], activeDestinationId: 'remote-browser', activeIncarnationId: 'remote-tab', position: 20 }))
     act(() => coordinator.hint(['sessions']))
-    await waitFor(() => expect(hook.result.current.session?.queue).toEqual(['remote-song']))
-    expect(dispatch).not.toHaveBeenCalled()
-    expect(mock.history.get.filter(request => request.url?.includes('/api/songs/'))).toHaveLength(0)
+    await waitFor(() => expect(hook.result.current.snapshot?.position).toBe(20))
+    expect(prepare).not.toHaveBeenCalled()
+    expect(execute).not.toHaveBeenCalled()
+    expect(mock.history.get).toHaveLength(0)
     expect(mock.history.post.filter(request => request.url !== '/api/devices')).toHaveLength(0)
-    expect(usePlayerStore.getState().queue).toEqual([])
-    hook.unmount()
-    dispatch.mockRestore()
-    usePlayerStore.setState(original)
   })
 
-  it('hydrates the initial queue once through StrictMode and retains eligibility after a transient hydration failure', async () => {
-    const original = usePlayerStore.getState()
-    usePlayerStore.setState({ queue: [], currentTrack: null, currentIndex: 0, isPlaying: false })
-    const dispatch = vi.spyOn(mediator, 'dispatch')
-    const session = { publicId: 'session', activeDeviceId: 'local', queue: ['remote-song'], currentTrackIndex: 0, position: 20 }
-    const devices = { data: [{ publicId: 'local', deviceId: getDeviceId(), name: 'Here' }] }
-    mock.onGet('/api/devices').reply(200, devices)
-    mock.onPost('/api/devices').reply(200, {})
-    mock.onGet('/api/session').reply(200, { data: session })
-    let failHydration = true
-    mock.onGet('/api/songs/').reply(() => failHydration ? [503, {}] : [200, { data: [{ publicId: 'remote-song', title: 'Remote', available: true }] }])
-    const { client, coordinator, wrapper: Wrapper } = setup()
-    client.setQueryData(['session', 'current'], session)
-    client.setQueryData(getGetDeviceListQueryKey(), devices)
-    const wrapper = ({ children }: { children: React.ReactNode }) => <StrictMode><Wrapper>{children}</Wrapper></StrictMode>
-    const hook = renderHook(useSession, { wrapper })
-    await waitFor(() => expect(mock.history.get.some(request => request.url === '/api/songs/')).toBe(true))
-    expect(dispatch).not.toHaveBeenCalled()
-    failHydration = false
-    // A new authoritative snapshot retries the unfinished initial hydration.
-    mock.onGet('/api/session').reply(200, { data: { ...session, position: 21 } })
-    act(() => coordinator.hint(['sessions']))
-    await waitFor(() => expect(dispatch).toHaveBeenCalledTimes(1))
-    mock.onGet('/api/session').reply(200, { data: { ...session, position: 22 } })
-    act(() => coordinator.hint(['sessions']))
-    await waitFor(() => expect(hook.result.current.session?.position).toBe(22))
-    expect(dispatch).toHaveBeenCalledTimes(1)
-    hook.unmount()
-    dispatch.mockRestore()
-    usePlayerStore.setState(original)
-  })
-
-  it('keeps the device picker claim explicit and hydrates its queue after initial restoration was consumed', async () => {
-    const original = usePlayerStore.getState()
-    usePlayerStore.setState({ queue: [{ publicId: 'local-song', title: 'Local', available: true }], currentTrack: null, currentIndex: 0, isPlaying: false })
-    const dispatch = vi.spyOn(mediator, 'dispatch')
-    let activeDeviceId = 'other'
-    const session = () => ({ publicId: 'session', activeDeviceId, queue: ['remote-song'], currentTrackIndex: 0, position: 20 })
-    mock.onGet('/api/devices').reply(200, { data: [{ publicId: 'local', deviceId: getDeviceId(), name: 'Here' }, { publicId: 'other', name: 'Elsewhere' }] })
-    mock.onPost('/api/devices').reply(200, {})
-    mock.onGet('/api/session').reply(() => [200, { data: session() }])
-    mock.onGet('/api/songs/').reply(200, { data: [{ publicId: 'remote-song', title: 'Remote', available: true }] })
-    mock.onPost('/api/session/claim').reply(() => { activeDeviceId = 'local'; return [200, { data: session() }] })
-    const { coordinator, wrapper } = setup()
-    const hook = renderHook(useSession, { wrapper })
-    render(<DevicePicker />, { wrapper })
-    await screen.findByRole('button', { name: 'Elsewhere' })
-    expect(dispatch).not.toHaveBeenCalled()
-    expect(mock.history.post.filter(request => request.url === '/api/session/claim')).toHaveLength(0)
-    await userEvent.setup().click(screen.getByRole('button', { name: 'Elsewhere' }))
-    await waitFor(() => expect(dispatch).toHaveBeenCalledTimes(1))
-    expect(mock.history.post.filter(request => request.url === '/api/session/claim')).toHaveLength(1)
-    expect(dispatch.mock.calls[0][1]).toMatchObject({ queue: [{ publicId: 'remote-song' }] })
-    act(() => coordinator.hint(['sessions']))
-    await waitFor(() => expect(hook.result.current.session?.activeDeviceId).toBe('local'))
-    expect(dispatch).toHaveBeenCalledTimes(1)
-    hook.unmount()
-    dispatch.mockRestore()
-    usePlayerStore.setState(original)
-  })
-
-  it('treats an absent initial session as a successful empty snapshot without issuing a command', async () => {
-    mock.onGet('/api/devices').reply(200, { data: [] })
-    mock.onGet('/api/session').reply(404, {})
+  it.each(['failed write', 'account replacement'] as const)('protects current playback from a late control response after %s', async outcome => {
+    let finish: ((value: [number, unknown]) => void) | undefined
+    mock.onPost('/api/session/control').reply(() => new Promise(resolve => { finish = resolve }))
     const { client, wrapper } = setup()
-    render(<DevicePicker />, { wrapper })
-    await waitFor(() => expect(client.getQueryState(['session', 'current'])?.status).toBe('success'))
-    expect(client.getQueryData(['session', 'current'])).toBeNull()
-    expect(mock.history.post).toHaveLength(0)
+    const playback = playbackRuntime(client)
+    const original = playbackSnapshot({ endpoint: { destinationId: 'local', incarnationId: 'tab', epoch: 1, capability: 'private' } })
+    playback.receive(original)
+    const hook = renderHook(usePlaybackSession, { wrapper })
+    const request = playback.runtime.request({ action: 'pause' }).catch(error => error)
+    await waitFor(() => expect(finish).toBeDefined())
+    if (outcome === 'account replacement') act(() => synchronizeOwnership('personal-b'))
+    await act(async () => {
+      finish?.(outcome === 'failed write' ? [503, {}] : [200, { data: playbackSnapshot({ revision: 9, position: 90 }) }])
+      await request
+    })
+    if (outcome === 'account replacement') {
+      expect(client.getQueryData(PLAYBACK_SESSION_KEY)).toBeUndefined()
+      hook.unmount()
+    } else {
+      expect(hook.result.current.snapshot?.revision).toBe(1)
+      await waitFor(() => expect(hook.result.current.error).toBeTruthy())
+    }
+    expect(mock.history.post.filter(request => request.url === '/api/session/transfer')).toHaveLength(0)
   })
 
+  it('represents an idle initial session without issuing a playback command', async () => {
+    const { client, wrapper } = setup()
+    const playback = playbackRuntime(client)
+    const hook = renderHook(usePlaybackSession, { wrapper })
+    playback.receive(playbackSnapshot())
+    await waitFor(() => expect(hook.result.current.snapshot?.media).toBeNull())
+    expect(hook.result.current.snapshot?.queue).toEqual([])
+    expect(mock.history.post.filter(request => request.url !== '/api/devices')).toHaveLength(0)
+  })
 })

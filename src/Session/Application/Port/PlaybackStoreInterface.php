@@ -11,6 +11,8 @@ interface PlaybackStoreInterface
 {
     public function lockSession(string $userId): ListeningSession;
     public function saveSession(ListeningSession $session): void;
+    /** Retire only unavailable managed browser execution with a durable, fenced quiescence acknowledgement. */
+    public function retireConfirmedPausedBrowser(ListeningSession $session): bool;
     /**
      * @param array<string,mixed> $input
      * @return array<string,mixed>
@@ -26,6 +28,8 @@ interface PlaybackStoreInterface
     public function insertCommand(array $command): void;
     /** @return array<string,mixed> */
     public function command(string $userId, string $commandId): array;
+    /** @return array{id:string,request_id:string,outcome:?string}|null */
+    public function requestedCommand(string $sessionId, string $requestId): ?array;
     public function acknowledgeCommand(string $commandId, string $outcome): void;
     public function cancelCommands(string $attemptId): void;
     public function hasPendingControl(string $sessionId): bool;
@@ -37,4 +41,10 @@ interface PlaybackStoreInterface
     public function snapshot(ListeningSession $session, ?string $incarnationId): array;
     public function observe(string $incarnationId, string $state, float $position, ?float $volume = null): void;
     public function observeVolume(string $incarnationId, float $volume): void;
+    /** @return array<string,mixed> */
+    public function localRecovery(string $owner, string $incarnationId, string $tabId, string $credential): array;
+    /** @param array<string,mixed> $result */
+    public function completeLocalRecovery(string $incarnationId, array $result): void;
+    public function supersedeIncarnationCommands(string $incarnationId): void;
+    public function sourceQuiesced(string $attemptId, string $sourceId): bool;
 }

@@ -1,6 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import type { ReactNode } from 'react'
 import { render, screen, fireEvent } from '@testing-library/react'
+import { registerPlaybackIntentHandler } from '@/features/session/services/playback-execution'
 import { ListRow, type ListSongData } from '../ListRow'
 import { useSelectionStore } from '../../stores/selection-store'
 import { useListColumnStore } from '../../stores/list-column-store'
@@ -30,7 +31,13 @@ const allSongs: ListSongData[] = [
 const defaultStyle = { height: '32px', transform: 'translateY(0px)' }
 
 describe('ListRow', () => {
+  const playback = vi.fn(async () => {})
+  let unregister: () => void
+  afterEach(() => unregister())
   beforeEach(() => {
+    playback.mockClear()
+    unregister = registerPlaybackIntentHandler(playback)
+    usePlayerStore.getState().runtimeActions.clearQueue()
     useSelectionStore.getState().clear()
     useListColumnStore.setState({
       visibleColumns: ['#', 'title', 'artist', 'album', 'year', 'duration'],
@@ -70,13 +77,13 @@ describe('ListRow', () => {
     const row = screen.getByRole('row')
     fireEvent.keyDown(row, { key: 'Enter' })
 
-    const playerState = usePlayerStore.getState()
-    expect(playerState.currentTrack?.publicId).toBe('song-1')
-    expect(playerState.queue).toHaveLength(2)
+    expect(playback).toHaveBeenCalledExactlyOnceWith({ action: 'load', media: { kind: 'song', publicId: 'song-1' },
+      queue: ['song-1', 'song-2'], currentTrackIndex: 0, position: 0, desiredState: 'playing' })
+    expect(usePlayerStore.getState().currentTrack).toBeNull()
   })
 
   it('keeps an unavailable song visible and selectable while Enter cannot play it', () => {
-    usePlayerStore.getState().clearQueue()
+    usePlayerStore.getState().runtimeActions.clearQueue()
     const missing = { ...baseSong, available: false }
     render(<ListRow song={missing} allSongs={[missing]} style={defaultStyle} />)
 
@@ -85,6 +92,7 @@ describe('ListRow', () => {
     expect(useSelectionStore.getState().selectedId).toBe(missing.publicId)
     fireEvent.keyDown(screen.getByRole('row'), { key: 'Enter' })
     expect(usePlayerStore.getState().currentTrack).toBeNull()
+    expect(playback).not.toHaveBeenCalled()
   })
 
   it('applies selected styling when selected', () => {

@@ -7,6 +7,8 @@ vi.mock('@/features/player/services/audio-processor', () => ({
       connectAudioElement: vi.fn(),
       connectDualAudioElements: vi.fn(),
       setPlayingState: vi.fn(),
+      fenceOutput: vi.fn(),
+      rearmOutput: vi.fn(),
       resumeContextIfNeeded: vi.fn().mockResolvedValue(undefined),
       destroy: vi.fn(),
       initializePassiveMode: vi.fn(),
@@ -109,6 +111,21 @@ describe('AudioService', () => {
         ? audioService.connectAudioElement(audioElement())
         : audioService.connectDualAudioElements(audioElement(), audioElement())
     }
+
+    it('invalidates late connection preferences while fencing output and preserves explicit rearm', async () => {
+      audioService.initialize()
+      const processor = audioService.getProcessor()!
+      const pending = deferred()
+      vi.mocked(processor[method]).mockReturnValueOnce(pending.promise)
+      const connection = connect()
+      audioService.fenceOutput()
+      pending.resolve()
+      await connection
+      expect(processor.fenceOutput).toHaveBeenCalledOnce()
+      expect(reapplyAllEqState).not.toHaveBeenCalled()
+      audioService.rearmOutput()
+      expect(processor.rearmOutput).toHaveBeenCalledOnce()
+    })
 
     it.each(['destroyed', 'replaced', 'superseded'] as const)('ignores success from a %s connection', async (owner) => {
       audioService.initialize()

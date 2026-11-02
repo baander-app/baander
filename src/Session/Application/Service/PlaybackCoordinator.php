@@ -29,7 +29,7 @@ final readonly class PlaybackCoordinator implements PlaybackCoordinationInterfac
         private PlaybackMediaAccessInterface $mediaAccess,
     ) {}
 
-    public function execute(Uuid $userId, PlaybackOperation $operation, array $input, ?string $endpointCapability = null): array
+    public function execute(Uuid $userId, PlaybackOperation $operation, #[\SensitiveParameter] array $input, ?string $endpointCapability = null): array
     {
         try {
             return $this->coordinate($userId, $operation, $input, $endpointCapability);
@@ -43,7 +43,7 @@ final readonly class PlaybackCoordinator implements PlaybackCoordinationInterfac
     /** @param array<string,mixed> $input
      * @return array<string,mixed>
      */
-    private function coordinate(Uuid $userId, PlaybackOperation $operation, array $input, ?string $endpointCapability): array
+    private function coordinate(Uuid $userId, PlaybackOperation $operation, #[\SensitiveParameter] array $input, ?string $endpointCapability): array
     {
         $owner = $userId->toString();
         $incarnationId = isset($input['incarnationId']) ? $this->uuid($input, 'incarnationId') : null;
@@ -57,6 +57,9 @@ final readonly class PlaybackCoordinator implements PlaybackCoordinationInterfac
         $registration = null;
         $result = $this->transactions->run(function () use ($userId, $owner, $operation, $input, $endpoint, $incarnationId, &$registration): array {
             $session = $this->store->lockSession($owner);
+            if ($operation === PlaybackOperation::RecoverLocal) {
+                return $this->recoverLocal($session, $input);
+            }
             $before = serialize($session->getState());
             $transfer = $this->store->currentTransfer($session->getId()->toString());
             if ($transfer !== null && new DateTimeImmutable($transfer['expires_at']) <= new DateTimeImmutable()) {
@@ -139,16 +142,16 @@ final readonly class PlaybackCoordinator implements PlaybackCoordinationInterfac
                     }
                     break;
                 case PlaybackOperation::Control:
-                    if ($transfer !== null) {
-                        throw new ConflictException('Playback controls wait for transfer reconciliation.');
-                    }
                     $requestId = $this->uuid($input, 'requestId');
                     if ($this->replayRequest($session, $requestId, $operation, $input)) {
                         break;
                     }
+                    if ($transfer !== null) {
+                        throw new ConflictException('Playback controls wait for transfer reconciliation.');
+                    }
                     $this->expectRevision($session, $input);
                     $action = $input['action'] ?? null;
-                    if (!in_array($action, ['play', 'pause', 'seek', 'load', 'stop', 'volume'], true)) {
+                    if (!in_array($action, ['play', 'pause', 'seek', 'load', 'stop', 'volume', 'queue'], true)) {
                         throw new InvalidArgumentException('Invalid playback action.');
                     }
                     if ($this->store->hasPendingControl($session->getId()->toString())) {
@@ -209,6 +212,12 @@ final readonly class PlaybackCoordinator implements PlaybackCoordinationInterfac
                     $this->persistTransfer($session, $transfer, $this->model($transfer));
                     break;
                 case PlaybackOperation::Snapshot:
+                    if ($transfer === null && $session->activeIncarnationId() !== null
+                        && $session->desiredState() === PlaybackState::Paused
+                        && $session->observedState() === ObservedPlaybackState::Paused
+                        && $this->store->retireConfirmedPausedBrowser($session)) {
+                        $session->releaseConfirmedPausedRunner();
+                    }
                     break;
                 default:
                     throw new InvalidArgumentException('Unknown playback operation.');
@@ -216,12 +225,98 @@ final readonly class PlaybackCoordinator implements PlaybackCoordinationInterfac
             if (serialize($session->getState()) !== $before) {
                 $this->store->saveSession($session);
             }
-            return $this->store->snapshot($session, $incarnationId);
+            $snapshot = $this->store->snapshot($session, $incarnationId);
+            if ($operation === PlaybackOperation::Control) {
+                $command = $this->store->requestedCommand($session->getId()->toString(), $this->uuid($input, 'requestId'));
+                if ($command !== null) {
+                    $snapshot['requestResult'] = [
+                        'requestId' => $command['request_id'],
+                        'commandId' => $command['id'],
+                        'outcome' => $command['outcome'],
+                    ];
+                }
+            }
+            return $snapshot;
         });
         if ($registration !== null) {
             $result['endpoint'] = $registration;
         }
         return $result;
+    }
+
+    /** @param array<string,mixed> $input
+     * @return array<string,mixed>
+     */
+    private function recoverLocal(ListeningSession $session, #[\SensitiveParameter] array $input): array
+    {
+        $incarnation = $this->uuid($input, 'incarnationId');
+        $tab = $this->uuid($input, 'tabId');
+        $credential = $input['recoveryCredential'] ?? null;
+        if (!is_string($credential) || preg_match('/^[0-9a-f]{64}$/D', $credential) !== 1) {
+            throw new InvalidArgumentException('A local recovery credential is required.');
+        }
+        $record = $this->store->localRecovery($session->getUserId()->toString(), $incarnation, $tab, $credential);
+        if ($record['recovery_result'] !== null) {
+            return $this->store->snapshot($session, null) + ['recoveryResult' => $record['recovery_result']];
+        }
+        $checkpoint = $input['checkpoint'] ?? null;
+        if (!is_array($checkpoint) || !array_key_exists('media', $checkpoint)
+            || !isset($checkpoint['revision'], $checkpoint['currentTrackIndex'])
+            || !is_int($checkpoint['revision']) || $checkpoint['revision'] < 0
+            || !is_int($checkpoint['currentTrackIndex']) || $checkpoint['currentTrackIndex'] < 0) {
+            throw new InvalidArgumentException('Invalid local recovery checkpoint.');
+        }
+        $position = $this->position($checkpoint);
+        $media = $checkpoint['media'] === null ? null : $this->media($checkpoint['media']);
+        $transfer = $this->store->currentTransfer($session->getId()->toString());
+        $source = $transfer !== null && $transfer['source_incarnation_id'] === $incarnation;
+        $target = $transfer !== null && $transfer['target_incarnation_id'] === $incarnation;
+        $active = $session->activeIncarnationId()?->toString() === $incarnation;
+        $preserveTarget = $source && in_array($transfer['state'], ['starting', 'uncertain'], true);
+        $mutate = !$preserveTarget && ($source || $target || ($transfer === null && $active));
+        $this->store->supersedeIncarnationCommands($incarnation);
+        if ($mutate) {
+            $targetPreparing = $target && $transfer['state'] === 'preparing';
+            if ($transfer !== null) {
+                $this->store->cancelCommands($transfer['id']);
+                $transfer['state'] = 'failed';
+            }
+            if (!$targetPreparing) {
+                $sourceId = $target ? $transfer['source_incarnation_id'] : null;
+                $sourceStopped = $sourceId === null || $this->store->sourceQuiesced($transfer['id'], $sourceId);
+                if ($sourceId !== null && !$sourceStopped) {
+                    $sourceEndpoint = $this->store->endpoint($session->getUserId()->toString(), $sourceId);
+                    $sourceStopped = ($sourceEndpoint['recovery_result'] ?? null) !== null
+                        && $sourceEndpoint['retired_at'] !== null && $sourceEndpoint['observed_state'] === 'stopped';
+                }
+                $session->recoverLocalRunner(
+                    $media,
+                    $checkpoint['currentTrackIndex'],
+                    $checkpoint['revision'],
+                    $position,
+                    !$target || $sourceId === null,
+                    $sourceStopped,
+                );
+                if ($target && $sourceId !== null) {
+                    $session->restoreSelection(Uuid::fromString($this->store->endpoint($session->getUserId()->toString(), $sourceId)['destination_id']));
+                    if (!$sourceStopped) {
+                        $obligation = (new Uuid())->toString();
+                        $this->enqueue($session, $obligation, $obligation, $sourceId, 'stop', hash('sha256', $obligation));
+                    }
+                }
+            } else {
+                $session->restoreSelection($active ? null : ($session->activeIncarnationId() === null ? null : Uuid::fromString($this->store->endpoint($session->getUserId()->toString(), $session->activeIncarnationId()->toString())['destination_id'])));
+                $session->advanceRevision();
+            }
+            if ($transfer !== null) {
+                $transfer['revision'] = $session->revision();
+                $this->store->saveTransfer($transfer);
+            }
+            $this->store->saveSession($session);
+        }
+        $result = ['incarnationId' => $incarnation, 'outcome' => 'recovered', 'revision' => $session->revision()];
+        $this->store->completeLocalRecovery($incarnation, $result);
+        return $this->store->snapshot($session, null) + ['recoveryResult' => $result];
     }
 
     private function expireControl(ListeningSession $session): void
@@ -231,12 +326,17 @@ final readonly class PlaybackCoordinator implements PlaybackCoordinationInterfac
             return;
         }
         $this->store->cancelCommands($command['attempt_id']);
-        if ($command['type'] === 'volume') {
+        if (in_array($command['type'], ['volume', 'queue'], true)) {
             $session->advanceRevision();
             return;
         }
+        $preservePaused = $command['type'] === 'stop' && $session->desiredState() === PlaybackState::Paused;
         $session->retainUncertainRunner();
-        $session->control(action: 'stop', media: null, queue: null, index: null, position: null, desired: null);
+        if ($preservePaused) {
+            $session->advanceRevision();
+        } else {
+            $session->control(action: 'stop', media: null, queue: null, index: null, position: null, desired: null);
+        }
         $this->enqueue(
             $session,
             $command['attempt_id'],
@@ -298,7 +398,7 @@ final readonly class PlaybackCoordinator implements PlaybackCoordinationInterfac
             return;
         }
         $expected = match ($command['type']) {
-            'play' => 'playing','pause' => 'paused','stop' => 'stopped','seek','load','volume' => 'applied', default => null,
+            'play' => 'playing','pause' => 'paused','stop' => 'stopped','seek','load','volume','queue' => 'applied', default => null,
         };
         if ($outcome !== $expected && $outcome !== 'rejected') {
             throw new ConflictException('Unexpected command acknowledgement.');
@@ -308,11 +408,19 @@ final readonly class PlaybackCoordinator implements PlaybackCoordinationInterfac
                 $this->store->observeVolume($endpoint['id'], $this->volume($input));
             }
             $this->store->acknowledgeCommand($command['id'], $outcome);
+            $session->advanceRevision();
             return;
         }
         $this->store->acknowledgeCommand($command['id'], $outcome);
+        if ($command['type'] === 'stop' && $outcome === 'rejected' && $session->desiredState() === PlaybackState::Paused) {
+            $session->retainUncertainRunner();
+            $session->advanceRevision();
+            $this->enqueue($session, $command['attempt_id'], $command['request_id'], $endpoint['id'], 'stop', $command['request_digest']);
+            return;
+        }
         $session->confirmControl($outcome === 'rejected', $command['type'] !== 'stop' && isset($input['position']) ? $this->position($input) : null);
-        $this->store->observe($endpoint['id'], $session->observedState()->value, $session->getPosition());
+        $this->store->observe($endpoint['id'], $command['type'] === 'stop' && $outcome === 'stopped' ? 'stopped' : $session->observedState()->value, $session->getPosition());
+        $session->advanceRevision();
     }
 
     /** @param array<string,mixed> $transfer */

@@ -139,7 +139,11 @@ export function requestSelectedTrackPlayback(
     && get().audioElement === el && el.src === src && get().currentTrack === track
   el.play().then(() => {
     settle()
-    if (!ownsSelection() || !get().isPlaying || el.paused || el.ended) return
+    if (!ownsSelection()) {
+      if (el.src === src && !get().playbackExecutionActive) el.pause()
+      return
+    }
+    if (!get().isPlaying || el.paused || el.ended) return
     // ActivityService handles its own request errors; those are not playback errors.
     activityService.recordPlay({ songId: track.publicId, albumId: track.albumPublicId })
   }, (err) => {

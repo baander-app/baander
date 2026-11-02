@@ -1,6 +1,6 @@
 # Baander roadmap
 
-Updated: 2026-11-01. This roadmap selects future work and records unresolved
+Updated: 2026-11-02. This roadmap selects future work and records unresolved
 acceptance. Current operating contracts belong in the linked guides; completed
 milestones and their verification evidence remain in Git history.
 
@@ -68,6 +68,62 @@ U3. Receiver grants, the companion, casting adapters and hardware qualification
 remain open. Queue authorization currently checks tracks individually; the receiver
 authorization work will assess a bounded Catalog batch contract without weakening
 per-item access checks.
+
+Browser integration checkpoint, 2026-11-02 (U3): music and video now
+use the shared command runner and destination selector. The legacy claim/sync
+entrypoints are removed. Queue edits preserve playback; controls wait for the
+destination's acknowledgement. Eligible local browsers retain stop-only recovery
+credentials, fence playback on page exit and recover paused after the old executor
+has stopped. Other browsers retain ordinary playback with recovery unavailable.
+
+Verification: 3,105 web tests passed across 244 files;
+typechecking passed and lint retained eight existing warnings with no errors.
+The CI image passed 43 schema/transfer tests with 437 assertions, 20 recovery unit
+tests with 160 assertions, nine recovery persistence tests with 58 assertions,
+and 22 stream-signing tests with 80 assertions.
+Full PHPStan passed; Deptrac reported zero violations against 484 existing skips.
+PR1 review and subsequent scoped reviews left no outstanding findings. The recovery simplification
+removed a duplicated video eligibility predicate; its 239 focused tests passed.
+
+Four isolated-preview browser checks passed: music transfer and remote controls;
+music recovery after reload, tab closure and renderer destruction; paused browser
+lease expiry and fresh registration; and paused video transfer, remote presentation
+close/reopen, return locally and recovery after reload.
+They assert native playback, retained media/cursor and fresh execution authority.
+The music destination menu stays within a 390px viewport. Fixtures cleaned up
+their owned accounts, media and jobs.
+
+These checks exposed and verified fixes for signed video URLs using a hostname
+instead of the application origin, Play failing to acquire a runner after local
+recovery, and an observation crossing a checkpoint write with a newer revision.
+Native routing prevention was verified in Linux Chromium. Safari automatic local
+recovery remains unavailable; ordinary playback is retained. Receiver grants,
+the companion, protocol adapters and physical receiver qualification remain open.
+
+An unavailable browser registered before durable recovery retained playback
+ownership despite its final acknowledged pause. Snapshot reconciliation now releases
+that ownership only with matching durable evidence and no later commands or
+unfinished transfer. The CI image passed the affected 36 tests with 264 assertions.
+After refreshing the preview, the normal coordinator released the retained session
+and preserved all 77 queue items, the selected song, queue index and playback position.
+The chooser lists available destinations and reports unconfirmed previous playback
+separately; unrelated recovery no longer claims playback is resumable.
+
+Local Play renews the browser's presence or fences a retired endpoint and waits for
+fresh registration. The browser regression passed after deliberately expiring a
+paused tab: native audio resumed with the same media and queue, a new incarnation
+and no rejected control or transfer request. The browser owns its local music/video
+execution independently of companion presence, pairing or connectivity. The companion
+plan explicitly prohibits claiming or acknowledging browser endpoints.
+
+Closing a video view now checks its original browser incarnation and video identity
+when the queued action executes. A stale Back handler cannot stop a destination
+that took over playback; explicit Stop remains a destination control. The 57 focused
+coordinator and overlay tests passed, and the scoped review found no remaining issues.
+
+Follow-up: the separate retry path can retain a pending control after a network
+failure followed by a rejected retry. Initial rejected requests are cleared; the
+retry-after-network-failure case remains outside this recovery check.
 
 ## Learning and plan maintenance
 

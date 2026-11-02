@@ -35,6 +35,7 @@ export interface PlayerQueueState {
 }
 
 export interface PlayerPlaybackState {
+  playbackExecutionActive: boolean
   isPlaying: boolean
   duration: number
   audioElement: HTMLAudioElement | null
@@ -42,6 +43,7 @@ export interface PlayerPlaybackState {
 }
 
 export interface PlayerQueueActions {
+  applyQueueSnapshot: (queue: Track[], index: number) => void
   playTrack: (track: Track, queue?: Track[]) => void
   playTrackFromList: (songs: SongEntry[], position: number) => void
   addToQueue: (track: Track) => void
@@ -56,6 +58,9 @@ export interface PlayerQueueActions {
 }
 
 export interface PlayerPlaybackActions {
+  observePlaybackState: (patch: Partial<PlayerPlaybackState & PlayerQueueState>) => void
+  observeListeningVolume: (volume: number) => void
+  setPlaybackExecutionActive: (active: boolean) => void
   replayCurrentTrack: () => void
   /** Replace the current track's original stream after the browser rejected its format. */
   switchToTranscodedStream: () => void
@@ -83,8 +88,11 @@ export interface PlayerPreferenceActions {
   toggleMute: () => void
 }
 
+export type PlayerRuntimeActions = PlayerQueueActions & PlayerPlaybackActions & PlayerPreferenceActions
+
 export type PlayerState = PlayerQueueState & PlayerPlaybackState & PlayerPreferences
   & PlayerQueueActions & PlayerPlaybackActions & PlayerPreferenceActions
+  & { runtimeActions: PlayerRuntimeActions }
 export type PersistedPlayerState = PlayerPreferences & Pick<PlayerQueueState, 'queue' | 'currentIndex'>
 
 /** Slices share one commit so queue, selection, and preferences change atomically. */

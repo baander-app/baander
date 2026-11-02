@@ -2,6 +2,21 @@ import { getSongIndex } from '@/shared/api-client/gen/endpoints'
 import type { PlayerSliceContext, Track } from './player-types'
 import { getPlaybackSelectionGeneration, invalidatePlaybackSelection } from './player-playback-runtime'
 
+export function readTrackResource(value: unknown): Track | null {
+  if (typeof value !== 'object' || value === null || !('publicId' in value) || !('title' in value)
+    || typeof value.publicId !== 'string' || typeof value.title !== 'string') return null
+  const resource = value as Record<string, unknown>
+  return {
+    publicId: value.publicId,
+    title: value.title,
+    available: resource.available === true,
+    duration: typeof resource.length === 'number' && Number.isFinite(resource.length) && resource.length > 0 ? resource.length : 0,
+    artistName: typeof resource.artistName === 'string' ? resource.artistName : undefined,
+    albumName: typeof resource.albumName === 'string' ? resource.albumName : undefined,
+    albumPublicId: typeof resource.albumId === 'string' ? resource.albumId : undefined,
+  }
+}
+
 /** Refresh restored catalogue observations without discarding the listener's queue or metadata. */
 export function hydrateQueueAvailability(
   { get, commit }: PlayerSliceContext,

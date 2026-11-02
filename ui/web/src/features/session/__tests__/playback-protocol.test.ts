@@ -46,6 +46,16 @@ describe('playback wire snapshots', () => {
     expect(parsePlaybackSnapshot(value)).toBeNull()
   })
 
+  it('accepts an absent control result in a general snapshot', () => {
+    const value = { ...snapshot, requestResult: null }
+    expect(parsePlaybackSnapshot(value)).toEqual(value)
+  })
+
+  it('accepts queue-only command snapshots without changing the retained cursor', () => {
+    const value = { ...snapshot, commands: [{ ...snapshot.commands[0], type: 'queue' }] }
+    expect(parsePlaybackSnapshot(value)).toEqual(value)
+  })
+
   it('accepts an idle snapshot without an endpoint credential', () => {
     const idle = {
       ...snapshot, media: null, queue: [], currentTrackIndex: 0, position: 0,

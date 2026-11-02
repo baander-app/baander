@@ -9,8 +9,14 @@ import { Sidebar } from '@/features/layout/components/Sidebar'
 import { useSidebarStore } from '@/features/layout/stores/sidebar-store'
 import { useMediaModeStore } from '@/features/layout/stores/media-mode-store'
 import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
+import { NotificationReader } from '@/features/notification/components/NotificationReader'
 
 const testTheme = resolveTheme('dark', 'violet')
+
+vi.mock('@/features/notification/api/notification-api', () => ({ notificationApi: {
+  list: vi.fn(async () => ({ data: [], nextCursor: null })),
+  unreadCount: vi.fn(async () => 0),
+} }))
 
 vi.mock('@/shared/api-client/axios-instance', () => ({
   AXIOS_INSTANCE: { get: vi.fn().mockResolvedValue({ data: { data: [] } }) },
@@ -27,7 +33,7 @@ function renderSidebar(initialPath = '/') {
     <QueryClientProvider client={client}>
       <SCTypedThemeProvider theme={testTheme}>
         <MemoryRouter initialEntries={[initialPath]}>
-          <Sidebar />
+          <NotificationReader><Sidebar /></NotificationReader>
         </MemoryRouter>
       </SCTypedThemeProvider>
     </QueryClientProvider>,

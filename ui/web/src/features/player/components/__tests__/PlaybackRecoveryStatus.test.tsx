@@ -1,6 +1,7 @@
 import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { registerPlaybackIntentHandler } from '@/features/session/services/playback-execution'
 import { ProgressBar } from '@/features/player/components/ProgressBar'
 import { PlaybackRecoveryAnnouncer } from '@/features/player/components/PlaybackRecoveryStatus'
 import { PlayerTimeLabel } from '@/features/layout/components/PlayerTimeLabel'
@@ -19,12 +20,17 @@ function renderPlayers() {
 }
 
 describe('playback recovery status', () => {
+  const playback = vi.fn(async () => {})
+  let unregister: () => void
   beforeEach(() => {
+    playback.mockClear()
+    unregister = registerPlaybackIntentHandler(playback)
     usePlayerStore.setState({ currentTrack: { publicId: 'song-1', title: 'Song', available: true }, isPlaying: true, duration: 200, audioElement: null, playbackRecovery: 'none' })
     updateTime(42)
   })
 
   afterEach(() => {
+    unregister()
     act(() => {
       updateTime(0)
       usePlayerStore.setState({ isPlaying: false, duration: 0, playbackRecovery: 'none' })
@@ -54,7 +60,7 @@ describe('playback recovery status', () => {
     expect(screen.getByRole('slider', { name: 'Seek' })).toHaveAttribute('aria-valuenow', '42')
   })
 
-  it('offers Tap to resume as a keyboard-reachable button that resumes playback', async () => {
+  it('offers Tap to resume as a keyboard-reachable button that requests playback', async () => {
     const user = userEvent.setup()
     usePlayerStore.setState({ isPlaying: false, playbackRecovery: 'tap-to-resume' })
     renderPlayers()
@@ -65,6 +71,7 @@ describe('playback recovery status', () => {
     await user.tab()
     expect(buttons[0]).toHaveFocus()
     await user.keyboard('{Enter}')
-    expect(usePlayerStore.getState().isPlaying).toBe(true)
+    expect(playback).toHaveBeenCalledExactlyOnceWith({ action: 'play' })
+    expect(usePlayerStore.getState().isPlaying).toBe(false)
   })
 })

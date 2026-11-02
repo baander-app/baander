@@ -1,7 +1,6 @@
 import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1 } from 'lucide-react'
 import { usePlayerStore } from '@/features/player/stores/player-store'
 import { Button } from '@/shared/components/ui/button'
-import { DevicePicker } from '@/features/session/components/DevicePicker'
 
 export function PlayerTransport() {
   const isPlaying = usePlayerStore((s) => s.isPlaying)
@@ -30,7 +29,6 @@ export function PlayerTransport() {
       <Button variant={repeat !== 'off' ? 'secondary' : 'ghost'} size="icon-xs" onClick={toggleRepeat} aria-label="Repeat">
         {repeat === 'one' ? <Repeat1 size={12} /> : <Repeat size={12} />}
       </Button>
-      <DevicePicker />
     </div>
   )
 }

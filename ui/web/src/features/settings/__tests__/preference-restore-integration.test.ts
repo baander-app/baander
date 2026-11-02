@@ -1,5 +1,6 @@
 import { act, renderHook } from '@testing-library/react'
-import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeAll, beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
+import { registerPlaybackIntentHandler } from '@/features/session/services/playback-execution'
 import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
 import { mediator } from '@/shared/lib/mediator/bus'
 import { useEqBandsStore, EQ_PRESETS } from '@/features/equalizer/stores/eq-bands-store'
@@ -23,6 +24,9 @@ import { audioPreferenceFixture } from './audio-preference-fixture'
 const audioPayload = audioPreferenceFixture()
 
 describe('remote preference restores through hooks and mediator handlers', () => {
+  const playback = vi.fn(async () => {})
+  let unregister: () => void
+  afterEach(() => unregister())
   beforeAll(() => {
     registerEqHandlers()
     registerPlayerHandlers()
@@ -30,6 +34,7 @@ describe('remote preference restores through hooks and mediator handlers', () =>
 
   beforeEach(() => {
     vi.clearAllMocks()
+    unregister = registerPlaybackIntentHandler(playback)
     mediator.clearLog()
     useEqBandsStore.setState(useEqBandsStore.getInitialState(), true)
     useEqProcessingStore.setState(useEqProcessingStore.getInitialState(), true)
@@ -170,6 +175,7 @@ describe('remote preference restores through hooks and mediator handlers', () =>
     await act(async () => { expect(await result.current.fetchFromServer()).toBe(true) })
 
     expect(usePlayerStore.getState()).toMatchObject({ ...payload, volume: 37 })
+    expect(playback).not.toHaveBeenCalled()
     expect(mediator.getActionLog().at(-1)?.errors).toEqual([])
   })
 })

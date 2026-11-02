@@ -7,17 +7,14 @@ namespace App\Tests\Unit\Session;
 use App\Auth\Infrastructure\Security\SecurityUser;
 use App\Session\Domain\Model\Device\Device;
 use App\Session\Domain\Repository\Device\DeviceRepositoryInterface;
-use App\Session\Domain\Repository\ListeningSession\ListeningSessionRepositoryInterface;
-use App\Session\Infrastructure\SessionAdapter;
+use App\Session\Infrastructure\DeviceAdapter;
 use App\Session\Interface\Controller\DeviceController;
 use App\Session\Interface\Request\RenameDeviceRequest;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Domain\Model\PublicId;
-use App\Session\Application\Port\SessionUserPublicIdentityInterface;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Bundle\SecurityBundle\Security;
-use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
 
 final class DeviceRenameFailureTest extends TestCase
 {
@@ -77,9 +74,6 @@ final class DeviceRenameFailureTest extends TestCase
     {
         $security = $this->createStub(Security::class);
         $security->method('getUser')->willReturn(new SecurityUser($userId->toString(), 'user@baander.app', 'hash'));
-        $sessions = $this->createStub(ListeningSessionRepositoryInterface::class);
-        $events = $this->createStub(EventDispatcherInterface::class);
-
-        return new DeviceController($security, new SessionAdapter($sessions, $devices, $events, $this->createStub(SessionUserPublicIdentityInterface::class)));
+        return new DeviceController($security, new DeviceAdapter($devices));
     }
 }

@@ -37,6 +37,10 @@ export function createPlayerPlaybackSlice({ get, commit }: PlayerSliceContext): 
     notifyFailure: (src) => notifyPlaybackFailure(isTranscodedStream(src)),
   }
   return {
+    playbackExecutionActive: false,
+    observePlaybackState: patch => commit(patch),
+    observeListeningVolume: volume => commit({ volume, muted: false }),
+    setPlaybackExecutionActive: active => commit({ playbackExecutionActive: active }),
     isPlaying: false,
     duration: 0,
     audioElement: null,

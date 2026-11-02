@@ -1,4 +1,5 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { registerPlaybackIntentHandler } from '@/features/session/services/playback-execution'
 import { ActionBus } from '../bus'
 import { usePlayerStore, type Track } from '@/features/player/stores/player-store'
 import { getCurrentTime, updateTime } from '@/features/player/stores/player-time-tracker'
@@ -8,8 +9,13 @@ import { useContextPanelStore } from '@/features/layout/stores/context-panel-sto
 
 describe('Mediator integration', () => {
   let bus: ActionBus
+  const playback = vi.fn(async () => {})
+  let unregister: () => void
+  afterEach(() => unregister())
 
   beforeEach(() => {
+    playback.mockClear()
+    unregister = registerPlaybackIntentHandler(playback)
     bus = new ActionBus({ maxLogSize: 100, warnOnNoHandlers: false })
 
     updateTime(0)
@@ -49,7 +55,7 @@ describe('Mediator integration', () => {
   })
 
   describe('player:pause', () => {
-    it('pauses the player store', () => {
+    it('requests an acknowledged player pause', () => {
       usePlayerStore.setState({ isPlaying: true })
 
       // Simulate handler
@@ -60,12 +66,13 @@ describe('Mediator integration', () => {
 
       bus.dispatch('player:pause', { reason: 'radio-started' }, 'radio')
 
-      expect(usePlayerStore.getState().isPlaying).toBe(false)
+      expect(playback).toHaveBeenCalledExactlyOnceWith({ action: 'pause' })
+      expect(usePlayerStore.getState().isPlaying).toBe(true)
     })
   })
 
   describe('radio:started → player pause', () => {
-    it('player handler pauses playback when radio starts', () => {
+    it('player handler requests a pause when radio starts', () => {
       usePlayerStore.setState({ isPlaying: true })
 
       bus.on('radio:started', function playerPauseForRadioHandler() {
@@ -75,7 +82,8 @@ describe('Mediator integration', () => {
 
       bus.dispatch('radio:started', { station: { name: 'Test FM', streams: [] } }, 'radio')
 
-      expect(usePlayerStore.getState().isPlaying).toBe(false)
+      expect(playback).toHaveBeenCalledExactlyOnceWith({ action: 'pause' })
+      expect(usePlayerStore.getState().isPlaying).toBe(true)
     })
   })
 
@@ -119,7 +127,7 @@ describe('Mediator integration', () => {
   })
 
   describe('player:state-restore', () => {
-    it('restores player queue and position', () => {
+    it('submits a paused queue restore with its retained position', () => {
       const tracks: Track[] = [
         { publicId: 't1', title: 'Song 1', artistName: 'Artist' },
         { publicId: 't2', title: 'Song 2', artistName: 'Artist' },
@@ -136,10 +144,9 @@ describe('Mediator integration', () => {
         currentTime: 45.5,
       }, 'session')
 
-      const state = usePlayerStore.getState()
-      expect(state.queue).toEqual(tracks)
-      expect(state.currentIndex).toBe(1)
-      expect(getCurrentTime()).toBe(45.5)
+      expect(playback).toHaveBeenCalledExactlyOnceWith({ action: 'load', media: { kind: 'song', publicId: 't2' },
+        queue: ['t1', 't2'], currentTrackIndex: 1, position: 45.5, desiredState: 'paused' })
+      expect(getCurrentTime()).toBe(0)
     })
   })
 

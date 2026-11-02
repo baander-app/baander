@@ -58,11 +58,11 @@ export class FixtureClient {
     child.on('error', (error) => this.pending?.reject(error))
     child.on('exit', (code) => this.pending?.reject(new Error(`Fixture exited ${code}: ${this.stderr}`)))
   }
-  static start() {
+  static start(script = 'tests/Fixtures/LiveUpdates/capacity-fixture.php') {
     const manifest = process.env.BAANDER_LIVE_CAPACITY_MANIFEST
     const args = manifest
       ? ['scripts/test-live-capacity-exec.php', manifest]
-      : ['scripts/dev-environment.php', 'exec', '--', 'php', 'tests/Fixtures/LiveUpdates/capacity-fixture.php']
+      : ['scripts/dev-environment.php', 'exec', '--', 'php', script]
     return new FixtureClient(spawn('php', args, {
       cwd: resolve(import.meta.dirname, '../../../../..'), stdio: 'pipe',
     }))

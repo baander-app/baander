@@ -7,6 +7,9 @@ import { Button } from '@/shared/components/ui/button'
 import { asMovieFromData } from '../utils/api-adapters'
 import { MovieHeader } from '../components/MovieHeader'
 import { MovieMetadata } from '../components/MovieMetadata'
+import { requestPlayback } from '@/features/session/services/playback-execution'
+import { usePlaybackSession } from '@/features/session/hooks/use-playback-session'
+import { useVideoPresentation } from '../stores/video-presentation-store'
 import { MoviePlayerOverlay } from '../components/MoviePlayerOverlay'
 
 const CenterMessage = styled.div`
@@ -41,6 +44,8 @@ export function MovieDetailPage() {
   const { publicId } = useParams<{ publicId: string }>()
   const { data, isLoading, isError, refetch } = useGetMovieShow(publicId!)
   const [isPlaying, setIsPlaying] = useState(false)
+  const { snapshot } = usePlaybackSession()
+  const error = useVideoPresentation(state => state.error)
 
   if (isError) {
     return (
@@ -70,6 +75,7 @@ export function MovieDetailPage() {
       <MoviePlayerOverlay
         title={movie.title}
         videoId={video.publicId}
+        sourceDuration={video.duration}
         onClose={() => setIsPlaying(false)}
       />
     )
@@ -77,7 +83,16 @@ export function MovieDetailPage() {
 
   return (
     <PageContainer>
-      <MovieHeader movie={movie} onPlay={() => setIsPlaying(true)} />
+      <MovieHeader movie={movie} onPlay={() => {
+        if (!video) return
+        if (snapshot?.media?.kind === 'video' && snapshot.media.publicId === video.publicId) {
+          setIsPlaying(true)
+          return
+        }
+        requestPlayback({ action: 'load', media: { kind: 'video', publicId: video.publicId }, desiredState: 'playing' })
+          .then(() => setIsPlaying(true)).catch(useVideoPresentation.getState().reportError)
+      }} />
+      {error ? <ErrorText role="alert">{error}</ErrorText> : null}
       <MovieMetadata movie={movie} />
     </PageContainer>
   )

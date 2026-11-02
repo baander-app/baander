@@ -192,6 +192,18 @@ Its incarnation identifies that instance's current connection lifetime, separate
 A playback handoff whose target may have started but has not confirmed its state.
 The source retains its media and cursor while paused until reconciliation establishes whether it can resume without overlapping the target.
 
+### Browser execution lock
+
+An exclusive Web Lock held while one browser tab owns eligible local playback execution. Its name includes the server, account and nonsecret tab identity. A free lock proves the old holder released it; media fencing is a separate recovery condition.
+
+### Local recovery credential
+
+A persisted, stop-only credential for one account, browser tab and endpoint incarnation. With authenticated owner authority, it permits retiring that exact local incarnation after the browser establishes its local stop condition. It grants no execution, command-reading or media access authority.
+
+### Recovery checkpoint
+
+The last recorded source-time cursor retained for interrupted playback, bound to its media identity, queue position and session revision. It preserves a useful resumption point without applying one item's position to another or claiming the exact position at a crash.
+
 ## Audio playback
 
 ### Loudness target

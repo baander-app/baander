@@ -1,3 +1,4 @@
+import { registerPlaybackIntentHandler } from '@/features/session/services/playback-execution'
 import { usePlayerStore } from '@/features/player/stores/player-store'
 import { useContextPanelStore } from '@/features/layout/stores/context-panel-store'
 import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react'
@@ -82,14 +83,19 @@ function renderPage() {
 }
 
 describe('PlaylistDetailPage sharing controls', () => {
+  const playback = vi.fn(async () => {})
+  let unregister: () => void
   beforeEach(() => {
-    usePlayerStore.getState().clearQueue()
+    playback.mockClear()
+    unregister = registerPlaybackIntentHandler(playback)
+    usePlayerStore.getState().runtimeActions.clearQueue()
     served = playlist()
     mockRequest.mockReset()
     serve()
   })
 
   afterEach(() => {
+    unregister()
     cleanup()
     useAuthStore.setState(initialAuthState, true)
   })
@@ -106,8 +112,8 @@ describe('PlaylistDetailPage sharing controls', () => {
     expect(usePlayerStore.getState().currentTrack).toBeNull()
     expect(useContextPanelStore.getState().selectedItem).toEqual({ type: 'song', publicId: 'missing' })
     fireEvent.click(screen.getByText('Present song'))
-    expect(usePlayerStore.getState().currentTrack?.publicId).toBe('present')
-    expect(usePlayerStore.getState().queue.map((song) => song.publicId)).toEqual(['present'])
+    expect(playback).toHaveBeenCalledExactlyOnceWith({ action: 'load', media: { kind: 'song', publicId: 'present' },
+      queue: ['present'], currentTrackIndex: 0, position: 0, desiredState: 'playing' })
   })
 
   it('offers the owner the share dialog and no leave action', async () => {

@@ -22,6 +22,9 @@ final readonly class RegisterPlaybackEndpointRequest
         #[Assert\Count(min: 1, max: 3)]
         #[Assert\All(constraints: [new Assert\Choice(choices: ['song', 'video', 'volume'])])]
         public array $capabilities = ['song', 'video'],
+        #[Assert\Uuid]
+        public ?string $tabId = null,
+        public bool $localRecoveryEligible = false,
     ) {}
 
     /** @return array<string,mixed> */

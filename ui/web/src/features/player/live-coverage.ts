@@ -80,8 +80,12 @@ export const playerLiveCoverage = [
     dependentFamilies: [],
     mirrors: [],
     responseCaches: ["authoritative-read"],
-    consumers: ["src/features/player/stores/player-availability.ts#getSongIndex:generated"],
+    consumers: [
+      "src/features/player/stores/player-availability.ts#getSongIndex:generated",
+      "src/features/player/hooks/use-audio-playback.ts#getSongIndex:generated",
+      "src/features/player/services/music-playback-adapter.ts#getSongIndex:generated",
+    ],
     coverageVerification: ["tests/live-updates/coverage.test.ts"],
-    behaviorVerification: { unitProofs: ["src/features/player/stores/__tests__/player-availability.test.ts"] },
+    behaviorVerification: { unitProofs: ["src/features/player/stores/__tests__/player-availability.test.ts", "src/features/player/hooks/__tests__/use-audio-playback.test.ts"] },
   },
 ] as const satisfies readonly LiveCoverageDescriptor[]

@@ -182,6 +182,50 @@ final class PlaybackTransferPersistenceTest extends TestCase
         self::assertSame($snapshot['revision'], $this->ack($service, $owner, $target, $start, 'started')['revision']);
     }
 
+    public function testControlResultRemainsPendingUntilAcknowledgedAndReplaysDuringTransfer(): void
+    {
+        $owner = $this->createUser();
+        $service = $this->coordinator();
+        $source = $this->endpoint($service, $owner);
+        $snapshot = $this->activate($service, $owner, $source);
+        $request = ['requestId' => new Uuid()->toString(), 'expectedRevision' => $snapshot['revision'], 'action' => 'stop'];
+        $pending = $service->execute($owner, PlaybackOperation::Control, $request);
+        $command = $this->pending($service, $owner, $source)['commands'][0];
+        self::assertSame(['requestId' => $request['requestId'], 'commandId' => $command['id'], 'outcome' => null], $pending['requestResult']);
+        $acknowledged = $this->ack($service, $owner, $source, $command, 'stopped');
+        self::assertGreaterThan($pending['revision'], $acknowledged['revision']);
+        self::assertArrayNotHasKey('requestResult', $service->execute($owner, PlaybackOperation::Snapshot, []));
+        $target = $this->endpoint($service, $owner);
+        $service->execute($owner, PlaybackOperation::Transfer, ['requestId' => new Uuid()->toString(), 'expectedRevision' => $acknowledged['revision'], 'targetIncarnationId' => $target['incarnationId']]);
+        $replay = $service->execute($owner, PlaybackOperation::Control, $request);
+        self::assertSame(['requestId' => $request['requestId'], 'commandId' => $command['id'], 'outcome' => 'stopped'], $replay['requestResult']);
+        self::assertSame('preparing', $replay['transfer']['state']);
+    }
+
+    public function testQueueCommandsAcknowledgeTheCursorWithoutReloadAndExpireWithoutStopping(): void
+    {
+        $owner = $this->createUser();
+        $service = $this->coordinator();
+        $source = $this->endpoint($service, $owner);
+        $snapshot = $this->activate($service, $owner, $source);
+        $request = ['requestId' => new Uuid()->toString(), 'expectedRevision' => $snapshot['revision'], 'action' => 'queue', 'queue' => [], 'currentTrackIndex' => 0];
+        $pending = $service->execute($owner, PlaybackOperation::Control, $request);
+        $command = $this->pending($service, $owner, $source)['commands'][0];
+        self::assertSame('queue', $command['type']);
+        self::assertSame($snapshot['desiredState'], $pending['desiredState']);
+        $acknowledged = $this->ack($service, $owner, $source, $command, 'applied', 18.5);
+        self::assertSame(18.5, $acknowledged['position']);
+        self::assertSame('applied', $service->execute($owner, PlaybackOperation::Control, $request)['requestResult']['outcome']);
+        $request['requestId'] = new Uuid()->toString();
+        $request['expectedRevision'] = $acknowledged['revision'];
+        $pending = $service->execute($owner, PlaybackOperation::Control, $request);
+        $this->observer->executeStatement("UPDATE playback_commands SET expires_at=CURRENT_TIMESTAMP-INTERVAL '1 second' WHERE id=:id", ['id' => $pending['requestResult']['commandId']]);
+        $expired = $service->execute($owner, PlaybackOperation::Control, $request);
+        self::assertSame('superseded', $expired['requestResult']['outcome']);
+        self::assertSame($acknowledged['desiredState'], $expired['desiredState']);
+        self::assertSame([], $this->pending($service, $owner, $source)['commands']);
+    }
+
     public function testStopAcknowledgementRetainsTheCursorEvenIfThePlayerUnloadsItsElement(): void
     {
         $owner = $this->createUser();
@@ -373,7 +417,7 @@ final class PlaybackTransferPersistenceTest extends TestCase
                 self::assertMatchesRegularExpression('/request identity|awaiting acknowledgement/', $error->getMessage());
             }
         }
-        $this->ack($service, $owner, $source, $this->pending($service, $owner, $source)['commands'][0], 'paused');
+        $snapshot = $this->ack($service, $owner, $source, $this->pending($service, $owner, $source)['commands'][0], 'paused');
         $snapshot = $service->execute($owner, PlaybackOperation::Transfer, ['requestId' => new Uuid()->toString(), 'expectedRevision' => $snapshot['revision'], 'targetIncarnationId' => $target['incarnationId']]);
         self::assertSame('preparing', $snapshot['transfer']['state']);
     }
@@ -412,6 +456,32 @@ final class PlaybackTransferPersistenceTest extends TestCase
         $after = $this->pending($this->coordinator(), $owner, $target)['commands'];
         self::assertCount(1, $after);
         self::assertSame($before, $after);
+        self::assertMatchesRegularExpression('/\A\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}[+-]\d{2}:\d{2}\z/', $after[0]['expiresAt']);
+        $storedExpiry = $this->observer->fetchOne('SELECT expires_at FROM playback_commands WHERE id = ?', [$after[0]['id']]);
+        self::assertEqualsWithDelta((float) new \DateTimeImmutable($storedExpiry)->format('U.u'), (float) new \DateTimeImmutable($after[0]['expiresAt'])->format('U.u'), .001);
+    }
+
+    public function testQueueBeforeFirstPlaybackIsRetainedWithoutInventingAnActiveRunner(): void
+    {
+        $owner = $this->createUser();
+        $library = new \App\Library\Infrastructure\Doctrine\Entity\LibraryEntity('Music', 'music', '/playback/music', 'music', 'local');
+        $album = new \App\Catalog\Infrastructure\Doctrine\Entity\AlbumEntity(new PublicId(), $library, 'Album', 'album');
+        $song = new \App\Catalog\Infrastructure\Doctrine\Entity\SongEntity(new PublicId(), $album, 'Song', '/playback/music/song.flac', 1, 'audio/flac');
+        foreach ([$library, $album, $song, new \App\Library\Infrastructure\Doctrine\Entity\UserLibraryAccessEntity($owner, $library, new \DateTimeImmutable())] as $entity) {
+            $this->manager->persist($entity);
+        }
+        $this->manager->flush();
+        $service = $this->coordinator();
+        $request = ['requestId' => new Uuid()->toString(), 'expectedRevision' => 0, 'action' => 'queue',
+            'queue' => [$song->getPublicId()->toString()], 'currentTrackIndex' => 0];
+        $snapshot = $service->execute($owner, PlaybackOperation::Control, $request);
+        self::assertSame($request['queue'], $snapshot['queue']);
+        self::assertNull($snapshot['media']);
+        self::assertNull($snapshot['activeIncarnationId']);
+        self::assertSame('stopped', $snapshot['desiredState']);
+        self::assertSame('retained', $snapshot['requestResult']['outcome']);
+        self::assertSame($snapshot['requestResult'], $service->execute($owner, PlaybackOperation::Control, $request)['requestResult']);
+        self::assertSame('retained', $this->observer->fetchOne('SELECT outcome FROM playback_commands WHERE request_id = ?', [$request['requestId']]));
     }
 
     public function testTypedVideoUsesLibraryPermissionAndPreservesTheExistingMusicQueue(): void

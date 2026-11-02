@@ -57,6 +57,43 @@ final readonly class PlaybackStore implements PlaybackStoreInterface
         ]);
     }
 
+    public function retireConfirmedPausedBrowser(ListeningSession $session): bool
+    {
+        // The caller holds the account/session lock. All commands and observations use that lock.
+        // This proof covers managed browser execution only; independent external routes need their own proof.
+        if ($session->activeIncarnationId() === null || $session->desiredState() !== PlaybackState::Paused
+            || $session->observedState() !== ObservedPlaybackState::Paused) {
+            return false;
+        }
+        return $this->connection()->fetchOne(<<<'SQL'
+            UPDATE playback_destination_incarnations i SET retired_at=coalesce(i.retired_at,CURRENT_TIMESTAMP)
+            FROM playback_destinations d
+            WHERE i.id=:incarnation AND i.user_id=:owner AND d.id=i.destination_id AND d.kind='browser'
+                AND (i.expires_at<=CURRENT_TIMESTAMP OR i.retired_at IS NOT NULL)
+                AND i.observed_state IN ('paused','stopped')
+                AND EXISTS (
+                    SELECT 1 FROM playback_commands proof
+                    WHERE proof.session_id=:session AND proof.incarnation_id=i.id AND proof.epoch=i.epoch
+                        AND proof.revision=:ackRevision AND proof.acknowledged_at IS NOT NULL
+                        AND ((proof.type='pause' AND proof.outcome='paused')
+                            OR (proof.type='quiesce' AND proof.outcome='quiesced')
+                            OR (proof.type='stop' AND proof.outcome='stopped'))
+                        AND NOT EXISTS (
+                            SELECT 1 FROM playback_commands later
+                            WHERE later.session_id=proof.session_id AND later.id<>proof.id
+                                AND (later.revision>=proof.revision OR later.created_at>proof.created_at)
+                        )
+                )
+                AND NOT EXISTS (SELECT 1 FROM playback_commands pending
+                    WHERE pending.session_id=:session AND pending.acknowledged_at IS NULL)
+                AND NOT EXISTS (SELECT 1 FROM playback_transfers transfer
+                    WHERE transfer.session_id=:session AND transfer.state NOT IN ('committed','failed'))
+            RETURNING i.id
+            SQL, ['incarnation' => $session->activeIncarnationId()->toString(),
+                'owner' => $session->getUserId()->toString(), 'session' => $session->getId()->toString(),
+                'ackRevision' => $session->revision() - 1]) !== false;
+    }
+
     public function register(string $userId, array $input): array
     {
         $deviceId = Uuid::fromString($input['deviceId'])->toString();
@@ -64,6 +101,14 @@ final readonly class PlaybackStore implements PlaybackStoreInterface
         $device = $this->connection()->fetchAssociative('SELECT * FROM devices WHERE user_id=:owner AND device_id=:device', ['owner' => $userId, 'device' => $deviceId]);
         if ($device === false) {
             throw new ConflictException('Register this browser device first.');
+        }
+        $eligible = $input['localRecoveryEligible'] ?? false;
+        if (!is_bool($eligible)) {
+            throw new \InvalidArgumentException('Local recovery eligibility must be a boolean.');
+        }
+        $tabId = isset($input['tabId']) ? Uuid::fromString($input['tabId'])->toString() : null;
+        if ($eligible && $tabId === null) {
+            throw new \InvalidArgumentException('Local recovery requires a tab identity.');
         }
         $name = $input['name'] ?? $device['name'] ?? 'Browser';
         if (!is_string($name) || trim($name) === '' || mb_strlen($name) > 128) {
@@ -92,7 +137,18 @@ final readonly class PlaybackStore implements PlaybackStoreInterface
             INSERT INTO playback_destination_incarnations(id,destination_id,user_id,epoch,capability_hash,expires_at)
             VALUES(:id,:destination,:owner,:epoch,:hash,CURRENT_TIMESTAMP+INTERVAL '30 seconds')
             SQL, ['id' => $incarnation, 'destination' => $destination['id'], 'owner' => $userId, 'epoch' => $epoch, 'hash' => hash('sha256', $capability)]);
-        return ['destinationId' => $destination['public_id'], 'incarnationId' => $incarnation, 'epoch' => $epoch, 'capability' => $capability];
+        $result = ['destinationId' => $destination['public_id'], 'incarnationId' => $incarnation, 'epoch' => $epoch, 'capability' => $capability];
+        if ($eligible) {
+            $credential = bin2hex(random_bytes(32));
+            $expires = new \DateTimeImmutable('+30 days');
+            $this->connection()->executeStatement(<<<'SQL'
+                UPDATE playback_destination_incarnations SET tab_id=:tab,local_recovery_eligible=TRUE,
+                    recovery_credential_hash=:hash,recovery_expires_at=:expires WHERE id=:id
+                SQL, ['tab' => $tabId, 'hash' => hash('sha256', $credential),
+                'expires' => $expires->format('Y-m-d H:i:s.uP'), 'id' => $incarnation]);
+            $result += ['recoveryCredential' => $credential, 'recoveryExpiresAt' => $expires->format(\DateTimeInterface::ATOM), 'recoveryTabId' => $tabId];
+        }
+        return $result;
     }
 
     public function endpoint(string $userId, string $incarnationId, ?string $capability = null): array
@@ -107,6 +163,42 @@ final readonly class PlaybackStore implements PlaybackStoreInterface
         }
         // Retirement never implies silence, and the old runner may still acknowledge a stop.
         return $this->decode($row);
+    }
+
+    public function localRecovery(string $owner, string $incarnationId, string $tabId, #[\SensitiveParameter] string $credential): array
+    {
+        $row = $this->connection()->fetchAssociative(<<<'SQL'
+            SELECT * FROM playback_destination_incarnations WHERE id=:id AND user_id=:owner AND tab_id=:tab FOR UPDATE
+            SQL, ['id' => $incarnationId, 'owner' => $owner, 'tab' => $tabId]);
+        if ($row === false || !$row['local_recovery_eligible']
+            || $row['recovery_revoked_at'] !== null || !is_string($row['recovery_credential_hash'])
+            || !hash_equals($row['recovery_credential_hash'], hash('sha256', $credential))) {
+            throw new ConflictException('Local recovery authority is invalid or expired.');
+        }
+        $valid = $this->connection()->fetchOne('SELECT recovery_expires_at>clock_timestamp() FROM playback_destination_incarnations WHERE id=:id', ['id' => $incarnationId]);
+        if (!$valid) {
+            throw new ConflictException('Local recovery authority is invalid or expired.');
+        }
+        $row['recovery_result'] = $row['recovery_result'] === null ? null : json_decode($row['recovery_result'], true, flags: JSON_THROW_ON_ERROR);
+        return $row;
+    }
+
+    public function completeLocalRecovery(string $incarnationId, array $result): void
+    {
+        $this->connection()->executeStatement(<<<'SQL'
+            UPDATE playback_destination_incarnations SET retired_at=coalesce(retired_at,CURRENT_TIMESTAMP),
+                observed_state='stopped',recovery_result=CAST(:result AS jsonb) WHERE id=:id
+            SQL, ['id' => $incarnationId, 'result' => json_encode($result, JSON_THROW_ON_ERROR)]);
+    }
+
+    public function supersedeIncarnationCommands(string $incarnationId): void
+    {
+        $this->connection()->executeStatement("UPDATE playback_commands SET outcome='superseded',acknowledged_at=CURRENT_TIMESTAMP WHERE incarnation_id=:id AND acknowledged_at IS NULL", ['id' => $incarnationId]);
+    }
+
+    public function sourceQuiesced(string $attemptId, string $sourceId): bool
+    {
+        return (bool) $this->connection()->fetchOne("SELECT EXISTS(SELECT 1 FROM playback_commands WHERE attempt_id=:attempt AND incarnation_id=:source AND type='quiesce' AND outcome='quiesced')", ['attempt' => $attemptId, 'source' => $sourceId]);
     }
 
     public function currentTransfer(string $sessionId): ?array
@@ -150,6 +242,15 @@ final readonly class PlaybackStore implements PlaybackStoreInterface
     public function acknowledgeCommand(string $commandId, string $outcome): void
     {
         $this->connection()->executeStatement('UPDATE playback_commands SET outcome=:outcome,acknowledged_at=CURRENT_TIMESTAMP WHERE id=:id AND acknowledged_at IS NULL', ['outcome' => $outcome, 'id' => $commandId]);
+    }
+
+    public function requestedCommand(string $sessionId, string $requestId): ?array
+    {
+        $row = $this->connection()->fetchAssociative(
+            'SELECT id,request_id,outcome FROM playback_commands WHERE session_id=:session AND request_id=:request ORDER BY created_at,id LIMIT 1',
+            ['session' => $sessionId, 'request' => $requestId],
+        );
+        return $row === false ? null : $row;
     }
 
     public function cancelCommands(string $attemptId): void
@@ -196,7 +297,11 @@ final readonly class PlaybackStore implements PlaybackStoreInterface
             'transfer' => $transfer === null ? null : ['attemptId' => $transfer['id'], 'state' => $transfer['state'],
                 'sourceIncarnationId' => $transfer['source_incarnation_id'], 'targetIncarnationId' => $transfer['target_incarnation_id'],
                 'position' => (float) $transfer['position'], 'desiredState' => $transfer['desired_state']],
-            'destinations' => array_map($this->decode(...), $destinations), 'commands' => array_map($this->decode(...), $commands)];
+            'destinations' => array_map($this->decode(...), $destinations),
+            'commands' => array_map(fn(array $command): array => [
+                ...$this->decode($command),
+                'expiresAt' => new \DateTimeImmutable($command['expiresAt'])->format(\DateTimeInterface::RFC3339_EXTENDED),
+            ], $commands)];
     }
 
     public function hasPendingControl(string $sessionId): bool
@@ -206,13 +311,13 @@ final readonly class PlaybackStore implements PlaybackStoreInterface
 
     public function pendingControl(string $sessionId): ?array
     {
-        $command = $this->connection()->fetchAssociative("SELECT * FROM playback_commands WHERE session_id=:session AND acknowledged_at IS NULL AND type IN ('play','pause','seek','load','stop','volume') ORDER BY created_at,id LIMIT 1", ['session' => $sessionId]);
+        $command = $this->connection()->fetchAssociative("SELECT * FROM playback_commands WHERE session_id=:session AND acknowledged_at IS NULL AND type IN ('play','pause','seek','load','stop','volume','queue') ORDER BY created_at,id LIMIT 1", ['session' => $sessionId]);
         return $command === false ? null : $this->decode($command);
     }
 
     public function supersedeControls(string $sessionId): void
     {
-        $this->connection()->executeStatement("UPDATE playback_commands SET outcome='superseded',acknowledged_at=CURRENT_TIMESTAMP WHERE session_id=:session AND acknowledged_at IS NULL AND type IN ('play','pause','seek','load','stop','volume')", ['session' => $sessionId]);
+        $this->connection()->executeStatement("UPDATE playback_commands SET outcome='superseded',acknowledged_at=CURRENT_TIMESTAMP WHERE session_id=:session AND acknowledged_at IS NULL AND type IN ('play','pause','seek','load','stop','volume','queue')", ['session' => $sessionId]);
     }
 
     public function rememberRequest(string $sessionId, string $requestId, string $digest): bool
@@ -267,7 +372,7 @@ final readonly class PlaybackStore implements PlaybackStoreInterface
      */
     private function decode(array $row): array
     {
-        foreach (['queue', 'media', 'capabilities', 'payload'] as $key) {
+        foreach (['queue', 'media', 'capabilities', 'payload', 'recovery_result'] as $key) {
             if (isset($row[$key]) && is_string($row[$key])) {
                 $row[$key] = json_decode($row[$key], true, 512, JSON_THROW_ON_ERROR);
             }

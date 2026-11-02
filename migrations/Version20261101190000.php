@@ -91,7 +91,7 @@ final class Version20261101190000 extends AbstractMigration
                 id uuid PRIMARY KEY, session_id uuid NOT NULL, user_id uuid NOT NULL,
                 attempt_id uuid NOT NULL, request_id uuid NOT NULL, request_digest text NOT NULL, incarnation_id uuid,
                 epoch integer, revision integer NOT NULL,
-                type text NOT NULL CHECK(type IN ('prepare','quiesce','start','stop','play','pause','seek','load','observe','volume')),
+                type text NOT NULL CHECK(type IN ('prepare','quiesce','start','stop','play','pause','seek','load','observe','volume','queue')),
                 payload jsonb NOT NULL, outcome text, acknowledged_at timestamptz,
                 CONSTRAINT chk_playback_command_authority CHECK (
                     (incarnation_id IS NULL AND epoch IS NULL AND outcome IS NOT NULL AND outcome='retained' AND acknowledged_at IS NOT NULL AND type IN ('load','play','pause','seek','stop'))
@@ -106,7 +106,7 @@ final class Version20261101190000 extends AbstractMigration
         $this->addSql(<<<'SQL'
             CREATE INDEX idx_playback_commands_replay ON playback_commands(incarnation_id,created_at) WHERE acknowledged_at IS NULL
             SQL);
-        $this->addSql("CREATE INDEX idx_playback_pending_controls ON playback_commands(session_id,created_at) WHERE acknowledged_at IS NULL AND type IN ('play','pause','seek','load','stop','volume')");
+        $this->addSql("CREATE INDEX idx_playback_pending_controls ON playback_commands(session_id,created_at) WHERE acknowledged_at IS NULL AND type IN ('play','pause','seek','load','stop','volume','queue')");
         $this->addSql('CREATE INDEX idx_playback_selected_destination ON listening_sessions(selected_destination_id,user_id)');
         $this->addSql('CREATE INDEX idx_playback_active_incarnation ON listening_sessions(active_incarnation_id,user_id)');
         $this->addSql(<<<'SQL'

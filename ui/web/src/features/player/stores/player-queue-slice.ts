@@ -16,6 +16,10 @@ export function createPlayerQueueSlice({ get, commit }: PlayerSliceContext): Pla
   }
   return {
     queue: [], currentIndex: -1, currentTrack: null, shuffleBag: [],
+    applyQueueSnapshot: (queue, index) => {
+      const currentIndex = queue.length ? Math.max(0, Math.min(queue.length - 1, index)) : -1
+      commit({ queue, currentIndex, currentTrack: queue[currentIndex] ?? null, shuffleBag: shuffleForQueue(queue, currentIndex) })
+    },
     playTrack: (track, queue) => {
       if (track.available !== true) {
         if (track.available === undefined && get().queue.some((item) => item.publicId === track.publicId)) {

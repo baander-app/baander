@@ -17,7 +17,7 @@ final readonly class ControlPlaybackRequest
         public string $requestId,
         #[Assert\PositiveOrZero]
         public int $expectedRevision,
-        #[Assert\Choice(choices: ['play', 'pause', 'seek', 'load', 'stop', 'volume'])]
+        #[Assert\Choice(choices: ['play', 'pause', 'seek', 'load', 'stop', 'volume', 'queue'])]
         public string $action,
         #[Assert\PositiveOrZero]
         public ?float $position = null,

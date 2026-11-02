@@ -11,8 +11,8 @@ import { ErrorBoundary } from '@/shared/components/ErrorBoundary'
 import { useAudioPlayback } from '@/features/player/hooks/use-audio-playback'
 import { useRadioAudio } from '@/features/radio/hooks/use-radio-audio'
 import { useMediaSession } from '@/shared/hooks/use-media-session'
-import { useSession } from '@/features/session/hooks/use-session'
-import { SessionTransferPrompt } from '@/features/session/components/SessionTransferPrompt'
+import { PlaybackSessionRuntime } from '@/features/session/components/PlaybackSessionRuntime'
+import { VideoPlaybackRuntime } from '@/features/catalog/components/VideoPlaybackRuntime'
 import { useContextPanelSelection } from '../hooks/use-context-panel-selection'
 import { useKeyboardShortcuts } from '@/shared/hooks/use-keyboard-shortcuts'
 import { useElectronPlaybackIpc } from '@/shared/hooks/use-electron-playback-ipc'
@@ -58,16 +58,6 @@ export function AppShell() {
   useAudioPlayback()
   useRadioAudio()
   useMediaSession()
-  const {
-    showTransferPrompt,
-    pendingSession,
-    claim,
-    claimWithQueue,
-    newSession,
-    dismissTransfer,
-    isClaiming,
-    isCreating,
-  } = useSession()
   useContextPanelSelection()
 
   const toggleHelp = useCallback(() => setHelpOpen((o) => !o), [])
@@ -83,6 +73,8 @@ export function AppShell() {
   return (
     <NotificationReader>
       <Shell>
+        <PlaybackSessionRuntime />
+        <VideoPlaybackRuntime />
         {window.BaanderElectron && <TitleBar />}
         <ShellRow>
           <ConnectionStatus><LiveConnectionStatus /></ConnectionStatus>
@@ -101,16 +93,6 @@ export function AppShell() {
         <KeyboardShortcutsHelp open={helpOpen} onOpenChange={setHelpOpen} />
         <Toaster />
         <MediatorDevPanel />
-        <SessionTransferPrompt
-          open={showTransferPrompt}
-          session={pendingSession}
-          onClaim={() => claim()}
-          onClaimWithQueue={() => claimWithQueue()}
-          onNew={() => newSession()}
-          onDismiss={dismissTransfer}
-          isClaiming={isClaiming}
-          isCreating={isCreating}
-        />
       </Shell>
     </NotificationReader>
   )

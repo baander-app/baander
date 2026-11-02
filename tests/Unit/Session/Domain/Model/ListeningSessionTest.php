@@ -4,9 +4,6 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Session\Domain\Model;
 
-use App\Session\Domain\Event\SessionClaimed;
-use App\Session\Domain\Event\SessionCreated;
-use App\Session\Domain\Event\SessionUpdated;
 use App\Session\Domain\Model\ListeningSession\ListeningSession;
 use App\Shared\Domain\Model\Uuid;
 use DateTimeImmutable;
@@ -45,208 +42,23 @@ final class ListeningSessionTest extends TestCase
         $this->assertNull($session->getLastUsedAt());
     }
 
-    public function testCreateFiresSessionCreatedEvent(): void
-    {
-        $queue = ['track-a', 'track-b'];
 
-        $session = ListeningSession::create(
-            userId: $this->userId,
-            queue: $queue,
-            currentTrackIndex: 0,
-            position: 0.0,
-        );
 
-        $events = $session->drainPendingEvents();
 
-        $this->assertCount(1, $events);
-        $this->assertInstanceOf(SessionCreated::class, $events[0]);
-        $this->assertTrue($events[0]->getUserId()->equals($this->userId));
-        $this->assertSame($queue, $events[0]->getQueue());
-    }
 
-    public function testClaimTransfersActiveDeviceAndFiresEvent(): void
-    {
-        $session = ListeningSession::create(
-            userId: $this->userId,
-            queue: ['track-a'],
-            currentTrackIndex: 0,
-            position: 0.0,
-        );
 
-        // Drain the creation event
-        $session->drainPendingEvents();
 
-        $deviceId = Uuid::v4();
-        $session->claim($deviceId);
 
-        $this->assertTrue($session->getActiveDeviceId()->equals($deviceId));
 
-        $events = $session->drainPendingEvents();
-        $this->assertCount(1, $events);
-        $this->assertInstanceOf(SessionClaimed::class, $events[0]);
-        $this->assertTrue($events[0]->getDeviceId()->equals($deviceId));
-        $this->assertTrue($events[0]->getUserId()->equals($this->userId));
-    }
 
-    public function testClaimFromSameDeviceIsNoOp(): void
-    {
-        $session = ListeningSession::create(
-            userId: $this->userId,
-            queue: ['track-a'],
-            currentTrackIndex: 0,
-            position: 0.0,
-        );
 
-        $deviceId = Uuid::v4();
-        $session->claim($deviceId);
-        $session->drainPendingEvents();
 
-        $updatedAtBefore = $session->getUpdatedAt();
 
-        // Claim again with the same device
-        $session->claim($deviceId);
 
-        $this->assertTrue($session->getActiveDeviceId()->equals($deviceId));
-        $events = $session->drainPendingEvents();
-        $this->assertCount(0, $events);
-    }
 
-    public function testClaimDifferentDeviceTransfersAndFiresEvent(): void
-    {
-        $session = ListeningSession::create(
-            userId: $this->userId,
-            queue: ['track-a'],
-            currentTrackIndex: 0,
-            position: 0.0,
-        );
 
-        $device1 = Uuid::v4();
-        $device2 = Uuid::v4();
 
-        $session->claim($device1);
-        $session->drainPendingEvents();
 
-        $session->claim($device2);
-
-        $this->assertTrue($session->getActiveDeviceId()->equals($device2));
-        $events = $session->drainPendingEvents();
-        $this->assertCount(1, $events);
-        $this->assertInstanceOf(SessionClaimed::class, $events[0]);
-        $this->assertTrue($events[0]->getDeviceId()->equals($device2));
-    }
-
-    public function testUpdatePlaybackModifiesPositionAndFiresEvent(): void
-    {
-        $session = ListeningSession::create(
-            userId: $this->userId,
-            queue: ['track-a', 'track-b'],
-            currentTrackIndex: 0,
-            position: 0.0,
-        );
-
-        $session->drainPendingEvents();
-
-        $newQueue = ['track-a', 'track-b', 'track-c'];
-        $session->updatePlayback(
-            queue: $newQueue,
-            currentTrackIndex: 2,
-            position: 120.5,
-            playbackState: 'playing',
-        );
-
-        $this->assertSame($newQueue, $session->getQueue());
-        $this->assertSame(2, $session->getCurrentTrackIndex());
-        $this->assertSame(120.5, $session->getPosition());
-        $this->assertSame('playing', $session->getPlaybackState());
-
-        $events = $session->drainPendingEvents();
-        $this->assertCount(1, $events);
-        $this->assertInstanceOf(SessionUpdated::class, $events[0]);
-        $this->assertSame($newQueue, $events[0]->getQueue());
-    }
-
-    public function testUpdatePlaybackThrowsOnNegativeTrackIndex(): void
-    {
-        $session = ListeningSession::create(
-            userId: $this->userId,
-            queue: ['track-a'],
-            currentTrackIndex: 0,
-            position: 0.0,
-        );
-
-        $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('Current track index cannot be negative.');
-
-        $session->updatePlayback(
-            queue: ['track-a'],
-            currentTrackIndex: -1,
-            position: 0.0,
-            playbackState: 'playing',
-        );
-    }
-
-    public function testUpdatePlaybackThrowsOnNegativePosition(): void
-    {
-        $session = ListeningSession::create(
-            userId: $this->userId,
-            queue: ['track-a'],
-            currentTrackIndex: 0,
-            position: 0.0,
-        );
-
-        $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('Position cannot be negative.');
-
-        $session->updatePlayback(
-            queue: ['track-a'],
-            currentTrackIndex: 0,
-            position: -5.0,
-            playbackState: 'playing',
-        );
-    }
-
-    public function testUpdatePlaybackThrowsOnInvalidState(): void
-    {
-        $session = ListeningSession::create(
-            userId: $this->userId,
-            queue: ['track-a'],
-            currentTrackIndex: 0,
-            position: 0.0,
-        );
-
-        $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('Invalid playback state "rewinding"');
-
-        $session->updatePlayback(
-            queue: ['track-a'],
-            currentTrackIndex: 0,
-            position: 0.0,
-            playbackState: 'rewinding',
-        );
-    }
-
-    public function testEndSetsPlaybackStateToStopped(): void
-    {
-        $session = ListeningSession::create(
-            userId: $this->userId,
-            queue: ['track-a'],
-            currentTrackIndex: 0,
-            position: 30.0,
-        );
-
-        $session->updatePlayback(
-            queue: ['track-a'],
-            currentTrackIndex: 0,
-            position: 30.0,
-            playbackState: 'playing',
-        );
-
-        $this->assertSame('playing', $session->getPlaybackState());
-
-        $session->end();
-
-        $this->assertSame('stopped', $session->getPlaybackState());
-    }
 
     public function testCreateThrowsOnNegativeTrackIndex(): void
     {
@@ -296,18 +108,7 @@ final class ListeningSessionTest extends TestCase
         $this->assertLessThanOrEqual($after, $session->getUpdatedAt());
     }
 
-    public function testDrainPendingEventsClearsEvents(): void
-    {
-        $session = ListeningSession::create(
-            userId: $this->userId,
-            queue: ['track-a'],
-            currentTrackIndex: 0,
-            position: 0.0,
-        );
 
-        $this->assertCount(1, $session->drainPendingEvents());
-        $this->assertCount(0, $session->drainPendingEvents());
-    }
 
     public function testReconstituteRestoresAllFields(): void
     {

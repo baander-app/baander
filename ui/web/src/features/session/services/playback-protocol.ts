@@ -3,7 +3,7 @@ import type { PlaybackSnapshotResource } from '@/shared/api-client/gen/endpoints
 const states = new Set(['playing', 'paused', 'stopped'])
 const observedStates = new Set([...states, 'unknown'])
 const phases = new Set(['preparing', 'quiescing', 'starting', 'uncertain'])
-const commands = new Set(['prepare', 'quiesce', 'start', 'stop', 'play', 'pause', 'seek', 'load', 'observe', 'volume'])
+const commands = new Set(['prepare', 'quiesce', 'start', 'stop', 'play', 'pause', 'seek', 'load', 'observe', 'volume', 'queue'])
 
 function record(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -69,7 +69,9 @@ function command(value: unknown): boolean {
 
 function endpoint(value: unknown): boolean {
   return value == null || (record(value) && identity(value.destinationId) && identity(value.incarnationId)
-    && integer(value.epoch, 1) && (value.capability == null || identity(value.capability)))
+    && integer(value.epoch, 1) && (value.capability == null || identity(value.capability))
+    && (value.recoveryCredential == null || (identity(value.recoveryCredential) && identity(value.recoveryTabId)
+      && typeof value.recoveryExpiresAt === 'string' && Number.isFinite(Date.parse(value.recoveryExpiresAt)))))
 }
 
 export function parsePlaybackSnapshot(value: unknown): PlaybackSnapshotResource | null {
@@ -78,6 +80,7 @@ export function parsePlaybackSnapshot(value: unknown): PlaybackSnapshotResource 
     || !nullableIdentity(value.selectedDestinationId) || !nullableIdentity(value.activeDestinationId)
     || !nullableIdentity(value.activeIncarnationId) || !transfer(value.transfer)
     || !Array.isArray(value.destinations) || !value.destinations.every(destination)
+    || (value.requestResult != null && (!record(value.requestResult) || !identity(value.requestResult.requestId) || !identity(value.requestResult.commandId) || !(value.requestResult.outcome === null || typeof value.requestResult.outcome === 'string')))
     || !Array.isArray(value.commands) || !value.commands.every(command) || !endpoint(value.endpoint)) return null
 
   return value as unknown as PlaybackSnapshotResource

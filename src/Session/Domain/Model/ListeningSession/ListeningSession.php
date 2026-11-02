@@ -14,11 +14,6 @@ use InvalidArgumentException;
 
 final class ListeningSession
 {
-    /**
-     * @var list<\App\Shared\Domain\Event\AbstractDomainEvent>
-     */
-    private array $pendingEvents = [];
-
     private function __construct(
         private ListeningSessionState $state,
     ) {}
@@ -57,12 +52,6 @@ final class ListeningSession
             lastUsedAt: null,
         ));
 
-        $session->pendingEvents[] = new \App\Session\Domain\Event\SessionCreated(
-            userId: $userId,
-            queue: $queue,
-            occurredAt: $now,
-        );
-
         return $session;
     }
 
@@ -76,80 +65,13 @@ final class ListeningSession
         return new self($state);
     }
 
-    /**
-     * Claim this session for a device, transferring the active device.
-     * No-op if the device already holds the session.
-     */
-    public function claim(Uuid $deviceId): void
-    {
-        if ($this->state->activeDeviceId !== null
-            && $this->state->activeDeviceId->equals($deviceId)) {
-            return;
-        }
 
-        $this->state->activeDeviceId = $deviceId;
-        $this->state->updatedAt = new DateTimeImmutable();
 
-        $this->pendingEvents[] = new \App\Session\Domain\Event\SessionClaimed(
-            userId: $this->state->userId,
-            deviceId: $deviceId,
-            occurredAt: new DateTimeImmutable(),
-        );
-    }
 
-    public function releaseDevice(Uuid $deviceId): void
-    {
-        if ($this->state->activeDeviceId?->equals($deviceId)) {
-            $this->state->activeDeviceId = null;
-            $this->state->updatedAt = new DateTimeImmutable();
-        }
-    }
 
-    /**
-     * Update playback state: queue, track index, position, and playback state.
-     * @param array<array-key, mixed> $queue
-     */
-    public function updatePlayback(array $queue, int $currentTrackIndex, float $position, string $playbackState): void
-    {
-        if ($currentTrackIndex < 0) {
-            throw new InvalidArgumentException('Current track index cannot be negative.');
-        }
 
-        if ($position < 0.0) {
-            throw new InvalidArgumentException('Position cannot be negative.');
-        }
 
-        $validStates = ['playing', 'paused', 'stopped'];
-        if (!in_array($playbackState, $validStates, true)) {
-            throw new InvalidArgumentException(sprintf(
-                'Invalid playback state "%s". Must be one of: %s',
-                $playbackState,
-                implode(', ', $validStates),
-            ));
-        }
 
-        $this->state->queue = $queue;
-        $this->state->currentTrackIndex = $currentTrackIndex;
-        $this->state->position = $position;
-        $this->state->playbackState = $playbackState;
-        $this->state->updatedAt = new DateTimeImmutable();
-
-        $this->pendingEvents[] = new \App\Session\Domain\Event\SessionUpdated(
-            userId: $this->state->userId,
-            deviceId: $this->state->activeDeviceId,
-            queue: $queue,
-            occurredAt: new DateTimeImmutable(),
-        );
-    }
-
-    /**
-     * End the listening session.
-     */
-    public function end(): void
-    {
-        $this->state->playbackState = 'stopped';
-        $this->state->updatedAt = new DateTimeImmutable();
-    }
 
     /**
      * Mark the session as recently used, updating the lastUsedAt timestamp.
@@ -161,18 +83,7 @@ final class ListeningSession
         $this->state->updatedAt = $now;
     }
 
-    /**
-     * Drain pending domain events.
-     *
-     * @return list<object>
-     */
-    public function drainPendingEvents(): array
-    {
-        $events = $this->pendingEvents;
-        $this->pendingEvents = [];
 
-        return $events;
-    }
 
     /** @param list<string>|null $queue */
     public function control(
@@ -184,7 +95,7 @@ final class ListeningSession
         ?PlaybackState $desired,
         ?float $volume = null,
     ): void {
-        if (!in_array($action, ['load', 'play', 'pause', 'seek', 'stop', 'volume'], true)) {
+        if (!in_array($action, ['load', 'play', 'pause', 'seek', 'stop', 'volume', 'queue'], true)) {
             throw new InvalidArgumentException('Invalid playback action.');
         }
         if ($action === 'volume') {
@@ -202,6 +113,9 @@ final class ListeningSession
         }
         if ($action !== 'load' && $desired !== null) {
             throw new InvalidArgumentException('Only loading media may supply a desired playback state.');
+        }
+        if ($action === 'queue' && ($media !== null || $position !== null || $queue === null || $index === null)) {
+            throw new InvalidArgumentException('Queue edits require a queue and cursor and cannot change media or position.');
         }
         if ($action === 'stop'
             && ($media !== null || $queue !== null || $index !== null || $position !== null)
@@ -261,10 +175,45 @@ final class ListeningSession
         $this->state->position = $position;
     }
 
+    public function recoverLocalRunner(
+        ?PlaybackMedia $checkpointMedia,
+        int $checkpointIndex,
+        int $checkpointRevision,
+        float $checkpointPosition,
+        bool $releaseRunner,
+        bool $sourceStopped,
+    ): void {
+        if (!is_finite($checkpointPosition) || $checkpointPosition < 0 || $checkpointIndex < 0 || $checkpointRevision < 0) {
+            throw new InvalidArgumentException('Invalid local recovery checkpoint.');
+        }
+        if ($releaseRunner && $checkpointRevision === $this->state->revision
+            && $checkpointIndex === $this->state->currentTrackIndex
+            && $checkpointMedia?->toArray() === $this->state->media?->toArray()) {
+            $this->state->position = $checkpointPosition;
+        }
+        if ($releaseRunner) {
+            $this->state->activeIncarnationId = null;
+            $this->state->selectedDestinationId = null;
+        }
+        $this->state->desiredState = PlaybackState::Paused;
+        $this->state->observedState = $sourceStopped ? ObservedPlaybackState::Paused : ObservedPlaybackState::Unknown;
+        $this->advanceRevision();
+    }
+
     public function retainUncertainRunner(): void
     {
         $this->state->desiredState = PlaybackState::Paused;
         $this->state->observedState = ObservedPlaybackState::Unknown;
+    }
+
+    public function releaseConfirmedPausedRunner(): void
+    {
+        if ($this->state->desiredState !== PlaybackState::Paused || $this->state->observedState !== ObservedPlaybackState::Paused) {
+            throw new \DomainException('Only confirmed paused execution can release its runner.');
+        }
+        $this->state->activeIncarnationId = null;
+        $this->state->selectedDestinationId = null;
+        $this->advanceRevision();
     }
 
     public function restoreSelection(?Uuid $destinationId): void

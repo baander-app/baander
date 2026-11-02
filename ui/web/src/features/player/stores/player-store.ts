@@ -6,8 +6,9 @@ import { withNoopGuard } from '@/shared/stores/with-noop-guard'
 import { createPlayerQueueSlice } from './player-queue-slice'
 import { createPlayerPlaybackSlice } from './player-playback-slice'
 import { createPlayerPreferencesSlice, normalizePlayerPreferences } from './player-preferences-slice'
+import { createPlayerIntentActions } from './player-intent-actions'
 import { generateShuffleBag } from './player-queue-navigation'
-import type { PlayerState, PersistedPlayerState } from './player-types'
+import type { PlayerState, PersistedPlayerState, PlayerRuntimeActions } from './player-types'
 
 export type { Track, RepeatMode, PlayerState, PlayerPreferences, PersistedPlayerState } from './player-types'
 export { buildStreamUrl, syncPlaybackVolume, getPlaybackSelectionGeneration } from './player-playback-runtime'
@@ -15,8 +16,10 @@ export { generateShuffleBag, resolveNextIndex } from './player-queue-navigation'
 
 const createPlayerState: StateCreator<PlayerState> = (set, get) => {
   const commit = (patch: Partial<PlayerState>) => set(patch)
-  const context = { get, commit }
-  return { ...createPlayerQueueSlice(context), ...createPlayerPlaybackSlice(context), ...createPlayerPreferencesSlice(context) }
+  const context = { get: () => ({ ...get(), ...get().runtimeActions }), commit }
+  const slices = { ...createPlayerQueueSlice(context), ...createPlayerPlaybackSlice(context), ...createPlayerPreferencesSlice(context) }
+  const runtimeActions = Object.fromEntries(Object.entries(slices).filter(([, value]) => typeof value === 'function')) as unknown as PlayerRuntimeActions
+  return { ...slices, runtimeActions, ...createPlayerIntentActions(get, runtimeActions) }
 }
 
 function persistedPlayerState(state: PlayerState): PersistedPlayerState {

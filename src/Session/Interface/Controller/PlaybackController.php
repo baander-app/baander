@@ -10,6 +10,7 @@ use App\Session\Interface\Request\AcknowledgePlaybackRequest;
 use App\Session\Interface\Request\ControlPlaybackRequest;
 use App\Session\Interface\Request\ObservePlaybackRequest;
 use App\Session\Interface\Request\ReconcilePlaybackRequest;
+use App\Session\Interface\Request\RecoverLocalPlaybackRequest;
 use App\Session\Interface\Request\RegisterPlaybackEndpointRequest;
 use App\Session\Interface\Request\TransferPlaybackRequest;
 use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
@@ -270,6 +271,25 @@ final readonly class PlaybackController
     public function reconcile(#[MapRequestPayload] ReconcilePlaybackRequest $input, Request $request): JsonResponse
     {
         return $this->respond(PlaybackOperation::Reconcile, $input->toArray(), $request);
+    }
+
+    #[OA\Post(
+        path: '/api/session/recover-local',
+        summary: 'Recover a proven stopped local browser incarnation',
+        requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(ref: new Model(type: RecoverLocalPlaybackRequest::class))),
+        responses: [
+            new OA\Response(response: '200', description: 'Capability-free snapshot and recorded recovery result', content: new OA\JsonContent(
+                properties: [new OA\Property(property: 'data', ref: new Model(type: PlaybackSnapshotResource::class))],
+            )),
+            new OA\Response(response: '401', description: 'Not authenticated'),
+            new OA\Response(response: '409', description: 'Recovery authority refused'),
+            new OA\Response(response: '422', description: 'Invalid recovery request'),
+        ],
+    )]
+    #[Route('/recover-local', name: 'recover_local', methods: ['POST'])]
+    public function recoverLocal(#[MapRequestPayload] RecoverLocalPlaybackRequest $input, Request $request): JsonResponse
+    {
+        return $this->respond(PlaybackOperation::RecoverLocal, $input->toArray(), $request);
     }
 
     #[OA\Get(

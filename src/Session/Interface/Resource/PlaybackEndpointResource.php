@@ -14,6 +14,9 @@ use OpenApi\Attributes as OA;
         new OA\Property(property: 'destinationId', type: 'string'),
         new OA\Property(property: 'incarnationId', type: 'string', format: 'uuid'),
         new OA\Property(property: 'epoch', type: 'integer', minimum: 1),
+        new OA\Property(property: 'recoveryCredential', type: 'string', nullable: true, description: 'Private stop-only recovery credential for durable local storage.'),
+        new OA\Property(property: 'recoveryExpiresAt', type: 'string', format: 'date-time', nullable: true),
+        new OA\Property(property: 'recoveryTabId', type: 'string', format: 'uuid', nullable: true),
         new OA\Property(property: 'capability', type: 'string', nullable: true, description: 'Returned only to the HTTP registration caller; keep in tab memory.'),
     ],
 )]
@@ -32,6 +35,11 @@ final class PlaybackEndpointResource extends AbstractResource
             $result['capability'] = $source['capability'];
         }
 
+        foreach (['recoveryCredential', 'recoveryExpiresAt', 'recoveryTabId'] as $field) {
+            if (isset($source[$field])) {
+                $result[$field] = $source[$field];
+            }
+        }
         return $result;
     }
 }

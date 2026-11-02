@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Button } from '@/shared/components/ui/button'
 import { Slider } from '@/shared/components/ui/slider'
 import styled from 'styled-components'
@@ -8,6 +9,7 @@ import { RadioPlayerBar } from '@/features/radio/components/RadioPlayerBar'
 import { ProgressBar } from './ProgressBar'
 import { PlaybackRecoveryAnnouncer } from './PlaybackRecoveryStatus'
 import { CoverArt } from '@/shared/components/cover-art'
+import { PlaybackDestinationSelector } from '@/features/session/components/PlaybackDestinationSelector'
 
 export function NowPlayingBar() {
   const activeRadioStation = useRadioStore((s) => s.activeStation)
@@ -24,7 +26,7 @@ const PlayerContainer = styled.section`
 
 const PlayerContent = styled.div`
   display: grid;
-  grid-template-columns: minmax(8.5rem, 1fr) minmax(0, 40rem) minmax(8.5rem, 1fr);
+  grid-template-columns: minmax(11rem, 1fr) minmax(0, 40rem) minmax(11rem, 1fr);
   align-items: center;
   gap: var(--space-lg);
   max-width: 76rem;
@@ -192,6 +194,7 @@ function MusicPlayerBar() {
 }
 
 function VolumeSlider() {
+  const [draft, setDraft] = useState<number | null>(null)
   const volume = usePlayerStore((s) => s.volume)
   const muted = usePlayerStore((s) => s.muted)
   const setVolume = usePlayerStore((s) => s.setVolume)
@@ -212,14 +215,17 @@ function VolumeSlider() {
           min={0}
           max={100}
           step={1}
-          value={[muted ? 0 : volume]}
-          onValueChange={([value]) => {
+          value={[draft ?? (muted ? 0 : volume)]}
+          onValueChange={([value]) => setDraft(value)}
+          onValueCommit={([value]) => {
+            setDraft(null)
             setVolume(value)
-            if (muted && value > 0) toggleMute()
           }}
+          onPointerCancel={() => setDraft(null)}
           aria-label="Volume"
         />
       </VolumeSliderWrap>
+      <PlaybackDestinationSelector compact />
     </VolumeGroup>
   )
 }

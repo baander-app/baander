@@ -865,8 +865,8 @@ services:
         alias: App\Session\Infrastructure\Doctrine\Repository\DeviceDoctrineRepository
 
     # --- Session Application Port Aliases ---
-    App\Session\Application\Port\SessionPortInterface:
-        alias: App\Session\Infrastructure\SessionAdapter
+    App\Session\Application\Port\DevicePortInterface:
+        alias: App\Session\Infrastructure\DeviceAdapter
 
     App\Session\Application\Port\PlaybackCoordinationInterface:
         alias: App\Session\Application\Service\PlaybackCoordinator
@@ -876,11 +876,6 @@ services:
 
     App\Session\Application\Port\PlaybackConnectionsInterface:
         alias: App\Session\Infrastructure\Swoole\PlaybackCommandRelay
-
-    # --- Session WebSocket Events ---
-    App\Session\Infrastructure\Swoole\SessionEventSubscriber:
-        tags:
-            - { name: 'kernel.event_subscriber' }
 
     # --- Metadata API Adapters ---
     App\Metadata\Infrastructure\Api\Discogs\DiscogsAdapter:
@@ -1036,7 +1031,7 @@ services:
     App\Transcode\Infrastructure\Auth\HmacStreamAuthAdapter:
         arguments:
             $hmacSecret: '%env(STREAM_URL_HMAC_SECRET)%'
-            $appDomain: '%env(APP_DOMAIN)%'
+            $appDomain: '%env(APP_URL)%'
 
     # --- Transcode Cache Decorator ---
     App\Transcode\Application\Port\TranscodeExecutionOwnershipPort:
@@ -1526,9 +1521,6 @@ services:
 
     App\Activity\Application\Port\ActivityIdentityProjectionPortInterface:
         alias: App\Activity\Infrastructure\Doctrine\ActivityIdentityProjection
-
-    App\Session\Application\Port\SessionUserPublicIdentityInterface:
-        alias: App\Session\Infrastructure\Doctrine\SessionUserPublicIdentityProjection
 
     App\Radio\Application\Port\RadioPublicIdentityInterface:
         alias: App\Radio\Infrastructure\RadioPublicIdentity

@@ -72,6 +72,15 @@ class AudioService {
     }
   }
 
+  public fenceOutput(): void {
+    this.connectionGeneration++
+    this.processor?.fenceOutput()
+  }
+
+  public rearmOutput(): void {
+    this.processor?.rearmOutput()
+  }
+
   public setPlayingState(isPlaying: boolean) {
     this.processor?.setPlayingState(isPlaying)
   }

@@ -6,12 +6,30 @@ namespace App\Tests\Unit\Session\Domain\Playback;
 
 use App\Session\Domain\Model\ListeningSession\ListeningSession;
 use App\Session\Domain\Model\Playback\PlaybackState;
+use App\Session\Domain\Model\Playback\PlaybackMedia;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
 
 final class PlaybackControlContractTest extends TestCase
 {
+    public function testQueueEditsPreserveCurrentPlaybackAndPosition(): void
+    {
+        $first = new PublicId();
+        $second = new PublicId();
+        $session = ListeningSession::create(new Uuid(), [$first->toString()], 0, 42.5);
+        $media = new PlaybackMedia('song', $first);
+        $session->control('load', $media, null, null, null, PlaybackState::Playing);
+
+        $session->control('queue', null, [$first->toString(), $second->toString()], 0, null, null);
+
+        self::assertSame([$first->toString(), $second->toString()], $session->getQueue());
+        self::assertSame($media, $session->media());
+        self::assertSame(42.5, $session->getPosition());
+        self::assertSame(PlaybackState::Playing, $session->desiredState());
+    }
+
     public function testTransportActionsCannotOverrideTheirOwnPlaybackState(): void
     {
         $session = ListeningSession::create(new Uuid(), [], 0, 12);

@@ -5,11 +5,14 @@ declare(strict_types=1);
 namespace App\Tests\Integration;
 
 use App\Session\Domain\Model\Device\Device;
+use App\Session\Domain\Model\Playback\PlaybackMedia;
+use App\Session\Domain\Model\Playback\PlaybackState;
 use App\Session\Domain\Model\ListeningSession\ListeningSession;
 use App\Session\Infrastructure\Doctrine\Entity\DeviceEntity;
 use App\Session\Infrastructure\Doctrine\Entity\ListeningSessionEntity;
 use App\Session\Infrastructure\Doctrine\Repository\DeviceDoctrineRepository;
 use App\Session\Infrastructure\Doctrine\Repository\ListeningSessionDoctrineRepository;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use Doctrine\DBAL\Exception\ForeignKeyConstraintViolationException;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -36,7 +39,7 @@ final class SessionOwnershipPersistenceTest extends TestCase
     public function testDeclaredForeignKeysMatchTheCatalog(): void
     {
         $this->assertDeclaredForeignKeysMatchCatalog(array_map(
-            static fn (array $table): array => ['user_id', $table[1]],
+            static fn(array $table): array => ['user_id', $table[1]],
             self::TABLES,
         ));
     }
@@ -68,7 +71,7 @@ final class SessionOwnershipPersistenceTest extends TestCase
         }
         $this->manager->clear();
 
-        $names = static fn (array $devices): array => array_map(static fn (Device $device): ?string => $device->getName(), $devices);
+        $names = static fn(array $devices): array => array_map(static fn(Device $device): ?string => $device->getName(), $devices);
         self::assertSame(['a-new', 'a-mid', 'a-old'], $names($repository->findByUserId($first)));
         self::assertSame(['b-new', 'b-old'], $names($repository->findByUserId($second)));
 
@@ -90,22 +93,29 @@ final class SessionOwnershipPersistenceTest extends TestCase
 
         $ids = [];
         $publicIds = [];
-        foreach ([$first, $second] as $index => $owner) {
-            $session = ListeningSession::create($owner, ['track-' . $index], 0, 1.5);
-            $session->claim(Uuid::generate());
+        $queues = [];
+        foreach ([$first, $second] as $owner) {
+            $songId = new PublicId()->toString();
+            $session = ListeningSession::create($owner, [], 0, 0);
+            $session->control('load', new PlaybackMedia('song', PublicId::fromString($songId)), [$songId], 0, 1.5, PlaybackState::Paused);
+            $queues[$owner->toString()] = [$songId];
             $repository->save($session);
             $ids[$owner->toString()] = $session->getId();
             $publicIds[$owner->toString()] = $session->getPublicId();
         }
         $this->manager->clear();
 
-        foreach ([$first, $second] as $index => $owner) {
+        foreach ([$first, $second] as $owner) {
             $found = $repository->findByUserId($owner);
             self::assertNotNull($found);
             self::assertTrue($found->getId()->equals($ids[$owner->toString()]));
             self::assertTrue($found->getPublicId()->equals($publicIds[$owner->toString()]));
             self::assertTrue($found->getUserId()->equals($owner));
-            self::assertSame(['track-' . $index], $found->getQueue());
+            self::assertSame($queues[$owner->toString()], $found->getQueue());
+            self::assertSame($queues[$owner->toString()][0], $found->media()?->publicId->toString());
+            self::assertSame(PlaybackState::Paused, $found->desiredState());
+            self::assertSame(1.5, $found->getPosition());
+            self::assertSame(1, $found->revision());
         }
     }
 

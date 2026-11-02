@@ -15,9 +15,8 @@ use App\Radio\Interface\Controller\RadioSessionController;
 use App\Radio\Interface\Controller\RadioSourceController;
 use App\Radio\Interface\Controller\RadioStationController;
 use App\Radio\Interface\Controller\StarredStationController;
-use App\Session\Application\Port\SessionPortInterface;
+use App\Session\Application\Port\DevicePortInterface;
 use App\Session\Interface\Controller\DeviceController;
-use App\Session\Interface\Controller\SessionController;
 use App\Shared\Domain\Model\Uuid;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -36,8 +35,7 @@ final class IdentityPortControllerTest extends TestCase
             'sources' => [RadioSourceController::class, 'list', RadioSourcePortInterface::class, 'listSources', false],
             'countries' => [RadioStationController::class, 'countries', CountrySubscriptionPortInterface::class, 'listAvailableCountries', false],
             'starred' => [StarredStationController::class, 'list', StarredStationPortInterface::class, 'listStarred', true],
-            'devices' => [DeviceController::class, 'list', SessionPortInterface::class, 'getDevices', true],
-            'session' => [SessionController::class, 'get', SessionPortInterface::class, 'getSession', true],
+            'devices' => [DeviceController::class, 'list', DevicePortInterface::class, 'getDevices', true],
         ];
         foreach ($controllers as $name => $arguments) {
             yield $name . ' identity' => [...$arguments, true];
@@ -67,7 +65,7 @@ final class IdentityPortControllerTest extends TestCase
         $port = $this->createMock($portClass);
         $expectation = $port->expects($supported ? self::once() : self::never())->method($portMethod);
         if ($supported && $scoped) {
-            $expectation->with(self::callback(static fn (Uuid $userId): bool => $userId->equals($id)));
+            $expectation->with(self::callback(static fn(Uuid $userId): bool => $userId->equals($id)));
         }
         $expectation->willReturn([]);
         $bus = $this->createStub(MessageBusInterface::class);
@@ -77,8 +75,7 @@ final class IdentityPortControllerTest extends TestCase
             $controllerClass === RadioSourceController::class && $port instanceof RadioSourcePortInterface => new RadioSourceController($security, $port),
             $controllerClass === RadioStationController::class && $port instanceof CountrySubscriptionPortInterface => new RadioStationController($security, $this->createStub(RadioStationPortInterface::class), $port),
             $controllerClass === StarredStationController::class && $port instanceof StarredStationPortInterface => new StarredStationController($security, $port, $bus, $this->createStub(RadioStationPortInterface::class)),
-            $controllerClass === DeviceController::class && $port instanceof SessionPortInterface => new DeviceController($security, $port),
-            $controllerClass === SessionController::class && $port instanceof SessionPortInterface => new SessionController($security, $port, $bus),
+            $controllerClass === DeviceController::class && $port instanceof DevicePortInterface => new DeviceController($security, $port),
             default => throw new \LogicException('Unknown controller fixture.'),
         };
 

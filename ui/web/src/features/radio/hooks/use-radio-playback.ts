@@ -26,9 +26,8 @@ export function useRadioPlayback() {
     const sorted = [...station.streams].sort((a, b) => b.reliability - a.reliability)
     const bestStream = sorted[0]
 
-    // Local playback owns the current selection immediately. Session replies
-    // carry no playback transition and cannot revive an older station.
-    startStation(station, bestStream.url)
+    // Selection is immediate; native playback waits for the previous destination to pause.
+    if (!await startStation(station, bestStream.url)) return
 
     try {
       await startRadioSession(station.publicId, bestStream.url)

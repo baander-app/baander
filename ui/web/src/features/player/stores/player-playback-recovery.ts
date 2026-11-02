@@ -194,6 +194,7 @@ function play(ep: Episode): void {
   ep.release = () => clearTimeout(timer)
   element.play().then(() => {
     if (current(ep, step)) finish(ep)
+    else if (!ep.host.get().playbackExecutionActive) element.pause()
   }, (err: unknown) => {
     if (!current(ep, step)) return
     if (err instanceof DOMException && err.name === 'NotAllowedError') {
