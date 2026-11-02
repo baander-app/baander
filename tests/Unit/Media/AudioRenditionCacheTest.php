@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Media;
 
 use App\Transcode\Application\DTO\AudioRenditionInput;
+use App\Shared\Application\DTO\DeploymentProfile;
+use App\Transcode\Application\Service\MediaExecutionPolicy;
 use App\Transcode\Application\DTO\AudioRenditionRuntimeSnapshot;
 use App\Transcode\Application\Exception\AudioRenditionFailedException;
 use App\Transcode\Application\Port\AudioRenditionFormat;
@@ -52,6 +54,31 @@ final class AudioRenditionCacheTest extends TestCase
         $rendition = $this->cache()->open('track', $this->source, AudioRenditionFormat::Mp3, 192000);
         self::assertTrue($rendition->isComplete());
         self::assertSame('finished', file_get_contents($rendition->path));
+    }
+
+    public function testCopyUsesSelectedStreamWithoutBitrateAndReturnsCompletedMp4(): void
+    {
+        $this->runtime->method('find')->willReturnCallback(function (): AudioRenditionRuntimeSnapshot {
+            $this->write('copied');
+            return $this->snapshot('complete');
+        });
+        $rendition = $this->cache()->openCopy('track', $this->source, hash_file('xxh3', $this->source), 3);
+        self::assertSame('copy', $this->input->mode);
+        self::assertNull($this->input->bitrate);
+        self::assertSame(3, $this->input->streamIndex);
+        self::assertSame('mp4', $this->input->outputContainer);
+        self::assertSame('audio/mp4', $rendition->mimeType());
+        self::assertTrue($rendition->isComplete());
+    }
+
+    public function testCopyNeverExposesIncompleteMp4Bytes(): void
+    {
+        $this->runtime->method('find')->willReturnCallback(function (): AudioRenditionRuntimeSnapshot {
+            $this->write('incomplete', true);
+            return $this->snapshot('running');
+        });
+        $this->expectException(AudioRenditionFailedException::class);
+        $this->cache()->openCopy('track', $this->source, hash_file('xxh3', $this->source), 0);
     }
 
     public function testGrowingReaderRetainsItsOpenFileAcrossFinalRename(): void
@@ -221,7 +248,7 @@ final class AudioRenditionCacheTest extends TestCase
         $runtime->expects(self::never())->method('admit');
         $runtime->expects(self::never())->method('resetCompleted');
         $runtime->method('find')->willReturn(null);
-        $cache = new AudioRenditionCache(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile('household')), new SegmentFileResolver($this->root), $runtime, new NullLogger());
+        $cache = new AudioRenditionCache(new MediaExecutionPolicy(new DeploymentProfile('household')), new SegmentFileResolver($this->root), $runtime, new NullLogger());
         $this->expectException(\App\Transcode\Application\Exception\MediaEncodingProhibitedException::class);
         $cache->open('track', $this->source, AudioRenditionFormat::Mp3, 192000);
     }
@@ -236,7 +263,7 @@ final class AudioRenditionCacheTest extends TestCase
         $runtime->expects(self::never())->method('admit');
         $runtime->expects(self::never())->method('resetCompleted');
         $runtime->method('find')->willReturnCallback(fn (): AudioRenditionRuntimeSnapshot => $this->snapshot('complete'));
-        $cache = new AudioRenditionCache(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile('household')), new SegmentFileResolver($this->root), $runtime, new NullLogger());
+        $cache = new AudioRenditionCache(new MediaExecutionPolicy(new DeploymentProfile('household')), new SegmentFileResolver($this->root), $runtime, new NullLogger());
         self::assertSame('finished', file_get_contents($cache->open('track', $this->source, $format, 192000)->path));
     }
 
@@ -252,7 +279,7 @@ final class AudioRenditionCacheTest extends TestCase
 
     private function cache(): AudioRenditionCache
     {
-        return new AudioRenditionCache(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile()), new SegmentFileResolver($this->root), $this->runtime, new NullLogger(), pollIntervalSeconds: .001, startTimeoutSeconds: .01);
+        return new AudioRenditionCache(new MediaExecutionPolicy(new DeploymentProfile()), new SegmentFileResolver($this->root), $this->runtime, new NullLogger(), pollIntervalSeconds: .001, startTimeoutSeconds: .01);
     }
 
     private function snapshot(string $state, int $generation = 1, bool $live = true): AudioRenditionRuntimeSnapshot

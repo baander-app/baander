@@ -12,6 +12,8 @@ use OpenApi\Attributes as OA;
     new OA\Property(property: 'kind', type: 'string', enum: ['original', 'cached', 'copy', 'encoded', 'incompatible']),
     new OA\Property(property: 'reason', type: 'string', nullable: true),
     new OA\Property(property: 'url', type: 'string', nullable: true),
+    new OA\Property(property: 'requestId', type: 'string', format: 'uuid', nullable: true),
+    new OA\Property(property: 'jobId', type: 'string', nullable: true),
     new OA\Property(property: 'selection', nullable: true, properties: [
         new OA\Property(property: 'container', type: 'string'),
         new OA\Property(property: 'transport', type: 'string', enum: ['file', 'hls', 'dash']),
@@ -27,7 +29,7 @@ final class DeliveryResource extends AbstractResource
         if (!$source instanceof DeliveryDecision) {
             throw new \InvalidArgumentException('Expected a media delivery decision.');
         }
-        return ['kind' => $source->kind->value, 'reason' => $source->reason, 'url' => $source->url,
+        return ['kind' => $source->kind->value, 'reason' => $source->reason, 'url' => $source->url, 'requestId' => $source->requestId, 'jobId' => $source->jobId,
             'selection' => $source->selection === null ? null : [
                 'container' => $source->selection->container,
                 'transport' => $source->selection->transport,

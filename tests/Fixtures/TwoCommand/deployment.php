@@ -65,7 +65,7 @@ function jsonBody(HttpExchange $response): array
 {
     return json_decode($response->body, true, flags: JSON_THROW_ON_ERROR);
 }
-/** @param array<string, string|int|float|bool>|null $payload */
+/** @param array<string, string|int|float|bool|list<string>>|null $payload */
 function twoCommandExchange(StreamClient $client, string $path, string $method = 'GET', ?array $payload = null): HttpExchange
 {
     $endpoint = BASE . $path;
@@ -260,7 +260,7 @@ function verifyDash(StreamClient $client, array $state): array
 {
     global $db;
     $signed = twoCommandExchange($client, '/api/stream/sign', 'POST', [
-        'path' => '/api/transcode/' . $state['video'] . '/manifest.mpd', 'refresh' => true,
+        'requestId' => $state['requestId'], 'jobIds' => [$state['job']], 'path' => '/api/transcode/' . $state['video'] . '/manifest.mpd', 'refresh' => true,
     ])->complete();
     ensure($signed->status() === 200, 'DASH signing failed: ' . $signed->body);
     $snapshot = jsonBody($signed);
@@ -383,7 +383,7 @@ function verifySignedDeliveryExpiry(StreamClient $client, array $state): array
     $evidence = [];
     foreach (['hls' => 'master.m3u8', 'dash' => 'manifest.mpd'] as $protocol => $file) {
         $signed = twoCommandExchange($client, '/api/stream/sign', 'POST', [
-            'path' => '/api/transcode/' . $state['video'] . '/' . $file,
+            'requestId' => $state['requestId'], 'jobIds' => [$state['job']], 'path' => '/api/transcode/' . $state['video'] . '/' . $file,
             'refresh' => true, 'expiresInSeconds' => $window,
         ])->complete(5);
         ensure($signed->status() === 200, 'Short-lived authenticated signing failed.');
@@ -419,7 +419,7 @@ function verifySignedDeliveryExpiry(StreamClient $client, array $state): array
     unset($proof);
     foreach (['hls' => 'master.m3u8', 'dash' => 'manifest.mpd'] as $protocol => $file) {
         $fresh = twoCommandExchange($client, '/api/stream/sign', 'POST', [
-            'path' => '/api/transcode/' . $state['video'] . '/' . $file,
+            'requestId' => $state['requestId'], 'jobIds' => [$state['job']], 'path' => '/api/transcode/' . $state['video'] . '/' . $file,
             'refresh' => true, 'expiresInSeconds' => $window,
         ])->complete(5);
         ensure($fresh->status() === 200, 'Authenticated signing refresh failed after expiry.');
@@ -569,6 +569,11 @@ if ($mode === 'prepare') {
     $album = new AlbumEntity(new PublicId(), $library, 'Two command album', 'two-command-album');
     $song = new SongEntity(new PublicId(), $album, 'Worker audio', AUDIO, (int) filesize(AUDIO), 'audio/flac');
     $video = new VideoEntity(new PublicId(), VIDEO, hash_file('sha256', VIDEO));
+    $catalogProbe = new Process(\App\Transcode\Infrastructure\FFmpeg\FFprobeArguments::video(VIDEO, 'ffprobe'), timeout: 30);
+    $catalogProbe->mustRun();
+    $video->setProbe(\App\Transcode\Domain\ValueObject\VideoProbeResult::fromProbeOutput(
+        json_decode($catalogProbe->getOutput(), true, flags: JSON_THROW_ON_ERROR),
+    )->jsonSerialize());
     $video->setDuration((int) round($catalogDuration)); $video->setWidth(1280); $video->setHeight(720); $video->setFramerate($movieEndpoint ? 25 : 30);
     $movie = new MovieEntity(new PublicId(), $movies, 'Two command playback');
     $movieVideo = new MovieVideoEntity($movie, $video);
@@ -580,7 +585,7 @@ if ($mode === 'prepare') {
     $image->setAlbum($album);
     foreach ([$library, $movies, $album, $song, $video, $movie, $movieVideo, $image] as $entity) { $manager->persist($entity); }
     $manager->flush();
-    $prepared = ['video' => (string) $video->getPublicId(), 'movie' => (string) $movie->getPublicId(), 'track' => (string) $song->getPublicId(), 'image' => (string) $image->getPublicId()];
+    $prepared = ['requestId' => \App\Shared\Domain\Model\Uuid::generate()->toString(), 'video' => (string) $video->getPublicId(), 'movie' => (string) $movie->getPublicId(), 'track' => (string) $song->getPublicId(), 'image' => (string) $image->getPublicId()];
     if ($movieEndpoint) {
         $prepared['scenario'] = 'movie-endpoint';
         $prepared['endpoint'] = ['videoEnd' => 42, 'containerEnd' => 48];
@@ -589,7 +594,7 @@ if ($mode === 'prepare') {
     $result = state();
 } elseif ($mode === 'absent') {
     $state = state(); $auth = $client();
-    $video = twoCommandExchange($auth, '/api/transcode/sessions/', 'POST', ['videoId' => $state['video'], 'qualityTier' => '360p']);
+    $video = twoCommandExchange($auth, '/api/transcode/sessions/', 'POST', ['requestId' => $state['requestId'], 'videoId' => $state['video'], 'qualityTier' => '360p']);
     $video->complete(15);
     ensure($video->status() === 503 && $video->header('Retry-After') === '2', 'Missing worker did not refuse video within its bound.');
     // Its sixty-second application deadline needs a client deadline above sixty.
@@ -608,7 +613,7 @@ if ($mode === 'prepare') {
 } elseif ($mode === 'capacity') {
     $state = state(); $auth = $client(); $sessions = [];
     foreach (['360p', '480p', '720p'] as $quality) {
-        $response = twoCommandExchange($auth, '/api/transcode/sessions/', 'POST', ['videoId' => $state['video'], 'qualityTier' => $quality])->complete(20);
+        $response = twoCommandExchange($auth, '/api/transcode/sessions/', 'POST', ['requestId' => $state['requestId'], 'videoId' => $state['video'], 'qualityTier' => $quality])->complete(20);
         ensure($response->status() === 201, 'Capacity video admission failed: ' . $response->body);
         $sessions[] = jsonBody($response);
     }
@@ -680,7 +685,7 @@ if ($mode === 'prepare') {
     $state = state(); $auth = $client();
     $requests = [];
     foreach (range(1, 4) as $_) {
-        $requests[] = twoCommandExchange($auth, '/api/transcode/sessions/', 'POST', ['videoId' => $state['video'], 'qualityTier' => '360p']);
+        $requests[] = twoCommandExchange($auth, '/api/transcode/sessions/', 'POST', ['requestId' => $state['requestId'], 'videoId' => $state['video'], 'qualityTier' => '360p']);
     }
     $deadline = microtime(true) + 20;
     do {

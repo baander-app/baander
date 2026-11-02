@@ -11,6 +11,13 @@ use PHPUnit\Framework\TestCase;
 
 final class FFprobeArgumentsTest extends TestCase
 {
+    public function testAudioProbeReadsContainerAndAbsoluteStreamMetadata(): void
+    {
+        self::assertSame(['/custom/ffprobe', '-threads', '2', '-v', 'quiet', '-print_format', 'json',
+            '-show_format', '-show_streams', '/audio with spaces.aac'],
+            FFprobeArguments::audio('/audio with spaces.aac', '/custom/ffprobe'));
+    }
+
     public function testVideoProbeKeepsMetadataAndBoundsPacketEvidence(): void
     {
         self::assertSame(['/custom/ffprobe', '-threads', '2', '-v', 'quiet', '-print_format', 'json',

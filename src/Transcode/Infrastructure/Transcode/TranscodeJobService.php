@@ -12,6 +12,7 @@ use App\Transcode\Domain\Event\TranscodeJobCreated;
 use App\Transcode\Domain\Model\TranscodeJob;
 use App\Transcode\Domain\Repository\TranscodeJobRepositoryInterface;
 use App\Transcode\Domain\ValueObject\QualityTier;
+use App\Transcode\Domain\ValueObject\PresentationSelection;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 
 final class TranscodeJobService implements TranscodeJobPortInterface
@@ -32,14 +33,17 @@ final class TranscodeJobService implements TranscodeJobPortInterface
         string $outputDirectory,
         Uuid $ownerUserId,
         array $audioTrackLanguages = [],
+        ?PresentationSelection $presentationSelection = null,
+        ?string $requestId = null,
     ): TranscodeJob {
-        $existing = $this->jobRepository->findByOwnerVideoAndQuality($ownerUserId, $videoId, $qualityTier->name);
+        $requestId ??= (new Uuid())->toString();
+        $existing = $this->jobRepository->findByOwnerVideoAndQuality($ownerUserId, $videoId, $qualityTier->name, $presentationSelection?->canonicalKey(), $requestId);
 
         if ($existing !== null) {
             return $existing;
         }
 
-        $job = TranscodeJob::create($videoId, $qualityTier, $outputDirectory, $ownerUserId, $audioTrackLanguages);
+        $job = TranscodeJob::create($videoId, $qualityTier, $outputDirectory, $ownerUserId, $audioTrackLanguages, $presentationSelection, $requestId);
         // Cleanup before the first claim must stay inside this job's namespace.
         $job->getState()->outputDirectory = dirname($this->storage->forGeneration($videoId, $qualityTier, 1, $job->getId())->resolveJobDirectory($videoId, $qualityTier));
         $this->jobRepository->save($job);
@@ -50,6 +54,30 @@ final class TranscodeJobService implements TranscodeJobPortInterface
             $job->getQualityTierName(),
         ));
 
+        return $job;
+    }
+
+    public function getOrCreateCopyJob(
+        Uuid $videoId,
+        string $outputDirectory,
+        Uuid $ownerUserId,
+        PresentationSelection $presentationSelection,
+        int $width,
+        int $height,
+        ?string $requestId = null,
+    ): TranscodeJob {
+        if ($presentationSelection->mode !== 'copy') {
+            throw new \InvalidArgumentException('A copy job requires a copy presentation.');
+        }
+        $requestId ??= (new Uuid())->toString();
+        $existing = $this->jobRepository->findByOwnerVideoAndQuality($ownerUserId, $videoId, 'copy', $presentationSelection->canonicalKey(), $requestId);
+        if ($existing !== null) {
+            return $existing;
+        }
+        $job = TranscodeJob::createCopy($videoId, $outputDirectory, $ownerUserId, $presentationSelection, $width, $height, $requestId);
+        $job->getState()->outputDirectory = rtrim($outputDirectory, '/') . '/job-' . $job->getId()->toString();
+        $this->jobRepository->save($job);
+        $this->eventDispatcher->dispatch(new TranscodeJobCreated($job->getId(), $videoId, 'copy'));
         return $job;
     }
 
@@ -86,16 +114,19 @@ final class TranscodeJobService implements TranscodeJobPortInterface
     public function cleanupOrphanedJobs(): int
     {
         $orphans = $this->jobRepository->findOrphanedJobs();
-        $count = count($orphans);
+        $count = 0;
 
         foreach ($orphans as $job) {
             try {
-                $this->storage->deleteDirectory($job->getOutputDirectory());
+                if (!$this->storage->deleteIfUnretained($job->getOutputDirectory())) {
+                    continue;
+                }
             } catch (\Throwable) {
-                // Best-effort cleanup
+                continue;
             }
 
             $this->jobRepository->delete($job);
+            ++$count;
         }
 
         return $count;

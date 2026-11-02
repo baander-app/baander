@@ -10,19 +10,19 @@ use App\Transcode\Domain\ValueObject\QualityTier;
 
 interface TranscodeStoragePortInterface
 {
-    public function forGeneration(Uuid $videoId, QualityTier $qualityTier, int $generation, Uuid $jobId): self;
+    public function forGeneration(Uuid $videoId, QualityTier|string $qualityTier, int $generation, Uuid $jobId): self;
 
-    public function resolveJobDirectory(Uuid $videoId, QualityTier $qualityTier): string;
+    public function resolveJobDirectory(Uuid $videoId, QualityTier|string $qualityTier): string;
 
-    public function resolveInitSegmentPath(Uuid $videoId, QualityTier $qualityTier): string;
+    public function resolveInitSegmentPath(Uuid $videoId, QualityTier|string $qualityTier): string;
 
-    public function resolveSegmentPath(Uuid $videoId, QualityTier $qualityTier, int $segmentIndex): string;
+    public function resolveSegmentPath(Uuid $videoId, QualityTier|string $qualityTier, int $segmentIndex): string;
 
-    public function resolveNativeManifestPath(Uuid $videoId, QualityTier $qualityTier): string;
+    public function resolveNativeManifestPath(Uuid $videoId, QualityTier|string $qualityTier): string;
 
-    public function resolveTrackInitSegmentPath(Uuid $videoId, QualityTier $qualityTier, MediaTrack $track): string;
+    public function resolveTrackInitSegmentPath(Uuid $videoId, QualityTier|string $qualityTier, MediaTrack $track): string;
 
-    public function resolveTrackSegmentPath(Uuid $videoId, QualityTier $qualityTier, MediaTrack $track, int $nativeNumber): string;
+    public function resolveTrackSegmentPath(Uuid $videoId, QualityTier|string $qualityTier, MediaTrack $track, int $nativeNumber): string;
 
     // --- Audio Track Paths ---
 
@@ -41,6 +41,14 @@ interface TranscodeStoragePortInterface
     public function exists(string $path): bool;
 
     public function deleteDirectory(string $path): void;
+
+    /** Retain existing output through the deadline; shorter grants never reduce it. */
+    public function retainUntil(string $directory, int $expiresAt): bool;
+
+    public function hasUnexpiredRetention(string $directory): bool;
+
+    /** Delete only when no live retention exists; an already absent directory succeeds. */
+    public function deleteIfUnretained(string $directory): bool;
 
     public function getDirectorySize(string $path): int;
 

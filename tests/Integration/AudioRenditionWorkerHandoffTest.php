@@ -74,6 +74,32 @@ final class AudioRenditionWorkerHandoffTest extends TestCase
         self::assertSame('complete', $this->first->fetchOne('SELECT state FROM audio_rendition_runtime'));
     }
 
+    public function testSelectedNonzeroAacStreamIsCopiedWithoutTheVideoStream(): void
+    {
+        $source = $this->root . '/audio-with-video.mkv';
+        $fixture = new Process(['/usr/bin/ffmpeg', '-nostdin', '-hide_banner', '-loglevel', 'error',
+            '-f', 'lavfi', '-i', 'color=c=black:s=16x16:r=1:d=3', '-i', $this->source,
+            '-map', '0:v:0', '-map', '1:a:0', '-c:v', 'mpeg4', '-c:a', 'aac', '-shortest', $source]);
+        $fixture->mustRun();
+        $reference = $this->root . '/reference.aac';
+        (new Process(['/usr/bin/ffmpeg', '-nostdin', '-hide_banner', '-loglevel', 'error', '-i', $source,
+            '-map', '0:1', '-c:a', 'copy', '-f', 'adts', $reference]))->mustRun();
+        $this->startWorker(.1);
+        $copy = $this->cache()->openCopy('track', $source, hash_file('xxh3', $source), 1);
+        self::assertTrue($copy->isComplete());
+        self::assertSame('audio/mp4', $copy->mimeType());
+        self::assertSame(0, $this->workerProcess->wait(), $this->workerProcess->getErrorOutput());
+        $roundtrip = $this->root . '/roundtrip.aac';
+        (new Process(['/usr/bin/ffmpeg', '-nostdin', '-hide_banner', '-loglevel', 'error', '-i', $copy->path,
+            '-map', '0:a:0', '-c:a', 'copy', '-f', 'adts', $roundtrip]))->mustRun();
+        self::assertSame(hash_file('sha256', $reference), hash_file('sha256', $roundtrip));
+        $probe = new Process(['/usr/bin/ffprobe', '-v', 'error', '-show_entries', 'stream=codec_type,codec_name', '-of', 'json', $copy->path]);
+        $probe->mustRun();
+        $streams = json_decode($probe->getOutput(), true, 32, JSON_THROW_ON_ERROR)['streams'];
+        self::assertSame([['codec_name' => 'aac', 'codec_type' => 'audio']], $streams);
+        self::assertSame(1, (int) $this->first->fetchOne('SELECT stream_index FROM audio_rendition_runtime'));
+    }
+
     public function testPinnedReaderRejectsLeaseLossAndExpiredWorkerCannotPublishACompletedFile(): void
     {
         $this->startWorker(2);

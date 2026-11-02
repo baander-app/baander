@@ -18,37 +18,37 @@ final class TranscodeFileStorage implements TranscodeStoragePortInterface
     ) {
     }
 
-    public function forGeneration(Uuid $videoId, QualityTier $qualityTier, int $generation, Uuid $jobId): self
+    public function forGeneration(Uuid $videoId, QualityTier|string $qualityTier, int $generation, Uuid $jobId): self
     {
         return new self($this->resolver->forGeneration($videoId, $qualityTier, $generation, $jobId));
     }
 
-    public function resolveJobDirectory(Uuid $videoId, QualityTier $qualityTier): string
+    public function resolveJobDirectory(Uuid $videoId, QualityTier|string $qualityTier): string
     {
         return $this->resolver->resolveJobDirectory($videoId, $qualityTier);
     }
 
-    public function resolveInitSegmentPath(Uuid $videoId, QualityTier $qualityTier): string
+    public function resolveInitSegmentPath(Uuid $videoId, QualityTier|string $qualityTier): string
     {
         return $this->resolver->resolveInitSegmentPath($videoId, $qualityTier);
     }
 
-    public function resolveSegmentPath(Uuid $videoId, QualityTier $qualityTier, int $segmentIndex): string
+    public function resolveSegmentPath(Uuid $videoId, QualityTier|string $qualityTier, int $segmentIndex): string
     {
         return $this->resolver->resolveSegmentPath($videoId, $qualityTier, $segmentIndex);
     }
 
-    public function resolveNativeManifestPath(Uuid $videoId, QualityTier $qualityTier): string
+    public function resolveNativeManifestPath(Uuid $videoId, QualityTier|string $qualityTier): string
     {
         return $this->resolver->resolveNativeManifestPath($videoId, $qualityTier);
     }
 
-    public function resolveTrackInitSegmentPath(Uuid $videoId, QualityTier $qualityTier, MediaTrack $track): string
+    public function resolveTrackInitSegmentPath(Uuid $videoId, QualityTier|string $qualityTier, MediaTrack $track): string
     {
         return $this->resolver->resolveTrackInitSegmentPath($videoId, $qualityTier, $track);
     }
 
-    public function resolveTrackSegmentPath(Uuid $videoId, QualityTier $qualityTier, MediaTrack $track, int $nativeNumber): string
+    public function resolveTrackSegmentPath(Uuid $videoId, QualityTier|string $qualityTier, MediaTrack $track, int $nativeNumber): string
     {
         return $this->resolver->resolveTrackSegmentPath($videoId, $qualityTier, $track, $nativeNumber);
     }
@@ -81,6 +81,140 @@ final class TranscodeFileStorage implements TranscodeStoragePortInterface
     public function exists(string $path): bool
     {
         return file_exists($this->resolver->resolvePath($path));
+    }
+
+    public function retainUntil(string $directory, int $expiresAt): bool
+    {
+        if ($expiresAt < 0) {
+            throw new InvalidArgumentException('A retention deadline must be non-negative.');
+        }
+
+        return $this->withRetentionLock($directory, function (int $current, string $lease) use ($expiresAt): bool {
+            if ($expiresAt > $current) {
+                $temporary = $lease . '.' . bin2hex(random_bytes(8)) . '.tmp';
+                $handle = @fopen($temporary, 'x+b');
+                if ($handle === false) {
+                    throw new RuntimeException('Unable to create a cache retention record.');
+                }
+                try {
+                    $content = $expiresAt . "\n";
+                    if (fwrite($handle, $content) !== strlen($content) || !fflush($handle) || !fsync($handle)) {
+                        throw new RuntimeException('Unable to persist a cache retention record.');
+                    }
+                    if (!rename($temporary, $lease)) {
+                        throw new RuntimeException('Unable to publish a cache retention record.');
+                    }
+                } finally {
+                    fclose($handle);
+                    if (is_file($temporary)) {
+                        unlink($temporary);
+                    }
+                }
+            }
+
+            return true;
+        }, false);
+    }
+
+    public function hasUnexpiredRetention(string $directory): bool
+    {
+        return $this->withRetentionLock($directory, static fn (int $current): bool => $current >= time(), false, LOCK_SH);
+    }
+
+    public function deleteIfUnretained(string $directory): bool
+    {
+        return $this->withRetentionLock($directory, function (int $current) use ($directory): bool {
+            if ($current >= time()) {
+                return false;
+            }
+            $this->deleteDirectory($directory);
+
+            return true;
+        }, true);
+    }
+
+    /** @param callable(int, string): bool $operation */
+    private function withRetentionLock(string $directory, callable $operation, bool $missing, int $lockMode = LOCK_EX): bool
+    {
+        $this->resolver->assertGenerationPath($directory);
+        $base = self::normalizeDeletionPath($this->resolver->getBasePath());
+        $directory = self::normalizeDeletionPath($directory);
+        $prefix = rtrim($base, '/') . '/';
+        if ($directory === $base || !str_starts_with($directory, $prefix)) {
+            throw new InvalidArgumentException('Retention requires a directory below the transcode storage root.');
+        }
+        $root = realpath($base);
+        if ($root === false || !is_dir($root)) {
+            return $missing;
+        }
+        $components = explode('/', substr($directory, strlen($prefix)));
+        if (!self::retentionDirectoryExists($root, $components)) {
+            return $missing;
+        }
+        $scope = $components[0] === SegmentFileResolver::AUDIO_RENDITION_DIRECTORY
+            ? implode('/', array_slice($components, 0, 2)) : $components[0];
+        $record = $root . '/.retention-' . hash('sha256', $scope);
+        $lockPath = $record . '.lock';
+        if (is_link($lockPath)) {
+            throw new InvalidArgumentException('A retention lock must not be a symbolic link.');
+        }
+        $lock = @fopen($lockPath, 'x+b');
+        if ($lock === false) {
+            $lock = @fopen($lockPath, 'r+b');
+        }
+        if ($lock === false) {
+            throw new RuntimeException('Unable to open a cache retention lock.');
+        }
+        try {
+            if (!flock($lock, $lockMode)) {
+                throw new RuntimeException('Unable to lock cache retention.');
+            }
+            clearstatcache(true, $lockPath);
+            $entry = lstat($lockPath);
+            $opened = fstat($lock);
+            if ($entry === false || $opened === false || ($entry['mode'] & 0170000) !== 0100000
+                || $entry['ino'] !== $opened['ino'] || $entry['dev'] !== $opened['dev']) {
+                throw new InvalidArgumentException('A retention lock must remain a regular file.');
+            }
+            if (!self::retentionDirectoryExists($root, $components)) {
+                return $missing;
+            }
+            $lease = $record . '.lease';
+            clearstatcache(true, $lease);
+            if (is_link($lease) || (file_exists($lease) && !is_file($lease))) {
+                throw new InvalidArgumentException('A retention record must be a regular file.');
+            }
+            $content = is_file($lease) ? file_get_contents($lease) : '';
+            if ($content === false || ($content !== '' && preg_match('/^[0-9]+\n?$/D', $content) !== 1)) {
+                throw new RuntimeException('The cache retention record is invalid.');
+            }
+
+            return $operation($content === '' ? 0 : (int) trim($content), $lease);
+        } finally {
+            flock($lock, LOCK_UN);
+            fclose($lock);
+        }
+    }
+
+    /**
+     * @param list<string> $components
+     * @phpstan-impure
+     */
+    private static function retentionDirectoryExists(string $root, array $components): bool
+    {
+        $path = $root;
+        foreach ($components as $component) {
+            $path .= '/' . $component;
+            clearstatcache(true, $path);
+            if (is_link($path)) {
+                throw new InvalidArgumentException('A retention path must not traverse a symbolic link.');
+            }
+            if (!is_dir($path)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     public function deleteDirectory(string $path): void

@@ -11,6 +11,7 @@ use App\Shared\Domain\Model\Uuid;
 use App\Transcode\Application\Command\CreateTranscodeSessionCommand;
 use App\Transcode\Application\CommandHandler\CreateTranscodeSessionHandler;
 use App\Transcode\Application\Exception\MediaEncodingProhibitedException;
+use App\Transcode\Application\Port\EncodePresentationPort;
 use App\Transcode\Application\Port\TranscodeExecutionOwnershipPort;
 use App\Transcode\Application\Port\TranscodeJobPortInterface;
 use App\Transcode\Application\Port\TranscodeSessionPortInterface;
@@ -34,7 +35,9 @@ final class CreateTranscodeSessionPolicyTest extends TestCase
         $transaction->expects(self::never())->method('run');
         $storage = $this->createMock(TranscodeStoragePortInterface::class);
         $storage->expects(self::never())->method('resolveJobDirectory');
-        $handler = new CreateTranscodeSessionHandler(new MediaExecutionPolicy(new DeploymentProfile('household')), $jobs, $sessions, $storage, $ownership, $transaction, $this->createStub(SleeperInterface::class));
+        $presentations = $this->createMock(EncodePresentationPort::class);
+        $presentations->expects(self::never())->method('select');
+        $handler = new CreateTranscodeSessionHandler(new MediaExecutionPolicy(new DeploymentProfile('household')), $jobs, $sessions, $storage, $ownership, $transaction, $this->createStub(SleeperInterface::class), $presentations);
         $this->expectException(MediaEncodingProhibitedException::class);
         $handler(new CreateTranscodeSessionCommand(Uuid::generate(), Uuid::generate(), QualityTier::p720(), AudioProfile::streamingStereo()));
     }

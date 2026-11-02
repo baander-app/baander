@@ -11,8 +11,10 @@ use App\Media\Application\Port\MediaReadScopeProviderInterface;
 use App\Media\Interface\Request\DeliveryRequest;
 use App\Media\Interface\Resource\DeliveryResource;
 use App\Shared\Domain\Model\PublicId;
+use App\Shared\Domain\Model\Uuid;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Transcode\Application\Port\StreamAuthPortInterface;
+use App\Transcode\Application\Port\CompletedVideoDeliveryPort;
 use Nelmio\ApiDocBundle\Attribute\Model;
 use OpenApi\Attributes as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -26,8 +28,12 @@ final readonly class DeliveryController
 {
     use ApiResponsesTrait;
 
-    public function __construct(private DeliveryDecisionPortInterface $delivery, private MediaReadScopeProviderInterface $scopes, private StreamAuthPortInterface $signing)
-    {
+    public function __construct(
+        private DeliveryDecisionPortInterface $delivery,
+        private MediaReadScopeProviderInterface $scopes,
+        private StreamAuthPortInterface $signing,
+        private CompletedVideoDeliveryPort $completed,
+    ) {
     }
 
     #[OA\Post(
@@ -45,6 +51,9 @@ final readonly class DeliveryController
             return $this->unauthorized();
         }
         try {
+            $requestId = $request->kind === 'video'
+                ? Uuid::fromString($request->requestId ?? '')->toString()
+                : null;
             $id = PublicId::fromString($request->id);
             $destination = new DeliveryDestination(
                 $request->containers,
@@ -63,9 +72,22 @@ final readonly class DeliveryController
         } catch (\InvalidArgumentException $error) {
             return $this->errorResponse($error->getMessage());
         }
-        $decision = $request->kind === 'video' ? $this->delivery->video($owner, $id, $destination) : $this->delivery->track($owner, $id, $destination);
-        if ($decision->kind === DeliveryKind::Cached && $request->kind === 'track' && $decision->url !== null) {
-            $decision = $decision->withUrl($this->signing->signUrl($decision->url)['url']);
+        $decision = $requestId !== null
+            ? $this->delivery->video($owner, $id, $destination, $requestId)->withRequestId($requestId)
+            : $this->delivery->track($owner, $id, $destination);
+        if (
+            $decision->url !== null
+            && ($decision->kind === DeliveryKind::Cached
+                || ($request->kind === 'track' && $decision->kind === DeliveryKind::Copy))
+        ) {
+            $signed = $this->signing->signUrl($decision->url);
+            if ($request->kind === 'video') {
+                $artifact = $decision->artifact ?? throw new \LogicException('Completed video has no artifact identity.');
+                if (!$this->completed->grant($artifact->jobId, $artifact->generation, $signed['exp'])) {
+                    return $this->errorResponse('Completed media is unavailable.', 503);
+                }
+            }
+            $decision = $decision->withUrl($signed['url']);
         }
         if ($decision->kind === DeliveryKind::Original) {
             $path = $request->kind === 'video' ? '/api/stream/video' : '/api/stream/original/track';

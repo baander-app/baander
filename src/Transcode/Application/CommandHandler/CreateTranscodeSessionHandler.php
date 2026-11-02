@@ -11,6 +11,7 @@ use App\Shared\Application\Port\TransactionPortInterface;
 use App\Transcode\Application\Command\CreateTranscodeSessionCommand;
 use App\Transcode\Application\DTO\DesiredTranscodeState;
 use App\Transcode\Application\Exception\TranscodeStartupUnavailableException;
+use App\Transcode\Application\Port\EncodePresentationPort;
 use App\Transcode\Application\Port\TranscodeExecutionOwnershipPort;
 use App\Transcode\Application\Port\TranscodeJobPortInterface;
 use App\Transcode\Application\Port\TranscodeSessionPortInterface;
@@ -31,23 +32,25 @@ final readonly class CreateTranscodeSessionHandler
         private TranscodeExecutionOwnershipPort $ownership,
         private TransactionPortInterface $transaction,
         private SleeperInterface $sleeper,
+        private EncodePresentationPort $presentations,
     ) {}
 
     #[AsMessageHandler]
     public function __invoke(CreateTranscodeSessionCommand $command): TranscodeSession
     {
         $this->executionPolicy->assertAllowed(MediaOperation::VideoEncode);
+        $selection = $this->presentations->select($command);
         $outputDirectory = $this->storagePort->resolveJobDirectory($command->getVideoId(), $command->getQualityTier());
-        $session = $this->transaction->run(function () use ($command, $outputDirectory): TranscodeSession {
+        $session = $this->transaction->run(function () use ($command, $outputDirectory, $selection): TranscodeSession {
             $this->ownership->lockAdmission($command->getVideoId());
-            $job = $this->jobPort->getOrCreateJob($command->getVideoId(), $command->getQualityTier(), $outputDirectory, $command->getUserId(), $command->getAudioLanguages());
+            $job = $this->jobPort->getOrCreateJob($command->getVideoId(), $command->getQualityTier(), $outputDirectory, $command->getUserId(), $command->getAudioLanguages(), presentationSelection: $selection, requestId: $command->requestId);
             $runtime = $this->ownership->find($job->getId());
             if ($runtime !== null) {
                 $this->ownership->lockSession($runtime->sessionId);
                 $job = $this->jobPort->findByUuid($job->getId()) ?? $job;
                 $runtime = $this->ownership->find($job->getId());
             }
-            if ($runtime !== null && ($runtime->requestId === $command->requestId || in_array($runtime->outcome, ['pending', 'accepted', 'ready', 'complete'], true))) {
+            if ($runtime !== null && $runtime->requestId === $command->requestId && in_array($runtime->outcome, ['pending', 'accepted', 'ready', 'complete'], true)) {
                 $existing = $this->sessionPort->findByUuid($runtime->sessionId);
                 if ($existing !== null && $existing->getUserId()->equals($command->getUserId())) {
                     return $existing;
@@ -59,7 +62,7 @@ final readonly class CreateTranscodeSessionHandler
             $job->attachSession();
             $this->jobPort->save($job);
             $session = $this->sessionPort->createSession($command->getUserId(), $job->getId(), $command->getVideoId(), $command->getAudioProfile(), $command->getPriority(), $command->getAudioLanguages());
-            $this->ownership->admit($job->getId(), $session->getId(), $command->requestId, new DesiredTranscodeState($command->getAudioProfile(), audioLanguages: array_values($command->getAudioLanguages())));
+            $this->ownership->admit($job->getId(), $session->getId(), $command->requestId, new DesiredTranscodeState($command->getAudioProfile(), audioLanguages: array_values($command->getAudioLanguages()), presentationSelection: $selection));
             return $session;
         });
 

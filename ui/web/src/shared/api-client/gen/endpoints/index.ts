@@ -662,6 +662,8 @@ export interface DeliveryRequest {
   supportsHdr?: boolean;
   /** @maxItems 32 */
   pixelFormats?: string[];
+  /** @nullable */
+  requestId?: string | null;
 }
 
 export interface ExtractMetadataRequest {
@@ -1095,6 +1097,8 @@ export interface CreateTranscodeSessionRequest {
      * @pattern ^[0-9a-zA-Z_-]{21}$
      */
   videoId: string;
+  /** Stable playback client session identifier */
+  requestId: string;
   qualityTier?: CreateTranscodeSessionRequestQualityTier;
   audioProfile?: CreateTranscodeSessionRequestAudioProfile;
   priority?: CreateTranscodeSessionRequestPriority;
@@ -2485,6 +2489,10 @@ export interface DeliveryResource {
   reason?: string | null;
   /** @nullable */
   url?: string | null;
+  /** @nullable */
+  requestId?: string | null;
+  /** @nullable */
+  jobId?: string | null;
   selection?: DeliveryResourceSelection;
 }
 
@@ -7255,6 +7263,11 @@ export type PostMonitorTransportFailedRetry200 = {
 
 export type GetDebugWorkers200 = { [key: string]: unknown };
 
+export type GetStreamArtifactSegmentParams = {
+  /** @minimum 0 */
+  index: number;
+};
+
 export type GetStreamMasterManifestParams = {
   /** Canonical signed set of admitted job and generation pairs */
   set: string;
@@ -7271,6 +7284,17 @@ export type GetStreamMediaManifestParams = {
 export type GetStreamDashManifestParams = {
   /** Canonical signed set of admitted job and generation pairs */
   set: string;
+};
+
+export type GetStreamQualityLadderParams = {
+  /** Playback client session identifier */
+  requestId: string;
+  /**
+   * Exact admitted jobs
+   * @minItems 1
+   * @maxItems 3
+   */
+  jobIds: string[];
 };
 
 export type GetStreamQualityLadder200DataItem = {
@@ -7334,13 +7358,23 @@ export type GetStreamSegmentSubtitleSegmentParams = {
 };
 
 export type PostStreamSigningSignBody = {
-  path?: string;
+  path: string;
   expiresInSeconds?: number;
   /** Read current playback state without creating another admission */
   refresh?: boolean;
+  /** Stable playback client session identifier, retained across reloads and reconnects */
+  requestId: string;
+  /**
+     * Exact admitted jobs; required for refresh and omitted for new admission
+     * @minItems 1
+     * @maxItems 3
+     */
+  jobIds?: string[];
 };
 
 export type PostStreamSigningSign200 = {
+  jobIds?: string[];
+  requestId?: string;
   /** @nullable */
   url?: string | null;
   sig?: string;
@@ -7437,6 +7471,8 @@ export type PostTranscodeSessionCreateBody = {
      * @pattern ^[0-9a-zA-Z_-]{21}$
      */
   videoId: string;
+  /** Stable playback client session identifier */
+  requestId: string;
   qualityTier?: PostTranscodeSessionCreateBodyQualityTier;
   audioProfile?: PostTranscodeSessionCreateBodyAudioProfile;
   priority?: PostTranscodeSessionCreateBodyPriority;
@@ -32819,6 +32855,481 @@ export function useGetDebugWorkers<TData = Awaited<ReturnType<typeof getDebugWor
 
 
 
+export const getGetStreamArtifactMasterUrl = (jobPublicId: string,
+    generation: string,) => {
+
+
+
+
+  return `/api/transcode/artifacts/${jobPublicId}/${generation}/master.m3u8`
+}
+
+/**
+ * @summary Get the HLS master playlist for completed video
+ */
+export const getStreamArtifactMaster = async (jobPublicId: string,
+    generation: string, options?: Parameters<typeof customInstance>[1]): Promise<unknown> => {
+
+  return customInstance<unknown>(getGetStreamArtifactMasterUrl(jobPublicId,generation),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetStreamArtifactMasterQueryKey = (jobPublicId: string,
+    generation: string,) => {
+    return [
+    `/api/transcode/artifacts/${jobPublicId}/${generation}/master.m3u8`
+    ] as const;
+    }
+
+
+export const getGetStreamArtifactMasterQueryOptions = <TData = Awaited<ReturnType<typeof getStreamArtifactMaster>>, TError = ErrorType<void>>(jobPublicId: string,
+    generation: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamArtifactMaster>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetStreamArtifactMasterQueryKey(jobPublicId,generation);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getStreamArtifactMaster>>> = ({ signal }) => getStreamArtifactMaster(jobPublicId,generation, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: jobPublicId !== null && jobPublicId !== undefined && generation !== null && generation !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getStreamArtifactMaster>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetStreamArtifactMasterQueryResult = NonNullable<Awaited<ReturnType<typeof getStreamArtifactMaster>>>
+export type GetStreamArtifactMasterQueryError = ErrorType<void>
+
+
+export function useGetStreamArtifactMaster<TData = Awaited<ReturnType<typeof getStreamArtifactMaster>>, TError = ErrorType<void>>(
+ jobPublicId: string,
+    generation: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamArtifactMaster>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getStreamArtifactMaster>>,
+          TError,
+          Awaited<ReturnType<typeof getStreamArtifactMaster>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetStreamArtifactMaster<TData = Awaited<ReturnType<typeof getStreamArtifactMaster>>, TError = ErrorType<void>>(
+ jobPublicId: string,
+    generation: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamArtifactMaster>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getStreamArtifactMaster>>,
+          TError,
+          Awaited<ReturnType<typeof getStreamArtifactMaster>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetStreamArtifactMaster<TData = Awaited<ReturnType<typeof getStreamArtifactMaster>>, TError = ErrorType<void>>(
+ jobPublicId: string,
+    generation: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamArtifactMaster>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Get the HLS master playlist for completed video
+ */
+
+export function useGetStreamArtifactMaster<TData = Awaited<ReturnType<typeof getStreamArtifactMaster>>, TError = ErrorType<void>>(
+ jobPublicId: string,
+    generation: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamArtifactMaster>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetStreamArtifactMasterQueryOptions(jobPublicId,generation,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetStreamArtifactMediaUrl = (jobPublicId: string,
+    generation: string,
+    track: 'video' | 'audio',) => {
+
+
+
+
+  return `/api/transcode/artifacts/${jobPublicId}/${generation}/tracks/${track}/media.m3u8`
+}
+
+/**
+ * @summary Get a completed HLS track playlist
+ */
+export const getStreamArtifactMedia = async (jobPublicId: string,
+    generation: string,
+    track: 'video' | 'audio', options?: Parameters<typeof customInstance>[1]): Promise<unknown> => {
+
+  return customInstance<unknown>(getGetStreamArtifactMediaUrl(jobPublicId,generation,track),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetStreamArtifactMediaQueryKey = (jobPublicId: string,
+    generation: string,
+    track: 'video' | 'audio',) => {
+    return [
+    `/api/transcode/artifacts/${jobPublicId}/${generation}/tracks/${track}/media.m3u8`
+    ] as const;
+    }
+
+
+export const getGetStreamArtifactMediaQueryOptions = <TData = Awaited<ReturnType<typeof getStreamArtifactMedia>>, TError = ErrorType<void>>(jobPublicId: string,
+    generation: string,
+    track: 'video' | 'audio', options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamArtifactMedia>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetStreamArtifactMediaQueryKey(jobPublicId,generation,track);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getStreamArtifactMedia>>> = ({ signal }) => getStreamArtifactMedia(jobPublicId,generation,track, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: jobPublicId !== null && jobPublicId !== undefined && generation !== null && generation !== undefined && track !== null && track !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getStreamArtifactMedia>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetStreamArtifactMediaQueryResult = NonNullable<Awaited<ReturnType<typeof getStreamArtifactMedia>>>
+export type GetStreamArtifactMediaQueryError = ErrorType<void>
+
+
+export function useGetStreamArtifactMedia<TData = Awaited<ReturnType<typeof getStreamArtifactMedia>>, TError = ErrorType<void>>(
+ jobPublicId: string,
+    generation: string,
+    track: 'video' | 'audio', options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamArtifactMedia>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getStreamArtifactMedia>>,
+          TError,
+          Awaited<ReturnType<typeof getStreamArtifactMedia>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetStreamArtifactMedia<TData = Awaited<ReturnType<typeof getStreamArtifactMedia>>, TError = ErrorType<void>>(
+ jobPublicId: string,
+    generation: string,
+    track: 'video' | 'audio', options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamArtifactMedia>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getStreamArtifactMedia>>,
+          TError,
+          Awaited<ReturnType<typeof getStreamArtifactMedia>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetStreamArtifactMedia<TData = Awaited<ReturnType<typeof getStreamArtifactMedia>>, TError = ErrorType<void>>(
+ jobPublicId: string,
+    generation: string,
+    track: 'video' | 'audio', options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamArtifactMedia>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Get a completed HLS track playlist
+ */
+
+export function useGetStreamArtifactMedia<TData = Awaited<ReturnType<typeof getStreamArtifactMedia>>, TError = ErrorType<void>>(
+ jobPublicId: string,
+    generation: string,
+    track: 'video' | 'audio', options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamArtifactMedia>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetStreamArtifactMediaQueryOptions(jobPublicId,generation,track,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetStreamArtifactInitUrl = (jobPublicId: string,
+    generation: string,
+    track: 'video' | 'audio',) => {
+
+
+
+
+  return `/api/transcode/artifacts/${jobPublicId}/${generation}/tracks/${track}/init.mp4`
+}
+
+/**
+ * @summary Get completed track initialization media
+ */
+export const getStreamArtifactInit = async (jobPublicId: string,
+    generation: string,
+    track: 'video' | 'audio', options?: Parameters<typeof customInstance>[1]): Promise<void> => {
+
+  return customInstance<void>(getGetStreamArtifactInitUrl(jobPublicId,generation,track),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetStreamArtifactInitQueryKey = (jobPublicId: string,
+    generation: string,
+    track: 'video' | 'audio',) => {
+    return [
+    `/api/transcode/artifacts/${jobPublicId}/${generation}/tracks/${track}/init.mp4`
+    ] as const;
+    }
+
+
+export const getGetStreamArtifactInitQueryOptions = <TData = Awaited<ReturnType<typeof getStreamArtifactInit>>, TError = ErrorType<void>>(jobPublicId: string,
+    generation: string,
+    track: 'video' | 'audio', options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamArtifactInit>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetStreamArtifactInitQueryKey(jobPublicId,generation,track);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getStreamArtifactInit>>> = ({ signal }) => getStreamArtifactInit(jobPublicId,generation,track, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: jobPublicId !== null && jobPublicId !== undefined && generation !== null && generation !== undefined && track !== null && track !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getStreamArtifactInit>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetStreamArtifactInitQueryResult = NonNullable<Awaited<ReturnType<typeof getStreamArtifactInit>>>
+export type GetStreamArtifactInitQueryError = ErrorType<void>
+
+
+export function useGetStreamArtifactInit<TData = Awaited<ReturnType<typeof getStreamArtifactInit>>, TError = ErrorType<void>>(
+ jobPublicId: string,
+    generation: string,
+    track: 'video' | 'audio', options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamArtifactInit>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getStreamArtifactInit>>,
+          TError,
+          Awaited<ReturnType<typeof getStreamArtifactInit>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetStreamArtifactInit<TData = Awaited<ReturnType<typeof getStreamArtifactInit>>, TError = ErrorType<void>>(
+ jobPublicId: string,
+    generation: string,
+    track: 'video' | 'audio', options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamArtifactInit>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getStreamArtifactInit>>,
+          TError,
+          Awaited<ReturnType<typeof getStreamArtifactInit>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetStreamArtifactInit<TData = Awaited<ReturnType<typeof getStreamArtifactInit>>, TError = ErrorType<void>>(
+ jobPublicId: string,
+    generation: string,
+    track: 'video' | 'audio', options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamArtifactInit>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Get completed track initialization media
+ */
+
+export function useGetStreamArtifactInit<TData = Awaited<ReturnType<typeof getStreamArtifactInit>>, TError = ErrorType<void>>(
+ jobPublicId: string,
+    generation: string,
+    track: 'video' | 'audio', options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamArtifactInit>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetStreamArtifactInitQueryOptions(jobPublicId,generation,track,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetStreamArtifactSegmentUrl = (jobPublicId: string,
+    generation: string,
+    track: 'video' | 'audio',
+    params: GetStreamArtifactSegmentParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/transcode/artifacts/${jobPublicId}/${generation}/tracks/${track}/segment.m4s?${stringifiedParams}` : `/api/transcode/artifacts/${jobPublicId}/${generation}/tracks/${track}/segment.m4s`
+}
+
+/**
+ * @summary Get a completed track segment
+ */
+export const getStreamArtifactSegment = async (jobPublicId: string,
+    generation: string,
+    track: 'video' | 'audio',
+    params: GetStreamArtifactSegmentParams, options?: Parameters<typeof customInstance>[1]): Promise<void> => {
+
+  return customInstance<void>(getGetStreamArtifactSegmentUrl(jobPublicId,generation,track,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetStreamArtifactSegmentQueryKey = (jobPublicId: string,
+    generation: string,
+    track: 'video' | 'audio',
+    params?: GetStreamArtifactSegmentParams,) => {
+    return [
+    `/api/transcode/artifacts/${jobPublicId}/${generation}/tracks/${track}/segment.m4s`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetStreamArtifactSegmentQueryOptions = <TData = Awaited<ReturnType<typeof getStreamArtifactSegment>>, TError = ErrorType<void>>(jobPublicId: string,
+    generation: string,
+    track: 'video' | 'audio',
+    params: GetStreamArtifactSegmentParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamArtifactSegment>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetStreamArtifactSegmentQueryKey(jobPublicId,generation,track,params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getStreamArtifactSegment>>> = ({ signal }) => getStreamArtifactSegment(jobPublicId,generation,track,params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: jobPublicId !== null && jobPublicId !== undefined && generation !== null && generation !== undefined && track !== null && track !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getStreamArtifactSegment>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetStreamArtifactSegmentQueryResult = NonNullable<Awaited<ReturnType<typeof getStreamArtifactSegment>>>
+export type GetStreamArtifactSegmentQueryError = ErrorType<void>
+
+
+export function useGetStreamArtifactSegment<TData = Awaited<ReturnType<typeof getStreamArtifactSegment>>, TError = ErrorType<void>>(
+ jobPublicId: string,
+    generation: string,
+    track: 'video' | 'audio',
+    params: GetStreamArtifactSegmentParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamArtifactSegment>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getStreamArtifactSegment>>,
+          TError,
+          Awaited<ReturnType<typeof getStreamArtifactSegment>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetStreamArtifactSegment<TData = Awaited<ReturnType<typeof getStreamArtifactSegment>>, TError = ErrorType<void>>(
+ jobPublicId: string,
+    generation: string,
+    track: 'video' | 'audio',
+    params: GetStreamArtifactSegmentParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamArtifactSegment>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getStreamArtifactSegment>>,
+          TError,
+          Awaited<ReturnType<typeof getStreamArtifactSegment>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetStreamArtifactSegment<TData = Awaited<ReturnType<typeof getStreamArtifactSegment>>, TError = ErrorType<void>>(
+ jobPublicId: string,
+    generation: string,
+    track: 'video' | 'audio',
+    params: GetStreamArtifactSegmentParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamArtifactSegment>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Get a completed track segment
+ */
+
+export function useGetStreamArtifactSegment<TData = Awaited<ReturnType<typeof getStreamArtifactSegment>>, TError = ErrorType<void>>(
+ jobPublicId: string,
+    generation: string,
+    track: 'video' | 'audio',
+    params: GetStreamArtifactSegmentParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamArtifactSegment>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetStreamArtifactSegmentQueryOptions(jobPublicId,generation,track,params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
 export const getGetStreamMasterManifestUrl = (videoId: string,
     params: GetStreamMasterManifestParams,) => {
   const normalizedParams = new URLSearchParams();
@@ -33175,20 +33686,37 @@ export function useGetStreamDashManifest<TData = Awaited<ReturnType<typeof getSt
 
 
 
-export const getGetStreamQualityLadderUrl = (videoId: string,) => {
+export const getGetStreamQualityLadderUrl = (videoId: string,
+    params: GetStreamQualityLadderParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
+    const explodeParameters = ["jobIds"];
 
+    if (Array.isArray(value) && explodeParameters.includes(key)) {
+      value.forEach((v) => {
+        normalizedParams.append(key, v === null ? 'null' : String(v));
+      });
+      return;
+    }
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
 
-  return `/api/transcode/${videoId}/quality-ladder`
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/transcode/${videoId}/quality-ladder?${stringifiedParams}` : `/api/transcode/${videoId}/quality-ladder`
 }
 
 /**
  * @summary Get available quality tiers for a video
  */
-export const getStreamQualityLadder = async (videoId: string, options?: Parameters<typeof customInstance>[1]): Promise<GetStreamQualityLadder200> => {
+export const getStreamQualityLadder = async (videoId: string,
+    params: GetStreamQualityLadderParams, options?: Parameters<typeof customInstance>[1]): Promise<GetStreamQualityLadder200> => {
 
-  return customInstance<GetStreamQualityLadder200>(getGetStreamQualityLadderUrl(videoId),
+  return customInstance<GetStreamQualityLadder200>(getGetStreamQualityLadderUrl(videoId,params),
   {
     ...options,
     method: 'GET'
@@ -33201,23 +33729,25 @@ export const getStreamQualityLadder = async (videoId: string, options?: Paramete
 
 
 
-export const getGetStreamQualityLadderQueryKey = (videoId: string,) => {
+export const getGetStreamQualityLadderQueryKey = (videoId: string,
+    params?: GetStreamQualityLadderParams,) => {
     return [
-    `/api/transcode/${videoId}/quality-ladder`
+    `/api/transcode/${videoId}/quality-ladder`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getGetStreamQualityLadderQueryOptions = <TData = Awaited<ReturnType<typeof getStreamQualityLadder>>, TError = ErrorType<unknown>>(videoId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamQualityLadder>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+export const getGetStreamQualityLadderQueryOptions = <TData = Awaited<ReturnType<typeof getStreamQualityLadder>>, TError = ErrorType<unknown>>(videoId: string,
+    params: GetStreamQualityLadderParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamQualityLadder>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetStreamQualityLadderQueryKey(videoId);
+  const queryKey =  queryOptions?.queryKey ?? getGetStreamQualityLadderQueryKey(videoId,params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getStreamQualityLadder>>> = ({ signal }) => getStreamQualityLadder(videoId, { signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getStreamQualityLadder>>> = ({ signal }) => getStreamQualityLadder(videoId,params, { signal, ...requestOptions });
 
 
 
@@ -33231,7 +33761,8 @@ export type GetStreamQualityLadderQueryError = ErrorType<unknown>
 
 
 export function useGetStreamQualityLadder<TData = Awaited<ReturnType<typeof getStreamQualityLadder>>, TError = ErrorType<unknown>>(
- videoId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamQualityLadder>>, TError, TData>> & Pick<
+ videoId: string,
+    params: GetStreamQualityLadderParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamQualityLadder>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getStreamQualityLadder>>,
           TError,
@@ -33241,7 +33772,8 @@ export function useGetStreamQualityLadder<TData = Awaited<ReturnType<typeof getS
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetStreamQualityLadder<TData = Awaited<ReturnType<typeof getStreamQualityLadder>>, TError = ErrorType<unknown>>(
- videoId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamQualityLadder>>, TError, TData>> & Pick<
+ videoId: string,
+    params: GetStreamQualityLadderParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamQualityLadder>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getStreamQualityLadder>>,
           TError,
@@ -33251,7 +33783,8 @@ export function useGetStreamQualityLadder<TData = Awaited<ReturnType<typeof getS
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetStreamQualityLadder<TData = Awaited<ReturnType<typeof getStreamQualityLadder>>, TError = ErrorType<unknown>>(
- videoId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamQualityLadder>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ videoId: string,
+    params: GetStreamQualityLadderParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamQualityLadder>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
@@ -33259,11 +33792,12 @@ export function useGetStreamQualityLadder<TData = Awaited<ReturnType<typeof getS
  */
 
 export function useGetStreamQualityLadder<TData = Awaited<ReturnType<typeof getStreamQualityLadder>>, TError = ErrorType<unknown>>(
- videoId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamQualityLadder>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ videoId: string,
+    params: GetStreamQualityLadderParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamQualityLadder>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
-  const queryOptions = getGetStreamQualityLadderQueryOptions(videoId,options)
+  const queryOptions = getGetStreamQualityLadderQueryOptions(videoId,params,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 

@@ -11,6 +11,6 @@ use App\Shared\Domain\Model\Uuid;
 
 interface DeliveryDecisionPortInterface
 {
-    public function video(Uuid $owner, PublicId $id, DeliveryDestination $destination): DeliveryDecision;
+    public function video(Uuid $owner, PublicId $id, DeliveryDestination $destination, ?string $requestId = null): DeliveryDecision;
     public function track(Uuid $owner, PublicId $id, DeliveryDestination $destination): DeliveryDecision;
 }

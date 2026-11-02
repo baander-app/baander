@@ -10,6 +10,7 @@ use App\Transcode\Domain\Model\TranscodeJob;
 use App\Transcode\Domain\Model\TranscodeJobState;
 use App\Transcode\Domain\Repository\TranscodeJobRepositoryInterface;
 use App\Transcode\Domain\ValueObject\TranscodeStatus;
+use App\Transcode\Domain\ValueObject\PresentationSelection;
 use App\Transcode\Infrastructure\Doctrine\Entity\TranscodeJobEntity;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Query;
@@ -68,11 +69,14 @@ final class TranscodeJobRepository implements TranscodeJobRepositoryInterface
         return $entity !== null ? $this->toDomain($entity) : null;
     }
 
-    public function findByOwnerVideoAndQuality(Uuid $ownerUserId, Uuid $videoId, string $qualityTierName): ?TranscodeJob
+    public function findByOwnerVideoAndQuality(Uuid $ownerUserId, Uuid $videoId, string $qualityTierName, ?string $presentationKey = null, ?string $requestId = null): ?TranscodeJob
     {
+        if ($requestId === null) {
+            return null;
+        }
         $entity = $this->entityManager
             ->getRepository(TranscodeJobEntity::class)
-            ->findOneBy(['ownerUserId' => $ownerUserId, 'videoId' => $videoId, 'qualityTierName' => $qualityTierName]);
+            ->findOneBy(['ownerUserId' => $ownerUserId, 'videoId' => $videoId, 'qualityTierName' => $qualityTierName, 'presentationKey' => $presentationKey ?? 'legacy', 'requestId' => $requestId]);
 
         if ($entity !== null) {
             $this->entityManager->refresh($entity);
@@ -176,6 +180,7 @@ final class TranscodeJobRepository implements TranscodeJobRepositoryInterface
             $job->getOwnerUserId(),
             $job->getStatus()->value,
             id: $job->getId(),
+            requestId: $job->getRequestId(),
         );
     }
 
@@ -208,11 +213,15 @@ final class TranscodeJobRepository implements TranscodeJobRepositoryInterface
             measuredLoudness: $entity->getMeasuredLoudness(),
             audioTrackLanguages: $entity->getAudioTrackLanguages(),
             audioSegmentMap: $entity->getAudioSegmentMap(),
+            requestId: $entity->getRequestId(),
+            presentationSelection: $entity->getPresentationSelection() === null ? null : PresentationSelection::fromArray($entity->getPresentationSelection()),
         ));
     }
 
     private function syncToEntity(TranscodeJob $job, TranscodeJobEntity $entity): void
     {
+        $selection = $job->getPresentationSelection();
+        $entity->setPresentationSelection($selection?->jsonSerialize(), $selection?->canonicalKey() ?? 'legacy');
         $entity->setStatus($job->getStatus()->value);
         $entity->setReferenceCount($job->getReferenceCount());
         $entity->setTotalSegments($job->getTotalSegments());

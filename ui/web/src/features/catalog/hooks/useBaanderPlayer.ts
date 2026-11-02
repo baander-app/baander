@@ -4,6 +4,7 @@ import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
 import { attachHlsPlayback, type SubtitlePreference } from './hls-playback'
 import type { PlaybackObservation } from '@/features/session/services/playback-execution'
 import type { PostTranscodeSessionPosition200 } from '@/shared/api-client/gen/endpoints'
+import { getPlaybackClientRequestId } from '@/features/session/services/playback-session-coordinator'
 
 interface UseBaanderPlayerOptions {
   videoId: string
@@ -33,6 +34,7 @@ interface PlaybackSnapshot {
   url: string | null
   renditionSet: string
   jobId: string
+  jobIds: string[]
   sessionId: string | null
   generation: number
   revision: number
@@ -138,6 +140,7 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, coor
     container.appendChild(video)
     videoRef.current = video
     const abort = new AbortController()
+    let clientRequestId: Promise<string> | null = null
     let requestRevision = 0
     let appliedRequest = 0
     let snapshot: PlaybackSnapshot | null = null
@@ -271,11 +274,15 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, coor
 
     const refresh = async (initial = false) => {
       if (!active() || terminal || recoveryFenced.current) return
+      if (!initial && snapshot === null) return
       const revision = ++requestRevision
       try {
+        const requestId = await (clientRequestId ??= getPlaybackClientRequestId(abort.signal))
+        if (!active() || terminal || recoveryFenced.current) return
         const { data } = await AXIOS_INSTANCE.post<PlaybackSnapshot>('/api/stream/sign', {
           path: `/api/transcode/${videoId}/master.m3u8`,
-          ...(initial ? {} : { refresh: true }),
+          requestId,
+          ...(initial ? {} : { refresh: true, jobIds: snapshot!.jobIds }),
         }, { signal: abort.signal, timeout: 5000 })
         if (!active() || terminal || revision < appliedRequest) return
         const previous = snapshot

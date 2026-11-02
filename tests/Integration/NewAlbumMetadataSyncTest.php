@@ -21,6 +21,9 @@ use App\Shared\Domain\Event\Outbox\RelayOutboxHandler;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Domain\ValueObject\FilesystemType;
 use App\Tests\Support\FinalSchemaBootstrap;
+use App\Transcode\Application\DTO\AudioProbeResult;
+use App\Transcode\Application\Port\AudioProbePortInterface;
+use App\Transcode\Application\Port\VideoProbePortInterface;
 use Doctrine\DBAL\Connection;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
@@ -46,6 +49,9 @@ final class NewAlbumMetadataSyncTest extends KernelTestCase
         file_put_contents($this->libraryDirectory . '/Album/track.flac', 'not really audio');
         self::bootKernel();
         $this->isolateSchema();
+        $probe = $this->createStubForIntersectionOfInterfaces([AudioProbePortInterface::class, VideoProbePortInterface::class]);
+        $probe->method('probeAudio')->willReturn(new AudioProbeResult('flac', 0, 'flac'));
+        static::getContainer()->set(AudioProbePortInterface::class, $probe);
     }
 
     protected function tearDown(): void

@@ -7,6 +7,7 @@ namespace App\Transcode\Domain\Model;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Transcode\Domain\ValueObject\QualityTier;
+use App\Transcode\Domain\ValueObject\PresentationSelection;
 use App\Transcode\Domain\ValueObject\TranscodeStatus;
 use DateTimeImmutable;
 use App\Transcode\Domain\Exception\EmptyOutputDirectoryException;
@@ -29,10 +30,16 @@ final class TranscodeJob
         string $outputDirectory,
         Uuid $ownerUserId,
         array $audioTrackLanguages = [],
+        ?PresentationSelection $presentationSelection = null,
+        ?string $requestId = null,
     ): self
     {
         if (trim($outputDirectory) === '') {
             throw EmptyOutputDirectoryException::create();
+        }
+
+        if ($presentationSelection !== null && $presentationSelection->mode !== 'encode') {
+            throw new \InvalidArgumentException('An encoded job requires an encoding presentation.');
         }
 
         return new self(new TranscodeJobState(
@@ -61,7 +68,55 @@ final class TranscodeJob
             measuredLoudness: [],
             audioTrackLanguages: $audioTrackLanguages,
             audioSegmentMap: [],
+            presentationSelection: $presentationSelection,
+            requestId: self::requestId($requestId),
         ));
+    }
+
+    public static function createCopy(
+        Uuid $videoId,
+        string $outputDirectory,
+        Uuid $ownerUserId,
+        PresentationSelection $presentationSelection,
+        int $width,
+        int $height,
+        ?string $requestId = null,
+    ): self {
+        if (trim($outputDirectory) === '') {
+            throw EmptyOutputDirectoryException::create();
+        }
+        if ($presentationSelection->mode !== 'copy' || $presentationSelection->videoStreamIndex === null || $width < 1 || $height < 1) {
+            throw new \InvalidArgumentException('Video copy requires a selected video stream and source dimensions.');
+        }
+        return new self(new TranscodeJobState(
+            id: new Uuid(), publicId: new PublicId(), videoId: $videoId, ownerUserId: $ownerUserId,
+            qualityTierName: 'copy', status: TranscodeStatus::Pending, referenceCount: 0,
+            totalSegments: 0, completedSegments: 0, outputDirectory: $outputDirectory,
+            initSegmentPath: null, segmentMap: [], probeData: [], videoCodec: null, audioCodec: null,
+            videoBitrate: 0, audioBitrate: 0, width: $width, height: $height, framerate: 0.0,
+            createdAt: new DateTimeImmutable(), updatedAt: new DateTimeImmutable(),
+            presentationSelection: $presentationSelection,
+            requestId: self::requestId($requestId),
+        ));
+    }
+
+    private static function requestId(?string $requestId): string
+    {
+        $requestId ??= (new Uuid())->toString();
+        if ($requestId === '' || strlen($requestId) > 128) {
+            throw new \InvalidArgumentException('Playback request identifier must contain at most 128 bytes.');
+        }
+        return $requestId;
+    }
+
+    public function getRequestId(): string
+    {
+        return $this->state->requestId;
+    }
+
+    public function getPresentationSelection(): ?PresentationSelection
+    {
+        return $this->state->presentationSelection;
     }
 
     public static function reconstitute(TranscodeJobState $state): self

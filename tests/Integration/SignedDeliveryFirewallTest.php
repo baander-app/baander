@@ -23,6 +23,10 @@ use App\Tests\Fixtures\Auth\ProductionOAuthKernel;
 use App\Tests\Fixtures\Auth\SignedDpopProof;
 use App\Tests\Fixtures\Shared\SignedDeliveryRoutes;
 use App\Transcode\Application\Port\SegmentAvailabilityInterface;
+use App\Transcode\Application\Port\CompletedVideoDeliveryPort;
+use App\Transcode\Application\Command\CreateTranscodeSessionCommand;
+use App\Transcode\Application\DTO\MediaTrack;
+use App\Transcode\Domain\Model\TranscodeSession;
 use App\Transcode\Application\DTO\DesiredTranscodeState;
 use App\Transcode\Domain\ValueObject\AudioProfile;
 use App\Transcode\Infrastructure\Doctrine\TranscodeRuntimeState;
@@ -46,6 +50,7 @@ use Symfony\Component\HttpKernel\Event\ExceptionEvent;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 use Symfony\Component\HttpKernel\KernelEvents;
 use Symfony\Component\Messenger\Envelope;
+use Symfony\Component\Messenger\Stamp\HandledStamp;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Security\Core\Exception\AccessDeniedException;
 
@@ -74,7 +79,7 @@ final class SignedDeliveryFirewallTest extends TestCase
     private const string SIGN_PATH = '/api/stream/sign';
     private const string SIGN_URL = 'https://baander.app' . self::SIGN_PATH;
     private const string SIGN_BODY_REFUSED = 'Expected a JSON object.';
-    private const string SIGN_REQUEST_REFUSED = 'Expected a video manifest path and a lifetime from 1 to 86400 seconds.';
+    private const string SIGN_REQUEST_REFUSED = 'Expected a video manifest path, a client session UUID, a lifetime from 1 to 86400 seconds, and exact job IDs when refreshing.';
     private const array STREAMING_METHODS = [
         'getMasterManifest', 'getMediaManifest', 'getDashManifest', 'getSubtitleManifest',
         'getInitSegmentPath', 'getSubtitleSegmentPath', 'resolveSegmentAvailability',
@@ -86,6 +91,12 @@ final class SignedDeliveryFirewallTest extends TestCase
     private EntityManagerInterface $manager;
     private TranscodeStreamingPortInterface&MockObject $streaming;
     private MessageBusInterface&MockObject $bus;
+    private CompletedVideoDeliveryPort&MockObject $completed;
+    private string $requestId;
+    /** @var array<string, array<string, TranscodeSession>> */
+    private array $admittedSessions = [];
+    /** @var array<string, list<string>> */
+    private array $admittedJobs = [];
     private HmacStreamAuthAdapter $signer;
     private SignedDpopProof $proof;
     private PublicId $videoId;
@@ -165,6 +176,15 @@ final class SignedDeliveryFirewallTest extends TestCase
         $availability = $this->createStub(SegmentAvailabilityInterface::class);
         $availability->method('isReady')->willReturn(self::$directory . '/segment.mp4');
         $this->bus = $this->createMock(MessageBusInterface::class);
+        $this->completed = $this->createMock(CompletedVideoDeliveryPort::class);
+        $this->completed->method('master')->willReturn('#EXTM3U');
+        $this->completed->method('playlist')->willReturn('#EXTINF:10');
+        $this->completed->method('path')->willReturn(self::$directory . '/segment.mp4');
+        $this->completed->expects($this->never())->method('grant');
+        $container->set(CompletedVideoDeliveryPort::class, $this->completed);
+        $this->requestId = Uuid::generate()->toString();
+        $this->admittedSessions = [];
+        $this->admittedJobs = [];
         $container->set(TranscodeStreamingPortInterface::class, $this->streaming);
         $container->set(SegmentAvailabilityInterface::class, $availability);
         $container->set('messenger.bus.default', $this->bus);
@@ -219,6 +239,9 @@ final class SignedDeliveryFirewallTest extends TestCase
         foreach (self::STREAMING_METHODS as $method) {
             $this->streaming->expects(in_array($method, ['getInitSegmentPath', 'getSubtitleSegmentPath', 'resolveSegmentAvailability'], true) ? $this->atLeastOnce() : $this->once())->method($method);
         }
+        $this->completed->expects($this->once())->method('master');
+        $this->completed->expects($this->once())->method('playlist');
+        $this->completed->expects($this->exactly(2))->method('path');
         foreach ($this->deliveryPaths() as $route => $path) {
             $response = $this->request('GET', $this->signedUrl($path), $jwt);
             self::assertSame(200, $response->getStatusCode(), $route . ': ' . $this->responseDetails($response));
@@ -254,11 +277,44 @@ final class SignedDeliveryFirewallTest extends TestCase
         $this->assertNoCredentialInResponsesOrLogs();
     }
 
+    public function testCompletedControllersReceiveTheVerifiedCapabilityExpiryThroughTheFirewall(): void
+    {
+        $this->bus->expects($this->never())->method('dispatch');
+        foreach (self::STREAMING_METHODS as $method) {
+            $this->streaming->expects($this->never())->method($method);
+        }
+        $expiresAt = 2000000000;
+        $this->completed->expects($this->once())->method('master')->with($this->jobId, 3, $expiresAt);
+        $this->completed->expects($this->once())->method('playlist')->with($this->jobId, 3, MediaTrack::Video, $expiresAt);
+        $indices = [];
+        $this->completed->expects($this->exactly(2))->method('path')
+            ->with($this->jobId, 3, MediaTrack::Video, self::anything(), $expiresAt)
+            ->willReturnCallback(static function (PublicId $job, int $generation, MediaTrack $track, ?int $index, int $expiry) use (&$indices): string {
+                $indices[] = $index;
+
+                return self::$directory . '/segment.mp4';
+            });
+        foreach ($this->deliveryPaths() as $route => $path) {
+            if (!str_starts_with($route, 'stream_artifact_')) {
+                continue;
+            }
+            $signed = $this->signer->signUrlUntil($path, $expiresAt);
+            $this->signatures[] = $signed['sig'];
+            $response = $this->request('GET', $signed['url']);
+            self::assertSame(200, $response->getStatusCode(), $route . ': ' . $this->responseDetails($response));
+        }
+        self::assertSame([null, 0], $indices);
+        $this->assertNoCredentialInResponsesOrLogs();
+    }
+
     public function testPublicAccessPatternOverMatchStillValidatesTheSignature(): void
     {
         $this->bus->expects($this->never())->method('dispatch');
         foreach (self::STREAMING_METHODS as $method) {
             $this->streaming->expects($this->never())->method($method);
+        }
+        foreach (['master', 'playlist', 'path'] as $method) {
+            $this->completed->expects($this->never())->method($method);
         }
 
         $this->assertSignatureRefused($this->request('GET', 'https://baander.app/api/transcode/sessions/tracks/video/init.mp4'), 'stream_segment_init_segment');
@@ -279,8 +335,11 @@ final class SignedDeliveryFirewallTest extends TestCase
         foreach (self::STREAMING_METHODS as $method) {
             $this->streaming->expects($this->never())->method($method);
         }
+        foreach (['master', 'playlist', 'path'] as $method) {
+            $this->completed->expects($this->never())->method($method);
+        }
         foreach ($this->deliveryPaths() as $route => $path) {
-            if ($kind === 'substituted-index' && $route !== 'stream_segment_segment') {
+            if ($kind === 'substituted-index' && !in_array($route, ['stream_segment_segment', 'stream_artifact_segment'], true)) {
                 continue;
             }
             if ($kind === 'substituted-track' && !str_contains($path, '/tracks/')) {
@@ -327,7 +386,7 @@ final class SignedDeliveryFirewallTest extends TestCase
             'fingerprint-bound token with a wrong header' => 401,
             'bound token under the Bearer scheme' => 401,
         ];
-        foreach (['stream_master_manifest', 'stream_segment_segment'] as $route) {
+        foreach (['stream_master_manifest', 'stream_segment_segment', 'stream_artifact_master', 'stream_artifact_media', 'stream_artifact_init', 'stream_artifact_segment'] as $route) {
             foreach ($conditions as $condition => $status) {
                 yield $condition . ' on ' . $route => [$route, $condition, $status];
             }
@@ -345,8 +404,20 @@ final class SignedDeliveryFirewallTest extends TestCase
         [$jwt, $proof, $scheme, $headers] = $this->credential($condition, proof: false);
         $sends = $condition === 'reused proof' ? 2 : 1;
         $this->bus->expects($this->never())->method('dispatch');
-        $this->streaming->expects($status === 200 ? ($route === 'stream_master_manifest' ? $this->exactly($sends) : $this->atLeast($sends)) : $this->never())
-            ->method($route === 'stream_master_manifest' ? 'getMasterManifest' : 'resolveSegmentAvailability');
+        if (str_starts_with($route, 'stream_artifact_')) {
+            foreach (self::STREAMING_METHODS as $method) {
+                $this->streaming->expects($this->never())->method($method);
+            }
+            $method = match ($route) {
+                'stream_artifact_master' => 'master',
+                'stream_artifact_media' => 'playlist',
+                default => 'path',
+            };
+            $this->completed->expects($status === 200 ? $this->exactly($sends) : $this->never())->method($method);
+        } else {
+            $this->streaming->expects($status === 200 ? ($route === 'stream_master_manifest' ? $this->exactly($sends) : $this->atLeast($sends)) : $this->never())
+                ->method($route === 'stream_master_manifest' ? 'getMasterManifest' : 'resolveSegmentAvailability');
+        }
         $url = $this->signedUrl($this->deliveryPaths()[$route]);
         if ($condition === 'reused proof') {
             self::assertIsString($jwt);
@@ -367,6 +438,9 @@ final class SignedDeliveryFirewallTest extends TestCase
         foreach (self::STREAMING_METHODS as $method) {
             $this->streaming->expects(in_array($method, ['getInitSegmentPath', 'getSubtitleSegmentPath', 'resolveSegmentAvailability'], true) ? $this->atLeastOnce() : $this->once())->method($method);
         }
+        $this->completed->expects($this->once())->method('master');
+        $this->completed->expects($this->once())->method('playlist');
+        $this->completed->expects($this->exactly(2))->method('path');
         foreach (SignedDeliveryRoutes::paths($foreign->getPublicId()->toString(), $this->jobId->toString()) as $route => $path) {
             $response = $this->request('GET', $this->signedUrl($path));
             self::assertSame(200, $response->getStatusCode(), $route . ': ' . $this->responseDetails($response));
@@ -379,14 +453,14 @@ final class SignedDeliveryFirewallTest extends TestCase
         $jwt = $this->actorToken('member');
         $video = $this->createVideoLibrary(true);
         $this->bus->expects($this->exactly(3))->method('dispatch')
-            ->willReturnCallback(static fn (object $message): Envelope => new Envelope($message));
+            ->willReturnCallback($this->admittedSession(...));
         $this->streaming->expects($this->once())->method('getMasterManifest');
         $path = '/api/transcode/' . $video->getPublicId()->toString() . '/master.m3u8';
         $proof = $this->mintProof($this->proof, 'POST', self::SIGN_URL, $jwt);
 
         $delivery = $this->request('GET', $this->signedUrl($path), $jwt, $proof);
         self::assertSame(200, $delivery->getStatusCode(), $this->responseDetails($delivery));
-        $signing = $this->request('POST', self::SIGN_URL, $jwt, $proof, ['path' => $path]);
+        $signing = $this->request('POST', self::SIGN_URL, $jwt, $proof, $this->signingBody($path));
         self::assertSame(200, $signing->getStatusCode(), $this->responseDetails($signing));
         $this->issuedUrl($signing);
         $this->assertNoCredentialInResponsesOrLogs();
@@ -431,12 +505,12 @@ final class SignedDeliveryFirewallTest extends TestCase
         $video = $this->createVideoLibrary(in_array($actor, ['owner', 'member'], true));
         $accepted = $status === 200 || $condition === 'reused proof';
         $this->bus->expects($accepted ? $this->exactly(3) : $this->never())->method('dispatch')
-            ->willReturnCallback(static fn (object $message): Envelope => new Envelope($message));
+            ->willReturnCallback($this->admittedSession(...));
         $this->streaming->expects($accepted ? $this->once() : $this->never())->method('getQualityLadderForVideo');
         $id = $video->getPublicId()->toString();
         $requests = [
-            ['GET', 'https://baander.app/api/transcode/' . $id . '/quality-ladder', []],
-            ['POST', self::SIGN_URL, ['path' => '/api/transcode/' . $id . '/master.m3u8']],
+            ['GET', $this->qualityLadderUrl($video), []],
+            ['POST', self::SIGN_URL, $this->signingBody('/api/transcode/' . $id . '/master.m3u8')],
         ];
         foreach ($requests as [$method, $url, $data]) {
             $sent = $proof;
@@ -498,6 +572,10 @@ final class SignedDeliveryFirewallTest extends TestCase
             ? strtr($body, $placeholders)
             : array_map(static fn (mixed $value): mixed => is_string($value) ? strtr($value, $placeholders) : $value, $body);
 
+        if (is_array($body)) {
+            $body['requestId'] = $this->requestId;
+        }
+
         $response = $this->request('POST', self::SIGN_URL, $jwt, true, $body);
 
         self::assertSame(400, $response->getStatusCode(), $this->responseDetails($response));
@@ -517,6 +595,9 @@ final class SignedDeliveryFirewallTest extends TestCase
         foreach (self::STREAMING_METHODS as $method) {
             $this->streaming->expects($this->never())->method($method);
         }
+        foreach (['master', 'playlist', 'path'] as $method) {
+            $this->completed->expects($this->never())->method($method);
+        }
         foreach ($this->deliveryPaths() as $route => $path) {
             $this->assertDecidedBy($this->request('GET', $this->signedUrl($path), $jwt), 401, self::INVALID_TOKEN, $route);
         }
@@ -529,17 +610,17 @@ final class SignedDeliveryFirewallTest extends TestCase
         $video = $this->createVideoLibrary(true);
         $id = $video->getPublicId()->toString();
         $this->bus->expects($this->exactly(3))->method('dispatch')
-            ->willReturnCallback(static fn (object $message): Envelope => new Envelope($message));
+            ->willReturnCallback($this->admittedSession(...));
         $this->streaming->expects($this->once())->method('getMasterManifest');
         $this->streaming->expects($this->never())->method('getQualityLadderForVideo');
-        $data = ['path' => '/api/transcode/' . $id . '/master.m3u8'];
+        $data = $this->signingBody('/api/transcode/' . $id . '/master.m3u8');
         $url = $this->issuedUrl($this->request('POST', self::SIGN_URL, $jwt, true, $data));
 
         $this->removeMembership();
 
         $delivery = $this->request('GET', $url);
         self::assertSame(200, $delivery->getStatusCode(), $this->responseDetails($delivery));
-        $this->assertDecidedBy($this->request('GET', 'https://baander.app/api/transcode/' . $id . '/quality-ladder', $jwt, true), 403, self::VIDEO_NOT_ACCESSIBLE, 'quality ladder');
+        $this->assertDecidedBy($this->request('GET', $this->qualityLadderUrl($video), $jwt, true), 403, self::VIDEO_NOT_ACCESSIBLE, 'quality ladder');
         $this->assertDecidedBy($this->request('POST', self::SIGN_URL, $jwt, true, $data), 403, self::VIDEO_NOT_ACCESSIBLE, 'new signature');
         $this->assertNoCredentialInResponsesOrLogs();
     }
@@ -549,11 +630,9 @@ final class SignedDeliveryFirewallTest extends TestCase
         $jwt = $this->actorToken('member');
         $video = $this->createVideoLibrary(true);
         $this->bus->expects($this->exactly(3))->method('dispatch')
-            ->willReturnCallback(static fn (object $message): Envelope => new Envelope($message));
+            ->willReturnCallback($this->admittedSession(...));
         $this->streaming->expects($this->once())->method('getMasterManifest');
-        $url = $this->issuedUrl($this->request('POST', self::SIGN_URL, $jwt, true, [
-            'path' => '/api/transcode/' . $video->getPublicId()->toString() . '/master.m3u8',
-        ]));
+        $url = $this->issuedUrl($this->request('POST', self::SIGN_URL, $jwt, true, $this->signingBody('/api/transcode/' . $video->getPublicId()->toString() . '/master.m3u8')));
 
         $this->accessToken->revoke();
         $this->manager->flush();
@@ -692,17 +771,46 @@ final class SignedDeliveryFirewallTest extends TestCase
         $this->manager->flush();
         if (isset($this->actor)) {
             $now = new \DateTimeImmutable();
-            $job = new TranscodeJobEntity(new PublicId(), $video->getId(), '720p', $this->actor->getId());
-            $session = new TranscodeSessionEntity(new PublicId(), $this->actor->getId(), $job, $video->getId(), 'pending', 'normal', AudioProfile::streamingStereo()->jsonSerialize(), $now, $now);
-            $this->persist($job);
-            $this->persist($session);
-            $this->manager->flush();
-            $connection = $this->manager->getConnection();
-            $runtime = new TranscodeRuntimeState($connection, $this->createStub(TransactionPortInterface::class));
-            $connection->transactional(fn () => $runtime->admit($job->getId(), $session->getId(), Uuid::generate()->toString(), new DesiredTranscodeState(AudioProfile::streamingStereo())));
+            $videoKey = $video->getId()->toString();
+            foreach (['360p', '720p', '1080p'] as $tier) {
+                $job = new TranscodeJobEntity(new PublicId(), $video->getId(), $tier, $this->actor->getId(), requestId: $this->requestId);
+                $admitted = TranscodeSession::create($this->actor->getId(), $job->getId(), $video->getId(), AudioProfile::streamingStereo());
+                $session = new TranscodeSessionEntity($admitted->getPublicId(), $this->actor->getId(), $job, $video->getId(), 'pending', 'normal', AudioProfile::streamingStereo()->jsonSerialize(), $now, $now, $admitted->getId());
+                $this->persist($job);
+                $this->persist($session);
+                $this->manager->flush();
+                $connection = $this->manager->getConnection();
+                $runtime = new TranscodeRuntimeState($connection, $this->createStub(TransactionPortInterface::class));
+                $connection->transactional(fn () => $runtime->admit($job->getId(), $session->getId(), $this->requestId, new DesiredTranscodeState(AudioProfile::streamingStereo())));
+                $this->admittedSessions[$videoKey][$tier] = $admitted;
+                $this->admittedJobs[$videoKey][] = $job->getPublicId()->toString();
+            }
         }
 
         return $video;
+    }
+
+    private function admittedSession(object $message): Envelope
+    {
+        self::assertInstanceOf(CreateTranscodeSessionCommand::class, $message);
+        self::assertSame($this->requestId, $message->requestId);
+        $session = $this->admittedSessions[$message->getVideoId()->toString()][$message->getQualityTier()->name];
+
+        return new Envelope($message, [new HandledStamp($session, 'fixture.admission')]);
+    }
+
+    /** @return array{path: string, requestId: string} */
+    private function signingBody(string $path): array
+    {
+        return ['path' => $path, 'requestId' => $this->requestId];
+    }
+
+    private function qualityLadderUrl(VideoEntity $video): string
+    {
+        return 'https://baander.app/api/transcode/' . $video->getPublicId() . '/quality-ladder?' . http_build_query([
+            'requestId' => $this->requestId,
+            'jobIds' => $this->admittedJobs[$video->getId()->toString()] ?? [(new PublicId())->toString()],
+        ]);
     }
 
     private function removeMembership(): void
@@ -880,7 +988,7 @@ final class SignedDeliveryKernel extends ProductionOAuthKernel
         $container->addCompilerPass(new class implements CompilerPassInterface {
             public function process(ContainerBuilder $container): void
             {
-                foreach ([TranscodeStreamingPortInterface::class, SegmentAvailabilityInterface::class, 'messenger.bus.default'] as $id) {
+                foreach ([CompletedVideoDeliveryPort::class, TranscodeStreamingPortInterface::class, SegmentAvailabilityInterface::class, 'messenger.bus.default'] as $id) {
                     $container->removeAlias($id);
                     $container->setDefinition($id, (new Definition())->setSynthetic(true)->setPublic(true));
                 }

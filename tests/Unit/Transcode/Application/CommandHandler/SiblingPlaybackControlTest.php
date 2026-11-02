@@ -60,7 +60,7 @@ final class SiblingPlaybackControlTest extends TestCase
         foreach ([QualityTier::p360(), QualityTier::p720(), QualityTier::p1080(), QualityTier::p360(), QualityTier::p360()] as $index => $tier) {
             $userId = $index === 3 ? Uuid::generate() : $owner;
             $videoId = $index === 4 ? Uuid::generate() : $video;
-            $job = TranscodeJob::create($videoId, $tier, '/media/' . $index, $userId);
+            $job = TranscodeJob::create($videoId, $tier, '/media/' . $index, $userId, requestId: 'admitted');
             $job->attachSession();
             $session = TranscodeSession::create($userId, $job->getId(), $videoId, AudioProfile::streamingStereo());
             $session->markPreparing();
@@ -130,6 +130,56 @@ final class SiblingPlaybackControlTest extends TestCase
         self::assertSame(3, $handler($command));
         $this->dispatch('pause', Uuid::generate()->toString());
         self::assertNull($handler($command));
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function isolatedClientActions(): iterable
+    {
+        yield 'pause' => ['pause'];
+        yield 'seek' => ['seek'];
+        yield 'cancel' => ['cancel'];
+    }
+
+    #[DataProvider('isolatedClientActions')]
+    public function testSameOwnerAndVideoClientsAndMismatchedRuntimesStayIndependent(string $action): void
+    {
+        $source = $this->sessions[0];
+        $excluded = [];
+        foreach (['other-client', 'admitted'] as $client) {
+            $job = TranscodeJob::create($source->getVideoId(), QualityTier::p720(), '/media/independent-' . $client, $source->getUserId(), requestId: $client);
+            $job->attachSession();
+            $session = TranscodeSession::create($source->getUserId(), $job->getId(), $source->getVideoId(), AudioProfile::streamingStereo());
+            $session->markPreparing();
+            $session->markActive();
+            $runtime = new TranscodeRuntimeSnapshot($job->getId(), $session->getId(), $client === 'admitted' ? 'mismatched-client' : $client, new DesiredTranscodeState(AudioProfile::streamingStereo(), position: 60.0), 5, 5, 3, 'ready', '/generation-3', null, true);
+            $this->sessions[] = $session;
+            $this->jobs[$job->getId()->toString()] = $job;
+            $this->runtimes[$job->getId()->toString()] = $runtime;
+            $excluded[] = [$session, $job, $runtime];
+        }
+
+        $this->dispatch($action, Uuid::generate()->toString());
+
+        self::assertCount(3, $this->controls);
+        foreach ($excluded as [$session, $job, $runtime]) {
+            self::assertSame($runtime, $this->runtimes[$job->getId()->toString()]);
+            self::assertSame(SessionState::Active, $session->getSessionState());
+            self::assertSame(0.0, $session->getWallClockOffset());
+            self::assertSame(1, $job->getReferenceCount());
+            self::assertNotContains($session->getId()->toString(), $this->locks);
+        }
+    }
+
+    public function testSourceWithMismatchedClientRuntimeCannotControlAnyTier(): void
+    {
+        $source = $this->sessions[0];
+        $runtime = $this->runtimes[$source->getJobId()->toString()];
+        $this->runtimes[$source->getJobId()->toString()] = new TranscodeRuntimeSnapshot($runtime->jobId, $runtime->sessionId, 'other-client', $runtime->desired, 5, 5, 3, 'ready', '/generation-3', null, true);
+
+        $this->dispatch('pause', Uuid::generate()->toString());
+
+        self::assertSame([], $this->controls);
+        self::assertSame(0, $this->persistenceWrites);
     }
 
     #[DataProvider('actions')]

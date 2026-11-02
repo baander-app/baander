@@ -30,17 +30,18 @@ final class SegmentFileResolver
     ) {
     }
 
-    public function forGeneration(Uuid $videoId, QualityTier $qualityTier, int $generation, Uuid $jobId): self
+    public function forGeneration(Uuid $videoId, QualityTier|string $qualityTier, int $generation, Uuid $jobId): self
     {
-        self::assertComponent($qualityTier->name);
+        $tierName = is_string($qualityTier) ? $qualityTier : $qualityTier->name;
+        self::assertComponent($tierName);
         if ($generation < 1) {
             throw new InvalidArgumentException('Execution generations must be positive.');
         }
         if ($this->generation !== null && ($this->videoIdentity !== $videoId->toString()
-            || $this->tierIdentity !== $qualityTier->name || $this->generation !== $generation || $this->jobIdentity !== $jobId->toString())) {
+            || $this->tierIdentity !== $tierName || $this->generation !== $generation || $this->jobIdentity !== $jobId->toString())) {
             throw new InvalidArgumentException('A generation resolver cannot change execution identity.');
         }
-        return new self($this->basePath, $videoId->toString(), $qualityTier->name, $generation, $jobId->toString());
+        return new self($this->basePath, $videoId->toString(), $tierName, $generation, $jobId->toString());
     }
 
     /**
@@ -102,7 +103,7 @@ final class SegmentFileResolver
         return $dirs;
     }
 
-    public function resolveJobDirectory(Uuid $videoId, QualityTier $qualityTier): string
+    public function resolveJobDirectory(Uuid $videoId, QualityTier|string $qualityTier): string
     {
         return $this->videoPath($videoId, $qualityTier);
     }
@@ -117,18 +118,19 @@ final class SegmentFileResolver
      * different source streams produces a different filename (no stale
      * collision — seek-back still hits the correct cached file).
      */
-    public function segmentPrefix(int $videoStreamIndex, int $audioStreamIndex, QualityTier $qualityTier): string
+    public function segmentPrefix(int $videoStreamIndex, int $audioStreamIndex, QualityTier|string $qualityTier): string
     {
-        self::assertComponent($qualityTier->name);
-        return sprintf('v%d_a%d_%s', $videoStreamIndex, $audioStreamIndex, $qualityTier->name);
+        $tierName = is_string($qualityTier) ? $qualityTier : $qualityTier->name;
+        self::assertComponent($tierName);
+        return sprintf('v%d_a%d_%s', $videoStreamIndex, $audioStreamIndex, $tierName);
     }
 
-    public function resolveInitSegmentPath(Uuid $videoId, QualityTier $qualityTier): string
+    public function resolveInitSegmentPath(Uuid $videoId, QualityTier|string $qualityTier): string
     {
         return $this->videoPath($videoId, $qualityTier, 'init.mp4');
     }
 
-    public function resolveSegmentPath(Uuid $videoId, QualityTier $qualityTier, int $segmentIndex): string
+    public function resolveSegmentPath(Uuid $videoId, QualityTier|string $qualityTier, int $segmentIndex): string
     {
         return $this->resolveSegmentPathForRendition($videoId, 0, 0, $qualityTier, $segmentIndex);
     }
@@ -143,7 +145,7 @@ final class SegmentFileResolver
         Uuid $videoId,
         int $videoStreamIndex,
         int $audioStreamIndex,
-        QualityTier $qualityTier,
+        QualityTier|string $qualityTier,
         int $segmentIndex,
     ): string {
         $prefix = $this->segmentPrefix($videoStreamIndex, $audioStreamIndex, $qualityTier);
@@ -151,17 +153,17 @@ final class SegmentFileResolver
         return $this->videoPath($videoId, $qualityTier, sprintf('%s_%d.m4s', $prefix, $segmentIndex));
     }
 
-    public function resolveNativeManifestPath(Uuid $videoId, QualityTier $qualityTier): string
+    public function resolveNativeManifestPath(Uuid $videoId, QualityTier|string $qualityTier): string
     {
         return $this->videoPath($videoId, $qualityTier, 'manifest.mpd');
     }
 
-    public function resolveTrackInitSegmentPath(Uuid $videoId, QualityTier $qualityTier, MediaTrack $track): string
+    public function resolveTrackInitSegmentPath(Uuid $videoId, QualityTier|string $qualityTier, MediaTrack $track): string
     {
         return $this->videoPath($videoId, $qualityTier, $track === MediaTrack::Video ? 'init-0.mp4' : 'init-1.mp4');
     }
 
-    public function resolveTrackSegmentPath(Uuid $videoId, QualityTier $qualityTier, MediaTrack $track, int $nativeNumber): string
+    public function resolveTrackSegmentPath(Uuid $videoId, QualityTier|string $qualityTier, MediaTrack $track, int $nativeNumber): string
     {
         if ($nativeNumber < 1) {
             throw new InvalidArgumentException('Native segment numbers must be positive.');
@@ -241,17 +243,18 @@ final class SegmentFileResolver
         }
     }
 
-    private function videoPath(Uuid $videoId, ?QualityTier $tier, string ...$components): string
+    private function videoPath(Uuid $videoId, QualityTier|string|null $tier, string ...$components): string
     {
+        $tierName = is_string($tier) ? $tier : $tier?->name;
         if ($this->generation !== null) {
-            if ($videoId->toString() !== $this->videoIdentity || ($tier !== null && $tier->name !== $this->tierIdentity)) {
+            if ($videoId->toString() !== $this->videoIdentity || ($tierName !== null && $tierName !== $this->tierIdentity)) {
                 throw new InvalidArgumentException('Output identity does not match the execution generation.');
             }
             return $this->buildPath($videoId->toString(), $this->tierIdentity ?? '', 'job-' . $this->jobIdentity, 'generation-' . $this->generation, ...$components);
         }
-        return $tier === null
+        return $tierName === null
             ? $this->buildPath($videoId->toString(), ...$components)
-            : $this->buildPath($videoId->toString(), $tier->name, ...$components);
+            : $this->buildPath($videoId->toString(), $tierName, ...$components);
     }
 
     private function buildPath(string ...$components): string

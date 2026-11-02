@@ -21,9 +21,9 @@ final class AudioRenditionRuntime implements AudioRenditionRuntimePort
     public function admit(AudioRenditionInput $input): AudioRenditionRuntimeSnapshot
     {
         $this->connection->executeStatement(<<<'SQL'
-INSERT INTO audio_rendition_runtime (rendition_key, track_key, source_signature, source_path, format, bitrate, output_directory, state, generation, updated_at)
-VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', 0, clock_timestamp()) ON CONFLICT DO NOTHING
-SQL, [$input->key(), $input->trackKey, $input->sourceSignature, $input->sourcePath, $input->format->value, $input->bitrate, $input->outputDirectory]);
+INSERT INTO audio_rendition_runtime (rendition_key, track_key, source_signature, source_path, format, bitrate, mode, stream_index, output_container, source_hash, output_directory, state, generation, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 0, clock_timestamp()) ON CONFLICT DO NOTHING
+SQL, [$input->key(), $input->trackKey, $input->sourceSignature, $input->sourcePath, $input->format->value, $input->bitrate, $input->mode, $input->streamIndex, $input->outputContainer, $input->sourceHash, $input->outputDirectory]);
         $runtime = $this->find($input->key()) ?? throw new \LogicException('Audio rendition admission disappeared.');
         if ($runtime->input->sourcePath !== $input->sourcePath || $runtime->input->outputDirectory !== $input->outputDirectory) {
             throw new \LogicException('An admitted audio rendition has an immutable input and output root.');
@@ -151,6 +151,6 @@ SQL, [$input->key(), $input->trackKey, $input->sourceSignature, $input->sourcePa
     /** @param array<string, mixed> $row */
     private function snapshot(array $row): AudioRenditionRuntimeSnapshot
     {
-        return new AudioRenditionRuntimeSnapshot($row['rendition_key'], new AudioRenditionInput($row['track_key'], $row['source_signature'], $row['source_path'], AudioRenditionFormat::from($row['format']), (int) $row['bitrate'], $row['output_directory']), $row['state'], (int) $row['generation'], $row['partial_path'], $row['final_path'], $row['error'], array_key_exists('ownership_live', $row) ? (bool) $row['ownership_live'] : $this->live($row));
+        return new AudioRenditionRuntimeSnapshot($row['rendition_key'], new AudioRenditionInput($row['track_key'], $row['source_signature'], $row['source_path'], AudioRenditionFormat::from($row['format']), $row['bitrate'] === null ? null : (int) $row['bitrate'], $row['output_directory'], mode: $row['mode'], streamIndex: $row['stream_index'] === null ? null : (int) $row['stream_index'], outputContainer: $row['output_container'], sourceHash: $row['source_hash']), $row['state'], (int) $row['generation'], $row['partial_path'], $row['final_path'], $row['error'], array_key_exists('ownership_live', $row) ? (bool) $row['ownership_live'] : $this->live($row));
     }
 }

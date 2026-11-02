@@ -29,6 +29,7 @@ final class TranscodeProcessPool
         private readonly LoggerInterface $logger,
         private readonly JsonEncoder $jsonEncoder,
         private readonly DeploymentProfile $deploymentProfile = new DeploymentProfile(),
+        private readonly string $ffprobePath = '/usr/bin/ffprobe',
     ) {}
 
     public function isRunning(): bool
@@ -42,7 +43,16 @@ final class TranscodeProcessPool
     public function probeVideo(TranscodeJob $job, string $sourcePath, int $generation): string
     {
         $key = sprintf('probe_video:%s:%d', $job->getId()->toString(), $generation);
-        $this->submit($key, FFprobeArguments::video($sourcePath), 60);
+        $this->submit($key, FFprobeArguments::video($sourcePath, $this->ffprobePath), 60);
+        return $key;
+    }
+
+    public function probeCopyKeyframes(TranscodeJob $job, string $sourcePath, int $streamIndex, int $generation): string
+    {
+        $key = sprintf('copy_keyframes:%s:%d', $job->getId()->toString(), $generation);
+        $this->submit($key, [$this->ffprobePath, '-threads', '1', '-v', 'error', '-print_format', 'json',
+            '-select_streams', (string) $streamIndex, '-skip_frame', 'nokey', '-show_frames',
+            '-show_entries', 'frame=best_effort_timestamp_time,key_frame', $sourcePath], 3600);
         return $key;
     }
 

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Transcode\Application\DTO;
 
 use App\Transcode\Domain\ValueObject\AudioProfile;
+use App\Transcode\Domain\ValueObject\PresentationSelection;
 
 #[\Symfony\Component\DependencyInjection\Attribute\Exclude]
 final readonly class DesiredTranscodeState
@@ -16,6 +17,7 @@ final readonly class DesiredTranscodeState
         public float $position = 0.0,
         public int $segmentIndex = 0,
         public array $audioLanguages = [],
+        public ?PresentationSelection $presentationSelection = null,
     ) {
         if (!in_array($status, ['running', 'paused', 'cancelled'], true)
             || !is_finite($position) || $position < 0 || $segmentIndex < 0

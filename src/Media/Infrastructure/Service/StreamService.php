@@ -46,6 +46,9 @@ final class StreamService implements StreamPortInterface
             sampleRate: $song->getSampleRate(),
             channels: $song->getChannels(),
             length: $song->getLength(),
+            containerFormat: $song->getContainerFormat(),
+            streamIndex: $song->getStreamIndex(),
+            sourceHash: $song->getHash(),
         );
     }
 

@@ -85,7 +85,8 @@ final class SweepTranscodeCacheHandler
         foreach ($this->storage->getAudioRenditionDirectories() as $trackKey) {
             $unit = self::AUDIO_RENDITION_UNIT_PREFIX . $trackKey;
             $directories[$unit] = $this->storage->resolveAudioRenditionDirectory($trackKey);
-            $active[$unit] = fn (): bool => $this->storage->isAudioRenditionEncodingSince($trackKey, $activeCutoff);
+            $active[$unit] = fn (): bool => $this->storage->hasUnexpiredRetention($directories[$unit])
+                || $this->storage->isAudioRenditionEncodingSince($trackKey, $activeCutoff);
         }
         // PHP turns numeric-string keys into ints, so cast the units back to strings.
         $units = array_map(strval(...), array_keys($directories));
@@ -119,8 +120,9 @@ final class SweepTranscodeCacheHandler
             // TTL: delete if the newest file is older than the TTL cutoff.
             $newestMtime = $dirNewestMtime[$unit];
             if ($newestMtime !== null && (new DateTimeImmutable('@' . $newestMtime)) < $ttlCutoff) {
-                $this->deleteDirectory($unit, $dir, $size, $dryRun, $deleted, $bytesFreed);
-                $totalBytes -= $size;
+                if ($this->deleteDirectory($unit, $dir, $size, $dryRun, $deleted, $bytesFreed)) {
+                    $totalBytes -= $size;
+                }
                 continue;
             }
         }
@@ -149,8 +151,9 @@ final class SweepTranscodeCacheHandler
                 }
                 $size = $dirSize[$unit];
                 $dir = $directories[$unit];
-                $this->deleteDirectory($unit, $dir, $size, $dryRun, $deleted, $bytesFreed);
-                $totalBytes -= $size;
+                if ($this->deleteDirectory($unit, $dir, $size, $dryRun, $deleted, $bytesFreed)) {
+                    $totalBytes -= $size;
+                }
             }
         }
 
@@ -178,6 +181,9 @@ final class SweepTranscodeCacheHandler
      */
     private function isVideoActive(string $videoId, DateTimeImmutable $activeCutoff): bool
     {
+        if ($this->storage->hasUnexpiredRetention($this->storage->getBasePath() . '/' . $videoId)) {
+            return true;
+        }
         try {
             $uuid = Uuid::fromString($videoId);
         } catch (\Throwable) {
@@ -236,9 +242,9 @@ final class SweepTranscodeCacheHandler
         bool $dryRun,
         array &$deleted,
         int &$bytesFreed,
-    ): void {
-        if (!$dryRun) {
-            $this->storage->deleteDirectory($dir);
+    ): bool {
+        if (!$dryRun && !$this->storage->deleteIfUnretained($dir)) {
+            return false;
         }
         $deleted[$unit] = true;
         $bytesFreed += $size;
@@ -247,5 +253,7 @@ final class SweepTranscodeCacheHandler
             'directory' => $unit,
             'bytes' => $size,
         ]);
+
+        return true;
     }
 }

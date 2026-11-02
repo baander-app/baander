@@ -22,6 +22,8 @@
   "tests/Unit/Shared/LiveUpdates/LiveRuntimeTest.php": "Owns native coroutine suspension and resumption while a WebSocket subscription is replaced.",
   "tests/Unit/Shared/LiveUpdates/LiveRuntimeDiagnosticsTest.php": "Reads native worker diagnostics and owns coroutine send scheduling and timer lifecycle.",
   "tests/Integration/NativeExecutionDaemonTest.php": "Owns a Unix socket daemon and real FFmpeg process groups.",
+  "tests/Integration/HouseholdMediaContainerTest.php": "Compiles the production container and resolves native copy-worker services without database or cache servers.",
+  "tests/Integration/VideoCopyPresentationTest.php": "Owns native FFmpeg producers and an execution daemon to verify copied packets, publication timing and seeks.",
   "tests/Integration/Transcode/Infrastructure/Packaging/ProgressiveMediaPublicationTest.php": "Owns a disposable loopback HTTP server and real FFmpeg producer/readers through publication and completion.",
   "tests/Unit/Auth/Infrastructure/Swoole/RevokedSocketReconcilerProbeTest.php": "native coroutine/reactor/server; native shared table/channel/process-pool wrapper",
   "tests/Unit/Auth/Infrastructure/Swoole/RevokedSocketReconcilerTest.php": "native coroutine/reactor/server; native shared table/channel/process-pool wrapper",

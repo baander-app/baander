@@ -39,6 +39,11 @@ final class AudioRenditionCache implements AudioRenditionPortInterface
         if ($input === null) {
             return null;
         }
+        return $this->completed($input);
+    }
+
+    private function completed(AudioRenditionInput $input): ?AudioRendition
+    {
         $current = $this->runtime->find($input->key());
         if ($current === null || $current->state !== 'complete') {
             return null;
@@ -50,7 +55,7 @@ final class AudioRenditionCache implements AudioRenditionPortInterface
         }
         clearstatcache(true, (string) $current->finalPath);
         return is_file((string) $current->finalPath) && is_readable((string) $current->finalPath) && filesize((string) $current->finalPath) > 0
-            ? AudioRendition::complete($format, (string) $current->finalPath)
+            ? AudioRendition::complete($input->format, (string) $current->finalPath, $input->mode === 'copy' ? 'audio/mp4' : null)
             : null;
     }
 
@@ -67,6 +72,35 @@ final class AudioRenditionCache implements AudioRenditionPortInterface
         return new AudioRenditionInput($trackKey, $signature, $sourcePath, $format, $bitrate, $this->paths->resolveAudioRenditionPath($trackKey, $signature));
     }
 
+    public function findCompleteCopy(string $trackKey, string $sourcePath, string $sourceHash, int $streamIndex): ?AudioRendition
+    {
+        $input = $this->copyInput($trackKey, $sourcePath, $sourceHash, $streamIndex);
+        return $input === null ? null : $this->completed($input);
+    }
+
+    public function openCopy(string $trackKey, string $sourcePath, string $sourceHash, int $streamIndex): AudioRendition
+    {
+        $this->executionPolicy->assertAllowed(MediaOperation::StreamCopy);
+        $input = $this->copyInput($trackKey, $sourcePath, $sourceHash, $streamIndex);
+        if ($input === null) {
+            $this->fail('the source file cannot be read');
+        }
+        return $this->openInput($input);
+    }
+
+    private function copyInput(string $trackKey, string $sourcePath, string $sourceHash, int $streamIndex): ?AudioRenditionInput
+    {
+        clearstatcache(true, $sourcePath);
+        $modified = @filemtime($sourcePath);
+        $size = @filesize($sourcePath);
+        if ($modified === false || $size === false) {
+            return null;
+        }
+        $signature = AudioRenditionInput::copySourceSignature($sourcePath, $sourceHash, $streamIndex, $modified, $size);
+        return new AudioRenditionInput($trackKey, $signature, $sourcePath, AudioRenditionFormat::Aac, null,
+            $this->paths->resolveAudioRenditionPath($trackKey, $signature), 'copy', $streamIndex, 'mp4', $sourceHash);
+    }
+
     public function open(string $trackKey, string $sourcePath, AudioRenditionFormat $format, int $bitrate): AudioRendition
     {
         if (!$this->executionPolicy->permits(MediaOperation::AudioEncode)) {
@@ -80,6 +114,11 @@ final class AudioRenditionCache implements AudioRenditionPortInterface
         if ($input === null) {
             $this->fail('the source file cannot be read');
         }
+        return $this->openInput($input);
+    }
+
+    private function openInput(AudioRenditionInput $input): AudioRendition
+    {
         try {
             $admitted = $this->runtime->admit($input);
         } catch (Throwable $error) {
@@ -94,8 +133,8 @@ final class AudioRenditionCache implements AudioRenditionPortInterface
             if ($current->state === 'complete') {
                 $this->validatePaths($current);
                 clearstatcache(true, (string) $current->finalPath);
-                if (is_file((string) $current->finalPath)) {
-                    return AudioRendition::complete($format, (string) $current->finalPath);
+                if (is_file((string) $current->finalPath) && is_readable((string) $current->finalPath) && filesize((string) $current->finalPath) > 0) {
+                    return AudioRendition::complete($input->format, (string) $current->finalPath, $input->mode === 'copy' ? 'audio/mp4' : null);
                 }
                 $this->runtime->resetCompleted($current->key, $current->generation);
             }
@@ -106,8 +145,8 @@ final class AudioRenditionCache implements AudioRenditionPortInterface
                 $this->validatePaths($current);
                 clearstatcache(true, (string) $current->partialPath);
                 clearstatcache(true, (string) $current->finalPath);
-                if ((int) @filesize((string) $current->partialPath) > 0 || (int) @filesize((string) $current->finalPath) > 0) {
-                    return AudioRendition::progressive($format, $this->follow($current));
+                if ($input->mode === 'encode' && ((int) @filesize((string) $current->partialPath) > 0 || (int) @filesize((string) $current->finalPath) > 0)) {
+                    return AudioRendition::progressive($input->format, $this->follow($current));
                 }
             }
             if (microtime(true) >= $deadline) {

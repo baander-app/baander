@@ -16,6 +16,9 @@ use App\Transcode\Domain\Model\TranscodeJob;
 use App\Transcode\Domain\ValueObject\QualityTier;
 use App\Transcode\Domain\ValueObject\AudioProfile;
 use App\Transcode\Infrastructure\FFmpeg\SegmentEncoder;
+use App\Transcode\Infrastructure\FFmpeg\CopySegmentArguments;
+use App\Transcode\Domain\ValueObject\PresentationSelection;
+use Closure;
 use Psr\Log\LoggerInterface;
 use RuntimeException;
 
@@ -46,11 +49,12 @@ final class TranscodeStreamManager
     public function __construct(
         private readonly SegmentAvailabilityInterface $availability,
         private readonly TranscodeStoragePortInterface $storage,
-        private readonly SegmentEncoder $segmentEncoder,
+        private readonly SegmentEncoder|Closure $segmentEncoder,
         private readonly LoggerInterface $logger,
         private readonly ProcessSpawnerInterface $spawner,
         private readonly int $maxConcurrentStreams = self::DEFAULT_MAX_CONCURRENT,
         private readonly PublishedPresentationReader $presentations = new PublishedPresentationReader(),
+        private readonly CopySegmentArguments $copyArguments = new CopySegmentArguments(),
     ) {
     }
 
@@ -68,7 +72,7 @@ final class TranscodeStreamManager
     public function startStream(
         TranscodeJob $job,
         string $sourcePath,
-        QualityTier $tier,
+        QualityTier|string $tier,
         string $videoFilters,
         ?int $startSegment = null,
         ?string $outputDirectory = null,
@@ -79,7 +83,10 @@ final class TranscodeStreamManager
         float $sourceFrameRate = 0.0,
         ?float $sourceTimestampOrigin = null,
         int $audioStreamOrdinal = 0,
+        ?PresentationSelection $presentationSelection = null,
+        float $sourceBoundary = 0.0,
     ): string {
+        $tierName = is_string($tier) ? $tier : $tier->name;
         $jobId = $job->getId();
         $jobKey = $jobId->toString();
 
@@ -96,7 +103,9 @@ final class TranscodeStreamManager
             mkdir($outputDir, 0755, true);
         }
 
-        $command = $this->segmentEncoder->buildStreamArgs(
+        $command = $presentationSelection?->mode === 'copy'
+            ? $this->copyArguments->build($sourcePath, $presentationSelection, $outputDir, $sourceBoundary)
+            : $this->encoder()->buildStreamArgs(
             $sourcePath,
             $tier,
             $videoFilters,
@@ -112,7 +121,7 @@ final class TranscodeStreamManager
 
         $this->logger->info('Starting long-lived video stream', [
             'jobId' => $jobKey,
-            'tier' => $tier->name,
+            'tier' => $tierName,
             'startSegment' => $startSegment,
         ]);
 
@@ -122,13 +131,18 @@ final class TranscodeStreamManager
             'identity' => new \stdClass(),
             'handle' => $spawned,
             'output_dir' => $outputDir,
-            'tier_name' => $tier->name,
-            'availability_tier' => $generation === null ? $tier->name : $tier->name . '/generation-' . $generation,
+            'tier_name' => $tierName,
+            'availability_tier' => $generation === null ? $tierName : $tierName . '/generation-' . $generation,
             'marked' => [],
             'publication' => null,
         ];
 
         return $outputDir;
+    }
+
+    private function encoder(): SegmentEncoder
+    {
+        return $this->segmentEncoder instanceof Closure ? ($this->segmentEncoder)() : $this->segmentEncoder;
     }
 
     /**

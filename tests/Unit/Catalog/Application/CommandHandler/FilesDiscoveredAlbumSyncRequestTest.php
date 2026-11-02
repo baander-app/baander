@@ -191,6 +191,7 @@ final class FilesDiscoveredAlbumSyncRequestTest extends TestCase
             $logger ?? new NullLogger(),
             $this->observedMediaFiles($this->createStub(LibraryMediaFilesInterface::class)),
             new PassThroughTransaction(),
+            audioProbe: $this->audioProbeStub(),
         );
     }
 

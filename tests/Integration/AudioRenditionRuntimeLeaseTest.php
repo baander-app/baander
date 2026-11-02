@@ -34,6 +34,24 @@ final class AudioRenditionRuntimeLeaseTest extends TestCase
         self::assertNull($second->claim($a->key, $this->worker('b')));
     }
 
+    public function testCopySelectionPersistsWithoutAnInventedEncodingBitrate(): void
+    {
+        $runtime = new AudioRenditionRuntime($this->first);
+        $copy = new AudioRenditionInput('baander-track', 'source-copy.m4a', '/fixture/source.aac', AudioRenditionFormat::Aac, null, '/fixture/derived/track', mode: 'copy', streamIndex: 2, outputContainer: 'mp4', sourceHash: '1234567890abcdef');
+        $admitted = $runtime->admit($copy);
+        $loaded = (new AudioRenditionRuntime($this->second))->find($admitted->key);
+        self::assertNotNull($loaded);
+        self::assertNull($loaded->input->bitrate);
+        self::assertSame('copy', $loaded->input->mode);
+        self::assertSame(2, $loaded->input->streamIndex);
+        self::assertSame('mp4', $loaded->input->outputContainer);
+        self::assertSame('1234567890abcdef', $loaded->input->sourceHash);
+        self::assertNotSame($runtime->admit($this->input())->key, $admitted->key);
+        $claim = $runtime->claim($admitted->key, $this->worker());
+        self::assertNotNull($claim);
+        self::assertSame($copy->key(), $claim->runtime->input->key());
+    }
+
     public function testBusyFilesystemLockCanDeferWithoutPublishingAPathAndRetryUsesAnotherGeneration(): void
     {
         $runtime = new AudioRenditionRuntime($this->first);

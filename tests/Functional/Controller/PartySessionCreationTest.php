@@ -152,6 +152,7 @@ final class PartySessionCreationTest extends TestCase
         $id = Uuid::generate();
         $publicId = new PublicId();
         $this->entityManager->getConnection()->insert('transcode_jobs', [
+            'request_id' => Uuid::generate()->toString(),
             'id' => $id->toString(),
             'video_id' => $video->getId()->toString(),
             'public_id' => $publicId->toString(),

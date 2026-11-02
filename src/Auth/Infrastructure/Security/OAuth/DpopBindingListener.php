@@ -45,6 +45,10 @@ final class DpopBindingListener
         'stream_segment_init_segment',
         'stream_segment_segment',
         'stream_segment_subtitle_segment',
+        'stream_artifact_master',
+        'stream_artifact_media',
+        'stream_artifact_init',
+        'stream_artifact_segment',
     ];
 
     private Parser $parser;

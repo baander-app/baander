@@ -31,6 +31,7 @@ final readonly class DeliveryRequest
         #[Assert\Range(min: 8, max: 16)] public int $maxBitDepth = 8,
         public bool $supportsHdr = false,
         #[Assert\Count(max: 32)] public array $pixelFormats = ['yuv420p', 'yuvj420p', 'nv12'],
+        #[Assert\Uuid] public ?string $requestId = null,
     ) {
     }
 }

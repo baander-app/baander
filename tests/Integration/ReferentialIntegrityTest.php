@@ -53,6 +53,12 @@ final class ReferentialIntegrityTest extends TestCase
         'party_members.audio_profile_id' => 'identifier within the video\'s probe data',
         'party_members.subtitle_track_id' => 'identifier within the video\'s probe data',
         'passkeys.credential_id' => 'the credential\'s own WebAuthn identifier',
+        'playback_commands.attempt_id' => 'coordinator-generated attempt identity shared by related commands, with no attempt table',
+        'playback_commands.request_id' => 'caller-generated command replay identity scoped to its listening session',
+        'playback_destination_incarnations.tab_id' => 'browser-generated tab identity retained for local recovery, not a database row',
+        'playback_destinations.device_id' => 'browser-generated device token scoped to its user, distinct from the device primary key',
+        'playback_destinations.endpoint_id' => 'browser-generated endpoint identity scoped to its device, with no endpoint table',
+        'playback_transfers.request_id' => 'caller-generated transfer replay identity scoped to its listening session',
         'query_change_inbox.scope_id' => 'polymorphic with scope_kind; includes global wildcard and deletion invalidations that outlive the referenced row',
         'query_scope_revision.scope_id' => 'polymorphic with scope_kind; durable revision identity includes global wildcard and deleted scopes',
         'radio_stations.external_id' => 'external station directory identifier',
@@ -65,7 +71,8 @@ final class ReferentialIntegrityTest extends TestCase
         'songs.discogs_id' => 'external Discogs identifier',
         'songs.spotify_id' => 'external Spotify identifier',
         'transcode_control_receipts.request_id' => 'caller-generated control replay identity scoped to its playback session',
-        'transcode_runtime_state.request_id' => 'caller-generated admission replay identity, not a referenced row',
+        'transcode_jobs.request_id' => 'stable client-session identity shared across its quality ladder and admissions, not a referenced row',
+        'transcode_runtime_state.request_id' => 'stable client-session identity shared across its quality ladder and admissions, not a referenced row',
         'transcode_runtime_state.worker_boot_id' => 'validated supervisor boot token; mutable deployment leases do not model individual worker launches',
         'transcode_runtime_state.worker_id' => 'worker role label within a launch, not a row identifier',
         'user_favorites.entity_public_id' => 'polymorphic with entity_type',
@@ -288,6 +295,7 @@ final class ReferentialIntegrityTest extends TestCase
         $jobs = [];
         foreach ([$deleted, $kept] as $video) {
             $jobs[] = $job = $this->insert('transcode_jobs', [
+                'request_id' => Uuid::generate()->toString(),
                 'video_id' => $video->toString(),
                 'public_id' => (new PublicId())->toString(),
                 'quality_tier_name' => '1080p',
@@ -467,6 +475,7 @@ final class ReferentialIntegrityTest extends TestCase
     private function createTranscodeJob(Uuid $video, string $tier = '1080p'): Uuid
     {
         return $this->insert('transcode_jobs', [
+            'request_id' => Uuid::generate()->toString(),
             'video_id' => $video->toString(),
             'public_id' => (new PublicId())->toString(),
             'quality_tier_name' => $tier,

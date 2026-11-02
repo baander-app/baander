@@ -51,6 +51,35 @@ describe('browser-local recovery', () => {
     expect(held.has(playbackLockName(record.server, record.account, first.tabId))).toBe(true)
   })
 
+  it('keeps the client identity after reconnect and after releasing the previous page lock', async () => {
+    const first = new PlaybackLocalRecovery(record.server, record.account, memory())
+    await first.initialize(vi.fn())
+    const id = first.tabId
+    await first.initialize(vi.fn())
+    expect(first.tabId).toBe(id)
+    first.dispose()
+    const reloaded = new PlaybackLocalRecovery(record.server, record.account, memory())
+    released.push(() => reloaded.dispose())
+    await reloaded.initialize(vi.fn())
+    expect(reloaded.tabId).toBe(id)
+  })
+
+  it('keeps a private runtime identity without locks instead of trusting copied storage', async () => {
+    delete (navigator as { locks?: unknown }).locks
+    sessionStorage.setItem('baander-playback-tab', crypto.randomUUID())
+    const first = new PlaybackLocalRecovery(record.server, record.account, memory())
+    const second = new PlaybackLocalRecovery(record.server, record.account, memory())
+    await first.initialize(vi.fn())
+    await second.initialize(vi.fn())
+    const id = first.tabId
+    await first.initialize(vi.fn())
+    expect(first.tabId).toBe(id)
+    expect(first.tabId).not.toBe(second.tabId)
+    expect(first.tabId).not.toBe(sessionStorage.getItem('baander-playback-tab'))
+    expect(first.isEligible()).toBe(false)
+    expect(second.isEligible()).toBe(false)
+  })
+
   it('recovers only eligible records whose exact execution lock is acquired', async () => {
     const existing = await acquirePlaybackLock(record.server, record.account, record.tabId)
     released.push(() => existing?.release())

@@ -8,18 +8,24 @@ use App\Transcode\Application\Exception\AudioRenditionBusyException;
 use App\Transcode\Application\Exception\AudioRenditionFailedException;
 
 /**
- * Cached on-the-fly audio transcoding for tracks.
+ * Owned audio presentations with read-only completed-artifact lookup.
  *
- * One rendition is cached per track, format and bitrate. When it is complete,
- * callers get the cached file. Otherwise the call starts the encode, or joins
- * the encode already running for that rendition, and gets a progressive stream.
- * Only one encode runs per rendition at a time.
- *
- * The caller decides the bitrate, including any server-wide cap, and must have
- * checked the listener's access to the track first.
+ * Encoded renditions may stream progressively. AAC container copies become
+ * readable only after the worker publishes a completed MP4 file. Callers must
+ * authorize access to the track before looking up or requesting a rendition.
  */
 interface AudioRenditionPortInterface
 {
+    /** Find a completed AAC stream copy without admitting work. */
+    public function findCompleteCopy(string $trackKey, string $sourcePath, string $sourceHash, int $streamIndex): ?AudioRendition;
+
+    /**
+     * Copy selected AAC audio to a completed, Range-capable MP4 file.
+     *
+     * @throws AudioRenditionFailedException when the source changes, copying fails or work cannot complete
+     */
+    public function openCopy(string $trackKey, string $sourcePath, string $sourceHash, int $streamIndex): AudioRendition;
+
     /** Find a complete, current artifact without admitting or repairing work. */
     public function findComplete(string $trackKey, string $sourcePath, AudioRenditionFormat $format, int $bitrate): ?AudioRendition;
 

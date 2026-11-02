@@ -68,19 +68,20 @@ final class TranscodeSiblingControlRollbackTest extends TestCase
         $sessionService = new TranscodeSessionService($sessions);
         $jobService = new TranscodeJobService($jobs, $this->createStub(TranscodeStoragePortInterface::class), new EventDispatcher());
         $tierSessions = [];
+        $clientId = 'start';
         foreach ([QualityTier::p1080(), QualityTier::p360(), QualityTier::p720()] as $index => $tier) {
             $job = $index === 0
                 ? $jobs->findByUuid($this->jobId)
-                : TranscodeJob::create($this->videoId, $tier, '/fixture/' . $tier->name, $this->userId);
+                : TranscodeJob::create($this->videoId, $tier, '/fixture/' . $tier->name, $this->userId, requestId: $clientId);
             self::assertNotNull($job);
             $job->attachSession();
             $jobs->save($job);
             $session = TranscodeSession::create($this->userId, $job->getId(), $this->videoId, AudioProfile::streamingStereo());
             $session->markPreparing();
             $session->markActive();
-            $transaction->run(function () use ($session, $sessions, $runtime, $tier): void {
+            $transaction->run(function () use ($session, $sessions, $runtime, $clientId): void {
                 $sessions->save($session);
-                $runtime->admit($session->getJobId(), $session->getId(), 'admit-' . $tier->name, new DesiredTranscodeState(AudioProfile::streamingStereo()));
+                $runtime->admit($session->getJobId(), $session->getId(), $clientId, new DesiredTranscodeState(AudioProfile::streamingStereo()));
             });
             $tierSessions[] = $session;
         }

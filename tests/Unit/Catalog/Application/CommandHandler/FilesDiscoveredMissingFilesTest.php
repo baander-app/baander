@@ -256,6 +256,7 @@ final class FilesDiscoveredMissingFilesTest extends TestCase
             new NullLogger(),
             $mediaFiles,
             $transaction ?? new PassThroughTransaction(),
+            audioProbe: $this->audioProbeStub(),
         );
     }
 

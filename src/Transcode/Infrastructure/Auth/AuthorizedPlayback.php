@@ -8,12 +8,15 @@ use App\Shared\Domain\Model\Uuid;
 use App\Shared\Domain\Model\PublicId;
 use App\Transcode\Application\Command\CreateTranscodeSessionCommand;
 use App\Transcode\Application\Port\PlaybackPortInterface;
+use App\Transcode\Domain\Model\TranscodeSession;
 use App\Transcode\Domain\ValueObject\AudioProfile;
 use App\Transcode\Domain\ValueObject\QualityTier;
 use App\Transcode\Domain\ValueObject\SessionPriority;
 use Doctrine\DBAL\Connection;
+use Doctrine\DBAL\ArrayParameterType;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\Messenger\MessageBusInterface;
+use Symfony\Component\Messenger\Stamp\HandledStamp;
 use Symfony\Component\Security\Core\Exception\AccessDeniedException;
 
 final readonly class AuthorizedPlayback implements PlaybackPortInterface
@@ -52,19 +55,35 @@ final readonly class AuthorizedPlayback implements PlaybackPortInterface
         return is_string($videoId) ? Uuid::fromString($videoId) : null;
     }
 
-    public function findSessions(Uuid $videoId): array
+    public function findSessions(Uuid $videoId, string $requestId, array $jobIds): array
+    {
+        return $this->sessionsForJobs($videoId, $requestId, array_map(static fn (PublicId $id): string => $id->toString(), $jobIds), false);
+    }
+
+    /**
+     * @param list<string> $jobIds
+     * @return array<string, PublicId>
+     */
+    private function sessionsForJobs(Uuid $videoId, string $requestId, array $jobIds, bool $internalIds): array
     {
         $user = $this->security->getUser();
         if ($user === null || !method_exists($user, 'getId')) {
             throw new AccessDeniedException('Authentication required.');
         }
+        if ($jobIds === []) {
+            return [];
+        }
+        $selection = $internalIds ? ' AND j.id IN (:jobs)' : ' AND j.public_id IN (:jobs)';
         $rows = $this->connection->fetchAllAssociative(
             'SELECT j.public_id AS job_id, s.public_id AS session_id FROM transcode_sessions s'
             .' JOIN transcode_jobs j ON j.id = s.job_id'
             .' JOIN transcode_runtime_state r ON r.session_id = s.id AND r.job_id = j.id'
             .' WHERE s.user_id = :user AND j.owner_user_id = :user AND s.video_id = :video AND j.video_id = :video'
-            ." AND j.status IN ('pending', 'in_progress', 'completed') ORDER BY j.height, j.public_id LIMIT 3",
-            ['user' => $user->getId(), 'video' => $videoId->toString()],
+            .' AND j.request_id = :request AND r.request_id = :request'
+            .$selection
+            ." AND j.status IN ('pending', 'in_progress', 'completed') ORDER BY j.height, j.public_id",
+            ['user' => $user->getId(), 'video' => $videoId->toString(), 'request' => $requestId, 'jobs' => $jobIds],
+            ['jobs' => ArrayParameterType::STRING],
         );
         $sessions = [];
         foreach ($rows as $row) {
@@ -73,22 +92,30 @@ final readonly class AuthorizedPlayback implements PlaybackPortInterface
         return $sessions;
     }
 
-    public function start(Uuid $videoId): void
+    public function start(Uuid $videoId, string $requestId): array
     {
         $this->assertAccess($videoId);
         $user = $this->security->getUser();
         if ($user === null || !method_exists($user, 'getId')) {
             throw new AccessDeniedException('Authentication required.');
         }
+        $jobIds = [];
         foreach ([QualityTier::p360(), QualityTier::p720(), QualityTier::p1080()] as $tier) {
-            $this->commandBus->dispatch(new CreateTranscodeSessionCommand(
+            $envelope = $this->commandBus->dispatch(new CreateTranscodeSessionCommand(
                 userId: Uuid::fromString($user->getId()),
                 videoId: $videoId,
                 qualityTier: $tier,
                 audioProfile: AudioProfile::streamingStereo(),
                 priority: SessionPriority::Normal,
                 audioLanguages: ['en'],
+                requestId: $requestId,
             ));
+            $session = $envelope->last(HandledStamp::class)?->getResult();
+            if (!$session instanceof TranscodeSession) {
+                throw new \LogicException('Video admission did not return a playback session.');
+            }
+            $jobIds[] = $session->getJobId()->toString();
         }
+        return $this->sessionsForJobs($videoId, $requestId, $jobIds, true);
     }
 }

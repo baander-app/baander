@@ -25,7 +25,9 @@ use App\Lyrics\Application\Port\LyricsFetchRequestInterface;
 use App\Metadata\Application\Port\AlbumMetadataSyncRequestInterface;
 use App\Shared\Application\Port\TransactionPortInterface;
 use App\Shared\Domain\Model\Uuid;
-use App\Transcode\Infrastructure\FFmpeg\FFprobeAdapter;
+use App\Transcode\Application\Port\VideoProbePortInterface;
+use App\Transcode\Application\DTO\AudioProbeResult;
+use App\Transcode\Application\Port\AudioProbePortInterface;
 use Psr\Log\LoggerInterface;
 use RuntimeException;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
@@ -47,13 +49,14 @@ final class FilesDiscoveredHandler
         private readonly MoviePortInterface $movieService,
         private readonly VideoRepositoryInterface $videoRepository,
         private readonly MetadataContentReaderPortInterface $metadataReader,
-        private readonly FFprobeAdapter $ffprobeAdapter,
+        private readonly VideoProbePortInterface $ffprobeAdapter,
         private readonly MessageBusInterface $messageBus,
         private readonly LyricsFetchRequestInterface $lyricsFetch,
         private readonly AlbumMetadataSyncRequestInterface $albumMetadataSync,
         private readonly LoggerInterface $logger,
         private readonly LibraryMediaFilesInterface $mediaFiles,
         private readonly TransactionPortInterface $transaction,
+        private readonly AudioProbePortInterface $audioProbe,
     ) {
     }
 
@@ -149,7 +152,7 @@ final class FilesDiscoveredHandler
 
             foreach ($written as $song) {
                 $committedPaths[$song['song']->getPath()] = true;
-                if (!isset($song['previousPath']) && $song['song']->getLyrics() === null) {
+                if (!isset($song['previousPath']) && !($song['technicalOnly'] ?? false) && $song['song']->getLyrics() === null) {
                     $songsAwaitingLyrics[] = $song['song']->getId();
                 }
             }
@@ -170,30 +173,38 @@ final class FilesDiscoveredHandler
     }
 
     /**
-     * The song a file becomes, with the artist and genres to link it to; null when a song
-     * already has the file's hash without an eligible source rename, or the file has no metadata.
-     * Writes nothing.
-     *
-     * @return array{file: DiscoveredFile, song: Song, artist: ?string, genres: list<string>, previousPath?: string, expectedAlbum?: Uuid}|null
+     * @return array{file: DiscoveredFile, song: Song, artist: ?string, genres: list<string>, previousPath?: string, expectedAlbum?: Uuid, probe?: AudioProbeResult, technicalOnly?: bool}|null
      */
     private function readSong(Album $album, DiscoveredFile $file): ?array
     {
         $existing = $this->songService->findByHash($file->hash);
         if ($existing !== null) {
             if (!$existing->getAlbumId()->equals($album->getId())
-                || $existing->getPath() === $file->absolutePath
                 || dirname($existing->getPath()) !== dirname($file->absolutePath)) {
                 return null;
             }
-
-            return [
+            $samePath = $existing->getPath() === $file->absolutePath;
+            $needsProbe = $existing->getContainerFormat() === null || $existing->getStreamIndex() === null || $existing->getCodec() === null;
+            if ($samePath && !$needsProbe) {
+                return null;
+            }
+            $prepared = [
                 'file' => $file,
                 'song' => $existing,
                 'artist' => null,
                 'genres' => [],
-                'previousPath' => $existing->getPath(),
                 'expectedAlbum' => $album->getId(),
             ];
+            if ($samePath) {
+                $prepared['technicalOnly'] = true;
+            } else {
+                $prepared['previousPath'] = $existing->getPath();
+            }
+            if ($needsProbe) {
+                $prepared['probe'] = $this->audioProbe->probeAudio($file->absolutePath);
+            }
+
+            return $prepared;
         }
 
         $metadata = $this->metadataReader->readMetadata($file->absolutePath);
@@ -208,6 +219,7 @@ final class FilesDiscoveredHandler
             $title = pathinfo($file->absolutePath, PATHINFO_FILENAME);
         }
 
+        $probe = $this->audioProbe->probeAudio($file->absolutePath);
         $song = Song::create(
             album: $album->getId(),
             title: $title,
@@ -221,9 +233,12 @@ final class FilesDiscoveredHandler
             year: $metadata->getYear(),
             comment: $metadata->getComment(),
             hash: $file->hash,
-            bitrate: $metadata->getBitrate(),
-            sampleRate: $metadata->getSampleRate(),
-            channels: $metadata->getChannels(),
+            bitrate: $probe->bitrate,
+            sampleRate: $probe->sampleRate,
+            channels: $probe->channels,
+            codec: $probe->codec,
+            containerFormat: $probe->containerFormat,
+            streamIndex: $probe->streamIndex,
         );
 
         $artist = trim($metadata->getArtist() ?? '');
@@ -240,10 +255,10 @@ final class FilesDiscoveredHandler
      * library. A song that fails is added to $failures and the others are written; a failed
      * statement fails the transaction and with it the message.
      *
-     * @param list<array{file: DiscoveredFile, song: Song, artist: ?string, genres: list<string>, previousPath?: string, expectedAlbum?: Uuid}> $songs
+     * @param list<array{file: DiscoveredFile, song: Song, artist: ?string, genres: list<string>, previousPath?: string, expectedAlbum?: Uuid, probe?: AudioProbeResult, technicalOnly?: bool}> $songs
      * @param list<array{path: string, error: string}>                                            $failures
      *
-     * @return list<array{file: DiscoveredFile, song: Song, artist: ?string, genres: list<string>, previousPath?: string, expectedAlbum?: Uuid}>|null
+     * @return list<array{file: DiscoveredFile, song: Song, artist: ?string, genres: list<string>, previousPath?: string, expectedAlbum?: Uuid, probe?: AudioProbeResult, technicalOnly?: bool}>|null
      *         the songs the transaction committed; null when a delete holds the library and nothing was written
      */
     private function writeSongs(Uuid $libraryId, array $songs, array &$failures): ?array
@@ -265,10 +280,19 @@ final class FilesDiscoveredHandler
                 }
                 try {
                     if (isset($song['previousPath'], $song['expectedAlbum'])) {
-                        $fresh = $this->reconcileSource($libraryId, $song['song']->getId(), $song['expectedAlbum'], $song['previousPath'], $song['file']);
+                        $fresh = $this->reconcileSource($libraryId, $song['song']->getId(), $song['expectedAlbum'], $song['previousPath'], $song['file'], $song['probe'] ?? null);
                         if ($fresh === null) {
                             continue;
                         }
+                        $song['song'] = $fresh;
+                    } elseif ($song['technicalOnly'] ?? false) {
+                        $fresh = $this->songService->findFreshByUuid($song['song']->getId());
+                        if ($fresh === null || !$fresh->getAlbumId()->equals($song['expectedAlbum'])
+                            || $fresh->getHash() !== $song['file']->hash || $fresh->getPath() !== $song['file']->absolutePath) {
+                            continue;
+                        }
+                        $this->applyAudioProbe($fresh, $song['probe']);
+                        $this->songService->persist($fresh);
                         $song['song'] = $fresh;
                     } else {
                         $this->writeSong($song['song'], $song['artist'], $song['genres']);
@@ -289,7 +313,14 @@ final class FilesDiscoveredHandler
         return $written;
     }
 
-    private function reconcileSource(Uuid $libraryId, Uuid $songId, Uuid $albumId, string $previousPath, DiscoveredFile $file): ?Song
+    private function applyAudioProbe(Song $song, AudioProbeResult $probe): void
+    {
+        $song->updateAudioMetadata(bitrate: $probe->bitrate, sampleRate: $probe->sampleRate,
+            channels: $probe->channels, codec: $probe->codec,
+            containerFormat: $probe->containerFormat, streamIndex: $probe->streamIndex);
+    }
+
+    private function reconcileSource(Uuid $libraryId, Uuid $songId, Uuid $albumId, string $previousPath, DiscoveredFile $file, ?AudioProbeResult $probe): ?Song
     {
         $song = $this->songService->findFreshByUuid($songId);
         if ($song === null
@@ -314,6 +345,9 @@ final class FilesDiscoveredHandler
         }
 
         $song->updateSourcePath($file->absolutePath);
+        if ($probe !== null) {
+            $this->applyAudioProbe($song, $probe);
+        }
         $this->songService->persist($song);
 
         return $song;
@@ -357,8 +391,9 @@ final class FilesDiscoveredHandler
                 try {
                     $video = $this->videoRepository->findByHash($file->hash);
                     $isNew = $video === null;
+                    $probe = $video === null || $this->videoNeedsProbe($video)
+                        ? $this->ffprobeAdapter->probeVideo($file->absolutePath) : null;
                     if ($video === null) {
-                        $probe = $this->ffprobeAdapter->probeVideo($file->absolutePath);
                         $video = Video::create(
                             path: $file->absolutePath,
                             hash: $file->hash,
@@ -370,7 +405,7 @@ final class FilesDiscoveredHandler
                         );
                         $video->updateProbe($probe->jsonSerialize());
                     }
-                    $prepared[] = ['file' => $file, 'video' => $video, 'isNew' => $isNew];
+                    $prepared[] = ['file' => $file, 'video' => $video, 'isNew' => $isNew, 'probe' => $probe];
                 } catch (\Throwable $error) {
                     $failures[] = $this->fileFailed($file, $error);
                 }
@@ -390,7 +425,7 @@ final class FilesDiscoveredHandler
                 if ($current === []) {
                     return [];
                 }
-                $movie = $this->resolveMovie($message->libraryId, basename($message->directory));
+                $movie = null;
                 $written = [];
                 foreach ($current as $entry) {
                     try {
@@ -403,6 +438,16 @@ final class FilesDiscoveredHandler
                                 $this->videoRepository->save($video);
                             }
                         }
+                        if (!$entry['isNew'] && $entry['probe'] !== null) {
+                            $video = $this->videoRepository->findFreshByUuid($video->getId());
+                            if ($video === null || $video->getHash() !== $entry['file']->hash
+                                || $video->getPath() !== $entry['file']->absolutePath) {
+                                continue;
+                            }
+                            $video->updateProbe($entry['probe']->jsonSerialize());
+                            $this->videoRepository->save($video);
+                        }
+                        $movie ??= $this->resolveMovie($message->libraryId, basename($message->directory));
                         if (!in_array($video->getId()->toString(), $movie->getVideoIds(), true)) {
                             $movie->addVideo($video->getId());
                             $this->movieService->persist($movie);
@@ -430,6 +475,21 @@ final class FilesDiscoveredHandler
         if ($failures !== []) {
             throw new RuntimeException($this->buildFailureMessage($failures));
         }
+    }
+
+    private function videoNeedsProbe(Video $video): bool
+    {
+        $probe = $video->getProbe();
+        if (!isset($probe['containerFormat'], $probe['videoStreamIndex'])) {
+            return true;
+        }
+        foreach ($probe['audioStreams'] ?? [] as $stream) {
+            if (!isset($stream['streamIndex'])) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

@@ -9,7 +9,7 @@ use App\Transcode\Infrastructure\Packaging\PublishedPresentation;
 use App\Transcode\Infrastructure\Packaging\PublishedTrack;
 
 /**
- * @phpstan-type VideoRepresentation array{quality_tier: QualityTier, track: PublishedTrack, init_url: string, segment_urls: array<int, string>, bandwidth: int}
+ * @phpstan-type VideoRepresentation array{quality_tier?: QualityTier, width?: int, height?: int, track: PublishedTrack, init_url: string, segment_urls: array<int, string>, bandwidth: int}
  * @phpstan-type AudioRepresentation array{track: PublishedTrack, init_url: string, segment_urls: array<int, string>, language: string, bandwidth: int, sample_rate: int, channels: int}
  */
 final class DashManifestGenerator
@@ -58,8 +58,8 @@ final class DashManifestGenerator
             foreach ($renditions as $name => $rendition) {
                 $track = $rendition['track'];
                 $representation = $this->representation($xml, $name, $track, $rendition['bandwidth']);
-                $representation->setAttribute('width', (string) $rendition['quality_tier']->width);
-                $representation->setAttribute('height', (string) $rendition['quality_tier']->height);
+                $representation->setAttribute('width', (string) ($rendition['width'] ?? $rendition['quality_tier']->width));
+                $representation->setAttribute('height', (string) ($rendition['height'] ?? $rendition['quality_tier']->height));
                 $representation->appendChild($this->segmentList($xml, $track, $rendition['init_url'], $rendition['segment_urls'], $dynamic));
                 $video->appendChild($representation);
             }

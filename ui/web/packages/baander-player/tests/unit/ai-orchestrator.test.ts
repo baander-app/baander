@@ -46,6 +46,7 @@ describe('AIOrchestrator remixMoment', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     await expect(createOrchestrator().remixMoment({
+      requestId: 'f8bf4989-7537-46ac-9fb6-910ea8e1d465',
       startTime: 10,
       endTime: 20,
       qualityTier: '1080p',
@@ -63,6 +64,7 @@ describe('AIOrchestrator remixMoment', () => {
         },
         body: JSON.stringify({
           videoId: 'videoPublicIdentity01',
+          requestId: 'f8bf4989-7537-46ac-9fb6-910ea8e1d465',
           qualityTier: '1080p',
           audioProfile: 'streaming_stereo',
           priority: 'normal',
@@ -78,6 +80,7 @@ describe('AIOrchestrator remixMoment', () => {
     )));
 
     await expect(createOrchestrator().remixMoment({
+      requestId: 'f8bf4989-7537-46ac-9fb6-910ea8e1d465',
       startTime: 10,
       endTime: 20,
       qualityTier: '1080p',

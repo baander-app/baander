@@ -11,6 +11,7 @@ use App\Transcode\Infrastructure\Packaging\PublishedPresentationReader;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Transcode\Application\DTO\DesiredTranscodeState;
+use App\Transcode\Application\Command\CreateTranscodeSessionCommand;
 use App\Transcode\Application\DTO\MediaTrack;
 use App\Transcode\Application\DTO\TranscodeRuntimeSnapshot;
 use App\Transcode\Application\Port\TranscodeExecutionOwnershipPort;
@@ -33,6 +34,7 @@ use App\Transcode\Interface\Controller\StreamSigningController;
 use App\Transcode\Interface\Security\SignedStreamRequest;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
+use Symfony\Component\Messenger\Stamp\HandledStamp;
 use PHPUnit\Framework\TestCase;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\Request;
@@ -56,10 +58,14 @@ final class AdaptiveDeliveryTest extends TestCase
     private array $runtimes = [];
     /** @var list<string> */
     private array $runtimeReads = [];
+    private string $requestId;
+    /** @var array<string, TranscodeSession> */
+    private array $sessions = [];
 
     protected function setUp(): void
     {
         $this->root = sys_get_temp_dir().'/baander-adaptive-'.bin2hex(random_bytes(5));
+        $this->requestId = Uuid::generate()->toString();
         $this->video = Uuid::generate(); $this->videoPublic = new PublicId();
         $this->actor = Uuid::generate(); $this->other = Uuid::generate();
         $this->connection = DriverManager::getConnection(['driver' => 'pdo_sqlite', 'memory' => true]);
@@ -68,9 +74,9 @@ final class AdaptiveDeliveryTest extends TestCase
             'CREATE TABLE movies (id TEXT, library_id TEXT)',
             'CREATE TABLE movie_video (movie_id TEXT, video_id TEXT)',
             'CREATE TABLE user_library_access (user_id TEXT, library_id TEXT)',
-            'CREATE TABLE transcode_jobs (id TEXT PRIMARY KEY, public_id TEXT, owner_user_id TEXT, video_id TEXT, height INTEGER, status TEXT)',
+            'CREATE TABLE transcode_jobs (id TEXT PRIMARY KEY, public_id TEXT, owner_user_id TEXT, video_id TEXT, height INTEGER, status TEXT, request_id TEXT, presentation_selection TEXT)',
             'CREATE TABLE transcode_sessions (id TEXT PRIMARY KEY, public_id TEXT, user_id TEXT, video_id TEXT, job_id TEXT)',
-            'CREATE TABLE transcode_runtime_state (job_id TEXT PRIMARY KEY, session_id TEXT)',
+            'CREATE TABLE transcode_runtime_state (job_id TEXT PRIMARY KEY, session_id TEXT, request_id TEXT)',
         ] as $sql) { $this->connection->executeStatement($sql); }
         $this->connection->insert('videos', ['id' => $this->video->toString()]);
         $this->connection->insert('movies', ['id' => 'movie', 'library_id' => 'shared']);
@@ -80,23 +86,32 @@ final class AdaptiveDeliveryTest extends TestCase
             foreach ([QualityTier::p360(), QualityTier::p720(), QualityTier::p1080()] as $index => $tier) {
                 $job = TranscodeJob::create($this->video, $tier, $this->root, $user);
                 $session = TranscodeSession::create($user, $job->getId(), $this->video, AudioProfile::streamingStereo());
+                $this->sessions[$job->getId()->toString()] = $session;
                 $generation = [2, 4, 7][$index];
                 $directory = $this->root.'/'.$this->video.'/'.$tier->name.'/job-'.$job->getId().'/generation-'.$generation;
                 mkdir($directory, 0700, true);
                 file_put_contents($directory.'/generation.json', json_encode(['schemaVersion' => 2, 'generation' => $generation, 'videoCodec' => 'h264', 'videoEncoder' => 'libx264', 'audioCodec' => 'aac', 'audioProfile' => AudioProfile::streamingStereo()->jsonSerialize(), 'duration' => 1000, 'startTime' => 0, 'nativeAvailabilityStartTime' => '2026-10-22T10:00:00Z'], JSON_THROW_ON_ERROR));
                 PublishedPresentationFixture::write($directory, $user->equals($this->other) ? 167 : 2, audio: true);
-                $runtime = new TranscodeRuntimeSnapshot($job->getId(), $session->getId(), 'admission', new DesiredTranscodeState(AudioProfile::streamingStereo(), $user->equals($this->other) ? 'paused' : 'running', $user->equals($this->other) ? 999 : 0), 1, 1, $generation, 'ready', $directory, null, true);
+                $runtime = new TranscodeRuntimeSnapshot($job->getId(), $session->getId(), $this->requestId, new DesiredTranscodeState(AudioProfile::streamingStereo(), $user->equals($this->other) ? 'paused' : 'running', $user->equals($this->other) ? 999 : 0), 1, 1, $generation, 'ready', $directory, null, true);
                 $this->jobs[$job->getPublicId()->toString()] = $job;
                 $this->runtimes[$job->getId()->toString()] = $runtime;
-                $this->connection->insert('transcode_jobs', ['id' => $job->getId()->toString(), 'public_id' => $job->getPublicId()->toString(), 'owner_user_id' => $user->toString(), 'video_id' => $this->video->toString(), 'height' => $tier->height, 'status' => 'in_progress']);
+                $this->connection->insert('transcode_jobs', ['id' => $job->getId()->toString(), 'public_id' => $job->getPublicId()->toString(), 'owner_user_id' => $user->toString(), 'video_id' => $this->video->toString(), 'height' => $tier->height, 'status' => 'in_progress', 'request_id' => $this->requestId]);
                 $this->connection->insert('transcode_sessions', ['id' => $session->getId()->toString(), 'public_id' => $session->getPublicId()->toString(), 'user_id' => $user->toString(), 'video_id' => $this->video->toString(), 'job_id' => $job->getId()->toString()]);
-                $this->connection->insert('transcode_runtime_state', ['job_id' => $job->getId()->toString(), 'session_id' => $session->getId()->toString()]);
+                $this->connection->insert('transcode_runtime_state', ['job_id' => $job->getId()->toString(), 'session_id' => $session->getId()->toString(), 'request_id' => $this->requestId]);
             }
         }
         $security = $this->createStub(Security::class);
         $security->method('getUser')->willReturnCallback(fn () => new SecurityUser($this->actor->toString(), 'viewer@baander.app', ''));
         $bus = $this->createStub(MessageBusInterface::class);
-        $bus->method('dispatch')->willReturnCallback(static fn (object $message) => new Envelope($message));
+        $bus->method('dispatch')->willReturnCallback(function (CreateTranscodeSessionCommand $message): Envelope {
+            $job = array_find($this->jobs, static fn (TranscodeJob $job): bool =>
+                $job->getOwnerUserId()?->equals($message->getUserId())
+                && $job->getQualityTierName() === $message->getQualityTier()->name);
+            if ($job === null) {
+                throw new \LogicException('The requested fixture rendition does not exist.');
+            }
+            return new Envelope($message, [new HandledStamp($this->sessions[$job->getId()->toString()], 'fixture')]);
+        });
         $playback = new AuthorizedPlayback($security, $this->connection, $bus);
         $jobs = $this->createMock(TranscodeJobRepositoryInterface::class);
         $jobs->expects(self::never())->method('findActiveByVideo');
@@ -350,7 +365,11 @@ final class AdaptiveDeliveryTest extends TestCase
     /** @return array<string, mixed> */
     private function sign(bool $refresh, string $name = 'master.m3u8', int $expiresInSeconds = 86400): array
     {
-        $response = $this->signing->sign(Request::create('/api/stream/sign', 'POST', content: json_encode(['path' => '/api/transcode/'.$this->videoPublic.'/'.$name, 'refresh' => $refresh, 'expiresInSeconds' => $expiresInSeconds], JSON_THROW_ON_ERROR)));
+        $payload = ['requestId' => $this->requestId, 'path' => '/api/transcode/'.$this->videoPublic.'/'.$name, 'refresh' => $refresh, 'expiresInSeconds' => $expiresInSeconds];
+        if ($refresh) {
+            $payload['jobIds'] = $this->connection->fetchFirstColumn('SELECT public_id FROM transcode_jobs WHERE owner_user_id = ?', [$this->actor->toString()]);
+        }
+        $response = $this->signing->sign(Request::create('/api/stream/sign', 'POST', content: json_encode($payload, JSON_THROW_ON_ERROR)));
         self::assertSame(200, $response->getStatusCode());
         return json_decode($response->getContent(), true, flags: JSON_THROW_ON_ERROR);
     }

@@ -11,6 +11,7 @@ use App\Media\Application\Port\StreamPortInterface;
 use App\Shared\Application\Exception\ConflictException;
 use App\Shared\Application\Port\SystemSettingsPortInterface;
 use App\Transcode\Application\DTO\MediaOperation;
+use App\Transcode\Application\Exception\AudioRenditionFailedException;
 use App\Transcode\Application\Port\MediaExecutionPolicyInterface;
 use App\Transcode\Application\Settings\TranscodeSettingDefinitions;
 use App\Shared\Domain\Model\PublicId;
@@ -75,6 +76,25 @@ final readonly class OriginalMediaController
             $metadata = $this->tracks->getTrackMetadata($id);
         } catch (\InvalidArgumentException|ConflictException) {
             return $this->forbidden('Playback media is unavailable.');
+        }
+        $mode = $request->query->getString('mode');
+        if (!in_array($mode, ['', 'copy'], true)) {
+            return $this->errorResponse('Invalid audio presentation mode.');
+        }
+        if ($mode === 'copy') {
+            $index = $request->query->getString('index');
+            if ($request->query->getString('format') !== 'aac' || $request->query->getString('container') !== 'mp4'
+                || $request->query->getString('bitrate') !== '' || !ctype_digit($index)
+                || $metadata->streamIndex !== (int) $index || $metadata->codec !== 'aac' || $metadata->sourceHash === null) {
+                return $this->errorResponse('The selected audio cannot be copied.', Response::HTTP_CONFLICT, ['reason' => 'source_stream_metadata_unavailable']);
+            }
+            try {
+                $copy = $this->renditions->findCompleteCopy($id->toString(), $path, $metadata->sourceHash, $metadata->streamIndex)
+                    ?? $this->renditions->openCopy($id->toString(), $path, $metadata->sourceHash, $metadata->streamIndex);
+            } catch (AudioRenditionFailedException) {
+                return $this->errorResponse('Audio copy failed.', Response::HTTP_CONFLICT, ['reason' => 'copy_failed']);
+            }
+            return $this->file((string) $copy->path, $copy->mimeType());
         }
         $format = $request->query->getString('format');
         if ($format !== '') {

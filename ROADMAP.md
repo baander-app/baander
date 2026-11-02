@@ -49,6 +49,18 @@ These checks exposed and verified corrections for a stale heartbeat reader, a re
 
 Copy-presentation execution and player integration remain next. The occupied full-profile drill does not establish household memory requirements, complete-stack capacity or Raspberry Pi support.
 
+Owned presentation checkpoint, 2026-11-02 (U4): audio and video remuxing now use the existing owned media workers. Video publication preserves actual timestamps, segment durations and preceding keyframe boundaries. Audio discovery persists the source container and stream index, so playback can select a verified copy path without probing media in an HTTP request. Copy and encode jobs carry distinct presentation identities.
+
+Video admission now belongs to a client session. The browser retains its request ID across reloads and reconnects when Web Locks are available; the fallback keeps a private identity for the current page lifetime. Signing refreshes name the exact admitted jobs. Pause, seek and cancellation affect only that client's quality tiers, including when another client uses the same account and video. Each control command retains its own replay ID.
+
+Completed video has a separate signed delivery path. Verified, sealed output remains readable after its producer changes playback state, and retention grants protect its files and job record through signed expiry. Delivery rechecks library access and preserves the original expiry on child URLs. Sources with subtitles use owned playback rather than the completed A/V-only cache path.
+
+Verification: the broad CI-image run passed 668 tests with 11,615 assertions across four lanes. The final client-control and container-wiring run passed 63 tests with 665 assertions, including real PostgreSQL checks for independent clients and atomic control rollback. Receipts are retained in `var/test-runs/20261102-191723-9fad455d` and `var/test-runs/20261102-192210-ca6cc0f4`. Native copy tests verify packet identity, irregular keyframes, nonzero timestamps, video without audio and the actual seek boundary. The scanned AAC case verifies signed MP4 range delivery and a byte-identical ADTS roundtrip.
+
+The browser coordinator, recovery and video-hook tests passed all 300 cases; the player package passed both affected tests. Web and player-package type checks, OpenAPI export, generated API client, backend PHPStan, dependency boundaries and both profile container compilations passed. Web lint reported zero errors and eight existing warnings. Simplification reviews retained the behavior proofs, and shared retention reads no longer take an exclusive lock. New PHP source was formatted; glossary prose and whitespace checks passed.
+
+The broader gate also found six existing playback foreign keys without supporting indexes; an additive migration now supplies them. Historical migration tests retain their original schema boundaries before separately checking the current schema. A compiled-container regression verifies that admission does not require a media worker's encoder state. Player delivery negotiation, the deployment preset, whole-stack qualification and measured operator guidance remain open; no host-memory or Raspberry Pi capacity claim is made by this checkpoint.
+
 ## Playback destinations and notifications
 
 Requirements checkpoint, 2026-11-01: the user confirmed the

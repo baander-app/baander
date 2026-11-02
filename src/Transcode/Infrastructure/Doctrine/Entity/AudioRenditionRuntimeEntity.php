@@ -9,7 +9,6 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Entity(readOnly: true)]
 #[ORM\Table(name: 'audio_rendition_runtime')]
 #[ORM\Index(name: 'idx_audio_rendition_runtime_pending', columns: ['updated_at', 'rendition_key'], options: ['where' => "(state = ANY (ARRAY['pending'::text, 'running'::text]))"])]
-#[ORM\UniqueConstraint(name: 'uniq_audio_rendition_runtime_canonical', columns: ['track_key', 'source_signature', 'format', 'bitrate'])]
 final class AudioRenditionRuntimeEntity
 {
     #[ORM\Id]
@@ -28,8 +27,20 @@ final class AudioRenditionRuntimeEntity
     #[ORM\Column(name: 'format', type: 'text')]
     private string $format;
 
-    #[ORM\Column(name: 'bitrate', type: 'integer')]
-    private int $bitrate;
+    #[ORM\Column(name: 'bitrate', type: 'integer', nullable: true)]
+    private ?int $bitrate;
+
+    #[ORM\Column(name: 'mode', type: 'text', options: ['default' => 'encode'])]
+    private string $mode;
+
+    #[ORM\Column(name: 'stream_index', type: 'integer', nullable: true)]
+    private ?int $streamIndex;
+
+    #[ORM\Column(name: 'output_container', type: 'text', nullable: true)]
+    private ?string $outputContainer;
+
+    #[ORM\Column(name: 'source_hash', type: 'text', nullable: true)]
+    private ?string $sourceHash;
 
     #[ORM\Column(name: 'output_directory', type: 'text')]
     private string $outputDirectory;

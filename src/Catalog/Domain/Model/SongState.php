@@ -54,6 +54,8 @@ final class SongState
         public readonly ?PublicId $albumPublicId = null,
         public readonly DateTimeImmutable $createdAt = new DateTimeImmutable(),
         public DateTimeImmutable $updatedAt = new DateTimeImmutable(),
+        public ?string $containerFormat = null,
+        public ?int $streamIndex = null,
     ) {
     }
 }

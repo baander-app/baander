@@ -42,7 +42,13 @@ final class Song
         ?int $channels = null,
         ?string $codec = null,
         bool $explicit = false,
+        ?string $containerFormat = null,
+        ?int $streamIndex = null,
     ): self {
+        if ($streamIndex !== null && $streamIndex < 0) {
+            throw new InvalidArgumentException('Audio stream index must be non-negative.');
+        }
+
         if (trim($title) === '') {
             throw new InvalidArgumentException('Song title cannot be empty.');
         }
@@ -75,6 +81,8 @@ final class Song
             channels: $channels,
             codec: $codec,
             explicit: $explicit,
+            containerFormat: $containerFormat,
+            streamIndex: $streamIndex,
             createdAt: new DateTimeImmutable(),
             updatedAt: new DateTimeImmutable(),
         ));
@@ -156,7 +164,12 @@ final class Song
         ?int $sampleRate = null,
         ?int $channels = null,
         ?string $codec = null,
+        ?string $containerFormat = null,
+        ?int $streamIndex = null,
     ): void {
+        if ($streamIndex !== null && $streamIndex < 0) {
+            throw new InvalidArgumentException('Audio stream index must be non-negative.');
+        }
         if ($size !== null) {
             $this->state->size = $size;
         }
@@ -171,6 +184,8 @@ final class Song
         $this->state->sampleRate = $sampleRate ?? $this->state->sampleRate;
         $this->state->channels = $channels ?? $this->state->channels;
         $this->state->codec = $codec ?? $this->state->codec;
+        $this->state->containerFormat = $containerFormat ?? $this->state->containerFormat;
+        $this->state->streamIndex = $streamIndex ?? $this->state->streamIndex;
 
         $this->state->updatedAt = new DateTimeImmutable();
     }
@@ -335,6 +350,16 @@ final class Song
     public function getChannels(): ?int
     {
         return $this->state->channels;
+    }
+
+    public function getContainerFormat(): ?string
+    {
+        return $this->state->containerFormat;
+    }
+
+    public function getStreamIndex(): ?int
+    {
+        return $this->state->streamIndex;
     }
 
     public function getCodec(): ?string

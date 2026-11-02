@@ -64,6 +64,44 @@ final class SweepTranscodeCacheHandlerTest extends TestCase
         $this->rmrf($this->cacheRoot);
     }
 
+    public function testRetainedCompletedOutputSurvivesTtlAndSizeEviction(): void
+    {
+        $video = Uuid::v7()->toString();
+        $directory = $this->cacheRoot . '/' . $video;
+        $this->writeSegment($directory . '/copy', 'segment.m4s', 'media', 3600 * 26);
+        self::assertTrue($this->storage->retainUntil($directory . '/copy', time() + 3600));
+
+        $result = $this->buildHandler()->sweep(['ttl_hours' => 24, 'max_gb' => 0.0]);
+
+        self::assertSame([], $result->deletedDirectories);
+        self::assertContains($video, $result->skippedActive);
+        self::assertSame(0, $result->bytesFreed);
+        self::assertSame(5, $result->totalCacheBytesAfter);
+        self::assertFileExists($directory . '/copy/segment.m4s');
+    }
+
+    public function testRetentionGrantedAfterClassificationDoesNotReportEviction(): void
+    {
+        $video = Uuid::v7()->toString();
+        $directory = $this->cacheRoot . '/' . $video;
+        $this->writeSegment($directory . '/copy', 'segment.m4s', 'media', 3600 * 26);
+        $storage = $this->createMock(TranscodeStoragePortInterface::class);
+        $storage->method('getBasePath')->willReturn($this->cacheRoot);
+        $storage->method('getVideoDirectories')->willReturn([$video]);
+        $storage->method('getAudioRenditionDirectories')->willReturn([]);
+        $storage->method('getDirectorySize')->willReturn(5);
+        $storage->method('hasUnexpiredRetention')->willReturn(false);
+        $storage->expects(self::atLeastOnce())->method('deleteIfUnretained')->with($directory)->willReturn(false);
+        $storage->expects(self::never())->method('deleteDirectory');
+
+        $result = new SweepTranscodeCacheHandler($storage, $this->jobPort, $this->sessionPort)->sweep(['ttl_hours' => 24, 'max_gb' => 0.0]);
+
+        self::assertSame([], $result->deletedDirectories);
+        self::assertSame([$video], $result->retainedDirectories);
+        self::assertSame(0, $result->bytesFreed);
+        self::assertSame(5, $result->totalCacheBytesAfter);
+    }
+
     public function testDeletesVideoDirectoryOlderThanTtl(): void
     {
         $videoId = Uuid::v7();

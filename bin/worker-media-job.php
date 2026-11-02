@@ -90,21 +90,24 @@ try {
                 throw new RuntimeException('Media video runtime is not configured.');
             }
             $claim = $runtime->claim($jobId, $identity);
-            if ($claim !== null && !$executionPolicy->permits(\App\Transcode\Application\DTO\MediaOperation::VideoEncode)) {
+            $copy = $claim?->runtime->desired->presentationSelection?->mode === 'copy';
+            if ($claim !== null && !$executionPolicy->permits($copy ? \App\Transcode\Application\DTO\MediaOperation::StreamCopy : \App\Transcode\Application\DTO\MediaOperation::VideoEncode)) {
                 $runtime->observe($claim, 'failed', error: (new \App\Transcode\Application\Exception\MediaEncodingProhibitedException())->getMessage());
                 $runtime->release($claim);
                 $claim = null;
             }
             if ($claim !== null) {
-                $snapshots = $container->get('worker.media.encoder_snapshot_store');
-                if (!$snapshots instanceof \App\Transcode\Infrastructure\FFmpeg\WorkerEncoderCapabilitiesSnapshotStore) {
-                    throw new RuntimeException('Media encoder snapshot store is not configured.');
+                if (!$copy) {
+                    $snapshots = $container->get('worker.media.encoder_snapshot_store');
+                    if (!$snapshots instanceof \App\Transcode\Infrastructure\FFmpeg\WorkerEncoderCapabilitiesSnapshotStore) {
+                        throw new RuntimeException('Media encoder snapshot store is not configured.');
+                    }
+                    $snapshot = $snapshots->read();
+                    if ($snapshot === null || $snapshot->workerIdentity !== $identity->bootId . ':' . $identity->launchGeneration) {
+                        throw new RuntimeException('Media job requires current worker encoder capabilities.');
+                    }
+                    $container->set('worker.media.encoder_profile', $snapshot->profile);
                 }
-                $snapshot = $snapshots->read();
-                if ($snapshot === null || $snapshot->workerIdentity !== $identity->bootId . ':' . $identity->launchGeneration) {
-                    throw new RuntimeException('Media job requires current worker encoder capabilities.');
-                }
-                $container->set('worker.media.encoder_profile', $snapshot->profile);
                 $executor = $container->get('transcode.loop_starter');
                 if (!$executor instanceof \App\Transcode\Application\Port\TranscodeLoopStarterInterface) {
                     throw new RuntimeException('Media video executor is not configured.');
@@ -113,12 +116,12 @@ try {
                 if (!$qol instanceof \App\QoL\Infrastructure\Worker\WorkerQoLLifecycle) {
                     throw new RuntimeException('Media worker QoL lifecycle is not configured.');
                 }
-                \Swoole\Coroutine\run(static function () use ($executor, $claim, $stopRequested, $qol): void {
-                    $qol->start();
+                \Swoole\Coroutine\run(static function () use ($executor, $claim, $stopRequested, $qol, $copy): void {
+                    $copy ? $qol->startCopy() : $qol->start();
                     try {
                         $executor->run($claim, $stopRequested);
                     } finally {
-                        $qol->stop();
+                        $copy ? $qol->stopCopy() : $qol->stop();
                     }
                 });
             }

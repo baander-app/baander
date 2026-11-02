@@ -40,6 +40,8 @@ export interface PlaybackConnection {
 export class PlaybackSessionCoordinator {
   private readonly ownership = captureOwnership()
   private readonly endpointId = crypto.randomUUID()
+  private clientRequestId: string | null = null
+  private readonly identityWaiters = new Set<{ resolve: (id: string) => void; reject: (error: unknown) => void }>()
   private readonly runner = new PlaybackCommandRunner(ack => this.acknowledge(ack), (command, signal) => this.checkpointCommand(command, signal))
   private endpoint: PlaybackEndpointResource | null = null
   private snapshot: PlaybackSnapshotResource | null = null
@@ -103,6 +105,29 @@ export class PlaybackSessionCoordinator {
     return () => this.dispose()
   }
 
+  async getClientRequestId(signal: AbortSignal): Promise<string> {
+    const check = () => {
+      signal.throwIfAborted()
+      if (!this.current()) throw new Error('Playback account or runtime changed.')
+    }
+    check()
+    const id = this.clientRequestId ?? await new Promise<string>((resolve, reject) => {
+      const waiter = {
+        resolve: (value: string) => { cleanup(); resolve(value) },
+        reject: (error: unknown) => { cleanup(); reject(error) },
+      }
+      const abort = () => waiter.reject(signal.reason)
+      const cleanup = () => {
+        this.identityWaiters.delete(waiter)
+        signal.removeEventListener('abort', abort)
+      }
+      this.identityWaiters.add(waiter)
+      signal.addEventListener('abort', abort, { once: true })
+    })
+    check()
+    return id
+  }
+
   private current(): boolean {
     return !this.disposed && isCurrentOwnership(this.ownership)
   }
@@ -118,6 +143,9 @@ export class PlaybackSessionCoordinator {
   }
 
   private fail(error: unknown): void {
+    if (this.clientRequestId === null) {
+      for (const waiter of this.identityWaiters) waiter.reject(error)
+    }
     this.presenceConfirmedAt = null
     this.publish(this.ready, error instanceof Error ? error.message : 'Playback connection failed.')
   }
@@ -196,6 +224,7 @@ export class PlaybackSessionCoordinator {
   }
 
   private disconnect(): void {
+    this.clientRequestId = null
     this.presenceConfirmedAt = null
     this.registrationStartedAt = null
     const fenced = this.runner.fenceLocalExecution()
@@ -234,6 +263,8 @@ export class PlaybackSessionCoordinator {
       if (!current()) return
       this.publish(false, null)
     }
+    this.clientRequestId = this.localRecovery?.tabId ?? this.endpointId
+    for (const waiter of this.identityWaiters) waiter.resolve(this.clientRequestId)
     if (this.stopProof && this.localRecovery?.wasRecovered(this.stopProof.endpoint.incarnationId)) { this.stopProof = null; retirement = null }
     const proof = this.stopProof
     if (proof) {
@@ -623,6 +654,7 @@ export class PlaybackSessionCoordinator {
     this.disconnect()
     if (this.ownership.principal === null || captureOwnership().principal !== this.ownership.principal) retirement = null
     this.disposed = true
+    for (const waiter of this.identityWaiters) waiter.reject(new Error('Playback account or runtime changed.'))
     for (const request of this.pendingRequests.values()) request.reject(new Error('Playback account or runtime changed.'))
     this.pendingRequests.clear()
     for (const transfer of this.transfers) transfer.reject(new Error('Playback account or runtime changed.'))
@@ -637,6 +669,10 @@ let activeCoordinator: PlaybackSessionCoordinator | undefined
 export function registerPlaybackCoordinator(coordinator: PlaybackSessionCoordinator): () => void {
   activeCoordinator = coordinator
   return () => { if (activeCoordinator === coordinator) activeCoordinator = undefined }
+}
+
+export function getPlaybackClientRequestId(signal: AbortSignal): Promise<string> {
+  return activeCoordinator ? activeCoordinator.getClientRequestId(signal) : Promise.reject(new Error('Playback connection is unavailable.'))
 }
 
 export function transferPlayback(incarnationId: string): Promise<void> {

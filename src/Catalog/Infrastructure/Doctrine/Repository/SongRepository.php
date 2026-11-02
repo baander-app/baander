@@ -241,6 +241,8 @@ final class SongRepository implements SongRepositoryInterface
          *     sampleRate: ?int,
          *     channels: ?int,
          *     codec: ?string,
+         *     containerFormat: ?string,
+         *     streamIndex: ?int,
          *     explicit: bool,
          *     energy: ?float,
          *     danceability: ?float,
@@ -289,6 +291,8 @@ final class SongRepository implements SongRepositoryInterface
                 sampleRate: $row['sampleRate'],
                 channels: $row['channels'],
                 codec: $row['codec'],
+                containerFormat: $row['containerFormat'],
+                streamIndex: $row['streamIndex'],
                 explicit: $row['explicit'],
                 energy: $row['energy'],
                 danceability: $row['danceability'],
@@ -805,6 +809,8 @@ final class SongRepository implements SongRepositoryInterface
             sampleRate: $entity->getSampleRate(),
             channels: $entity->getChannels(),
             codec: $entity->getCodec(),
+            containerFormat: $entity->getContainerFormat(),
+            streamIndex: $entity->getStreamIndex(),
             explicit: $entity->isExplicit(),
             energy: $entity->getEnergy(),
             danceability: $entity->getDanceability(),
@@ -882,6 +888,8 @@ final class SongRepository implements SongRepositoryInterface
         $entity->setSampleRate($song->getSampleRate());
         $entity->setChannels($song->getChannels());
         $entity->setCodec($song->getCodec());
+        $entity->setContainerFormat($song->getContainerFormat());
+        $entity->setStreamIndex($song->getStreamIndex());
         $entity->setExplicit($song->isExplicit());
         $entity->setEnergy($song->getEnergy());
         $entity->setDanceability($song->getDanceability());

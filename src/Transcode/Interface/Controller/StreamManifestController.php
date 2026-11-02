@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Transcode\Interface\Controller;
 
 use App\Shared\Domain\Model\PublicId;
+use App\Shared\Domain\Model\Uuid;
 use App\Shared\Application\Port\SleeperInterface;
 use App\Transcode\Application\DTO\MediaTrack;
 use App\Transcode\Application\DTO\TranscodeRenditionSet;
@@ -122,6 +123,8 @@ final class StreamManifestController
         path: '/api/transcode/{videoId}/quality-ladder',
         summary: 'Get available quality tiers for a video',
         parameters: [
+            new OA\Parameter(name: 'requestId', description: 'Playback client session identifier', in: 'query', required: true, schema: new OA\Schema(type: 'string', format: 'uuid')),
+            new OA\Parameter(name: 'jobIds', description: 'Exact admitted jobs', in: 'query', required: true, schema: new OA\Schema(type: 'array', minItems: 1, maxItems: 3, items: new OA\Items(type: 'string'))),
             new OA\Parameter(name: 'videoId', description: 'Video public identifier', in: 'path', required: true, schema: new OA\Schema(type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$')),
         ],
         responses: [
@@ -129,11 +132,27 @@ final class StreamManifestController
         ],
     )]
     #[Route('/{videoId}/quality-ladder', name: 'quality_ladder', methods: ['GET'])]
-    public function qualityLadder(string $videoId): JsonResponse
+    public function qualityLadder(string $videoId, Request $request): JsonResponse
     {
+        try {
+            $requestId = Uuid::fromString($request->query->getString('requestId'))->toString();
+            $identifiers = $request->query->all('jobIds');
+            if ($identifiers === [] || !array_is_list($identifiers) || count($identifiers) > 3) {
+                throw new \InvalidArgumentException('One to three admitted job identifiers are required.');
+            }
+            $jobIds = array_map(static function (mixed $id): PublicId {
+                if (!is_string($id)) {
+                    throw new \InvalidArgumentException('Job identifiers must be strings.');
+                }
+                return PublicId::fromString($id);
+            }, $identifiers);
+        } catch (\InvalidArgumentException $error) {
+            throw new BadRequestHttpException('A playback client session UUID and admitted job identifiers are required.', $error);
+        }
         $video = $this->requireVideo($videoId);
         $this->playback->assertAccess($video);
-        $tiers = $this->streamingService->getQualityLadderForVideo($video, array_keys($this->playback->findSessions($video)));
+        $jobs = $this->playback->findSessions($video, $requestId, $jobIds) |> array_keys(...);
+        $tiers = $this->streamingService->getQualityLadderForVideo($video, $jobs);
 
         return $this->successResponse($tiers);
     }

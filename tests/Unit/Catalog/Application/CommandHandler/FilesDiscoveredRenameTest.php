@@ -49,6 +49,7 @@ final class FilesDiscoveredRenameTest extends TestCase
             $oldPath = '/music/Other/old.flac';
         }
         $song = Song::create($case === 'different album' ? Uuid::v7() : $album->getId(), 'Edited title', $oldPath, 100, 'audio/flac', hash: 'hash');
+        $song->updateAudioMetadata(codec: 'flac', containerFormat: 'flac', streamIndex: 0);
         $song->lockField('title');
         $fresh = Song::reconstitute(clone $song->getState());
         $fresh->updateMetadata(comment: 'Concurrent edit');
@@ -221,6 +222,7 @@ final class FilesDiscoveredRenameTest extends TestCase
             new NullLogger(),
             $media,
             new PassThroughTransaction(),
+            audioProbe: $this->audioProbeStub(),
         );
     }
 }

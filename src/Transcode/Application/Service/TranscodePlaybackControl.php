@@ -99,16 +99,18 @@ final readonly class TranscodePlaybackControl
             }
             return [];
         }
+        $sourceJob = $this->jobPort->findByUuid($source->getJobId());
+        if ($sourceJob === null) {
+            return [];
+        }
+        $clientId = $sourceJob->getRequestId();
+        if (!$this->belongsToClient($source, $source, $clientId)) {
+            return [];
+        }
         $candidates = [$source, ...$this->sessionPort->findActiveByUserAndVideo($source->getUserId(), $source->getVideoId())];
         $group = [];
         foreach ($candidates as $session) {
-            if (!$session->getUserId()->equals($source->getUserId()) || !$session->getVideoId()->equals($source->getVideoId())) {
-                continue;
-            }
-            $job = $this->jobPort->findByUuid($session->getJobId());
-            $runtime = $this->ownership->find($session->getJobId());
-            if ($job === null || $job->getOwnerUserId()?->equals($source->getUserId()) !== true
-                || $runtime === null || !$runtime->sessionId->equals($session->getId())) {
+            if (!$this->belongsToClient($session, $source, $clientId)) {
                 continue;
             }
             $group[$session->getId()->toString()] = $session;
@@ -122,13 +124,28 @@ final readonly class TranscodePlaybackControl
         }
         foreach ($group as $id => $session) {
             $current = $this->sessionPort->findByUuid($session->getId());
-            if ($current === null) {
+            if ($current === null || !$this->belongsToClient($current, $source, $clientId)) {
                 unset($group[$id]);
             } else {
                 $group[$id] = $current;
             }
         }
         return $group;
+    }
+
+    private function belongsToClient(TranscodeSession $session, TranscodeSession $source, string $clientId): bool
+    {
+        if (!$session->getUserId()->equals($source->getUserId()) || !$session->getVideoId()->equals($source->getVideoId())) {
+            return false;
+        }
+        $job = $this->jobPort->findByUuid($session->getJobId());
+        if ($job === null || $job->getOwnerUserId()?->equals($source->getUserId()) !== true
+            || !$job->getVideoId()->equals($source->getVideoId()) || $job->getRequestId() !== $clientId) {
+            return false;
+        }
+        $runtime = $this->ownership->find($session->getJobId());
+        return $runtime !== null && $runtime->jobId->equals($job->getId())
+            && $runtime->sessionId->equals($session->getId()) && $runtime->requestId === $clientId;
     }
 
     private function project(TranscodeSession $session, TranscodeRuntimeSnapshot $previous, TranscodeRuntimeSnapshot $runtime): void

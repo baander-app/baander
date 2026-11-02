@@ -7,12 +7,22 @@ namespace App\Tests\Fixtures\Catalog;
 use App\Library\Application\Message\DiscoveredFile;
 use App\Library\Application\Port\LibraryMediaFilesInterface;
 use App\Shared\Domain\Model\Uuid;
+use App\Transcode\Application\DTO\AudioProbeResult;
+use App\Transcode\Application\Port\AudioProbePortInterface;
 use PHPUnit\Framework\MockObject\Stub;
 
 trait DiscoveredFileObservations
 {
     /** @var array<string, string> */
     private array $availableHashes = [];
+
+    private function audioProbeStub(): AudioProbePortInterface
+    {
+        $probe = $this->createStub(AudioProbePortInterface::class);
+        $probe->method('probeAudio')->willReturn(new AudioProbeResult('flac', 0, 'flac', 2, 44100, 320000));
+
+        return $probe;
+    }
 
     private function observedFile(DiscoveredFile $file): DiscoveredFile
     {

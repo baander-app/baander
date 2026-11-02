@@ -31,6 +31,8 @@ use App\Shared\Domain\Event\Outbox\RelayOutboxCommand;
 use App\Shared\Domain\Event\Outbox\RelayOutboxHandler;
 use App\Shared\Domain\ValueObject\FilesystemType;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\Model\PublicId;
+use App\Media\Application\Port\StreamPortInterface;
 use App\Tests\Fixtures\Library\LibraryScanClaimRace;
 use App\Tests\Support\FinalSchemaBootstrap;
 use Closure;
@@ -59,6 +61,8 @@ use Symfony\Component\Process\Process;
 #[SkipDatabaseRollback]
 final class LibraryDirectoryPublicationTest extends TestCase
 {
+    use \App\Tests\Support\ScannedAudioCopyProof;
+
     private Kernel $kernel;
     private EntityManagerInterface $manager;
     private Connection $writer;
@@ -515,6 +519,62 @@ final class LibraryDirectoryPublicationTest extends TestCase
             }
             $lease->fail();
             self::assertSame($successor->toString(), $this->observer->fetchOne('SELECT claim_id FROM libraries'));
+        }
+    }
+
+    /** @return iterable<string, array{string, int}> */
+    public static function aacContainers(): iterable
+    {
+        yield 'ADTS' => ['aac', 0];
+        yield 'MP4' => ['m4a', 0];
+        yield 'MP4 alternate default audio' => ['m4a', 1];
+    }
+
+    #[DataProvider('aacContainers')]
+    public function testScannedAacMetadataSurvivesPublicationAndMissingMetadataRefresh(string $extension, int $expectedStream): void
+    {
+        $library = $this->library(LibraryType::Music);
+        $path = $this->root . '/Album/source.' . $extension;
+        (new Filesystem())->mkdir(dirname($path));
+        $arguments = ['/usr/bin/ffmpeg', '-y', '-nostdin', '-hide_banner', '-loglevel', 'error',
+            '-f', 'lavfi', '-i', 'sine=frequency=440:sample_rate=48000:duration=0.3'];
+        if ($expectedStream === 1) {
+            array_push($arguments, '-f', 'lavfi', '-i', 'sine=frequency=880:sample_rate=48000:duration=0.3',
+                '-map', '0:a', '-map', '1:a', '-disposition:a:0', '0', '-disposition:a:1', 'default');
+        }
+        array_push($arguments, '-c:a', 'aac', '-metadata', 'title=Scanned AAC', $path);
+        $fixture = new Process($arguments);
+        $fixture->mustRun();
+        $this->scanner(LibraryType::Music)->scan($library, publishDirectory: $this->capture($library));
+        self::assertSame(1, $this->relayPublishedEvents());
+        $message = $this->discovery(0, $library, $path);
+        $container = $this->kernel->getContainer()->get('test.service_container');
+        $consumer = $container->get(FilesDiscoveredHandler::class);
+        $consumer($message);
+        $song = $this->observer->fetchAssociative('SELECT id, public_id, codec, container_format, stream_index, hash FROM songs');
+        self::assertNotFalse($song);
+        self::assertSame('aac', $song['codec']);
+        self::assertNotEmpty($song['container_format']);
+        self::assertSame($expectedStream, $song['stream_index']);
+        self::assertSame(hash_file('xxh3', $path), $song['hash']);
+        $metadata = $container->get(StreamPortInterface::class)->getTrackMetadata(new PublicId($song['public_id']));
+        self::assertSame($song['hash'], $metadata->sourceHash);
+        self::assertSame('aac', $metadata->codec);
+        self::assertSame($expectedStream, $metadata->streamIndex);
+
+        $this->writer->executeStatement("UPDATE songs SET title = 'Edited title', codec = NULL, container_format = NULL, stream_index = NULL WHERE id = ?", [$song['id']]);
+        $this->manager->clear();
+        $consumer($message);
+        self::assertSame(1, (int) $this->observer->fetchOne('SELECT count(*) FROM songs'));
+        $refreshed = $this->observer->fetchAssociative('SELECT id, title, codec, container_format, stream_index FROM songs');
+        self::assertNotFalse($refreshed);
+        self::assertSame($song['id'], $refreshed['id']);
+        self::assertSame('Edited title', $refreshed['title']);
+        self::assertSame('aac', $refreshed['codec']);
+        self::assertSame($song['container_format'], $refreshed['container_format']);
+        self::assertSame($expectedStream, $refreshed['stream_index']);
+        if ($extension === 'aac') {
+            $this->assertScannedAudioCopy($container, $this->writer, $this->schema, $this->root, $library->getId(), new PublicId($song['public_id']), $path);
         }
     }
 

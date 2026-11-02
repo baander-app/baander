@@ -19,6 +19,7 @@ final readonly class TrackStreamMetadata
         public ?float $length,
         public ?string $containerFormat = null,
         public ?int $streamIndex = null,
+        public ?string $sourceHash = null,
     ) {
     }
 }

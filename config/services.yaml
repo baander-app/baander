@@ -759,6 +759,18 @@ services:
     App\Media\Application\Port\DeliveryDecisionPortInterface:
         alias: App\Media\Application\Service\DeliveryDecisionService
 
+    App\Transcode\Application\Port\CopyPresentationPortInterface:
+        alias: App\Transcode\Application\Service\CopyPresentationService
+
+    App\Transcode\Application\Port\EncodePresentationPort:
+        alias: App\Transcode\Infrastructure\Transcode\EncodePresentationAdapter
+
+    App\Transcode\Application\Port\CompletedVideoDeliveryPort:
+        alias: App\Transcode\Infrastructure\Transcode\CompletedVideoDeliveryAdapter
+
+    App\Transcode\Application\Port\CompletedVideoArtifactPort:
+        alias: App\Transcode\Infrastructure\Transcode\CompletedVideoArtifactAdapter
+
     # --- Recommendation Domain Repository Aliases ---
     App\Recommendation\Domain\Repository\RecommendationRepositoryInterface:
         alias: App\Recommendation\Infrastructure\Doctrine\Repository\RecommendationRepository
@@ -1044,6 +1056,7 @@ services:
     App\Transcode\Infrastructure\Swoole\TranscodeStreamManager:
         arguments:
             $maxConcurrentStreams: 4
+            $segmentEncoder: !service_closure App\Transcode\Infrastructure\FFmpeg\SegmentEncoder
 
     # --- Transcode Auth ---
     App\Transcode\Infrastructure\Auth\HmacStreamAuthAdapter:
@@ -1070,6 +1083,12 @@ services:
     App\Transcode\Infrastructure\FFmpeg\FFprobeAdapter:
         arguments:
             $ffprobePath: '%env(FFPROBE_PATH)%'
+
+    App\Transcode\Application\Port\AudioProbePortInterface:
+        alias: App\Transcode\Infrastructure\FFmpeg\FFprobeAdapter
+
+    App\Transcode\Application\Port\VideoProbePortInterface:
+        alias: App\Transcode\Infrastructure\FFmpeg\FFprobeAdapter
 
     App\Metadata\Infrastructure\Api\Tmdb\TmdbAdapter:
         arguments:
@@ -1135,15 +1154,22 @@ services:
     SwooleBundle\SwooleBundle\Server\LifecycleHandler\ServerShutdownHandler:
         alias: App\Shared\Infrastructure\Swoole\Drain\DrainShutdownHandler
 
-    App\Transcode\Infrastructure\Swoole\TranscodeProcessPool: ~
+    App\Transcode\Infrastructure\Swoole\TranscodeProcessPool:
+        arguments:
+            $ffprobePath: '%env(FFPROBE_PATH)%'
 
     App\Transcode\Infrastructure\FFmpeg\SegmentEncoder:
         arguments:
             $encoderProfile: '@App\Transcode\Domain\ValueObject\EncoderProfile'
             $bitrateMultiplier: '%env(float:HW_BITRATE_MULTIPLIER)%'
 
+    App\Transcode\Infrastructure\FFmpeg\CopySegmentArguments:
+        arguments:
+            $ffmpegPath: '%env(FFMPEG_PATH)%'
+
     App\Transcode\Infrastructure\Swoole\TranscodeSessionSubscriber:
         arguments:
+            $segmentEncoder: !service_closure App\Transcode\Infrastructure\FFmpeg\SegmentEncoder
             $videoRepository: '@App\Catalog\Domain\Repository\VideoRepositoryInterface'
             $controlOwnership: '@worker.media.control_runtime'
             $renewalTimer: '@App\Transcode\Infrastructure\Swoole\LoopLockRenewalTimerInterface'
@@ -1346,6 +1372,7 @@ services:
     App\Transcode\Infrastructure\Transcode\AudioRenditionExecutor:
         arguments:
             $ffmpegPath: '%env(FFMPEG_PATH)%'
+            $ffprobePath: '%env(FFPROBE_PATH)%'
 
     worker.media.control_connection:
         class: Doctrine\DBAL\Connection

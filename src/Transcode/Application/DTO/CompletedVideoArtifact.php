@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Transcode\Application\DTO;
 
+use App\Shared\Domain\Model\PublicId;
+
 #[\Symfony\Component\DependencyInjection\Attribute\Exclude]
 final readonly class CompletedVideoArtifact
 {
@@ -21,6 +23,8 @@ final readonly class CompletedVideoArtifact
         public bool $hdr,
         public string $transport,
         public string $pixelFormat,
+        public PublicId $jobId,
+        public int $generation,
     ) {
     }
 }

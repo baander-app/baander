@@ -6,7 +6,7 @@ namespace App\Transcode\Domain\Model;
 
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
-use App\Transcode\Domain\ValueObject\QualityTier;
+use App\Transcode\Domain\ValueObject\PresentationSelection;
 use App\Transcode\Domain\ValueObject\TranscodeStatus;
 use DateTimeImmutable;
 
@@ -36,6 +36,7 @@ final class TranscodeJobState
         public float $framerate,
         public readonly DateTimeImmutable $createdAt,
         public DateTimeImmutable $updatedAt,
+        public readonly string $requestId,
         public ?string $failReason = null,
         /** @var array<string, float> Measured loudness values from two-pass analysis */
         public array $measuredLoudness = [],
@@ -44,6 +45,7 @@ final class TranscodeJobState
         /** @var array<string, array{path: string, size: int, duration: float}> Audio segment map keyed by "{language}:{index}" */
         public array $audioSegmentMap = [],
         public readonly ?Uuid $ownerUserId = null,
+        public readonly ?PresentationSelection $presentationSelection = null,
     ) {
     }
 }

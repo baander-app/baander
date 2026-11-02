@@ -41,7 +41,7 @@ deptrac:
         Party: ['Party Domain', 'Party Application', 'Party Infrastructure', 'Party Resources', 'Party Interface']
         Playlist: ['Playlist Live Audience Contract', 'Playlist Deletion Preview Contract', 'Playlist Domain', 'Playlist Application', 'Playlist Infrastructure', 'Playlist Resources', 'Playlist Interface']
         Recommendation: ['Recommendation Domain', 'Recommendation Application', 'Recommendation Infrastructure', 'Recommendation Resources', 'Recommendation Interface']
-        Transcode: ['Transcode Playback Access Contract', 'Transcode Audio Rendition Contract', 'Transcode Delivery Contract', 'Transcode Domain', 'Transcode Application', 'Transcode Infrastructure', 'Transcode Resources', 'Transcode Interface']
+        Transcode: ['Transcode Playback Access Contract', 'Transcode Audio Rendition Contract', 'Transcode Delivery Contract', 'Transcode Probe Contract', 'Transcode Domain', 'Transcode Application', 'Transcode Infrastructure', 'Transcode Resources', 'Transcode Interface']
         UserPreference: ['UserPreference Settings Contract', 'UserPreference Domain', 'UserPreference Application', 'UserPreference Infrastructure', 'UserPreference Resources', 'UserPreference Interface']
         Discovery: ['Discovery Domain', 'Discovery Application', 'Discovery Infrastructure', 'Discovery Resources', 'Discovery Interface']
         Favorites: ['Favorites Domain', 'Favorites Application', 'Favorites Infrastructure', 'Favorites Resources', 'Favorites Interface']
@@ -644,7 +644,12 @@ deptrac:
     - name: 'Transcode Delivery Contract'
       collectors:
         - type: classLike
-          value: '^App\\Transcode\\Application\\(Port\\(MediaExecutionPolicyInterface|CompletedVideoArtifactPort|StreamAuthPortInterface)|DTO\\(MediaOperation|CompletedVideoArtifact)|Exception\\MediaEncodingProhibitedException)$'
+          value: '^App\\Transcode\\Application\\(Port\\(MediaExecutionPolicyInterface|CompletedVideoArtifactPort|CompletedVideoDeliveryPort|CopyPresentationPortInterface|StreamAuthPortInterface)|DTO\\(MediaOperation|MediaTrack|CompletedVideoArtifact|CopyPresentation|CopyPresentationInput)|Exception\\MediaEncodingProhibitedException)$'
+
+    - name: 'Transcode Probe Contract'
+      collectors:
+        - type: classLike
+          value: '^App\\Transcode\\Application\\(Port\\(Audio|Video)ProbePortInterface|DTO\\AudioProbeResult)$'
 
     - name: 'Transcode Application'
       collectors:
@@ -658,7 +663,9 @@ deptrac:
             - type: classLike
               value: '^App\\Transcode\\Application\\(Port\\AudioRendition(PortInterface|Format)?|Exception\\AudioRendition(Failed|Busy)Exception|Settings\\TranscodeSettingDefinitions)$'
             - type: classLike
-              value: '^App\\Transcode\\Application\\(Port\\(MediaExecutionPolicyInterface|CompletedVideoArtifactPort|StreamAuthPortInterface)|DTO\\(MediaOperation|CompletedVideoArtifact)|Exception\\MediaEncodingProhibitedException)$'
+              value: '^App\\Transcode\\Application\\(Port\\(MediaExecutionPolicyInterface|CompletedVideoArtifactPort|CompletedVideoDeliveryPort|CopyPresentationPortInterface|StreamAuthPortInterface)|DTO\\(MediaOperation|MediaTrack|CompletedVideoArtifact|CopyPresentation|CopyPresentationInput)|Exception\\MediaEncodingProhibitedException)$'
+            - type: classLike
+              value: '^App\\Transcode\\Application\\(Port\\(Audio|Video)ProbePortInterface|DTO\\AudioProbeResult)$'
 
     - name: 'Transcode Infrastructure'
       collectors:
@@ -1124,6 +1131,7 @@ deptrac:
     'Catalog Domain':
       - 'Shared Domain'
     'Catalog Application':
+      - 'Transcode Probe Contract'
       - 'Catalog Video Contract'
       - 'Media Image Contract'
       - 'Filesystem MIME Contract'
@@ -1452,9 +1460,13 @@ deptrac:
     'Transcode Delivery Contract':
       - 'Shared Domain'
       - 'Shared Application'
+    'Transcode Probe Contract':
+      - 'Transcode Domain'
+      - 'Shared Domain'
     'Transcode Domain':
       - 'Shared Domain'
     'Transcode Application':
+      - 'Transcode Probe Contract'
       - 'Transcode Playback Access Contract'
       - 'Transcode Audio Rendition Contract'
       - 'Transcode Delivery Contract'
@@ -1463,6 +1475,9 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Application'
     'Transcode Infrastructure':
+      - 'Catalog Video Contract'
+      - 'Media Playback Access Contract'
+      - 'Transcode Probe Contract'
       - 'Transcode Playback Access Contract'
       - 'Transcode Audio Rendition Contract'
       - 'Transcode Delivery Contract'

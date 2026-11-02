@@ -16,6 +16,7 @@ use App\Transcode\Application\Port\TranscodeStreamingPortInterface;
 use App\Transcode\Domain\Model\TranscodeJob;
 use App\Transcode\Domain\Repository\TranscodeJobRepositoryInterface;
 use App\Transcode\Domain\ValueObject\QualityTier;
+use App\Transcode\Domain\ValueObject\AudioStreamInfo;
 use App\Transcode\Domain\ValueObject\SubtitleTrackInfo;
 use App\Transcode\Domain\ValueObject\VideoProbeResult;
 use App\Transcode\Infrastructure\DASH\DashManifestGenerator;
@@ -26,7 +27,7 @@ use App\Transcode\Infrastructure\Packaging\PublishedPresentationReader;
 use App\Transcode\Infrastructure\Packaging\PublishedTrack;
 
 /**
- * @phpstan-type GenerationMetadata array{audioCodec: ?string, audioProfile: array<string, mixed>, duration: float, startTime: float, nativeAvailabilityStartTime: ?string}
+ * @phpstan-type GenerationMetadata array{audioCodec: ?string, audioProfile: array<string, mixed>, duration: float, startTime: float, hlsTargetDuration: float, nativeAvailabilityStartTime: ?string}
  * @phpstan-type Context array{runtime: TranscodeRuntimeSnapshot, storage: TranscodeStoragePortInterface, directory: string, metadata: GenerationMetadata, presentation: PublishedPresentation}
  */
 final class TranscodeStreamingService implements TranscodeStreamingPortInterface
@@ -92,22 +93,25 @@ final class TranscodeStreamingService implements TranscodeStreamingPortInterface
         $audioGroups = $audio === null ? [] : [[
             'language' => VideoProbeResult::fromSerialized($primaryJob->getProbeData())->selectedAudioStream()->language ?? 'und',
             'name' => 'Audio', 'groupId' => 'audio', 'isDefault' => true,
-            'channels' => (string) $primaryContext['runtime']->desired->audioProfile->channelCount,
+            'channels' => (string) ($primaryJob->getPresentationSelection()?->mode === 'copy'
+                ? ($this->selectedAudio($primaryJob) === null ? 2 : $this->selectedAudio($primaryJob)->channels) : $primaryContext['runtime']->desired->audioProfile->channelCount),
             'uri' => $this->trackUrl($primaryJob, MediaTrack::Audio, 'media.m3u8', $primaryContext['runtime']->generation, $expiresAt),
         ]];
-        $urls = $codecs = $bandwidths = [];
+        $urls = $codecs = $bandwidths = $dimensions = [];
         foreach ($contexts as $entry) {
             $job = $entry['job']; $context = $entry['context'];
-            $tier = QualityTier::fromString($job->getQualityTierName());
+            $tier = $job->getPresentationSelection()?->mode === 'copy' ? null : QualityTier::fromString($job->getQualityTierName());
             $video = $context['presentation']->track(MediaTrack::Video);
             if ($video === null) {
                 return $this->manifestGenerator->generateMasterManifest([]);
             }
-            $urls[$tier->name] = $this->trackUrl($job, MediaTrack::Video, 'media.m3u8', $context['runtime']->generation, $expiresAt, ['tier' => $tier->name]);
-            $codecs[$tier->name] = $video->codec . ($audio === null ? '' : ',' . $audio->codec);
-            $bandwidths[$tier->name] = $this->bandwidth($context, $tier, $audio !== null);
+            $name = $job->getQualityTierName();
+            $urls[$name] = $this->trackUrl($job, MediaTrack::Video, 'media.m3u8', $context['runtime']->generation, $expiresAt, ['tier' => $name]);
+            $codecs[$name] = $video->codec . ($audio === null ? '' : ',' . $audio->codec);
+            $bandwidths[$name] = $tier === null ? $this->copyBandwidth($context) : $this->bandwidth($context, $tier, $audio !== null);
+            $dimensions[$name] = ['width' => $tier === null ? $job->getWidth() : $tier->width, 'height' => $tier === null ? $job->getHeight() : $tier->height];
         }
-        return $this->manifestGenerator->generateMasterManifest($urls, $audioGroups, $this->subtitleGroups($primaryJob, $primaryContext, $expiresAt), $codecs, $bandwidths);
+        return $this->manifestGenerator->generateMasterManifest($urls, $audioGroups, $this->subtitleGroups($primaryJob, $primaryContext, $expiresAt), $codecs, $bandwidths, $dimensions);
     }
 
     public function getMediaManifest(PublicId $jobPublicId, MediaTrack $track, int $generation, int $expiresAt): string
@@ -125,6 +129,7 @@ final class TranscodeStreamingService implements TranscodeStreamingPortInterface
         }
         return $this->manifestGenerator->generateMediaManifest(
             $this->trackUrl($job, $track, 'init.mp4', $generation, $expiresAt), $segments, $context['presentation']->complete,
+            targetDuration: max($context['metadata']['hlsTargetDuration'], ceil(max(array_column($segments, 'duration') ?: [1.0]))),
         );
     }
 
@@ -180,9 +185,10 @@ final class TranscodeStreamingService implements TranscodeStreamingPortInterface
             if ($track === null) {
                 return $this->dashManifestGenerator->generate([]);
             }
-            $tier = QualityTier::fromString($job->getQualityTierName());
-            $representations[$tier->name] = $this->dashTrack($job, $context, $track, $expiresAt) + [
-                'quality_tier' => $tier, 'bandwidth' => (int) ceil($tier->maxBitrate * 1.05),
+            $tier = $job->getPresentationSelection()?->mode === 'copy' ? null : QualityTier::fromString($job->getQualityTierName());
+            $representations[$job->getQualityTierName()] = $this->dashTrack($job, $context, $track, $expiresAt) + [
+                'width' => $tier === null ? $job->getWidth() : $tier->width, 'height' => $tier === null ? $job->getHeight() : $tier->height,
+                'bandwidth' => $tier === null ? $this->copyBandwidth($context) : (int) ceil($tier->maxBitrate * 1.05),
             ];
         }
         $audioTrack = $primary['context']['presentation']->track(MediaTrack::Audio);
@@ -190,7 +196,8 @@ final class TranscodeStreamingService implements TranscodeStreamingPortInterface
             'language' => VideoProbeResult::fromSerialized($primary['job']->getProbeData())->selectedAudioStream()->language ?? 'und',
             'bandwidth' => $primary['context']['runtime']->desired->audioProfile->bitrate,
             'sample_rate' => $primary['context']['runtime']->desired->audioProfile->sampleRate,
-            'channels' => $primary['context']['runtime']->desired->audioProfile->channelCount,
+            'channels' => $primary['job']->getPresentationSelection()?->mode === 'copy'
+                ? ($this->selectedAudio($primary['job']) === null ? 2 : $this->selectedAudio($primary['job'])->channels) : $primary['context']['runtime']->desired->audioProfile->channelCount,
         ];
         return $this->dashManifestGenerator->generate($representations, $audio, $this->mergedPresentation($contexts));
     }
@@ -216,8 +223,10 @@ final class TranscodeStreamingService implements TranscodeStreamingPortInterface
             $context = $runtime === null ? null : $this->context($job, $runtime->generation);
             $video = $context === null ? null : $context['presentation']->track(MediaTrack::Video);
             if ($video !== null) {
-                $tier = QualityTier::fromString($job->getQualityTierName());
-                $entry = $this->qualityLadderRenderer->renderAvailableTiers([$tier])[0];
+                $tier = $job->getPresentationSelection()?->mode === 'copy' ? null : QualityTier::fromString($job->getQualityTierName());
+                $entry = $tier === null ? ['name' => 'copy', 'height' => $job->getHeight(), 'width' => $job->getWidth(),
+                    'bitrate' => $this->copyBandwidth($context), 'codec' => $video->codec]
+                    : $this->qualityLadderRenderer->renderAvailableTiers([$tier])[0];
                 $entry['codec'] = $video->codec;
                 $tiers[] = $entry;
             }
@@ -304,9 +313,9 @@ final class TranscodeStreamingService implements TranscodeStreamingPortInterface
             return null;
         }
         try {
-            $tier = QualityTier::fromString($job->getQualityTierName());
-            $storage = $this->storage->forGeneration($job->getVideoId(), $tier, $generation, $job->getId());
-            $directory = $storage->resolveJobDirectory($job->getVideoId(), $tier);
+            $tier = $job->getPresentationSelection()?->mode === 'copy' ? null : QualityTier::fromString($job->getQualityTierName());
+            $storage = $this->storage->forGeneration($job->getVideoId(), $job->getQualityTierName(), $generation, $job->getId());
+            $directory = $storage->resolveJobDirectory($job->getVideoId(), $job->getQualityTierName());
             if (!$this->readable($runtime, $generation, $directory)) {
                 return null;
             }
@@ -337,6 +346,7 @@ final class TranscodeStreamingService implements TranscodeStreamingPortInterface
             return ['runtime' => $latest, 'storage' => $storage, 'directory' => $directory, 'presentation' => $presentation,
                 'metadata' => ['audioCodec' => $metadata['audioCodec'], 'audioProfile' => $metadata['audioProfile'],
                     'duration' => (float) $metadata['duration'], 'startTime' => (float) $metadata['startTime'],
+                    'hlsTargetDuration' => (float) ($metadata['hlsTargetDuration'] ?? 7.0),
                     'nativeAvailabilityStartTime' => is_string($metadata['nativeAvailabilityStartTime'] ?? null) ? $metadata['nativeAvailabilityStartTime'] : null]];
         } catch (\InvalidArgumentException|\JsonException) {
             return null;
@@ -363,7 +373,7 @@ final class TranscodeStreamingService implements TranscodeStreamingPortInterface
             }
             $jobs[] = $job;
         }
-        usort($jobs, static fn (TranscodeJob $left, TranscodeJob $right): int => QualityTier::fromString($left->getQualityTierName())->height <=> QualityTier::fromString($right->getQualityTierName())->height);
+        usort($jobs, static fn (TranscodeJob $left, TranscodeJob $right): int => $left->getHeight() <=> $right->getHeight());
         return $jobs;
     }
 
@@ -450,6 +460,35 @@ final class TranscodeStreamingService implements TranscodeStreamingPortInterface
     {
         $track = $presentation->track(MediaTrack::Video);
         return $track === null || $track->segments === [] ? null : ($track->segments[0]->start - $track->presentationTimeOffset) / $track->timescale;
+    }
+
+    private function selectedAudio(TranscodeJob $job): ?AudioStreamInfo
+    {
+        $index = $job->getPresentationSelection()?->audioStreamIndex;
+        foreach (VideoProbeResult::fromSerialized($job->getProbeData())->audioStreams as $stream) {
+            if ($stream->streamIndex === $index) {
+                return $stream;
+            }
+        }
+        return null;
+    }
+
+    /** @param Context $context */
+    private function copyBandwidth(array $context): int
+    {
+        $bandwidth = 1;
+        foreach ($context['presentation']->tracks as $track) {
+            $peak = 0;
+            foreach ($track->segments as $segment) {
+                $duration = $segment->duration / $track->timescale;
+                $bytes = @filesize($context['directory'] . '/' . $segment->file);
+                if ($duration > 0 && $bytes !== false) {
+                    $peak = max($peak, (int) ceil($bytes * 8 / $duration));
+                }
+            }
+            $bandwidth += $peak;
+        }
+        return $bandwidth;
     }
 
     /** @param Context $context */

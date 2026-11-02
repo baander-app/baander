@@ -18,6 +18,8 @@ use Symfony\Component\Security\Core\Exception\AccessDeniedException;
 
 final class StreamSigningSecurityTest extends TestCase
 {
+    private const string REQUEST_ID = '019a4321-7321-7000-8000-000000000001';
+
     #[DataProvider('invalidRequests')]
     public function testInvalidSigningRequestsNeverStartPlayback(string $body): void
     {
@@ -39,10 +41,18 @@ final class StreamSigningSecurityTest extends TestCase
         yield ['{"path":[]}'];
         yield ['{"path":"/api/transcode/00000000-0000-4000-8000-000000000001/master.m3u8"}'];
         $path = '/api/transcode/0123456789abABCD_-xyz/master.m3u8';
-        foreach ([0, -1, 86401, '60', 1.5, null, []] as $duration) {
-            yield [json_encode(['path' => $path, 'expiresInSeconds' => $duration], JSON_THROW_ON_ERROR)];
+        yield [json_encode(['path' => $path], JSON_THROW_ON_ERROR)];
+        yield [json_encode(['path' => $path, 'refresh' => true], JSON_THROW_ON_ERROR)];
+        foreach (['', 'another-client', null, [], 42] as $requestId) {
+            yield [json_encode(['path' => $path, 'requestId' => $requestId], JSON_THROW_ON_ERROR)];
         }
-        yield [json_encode(['path' => $path.'?unexpected=1'], JSON_THROW_ON_ERROR)];
+        foreach ([[], null, 'job', ['bad-id'], [42], array_fill(0, 4, '0123456789abABCD_-xyz')] as $jobs) {
+            yield [json_encode(['path' => $path, 'requestId' => self::REQUEST_ID, 'refresh' => true, 'jobIds' => $jobs], JSON_THROW_ON_ERROR)];
+        }
+        foreach ([0, -1, 86401, '60', 1.5, null, []] as $duration) {
+            yield [json_encode(['requestId' => self::REQUEST_ID, 'path' => $path, 'expiresInSeconds' => $duration], JSON_THROW_ON_ERROR)];
+        }
+        yield [json_encode(['requestId' => self::REQUEST_ID, 'path' => $path.'?unexpected=1'], JSON_THROW_ON_ERROR)];
     }
 
     public function testSigningCannotBypassLibraryAccess(): void
@@ -56,7 +66,7 @@ final class StreamSigningSecurityTest extends TestCase
             ->willThrowException(new AccessDeniedException());
         $controller = new StreamSigningController($auth, $playback, $this->videos($video), $this->streaming());
         $this->expectException(AccessDeniedException::class);
-        $controller->sign(Request::create('/', 'POST', content: json_encode(['path' => '/api/transcode/'.$video->getPublicId().'/master.m3u8'], JSON_THROW_ON_ERROR)));
+        $controller->sign(Request::create('/', 'POST', content: json_encode(['requestId' => self::REQUEST_ID, 'path' => '/api/transcode/'.$video->getPublicId().'/master.m3u8'], JSON_THROW_ON_ERROR)));
     }
 
     public function testSigningDefaultsTo24Hours(): void
@@ -65,13 +75,14 @@ final class StreamSigningSecurityTest extends TestCase
         $id = $video->getId();
         $path = '/api/transcode/'.$video->getPublicId().'/master.m3u8';
         $playback = $this->createMock(PlaybackPortInterface::class);
-        $playback->expects($this->once())->method('start')->with($this->equalTo($id));
-        $playback->method('findSessions')->willReturn(['0123456789abABCD_-xyz' => new PublicId()]);
+        $playback->expects($this->once())->method('start')->with($this->equalTo($id), self::REQUEST_ID)
+            ->willReturn(['0123456789abABCD_-xyz' => new PublicId()]);
+        $playback->expects(self::never())->method('findSessions');
         $auth = $this->createMock(StreamAuthPortInterface::class);
         $auth->expects($this->once())->method('signUrl')->with($path.'?set=0123456789abABCD_-xyz.3', 86400)
             ->willReturn(['url' => $path.'?sig=s&exp=1', 'sig' => 's', 'exp' => 1]);
         $controller = new StreamSigningController($auth, $playback, $this->videos($video), $this->streaming());
-        self::assertSame(200, $controller->sign(Request::create('/', 'POST', content: json_encode(['path' => $path], JSON_THROW_ON_ERROR)))->getStatusCode());
+        self::assertSame(200, $controller->sign(Request::create('/', 'POST', content: json_encode(['requestId' => self::REQUEST_ID, 'path' => $path], JSON_THROW_ON_ERROR)))->getStatusCode());
     }
     public function testRefreshChecksAccessWithoutAdmittingAgain(): void
     {
@@ -79,12 +90,14 @@ final class StreamSigningSecurityTest extends TestCase
         $playback = $this->createMock(PlaybackPortInterface::class);
         $playback->expects($this->never())->method('start');
         $playback->expects($this->once())->method('assertAccess')->with($video->getId());
-        $playback->method('findSessions')->willReturn(['0123456789abABCD_-xyz' => new PublicId()]);
+        $playback->expects(self::once())->method('findSessions')->with(self::anything(), self::REQUEST_ID, [PublicId::fromString('0123456789abABCD_-xyz')])->willReturn(['0123456789abABCD_-xyz' => new PublicId()]);
         $auth = $this->createStub(StreamAuthPortInterface::class);
         $auth->method('signUrl')->willReturn(['url' => '/signed', 'sig' => 's', 'exp' => 1]);
         $controller = new StreamSigningController($auth, $playback, $this->videos($video), $this->streaming());
-        $response = $controller->sign(Request::create('/', 'POST', content: json_encode(['path' => '/api/transcode/'.$video->getPublicId().'/master.m3u8', 'refresh' => true], JSON_THROW_ON_ERROR)));
+        $response = $controller->sign(Request::create('/', 'POST', content: json_encode(['requestId' => self::REQUEST_ID, 'path' => '/api/transcode/'.$video->getPublicId().'/master.m3u8', 'refresh' => true, 'jobIds' => ['0123456789abABCD_-xyz']], JSON_THROW_ON_ERROR)));
         $body = json_decode($response->getContent(), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame(self::REQUEST_ID, $body['requestId']);
+        self::assertSame(['0123456789abABCD_-xyz'], $body['jobIds']);
         self::assertSame(3, $body['generation']);
         self::assertTrue($body['ready']);
         self::assertSame('paused', $body['status']);
@@ -95,10 +108,10 @@ final class StreamSigningSecurityTest extends TestCase
         $video = Video::create('/video.mp4', 'hash');
         $streaming = $this->createMock(TranscodeStreamingPortInterface::class);
         $streaming->expects(self::never())->method('getPlaybackState');
-        $playback = $this->createStub(PlaybackPortInterface::class);
-        $playback->method('findSessions')->willReturn([]);
+        $playback = $this->createMock(PlaybackPortInterface::class);
+        $playback->expects(self::once())->method('findSessions')->with(self::anything(), self::REQUEST_ID, [PublicId::fromString('0123456789abABCD_-xyz')])->willReturn([]);
         $controller = new StreamSigningController($this->createStub(StreamAuthPortInterface::class), $playback, $this->videos($video), $streaming);
-        $response = $controller->sign(Request::create('/', 'POST', content: json_encode(['path' => '/api/transcode/'.$video->getPublicId().'/master.m3u8', 'refresh' => true], JSON_THROW_ON_ERROR)));
+        $response = $controller->sign(Request::create('/', 'POST', content: json_encode(['requestId' => self::REQUEST_ID, 'path' => '/api/transcode/'.$video->getPublicId().'/master.m3u8', 'refresh' => true, 'jobIds' => ['0123456789abABCD_-xyz']], JSON_THROW_ON_ERROR)));
         self::assertSame(503, $response->getStatusCode());
         $body = json_decode($response->getContent(), true, flags: JSON_THROW_ON_ERROR);
         foreach (['position', 'status', 'sessionId', 'jobId'] as $field) { self::assertArrayNotHasKey($field, $body); }

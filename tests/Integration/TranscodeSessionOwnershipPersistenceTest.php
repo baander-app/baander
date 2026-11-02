@@ -60,10 +60,159 @@ final class TranscodeSessionOwnershipPersistenceTest extends TestCase
         $this->manager->persist($unowned);
         $this->manager->flush();
         $this->manager->clear();
-        self::assertTrue($repository->findByOwnerVideoAndQuality($alice, $video, $tier->name)?->getId()->equals($first->getId()));
-        self::assertTrue($repository->findByOwnerVideoAndQuality($bob, $video, $tier->name)?->getId()->equals($second->getId()));
+        self::assertTrue($repository->findByOwnerVideoAndQuality($alice, $video, $tier->name, requestId: $first->getRequestId())?->getId()->equals($first->getId()));
+        self::assertTrue($repository->findByOwnerVideoAndQuality($bob, $video, $tier->name, requestId: $second->getRequestId())?->getId()->equals($second->getId()));
         self::assertSame([$first->getId()->toString()], array_map(static fn(\App\Transcode\Domain\Model\TranscodeJob $job): string => $job->getId()->toString(), $repository->findActiveByOwnerAndVideo($alice, $video)));
         self::assertNull($repository->findByUuid($unowned->getId())?->getOwnerUserId());
+    }
+
+    public function testPresentationIdentityIsPersistedAndSeparatesSelectedAudioStreams(): void
+    {
+        $owner = $this->createUser();
+        $video = $this->createVideo();
+        $repository = new \App\Transcode\Infrastructure\Doctrine\Repository\TranscodeJobRepository($this->manager);
+        $firstSelection = new \App\Transcode\Domain\ValueObject\PresentationSelection('copy', 'source-hash', 2, 4, 'mp4');
+        $secondSelection = new \App\Transcode\Domain\ValueObject\PresentationSelection('copy', 'source-hash', 2, 5, 'mp4');
+        $first = \App\Transcode\Domain\Model\TranscodeJob::createCopy($video, '/fixture/copy-first', $owner, $firstSelection, 1920, 1080);
+        $second = \App\Transcode\Domain\Model\TranscodeJob::createCopy($video, '/fixture/copy-second', $owner, $secondSelection, 1920, 1080);
+        $repository->save($first);
+        $repository->save($second);
+        $this->manager->clear();
+        self::assertSame($firstSelection->jsonSerialize(), $repository->findByUuid($first->getId())?->getPresentationSelection()?->jsonSerialize());
+        self::assertTrue($repository->findByOwnerVideoAndQuality($owner, $video, 'copy', $firstSelection->canonicalKey(), $first->getRequestId())?->getId()->equals($first->getId()));
+        self::assertTrue($repository->findByOwnerVideoAndQuality($owner, $video, 'copy', $secondSelection->canonicalKey(), $second->getRequestId())?->getId()->equals($second->getId()));
+        self::assertNull($repository->findByOwnerVideoAndQuality($owner, $video, 'copy'));
+        $this->assertSchemaComparisonIsClean(['transcode_jobs']);
+    }
+
+    public function testCurrentSessionsAreIsolatedByLogicalPlaybackRequest(): void
+    {
+        $owner = $this->createUser();
+        $video = $this->createVideo();
+        $selection = new \App\Transcode\Domain\ValueObject\PresentationSelection('copy', 'source-hash', 2, 4, 'mp4');
+        $jobs = new \App\Transcode\Infrastructure\Doctrine\Repository\TranscodeJobRepository($this->manager);
+        $sessions = new TranscodeSessionRepository($this->manager);
+        $connection = $this->manager->getConnection();
+        $transaction = new class($connection) implements \App\Shared\Application\Port\TransactionPortInterface {
+            public function __construct(private readonly \Doctrine\DBAL\Connection $connection) {}
+            public function run(callable $operation): mixed { return $this->connection->transactional(static fn (): mixed => $operation()); }
+        };
+        $runtime = new \App\Transcode\Infrastructure\Doctrine\TranscodeRuntimeState($connection, $transaction);
+        $expected = [];
+        foreach (['first-client', 'second-client'] as $request) {
+            $job = \App\Transcode\Domain\Model\TranscodeJob::createCopy($video, '/fixture/' . $request, $owner, $selection, 1920, 1080, $request);
+            $jobs->save($job);
+            $session = TranscodeSession::create($owner, $job->getId(), $video, AudioProfile::streamingStereo());
+            $sessions->save($session);
+            $runtime->admit($job->getId(), $session->getId(), $request, new \App\Transcode\Application\DTO\DesiredTranscodeState(AudioProfile::streamingStereo(), presentationSelection: $selection));
+            $expected[$request] = [$job->getPublicId()->toString() => $session->getPublicId()->toString()];
+        }
+        $security = $this->createStub(\Symfony\Bundle\SecurityBundle\Security::class);
+        $security->method('getUser')->willReturn(new \App\Auth\Infrastructure\Security\SecurityUser($owner->toString(), 'viewer@baander.app', ''));
+        $playback = new \App\Transcode\Infrastructure\Auth\AuthorizedPlayback($security, $connection, $this->createStub(\Symfony\Component\Messenger\MessageBusInterface::class));
+        foreach ($expected as $request => $sessions) {
+            self::assertSame($sessions, array_map(static fn (PublicId $id): string => $id->toString(), $playback->findSessions($video, $request, [PublicId::fromString(array_key_first($sessions))])));
+            self::assertSame([], $playback->findSessions($video, $request, []));
+        }
+        self::assertSame([], $playback->findSessions($video, 'unknown-client', [PublicId::fromString(array_key_first($expected['first-client']))]));
+    }
+
+    public function testPlaybackControlsChangeOnlyTheMatchingClientTiers(): void
+    {
+        $owner = $this->createUser();
+        $video = $this->createVideo();
+        $jobs = new \App\Transcode\Infrastructure\Doctrine\Repository\TranscodeJobRepository($this->manager);
+        $sessions = new TranscodeSessionRepository($this->manager);
+        $connection = $this->manager->getConnection();
+        $transaction = new class($connection) implements \App\Shared\Application\Port\TransactionPortInterface {
+            public function __construct(private readonly \Doctrine\DBAL\Connection $connection) {}
+            public function run(callable $operation): mixed { return $this->connection->transactional(static fn (): mixed => $operation()); }
+        };
+        $runtime = new \App\Transcode\Infrastructure\Doctrine\TranscodeRuntimeState($connection, $transaction);
+        $control = new \App\Transcode\Application\Service\TranscodePlaybackControl(
+            new \App\Transcode\Infrastructure\Transcode\TranscodeSessionService($sessions),
+            $runtime,
+            $transaction,
+            new \App\Transcode\Infrastructure\Transcode\TranscodeJobService($jobs, $this->createStub(\App\Transcode\Application\Port\TranscodeStoragePortInterface::class), new \Symfony\Component\EventDispatcher\EventDispatcher()),
+        );
+        $controlled = [];
+        $protected = [];
+        $mismatchedSession = null;
+        foreach ([
+            ['first-client', 'first-client', \App\Transcode\Domain\ValueObject\QualityTier::p360()],
+            ['first-client', 'first-client', \App\Transcode\Domain\ValueObject\QualityTier::p720()],
+            ['second-client', 'second-client', \App\Transcode\Domain\ValueObject\QualityTier::p360()],
+            ['second-client', 'second-client', \App\Transcode\Domain\ValueObject\QualityTier::p720()],
+            ['first-client', 'mismatched-client', \App\Transcode\Domain\ValueObject\QualityTier::p1080()],
+        ] as [$jobRequest, $runtimeRequest, $tier]) {
+            $job = \App\Transcode\Domain\Model\TranscodeJob::create($video, $tier, '/fixture/' . $jobRequest . '/' . $tier->name, $owner, requestId: $jobRequest);
+            $job->attachSession();
+            $job->markInProgress();
+            $jobs->save($job);
+            $session = TranscodeSession::create($owner, $job->getId(), $video, AudioProfile::streamingStereo());
+            $session->markPreparing();
+            $session->markActive();
+            $sessions->save($session);
+            $runtime->admit($job->getId(), $session->getId(), $runtimeRequest, new \App\Transcode\Application\DTO\DesiredTranscodeState(AudioProfile::streamingStereo()));
+            if ($jobRequest === 'first-client' && $runtimeRequest === $jobRequest) {
+                $controlled[] = [$job->getId(), $session->getId()];
+            } else {
+                $protected[$job->getId()->toString()] = $this->playbackRows($job->getId());
+                if ($runtimeRequest !== $jobRequest) {
+                    $mismatchedSession = $session;
+                }
+            }
+        }
+        self::assertNotNull($mismatchedSession);
+        $allBefore = [];
+        foreach ($controlled as [$jobId]) {
+            $allBefore[$jobId->toString()] = $this->playbackRows($jobId);
+        }
+        self::assertNull($control->apply($mismatchedSession->getId(), 'ignored-control', status: 'paused'));
+        foreach ($allBefore as $jobId => $snapshot) {
+            self::assertSame($snapshot, $this->playbackRows(Uuid::fromString($jobId)), 'A mismatched source cannot change another client tier.');
+        }
+
+        foreach (['pause', 'seek', 'cancel'] as $operation) {
+            match ($operation) {
+                'pause' => $control->apply($controlled[0][1], 'first-client-pause', status: 'paused'),
+                'seek' => $control->apply($controlled[0][1], 'first-client-seek', position: 17.25, seek: true),
+                'cancel' => $control->apply($controlled[0][1], 'first-client-cancel', status: 'cancelled'),
+            };
+            foreach ($protected as $jobId => $snapshot) {
+                self::assertSame($snapshot, $this->playbackRows(Uuid::fromString($jobId)), 'Other clients and mismatched runtime identities stay byte-for-byte unchanged.');
+            }
+            foreach ($controlled as [$jobId, $sessionId]) {
+                $observed = $runtime->find($jobId);
+                $session = $sessions->findByUuid($sessionId);
+                $job = $jobs->findByUuid($jobId);
+                self::assertNotNull($observed);
+                self::assertNotNull($session);
+                self::assertNotNull($job);
+                self::assertSame('first-client', $job->getRequestId());
+                self::assertSame($job->getRequestId(), $observed->requestId);
+                self::assertSame($operation === 'cancel' ? 'cancelled' : 'paused', $observed->desired->status);
+                self::assertSame($operation === 'cancel' ? SessionState::Cancelled : SessionState::Paused, $session->getSessionState());
+                self::assertSame($operation === 'pause' ? 0.0 : 17.25, $observed->desired->position);
+                self::assertSame($observed->desired->position, $session->getWallClockOffset());
+                self::assertSame($operation === 'pause' ? 1 : 2, $observed->generation);
+                self::assertSame($operation === 'cancel' ? 0 : 1, $job->getReferenceCount());
+                self::assertSame($operation === 'cancel' ? 'cancelled' : 'in_progress', $job->getStatus()->value);
+            }
+        }
+    }
+
+    /** @return array<string, mixed> */
+    private function playbackRows(Uuid $jobId): array
+    {
+        $rows = $this->manager->getConnection()->fetchAssociative(
+            'SELECT row_to_json(j)::text AS job, row_to_json(s)::text AS session, row_to_json(r)::text AS runtime'
+            . ' FROM transcode_jobs j JOIN transcode_sessions s ON s.job_id = j.id'
+            . ' JOIN transcode_runtime_state r ON r.job_id = j.id AND r.session_id = s.id WHERE j.id = ?',
+            [$jobId->toString()],
+        );
+        self::assertNotFalse($rows);
+        return $rows;
     }
 
     public function testLookupsByUserAndByJobStayOwnerScoped(): void

@@ -20,6 +20,16 @@ final readonly class WorkerQoLLifecycle
     ) {
     }
 
+    public function startCopy(): void
+    {
+        $this->sampler->startWorkerSampling();
+    }
+
+    public function stopCopy(): void
+    {
+        $this->sampler->stopSampling();
+    }
+
     public function start(): void
     {
         $this->profiles->boot();

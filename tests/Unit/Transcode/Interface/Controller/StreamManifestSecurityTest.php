@@ -7,6 +7,7 @@ namespace App\Tests\Unit\Transcode\Interface\Controller;
 use App\Catalog\Domain\Model\Video;
 use App\Transcode\Application\Port\TranscodePublicViewInterface;
 use App\Shared\Domain\Model\PublicId;
+use App\Shared\Domain\Model\Uuid;
 use App\Shared\Application\Port\SleeperInterface;
 use App\Transcode\Application\DTO\MediaTrack;
 use App\Transcode\Application\Port\StreamAuthPortInterface;
@@ -22,6 +23,29 @@ use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 
 final class StreamManifestSecurityTest extends TestCase
 {
+    public function testQualityLadderUsesOnlyTheRequestingClientsJobs(): void
+    {
+        $video = Video::create('/video.mp4', 'hash');
+        $requestId = new Uuid()->toString();
+        $jobId = new PublicId()->toString();
+        $playback = $this->createMock(PlaybackPortInterface::class);
+        $playback->expects(self::once())->method('assertAccess')->with($video->getId());
+        $playback->expects(self::once())->method('findSessions')->with($video->getId(), $requestId, [PublicId::fromString($jobId)])
+            ->willReturn([$jobId => new PublicId()]);
+        $streaming = $this->createMock(TranscodeStreamingPortInterface::class);
+        $streaming->expects(self::once())->method('getQualityLadderForVideo')->with($video->getId(), [$jobId])
+            ->willReturn([]);
+        $videos = $this->createStub(TranscodePublicViewInterface::class);
+        $videos->method('videoId')->willReturn($video->getId());
+        $controller = new StreamManifestController($streaming, new SignedStreamRequest(new HmacStreamAuthAdapter('test-secret')),
+            $playback, $videos, $this->createStub(SleeperInterface::class));
+
+        $response = $controller->qualityLadder($video->getPublicId()->toString(), Request::create('/?' . http_build_query(['requestId' => $requestId, 'jobIds' => [$jobId]])));
+
+        self::assertSame(200, $response->getStatusCode());
+        self::assertSame(['data' => []], json_decode($response->getContent(), true, flags: JSON_THROW_ON_ERROR));
+    }
+
     #[DataProvider('manifests')]
     public function testManifestRequiresAnUntamperedUnexpiredSignature(string $method, string $kind): void
     {

@@ -8,6 +8,8 @@ use App\Auth\Infrastructure\Security\SecurityUser;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Domain\Model\PublicId;
 use App\Transcode\Application\Command\CreateTranscodeSessionCommand;
+use App\Transcode\Domain\Model\TranscodeSession;
+use App\Transcode\Domain\ValueObject\AudioProfile;
 use App\Transcode\Infrastructure\Auth\AuthorizedPlayback;
 use Doctrine\DBAL\DriverManager;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -15,6 +17,7 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\MessageBusInterface;
+use Symfony\Component\Messenger\Stamp\HandledStamp;
 use Symfony\Component\Security\Core\Exception\AccessDeniedException;
 
 final class AuthorizedPlaybackTest extends TestCase
@@ -27,8 +30,12 @@ final class AuthorizedPlaybackTest extends TestCase
         $connection->executeStatement('CREATE TABLE movies (id TEXT PRIMARY KEY, library_id TEXT)');
         $connection->executeStatement('CREATE TABLE movie_video (video_id TEXT, movie_id TEXT)');
         $connection->executeStatement('CREATE TABLE user_library_access (user_id TEXT, library_id TEXT)');
+        $connection->executeStatement('CREATE TABLE transcode_jobs (id TEXT PRIMARY KEY, public_id TEXT, owner_user_id TEXT, video_id TEXT, height INTEGER, status TEXT, request_id TEXT)');
+        $connection->executeStatement('CREATE TABLE transcode_sessions (id TEXT PRIMARY KEY, public_id TEXT, user_id TEXT, video_id TEXT, job_id TEXT)');
+        $connection->executeStatement('CREATE TABLE transcode_runtime_state (job_id TEXT PRIMARY KEY, session_id TEXT, request_id TEXT)');
         $userId = new Uuid();
         $videoId = new Uuid();
+        $requestId = new Uuid()->toString();
         if ($exists) {
             $connection->insert('videos', ['id' => $videoId->toString()]);
             $connection->insert('movies', ['id' => 'movie', 'library_id' => 'library']);
@@ -40,17 +47,23 @@ final class AuthorizedPlaybackTest extends TestCase
         $security->method('isGranted')->willReturn($actor === 'admin');
         $bus = $this->createMock(MessageBusInterface::class);
         $bus->expects($allowed ? $this->exactly(3) : $this->never())->method('dispatch')
-            ->willReturnCallback(static function (CreateTranscodeSessionCommand $command) use ($userId, $videoId): Envelope {
+            ->willReturnCallback(static function (CreateTranscodeSessionCommand $command) use ($userId, $videoId, $requestId, $connection): Envelope {
                 self::assertTrue($command->getUserId()->equals($userId));
                 self::assertTrue($command->getVideoId()->equals($videoId));
-                return new Envelope($command);
+                self::assertSame($requestId, $command->requestId);
+                $jobId = new Uuid();
+                $session = TranscodeSession::create($userId, $jobId, $videoId, AudioProfile::streamingStereo());
+                $connection->insert('transcode_jobs', ['id' => $jobId->toString(), 'public_id' => new PublicId()->toString(), 'owner_user_id' => $userId->toString(), 'video_id' => $videoId->toString(), 'height' => $command->getQualityTier()->height, 'status' => 'pending', 'request_id' => $requestId]);
+                $connection->insert('transcode_sessions', ['id' => $session->getId()->toString(), 'public_id' => $session->getPublicId()->toString(), 'user_id' => $userId->toString(), 'video_id' => $videoId->toString(), 'job_id' => $jobId->toString()]);
+                $connection->insert('transcode_runtime_state', ['job_id' => $jobId->toString(), 'session_id' => $session->getId()->toString(), 'request_id' => $requestId]);
+                return new Envelope($command, [new HandledStamp($session, 'test-handler')]);
             });
         $playback = new AuthorizedPlayback($security, $connection, $bus);
         if (!$allowed) {
             $this->expectException(AccessDeniedException::class);
         }
         try {
-            $playback->start($videoId);
+            self::assertCount(3, $playback->start($videoId, $requestId));
         } finally {
             $connection->close();
         }
@@ -70,26 +83,41 @@ final class AuthorizedPlaybackTest extends TestCase
     public function testControlsExposeOnlyTheActorsCurrentRuntimeSession(): void
     {
         $connection = DriverManager::getConnection(['driver' => 'pdo_sqlite', 'memory' => true]);
-        $connection->executeStatement('CREATE TABLE transcode_jobs (id TEXT PRIMARY KEY, public_id TEXT, owner_user_id TEXT, video_id TEXT, height INTEGER, status TEXT)');
+        $connection->executeStatement('CREATE TABLE transcode_jobs (id TEXT PRIMARY KEY, public_id TEXT, owner_user_id TEXT, video_id TEXT, height INTEGER, status TEXT, request_id TEXT, presentation_selection TEXT)');
         $connection->executeStatement('CREATE TABLE transcode_sessions (id TEXT PRIMARY KEY, public_id TEXT, user_id TEXT, video_id TEXT, job_id TEXT)');
-        $connection->executeStatement('CREATE TABLE transcode_runtime_state (job_id TEXT PRIMARY KEY, session_id TEXT)');
+        $connection->executeStatement('CREATE TABLE transcode_runtime_state (job_id TEXT PRIMARY KEY, session_id TEXT, request_id TEXT)');
         $actor = new Uuid();
         $video = new Uuid();
         $job = new PublicId();
         $session = new PublicId();
+        $requestId = new Uuid()->toString();
+        $otherRequestId = new Uuid()->toString();
         $security = $this->createStub(Security::class);
         $security->method('getUser')->willReturn(new SecurityUser($actor->toString(), 'viewer@baander.app', ''));
-        $connection->insert('transcode_jobs', ['id' => 'job', 'public_id' => $job->toString(), 'owner_user_id' => $actor->toString(), 'video_id' => $video->toString(), 'height' => 720, 'status' => 'in_progress']);
+        $connection->insert('transcode_jobs', ['id' => 'job', 'public_id' => $job->toString(), 'owner_user_id' => $actor->toString(), 'video_id' => $video->toString(), 'height' => 720, 'status' => 'in_progress', 'request_id' => $requestId]);
         $connection->insert('transcode_sessions', ['id' => 'session', 'public_id' => $session->toString(), 'user_id' => $actor->toString(), 'video_id' => $video->toString(), 'job_id' => 'job']);
-        $connection->insert('transcode_runtime_state', ['job_id' => 'job', 'session_id' => 'session']);
+        $connection->insert('transcode_runtime_state', ['job_id' => 'job', 'session_id' => 'session', 'request_id' => $requestId]);
+        $connection->insert('transcode_jobs', ['id' => 'other-job', 'public_id' => new PublicId()->toString(), 'owner_user_id' => $actor->toString(), 'video_id' => $video->toString(), 'height' => 720, 'status' => 'in_progress', 'request_id' => $otherRequestId]);
+        $connection->insert('transcode_sessions', ['id' => 'other-session', 'public_id' => new PublicId()->toString(), 'user_id' => $actor->toString(), 'video_id' => $video->toString(), 'job_id' => 'other-job']);
+        $connection->insert('transcode_runtime_state', ['job_id' => 'other-job', 'session_id' => 'other-session', 'request_id' => $otherRequestId]);
+        $copyJob = new PublicId();
+        $copySession = new PublicId();
+        $connection->insert('transcode_jobs', ['id' => 'copy-job', 'public_id' => $copyJob->toString(), 'owner_user_id' => $actor->toString(), 'video_id' => $video->toString(), 'height' => 720, 'status' => 'in_progress', 'request_id' => $requestId, 'presentation_selection' => '{"mode":"copy"}']);
+        $connection->insert('transcode_sessions', ['id' => 'copy-session', 'public_id' => $copySession->toString(), 'user_id' => $actor->toString(), 'video_id' => $video->toString(), 'job_id' => 'copy-job']);
+        $connection->insert('transcode_runtime_state', ['job_id' => 'copy-job', 'session_id' => 'copy-session', 'request_id' => $requestId]);
         $playback = new AuthorizedPlayback($security, $connection, $this->createStub(MessageBusInterface::class));
         try {
-            self::assertSame($session->toString(), $this->currentSessions($playback, $video)[$job->toString()]->toString());
+            self::assertSame([$job->toString()], array_keys($this->currentSessions($playback, $video, $requestId, $job)));
+            self::assertSame($session->toString(), $this->currentSessions($playback, $video, $requestId, $job)[$job->toString()]->toString());
+            self::assertEquals([$copyJob->toString() => $copySession], $playback->findSessions($video, $requestId, [$copyJob]));
+            self::assertSame([], $playback->findSessions($video, $otherRequestId, [$copyJob]));
+            self::assertSame([], $playback->findSessions($video, $requestId, [new PublicId()]));
+            self::assertSame([], $playback->findSessions($video, $requestId, []));
             $connection->update('transcode_sessions', ['user_id' => (new Uuid())->toString()], ['id' => 'session']);
-            self::assertSame([], $this->currentSessions($playback, $video));
+            self::assertSame([], $this->currentSessions($playback, $video, $requestId, $job));
             $connection->update('transcode_sessions', ['user_id' => $actor->toString()], ['id' => 'session']);
             $connection->update('transcode_runtime_state', ['session_id' => 'retired-session'], ['job_id' => 'job']);
-            self::assertSame([], $this->currentSessions($playback, $video));
+            self::assertSame([], $this->currentSessions($playback, $video, $requestId, $job));
         } finally {
             $connection->close();
         }
@@ -99,9 +127,9 @@ final class AuthorizedPlaybackTest extends TestCase
      * @return array<string, PublicId>
      * @phpstan-impure
      */
-    private function currentSessions(AuthorizedPlayback $playback, Uuid $video): array
+    private function currentSessions(AuthorizedPlayback $playback, Uuid $video, string $requestId, PublicId $jobId): array
     {
-        return $playback->findSessions($video);
+        return $playback->findSessions($video, $requestId, [$jobId]);
     }
 
     public function testFindsTheVideoATranscodeJobEncodes(): void

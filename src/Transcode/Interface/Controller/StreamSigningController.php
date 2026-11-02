@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Transcode\Interface\Controller;
 
 use App\Shared\Domain\Model\PublicId;
+use App\Shared\Domain\Model\Uuid;
 
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
@@ -40,15 +41,18 @@ final class StreamSigningController
         requestBody: new OA\RequestBody(
             required: true,
             content: new OA\JsonContent(
+                required: ['path', 'requestId'],
                 properties: [
                     new OA\Property(property: 'path', type: 'string', example: '/api/transcode/0123456789abABCD_-xyz/master.m3u8'),
                     new OA\Property(property: 'expiresInSeconds', type: 'int', example: 86400),
                     new OA\Property(property: 'refresh', type: 'boolean', description: 'Read current playback state without creating another admission'),
+                    new OA\Property(property: 'requestId', type: 'string', format: 'uuid', description: 'Stable playback client session identifier, retained across reloads and reconnects'),
+                    new OA\Property(property: 'jobIds', type: 'array', minItems: 1, maxItems: 3, uniqueItems: true, items: new OA\Items(type: 'string'), description: 'Exact admitted jobs; required for refresh and omitted for new admission'),
                 ],
             ),
         ),
         responses: [
-            new OA\Response(response: '200', description: 'Signed URL generated', content: new OA\JsonContent(properties: [new OA\Property(property: 'url', type: 'string', nullable: true), new OA\Property(property: 'sig', type: 'string'), new OA\Property(property: 'exp', type: 'integer'), new OA\Property(property: 'generation', type: 'integer'), new OA\Property(property: 'jobId', type: 'string'), new OA\Property(property: 'sessionId', type: 'string', nullable: true), new OA\Property(property: 'revision', type: 'integer'), new OA\Property(property: 'ready', type: 'boolean'), new OA\Property(property: 'position', type: 'number'), new OA\Property(property: 'status', type: 'string'), new OA\Property(property: 'startTime', type: 'number', nullable: true), new OA\Property(property: 'duration', type: 'number', nullable: true), new OA\Property(property: 'renditionSet', type: 'string')])),
+            new OA\Response(response: '200', description: 'Signed URL generated', content: new OA\JsonContent(properties: [new OA\Property(property: 'jobIds', type: 'array', items: new OA\Items(type: 'string')), new OA\Property(property: 'requestId', type: 'string', format: 'uuid'), new OA\Property(property: 'url', type: 'string', nullable: true), new OA\Property(property: 'sig', type: 'string'), new OA\Property(property: 'exp', type: 'integer'), new OA\Property(property: 'generation', type: 'integer'), new OA\Property(property: 'jobId', type: 'string'), new OA\Property(property: 'sessionId', type: 'string', nullable: true), new OA\Property(property: 'revision', type: 'integer'), new OA\Property(property: 'ready', type: 'boolean'), new OA\Property(property: 'position', type: 'number'), new OA\Property(property: 'status', type: 'string'), new OA\Property(property: 'startTime', type: 'number', nullable: true), new OA\Property(property: 'duration', type: 'number', nullable: true), new OA\Property(property: 'renditionSet', type: 'string')])),
             new OA\Response(response: '400', description: 'Invalid request'),
             new OA\Response(response: '503', description: 'Transcode startup is temporarily unavailable', headers: [
                 new OA\Header(header: 'Retry-After', schema: new OA\Schema(type: 'integer', example: 2)),
@@ -64,25 +68,39 @@ final class StreamSigningController
             return $this->errorResponse('Expected a JSON object.', 400);
         }
         $path = $data['path'] ?? null;
+        $requestId = $data['requestId'] ?? null;
+        $jobIdentifiers = array_key_exists('jobIds', $data) ? $data['jobIds'] : [];
         $refresh = array_key_exists('refresh', $data) ? $data['refresh'] : false;
         $expiresInSeconds = array_key_exists('expiresInSeconds', $data) ? $data['expiresInSeconds'] : 86400;
         if (!is_string($path) || !preg_match('~^/api/transcode/([0-9a-zA-Z_-]{21})/(?:master\.m3u8|manifest\.mpd)$~D', $path, $matches)
-            || !is_bool($refresh) || !is_int($expiresInSeconds) || $expiresInSeconds < 1 || $expiresInSeconds > 86400) {
-            return $this->errorResponse('Expected a video manifest path and a lifetime from 1 to 86400 seconds.', 400);
+            || !is_string($requestId) || !is_bool($refresh) || !is_int($expiresInSeconds) || $expiresInSeconds < 1 || $expiresInSeconds > 86400
+            || !is_array($jobIdentifiers) || !array_is_list($jobIdentifiers) || count($jobIdentifiers) > 3
+            || ($refresh && $jobIdentifiers === []) || (!$refresh && $jobIdentifiers !== [])) {
+            return $this->errorResponse('Expected a video manifest path, a client session UUID, a lifetime from 1 to 86400 seconds, and exact job IDs when refreshing.', 400);
         }
         try {
+            $requestId = Uuid::fromString($requestId)->toString();
+            $jobIds = array_map(static function (mixed $id): PublicId {
+                if (!is_string($id)) {
+                    throw new \InvalidArgumentException('Job identifiers must be strings.');
+                }
+                return PublicId::fromString($id);
+            }, $jobIdentifiers);
+            if (count(array_unique($jobIdentifiers)) !== count($jobIdentifiers)) {
+                throw new \InvalidArgumentException('Job identifiers must be unique.');
+            }
             $video = $this->publicView->videoId(PublicId::fromString($matches[1]))
                 ?? throw new NotFoundHttpException('Video not found.');
             $videoId = $video;
         } catch (\InvalidArgumentException) {
-            return $this->errorResponse('Invalid video identifier.', 400);
+            return $this->errorResponse('Invalid video or client session identifier.', 400);
         }
         if ($refresh) {
             $this->playback->assertAccess($videoId);
+            $sessions = $this->playback->findSessions($videoId, $requestId, $jobIds);
         } else {
-            $this->playback->start($videoId);
+            $sessions = $this->playback->start($videoId, $requestId);
         }
-        $sessions = $this->playback->findSessions($videoId);
         if ($sessions === []) {
             return new JsonResponse(['error' => 'Owned media execution is unavailable'], 503, ['Retry-After' => '2']);
         }
@@ -91,6 +109,8 @@ final class StreamSigningController
             return new JsonResponse(['error' => 'Media execution is unavailable'], 503, ['Retry-After' => '2']);
         }
         $state['sessionId'] = $sessions[$state['jobId']]->toString();
+        $state['requestId'] = $requestId;
+        $state['jobIds'] = array_keys($sessions);
         $result = ['url' => null];
         if ($state['ready']) {
             $path .= '?'.http_build_query(['set' => $state['renditionSet']]);

@@ -47,6 +47,7 @@ final class MovieLibraryIngestTest extends TestCase
     {
         $libraryId = Uuid::v7();
         $video = Video::create('/srv/baander-e2e/Fixture Movie/clip.mp4', 'fixture-hash');
+        $video->updateProbe(['containerFormat' => 'mp4', 'videoStreamIndex' => 0, 'audioStreams' => []]);
         $file = $this->observedFile(new DiscoveredFile('/srv/baander-e2e/Fixture Movie/clip.mp4', 'Fixture Movie/clip.mp4', 'mp4', 1024, 1_700_000_000, 'fixture-hash'));
         $provisioning = $this->createStub(LibraryProvisioningInterface::class);
         $provisioning->method('scanExistingLibrary')->willReturn(new ProvisionedLibraryScan($libraryId, 'E2E Test Movies', false, [
@@ -80,6 +81,7 @@ final class MovieLibraryIngestTest extends TestCase
             $this->createStub(MessageBusInterface::class), $this->createStub(LyricsFetchRequestInterface::class), $this->createStub(AlbumMetadataSyncRequestInterface::class), new NullLogger(),
             $this->observedMediaFiles($this->createStub(LibraryMediaFilesInterface::class)),
             new PassThroughTransaction(),
+            audioProbe: $this->audioProbeStub(),
         );
 
         return new MovieLibraryIngest($provisioning, $handler, $videos);

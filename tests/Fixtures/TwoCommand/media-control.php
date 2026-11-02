@@ -90,7 +90,7 @@ foreach (['480p', '720p', '1080p'] as $quality) {
         (string) file_get_contents($project . '/config/secrets/oauth/private.key'), BASE . '/api/stream/track', audience: BASE);
 }
 foreach (['360p', '480p', '720p'] as $quality) {
-    $response = twoCommandExchange($owners[$quality], '/api/transcode/sessions/', 'POST', ['videoId' => $state['video'], 'qualityTier' => $quality])->complete(20);
+    $response = twoCommandExchange($owners[$quality], '/api/transcode/sessions/', 'POST', ['requestId' => $state['requestId'], 'videoId' => $state['video'], 'qualityTier' => $quality])->complete(20);
     $admissionBody = json_decode($response->body, true);
     ensure($response->status() === 201, 'Video capacity admission failed: ' . json_encode([
         'httpStatus' => $response->status(), 'curlResult' => $response->result, 'contentType' => $response->header('Content-Type'),
@@ -143,7 +143,7 @@ $attach = static function (string $phase) use ($auth, $db, &$state, &$attachment
     $before = row($db, $state);
     $attempts = MediaControlObservation::launchesForJob(mediaJobUuid($state['job']));
     $requests = [];
-    foreach (range(1, 4) as $_) { $requests[] = twoCommandExchange($auth, '/api/transcode/sessions/', 'POST', ['videoId' => $state['video'], 'qualityTier' => '360p']); }
+    foreach (range(1, 4) as $_) { $requests[] = twoCommandExchange($auth, '/api/transcode/sessions/', 'POST', ['requestId' => $state['requestId'], 'videoId' => $state['video'], 'qualityTier' => '360p']); }
     foreach ($requests as $request) {
         $request->complete(20);
         $body = jsonBody($request);
@@ -158,7 +158,7 @@ $attach = static function (string $phase) use ($auth, $db, &$state, &$attachment
 };
 // Begin admission without waiting for its startup response; the durable pending
 // session is cancellable while all three video slots remain occupied.
-$pendingRequest = twoCommandExchange($owners['1080p'], '/api/transcode/sessions/', 'POST', ['videoId' => $state['video'], 'qualityTier' => '1080p']);
+$pendingRequest = twoCommandExchange($owners['1080p'], '/api/transcode/sessions/', 'POST', ['requestId' => $state['requestId'], 'videoId' => $state['video'], 'qualityTier' => '1080p']);
 $pending = await(static function () use ($pendingRequest, $db): array|false {
     $pendingRequest->until(static fn (HttpExchange $value): bool => $value->done, .01);
     $value = $db->fetchAssociative("SELECT s.public_id AS session, j.public_id AS job, j.id AS native_job, r.outcome, r.claim_token FROM transcode_runtime_state r JOIN transcode_jobs j ON j.id=r.job_id JOIN transcode_sessions s ON s.id=r.session_id WHERE j.quality_tier_name='1080p'");
@@ -239,7 +239,7 @@ foreach (['pause', 'resume', 'seek'] as $action) {
     $after = row($db, $state);
     ensure($after['outcome'] === 'cancelled' && $after['desired_revision'] === $cancelled['desired_revision'] && $after['generation'] === $cancelled['generation'], 'Late control revived cancelled session.');
 }
-$admission = twoCommandExchange($auth, '/api/transcode/sessions/', 'POST', ['videoId' => $state['video'], 'qualityTier' => '360p'])->complete(20);
+$admission = twoCommandExchange($auth, '/api/transcode/sessions/', 'POST', ['requestId' => $state['requestId'], 'videoId' => $state['video'], 'qualityTier' => '360p'])->complete(20);
 ensure($admission->status() === 201 && jsonBody($admission)['publicId'] !== $state['session'], 'Deliberate new admission did not create a session.');
 $newSession = jsonBody($admission);
 $newAttempt = mediaAttempt($newSession['jobId']);

@@ -12,6 +12,7 @@ use App\Catalog\Infrastructure\Doctrine\Entity\VideoEntity;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Domain\ValueObject\LibraryReadScope;
+use App\Shared\Infrastructure\Doctrine\Repository\RefreshedEntityTrait;
 use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\ORM\EntityManagerInterface;
 
@@ -20,6 +21,8 @@ use Doctrine\ORM\EntityManagerInterface;
  */
 final class VideoRepository implements VideoRepositoryInterface
 {
+    use RefreshedEntityTrait;
+
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
     ) {}
@@ -39,6 +42,13 @@ final class VideoRepository implements VideoRepositoryInterface
             ->find($uuid);
 
         return $entity !== null ? $this->toDomain($entity) : null;
+    }
+
+    public function findFreshByUuid(Uuid $uuid): ?Video
+    {
+        $entity = $this->findRefreshedEntity($this->entityManager, VideoEntity::class, $uuid);
+
+        return $entity === null ? null : $this->toDomain($entity);
     }
 
     public function findByPublicId(PublicId $publicId): ?Video

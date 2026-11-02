@@ -18,18 +18,24 @@ final readonly class AudioRendition
         public AudioRenditionFormat $format,
         public ?string $path,
         private ?iterable $chunks,
+        private ?string $contentType = null,
     ) {
     }
 
-    public static function complete(AudioRenditionFormat $format, string $path): self
+    public static function complete(AudioRenditionFormat $format, string $path, ?string $contentType = null): self
     {
-        return new self($format, $path, null);
+        return new self($format, $path, null, $contentType);
     }
 
     /** @param iterable<string> $chunks */
     public static function progressive(AudioRenditionFormat $format, iterable $chunks): self
     {
         return new self($format, null, $chunks);
+    }
+
+    public function mimeType(): string
+    {
+        return $this->contentType ?? $this->format->mimeType();
     }
 
     public function isComplete(): bool

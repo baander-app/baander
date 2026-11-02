@@ -72,7 +72,7 @@ export interface AIEvents {
  * // which can be used to show chapter markers or trigger prefetch
  *
  * // Remix a moment
- * await ai.remixMoment({ startTime: 10, endTime: 20, qualityTier: '1080p' });
+ * await ai.remixMoment({ requestId: clientSessionId, startTime: 10, endTime: 20, qualityTier: '1080p' });
  * ```
  */
 export class AIOrchestrator {
@@ -175,7 +175,7 @@ export class AIOrchestrator {
    * Remix a moment — triggers a new transcode session via the backend.
    *
    * POST /api/transcode/sessions/
-   * Body: { videoId, qualityTier, audioProfile, priority }
+   * Body: { videoId, requestId, qualityTier, audioProfile, priority }
    */
   async remixMoment(request: AIRemixRequest): Promise<string> {
     const url = `${this.playerConfig.baseUrl}/api/transcode/sessions/`;
@@ -187,6 +187,7 @@ export class AIOrchestrator {
       },
       body: JSON.stringify({
         videoId: this.videoId,
+        requestId: request.requestId,
         qualityTier: request.qualityTier,
         audioProfile: 'streaming_stereo',
         priority: 'normal',

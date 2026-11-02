@@ -265,6 +265,7 @@ aren't ready.
 ```json
 {
   "videoId": "550e8400-e29b-41d4-a716-446655440000",
+  "requestId": "f8bf4989-7537-46ac-9fb6-910ea8e1d465",
   "qualityTier": "1080p",
   "audioProfile": "streaming_stereo",
   "priority": "normal"
@@ -276,6 +277,16 @@ aren't ready.
   `broadcast_stereo`, `broadcast_5.1`, `hifi_stereo`, `opus_stereo`
 **Priorities:** `critical`, `high`, `normal`, `low`, `bulk`
 
+The receiving client supplies `requestId` from its playback session identity.
+Keep this UUID across admissions, retries and reconnects. The web application
+also retains it across reloads when Web Locks can establish exclusive tab
+ownership. A duplicated tab gets a separate identity. Without Web Locks, the
+identity lasts for the current page only.
+
+Each seek or control command still gets its own idempotency ID. A signing refresh
+also supplies the exact `jobIds` returned by admission, so an older presentation
+cannot enter the client's current quality ladder.
+
 ### Use Case: "Remix This Moment"
 
 The player's AI layer can trigger a new transcode session to re-encode a specific
@@ -283,6 +294,7 @@ moment at a different quality or with different parameters:
 
 ```ts
 const sessionId = await aiOrchestrator.remixMoment({
+  requestId: playbackClientSessionId,
   startTime: 42.5,
   endTime: 55.0,
   qualityTier: '4K',

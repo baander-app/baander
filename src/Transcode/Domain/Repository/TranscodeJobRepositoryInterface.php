@@ -20,7 +20,7 @@ interface TranscodeJobRepositoryInterface
 
     public function findByPublicId(PublicId $publicId): ?TranscodeJob;
 
-    public function findByOwnerVideoAndQuality(Uuid $ownerUserId, Uuid $videoId, string $qualityTierName): ?TranscodeJob;
+    public function findByOwnerVideoAndQuality(Uuid $ownerUserId, Uuid $videoId, string $qualityTierName, ?string $presentationKey = null, ?string $requestId = null): ?TranscodeJob;
 
     /** @return TranscodeJob[] */
     public function findActiveByOwnerAndVideo(Uuid $ownerUserId, Uuid $videoId): array;

@@ -20,6 +20,7 @@ use App\Shared\Application\Port\TransactionPortInterface;
 use App\Transcode\Domain\Model\TranscodeJob;
 use App\Transcode\Domain\Repository\TranscodeJobRepositoryInterface;
 use App\Transcode\Domain\ValueObject\QualityTier;
+use App\Transcode\Domain\ValueObject\PresentationSelection;
 use App\Transcode\Infrastructure\Transcode\TranscodeJobService;
 use App\Transcode\Infrastructure\Storage\TranscodeFileStorage;
 use App\Transcode\Infrastructure\Storage\SegmentFileResolver;
@@ -35,9 +36,9 @@ final class OwnedTranscodeJobTest extends TestCase
         $video = Uuid::generate();
         $alice = Uuid::generate();
         $bob = Uuid::generate();
-        $first = $service->getOrCreateJob($video, QualityTier::p720(), '/cache', $alice);
-        $second = $service->getOrCreateJob($video, QualityTier::p720(), '/cache', $bob);
-        $again = $service->getOrCreateJob($video, QualityTier::p720(), '/cache', $alice);
+        $first = $service->getOrCreateJob($video, QualityTier::p720(), '/cache', $alice, requestId: 'alice-request');
+        $second = $service->getOrCreateJob($video, QualityTier::p720(), '/cache', $bob, requestId: 'bob-request');
+        $again = $service->getOrCreateJob($video, QualityTier::p720(), '/cache', $alice, requestId: 'alice-request');
         self::assertFalse($first->getId()->equals($second->getId()));
         self::assertNotNull($first->getOwnerUserId());
         self::assertNotNull($second->getOwnerUserId());
@@ -53,6 +54,46 @@ final class OwnedTranscodeJobTest extends TestCase
         self::assertSame('pending', $second->getStatus()->value);
         self::assertSame(0, $second->getReferenceCount());
     }
+    public function testLogicalRequestsKeepIndependentMutableJobs(): void
+    {
+        $repository = new OwnedJobRepository();
+        $service = new TranscodeJobService($repository, new TranscodeFileStorage(new SegmentFileResolver('/cache')), new EventDispatcher());
+        $video = Uuid::generate();
+        $owner = Uuid::generate();
+        $selection = new PresentationSelection('copy', 'source-hash', 2, 4, 'mp4');
+        $first = $service->getOrCreateCopyJob($video, '/cache', $owner, $selection, 1920, 1080, 'first-client-request');
+        $again = $service->getOrCreateCopyJob($video, '/cache', $owner, $selection, 1920, 1080, 'first-client-request');
+        $second = $service->getOrCreateCopyJob($video, '/cache', $owner, $selection, 1920, 1080, 'second-client-request');
+        self::assertSame($first, $again);
+        self::assertFalse($first->getId()->equals($second->getId()));
+        self::assertSame($first->getPresentationSelection()?->canonicalKey(), $second->getPresentationSelection()?->canonicalKey());
+        self::assertSame('first-client-request', $first->getRequestId());
+        $fresh = $service->getOrCreateCopyJob($video, '/cache', $owner, $selection, 1920, 1080);
+        $otherFresh = $service->getOrCreateCopyJob($video, '/cache', $owner, $selection, 1920, 1080);
+        self::assertNotSame($fresh->getRequestId(), $otherFresh->getRequestId());
+        self::assertFalse($fresh->getId()->equals($otherFresh->getId()));
+    }
+
+    public function testCopyReuseRequiresTheSameOwnerSourceAndSelectedStreams(): void
+    {
+        $repository = new OwnedJobRepository();
+        $service = new TranscodeJobService($repository, new TranscodeFileStorage(new SegmentFileResolver('/cache')), new EventDispatcher());
+        $video = Uuid::generate();
+        $owner = Uuid::generate();
+        $selection = new PresentationSelection('copy', 'source-hash', 2, 4, 'mp4');
+        $copy = $service->getOrCreateCopyJob($video, '/cache', $owner, $selection, 1920, 1080, 'copy-request');
+        self::assertSame($copy, $service->getOrCreateCopyJob($video, '/cache', $owner, $selection, 1920, 1080, 'copy-request'));
+        $otherAudio = $service->getOrCreateCopyJob($video, '/cache', $owner, new PresentationSelection('copy', 'source-hash', 2, 5, 'mp4'), 1920, 1080, 'copy-request');
+        $otherSource = $service->getOrCreateCopyJob($video, '/cache', $owner, new PresentationSelection('copy', 'new-source', 2, 4, 'mp4'), 1920, 1080, 'copy-request');
+        $otherOwner = $service->getOrCreateCopyJob($video, '/cache', Uuid::generate(), $selection, 1920, 1080, 'copy-request');
+        $encoded = $service->getOrCreateJob($video, QualityTier::p720(), '/cache', $owner, [], new PresentationSelection('encode', 'source-hash', 2, 4, 'mp4', 'encoder-config'));
+        self::assertCount(5, $repository->jobs);
+        foreach ([$otherAudio, $otherSource, $otherOwner, $encoded] as $job) {
+            self::assertFalse($copy->getId()->equals($job->getId()));
+            self::assertNotSame($copy->getOutputDirectory(), $job->getOutputDirectory());
+        }
+    }
+
     public function testAdmissionReturnsEachUsersOwnedSessionAndReusesOnlyItsOwn(): void
     {
         $repository = new OwnedJobRepository();
@@ -73,13 +114,15 @@ final class OwnedTranscodeJobTest extends TestCase
         });
         $transaction = $this->createStub(TransactionPortInterface::class);
         $transaction->method('run')->willReturnCallback(static fn(callable $operation): mixed => $operation());
-        $handler = new CreateTranscodeSessionHandler(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile('full')), $jobs, $sessions, $storage, $ownership, $transaction, $this->createStub(SleeperInterface::class));
+        $presentations = $this->createStub(\App\Transcode\Application\Port\EncodePresentationPort::class);
+        $presentations->method('select')->willReturn(new PresentationSelection('encode', 'source-hash', 0, 1, 'mp4', 'encoder-config'));
+        $handler = new CreateTranscodeSessionHandler(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile('full')), $jobs, $sessions, $storage, $ownership, $transaction, $this->createStub(SleeperInterface::class), $presentations);
         $video = Uuid::generate();
         $alice = Uuid::generate();
         $bob = Uuid::generate();
-        $first = $handler(new CreateTranscodeSessionCommand($alice, $video, QualityTier::p720(), AudioProfile::streamingStereo()));
-        $second = $handler(new CreateTranscodeSessionCommand($bob, $video, QualityTier::p720(), AudioProfile::streamingStereo()));
-        $again = $handler(new CreateTranscodeSessionCommand($alice, $video, QualityTier::p720(), AudioProfile::streamingStereo()));
+        $first = $handler(new CreateTranscodeSessionCommand($alice, $video, QualityTier::p720(), AudioProfile::streamingStereo(), requestId: 'alice-request'));
+        $second = $handler(new CreateTranscodeSessionCommand($bob, $video, QualityTier::p720(), AudioProfile::streamingStereo(), requestId: 'bob-request'));
+        $again = $handler(new CreateTranscodeSessionCommand($alice, $video, QualityTier::p720(), AudioProfile::streamingStereo(), requestId: 'alice-request'));
         self::assertTrue($first->getUserId()->equals($alice));
         self::assertTrue($second->getUserId()->equals($bob));
         self::assertFalse($first->getJobId()->equals($second->getJobId()));
@@ -99,10 +142,10 @@ final class OwnedJobRepository implements TranscodeJobRepositoryInterface
     public function flush(): void {}
     public function findByUuid(Uuid $uuid): ?TranscodeJob { return $this->jobs[$uuid->toString()] ?? null; }
     public function findByPublicId(PublicId $publicId): ?TranscodeJob { return null; }
-    public function findByOwnerVideoAndQuality(Uuid $ownerUserId, Uuid $videoId, string $qualityTierName): ?TranscodeJob
+    public function findByOwnerVideoAndQuality(Uuid $ownerUserId, Uuid $videoId, string $qualityTierName, ?string $presentationKey = null, ?string $requestId = null): ?TranscodeJob
     {
         foreach ($this->jobs as $job) {
-            if ($job->getOwnerUserId()?->equals($ownerUserId) && $job->getVideoId()->equals($videoId) && $job->getQualityTierName() === $qualityTierName) {
+            if ($job->getOwnerUserId()?->equals($ownerUserId) && $job->getVideoId()->equals($videoId) && $job->getQualityTierName() === $qualityTierName && $job->getPresentationSelection()?->canonicalKey() === $presentationKey && $job->getRequestId() === $requestId) {
                 return $job;
             }
         }

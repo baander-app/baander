@@ -69,6 +69,7 @@ final class TranscodeWorkerExecutionTest extends TestCase
     /** @var list<list<string>> */
     private array $probeCommands = [];
     private bool $sourceHasAudio = true;
+    private bool $forbidEncoder = false;
     /** @var list<array<string, mixed>> */
     private array $subtitleStreams = [];
     /** @var array<int, list<string>> */
@@ -86,7 +87,7 @@ final class TranscodeWorkerExecutionTest extends TestCase
         $this->root = sys_get_temp_dir() . '/baander-worker-video-' . bin2hex(random_bytes(8));
         mkdir($this->root, 0700);
         file_put_contents($this->root . '/source', 'source');
-        $video = Video::create($this->root . '/source', 'video-test');
+        $video = Video::create($this->root . '/source', hash_file('xxh3', $this->root . '/source'));
         $this->job = TranscodeJob::create($video->getId(), QualityTier::p720(), $this->root, \App\Shared\Domain\Model\Uuid::generate());
         $this->session = TranscodeSession::create(Uuid::generate(), $this->job->getId(), $video->getId(), AudioProfile::streamingStereo());
         $this->current = $this->claim(1, 1);
@@ -178,10 +179,11 @@ final class TranscodeWorkerExecutionTest extends TestCase
         $admission->method('complete')->willReturnCallback(function (): void { --$this->allocations; });
         $storage = new TranscodeFileStorage(new SegmentFileResolver($this->root));
         $encoder = new SegmentEncoder(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile('full')), $ffmpeg, $storage, EncoderProfile::software('libx264'));
+        $lazyEncoder = fn(): SegmentEncoder => $this->forbidEncoder ? throw new \RuntimeException('Copy resolved an encoder') : $encoder;
         $this->spawner = new VideoExecutionSpawner();
-        $streams = new TranscodeStreamManager($this->createStub(SegmentAvailabilityInterface::class), $storage, $encoder, new NullLogger(), $this->spawner);
+        $streams = new TranscodeStreamManager($this->createStub(SegmentAvailabilityInterface::class), $storage, $lazyEncoder, new NullLogger(), $this->spawner);
         $this->helpers = new TranscodeProcessPool($pool, new NullLogger(), new JsonEncoder());
-        $this->workerForPolicy = fn(\App\Transcode\Application\Service\MediaExecutionPolicy $policy): TranscodeSessionSubscriber => new TranscodeSessionSubscriber($policy, $jobs, $sessions, $storage, $this->helpers, $encoder, $videos, new NullLogger(), $ownership, $control, $streams, $this->timer, $admission);
+        $this->workerForPolicy = fn(\App\Transcode\Application\Service\MediaExecutionPolicy $policy): TranscodeSessionSubscriber => new TranscodeSessionSubscriber($policy, $jobs, $sessions, $storage, $this->helpers, $lazyEncoder, $videos, new NullLogger(), $ownership, $control, $streams, $this->timer, $admission);
         $this->worker = ($this->workerForPolicy)(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile()));
     }
 
@@ -203,6 +205,81 @@ final class TranscodeWorkerExecutionTest extends TestCase
         self::assertSame(0, $this->allocations);
         self::assertSame([], $this->probeCommands);
         self::assertSame([], $this->subtitleCommands);
+    }
+
+    public function testHouseholdCopiesWithoutResolvingEncoderAndPublishesSourceTiming(): void
+    {
+        $worker = $this->copyWorker();
+        $worker->run($this->current, static fn(): bool => false);
+        self::assertSame(['accepted', 'ready', 'complete'], $this->observed);
+        self::assertSame(TranscodeStatus::Completed, $this->job->getStatus());
+        self::assertSame(0, $this->allocations);
+        self::assertSame(1, $this->releases);
+        self::assertContains('copy', $this->spawner->commands[0]);
+        self::assertNotContains('-vf', $this->spawner->commands[0]);
+        $metadata = json_decode(file_get_contents($this->job->getOutputDirectory() . '/generation.json'), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame('copy', $metadata['videoEncoder']);
+        self::assertSame(6, $metadata['duration']);
+        self::assertSame(0, $metadata['startTime']);
+        self::assertSame('aac', $metadata['audioCodec']);
+    }
+
+    public function testCopyPauseReplacementAndCancellationRetainOwnedLifecycle(): void
+    {
+        $worker = $this->copyWorker();
+        $this->spawner->running = true;
+        $phase = 0;
+        $this->spawner->onRunning = function () use (&$phase): void {
+            if ($phase++ === 0) {
+                $this->current = $this->claim(2, 2, 'paused');
+            } elseif (count($this->spawner->commands) === 2) {
+                $this->current = $this->claim(2, 3, 'cancelled');
+            }
+        };
+        $worker->run($this->current, static fn(): bool => false);
+        self::assertCount(2, $this->spawner->commands);
+        self::assertContains('cancelled', $this->observed);
+        self::assertNotContains('failed', $this->observed);
+        self::assertSame(['spawn:1', 'kill:1', 'close:1', 'spawn:2'], array_slice($this->spawner->events, 0, 4));
+        self::assertSame(1, $this->releases);
+    }
+
+    public function testCopyRecoveryUsesAFreshGenerationAfterOwnershipLoss(): void
+    {
+        $worker = $this->copyWorker();
+        $this->spawner->running = true;
+        $this->spawner->onRunning = function (): void { $this->current = null; };
+        $worker->run($this->current, static fn(): bool => false);
+        self::assertNotContains('failed', $this->observed);
+        self::assertNotContains('complete', $this->observed);
+        $this->current = $this->claim(2, 2);
+        $this->spawner->onRunning = null;
+        $this->spawner->running = false;
+        $worker->run($this->current, static fn(): bool => false);
+        self::assertSame(TranscodeStatus::Completed, $this->job->getStatus());
+        self::assertStringEndsWith('/generation-2', $this->job->getOutputDirectory());
+        self::assertSame(0, $this->allocations);
+    }
+
+    private function copyWorker(): TranscodeSessionSubscriber
+    {
+        $this->forbidEncoder = true;
+        $state = get_object_vars($this->job->getState());
+        $state['qualityTierName'] = 'copy';
+        $state['presentationSelection'] = new \App\Transcode\Domain\ValueObject\PresentationSelection('copy', hash_file('xxh3', $this->root . '/source'), 0, 1, 'mp4');
+        $this->job = TranscodeJob::reconstitute(new \App\Transcode\Domain\Model\TranscodeJobState(...$state));
+        $this->current = $this->claim(1, 1);
+        $this->sourceProbeOutput = [
+            'format' => ['format_name' => 'matroska', 'start_time' => '3.229', 'duration' => '9.25'],
+            'packets' => [['stream_index' => 0, 'pts_time' => '3.25', 'flags' => 'K_']],
+            'frames' => [['best_effort_timestamp_time' => '3.25', 'key_frame' => 1]],
+            'streams' => [
+                ['index' => 0, 'codec_type' => 'video', 'codec_name' => 'h264', 'width' => 1280, 'height' => 720, 'tags' => ['DURATION' => '00:00:09.250']],
+                ['index' => 1, 'codec_type' => 'audio', 'codec_name' => 'aac', 'channels' => 2, 'sample_rate' => '48000'],
+            ],
+        ];
+        $this->spawner->publishAudio = true;
+        return ($this->workerForPolicy)(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile('household')));
     }
 
     public function testCompletionPublishesActualCodecAndGenerationAndReleasesAllocation(): void
@@ -915,7 +992,7 @@ final class TranscodeWorkerExecutionTest extends TestCase
     private function claim(int $generation, int $revision, string $status = 'running', ?AudioProfile $profile = null, float $position = 0.0): TranscodeExecutionClaim
     {
         return new TranscodeExecutionClaim(new TranscodeRuntimeSnapshot($this->job->getId(), $this->session->getId(), 'request',
-            new DesiredTranscodeState($profile ?? AudioProfile::streamingStereo(), $status, $position), $revision, 0, $generation, 'pending', null, null, true),
+            new DesiredTranscodeState($profile ?? AudioProfile::streamingStereo(), $status, $position, presentationSelection: $this->job->getPresentationSelection()), $revision, 0, $generation, 'pending', null, null, true),
             new MediaWorkerIdentity('test', str_repeat('a', 32), 'media', 1), str_repeat('b', 64));
     }
 

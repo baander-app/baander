@@ -8,6 +8,7 @@ use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Transcode\Domain\Model\TranscodeJob;
 use App\Transcode\Domain\ValueObject\QualityTier;
+use App\Transcode\Domain\ValueObject\PresentationSelection;
 
 interface TranscodeJobPortInterface
 {
@@ -20,6 +21,18 @@ interface TranscodeJobPortInterface
         string $outputDirectory,
         Uuid $ownerUserId,
         array $audioTrackLanguages = [],
+        ?PresentationSelection $presentationSelection = null,
+        ?string $requestId = null,
+    ): TranscodeJob;
+
+    public function getOrCreateCopyJob(
+        Uuid $videoId,
+        string $outputDirectory,
+        Uuid $ownerUserId,
+        PresentationSelection $presentationSelection,
+        int $width,
+        int $height,
+        ?string $requestId = null,
     ): TranscodeJob;
 
     public function findByUuid(Uuid $uuid): ?TranscodeJob;

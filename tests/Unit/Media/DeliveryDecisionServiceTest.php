@@ -95,6 +95,20 @@ final class DeliveryDecisionServiceTest extends TestCase
         self::assertSame(DeliveryKind::Cached, $result->kind);
     }
 
+    public function testScannedAacSelectsOwnedMp4CopyWithItsAbsoluteStream(): void
+    {
+        $metadata = new TrackStreamMetadata('track', 'song.aac', '/library/song.aac', 'audio/aac', 100, 'aac', 128000, 48000, 2, 10.0,
+            'aac', 3, '0123456789abcdef');
+        $audio = $this->createMock(AudioRenditionPortInterface::class);
+        $audio->expects(self::never())->method('open');
+        $audio->expects(self::never())->method('openCopy');
+        $audio->expects(self::once())->method('findCompleteCopy')->with(self::anything(), '/library/song.aac', '0123456789abcdef', 3)->willReturn(null);
+        $decision = $this->service(audio: $audio, enabled: false, metadata: $metadata)->track(new Uuid(), new PublicId(), new DeliveryDestination(['mp4'], audioCodecs: ['aac']));
+        self::assertSame(DeliveryKind::Copy, $decision->kind);
+        self::assertStringContainsString('mode=copy', (string) $decision->url);
+        self::assertStringContainsString('index=3', (string) $decision->url);
+    }
+
     public function testAudioToggleSkipsCacheAndReturnsTerminalReason(): void
     {
         $audio = $this->createMock(AudioRenditionPortInterface::class);
@@ -111,9 +125,9 @@ final class DeliveryDecisionServiceTest extends TestCase
             [['codec' => 'aac', 'channels' => 2, 'streamIndex' => 8, 'isDefault' => true]], 1920, 1080, 24.0, 100.0, pixFmt: 'yuv420p', colorSpace: ['transfer' => 'bt709']));
         $artifacts = $this->createStub(CompletedVideoArtifactPort::class);
         $artifacts->method('findComplete')->willReturn([
-            new CompletedVideoArtifact('/wrong-stream', 'mp4', 'h264', 'aac', 1920, 1080, 2, 3, 1, 8, false, 'hls', 'yuv420p'),
-            new CompletedVideoArtifact('/wrong-bit-depth', 'mp4', 'h264', 'aac', 1920, 1080, 2, 3, 8, 10, false, 'hls', 'yuv420p'),
-            new CompletedVideoArtifact('/accepted', 'mp4', 'h264', 'aac', 1920, 1080, 2, 3, 8, 8, false, 'hls', 'yuv420p'),
+            new CompletedVideoArtifact('/wrong-stream', 'mp4', 'h264', 'aac', 1920, 1080, 2, 3, 1, 8, false, 'hls', 'yuv420p', new PublicId(), 1),
+            new CompletedVideoArtifact('/wrong-bit-depth', 'mp4', 'h264', 'aac', 1920, 1080, 2, 3, 8, 10, false, 'hls', 'yuv420p', new PublicId(), 1),
+            new CompletedVideoArtifact('/accepted', 'mp4', 'h264', 'aac', 1920, 1080, 2, 3, 8, 8, false, 'hls', 'yuv420p', new PublicId(), 1),
         ]);
         $service = $this->service(videos: $videos, artifacts: $artifacts);
         $result = $service->video(new Uuid(), new PublicId(), new DeliveryDestination(['mp4'], ['h264'], ['aac'], transports: ['hls']));
@@ -121,13 +135,13 @@ final class DeliveryDecisionServiceTest extends TestCase
         self::assertSame('/accepted', $result->url);
     }
 
-    private function service(?PlaybackMediaAccessInterface $access = null, ?VideoPortInterface $videos = null, ?AudioRenditionPortInterface $audio = null, bool $enabled = true, string $profile = 'household', ?CompletedVideoArtifactPort $artifacts = null): DeliveryDecisionService
+    private function service(?PlaybackMediaAccessInterface $access = null, ?VideoPortInterface $videos = null, ?AudioRenditionPortInterface $audio = null, bool $enabled = true, string $profile = 'household', ?CompletedVideoArtifactPort $artifacts = null, ?TrackStreamMetadata $metadata = null): DeliveryDecisionService
     {
         $scopes = $this->createStub(MediaReadScopeProviderInterface::class);
         $scopes->method('forUser')->willReturn(MediaReadScope::authenticated(new Uuid(), LibraryReadScope::unrestricted()));
         $streams = $this->createStub(StreamPortInterface::class);
-        $streams->method('getTrackMetadata')->willReturn(new TrackStreamMetadata((new PublicId())->toString(), 'song.flac', '/library/song.flac', 'audio/flac', 100, 'flac', 1000000, 48000, 2, 10.0));
-        $streams->method('resolveTrackPath')->willReturn('/library/song.flac');
+        $streams->method('getTrackMetadata')->willReturn($metadata ?? new TrackStreamMetadata((new PublicId())->toString(), 'song.flac', '/library/song.flac', 'audio/flac', 100, 'flac', 1000000, 48000, 2, 10.0));
+        $streams->method('resolveTrackPath')->willReturn($metadata->filePath ?? '/library/song.flac');
         $settings = $this->createStub(SystemSettingsPortInterface::class);
         $settings->method('get')->willReturnCallback(static fn (string $key): mixed => $key === TranscodeSettingDefinitions::ENABLED ? $enabled : 192);
         return new DeliveryDecisionService($access ?? $this->createStub(PlaybackMediaAccessInterface::class), $scopes,

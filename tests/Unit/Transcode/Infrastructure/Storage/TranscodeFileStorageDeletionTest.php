@@ -44,6 +44,96 @@ final class TranscodeFileStorageDeletionTest extends TestCase
         rmdir($this->fixture);
     }
 
+    public function testRetentionPinsTheWholeVideoUntilTheLongestDeadline(): void
+    {
+        $generation = $this->root . '/video/copy/job-one/generation-1';
+        mkdir($generation, 0700, true);
+        file_put_contents($generation . '/segment.m4s', 'media');
+        self::assertTrue($this->storage->retainUntil($generation, time() + 3600));
+        self::assertTrue($this->storage->retainUntil($generation, time() - 1));
+        self::assertTrue($this->storage->hasUnexpiredRetention($this->root . '/video'));
+        self::assertFalse($this->storage->deleteIfUnretained($this->root . '/video'));
+        self::assertSame('media', file_get_contents($generation . '/segment.m4s'));
+        self::assertSame(['video'], $this->storage->getVideoDirectories());
+    }
+
+    public function testExpiredRetentionAllowsCleanupAndCannotResurrectDeletedOutput(): void
+    {
+        $directory = $this->root . '/video';
+        mkdir($directory);
+        self::assertTrue($this->storage->retainUntil($directory, time() - 1));
+        self::assertFalse($this->storage->hasUnexpiredRetention($directory));
+        self::assertTrue($this->storage->deleteIfUnretained($directory));
+        self::assertDirectoryDoesNotExist($directory);
+        self::assertFalse($this->storage->retainUntil($directory, time() + 3600));
+        self::assertTrue($this->storage->deleteIfUnretained($directory));
+    }
+
+    public function testRetentionRejectsSymlinksAndOutsideDirectories(): void
+    {
+        symlink($this->outside, $this->root . '/linked');
+        foreach ([$this->outside, $this->root . '/linked', $this->root . '/linked/child'] as $directory) {
+            try {
+                $this->storage->retainUntil($directory, time() + 3600);
+                self::fail('Retention must not follow an outside path or symlink.');
+            } catch (InvalidArgumentException) {
+                $this->assertBoundaryPreserved();
+            }
+        }
+    }
+
+    #[DataProvider('waitingRetentionOperations')]
+    public function testWaitingOperationRechecksDirectoryAndDeadlineUnderTheStableLock(string $operation): void
+    {
+        $directory = $this->root . '/video';
+        mkdir($directory);
+        $record = $this->root . '/.retention-' . hash('sha256', 'video');
+        $lock = fopen($record . '.lock', 'x+b');
+        self::assertNotFalse($lock);
+        self::assertTrue(flock($lock, LOCK_EX));
+        $code = <<<'PHP'
+            require $argv[1] . '/vendor/autoload.php';
+            $storage = new App\Transcode\Infrastructure\Storage\TranscodeFileStorage(new App\Transcode\Infrastructure\Storage\SegmentFileResolver($argv[2]));
+            echo "ready\n";
+            flush();
+            $result = $argv[3] === 'grant' ? $storage->retainUntil($argv[2] . '/video', time() + 3600) : $storage->deleteIfUnretained($argv[2] . '/video');
+            echo $result ? "true\n" : "false\n";
+            PHP;
+        $process = proc_open([PHP_BINARY, '-r', $code, dirname(__DIR__, 5), $this->root, $operation],
+            [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
+        self::assertIsResource($process);
+        fclose($pipes[0]);
+        try {
+            self::assertSame("ready\n", fgets($pipes[1]));
+            stream_set_blocking($pipes[1], false);
+            usleep(50_000);
+            self::assertSame('', stream_get_contents($pipes[1]), 'The lifecycle operation must wait for the stable root lock.');
+            if ($operation === 'grant') {
+                $this->storage->deleteDirectory($directory);
+            } else {
+                file_put_contents($record . '.lease', (time() + 3600) . "\n");
+            }
+            flock($lock, LOCK_UN);
+            stream_set_blocking($pipes[1], true);
+            self::assertSame("false\n", stream_get_contents($pipes[1]));
+            self::assertSame('', stream_get_contents($pipes[2]));
+            self::assertSame($operation === 'delete', is_dir($directory));
+        } finally {
+            flock($lock, LOCK_UN);
+            fclose($lock);
+            fclose($pipes[1]);
+            fclose($pipes[2]);
+            self::assertSame(0, proc_close($process));
+        }
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function waitingRetentionOperations(): iterable
+    {
+        yield 'grant after deletion' => ['grant'];
+        yield 'delete after grant' => ['delete'];
+    }
+
     public function testDeletesNestedCacheAndLinksWithoutRemovingTheirTargets(): void
     {
         $video = $this->root . '/video';

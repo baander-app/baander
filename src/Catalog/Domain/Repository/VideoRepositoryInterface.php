@@ -15,6 +15,8 @@ interface VideoRepositoryInterface
 
     public function findByUuid(Uuid $uuid): ?Video;
 
+    public function findFreshByUuid(Uuid $uuid): ?Video;
+
     public function findByPublicId(PublicId $publicId): ?Video;
 
     public function isVisibleByPublicId(PublicId $publicId, LibraryReadScope $scope): bool;

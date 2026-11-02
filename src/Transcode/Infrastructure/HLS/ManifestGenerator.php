@@ -14,6 +14,7 @@ final class ManifestGenerator
      * @param array<string, string> $mediaManifestUrls Map of tier name => video manifest URL
      * @param list<array{language: string, name: string, uri: string, channels?: string, isDefault?: bool, groupId?: string, codec?: string}> $audioGroups Audio track definitions
      * @param list<array{language: string, name: string, uri: string, isDefault?: bool, isForced?: bool, groupId?: string}> $subtitleGroups Subtitle track definitions
+     * @param array<string, array{width: int, height: int}> $dimensions Source or encoded output dimensions
      * @param array<string, int> $bandwidths Whole-rendition peak bitrate estimates
      * @param string|array<string, string>|null $videoCodecRfc6381 RFC6381 codec override (per-tier map or single string)
      */
@@ -23,6 +24,7 @@ final class ManifestGenerator
         array $subtitleGroups = [],
         string|array|null $videoCodecRfc6381 = null,
         array $bandwidths = [],
+        array $dimensions = [],
     ): string {
         $lines = [];
         $lines[] = '#EXTM3U';
@@ -67,14 +69,14 @@ final class ManifestGenerator
 
         // Video variants — CODECS includes audio codec, AUDIO/SUBTITLES use parameterized IDs
         foreach ($mediaManifestUrls as $tierName => $url) {
-            $tier = QualityTier::fromString($tierName);
+            $tier = $tierName === 'copy' ? null : QualityTier::fromString($tierName);
 
-            $codecs = is_array($videoCodecRfc6381) ? ($videoCodecRfc6381[$tierName] ?? $tier->rfc6381Codec) : ($videoCodecRfc6381 ?? $tier->rfc6381Codec);
+            $codecs = is_array($videoCodecRfc6381) ? ($videoCodecRfc6381[$tierName] ?? ($tier === null ? '' : $tier->rfc6381Codec)) : ($videoCodecRfc6381 ?? ($tier === null ? '' : $tier->rfc6381Codec));
             $streamInf = sprintf(
                 '#EXT-X-STREAM-INF:BANDWIDTH=%d,RESOLUTION=%dx%d,CODECS="%s"',
-                $bandwidths[$tierName] ?? $tier->maxBitrate,
-                $tier->width,
-                $tier->height,
+                $bandwidths[$tierName] ?? ($tier === null ? 1 : $tier->maxBitrate),
+                $dimensions[$tierName]['width'] ?? ($tier === null ? 0 : $tier->width),
+                $dimensions[$tierName]['height'] ?? ($tier === null ? 0 : $tier->height),
                 $codecs,
             );
 

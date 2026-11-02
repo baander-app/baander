@@ -187,6 +187,12 @@ It connects the listener's home receivers to playback controlled through Bånder
 A live player instance that can execute and report playback for a destination, such as one browser tab, a companion process or a Cast receiver application.
 Its incarnation identifies that instance's current connection lifetime, separately from the saved browser device token or destination identity.
 
+### Playback client-session identity
+
+The browser tab's identity for video admission, retained across reloads and reconnects when browser execution locks are available.
+It separates mutable playback jobs for clients using the same account and video. Without those locks, the identity is private to the current page lifetime.
+Admission and signing carry this identity as `requestId`; individual playback commands use separate request IDs for replay detection.
+
 ### Uncertain transfer
 
 A playback handoff whose target may have started but has not confirmed its state.
@@ -220,7 +226,7 @@ A user's playback lifecycle for a video transcode job, carrying its preparation,
 
 ### Transcode execution generation
 
-The identity of one admitted encoding attempt inside a job-specific output
+The identity of one admitted media execution attempt inside a job-specific output
 directory. A seek or restarted attempt advances the generation so stale output
 cannot be delivered as current output. Different jobs have independent generations.
 This identity is distinct from a worker deployment's boot generation.
@@ -233,9 +239,9 @@ and treating cancellation as terminal.
 
 ### Owned video job
 
-A transcode job belonging to one playback user, video and quality tier.
+A transcode job belonging to one playback user, client session, video, selected presentation and quality tier.
 
-Another user's job for the same source has independent controls, execution claims and output.
+Another client's job for the same source has independent controls, execution claims and output, including when both clients use the same account.
 
 ### Rendition set
 
@@ -253,9 +259,14 @@ remain separate.
 
 ### Copy presentation
 
-A proposed media presentation produced by repackaging selected source streams without audio or video re-encoding.
+A media presentation produced by repackaging selected source streams without audio or video re-encoding.
 Its identity includes the selected streams and output container, and its timing comes from the copied media rather than an encoder's fixed keyframe schedule.
 It uses the same execution ownership and publication guarantees as other presentations.
+
+### Completed video presentation
+
+A verified, sealed video presentation that can be delivered independently of its producer's later playback controls.
+An active signed delivery grant retains its files and job record through the grant's expiry. Reading its playlists does not extend that deadline.
 
 ### Canonical audio track
 
@@ -297,7 +308,7 @@ retains the existing input timestamp handling; it does not mean an inferred zero
 
 A durable record that one session has applied a request identity. It prevents the
 same request from applying again after other controls have intervened. Controls
-fan out transactionally to sibling renditions of the same playback owner and video.
+fan out transactionally to sibling renditions of the same playback owner, client session and video.
 
 ### Source subtitle track key
 

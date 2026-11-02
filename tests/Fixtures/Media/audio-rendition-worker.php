@@ -16,7 +16,7 @@ use Psr\Log\NullLogger;
 require dirname(__DIR__, 3) . '/vendor/autoload.php';
 
 [, $schema, $delay] = $_SERVER['argv'];
-if (preg_match('/^media_runtime_[a-f0-9]{16}$/D', $schema) !== 1) {
+if (preg_match('/^(?:media_runtime|directory_publication)_[a-f0-9]{16}$/D', $schema) !== 1) {
     throw new RuntimeException('Invalid disposable schema.');
 }
 $url = getenv('OUTBOX_TEST_DATABASE_URL') ?: throw new RuntimeException('Missing disposable database.');
@@ -24,17 +24,17 @@ $connection = DriverManager::getConnection((new DsnParser(['postgresql' => 'pdo_
 $connection->executeStatement('SET search_path TO ' . $schema . ', public');
 $runtime = new AudioRenditionRuntime($connection);
 // Pace real input and flush packets so the reader can observe an unfinished encode.
-$client = new class(NativeExecutionClient::fromEnvironment('media-audio-0'), 3 / (float) $delay) implements NativeExecutionClientInterface {
+$profile = \App\Shared\Application\DTO\DeploymentProfile::fromEnvironment();
+$client = new class(NativeExecutionClient::fromEnvironment($profile->sharedCopySlots > 0 ? 'media-copy-0' : 'media-audio-0'), 3 / (float) $delay) implements NativeExecutionClientInterface {
     public function __construct(private NativeExecutionClientInterface $inner, private float $readRate) {}
     public function handshake(): array { return $this->inner->handshake(); }
     public function submit(array $argv, float $executionTimeoutSeconds = 600, ?int $attempt = null): NativeExecutionHandle
     {
         $input = array_search('-i', $argv, true);
-        if ($input === false) {
-            throw new RuntimeException('Audio fixture requires an input argument.');
+        if ($input !== false && $argv[0] === '/usr/bin/ffmpeg') {
+            array_splice($argv, $input, 0, ['-readrate', (string) $this->readRate]);
+            array_splice($argv, -1, 0, ['-flush_packets', '1']);
         }
-        array_splice($argv, $input, 0, ['-readrate', (string) $this->readRate]);
-        array_splice($argv, -1, 0, ['-flush_packets', '1']);
         return $this->inner->submit($argv, $executionTimeoutSeconds, $attempt);
     }
     public function inspect(NativeExecutionHandle $handle): array { return $this->inner->inspect($handle); }

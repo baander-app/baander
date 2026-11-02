@@ -118,9 +118,14 @@ final class StreamController
             return $this->notFound($this->trans('errors.file_not_found', domain: 'media'));
         }
 
+        $mode = $request->query->getString('mode');
+        if (!in_array($mode, ['', 'copy'], true)) {
+            return $this->errorResponse('Invalid audio presentation mode.');
+        }
+        $copy = $mode === 'copy';
         $format = (string) $request->query->get('format', '');
         $bitrate = (string) $request->query->get('bitrate', '');
-        if ($format === '') {
+        if ($format === '' && !$copy) {
             if ($bitrate !== '') {
                 return $this->errorResponse($this->trans('errors.invalid_transcode_bitrate', domain: 'media'));
             }
@@ -135,7 +140,15 @@ final class StreamController
         if ($bitrate !== '' && (!ctype_digit($bitrate) || (int) $bitrate === 0)) {
             return $this->errorResponse($this->trans('errors.invalid_transcode_bitrate', domain: 'media'));
         }
-        if ($this->executionPolicy->permits(MediaOperation::AudioEncode) && $this->settings->get(TranscodeSettingDefinitions::ENABLED) !== true) {
+        if ($copy) {
+            $index = $request->query->getString('index');
+            if ($format !== 'aac' || $request->query->getString('container') !== 'mp4' || $bitrate !== ''
+                || !ctype_digit($index) || $metadata->streamIndex !== (int) $index
+                || $metadata->codec !== 'aac' || $metadata->sourceHash === null) {
+                return $this->errorResponse('The selected audio cannot be copied.', Response::HTTP_CONFLICT, ['reason' => 'source_stream_metadata_unavailable']);
+            }
+        }
+        if (!$copy && $this->executionPolicy->permits(MediaOperation::AudioEncode) && $this->settings->get(TranscodeSettingDefinitions::ENABLED) !== true) {
             return $this->errorResponse($this->trans('errors.transcode_disabled', domain: 'media'), Response::HTTP_FORBIDDEN);
         }
         // transcode.max_bitrate is in kilobits; without a requested bitrate the cap applies.
@@ -143,7 +156,10 @@ final class StreamController
         $targetBitrate = $bitrate === '' ? $maxBitrate : min((int) $bitrate, $maxBitrate);
 
         try {
-            $rendition = $this->renditions->open($trackId->toString(), $fullPath, $renditionFormat, $targetBitrate);
+            $rendition = $copy
+                ? ($this->renditions->findCompleteCopy($trackId->toString(), $fullPath, (string) $metadata->sourceHash, (int) $metadata->streamIndex)
+                    ?? $this->renditions->openCopy($trackId->toString(), $fullPath, (string) $metadata->sourceHash, (int) $metadata->streamIndex))
+                : $this->renditions->open($trackId->toString(), $fullPath, $renditionFormat, $targetBitrate);
         } catch (MediaEncodingProhibitedException $error) {
             return $this->errorResponse($error->getMessage(), Response::HTTP_CONFLICT, $error->details);
         } catch (AudioRenditionBusyException) {
@@ -157,12 +173,13 @@ final class StreamController
         } catch (AudioRenditionFailedException) {
             return $this->errorResponse(
                 $this->trans('errors.transcode_failed', domain: 'media'),
-                Response::HTTP_INTERNAL_SERVER_ERROR,
+                $copy ? Response::HTTP_CONFLICT : Response::HTTP_INTERNAL_SERVER_ERROR,
+                $copy ? ['reason' => 'copy_failed'] : [],
             );
         }
 
         return $rendition->isComplete()
-            ? $this->fileResponse((string) $rendition->path, $renditionFormat->mimeType())
+            ? $this->fileResponse((string) $rendition->path, $rendition->mimeType())
             : $this->progressiveResponse($rendition);
     }
 

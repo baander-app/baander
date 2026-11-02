@@ -5,11 +5,14 @@ declare(strict_types=1);
 namespace App\Transcode\Infrastructure\FFmpeg;
 
 use App\Transcode\Domain\ValueObject\VideoProbeResult;
+use App\Transcode\Application\DTO\AudioProbeResult;
+use App\Transcode\Application\Port\AudioProbePortInterface;
+use App\Transcode\Application\Port\VideoProbePortInterface;
 use InvalidArgumentException;
 use RuntimeException;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
 
-final class FFprobeAdapter
+final class FFprobeAdapter implements AudioProbePortInterface, VideoProbePortInterface
 {
     public function __construct(
         private readonly JsonEncoder $jsonEncoder,
@@ -19,12 +22,25 @@ final class FFprobeAdapter
 
     public function probeVideo(string $sourcePath): VideoProbeResult
     {
+        return VideoProbeResult::fromProbeOutput($this->probe($sourcePath, FFprobeArguments::video($sourcePath, $this->ffprobePath)));
+    }
+
+    public function probeAudio(string $sourcePath): AudioProbeResult
+    {
+        return AudioProbeResult::fromProbeOutput($this->probe($sourcePath, FFprobeArguments::audio($sourcePath, $this->ffprobePath)));
+    }
+
+    /** @param list<string> $arguments
+     * @return array<string, mixed>
+     */
+    private function probe(string $sourcePath, array $arguments): array
+    {
         if (!file_exists($sourcePath)) {
             throw new InvalidArgumentException(sprintf('Source file does not exist: %s', $sourcePath));
         }
 
         $result = ProcessExecutor::exec(
-            FFprobeArguments::video($sourcePath, $this->ffprobePath),
+            $arguments,
             60,
         );
 
@@ -36,8 +52,6 @@ final class FFprobeAdapter
             ));
         }
 
-        $raw = $this->jsonEncoder->decode($result['output'], 'json');
-
-        return VideoProbeResult::fromProbeOutput($raw);
+        return $this->jsonEncoder->decode($result['output'], 'json');
     }
 }

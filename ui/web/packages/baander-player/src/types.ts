@@ -112,6 +112,7 @@ export type SessionStatus =
 /** Request body for POST /api/transcode/sessions/ */
 export interface CreateTranscodeSessionPayload {
   videoId: string;
+  requestId: string;
   qualityTier?: string;
   audioProfile?: AudioProfileName;
   priority?: SessionPriority;
@@ -401,6 +402,8 @@ export interface Highlight {
 }
 
 export interface AIRemixRequest {
+  /** Stable identity owned by the receiving playback client session. */
+  requestId: string;
   /** Segment timestamps to remix. */
   startTime: number;
   endTime: number;

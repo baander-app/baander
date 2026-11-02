@@ -101,6 +101,7 @@ final class TranscodeSessionIdentityTest extends TestCase
     public function testValidIdentityCreatesSessionWithItsUuid(): void
     {
         $owner = Uuid::generate();
+        $requestId = Uuid::generate()->toString();
         $videoModel = Video::create('/video.mp4', 'hash');
         $video = $videoModel->getId();
         $session = TranscodeSession::create($owner, Uuid::generate(), $video, AudioProfile::streamingStereo());
@@ -112,17 +113,18 @@ final class TranscodeSessionIdentityTest extends TestCase
         $playback->expects(self::once())->method('assertAccess')->with($video);
         $bus = $this->createMock(MessageBusInterface::class);
         $bus->expects(self::once())->method('dispatch')->willReturnCallback(
-            static function (CreateTranscodeSessionCommand $command) use ($owner, $video, $session): Envelope {
+            static function (CreateTranscodeSessionCommand $command) use ($owner, $video, $session, $requestId): Envelope {
                 self::assertTrue($command->getUserId()->equals($owner));
                 self::assertTrue($command->getVideoId()->equals($video));
                 self::assertSame('720p', $command->getQualityTier()->name);
+                self::assertSame($requestId, $command->requestId);
 
                 return new Envelope($command, [new HandledStamp($session, 'test-handler')]);
             },
         );
         $controller = new TranscodeSessionController($security, $bus, $sessions, $playback, new \App\Tests\Unit\Transcode\PublicViewStub($video));
 
-        $response = $controller->create(new CreateTranscodeSessionRequest(videoId: $videoModel->getPublicId()->toString(), qualityTier: '720p'));
+        $response = $controller->create(new CreateTranscodeSessionRequest(videoId: $videoModel->getPublicId()->toString(), qualityTier: '720p', requestId: $requestId));
 
         self::assertSame(201, $response->getStatusCode());
         $body = json_decode((string) $response->getContent(), true);

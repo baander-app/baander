@@ -103,7 +103,7 @@ final class DeliveryRouteInventoryTest extends TestCase
                 if ($methods !== [] && !in_array('GET', $methods, true)) {
                     continue;
                 }
-                if (preg_match('{' . $rule['path'] . '}', str_replace('{track}', 'video', $route->getPath())) !== 1) {
+                if (preg_match('{' . $rule['path'] . '}', str_replace(['{track}', '{generation}'], ['video', '3'], $route->getPath())) !== 1) {
                     continue;
                 }
                 if (in_array('PUBLIC_ACCESS', (array) ($rule['roles'] ?? []), true)) {

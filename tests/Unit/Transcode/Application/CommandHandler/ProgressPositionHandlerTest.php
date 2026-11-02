@@ -29,7 +29,7 @@ final class ProgressPositionHandlerTest extends TestCase
     {
         $owner = Uuid::generate();
         $video = Uuid::generate();
-        $job = TranscodeJob::create($video, QualityTier::p720(), '/media/progress', $owner);
+        $job = TranscodeJob::create($video, QualityTier::p720(), '/media/progress', $owner, requestId: 'admission');
         $session = TranscodeSession::create($owner, $job->getId(), $video, AudioProfile::streamingStereo());
         $runtime = new TranscodeRuntimeSnapshot($session->getJobId(), $session->getId(), 'admission', new DesiredTranscodeState(AudioProfile::streamingStereo(), $status, 60.0), $revision, $revision, $generation, 'ready', '/generation-'.$generation, null, true);
         $sessions = $this->createMock(TranscodeSessionPortInterface::class);

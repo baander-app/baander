@@ -11,7 +11,7 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Entity]
 #[ORM\Table(name: 'transcode_jobs')]
 #[ORM\UniqueConstraint(name: 'uniq_transcode_jobs_public_id', columns: ['public_id'])]
-#[ORM\UniqueConstraint(name: 'uniq_transcode_jobs_owner_user_id_video_id_quality_tier_name', columns: ['owner_user_id', 'video_id', 'quality_tier_name'])]
+#[ORM\UniqueConstraint(name: 'uniq_transcode_jobs_owner_user_id_video_id_quality_tier_name', columns: ['owner_user_id', 'video_id', 'quality_tier_name', 'presentation_key', 'request_id'])]
 #[ORM\Index(name: 'idx_transcode_jobs_status', columns: ['status'])]
 #[ORM\Index(name: 'idx_transcode_jobs_video_id', columns: ['video_id'])]
 class TranscodeJobEntity
@@ -32,6 +32,16 @@ class TranscodeJobEntity
 
     #[ORM\Column(type: 'text')]
     private string $qualityTierName;
+
+    #[ORM\Column(type: 'text')]
+    private string $requestId;
+
+    #[ORM\Column(type: 'text', options: ['default' => 'legacy'])]
+    private string $presentationKey = 'legacy';
+
+    /** @var array<string, mixed>|null */
+    #[ORM\Column(type: 'json', nullable: true, options: ['jsonb' => true])]
+    private ?array $presentationSelection = null;
 
     #[ORM\Column(type: 'text', options: ['default' => 'pending'])]
     private string $status;
@@ -118,8 +128,10 @@ class TranscodeJobEntity
         ?Uuid $ownerUserId,
         string $status = 'pending',
         ?Uuid $id = null,
+        ?string $requestId = null,
     ) {
         $this->id = $id ?? new Uuid();
+        $this->requestId = $requestId ?? $this->id->toString();
         $this->publicId = $publicId;
         $this->videoId = $videoId;
         $this->ownerUserId = $ownerUserId;
@@ -152,6 +164,16 @@ class TranscodeJobEntity
     public function getOwnerUserId(): ?Uuid { return $this->ownerUserId; }
     public function getVideoId(): Uuid { return $this->videoId; }
     public function getQualityTierName(): string { return $this->qualityTierName; }
+    public function getRequestId(): string { return $this->requestId; }
+    public function getPresentationKey(): string { return $this->presentationKey; }
+    /** @return array<string, mixed>|null */
+    public function getPresentationSelection(): ?array { return $this->presentationSelection; }
+    /** @param array<string, mixed>|null $selection */
+    public function setPresentationSelection(?array $selection, string $key): void
+    {
+        $this->presentationSelection = $selection;
+        $this->presentationKey = $key;
+    }
     public function getStatus(): string { return $this->status; }
     public function getReferenceCount(): int { return $this->referenceCount; }
     public function getTotalSegments(): int { return $this->totalSegments; }

@@ -24,6 +24,7 @@ use App\Metadata\Application\Port\AlbumMetadataSyncRequestInterface;
 use App\Shared\Domain\Model\Uuid;
 use App\Transcode\Infrastructure\FFmpeg\FFprobeAdapter;
 use App\Tests\Fixtures\Catalog\PassThroughTransaction;
+use App\Tests\Fixtures\Catalog\DiscoveredFileObservations;
 use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
@@ -35,6 +36,8 @@ use Symfony\Component\Serializer\Encoder\JsonEncoder;
 
 final class IngestTestVideoCommandTest extends TestCase
 {
+    use DiscoveredFileObservations;
+
     private const string DIRECTORY = '/srv/baander-e2e/Fixture Movie';
     private const string HASH = 'fixture-hash';
 
@@ -112,6 +115,7 @@ final class IngestTestVideoCommandTest extends TestCase
             $this->createStub(LyricsFetchRequestInterface::class), $this->createStub(AlbumMetadataSyncRequestInterface::class), new NullLogger(),
             $this->createStub(LibraryMediaFilesInterface::class),
             new PassThroughTransaction(),
+            audioProbe: $this->audioProbeStub(),
         );
 
         return new IngestTestVideoCommand(new MovieLibraryIngest($provisioning, $handler, $videos));

@@ -81,6 +81,12 @@ class SongEntity
     #[ORM\Column(type: 'text', nullable: true)]
     private ?string $codec = null;
 
+    #[ORM\Column(type: 'text', nullable: true)]
+    private ?string $containerFormat = null;
+
+    #[ORM\Column(type: 'integer', nullable: true)]
+    private ?int $streamIndex = null;
+
     #[ORM\Column(type: 'boolean', options: ['default' => false])]
     private bool $explicit = false;
 
@@ -329,6 +335,26 @@ class SongEntity
     {
         $this->channels = $channels;
         $this->updatedAt = new \DateTimeImmutable();
+    }
+
+    public function getContainerFormat(): ?string
+    {
+        return $this->containerFormat;
+    }
+
+    public function setContainerFormat(?string $containerFormat): void
+    {
+        $this->containerFormat = $containerFormat;
+    }
+
+    public function getStreamIndex(): ?int
+    {
+        return $this->streamIndex;
+    }
+
+    public function setStreamIndex(?int $streamIndex): void
+    {
+        $this->streamIndex = $streamIndex;
     }
 
     public function getCodec(): ?string

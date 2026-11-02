@@ -16,9 +16,10 @@ interface TestAttachment {
 
 type MockAttachmentOptions = Omit<TestAttachment, 'dispose'> & { video: HTMLVideoElement, url: string }
 
-const { post, attachments, loader } = vi.hoisted(() => ({
-  post: vi.fn(), loader: { ready: true }, attachments: [] as TestAttachment[],
+const { post, attachments, loader, clientIdentity } = vi.hoisted(() => ({
+  post: vi.fn(), clientIdentity: vi.fn(), loader: { ready: true }, attachments: [] as TestAttachment[],
 }))
+vi.mock('@/features/session/services/playback-session-coordinator', () => ({ getPlaybackClientRequestId: clientIdentity }))
 vi.mock('@/features/catalog/hooks/hls-playback', () => ({
   attachHlsPlayback: ({ video, url, position, onReady, onError, getSubtitlePreference, onSubtitlePreferenceChange }: MockAttachmentOptions) => {
     const dispose = vi.fn()
@@ -33,6 +34,7 @@ vi.mock('@/shared/api-client/axios-instance', () => ({ AXIOS_INSTANCE: { post } 
 describe('useBaanderPlayer authorization', () => {
   beforeEach(() => {
     post.mockReset()
+    clientIdentity.mockReset().mockResolvedValue('f8bf4989-7537-46ac-9fb6-910ea8e1d465')
     attachments.length = 0
     loader.ready = true
     vi.spyOn(HTMLMediaElement.prototype, 'load').mockImplementation(() => {})
@@ -45,9 +47,36 @@ describe('useBaanderPlayer authorization', () => {
   })
   afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks() })
 
+  it('waits for the receiving client identity and keeps it on exact-job refreshes', async () => {
+    vi.useFakeTimers()
+    let identify!: (id: string) => void
+    clientIdentity.mockReturnValue(new Promise<string>(resolve => { identify = resolve }))
+    post.mockResolvedValue({ data: { url: '/manifest', jobId: 'low', jobIds: ['low', 'high'], renditionSet: 'set', sessionId: 'session', generation: 1, revision: 1, ready: true, startTime: 0, duration: 100, position: 0, status: 'paused' } })
+    const containerRef = { current: document.createElement('div') }
+    const { unmount } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef }))
+    await act(async () => { await vi.advanceTimersByTimeAsync(2000) })
+    expect(post).not.toHaveBeenCalled()
+    await act(async () => identify('81b42c41-c2bb-47f2-b0b6-f2eeed3d14fe'))
+    expect(post.mock.calls[0][1]).toEqual({ path: '/api/transcode/video/master.m3u8', requestId: '81b42c41-c2bb-47f2-b0b6-f2eeed3d14fe' })
+    await act(async () => { await vi.advanceTimersByTimeAsync(1000) })
+    expect(post.mock.calls.at(-1)?.[1]).toEqual({ path: '/api/transcode/video/master.m3u8', requestId: '81b42c41-c2bb-47f2-b0b6-f2eeed3d14fe', refresh: true, jobIds: ['low', 'high'] })
+    unmount()
+  })
+
+  it('does not admit playback after unmount while client identity is pending', async () => {
+    let identify!: (id: string) => void
+    clientIdentity.mockReturnValue(new Promise<string>(resolve => { identify = resolve }))
+    const containerRef = { current: document.createElement('div') }
+    const { unmount } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef }))
+    unmount()
+    await act(async () => identify('81b42c41-c2bb-47f2-b0b6-f2eeed3d14fe'))
+    expect(post).not.toHaveBeenCalled()
+    expect(clientIdentity.mock.calls[0][0].aborted).toBe(true)
+  })
+
   it('prepares an acknowledged source without starting native playback', async () => {
     loader.ready = false
-    post.mockResolvedValue({ data: { url: '/manifest', jobId: 'job', renditionSet: 'set', sessionId: 'owned-session', generation: 1, revision: 1, ready: true, startTime: 24, duration: 180, position: 42, status: 'running' } })
+    post.mockResolvedValue({ data: { url: '/manifest', jobIds: ['job'], jobId: 'job', renditionSet: 'set', sessionId: 'owned-session', generation: 1, revision: 1, ready: true, startTime: 24, duration: 180, position: 42, status: 'running' } })
     const containerRef = { current: document.createElement('div') }
     const { result } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef, coordinated: true }))
     await act(async () => {})
@@ -67,7 +96,7 @@ describe('useBaanderPlayer authorization', () => {
   })
 
   it('rejects native play failure instead of acknowledging playback', async () => {
-    post.mockResolvedValue({ data: { url: '/manifest', jobId: 'job', renditionSet: 'set', sessionId: 'owned-session', generation: 1, revision: 1, ready: true, startTime: 0, duration: 180, position: 0, status: 'running' } })
+    post.mockResolvedValue({ data: { url: '/manifest', jobIds: ['job'], jobId: 'job', renditionSet: 'set', sessionId: 'owned-session', generation: 1, revision: 1, ready: true, startTime: 0, duration: 180, position: 0, status: 'running' } })
     const containerRef = { current: document.createElement('div') }
     const { result } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef, coordinated: true }))
     await act(async () => {})
@@ -78,7 +107,7 @@ describe('useBaanderPlayer authorization', () => {
   })
 
   it('keeps a page-hidden video fenced through BFCache restoration until registration rearms it', async () => {
-    post.mockResolvedValue({ data: { url: '/manifest', jobId: 'job', renditionSet: 'set', sessionId: 'owned-session', generation: 1, revision: 1, ready: true, startTime: 0, duration: 180, position: 0, status: 'running' } })
+    post.mockResolvedValue({ data: { url: '/manifest', jobIds: ['job'], jobId: 'job', renditionSet: 'set', sessionId: 'owned-session', generation: 1, revision: 1, ready: true, startTime: 0, duration: 180, position: 0, status: 'running' } })
     const containerRef = { current: document.createElement('div') }
     const { result } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef, coordinated: true }))
     await act(async () => {})
@@ -101,7 +130,7 @@ describe('useBaanderPlayer authorization', () => {
   })
 
   it('rejects a late native start after the synchronous recovery fence', async () => {
-    post.mockResolvedValue({ data: { url: '/manifest', jobId: 'job', renditionSet: 'set', sessionId: 'owned-session', generation: 1, revision: 1, ready: true, startTime: 0, duration: 180, position: 0, status: 'running' } })
+    post.mockResolvedValue({ data: { url: '/manifest', jobIds: ['job'], jobId: 'job', renditionSet: 'set', sessionId: 'owned-session', generation: 1, revision: 1, ready: true, startTime: 0, duration: 180, position: 0, status: 'running' } })
     const containerRef = { current: document.createElement('div') }
     const { result } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef, coordinated: true }))
     await act(async () => {})
@@ -136,7 +165,7 @@ describe('useBaanderPlayer authorization', () => {
     Object.defineProperty(HTMLMediaElement.prototype, 'remote', { configurable: true, value: route })
     vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue('Mozilla/5.0 (X11; Linux x86_64) Chrome/130.0.0.0')
     try {
-      post.mockResolvedValue({ data: { url: '/manifest', jobId: 'job', renditionSet: 'set', sessionId: 'owned-session', generation: 1, revision: 1, ready: true, startTime: 0, duration: 180, position: 0, status: 'running' } })
+      post.mockResolvedValue({ data: { url: '/manifest', jobIds: ['job'], jobId: 'job', renditionSet: 'set', sessionId: 'owned-session', generation: 1, revision: 1, ready: true, startTime: 0, duration: 180, position: 0, status: 'running' } })
       const containerRef = { current: document.createElement('div') }
       const { result, unmount } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef, coordinated: true }))
       await act(async () => {})
@@ -160,7 +189,7 @@ describe('useBaanderPlayer authorization', () => {
   })
 
   it('stops native execution and releases its source while preserving the acknowledged cursor', async () => {
-    post.mockResolvedValue({ data: { url: '/manifest', jobId: 'job', renditionSet: 'set', sessionId: 'owned-session', generation: 1, revision: 1, ready: true, startTime: 24, duration: 180, position: 42, status: 'paused' } })
+    post.mockResolvedValue({ data: { url: '/manifest', jobIds: ['job'], jobId: 'job', renditionSet: 'set', sessionId: 'owned-session', generation: 1, revision: 1, ready: true, startTime: 24, duration: 180, position: 42, status: 'paused' } })
     const containerRef = { current: document.createElement('div') }
     const { result } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef, coordinated: true }))
     await act(async () => {})
@@ -182,7 +211,7 @@ describe('useBaanderPlayer authorization', () => {
   })
 
   it('quiesces a pending native play and fences its late completion', async () => {
-    post.mockResolvedValue({ data: { url: '/manifest', jobId: 'job', renditionSet: 'set', sessionId: 'owned-session', generation: 1, revision: 1, ready: true, startTime: 24, duration: 180, position: 42, status: 'running' } })
+    post.mockResolvedValue({ data: { url: '/manifest', jobIds: ['job'], jobId: 'job', renditionSet: 'set', sessionId: 'owned-session', generation: 1, revision: 1, ready: true, startTime: 24, duration: 180, position: 42, status: 'running' } })
     const containerRef = { current: document.createElement('div') }
     const { result } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef, coordinated: true }))
     await act(async () => {})
@@ -205,7 +234,7 @@ describe('useBaanderPlayer authorization', () => {
 
   it('cancels readiness without admitting a stale attachment', async () => {
     loader.ready = false
-    post.mockResolvedValue({ data: { url: '/manifest', jobId: 'job', renditionSet: 'set', sessionId: 'owned-session', generation: 1, revision: 1, ready: true, startTime: 0, duration: 180, position: 0, status: 'running' } })
+    post.mockResolvedValue({ data: { url: '/manifest', jobIds: ['job'], jobId: 'job', renditionSet: 'set', sessionId: 'owned-session', generation: 1, revision: 1, ready: true, startTime: 0, duration: 180, position: 0, status: 'running' } })
     const containerRef = { current: document.createElement('div') }
     const { result } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef, coordinated: true }))
     await act(async () => {})
@@ -224,7 +253,7 @@ describe('useBaanderPlayer authorization', () => {
     { position: 0, startTime: 0, status: 'paused', nativeTime: 1, shouldSeek: true },
     { position: 180, startTime: 162, status: 'paused', nativeTime: 0, shouldSeek: true },
   ])('restores $status global position $position from native time $nativeTime without unnecessary seeking', async ({ position, startTime, status, nativeTime, shouldSeek }) => {
-    post.mockResolvedValue({ data: { url: '/manifest', jobId: 'job', renditionSet: 'set', sessionId: 'owned-session', generation: 1, revision: 1, ready: true, startTime, duration: 180, position, status } })
+    post.mockResolvedValue({ data: { url: '/manifest', jobIds: ['job'], jobId: 'job', renditionSet: 'set', sessionId: 'owned-session', generation: 1, revision: 1, ready: true, startTime, duration: 180, position, status } })
     const containerRef = { current: document.createElement('div') }
     const { unmount } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef, autoPlay: true }))
     await act(async () => {})
@@ -249,7 +278,7 @@ describe('useBaanderPlayer authorization', () => {
     vi.setSystemTime(new Date('2026-10-23T10:00:00Z'))
     const initialExpiry = Math.floor(Date.now() / 1000) + 20
     post.mockImplementation(() => Promise.resolve({ data: {
-      url: `/manifest?exp=${Math.floor(Date.now() / 1000) + 20}`, jobId: 'job',
+      url: `/manifest?exp=${Math.floor(Date.now() / 1000) + 20}`, jobIds: ['job'], jobId: 'job',
       generation: 1, revision: 1, renditionSet: 'job.1', ready: true,
       position: 42, startTime: 24, duration: 180, status,
     } }))
@@ -279,10 +308,10 @@ describe('useBaanderPlayer authorization', () => {
   it.each(['', 'exp=invalid', 'exp=-1', 'exp=1.5', 'exp=9007199254740992'])('does not loop when an attached expiry is missing or malformed: %s', async query => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-10-23T10:00:00Z'))
-    post.mockResolvedValueOnce({ data: { url: `/manifest?${query}`, jobId: 'job', generation: 1,
+    post.mockResolvedValueOnce({ data: { url: `/manifest?${query}`, jobIds: ['job'], jobId: 'job', generation: 1,
       revision: 1, renditionSet: 'job.1', ready: true, position: 0, startTime: 0, duration: 100, status: 'paused' } })
       .mockImplementation(() => Promise.resolve({ data: { url: `/manifest?exp=${Math.floor(Date.now() / 1000) + 20}`,
-        jobId: 'job', generation: 1, revision: 1, renditionSet: 'job.1', ready: true,
+        jobIds: ['job'], jobId: 'job', generation: 1, revision: 1, renditionSet: 'job.1', ready: true,
         position: 0, startTime: 0, duration: 100, status: 'paused' } }))
     const containerRef = { current: document.createElement('div') }
     const { unmount } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef }))
@@ -297,7 +326,7 @@ describe('useBaanderPlayer authorization', () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-10-23T10:00:00Z'))
     post.mockImplementation(() => Promise.resolve({ data: {
-      url: `/manifest?exp=${Math.floor(Date.now() / 1000) + 20}`, jobId: 'job', generation: 1,
+      url: `/manifest?exp=${Math.floor(Date.now() / 1000) + 20}`, jobIds: ['job'], jobId: 'job', generation: 1,
       revision: 1, renditionSet: 'job.1', ready: true, position: 42, startTime: 24, duration: 180, status: 'paused',
     } }))
     const containerRef = { current: document.createElement('div') }
@@ -324,7 +353,7 @@ describe('useBaanderPlayer authorization', () => {
     vi.setSystemTime(new Date('2026-10-23T10:00:00Z'))
     const seconds = Math.floor(Date.now() / 1000)
     let expiry = seconds + 3
-    post.mockImplementation(() => Promise.resolve({ data: { url: `/manifest?exp=${expiry}`, jobId: 'job',
+    post.mockImplementation(() => Promise.resolve({ data: { url: `/manifest?exp=${expiry}`, jobIds: ['job'], jobId: 'job',
       generation: 1, revision: 1, renditionSet: 'job.1', ready: true,
       position: 0, startTime: 0, duration: 180, status: 'paused' } }))
     const containerRef = { current: document.createElement('div') }
@@ -347,7 +376,7 @@ describe('useBaanderPlayer authorization', () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-10-23T10:00:00Z'))
     const expiry = Math.floor(Date.now() / 1000) + 20
-    const snapshot = { url: `/manifest?exp=${expiry}`, jobId: 'job', sessionId: 'owned', generation: 1,
+    const snapshot = { url: `/manifest?exp=${expiry}`, jobIds: ['job'], jobId: 'job', sessionId: 'owned', generation: 1,
       revision: 1, renditionSet: 'job.1', ready: true, position: 42, startTime: 24, duration: 180, status: 'running' }
     post.mockResolvedValue({ data: snapshot })
     const onError = vi.fn()
@@ -391,7 +420,7 @@ describe('useBaanderPlayer authorization', () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-10-23T10:00:00Z'))
     const expiry = Math.floor(Date.now() / 1000) + 20
-    const snapshot = { url: `/manifest?exp=${expiry}`, jobId: 'job', sessionId: 'owned', generation: 1,
+    const snapshot = { url: `/manifest?exp=${expiry}`, jobIds: ['job'], jobId: 'job', sessionId: 'owned', generation: 1,
       revision: 1, renditionSet: 'job.1', ready: true, position: 42, startTime: 24, duration: 180, status: 'running' }
     post.mockImplementation((path: string) => path === '/api/stream/sign'
       ? Promise.resolve({ data: snapshot }) : new Promise(() => {}))
@@ -417,7 +446,7 @@ describe('useBaanderPlayer authorization', () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-10-23T10:00:00Z'))
     const expiry = Math.floor(Date.now() / 1000) + 20
-    const snapshot = { url: `/manifest?exp=${expiry}`, jobId: 'job', generation: 1, revision: 1,
+    const snapshot = { url: `/manifest?exp=${expiry}`, jobIds: ['job'], jobId: 'job', generation: 1, revision: 1,
       renditionSet: 'job.1', ready: true, position: 0, startTime: 0, duration: 180, status: 'running' }
     post.mockResolvedValue({ data: snapshot })
     const onError = vi.fn()
@@ -442,7 +471,7 @@ describe('useBaanderPlayer authorization', () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-10-23T10:00:00Z'))
     const expiry = Math.floor(Date.now() / 1000) + 20
-    const snapshot = { url: `/manifest?exp=${expiry}`, jobId: 'job', generation: 1, revision: 1,
+    const snapshot = { url: `/manifest?exp=${expiry}`, jobIds: ['job'], jobId: 'job', generation: 1, revision: 1,
       renditionSet: 'job.1', ready: true, position: 0, startTime: 0, duration: 180, status: 'paused' }
     post.mockResolvedValue({ data: snapshot })
     const containerRef = { current: document.createElement('div') }
@@ -470,7 +499,7 @@ describe('useBaanderPlayer authorization', () => {
     post.mockImplementation((path: string) => {
       if (path !== '/api/stream/sign') return new Promise(resolve => { accept = resolve })
       return Promise.resolve({ data: { url: `/manifest?exp=${Math.floor(Date.now() / 1000) + 20}`,
-        jobId: 'job', sessionId: 'owned', generation: 1, revision, renditionSet: 'job.1',
+        jobIds: ['job'], jobId: 'job', sessionId: 'owned', generation: 1, revision, renditionSet: 'job.1',
         ready: true, position, startTime: 24, duration: 180, status: 'paused' } })
     })
     const containerRef = { current: document.createElement('div') }
@@ -498,7 +527,7 @@ describe('useBaanderPlayer authorization', () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-10-23T10:00:00Z'))
     const expiry = Math.floor(Date.now() / 1000) + 20
-    const snapshot = { url: `/manifest?exp=${expiry}`, jobId: 'job', generation: 1, revision: 1,
+    const snapshot = { url: `/manifest?exp=${expiry}`, jobIds: ['job'], jobId: 'job', generation: 1, revision: 1,
       renditionSet: 'job.1', ready: true, position: 42, startTime: 24, duration: 180, status: 'running' }
     post.mockResolvedValue({ data: snapshot })
     const onError = vi.fn()
@@ -537,7 +566,7 @@ describe('useBaanderPlayer authorization', () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-10-23T10:00:00Z'))
     const expiry = Math.floor(Date.now() / 1000) + 3600
-    const snapshot = { url: `/manifest?exp=${expiry}`, jobId: 'job', generation: 1, revision: 1,
+    const snapshot = { url: `/manifest?exp=${expiry}`, jobIds: ['job'], jobId: 'job', generation: 1, revision: 1,
       renditionSet: 'job.1', ready: true, position: 30, startTime: 12, duration: 180, status: 'paused' }
     post.mockResolvedValue({ data: snapshot })
     const onError = vi.fn()
@@ -576,7 +605,7 @@ describe('useBaanderPlayer authorization', () => {
     vi.setSystemTime(new Date('2026-10-23T10:00:00Z'))
     const seconds = Math.floor(Date.now() / 1000)
     const expiry = seconds + 3600
-    const snapshot = { url: `/manifest?exp=${expiry}`, jobId: 'job', generation: 1, revision: 1,
+    const snapshot = { url: `/manifest?exp=${expiry}`, jobIds: ['job'], jobId: 'job', generation: 1, revision: 1,
       renditionSet: 'job.1', ready: true, position: 30, startTime: 12, duration: 180, status: 'paused' }
     post.mockResolvedValue({ data: snapshot })
     const onError = vi.fn()
@@ -613,7 +642,7 @@ describe('useBaanderPlayer authorization', () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-10-23T10:00:00Z'))
     const expiry = Math.floor(Date.now() / 1000) + 3600
-    const snapshot = { url: `/manifest?exp=${expiry}`, jobId: 'job', generation: 1, revision: 1,
+    const snapshot = { url: `/manifest?exp=${expiry}`, jobIds: ['job'], jobId: 'job', generation: 1, revision: 1,
       renditionSet: 'job.1', ready: true, position: 30, startTime: 12, duration: 180, status: 'paused' }
     loader.ready = false
     post.mockResolvedValueOnce({ data: phase === 'preparing'
@@ -643,7 +672,7 @@ describe('useBaanderPlayer authorization', () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-10-23T10:00:00Z'))
     const expiry = Math.floor(Date.now() / 1000) + 3600
-    const snapshot = { url: `/manifest?exp=${expiry}`, jobId: 'job', generation: 1, revision: 1,
+    const snapshot = { url: `/manifest?exp=${expiry}`, jobIds: ['job'], jobId: 'job', generation: 1, revision: 1,
       renditionSet: 'job.1', ready: true, position: 30, startTime: 12, duration: 180, status: 'running' }
     post.mockResolvedValue({ data: snapshot })
     const onError = vi.fn()
@@ -675,7 +704,7 @@ describe('useBaanderPlayer authorization', () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-10-23T10:00:00Z'))
     const expiry = Math.floor(Date.now() / 1000) + 3600
-    const snapshot = { url: `/manifest?exp=${expiry}`, jobId: 'job', generation: 1, revision: 1,
+    const snapshot = { url: `/manifest?exp=${expiry}`, jobIds: ['job'], jobId: 'job', generation: 1, revision: 1,
       renditionSet: 'job.1', ready: true, position: 30, startTime: 12, duration: 180, status: 'paused' }
     post.mockResolvedValue({ data: snapshot })
     const onError = vi.fn()
@@ -699,7 +728,7 @@ describe('useBaanderPlayer authorization', () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-10-23T10:00:00Z'))
     const expiry = Math.floor(Date.now() / 1000) + 3600
-    let snapshot = { url: `/manifest?exp=${expiry}`, jobId: 'job', sessionId: 'owned', generation: 1, revision: 1,
+    let snapshot = { url: `/manifest?exp=${expiry}`, jobIds: ['job'], jobId: 'job', sessionId: 'owned', generation: 1, revision: 1,
       renditionSet: 'job.1', ready: true, position: 30, startTime: 12, duration: 180, status: 'paused' }
     post.mockImplementation((path: string) => Promise.resolve(path === '/api/stream/sign'
       ? { data: snapshot } : { data: { data: { acceptedGeneration: 1 } } }))
@@ -735,7 +764,7 @@ describe('useBaanderPlayer authorization', () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-10-23T10:00:00Z'))
     const expiry = Math.floor(Date.now() / 1000) + 86400
-    const ready = { url: `/manifest?exp=${expiry}`, jobId: 'job', sessionId: 'owned-session', generation: 10,
+    const ready = { url: `/manifest?exp=${expiry}`, jobIds: ['job'], jobId: 'job', sessionId: 'owned-session', generation: 10,
       revision: 38, renditionSet: 'job.10', ready: true, position: 30, startTime: 12, duration: 180, status: 'running' }
     const unavailable = { ...ready, ready: false, url: null, startTime: null, duration: null, renditionSet: '' }
     let snapshot: { data: Partial<typeof ready> | typeof unavailable } = { data: ready }
@@ -777,7 +806,7 @@ describe('useBaanderPlayer authorization', () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-10-23T10:00:00Z'))
     const expiry = Math.floor(Date.now() / 1000) + 86400
-    const ready = { url: `/manifest?exp=${expiry}`, jobId: 'job', sessionId: 'owned-session', generation: 10,
+    const ready = { url: `/manifest?exp=${expiry}`, jobIds: ['job'], jobId: 'job', sessionId: 'owned-session', generation: 10,
       revision: 38, renditionSet: 'job.10', ready: true, position: 30, startTime: 12, duration: 180, status: 'running' }
     const unavailable = { ...ready, ready: false, url: null, startTime: null, duration: null, renditionSet: '' }
     let snapshot: { data: Partial<typeof ready> | typeof unavailable } = { data: ready }
@@ -817,7 +846,7 @@ describe('useBaanderPlayer authorization', () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-10-23T10:00:00Z'))
     const expiry = Math.floor(Date.now() / 1000) + 86400
-    const ready = { url: `/manifest?exp=${expiry}`, jobId: 'job', sessionId: 'owned-session', generation: 10,
+    const ready = { url: `/manifest?exp=${expiry}`, jobIds: ['job'], jobId: 'job', sessionId: 'owned-session', generation: 10,
       revision: 38, renditionSet: 'job.10', ready: true, position: 30, startTime: 12, duration: 180, status: 'paused' }
     const unavailable = { ...ready, ready: false, url: null, startTime: null, duration: null, renditionSet: '' }
     let snapshot: { data: Partial<typeof ready> | typeof unavailable } = { data: kind === 'initial preparation' ? unavailable : ready }
@@ -848,16 +877,18 @@ describe('useBaanderPlayer authorization', () => {
   })
 
   it('waits for authorization and uses the signed manifest', async () => {
-    let resolve!: (value: { data: { url: string, ready?: boolean, generation?: number, revision?: number, jobId?: string, sessionId?: string | null, position?: number, status?: string, startTime?: number, duration?: number, renditionSet?: string } }) => void
+    let resolve!: (value: { data: { url: string, ready?: boolean, generation?: number, revision?: number, jobId?: string, jobIds?: string[], sessionId?: string | null, position?: number, status?: string, startTime?: number, duration?: number, renditionSet?: string } }) => void
     post.mockReturnValue(new Promise((done) => { resolve = done }))
     const containerRef = { current: document.createElement('div') }
     const { unmount } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef, autoPlay: true }))
     const video = containerRef.current.querySelector('video')!
     expect(video.getAttribute('src')).toBeNull()
+    await act(async () => {})
     expect(post).toHaveBeenCalledWith('/api/stream/sign', {
       path: '/api/transcode/video/master.m3u8',
+      requestId: 'f8bf4989-7537-46ac-9fb6-910ea8e1d465',
     }, { signal: expect.any(AbortSignal), timeout: 5000 })
-    await act(async () => resolve({ data: { url: '/api/transcode/video/master.m3u8?sig=proof&exp=100', ready: true, startTime: 0, duration: 100, generation: 1, revision: 1, jobId: 'job', renditionSet: 'set', sessionId: null, position: 0, status: 'running' } }))
+    await act(async () => resolve({ data: { url: '/api/transcode/video/master.m3u8?sig=proof&exp=100', ready: true, startTime: 0, duration: 100, generation: 1, revision: 1, jobIds: ['job'], jobId: 'job', renditionSet: 'set', sessionId: null, position: 0, status: 'running' } }))
     expect(video.src).toBe('https://media.baander.app/api/transcode/video/master.m3u8?sig=proof&exp=100')
     expect(video.play).toHaveBeenCalledOnce()
     unmount()
@@ -867,7 +898,7 @@ describe('useBaanderPlayer authorization', () => {
     vi.useFakeTimers()
     let rejectPlay: (error: Error) => void = () => {}
     vi.mocked(HTMLMediaElement.prototype.play).mockImplementationOnce(() => new Promise((_resolve, reject) => { rejectPlay = reject }))
-    const snapshot = (generation: number) => ({ data: { url: `/manifest?generation=${generation}`, jobId: 'job',
+    const snapshot = (generation: number) => ({ data: { url: `/manifest?generation=${generation}`, jobIds: ['job'], jobId: 'job',
       sessionId: 'owned', generation, revision: generation, renditionSet: `job.${generation}`,
       ready: true, position: 0, startTime: 0, duration: 100, status: 'running' } })
     post.mockResolvedValueOnce(snapshot(1)).mockResolvedValue(snapshot(2))
@@ -891,7 +922,7 @@ describe('useBaanderPlayer authorization', () => {
   })
 
   it('releases the active attachment through StrictMode replay and final cleanup', async () => {
-    post.mockResolvedValue({ data: { url: '/manifest', jobId: 'job', generation: 1, revision: 1,
+    post.mockResolvedValue({ data: { url: '/manifest', jobIds: ['job'], jobId: 'job', generation: 1, revision: 1,
       renditionSet: 'job.1', ready: true, position: 0, startTime: 0, duration: 100, status: 'paused' } })
     const containerRef = { current: document.createElement('div') }
     const { unmount } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef }), {
@@ -926,7 +957,7 @@ describe('useBaanderPlayer authorization', () => {
   it('preserves play then pause before a delayed attachment is ready', async () => {
     loader.ready = false
     post.mockImplementation((path: string) => Promise.resolve(path === '/api/stream/sign' ? { data: {
-      url: '/manifest', jobId: 'job', sessionId: 'owned', generation: 1, revision: 1,
+      url: '/manifest', jobIds: ['job'], jobId: 'job', sessionId: 'owned', generation: 1, revision: 1,
       renditionSet: 'job.1', ready: true, position: 0, startTime: 0, duration: 100, status: 'running',
     } } : { data: {} }))
     const containerRef = { current: document.createElement('div') }
@@ -952,7 +983,7 @@ describe('useBaanderPlayer authorization', () => {
         return Promise.resolve({ data: { data: { acceptedGeneration: 2 } } })
       }
       return Promise.resolve({ data: { url: ready ? `/manifest?generation=${generation}` : null,
-        jobId: 'job', sessionId: 'owned', generation, revision: generation, renditionSet: ready ? `job.${generation}` : '',
+        jobIds: ['job'], jobId: 'job', sessionId: 'owned', generation, revision: generation, renditionSet: ready ? `job.${generation}` : '',
         ready, position: generation === 1 ? 120 : 0, startTime: ready ? generation === 1 ? 102 : 0 : null,
         duration: ready ? 180 : null, status: 'paused' } })
     })
@@ -974,7 +1005,7 @@ describe('useBaanderPlayer authorization', () => {
 
   it.each([undefined, 503])('preserves an attached cursor across a transient sign poll failure (%s)', async status => {
     vi.useFakeTimers()
-    const snapshot = { data: { url: '/manifest', jobId: 'job', sessionId: 'owned', generation: 1, revision: 1,
+    const snapshot = { data: { url: '/manifest', jobIds: ['job'], jobId: 'job', sessionId: 'owned', generation: 1, revision: 1,
       renditionSet: 'job.1', ready: true, position: 42, startTime: 24, duration: 180, status: 'paused' } }
     const outage = Object.assign(new AxiosError('Temporarily unavailable', 'ERR_NETWORK'), status ? { response: { status } } : {})
     post.mockResolvedValueOnce(snapshot).mockRejectedValueOnce(outage).mockResolvedValue(snapshot)
@@ -998,7 +1029,7 @@ describe('useBaanderPlayer authorization', () => {
 
   it.each([403, 404])('disposes attached playback when sign polling refuses access (%s)', async status => {
     vi.useFakeTimers()
-    const snapshot = { data: { url: '/manifest', jobId: 'job', generation: 1, revision: 1,
+    const snapshot = { data: { url: '/manifest', jobIds: ['job'], jobId: 'job', generation: 1, revision: 1,
       renditionSet: 'job.1', ready: true, position: 0, startTime: 0, duration: 180, status: 'paused' } }
     post.mockResolvedValueOnce(snapshot).mockRejectedValue(Object.assign(new AxiosError('Refused'), { response: { status } }))
     const containerRef = { current: document.createElement('div') }
@@ -1025,7 +1056,7 @@ describe('useBaanderPlayer authorization', () => {
     vi.useFakeTimers()
     const snapshot = (generation: number, position: number, status: string) => ({ data: {
       url: `/manifest?generation=${generation}`, generation, revision: generation,
-      jobId: 'job', renditionSet: 'set', ready: true, startTime: 0, duration: 100, position, status,
+      jobIds: ['job'], jobId: 'job', renditionSet: 'set', ready: true, startTime: 0, duration: 100, position, status,
     } })
     post.mockResolvedValueOnce(snapshot(1, 0, 'running'))
       .mockResolvedValueOnce(snapshot(2, 42, 'paused'))
@@ -1038,14 +1069,14 @@ describe('useBaanderPlayer authorization', () => {
     await act(async () => video.dispatchEvent(new Event('loadedmetadata')))
     expect(video.currentTime).toBe(42)
     expect(video.pause).toHaveBeenCalled()
-    expect(post.mock.calls[1][1]).toEqual({ path: '/api/transcode/video/master.m3u8', refresh: true })
+    expect(post.mock.calls[1][1]).toEqual({ path: '/api/transcode/video/master.m3u8', requestId: 'f8bf4989-7537-46ac-9fb6-910ea8e1d465', refresh: true, jobIds: ['job'] })
     unmount()
     vi.useRealTimers()
   })
 
   it('ignores an older refresh that completes after a newer generation', async () => {
     vi.useFakeTimers()
-    const snapshot = (generation: number) => ({ data: { url: `/manifest?generation=${generation}`, jobId: 'job', renditionSet: 'set', generation, revision: generation, ready: true, startTime: 0, duration: 100, position: generation * 10, status: 'paused' } })
+    const snapshot = (generation: number) => ({ data: { url: `/manifest?generation=${generation}`, jobIds: ['job'], jobId: 'job', renditionSet: 'set', generation, revision: generation, ready: true, startTime: 0, duration: 100, position: generation * 10, status: 'paused' } })
     let resolveOld!: (value: ReturnType<typeof snapshot>) => void
     post.mockResolvedValueOnce(snapshot(1))
       .mockReturnValueOnce(new Promise((done) => { resolveOld = done }))
@@ -1065,7 +1096,7 @@ describe('useBaanderPlayer authorization', () => {
   })
 
   it('persists native seek and pause through the authorized current session', async () => {
-    post.mockResolvedValue({ data: { url: '/manifest?generation=1', jobId: 'job', renditionSet: 'set', sessionId: 'owned-session', generation: 1, revision: 1, ready: true, startTime: 0, duration: 100, position: 0, status: 'running' } })
+    post.mockResolvedValue({ data: { url: '/manifest?generation=1', jobIds: ['job'], jobId: 'job', renditionSet: 'set', sessionId: 'owned-session', generation: 1, revision: 1, ready: true, startTime: 0, duration: 100, position: 0, status: 'running' } })
     const containerRef = { current: document.createElement('div') }
     const { unmount } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef, autoPlay: true }))
     await act(async () => {})
@@ -1083,7 +1114,7 @@ describe('useBaanderPlayer authorization', () => {
   })
 
   it('keeps a decoder failure as an error without committing its native pause as user intent', async () => {
-    post.mockResolvedValue({ data: { url: '/manifest', jobId: 'job', renditionSet: 'set', sessionId: 'owned-session', generation: 1, revision: 1, ready: true, startTime: 0, duration: 100, position: 0, status: 'running' } })
+    post.mockResolvedValue({ data: { url: '/manifest', jobIds: ['job'], jobId: 'job', renditionSet: 'set', sessionId: 'owned-session', generation: 1, revision: 1, ready: true, startTime: 0, duration: 100, position: 0, status: 'running' } })
     const onError = vi.fn()
     const containerRef = { current: document.createElement('div') }
     const { result, unmount } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef, autoPlay: true, onError }))
@@ -1102,7 +1133,7 @@ describe('useBaanderPlayer authorization', () => {
 
   it('sends bounded playing progress without repeated or paused heartbeats', async () => {
     vi.useFakeTimers()
-    const snapshot = { url: '/manifest?generation=1', jobId: 'job', renditionSet: 'set', sessionId: 'owned-session', generation: 1, revision: 5, ready: true, startTime: 0, duration: 100, position: 0, status: 'running' }
+    const snapshot = { url: '/manifest?generation=1', jobIds: ['job'], jobId: 'job', renditionSet: 'set', sessionId: 'owned-session', generation: 1, revision: 5, ready: true, startTime: 0, duration: 100, position: 0, status: 'running' }
     post.mockImplementation(async (path: string, payload: { action?: string, position?: number }) => {
       if (path === '/api/stream/sign') return { data: { ...snapshot } }
       if (payload.action === 'pause') snapshot.status = 'paused'
@@ -1131,7 +1162,7 @@ describe('useBaanderPlayer authorization', () => {
 
   it.each(['ERR_NETWORK', 'ECONNABORTED', 'ETIMEDOUT', '503'])('preserves running playback through a failed automatic progress request: %s', async code => {
     vi.useFakeTimers()
-    const snapshot = { url: '/manifest', jobId: 'job', renditionSet: 'set', sessionId: 'owned-session',
+    const snapshot = { url: '/manifest', jobIds: ['job'], jobId: 'job', renditionSet: 'set', sessionId: 'owned-session',
       generation: 1, revision: 5, ready: true, startTime: 24, duration: 180, position: 24, status: 'running' }
     let attempts = 0
     post.mockImplementation((path: string, payload: { action?: string, position?: number }) => {
@@ -1172,7 +1203,7 @@ describe('useBaanderPlayer authorization', () => {
 
   it('reconciles accepted progress after its response is lost and sends the latest eligible cursor next', async () => {
     vi.useFakeTimers()
-    const snapshot = { url: '/manifest', jobId: 'job', renditionSet: 'set', sessionId: 'owned-session',
+    const snapshot = { url: '/manifest', jobIds: ['job'], jobId: 'job', renditionSet: 'set', sessionId: 'owned-session',
       generation: 1, revision: 5, ready: true, startTime: 0, duration: 180, position: 0, status: 'running' }
     let rejectProgress!: (error: Error) => void
     let attempts = 0
@@ -1210,7 +1241,7 @@ describe('useBaanderPlayer authorization', () => {
 
   it('retains queued source seeks when their predecessor progress update loses its response', async () => {
     vi.useFakeTimers()
-    let snapshot = { url: '/manifest?generation=1', jobId: 'job', renditionSet: 'job.1', sessionId: 'owned-session',
+    let snapshot = { url: '/manifest?generation=1', jobIds: ['job'], jobId: 'job', renditionSet: 'job.1', sessionId: 'owned-session',
       generation: 1, revision: 5, ready: true, startTime: 0, duration: 180, position: 0, status: 'running' }
     let rejectProgress!: (error: Error) => void
     post.mockImplementation((path: string, payload: { action?: string, position?: number }) => {
@@ -1248,7 +1279,7 @@ describe('useBaanderPlayer authorization', () => {
 
   it.each(['unmounted', 'session replaced', 'generation replaced', 'terminal'])('fences a failed progress completion after playback is %s', async outcome => {
     vi.useFakeTimers()
-    let snapshot = { url: '/manifest?generation=1', jobId: 'job', renditionSet: 'job.1', sessionId: 'owned-session',
+    let snapshot = { url: '/manifest?generation=1', jobIds: ['job'], jobId: 'job', renditionSet: 'job.1', sessionId: 'owned-session',
       generation: 1, revision: 5, ready: true, startTime: 0, duration: 180, position: 0, status: 'running' }
     let rejectProgress!: (error: Error) => void
     post.mockImplementation((path: string) => path === '/api/stream/sign'
@@ -1266,7 +1297,7 @@ describe('useBaanderPlayer authorization', () => {
     else if (outcome === 'terminal') await act(async () => attachments[0].onError())
     else {
       snapshot = { ...snapshot, generation: 2, revision: 6, url: '/manifest?generation=2', renditionSet: 'job.2', status: 'paused',
-        ...(outcome === 'session replaced' ? { jobId: 'replacement-job', sessionId: 'replacement-session', renditionSet: 'replacement-job.2' } : {}) }
+        ...(outcome === 'session replaced' ? { jobIds: ['replacement-job'], jobId: 'replacement-job', sessionId: 'replacement-session', renditionSet: 'replacement-job.2' } : {}) }
       await act(async () => vi.advanceTimersByTimeAsync(1000))
       await act(async () => video.dispatchEvent(new Event('loadedmetadata')))
     }
@@ -1297,7 +1328,7 @@ describe('useBaanderPlayer authorization', () => {
         : kind === 'canceled' ? new CanceledError('Canceled')
           : new AxiosError('Invalid request', kind === 'no Axios code' ? undefined : kind)
     post.mockImplementation((path: string) => path === '/api/stream/sign'
-      ? Promise.resolve({ data: { url: '/manifest', jobId: 'job', renditionSet: 'job.1', sessionId: 'owned-session',
+      ? Promise.resolve({ data: { url: '/manifest', jobIds: ['job'], jobId: 'job', renditionSet: 'job.1', sessionId: 'owned-session',
         generation: 1, revision: 5, ready: true, startTime: 0, duration: 180, position: 0, status: 'running' } })
       : Promise.reject(failure))
     const onError = vi.fn()
@@ -1317,7 +1348,7 @@ describe('useBaanderPlayer authorization', () => {
 
   it('preserves decoded playback after both explicit seek transport attempts fail', async () => {
     post.mockImplementation((path: string) => path === '/api/stream/sign'
-      ? Promise.resolve({ data: { url: '/manifest', jobId: 'job', renditionSet: 'job.1', sessionId: 'owned-session',
+      ? Promise.resolve({ data: { url: '/manifest', jobIds: ['job'], jobId: 'job', renditionSet: 'job.1', sessionId: 'owned-session',
         generation: 1, revision: 5, ready: true, startTime: 0, duration: 180, position: 0, status: 'running' } })
       : Promise.reject(new AxiosError('Connection lost', 'ERR_NETWORK')))
     const onError = vi.fn()
@@ -1336,7 +1367,7 @@ describe('useBaanderPlayer authorization', () => {
   })
 
   describe('uncertain status delivery', () => {
-    const playback = (status: string) => ({ url: '/manifest', jobId: 'job', sessionId: 'owned-session',
+    const playback = (status: string) => ({ url: '/manifest', jobIds: ['job'], jobId: 'job', sessionId: 'owned-session',
       generation: 4, revision: 10, renditionSet: 'job.4', ready: true, position: 30, startTime: 12, duration: 180, status })
     const networkError = (code: string) => code === '503'
       ? Object.assign(new AxiosError('Unavailable'), { response: { status: 503 } }) : new AxiosError('Unavailable', code)
@@ -1524,7 +1555,7 @@ describe('useBaanderPlayer authorization', () => {
       let rejectOld!: (error: Error) => void
       post.mockImplementation((path: string) => {
         if (path === '/api/stream/sign') return Promise.resolve({ data: replaced
-          ? { ...playback('paused'), jobId: 'replacement-job', sessionId: 'replacement-session', ready: false,
+          ? { ...playback('paused'), jobIds: ['replacement-job'], jobId: 'replacement-job', sessionId: 'replacement-session', ready: false,
             url: null, startTime: null, duration: null, renditionSet: '' } : playback('running') })
         if (path.includes('/owned-session/')) return new Promise((_resolve, reject) => { rejectOld = reject })
         return Promise.resolve({ data: {} })
@@ -1601,7 +1632,7 @@ describe('useBaanderPlayer authorization', () => {
       if (outcome === 'unmounted') player.unmount()
       else if (outcome === 'terminal') await act(async () => attachments[0].onError())
       else {
-        snapshot = { ...snapshot, jobId: 'replacement-job', sessionId: 'replacement-session', renditionSet: 'replacement.4' }
+        snapshot = { ...snapshot, jobIds: ['replacement-job'], jobId: 'replacement-job', sessionId: 'replacement-session', renditionSet: 'replacement.4' }
         await act(async () => vi.advanceTimersByTimeAsync(1000))
       }
       const count = post.mock.calls.length
@@ -1638,7 +1669,7 @@ describe('useBaanderPlayer authorization', () => {
     let revision = 5
     let finishProgress!: (value: { data: object }) => void
     post.mockImplementation((path: string, payload: { action?: string }) => {
-      if (path === '/api/stream/sign') return Promise.resolve({ data: { url: '/manifest', jobId: 'job', renditionSet: 'set', sessionId: 'owned-session', generation: 1, revision, ready: true, startTime: 0, duration: 100, position: 0, status: 'running' } })
+      if (path === '/api/stream/sign') return Promise.resolve({ data: { url: '/manifest', jobIds: ['job'], jobId: 'job', renditionSet: 'set', sessionId: 'owned-session', generation: 1, revision, ready: true, startTime: 0, duration: 100, position: 0, status: 'running' } })
       if (payload.action === 'progress') return new Promise((resolve) => { finishProgress = resolve })
       return Promise.resolve({ data: {} })
     })
@@ -1670,7 +1701,7 @@ describe('useBaanderPlayer authorization', () => {
     let generation = 1
     let finishProgress!: (value: { data: object }) => void
     post.mockImplementation((path: string, payload: { action?: string }) => {
-      if (path === '/api/stream/sign') return Promise.resolve({ data: { url: `/manifest?generation=${generation}`, jobId: 'job', renditionSet: `job.${generation}`, sessionId: 'owned-session', generation, revision: generation + 4, ready: true, startTime: 0, duration: 100, position: 0, status: 'running' } })
+      if (path === '/api/stream/sign') return Promise.resolve({ data: { url: `/manifest?generation=${generation}`, jobIds: ['job'], jobId: 'job', renditionSet: `job.${generation}`, sessionId: 'owned-session', generation, revision: generation + 4, ready: true, startTime: 0, duration: 100, position: 0, status: 'running' } })
       if (payload.action === 'progress') return new Promise((resolve) => { finishProgress = resolve })
       return Promise.resolve({ data: {} })
     })
@@ -1698,7 +1729,7 @@ describe('useBaanderPlayer authorization', () => {
   it.each([7, undefined])('retains only the latest native target through its own accepted generation %s', async (acceptedGeneration) => {
     vi.useFakeTimers()
     const snapshot = (generation: number) => ({ data: {
-      url: `/manifest?generation=${generation}`, jobId: 'job', renditionSet: `job.${generation}`,
+      url: `/manifest?generation=${generation}`, jobIds: ['job'], jobId: 'job', renditionSet: `job.${generation}`,
       sessionId: 'owned-session', generation, revision: generation, ready: true,
       position: generation === 4 ? 30 : 45, status: 'running', startTime: 12, duration: 180,
     } })
@@ -1749,7 +1780,7 @@ describe('useBaanderPlayer authorization', () => {
     let position = 30
     let status = 'running'
     const snapshot = () => ({ data: {
-      url: `/manifest?generation=${generation}`, jobId: 'job', renditionSet: `job.${generation}`,
+      url: `/manifest?generation=${generation}`, jobIds: ['job'], jobId: 'job', renditionSet: `job.${generation}`,
       sessionId: 'owned-session', generation, revision: generation, ready: true,
       position, status, startTime: 12, duration: 180,
     } })
@@ -1800,7 +1831,7 @@ describe('useBaanderPlayer authorization', () => {
     let generation = 4
     let position = 30
     const snapshot = () => ({ data: {
-      url: `/manifest?generation=${generation}`, jobId: 'job', renditionSet: `job.${generation}`,
+      url: `/manifest?generation=${generation}`, jobIds: ['job'], jobId: 'job', renditionSet: `job.${generation}`,
       sessionId: 'owned-session', generation, revision: generation, ready: true,
       position, status: 'paused', startTime: 12, duration: 180,
     } })
@@ -1844,7 +1875,7 @@ describe('useBaanderPlayer authorization', () => {
   })
 
   describe('uncertain seek delivery', () => {
-    const initial = (status = 'paused') => ({ url: '/manifest?generation=4', jobId: 'job', sessionId: 'owned-session',
+    const initial = (status = 'paused') => ({ url: '/manifest?generation=4', jobIds: ['job'], jobId: 'job', sessionId: 'owned-session',
       generation: 4, revision: 10, renditionSet: 'job.4', ready: true, position: 30, startTime: 12, duration: 180, status })
     const outage = (code = 'ERR_NETWORK') => code === '503'
       ? Object.assign(new AxiosError('Unavailable'), { response: { status: 503 } }) : new AxiosError('Unavailable', code)
@@ -2117,7 +2148,7 @@ describe('useBaanderPlayer authorization', () => {
         post.mockRejectedValueOnce(Object.assign(new AxiosError('Refused'), { response: { status: 403 } }))
         await act(async () => vi.advanceTimersByTimeAsync(1000))
       } else {
-        snapshot = { ...snapshot, jobId: 'replacement-job', sessionId: 'replacement-session', renditionSet: 'replacement.4' }
+        snapshot = { ...snapshot, jobIds: ['replacement-job'], jobId: 'replacement-job', sessionId: 'replacement-session', renditionSet: 'replacement.4' }
         await act(async () => vi.advanceTimersByTimeAsync(1000))
       }
       await act(async () => rejectFirst(outage()))
@@ -2173,7 +2204,7 @@ describe('useBaanderPlayer authorization', () => {
       const player = await mount()
       await act(async () => player.result.current.seekTo(120))
       expect(attempts).toHaveLength(2)
-      snapshot = { ...snapshot, jobId: 'replacement-job', sessionId: 'replacement-session',
+      snapshot = { ...snapshot, jobIds: ['replacement-job'], jobId: 'replacement-job', sessionId: 'replacement-session',
         renditionSet: 'replacement.4', url: '/replacement-manifest' }
       await act(async () => vi.advanceTimersByTimeAsync(1000))
       await act(async () => player.video.dispatchEvent(new Event('loadedmetadata')))
@@ -2216,7 +2247,7 @@ describe('useBaanderPlayer authorization', () => {
         post.mockRejectedValueOnce(Object.assign(new AxiosError('Refused'), { response: { status: 403 } }))
         await act(async () => vi.advanceTimersByTimeAsync(1000))
       } else {
-        snapshot = { ...snapshot, jobId: 'replacement-job', sessionId: 'replacement-session', renditionSet: 'replacement.4' }
+        snapshot = { ...snapshot, jobIds: ['replacement-job'], jobId: 'replacement-job', sessionId: 'replacement-session', renditionSet: 'replacement.4' }
         await act(async () => vi.advanceTimersByTimeAsync(1000))
         await act(async () => player.video.dispatchEvent(new Event('loadedmetadata')))
       }
@@ -2251,7 +2282,7 @@ describe('useBaanderPlayer authorization', () => {
       player.video.currentTime = 20
       await act(async () => vi.advanceTimersByTimeAsync(1000))
       await act(async () => player.result.current.seekTo(120))
-      snapshot = { ...snapshot, jobId: 'replacement-job', sessionId: 'replacement-session', renditionSet: 'replacement.4', status: 'paused' }
+      snapshot = { ...snapshot, jobIds: ['replacement-job'], jobId: 'replacement-job', sessionId: 'replacement-session', renditionSet: 'replacement.4', status: 'paused' }
       await act(async () => vi.advanceTimersByTimeAsync(1000))
       await act(async () => finishProgress({ data: {} }))
       expect(attempts).toHaveLength(0)
@@ -2320,7 +2351,7 @@ describe('useBaanderPlayer authorization', () => {
   })
 
   it('fences explicit source seek intent with the attached generation', async () => {
-    post.mockResolvedValue({ data: { url: '/manifest', jobId: 'job', renditionSet: 'job.4', sessionId: 'owned-session', generation: 4, revision: 8, ready: true, position: 0, status: 'paused', startTime: 0, duration: 180 } })
+    post.mockResolvedValue({ data: { url: '/manifest', jobIds: ['job'], jobId: 'job', renditionSet: 'job.4', sessionId: 'owned-session', generation: 4, revision: 8, ready: true, position: 0, status: 'paused', startTime: 0, duration: 180 } })
     const containerRef = { current: document.createElement('div') }
     const { result, unmount } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef, autoPlay: true }))
     await act(async () => {})
@@ -2334,7 +2365,7 @@ describe('useBaanderPlayer authorization', () => {
   it('restores a global seek on the generation local timeline and reports global progress', async () => {
     vi.useFakeTimers()
     post.mockImplementation(async (path: string) => path === '/api/stream/sign' ? { data: {
-      url: '/manifest?generation=3', jobId: 'job', renditionSet: 'set', sessionId: 'owned-session', generation: 3, revision: 5,
+      url: '/manifest?generation=3', jobIds: ['job'], jobId: 'job', renditionSet: 'set', sessionId: 'owned-session', generation: 3, revision: 5,
       ready: true, position: 180, status: 'running', startTime: 162, duration: 600,
     } } : { data: {} })
     const timeUpdate = vi.fn()
@@ -2356,7 +2387,7 @@ describe('useBaanderPlayer authorization', () => {
   })
 
   it.each([0, 180])('keeps paused restoration authoritative when the native duration is %s and its seek clamps', async (initialDuration) => {
-    post.mockResolvedValue({ data: { url: '/manifest', jobId: 'job', renditionSet: 'set', sessionId: 'owned-session', generation: 4, revision: 8, ready: true, position: 30, status: 'paused', startTime: 12, duration: 180 } })
+    post.mockResolvedValue({ data: { url: '/manifest', jobIds: ['job'], jobId: 'job', renditionSet: 'set', sessionId: 'owned-session', generation: 4, revision: 8, ready: true, position: 30, status: 'paused', startTime: 12, duration: 180 } })
     const containerRef = { current: document.createElement('div') }
     const { unmount } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef, autoPlay: true }))
     await act(async () => {})
@@ -2391,7 +2422,7 @@ describe('useBaanderPlayer authorization', () => {
 
   it('ignores old media seek completion while the committed generation is preparing', async () => {
     vi.useFakeTimers()
-    const initial = { url: '/manifest', jobId: 'job', renditionSet: 'set', sessionId: 'owned-session', generation: 1, revision: 1, ready: true, position: 0, status: 'running', startTime: 0, duration: 180 }
+    const initial = { url: '/manifest', jobIds: ['job'], jobId: 'job', renditionSet: 'set', sessionId: 'owned-session', generation: 1, revision: 1, ready: true, position: 0, status: 'running', startTime: 0, duration: 180 }
     post.mockResolvedValueOnce({ data: initial }).mockResolvedValue({ data: { ...initial, generation: 2, revision: 3, ready: false, position: 30, status: 'paused', startTime: null, duration: null, url: null, renditionSet: '' } })
     const containerRef = { current: document.createElement('div') }
     const { unmount } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef, autoPlay: true }))
@@ -2405,7 +2436,7 @@ describe('useBaanderPlayer authorization', () => {
   })
 
   it('commits an explicit user seek while native restoration is waiting for media', async () => {
-    post.mockResolvedValue({ data: { url: '/manifest', jobId: 'job', renditionSet: 'set', sessionId: 'owned-session', generation: 4, revision: 8, ready: true, position: 30, status: 'paused', startTime: 12, duration: 180 } })
+    post.mockResolvedValue({ data: { url: '/manifest', jobIds: ['job'], jobId: 'job', renditionSet: 'set', sessionId: 'owned-session', generation: 4, revision: 8, ready: true, position: 30, status: 'paused', startTime: 12, duration: 180 } })
     const containerRef = { current: document.createElement('div') }
     const { result, unmount } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef, autoPlay: true }))
     await act(async () => {})
@@ -2419,7 +2450,7 @@ describe('useBaanderPlayer authorization', () => {
   })
 
   it('waits for metadata and a known native timeline before restoring a nonzero cursor', async () => {
-    post.mockResolvedValue({ data: { url: '/manifest', jobId: 'job', renditionSet: 'set', sessionId: 'owned-session', generation: 4, revision: 8, ready: true, position: 30, status: 'paused', startTime: 12, duration: 180 } })
+    post.mockResolvedValue({ data: { url: '/manifest', jobIds: ['job'], jobId: 'job', renditionSet: 'set', sessionId: 'owned-session', generation: 4, revision: 8, ready: true, position: 30, status: 'paused', startTime: 12, duration: 180 } })
     const containerRef = { current: document.createElement('div') }
     const { unmount } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef, autoPlay: true }))
     await act(async () => {})
@@ -2446,7 +2477,7 @@ describe('useBaanderPlayer authorization', () => {
   it('keeps a backward seek authoritative through pending and claimed generations', async () => {
     vi.useFakeTimers()
     const snapshot = (generation: number, position: number, ready = true) => ({ data: {
-      url: `/manifest?generation=${generation}`, jobId: 'job', renditionSet: 'set', sessionId: 'owned-session', generation, revision: generation,
+      url: `/manifest?generation=${generation}`, jobIds: ['job'], jobId: 'job', renditionSet: 'set', sessionId: 'owned-session', generation, revision: generation,
       ready, position, status: 'paused', startTime: ready ? (generation === 1 ? 0 : 42) : null, duration: ready ? 1200 : null,
     } })
     post.mockResolvedValueOnce(snapshot(1, 600)).mockResolvedValueOnce(snapshot(2, 60, false)).mockResolvedValueOnce(snapshot(3, 60))
@@ -2465,7 +2496,7 @@ describe('useBaanderPlayer authorization', () => {
 
   it('keeps an unchanged committed paused cursor authoritative over an advanced old media clock', async () => {
     vi.useFakeTimers()
-    const initial = { url: '/manifest', jobId: 'job', renditionSet: 'first', sessionId: 'owned-session', generation: 1, revision: 1, ready: true, position: 30, status: 'running', startTime: 0, duration: 180 }
+    const initial = { url: '/manifest', jobIds: ['job'], jobId: 'job', renditionSet: 'first', sessionId: 'owned-session', generation: 1, revision: 1, ready: true, position: 30, status: 'running', startTime: 0, duration: 180 }
     let committed: Omit<typeof initial, 'url' | 'startTime' | 'duration'> & { url: string | null, startTime: number | null, duration: number | null } = initial
     post.mockImplementation(async (path: string) => ({ data: path === '/api/stream/sign' ? { ...committed } : {} }))
     const containerRef = { current: document.createElement('div') }
@@ -2492,7 +2523,7 @@ describe('useBaanderPlayer authorization', () => {
   })
 
   it('keeps a rapid resume queued while the preceding pause is committing', async () => {
-    const snapshot = { url: '/manifest', jobId: 'job', renditionSet: 'set', sessionId: 'owned-session', generation: 1, revision: 1, ready: true, position: 0, status: 'running', startTime: 0, duration: 100 }
+    const snapshot = { url: '/manifest', jobIds: ['job'], jobId: 'job', renditionSet: 'set', sessionId: 'owned-session', generation: 1, revision: 1, ready: true, position: 0, status: 'running', startTime: 0, duration: 100 }
     let commitPause!: () => void
     post.mockImplementation((path: string, payload: { action?: string }) => {
       if (path === '/api/stream/sign') return Promise.resolve({ data: { ...snapshot } })
@@ -2516,7 +2547,7 @@ describe('useBaanderPlayer authorization', () => {
 
   it.each([['running', 'paused'], ['paused', 'running']])('applies the latest %s to %s control when metadata arrives', async (initial, latest) => {
     vi.useFakeTimers()
-    const snapshot = (status: string, revision: number) => ({ data: { url: '/manifest', jobId: 'job', renditionSet: 'set', sessionId: 'owned-session', generation: 1, revision, ready: true, position: 0, status, startTime: 0, duration: 100 } })
+    const snapshot = (status: string, revision: number) => ({ data: { url: '/manifest', jobIds: ['job'], jobId: 'job', renditionSet: 'set', sessionId: 'owned-session', generation: 1, revision, ready: true, position: 0, status, startTime: 0, duration: 100 } })
     post.mockResolvedValueOnce(snapshot(initial, 1)).mockResolvedValue(snapshot(latest, 2))
     const containerRef = { current: document.createElement('div') }
     const { unmount } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef, autoPlay: true }))
@@ -2536,7 +2567,7 @@ describe('useBaanderPlayer authorization', () => {
   it('does not restore playback after a control response arrives past destroy', async () => {
     let finishPause!: (value: { data: object }) => void
     post.mockImplementation((path: string) => path === '/api/stream/sign'
-      ? Promise.resolve({ data: { url: '/manifest', jobId: 'job', renditionSet: 'set', sessionId: 'owned-session', generation: 1, revision: 1, ready: true, position: 0, status: 'running', startTime: 0, duration: 100 } })
+      ? Promise.resolve({ data: { url: '/manifest', jobIds: ['job'], jobId: 'job', renditionSet: 'set', sessionId: 'owned-session', generation: 1, revision: 1, ready: true, position: 0, status: 'running', startTime: 0, duration: 100 } })
       : new Promise((resolve) => { finishPause = resolve }))
     const containerRef = { current: document.createElement('div') }
     const { result, unmount } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef, autoPlay: true }))
@@ -2551,7 +2582,7 @@ describe('useBaanderPlayer authorization', () => {
   })
 
   it('does not treat an in-flight programmatic restoration as native seek intent', async () => {
-    post.mockResolvedValue({ data: { url: '/manifest', jobId: 'job', sessionId: 'owned-session',
+    post.mockResolvedValue({ data: { url: '/manifest', jobIds: ['job'], jobId: 'job', sessionId: 'owned-session',
       generation: 4, revision: 11, ready: true, position: 33, status: 'paused',
       startTime: 12, duration: 180, renditionSet: 'job.4' } })
     const containerRef = { current: document.createElement('div') }
@@ -2575,7 +2606,7 @@ describe('useBaanderPlayer authorization', () => {
   })
 
   it('submits a paused native seek before decoding completes and does not duplicate its completion', async () => {
-    const snapshot = { url: '/manifest', jobId: 'job', sessionId: 'owned-session',
+    const snapshot = { url: '/manifest', jobIds: ['job'], jobId: 'job', sessionId: 'owned-session',
       generation: 4, revision: 11, ready: true, position: 33, status: 'paused',
       startTime: 12, duration: 180, renditionSet: 'job.4' }
     post.mockImplementation((path: string) => path === '/api/stream/sign'
@@ -2634,7 +2665,7 @@ describe('useBaanderPlayer authorization', () => {
     { generation: 4, revision: 12, status: 'running' },
   ])('applies committed generation $generation revision $revision while native seeking', async (committed) => {
     vi.useFakeTimers()
-    const initial = { url: '/manifest?set=job.4', jobId: 'job', sessionId: 'owned-session',
+    const initial = { url: '/manifest?set=job.4', jobIds: ['job'], jobId: 'job', sessionId: 'owned-session',
       generation: 4, revision: 11, ready: true, position: 33, status: 'paused',
       startTime: 12, duration: 180, renditionSet: 'job.4' }
     post.mockResolvedValueOnce({ data: initial }).mockResolvedValue({ data: {
@@ -2663,7 +2694,7 @@ describe('useBaanderPlayer authorization', () => {
 
   it('attaches a prepared replacement while the retired native source is still seeking', async () => {
     vi.useFakeTimers()
-    const initial = { url: '/manifest?generation=4', jobId: 'job', sessionId: 'owned-session',
+    const initial = { url: '/manifest?generation=4', jobIds: ['job'], jobId: 'job', sessionId: 'owned-session',
       generation: 4, revision: 11, ready: true, position: 33, status: 'paused',
       startTime: 12, duration: 180, renditionSet: 'job.4' }
     post.mockResolvedValueOnce({ data: initial })
@@ -2722,7 +2753,7 @@ describe('useBaanderPlayer authorization', () => {
     vi.useFakeTimers()
     let generation = 1
     post.mockImplementation((path: string) => path === '/api/stream/sign'
-      ? Promise.resolve({ data: { url: `/manifest?generation=${generation}`, jobId: 'job', renditionSet: `job.${generation}`, sessionId: 'owned-session', generation, revision: generation, ready: true, position: 0, status: committed, startTime: 0, duration: 100 } })
+      ? Promise.resolve({ data: { url: `/manifest?generation=${generation}`, jobIds: ['job'], jobId: 'job', renditionSet: `job.${generation}`, sessionId: 'owned-session', generation, revision: generation, ready: true, position: 0, status: committed, startTime: 0, duration: 100 } })
       : Promise.reject(new Error('Control rejected')))
     const containerRef = { current: document.createElement('div') }
     const { unmount } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef, autoPlay: true }))
@@ -2746,7 +2777,7 @@ describe('useBaanderPlayer authorization', () => {
     let generation = 1
     let rejectResume!: (error: Error) => void
     post.mockImplementation((path: string, payload: { action?: string }) => {
-      if (path === '/api/stream/sign') return Promise.resolve({ data: { url: `/manifest?generation=${generation}`, jobId: 'job', renditionSet: `job.${generation}`, sessionId: 'owned-session', generation, revision: generation, ready: true, position: 0, status: generation === 1 ? 'paused' : 'running', startTime: 0, duration: 100 } })
+      if (path === '/api/stream/sign') return Promise.resolve({ data: { url: `/manifest?generation=${generation}`, jobIds: ['job'], jobId: 'job', renditionSet: `job.${generation}`, sessionId: 'owned-session', generation, revision: generation, ready: true, position: 0, status: generation === 1 ? 'paused' : 'running', startTime: 0, duration: 100 } })
       if (payload.action === 'resume') return new Promise((_resolve, reject) => { rejectResume = reject })
       return new Promise(() => {})
     })
@@ -2776,6 +2807,7 @@ describe('useBaanderPlayer authorization', () => {
     post.mockReturnValue(new Promise(() => {}))
     const containerRef = { current: document.createElement('div') }
     const { result, unmount } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef }))
+    await act(async () => {})
     const signal = post.mock.calls[0][2].signal as AbortSignal
     act(() => result.current.destroy())
     await act(async () => vi.advanceTimersByTimeAsync(3000))
@@ -2791,6 +2823,7 @@ describe('useBaanderPlayer authorization', () => {
     const containerRef = { current: document.createElement('div') }
     const { unmount } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef, autoPlay: true }))
     const video = containerRef.current.querySelector('video')!
+    await act(async () => {})
     const signal = post.mock.calls[0][2].signal as AbortSignal
     unmount()
     await act(async () => resolve({ data: { url: '/signed' } }))
@@ -2801,7 +2834,7 @@ describe('useBaanderPlayer authorization', () => {
 
   it('seeks beyond a growing EVENT window without reporting clamped native feedback', async () => {
     vi.useFakeTimers()
-    const initial = { url: '/manifest?generation=4', jobId: 'job', renditionSet: 'job.4', sessionId: 'owned-session',
+    const initial = { url: '/manifest?generation=4', jobIds: ['job'], jobId: 'job', renditionSet: 'job.4', sessionId: 'owned-session',
       generation: 4, revision: 4, ready: true, position: 0, status: 'paused', startTime: 0, duration: 180 }
     let snapshot: { data: Partial<typeof initial> } = { data: initial }
     let accept!: (value: { data: { data: { acceptedGeneration: number } } }) => void
@@ -2855,7 +2888,7 @@ describe('useBaanderPlayer authorization', () => {
   })
 
   it.each([false, true])('coalesces explicit source seeks through predecessor acceptance when its attachment fails: %s', async attachmentFails => {
-    const initial = { url: '/manifest?generation=4', jobId: 'job', renditionSet: 'job.4', sessionId: 'owned-session',
+    const initial = { url: '/manifest?generation=4', jobIds: ['job'], jobId: 'job', renditionSet: 'job.4', sessionId: 'owned-session',
       generation: 4, revision: 4, ready: true, position: 0, status: 'paused', startTime: 0, duration: 180 }
     let snapshot = initial
     let accept!: (value: { data: { data: { acceptedGeneration: number } } }) => void
@@ -2900,7 +2933,7 @@ describe('useBaanderPlayer authorization', () => {
 
   it.each(['rejected', 'unmounted', 'replaced', 'replaced-rejected'] as const)('abandons queued source seeks when the predecessor is %s after attachment failure', async outcome => {
     vi.useFakeTimers()
-    const initial = { url: '/manifest?generation=4', jobId: 'job', renditionSet: 'job.4', sessionId: 'owned-session',
+    const initial = { url: '/manifest?generation=4', jobIds: ['job'], jobId: 'job', renditionSet: 'job.4', sessionId: 'owned-session',
       generation: 4, revision: 4, ready: true, position: 0, status: 'paused', startTime: 0, duration: 180 }
     let snapshot = initial
     let accept!: (value: { data: { data: { acceptedGeneration: number } } }) => void
@@ -2926,7 +2959,7 @@ describe('useBaanderPlayer authorization', () => {
     await act(async () => attachments[0].onError())
     if (outcome === 'unmounted') unmount()
     if (outcome === 'replaced' || outcome === 'replaced-rejected') {
-      snapshot = { ...initial, sessionId: 'replacement-session', jobId: 'replacement-job', renditionSet: 'replacement-job.4',
+      snapshot = { ...initial, sessionId: 'replacement-session', jobIds: ['replacement-job'], jobId: 'replacement-job', renditionSet: 'replacement-job.4',
         url: '/replacement-manifest', position: 30 }
       await act(async () => vi.advanceTimersByTimeAsync(1000))
       await act(async () => video.dispatchEvent(new Event('loadedmetadata')))
@@ -2959,7 +2992,7 @@ describe('useBaanderPlayer authorization', () => {
 
   it('keeps a current attachment failure terminal without a replacement seek', async () => {
     vi.useFakeTimers()
-    post.mockResolvedValue({ data: { url: '/manifest', jobId: 'job', renditionSet: 'job.4', sessionId: 'owned-session',
+    post.mockResolvedValue({ data: { url: '/manifest', jobIds: ['job'], jobId: 'job', renditionSet: 'job.4', sessionId: 'owned-session',
       generation: 4, revision: 4, ready: true, position: 0, status: 'paused', startTime: 0, duration: 180 } })
     const containerRef = { current: document.createElement('div') }
     const onError = vi.fn()
@@ -2980,7 +3013,7 @@ describe('useBaanderPlayer authorization', () => {
 
   it('releases explicit source seek intent when its request fails', async () => {
     post.mockImplementation((path: string) => path === '/api/stream/sign' ? Promise.resolve({ data: {
-      url: '/manifest', jobId: 'job', renditionSet: 'job.4', sessionId: 'owned-session',
+      url: '/manifest', jobIds: ['job'], jobId: 'job', renditionSet: 'job.4', sessionId: 'owned-session',
       generation: 4, revision: 4, ready: true, position: 0, status: 'paused', startTime: 0, duration: 180,
     } }) : Promise.reject(new Error('Unavailable')))
     const containerRef = { current: document.createElement('div') }
@@ -2995,7 +3028,7 @@ describe('useBaanderPlayer authorization', () => {
   it('destroys a pending source seek without attaching its late accepted generation', async () => {
     let accept!: (value: { data: { data: { acceptedGeneration: number } } }) => void
     post.mockImplementation((path: string) => path === '/api/stream/sign' ? Promise.resolve({ data: {
-      url: '/manifest', jobId: 'job', renditionSet: 'job.4', sessionId: 'owned-session',
+      url: '/manifest', jobIds: ['job'], jobId: 'job', renditionSet: 'job.4', sessionId: 'owned-session',
       generation: 4, revision: 4, ready: true, position: 0, status: 'paused', startTime: 0, duration: 180,
     } }) : new Promise(resolve => { accept = resolve }))
     const containerRef = { current: document.createElement('div') }
@@ -3011,7 +3044,7 @@ describe('useBaanderPlayer authorization', () => {
   })
 
   it('restores exact source EOF to a nearby finite seekable end without changing the global cursor', async () => {
-    post.mockResolvedValue({ data: { url: '/manifest', jobId: 'job', renditionSet: 'job.5', sessionId: 'owned-session',
+    post.mockResolvedValue({ data: { url: '/manifest', jobIds: ['job'], jobId: 'job', renditionSet: 'job.5', sessionId: 'owned-session',
       generation: 5, revision: 5, ready: true, position: 180, status: 'paused', startTime: 162, duration: 180 } })
     const onTimeUpdate = vi.fn()
     const containerRef = { current: document.createElement('div') }
@@ -3056,7 +3089,7 @@ describe('useBaanderPlayer authorization', () => {
     { position: 180, nativeEnd: 17.92, nativeDuration: Infinity },
     { position: 179.95, nativeEnd: 17.92, nativeDuration: 17.92 },
   ])('waits for unavailable source position $position when the native end is $nativeEnd and duration is $nativeDuration', async ({ position, nativeEnd, nativeDuration }) => {
-    post.mockResolvedValue({ data: { url: '/manifest', jobId: 'job', renditionSet: 'job.5', sessionId: 'owned-session',
+    post.mockResolvedValue({ data: { url: '/manifest', jobIds: ['job'], jobId: 'job', renditionSet: 'job.5', sessionId: 'owned-session',
       generation: 5, revision: 5, ready: true, position, status: 'paused', startTime: 162, duration: 180 } })
     const containerRef = { current: document.createElement('div') }
     const { unmount } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef }))
@@ -3079,7 +3112,7 @@ describe('useBaanderPlayer authorization', () => {
     const setupCompletion = async ({ status = 'running', position = 162, nativeEnd = 17.92, lostPause = false } = {}) => {
       vi.useFakeTimers()
       vi.setSystemTime(new Date('2026-10-24T10:00:00Z'))
-      let signed = { url: `/manifest?exp=${Math.floor(Date.now() / 1000) + 3}`, jobId: 'job', renditionSet: 'job.5',
+      let signed = { url: `/manifest?exp=${Math.floor(Date.now() / 1000) + 3}`, jobIds: ['job'], jobId: 'job', renditionSet: 'job.5',
         sessionId: 'owned-session', generation: 5, revision: 5, ready: true, position, status, startTime: 162, duration: 180 }
       post.mockImplementation((_path: string, payload: { action?: string, position: number }) => {
         if (!payload.action) return Promise.resolve({ data: { ...signed, url: `/manifest?exp=${Math.floor(Date.now() / 1000) + 3}` } })
@@ -3367,7 +3400,7 @@ describe('useBaanderPlayer authorization', () => {
     vi.setSystemTime(new Date('2026-10-24T10:00:00Z'))
     let generation = 1
     post.mockImplementation(() => Promise.resolve({ data: {
-      url: `/manifest?exp=${Math.floor(Date.now() / 1000) + 20}`, jobId: 'job', sessionId: 'owned-session',
+      url: `/manifest?exp=${Math.floor(Date.now() / 1000) + 20}`, jobIds: ['job'], jobId: 'job', sessionId: 'owned-session',
       generation, revision: generation, renditionSet: `job.${generation}`, ready: true,
       position: 0, startTime: 0, duration: 180, status: 'paused',
     } }))

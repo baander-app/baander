@@ -6,7 +6,7 @@ import { advanceAuthorization, synchronizeOwnership } from '@/shared/live/owners
 import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
 import { PlaybackLocalRecovery } from '../services/playback-local-recovery'
 import { registerPlaybackAdapter, requestPlayback } from '../services/playback-execution'
-import { PlaybackSessionCoordinator, PLAYBACK_CONNECTION_KEY, PLAYBACK_SESSION_KEY } from '../services/playback-session-coordinator'
+import { PlaybackSessionCoordinator, getPlaybackClientRequestId, registerPlaybackCoordinator, PLAYBACK_CONNECTION_KEY, PLAYBACK_SESSION_KEY } from '../services/playback-session-coordinator'
 
 vi.mock('@/shared/api-client/axios-instance', () => ({ AXIOS_INSTANCE: { post: vi.fn(), get: vi.fn() } }))
 vi.mock('@/shared/live/transport', () => ({ authenticatedTransport: {} }))
@@ -78,6 +78,65 @@ function controlledServer() {
 }
 
 describe('browser playback coordination', () => {
+  it('waits for the final recovery identity before exposing it, without waiting for registration', async () => {
+    const recovery = new PlaybackLocalRecovery('https://baander.app', 'listener')
+    let finish!: () => void
+    vi.spyOn(recovery, 'initialize').mockImplementation(() => new Promise(resolve => {
+      finish = () => { recovery.tabId = 'rotated-client'; resolve() }
+    }))
+    vi.mocked(AXIOS_INSTANCE.post).mockImplementation(() => new Promise(() => {}))
+    const h = harness(recovery)
+    cleanup.push(h.stop, registerPlaybackCoordinator(h.runtime))
+    const controller = new AbortController()
+    const received = vi.fn()
+    const identity = getPlaybackClientRequestId(controller.signal).then(value => { received(value); return value })
+    await vi.waitFor(() => expect(recovery.initialize).toHaveBeenCalledOnce())
+    expect(received).not.toHaveBeenCalled()
+    finish()
+    await expect(identity).resolves.toBe('rotated-client')
+    expect(h.transport.send).not.toHaveBeenCalled()
+    await expect(getPlaybackClientRequestId(controller.signal)).resolves.toBe('rotated-client')
+  })
+
+  it('cancels identity waits and rejects disposed or replaced ownership', async () => {
+    const recovery = new PlaybackLocalRecovery('https://baander.app', 'listener')
+    vi.spyOn(recovery, 'initialize').mockImplementation(() => new Promise(() => {}))
+    const h = harness(recovery)
+    cleanup.push(h.stop, registerPlaybackCoordinator(h.runtime))
+    const aborted = new AbortController()
+    const waiting = expect(getPlaybackClientRequestId(aborted.signal)).rejects.toMatchObject({ name: 'AbortError' })
+    aborted.abort()
+    await waiting
+    const stale = expect(getPlaybackClientRequestId(new AbortController().signal)).rejects.toThrow('Playback account or runtime changed.')
+    advanceAuthorization()
+    await stale
+    await expect(getPlaybackClientRequestId(new AbortController().signal)).rejects.toThrow('Playback account or runtime changed.')
+  })
+
+  it('rechecks ownership after an identity wait resolves', async () => {
+    vi.mocked(AXIOS_INSTANCE.post).mockImplementation(async () => {
+      advanceAuthorization()
+      return { data: {} }
+    })
+    const h = harness()
+    cleanup.push(h.stop, registerPlaybackCoordinator(h.runtime))
+    const identity = getPlaybackClientRequestId(new AbortController().signal)
+    await expect(identity).rejects.toThrow('Playback account or runtime changed.')
+  })
+
+  it('retains the receiving client identity through reconnect despite a foreign active destination', async () => {
+    const h = harness()
+    cleanup.push(h.stop, registerPlaybackCoordinator(h.runtime))
+    await vi.waitFor(() => expect(h.transport.send).toHaveBeenCalled())
+    h.receive(snapshot({ endpoint, activeIncarnationId: 'remote', activeDestinationId: 'remote-device' }))
+    const identity = await getPlaybackClientRequestId(new AbortController().signal)
+    expect(identity).not.toBe('remote-device')
+    h.close()
+    const reconnected = getPlaybackClientRequestId(new AbortController().signal)
+    h.open()
+    await expect(reconnected).resolves.toBe(identity)
+  })
+
   it('switches songs through the control response without a presence probe or relay', async () => {
     const execute = vi.fn(async () => ({ observedState: 'playing' as const, position: 0 }))
     cleanup.push(registerPlaybackAdapter({ kind: 'song', supportsVolume: true, prepare: vi.fn(), execute, quiesce: vi.fn(), observe: vi.fn() }))

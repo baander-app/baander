@@ -9,8 +9,12 @@ use App\Shared\Domain\Model\PublicId;
 
 interface PlaybackPortInterface extends PlaybackAccessInterface
 {
-    /** @return array<string, PublicId> Owned job public IDs mapped to their current session public IDs. */
-    public function findSessions(Uuid $videoId): array;
+    /**
+     * @param list<PublicId> $jobIds
+     * @return array<string, PublicId> This client's requested jobs mapped to their current session public IDs.
+     */
+    public function findSessions(Uuid $videoId, string $requestId, array $jobIds): array;
 
-    public function start(Uuid $videoId): void;
+    /** @return array<string, PublicId> The admitted jobs mapped to their session public IDs. */
+    public function start(Uuid $videoId, string $requestId): array;
 }

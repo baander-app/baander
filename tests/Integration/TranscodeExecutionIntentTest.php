@@ -40,6 +40,23 @@ final class TranscodeExecutionIntentTest extends TestCase
         self::assertNotNull($other->claim($this->jobId, $this->worker()));
     }
 
+    public function testCopySelectionSurvivesControlsAndRecovery(): void
+    {
+        $selection = new \App\Transcode\Domain\ValueObject\PresentationSelection('copy', 'source-hash', 2, 4, 'mp4');
+        $this->first->transactional(function () use ($selection): void {
+            $this->insertSession();
+            $this->runtime->admit($this->jobId, $this->sessionId, 'copy-start', new DesiredTranscodeState(AudioProfile::streamingStereo(), presentationSelection: $selection));
+        });
+        $this->runtime->control($this->jobId, $this->sessionId, 'copy-pause', status: 'paused');
+        $this->runtime->control($this->jobId, $this->sessionId, 'copy-seek', status: 'running', position: 12.5);
+        $other = $this->runtimeFor($this->second);
+        self::assertSame($selection->jsonSerialize(), $other->find($this->jobId)?->desired->presentationSelection?->jsonSerialize());
+        $claim = $other->claim($this->jobId, $this->worker());
+        self::assertNotNull($claim);
+        self::assertSame($selection->canonicalKey(), $claim->runtime->desired->presentationSelection?->canonicalKey());
+        self::assertSame(12.5, $claim->runtime->desired->position);
+    }
+
     public function testFailureAfterIntentInsertionRollsBackTheSessionAndIntent(): void
     {
         $failure = new \RuntimeException('Outbox capture failed');

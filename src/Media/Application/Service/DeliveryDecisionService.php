@@ -9,6 +9,7 @@ use App\Media\Application\DTO\DeliveryDecision;
 use App\Media\Application\DTO\DeliveryDestination;
 use App\Media\Application\DTO\DeliveryKind;
 use App\Media\Application\DTO\DeliverySource;
+use App\Media\Application\DTO\DeliverySelection;
 use App\Media\Application\Port\DeliveryDecisionPortInterface;
 use App\Media\Application\Port\MediaReadScopeProviderInterface;
 use App\Media\Application\Port\PlaybackMediaAccessInterface;
@@ -22,6 +23,8 @@ use App\Transcode\Application\Port\MediaExecutionPolicyInterface;
 use App\Transcode\Application\Port\AudioRenditionFormat;
 use App\Transcode\Application\Port\AudioRenditionPortInterface;
 use App\Transcode\Application\Port\CompletedVideoArtifactPort;
+use App\Transcode\Application\Port\CopyPresentationPortInterface;
+use App\Transcode\Application\DTO\CopyPresentationInput;
 use App\Transcode\Application\Settings\TranscodeSettingDefinitions;
 
 final readonly class DeliveryDecisionService implements DeliveryDecisionPortInterface
@@ -36,10 +39,11 @@ final readonly class DeliveryDecisionService implements DeliveryDecisionPortInte
         private AudioRenditionPortInterface $audio,
         private SystemSettingsPortInterface $settings,
         private ?CompletedVideoArtifactPort $videoArtifacts = null,
+        private ?CopyPresentationPortInterface $copyPresentations = null,
     ) {
     }
 
-    public function video(Uuid $owner, PublicId $id, DeliveryDestination $destination): DeliveryDecision
+    public function video(Uuid $owner, PublicId $id, DeliveryDestination $destination, ?string $requestId = null): DeliveryDecision
     {
         $this->access->assertVideoAccess($owner, $id);
         $source = $this->videos->getSourceMetadata($id, $this->scopes->forUser($owner)->getLibraries())
@@ -98,8 +102,17 @@ final readonly class DeliveryDecisionService implements DeliveryDecisionPortInte
                 pixelFormat: $artifact->pixelFormat
             );
             if ($this->compatibility->isCompatible($candidate, $destination)) {
-                return new DeliveryDecision(DeliveryKind::Cached, url: $artifact->url);
+                return new DeliveryDecision(DeliveryKind::Cached, selection: new DeliverySelection($artifact->container, $artifact->sourceVideoStreamIndex, $artifact->sourceAudioStreamIndex, $artifact->transport), url: $artifact->url, artifact: $artifact);
             }
+        }
+        if ($decision->kind === DeliveryKind::Copy && $decision->selection !== null && $requestId !== null) {
+            if ($this->copyPresentations === null) {
+                throw new \LogicException('Copy presentation admission is not configured.');
+            }
+            $presentation = $this->copyPresentations->start(new CopyPresentationInput($owner, $source->videoId, $source->hash, $decision->selection->videoStreamIndex,
+                $decision->selection->audioStreamIndex, $decision->selection->container, $source->width, $source->height, $requestId));
+            return new DeliveryDecision(DeliveryKind::Copy, selection: $decision->selection,
+                url: '/api/transcode/' . $id->toString() . '/master.m3u8', requestId: $requestId, jobId: $presentation->jobId->toString());
         }
         return $decision;
     }
@@ -160,6 +173,15 @@ final readonly class DeliveryDecisionService implements DeliveryDecisionPortInte
         ), $destination);
         if ($decision->kind === DeliveryKind::Original) {
             return $decision;
+        }
+        if ($decision->kind === DeliveryKind::Copy) {
+            if ($source->sourceHash === null || $source->streamIndex === null || $source->codec !== 'aac' || $decision->selection?->container !== 'mp4') {
+                return new DeliveryDecision(DeliveryKind::Incompatible, 'source_stream_metadata_unavailable');
+            }
+            $cached = $this->audio->findCompleteCopy($id->toString(), $path, $source->sourceHash, $source->streamIndex);
+            $url = '/api/stream/original/track?' . http_build_query(['id' => $id->toString(), 'owner' => $owner->toString(),
+                'format' => 'aac', 'mode' => 'copy', 'container' => 'mp4', 'index' => $source->streamIndex]);
+            return $cached === null ? $decision->withUrl($url) : new DeliveryDecision(DeliveryKind::Cached, url: $url);
         }
         if ($this->policy->permits(MediaOperation::AudioEncode) && $this->settings->get(TranscodeSettingDefinitions::ENABLED) !== true) {
             return $decision->kind === DeliveryKind::Encoded

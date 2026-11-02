@@ -18683,6 +18683,229 @@
                 }
             }
         },
+        "/api/transcode/artifacts/{jobPublicId}/{generation}/master.m3u8": {
+            "get": {
+                "tags": [
+                    "Streaming"
+                ],
+                "summary": "Get the HLS master playlist for completed video",
+                "operationId": "get_stream_artifact_master",
+                "parameters": [
+                    {
+                        "name": "jobPublicId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "pattern": "[0-9a-zA-Z_-]{21}"
+                        }
+                    },
+                    {
+                        "name": "generation",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "pattern": "[1-9][0-9]*"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Completed HLS master playlist",
+                        "content": {
+                            "application/vnd.apple.mpegurl": {}
+                        }
+                    },
+                    "403": {
+                        "description": "Invalid or expired signature"
+                    },
+                    "404": {
+                        "description": "Completed media is unavailable"
+                    }
+                }
+            }
+        },
+        "/api/transcode/artifacts/{jobPublicId}/{generation}/tracks/{track}/media.m3u8": {
+            "get": {
+                "tags": [
+                    "Streaming"
+                ],
+                "summary": "Get a completed HLS track playlist",
+                "operationId": "get_stream_artifact_media",
+                "parameters": [
+                    {
+                        "name": "jobPublicId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "pattern": "[0-9a-zA-Z_-]{21}"
+                        }
+                    },
+                    {
+                        "name": "generation",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "pattern": "[1-9][0-9]*"
+                        }
+                    },
+                    {
+                        "name": "track",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "pattern": "video|audio",
+                            "enum": [
+                                "video",
+                                "audio"
+                            ]
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Completed HLS media playlist",
+                        "content": {
+                            "application/vnd.apple.mpegurl": {}
+                        }
+                    },
+                    "403": {
+                        "description": "Invalid or expired signature"
+                    },
+                    "404": {
+                        "description": "Completed media is unavailable"
+                    }
+                }
+            }
+        },
+        "/api/transcode/artifacts/{jobPublicId}/{generation}/tracks/{track}/init.mp4": {
+            "get": {
+                "tags": [
+                    "Streaming"
+                ],
+                "summary": "Get completed track initialization media",
+                "operationId": "get_stream_artifact_init",
+                "parameters": [
+                    {
+                        "name": "jobPublicId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "pattern": "[0-9a-zA-Z_-]{21}"
+                        }
+                    },
+                    {
+                        "name": "generation",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "pattern": "[1-9][0-9]*"
+                        }
+                    },
+                    {
+                        "name": "track",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "pattern": "video|audio",
+                            "enum": [
+                                "video",
+                                "audio"
+                            ]
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "MP4 initialization media"
+                    },
+                    "206": {
+                        "description": "Requested byte range"
+                    },
+                    "403": {
+                        "description": "Invalid or expired signature"
+                    },
+                    "404": {
+                        "description": "Completed media is unavailable"
+                    }
+                }
+            }
+        },
+        "/api/transcode/artifacts/{jobPublicId}/{generation}/tracks/{track}/segment.m4s": {
+            "get": {
+                "tags": [
+                    "Streaming"
+                ],
+                "summary": "Get a completed track segment",
+                "operationId": "get_stream_artifact_segment",
+                "parameters": [
+                    {
+                        "name": "index",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 0
+                        }
+                    },
+                    {
+                        "name": "jobPublicId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "pattern": "[0-9a-zA-Z_-]{21}"
+                        }
+                    },
+                    {
+                        "name": "generation",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "pattern": "[1-9][0-9]*"
+                        }
+                    },
+                    {
+                        "name": "track",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "pattern": "video|audio",
+                            "enum": [
+                                "video",
+                                "audio"
+                            ]
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "MP4 media segment"
+                    },
+                    "206": {
+                        "description": "Requested byte range"
+                    },
+                    "400": {
+                        "description": "Missing or invalid segment index"
+                    },
+                    "403": {
+                        "description": "Invalid or expired signature"
+                    },
+                    "404": {
+                        "description": "Completed media is unavailable"
+                    }
+                }
+            }
+        },
         "/api/transcode/{videoId}/master.m3u8": {
             "get": {
                 "tags": [
@@ -18823,6 +19046,30 @@
                 "summary": "Get available quality tiers for a video",
                 "operationId": "get_stream_quality_ladder",
                 "parameters": [
+                    {
+                        "name": "requestId",
+                        "in": "query",
+                        "description": "Playback client session identifier",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    },
+                    {
+                        "name": "jobIds",
+                        "in": "query",
+                        "description": "Exact admitted jobs",
+                        "required": true,
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            },
+                            "maxItems": 3,
+                            "minItems": 1
+                        }
+                    },
                     {
                         "name": "videoId",
                         "in": "path",
@@ -19246,6 +19493,10 @@
                     "content": {
                         "application/json": {
                             "schema": {
+                                "required": [
+                                    "path",
+                                    "requestId"
+                                ],
                                 "properties": {
                                     "path": {
                                         "type": "string",
@@ -19258,6 +19509,21 @@
                                     "refresh": {
                                         "description": "Read current playback state without creating another admission",
                                         "type": "boolean"
+                                    },
+                                    "requestId": {
+                                        "description": "Stable playback client session identifier, retained across reloads and reconnects",
+                                        "type": "string",
+                                        "format": "uuid"
+                                    },
+                                    "jobIds": {
+                                        "description": "Exact admitted jobs; required for refresh and omitted for new admission",
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        },
+                                        "maxItems": 3,
+                                        "minItems": 1,
+                                        "uniqueItems": true
                                     }
                                 },
                                 "type": "object"
@@ -19272,6 +19538,16 @@
                             "application/json": {
                                 "schema": {
                                     "properties": {
+                                        "jobIds": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        },
+                                        "requestId": {
+                                            "type": "string",
+                                            "format": "uuid"
+                                        },
                                         "url": {
                                             "type": "string",
                                             "nullable": true
@@ -19569,7 +19845,8 @@
                         "application/json": {
                             "schema": {
                                 "required": [
-                                    "videoId"
+                                    "videoId",
+                                    "requestId"
                                 ],
                                 "properties": {
                                     "videoId": {
@@ -19577,6 +19854,11 @@
                                         "pattern": "^[0-9a-zA-Z_-]{21}$",
                                         "maxLength": 21,
                                         "minLength": 21
+                                    },
+                                    "requestId": {
+                                        "description": "Stable playback client session identifier",
+                                        "type": "string",
+                                        "format": "uuid"
                                     },
                                     "qualityTier": {
                                         "type": "string",
@@ -23244,6 +23526,11 @@
                             "nv12"
                         ],
                         "maxItems": 32
+                    },
+                    "requestId": {
+                        "type": "string",
+                        "nullable": true,
+                        "default": null
                     }
                 },
                 "type": "object"
@@ -23996,7 +24283,8 @@
             },
             "CreateTranscodeSessionRequest": {
                 "required": [
-                    "videoId"
+                    "videoId",
+                    "requestId"
                 ],
                 "properties": {
                     "videoId": {
@@ -24006,6 +24294,12 @@
                         "default": "",
                         "maxLength": 21,
                         "minLength": 21
+                    },
+                    "requestId": {
+                        "description": "Stable playback client session identifier",
+                        "type": "string",
+                        "format": "uuid",
+                        "default": ""
                     },
                     "qualityTier": {
                         "type": "string",
@@ -26242,6 +26536,15 @@
                         "nullable": true
                     },
                     "url": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "requestId": {
+                        "type": "string",
+                        "format": "uuid",
+                        "nullable": true
+                    },
+                    "jobId": {
                         "type": "string",
                         "nullable": true
                     },
