@@ -16299,6 +16299,17 @@
                 ],
                 "summary": "Control the committed playback runner",
                 "operationId": "post_playback_control",
+                "parameters": [
+                    {
+                        "name": "X-Baander-Playback-Endpoint",
+                        "in": "header",
+                        "description": "Required when incarnationId is supplied. Authenticates the endpoint receiving its pending commands in the response.",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
                 "requestBody": {
                     "required": true,
                     "content": {
@@ -23674,6 +23685,11 @@
                         "default": null,
                         "maximum": 1,
                         "minimum": 0
+                    },
+                    "incarnationId": {
+                        "type": "string",
+                        "nullable": true,
+                        "default": null
                     }
                 },
                 "type": "object"

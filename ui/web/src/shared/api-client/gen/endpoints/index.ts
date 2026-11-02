@@ -971,6 +971,8 @@ export interface ControlPlaybackRequest {
      * @nullable
      */
   volume?: number | null;
+  /** @nullable */
+  incarnationId?: string | null;
 }
 
 export interface ReconcilePlaybackRequest {

@@ -31,6 +31,8 @@ final readonly class ControlPlaybackRequest
         public ?string $desiredState = null,
         #[Assert\Range(min: 0, max: 1)]
         public ?float $volume = null,
+        #[Assert\Uuid]
+        public ?string $incarnationId = null,
     ) {}
 
     /** @return array<string,mixed> */

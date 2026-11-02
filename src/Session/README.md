@@ -64,7 +64,10 @@ command ledger.
 3. Session commits the control and its command intent in one transaction. An
    identical repeated request returns the original command result. The control
    response exposes that result as `requestResult`, including a pending or settled
-   outcome; general snapshots omit it.
+   outcome; general snapshots omit it. Supplying `incarnationId` with its
+   `X-Baander-Playback-Endpoint` capability also returns that endpoint's pending
+   commands after commit. The browser executes them without waiting for the relay
+   timer. Delivery identity does not change the logical request or its saved target.
 4. A transfer prepares the target without playing, quiesces the source and captures
    its final cursor, then starts the target. A matching acknowledgement commits the
    active destination. Rejection before quiescence leaves the source unchanged;
@@ -77,6 +80,11 @@ command ledger.
    changed complete snapshots or pending commands. HTTP snapshot recovery uses
    the same coordinator. A stop retains the media, queue and cursor, and remains
    unconfirmed until the destination acknowledges it.
+
+Changing tracks on the active device is an ordinary control. The selected media
+is authorized on load, play and seek. Queue entries are rechecked when the queue
+changes; an unchanged queue adds no repeated access lookups. Both immediate HTTP
+delivery and relay delivery use the same command identity and execution guards.
 
 ## Browser-local recovery
 
@@ -108,8 +116,11 @@ or unfinished transfer. Retirement and release share the session transaction and
 retain the media, queue and cursor. An expired presence lease alone is insufficient;
 this recovery does not apply to external receivers.
 
-Before local playback resumes, the browser renews its own presence. If its endpoint
-has been retired, it fences the old execution and waits for a fresh registration.
+For its active, available endpoint, the browser reuses presence confirmed within
+the current heartbeat interval. The freshness window starts when registration or
+observation begins, so a delayed response cannot extend it. Otherwise the browser
+renews presence before playback. If its endpoint has been retired, it fences the
+old execution and waits for a fresh registration.
 The destination chooser lists available targets and reports unconfirmed previous
 playback separately from unavailable device history.
 

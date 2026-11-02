@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration;
 
+use App\Media\Application\Port\PlaybackMediaAccessInterface;
 use App\Session\Application\Port\PlaybackOperation;
 use App\Session\Application\Service\PlaybackCoordinator;
 use App\Session\Domain\Model\Device\Device;
+use App\Session\Domain\Model\Playback\PlaybackMedia;
+use App\Session\Domain\Model\Playback\PlaybackState;
 use App\Session\Infrastructure\Doctrine\PlaybackStore;
 use App\Session\Infrastructure\Doctrine\Repository\DeviceDoctrineRepository;
 use App\Tests\Fixtures\Session\PlaybackPersistenceFixture;
@@ -16,6 +19,7 @@ use Doctrine\ORM\EntityManager;
 use Doctrine\DBAL\Connection;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Application\Port\TransactionPortInterface;
 use Doctrine\DBAL\Schema\Schema;
 use App\Shared\Application\Exception\ConflictException;
 use PHPUnit\Framework\TestCase;
@@ -124,6 +128,110 @@ final class PlaybackTransferPersistenceTest extends TestCase
         $this->ack($service, $owner, $target, $prepare, 'prepared');
         $start = $this->pending($service, $owner, $target)['commands'][0];
         return $this->ack($service, $owner, $target, $start, 'started');
+    }
+
+    public function testControlDeliversOnlyAuthenticatedRequestingEndpointCommandsAndKeepsRetryTarget(): void
+    {
+        $owner = $this->createUser();
+        $service = $this->coordinator();
+        $source = $this->endpoint($service, $owner);
+        $snapshot = $this->activate($service, $owner, $source);
+        $request = ['requestId' => new Uuid()->toString(), 'expectedRevision' => $snapshot['revision'], 'action' => 'pause'];
+        $response = $service->execute($owner, PlaybackOperation::Control, $request + ['incarnationId' => $source['incarnationId']], $source['capability']);
+
+        self::assertCount(1, $response['commands']);
+        self::assertSame('pause', $response['commands'][0]['type']);
+        self::assertSame($source['incarnationId'], $response['commands'][0]['incarnationId']);
+        self::assertSame($source['epoch'], $response['commands'][0]['epoch']);
+        self::assertSame($response['revision'], $response['commands'][0]['revision']);
+        self::assertSame($response['commands'][0]['id'], $response['requestResult']['commandId']);
+
+        $replacement = $this->endpoint($service, $owner);
+        $retry = $service->execute($owner, PlaybackOperation::Control, $request + ['incarnationId' => $replacement['incarnationId']], $replacement['capability']);
+        self::assertSame([], $retry['commands']);
+        self::assertSame($response['requestResult'], $retry['requestResult']);
+        self::assertSame($source['incarnationId'], $retry['activeIncarnationId']);
+        self::assertSame([], $service->execute($owner, PlaybackOperation::Control, $request)['commands']);
+        self::assertSame($response['commands'][0]['id'], $this->pending($service, $owner, $source)['commands'][0]['id']);
+        self::assertSame(1, (int) $this->observer->fetchOne('SELECT count(*) FROM playback_commands WHERE request_id=?', [$request['requestId']]));
+
+        $settled = $this->ack($service, $owner, $source, $response['commands'][0], 'paused');
+        $remoteResponse = $service->execute($owner, PlaybackOperation::Control, [
+            'requestId' => new Uuid()->toString(), 'expectedRevision' => $settled['revision'], 'action' => 'pause',
+            'incarnationId' => $replacement['incarnationId'],
+        ], $replacement['capability']);
+        self::assertSame([], $remoteResponse['commands']);
+        self::assertSame($remoteResponse['requestResult']['commandId'], $this->pending($service, $owner, $source)['commands'][0]['id']);
+    }
+
+    public function testControlRejectsMissingWrongAndForeignDeliveryCapabilitiesBeforeMutation(): void
+    {
+        $owner = $this->createUser();
+        $other = $this->createUser();
+        $service = $this->coordinator();
+        $source = $this->endpoint($service, $owner);
+        $snapshot = $this->activate($service, $owner, $source);
+        $before = (int) $this->observer->fetchOne('SELECT count(*) FROM playback_commands');
+        foreach ([[$owner, null], [$owner, 'wrong-capability'], [$other, $source['capability']]] as [$actor, $capability]) {
+            try {
+                $service->execute($actor, PlaybackOperation::Control, [
+                    'requestId' => new Uuid()->toString(), 'expectedRevision' => $snapshot['revision'],
+                    'action' => 'pause', 'incarnationId' => $source['incarnationId'],
+                ], $capability);
+                self::fail('Unauthenticated delivery context must not execute a control.');
+            } catch (ConflictException) {
+                self::assertSame($before, (int) $this->observer->fetchOne('SELECT count(*) FROM playback_commands'));
+            }
+        }
+    }
+
+    public function testDeniedNewSelectionAndChangedQueueRollBackWithoutCommands(): void
+    {
+        $owner = $this->createUser();
+        $service = $this->coordinator();
+        $source = $this->endpoint($service, $owner);
+        $this->activate($service, $owner, $source);
+        $connection = $this->manager->getConnection();
+        $store = new PlaybackStore($this->manager);
+        $oldTrack = new PublicId();
+        $connection->transactional(function () use ($store, $owner, $oldTrack): void {
+            $session = $store->lockSession($owner->toString());
+            $session->control('load', new PlaybackMedia('song', $oldTrack), [$oldTrack->toString()], 0, 19.5, PlaybackState::Paused);
+            $store->saveSession($session);
+        });
+        $before = $service->execute($owner, PlaybackOperation::Snapshot, []);
+        $commandCount = (int) $this->observer->fetchOne('SELECT count(*) FROM playback_commands');
+        foreach (['selected', 'queued'] as $deniedKind) {
+            $denied = new PublicId();
+            $selected = $deniedKind === 'selected' ? $denied : $oldTrack;
+            $access = $this->createMock(PlaybackMediaAccessInterface::class);
+            $access->expects(self::atLeastOnce())->method('assertTrackAccess')->willReturnCallback(static function (Uuid $actor, PublicId $track) use ($denied): void {
+                if ($track->toString() === $denied->toString()) {
+                    throw new \RuntimeException('Track access denied.');
+                }
+            });
+            $transaction = $this->createStub(TransactionPortInterface::class);
+            $transaction->method('run')->willReturnCallback(
+                static fn (callable $operation): mixed => $connection->transactional(static fn (): mixed => $operation()),
+            );
+            $guarded = new PlaybackCoordinator($store, $transaction, $access);
+            try {
+                $guarded->execute($owner, PlaybackOperation::Control, [
+                    'requestId' => new Uuid()->toString(), 'expectedRevision' => $before['revision'], 'action' => 'load',
+                    'media' => ['kind' => 'song', 'publicId' => $selected->toString()], 'position' => 0,
+                    'queue' => $deniedKind === 'selected' ? [$oldTrack->toString()] : [$oldTrack->toString(), $denied->toString()],
+                    'currentTrackIndex' => 0, 'desiredState' => 'playing',
+                ]);
+                self::fail('A denied selection or queue entry must roll back.');
+            } catch (\RuntimeException $error) {
+                self::assertSame('Track access denied.', $error->getMessage());
+            }
+            $after = $service->execute($owner, PlaybackOperation::Snapshot, []);
+            foreach (['media', 'queue', 'position', 'currentTrackIndex', 'revision', 'desiredState', 'activeIncarnationId'] as $key) {
+                self::assertSame($before[$key], $after[$key], $key);
+            }
+            self::assertSame($commandCount, (int) $this->observer->fetchOne('SELECT count(*) FROM playback_commands'));
+        }
     }
 
     public function testTwoTabsOnOneDeviceHaveDistinctAuthorityAndWrongAccountCannotAcknowledge(): void

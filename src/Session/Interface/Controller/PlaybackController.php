@@ -198,6 +198,15 @@ final readonly class PlaybackController
     #[OA\Post(
         path: '/api/session/control',
         summary: 'Control the committed playback runner',
+        parameters: [
+            new OA\Parameter(
+                name: 'X-Baander-Playback-Endpoint',
+                in: 'header',
+                description: 'Required when incarnationId is supplied. Authenticates the endpoint receiving its pending commands in the response.',
+                required: false,
+                schema: new OA\Schema(type: 'string'),
+            ),
+        ],
         requestBody: new OA\RequestBody(
             required: true,
             content: new OA\JsonContent(ref: new Model(type: ControlPlaybackRequest::class)),

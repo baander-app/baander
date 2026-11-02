@@ -48,7 +48,8 @@ final readonly class PlaybackCoordinator implements PlaybackCoordinationInterfac
         $owner = $userId->toString();
         $incarnationId = isset($input['incarnationId']) ? $this->uuid($input, 'incarnationId') : null;
         $endpoint = null;
-        if (in_array($operation, [PlaybackOperation::Acknowledge, PlaybackOperation::Observe], true) || ($operation === PlaybackOperation::Snapshot && $incarnationId !== null)) {
+        if (in_array($operation, [PlaybackOperation::Acknowledge, PlaybackOperation::Observe], true)
+            || (in_array($operation, [PlaybackOperation::Snapshot, PlaybackOperation::Control], true) && $incarnationId !== null)) {
             if ($incarnationId === null || $endpointCapability === null || $endpointCapability === '') {
                 throw new ConflictException('An endpoint capability is required.');
             }
@@ -160,6 +161,7 @@ final readonly class PlaybackCoordinator implements PlaybackCoordinationInterfac
                         }
                         $this->store->supersedeControls($session->getId()->toString());
                     }
+                    $previousQueue = $session->getQueue();
                     $session->control(
                         $action,
                         isset($input['media']) ? $this->media($input['media']) : null,
@@ -173,8 +175,10 @@ final readonly class PlaybackCoordinator implements PlaybackCoordinationInterfac
                         if ($session->media() !== null) {
                             $this->assertPlayable($userId, $session->media());
                         }
-                        foreach ($session->getQueue() as $queuedId) {
-                            $this->assertPlayable($userId, new PlaybackMedia('song', PublicId::fromString($queuedId)));
+                        if ($session->getQueue() !== $previousQueue) {
+                            foreach ($session->getQueue() as $queuedId) {
+                                $this->assertPlayable($userId, new PlaybackMedia('song', PublicId::fromString($queuedId)));
+                            }
                         }
                     }
                     if ($session->activeIncarnationId()?->toString() !== null) {
@@ -480,6 +484,9 @@ final readonly class PlaybackCoordinator implements PlaybackCoordinationInterfac
     private function requestDigest(PlaybackOperation $operation, array $input): string
     {
         unset($input['expectedRevision'],$input['type']);
+        if ($operation === PlaybackOperation::Control) {
+            unset($input['incarnationId']);
+        }
         ksort($input);
         return hash('sha256', json_encode(['operation' => $operation->value, 'input' => $input], JSON_THROW_ON_ERROR));
     }

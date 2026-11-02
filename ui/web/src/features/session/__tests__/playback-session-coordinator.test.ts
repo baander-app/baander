@@ -4,6 +4,7 @@ import type { PlaybackSnapshotResource } from '@/shared/api-client/gen/endpoints
 import type { LiveTransportListener, SharedLiveTransport } from '@/shared/live/transport'
 import { advanceAuthorization, synchronizeOwnership } from '@/shared/live/ownership'
 import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
+import { PlaybackLocalRecovery } from '../services/playback-local-recovery'
 import { registerPlaybackAdapter, requestPlayback } from '../services/playback-execution'
 import { PlaybackSessionCoordinator, PLAYBACK_CONNECTION_KEY, PLAYBACK_SESSION_KEY } from '../services/playback-session-coordinator'
 
@@ -24,12 +25,12 @@ function snapshot(overrides: Partial<PlaybackSnapshotResource> = {}): PlaybackSn
       observedState: null, position: null, observedVolume: null,
     }] : [])], commands: [], ...overrides }
 }
-function harness() {
+function harness(recovery?: PlaybackLocalRecovery) {
   let listener: LiveTransportListener = {}
   let connected = true
   const transport = { subscribe: vi.fn((value: LiveTransportListener) => { listener = value; return vi.fn() }), retain: vi.fn(() => vi.fn()), isConnected: () => connected, send: vi.fn() }
   const client = new QueryClient()
-  const runtime = new PlaybackSessionCoordinator(client, transport as unknown as SharedLiveTransport)
+  const runtime = new PlaybackSessionCoordinator(client, transport as unknown as SharedLiveTransport, recovery)
   const stop = runtime.start()
   return { runtime, client, transport, stop,
     receive: (state: PlaybackSnapshotResource) => listener.onMessage?.({ type: 'session.snapshot', data: state }),
@@ -77,6 +78,162 @@ function controlledServer() {
 }
 
 describe('browser playback coordination', () => {
+  it('switches songs through the control response without a presence probe or relay', async () => {
+    const execute = vi.fn(async () => ({ observedState: 'playing' as const, position: 0 }))
+    cleanup.push(registerPlaybackAdapter({ kind: 'song', supportsVolume: true, prepare: vi.fn(), execute, quiesce: vi.fn(), observe: vi.fn() }))
+    const h = harness()
+    cleanup.push(h.stop)
+    const initial = snapshot({ endpoint, activeIncarnationId: endpoint.incarnationId, queue: ['first', 'second'],
+      media: { kind: 'song', publicId: 'first' } })
+    h.receive(initial)
+    let delivered: PlaybackSnapshotResource
+    vi.mocked(AXIOS_INSTANCE.post).mockImplementation(async (path, body) => {
+      const request = body as { requestId: string }
+      if (path === '/api/session/control') {
+        delivered = { ...initial, endpoint: undefined, revision: 2, currentTrackIndex: 1,
+          commands: [{ id: 'switch', attemptId: 'attempt', revision: 2, incarnationId: endpoint.incarnationId, epoch: 1,
+            type: 'load', payload: { media: { kind: 'song', publicId: 'second' }, queue: initial.queue,
+              currentTrackIndex: 1, position: 0, desiredState: 'playing' }, expiresAt: new Date(Date.now() + 60_000).toISOString() }],
+          requestResult: { requestId: request.requestId, commandId: 'switch', outcome: 'applied' } }
+        return { data: { data: delivered } }
+      }
+      return { data: { data: snapshot({ revision: 2, activeIncarnationId: endpoint.incarnationId }) } }
+    })
+
+    await requestPlayback({ action: 'load', media: { kind: 'song', publicId: 'second' } })
+    await vi.waitFor(() => expect(execute).toHaveBeenCalledTimes(1))
+    const calls = vi.mocked(AXIOS_INSTANCE.post).mock.calls
+    expect(calls.find(([path]) => path === '/api/session/control')).toEqual([
+      '/api/session/control', expect.objectContaining({ incarnationId: endpoint.incarnationId, queue: ['first', 'second'], currentTrackIndex: 1 }),
+      expect.objectContaining({ headers: { 'X-Baander-Playback-Endpoint': endpoint.capability } }),
+    ])
+    expect(calls.slice(0, calls.findIndex(([path]) => path === '/api/session/control')).some(([path]) => path === '/api/session/observe')).toBe(false)
+    h.receive(delivered!)
+    await Promise.resolve()
+    expect(execute).toHaveBeenCalledTimes(1)
+  })
+
+  it.each(['stale snapshot', 'wrong incarnation', 'wrong epoch', 'wrong revision', 'expired'] as const)('does not execute a control response with %s', async scenario => {
+    const execute = vi.fn()
+    cleanup.push(registerPlaybackAdapter({ kind: 'song', supportsVolume: true, prepare: vi.fn(), execute, quiesce: vi.fn(), observe: vi.fn() }))
+    const h = harness()
+    cleanup.push(h.stop)
+    h.receive(snapshot({ endpoint, revision: 3, activeIncarnationId: endpoint.incarnationId }))
+    vi.mocked(AXIOS_INSTANCE.post).mockImplementation(async (_path, body) => ({ data: { data: snapshot({
+      revision: scenario === 'stale snapshot' ? 2 : 3, activeIncarnationId: endpoint.incarnationId,
+      commands: [{ id: 'invalid', attemptId: 'attempt', revision: scenario === 'wrong revision' ? 2 : 3,
+        incarnationId: scenario === 'wrong incarnation' ? 'foreign' : endpoint.incarnationId,
+        epoch: scenario === 'wrong epoch' ? 2 : 1, type: 'load',
+        payload: { media: { kind: 'song', publicId: 'second' }, queue: ['second'], currentTrackIndex: 0, position: 0, desiredState: 'playing' },
+        expiresAt: new Date(Date.now() + (scenario === 'expired' ? -1000 : 60_000)).toISOString() }],
+      requestResult: { requestId: (body as { requestId: string }).requestId, commandId: 'invalid', outcome: 'retained' },
+    }) } }))
+    await requestPlayback({ action: 'load', media: { kind: 'song', publicId: 'second' } })
+    expect(execute).not.toHaveBeenCalled()
+  })
+
+  it.each(['ordinary snapshot', 'failed probe'] as const)('checks stale cached availability after an %s', async scenario => {
+    const now = Date.now()
+    const date = vi.spyOn(Date, 'now').mockReturnValue(now)
+    cleanup.push(() => date.mockRestore())
+    const h = harness()
+    cleanup.push(h.stop)
+    await vi.waitFor(() => expect(h.transport.send).toHaveBeenCalledOnce())
+    const state = snapshot({ endpoint, activeIncarnationId: endpoint.incarnationId })
+    h.receive(state)
+    date.mockReturnValue(now + 10_001)
+    h.receive({ ...state, endpoint: undefined, revision: 2 })
+    let probes = 0
+    vi.mocked(AXIOS_INSTANCE.post).mockImplementation(async (path, body) => {
+      if (path === '/api/session/observe') {
+        probes++
+        if (scenario === 'failed probe' && probes === 1) throw new Error('Presence failed')
+      }
+      return { data: { data: { ...state, endpoint: undefined, revision: 2,
+        ...(path === '/api/session/control' ? { requestResult: { requestId: (body as { requestId: string }).requestId, commandId: 'load', outcome: 'retained' } } : {}),
+      } } }
+    })
+    if (scenario === 'failed probe') await expect(requestPlayback({ action: 'play' })).rejects.toThrow('Presence failed')
+    await requestPlayback({ action: 'play' })
+    expect(probes).toBe(scenario === 'failed probe' ? 2 : 1)
+  })
+
+  it('retries the same logical request with the replacement endpoint delivery identity', async () => {
+    const h = controlledServer()
+    const pending = requestPlayback({ action: 'pause' })
+    await vi.waitFor(() => expect(h.requests).toHaveLength(1))
+    h.close()
+    h.open()
+    await vi.waitFor(() => expect(h.transport.send).toHaveBeenCalledTimes(2))
+    const replacement = { ...endpoint, incarnationId: 'replacement', epoch: 2, capability: 'new-capability' }
+    h.receive(snapshot({ endpoint: replacement, revision: 3, activeIncarnationId: endpoint.incarnationId }))
+    await vi.waitFor(() => {
+      const controls = vi.mocked(AXIOS_INSTANCE.post).mock.calls.filter(([path]) => path === '/api/session/control')
+      expect(controls).toHaveLength(2)
+      const originalPayload = controls[0][1] as Record<string, unknown>
+      expect(controls[1][1]).toEqual({ ...originalPayload, incarnationId: replacement.incarnationId })
+      expect(controls[1][2]).toMatchObject({ headers: { 'X-Baander-Playback-Endpoint': replacement.capability } })
+    })
+    h.settle(0)
+    h.publish()
+    await pending
+  })
+
+  it('measures confirmed presence from the observation request start', async () => {
+    const now = Date.now()
+    const date = vi.spyOn(Date, 'now').mockReturnValue(now)
+    cleanup.push(() => date.mockRestore())
+    const h = harness()
+    cleanup.push(h.stop)
+    const state = snapshot({ endpoint, activeIncarnationId: endpoint.incarnationId })
+    h.receive(state)
+    date.mockReturnValue(now + 10_001)
+    let release!: () => void
+    let probes = 0
+    vi.mocked(AXIOS_INSTANCE.post).mockImplementation(async (path, body) => {
+      if (path === '/api/session/observe') {
+        probes++
+        if (probes === 1) await new Promise<void>(resolve => { release = resolve })
+      }
+      return { data: { data: { ...state, endpoint: undefined,
+        ...(path === '/api/session/control' ? { requestResult: { requestId: (body as { requestId: string }).requestId, commandId: 'play', outcome: 'retained' } } : {}),
+      } } }
+    })
+    const first = requestPlayback({ action: 'play' })
+    await vi.waitFor(() => expect(release).toBeDefined())
+    date.mockReturnValue(now + 20_002)
+    release()
+    await first
+    await requestPlayback({ action: 'play' })
+    expect(probes).toBe(2)
+  })
+
+  it('still executes stop commands after recovery checkpoint storage fails', async () => {
+    const recovery = new PlaybackLocalRecovery('https://baander.app', 'listener')
+    const spies = [
+      vi.spyOn(recovery, 'initialize').mockResolvedValue(),
+      vi.spyOn(recovery, 'isEligible').mockReturnValue(true),
+      vi.spyOn(recovery, 'registered').mockResolvedValue(),
+      vi.spyOn(recovery, 'checkpoint').mockRejectedValue(new Error('Storage unavailable')),
+    ]
+    cleanup.push(() => spies.forEach(spy => spy.mockRestore()))
+    const execute = vi.fn(async () => ({ observedState: 'stopped' as const, position: 0 }))
+    cleanup.push(registerPlaybackAdapter({ kind: 'song', supportsVolume: true, prepare: vi.fn(), execute,
+      quiesce: vi.fn(), observe: vi.fn(), localRecovery: { eligible: true,
+        fence: () => ({ observedState: 'stopped', position: 0 }), rearmAfterRegistration: vi.fn() } }))
+    const h = harness(recovery)
+    cleanup.push(h.stop)
+    await vi.waitFor(() => expect(h.transport.send).toHaveBeenCalledOnce())
+    const command = { id: 'load', attemptId: 'attempt', revision: 1, incarnationId: endpoint.incarnationId, epoch: 1,
+      type: 'load' as const, payload: { media: { kind: 'song' as const, publicId: 'song' }, queue: ['song'],
+        currentTrackIndex: 0, position: 0, desiredState: 'playing' as const }, expiresAt: new Date(Date.now() + 60_000).toISOString() }
+    h.receive(snapshot({ endpoint, commands: [command] }))
+    await vi.waitFor(() => expect(h.client.getQueryData(PLAYBACK_CONNECTION_KEY)).toHaveProperty('error', 'Storage unavailable'))
+    h.receive(snapshot({ revision: 2, commands: [{ ...command, id: 'stop', revision: 2, type: 'stop' }] }))
+    await vi.waitFor(() => expect(execute).toHaveBeenCalledOnce())
+    expect(execute).toHaveBeenCalledWith(expect.objectContaining({ type: 'stop' }), expect.anything())
+  })
+
   it('does not retarget a queued local video close after playback moves to another browser', async () => {
     const h = harness()
     cleanup.push(h.stop)

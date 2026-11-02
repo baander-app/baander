@@ -121,6 +121,36 @@ when the queued action executes. A stale Back handler cannot stop a destination
 that took over playback; explicit Stop remains a destination control. The 57 focused
 coordinator and overlay tests passed, and the scoped review found no remaining issues.
 
+Same-device song switching checkpoint, 2026-11-02 (U3): a control response now
+delivers pending commands directly to the authenticated requesting browser after
+commit. HTTP and WebSocket delivery share the command runner's execution guards
+and deduplication. Reconnecting changes delivery credentials without changing the
+saved command's target or logical request identity.
+
+An active, available browser reuses presence confirmed within the current
+10-second heartbeat interval, measured from the request's start. Stale or failed
+presence still requires renewal or recovery. Song changes authorize the selected
+media and recheck queue entries only when the queue changes. Device transfers
+retain their preparation, stop acknowledgement and activation checks.
+
+The isolated-preview comparison used the same 77-song fixture with crossfade off:
+three row selections and three Next clicks before and after the change. Median
+time from input to the browser's playing event fell from 446 ms to 121 ms for
+selection and from 722 ms to 124 ms for Next. All six commands arrived first in
+the HTTP response, 34–47 ms after input; a later WebSocket duplicate did not execute
+twice. These measurements cover Chromium media events, not physical audio output
+or a latency guarantee for other devices.
+
+Verification: 3,116 web tests passed across 244 files. Typechecking for the web app
+and browser tests passed; lint retained eight existing warnings and no errors.
+The CI image passed full PHPStan analysis and 41 affected backend tests with 272
+assertions, including the final 24-test transfer run. All five preview browser
+checks passed: song-switch timing, lifecycle recovery, expired-presence recovery,
+music transfer and video transfer.
+The timing trace contained no HTTP errors. The video check rejected one stale
+observation during Pause with HTTP 409; transfer, recovery and final Stop still
+completed. Review and simplification left no outstanding findings.
+
 Follow-up: the separate retry path can retain a pending control after a network
 failure followed by a rejected retry. Initial rejected requests are cleared; the
 retry-after-network-failure case remains outside this recovery check.

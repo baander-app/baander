@@ -26,6 +26,8 @@ interface PendingRequest {
 type StopProof = { endpoint: PlaybackEndpointResource; position: number }
 let retirement: { owner: ReturnType<typeof captureOwnership>; recovery: Promise<StopProof | null> } | null = null
 
+const PRESENCE_INTERVAL_MS = 10_000
+
 export const PLAYBACK_SESSION_KEY = ['session', 'current'] as const
 export const PLAYBACK_CONNECTION_KEY = ['session', 'connection'] as const
 export interface PlaybackConnection {
@@ -51,6 +53,8 @@ export class PlaybackSessionCoordinator {
   private localQualified = false
   private suspended = false
   private executionBlocked = false
+  private presenceConfirmedAt: number | null = null
+  private registrationStartedAt: number | null = null
   private ready = false
   private registrationPending = false
   private cleanup: (() => void)[] = []
@@ -95,7 +99,7 @@ export class PlaybackSessionCoordinator {
     window.addEventListener('pagehide', hide)
     window.addEventListener('pageshow', show)
     this.cleanup.push(() => { window.removeEventListener('pagehide', hide); window.removeEventListener('pageshow', show) })
-    this.interval = setInterval(() => { this.observe().catch(error => this.fail(error)) }, 10_000)
+    this.interval = setInterval(() => { this.observe().catch(error => this.fail(error)) }, PRESENCE_INTERVAL_MS)
     return () => this.dispose()
   }
 
@@ -114,6 +118,7 @@ export class PlaybackSessionCoordinator {
   }
 
   private fail(error: unknown): void {
+    this.presenceConfirmedAt = null
     this.publish(this.ready, error instanceof Error ? error.message : 'Playback connection failed.')
   }
 
@@ -179,15 +184,20 @@ export class PlaybackSessionCoordinator {
         this.acceptEndpoint(snapshot).catch(error => { this.registrationPending = false; this.fail(error) })
         return
       }
-      if (this.ready) {
-        for (const command of snapshot.commands) {
-          this.runner.accept(command, snapshot.revision).catch(error => this.fail(error))
-        }
-      }
+      this.dispatchCommands(snapshot)
     } catch (error) { this.fail(error) }
   }
 
+  private dispatchCommands(snapshot: PlaybackSnapshotResource): void {
+    if (!this.current() || !this.ready || !this.snapshot || snapshot.revision < this.snapshot.revision) return
+    for (const command of snapshot.commands) {
+      this.runner.accept(command, snapshot.revision).catch(error => this.fail(error))
+    }
+  }
+
   private disconnect(): void {
+    this.presenceConfirmedAt = null
+    this.registrationStartedAt = null
     const fenced = this.runner.fenceLocalExecution()
     this.localRecovery?.noteFence(fenced)
     this.abortRequests()
@@ -211,6 +221,7 @@ export class PlaybackSessionCoordinator {
   private async reconnect(): Promise<void> {
     if (this.registrationPending || this.suspended) return
     this.registrationPending = true
+    this.registrationStartedAt = Date.now()
     const connection = ++this.connection
     const current = () => this.current() && connection === this.connection && this.transport.isConnected()
     await this.recovery
@@ -283,18 +294,22 @@ export class PlaybackSessionCoordinator {
     this.executionBlocked = false
     for (const adapter of getPlaybackAdapters()) adapter.localRecovery?.rearmAfterRegistration()
     this.ready = true
+    this.presenceConfirmedAt = this.registrationStartedAt
     this.publish(true, null)
     this.refreshRequests(true)
-    for (const command of snapshot.commands) this.runner.accept(command, snapshot.revision).catch(error => this.fail(error))
+    this.dispatchCommands(snapshot)
     for (const ready of this.registrationReady) ready()
   }
 
   private async ensureLocalEndpoint(): Promise<PlaybackEndpointResource> {
     if (!this.current() || !this.ready || !this.endpoint) throw new Error('Playback connection is unavailable.')
-    await this.observe()
-    if (!this.current() || !this.ready || !this.endpoint) throw new Error('Playback connection is unavailable.')
     const available = () => this.snapshot?.destinations.some(destination =>
       destination.incarnationId === this.endpoint?.incarnationId && destination.available)
+    const presenceAge = this.presenceConfirmedAt === null ? null : Date.now() - this.presenceConfirmedAt
+    if (this.snapshot?.activeIncarnationId === this.endpoint.incarnationId && available()
+      && presenceAge !== null && presenceAge >= 0 && presenceAge < PRESENCE_INTERVAL_MS) return this.endpoint
+    await this.observe()
+    if (!this.current() || !this.ready || !this.endpoint) throw new Error('Playback connection is unavailable.')
     if (available()) return this.endpoint
 
     this.disconnect()
@@ -377,7 +392,14 @@ export class PlaybackSessionCoordinator {
     }
     // Transfer activation can replace the snapshot without increasing its command revision.
     if (generation !== this.connection || endpoint !== this.endpoint || snapshot !== this.snapshot || !this.ready || !this.current()) return
-    await this.post('/api/session/observe', { incarnationId: endpoint.incarnationId, expectedRevision: snapshot.revision, ...observation }, endpoint)
+    const startedAt = Date.now()
+    try {
+      await this.post('/api/session/observe', { incarnationId: endpoint.incarnationId, expectedRevision: snapshot.revision, ...observation }, endpoint)
+      if (generation === this.connection && endpoint === this.endpoint && this.ready && this.current()) this.presenceConfirmedAt = startedAt
+    } catch (error) {
+      this.presenceConfirmedAt = null
+      throw error
+    }
   }
 
   request(intent: PlaybackIntent): Promise<void> {
@@ -422,11 +444,21 @@ export class PlaybackSessionCoordinator {
     } catch (error) { this.fail(error); throw error }
   }
 
+  private async postControl(payload: Record<string, unknown>): Promise<ControlSnapshot> {
+    const endpoint = this.endpoint
+    const response = await this.post('/api/session/control', {
+      ...payload,
+      ...(endpoint ? { incarnationId: endpoint.incarnationId } : {}),
+    }, endpoint ?? undefined)
+    this.dispatchCommands(response)
+    return response
+  }
+
   private sendControl(payload: Record<string, unknown>): Promise<void> {
     return new Promise((resolve, reject) => {
       const request: PendingRequest = { payload, resolve, reject, lastRevision: this.snapshot!.revision, reading: true, commandId: null }
       this.pendingRequests.set(String(payload.requestId), request)
-      this.post('/api/session/control', payload).then(response => {
+      this.postControl(payload).then(response => {
         request.lastRevision = response.revision
         this.completeRequest(request, response.requestResult)
       }).catch(error => {
@@ -473,7 +505,7 @@ export class PlaybackSessionCoordinator {
       if (request.reading || (!force && request.lastRevision >= this.snapshot.revision)) continue
       request.reading = true
       request.lastRevision = this.snapshot.revision
-      this.post('/api/session/control', request.payload).then(response => {
+      this.postControl(request.payload).then(response => {
         this.completeRequest(request, response.requestResult)
       }).catch(error => {
         this.rejectUnconfirmed(request, error)
