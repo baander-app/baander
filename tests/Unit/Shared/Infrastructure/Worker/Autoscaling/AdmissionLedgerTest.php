@@ -36,6 +36,43 @@ final class AdmissionLedgerTest extends TestCase
         rmdir($this->directory);
     }
 
+    public function testForeignDeploymentProfileHeartbeatCannotGrantAdmission(): void
+    {
+        (new WorkerPeerHandshake($this->directory, 'worker.baander.app', $this->boot, 'execution', 0,
+            new \App\Shared\Application\DTO\DeploymentProfile('household')))->publish(4, true, false, 10);
+        $this->expectExceptionMessage('Foreign admission peer heartbeat');
+        $this->ledger->acquire($this->identity(), 1, $this->request(), 10);
+    }
+
+    public function testHouseholdProfileGrantsItsConfiguredOrdinarySlot(): void
+    {
+        $directory = $this->directory . '/household';
+        $profile = new \App\Shared\Application\DTO\DeploymentProfile('household');
+        foreach (['control', 'execution'] as $unit) {
+            (new WorkerPeerHandshake($directory, 'worker.baander.app', $this->boot, $unit, 0, $profile))->publish(4, true, false, 10);
+        }
+        try {
+            $ledger = new AdmissionLedger($directory, new DeploymentLease('worker.baander.app', $this->boot, 4), new WorkerAutoscalingProfile(), $profile);
+            $ledger->initialize(10);
+            $ledger->publishDecision(1, 'demand', [], 10);
+            self::assertTrue($ledger->acquire($this->identity(), 1, $this->request(), 10));
+        } finally {
+            foreach (glob($directory . '/' . $this->boot . '/*') ?: [] as $path) {
+                unlink($path);
+            }
+            rmdir($directory . '/' . $this->boot);
+            rmdir($directory);
+        }
+    }
+
+    public function testDeploymentProfileIsPartOfTheLedgerFingerprint(): void
+    {
+        $foreign = new AdmissionLedger($this->directory, new DeploymentLease('worker.baander.app', $this->boot, 4),
+            new WorkerAutoscalingProfile(maximumConcurrency: 4), new \App\Shared\Application\DTO\DeploymentProfile('household'));
+        $this->expectException(\RuntimeException::class);
+        $foreign->snapshot(10);
+    }
+
     public function testUnseenSlotsRemainMissingAndEmptyCompletionReportsIdle(): void
     {
         $initial = $this->ledger->snapshot(10)['slots']['consumer-0'];

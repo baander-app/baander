@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Shared\Infrastructure\Worker;
 
+use App\Shared\Application\DTO\DeploymentProfile;
 use Symfony\Component\DependencyInjection\Attribute\Exclude;
 
 /** Fresh execution-container CLI process; all native process ownership stays here. */
@@ -17,7 +18,7 @@ final class NativeExecutionDaemon
     private bool $stopping = false;
     private bool $poisoned = false;
 
-    public function __construct(private readonly string $namespace, private readonly string $bootId, private readonly int $epoch)
+    public function __construct(private readonly string $namespace, private readonly string $bootId, private readonly int $epoch, private readonly DeploymentProfile $deploymentProfile = new DeploymentProfile())
     {
         if ($namespace === '' || preg_match('/^[a-f0-9]{32}$/D', $bootId) !== 1 || $epoch < 1) {
             throw new \InvalidArgumentException('Invalid native launcher identity.');
@@ -141,7 +142,8 @@ final class NativeExecutionDaemon
         }
 
         return NativeExecutionProtocol::encode(['id' => $id, 'namespace' => $this->namespace, 'bootId' => $this->bootId,
-            'epoch' => $this->epoch, ...$reply], NativeExecutionProtocol::RESPONSE_BYTES);
+            'epoch' => $this->epoch, 'deploymentProfile' => $this->deploymentProfile->toJson(),
+            'limits' => NativeExecutionProtocol::limits($this->deploymentProfile), ...$reply], NativeExecutionProtocol::RESPONSE_BYTES);
     }
 
     /** @param array<string, mixed> $request */
@@ -149,6 +151,8 @@ final class NativeExecutionDaemon
     {
         if (($request['namespace'] ?? null) !== $this->namespace || ($request['bootId'] ?? null) !== $this->bootId
             || ($request['epoch'] ?? null) !== $this->epoch
+            || ($request['deploymentProfile'] ?? null) !== $this->deploymentProfile->toJson()
+            || ($request['limits'] ?? null) !== NativeExecutionProtocol::limits($this->deploymentProfile)
         ) {
             throw new NativeExecutionException('Native request authority mismatch.');
         }
@@ -157,8 +161,12 @@ final class NativeExecutionDaemon
         if (!is_string($client) || preg_match('/^[A-Za-z0-9_.:-]{1,128}$/D', $client) !== 1 || !is_int($generation) || $generation < 1) {
             throw new NativeExecutionException('Invalid native client identity.', false);
         }
+        if ($this->deploymentProfile->sharedCopySlots > 0
+            && !in_array($client, ['supervisor', 'media-control', 'media-copy-0', 'media-copy-1'], true)) {
+            throw new NativeExecutionException('Native client is not admitted by the deployment profile.', false);
+        }
         $previous = $this->clients[$client] ?? null;
-        if ($previous === null && count($this->clients) >= NativeExecutionProtocol::MAX_CLIENTS) {
+        if ($previous === null && count($this->clients) >= $this->deploymentProfile->nativeClientLimit()) {
             throw new NativeExecutionException('Native client ledger is full.', false);
         }
         if ($previous !== null && $generation < $previous['generation']) {
@@ -191,7 +199,7 @@ final class NativeExecutionDaemon
     private function operate(array $request, string $session): array
     {
         $operation = $request['operation'] ?? null;
-        $allowed = ['id', 'namespace', 'bootId', 'epoch', 'clientId', 'generation', 'operation'];
+        $allowed = ['id', 'namespace', 'bootId', 'epoch', 'clientId', 'generation', 'operation', 'deploymentProfile', 'limits'];
         $allowed = match ($operation) {
             'submit' => [...$allowed, 'argv', 'timeout', 'attempt'],
             'inspect', 'release' => [...$allowed, 'token', 'attempt'],
@@ -305,8 +313,16 @@ final class NativeExecutionDaemon
 
             return $existing->snapshot();
         }
+        if ($this->deploymentProfile->sharedCopySlots > 0) {
+            $client = substr($session, 0, strrpos($session, ':'));
+            $limit = str_starts_with($client, 'media-copy-') ? 2 : ($client === 'media-control' ? 1 : 0);
+            $owned = count(array_filter($this->attempts, static fn (NativeExecutionAttempt $attempt): bool => $attempt->session === $session && $attempt->state === 'running'));
+            if ($owned >= $limit) {
+                throw new NativeExecutionException('Native client command capacity is exhausted.', false);
+            }
+        }
         $active = count(array_filter($this->attempts, static fn (NativeExecutionAttempt $attempt): bool => $attempt->state === 'running'));
-        if ($active >= NativeExecutionProtocol::MAX_COMMANDS || count($this->attempts) >= NativeExecutionProtocol::MAX_RESULTS) {
+        if ($active >= $this->deploymentProfile->nativeCommandLimit() || count($this->attempts) >= $this->deploymentProfile->nativeResultLimit()) {
             throw new NativeExecutionException('Native command or result capacity is exhausted.', false);
         }
         $process = @proc_open(['/usr/bin/setsid', ...$argv], [0 => ['file', '/dev/null', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']],

@@ -51,7 +51,7 @@ final readonly class WorkerSupervisorRunner implements WorkerSupervisorRunnerInt
             $environment['BAANDER_WORKER_NAMESPACE'] = $configuration->namespace;
             $environment['BAANDER_WORKER_BOOT_ID'] = $configuration->bootId;
             $startedAt = hrtime(true) / 1e9;
-            $peer = new WorkerPeerHandshake($configuration->ipcDirectory, $configuration->namespace, $configuration->bootId, $configuration->unit, $startedAt);
+            $peer = new WorkerPeerHandshake($configuration->ipcDirectory, $configuration->namespace, $configuration->bootId, $configuration->unit, $startedAt, $configuration->deploymentProfile);
             $environment['BAANDER_NATIVE_SOCKET'] = $peer->socketPath();
             $environment['BAANDER_WORKER_UNIT'] = $configuration->unit;
             $environment['BAANDER_DEPLOYMENT_PROFILE'] = $configuration->deploymentProfile->identifier;
@@ -88,7 +88,7 @@ final readonly class WorkerSupervisorRunner implements WorkerSupervisorRunnerInt
                     $epoch = $lease->epoch;
                     if ($configuration->unit === 'control' && $ledger === null) {
                         // Create once before execution can observe ready authority.
-                        $ledger = new AdmissionLedger($configuration->ipcDirectory, $lease, $configuration->autoscaling);
+                        $ledger = new AdmissionLedger($configuration->ipcDirectory, $lease, $configuration->autoscaling, $configuration->deploymentProfile);
                         $ledger->initialize($now);
                     }
                     if ($resourceSampler !== null && $now >= $nextResourceSample) {
@@ -102,13 +102,13 @@ final readonly class WorkerSupervisorRunner implements WorkerSupervisorRunnerInt
                             $nativeEnvironment['BAANDER_WORKER_LEASE_EPOCH'] = (string) $epoch;
                             $nativeEnvironment['BAANDER_WORKER_ID'] = 'native';
                             $nativeEnvironment['BAANDER_WORKER_GENERATION'] = '1';
-                            $native = WorkerChildProcess::start([PHP_BINARY, '-d', 'memory_limit=128M', $this->projectDirectory . '/bin/worker-native.php'], $this->projectDirectory, STDOUT, STDERR, $nativeEnvironment);
+                            $native = WorkerChildProcess::start([PHP_BINARY, '-d', 'memory_limit=' . $configuration->deploymentProfile->nativeManagerHeapMiB() . 'M', $this->projectDirectory . '/bin/worker-native.php'], $this->projectDirectory, STDOUT, STDERR, $nativeEnvironment);
                         }
                         if (!$native->poll($now)) {
                             throw new \RuntimeException('Native execution manager exited.');
                         }
                         if (!$nativeReady && file_exists($peer->socketPath())) {
-                            $client = new NativeExecutionClient($peer->socketPath(), $configuration->namespace, $configuration->bootId, $epoch, 'supervisor', 1);
+                            $client = new NativeExecutionClient($peer->socketPath(), $configuration->namespace, $configuration->bootId, $epoch, 'supervisor', 1, $configuration->deploymentProfile);
                             $reply = $client->handshake();
                             $nativeReady = ($reply['ready'] ?? false) === true;
                         }
@@ -214,25 +214,27 @@ final readonly class WorkerSupervisorRunner implements WorkerSupervisorRunnerInt
         if ($this->workloads->receivers() !== ['async', 'scheduler']) {
             throw new \RuntimeException('Worker units require the async and scheduler receiver catalog.');
         }
+        $heap = $configuration->deploymentProfile->phpHeapMiB() . 'M';
+        $reservation = $configuration->deploymentProfile->phpProcessMemoryMiB() * 1024 * 1024;
         if ($configuration->unit === 'execution') {
             $roles = [];
             foreach ($configuration->autoscaling->consumerIds() as $id) {
-                $roles[] = new WorkerDefinition($id, [PHP_BINARY, '-d', 'memory_limit=256M', $this->projectDirectory . '/bin/console',
-                    'messenger:consume', 'async', '--memory-limit=256M', '--keepalive=30', '--no-interaction'],
-                    $this->projectDirectory, 320 * 1024 * 1024, 30.0);
+                $roles[] = new WorkerDefinition($id, [PHP_BINARY, '-d', 'memory_limit=' . $heap, $this->projectDirectory . '/bin/console',
+                    'messenger:consume', 'async', '--memory-limit=' . $heap, '--keepalive=30', '--no-interaction'],
+                    $this->projectDirectory, $reservation, 30.0);
             }
-            $roles[] = new WorkerDefinition('scheduled-consumer', [PHP_BINARY, '-d', 'memory_limit=256M', $this->projectDirectory . '/bin/console',
-                    'messenger:consume', 'scheduler', '--memory-limit=256M', '--keepalive=30', '--no-interaction'],
-                    $this->projectDirectory, 320 * 1024 * 1024 + $configuration->scheduledConsoleReservationBytes, 30.0);
+            $roles[] = new WorkerDefinition('scheduled-consumer', [PHP_BINARY, '-d', 'memory_limit=' . $heap, $this->projectDirectory . '/bin/console',
+                    'messenger:consume', 'scheduler', '--memory-limit=' . $heap, '--keepalive=30', '--no-interaction'],
+                    $this->projectDirectory, $reservation + $configuration->scheduledConsoleReservationBytes, 30.0);
             return $roles;
         }
         return [
-            new WorkerDefinition('relay', [PHP_BINARY, '-d', 'memory_limit=256M', $this->projectDirectory . '/bin/console',
-                'app:outbox:consume', '--time-limit=86400', '--no-interaction'], $this->projectDirectory, 320 * 1024 * 1024, 30.0),
-            new WorkerDefinition('scheduler', [PHP_BINARY, '-d', 'memory_limit=256M', $this->projectDirectory . '/bin/worker-scheduler.php'], $this->projectDirectory, 320 * 1024 * 1024, 30.0),
-            // One manager and four kernel children each reserve 256 MiB heap plus 64 MiB headroom.
-            new WorkerDefinition('media', [PHP_BINARY, '-d', 'memory_limit=256M', $this->projectDirectory . '/bin/worker-media.php'], $this->projectDirectory, 1600 * 1024 * 1024, 30.0, descendantProcessReservation: 4),
-            new WorkerDefinition('autoscaler', [PHP_BINARY, '-d', 'memory_limit=256M', $this->projectDirectory . '/bin/worker-autoscaler.php'], $this->projectDirectory, 320 * 1024 * 1024, 30.0),
+            new WorkerDefinition('relay', [PHP_BINARY, '-d', 'memory_limit=' . $heap, $this->projectDirectory . '/bin/console',
+                'app:outbox:consume', '--time-limit=86400', '--no-interaction'], $this->projectDirectory, $reservation, 30.0),
+            new WorkerDefinition('scheduler', [PHP_BINARY, '-d', 'memory_limit=' . $heap, $this->projectDirectory . '/bin/worker-scheduler.php'], $this->projectDirectory, $reservation, 30.0),
+            // Media includes its manager and every admitted kernel child.
+            new WorkerDefinition('media', [PHP_BINARY, '-d', 'memory_limit=' . $heap, $this->projectDirectory . '/bin/worker-media.php'], $this->projectDirectory, $configuration->deploymentProfile->mediaMemoryMiB() * 1024 * 1024, 30.0, descendantProcessReservation: $configuration->deploymentProfile->mediaChildSlots()),
+            new WorkerDefinition('autoscaler', [PHP_BINARY, '-d', 'memory_limit=' . $heap, $this->projectDirectory . '/bin/worker-autoscaler.php'], $this->projectDirectory, $reservation, 30.0),
         ];
     }
 

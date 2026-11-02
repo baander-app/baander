@@ -28,6 +28,7 @@ final readonly class StreamClient
         string $email,
         string $privateKey,
         private string $endpoint,
+        string $audience = 'https://baander.app',
     ) {
         $user = $manager->getRepository(UserEntity::class)->findOneBy(['email' => $email]);
         if (!$user instanceof UserEntity) {
@@ -47,7 +48,7 @@ final readonly class StreamClient
         $manager->persist($client);
         $manager->persist($token);
         $manager->flush();
-        $this->jwt = OAuthAccessTokenJwt::sign($privateKey, $token);
+        $this->jwt = OAuthAccessTokenJwt::sign($privateKey, $token, $audience);
     }
 
     /** The signed access token, also used by negative authentication probes. */

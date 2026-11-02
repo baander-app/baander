@@ -46,13 +46,13 @@ function mediaAttempt(string $job): array
 /** @param array<string,mixed> $payload */
 function mediaSocket(StreamClient $auth, array $payload): void
 {
-    $ticket = $auth->webSocketTicket(BASE . '/api/ws/tickets', 'https://baander.app');
+    $ticket = $auth->webSocketTicket(BASE . '/api/ws/tickets', BASE);
     $failure = null;
     Swoole\Coroutine\run(static function () use ($ticket, $payload, &$failure): void {
         $socket = new Swoole\Coroutine\Http\Client('127.0.0.1', 9501);
         try {
             $socket->set(['timeout' => 2]);
-            $socket->setHeaders(['Origin' => 'https://baander.app']);
+            $socket->setHeaders(['Origin' => BASE]);
             ensure($socket->upgrade('/api/ws?ticket=' . $ticket), 'Ticketed control socket upgrade failed.');
             ensure($socket->push(json_encode(['type' => 'transcode.position', ...$payload], JSON_THROW_ON_ERROR)), 'Socket control send failed.');
             $deadline = microtime(true) + 2;
@@ -87,11 +87,18 @@ foreach (['480p', '720p', '1080p'] as $quality) {
     $manager->persist($owner);
     $manager->flush();
     $owners[$quality] = new StreamClient($manager, $email,
-        (string) file_get_contents($project . '/config/secrets/oauth/private.key'), BASE . '/api/stream/track');
+        (string) file_get_contents($project . '/config/secrets/oauth/private.key'), BASE . '/api/stream/track', audience: BASE);
 }
 foreach (['360p', '480p', '720p'] as $quality) {
     $response = twoCommandExchange($owners[$quality], '/api/transcode/sessions/', 'POST', ['videoId' => $state['video'], 'qualityTier' => $quality])->complete(20);
-    ensure($response->status() === 201, 'Video capacity admission failed.');
+    $admissionBody = json_decode($response->body, true);
+    ensure($response->status() === 201, 'Video capacity admission failed: ' . json_encode([
+        'httpStatus' => $response->status(), 'curlResult' => $response->result, 'contentType' => $response->header('Content-Type'),
+        'responseKeys' => is_array($admissionBody) ? array_slice(array_keys($admissionBody), 0, 12) : [],
+        'message' => is_string($admissionBody['message'] ?? null) ? substr($admissionBody['message'], 0, 256) : null,
+        'error' => is_string($admissionBody['error'] ?? null) ? substr($admissionBody['error'], 0, 256) : null,
+        'errorCode' => is_string($admissionBody['error_code'] ?? null) ? substr($admissionBody['error_code'], 0, 128) : null,
+    ], JSON_THROW_ON_ERROR));
     $sessions[] = jsonBody($response);
 }
 ensure(count(array_unique(array_column($sessions, 'jobId'))) === 3, 'Expected three independent capacity jobs.');

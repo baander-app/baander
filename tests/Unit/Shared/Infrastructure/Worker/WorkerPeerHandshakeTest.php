@@ -104,6 +104,16 @@ PHP;
         $control->ready(4, 12);
     }
 
+    public function testMismatchingDeploymentProfileCannotAdmitBusiness(): void
+    {
+        $control = $this->peer('control');
+        $execution = new WorkerPeerHandshake($this->directory, 'worker.baander.app', str_repeat('a', 32), 'execution', 10,
+            new \App\Shared\Application\DTO\DeploymentProfile('household'));
+        $execution->publish(4, true, false, 10);
+        $this->expectException(\RuntimeException::class);
+        $control->ready(4, 10);
+    }
+
     public function testMismatchingEpochCannotAdmitBusiness(): void
     {
         $control = $this->peer('control');

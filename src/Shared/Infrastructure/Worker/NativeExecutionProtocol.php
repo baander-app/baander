@@ -12,9 +12,12 @@ final class NativeExecutionProtocol
     public const int REQUEST_BYTES = 65_536;
     public const int OUTPUT_BYTES = 1_048_576;
     public const int RESPONSE_BYTES = 3_000_000;
-    public const int MAX_COMMANDS = 8;
-    public const int MAX_RESULTS = 32;
-    public const int MAX_CLIENTS = 64;
+
+    /** @return array{commands:int, results:int, clients:int} */
+    public static function limits(\App\Shared\Application\DTO\DeploymentProfile $profile): array
+    {
+        return ['commands' => $profile->nativeCommandLimit(), 'results' => $profile->nativeResultLimit(), 'clients' => $profile->nativeClientLimit()];
+    }
 
     /** @param array<string, mixed> $value */
     public static function encode(array $value, int $limit): string

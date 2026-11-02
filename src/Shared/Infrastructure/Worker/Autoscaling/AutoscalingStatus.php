@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Shared\Infrastructure\Worker\Autoscaling;
 
+use App\Shared\Application\DTO\DeploymentProfile;
 use App\Shared\Application\DTO\WorkerAutoscalingProfile;
 use App\Shared\Infrastructure\Worker\DeploymentLease;
 use Symfony\Component\DependencyInjection\Attribute\Exclude;
@@ -14,9 +15,9 @@ final readonly class AutoscalingStatus
     private AdmissionLedger $ledger;
     private ResourceChannel $resources;
 
-    public function __construct(string $ipcDirectory, DeploymentLease $lease, private WorkerAutoscalingProfile $profile)
+    public function __construct(string $ipcDirectory, DeploymentLease $lease, private WorkerAutoscalingProfile $profile, DeploymentProfile $deploymentProfile = new DeploymentProfile())
     {
-        $this->ledger = new AdmissionLedger($ipcDirectory, $lease, $profile);
+        $this->ledger = new AdmissionLedger($ipcDirectory, $lease, $profile, $deploymentProfile);
         $this->resources = new ResourceChannel($ipcDirectory, $lease);
     }
 

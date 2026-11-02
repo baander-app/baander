@@ -27,7 +27,7 @@ $profileFields = json_decode((string) file_get_contents(__DIR__ . '/autoscaling-
 $profileFields['maximumConcurrency'] = count($ledger['slots']);
 $profile = WorkerAutoscalingProfile::fromJson(json_encode($profileFields, JSON_THROW_ON_ERROR));
 if ($profile->maxSampleAgeMs > 6000) { throw new RuntimeException('Observation gap exceeds qualification time budget.'); }
-$status = new AutoscalingStatus(dirname($directory), $lease, $profile);
+$status = new AutoscalingStatus(dirname($directory), $lease, $profile, \App\Shared\Application\DTO\DeploymentProfile::fromEnvironment());
 $db = Doctrine\DBAL\DriverManager::getConnection((new Doctrine\DBAL\Tools\DsnParser(['postgresql' => 'pdo_pgsql']))->parse((string) getenv('DATABASE_URL')));
 $db->executeStatement("SET statement_timeout = '1000ms'");
 $startTicks = static function (int $pid): ?string {

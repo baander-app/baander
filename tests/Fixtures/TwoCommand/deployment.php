@@ -11,6 +11,7 @@ use App\Library\Infrastructure\Doctrine\Entity\LibraryEntity;
 use App\Media\Infrastructure\Doctrine\Entity\ImageEntity;
 use App\Shared\Domain\Model\PublicId;
 use App\Tests\Fixtures\TwoCommand\TrackDelivery;
+use App\Tests\Fixtures\TwoCommand\LocalOrigin;
 use App\Tests\Fixtures\WebRuntime\HttpExchange;
 use App\Tests\Fixtures\WebRuntime\StreamClient;
 use Symfony\Component\Process\Process;
@@ -28,7 +29,7 @@ spl_autoload_register(static function (string $class) use ($project): void {
     }
 });
 (new Symfony\Component\Dotenv\Dotenv())->bootEnv($project . '/.env');
-const BASE = 'http://127.0.0.1:9501';
+const BASE = LocalOrigin::BASE;
 const ROOT = '/var/www/html/storage/two-command';
 const STATE = ROOT . '/state.json';
 const EMAIL = 'two-command-admin@baander.app';
@@ -139,7 +140,7 @@ function playback(StreamClient $client, array $state): array
 }
 function url(string $path): string
 {
-    return str_starts_with($path, '/') ? BASE . $path : $path;
+    return LocalOrigin::resolve($path);
 }
 /** @return array{decodedFrames: int, decodedPcmBytes: int} */
 function decodeMedia(string $input, string $name, ?float $duration = null): array
@@ -147,7 +148,7 @@ function decodeMedia(string $input, string $name, ?float $duration = null): arra
     $video = ROOT . '/' . $name . '.gray';
     $audio = ROOT . '/' . $name . '.pcm';
     $limit = $duration === null ? [] : ['-t', (string) $duration];
-    command(['ffmpeg', '-nostdin', '-v', 'error', '-xerror', '-y', '-threads', '1', '-filter_threads', '1', '-i', $input,
+    command(['ffmpeg', '-nostdin', '-v', 'error', '-xerror', '-y', '-threads', '1', '-filter_threads', '1', ...LocalOrigin::ffmpegInput($input),
         ...$limit, '-map', '0:v:0', '-vf', 'scale=16:16', '-c:v', 'rawvideo', '-threads:v', '1', '-pix_fmt', 'gray', '-f', 'rawvideo', $video,
         ...$limit, '-map', '0:a:0', '-c:a', 'pcm_s16le', '-ac', '2', '-ar', '48000', '-f', 's16le', $audio], 45);
     clearstatcache(true, $video);
@@ -514,7 +515,7 @@ $kernel->boot();
 $manager = $kernel->getContainer()->get('doctrine')->getManager();
 $db = $manager->getConnection();
 $client = static fn (): StreamClient => new StreamClient($manager, EMAIL,
-    (string) file_get_contents($project . '/config/secrets/oauth/private.key'), BASE . '/api/stream/track');
+    (string) file_get_contents($project . '/config/secrets/oauth/private.key'), BASE . '/api/stream/track', audience: BASE);
 $result = [];
 if ($mode === 'prepare') {
     ensure(is_dir(ROOT) || mkdir(ROOT, 0750, true), 'Cannot create scratch state.');

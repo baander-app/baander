@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Transcode\Infrastructure\Swoole;
 
+use App\Shared\Application\DTO\DeploymentProfile;
 use App\Shared\Infrastructure\Worker\NativeExecutionClientInterface;
 use App\Shared\Infrastructure\Worker\NativeExecutionException;
 use App\Shared\Infrastructure\Worker\NativeExecutionHandle;
@@ -20,10 +21,14 @@ final class TranscodeProcessPool
     /** @var array<string, array{handle: NativeExecutionHandle, output: ?string, subtitleStartTime: float}> */
     private array $attempts = [];
 
+    /** @var array<string, array{argv:list<string>, timeout:int, output:?string, subtitleStartTime:float}> */
+    private array $pending = [];
+
     public function __construct(
         private readonly NativeExecutionClientInterface $client,
         private readonly LoggerInterface $logger,
         private readonly JsonEncoder $jsonEncoder,
+        private readonly DeploymentProfile $deploymentProfile = new DeploymentProfile(),
     ) {}
 
     public function isRunning(): bool
@@ -59,6 +64,9 @@ final class TranscodeProcessPool
     /** @return array{data: string, status: string}|null */
     public function readResult(string $key): ?array
     {
+        if (isset($this->pending[$key])) {
+            return null;
+        }
         $attempt = $this->attempts[$key] ?? throw new \LogicException('Unknown media helper result key.');
         $status = $this->client->inspect($attempt['handle']);
         if ($status['state'] === 'running') {
@@ -71,6 +79,7 @@ final class TranscodeProcessPool
             throw new NativeExecutionException('Media helper release is unconfirmed.');
         }
         unset($this->attempts[$key]);
+        $this->startPending();
         if ($status['exitCode'] !== 0) {
             if ($attempt['output'] !== null) {
                 @unlink($attempt['output'] . '.part');
@@ -109,6 +118,7 @@ final class TranscodeProcessPool
     /** Retire outstanding probes even when cancellation interrupts their polling. */
     public function shutdown(): void
     {
+        $this->pending = [];
         $spawner = new NativeProcessSpawner($this->client);
         $failure = null;
         foreach ($this->attempts as $key => $attempt) {
@@ -131,14 +141,25 @@ final class TranscodeProcessPool
     /** @param list<string> $argv */
     private function submit(string $key, array $argv, int $timeout, ?string $output = null, float $subtitleStartTime = 0.0): void
     {
-        if (isset($this->attempts[$key])) {
+        if (isset($this->attempts[$key]) || isset($this->pending[$key])) {
             return;
         }
-        if (count($this->attempts) >= 8) {
+        if (count($this->attempts) + count($this->pending) >= 8) {
             throw new NativeExecutionException('Media helper capacity is exhausted.', false);
         }
-        $this->logger->debug('Submitting remote media helper', ['key' => $key]);
-        $handle = $this->client->submit($argv, $timeout);
-        $this->attempts[$key] = ['handle' => $handle, 'output' => $output, 'subtitleStartTime' => $subtitleStartTime];
+        $this->pending[$key] = ['argv' => $argv, 'timeout' => $timeout, 'output' => $output, 'subtitleStartTime' => $subtitleStartTime];
+        $this->startPending();
+    }
+
+    private function startPending(): void
+    {
+        while ($this->pending !== [] && count($this->attempts) < $this->deploymentProfile->mediaHelperLimit()) {
+            $key = array_key_first($this->pending);
+            $pending = $this->pending[$key];
+            $this->logger->debug('Submitting remote media helper', ['key' => $key]);
+            $handle = $this->client->submit($pending['argv'], $pending['timeout']);
+            $this->attempts[$key] = ['handle' => $handle, 'output' => $pending['output'], 'subtitleStartTime' => $pending['subtitleStartTime']];
+            unset($this->pending[$key]);
+        }
     }
 }

@@ -38,9 +38,22 @@ final class WorkerReadinessObservationTest extends TestCase
         }
     }
 
+    public function testRunnableChildrenAreReady(): void
+    {
+        foreach (['control', 'execution'] as $unit) {
+            $processes = self::processes($unit);
+            foreach ($processes as &$process) {
+                $process['status'] = "PPid:\t1\nState:\tR (running)\n";
+            }
+            unset($process);
+            $roles = WorkerReadinessObservation::verifyProcesses($processes, self::lease(), $unit, new WorkerAutoscalingProfile(), '/var/www/html');
+            self::assertCount($unit === 'control' ? 4 : 3, $roles);
+        }
+    }
+
     public function testMissingDuplicateForeignStaleAndReparentedChildrenAreRejected(): void
     {
-        foreach (['missing', 'duplicate', 'foreign', 'epoch', 'unit', 'profile', 'deployment-profile', 'deployment-settings', 'transport', 'reparented', 'zombie', 'consumer-name'] as $kind) {
+        foreach (['missing', 'duplicate', 'foreign', 'epoch', 'unit', 'profile', 'deployment-profile', 'deployment-settings', 'transport', 'reparented', 'zombie', 'dead', 'legacy-dead', 'stopped', 'tracing-stop', 'consumer-name'] as $kind) {
             $processes = self::processes('execution');
             match ($kind) {
                 'missing' => array_pop($processes),
@@ -54,6 +67,10 @@ final class WorkerReadinessObservationTest extends TestCase
                 'transport' => $processes[0]['command'][] = 'scheduler',
                 'reparented' => $processes[0]['status'] = "PPid:\t22\nState:\tS (sleeping)\n",
                 'zombie' => $processes[0]['status'] = "PPid:\t1\nState:\tZ (zombie)\n",
+                'dead' => $processes[0]['status'] = "PPid:\t1\nState:\tX (dead)\n",
+                'legacy-dead' => $processes[0]['status'] = "PPid:\t1\nState:\tx (dead)\n",
+                'stopped' => $processes[0]['status'] = "PPid:\t1\nState:\tT (stopped)\n",
+                'tracing-stop' => $processes[0]['status'] = "PPid:\t1\nState:\tt (tracing stop)\n",
                 'consumer-name' => $processes[0]['environment'] = str_replace('MESSENGER_CONSUMER_NAME=worker-', 'MESSENGER_CONSUMER_NAME=foreign-', $processes[0]['environment']),
             };
             $rejected = false;

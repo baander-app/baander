@@ -49,10 +49,10 @@ final readonly class DeploymentOperatorManifest
             throw new InvalidArgumentException('Control and execution require disjoint CPU sets.');
         }
         if ($autoscaling->maximumConcurrency > $deploymentProfile->ordinaryConsumerLimit
-            || $control->memoryBytes < $autoscaling->minimumMemoryMiB('control') * self::MIB
-            || $execution->memoryBytes < $autoscaling->minimumMemoryMiB('execution') * self::MIB + $scheduledConsoleBytes
+            || $control->memoryBytes < $autoscaling->minimumMemoryMiB('control', $deploymentProfile) * self::MIB
+            || $execution->memoryBytes < $autoscaling->minimumMemoryMiB('execution', $deploymentProfile) * self::MIB + $scheduledConsoleBytes
             || $control->pidsLimit < $autoscaling->minimumPids('control') || $execution->pidsLimit < $autoscaling->minimumPids('execution')
-            || ($scheduledConsoleBytes !== 0 && $scheduledConsoleBytes < 320 * self::MIB)) {
+            || ($scheduledConsoleBytes !== 0 && $scheduledConsoleBytes < $deploymentProfile->phpProcessMemoryMiB() * self::MIB)) {
             throw new InvalidArgumentException('Worker budgets must cover control management, autoscaling, media PHP, every resident consumer, native execution and any scheduled console child.');
         }
         foreach (DeploymentUnit::cases() as $unit) {
@@ -116,7 +116,7 @@ final readonly class DeploymentOperatorManifest
         }
         $budget = $unit === DeploymentUnit::Control ? $this->control : $this->execution;
         $recipe = new DeploymentContainerRecipe($this->namespace, $this->bootId, $this->daemonId, $this->imageId,
-            ['/usr/local/bin/php', '-d', 'memory_limit=256M', $this->appHome . '/bin/console', 'app:worker', '--no-interaction',
+            ['/usr/local/bin/php', '-d', 'memory_limit=' . $this->deploymentProfile->phpHeapMiB() . 'M', $this->appHome . '/bin/console', 'app:worker', '--no-interaction',
                 '--deployment=' . $this->namespace, '--boot-id=' . $this->bootId, '--unit=' . $unit->value,
                 '--memory-mib=' . intdiv($budget->memoryBytes, self::MIB), '--pids-limit=' . $budget->pidsLimit,
                 '--scheduled-console-mib=' . ($unit === DeploymentUnit::Control ? 0 : intdiv($this->scheduledConsoleBytes, self::MIB)),

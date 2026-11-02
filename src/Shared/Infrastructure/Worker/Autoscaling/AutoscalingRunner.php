@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Shared\Infrastructure\Worker\Autoscaling;
 
+use App\Shared\Application\DTO\DeploymentProfile;
 use App\Shared\Application\DTO\WorkerAutoscalingProfile;
 use App\Shared\Infrastructure\Worker\DeploymentLease;
 use App\Shared\Infrastructure\Worker\WorkerLaunchIdentity;
@@ -37,7 +38,7 @@ final readonly class AutoscalingRunner
         new WorkerLaunchIdentity($namespace, $bootId, 'autoscaler', 1);
         $lease = new DeploymentLease($namespace, $bootId, (int) $epoch);
         $profile = WorkerAutoscalingProfile::fromJson($profileJson);
-        $ledger = new AdmissionLedger($directory, $lease, $profile);
+        $ledger = new AdmissionLedger($directory, $lease, $profile, DeploymentProfile::fromEnvironment());
         $channel = new ResourceChannel($directory, $lease);
         $policy = new AutoscalingPolicy($profile);
         $ledger->snapshot(hrtime(true) / 1e9);

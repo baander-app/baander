@@ -165,7 +165,9 @@ if ($command === 'info') {
     }
 } elseif ($command === 'inspect' && in_array('{{.State.ExitCode}}', $arguments, true)) {
     echo '0';
-} elseif (!in_array($command, ['cp', 'start'], true)) {
+} elseif ($command === 'port') {
+    echo '127.0.0.1:19251';
+} elseif (!in_array($command, ['cp', 'start', 'exec', 'network'], true)) {
     $fail('Unsupported fixture operation: ' . json_encode($arguments), 90);
 }
 $save();

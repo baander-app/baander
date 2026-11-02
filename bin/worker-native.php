@@ -7,11 +7,12 @@ declare(strict_types=1);
 require dirname(__DIR__) . '/vendor/autoload.php';
 
 try {
-    \App\Shared\Application\DTO\DeploymentProfile::fromEnvironment();
+    $profile = \App\Shared\Application\DTO\DeploymentProfile::fromEnvironment();
     $daemon = new \App\Shared\Infrastructure\Worker\NativeExecutionDaemon(
         getenv('BAANDER_WORKER_NAMESPACE') ?: '',
         getenv('BAANDER_WORKER_BOOT_ID') ?: '',
         (int) getenv('BAANDER_WORKER_LEASE_EPOCH'),
+        $profile,
     );
     exit($daemon->run(getenv('BAANDER_NATIVE_SOCKET') ?: ''));
 } catch (\Throwable) {

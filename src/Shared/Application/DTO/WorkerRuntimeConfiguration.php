@@ -24,10 +24,8 @@ final readonly class WorkerRuntimeConfiguration
         public WorkerAutoscalingProfile $autoscaling = new WorkerAutoscalingProfile(),
         public DeploymentProfile $deploymentProfile = new DeploymentProfile(),
     ) {
-        // Management covers a 256 MiB supervisor, a 64 MiB lease helper and 64 MiB
-        // of native headroom. Execution also reserves its 3136 MiB native process envelope.
-        $this->managementReservationBytes = ($unit === 'control' ? 384 : 3520) * 1024 * 1024;
-        $minimum = $autoscaling->minimumMemoryMiB($unit) * 1024 * 1024;
+        $this->managementReservationBytes = $deploymentProfile->managementMemoryMiB($unit) * 1024 * 1024;
+        $minimum = $autoscaling->minimumMemoryMiB($unit, $deploymentProfile) * 1024 * 1024;
         if (preg_match('/\A[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}\z/D', $namespace) !== 1
             || preg_match('/\A[0-9a-f]{32}\z/D', $bootId) !== 1
             || !in_array($unit, ['control', 'execution'], true)
@@ -36,10 +34,10 @@ final readonly class WorkerRuntimeConfiguration
             || $pidsLimit < $autoscaling->minimumPids($unit) || $pidsLimit > 4096
             || $scheduledConsoleReservationBytes < 0
             || $scheduledConsoleReservationBytes > $memoryLimitBytes - $minimum
-            || ($scheduledConsoleReservationBytes !== 0 && ($unit !== 'execution' || $scheduledConsoleReservationBytes < 320 * 1024 * 1024))
+            || ($scheduledConsoleReservationBytes !== 0 && ($unit !== 'execution' || $scheduledConsoleReservationBytes < $deploymentProfile->phpProcessMemoryMiB() * 1024 * 1024))
             || !$this->validPath($lockDirectory) || !$this->validPath($ipcDirectory)
         ) {
-            throw new \InvalidArgumentException('Worker requires a bounded identity, absolute private directories and memory/PID capacity for every resident consumer and controller. Scheduled console requires at least 320 MiB in execution.');
+            throw new \InvalidArgumentException('Worker requires a bounded identity, absolute private directories and memory/PID capacity for every resident consumer and controller. Scheduled console requires one PHP process reservation in execution.');
         }
     }
 

@@ -14,6 +14,15 @@ use PHPUnit\Framework\TestCase;
 
 final class DeploymentOperatorManifestTest extends TestCase
 {
+    public function testHouseholdAcceptsItsReducedControlReservation(): void
+    {
+        $manifest = DeploymentOperatorManifest::fromJson($this->json([
+            'deploymentProfile' => json_decode((new \App\Shared\Application\DTO\DeploymentProfile('household'))->toJson(), true, flags: JSON_THROW_ON_ERROR),
+            'controlMemoryMiB' => 2304,
+        ]), '/var/www/html');
+        self::assertSame(2304 * 1024 * 1024, $manifest->control->memoryBytes);
+    }
+
     public function testSavedManifestRemainsInspectableAfterItsSourceDirectoryDisappears(): void
     {
         $source = sys_get_temp_dir() . '/baander-media-' . bin2hex(random_bytes(8));

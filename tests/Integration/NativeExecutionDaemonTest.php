@@ -204,6 +204,8 @@ final class NativeExecutionDaemonTest extends TestCase
         self::assertIsResource($socket);
         $request = ['id' => str_repeat('c', 32), 'namespace' => 'baander.app:workers', 'bootId' => str_repeat('a', 32),
             'epoch' => 1, 'clientId' => 'media', 'generation' => 1, 'operation' => 'submit', 'attempt' => 1,
+            'deploymentProfile' => (new \App\Shared\Application\DTO\DeploymentProfile())->toJson(),
+            'limits' => ['commands' => 8, 'results' => 32, 'clients' => 64],
             'argv' => ['ffmpeg', '-version'], 'timeout' => 5];
         $frame = json_encode($request, JSON_THROW_ON_ERROR) . "\n";
         self::assertSame(strlen($frame), fwrite($socket, $frame));
@@ -453,6 +455,46 @@ PHP;
             proc_close($process);
             if (file_exists($socketPath)) { unlink($socketPath); }
             if (is_dir($directory)) { rmdir($directory); }
+        }
+    }
+
+    public function testDifferentDeploymentProfileCannotHandshake(): void
+    {
+        $wrong = new NativeExecutionClient($this->directory . '/native.sock', 'baander.app:workers', str_repeat('a', 32), 1,
+            'media-copy-0', 1, new \App\Shared\Application\DTO\DeploymentProfile('household'));
+        $this->expectException(NativeExecutionException::class);
+        $wrong->handshake();
+    }
+
+    public function testHouseholdPreservesAuxiliaryCapacityForBothCopySlotsAndControl(): void
+    {
+        $profile = new \App\Shared\Application\DTO\DeploymentProfile('household');
+        $fixture = new \App\Tests\Support\NativeExecutionFixture('baander.app:household', str_repeat('c', 32), profile: $profile);
+        $clients = [];
+        $handles = [];
+        try {
+            foreach (['media-copy-0' => 2, 'media-copy-1' => 2, 'media-control' => 1] as $id => $capacity) {
+                $client = new NativeExecutionClient($fixture->socketPath(), 'baander.app:household', str_repeat('c', 32), 1, $id, 1, $profile);
+                $clients[$id] = $client;
+                for ($index = 0; $index < $capacity; ++$index) {
+                    $handles[] = [$client, $client->submit(['ffmpeg', '-nostdin', '-re', '-f', 'lavfi', '-i', 'anullsrc', '-f', 'null', '-'], 10)];
+                }
+            }
+            self::assertCount(5, $handles);
+            try {
+                $clients['media-copy-0']->submit(['ffmpeg', '-version'], 5);
+                self::fail('A copy client must not consume a third command slot.');
+            } catch (NativeExecutionException $error) {
+                self::assertFalse($error->uncertain);
+                self::assertStringContainsString('capacity', $error->getMessage());
+            }
+            foreach ($handles as [$client, $handle]) {
+                self::assertSame('running', $client->inspect($handle)['state']);
+            }
+            $supervisor = new NativeExecutionClient($fixture->socketPath(), 'baander.app:household', str_repeat('c', 32), 1, 'supervisor', 1, $profile);
+            self::assertTrue($supervisor->handshake()['ready']);
+        } finally {
+            $fixture->close();
         }
     }
 

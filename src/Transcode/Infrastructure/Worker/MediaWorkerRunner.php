@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Transcode\Infrastructure\Worker;
 
+use App\Shared\Application\DTO\DeploymentProfile;
 use App\Transcode\Application\Port\AudioRenditionRuntimePort;
 use App\Transcode\Application\Port\TranscodeExecutionOwnershipPort;
 use Closure;
@@ -23,6 +24,7 @@ final class MediaWorkerRunner
         private readonly MediaWorkerAuthorityInterface $authority,
         private readonly string $jobScript = __DIR__ . '/../../../../bin/worker-media-job.php',
         private readonly string $phpBinary = PHP_BINARY,
+        private readonly DeploymentProfile $deploymentProfile = new DeploymentProfile(),
     ) {}
 
     /** @param Closure():void|null $ready */
@@ -59,20 +61,18 @@ final class MediaWorkerRunner
             while (!$this->shouldStop($stopRequested)) {
                 $this->reap(true);
                 $this->authority->assertActive();
-                if ($this->hasCapacity('video', 3)) {
-                    foreach ($this->video->pending(100) as $runtime) {
-                        if ($this->shouldStop($stopRequested)) {
-                            return;
-                        }
-                        $this->launch('video', $runtime->jobId->toString(), 3, $stopRequested);
+                $videos = $this->hasCapacity('video', $this->capacity('video')) ? $this->video->pending(100) : [];
+                $audios = $this->hasCapacity('audio', $this->capacity('audio')) ? $this->audio->pending(100) : [];
+                // Interleave the queues so shared slots admit both kinds under backlog.
+                for ($index = 0; $index < max(count($videos), count($audios)); ++$index) {
+                    if ($this->shouldStop($stopRequested)) {
+                        return;
                     }
-                }
-                if ($this->hasCapacity('audio', 1)) {
-                    foreach ($this->audio->pending(100) as $runtime) {
-                        if ($this->shouldStop($stopRequested)) {
-                            return;
-                        }
-                        $this->launch('audio', $runtime->key, 1, $stopRequested);
+                    if (isset($videos[$index])) {
+                        $this->launch('video', $videos[$index]->jobId->toString(), $this->capacity('video'), $stopRequested);
+                    }
+                    if (isset($audios[$index])) {
+                        $this->launch('audio', $audios[$index]->key, $this->capacity('audio'), $stopRequested);
                     }
                 }
                 usleep(50000);
@@ -108,7 +108,7 @@ final class MediaWorkerRunner
         $used = array_column($this->children, 'slot');
         $slot = null;
         for ($index = 0; $index < $capacity; ++$index) {
-            $candidate = 'media-' . $kind . '-' . $index;
+            $candidate = 'media-' . ($this->deploymentProfile->sharedCopySlots > 0 ? 'copy' : $kind) . '-' . $index;
             if (!in_array($candidate, $used, true)) {
                 $slot = $candidate;
                 break;
@@ -134,11 +134,18 @@ final class MediaWorkerRunner
         $this->children[$childKey] = ['process' => $process, 'kind' => $kind, 'slot' => $slot];
     }
 
+    private function capacity(string $kind): int
+    {
+        return $this->deploymentProfile->sharedCopySlots > 0
+            ? $this->deploymentProfile->sharedCopySlots
+            : ($kind === 'video' ? $this->deploymentProfile->videoEncoderSlots : $this->deploymentProfile->audioEncoderSlots);
+    }
+
     private function hasCapacity(string $kind, int $capacity): bool
     {
         $count = 0;
         foreach ($this->children as $child) {
-            if ($child['kind'] === $kind) {
+            if ($this->deploymentProfile->sharedCopySlots > 0 || $child['kind'] === $kind) {
                 ++$count;
             }
         }

@@ -111,6 +111,27 @@ final readonly class LifecycleCheckpoint
         throw new RuntimeException('Redis server identity missing');
     }
 
+    /** @param array<string,mixed> $manifest */
+    private function assertManifest(array $manifest): void
+    {
+        $expected = OperatorConfiguration::json($this->qualification->root . '/tests/Fixtures/Worker/deployment-profile.json');
+        $profile = $manifest['deploymentProfile'] ?? [];
+        if (!is_array($profile)) {
+            throw new RuntimeException('Lifecycle requires a structured deployment profile');
+        }
+        ksort($expected);
+        ksort($profile);
+        $this->qualification->expect(
+            ($manifest['version'] ?? null) === 6 && ($manifest['autoscaling']['maximumConcurrency'] ?? null) === 2
+            && ($expected['identifier'] ?? null) === 'full' && $profile === $expected
+            && ($manifest['controlMemoryMiB'] ?? null) === 2944
+            && ($manifest['controlPidsLimit'] ?? null) === 129
+            && ($manifest['executionMemoryMiB'] ?? null) === 4800
+            && ($manifest['executionPidsLimit'] ?? null) === 257,
+            'Lifecycle requires the two-slot bounded full-profile worker pair',
+        );
+    }
+
     public function run(): void
     {
         $q = $this->qualification;
@@ -130,14 +151,7 @@ final readonly class LifecycleCheckpoint
             stdout: $q->artifact('containers-before.txt'),
         );
         $manifest = OperatorConfiguration::json($q->artifact('manifest.json'));
-        $q->expect(
-            $manifest['version'] === 5 && $manifest['autoscaling']['maximumConcurrency'] === 2
-            && $manifest['controlMemoryMiB'] === 2944
-            && $manifest['controlPidsLimit'] === 129
-            && $manifest['executionMemoryMiB'] === 4800
-            && $manifest['executionPidsLimit'] === 257,
-            'Lifecycle requires the two-slot bounded worker pair',
-        );
+        $this->assertManifest($manifest);
         $q->expect(
             !in_array($s->webName, explode("\n", $q->read($q->artifact('containers-before.txt'))), true),
             'HTTP must be absent',

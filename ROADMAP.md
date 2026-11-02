@@ -39,6 +39,16 @@ PHPStan, Deptrac, full and household container compilation, OpenAPI export with 
 
 Owned copy execution, verified completed-video lookup and persisted audio source metadata remain for U4. Copy decisions currently carry the selected streams and transport without a playable URL. Player integration, reduced deployment qualification and measured operator guidance remain open; this checkpoint makes no host-memory or Raspberry Pi capacity claim.
 
+Worker capacity checkpoint, 2026-11-02 (U2): household admission shares two copy slots between audio and video, limits auxiliary media work and skips encoder qualification. Worker reservations, native command limits, heartbeats and admission readers now use the same deployment profile. The full profile retains its existing capacity. The conservative native-memory allowance remains until whole-stack measurements justify reducing it.
+
+Verification: the focused CI run passed 932 tests with 6,288 assertions across ordinary, native and database-backed lanes. Subsequent CI runs passed 19 fixture-origin and token tests with 69 assertions, and five readiness tests with 25 assertions. Seven tooling tests passed with 11 assertions. Backend and tooling PHPStan, Deptrac, both profile container compilations, tooling source policy and whitespace checks passed. The five-part simplification review retained the existing admission structure and all behavior tests.
+
+Production-image startup, external-controller recovery, Redis and PostgreSQL outage recovery, and occupied media-control drills passed with verified cleanup. The final media-control run used worker image `sha256:8b2185c46aba673d5e259c00f6b5e68c952d9bf8269e7100ac75ad4b61f47bb2`; its receipts are in `var/test-runs/media-control-1793644552-540907`. It recorded 758 fully occupied samples and 155 control acknowledgements, with no overlapping native launches or duplicate generations. Pending cancellation started no native process. The outage receipts are in `var/test-runs/worker-lifecycle-1793643834-486142`.
+
+These checks exposed and verified corrections for a stale heartbeat reader, a readiness check that rejected running Linux processes, and fixture URLs and token audiences that pointed outside the disposable application. Regression tests cover those failures. The separate [AAC copy-verification learning](docs/solutions/best-practices/verify-aac-copy-after-normalizing-transport-framing.md) preserves the transport-normalization experiment, its reproduction commands and its qualification limits. Its full compounding review, factual grounding, schema, links and prose checks passed; no glossary change was needed.
+
+Copy-presentation execution and player integration remain next. The occupied full-profile drill does not establish household memory requirements, complete-stack capacity or Raspberry Pi support.
+
 ## Playback destinations and notifications
 
 Requirements checkpoint, 2026-11-01: the user confirmed the

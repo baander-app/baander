@@ -91,7 +91,7 @@ final class WorkerReadinessObservation
                 continue;
             }
             if (preg_match('/^PPid:\s+1$/m', $process['status']) !== 1
-                || preg_match('/^State:\s+[ZRXT]/m', $process['status']) === 1) {
+                || preg_match('/^State:\s+[ZXxTt]/m', $process['status']) === 1) {
                 throw new RuntimeException('Worker role is not a live direct child of PID 1.');
             }
             $environment = [];

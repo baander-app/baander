@@ -67,6 +67,68 @@ final readonly class DeploymentProfile
         return $profile;
     }
 
+    public function phpHeapMiB(): int
+    {
+        return 256;
+    }
+
+    public function phpProcessMemoryMiB(): int
+    {
+        return $this->phpHeapMiB() + 64;
+    }
+
+    public function nativeManagerHeapMiB(): int
+    {
+        return 128;
+    }
+
+    public function nativeEnvelopeMiB(): int
+    {
+        // Retain the conservative native envelope until workload measurement qualifies a reduction.
+        return 3136;
+    }
+
+    public function managementMemoryMiB(string $unit): int
+    {
+        // Supervisor heap, lease helper, and native headroom are resident in both units.
+        $management = $this->phpHeapMiB() + 64 + 64;
+        return $management + match ($unit) {
+            'control' => 0,
+            'execution' => $this->nativeEnvelopeMiB(),
+            default => throw new \InvalidArgumentException('Unknown worker unit.'),
+        };
+    }
+
+    public function mediaMemoryMiB(): int
+    {
+        return $this->phpProcessMemoryMiB() * (1 + $this->mediaChildSlots());
+    }
+
+    public function mediaChildSlots(): int
+    {
+        return $this->sharedCopySlots + $this->videoEncoderSlots + $this->audioEncoderSlots;
+    }
+
+    public function nativeCommandLimit(): int
+    {
+        return $this->identifier === 'household' ? 5 : 8;
+    }
+
+    public function nativeResultLimit(): int
+    {
+        return $this->identifier === 'household' ? 12 : 32;
+    }
+
+    public function nativeClientLimit(): int
+    {
+        return $this->identifier === 'household' ? 4 : 64;
+    }
+
+    public function mediaHelperLimit(): int
+    {
+        return $this->identifier === 'household' ? 1 : 8;
+    }
+
     public function toJson(): string
     {
         return json_encode(get_object_vars($this), JSON_THROW_ON_ERROR);

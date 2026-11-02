@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Shared\Infrastructure\Worker;
 
+use App\Shared\Application\DTO\DeploymentProfile;
 use Symfony\Component\DependencyInjection\Attribute\Exclude;
 
 /** Bounded shared-kernel monotonic heartbeats; not a containment receipt. */
@@ -13,7 +14,7 @@ final class WorkerPeerHandshake
     private readonly string $directory;
     private bool $established = false;
 
-    public function __construct(string $directory, private readonly string $namespace, private readonly string $bootId, private readonly string $unit, private readonly float $startedAt)
+    public function __construct(string $directory, private readonly string $namespace, private readonly string $bootId, private readonly string $unit, private readonly float $startedAt, private readonly DeploymentProfile $deploymentProfile = new DeploymentProfile())
     {
         DeploymentLease::validateIdentity($namespace, $bootId);
         if (!in_array($unit, ['control', 'execution'], true) || !str_starts_with($directory, '/')) {
@@ -47,7 +48,7 @@ final class WorkerPeerHandshake
         }
         try {
             $payload = json_encode(['namespace' => $this->namespace, 'bootId' => $this->bootId, 'unit' => $this->unit,
-                'epoch' => $epoch, 'ready' => $ready, 'draining' => $draining, 'time' => $now], JSON_THROW_ON_ERROR);
+                'deploymentProfile' => $this->deploymentProfile->toJson(), 'epoch' => $epoch, 'ready' => $ready, 'draining' => $draining, 'time' => $now], JSON_THROW_ON_ERROR);
             if (file_put_contents($temporary, $payload) !== strlen($payload) || !chmod($temporary, 0600) || !rename($temporary, $path)) {
                 throw new \RuntimeException('Cannot publish worker heartbeat.');
             }
@@ -71,7 +72,8 @@ final class WorkerPeerHandshake
             throw new \RuntimeException('Invalid worker peer heartbeat.');
         }
         $value = json_decode($raw, true, 8, JSON_THROW_ON_ERROR);
-        if (!is_array($value) || count($value) !== 7 || ($value['namespace'] ?? null) !== $this->namespace
+        if (!is_array($value) || count($value) !== 8 || ($value['namespace'] ?? null) !== $this->namespace
+            || ($value['deploymentProfile'] ?? null) !== $this->deploymentProfile->toJson()
             || ($value['bootId'] ?? null) !== $this->bootId || ($value['unit'] ?? null) !== $peer
             || !is_int($value['epoch'] ?? null) || $value['epoch'] < 1 || ($epoch !== null && $value['epoch'] !== $epoch)
             || !is_bool($value['ready'] ?? null) || !is_bool($value['draining'] ?? null)

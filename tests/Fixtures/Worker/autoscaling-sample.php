@@ -30,7 +30,7 @@ while (true) {
         $profileFields['maximumConcurrency'] = count($state['slots']);
         $profile = App\Shared\Application\DTO\WorkerAutoscalingProfile::fromJson(json_encode($profileFields, JSON_THROW_ON_ERROR));
         $lease = new App\Shared\Infrastructure\Worker\DeploymentLease($state['namespace'], $state['bootId'], $state['epoch']);
-        $status = new App\Shared\Infrastructure\Worker\Autoscaling\AutoscalingStatus(dirname($directory), $lease, $profile);
+        $status = new App\Shared\Infrastructure\Worker\Autoscaling\AutoscalingStatus(dirname($directory), $lease, $profile, \App\Shared\Application\DTO\DeploymentProfile::fromEnvironment());
         $observation = \Baander\Tooling\Fixtures\Worker\AutoscalingStatusObservation::capture($status->snapshot(...));
         $sample['status'] = $observation['status'];
         $sample['statusAttempts'] = $observation['attempts'];

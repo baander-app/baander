@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Shared\Infrastructure\Worker;
 
 use App\Shared\Infrastructure\Swoole\Async;
+use App\Shared\Application\DTO\DeploymentProfile;
 use Symfony\Component\DependencyInjection\Attribute\Exclude;
 
 #[Exclude]
@@ -19,6 +20,7 @@ final class NativeExecutionClient implements NativeExecutionClientInterface
         private readonly int $leaseEpoch,
         private readonly string $clientId,
         private readonly int $clientGeneration,
+        private readonly DeploymentProfile $deploymentProfile = new DeploymentProfile(),
     ) {
         if ($namespace === '' || preg_match('/^[a-f0-9]{32}$/D', $bootId) !== 1
             || $leaseEpoch < 1 || preg_match('/^[A-Za-z0-9_.:-]{1,128}$/D', $clientId) !== 1 || $clientGeneration < 1
@@ -36,6 +38,7 @@ final class NativeExecutionClient implements NativeExecutionClientInterface
             (int) getenv('BAANDER_WORKER_LEASE_EPOCH'),
             $clientId,
             $generation,
+            DeploymentProfile::fromEnvironment(),
         );
     }
 
@@ -83,7 +86,8 @@ final class NativeExecutionClient implements NativeExecutionClientInterface
     {
         $correlation = bin2hex(random_bytes(16));
         $identity = ['namespace' => $this->namespace, 'bootId' => $this->bootId, 'epoch' => $this->leaseEpoch,
-            'clientId' => $this->clientId, 'generation' => $this->clientGeneration];
+            'clientId' => $this->clientId, 'generation' => $this->clientGeneration,
+            'deploymentProfile' => $this->deploymentProfile->toJson(), 'limits' => NativeExecutionProtocol::limits($this->deploymentProfile)];
         $frame = NativeExecutionProtocol::encode(['id' => $correlation, ...$identity, 'operation' => $operation, ...$payload], NativeExecutionProtocol::REQUEST_BYTES);
         $deadline = hrtime(true) + 1_000_000_000;
         $socket = @stream_socket_client('unix://' . $this->socketPath, $errno, $error, 0,
@@ -115,6 +119,8 @@ final class NativeExecutionClient implements NativeExecutionClientInterface
                     $reply = NativeExecutionProtocol::decode($received, NativeExecutionProtocol::RESPONSE_BYTES);
                     if (($reply['id'] ?? null) !== $correlation || ($reply['namespace'] ?? null) !== $this->namespace
                         || ($reply['bootId'] ?? null) !== $this->bootId || ($reply['epoch'] ?? null) !== $this->leaseEpoch
+                        || ($reply['deploymentProfile'] ?? null) !== $this->deploymentProfile->toJson()
+                        || ($reply['limits'] ?? null) !== NativeExecutionProtocol::limits($this->deploymentProfile)
                     ) {
                         throw new NativeExecutionException('Native execution reply identity mismatch.');
                     }

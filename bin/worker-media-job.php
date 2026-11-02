@@ -24,7 +24,7 @@ try {
     } elseif (preg_match('/\A[a-f0-9]{64}\z/D', $key) !== 1) {
         throw new RuntimeException('Media job requires a canonical runtime key.');
     }
-    ini_set('memory_limit', '256M');
+    ini_set('memory_limit', $profile->phpHeapMiB() . 'M');
     pcntl_async_signals(true);
     $stop = static function () use (&$stopping): void { $stopping = true; };
     pcntl_signal(SIGTERM, $stop);

@@ -22,6 +22,17 @@ final class WorkerAutoscalingProfileTest extends TestCase
         }
     }
 
+    public function testHouseholdReservesOnlyItsResidentMediaChildren(): void
+    {
+        $deployment = new \App\Shared\Application\DTO\DeploymentProfile('household');
+        $profile = new WorkerAutoscalingProfile();
+        self::assertSame(2304, $profile->minimumMemoryMiB('control', $deployment));
+        self::assertSame(4160, $profile->minimumMemoryMiB('execution', $deployment));
+        $configuration = new WorkerRuntimeConfiguration('worker.baander.app', str_repeat('a', 32), 'control',
+            2304 * 1024 * 1024, 129, 0, '/tmp/worker-locks', '/run/baander-worker', deploymentProfile: $deployment);
+        self::assertSame(384 * 1024 * 1024, $configuration->managementReservationBytes);
+    }
+
     public function testProfileRoundTripPreservesEveryPolicyInput(): void
     {
         $profile = new WorkerAutoscalingProfile(maximumConcurrency: 4, targetBacklogAgeMs: 20000);

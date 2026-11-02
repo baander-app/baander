@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Shared\Infrastructure\Worker\Autoscaling;
 
+use App\Shared\Application\DTO\DeploymentProfile;
 use App\Shared\Application\DTO\WorkerAutoscalingProfile;
 use App\Shared\Infrastructure\Worker\DeploymentLease;
 use App\Shared\Infrastructure\Worker\WorkerLaunchIdentity;
@@ -17,10 +18,10 @@ final class AdmissionLedger
     private readonly string $directory;
     private readonly string $profileHash;
 
-    public function __construct(string $ipcDirectory, private readonly DeploymentLease $lease, private readonly WorkerAutoscalingProfile $profile)
+    public function __construct(string $ipcDirectory, private readonly DeploymentLease $lease, private readonly WorkerAutoscalingProfile $profile, private readonly DeploymentProfile $deploymentProfile = new DeploymentProfile())
     {
         $this->directory = rtrim($ipcDirectory, '/') . '/' . $lease->bootId;
-        $this->profileHash = hash('sha256', $profile->toJson());
+        $this->profileHash = hash('sha256', $profile->toJson() . "\n" . $deploymentProfile->toJson());
         $this->validateDirectory();
     }
 
@@ -398,7 +399,8 @@ final class AdmissionLedger
             $raw = file_get_contents($path, false, null, 0, 2049);
             if ($raw === false || strlen($raw) > 2048) { throw new \RuntimeException('Invalid admission peer heartbeat.'); }
             $peer = json_decode($raw, true, 8, JSON_THROW_ON_ERROR);
-            if (!is_array($peer) || count($peer) !== 7 || ($peer['namespace'] ?? null) !== $this->lease->namespace
+            if (!is_array($peer) || count($peer) !== 8 || ($peer['namespace'] ?? null) !== $this->lease->namespace
+                || ($peer['deploymentProfile'] ?? null) !== $this->deploymentProfile->toJson()
                 || ($peer['bootId'] ?? null) !== $this->lease->bootId || ($peer['epoch'] ?? null) !== $this->lease->epoch || ($peer['unit'] ?? null) !== $unit) {
                 throw new \RuntimeException('Foreign admission peer heartbeat.');
             }

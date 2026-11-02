@@ -45,6 +45,7 @@ final class HttpExchange
         $this->handle = curl_init($url);
         curl_setopt_array($this->handle, [
             CURLOPT_CUSTOMREQUEST => $method,
+            CURLOPT_FOLLOWLOCATION => false,
             CURLOPT_HTTPHEADER => $headers,
             CURLOPT_TIMEOUT => $timeoutSeconds,
             CURLOPT_HEADERFUNCTION => function (CurlHandle $handle, string $line): int {

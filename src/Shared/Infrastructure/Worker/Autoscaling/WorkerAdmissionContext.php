@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Shared\Infrastructure\Worker\Autoscaling;
 
+use App\Shared\Application\DTO\DeploymentProfile;
 use App\Shared\Application\DTO\WorkerAutoscalingProfile;
 use App\Shared\Infrastructure\Worker\DeploymentLease;
 use App\Shared\Infrastructure\Worker\WorkerLaunchIdentity;
@@ -30,7 +31,7 @@ final readonly class WorkerAdmissionContext
         $generation = self::positiveInteger('BAANDER_WORKER_GENERATION');
         $lease = new DeploymentLease($namespace, $boot, self::positiveInteger('BAANDER_WORKER_LEASE_EPOCH'));
         $profile = WorkerAutoscalingProfile::fromJson(self::environment('BAANDER_WORKER_AUTOSCALING_PROFILE'));
-        $ledger = new AdmissionLedger(self::environment('BAANDER_WORKER_IPC_DIRECTORY'), $lease, $profile);
+        $ledger = new AdmissionLedger(self::environment('BAANDER_WORKER_IPC_DIRECTORY'), $lease, $profile, DeploymentProfile::fromEnvironment());
         return new self($ledger, new WorkerLaunchIdentity($namespace, $boot, $id, $generation));
     }
 

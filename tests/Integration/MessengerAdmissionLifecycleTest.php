@@ -431,10 +431,7 @@ final class MessengerAdmissionLifecycleTest extends TestCase
     {
         $now = hrtime(true) / 1e9;
         foreach (['control', 'execution'] as $unit) {
-            $path = $this->directory . '/' . $this->boot . '/' . $unit . '.json';
-            file_put_contents($path, json_encode(['namespace' => 'worker.baander.app', 'bootId' => $this->boot, 'unit' => $unit,
-                'epoch' => 1, 'ready' => true, 'draining' => false, 'time' => $now], JSON_THROW_ON_ERROR));
-            chmod($path, 0600);
+            (new \App\Shared\Infrastructure\Worker\WorkerPeerHandshake($this->directory, 'worker.baander.app', $this->boot, $unit, $now))->publish(1, true, false, $now);
         }
         $this->ledger->publishDecision($target, 'test-demand', [], $now);
     }
