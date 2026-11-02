@@ -23,6 +23,9 @@ final readonly class AudioStreamInfo implements JsonSerializable
         public string $title,
         public bool $isDefault,
         public string $channelLayout = '',
+        public ?int $streamIndex = null,
+        public ?float $startTime = null,
+        public ?string $timeBase = null,
     ) {
     }
 
@@ -46,6 +49,9 @@ final readonly class AudioStreamInfo implements JsonSerializable
             title: $title,
             isDefault: (bool) ($stream['disposition']['default'] ?? false),
             channelLayout: (string) ($stream['channel_layout'] ?? ''),
+            streamIndex: isset($stream['index']) ? (int) $stream['index'] : null,
+            startTime: is_numeric($stream['start_time'] ?? null) ? (float) $stream['start_time'] : null,
+            timeBase: $stream['time_base'] ?? null,
         );
     }
 
@@ -64,6 +70,9 @@ final readonly class AudioStreamInfo implements JsonSerializable
             title: $data['title'] ?? '',
             isDefault: (bool) ($data['isDefault'] ?? false),
             channelLayout: (string) ($data['channelLayout'] ?? ''),
+            streamIndex: isset($data['streamIndex']) ? (int) $data['streamIndex'] : null,
+            startTime: isset($data['startTime']) ? (float) $data['startTime'] : null,
+            timeBase: $data['timeBase'] ?? null,
         );
     }
 
@@ -83,11 +92,14 @@ final readonly class AudioStreamInfo implements JsonSerializable
             && $this->bitrate === $other->bitrate
             && $this->title === $other->title
             && $this->isDefault === $other->isDefault
-            && $this->channelLayout === $other->channelLayout;
+            && $this->channelLayout === $other->channelLayout
+            && $this->streamIndex === $other->streamIndex
+            && $this->startTime === $other->startTime
+            && $this->timeBase === $other->timeBase;
     }
 
     /**
-     * @return array{language: string, codec: string, channels: int, sampleRate: int, bitrate: int, title: string, isDefault: bool, channelLayout: string}
+     * @return array{language: string, codec: string, channels: int, sampleRate: int, bitrate: int, title: string, isDefault: bool, channelLayout: string, streamIndex: ?int, startTime: ?float, timeBase: ?string}
      */
     public function jsonSerialize(): array
     {
@@ -100,6 +112,9 @@ final readonly class AudioStreamInfo implements JsonSerializable
             'title' => $this->title,
             'isDefault' => $this->isDefault,
             'channelLayout' => $this->channelLayout,
+            'streamIndex' => $this->streamIndex,
+            'startTime' => $this->startTime,
+            'timeBase' => $this->timeBase,
         ];
     }
 }

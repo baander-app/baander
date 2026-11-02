@@ -109,7 +109,7 @@ abstract class AudioStreamTestCase extends TestCase
             $operation();
             return true;
         });
-        $executor = new AudioRenditionExecutor($runtime, new NullLogger(), getenv('FFMPEG_PATH') ?: 'ffmpeg');
+        $executor = new AudioRenditionExecutor(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile('full')), $runtime, new NullLogger(), getenv('FFMPEG_PATH') ?: 'ffmpeg');
         $runtime->method('admit')->willReturnCallback(static function (AudioRenditionInput $input) use (&$rows, $executor): AudioRenditionRuntimeSnapshot {
             if (!isset($rows[$input->key()])) {
                 $row = new AudioRenditionRuntimeSnapshot($input->key(), $input, 'pending', 1, null, null, null, true);

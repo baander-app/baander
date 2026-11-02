@@ -17,6 +17,8 @@ final readonly class TrackStreamMetadata
         public ?int $sampleRate,
         public ?int $channels,
         public ?float $length,
+        public ?string $containerFormat = null,
+        public ?int $streamIndex = null,
     ) {
     }
 }

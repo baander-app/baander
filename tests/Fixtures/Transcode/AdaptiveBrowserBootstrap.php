@@ -188,7 +188,7 @@ $ffmpegPort = $generator->testDouble(FFmpegPortInterface::class, false);
 $storagePort = $generator->testDouble(TranscodeStoragePortInterface::class, false);
 assert($ffmpegPort instanceof FFmpegPortInterface);
 assert($storagePort instanceof TranscodeStoragePortInterface);
-$encoder = new SegmentEncoder($ffmpegPort, $storagePort, EncoderProfile::software('libx264'));
+$encoder = new SegmentEncoder(new \App\Transcode\Application\Service\MediaExecutionPolicy(\App\Shared\Application\DTO\DeploymentProfile::fromEnvironment()), $ffmpegPort, $storagePort, EncoderProfile::software('libx264'));
 $origin = 'https://adaptive.baander.app:18779';
 $state = ['origin' => $origin, 'videoId' => Uuid::generate(), 'videoPublicId' => new PublicId(),
     'audioProfile' => $audioProfile->name, 'sourceStartTime' => $sourceStartTime, 'jobs' => []];

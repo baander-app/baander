@@ -40,7 +40,7 @@ final class TranscodeStreamManagerOwnershipTest extends TestCase
         self::assertTrue(mkdir($this->directory, 0700));
         $storage = $this->createStub(TranscodeStoragePortInterface::class);
         $storage->method('resolveJobDirectory')->willReturn($this->directory);
-        $encoder = new SegmentEncoder($this->createStub(FFmpegPortInterface::class), $storage, EncoderProfile::software('libx265'));
+        $encoder = new SegmentEncoder(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile('full')), $this->createStub(FFmpegPortInterface::class), $storage, EncoderProfile::software('libx265'));
         $spawner = $this->createStub(ProcessSpawnerInterface::class);
         $spawner->method('spawn')->willReturnCallback(function (): mixed {
             // Deliberately reuse the process resource to prove stream identity

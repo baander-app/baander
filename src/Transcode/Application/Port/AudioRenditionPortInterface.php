@@ -20,6 +20,9 @@ use App\Transcode\Application\Exception\AudioRenditionFailedException;
  */
 interface AudioRenditionPortInterface
 {
+    /** Find a complete, current artifact without admitting or repairing work. */
+    public function findComplete(string $trackKey, string $sourcePath, AudioRenditionFormat $format, int $bitrate): ?AudioRendition;
+
     /**
      * @param string $trackKey   stable identifier of the track (its public ID)
      * @param string $sourcePath absolute path of the original audio file

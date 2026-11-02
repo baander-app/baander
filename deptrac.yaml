@@ -41,7 +41,7 @@ deptrac:
         Party: ['Party Domain', 'Party Application', 'Party Infrastructure', 'Party Resources', 'Party Interface']
         Playlist: ['Playlist Live Audience Contract', 'Playlist Deletion Preview Contract', 'Playlist Domain', 'Playlist Application', 'Playlist Infrastructure', 'Playlist Resources', 'Playlist Interface']
         Recommendation: ['Recommendation Domain', 'Recommendation Application', 'Recommendation Infrastructure', 'Recommendation Resources', 'Recommendation Interface']
-        Transcode: ['Transcode Playback Access Contract', 'Transcode Audio Rendition Contract', 'Transcode Domain', 'Transcode Application', 'Transcode Infrastructure', 'Transcode Resources', 'Transcode Interface']
+        Transcode: ['Transcode Playback Access Contract', 'Transcode Audio Rendition Contract', 'Transcode Delivery Contract', 'Transcode Domain', 'Transcode Application', 'Transcode Infrastructure', 'Transcode Resources', 'Transcode Interface']
         UserPreference: ['UserPreference Settings Contract', 'UserPreference Domain', 'UserPreference Application', 'UserPreference Infrastructure', 'UserPreference Resources', 'UserPreference Interface']
         Discovery: ['Discovery Domain', 'Discovery Application', 'Discovery Infrastructure', 'Discovery Resources', 'Discovery Interface']
         Favorites: ['Favorites Domain', 'Favorites Application', 'Favorites Infrastructure', 'Favorites Resources', 'Favorites Interface']
@@ -218,7 +218,7 @@ deptrac:
     - name: 'Catalog Video Contract'
       collectors:
         - type: classLike
-          value: '^App\\Catalog\\Application\\Port\\VideoPortInterface$'
+          value: '^App\\Catalog\\Application\\(Port\\VideoPortInterface|Dto\\VideoSourceMetadata)$'
 
     - name: 'Catalog Application'
       collectors:
@@ -228,7 +228,7 @@ deptrac:
               value: '^App\\Catalog\\Application\\'
           must_not:
             - type: classLike
-              value: '^App\\Catalog\\Application\\Port\\VideoPortInterface$'
+              value: '^App\\Catalog\\Application\\(Port\\VideoPortInterface|Dto\\VideoSourceMetadata)$'
             - type: classLike
               value: '^App\\Catalog\\Application\\Port\\SongAvailabilityPortInterface$'
             - type: classLike
@@ -641,6 +641,11 @@ deptrac:
         - type: classLike
           value: '^App\\Transcode\\Application\\(Port\\AudioRendition(PortInterface|Format)?|Exception\\AudioRendition(Failed|Busy)Exception|Settings\\TranscodeSettingDefinitions)$'
 
+    - name: 'Transcode Delivery Contract'
+      collectors:
+        - type: classLike
+          value: '^App\\Transcode\\Application\\(Port\\(MediaExecutionPolicyInterface|CompletedVideoArtifactPort|StreamAuthPortInterface)|DTO\\(MediaOperation|CompletedVideoArtifact)|Exception\\MediaEncodingProhibitedException)$'
+
     - name: 'Transcode Application'
       collectors:
         - type: bool
@@ -652,6 +657,8 @@ deptrac:
               value: '^App\\Transcode\\Application\\Port\\PlaybackAccessInterface$'
             - type: classLike
               value: '^App\\Transcode\\Application\\(Port\\AudioRendition(PortInterface|Format)?|Exception\\AudioRendition(Failed|Busy)Exception|Settings\\TranscodeSettingDefinitions)$'
+            - type: classLike
+              value: '^App\\Transcode\\Application\\(Port\\(MediaExecutionPolicyInterface|CompletedVideoArtifactPort|StreamAuthPortInterface)|DTO\\(MediaOperation|CompletedVideoArtifact)|Exception\\MediaEncodingProhibitedException)$'
 
     - name: 'Transcode Infrastructure'
       collectors:
@@ -1134,6 +1141,7 @@ deptrac:
       - 'Catalog Video Contract'
       - 'Catalog Song Availability Contract'
       - 'Library File Availability Contract'
+      - 'Library Media Files Contract'
       - 'Auth Identity Contract'
       - 'Catalog Song Lookup Contract'
       - 'Library Content Stats Contract'
@@ -1253,6 +1261,8 @@ deptrac:
     'Media Application':
       - 'Media Playback Access Contract'
       - 'Catalog Video Contract'
+      - 'Transcode Audio Rendition Contract'
+      - 'Transcode Delivery Contract'
       - 'Media Image Contract'
       - 'Scheduler Schedulable Contract'
       - 'Media Domain'
@@ -1277,7 +1287,10 @@ deptrac:
       - 'Shared Interface'
     'Media Interface':
       - 'Media Image Contract'
+      - 'Media Playback Access Contract'
+      - 'Catalog Video Contract'
       - 'Transcode Audio Rendition Contract'
+      - 'Transcode Delivery Contract'
       - 'Media Resources'
       - 'Media Application'
       - 'Shared Domain'
@@ -1436,11 +1449,15 @@ deptrac:
     'Transcode Audio Rendition Contract':
       - 'Shared Domain'
       - 'Shared Application'
+    'Transcode Delivery Contract':
+      - 'Shared Domain'
+      - 'Shared Application'
     'Transcode Domain':
       - 'Shared Domain'
     'Transcode Application':
       - 'Transcode Playback Access Contract'
       - 'Transcode Audio Rendition Contract'
+      - 'Transcode Delivery Contract'
       - 'Scheduler Schedulable Contract'
       - 'Transcode Domain'
       - 'Shared Domain'
@@ -1448,6 +1465,7 @@ deptrac:
     'Transcode Infrastructure':
       - 'Transcode Playback Access Contract'
       - 'Transcode Audio Rendition Contract'
+      - 'Transcode Delivery Contract'
       - 'QoL Encoder Profile Contract'
       - 'QoL Quality Ladder Contract'
       - 'QoL Stream Admission Contract'
@@ -1465,6 +1483,7 @@ deptrac:
       - 'Shared Interface'
     'Transcode Interface':
       - 'Transcode Playback Access Contract'
+      - 'Transcode Delivery Contract'
       - 'Scheduler Schedulable Contract'
       - 'Transcode Resources'
       - 'Auth Identity Contract'

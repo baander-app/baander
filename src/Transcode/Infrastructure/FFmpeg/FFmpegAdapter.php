@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Transcode\Infrastructure\FFmpeg;
 
+use App\Transcode\Application\DTO\MediaOperation;
+use App\Transcode\Application\Service\MediaExecutionPolicy;
 use App\Transcode\Application\Port\FFmpegPortInterface;
 use App\Transcode\Domain\Service\AudioProcessingRules;
 use App\Transcode\Domain\Service\VideoProcessingRules;
@@ -21,6 +23,7 @@ use Symfony\Component\Serializer\Encoder\JsonEncoder;
 final class FFmpegAdapter implements FFmpegPortInterface
 {
     public function __construct(
+        private readonly MediaExecutionPolicy $executionPolicy,
         private readonly LoggerInterface $logger,
         private readonly FFprobeAdapter $ffprobeAdapter,
         private readonly FMP4SegmentWriter $fmp4Writer,
@@ -47,6 +50,7 @@ final class FFmpegAdapter implements FFmpegPortInterface
         QualityTier $qualityTier,
         string $outputPath,
     ): string {
+        $this->executionPolicy->assertAllowed(MediaOperation::VideoEncode);
         return $this->fmp4Writer->encodeInitSegment($sourcePath, $qualityTier, $outputPath);
     }
 
@@ -63,6 +67,7 @@ final class FFmpegAdapter implements FFmpegPortInterface
         string $audioFilters,
         string $outputPath,
     ): void {
+        $this->executionPolicy->assertAllowed(MediaOperation::VideoEncode);
         $dir = dirname($outputPath);
         if (!is_dir($dir)) {
             mkdir($dir, 0755, true);
@@ -138,6 +143,7 @@ final class FFmpegAdapter implements FFmpegPortInterface
         array $audioProfile,
         string $outputPath,
     ): string {
+        $this->executionPolicy->assertAllowed(MediaOperation::AudioEncode);
         $dir = dirname($outputPath);
         if (!is_dir($dir)) {
             mkdir($dir, 0755, true);
@@ -175,6 +181,7 @@ final class FFmpegAdapter implements FFmpegPortInterface
         string $audioFilters,
         string $outputPath,
     ): void {
+        $this->executionPolicy->assertAllowed(MediaOperation::AudioEncode);
         $dir = dirname($outputPath);
         if (!is_dir($dir)) {
             mkdir($dir, 0755, true);

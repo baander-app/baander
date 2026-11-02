@@ -231,6 +231,7 @@ final class StreamControllerSecurityTest extends TestCase
     private function createController(MediaReadScopeProviderInterface $scopes): StreamController
     {
         $controller = new StreamController(
+            executionPolicy: new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile()),
             streamService: $this->streamService,
             scopes: $scopes,
             renditions: $this->createStub(AudioRenditionPortInterface::class),

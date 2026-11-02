@@ -34,6 +34,17 @@ final class HardwareCapabilitiesProberTest extends TestCase
         ProcessExecutor::configureNativeExecution(null);
     }
 
+    public function testHouseholdNeverRunsStartupEncoderQualification(): void
+    {
+        $client = $this->createMock(NativeExecutionClientInterface::class);
+        $client->expects(self::never())->method('submit');
+        ProcessExecutor::configureNativeExecution($client);
+        $policy = new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile('household'));
+        $prober = new HardwareCapabilitiesProber($policy, $this->logger);
+        $this->expectException(\App\Transcode\Application\Exception\MediaEncodingProhibitedException::class);
+        $prober->probeForWorker();
+    }
+
     public function testRemoteStartupQualifiesSoftwareInsteadOfConfiguredHardware(): void
     {
         $client = $this->createMock(NativeExecutionClientInterface::class);
@@ -43,7 +54,7 @@ final class HardwareCapabilitiesProberTest extends TestCase
         $client->method('inspect')->willReturn(['state' => 'exited', 'exitCode' => 0, 'stdout' => '', 'stderr' => '']);
         $client->method('release')->willReturn(true);
         ProcessExecutor::configureNativeExecution($client);
-        $prober = new HardwareCapabilitiesProber($this->logger, preferredEncoder: 'hevc_nvenc');
+        $prober = new HardwareCapabilitiesProber(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile('full')), $this->logger, preferredEncoder: 'hevc_nvenc');
         $profile = $prober->probeForWorker();
         self::assertSame('libx265', $profile->encoder);
         self::assertFalse($profile->isHardware());
@@ -58,7 +69,7 @@ final class HardwareCapabilitiesProberTest extends TestCase
         $client->method('release')->willReturn(true);
         ProcessExecutor::configureNativeExecution($client);
         $this->expectException(\RuntimeException::class);
-        (new HardwareCapabilitiesProber($this->logger))->probeForWorker();
+        (new HardwareCapabilitiesProber(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile('full')), $this->logger))->probeForWorker();
     }
 
     //
@@ -143,7 +154,7 @@ final class HardwareCapabilitiesProberTest extends TestCase
         file_put_contents($executable, '#!' . PHP_BINARY . "\n<?php\nfile_put_contents(__DIR__ . '/argv.json', json_encode(['argv' => \$argv, 'threads' => getenv('OMP_NUM_THREADS')]));\n");
         chmod($executable, 0700);
         try {
-            $prober = new HardwareCapabilitiesProber($this->logger, $executable, 'hevc_vaapi', '/dev/dri/device with spaces');
+            $prober = new HardwareCapabilitiesProber(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile('full')), $this->logger, $executable, 'hevc_vaapi', '/dev/dri/device with spaces');
             $profile = $prober->probeForWorker();
             self::assertTrue($profile->isHardware());
             $captured = json_decode((string) file_get_contents($arguments), true, flags: JSON_THROW_ON_ERROR);
@@ -423,7 +434,7 @@ class TestableHardwareCapabilitiesProber extends HardwareCapabilitiesProber
         float $bitrateMultiplier = 1.0,
         array $execResults = [],
     ): self {
-        $instance = new self($logger, '/usr/bin/ffmpeg', $preferredEncoder, $hwAccelDevice, $bitrateMultiplier);
+        $instance = new self(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile('full')), $logger, '/usr/bin/ffmpeg', $preferredEncoder, $hwAccelDevice, $bitrateMultiplier);
         $instance->execQueue = $execResults;
 
         return $instance;
@@ -439,7 +450,7 @@ class TestableHardwareCapabilitiesProber extends HardwareCapabilitiesProber
         float $bitrateMultiplier = 1.0,
         ?\Closure $callback = null,
     ): self {
-        $instance = new self($logger, '/usr/bin/ffmpeg', $preferredEncoder, $hwAccelDevice, $bitrateMultiplier);
+        $instance = new self(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile('full')), $logger, '/usr/bin/ffmpeg', $preferredEncoder, $hwAccelDevice, $bitrateMultiplier);
         $instance->callback = $callback;
 
         return $instance;

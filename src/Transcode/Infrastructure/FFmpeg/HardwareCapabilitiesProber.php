@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Transcode\Infrastructure\FFmpeg;
 
+use App\Transcode\Application\DTO\MediaOperation;
+use App\Transcode\Application\Service\MediaExecutionPolicy;
 use App\Transcode\Domain\ValueObject\EncoderProfile;
 use App\Transcode\Domain\ValueObject\HardwareAccelerator;
 use Psr\Log\LoggerInterface;
@@ -21,6 +23,7 @@ class HardwareCapabilitiesProber
     private ?EncoderProfile $profile = null;
 
     public function __construct(
+        private readonly MediaExecutionPolicy $executionPolicy,
         private readonly LoggerInterface $logger,
         private readonly string $ffmpegPath = '/usr/bin/ffmpeg',
         private readonly string $preferredEncoder = '',
@@ -31,6 +34,7 @@ class HardwareCapabilitiesProber
 
     public function probeForWorker(): EncoderProfile
     {
+        $this->executionPolicy->assertAllowed(MediaOperation::VideoEncode);
         if ($this->profile !== null) {
             return $this->profile;
         }

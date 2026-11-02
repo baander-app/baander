@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Transcode\Infrastructure\Transcode;
 
+use App\Transcode\Application\DTO\MediaOperation;
+use App\Transcode\Application\Service\MediaExecutionPolicy;
 use App\Transcode\Application\DTO\AudioRenditionClaim;
 use App\Transcode\Application\Port\AudioRenditionFormat;
 use App\Transcode\Application\Port\AudioRenditionRuntimePort;
@@ -20,6 +22,7 @@ final class AudioRenditionExecutor
     private const int TIMEOUT_SECONDS = 3600;
 
     public function __construct(
+        private readonly MediaExecutionPolicy $executionPolicy,
         private readonly AudioRenditionRuntimePort $runtime,
         private readonly LoggerInterface $logger,
         private readonly string $ffmpegPath,
@@ -33,6 +36,7 @@ final class AudioRenditionExecutor
         $final = $claim->runtime->generationDirectory() . '/' . $input->sourceSignature;
         $partial = $final . SegmentFileResolver::PARTIAL_SUFFIX;
         try {
+            $this->executionPolicy->assertAllowed(MediaOperation::AudioEncode);
             clearstatcache(true, $input->sourcePath);
             $modified = @filemtime($input->sourcePath);
             $size = @filesize($input->sourcePath);

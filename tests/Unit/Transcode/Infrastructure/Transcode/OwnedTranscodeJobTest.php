@@ -73,7 +73,7 @@ final class OwnedTranscodeJobTest extends TestCase
         });
         $transaction = $this->createStub(TransactionPortInterface::class);
         $transaction->method('run')->willReturnCallback(static fn(callable $operation): mixed => $operation());
-        $handler = new CreateTranscodeSessionHandler($jobs, $sessions, $storage, $ownership, $transaction, $this->createStub(SleeperInterface::class));
+        $handler = new CreateTranscodeSessionHandler(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile('full')), $jobs, $sessions, $storage, $ownership, $transaction, $this->createStub(SleeperInterface::class));
         $video = Uuid::generate();
         $alice = Uuid::generate();
         $bob = Uuid::generate();

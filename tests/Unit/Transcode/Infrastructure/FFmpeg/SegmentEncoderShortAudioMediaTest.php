@@ -78,8 +78,7 @@ final class SegmentEncoderShortAudioMediaTest extends TestCase
         self::assertEqualsWithDelta(4.0, (float) $lastSourceAudio['pts_time'] + (float) $lastSourceAudio['duration_time'], 0.002);
         $profile = AudioProfile::fromString($profileName);
         $tier = new QualityTier('fixture', 64, 64, 100_000, 200_000, 200_000, 'avc1', 'avc1.64001f');
-        $encoder = new SegmentEncoder($this->createStub(FFmpegPortInterface::class),
-            $this->createStub(TranscodeStoragePortInterface::class), EncoderProfile::software('libx264'));
+        $encoder = new SegmentEncoder(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile('full')), $this->createStub(FFmpegPortInterface::class), $this->createStub(TranscodeStoragePortInterface::class), EncoderProfile::software('libx264'));
         $output = $this->directory.'/output';
         mkdir($output);
         $arguments = $encoder->buildStreamArgs($source, $tier, $encoder->buildVideoFilters($probe, $tier), $output, 1,
@@ -267,8 +266,7 @@ final class SegmentEncoderShortAudioMediaTest extends TestCase
         }
         $profile = AudioProfile::fromString($profileName);
         $tier = new QualityTier('fixture', 64, 64, 100_000, 200_000, 200_000, 'avc1', 'avc1.64001f');
-        $encoder = new SegmentEncoder($this->createStub(FFmpegPortInterface::class),
-            $this->createStub(TranscodeStoragePortInterface::class), EncoderProfile::software('libx264'));
+        $encoder = new SegmentEncoder(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile('full')), $this->createStub(FFmpegPortInterface::class), $this->createStub(TranscodeStoragePortInterface::class), EncoderProfile::software('libx264'));
         $spawner = new class(fn (array $command): string => $this->runMedia($command)) implements ProcessSpawnerInterface {
             /** @var list<string> */
             public array $command = [];

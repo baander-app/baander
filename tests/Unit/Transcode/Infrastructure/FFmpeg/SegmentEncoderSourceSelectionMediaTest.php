@@ -188,8 +188,7 @@ final class SegmentEncoderSourceSelectionMediaTest extends TestCase
 
     private function encoder(): SegmentEncoder
     {
-        return new SegmentEncoder($this->createStub(FFmpegPortInterface::class),
-            $this->createStub(TranscodeStoragePortInterface::class), EncoderProfile::software('libx264'));
+        return new SegmentEncoder(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile('full')), $this->createStub(FFmpegPortInterface::class), $this->createStub(TranscodeStoragePortInterface::class), EncoderProfile::software('libx264'));
     }
 
     private function tier(): QualityTier

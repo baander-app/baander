@@ -185,9 +185,74 @@ final class AudioRenditionCacheTest extends TestCase
         yield 'another request already reset and rebuilt it' => [false];
     }
 
+    public function testReadOnlyMissNeverAdmitsOrResetsWork(): void
+    {
+        $runtime = $this->createMock(AudioRenditionRuntimePort::class);
+        $runtime->expects(self::never())->method('admit');
+        $runtime->expects(self::never())->method('resetCompleted');
+        $runtime->method('find')->willReturn(null);
+        $this->runtime = $runtime;
+        self::assertNull($this->cache()->findComplete('track', $this->source, AudioRenditionFormat::Mp3, 192000));
+    }
+
+    public function testReadOnlyLookupRequiresCompleteExistingGeneration(): void
+    {
+        $format = AudioRenditionFormat::Mp3;
+        $signature = $format->sourceSignature($this->source, 192000, filemtime($this->source), filesize($this->source));
+        $this->input = new AudioRenditionInput('track', $signature, $this->source, $format, 192000, $this->root . '/audio-renditions/track/' . $signature);
+        $runtime = $this->createMock(AudioRenditionRuntimePort::class);
+        $runtime->expects(self::never())->method('admit');
+        $runtime->expects(self::never())->method('resetCompleted');
+        $runtime->method('find')->willReturnCallback(fn (): AudioRenditionRuntimeSnapshot => $this->snapshot('complete'));
+        $this->runtime = $runtime;
+        self::assertNull($this->cache()->findComplete('track', $this->source, $format, 192000));
+        $this->write('finished');
+        $hit = $this->cache()->findComplete('track', $this->source, $format, 192000);
+        self::assertNotNull($hit);
+        self::assertSame('finished', file_get_contents($hit->path));
+        unlink($this->source);
+        self::assertNull($this->cache()->findComplete('track', $this->source, $format, 192000));
+        file_put_contents($this->source, 'changed source');
+    }
+
+    public function testHouseholdMissingArtifactIsTerminalWithoutAdmission(): void
+    {
+        $runtime = $this->createMock(AudioRenditionRuntimePort::class);
+        $runtime->expects(self::never())->method('admit');
+        $runtime->expects(self::never())->method('resetCompleted');
+        $runtime->method('find')->willReturn(null);
+        $cache = new AudioRenditionCache(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile('household')), new SegmentFileResolver($this->root), $runtime, new NullLogger());
+        $this->expectException(\App\Transcode\Application\Exception\MediaEncodingProhibitedException::class);
+        $cache->open('track', $this->source, AudioRenditionFormat::Mp3, 192000);
+    }
+
+    public function testHouseholdServesCompletedArtifactWithoutAdmission(): void
+    {
+        $format = AudioRenditionFormat::Mp3;
+        $signature = $format->sourceSignature($this->source, 192000, filemtime($this->source), filesize($this->source));
+        $this->input = new AudioRenditionInput('track', $signature, $this->source, $format, 192000, $this->root . '/audio-renditions/track/' . $signature);
+        $this->write('finished');
+        $runtime = $this->createMock(AudioRenditionRuntimePort::class);
+        $runtime->expects(self::never())->method('admit');
+        $runtime->expects(self::never())->method('resetCompleted');
+        $runtime->method('find')->willReturnCallback(fn (): AudioRenditionRuntimeSnapshot => $this->snapshot('complete'));
+        $cache = new AudioRenditionCache(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile('household')), new SegmentFileResolver($this->root), $runtime, new NullLogger());
+        self::assertSame('finished', file_get_contents($cache->open('track', $this->source, $format, 192000)->path));
+    }
+
+    public function testEmptyCompletedArtifactIsAReadOnlyMiss(): void
+    {
+        $format = AudioRenditionFormat::Mp3;
+        $signature = $format->sourceSignature($this->source, 192000, filemtime($this->source), filesize($this->source));
+        $this->input = new AudioRenditionInput('track', $signature, $this->source, $format, 192000, $this->root . '/audio-renditions/track/' . $signature);
+        $this->runtime->method('find')->willReturnCallback(fn (): AudioRenditionRuntimeSnapshot => $this->snapshot('complete'));
+        $this->write('');
+        self::assertNull($this->cache()->findComplete('track', $this->source, $format, 192000));
+    }
+
     private function cache(): AudioRenditionCache
     {
-        return new AudioRenditionCache(new SegmentFileResolver($this->root), $this->runtime, new NullLogger(), pollIntervalSeconds: .001, startTimeoutSeconds: .01);
+        return new AudioRenditionCache(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile()), new SegmentFileResolver($this->root), $this->runtime, new NullLogger(), pollIntervalSeconds: .001, startTimeoutSeconds: .01);
     }
 
     private function snapshot(string $state, int $generation = 1, bool $live = true): AudioRenditionRuntimeSnapshot

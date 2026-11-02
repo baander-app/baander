@@ -19,6 +19,9 @@ interface VideoRepositoryInterface
 
     public function isVisibleByPublicId(PublicId $publicId, LibraryReadScope $scope): bool;
 
+    /** @return list<Uuid> */
+    public function getLibraryIdsByPublicId(PublicId $publicId, LibraryReadScope $scope): array;
+
     public function findByHash(string $hash): ?Video;
 
     /**

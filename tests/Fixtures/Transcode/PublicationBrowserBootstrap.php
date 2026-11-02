@@ -49,7 +49,7 @@ $ffmpegPort = $generator->testDouble(FFmpegPortInterface::class, false);
 $storagePort = $generator->testDouble(TranscodeStoragePortInterface::class, false);
 assert($ffmpegPort instanceof FFmpegPortInterface);
 assert($storagePort instanceof TranscodeStoragePortInterface);
-$encoder = new SegmentEncoder($ffmpegPort, $storagePort, EncoderProfile::software('libx264'));
+$encoder = new SegmentEncoder(new \App\Transcode\Application\Service\MediaExecutionPolicy(\App\Shared\Application\DTO\DeploymentProfile::fromEnvironment()), $ffmpegPort, $storagePort, EncoderProfile::software('libx264'));
 $arguments = $encoder->buildStreamArgs($source, QualityTier::p720(), '', $directory,
     audioFilters: 'aformat=channel_layouts=stereo', hasAudio: true);
 $input = array_search('-i', $arguments, true);

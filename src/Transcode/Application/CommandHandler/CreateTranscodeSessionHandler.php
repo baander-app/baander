@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Transcode\Application\CommandHandler;
 
+use App\Transcode\Application\DTO\MediaOperation;
+use App\Transcode\Application\Service\MediaExecutionPolicy;
 use App\Shared\Application\Port\SleeperInterface;
 use App\Shared\Application\Port\TransactionPortInterface;
 use App\Transcode\Application\Command\CreateTranscodeSessionCommand;
@@ -22,6 +24,7 @@ final readonly class CreateTranscodeSessionHandler
     private const int STARTUP_POLLS = 50;
 
     public function __construct(
+        private MediaExecutionPolicy $executionPolicy,
         private TranscodeJobPortInterface $jobPort,
         private TranscodeSessionPortInterface $sessionPort,
         private TranscodeStoragePortInterface $storagePort,
@@ -33,6 +36,7 @@ final readonly class CreateTranscodeSessionHandler
     #[AsMessageHandler]
     public function __invoke(CreateTranscodeSessionCommand $command): TranscodeSession
     {
+        $this->executionPolicy->assertAllowed(MediaOperation::VideoEncode);
         $outputDirectory = $this->storagePort->resolveJobDirectory($command->getVideoId(), $command->getQualityTier());
         $session = $this->transaction->run(function () use ($command, $outputDirectory): TranscodeSession {
             $this->ownership->lockAdmission($command->getVideoId());

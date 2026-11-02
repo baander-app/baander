@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Transcode\Infrastructure\Transcode;
 
+use App\Transcode\Application\DTO\MediaOperation;
+use App\Transcode\Application\Service\MediaExecutionPolicy;
 use App\Shared\Infrastructure\Swoole\Async;
 use App\Transcode\Application\DTO\AudioRenditionInput;
 use App\Transcode\Application\DTO\AudioRenditionRuntimeSnapshot;
@@ -23,6 +25,7 @@ final class AudioRenditionCache implements AudioRenditionPortInterface
     private const int CHUNK_BYTES = 65_536;
 
     public function __construct(
+        private readonly MediaExecutionPolicy $executionPolicy,
         private readonly SegmentFileResolver $paths,
         private readonly AudioRenditionRuntimePort $runtime,
         private readonly LoggerInterface $logger,
@@ -30,18 +33,54 @@ final class AudioRenditionCache implements AudioRenditionPortInterface
         private readonly float $startTimeoutSeconds = 60.0,
     ) {}
 
-    public function open(string $trackKey, string $sourcePath, AudioRenditionFormat $format, int $bitrate): AudioRendition
+    public function findComplete(string $trackKey, string $sourcePath, AudioRenditionFormat $format, int $bitrate): ?AudioRendition
+    {
+        $input = $this->input($trackKey, $sourcePath, $format, $bitrate);
+        if ($input === null) {
+            return null;
+        }
+        $current = $this->runtime->find($input->key());
+        if ($current === null || $current->state !== 'complete') {
+            return null;
+        }
+        try {
+            $this->validatePaths($current);
+        } catch (AudioRenditionFailedException) {
+            return null;
+        }
+        clearstatcache(true, (string) $current->finalPath);
+        return is_file((string) $current->finalPath) && is_readable((string) $current->finalPath) && filesize((string) $current->finalPath) > 0
+            ? AudioRendition::complete($format, (string) $current->finalPath)
+            : null;
+    }
+
+    private function input(string $trackKey, string $sourcePath, AudioRenditionFormat $format, int $bitrate): ?AudioRenditionInput
     {
         $bitrate = $format->supportedBitrate($bitrate);
         clearstatcache(true, $sourcePath);
         $modified = @filemtime($sourcePath);
         $size = @filesize($sourcePath);
         if ($modified === false || $size === false) {
-            $this->fail('the source file cannot be read');
+            return null;
         }
         $signature = $format->sourceSignature($sourcePath, $bitrate, $modified, $size);
+        return new AudioRenditionInput($trackKey, $signature, $sourcePath, $format, $bitrate, $this->paths->resolveAudioRenditionPath($trackKey, $signature));
+    }
+
+    public function open(string $trackKey, string $sourcePath, AudioRenditionFormat $format, int $bitrate): AudioRendition
+    {
+        if (!$this->executionPolicy->permits(MediaOperation::AudioEncode)) {
+            $complete = $this->findComplete($trackKey, $sourcePath, $format, $bitrate);
+            if ($complete !== null) {
+                return $complete;
+            }
+            $this->executionPolicy->assertAllowed(MediaOperation::AudioEncode);
+        }
+        $input = $this->input($trackKey, $sourcePath, $format, $bitrate);
+        if ($input === null) {
+            $this->fail('the source file cannot be read');
+        }
         try {
-            $input = new AudioRenditionInput($trackKey, $signature, $sourcePath, $format, $bitrate, $this->paths->resolveAudioRenditionPath($trackKey, $signature));
             $admitted = $this->runtime->admit($input);
         } catch (Throwable $error) {
             $this->fail($error->getMessage());

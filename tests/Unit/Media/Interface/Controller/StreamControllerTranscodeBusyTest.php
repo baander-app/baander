@@ -90,7 +90,7 @@ final class StreamControllerTranscodeBusyTest extends TestCase
         $translator->addResource('yaml', dirname(__DIR__, 5) . '/translations/media+intl-icu.da.yaml', 'da', 'media+intl-icu');
         $requests = new RequestStack();
         $requests->push($request);
-        $controller = new StreamController($stream, $scopes, $renditions, $settings);
+        $controller = new StreamController(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile()), $stream, $scopes, $renditions, $settings);
         $controller->setTranslator($translator);
         $controller->setTranslationRequests($requests);
 

@@ -90,7 +90,7 @@ final class PlaybackPersistenceFixture
         return new \App\Media\Application\Service\PlaybackMediaAccess(
             new \App\Media\Infrastructure\MediaReadScopeProvider($security, $libraries),
             new \App\Media\Infrastructure\Service\StreamService($songs, $files),
-            new \App\Catalog\Infrastructure\VideoService(new \App\Catalog\Infrastructure\Doctrine\Repository\VideoRepository($manager)),
+            new \App\Catalog\Infrastructure\VideoService(new \App\Catalog\Infrastructure\Doctrine\Repository\VideoRepository($manager), $files),
         );
     }
 

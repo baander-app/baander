@@ -11,6 +11,9 @@ use App\Shared\Domain\Model\PublicId;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\Controller\TranslatorTrait;
 use App\Transcode\Application\Exception\AudioRenditionBusyException;
+use App\Transcode\Application\Exception\MediaEncodingProhibitedException;
+use App\Transcode\Application\DTO\MediaOperation;
+use App\Transcode\Application\Port\MediaExecutionPolicyInterface;
 use App\Transcode\Application\Exception\AudioRenditionFailedException;
 use App\Transcode\Application\Port\AudioRendition;
 use App\Transcode\Application\Port\AudioRenditionFormat;
@@ -35,6 +38,7 @@ final class StreamController
     private const int TRANSCODE_BUSY_RETRY_SECONDS = 5;
 
     public function __construct(
+        private readonly MediaExecutionPolicyInterface $executionPolicy,
         private readonly StreamPortInterface $streamService,
         private readonly MediaReadScopeProviderInterface $scopes,
         private readonly AudioRenditionPortInterface $renditions,
@@ -131,7 +135,7 @@ final class StreamController
         if ($bitrate !== '' && (!ctype_digit($bitrate) || (int) $bitrate === 0)) {
             return $this->errorResponse($this->trans('errors.invalid_transcode_bitrate', domain: 'media'));
         }
-        if ($this->settings->get(TranscodeSettingDefinitions::ENABLED) !== true) {
+        if ($this->executionPolicy->permits(MediaOperation::AudioEncode) && $this->settings->get(TranscodeSettingDefinitions::ENABLED) !== true) {
             return $this->errorResponse($this->trans('errors.transcode_disabled', domain: 'media'), Response::HTTP_FORBIDDEN);
         }
         // transcode.max_bitrate is in kilobits; without a requested bitrate the cap applies.
@@ -140,6 +144,8 @@ final class StreamController
 
         try {
             $rendition = $this->renditions->open($trackId->toString(), $fullPath, $renditionFormat, $targetBitrate);
+        } catch (MediaEncodingProhibitedException $error) {
+            return $this->errorResponse($error->getMessage(), Response::HTTP_CONFLICT, $error->details);
         } catch (AudioRenditionBusyException) {
             $response = $this->errorResponse(
                 $this->trans('errors.transcode_busy', domain: 'media'),

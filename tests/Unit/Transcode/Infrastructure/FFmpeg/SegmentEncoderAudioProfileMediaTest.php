@@ -46,8 +46,7 @@ final class SegmentEncoderAudioProfileMediaTest extends TestCase
         $source = $this->createSource();
         $probe = VideoProbeResult::fromProbeOutput($this->probe($source));
         self::assertTrue($probe->hasAudio());
-        $encoder = new SegmentEncoder($this->createStub(FFmpegPortInterface::class),
-            $this->createStub(TranscodeStoragePortInterface::class), EncoderProfile::software('libx264'));
+        $encoder = new SegmentEncoder(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile('full')), $this->createStub(FFmpegPortInterface::class), $this->createStub(TranscodeStoragePortInterface::class), EncoderProfile::software('libx264'));
         $tier = new QualityTier('fixture', 64, 64, 100_000, 200_000, 200_000, 'avc1', 'avc1.64001f');
         $output = $this->directory.'/output';
         mkdir($output);

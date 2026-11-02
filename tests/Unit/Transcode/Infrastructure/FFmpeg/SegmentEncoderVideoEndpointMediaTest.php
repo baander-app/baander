@@ -120,8 +120,7 @@ final class SegmentEncoderVideoEndpointMediaTest extends TestCase
         self::assertSame($probed->sourceTimestampOrigin, $probe->sourceTimestampOrigin);
         $profile = AudioProfile::fromString($profileName);
         $tier = new QualityTier('fixture', 64, 64, 100_000, 200_000, 200_000, 'avc1', 'avc1.64001f');
-        $encoder = new SegmentEncoder($this->createStub(FFmpegPortInterface::class),
-            $this->createStub(TranscodeStoragePortInterface::class), EncoderProfile::software('libx264'));
+        $encoder = new SegmentEncoder(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile('full')), $this->createStub(FFmpegPortInterface::class), $this->createStub(TranscodeStoragePortInterface::class), EncoderProfile::software('libx264'));
         $spawner = new class(fn (array $command): string => $this->runMedia($command)) implements ProcessSpawnerInterface {
             /** @var list<string> */
             public array $command = [];

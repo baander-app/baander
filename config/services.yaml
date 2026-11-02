@@ -66,6 +66,13 @@ services:
             $identifier: '%env(BAANDER_DEPLOYMENT_PROFILE)%'
             $serialized: '%env(default::BAANDER_DEPLOYMENT_PROFILE_JSON)%'
 
+    App\Transcode\Application\Service\MediaExecutionPolicy:
+        arguments:
+            $profile: '@App\Shared\Application\DTO\DeploymentProfile'
+
+    App\Transcode\Application\Port\MediaExecutionPolicyInterface:
+        alias: App\Transcode\Application\Service\MediaExecutionPolicy
+
     baander.provider_http_transport:
         class: Symfony\Component\HttpClient\CurlHttpClient
         autowire: false
@@ -748,6 +755,9 @@ services:
     # --- Media Stream ---
     App\Media\Application\Port\StreamPortInterface:
         alias: App\Media\Infrastructure\Service\StreamService
+
+    App\Media\Application\Port\DeliveryDecisionPortInterface:
+        alias: App\Media\Application\Service\DeliveryDecisionService
 
     # --- Recommendation Domain Repository Aliases ---
     App\Recommendation\Domain\Repository\RecommendationRepositoryInterface:

@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Transcode\Infrastructure\Swoole;
 
+use App\Transcode\Application\DTO\MediaOperation;
+use App\Transcode\Application\Exception\MediaEncodingProhibitedException;
+use App\Transcode\Application\Service\MediaExecutionPolicy;
 use App\Catalog\Domain\Repository\VideoRepositoryInterface;
 use App\QoL\Application\Port\StreamAdmissionPortInterface;
 use App\Shared\Infrastructure\Swoole\Async;
@@ -32,6 +35,7 @@ final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
     private const int LEASE_SECONDS = 15;
 
     public function __construct(
+        private readonly MediaExecutionPolicy $executionPolicy,
         private readonly TranscodeJobPortInterface $jobPort,
         private readonly TranscodeSessionPortInterface $sessionPort,
         private readonly TranscodeStoragePortInterface $storage,
@@ -48,6 +52,11 @@ final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
 
     public function run(TranscodeExecutionClaim $claim, callable $stopRequested): void
     {
+        if (!$this->executionPolicy->permits(MediaOperation::VideoEncode)) {
+            $this->ownership->observe($claim, 'failed', error: (new MediaEncodingProhibitedException())->getMessage());
+            $this->ownership->release($claim);
+            return;
+        }
         $jobId = $claim->runtime->jobId;
         // Renewal uses a dedicated connection, never the aggregate connection.
         $local = new TranscodeLoopOwnership(fn(int $seconds): bool => $this->controlOwnership->renew($claim, $seconds));

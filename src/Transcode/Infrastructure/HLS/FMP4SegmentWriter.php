@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Transcode\Infrastructure\HLS;
 
+use App\Transcode\Application\DTO\MediaOperation;
+use App\Transcode\Application\Service\MediaExecutionPolicy;
 use App\Transcode\Domain\Service\VideoProcessingRules;
 use App\Transcode\Domain\ValueObject\EncoderProfile;
 use App\Transcode\Domain\ValueObject\HardwareAccelerator;
@@ -15,6 +17,7 @@ use RuntimeException;
 final class FMP4SegmentWriter
 {
     public function __construct(
+        private readonly MediaExecutionPolicy $executionPolicy,
         private readonly string $ffmpegPath = '/usr/bin/ffmpeg',
         private readonly EncoderProfile $encoderProfile = new EncoderProfile(
             HardwareAccelerator::None,
@@ -32,6 +35,7 @@ final class FMP4SegmentWriter
         QualityTier $qualityTier,
         string $outputPath,
     ): string {
+        $this->executionPolicy->assertAllowed(MediaOperation::VideoEncode);
         $dir = dirname($outputPath);
         if (!is_dir($dir)) {
             mkdir($dir, 0755, true);

@@ -612,6 +612,58 @@ export interface ApplyLyricsRequest {
   songPublicId: string;
 }
 
+export type DeliveryRequestKind = typeof DeliveryRequestKind[keyof typeof DeliveryRequestKind];
+
+
+export const DeliveryRequestKind = {
+  track: 'track',
+  video: 'video',
+} as const;
+
+export interface DeliveryRequest {
+  kind: DeliveryRequestKind;
+  id: string;
+  /**
+     * @minItems 1
+     * @maxItems 32
+     */
+  containers: string[];
+  /** @maxItems 32 */
+  videoCodecs?: string[];
+  /** @maxItems 32 */
+  audioCodecs?: string[];
+  /**
+     * @exclusiveMinimum 0
+     * @nullable
+     */
+  maxWidth?: number | null;
+  /**
+     * @exclusiveMinimum 0
+     * @nullable
+     */
+  maxHeight?: number | null;
+  /**
+     * @exclusiveMinimum 0
+     * @nullable
+     */
+  maxAudioChannels?: number | null;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  audioStreamIndex?: number | null;
+  subtitleBurnIn?: boolean;
+  transports?: string[];
+  /**
+     * @minimum 8
+     * @maximum 16
+     */
+  maxBitDepth?: number;
+  supportsHdr?: boolean;
+  /** @maxItems 32 */
+  pixelFormats?: string[];
+}
+
 export interface ExtractMetadataRequest {
   /** Filesystem path to the media file to analyze */
   path: string;
@@ -2396,6 +2448,44 @@ export interface LrclibSearchResource {
      * @nullable
      */
   syncedLyrics?: string | null;
+}
+
+export type DeliveryResourceKind = typeof DeliveryResourceKind[keyof typeof DeliveryResourceKind];
+
+
+export const DeliveryResourceKind = {
+  original: 'original',
+  cached: 'cached',
+  copy: 'copy',
+  encoded: 'encoded',
+  incompatible: 'incompatible',
+} as const;
+
+export type DeliveryResourceSelectionTransport = typeof DeliveryResourceSelectionTransport[keyof typeof DeliveryResourceSelectionTransport];
+
+
+export const DeliveryResourceSelectionTransport = {
+  file: 'file',
+  hls: 'hls',
+  dash: 'dash',
+} as const;
+
+export type DeliveryResourceSelection = {
+  container?: string;
+  transport?: DeliveryResourceSelectionTransport;
+  /** @nullable */
+  videoStreamIndex?: number | null;
+  /** @nullable */
+  audioStreamIndex?: number | null;
+};
+
+export interface DeliveryResource {
+  kind: DeliveryResourceKind;
+  /** @nullable */
+  reason?: string | null;
+  /** @nullable */
+  url?: string | null;
+  selection?: DeliveryResourceSelection;
 }
 
 export interface ImageResource {
@@ -5121,6 +5211,14 @@ export type GetAdminMediaMissingCheck200Data = {
 
 export type GetAdminMediaMissingCheck200 = {
   data?: GetAdminMediaMissingCheck200Data;
+};
+
+export type GetStreamOriginalVideoParams = {
+  id: string;
+};
+
+export type GetStreamOriginalTrackParams = {
+  id: string;
 };
 
 export type GetStreamTrackParams = {
@@ -19840,6 +19938,94 @@ export const usePostLyricsApply = <TError = ErrorType<void | ApiError>,
       return useMutation(getPostLyricsApplyMutationOptions(options), queryClient);
     }
 
+export const getPostStreamDeliveryUrl = () => {
+
+
+
+
+  return `/api/stream/delivery`
+}
+
+/**
+ * @summary Choose compatible delivery for the destination before loading media
+ */
+export const postStreamDelivery = async (deliveryRequest: DeliveryRequest, options?: Parameters<typeof customInstance>[1]): Promise<DeliveryResource> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customInstance<DeliveryResource>(getPostStreamDeliveryUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(deliveryRequest)
+  }
+);}
+
+
+
+
+
+export const getPostStreamDeliveryMutationKey = () => ['postStreamDelivery'] as const;
+
+export const getPostStreamDeliveryMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postStreamDelivery>>, TError,PostStreamDeliveryMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof postStreamDelivery>>, TError,PostStreamDeliveryMutationVariables, TContext> => {
+
+const mutationKey = getPostStreamDeliveryMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postStreamDelivery>>, PostStreamDeliveryMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  postStreamDelivery(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostStreamDeliveryMutationResult = NonNullable<Awaited<ReturnType<typeof postStreamDelivery>>>
+    export type PostStreamDeliveryMutationBody = BodyType<DeliveryRequest>
+    export type PostStreamDeliveryMutationError = ErrorType<void>
+    export type PostStreamDeliveryMutationVariables = {data: BodyType<DeliveryRequest>}
+
+    /**
+ * @summary Choose compatible delivery for the destination before loading media
+ */
+export const usePostStreamDelivery = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postStreamDelivery>>, TError,PostStreamDeliveryMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof postStreamDelivery>>,
+        TError,
+        PostStreamDeliveryMutationVariables,
+        TContext
+      > => {
+      return useMutation(getPostStreamDeliveryMutationOptions(options), queryClient);
+    }
+
 export const getGetImageShowUrl = (publicId: string,) => {
 
 
@@ -20433,6 +20619,358 @@ export function useGetAdminMediaMissingCheck<TData = Awaited<ReturnType<typeof g
 
 
 
+
+export const getGetStreamOriginalVideoUrl = (params: GetStreamOriginalVideoParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/stream/video?${stringifiedParams}` : `/api/stream/video`
+}
+
+/**
+ * @summary Deliver an authorized original video with byte ranges
+ */
+export const getStreamOriginalVideo = async (params: GetStreamOriginalVideoParams, options?: Parameters<typeof customInstance>[1]): Promise<void> => {
+
+  return customInstance<void>(getGetStreamOriginalVideoUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetStreamOriginalVideoQueryKey = (params?: GetStreamOriginalVideoParams,) => {
+    return [
+    `/api/stream/video`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetStreamOriginalVideoQueryOptions = <TData = Awaited<ReturnType<typeof getStreamOriginalVideo>>, TError = ErrorType<void>>(params: GetStreamOriginalVideoParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamOriginalVideo>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetStreamOriginalVideoQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getStreamOriginalVideo>>> = ({ signal }) => getStreamOriginalVideo(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getStreamOriginalVideo>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetStreamOriginalVideoQueryResult = NonNullable<Awaited<ReturnType<typeof getStreamOriginalVideo>>>
+export type GetStreamOriginalVideoQueryError = ErrorType<void>
+
+
+export function useGetStreamOriginalVideo<TData = Awaited<ReturnType<typeof getStreamOriginalVideo>>, TError = ErrorType<void>>(
+ params: GetStreamOriginalVideoParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamOriginalVideo>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getStreamOriginalVideo>>,
+          TError,
+          Awaited<ReturnType<typeof getStreamOriginalVideo>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetStreamOriginalVideo<TData = Awaited<ReturnType<typeof getStreamOriginalVideo>>, TError = ErrorType<void>>(
+ params: GetStreamOriginalVideoParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamOriginalVideo>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getStreamOriginalVideo>>,
+          TError,
+          Awaited<ReturnType<typeof getStreamOriginalVideo>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetStreamOriginalVideo<TData = Awaited<ReturnType<typeof getStreamOriginalVideo>>, TError = ErrorType<void>>(
+ params: GetStreamOriginalVideoParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamOriginalVideo>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Deliver an authorized original video with byte ranges
+ */
+
+export function useGetStreamOriginalVideo<TData = Awaited<ReturnType<typeof getStreamOriginalVideo>>, TError = ErrorType<void>>(
+ params: GetStreamOriginalVideoParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamOriginalVideo>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetStreamOriginalVideoQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getHeadStreamOriginalVideoUrl = () => {
+
+
+
+
+  return `/api/stream/video`
+}
+
+export const headStreamOriginalVideo = async ( options?: Parameters<typeof customInstance>[1]): Promise<void> => {
+
+  return customInstance<void>(getHeadStreamOriginalVideoUrl(),
+  {
+    ...options,
+    method: 'HEAD'
+
+
+  }
+);}
+
+
+
+
+
+export const getHeadStreamOriginalVideoMutationKey = () => ['headStreamOriginalVideo'] as const;
+
+export const getHeadStreamOriginalVideoMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof headStreamOriginalVideo>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof headStreamOriginalVideo>>, TError,void, TContext> => {
+
+const mutationKey = getHeadStreamOriginalVideoMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof headStreamOriginalVideo>>, void> = () => {
+
+
+          return  headStreamOriginalVideo(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type HeadStreamOriginalVideoMutationResult = NonNullable<Awaited<ReturnType<typeof headStreamOriginalVideo>>>
+
+    export type HeadStreamOriginalVideoMutationError = ErrorType<void>
+
+
+    export const useHeadStreamOriginalVideo = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof headStreamOriginalVideo>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof headStreamOriginalVideo>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getHeadStreamOriginalVideoMutationOptions(options), queryClient);
+    }
+
+export const getGetStreamOriginalTrackUrl = (params: GetStreamOriginalTrackParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/stream/original/track?${stringifiedParams}` : `/api/stream/original/track`
+}
+
+/**
+ * @summary Deliver authorized track audio with byte ranges
+ */
+export const getStreamOriginalTrack = async (params: GetStreamOriginalTrackParams, options?: Parameters<typeof customInstance>[1]): Promise<void> => {
+
+  return customInstance<void>(getGetStreamOriginalTrackUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetStreamOriginalTrackQueryKey = (params?: GetStreamOriginalTrackParams,) => {
+    return [
+    `/api/stream/original/track`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetStreamOriginalTrackQueryOptions = <TData = Awaited<ReturnType<typeof getStreamOriginalTrack>>, TError = ErrorType<void>>(params: GetStreamOriginalTrackParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamOriginalTrack>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetStreamOriginalTrackQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getStreamOriginalTrack>>> = ({ signal }) => getStreamOriginalTrack(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getStreamOriginalTrack>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetStreamOriginalTrackQueryResult = NonNullable<Awaited<ReturnType<typeof getStreamOriginalTrack>>>
+export type GetStreamOriginalTrackQueryError = ErrorType<void>
+
+
+export function useGetStreamOriginalTrack<TData = Awaited<ReturnType<typeof getStreamOriginalTrack>>, TError = ErrorType<void>>(
+ params: GetStreamOriginalTrackParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamOriginalTrack>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getStreamOriginalTrack>>,
+          TError,
+          Awaited<ReturnType<typeof getStreamOriginalTrack>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetStreamOriginalTrack<TData = Awaited<ReturnType<typeof getStreamOriginalTrack>>, TError = ErrorType<void>>(
+ params: GetStreamOriginalTrackParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamOriginalTrack>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getStreamOriginalTrack>>,
+          TError,
+          Awaited<ReturnType<typeof getStreamOriginalTrack>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetStreamOriginalTrack<TData = Awaited<ReturnType<typeof getStreamOriginalTrack>>, TError = ErrorType<void>>(
+ params: GetStreamOriginalTrackParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamOriginalTrack>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Deliver authorized track audio with byte ranges
+ */
+
+export function useGetStreamOriginalTrack<TData = Awaited<ReturnType<typeof getStreamOriginalTrack>>, TError = ErrorType<void>>(
+ params: GetStreamOriginalTrackParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamOriginalTrack>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetStreamOriginalTrackQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getHeadStreamOriginalTrackUrl = () => {
+
+
+
+
+  return `/api/stream/original/track`
+}
+
+export const headStreamOriginalTrack = async ( options?: Parameters<typeof customInstance>[1]): Promise<void> => {
+
+  return customInstance<void>(getHeadStreamOriginalTrackUrl(),
+  {
+    ...options,
+    method: 'HEAD'
+
+
+  }
+);}
+
+
+
+
+
+export const getHeadStreamOriginalTrackMutationKey = () => ['headStreamOriginalTrack'] as const;
+
+export const getHeadStreamOriginalTrackMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof headStreamOriginalTrack>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof headStreamOriginalTrack>>, TError,void, TContext> => {
+
+const mutationKey = getHeadStreamOriginalTrackMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof headStreamOriginalTrack>>, void> = () => {
+
+
+          return  headStreamOriginalTrack(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type HeadStreamOriginalTrackMutationResult = NonNullable<Awaited<ReturnType<typeof headStreamOriginalTrack>>>
+
+    export type HeadStreamOriginalTrackMutationError = ErrorType<void>
+
+
+    export const useHeadStreamOriginalTrack = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof headStreamOriginalTrack>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof headStreamOriginalTrack>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getHeadStreamOriginalTrackMutationOptions(options), queryClient);
+    }
 
 export const getGetStreamTrackUrl = (params: GetStreamTrackParams,) => {
   const normalizedParams = new URLSearchParams();

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Transcode\Infrastructure\FFmpeg;
 
+use App\Transcode\Application\DTO\MediaOperation;
+use App\Transcode\Application\Service\MediaExecutionPolicy;
 use App\Transcode\Application\Port\FFmpegPortInterface;
 use App\Transcode\Application\Port\TranscodeStoragePortInterface;
 use App\Transcode\Domain\Model\TranscodeJob;
@@ -22,6 +24,7 @@ final class SegmentEncoder
     private const string FFMPEG_PATH = '/usr/bin/ffmpeg';
 
     public function __construct(
+        private readonly MediaExecutionPolicy $executionPolicy,
         private readonly FFmpegPortInterface $ffmpeg,
         private readonly TranscodeStoragePortInterface $storage,
         private readonly EncoderProfile $encoderProfile = new EncoderProfile(
@@ -45,6 +48,7 @@ final class SegmentEncoder
 
     public function encodeInit(TranscodeJob $job, string $sourcePath): string
     {
+        $this->executionPolicy->assertAllowed(MediaOperation::VideoEncode);
         $tier = QualityTier::fromString($job->getQualityTierName());
         $initPath = $this->storage->resolveInitSegmentPath($job->getVideoId(), $tier);
 
@@ -139,6 +143,7 @@ final class SegmentEncoder
         float $sourceFrameRate = 0.0,
         ?float $sourceTimestampOrigin = null,
     ): array {
+        $this->executionPolicy->assertAllowed(MediaOperation::VideoEncode);
         if ($sourceTimestampOrigin !== null && (!is_finite($sourceTimestampOrigin) || $sourceTimestampOrigin < 0.0)) {
             throw new \InvalidArgumentException('Invalid source timestamp origin.');
         }
@@ -311,6 +316,7 @@ final class SegmentEncoder
         string $videoFilters,
         string $audioFilters,
     ): string {
+        $this->executionPolicy->assertAllowed(MediaOperation::VideoEncode);
         $tier = QualityTier::fromString($job->getQualityTierName());
         $outputPath = $this->storage->resolveSegmentPath($job->getVideoId(), $tier, $segmentIndex);
 

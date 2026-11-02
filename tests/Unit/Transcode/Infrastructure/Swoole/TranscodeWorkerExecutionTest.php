@@ -48,6 +48,7 @@ final class TranscodeWorkerExecutionTest extends TestCase
     private TranscodeSession $session;
     private ?TranscodeExecutionClaim $current;
     private TranscodeSessionSubscriber $worker;
+    private Closure $workerForPolicy;
     private VideoExecutionSpawner $spawner;
     /** @var list<string> */
     private array $observed = [];
@@ -176,13 +177,12 @@ final class TranscodeWorkerExecutionTest extends TestCase
         $admission->method('admit')->willReturnCallback(function (): void { ++$this->allocations; });
         $admission->method('complete')->willReturnCallback(function (): void { --$this->allocations; });
         $storage = new TranscodeFileStorage(new SegmentFileResolver($this->root));
-        $encoder = new SegmentEncoder($ffmpeg, $storage, EncoderProfile::software('libx264'));
+        $encoder = new SegmentEncoder(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile('full')), $ffmpeg, $storage, EncoderProfile::software('libx264'));
         $this->spawner = new VideoExecutionSpawner();
         $streams = new TranscodeStreamManager($this->createStub(SegmentAvailabilityInterface::class), $storage, $encoder, new NullLogger(), $this->spawner);
         $this->helpers = new TranscodeProcessPool($pool, new NullLogger(), new JsonEncoder());
-        $this->worker = new TranscodeSessionSubscriber($jobs, $sessions, $storage,
-            $this->helpers,
-            $encoder, $videos, new NullLogger(), $ownership, $control, $streams, $this->timer, $admission);
+        $this->workerForPolicy = fn(\App\Transcode\Application\Service\MediaExecutionPolicy $policy): TranscodeSessionSubscriber => new TranscodeSessionSubscriber($policy, $jobs, $sessions, $storage, $this->helpers, $encoder, $videos, new NullLogger(), $ownership, $control, $streams, $this->timer, $admission);
+        $this->worker = ($this->workerForPolicy)(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile()));
     }
 
     protected function tearDown(): void
@@ -192,6 +192,17 @@ final class TranscodeWorkerExecutionTest extends TestCase
             $entry->isDir() ? rmdir($entry->getPathname()) : unlink($entry->getPathname());
         }
         rmdir($this->root);
+    }
+
+    public function testHouseholdRejectsRecoveredVideoBeforeNativeWorkAndTerminatesTheClaim(): void
+    {
+        $worker = ($this->workerForPolicy)(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile('household')));
+        $worker->run($this->current, static fn(): bool => false);
+        self::assertSame(['failed'], $this->observed);
+        self::assertSame(1, $this->releases);
+        self::assertSame(0, $this->allocations);
+        self::assertSame([], $this->probeCommands);
+        self::assertSame([], $this->subtitleCommands);
     }
 
     public function testCompletionPublishesActualCodecAndGenerationAndReleasesAllocation(): void

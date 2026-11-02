@@ -149,12 +149,7 @@ final class TranscodeCommandSnapshotTest extends TestCase
 
     public function testBitrateMultiplierScalesQualityTier(): void
     {
-        $encoder = new SegmentEncoder(
-            $this->createStub(\App\Transcode\Application\Port\FFmpegPortInterface::class),
-            $this->createStub(\App\Transcode\Application\Port\TranscodeStoragePortInterface::class),
-            EncoderProfile::fromEncoderName('hevc_nvenc'),
-            1.5,
-        );
+        $encoder = new SegmentEncoder(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile('full')), $this->createStub(\App\Transcode\Application\Port\FFmpegPortInterface::class), $this->createStub(\App\Transcode\Application\Port\TranscodeStoragePortInterface::class), EncoderProfile::fromEncoderName('hevc_nvenc'), 1.5);
 
         $tier = QualityTier::p1080();
         $scaled = $encoder->applyBitrateMultiplier($tier);
@@ -166,12 +161,7 @@ final class TranscodeCommandSnapshotTest extends TestCase
 
     public function testBitrateMultiplierOneIsNoop(): void
     {
-        $encoder = new SegmentEncoder(
-            $this->createStub(\App\Transcode\Application\Port\FFmpegPortInterface::class),
-            $this->createStub(\App\Transcode\Application\Port\TranscodeStoragePortInterface::class),
-            EncoderProfile::software(),
-            1.0,
-        );
+        $encoder = new SegmentEncoder(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile('full')), $this->createStub(\App\Transcode\Application\Port\FFmpegPortInterface::class), $this->createStub(\App\Transcode\Application\Port\TranscodeStoragePortInterface::class), EncoderProfile::software(), 1.0);
 
         $tier = QualityTier::p1080();
         $scaled = $encoder->applyBitrateMultiplier($tier);

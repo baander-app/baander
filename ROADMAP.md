@@ -31,6 +31,14 @@ Verification: 439 distinct configuration and bootstrap tests passed across focus
 
 Backend and tooling PHPStan, both dependency-boundary checks, tooling source policy, container compilation for both profiles and whitespace checks passed. A focused source/consumer review found no actionable issues. Reduced worker budgets, media delivery policy, copy execution, player integration and whole-stack qualification remain open.
 
+Media delivery checkpoint, 2026-11-02 (U3): delivery negotiation now checks destination capabilities against trusted video container, stream, color and timing metadata. Signed original audio and video URLs support byte ranges and recheck library access when used. Completed audio lookup does not admit or repair work. Household encoding requests and recovered encoding jobs reach a terminal failure before an encoder starts. An explicitly selected alternate audio stream requires a matching copy or cached presentation instead of silently playing the default stream.
+
+Verification: the broad media gate passed 1,204 tests with 35,784 assertions across ordinary, native and database-backed lanes. It includes signed range requests, membership revocation, source confinement and real FFmpeg publication. The subsequent focused gate rechecked the alternate-audio selection fix. Backend checks used `baander-ci:php-refresh`, image `sha256:b8a4f6b13ac2ed5934605a3574e4d6d56213d5dab3153c4c208a91c47491ce7e`; the broad run is retained at `var/test-runs/20261102-175312-bfacd9eb`.
+
+PHPStan, Deptrac, full and household container compilation, OpenAPI export with a 512 MiB CLI heap, Orval generation and web type checking passed. The five-part simplification review preserved the behavior tests; it corrected contract-comment placement and removed a redundant service binding. New PHP source was formatted and whitespace checks passed.
+
+Owned copy execution, verified completed-video lookup and persisted audio source metadata remain for U4. Copy decisions currently carry the selected streams and transport without a playable URL. Player integration, reduced deployment qualification and measured operator guidance remain open; this checkpoint makes no host-memory or Raspberry Pi capacity claim.
+
 ## Playback destinations and notifications
 
 Requirements checkpoint, 2026-11-01: the user confirmed the

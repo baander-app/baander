@@ -77,11 +77,7 @@ final class SegmentEncoderAudioDelayMediaTest extends TestCase
         } else {
             self::assertEqualsWithDelta($audioDelay, (float) $sourceAudio[0]['pts_time'], 0.002);
         }
-        $encoder = new SegmentEncoder(
-            $this->createStub(FFmpegPortInterface::class),
-            $this->createStub(TranscodeStoragePortInterface::class),
-            EncoderProfile::software($encoderName),
-        );
+        $encoder = new SegmentEncoder(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile('full')), $this->createStub(FFmpegPortInterface::class), $this->createStub(TranscodeStoragePortInterface::class), EncoderProfile::software($encoderName));
         $tier = new QualityTier(
             'fixture',
             64,

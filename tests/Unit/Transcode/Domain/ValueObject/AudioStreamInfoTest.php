@@ -175,6 +175,9 @@ final class AudioStreamInfoTest extends TestCase
             'title' => 'English',
             'isDefault' => true,
             'channelLayout' => '',
+            'streamIndex' => null,
+            'startTime' => null,
+            'timeBase' => null,
         ], $data);
     }
 }

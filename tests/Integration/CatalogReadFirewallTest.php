@@ -19,6 +19,9 @@ use App\Catalog\Infrastructure\Doctrine\Entity\ArtistEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\ArtistSongEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\SongEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\MovieEntity;
+use App\Catalog\Infrastructure\Doctrine\Entity\MovieVideoEntity;
+use App\Catalog\Infrastructure\Doctrine\Entity\VideoEntity;
+use App\Catalog\Infrastructure\Doctrine\Repository\VideoRepository;
 use App\Library\Infrastructure\Doctrine\Entity\LibraryEntity;
 use App\Library\Application\Port\LibraryAccessPortInterface;
 use App\Library\Infrastructure\Doctrine\Entity\UserLibraryAccessEntity;
@@ -159,6 +162,27 @@ final class CatalogReadFirewallTest extends TestCase
             $this->kernel->shutdown();
         }
         parent::tearDown();
+    }
+
+    public function testVideoSourceLibraryLookupKeepsOnlyVisibleOwningLibraries(): void
+    {
+        $video = new VideoEntity(new PublicId(), '/tmp/source-video.mkv', bin2hex(random_bytes(16)));
+        $this->persistFixture($video, $video->getId());
+        foreach ($this->catalog as $entities) {
+            $this->manager->persist(new MovieVideoEntity($entities['movie'], $video));
+        }
+        $this->manager->flush();
+        $repository = new VideoRepository($this->manager);
+        $allowed = $this->catalog['allowed']['library']->getId();
+        $denied = $this->catalog['denied']['library']->getId();
+
+        self::assertSame([], $repository->getLibraryIdsByPublicId($video->getPublicId(), LibraryReadScope::none()));
+        $visible = $repository->getLibraryIdsByPublicId($video->getPublicId(), LibraryReadScope::restricted([$allowed]));
+        self::assertCount(1, $visible);
+        self::assertTrue($visible[0]->equals($allowed));
+        $all = $repository->getLibraryIdsByPublicId($video->getPublicId(), LibraryReadScope::unrestricted());
+        self::assertEqualsCanonicalizing([$allowed->toString(), $denied->toString()], array_map(static fn (Uuid $id): string => $id->toString(), $all));
+        self::assertSame([], $repository->getLibraryIdsByPublicId(new PublicId(), LibraryReadScope::unrestricted()));
     }
 
     /** @return iterable<string, array{string, string, string}> */

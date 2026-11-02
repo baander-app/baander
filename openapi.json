@@ -9265,6 +9265,43 @@
                 }
             }
         },
+        "/api/stream/delivery": {
+            "post": {
+                "tags": [
+                    "Media"
+                ],
+                "summary": "Choose compatible delivery for the destination before loading media",
+                "operationId": "post_stream_delivery",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/DeliveryRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Delivery choice, or a terminal compatibility reason",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DeliveryResource"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid capabilities or media identifier"
+                    },
+                    "401": {
+                        "description": "Authentication required"
+                    }
+                }
+            }
+        },
         "/api/images/{publicId}": {
             "get": {
                 "tags": [
@@ -9640,6 +9677,91 @@
                                 }
                             }
                         }
+                    }
+                }
+            }
+        },
+        "/api/stream/video": {
+            "get": {
+                "tags": [
+                    "Media"
+                ],
+                "summary": "Deliver an authorized original video with byte ranges",
+                "operationId": "get_stream_original_video",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Original video"
+                    },
+                    "206": {
+                        "description": "Byte range"
+                    },
+                    "403": {
+                        "description": "Media access denied"
+                    }
+                }
+            },
+            "head": {
+                "tags": [
+                    "Media"
+                ],
+                "operationId": "head_stream_original_video",
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/stream/original/track": {
+            "get": {
+                "tags": [
+                    "Media"
+                ],
+                "summary": "Deliver authorized track audio with byte ranges",
+                "operationId": "get_stream_original_track",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Track audio"
+                    },
+                    "206": {
+                        "description": "Byte range"
+                    },
+                    "403": {
+                        "description": "Media access denied"
+                    },
+                    "409": {
+                        "description": "Completed rendition unavailable; negotiate delivery again"
+                    }
+                }
+            },
+            "head": {
+                "tags": [
+                    "Media"
+                ],
+                "operationId": "head_stream_original_track",
+                "responses": {
+                    "default": {
+                        "description": ""
                     }
                 }
             }
@@ -23020,6 +23142,112 @@
                 },
                 "type": "object"
             },
+            "DeliveryRequest": {
+                "required": [
+                    "kind",
+                    "id",
+                    "containers"
+                ],
+                "properties": {
+                    "kind": {
+                        "type": "string",
+                        "enum": [
+                            "track",
+                            "video"
+                        ]
+                    },
+                    "id": {
+                        "type": "string"
+                    },
+                    "containers": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "maxItems": 32,
+                        "minItems": 1
+                    },
+                    "videoCodecs": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "default": [],
+                        "maxItems": 32
+                    },
+                    "audioCodecs": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "default": [],
+                        "maxItems": 32
+                    },
+                    "maxWidth": {
+                        "type": "integer",
+                        "nullable": true,
+                        "default": null,
+                        "minimum": 0,
+                        "exclusiveMinimum": true
+                    },
+                    "maxHeight": {
+                        "type": "integer",
+                        "nullable": true,
+                        "default": null,
+                        "minimum": 0,
+                        "exclusiveMinimum": true
+                    },
+                    "maxAudioChannels": {
+                        "type": "integer",
+                        "nullable": true,
+                        "default": null,
+                        "minimum": 0,
+                        "exclusiveMinimum": true
+                    },
+                    "audioStreamIndex": {
+                        "type": "integer",
+                        "nullable": true,
+                        "default": null,
+                        "minimum": 0
+                    },
+                    "subtitleBurnIn": {
+                        "type": "boolean",
+                        "default": false
+                    },
+                    "transports": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "default": [
+                            "file"
+                        ]
+                    },
+                    "maxBitDepth": {
+                        "type": "integer",
+                        "default": 8,
+                        "maximum": 16,
+                        "minimum": 8
+                    },
+                    "supportsHdr": {
+                        "type": "boolean",
+                        "default": false
+                    },
+                    "pixelFormats": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "default": [
+                            "yuv420p",
+                            "yuvj420p",
+                            "nv12"
+                        ],
+                        "maxItems": 32
+                    }
+                },
+                "type": "object"
+            },
             "ExtractMetadataRequest": {
                 "required": [
                     "path"
@@ -25990,6 +26218,55 @@
                         "description": "Synced (LRC) lyrics",
                         "type": "string",
                         "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "DeliveryResource": {
+                "required": [
+                    "kind"
+                ],
+                "properties": {
+                    "kind": {
+                        "type": "string",
+                        "enum": [
+                            "original",
+                            "cached",
+                            "copy",
+                            "encoded",
+                            "incompatible"
+                        ]
+                    },
+                    "reason": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "url": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "selection": {
+                        "properties": {
+                            "container": {
+                                "type": "string"
+                            },
+                            "transport": {
+                                "type": "string",
+                                "enum": [
+                                    "file",
+                                    "hls",
+                                    "dash"
+                                ]
+                            },
+                            "videoStreamIndex": {
+                                "type": "integer",
+                                "nullable": true
+                            },
+                            "audioStreamIndex": {
+                                "type": "integer",
+                                "nullable": true
+                            }
+                        }
                     }
                 },
                 "type": "object"

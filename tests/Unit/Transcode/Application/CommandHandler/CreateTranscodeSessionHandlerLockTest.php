@@ -65,7 +65,7 @@ final class CreateTranscodeSessionHandlerLockTest extends TestCase
             self::assertFalse($this->insideTransaction, 'Waiting cannot hold the producer transaction.');
             $this->sleeps[] = $seconds;
         });
-        $this->handler = new CreateTranscodeSessionHandler($this->jobs, $this->sessions, $storage, $this->ownership, $transaction, $sleeper);
+        $this->handler = new CreateTranscodeSessionHandler(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile('full')), $this->jobs, $this->sessions, $storage, $this->ownership, $transaction, $sleeper);
     }
 
     private function snapshot(string $outcome): TranscodeRuntimeSnapshot

@@ -42,11 +42,7 @@ final class TranscodeStreamManagerTest extends TestCase
         // SegmentEncoder is final — create a real instance with stub deps
         $ffmpeg = $this->createStub(FFmpegPortInterface::class);
         $encoderStorage = $this->createStub(TranscodeStoragePortInterface::class);
-        $this->segmentEncoder = new SegmentEncoder(
-            ffmpeg: $ffmpeg,
-            storage: $encoderStorage,
-            encoderProfile: EncoderProfile::software('libx265'),
-        );
+        $this->segmentEncoder = new SegmentEncoder(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile('full')), ffmpeg: $ffmpeg, storage: $encoderStorage, encoderProfile: EncoderProfile::software('libx265'));
 
         // Storage returns a temp dir for resolveJobDirectory
         $this->storage->method('resolveJobDirectory')->willReturnCallback(

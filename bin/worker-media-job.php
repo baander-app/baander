@@ -10,7 +10,8 @@ $exitCode = 0;
 $stopping = false;
 try {
     require dirname(__DIR__) . '/vendor/autoload.php';
-    \App\Shared\Application\DTO\DeploymentProfile::fromEnvironment();
+    $profile = \App\Shared\Application\DTO\DeploymentProfile::fromEnvironment();
+    $executionPolicy = new \App\Transcode\Application\Service\MediaExecutionPolicy($profile);
     $arguments = $_SERVER['argv'] ?? [];
     if (PHP_SAPI !== 'cli' || count($arguments) !== 3 || !in_array($arguments[1], ['video', 'audio'], true)) {
         throw new RuntimeException('Media job requires private manager admission.');
@@ -41,8 +42,10 @@ try {
     $clientId = getenv('BAANDER_NATIVE_CLIENT_ID');
     $clientGeneration = getenv('BAANDER_NATIVE_CLIENT_GENERATION');
     $generation = is_string($clientGeneration) ? filter_var($clientGeneration, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]) : false;
-    if (!is_string($clientId) || preg_match('/\Amedia-(?:video-[0-2]|audio-0)\z/D', $clientId) !== 1
-        || !str_starts_with($clientId, 'media-' . $kind . '-') || $generation === false
+    $validClient = is_string($clientId) && ($profile->sharedCopySlots > 0
+        ? preg_match('/\Amedia-copy-[01]\z/D', $clientId) === 1
+        : preg_match('/\Amedia-(?:video-[0-2]|audio-0)\z/D', $clientId) === 1 && str_starts_with($clientId, 'media-' . $kind . '-'));
+    if (!$validClient || $generation === false
         || !is_string($clientGeneration) || preg_match('/\A[1-9][0-9]*\z/D', $clientGeneration) !== 1
     ) {
         throw new RuntimeException('Media job requires a native client launch fence.');
@@ -58,17 +61,6 @@ try {
     $kernel->boot();
     $container = $kernel->getContainer();
     $container->set(\App\Shared\Infrastructure\Worker\NativeExecutionClientInterface::class, $native);
-    if ($kind === 'video') {
-        $snapshots = $container->get('worker.media.encoder_snapshot_store');
-        if (!$snapshots instanceof \App\Transcode\Infrastructure\FFmpeg\WorkerEncoderCapabilitiesSnapshotStore) {
-            throw new RuntimeException('Media encoder snapshot store is not configured.');
-        }
-        $snapshot = $snapshots->read();
-        if ($snapshot === null || $snapshot->workerIdentity !== $identity->bootId . ':' . $identity->launchGeneration) {
-            throw new RuntimeException('Media job requires current worker encoder capabilities.');
-        }
-        $container->set('worker.media.encoder_profile', $snapshot->profile);
-    }
     $authorityChecking = false;
     $stopRequested = static function () use (&$stopping, &$authorityChecking, $authority): bool {
         if ($stopping) {
@@ -98,7 +90,21 @@ try {
                 throw new RuntimeException('Media video runtime is not configured.');
             }
             $claim = $runtime->claim($jobId, $identity);
+            if ($claim !== null && !$executionPolicy->permits(\App\Transcode\Application\DTO\MediaOperation::VideoEncode)) {
+                $runtime->observe($claim, 'failed', error: (new \App\Transcode\Application\Exception\MediaEncodingProhibitedException())->getMessage());
+                $runtime->release($claim);
+                $claim = null;
+            }
             if ($claim !== null) {
+                $snapshots = $container->get('worker.media.encoder_snapshot_store');
+                if (!$snapshots instanceof \App\Transcode\Infrastructure\FFmpeg\WorkerEncoderCapabilitiesSnapshotStore) {
+                    throw new RuntimeException('Media encoder snapshot store is not configured.');
+                }
+                $snapshot = $snapshots->read();
+                if ($snapshot === null || $snapshot->workerIdentity !== $identity->bootId . ':' . $identity->launchGeneration) {
+                    throw new RuntimeException('Media job requires current worker encoder capabilities.');
+                }
+                $container->set('worker.media.encoder_profile', $snapshot->profile);
                 $executor = $container->get('transcode.loop_starter');
                 if (!$executor instanceof \App\Transcode\Application\Port\TranscodeLoopStarterInterface) {
                     throw new RuntimeException('Media video executor is not configured.');

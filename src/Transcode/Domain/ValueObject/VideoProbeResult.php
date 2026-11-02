@@ -35,6 +35,11 @@ final readonly class VideoProbeResult implements JsonSerializable
         public array $subtitleStreams = [],
         string $audioChannelLayout = '',
         public ?float $sourceTimestampOrigin = null,
+        public ?string $containerFormat = null,
+        public ?int $videoStreamIndex = null,
+        public ?float $containerStartTime = null,
+        public ?float $videoStartTime = null,
+        public ?string $videoTimeBase = null,
     ) {
         $selected = $this->selectedAudioStream();
         $this->audioChannels = $selected->channels ?? $audioChannels;
@@ -141,6 +146,11 @@ final readonly class VideoProbeResult implements JsonSerializable
             subtitleStreams: $subtitleStreams,
             audioChannelLayout: (string) ($audioStream['channel_layout'] ?? ''),
             sourceTimestampOrigin: $sourceTimestampOrigin,
+            containerFormat: is_string($format['format_name'] ?? null) ? $format['format_name'] : null,
+            videoStreamIndex: isset($videoStream['index']) ? (int) $videoStream['index'] : null,
+            containerStartTime: is_numeric($format['start_time'] ?? null) ? (float) $format['start_time'] : null,
+            videoStartTime: is_numeric($videoStream['start_time'] ?? null) ? (float) $videoStream['start_time'] : null,
+            videoTimeBase: $videoStream['time_base'] ?? null,
         );
     }
 
@@ -192,6 +202,11 @@ final readonly class VideoProbeResult implements JsonSerializable
             subtitleStreams: $subtitleStreams,
             audioChannelLayout: (string) ($data['audioChannelLayout'] ?? ''),
             sourceTimestampOrigin: self::nonnegativeTimestamp($data['sourceTimestampOrigin'] ?? null),
+            containerFormat: isset($data['containerFormat']) ? (string) $data['containerFormat'] : null,
+            videoStreamIndex: isset($data['videoStreamIndex']) ? (int) $data['videoStreamIndex'] : null,
+            containerStartTime: isset($data['containerStartTime']) ? (float) $data['containerStartTime'] : null,
+            videoStartTime: isset($data['videoStartTime']) ? (float) $data['videoStartTime'] : null,
+            videoTimeBase: $data['videoTimeBase'] ?? null,
         );
     }
 
@@ -392,6 +407,11 @@ final readonly class VideoProbeResult implements JsonSerializable
     {
         return [
             'duration' => $this->duration,
+            'containerFormat' => $this->containerFormat,
+            'videoStreamIndex' => $this->videoStreamIndex,
+            'containerStartTime' => $this->containerStartTime,
+            'videoStartTime' => $this->videoStartTime,
+            'videoTimeBase' => $this->videoTimeBase,
             'sourceTimestampOrigin' => $this->sourceTimestampOrigin,
             'width' => $this->width,
             'height' => $this->height,

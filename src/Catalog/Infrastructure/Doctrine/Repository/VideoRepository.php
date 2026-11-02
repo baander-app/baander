@@ -74,6 +74,33 @@ final class VideoRepository implements VideoRepositoryInterface
         return $this->entityManager->getConnection()->fetchOne($sql . ' LIMIT 1', $parameters, $types) !== false;
     }
 
+    public function getLibraryIdsByPublicId(PublicId $publicId, LibraryReadScope $scope): array
+    {
+        if (!$scope->isUnrestricted() && $scope->getLibraryIds() === []) {
+            return [];
+        }
+
+        $sql = <<<'SQL'
+            SELECT DISTINCT m.library_id
+            FROM videos v
+            JOIN movie_video mv ON mv.video_id = v.id
+            JOIN movies m ON m.id = mv.movie_id
+            WHERE v.public_id = :public_id
+            SQL;
+        $parameters = ['public_id' => $publicId->toString()];
+        $types = [];
+        if (!$scope->isUnrestricted()) {
+            $sql .= ' AND m.library_id IN (:library_ids)';
+            $parameters['library_ids'] = $scope->getLibraryIds();
+            $types['library_ids'] = ArrayParameterType::STRING;
+        }
+
+        return array_map(
+            static fn (string $id): Uuid => new Uuid($id),
+            $this->entityManager->getConnection()->fetchFirstColumn($sql, $parameters, $types),
+        );
+    }
+
     public function findByHash(string $hash): ?Video
     {
         $entity = $this->entityManager

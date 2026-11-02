@@ -11,6 +11,45 @@ use PHPUnit\Framework\TestCase;
 
 class VideoProbeResultTest extends TestCase
 {
+    public function testPreservesAbsoluteStreamIndicesAndContainerThroughStorage(): void
+    {
+        $probe = VideoProbeResult::fromProbeOutput([
+            'format' => ['format_name' => 'matroska,webm', 'start_time' => '-0.125'],
+            'streams' => [
+                ['index' => 0, 'codec_type' => 'video', 'disposition' => ['attached_pic' => 1]],
+                ['index' => 3, 'codec_type' => 'video', 'codec_name' => 'h264', 'start_time' => '2.25', 'time_base' => '1/1000'],
+                ['index' => 5, 'codec_type' => 'audio', 'codec_name' => 'aac'],
+                ['index' => 8, 'codec_type' => 'audio', 'codec_name' => 'opus', 'disposition' => ['default' => 1], 'start_time' => '2.125', 'time_base' => '1/48000'],
+            ],
+        ]);
+
+        foreach ([$probe, VideoProbeResult::fromSerialized($probe->jsonSerialize())] as $result) {
+            self::assertSame('matroska,webm', $result->containerFormat);
+            self::assertSame(3, $result->videoStreamIndex);
+            self::assertSame(1, $result->selectedAudioStreamOrdinal());
+            self::assertSame(8, $result->selectedAudioStream()?->streamIndex);
+            self::assertSame(-0.125, $result->containerStartTime);
+            self::assertSame(2.25, $result->videoStartTime);
+            self::assertSame('1/1000', $result->videoTimeBase);
+            self::assertSame(2.125, $result->selectedAudioStream()->startTime);
+            self::assertSame('1/48000', $result->selectedAudioStream()->timeBase);
+        }
+    }
+
+    public function testMissingStreamIndicesAreNotInferredFromOrdinals(): void
+    {
+        $probe = VideoProbeResult::fromProbeOutput([
+            'streams' => [
+                ['codec_type' => 'video', 'codec_name' => 'h264'],
+                ['codec_type' => 'audio', 'codec_name' => 'aac'],
+            ],
+        ]);
+
+        self::assertNull($probe->videoStreamIndex);
+        self::assertNull($probe->selectedAudioStream()?->streamIndex);
+        self::assertNull($probe->containerFormat);
+    }
+
     /** @return array<string, mixed> */
     private static function movieWithLongerAudio(): array
     {
