@@ -77,6 +77,12 @@ The encoded check exposed two further defects: lazy encoder bindings returned se
 
 Backend PHPStan and Deptrac passed with no new violations; Deptrac retained 482 existing skips. Subsequent PHPStan checks passed for the added container and admission regressions.
 
+Deployment preset checkpoint, 2026-11-02 (U6): the household deployment now resolves immutable application, worker and operator images against one startup profile. Its gateway, web service, PostgreSQL, Redis and worker pair use explicit limits and owned persistent volumes. Development and household deployments share the worker lifecycle. Setup helpers also receive memory limits, and worker recipes avoid duplicating profile settings supplied by the runtime environment.
+
+Verification: the deployment tests passed 10 tests with 102 assertions. The worker-recipe CI run passed 204 tests with 262 assertions. Development-worker tests passed 51 tests with 163 assertions and retained six explicit live-test skips. Focused tooling PHPStan and formatting checks passed. A disposable PostgreSQL 18 instance verified the selected configuration, connection limit, autovacuum and installed extensions.
+
+The isolated preview refreshed successfully. A separate production-image household deployment started and served its page and compiled JavaScript. Normal stop, restart and final stop passed; all seven data volumes, both OAuth signing keys, a storage marker and the PostgreSQL cluster identity survived the restart. These checks verify deployment behavior. Whole-stack workload qualification and measured memory guidance remain open; the configured reservations are not a tested host minimum or evidence of Raspberry Pi support.
+
 ## Playback destinations and notifications
 
 Requirements checkpoint, 2026-11-01: the user confirmed the

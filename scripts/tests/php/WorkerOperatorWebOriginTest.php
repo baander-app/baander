@@ -36,7 +36,7 @@ final class WorkerOperatorWebOriginTest extends TestCase
         try {
             new OperatorProvisioning($qualification)->startWeb();
             $calls = AtomicFile::readJson($directory . '/state.json')['calls'];
-            $create = array_find($calls, static fn (array $call): bool => ($call[0] ?? '') === 'create');
+            $create = array_find($calls, static fn(array $call): bool => ($call[0] ?? '') === 'create');
             self::assertNotNull($create);
             foreach (['APP_URL', 'DEFAULT_URI'] as $name) {
                 self::assertContains($name . '=http://127.0.0.1:9501', $create);

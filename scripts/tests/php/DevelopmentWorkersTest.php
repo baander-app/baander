@@ -30,6 +30,7 @@ final class DevelopmentWorkersTest extends DevDataTestCase
         AtomicFile::writeJson($this->root . '/daemon.json', ['daemonId' => 'daemon']);
         $this->instance['docker'] = DevelopmentCommandExecutor::target($docker, 'fixture');
         $this->release['target'] = $this->instance['docker'];
+        $this->release['images']['worker_image']['resolvedId'] = 'sha256:' . str_repeat('a', 64);
     }
 
     /** @param \Closure(non-empty-list<string>,?string,?array<string,string>):(string|\Baander\Tooling\Process\ProcessResult) $callback */
@@ -42,14 +43,27 @@ final class DevelopmentWorkersTest extends DevDataTestCase
     private function lifecycle(\Closure $callback, ?DevelopmentCommandExecutor $runner = null): Workers
     {
         return new class ($this->store, $runner ?? $this->catalogRunner([]), $callback) extends Workers {
+            private readonly \Baander\Tooling\Development\StateStore $testStore;
+            private readonly DevelopmentCommandExecutor $testRunner;
             /** @param \Closure(array<string,mixed>,string):array<string,mixed> $callback */
             public function __construct(\Baander\Tooling\Development\StateStore $store, DevelopmentCommandExecutor $runner, private readonly \Closure $callback)
             {
+                $this->testStore = $store;
+                $this->testRunner = $runner;
                 parent::__construct($store, $runner);
             }
-            public function invoke(array $instance, string $action): array
+            protected function lifecycle(array $instance): \Baander\Tooling\Deployment\WorkerLifecycle
             {
-                return ($this->callback)($instance, $action);
+                return new class (new \Baander\Tooling\Development\WorkerStateStore($this->testStore, $instance), $this->testRunner, $this->callback) extends \Baander\Tooling\Deployment\WorkerLifecycle {
+                    public function __construct(\Baander\Tooling\Deployment\WorkerStateStore $store, \Baander\Tooling\Process\CommandExecutor $runner, private readonly \Closure $callback)
+                    {
+                        parent::__construct($store, $runner, \Baander\Tooling\Development\Environment::clean());
+                    }
+                    public function invoke(array $record, string $action): array
+                    {
+                        return ($this->callback)($record, $action);
+                    }
+                };
             }
         };
     }
@@ -212,6 +226,8 @@ final class DevelopmentWorkersTest extends DevDataTestCase
         self::assertSame('started', $instance['workers']['phase']);
         $workers->ready($instance, timeout: 0);
         self::assertSame('ready', $instance['workers']['phase']);
+        self::assertSame($instance['project'], $instance['workers']['namespace']);
+        self::assertSame($instance['docker'], $instance['workers']['target']);
     }
 
     public function testPrivateDocumentsTravelOnlyInBoundedStdin(): void
@@ -470,6 +486,9 @@ final class DevelopmentWorkersTest extends DevDataTestCase
                 return $arguments[array_key_last($arguments)];
             }
             return json_encode([
+                'version' => 1,
+                'runtime' => ['phpHeapMiB' => 256],
+                'budgets' => ['controlMemoryMiB' => 2944, 'executionMemoryMiB' => 4480, 'controlPidsLimit' => 129, 'executionPidsLimit' => 256, 'scheduledConsoleMiB' => 320],
                 'autoscaling' => AtomicFile::readJson(dirname(__DIR__, 3) . '/tests/Fixtures/Worker/autoscaling-profile.json'),
                 'deployment' => AtomicFile::readJson(dirname(__DIR__, 3) . '/tests/Fixtures/Worker/deployment-profile.json'),
             ], JSON_THROW_ON_ERROR);
@@ -513,7 +532,7 @@ final class DevelopmentWorkersTest extends DevDataTestCase
         self::assertTrue(array_any(
             $runner->calls,
             fn(array $call): bool => in_array(
-                'baander-development-controller:' . $this->instance['project'] . '-' . $manifest['bootId'],
+                'baander-worker-controller:' . $this->instance['project'] . '-' . $manifest['bootId'],
                 $call['arguments'],
                 true,
             ),

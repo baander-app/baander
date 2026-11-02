@@ -58,6 +58,39 @@ final class DeploymentContainerRecipeTest extends TestCase
         self::assertStringNotContainsString('test-only-secret', implode(' ', $arguments));
     }
 
+    #[DataProvider('profileEnvironmentCases')]
+    public function testProfileVariablesAppearOnceAcrossArgumentsAndEnvironmentFile(string $identifier, bool $includeJson): void
+    {
+        $profile = new \App\Shared\Application\DTO\DeploymentProfile($identifier);
+        $variables = ['APP_ENV' => 'prod', 'BAANDER_DEPLOYMENT_PROFILE' => $identifier];
+        if ($includeJson) {
+            $variables['BAANDER_DEPLOYMENT_PROFILE_JSON'] = $profile->toJson();
+        }
+        $environment = new DeploymentRuntimeEnvironment($variables);
+        $recipe = $this->recipe(['runtimeEnvironment' => $environment, 'deploymentProfile' => $profile]);
+        $environment->withFile(function (string $path) use ($recipe, $profile): void {
+            $arguments = $recipe->createArguments($path);
+            $entries = array_filter(explode("\n", file_get_contents($path)));
+            foreach ($arguments as $index => $argument) {
+                if ($argument === '--env') {
+                    $entries[] = $arguments[$index + 1];
+                }
+            }
+            foreach (['BAANDER_DEPLOYMENT_PROFILE' => $profile->identifier, 'BAANDER_DEPLOYMENT_PROFILE_JSON' => $profile->toJson()] as $key => $value) {
+                $matching = array_values(array_filter($entries, static fn(string $entry): bool => str_starts_with($entry, $key . '=')));
+                self::assertSame([$key . '=' . $value], $matching);
+            }
+        });
+    }
+
+    /** @return iterable<string,array{string,bool}> */
+    public static function profileEnvironmentCases(): iterable
+    {
+        yield 'full runtime profile' => ['full', true];
+        yield 'household runtime profile' => ['household', true];
+        yield 'household identifier with canonical JSON fallback' => ['household', false];
+    }
+
     public function testPopulatedRuntimeConfigurationCannotSilentlyUseImageDefaults(): void
     {
         $recipe = $this->recipe(['runtimeEnvironment' => new DeploymentRuntimeEnvironment(['APP_ENV' => 'prod'])]);

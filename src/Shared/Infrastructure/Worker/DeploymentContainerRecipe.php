@@ -111,6 +111,15 @@ final readonly class DeploymentContainerRecipe
         $fraction = rtrim(sprintf('%09d', $this->nanoCpus % 1_000_000_000), '0');
         $cpus = (string) $wholeCpus . ($fraction === '' ? '' : '.' . $fraction);
 
+        $profileArguments = [];
+        foreach (['BAANDER_DEPLOYMENT_PROFILE' => $this->deploymentProfile->identifier,
+            'BAANDER_DEPLOYMENT_PROFILE_JSON' => $this->deploymentProfile->toJson()] as $key => $value) {
+            if (!array_key_exists($key, $this->runtimeEnvironment->variables)) {
+                $profileArguments[] = '--env';
+                $profileArguments[] = $key . '=' . $value;
+            }
+        }
+
         return [
             'container', 'create', '--pull=never', '--name', RegisteredDeploymentStart::containerName($this->namespace, $this->bootId, $this->unit),
             '--network', $this->network, '--memory', (string) $this->memoryBytes, '--memory-swap', (string) $this->memoryBytes,
@@ -120,8 +129,7 @@ final readonly class DeploymentContainerRecipe
             '--label', 'app.baander.worker.boot-id=' . $this->bootId, '--label', 'app.baander.worker.role=' . $this->unit->value,
             '--env', 'BAANDER_WORKER_NAMESPACE=' . $this->namespace, '--env', 'BAANDER_WORKER_BOOT_ID=' . $this->bootId,
             '--env', 'BAANDER_WORKER_UNIT=' . $this->unit->value,
-            '--env', 'BAANDER_DEPLOYMENT_PROFILE=' . $this->deploymentProfile->identifier,
-            '--env', 'BAANDER_DEPLOYMENT_PROFILE_JSON=' . $this->deploymentProfile->toJson(),
+            ...$profileArguments,
             ...($environmentFile === null ? [] : ['--env-file', $environmentFile]),
             ...$this->mountArguments(),
             '--mount', 'type=volume,src=' . $this->ipcVolume . ',dst=/run/baander-worker,volume-nocopy',

@@ -107,6 +107,15 @@ deptrac:
           type: directory
           value: /packages/baander-tooling/src/Runtime/
     -
+      name: Deployment
+      collectors:
+        -
+          type: classLike
+          value: ^Baander\\Tooling\\Deployment\\
+        -
+          type: directory
+          value: /packages/baander-tooling/src/Deployment/
+    -
       name: Development
       collectors:
         -
@@ -296,8 +305,17 @@ deptrac:
       - Process
     CommandLine: {  }
     Runtime: {  }
+    Deployment:
+      - CommandLine
+      - Configuration
+      - Docker
+      - Filesystem
+      - Process
+      - Resources
+      - Runtime
     Development:
       - Build
+      - Deployment
       - CommandLine
       - Configuration
       - Docker
@@ -368,6 +386,7 @@ deptrac:
       - Process
     ComposerSemver: {  }
     CLI:
+      - Deployment
       - JavaScriptDependencies
       - Dependencies
       - Acceptance
@@ -392,6 +411,7 @@ deptrac:
       - Runtime
       - Architecture
     ToolingTests:
+      - Deployment
       - JavaScriptDependencies
       - Dependencies
       - Acceptance
