@@ -5,6 +5,25 @@ declare(strict_types=1);
 
 ini_set('display_errors', '0');
 ini_set('log_errors', '0');
+$diagnosticReserve = str_repeat(' ', 65536);
+register_shutdown_function(static function () use (&$diagnosticReserve): void {
+    $diagnosticReserve = null;
+    $error = error_get_last();
+    if ($error === null || !in_array($error['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR, E_USER_ERROR, E_RECOVERABLE_ERROR], true)) {
+        return;
+    }
+    $diagnostic = @fopen('php://fd/3', 'w');
+    if (is_resource($diagnostic)) {
+        fwrite($diagnostic, json_encode([
+            'event' => 'worker_media_fatal',
+            'errorType' => $error['type'],
+            'sourceFile' => basename($error['file']),
+            'sourceLine' => $error['line'],
+            'memoryExhausted' => str_starts_with($error['message'], 'Allowed memory size of '),
+        ], JSON_INVALID_UTF8_SUBSTITUTE) . "\n");
+        fclose($diagnostic);
+    }
+});
 $kernel = null;
 $exitCode = 0;
 $stopping = false;
@@ -140,7 +159,17 @@ try {
             }
         }
     }
-} catch (Throwable) {
+} catch (Throwable $error) {
+    $diagnostic = @fopen('php://fd/3', 'w');
+    if (is_resource($diagnostic)) {
+        fwrite($diagnostic, json_encode([
+            'event' => 'worker_media_failure',
+            'exceptionClass' => $error::class,
+            'sourceFile' => basename($error->getFile()),
+            'sourceLine' => $error->getLine(),
+        ], JSON_INVALID_UTF8_SUBSTITUTE) . "\n");
+        fclose($diagnostic);
+    }
     fwrite(STDERR, "Media execution failed; deployment reconciliation is required.\n");
     $exitCode = 1;
 } finally {

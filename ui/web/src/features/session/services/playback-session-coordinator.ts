@@ -11,8 +11,10 @@ import { PlaybackLocalRecovery, type LocalRecoveryState, type RecoveryEndpoint }
 import type { PlaybackRecoveryCheckpoint, PlaybackRecoveryRecord } from './playback-recovery-store'
 import { PlaybackCommandRunner, type PlaybackAcknowledgement } from './playback-command-runner'
 import { hasUnconfirmedPlayback } from './playback-status'
+import { MediaCompatibilityError } from '@/features/player/services/media-delivery'
 
 type RequestResult = NonNullable<PlaybackSnapshotResource['requestResult']>
+type TransferResult = NonNullable<PlaybackSnapshotResource['transferResult']>
 type ControlSnapshot = PlaybackSnapshotResource
 interface PendingRequest {
   payload: Record<string, unknown>
@@ -21,6 +23,15 @@ interface PendingRequest {
   lastRevision: number
   commandId: string | null
   reading: boolean
+}
+
+interface PendingTransfer {
+  payload: { requestId: string; expectedRevision: number; targetIncarnationId: string }
+  attemptId: string | null
+  resolve: () => void
+  reject: (error: Error) => void
+  reading: boolean
+  lastRevision: number
 }
 
 type StopProof = { endpoint: PlaybackEndpointResource; position: number }
@@ -45,7 +56,7 @@ export class PlaybackSessionCoordinator {
   private readonly runner = new PlaybackCommandRunner(ack => this.acknowledge(ack), (command, signal) => this.checkpointCommand(command, signal))
   private endpoint: PlaybackEndpointResource | null = null
   private snapshot: PlaybackSnapshotResource | null = null
-  private readonly transfers = new Set<{ attemptId: string | null; target: string; resolve: () => void; reject: (error: Error) => void }>()
+  private readonly transfers = new Set<PendingTransfer>()
   private readonly httpRequests = new Set<AbortController>()
   private readonly pendingRequests = new Map<string, PendingRequest>()
   private readonly registrationReady = new Set<() => void>()
@@ -159,11 +170,12 @@ export class PlaybackSessionCoordinator {
     const published = { ...snapshot, commands: [] }
     delete published.endpoint
     delete published.requestResult
+    delete published.transferResult
     delete published.recoveryResult
     this.client.setQueryData(PLAYBACK_SESSION_KEY, published)
     this.runner.fence(snapshot.revision)
     this.refreshRequests()
-    this.completeTransfers(snapshot)
+    this.refreshTransfers()
     return snapshot
   }
 
@@ -328,6 +340,7 @@ export class PlaybackSessionCoordinator {
     this.presenceConfirmedAt = this.registrationStartedAt
     this.publish(true, null)
     this.refreshRequests(true)
+    this.refreshTransfers(true)
     this.dispatchCommands(snapshot)
     for (const ready of this.registrationReady) ready()
   }
@@ -390,7 +403,11 @@ export class PlaybackSessionCoordinator {
 
   async retry(): Promise<void> {
     if (!this.current()) throw new Error('Playback account changed.')
-    if (this.ready && !this.executionBlocked) { this.refreshRequests(true); return }
+    if (this.ready && !this.executionBlocked) {
+      this.refreshRequests(true)
+      this.refreshTransfers(true)
+      return
+    }
     if (this.executionBlocked) this.disconnect()
     if (this.registrationPending) throw new Error('Playback registration is still pending.')
     this.publish(false, null)
@@ -404,7 +421,9 @@ export class PlaybackSessionCoordinator {
     const endpoint = this.endpoint
     if (!endpoint || !this.ready) return
     await this.post('/api/session/ack', ack, endpoint)
-    if (ack.outcome === 'rejected') this.fail(new Error('Playback could not start or apply the control. Try again on the destination; it may require a user gesture.'))
+    if (ack.outcome === 'rejected') this.fail(ack.rejectionReason
+      ? new MediaCompatibilityError(ack.rejectionReason)
+      : new Error('Playback could not start or apply the control. Try again on the destination; it may require a user gesture.'))
     else await this.observe()
   }
 
@@ -524,7 +543,9 @@ export class PlaybackSessionCoordinator {
       request.resolve()
       this.publish(this.ready, null)
     } else {
-      const error = new Error(result.outcome === 'superseded' ? 'The playback request was superseded.' : 'The destination rejected the playback request.')
+      const error = result.outcome === 'rejected' && result.rejectionReason
+        ? new MediaCompatibilityError(result.rejectionReason)
+        : new Error(result.outcome === 'superseded' ? 'The playback request was superseded.' : 'The destination rejected the playback request.')
       request.reject(error)
       this.fail(error)
     }
@@ -624,22 +645,50 @@ export class PlaybackSessionCoordinator {
   private async performTransfer(incarnationId: string): Promise<void> {
     if (!this.current() || !this.ready || !this.snapshot) throw new Error('Playback connection is unavailable.')
     try {
-      const snapshot = await this.post('/api/session/transfer', { requestId: crypto.randomUUID(), expectedRevision: this.snapshot.revision, targetIncarnationId: incarnationId })
+      const payload = { requestId: crypto.randomUUID(), expectedRevision: this.snapshot.revision, targetIncarnationId: incarnationId }
       await new Promise<void>((resolve, reject) => {
-        this.transfers.add({ attemptId: snapshot.transfer?.attemptId ?? null, target: incarnationId, resolve, reject })
-        this.completeTransfers(this.snapshot!)
+        this.transfers.add({ payload, attemptId: null, resolve, reject, reading: false, lastRevision: -1 })
+        this.refreshTransfers(true)
       })
     } catch (error) { this.fail(error); throw error }
   }
 
-  private completeTransfers(snapshot: PlaybackSnapshotResource): void {
-    for (const transfer of this.transfers) {
-      if (snapshot.transfer?.attemptId === transfer.attemptId && snapshot.transfer.state !== 'uncertain') continue
+  private completeTransfer(transfer: PendingTransfer, result: TransferResult | null | undefined): void {
+    if (!result || result.requestId !== transfer.payload.requestId
+      || (transfer.attemptId && result.attemptId !== transfer.attemptId)) {
+      transfer.reject(new Error('The server did not return this playback transfer’s result.'))
       this.transfers.delete(transfer)
-      if (!snapshot.transfer && snapshot.activeIncarnationId === transfer.target) transfer.resolve()
-      else transfer.reject(new Error(snapshot.transfer?.state === 'uncertain'
+      return
+    }
+    transfer.attemptId = result.attemptId
+    if (!['committed', 'failed', 'uncertain'].includes(result.state)) return
+    this.transfers.delete(transfer)
+    if (result.state === 'committed') transfer.resolve()
+    else transfer.reject(result.state === 'failed' && result.rejectionReason
+      ? new MediaCompatibilityError(result.rejectionReason)
+      : new Error(result.state === 'uncertain'
         ? 'Playback at the destination is uncertain. Confirm it stopped before resuming here.'
         : 'The playback transfer failed or was superseded.'))
+  }
+
+  private refreshTransfers(force = false): void {
+    if (!this.current() || !this.ready || !this.snapshot) return
+    for (const transfer of this.transfers) {
+      if (transfer.reading || (!force && transfer.lastRevision >= this.snapshot.revision)) continue
+      transfer.reading = true
+      transfer.lastRevision = this.snapshot.revision
+      this.post('/api/session/transfer', transfer.payload).then(response => {
+        transfer.lastRevision = Math.max(transfer.lastRevision, response.revision)
+        this.completeTransfer(transfer, response.transferResult)
+      }).catch(error => {
+        transfer.reject(error instanceof Error ? error : new Error('The playback transfer result could not be confirmed.'))
+        const status = (error as { response?: { status?: number } })?.response?.status
+        if (status && status >= 400 && status < 500) this.transfers.delete(transfer)
+        this.fail(error)
+      }).finally(() => {
+        transfer.reading = false
+        this.refreshTransfers()
+      })
     }
   }
 

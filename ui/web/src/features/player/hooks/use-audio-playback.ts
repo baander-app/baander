@@ -1,3 +1,4 @@
+import { assignMusicSource, isAssignedMusicSource, resolveMusicSource } from '../services/music-delivery'
 import { useEffect, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { PLAYBACK_SESSION_KEY } from '@/features/session/services/playback-session-coordinator'
@@ -9,10 +10,9 @@ import { usePlaybackSession } from '@/features/session/hooks/use-playback-sessio
 import { registerPlaybackAdapter, requestPlayback } from '@/features/session/services/playback-execution'
 import { createMusicPlaybackAdapter } from '../services/music-playback-adapter'
 import { audioService } from '@/features/player/services/audio-service'
-import { usePlayerStore, resolveNextIndex, buildStreamUrl, syncPlaybackVolume, getPlaybackSelectionGeneration } from '@/features/player/stores/player-store'
+import { usePlayerStore, resolveNextIndex, syncPlaybackVolume, getPlaybackSelectionGeneration } from '@/features/player/stores/player-store'
 import { updateTime } from '@/features/player/stores/player-time-tracker'
 import {
-  chooseTranscodeFormat,
   isTrackStream,
   isTranscodedStream,
   isUnsupportedOriginalStream,
@@ -148,6 +148,8 @@ export function useAudioPlayback() {
       nextId: string
       src: string
       ready: boolean
+      controller: AbortController
+      retried: boolean
     }
     let candidate: Candidate | undefined
     let transitionPending = false
@@ -170,6 +172,7 @@ export function useAudioPlayback() {
       for (const clear of clearStallTimers) clear()
       transitionPending = false
       removeReadyListeners?.()
+      candidate?.controller.abort()
       candidate = undefined
       if (fadeTimer !== undefined) clearTimeout(fadeTimer)
       fadeTimer = undefined
@@ -228,6 +231,7 @@ export function useAudioPlayback() {
         if (!adopted) { invalidate(); return }
         processor.resetProgramme()
         removeReadyListeners?.()
+        candidate?.controller.abort()
         candidate = undefined
         if (duration > 0) {
           processor.crossfadeToInactive(duration)
@@ -273,7 +277,7 @@ export function useAudioPlayback() {
       const next: Candidate = {
         audio: nextAudio, owner: audio, ownerSrc: audio.src,
         currentId: state.currentTrack.publicId, nextId: state.queue[index].publicId,
-        src: '', ready: false,
+        src: '', ready: false, controller: new AbortController(), retried: false,
       }
       candidate = next
       const onReady = () => {
@@ -282,12 +286,19 @@ export function useAudioPlayback() {
         next.ready = true
         maybeFade()
       }
-      const onError = () => {
-        if (candidate !== next) return
-        if (isUnsupportedOriginalStream(nextAudio, next.nextId)) {
-          nextAudio.src = buildStreamUrl(next.nextId, chooseTranscodeFormat(nextAudio))
+      const loadSource = (failed?: string) => {
+        resolveMusicSource(nextAudio, next.nextId, next.controller.signal, undefined, failed).then(url => {
+          if (candidate !== next || next.controller.signal.aborted || !lifetime.active || !lifetime.executionOwned) return
+          assignMusicSource(nextAudio, next.nextId, url)
           next.src = nextAudio.src
           nextAudio.load()
+        }).catch(() => { if (candidate === next) invalidate() })
+      }
+      const onError = () => {
+        if (candidate !== next) return
+        if (!next.retried && isUnsupportedOriginalStream(nextAudio, next.nextId)) {
+          next.retried = true
+          loadSource(nextAudio.src)
           return
         }
         invalidate()
@@ -299,9 +310,7 @@ export function useAudioPlayback() {
       }
       nextAudio.addEventListener('canplaythrough', onReady)
       nextAudio.addEventListener('error', onError)
-      nextAudio.src = buildStreamUrl(next.nextId)
-      next.src = nextAudio.src
-      nextAudio.load()
+      loadSource()
     }
     const removers = [audioA, audioB].map((audio) => {
       const owned = () => lifetime.active && lifetime.executionOwned && active() === audio
@@ -489,7 +498,8 @@ export function useAudioPlayback() {
       && getPlaybackSelectionGeneration() === generation
       && usePlayerStore.getState().audioElement === audio && audio.src === src
       && usePlayerStore.getState().currentTrack === track
-    if (lifetime?.executionOwned && isPlaying && audio.paused && !isRecoveringPlayback(audio)) {
+    if (lifetime?.executionOwned && isPlaying && audio.paused && !isRecoveringPlayback(audio)
+      && track && (isAssignedMusicSource(audio, track.publicId) || isTrackStream(audio.src, track.publicId))) {
       audioService.resumeContextIfNeeded().then(async () => {
         if (isActive() && usePlayerStore.getState().isPlaying) {
           await audio.play()

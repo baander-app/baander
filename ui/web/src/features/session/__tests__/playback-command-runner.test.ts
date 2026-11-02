@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { PlaybackCommandResource } from '@/shared/api-client/gen/endpoints'
 import { registerPlaybackAdapter } from '../services/playback-execution'
 import { PlaybackCommandRunner } from '../services/playback-command-runner'
+import { MediaCompatibilityError } from '@/features/player/services/media-delivery'
 
 const command = (type: PlaybackCommandResource['type'] = 'start'): PlaybackCommandResource => ({
   id: 'command', attemptId: 'attempt', revision: 4, incarnationId: 'endpoint', epoch: 2,
@@ -21,6 +22,18 @@ function setup() {
 }
 
 describe('playback command execution', () => {
+  it('retains a terminal media reason when destination preparation fails and is replayed', async () => {
+    const { runner, adapter, ack } = setup()
+    adapter.prepare.mockRejectedValue(new MediaCompatibilityError('audio_codec_unsupported'))
+    await runner.accept(command('prepare'), 4)
+    await runner.accept(command('prepare'), 4)
+    expect(adapter.prepare).toHaveBeenCalledTimes(1)
+    expect(ack).toHaveBeenLastCalledWith(expect.objectContaining({
+      outcome: 'rejected', rejectionReason: 'audio_codec_unsupported',
+    }))
+    expect(ack.mock.calls[0]).toEqual(ack.mock.calls[1])
+  })
+
   it('prepares and starts an idle stopped destination without starting native media', async () => {
     const { runner, adapter, ack } = setup()
     const idle = { ...command('prepare'), payload: { ...command().payload, media: null, queue: [], position: 0, desiredState: 'stopped' as const } }

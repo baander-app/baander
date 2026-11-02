@@ -7,6 +7,7 @@ namespace App\Transcode\Infrastructure\Auth;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Domain\Model\PublicId;
 use App\Transcode\Application\Command\CreateTranscodeSessionCommand;
+use App\Transcode\Application\Exception\TranscodeStartupUnavailableException;
 use App\Transcode\Application\Port\PlaybackPortInterface;
 use App\Transcode\Domain\Model\TranscodeSession;
 use App\Transcode\Domain\ValueObject\AudioProfile;
@@ -99,8 +100,16 @@ final readonly class AuthorizedPlayback implements PlaybackPortInterface
         if ($user === null || !method_exists($user, 'getId')) {
             throw new AccessDeniedException('Authentication required.');
         }
+        $sourceHeight = $this->connection->fetchOne('SELECT height FROM videos WHERE id = :videoId', ['videoId' => $videoId->toString()]);
+        if ($sourceHeight === false) {
+            throw new TranscodeStartupUnavailableException();
+        }
+        $tiers = array_filter([QualityTier::p360(), QualityTier::p720(), QualityTier::p1080()], static fn (QualityTier $tier): bool => $tier->height <= (int) $sourceHeight);
+        if ($tiers === []) {
+            $tiers = [QualityTier::p360()];
+        }
         $jobIds = [];
-        foreach ([QualityTier::p360(), QualityTier::p720(), QualityTier::p1080()] as $tier) {
+        foreach ($tiers as $tier) {
             $envelope = $this->commandBus->dispatch(new CreateTranscodeSessionCommand(
                 userId: Uuid::fromString($user->getId()),
                 videoId: $videoId,

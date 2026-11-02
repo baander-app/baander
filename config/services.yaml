@@ -1056,7 +1056,7 @@ services:
     App\Transcode\Infrastructure\Swoole\TranscodeStreamManager:
         arguments:
             $maxConcurrentStreams: 4
-            $segmentEncoder: !service_closure App\Transcode\Infrastructure\FFmpeg\SegmentEncoder
+            $segmentEncoder: !service_closure '@App\Transcode\Infrastructure\FFmpeg\SegmentEncoder'
 
     # --- Transcode Auth ---
     App\Transcode\Infrastructure\Auth\HmacStreamAuthAdapter:
@@ -1169,7 +1169,7 @@ services:
 
     App\Transcode\Infrastructure\Swoole\TranscodeSessionSubscriber:
         arguments:
-            $segmentEncoder: !service_closure App\Transcode\Infrastructure\FFmpeg\SegmentEncoder
+            $segmentEncoder: !service_closure '@App\Transcode\Infrastructure\FFmpeg\SegmentEncoder'
             $videoRepository: '@App\Catalog\Domain\Repository\VideoRepositoryInterface'
             $controlOwnership: '@worker.media.control_runtime'
             $renewalTimer: '@App\Transcode\Infrastructure\Swoole\LoopLockRenewalTimerInterface'

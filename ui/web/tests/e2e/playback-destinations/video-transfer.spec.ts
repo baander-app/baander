@@ -1,7 +1,7 @@
 import { test, expect, type Browser, type Page } from '@playwright/test'
 import { VideoDiagnostics } from './video-diagnostics'
 import { loadedRuntimeModule } from './loaded-runtime-module'
-import type { PlaybackSnapshotResource } from '../../../src/shared/api-client/gen/endpoints'
+import type { DeliveryResource, PlaybackSnapshotResource } from '../../../src/shared/api-client/gen/endpoints'
 import { authenticatedGet, FixtureClient, login, type FixtureManifest, type FixtureUser } from '../live-updates/capacity-fixtures'
 
 interface VideoManifest extends FixtureManifest {
@@ -15,6 +15,32 @@ async function openBrowser(browser: Browser, user: FixtureUser, baseURL: string,
   const page = await context.newPage()
   await login(page, user)
   return { context, page }
+}
+
+function observeVideoDelivery(page: Page, videoId: string) {
+  const observation: { startTime: number | null; initialKind: DeliveryResource['kind'] | null } = {
+    startTime: null, initialKind: null,
+  }
+  page.on('response', async response => {
+    const path = new URL(response.url()).pathname
+    if (!response.ok() || (path !== '/api/stream/delivery' && path !== '/api/stream/sign')) return
+    try {
+      const request = response.request().postDataJSON() as { id?: string; path?: string }
+      if (path === '/api/stream/delivery') {
+        if (request.id !== videoId) return
+        const delivery = await response.json() as DeliveryResource
+        observation.initialKind ??= delivery.kind
+        observation.startTime = (delivery.kind === 'original' || delivery.kind === 'cached')
+          && typeof delivery.url === 'string' && delivery.url.length > 0 ? 0 : null
+      } else {
+        if (request.path !== `/api/transcode/${videoId}/master.m3u8`) return
+        const body = await response.json() as { startTime?: number; data?: { startTime?: number } }
+        const start = body.data?.startTime ?? body.startTime
+        if (typeof start === 'number') observation.startTime = start
+      }
+    } catch { /* Reloads and closed contexts can interrupt an in-flight observation. */ }
+  })
+  return observation
 }
 
 async function snapshot(page: Page) {
@@ -61,7 +87,7 @@ test('paused video transfers, reopens remotely, returns locally, and recovers af
   const transcodeSamples: unknown[] = []
   let startupInspection: Promise<void> | null = null
   try {
-    const manifest = (await fixture.request<VideoManifest>({ op: 'create', run })).receipt
+    const manifest = (await fixture.request<VideoManifest>({ op: 'create', run, delivery: 'encoded' })).receipt
     const source = await openBrowser(browser, manifest.users[0]!, baseURL, 'Video source')
     contexts.push(source)
     diagnostics.observe(source.page, 'source')
@@ -71,31 +97,15 @@ test('paused video transfers, reopens remotely, returns locally, and recovers af
     await diagnostics.instrument(receiver.page)
     await expect.poll(async () => (await snapshot(source.page)).destinations.filter(item => item.available).length, { timeout: 30_000 }).toBe(2)
 
-    let receiverStart: number | null = null
-    let sourceStart: number | null = null
-    source.page.on('response', async response => {
-      if (new URL(response.url()).pathname !== '/api/stream/sign' || !response.ok()) return
-      try {
-        const body = await response.json() as { startTime?: number; data?: { startTime?: number } }
-        const start = body.data?.startTime ?? body.startTime
-        if (typeof start === 'number') sourceStart = start
-      } catch { /* A reload can interrupt an in-flight observation. */ }
-    })
+    const sourceDelivery = observeVideoDelivery(source.page, manifest.video.publicId)
+    const receiverDelivery = observeVideoDelivery(receiver.page, manifest.video.publicId)
     const sourcePosition = async () => {
       const nativeTime = await source.page.locator('video').evaluateAll(videos => {
         const video = videos[0]
         return video instanceof HTMLVideoElement ? video.currentTime : Number.NaN
       })
-      return sourceStart === null ? Number.NaN : sourceStart + nativeTime
+      return sourceDelivery.startTime === null ? Number.NaN : sourceDelivery.startTime + nativeTime
     }
-    receiver.page.on('response', async response => {
-      if (new URL(response.url()).pathname !== '/api/stream/sign' || !response.ok()) return
-      try {
-        const body = await response.json() as { startTime?: number; data?: { startTime?: number } }
-        const start = body.data?.startTime ?? body.startTime
-        if (typeof start === 'number') receiverStart = start
-      } catch { /* A closed context can interrupt an in-flight observation. */ }
-    })
     const controls: string[] = []
     source.page.on('request', request => {
       if (request.method() === 'POST' && new URL(request.url()).pathname === '/api/session/control') {
@@ -106,6 +116,7 @@ test('paused video transfers, reopens remotely, returns locally, and recovers af
     await source.page.goto(`/movies/${manifest.movie.publicId}`)
     await diagnostics.instrument(source.page)
     await source.page.getByRole('heading', { name: `Owned playback movie ${run}`, exact: true }).locator('..').getByRole('button', { name: 'Play', exact: true }).click()
+    await expect.poll(() => sourceDelivery.initialKind, { timeout: 30_000 }).toBe('encoded')
     startupInspection = new Promise<void>(resolve => { setTimeout(resolve, 5000) })
       .then(async () => { transcodeSamples.push((await fixture.request({ op: 'inspect', run })).receipt) })
       .catch(error => { transcodeSamples.push({ inspectionError: error instanceof Error ? error.message : String(error) }) })
@@ -144,8 +155,8 @@ test('paused video transfers, reopens remotely, returns locally, and recovers af
     await expect.poll(() => receiver.page.locator('video').evaluateAll(videos => videos.length === 1 && videos[0] instanceof HTMLVideoElement && videos[0].paused && videos[0].readyState >= 2), { timeout: 45_000 }).toBe(true)
     const receiverVideo = await receiver.page.locator('video').elementHandle()
     if (!receiverVideo) throw new Error('The receiver did not retain a native video element.')
-    await expect.poll(async () => receiverStart === null ? null
-      : Math.round((receiverStart + await receiverVideo.evaluate(video => video instanceof HTMLVideoElement ? video.currentTime : Number.NaN)) * 10) / 10,
+    await expect.poll(async () => receiverDelivery.startTime === null ? null
+      : Math.round((receiverDelivery.startTime + await receiverVideo.evaluate(video => video instanceof HTMLVideoElement ? video.currentTime : Number.NaN)) * 10) / 10,
     { timeout: 30_000 }).toBe(12)
     const loads = controls.filter(action => action === 'load').length
     expect(loads).toBe(1)

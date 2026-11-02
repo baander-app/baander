@@ -27,6 +27,7 @@ final readonly class DeliveryDestination
         public int $maxBitDepth = 8,
         public bool $supportsHdr = false,
         public array $pixelFormats = ['yuv420p', 'yuvj420p', 'nv12'],
+        public bool $sourcePlaybackFailed = false,
     ) {
         if ($transports === [] || array_diff($transports, ['file', 'hls', 'dash']) !== [] || $maxBitDepth < 8 || $maxBitDepth > 16) {
             throw new \InvalidArgumentException('Invalid destination transport or bit depth.');

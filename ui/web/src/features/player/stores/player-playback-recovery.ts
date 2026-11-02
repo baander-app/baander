@@ -1,3 +1,6 @@
+import { assignMusicSource, resolveMusicSource } from '../services/music-delivery'
+import { MediaCompatibilityError } from '../services/media-delivery'
+import { toast } from 'sonner'
 import { activityService } from '../services/activity-service'
 import { probeServerLiveness } from '../services/server-liveness'
 import { takeStreamRetryAfter } from '../services/stream-retry-after'
@@ -171,7 +174,23 @@ function reload(ep: Episode, patch?: Partial<PlayerState>): void {
     clearTimeout(timer)
     element.removeEventListener('loadedmetadata', onMetadata)
   }
-  element.load()
+  const controller = new AbortController()
+  const release = ep.release
+  ep.release = () => { controller.abort(); release?.() }
+  const previousFormat = new URL(ep.src, document.baseURI).searchParams.get('format')
+  const format = previousFormat === 'opus' || previousFormat === 'aac' || previousFormat === 'mp3' ? previousFormat : undefined
+  resolveMusicSource(element, ep.track.publicId, controller.signal, format).then(url => {
+    if (!current(ep, step)) return
+    assignMusicSource(element, ep.track.publicId, url)
+    ep.src = element.src
+    element.load()
+  }).catch((error: unknown) => {
+    if (!current(ep, step)) return
+    if (error instanceof MediaCompatibilityError) {
+      enter(ep, 'stopped', { isPlaying: false })
+      toast.error(error.message, { id: 'player-playback-failure' })
+    } else probe(ep, 'stall')
+  })
 }
 
 function start(ep: Episode): void {

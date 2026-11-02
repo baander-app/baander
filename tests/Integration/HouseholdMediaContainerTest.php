@@ -9,6 +9,10 @@ use App\QoL\Infrastructure\Worker\WorkerQoLLifecycle;
 use App\Shared\Infrastructure\Worker\NativeExecutionClientInterface;
 use App\Transcode\Application\Port\EncodePresentationPort;
 use App\Transcode\Application\Port\TranscodeLoopStarterInterface;
+use App\Transcode\Domain\ValueObject\EncoderProfile;
+use App\Transcode\Infrastructure\FFmpeg\SegmentEncoder;
+use App\Transcode\Infrastructure\Swoole\TranscodeSessionSubscriber;
+use App\Transcode\Infrastructure\Swoole\TranscodeStreamManager;
 use App\Transcode\Infrastructure\Transcode\AudioRenditionExecutor;
 use App\Transcode\Infrastructure\Transcode\EncodePresentationAdapter;
 use PHPUnit\Framework\TestCase;
@@ -42,6 +46,21 @@ final class HouseholdMediaContainerTest extends TestCase
             self::assertInstanceOf(AudioRenditionExecutor::class, $container->get('worker.media.audio_executor'));
             self::assertInstanceOf(EncodePresentationPort::class, $container->get(EncodePresentationAdapter::class));
             self::assertFalse($container->initialized('worker.media.encoder_profile'));
+            self::assertFalse($container->initialized(SegmentEncoder::class));
+
+            $profile = EncoderProfile::software();
+            $container->set('worker.media.encoder_profile', $profile);
+            $encoder = null;
+            foreach ([TranscodeSessionSubscriber::class, TranscodeStreamManager::class] as $consumer) {
+                $service = $consumer === TranscodeSessionSubscriber::class
+                    ? $container->get('transcode.loop_starter') : $container->get($consumer);
+                $resolved = new \ReflectionMethod($consumer, 'encoder')->invoke($service);
+                self::assertInstanceOf(SegmentEncoder::class, $resolved);
+                self::assertSame($profile, $resolved->getEncoderProfile());
+                $encoder ??= $resolved;
+                self::assertSame($encoder, $resolved);
+            }
+            self::assertTrue($container->initialized(SegmentEncoder::class));
         } finally {
             $kernel->shutdown();
             $_ENV = $savedEnv;
@@ -70,6 +89,8 @@ final class HouseholdMediaKernel extends Kernel
             public function process(ContainerBuilder $container): void
             {
                 $container->getDefinition(EncodePresentationAdapter::class)->setPublic(true);
+                $container->getDefinition(SegmentEncoder::class)->setPublic(true);
+                $container->getDefinition(TranscodeStreamManager::class)->setPublic(true);
             }
         });
     }

@@ -65,8 +65,14 @@ try {
             ],
         ], JSON_THROW_ON_ERROR) . "\n");
     });
-} catch (Throwable) {
+} catch (Throwable $error) {
     fwrite(STDERR, "Media worker failed; deployment reconciliation is required.\n");
+    fwrite(STDERR, json_encode([
+        'event' => 'worker_media_failure',
+        'exceptionClass' => $error::class,
+        'sourceFile' => basename($error->getFile()),
+        'sourceLine' => $error->getLine(),
+    ], JSON_INVALID_UTF8_SUBSTITUTE) . "\n");
     $exitCode = 1;
 } finally {
     try {

@@ -49,7 +49,7 @@ afterEach(() => { cleanup.forEach(stop => stop()); cleanup = []; vi.useRealTimer
 function controlledServer() {
   let state = snapshot({ endpoint, activeIncarnationId: endpoint.incarnationId, activeDestinationId: endpoint.destinationId,
     media: { kind: 'song', publicId: 'first' }, queue: ['first'], desiredState: 'playing', observedState: 'playing' })
-  const requests: { payload: Record<string, unknown>; commandId: string; outcome: string | null }[] = []
+  const requests: { payload: Record<string, unknown>; commandId: string; outcome: string | null; rejectionReason?: string }[] = []
   vi.mocked(AXIOS_INSTANCE.post).mockImplementation(async (path, value) => {
     if (path !== '/api/session/control') return { data: { data: state } }
     const payload = value as Record<string, unknown>
@@ -62,15 +62,16 @@ function controlledServer() {
         ...(payload.action === 'stop' ? { desiredState: 'stopped' as const } : {}),
       }
     }
-    return { data: { data: { ...state, requestResult: { requestId: entry.payload.requestId, commandId: entry.commandId, outcome: entry.outcome } } } }
+    return { data: { data: { ...state, requestResult: { requestId: entry.payload.requestId, commandId: entry.commandId, outcome: entry.outcome, rejectionReason: entry.rejectionReason } } } }
   })
   const h = harness()
   cleanup.push(h.stop)
   h.receive(state)
   return { ...h, requests,
     publish: () => { state = { ...state, revision: state.revision + 1 }; h.receive(state) },
-    settle: (index: number, outcome = 'applied') => {
+    settle: (index: number, outcome = 'applied', rejectionReason?: string) => {
       requests[index].outcome = outcome
+      requests[index].rejectionReason = rejectionReason
       state = { ...state, revision: state.revision + 1 }
       h.receive(state)
     },
@@ -78,6 +79,65 @@ function controlledServer() {
 }
 
 describe('browser playback coordination', () => {
+  it('shows the receiving browser compatibility reason for its exact control request', async () => {
+    const h = controlledServer()
+    const result = requestPlayback({ action: 'play' }).then(() => null, error => error as Error)
+    await vi.waitFor(() => expect(h.requests).toHaveLength(1))
+    h.settle(0, 'rejected', 'audio_codec_unsupported')
+    expect((await result)?.message).toContain('audio codec')
+    expect(h.client.getQueryData(PLAYBACK_CONNECTION_KEY)).toHaveProperty('error', expect.stringContaining('audio codec'))
+  })
+
+  it('reads the exact failed transfer reason even after another transfer becomes current', async () => {
+    const h = harness()
+    cleanup.push(h.stop)
+    let state = snapshot({ endpoint, activeIncarnationId: 'source' })
+    h.receive(state)
+    let original: Record<string, unknown> | undefined
+    let failed = false
+    vi.mocked(AXIOS_INSTANCE.post).mockImplementation(async (path, body) => {
+      if (path !== '/api/session/transfer') return { data: { data: state } }
+      if (!original) original = body as Record<string, unknown>
+      else expect(body).toEqual(original)
+      return { data: { data: { ...state, transferResult: {
+        requestId: original.requestId, attemptId: 'our-attempt', state: failed ? 'failed' : 'preparing',
+        rejectionReason: failed ? 'video_codec_unsupported' : null,
+      } } } }
+    })
+    const result = h.runtime.transfer('target').then(() => null, error => error as Error)
+    await vi.waitFor(() => expect(original).toBeDefined())
+    await Promise.resolve()
+    failed = true
+    state = snapshot({ endpoint, revision: 3, activeIncarnationId: 'source', transfer: {
+      attemptId: 'other-attempt', state: 'preparing', sourceIncarnationId: 'source', targetIncarnationId: 'other-target', position: 0, desiredState: 'playing',
+    } })
+    h.receive(state)
+    expect((await result)?.message).toContain('video codec')
+    expect(h.client.getQueryData(PLAYBACK_SESSION_KEY)).toHaveProperty('activeIncarnationId', 'source')
+  })
+
+  it.each(['request', 'attempt'] as const)('rejects a transfer result with a different %s identity', async mismatch => {
+    const h = harness()
+    cleanup.push(h.stop)
+    const state = snapshot({ endpoint, activeIncarnationId: 'source' })
+    h.receive(state)
+    let terminal = false
+    vi.mocked(AXIOS_INSTANCE.post).mockImplementation(async (_path, body) => ({ data: { data: {
+      ...state, revision: terminal ? 2 : 1,
+      transferResult: {
+        requestId: terminal && mismatch === 'request' ? 'another-request' : (body as { requestId: string }).requestId,
+        attemptId: terminal && mismatch === 'attempt' ? 'another-attempt' : 'our-attempt',
+        state: terminal ? 'committed' : 'preparing', rejectionReason: null,
+      },
+    } } }))
+    const result = h.runtime.transfer('target').then(() => null, error => error as Error)
+    await vi.waitFor(() => expect(AXIOS_INSTANCE.post).toHaveBeenCalled())
+    await Promise.resolve()
+    terminal = true
+    h.receive({ ...state, revision: 2 })
+    expect((await result)?.message).toContain('this playback transfer')
+  })
+
   it('waits for the final recovery identity before exposing it, without waiting for registration', async () => {
     const recovery = new PlaybackLocalRecovery('https://baander.app', 'listener')
     let finish!: () => void
@@ -153,7 +213,7 @@ describe('browser playback coordination', () => {
           commands: [{ id: 'switch', attemptId: 'attempt', revision: 2, incarnationId: endpoint.incarnationId, epoch: 1,
             type: 'load', payload: { media: { kind: 'song', publicId: 'second' }, queue: initial.queue,
               currentTrackIndex: 1, position: 0, desiredState: 'playing' }, expiresAt: new Date(Date.now() + 60_000).toISOString() }],
-          requestResult: { requestId: request.requestId, commandId: 'switch', outcome: 'applied' } }
+          requestResult: { requestId: request.requestId, commandId: 'switch', outcome: 'applied', rejectionReason: null } }
         return { data: { data: delivered } }
       }
       return { data: { data: snapshot({ revision: 2, activeIncarnationId: endpoint.incarnationId }) } }
@@ -185,7 +245,7 @@ describe('browser playback coordination', () => {
         epoch: scenario === 'wrong epoch' ? 2 : 1, type: 'load',
         payload: { media: { kind: 'song', publicId: 'second' }, queue: ['second'], currentTrackIndex: 0, position: 0, desiredState: 'playing' },
         expiresAt: new Date(Date.now() + (scenario === 'expired' ? -1000 : 60_000)).toISOString() }],
-      requestResult: { requestId: (body as { requestId: string }).requestId, commandId: 'invalid', outcome: 'retained' },
+      requestResult: { requestId: (body as { requestId: string }).requestId, commandId: 'invalid', outcome: 'retained', rejectionReason: null },
     }) } }))
     await requestPlayback({ action: 'load', media: { kind: 'song', publicId: 'second' } })
     expect(execute).not.toHaveBeenCalled()
@@ -386,7 +446,8 @@ describe('browser playback coordination', () => {
     })
     vi.mocked(AXIOS_INSTANCE.post).mockImplementation(async (path, body) => ({ data: { data: {
       ...current,
-      ...(path === '/api/session/transfer' ? { activeIncarnationId: replacement.incarnationId } : {}),
+      ...(path === '/api/session/transfer' ? { activeIncarnationId: replacement.incarnationId,
+        transferResult: { requestId: (body as { requestId: string }).requestId, attemptId: 'attempt', state: 'committed', rejectionReason: null } } : {}),
       ...(path === '/api/session/control' ? { requestResult: {
         requestId: (body as { requestId: string }).requestId, commandId: 'play', outcome: 'retained',
       } } : {}),
@@ -569,15 +630,22 @@ describe('browser playback coordination', () => {
     const state = snapshot({ endpoint, activeIncarnationId: 'source' })
     h.receive(state)
     const transfer = { attemptId: 'attempt', state: 'preparing' as const, sourceIncarnationId: 'source', targetIncarnationId: 'target', position: 12, desiredState: 'playing' as const }
-    vi.mocked(AXIOS_INSTANCE.post).mockResolvedValue({ data: { data: { ...state, revision: 2, transfer } } })
+    let response = { ...state, revision: 2, transfer: transfer as PlaybackSnapshotResource['transfer'] }
+    let phase: string = 'preparing'
+    vi.mocked(AXIOS_INSTANCE.post).mockImplementation(async (_path, body) => ({ data: { data: {
+      ...response, transferResult: { requestId: (body as { requestId: string }).requestId,
+        attemptId: 'attempt', state: phase, rejectionReason: null },
+    } } }))
     let completed = false
     const pending = h.runtime.transfer('target').then(() => { completed = true; return null }, error => error as Error)
     await vi.waitFor(() => expect(AXIOS_INSTANCE.post).toHaveBeenCalledWith('/api/session/transfer', expect.anything(), expect.objectContaining({ signal: expect.any(AbortSignal) })))
     await Promise.resolve()
     expect(completed).toBe(false)
-    h.receive(outcome === 'committed'
+    phase = outcome
+    response = outcome === 'committed'
       ? { ...state, revision: 3, transfer: null, activeIncarnationId: 'target' }
-      : { ...state, revision: 3, transfer: { ...transfer, state: 'uncertain' } })
+      : { ...state, revision: 3, transfer: { ...transfer, state: 'uncertain' } }
+    h.receive(response)
     if (outcome === 'committed') expect(await pending).toBeNull()
     else expect(await pending).toBeInstanceOf(Error)
   })
@@ -728,6 +796,8 @@ describe('browser playback coordination', () => {
     h.receive(snapshot({ endpoint }))
     vi.mocked(AXIOS_INSTANCE.post).mockImplementation(async (path, body) => ({ data: { data: {
       ...snapshot(path === '/api/session/transfer' ? { activeIncarnationId: endpoint.incarnationId } : {}),
+      ...(path === '/api/session/transfer' ? { transferResult: { requestId: (body as { requestId: string }).requestId,
+        attemptId: 'attempt', state: 'committed', rejectionReason: null } } : {}),
       ...(path === '/api/session/control' ? { requestResult: { requestId: (body as { requestId: string }).requestId, commandId: 'load', outcome: 'retained' } } : {}),
     } } }))
     await requestPlayback({ action: 'load', media: { kind: 'song', publicId: 'song' }, desiredState: 'paused' })
@@ -748,7 +818,8 @@ describe('browser playback coordination', () => {
     vi.mocked(AXIOS_INSTANCE.post).mockImplementation(async (path, body) => ({ data: { data: {
       ...recovered,
       desiredState: 'playing',
-      ...(path === '/api/session/transfer' ? { activeIncarnationId: endpoint.incarnationId } : {}),
+      ...(path === '/api/session/transfer' ? { activeIncarnationId: endpoint.incarnationId,
+        transferResult: { requestId: (body as { requestId: string }).requestId, attemptId: 'attempt', state: 'committed', rejectionReason: null } } : {}),
       ...(path === '/api/session/control' ? { requestResult: {
         requestId: (body as { requestId: string }).requestId, commandId: 'resume', outcome: 'retained',
       } } : {}),

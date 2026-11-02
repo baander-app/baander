@@ -23531,6 +23531,10 @@
                         "type": "string",
                         "nullable": true,
                         "default": null
+                    },
+                    "sourcePlaybackFailed": {
+                        "type": "boolean",
+                        "default": false
                     }
                 },
                 "type": "object"
@@ -24084,6 +24088,31 @@
                         "default": null,
                         "maximum": 1,
                         "minimum": 0
+                    },
+                    "rejectionReason": {
+                        "type": "string",
+                        "nullable": true,
+                        "default": null,
+                        "enum": [
+                            "source_color_metadata_unavailable",
+                            "video_pixel_format_unsupported",
+                            "video_bit_depth_unsupported",
+                            "video_hdr_unsupported",
+                            "subtitle_burn_in_required",
+                            "video_codec_unsupported",
+                            "video_dimensions_unsupported",
+                            "audio_codec_unsupported",
+                            "audio_channels_unsupported",
+                            "source_stream_metadata_unavailable",
+                            "audio_stream_selection_requires_remux",
+                            "container_unsupported",
+                            "audio_stream_unavailable",
+                            "audio_transcoding_disabled",
+                            "destination_media_unsupported",
+                            "subtitle_delivery_unsupported",
+                            "browser_rejected_source",
+                            "unknown"
+                        ]
                     }
                 },
                 "type": "object"
@@ -27558,11 +27587,47 @@
                         "type": "object",
                         "nullable": true
                     },
+                    "transferResult": {
+                        "required": [
+                            "requestId",
+                            "attemptId",
+                            "state",
+                            "rejectionReason"
+                        ],
+                        "properties": {
+                            "requestId": {
+                                "type": "string",
+                                "format": "uuid"
+                            },
+                            "attemptId": {
+                                "type": "string",
+                                "format": "uuid"
+                            },
+                            "state": {
+                                "type": "string",
+                                "enum": [
+                                    "preparing",
+                                    "quiescing",
+                                    "starting",
+                                    "committed",
+                                    "failed",
+                                    "uncertain"
+                                ]
+                            },
+                            "rejectionReason": {
+                                "type": "string",
+                                "nullable": true
+                            }
+                        },
+                        "type": "object",
+                        "nullable": true
+                    },
                     "requestResult": {
                         "required": [
                             "requestId",
                             "commandId",
-                            "outcome"
+                            "outcome",
+                            "rejectionReason"
                         ],
                         "properties": {
                             "requestId": {
@@ -27574,6 +27639,10 @@
                                 "format": "uuid"
                             },
                             "outcome": {
+                                "type": "string",
+                                "nullable": true
+                            },
+                            "rejectionReason": {
                                 "type": "string",
                                 "nullable": true
                             }

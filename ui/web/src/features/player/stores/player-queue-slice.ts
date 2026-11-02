@@ -3,7 +3,7 @@ import type { PlayerQueueState, PlayerQueueActions, PlayerSliceContext, Track } 
 import { activityService } from '../services/activity-service'
 import { getCurrentTime, updateTime } from './player-time-tracker'
 import { generateShuffleBag, resolveNextIndex } from './player-queue-navigation'
-import { buildStreamUrl, invalidatePlaybackSelection, requestSelectedTrackPlayback, syncPlaybackVolume } from './player-playback-runtime'
+import { invalidatePlaybackSelection, requestSelectedTrackPlayback, syncPlaybackVolume } from './player-playback-runtime'
 
 export function createPlayerQueueSlice({ get, commit }: PlayerSliceContext): PlayerQueueState & PlayerQueueActions {
   const shuffleForQueue = (queue: Track[], index: number) => get().shuffle ? generateShuffleBag(queue.length, index) : []
@@ -139,11 +139,12 @@ export function createPlayerQueueSlice({ get, commit }: PlayerSliceContext): Pla
         invalidatePlaybackSelection()
         if (state.audioElement) {
           state.audioElement.pause()
-          state.audioElement.src = currentTrack.available === true ? buildStreamUrl(currentTrack.publicId) : ''
+          state.audioElement.src = ''
         }
         commit({ queue, currentIndex, currentTrack, isPlaying: false, duration: 0,
           shuffleBag: shuffleForQueue(queue, currentIndex) })
         updateTime(0)
+        if (currentTrack.available === true) requestSelectedTrackPlayback(currentTrack, get, commit, { autoplay: false })
         return
       }
       commit({ queue, currentIndex, currentTrack, shuffleBag: shuffleForQueue(queue, currentIndex) })
@@ -165,12 +166,12 @@ export function createPlayerQueueSlice({ get, commit }: PlayerSliceContext): Pla
       const currentTrack = queue[currentIndex] ?? null
       const time = Number.isFinite(position) ? Math.max(0, position) : 0
       if (state.audioElement) {
-        state.audioElement.src = currentTrack?.available === true ? buildStreamUrl(currentTrack.publicId) : ''
-        if (currentTrack) state.audioElement.currentTime = time
+        state.audioElement.src = ''
       }
       commit({ queue, currentIndex, currentTrack, isPlaying: false,
         duration: 0, shuffleBag: shuffleForQueue(queue, currentIndex) })
       updateTime(time)
+      if (currentTrack?.available === true) requestSelectedTrackPlayback(currentTrack, get, commit, { autoplay: false, position: time })
     },
   }
 }

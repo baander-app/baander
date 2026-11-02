@@ -603,7 +603,13 @@ final class LiveCapacityFixture
     private function insertSong(array $identity, int $index, int $duration = 60): void
     {
         $source = $this->manifest['audioVariants'][$duration] ?? $this->manifest['song'];
-        $this->insert('songs', $identity, ['album_id' => $this->manifest['album']['id'], 'title' => sprintf('Live song %05d', $index), 'path' => $source['path'], 'hash' => $source['hash'], 'size' => filesize($source['path']), 'mime_type' => 'audio/wav', 'length' => $duration, 'sample_rate' => 8000, 'channels' => 1, 'bitrate' => 128_000, 'codec' => 'pcm_s16le', 'track' => $index + 1, 'disc' => 1]);
+        $this->insert('songs', $identity, [
+            'album_id' => $this->manifest['album']['id'], 'title' => sprintf('Live song %05d', $index),
+            'path' => $source['path'], 'hash' => $source['hash'], 'size' => filesize($source['path']),
+            'mime_type' => 'audio/wav', 'length' => $duration, 'sample_rate' => 8000, 'channels' => 1,
+            'bitrate' => 128_000, 'codec' => 'pcm_s16le', 'container_format' => 'wav', 'stream_index' => 0,
+            'track' => $index + 1, 'disc' => 1,
+        ]);
     }
 
     /** @return list<string> */

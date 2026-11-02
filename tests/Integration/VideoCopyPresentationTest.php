@@ -135,10 +135,37 @@ final class VideoCopyPresentationTest extends TestCase
             $worker->run($claim, static fn(): bool => false);
             self::assertSame('complete', array_last($outcomes), json_encode($outcomes));
             $metadata = json_decode(file_get_contents($job->getOutputDirectory() . '/generation.json'), true, flags: JSON_THROW_ON_ERROR);
-            self::assertEqualsWithDelta(2.92, $metadata['startTime'], .001);
+            self::assertEqualsWithDelta(0.0, $metadata['startTime'], .001);
             $seek = (new PublishedPresentationReader())->read($job->getOutputDirectory());
             self::assertNotNull($seek);
             self::assertTrue($seek->covers(7.0 - $metadata['startTime'], $hasAudio));
+
+            foreach ([0.0, 0.001, 0.005] as $index => $offset) {
+                $position = 8.2 + $offset;
+                $claim = $this->claim($job, $session, $selection, 3 + $index, $position, 'paused');
+                $outcomes = [];
+                $worker->run($claim, static function () use (&$outcomes): bool {
+                    /** @var list<string> $outcomes */
+                    return in_array('ready', $outcomes, true);
+                });
+                self::assertContains('ready', $outcomes, json_encode($outcomes));
+                $metadata = json_decode(file_get_contents($job->getOutputDirectory() . '/generation.json'), true, flags: JSON_THROW_ON_ERROR);
+                self::assertEqualsWithDelta(2.92, $metadata['startTime'], .001);
+                $seek = (new PublishedPresentationReader())->read($job->getOutputDirectory());
+                self::assertNotNull($seek);
+                foreach ([MediaTrack::Video, ...($hasAudio ? [MediaTrack::Audio] : [])] as $kind) {
+                    $track = $seek->track($kind);
+                    self::assertNotNull($track);
+                    self::assertTrue($track->covers($position - $metadata['startTime']));
+                    $stream = $kind === MediaTrack::Video ? 'v:0' : 'a:0';
+                    $original = $this->packetHashes($source, $stream);
+                    $copied = $this->packetHashes($job->getOutputDirectory() . '/manifest.mpd', $stream);
+                    self::assertNotEmpty($copied);
+                    $first = array_search($copied[0], $original, true);
+                    self::assertNotFalse($first);
+                    self::assertSame(array_slice($original, $first), $copied);
+                }
+            }
         } finally {
             $native?->close();
             $entries = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($root, \FilesystemIterator::SKIP_DOTS), \RecursiveIteratorIterator::CHILD_FIRST);
@@ -149,17 +176,17 @@ final class VideoCopyPresentationTest extends TestCase
         }
     }
 
-    private function claim(TranscodeJob $job, TranscodeSession $session, PresentationSelection $selection, int $generation, float $position): TranscodeExecutionClaim
+    private function claim(TranscodeJob $job, TranscodeSession $session, PresentationSelection $selection, int $generation, float $position, string $status = 'running'): TranscodeExecutionClaim
     {
         return new TranscodeExecutionClaim(new TranscodeRuntimeSnapshot($job->getId(), $session->getId(), Uuid::generate()->toString(),
-            new DesiredTranscodeState(AudioProfile::streamingStereo(), position: $position, presentationSelection: $selection), $generation, 0, $generation, 'pending', null, null, true),
+            new DesiredTranscodeState(AudioProfile::streamingStereo(), status: $status, position: $position, presentationSelection: $selection), $generation, 0, $generation, 'pending', null, null, true),
             new MediaWorkerIdentity('baander.app:test', str_repeat('c', 32), 'media-copy-0', 1), str_repeat('d', 64));
     }
 
     /** @return list<string> */
-    private function packetHashes(string $path): array
+    private function packetHashes(string $path, string $stream = 'v:0'): array
     {
-        $probe = new Process(['/usr/bin/ffprobe', '-v', 'error', '-select_streams', 'v:0', '-show_packets', '-show_data_hash', 'sha256',
+        $probe = new Process(['/usr/bin/ffprobe', '-v', 'error', '-select_streams', $stream, '-show_packets', '-show_data_hash', 'sha256',
             '-show_entries', 'packet=data_hash', '-of', 'json', $path]);
         $probe->mustRun();
         return array_column(json_decode($probe->getOutput(), true, flags: JSON_THROW_ON_ERROR)['packets'], 'data_hash');

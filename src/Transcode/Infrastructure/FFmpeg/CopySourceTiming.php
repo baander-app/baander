@@ -79,6 +79,7 @@ final readonly class CopySourceTiming
     {
         $target = $this->origin + $position;
         $boundary = null;
+        $previous = null;
         foreach ($packets as $packet) {
             if (!is_numeric($packet['pts_time'] ?? $packet['best_effort_timestamp_time'] ?? null)
                 || (!str_contains($packet['flags'] ?? '', 'K') && ($packet['key_frame'] ?? null) !== 1)) {
@@ -86,9 +87,16 @@ final readonly class CopySourceTiming
             }
             $time = (float) ($packet['pts_time'] ?? $packet['best_effort_timestamp_time']);
             if (is_finite($time) && $time >= $this->origin && $time <= $target + 0.000001) {
-                $boundary = $boundary === null ? $time : max($boundary, $time);
+                if ($boundary === null || $time > $boundary) {
+                    $previous = $boundary;
+                    $boundary = $time;
+                } elseif ($time < $boundary && ($previous === null || $time > $previous)) {
+                    $previous = $time;
+                }
             }
         }
-        return $boundary ?? throw new RuntimeException('No source keyframe was found for the requested position.');
+        // AAC packets may begin just after a video keyframe. Keep one earlier GOP
+        // so a cursor on or near that keyframe has audio pre-roll without retiming.
+        return $previous ?? $boundary ?? throw new RuntimeException('No source keyframe was found for the requested position.');
     }
 }

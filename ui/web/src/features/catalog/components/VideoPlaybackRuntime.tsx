@@ -32,9 +32,9 @@ export function VideoPlaybackRuntime() {
   useEffect(() => {
     useVideoPresentation.getState().publish({
       duration: player.duration, currentTime: player.currentTime,
-      pendingSeekPosition: player.pendingSeekPosition, state: player.state,
+      pendingSeekPosition: player.pendingSeekPosition, state: player.state, error: player.error,
     })
-  }, [player.duration, player.currentTime, player.pendingSeekPosition, player.state])
+  }, [player.duration, player.currentTime, player.pendingSeekPosition, player.state, player.error])
 
   useEffect(() => {
     let stoppedObservation: PlaybackObservation | null = null

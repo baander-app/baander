@@ -56,6 +56,7 @@ final class VideoServiceTest extends TestCase
                 'containerFormat' => 'matroska,webm', 'videoCodec' => 'h264', 'videoStreamIndex' => 3,
                 'width' => 1920, 'height' => 1080, 'framerate' => 23.976, 'duration' => 12.5,
                 'audioStreams' => [['streamIndex' => 5, 'codec' => 'aac', 'channels' => 2]],
+                'subtitleStreams' => [['index' => 6, 'codec' => 'subrip']],
                 'pixFmt' => 'yuv420p10le', 'colorSpace' => ['primaries' => 'bt2020', 'transfer' => 'smpte2084', 'matrix' => 'bt2020nc'],
                 'colorRange' => 'tv', 'sourceTimestampOrigin' => 2.125,
             ]);
@@ -85,6 +86,7 @@ final class VideoServiceTest extends TestCase
             self::assertSame('smpte2084', $source->colorSpace['transfer']);
             self::assertSame('tv', $source->colorRange);
             self::assertSame(2.125, $source->sourceTimestampOrigin);
+            self::assertTrue($source->hasSubtitles);
         } finally {
             unlink($path);
         }

@@ -3,6 +3,7 @@ import type { PlaybackSnapshotResource } from '@/shared/api-client/gen/endpoints
 const states = new Set(['playing', 'paused', 'stopped'])
 const observedStates = new Set([...states, 'unknown'])
 const phases = new Set(['preparing', 'quiescing', 'starting', 'uncertain'])
+const transferResults = new Set([...phases, 'committed', 'failed'])
 const commands = new Set(['prepare', 'quiesce', 'start', 'stop', 'play', 'pause', 'seek', 'load', 'observe', 'volume', 'queue'])
 
 function record(value: unknown): value is Record<string, unknown> {
@@ -80,7 +81,11 @@ export function parsePlaybackSnapshot(value: unknown): PlaybackSnapshotResource 
     || !nullableIdentity(value.selectedDestinationId) || !nullableIdentity(value.activeDestinationId)
     || !nullableIdentity(value.activeIncarnationId) || !transfer(value.transfer)
     || !Array.isArray(value.destinations) || !value.destinations.every(destination)
-    || (value.requestResult != null && (!record(value.requestResult) || !identity(value.requestResult.requestId) || !identity(value.requestResult.commandId) || !(value.requestResult.outcome === null || typeof value.requestResult.outcome === 'string')))
+    || (value.requestResult != null && (!record(value.requestResult) || !identity(value.requestResult.requestId) || !identity(value.requestResult.commandId) || !(value.requestResult.outcome === null || typeof value.requestResult.outcome === 'string')
+      || (value.requestResult.rejectionReason != null && !identity(value.requestResult.rejectionReason))))
+    || (value.transferResult != null && (!record(value.transferResult) || !identity(value.transferResult.requestId)
+      || !identity(value.transferResult.attemptId) || !member(value.transferResult.state, transferResults)
+      || (value.transferResult.rejectionReason != null && !identity(value.transferResult.rejectionReason))))
     || !Array.isArray(value.commands) || !value.commands.every(command) || !endpoint(value.endpoint)) return null
 
   return value as unknown as PlaybackSnapshotResource

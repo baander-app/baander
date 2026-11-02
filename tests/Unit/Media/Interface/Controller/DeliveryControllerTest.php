@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Media\Interface\Controller;
 
 use App\Media\Application\DTO\DeliveryDecision;
+use App\Media\Application\DTO\DeliveryDestination;
 use App\Media\Application\DTO\DeliveryKind;
 use App\Media\Application\Port\DeliveryDecisionPortInterface;
 use App\Media\Application\Port\MediaReadScopeProviderInterface;
@@ -22,6 +23,26 @@ use PHPUnit\Framework\TestCase;
 
 final class DeliveryControllerTest extends TestCase
 {
+    public function testRenegotiationPassesTheReportedSourceFailureToTheDeliveryPolicy(): void
+    {
+        $owner = new Uuid();
+        $track = new PublicId();
+        $delivery = $this->createMock(DeliveryDecisionPortInterface::class);
+        $delivery->expects(self::once())->method('track')
+            ->with($owner, $track, self::callback(static fn (DeliveryDestination $destination): bool => $destination->sourcePlaybackFailed))
+            ->willReturn(new DeliveryDecision(DeliveryKind::Incompatible, 'browser_rejected_source'));
+        $scopes = $this->createStub(MediaReadScopeProviderInterface::class);
+        $scopes->method('current')->willReturn(MediaReadScope::authenticated($owner, LibraryReadScope::unrestricted()));
+        $controller = new DeliveryController($delivery, $scopes, new HmacStreamAuthAdapter('delivery-test-secret'), $this->createStub(CompletedVideoDeliveryPort::class));
+
+        $response = $controller->decide(new DeliveryRequest('track', $track->toString(), ['mp3'], sourcePlaybackFailed: true));
+        $body = json_decode($response->getContent(), true, flags: JSON_THROW_ON_ERROR);
+
+        self::assertSame(200, $response->getStatusCode());
+        self::assertSame('incompatible', $body['kind']);
+        self::assertSame('browser_rejected_source', $body['reason']);
+    }
+
     #[DataProvider('retentionResults')]
     public function testCompletedVideoMustBeRetainedForTheSignedLifetime(bool $retained): void
     {

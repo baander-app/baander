@@ -32,6 +32,41 @@ use PHPUnit\Framework\TestCase;
 
 final class DeliveryDecisionServiceTest extends TestCase
 {
+    public function testFailedNativeSourceCanOnlyFallBackToPermittedEncoding(): void
+    {
+        $metadata = new TrackStreamMetadata('track', 'song.mp3', '/library/song.mp3', 'audio/mpeg', 100, 'mp3', 128000, 48000, 2, 10.0,
+            'mp3', 0, '0123456789abcdef');
+        $destination = new DeliveryDestination(['mp3'], audioCodecs: ['mp3'], sourcePlaybackFailed: true);
+        $full = $this->service(profile: 'full', metadata: $metadata)->track(new Uuid(), new PublicId(), $destination);
+        self::assertSame(DeliveryKind::Encoded, $full->kind);
+        self::assertSame('browser_rejected_source', $full->reason);
+        $household = $this->service(metadata: $metadata)->track(new Uuid(), new PublicId(), $destination);
+        self::assertSame(DeliveryKind::Incompatible, $household->kind);
+        self::assertSame('browser_rejected_source', $household->reason);
+        $disabled = $this->service(profile: 'full', enabled: false, metadata: $metadata)->track(new Uuid(), new PublicId(), $destination);
+        self::assertSame(DeliveryKind::Incompatible, $disabled->kind);
+        self::assertSame('audio_transcoding_disabled', $disabled->reason);
+    }
+
+    public function testEmbeddedSubtitlesKeepTheirAdaptiveRenditions(): void
+    {
+        $videos = $this->createStub(VideoPortInterface::class);
+        $videos->method('getSourceMetadata')->willReturn(new VideoSourceMetadata(
+            new Uuid(), (new PublicId())->toString(), '/library/movie.mp4', 'movie.mp4', 100,
+            'video/mp4', 'hash', 'mp4', 'h264', 0,
+            [['codec' => 'aac', 'channels' => 2, 'streamIndex' => 1, 'isDefault' => true]],
+            1920, 1080, 24.0, 100.0, pixFmt: 'yuv420p', colorSpace: ['transfer' => 'bt709'],
+            hasSubtitles: true,
+        ));
+        $service = $this->service(videos: $videos);
+        $decision = $service->video(new Uuid(), new PublicId(), new DeliveryDestination(['mp4'], ['h264'], ['aac'], transports: ['file', 'hls']));
+        self::assertSame(DeliveryKind::Copy, $decision->kind);
+        self::assertSame('hls', $decision->selection?->transport);
+        $unsupported = $service->video(new Uuid(), new PublicId(), new DeliveryDestination(['mp4'], ['h264'], ['aac']));
+        self::assertSame(DeliveryKind::Incompatible, $unsupported->kind);
+        self::assertSame('subtitle_delivery_unsupported', $unsupported->reason);
+    }
+
     public function testAuthorizationRunsBeforeMetadataLookup(): void
     {
         $access = $this->createStub(PlaybackMediaAccessInterface::class);

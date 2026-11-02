@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Session\Application\Service;
 
 use App\Session\Application\Port\PlaybackCoordinationInterface;
+use App\Session\Application\DTO\PlaybackRejectionReason;
 use App\Session\Application\Port\PlaybackStoreInterface;
 use App\Session\Application\Port\PlaybackOperation;
 use App\Session\Domain\Model\Playback\PlaybackMedia;
@@ -237,6 +238,18 @@ final readonly class PlaybackCoordinator implements PlaybackCoordinationInterfac
                         'requestId' => $command['request_id'],
                         'commandId' => $command['id'],
                         'outcome' => $command['outcome'],
+                        'rejectionReason' => $command['rejection_reason'] ?? null,
+                    ];
+                }
+            }
+            if ($operation === PlaybackOperation::Transfer) {
+                $requestedTransfer = $this->store->requestedTransfer($session->getId()->toString(), $this->uuid($input, 'requestId'));
+                if ($requestedTransfer !== null) {
+                    $snapshot['transferResult'] = [
+                        'requestId' => $requestedTransfer['request_id'],
+                        'attemptId' => $requestedTransfer['id'],
+                        'state' => $requestedTransfer['state'],
+                        'rejectionReason' => $requestedTransfer['rejection_reason'],
                     ];
                 }
             }
@@ -367,8 +380,12 @@ final readonly class PlaybackCoordinator implements PlaybackCoordinationInterfac
         if (!is_string($outcome)) {
             throw new InvalidArgumentException('Acknowledgement outcome is required.');
         }
+        $rejectionReason = $input['rejectionReason'] ?? null;
+        if ($rejectionReason !== null && ($outcome !== 'rejected' || !in_array($rejectionReason, PlaybackRejectionReason::VALUES, true))) {
+            throw new InvalidArgumentException('Invalid playback rejection reason.');
+        }
         if ($command['acknowledged_at'] !== null) {
-            if ($command['outcome'] !== $outcome) {
+            if ($command['outcome'] !== $outcome || ($command['rejection_reason'] ?? null) !== $rejectionReason) {
                 throw new ConflictException('Command outcome has already been recorded.');
             }
             return;
@@ -397,7 +414,7 @@ final readonly class PlaybackCoordinator implements PlaybackCoordinationInterfac
             if ($model->state() === 'failed') {
                 $session->restoreSelection($session->activeIncarnationId() === null ? null : Uuid::fromString($this->store->endpoint($session->getUserId()->toString(), $session->activeIncarnationId()->toString())['destination_id']));
             }
-            $this->store->acknowledgeCommand($command['id'], $outcome);
+            $this->store->acknowledgeCommand($command['id'], $outcome, $rejectionReason);
             $this->persistTransfer($session, $transfer, $model);
             return;
         }
@@ -411,11 +428,11 @@ final readonly class PlaybackCoordinator implements PlaybackCoordinationInterfac
             if ($outcome === 'applied') {
                 $this->store->observeVolume($endpoint['id'], $this->volume($input));
             }
-            $this->store->acknowledgeCommand($command['id'], $outcome);
+            $this->store->acknowledgeCommand($command['id'], $outcome, $rejectionReason);
             $session->advanceRevision();
             return;
         }
-        $this->store->acknowledgeCommand($command['id'], $outcome);
+        $this->store->acknowledgeCommand($command['id'], $outcome, $rejectionReason);
         if ($command['type'] === 'stop' && $outcome === 'rejected' && $session->desiredState() === PlaybackState::Paused) {
             $session->retainUncertainRunner();
             $session->advanceRevision();

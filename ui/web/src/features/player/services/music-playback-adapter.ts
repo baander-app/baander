@@ -1,9 +1,10 @@
+import { assignMusicSource, isAssignedMusicSource, resolveMusicSource } from './music-delivery'
 import { getSongIndex, type PlaybackCommandResource } from '@/shared/api-client/gen/endpoints'
 import type { PlaybackExecutionAdapter, PlaybackObservation } from '@/features/session/services/playback-execution'
 import { readTrackResource } from '../stores/player-availability'
 import { usePlayerStore } from '../stores/player-store'
 import { getCurrentTime, updateTime } from '../stores/player-time-tracker'
-import { buildStreamUrl, canSeekStream, chooseTranscodeFormat, invalidatePlaybackSelection, isUnsupportedOriginalStream, isTrackStream } from '../stores/player-playback-runtime'
+import { canSeekStream, invalidatePlaybackSelection, isUnsupportedOriginalStream, isTrackStream } from '../stores/player-playback-runtime'
 import type { Track } from '../stores/player-types'
 import { useRadioStore } from '@/features/radio/stores/radio-store'
 import { audioService } from './audio-service'
@@ -115,7 +116,7 @@ export function createMusicPlaybackAdapter(runtime: Runtime): PlaybackExecutionA
     const retainedQueue = payload.queue.length ? queue : []
     if (!track || track.publicId !== payload.media.publicId || track.available !== true) throw new Error('This track is unavailable.')
     const selected = usePlayerStore.getState().audioElement
-    if (selected && isTrackStream(selected.src, track.publicId)) {
+    if (selected && (isAssignedMusicSource(selected, track.publicId) || isTrackStream(selected.src, track.publicId))) {
       await existingSourceReady(selected, signal)
       check(signal, token)
       retainPrepared(payload, retainedQueue, selected, false)
@@ -133,6 +134,9 @@ export function createMusicPlaybackAdapter(runtime: Runtime): PlaybackExecutionA
     const needsAlternate = (processor?.isActive && !processor.passive) || (current?.src && !current.ended)
     const audio = needsAlternate ? alternate : current ?? runtime.elements[0]
     audio.pause()
+    const source = await resolveMusicSource(audio, track.publicId, signal)
+    check(signal, token)
+    let retried = false
     const readiness = new Promise<void>((resolve, reject) => {
       const cleanup = () => {
         audio.removeEventListener('canplay', ready)
@@ -142,18 +146,22 @@ export function createMusicPlaybackAdapter(runtime: Runtime): PlaybackExecutionA
       const ready = () => { cleanup(); resolve() }
       const cancel = () => { cleanup(); audio.pause(); reject(aborted()) }
       const failed = () => {
-        if (isUnsupportedOriginalStream(audio, track.publicId)) {
-          audio.src = buildStreamUrl(track.publicId, chooseTranscodeFormat(audio))
-          audio.load()
+        if (retried || !isUnsupportedOriginalStream(audio, track.publicId)) {
+          cleanup()
+          reject(new Error('This track could not be prepared.'))
           return
         }
-        cleanup()
-        reject(new Error('This track could not be prepared.'))
+        retried = true
+        resolveMusicSource(audio, track.publicId, signal, undefined, audio.src).then(url => {
+          check(signal, token)
+          assignMusicSource(audio, track.publicId, url)
+          audio.load()
+        }).catch(error => { cleanup(); reject(error) })
       }
       audio.addEventListener('canplay', ready)
       audio.addEventListener('error', failed)
       signal.addEventListener('abort', cancel, { once: true })
-      audio.src = buildStreamUrl(track.publicId)
+      assignMusicSource(audio, track.publicId, source)
       audio.load()
       if (audio.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) ready()
     })

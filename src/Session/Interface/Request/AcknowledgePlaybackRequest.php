@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Session\Interface\Request;
 
+use App\Session\Application\DTO\PlaybackRejectionReason;
 use Symfony\Component\Validator\Constraints as Assert;
 
 final readonly class AcknowledgePlaybackRequest
@@ -25,6 +26,9 @@ final readonly class AcknowledgePlaybackRequest
         public ?float $position = null,
         #[Assert\Range(min: 0, max: 1)]
         public ?float $volume = null,
+        #[Assert\Choice(choices: PlaybackRejectionReason::VALUES)]
+        #[Assert\Expression('value == null or this.outcome == "rejected"', message: 'A rejection reason requires a rejected outcome.')]
+        public ?string $rejectionReason = null,
     ) {}
 
     /** @return array<string,mixed> */

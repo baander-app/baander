@@ -1,5 +1,6 @@
 import type { PlaybackCommandResource, PlaybackEndpointResource } from '@/shared/api-client/gen/endpoints'
 import { getPlaybackAdapters, getPlaybackAdapter, type PlaybackExecutionAdapter, type PlaybackObservation } from './playback-execution'
+import { MediaCompatibilityError } from '@/features/player/services/media-delivery'
 
 export interface PlaybackAcknowledgement {
   commandId: string
@@ -10,6 +11,7 @@ export interface PlaybackAcknowledgement {
   outcome: string
   position?: number
   volume?: number
+  rejectionReason?: string
 }
 
 const outcomes: Record<PlaybackCommandResource['type'], string> = {
@@ -117,7 +119,8 @@ export class PlaybackCommandRunner {
       if (!current()) return null
       return { ...ack, outcome: outcomes[command.type], position: observation.position,
         ...(observation.volume === undefined ? {} : { volume: observation.volume }) }
-    } catch {
+    } catch (error) {
+      if (error instanceof MediaCompatibilityError) ack.rejectionReason = error.reason
       return current() ? ack : null
     } finally {
       clearTimeout(timeout)

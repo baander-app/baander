@@ -22,11 +22,13 @@ use Symfony\Component\Security\Core\Exception\AccessDeniedException;
 
 final class AuthorizedPlaybackTest extends TestCase
 {
+    /** @param list<int> $expectedHeights */
     #[DataProvider('actors')]
-    public function testPlaybackChecksLibraryMembership(string $actor, bool $exists, bool $allowed): void
+    /** @param list<int> $expectedHeights */
+    public function testPlaybackChecksLibraryMembership(string $actor, bool $exists, bool $allowed, ?int $sourceHeight = 1080, array $expectedHeights = [360, 720, 1080]): void
     {
         $connection = DriverManager::getConnection(['driver' => 'pdo_sqlite', 'memory' => true]);
-        $connection->executeStatement('CREATE TABLE videos (id TEXT PRIMARY KEY)');
+        $connection->executeStatement('CREATE TABLE videos (id TEXT PRIMARY KEY, height INTEGER)');
         $connection->executeStatement('CREATE TABLE movies (id TEXT PRIMARY KEY, library_id TEXT)');
         $connection->executeStatement('CREATE TABLE movie_video (video_id TEXT, movie_id TEXT)');
         $connection->executeStatement('CREATE TABLE user_library_access (user_id TEXT, library_id TEXT)');
@@ -37,7 +39,7 @@ final class AuthorizedPlaybackTest extends TestCase
         $videoId = new Uuid();
         $requestId = new Uuid()->toString();
         if ($exists) {
-            $connection->insert('videos', ['id' => $videoId->toString()]);
+            $connection->insert('videos', ['id' => $videoId->toString(), 'height' => $sourceHeight]);
             $connection->insert('movies', ['id' => 'movie', 'library_id' => 'library']);
             $connection->insert('movie_video', ['video_id' => $videoId->toString(), 'movie_id' => 'movie']);
         }
@@ -46,11 +48,13 @@ final class AuthorizedPlaybackTest extends TestCase
         $security->method('getUser')->willReturn($actor === 'anonymous' ? null : new SecurityUser($userId->toString(), 'test@baander.app', ''));
         $security->method('isGranted')->willReturn($actor === 'admin');
         $bus = $this->createMock(MessageBusInterface::class);
-        $bus->expects($allowed ? $this->exactly(3) : $this->never())->method('dispatch')
-            ->willReturnCallback(static function (CreateTranscodeSessionCommand $command) use ($userId, $videoId, $requestId, $connection): Envelope {
+        $heights = [];
+        $bus->expects($allowed ? $this->exactly(count($expectedHeights)) : $this->never())->method('dispatch')
+            ->willReturnCallback(static function (CreateTranscodeSessionCommand $command) use ($userId, $videoId, $requestId, $connection, &$heights): Envelope {
                 self::assertTrue($command->getUserId()->equals($userId));
                 self::assertTrue($command->getVideoId()->equals($videoId));
                 self::assertSame($requestId, $command->requestId);
+                $heights[] = $command->getQualityTier()->height;
                 $jobId = new Uuid();
                 $session = TranscodeSession::create($userId, $jobId, $videoId, AudioProfile::streamingStereo());
                 $connection->insert('transcode_jobs', ['id' => $jobId->toString(), 'public_id' => new PublicId()->toString(), 'owner_user_id' => $userId->toString(), 'video_id' => $videoId->toString(), 'height' => $command->getQualityTier()->height, 'status' => 'pending', 'request_id' => $requestId]);
@@ -63,13 +67,14 @@ final class AuthorizedPlaybackTest extends TestCase
             $this->expectException(AccessDeniedException::class);
         }
         try {
-            self::assertCount(3, $playback->start($videoId, $requestId));
+            self::assertCount(count($expectedHeights), $playback->start($videoId, $requestId));
+            self::assertSame($expectedHeights, $heights);
         } finally {
             $connection->close();
         }
     }
 
-    /** @return iterable<array{string, bool, bool}> */
+    /** @return iterable<array{string, bool, bool}|array{string, bool, bool, ?int, list<int>}> */
     public static function actors(): iterable
     {
         yield ['member', true, true];
@@ -78,6 +83,12 @@ final class AuthorizedPlaybackTest extends TestCase
         yield ['anonymous', true, false];
         yield ['admin', false, false];
         yield ['member', false, false];
+        yield 'source below minimum tier' => ['member', true, true, 180, [360]];
+        yield 'source at minimum tier' => ['member', true, true, 360, [360]];
+        yield 'source between admitted tiers' => ['member', true, true, 480, [360]];
+        yield 'source at middle tier' => ['member', true, true, 720, [360, 720]];
+        yield 'large source keeps existing tier set' => ['member', true, true, 2160, [360, 720, 1080]];
+        yield 'unknown source height uses minimum tier' => ['member', true, true, null, [360]];
     }
 
     public function testControlsExposeOnlyTheActorsCurrentRuntimeSession(): void

@@ -2,7 +2,6 @@ import { hydrateQueueAvailability } from './player-availability'
 import type { PlayerPlaybackState, PlayerPlaybackActions, PlayerSliceContext } from './player-types'
 import { getCurrentTime, updateTime } from './player-time-tracker'
 import {
-  buildStreamUrl,
   canSeekStream,
   chooseTranscodeFormat,
   hasPendingPlayRecord,
@@ -48,18 +47,17 @@ export function createPlayerPlaybackSlice({ get, commit }: PlayerSliceContext): 
     replayCurrentTrack: () => {
       const { currentTrack, audioElement } = get()
       if (!currentTrack || !audioElement?.src) return
-      requestSelectedTrackPlayback(currentTrack, get, commit, canSeekStream(audioElement) ? 'preserve' : 'reload')
+      requestSelectedTrackPlayback(currentTrack, get, commit, { sourceMode: canSeekStream(audioElement) ? 'preserve' : 'reload' })
     },
     switchToTranscodedStream: () => {
       const { currentTrack, audioElement, isPlaying } = get()
       if (!currentTrack || !audioElement) return
       const format = chooseTranscodeFormat(audioElement)
       if (isPlaying) {
-        requestSelectedTrackPlayback(currentTrack, get, commit, 'replace', format)
+        requestSelectedTrackPlayback(currentTrack, get, commit, { format })
         return
       }
-      invalidatePlaybackSelection()
-      audioElement.src = buildStreamUrl(currentTrack.publicId, format)
+      requestSelectedTrackPlayback(currentTrack, get, commit, { format, autoplay: false })
     },
     interruptPlayback: (element, cause, onServerUp) => {
       const { audioElement, currentTrack } = get()
@@ -88,8 +86,8 @@ export function createPlayerPlaybackSlice({ get, commit }: PlayerSliceContext): 
       if (!playing) invalidatePlaybackSelection()
       const { audioElement, currentTrack } = get()
       if (playing && audioElement && (!audioElement.src || audioElement.getAttribute?.('src') === '') && currentTrack) {
-        audioElement.src = buildStreamUrl(currentTrack.publicId)
-        audioElement.currentTime = getCurrentTime()
+        requestSelectedTrackPlayback(currentTrack, get, commit, { position: getCurrentTime() })
+        return
       }
       commit({ isPlaying: playing })
     },

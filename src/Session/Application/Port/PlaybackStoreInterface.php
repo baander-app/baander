@@ -28,9 +28,11 @@ interface PlaybackStoreInterface
     public function insertCommand(array $command): void;
     /** @return array<string,mixed> */
     public function command(string $userId, string $commandId): array;
-    /** @return array{id:string,request_id:string,outcome:?string}|null */
+    /** @return array{id:string,request_id:string,outcome:?string,rejection_reason:?string}|null */
     public function requestedCommand(string $sessionId, string $requestId): ?array;
-    public function acknowledgeCommand(string $commandId, string $outcome): void;
+    public function acknowledgeCommand(string $commandId, string $outcome, ?string $rejectionReason = null): void;
+    /** @return array{id:string,request_id:string,state:string,rejection_reason:?string}|null */
+    public function requestedTransfer(string $sessionId, string $requestId): ?array;
     public function cancelCommands(string $attemptId): void;
     public function hasPendingControl(string $sessionId): bool;
     /** @return array<string,mixed>|null */

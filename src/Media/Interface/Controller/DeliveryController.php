@@ -67,7 +67,8 @@ final readonly class DeliveryController
                 $request->transports,
                 $request->maxBitDepth,
                 $request->supportsHdr,
-                $request->pixelFormats
+                $request->pixelFormats,
+                $request->sourcePlaybackFailed,
             );
         } catch (\InvalidArgumentException $error) {
             return $this->errorResponse($error->getMessage());

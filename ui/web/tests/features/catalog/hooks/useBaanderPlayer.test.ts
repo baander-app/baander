@@ -16,8 +16,12 @@ interface TestAttachment {
 
 type MockAttachmentOptions = Omit<TestAttachment, 'dispose'> & { video: HTMLVideoElement, url: string }
 
-const { post, attachments, loader, clientIdentity } = vi.hoisted(() => ({
-  post: vi.fn(), clientIdentity: vi.fn(), loader: { ready: true }, attachments: [] as TestAttachment[],
+const { post, attachments, loader, clientIdentity, negotiate, detect } = vi.hoisted(() => ({
+  post: vi.fn(), clientIdentity: vi.fn(), negotiate: vi.fn(), detect: vi.fn(), loader: { ready: true }, attachments: [] as TestAttachment[],
+}))
+vi.mock('@/features/player/services/media-delivery', () => ({
+  detectDestinationCapabilities: detect, negotiateMediaDelivery: negotiate,
+  MediaCompatibilityError: class extends Error { constructor(readonly reason: string) { super(reason) } },
 }))
 vi.mock('@/features/session/services/playback-session-coordinator', () => ({ getPlaybackClientRequestId: clientIdentity }))
 vi.mock('@/features/catalog/hooks/hls-playback', () => ({
@@ -34,9 +38,17 @@ vi.mock('@/shared/api-client/axios-instance', () => ({ AXIOS_INSTANCE: { post } 
 describe('useBaanderPlayer authorization', () => {
   beforeEach(() => {
     post.mockReset()
+    detect.mockReset().mockResolvedValue({ containers: ['mp4'] })
+    negotiate.mockReset().mockResolvedValue({ kind: 'encoded', url: null, selection: null, jobId: null, requestId: null })
     clientIdentity.mockReset().mockResolvedValue('f8bf4989-7537-46ac-9fb6-910ea8e1d465')
     attachments.length = 0
     loader.ready = true
+    const trackEvents = new EventTarget()
+    const tracks = Object.assign([], {
+      addEventListener: trackEvents.addEventListener.bind(trackEvents),
+      removeEventListener: trackEvents.removeEventListener.bind(trackEvents),
+    })
+    vi.spyOn(HTMLMediaElement.prototype, 'textTracks', 'get').mockReturnValue(tracks as unknown as TextTrackList)
     vi.spyOn(HTMLMediaElement.prototype, 'load').mockImplementation(() => {})
     vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {})
     vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue()
@@ -46,6 +58,104 @@ describe('useBaanderPlayer authorization', () => {
     window.__BAANDER_API_URL__ = 'https://media.baander.app'
   })
   afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks() })
+
+  it('attaches original files natively and seeks without producer controls', async () => {
+    negotiate.mockResolvedValue({ kind: 'original', url: '/original.mp4', selection: { transport: 'file' } })
+    const containerRef = { current: document.createElement('div') }
+    const { result } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef }))
+    await act(async () => {})
+    const video = containerRef.current.querySelector('video')!
+    expect(video.src).toBe('https://media.baander.app/original.mp4')
+    act(() => video.dispatchEvent(new Event('loadedmetadata')))
+    act(() => result.current.seekTo(90))
+    expect(video.currentTime).toBe(90)
+    expect(result.current.duration).toBe(1200)
+    expect(attachments).toHaveLength(0)
+    expect(post).not.toHaveBeenCalled()
+    expect(negotiate).toHaveBeenCalledWith(expect.objectContaining({ requestId: 'f8bf4989-7537-46ac-9fb6-910ea8e1d465' }), expect.any(AbortSignal))
+  })
+
+  it('plays cached immutable HLS without producer controls', async () => {
+    negotiate.mockResolvedValue({ kind: 'cached', url: '/cached/master.m3u8', selection: { transport: 'hls' } })
+    const containerRef = { current: document.createElement('div') }
+    const { result } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef, coordinated: true }))
+    await act(async () => {})
+    const video = containerRef.current.querySelector('video')!
+    let paused = true
+    Object.defineProperty(video, 'paused', { get: () => paused })
+    vi.mocked(video.pause).mockImplementation(() => { paused = true })
+    vi.mocked(video.play).mockImplementation(async () => { paused = false; video.dispatchEvent(new Event('play')) })
+    act(() => video.dispatchEvent(new Event('loadedmetadata')))
+    await act(async () => { await result.current.execution.execute('play', undefined, new AbortController().signal) })
+    act(() => video.dispatchEvent(new Event('canplay')))
+    expect(paused).toBe(false)
+    await act(async () => { await result.current.execution.execute('seek', 90, new AbortController().signal) })
+    expect(result.current.execution.observe().position).toBe(90)
+    expect(attachments).toHaveLength(1)
+    expect(post).not.toHaveBeenCalled()
+  })
+
+  it('renews cached delivery with the same identity and preserves a natively paused cursor', async () => {
+    vi.useFakeTimers()
+    const expiry = Math.floor(Date.now() / 1000) + 4
+    negotiate.mockResolvedValueOnce({ kind: 'cached', url: `/cached/master.m3u8?exp=${expiry}`, selection: { transport: 'hls' } })
+      .mockResolvedValue({ kind: 'cached', url: `/cached/master.m3u8?exp=${expiry + 120}`, selection: { transport: 'hls' } })
+    const containerRef = { current: document.createElement('div') }
+    const { result } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef }))
+    await act(async () => {})
+    const video = containerRef.current.querySelector('video')!
+    act(() => video.dispatchEvent(new Event('loadedmetadata')))
+    act(() => result.current.seekTo(90))
+    act(() => {
+      video.dispatchEvent(new Event('play'))
+      video.dispatchEvent(new Event('pause'))
+    })
+    await act(async () => { await vi.advanceTimersByTimeAsync(5000) })
+    act(() => video.dispatchEvent(new Event('loadedmetadata')))
+    expect(attachments).toHaveLength(2)
+    expect(attachments[1]!.position).toBe(90)
+    expect(video.currentTime).toBe(90)
+    expect(video.play).not.toHaveBeenCalled()
+    expect(negotiate.mock.calls.map(([input]) => input.requestId)).toEqual([
+      'f8bf4989-7537-46ac-9fb6-910ea8e1d465', 'f8bf4989-7537-46ac-9fb6-910ea8e1d465',
+    ])
+    expect(post).not.toHaveBeenCalled()
+  })
+
+  it('ignores an old negotiation after a different video is selected', async () => {
+    let resolveOld!: (value: unknown) => void
+    negotiate.mockImplementationOnce(() => new Promise(resolve => { resolveOld = resolve }))
+      .mockResolvedValue({ kind: 'original', url: '/new.mp4', selection: { transport: 'file' } })
+    const containerRef = { current: document.createElement('div') }
+    const { rerender } = renderHook(({ videoId }) => useBaanderPlayer({ videoId, containerRef }), { initialProps: { videoId: 'old' } })
+    await act(async () => {})
+    rerender({ videoId: 'new' })
+    await act(async () => {})
+    await act(async () => { resolveOld({ kind: 'original', url: '/old.mp4', selection: { transport: 'file' } }) })
+    expect(containerRef.current.querySelector('video')!.src).toBe('https://media.baander.app/new.mp4')
+    expect(post).not.toHaveBeenCalled()
+  })
+
+  it('signs an admitted copy job with the same identity and exact job ownership', async () => {
+    negotiate.mockResolvedValue({ kind: 'copy', url: '/unused', jobId: 'copy-job', selection: { transport: 'hls' } })
+    post.mockResolvedValue({ data: { url: '/manifest', jobIds: ['copy-job'], jobId: 'copy-job', renditionSet: 'set', sessionId: 'owned-session', generation: 1, revision: 1, ready: true, startTime: 0, duration: 180, position: 0, status: 'running' } })
+    const containerRef = { current: document.createElement('div') }
+    renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef }))
+    await act(async () => {})
+    expect(post).toHaveBeenCalledWith('/api/stream/sign', {
+      path: '/api/transcode/video/master.m3u8', refresh: true, jobIds: ['copy-job'], requestId: 'f8bf4989-7537-46ac-9fb6-910ea8e1d465',
+    }, expect.any(Object))
+  })
+
+  it('keeps incompatible delivery terminal and exposes its explanation', async () => {
+    negotiate.mockResolvedValue({ kind: 'incompatible', reason: 'This browser cannot play the available codecs.' })
+    const containerRef = { current: document.createElement('div') }
+    const { result } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef }))
+    await act(async () => {})
+    expect(result.current.state).toBe('error')
+    expect(result.current.error).toBe('This browser cannot play the available codecs.')
+    expect(post).not.toHaveBeenCalled()
+  })
 
   it('waits for the receiving client identity and keeps it on exact-job refreshes', async () => {
     vi.useFakeTimers()

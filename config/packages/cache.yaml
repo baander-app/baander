@@ -7,15 +7,12 @@ framework:
         # directly, with the same timeouts.
         default_redis_provider: 'redis://default:%env(REDIS_PASSWORD)%@redis:6379?timeout=1&read_timeout=1'
 
-        # Redis-backed cache pools for Swoole workers
         app: cache.adapter.redis
-        system: cache.adapter.redis
+        system: cache.adapter.system
 
         pools:
-            # Doctrine system cache (metadata, query) — indefinite, cleared on deploy
             doctrine.system_cache_pool:
-                adapter: cache.adapter.redis
-                provider: 'redis://default:%env(REDIS_PASSWORD)%@redis:6379?timeout=1&read_timeout=1'
+                adapter: cache.system
                 default_lifetime: 0
 
             # Doctrine result cache — 1 hour default, overridable per-query

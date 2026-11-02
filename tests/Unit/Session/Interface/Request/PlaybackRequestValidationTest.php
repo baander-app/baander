@@ -29,6 +29,17 @@ final class PlaybackRequestValidationTest extends TestCase
         }
     }
 
+    public function testAcknowledgementAcceptsOnlyTerminalCompatibilityReasons(): void
+    {
+        $validator = Validation::createValidatorBuilder()->enableAttributeMapping()->getValidator();
+        $id = new Uuid()->toString();
+        $accepted = new AcknowledgePlaybackRequest($id, $id, 1, $id, 1, 'rejected', rejectionReason: 'video_codec_unsupported');
+        self::assertCount(0, $validator->validate($accepted));
+        self::assertSame('video_codec_unsupported', $accepted->toArray()['rejectionReason']);
+        self::assertNotCount(0, $validator->validate(new AcknowledgePlaybackRequest($id, $id, 1, $id, 1, 'rejected', rejectionReason: 'raw error message')));
+        self::assertNotCount(0, $validator->validate(new AcknowledgePlaybackRequest($id, $id, 1, $id, 1, 'prepared', rejectionReason: 'unknown')));
+    }
+
     public function testMalformedMediaAndEndpointAuthorityAreRejectedBeforeTheUseCase(): void
     {
         $validator = Validation::createValidatorBuilder()->enableAttributeMapping()->getValidator();

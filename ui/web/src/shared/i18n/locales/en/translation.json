@@ -120,7 +120,27 @@
     "repeat": "Repeat",
     "volume": "Volume",
     "queue": "Queue",
-    "nowPlaying": "Now playing"
+    "nowPlaying": "Now playing",
+    "compatibility": {
+      "unknown": "This item cannot play on this device with the server’s current playback settings.",
+      "destination_media_unsupported": "This device does not report support for a playable media format.",
+      "browser_rejected_source": "This browser could not play the available media. No other compatible version is available with the server’s current playback settings.",
+      "source_stream_metadata_unavailable": "Playback needs stream information that is missing. Scan this item again to update it.",
+      "source_color_metadata_unavailable": "Playback needs video color information that is missing. Scan this item again to update it.",
+      "video_pixel_format_unsupported": "This device cannot play the video’s pixel format without re-encoding.",
+      "video_bit_depth_unsupported": "This device cannot play the video’s color depth without re-encoding.",
+      "video_hdr_unsupported": "This device cannot play this HDR video without re-encoding.",
+      "subtitle_burn_in_required": "These subtitles need to be burned into the video, which requires re-encoding.",
+      "subtitle_delivery_unsupported": "This device cannot play the stream format needed to preserve this video’s subtitles.",
+      "video_codec_unsupported": "This device cannot play the video codec without re-encoding.",
+      "video_dimensions_unsupported": "This device cannot play the video’s resolution without re-encoding.",
+      "audio_codec_unsupported": "This device cannot play the audio codec without re-encoding.",
+      "audio_channels_unsupported": "This device cannot play this audio channel layout without re-encoding.",
+      "container_unsupported": "This item’s container cannot be played or remuxed for this device.",
+      "audio_stream_selection_requires_remux": "The selected audio track needs remuxing into a format this device can play.",
+      "audio_stream_unavailable": "The selected audio track is no longer available.",
+      "audio_transcoding_disabled": "This audio needs re-encoding, which is disabled in the server’s settings."
+    }
   },
   "catalog": {
     "albums": "Albums",

@@ -13,12 +13,24 @@ import { toast } from 'sonner'
 import { PLAYBACK_CONNECTION_KEY, PLAYBACK_SESSION_KEY } from '@/features/session/services/playback-session-coordinator'
 import { PlayerProgress } from '@/features/layout/components/PlayerProgress'
 import { ProgressBar } from '../../components/ProgressBar'
+import { negotiateMediaDelivery } from '../../services/media-delivery'
 import { getPlaybackAdapter, registerPlaybackIntentHandler } from '@/features/session/services/playback-execution'
 
 const renderHook: typeof renderBaseHook = (callback, options) => {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, queryFn: async () => null } } })
   return renderBaseHook(callback, { ...options, wrapper: ({ children }) => createElement(QueryClientProvider, { client }, children) })
 }
+
+// Unit tests supply server decisions; native support negotiation is covered separately.
+vi.mock('@/features/player/services/media-delivery', () => ({
+  detectDestinationCapabilities: vi.fn(async (element: HTMLAudioElement) => ({ failed: element.error?.code === 4 || element.src.includes('format=') })),
+  negotiateMediaDelivery: vi.fn(async ({ id, capabilities }: { id: string; capabilities: { failed: boolean } }) => ({
+    kind: capabilities.failed ? 'encoded' : 'original',
+    url: capabilities.failed ? null : `/api/stream/track?id=${encodeURIComponent(id)}`,
+    reason: null, selection: null, requestId: null, jobId: null,
+  })),
+  MediaCompatibilityError: class extends Error {},
+}))
 
 // --- Mocks must be hoisted before the hook imports them ---------------------
 
@@ -317,7 +329,7 @@ describe('useAudioPlayback', () => {
     stop()
   })
 
-  it('uses the remote duration for a footer seek click', () => {
+  it('uses the remote duration for a footer seek click', async () => {
     const selected = { ...track('remote-song'), duration: 240 }
     usePlayerStore.setState({ queue: [selected], currentTrack: selected, currentIndex: 0, duration: 999 })
     renderController()
@@ -338,18 +350,18 @@ describe('useAudioPlayback', () => {
     usePlayerStore.setState({ queue: [selected], currentTrack: selected, currentIndex: 0 })
     const { client, snapshot } = renderController()
     expect(usePlayerStore.getState().duration).toBe(14)
-    act(() => { vi.advanceTimersByTime(1500) })
+    await act(async () => { vi.advanceTimersByTime(1500) })
     expect(getCurrentTime()).toBe(13.5)
-    act(() => { vi.advanceTimersByTime(2000) })
+    await act(async () => { vi.advanceTimersByTime(2000) })
     expect(getCurrentTime()).toBe(14)
     await act(async () => { client.setQueryData(PLAYBACK_SESSION_KEY, { ...snapshot, observedState: 'paused', position: 8 }) })
-    act(() => { vi.advanceTimersByTime(2000) })
+    await act(async () => { vi.advanceTimersByTime(2000) })
     expect(getCurrentTime()).toBe(8)
     await act(async () => {
       client.setQueryData(PLAYBACK_SESSION_KEY, { ...snapshot, position: 9 })
       client.setQueryData(PLAYBACK_CONNECTION_KEY, { endpoint: null, connected: false, error: 'Disconnected' })
     })
-    act(() => { vi.advanceTimersByTime(2000) })
+    await act(async () => { vi.advanceTimersByTime(2000) })
     expect(getCurrentTime()).toBe(9)
     expect(capturedAudioElements.every(audio => vi.mocked(audio.play).mock.calls.length === 0)).toBe(true)
   })
@@ -381,7 +393,7 @@ describe('useAudioPlayback', () => {
     audio.readyState = 0
     let prepared = false
     const task = getPlaybackAdapter('song')!.prepare(loadCommand().payload, new AbortController().signal).then(() => { prepared = true })
-    await Promise.resolve()
+    await vi.waitFor(() => expect(audio.src).toContain('id=t0'))
     expect(audio.src).toContain('id=t0')
     expect(prepared).toBe(false)
     expect(audio.play).not.toHaveBeenCalled()
@@ -462,7 +474,7 @@ describe('useAudioPlayback', () => {
     await act(async () => { await adapter.execute(command, new AbortController().signal) })
 
     expect(usePlayerStore.getState().duration).toBe(expected)
-    act(() => {
+    await act(async () => {
       outgoing.duration = 999
       outgoing.dispatchEvent(new Event('durationchange'))
     })
@@ -676,7 +688,7 @@ describe('useAudioPlayback', () => {
     expect(audio.paused).toBe(true)
   })
 
-  it('still pauses both elements but refuses a stop proof if graph muting fails', () => {
+  it('still pauses both elements but refuses a stop proof if graph muting fails', async () => {
     renderHook(() => useAudioPlayback())
     const [audio, incoming] = capturedAudioElements
     vi.mocked(audioService.fenceOutput).mockImplementationOnce(() => { throw new Error('Graph failed') })
@@ -685,14 +697,14 @@ describe('useAudioPlayback', () => {
     expect(incoming.pause).toHaveBeenCalled()
   })
 
-  it('does not return a stop proof if an owned element remains playing', () => {
+  it('does not return a stop proof if an owned element remains playing', async () => {
     renderHook(() => useAudioPlayback())
     const [audio] = capturedAudioElements
     audio.paused = false
     expect(getPlaybackAdapter('song')!.localRecovery!.fence()).toBeNull()
   })
 
-  it('qualifies prevented Chromium local output while keeping Safari ineligible', () => {
+  it('qualifies prevented Chromium local output while keeping Safari ineligible', async () => {
     const userAgent = vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue('Mozilla/5.0 Chrome/156.0.0.0 Safari/537.36')
     const first = renderHook(() => useAudioPlayback())
     expect(getPlaybackAdapter('song')!.localRecovery!.eligible).toBe(true)
@@ -721,14 +733,14 @@ describe('useAudioPlayback', () => {
     expect(radio.src).toBe('')
   })
 
-  it('registers its owned runtime and removes it on unmount', () => {
+  it('registers its owned runtime and removes it on unmount', async () => {
     const { unmount } = renderHook(() => useAudioPlayback())
     expect(getPlaybackAdapter('song')?.kind).toBe('song')
     unmount()
     expect(getPlaybackAdapter('song')).toBeUndefined()
   })
 
-  it('recreates playable resources when StrictMode replays setup', () => {
+  it('recreates playable resources when StrictMode replays setup', async () => {
     const { result, unmount } = renderHook(() => useAudioPlayback(), {
       reactStrictMode: true,
     })
@@ -739,20 +751,20 @@ describe('useAudioPlayback', () => {
     expect(usePlayerStore.getState().audioElement).toBe(active)
     usePlayerStore.setState({ currentTrack: track('t0') })
     active.src = '/api/stream/track?id=t0'
-    act(() => { active.dispatchEvent(new Event('loadstart')) })
+    await act(async () => { active.dispatchEvent(new Event('loadstart')) })
     expect(audioService.connectDualAudioElements).toHaveBeenCalledWith(active, capturedAudioElements[3])
-    act(() => { playMedia(active) })
+    await act(async () => { playMedia(active) })
     expect(usePlayerStore.getState().isPlaying).toBe(true)
     unmount()
     expect(result.current.current).toBeNull()
     expect(usePlayerStore.getState().audioElement).toBeNull()
   })
 
-  it('removes loadstart and pending preload listeners on teardown', () => {
+  it('removes loadstart and pending preload listeners on teardown', async () => {
     seedQueue(0, 2)
     const { unmount } = renderHook(() => useAudioPlayback())
     const [a, b] = capturedAudioElements
-    act(() => { timeUpdate(a, 95, 100) })
+    await act(async () => { timeUpdate(a, 95, 100) })
     unmount()
     expect(a.removeEventListener).toHaveBeenCalledWith('loadstart', expect.any(Function))
     expect(b.removeEventListener).toHaveBeenCalledWith('canplaythrough', expect.any(Function))
@@ -762,29 +774,31 @@ describe('useAudioPlayback', () => {
     expect(audioService.connectDualAudioElements).not.toHaveBeenCalled()
   })
 
-  it('does not publish pause events raised while disposing the owned elements', () => {
+  it('does not publish pause events raised while disposing the owned elements', async () => {
     const { unmount } = renderHook(() => useAudioPlayback())
     const [a] = capturedAudioElements
     vi.mocked(a.pause).mockImplementation(() => { a.dispatchEvent(new Event('pause')) })
-    act(() => { usePlayerStore.setState({ isPlaying: true }) })
+    await act(async () => { usePlayerStore.setState({ isPlaying: true }) })
     unmount()
     expect(usePlayerStore.getState().isPlaying).toBe(true)
     expect(usePlayerStore.getState().audioElement).toBeNull()
   })
 
   it('does not resume a retired element after deferred context resume', async () => {
+    seedQueue(0, 1)
     let resolveResume!: () => void
     vi.mocked(audioService.resumeContextIfNeeded).mockReturnValue(new Promise<void>((resolve) => { resolveResume = resolve }))
     const { unmount } = renderHook(() => useAudioPlayback())
     const [a] = capturedAudioElements
     a.src = '/api/stream/track?id=t0'
-    act(() => { usePlayerStore.setState({ isPlaying: true }) })
+    await act(async () => { usePlayerStore.setState({ isPlaying: true }) })
     unmount()
     await act(async () => { resolveResume() })
     expect(a.play).not.toHaveBeenCalled()
   })
 
   it('ignores playback failures delivered after teardown', async () => {
+    seedQueue(0, 1)
     let rejectPlay!: (reason: Error) => void
     const { unmount } = renderHook(() => useAudioPlayback())
     const [a] = capturedAudioElements
@@ -801,13 +815,13 @@ describe('useAudioPlayback', () => {
     let resolveResume!: () => void
     vi.mocked(audioService.resumeContextIfNeeded).mockReturnValue(new Promise<void>((resolve) => { resolveResume = resolve }))
     const { unmount } = renderHook(() => useAudioPlayback())
-    act(() => { document.dispatchEvent(new Event('click')) })
+    await act(async () => { document.dispatchEvent(new Event('click')) })
     unmount()
     await act(async () => { resolveResume() })
     expect(reapplyAllEqState).not.toHaveBeenCalled()
   })
 
-  it('creates dual audio elements, wires the primary (A) element to the store, and inits the audio service', () => {
+  it('creates dual audio elements, wires the primary (A) element to the store, and inits the audio service', async () => {
     const { unmount } = renderHook(() => useAudioPlayback())
 
     expect(capturedAudioElements).toHaveLength(2)
@@ -821,7 +835,7 @@ describe('useAudioPlayback', () => {
   // --- Preload scheduler ---------------------------------------------------
 
   describe('preload scheduler', () => {
-    it('primes the inactive element (B) when within the gapless threshold (6s) and moves toward ready on canplaythrough', () => {
+    it('primes the inactive element (B) when within the gapless threshold (6s) and moves toward ready on canplaythrough', async () => {
       const q = seedQueue(0, 2) // t0 playing, t1 next
       const { result } = renderHook(() => useAudioPlayback())
       const [a, b] = capturedAudioElements
@@ -831,7 +845,7 @@ describe('useAudioPlayback', () => {
       expect(b.src).toBe('')
 
       // Cross gapless threshold: 100 - 95 = 5 < 6.
-      act(() => {
+      await act(async () => {
         timeUpdate(a, 95, 100)
       })
 
@@ -840,13 +854,13 @@ describe('useAudioPlayback', () => {
 
       // canplaythrough promotes preload state to 'ready' (observable only via
       // the ended path, exercised below); fire it to complete the cycle.
-      act(() => {
+      await act(async () => {
         b.dispatchEvent(new Event('canplaythrough'))
       })
 
       // A second timeupdate near the end must NOT re-prime (preloadState != idle).
       const srcAfterReady = b.src
-      act(() => {
+      await act(async () => {
         timeUpdate(a, 97, 100)
       })
       expect(b.src).toBe(srcAfterReady)
@@ -854,7 +868,7 @@ describe('useAudioPlayback', () => {
       void result
     })
 
-    it('uses crossfadeDuration + 3s buffer as the threshold when crossfade is enabled', () => {
+    it('uses crossfadeDuration + 3s buffer as the threshold when crossfade is enabled', async () => {
       seedQueue(0, 2)
       resetStore({
         queue: [track('t0'), track('t1')],
@@ -867,48 +881,48 @@ describe('useAudioPlayback', () => {
       const [a, b] = capturedAudioElements
 
       // 100 - 90 = 10 < 11 → should preload.
-      act(() => {
+      await act(async () => {
         timeUpdate(a, 90, 100)
       })
       expect(b.src).toContain('t1')
     })
 
-    it('does not preload when there is no next track (end of non-repeating queue)', () => {
+    it('does not preload when there is no next track (end of non-repeating queue)', async () => {
       seedQueue(1, 2) // at last index, repeat off → resolveNextIndex returns null
       renderHook(() => useAudioPlayback())
       const [a, b] = capturedAudioElements
 
-      act(() => {
+      await act(async () => {
         timeUpdate(a, 95, 100)
       })
       expect(b.src).toBe('')
     })
 
-    it('does not preload when duration is not finite', () => {
+    it('does not preload when duration is not finite', async () => {
       seedQueue(0, 2)
       renderHook(() => useAudioPlayback())
       const [a, b] = capturedAudioElements
 
       // Live stream (Infinity duration) — guard returns early.
-      act(() => {
+      await act(async () => {
         timeUpdate(a, 50, Infinity)
       })
       expect(b.src).toBe('')
     })
 
-    it('resets preloadState to idle on element error', () => {
+    it('resets preloadState to idle on element error', async () => {
       seedQueue(0, 2)
       renderHook(() => useAudioPlayback())
       const [a, b] = capturedAudioElements
 
-      act(() => {
+      await act(async () => {
         timeUpdate(a, 95, 100) // → preloading
       })
       expect(b.src).toContain('t1')
 
       // Fire error → state back to idle. A subsequent timeupdate past threshold
       // should attempt to re-prime (src gets set again).
-      act(() => {
+      await act(async () => {
         b.dispatchEvent(new Event('error'))
         timeUpdate(a, 96, 100)
       })
@@ -919,14 +933,14 @@ describe('useAudioPlayback', () => {
   // --- ended branching -----------------------------------------------------
 
   describe('programme boundaries', () => {
-    it.each(['paused', 'ended'] as const)('ignores a queued play notification while current media is %s', (state) => {
+    it.each(['paused', 'ended'] as const)('ignores a queued play notification while current media is %s', async (state) => {
       seedQueue(0, 2)
       renderHook(() => useAudioPlayback())
       const [a] = capturedAudioElements
       a.src = '/api/stream/track?id=t0'
       a.paused = state === 'paused'
       a.ended = state === 'ended'
-      act(() => { a.dispatchEvent(new Event('play')) })
+      await act(async () => { a.dispatchEvent(new Event('play')) })
       expect(usePlayerStore.getState().isPlaying).toBe(false)
       expect(audioService.setPlayingState).not.toHaveBeenCalledWith(true)
       expect(audioService.connectDualAudioElements).not.toHaveBeenCalled()
@@ -953,34 +967,34 @@ describe('useAudioPlayback', () => {
       expect(activityService.recordPlay).not.toHaveBeenCalled()
     })
 
-    it('ignores a queued pause from a replaced source while current playback is active', () => {
+    it('ignores a queued pause from a replaced source while current playback is active', async () => {
       seedQueue(0, 2)
       usePlayerStore.setState({ isPlaying: true })
       renderHook(() => useAudioPlayback())
       const [a] = capturedAudioElements
       a.paused = false
-      act(() => { a.dispatchEvent(new Event('pause')) })
+      await act(async () => { a.dispatchEvent(new Event('pause')) })
       expect(usePlayerStore.getState().isPlaying).toBe(true)
       expect(audioService.setPlayingState).not.toHaveBeenCalledWith(false)
       a.paused = true
-      act(() => { a.dispatchEvent(new Event('pause')) })
+      await act(async () => { a.dispatchEvent(new Event('pause')) })
       expect(usePlayerStore.getState().isPlaying).toBe(false)
       expect(audioService.setPlayingState).toHaveBeenCalledWith(false)
     })
 
-    it('resets for active source loads including reloading the same track', () => {
+    it('resets for active source loads including reloading the same track', async () => {
       seedQueue(0, 2)
       renderHook(() => useAudioPlayback())
       const [a, b] = capturedAudioElements
       a.src = '/api/stream/track?id=t0'
-      act(() => {
+      await act(async () => {
         a.dispatchEvent(new Event('loadstart'))
         a.dispatchEvent(new Event('loadstart'))
       })
       expect(processorMock.instance.resetProgramme).toHaveBeenCalledTimes(2)
 
       processorMock.instance.resetProgramme.mockClear()
-      act(() => {
+      await act(async () => {
         timeUpdate(a, 95, 100)
         b.dispatchEvent(new Event('loadstart'))
         b.dispatchEvent(new Event('canplaythrough'))
@@ -988,18 +1002,18 @@ describe('useAudioPlayback', () => {
       expect(b.load).toHaveBeenCalledOnce()
       expect(processorMock.instance.resetProgramme).not.toHaveBeenCalled()
 
-      act(() => {
+      await act(async () => {
         a.src = ''
         a.dispatchEvent(new Event('loadstart'))
       })
       expect(processorMock.instance.resetProgramme).not.toHaveBeenCalled()
     })
 
-    it('preserves the programme on play, pause, seek and queue mutation', () => {
+    it('preserves the programme on play, pause, seek and queue mutation', async () => {
       seedQueue(0, 2)
       renderHook(() => useAudioPlayback())
       const [a] = capturedAudioElements
-      act(() => {
+      await act(async () => {
         playMedia(a)
         a.dispatchEvent(new Event('pause'))
         a.currentTime = 0
@@ -1016,6 +1030,8 @@ describe('useAudioPlayback', () => {
       vi.mocked(b.play).mockRejectedValueOnce(new Error('Playback unavailable'))
       await act(async () => {
         timeUpdate(a, 95, 100)
+      })
+      await act(async () => {
         b.dispatchEvent(new Event('canplaythrough'))
         endMedia(a)
       })
@@ -1070,8 +1086,10 @@ describe('useAudioPlayback', () => {
       const [a, b] = capturedAudioElements
 
       // Prime + ready the preload.
-      act(() => {
+      await act(async () => {
         timeUpdate(a, 95, 100)
+      })
+      await act(async () => {
         b.dispatchEvent(new Event('canplaythrough'))
       })
 
@@ -1109,8 +1127,10 @@ describe('useAudioPlayback', () => {
       renderHook(() => useAudioPlayback())
       const [a, b] = capturedAudioElements
 
-      act(() => {
+      await act(async () => {
         timeUpdate(a, 95, 100)
+      })
+      await act(async () => {
         b.dispatchEvent(new Event('canplaythrough'))
       })
 
@@ -1120,7 +1140,7 @@ describe('useAudioPlayback', () => {
       expect(usePlayerStore.getState().audioElement).toBe(b)
       expect(b.volume).toBe(1)
       expect(processorMock.instance.setVolume).toHaveBeenLastCalledWith(0.75)
-      act(() => { vi.advanceTimersByTime(3000) })
+      await act(async () => { vi.advanceTimersByTime(3000) })
       expect(a.pause).toHaveBeenCalled()
       vi.useRealTimers()
 
@@ -1154,7 +1174,7 @@ describe('useAudioPlayback', () => {
       const [a] = capturedAudioElements
 
       // Start preload (→ preloading) but do NOT fire canplaythrough.
-      act(() => {
+      await act(async () => {
         timeUpdate(a, 95, 100)
       })
       // ended before ready → fallback path (processor swap skipped).
@@ -1175,18 +1195,20 @@ describe('useAudioPlayback', () => {
       a.src = '/api/stream/track?id=t0'
       await act(async () => {
         timeUpdate(a, 95, 100)
+      })
+      await act(async () => {
         b.dispatchEvent(new Event('canplaythrough'))
         endMedia(a)
       })
       expect(usePlayerStore.getState().audioElement).toBe(b)
       expect(a.src).toContain('t0')
       expect(processorMock.instance.resetProgramme).toHaveBeenCalledOnce()
-      act(() => {
+      await act(async () => {
         a.dispatchEvent(new Event('loadstart'))
         b.dispatchEvent(new Event('loadstart'))
       })
       expect(processorMock.instance.resetProgramme).toHaveBeenCalledTimes(2)
-      act(() => {
+      await act(async () => {
         b.duration = 120
         b.dispatchEvent(new Event('durationchange'))
         a.duration = 999
@@ -1194,11 +1216,13 @@ describe('useAudioPlayback', () => {
       })
       expect(usePlayerStore.getState().duration).toBe(120)
       b.paused = false
-      act(() => { usePlayerStore.setState({ isPlaying: false }) })
+      await act(async () => { usePlayerStore.setState({ isPlaying: false }) })
       expect(b.pause).toHaveBeenCalled()
       await act(async () => { usePlayerStore.setState({ isPlaying: true }) })
       await act(async () => {
         timeUpdate(b, 115, 120)
+      })
+      await act(async () => {
         a.dispatchEvent(new Event('canplaythrough'))
         endMedia(b)
       })
@@ -1215,6 +1239,8 @@ describe('useAudioPlayback', () => {
       const [a, b] = capturedAudioElements
       await act(async () => {
         timeUpdate(a, 95, 100)
+      })
+      await act(async () => {
         b.dispatchEvent(new Event('canplaythrough'))
         a.ended = true
         a.dispatchEvent(new Event('pause'))
@@ -1233,6 +1259,8 @@ describe('useAudioPlayback', () => {
       vi.mocked(b.play).mockReturnValue(new Promise<void>((resolve) => { resolvePlay = resolve }))
       await act(async () => {
         timeUpdate(a, 95, 100)
+      })
+      await act(async () => {
         b.dispatchEvent(new Event('canplaythrough'))
         endMedia(a)
       })
@@ -1253,9 +1281,11 @@ describe('useAudioPlayback', () => {
       vi.mocked(b.play).mockReturnValue(new Promise<void>((resolve) => { resolvePlay = resolve }))
       await act(async () => {
         timeUpdate(a, 97, 100)
+      })
+      await act(async () => {
         b.dispatchEvent(new Event('canplaythrough'))
       })
-      act(() => {
+      await act(async () => {
         a.currentTime = 10
         a.seeking = true
         if (dispatchSeeking) a.dispatchEvent(new Event('seeking'))
@@ -1277,10 +1307,12 @@ describe('useAudioPlayback', () => {
       vi.mocked(b.play).mockReturnValue(new Promise<void>((resolve) => { resolvePlay = resolve }))
       await act(async () => {
         timeUpdate(a, 95, 100)
+      })
+      await act(async () => {
         b.dispatchEvent(new Event('canplaythrough'))
         endMedia(a)
       })
-      act(() => {
+      await act(async () => {
         if (interruption === 'pause') usePlayerStore.setState({ isPlaying: false })
         if (interruption === 'queue') usePlayerStore.setState({ queue: [track('t0'), track('changed')] })
         if (interruption === 'unmount') unmount()
@@ -1299,6 +1331,8 @@ describe('useAudioPlayback', () => {
       const [a, b] = capturedAudioElements
       await act(async () => {
         timeUpdate(a, 95, 100)
+      })
+      await act(async () => {
         b.dispatchEvent(new Event('canplaythrough'))
         endMedia(a)
       })
@@ -1306,7 +1340,7 @@ describe('useAudioPlayback', () => {
       expect([a.muted, b.muted]).toEqual([false, false])
       expect(processorMock.instance.setVolume).toHaveBeenLastCalledWith(0.25)
       expect(processorMock.instance.setMuted).toHaveBeenLastCalledWith(true)
-      act(() => {
+      await act(async () => {
         usePlayerStore.getState().runtimeActions.setMuted(true)
         usePlayerStore.getState().runtimeActions.setVolume(40)
         usePlayerStore.getState().runtimeActions.setMuted(false)
@@ -1315,7 +1349,7 @@ describe('useAudioPlayback', () => {
       expect([a.muted, b.muted]).toEqual([false, false])
       expect(processorMock.instance.setVolume).toHaveBeenLastCalledWith(0.4)
       expect(processorMock.instance.setMuted).toHaveBeenLastCalledWith(false)
-      act(() => { usePlayerStore.getState().runtimeActions.toggleMute() })
+      await act(async () => { usePlayerStore.getState().runtimeActions.toggleMute() })
       expect([a.muted, b.muted]).toEqual([false, false])
       expect(processorMock.instance.setMuted).toHaveBeenLastCalledWith(true)
     })
@@ -1394,14 +1428,14 @@ describe('useAudioPlayback', () => {
       vi.mocked(audioService.connectDualAudioElements).mockImplementationOnce(() => new Promise<void>((_, reject) => { rejectConnection = reject }))
       const first = renderHook(() => useAudioPlayback())
       const [a] = capturedAudioElements
-      act(() => {
+      await act(async () => {
         a.src = 'https://baander.app/audio.mp3'
         a.dispatchEvent(new Event('loadstart'))
         first.unmount()
       })
       renderHook(() => useAudioPlayback())
       const replacement = capturedAudioElements[2]
-      act(() => { usePlayerStore.setState({ isPlaying: true }) })
+      await act(async () => { usePlayerStore.setState({ isPlaying: true }) })
       const pauses = vi.mocked(replacement.pause).mock.calls.length
       await act(async () => { rejectConnection(new Error('Stale source capture failure')) })
       expect(usePlayerStore.getState().isPlaying).toBe(true)
@@ -1411,7 +1445,7 @@ describe('useAudioPlayback', () => {
   })
 
   describe('volume ownership', () => {
-    it.each(['unconnected', 'absent', 'passive'])('keeps both elements at listening volume with %s processor', (mode) => {
+    it.each(['unconnected', 'absent', 'passive'])('keeps both elements at listening volume with %s processor', async (mode) => {
       if (mode === 'absent') vi.mocked(audioService.getProcessor).mockReturnValue(null)
       if (mode === 'passive') {
         processorMock.instance.isActive = true
@@ -1419,13 +1453,13 @@ describe('useAudioPlayback', () => {
       }
       renderHook(() => useAudioPlayback())
       const [a, b] = capturedAudioElements
-      act(() => {
+      await act(async () => {
         usePlayerStore.getState().runtimeActions.setMuted(true)
         usePlayerStore.getState().runtimeActions.setVolume(35)
       })
       expect([a.volume, b.volume]).toEqual([0.35, 0.35])
       expect([a.muted, b.muted]).toEqual([true, true])
-      act(() => { usePlayerStore.getState().runtimeActions.toggleMute() })
+      await act(async () => { usePlayerStore.getState().runtimeActions.toggleMute() })
       expect([a.volume, b.volume]).toEqual([0.35, 0.35])
       expect([a.muted, b.muted]).toEqual([false, false])
     })
@@ -1441,14 +1475,14 @@ describe('useAudioPlayback', () => {
       })
       renderHook(() => useAudioPlayback())
       const [a, b] = capturedAudioElements
-      act(() => {
+      await act(async () => {
         a.src = 'https://baander.app/audio.mp3'
         a.dispatchEvent(new Event('loadstart'))
       })
       // Pending EQ import must not leave attenuation ahead of the meter.
       expect([a.volume, b.volume]).toEqual([1, 1])
       expect([a.muted, b.muted]).toEqual([false, false])
-      act(() => { usePlayerStore.getState().runtimeActions.setVolume(20) })
+      await act(async () => { usePlayerStore.getState().runtimeActions.setVolume(20) })
       expect(processorMock.instance.setVolume).toHaveBeenLastCalledWith(0.2)
       await act(async () => {
         processorMock.instance.passive = true
@@ -1466,7 +1500,7 @@ describe('useAudioPlayback', () => {
       }))
       renderHook(() => useAudioPlayback())
       const [a, b] = capturedAudioElements
-      act(() => {
+      await act(async () => {
         a.src = 'https://baander.app/audio.mp3'
         a.dispatchEvent(new Event('loadstart'))
         usePlayerStore.getState().runtimeActions.setVolume(20)
@@ -1494,7 +1528,7 @@ describe('useAudioPlayback', () => {
         playMedia(a)
       })
       expect(usePlayerStore.getState().isPlaying).toBe(true)
-      act(() => { errorMedia(a) })
+      await act(async () => { errorMedia(a) })
       expect(usePlayerStore.getState().isPlaying).toBe(false)
       expect(audioService.setPlayingState).toHaveBeenLastCalledWith(false)
       expect(a.pause).toHaveBeenCalled()
@@ -1520,19 +1554,21 @@ describe('useAudioPlayback', () => {
       a.paused = false
       await act(async () => {
         timeUpdate(a, 97, 100)
+      })
+      await act(async () => {
         b.dispatchEvent(new Event('canplaythrough'))
       })
       expect(usePlayerStore.getState().audioElement).toBe(b)
       expect(processorMock.instance.crossfadeToInactive).toHaveBeenCalledOnce()
       const cancellations = processorMock.instance.cancelCrossfade.mock.calls.length
-      act(() => { errorMedia(b) })
+      await act(async () => { errorMedia(b) })
       expect(usePlayerStore.getState().isPlaying).toBe(false)
       expect(audioService.setPlayingState).toHaveBeenLastCalledWith(false)
       expect(a.pause).toHaveBeenCalled()
       expect(b.pause).toHaveBeenCalled()
       expect(processorMock.instance.cancelCrossfade.mock.calls.length).toBeGreaterThan(cancellations)
       const pauses = vi.mocked(a.pause).mock.calls.length
-      act(() => { vi.advanceTimersByTime(5000) })
+      await act(async () => { vi.advanceTimersByTime(5000) })
       expect(a.pause).toHaveBeenCalledTimes(pauses)
     })
 
@@ -1545,10 +1581,12 @@ describe('useAudioPlayback', () => {
       vi.mocked(b.play).mockReturnValueOnce(new Promise<void>((resolve) => { finishPlay = resolve }))
       await act(async () => {
         timeUpdate(a, 97, 100)
+      })
+      await act(async () => {
         b.dispatchEvent(new Event('canplaythrough'))
       })
       expect(b.play).toHaveBeenCalledOnce()
-      act(() => { errorMedia(a) })
+      await act(async () => { errorMedia(a) })
       await act(async () => { finishPlay() })
       expect(usePlayerStore.getState().audioElement).toBe(a)
       expect(usePlayerStore.getState().currentIndex).toBe(0)
@@ -1559,14 +1597,14 @@ describe('useAudioPlayback', () => {
       expect(b.pause).toHaveBeenCalled()
     })
 
-    it.each(['stale', 'inactive'] as const)('ignores an %s error notification', (source) => {
+    it.each(['stale', 'inactive'] as const)('ignores an %s error notification', async (source) => {
       seedQueue(0, 2)
       usePlayerStore.setState({ isPlaying: true })
       renderHook(() => useAudioPlayback())
       const [a, b] = capturedAudioElements
       a.paused = false
       const pauses = vi.mocked(a.pause).mock.calls.length
-      act(() => {
+      await act(async () => {
         if (source === 'inactive') errorMedia(b)
         else a.dispatchEvent(new Event('error'))
       })
@@ -1575,14 +1613,14 @@ describe('useAudioPlayback', () => {
       expect(audioService.setPlayingState).not.toHaveBeenCalledWith(false)
     })
 
-    it('ignores owned-source error notifications delivered after teardown', () => {
+    it('ignores owned-source error notifications delivered after teardown', async () => {
       seedQueue(0, 2)
       usePlayerStore.setState({ isPlaying: true })
       const { unmount } = renderHook(() => useAudioPlayback())
       const [a] = capturedAudioElements
       unmount()
       const pauses = vi.mocked(a.pause).mock.calls.length
-      act(() => { errorMedia(a) })
+      await act(async () => { errorMedia(a) })
       expect(usePlayerStore.getState().isPlaying).toBe(true)
       expect(a.pause).toHaveBeenCalledTimes(pauses)
       expect(audioService.setPlayingState).not.toHaveBeenCalledWith(false)
@@ -1610,6 +1648,26 @@ describe('useAudioPlayback', () => {
       }
       return { played, failSource }
     }
+
+    it('renegotiates an unsupported signed original using the receiving browser failure', async () => {
+      const queue = seedQueue(0, 2)
+      renderHook(() => useAudioPlayback())
+      const [audio] = capturedAudioElements
+      const url = 'https://baander.app/api/stream/original/track?id=t1&owner=listener&expires=9999999999&signature=signed'
+      vi.mocked(negotiateMediaDelivery).mockResolvedValueOnce({ kind: 'original', url, reason: null, selection: null, requestId: null, jobId: null })
+      const playback = holdOriginalPlayback(audio)
+      await act(async () => { usePlayerStore.getState().runtimeActions.playTrack(queue[1]) })
+      expect(audio.src).toBe(url)
+
+      await act(async () => { playback.failSource() })
+
+      expect(negotiateMediaDelivery).toHaveBeenLastCalledWith(
+        expect.objectContaining({ id: 't1', capabilities: expect.objectContaining({ sourcePlaybackFailed: true }) }),
+        expect.any(AbortSignal),
+      )
+      expect(audio.src).toBe('/api/stream/track?id=t1&format=mp3')
+      expect(usePlayerStore.getState().isPlaying).toBe(true)
+    })
 
     it('requests the original stream for a track whose format the browser plays', async () => {
       const queue = seedQueue(0, 2)
@@ -1674,7 +1732,7 @@ describe('useAudioPlayback', () => {
       renderHook(() => useAudioPlayback())
       const [a] = capturedAudioElements
       vi.mocked(a.canPlayType).mockImplementation((type: string) => type === OPUS ? 'probably' : '')
-      act(() => { usePlayerStore.getState().runtimeActions.restoreQueue(queue, 1, 0) })
+      await act(async () => { usePlayerStore.getState().runtimeActions.restoreQueue(queue, 1, 0) })
       expect(a.src).toBe('/api/stream/track?id=t1')
       await act(async () => { errorMedia(a, 4) })
 
@@ -1690,7 +1748,7 @@ describe('useAudioPlayback', () => {
       const [a] = capturedAudioElements
       a.src = '/api/stream/track?id=unavailable'
       await act(async () => { usePlayerStore.setState({ isPlaying: true }) })
-      act(() => { errorMedia(a, 4) })
+      await act(async () => { errorMedia(a, 4) })
 
       expect(a.src).toBe('/api/stream/track?id=unavailable')
       expect(usePlayerStore.getState().isPlaying).toBe(false)
@@ -1704,7 +1762,7 @@ describe('useAudioPlayback', () => {
       vi.mocked(b.canPlayType).mockImplementation((type: string) => type === 'audio/aac' ? 'maybe' : '')
       await act(async () => { timeUpdate(a, 95, 100) })
       expect(b.src).toBe('/api/stream/track?id=t1')
-      act(() => { errorMedia(b, 4) })
+      await act(async () => { errorMedia(b, 4) })
       expect(b.src).toBe('/api/stream/track?id=t1&format=aac')
       expect(b.load).toHaveBeenCalledTimes(2)
 
@@ -1767,7 +1825,7 @@ describe('useAudioPlayback', () => {
       })
       await act(async () => { usePlayerStore.getState().runtimeActions.playTrack(queue[0]) })
       a.src = src
-      act(() => {
+      await act(async () => {
         playMedia(a)
         a.duration = duration
         a.dispatchEvent(new Event('durationchange'))
@@ -1874,12 +1932,12 @@ describe('useAudioPlayback', () => {
 
     it('enters the retry when playback stalls without an error for longer than the stall timeout', async () => {
       const { a } = await playAtPosition()
-      act(() => { a.dispatchEvent(new Event('stalled')) })
-      act(() => { timeUpdate(a, POSITION + 1, 200) })
+      await act(async () => { a.dispatchEvent(new Event('stalled')) })
+      await act(async () => { timeUpdate(a, POSITION + 1, 200) })
       await elapse(20_000)
       expect(liveness.get).not.toHaveBeenCalled()
 
-      act(() => { a.dispatchEvent(new Event('waiting')) })
+      await act(async () => { a.dispatchEvent(new Event('waiting')) })
       await elapse(9_000)
       expect(liveness.get).not.toHaveBeenCalled()
       await elapse(1_000)
@@ -1931,7 +1989,7 @@ describe('useAudioPlayback', () => {
       const { a } = await playAtPosition()
       answerLiveness('unreachable', 200)
       await act(async () => { errorMedia(a, 2) })
-      act(() => { usePlayerStore.getState().runtimeActions.seekTo(90) })
+      await act(async () => { usePlayerStore.getState().runtimeActions.seekTo(90) })
       expect(getCurrentTime()).toBe(90)
       expect(toast.info).not.toHaveBeenCalled()
 
@@ -1961,7 +2019,7 @@ describe('useAudioPlayback', () => {
       const { a } = await playAtPosition()
       answerLiveness('unreachable')
       await act(async () => { errorMedia(a, 2) })
-      act(() => { usePlayerStore.getState().runtimeActions.setIsPlaying(false) })
+      await act(async () => { usePlayerStore.getState().runtimeActions.setIsPlaying(false) })
       expect(usePlayerStore.getState().playbackRecovery).toBe('none')
 
       await elapse(60_000)
@@ -1970,7 +2028,7 @@ describe('useAudioPlayback', () => {
       expect(toast.error).not.toHaveBeenCalled()
 
       const plays = vi.mocked(a.play).mock.calls.length
-      act(() => { usePlayerStore.getState().runtimeActions.setIsPlaying(true) })
+      await act(async () => { usePlayerStore.getState().runtimeActions.setIsPlaying(true) })
       expect(a.load).toHaveBeenCalledOnce()
       expect(usePlayerStore.getState().playbackRecovery).toBe('reconnecting')
       await loadMetadata(a, 200)
@@ -1993,7 +2051,7 @@ describe('useAudioPlayback', () => {
       expect(toast.error).toHaveBeenCalledExactlyOnceWith('This track could not be played.', expect.anything())
       expect(getCurrentTime()).toBe(POSITION)
 
-      act(() => { usePlayerStore.getState().runtimeActions.setIsPlaying(true) })
+      await act(async () => { usePlayerStore.getState().runtimeActions.setIsPlaying(true) })
       expect(a.load).toHaveBeenCalledOnce()
       await loadMetadata(a, 200)
       expect(a.currentTime).toBe(POSITION)
@@ -2025,13 +2083,13 @@ describe('useAudioPlayback', () => {
       answerLiveness('unreachable', 200)
       await act(async () => { errorMedia(a, 2) })
       // WebKit rewinds a failed element.
-      act(() => { timeUpdate(a, 0, NaN) })
+      await act(async () => { timeUpdate(a, 0, NaN) })
       await elapse(1000)
-      act(() => { timeUpdate(a, 0, 200) })
+      await act(async () => { timeUpdate(a, 0, 200) })
       expect(getCurrentTime()).toBe(POSITION)
 
       await loadMetadata(a, 200)
-      act(() => { timeUpdate(a, POSITION + 1, 200) })
+      await act(async () => { timeUpdate(a, POSITION + 1, 200) })
       stop()
       expect(getCurrentTime()).toBe(POSITION + 1)
       expect(seen).not.toContain(0)
@@ -2039,7 +2097,7 @@ describe('useAudioPlayback', () => {
 
     it('resumes repeat-one at its position when Firefox reports the cut and then the end of its buffer', async () => {
       const { a } = await playAtPosition()
-      act(() => { usePlayerStore.getState().setRepeat('one') })
+      await act(async () => { usePlayerStore.getState().setRepeat('one') })
       answerLiveness('unreachable', 200)
       await act(async () => { errorMedia(a, 2) })
       await act(async () => { endMedia(a) })
@@ -2066,7 +2124,7 @@ describe('useAudioPlayback', () => {
 
     it('keeps the active track when the next-track preload fails during the outage', async () => {
       const { a, b, queue } = await playAtPosition()
-      act(() => { timeUpdate(a, 195, 200) })
+      await act(async () => { timeUpdate(a, 195, 200) })
       expect(b.src).toBe('/api/stream/track?id=t1')
       await act(async () => { errorMedia(b, 4) })
       await act(async () => { errorMedia(b, 4) })
@@ -2089,7 +2147,7 @@ describe('useAudioPlayback', () => {
       expect(toast.error).not.toHaveBeenCalled()
 
       const plays = vi.mocked(a.play).mock.calls.length
-      act(() => { usePlayerStore.getState().runtimeActions.setIsPlaying(true) })
+      await act(async () => { usePlayerStore.getState().runtimeActions.setIsPlaying(true) })
       // Called synchronously, so the browser still sees the listener's gesture.
       expect(a.play).toHaveBeenCalledTimes(plays + 1)
       await elapse(0)
@@ -2135,7 +2193,7 @@ describe('useAudioPlayback', () => {
       renderHook(() => useAudioPlayback())
       const [a] = capturedAudioElements
       a.src = '/api/stream/track?id=t0'
-      act(() => { usePlayerStore.getState().runtimeActions.setIsPlaying(true) })
+      await act(async () => { usePlayerStore.getState().runtimeActions.setIsPlaying(true) })
       expect(audioService.resumeContextIfNeeded).toHaveBeenCalledOnce()
       expect(a.play).not.toHaveBeenCalled()
       vi.mocked(a.play).mockImplementation(() => {

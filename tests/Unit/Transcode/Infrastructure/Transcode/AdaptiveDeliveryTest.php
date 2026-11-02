@@ -70,7 +70,7 @@ final class AdaptiveDeliveryTest extends TestCase
         $this->actor = Uuid::generate(); $this->other = Uuid::generate();
         $this->connection = DriverManager::getConnection(['driver' => 'pdo_sqlite', 'memory' => true]);
         foreach ([
-            'CREATE TABLE videos (id TEXT PRIMARY KEY)',
+            'CREATE TABLE videos (id TEXT PRIMARY KEY, height INTEGER)',
             'CREATE TABLE movies (id TEXT, library_id TEXT)',
             'CREATE TABLE movie_video (movie_id TEXT, video_id TEXT)',
             'CREATE TABLE user_library_access (user_id TEXT, library_id TEXT)',
@@ -78,7 +78,7 @@ final class AdaptiveDeliveryTest extends TestCase
             'CREATE TABLE transcode_sessions (id TEXT PRIMARY KEY, public_id TEXT, user_id TEXT, video_id TEXT, job_id TEXT)',
             'CREATE TABLE transcode_runtime_state (job_id TEXT PRIMARY KEY, session_id TEXT, request_id TEXT)',
         ] as $sql) { $this->connection->executeStatement($sql); }
-        $this->connection->insert('videos', ['id' => $this->video->toString()]);
+        $this->connection->insert('videos', ['id' => $this->video->toString(), 'height' => 1080]);
         $this->connection->insert('movies', ['id' => 'movie', 'library_id' => 'shared']);
         $this->connection->insert('movie_video', ['movie_id' => 'movie', 'video_id' => $this->video->toString()]);
         foreach ([$this->actor, $this->other] as $user) {

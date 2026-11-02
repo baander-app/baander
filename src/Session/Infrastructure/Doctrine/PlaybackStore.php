@@ -239,17 +239,29 @@ final readonly class PlaybackStore implements PlaybackStoreInterface
         return $this->decode($row);
     }
 
-    public function acknowledgeCommand(string $commandId, string $outcome): void
+    public function acknowledgeCommand(string $commandId, string $outcome, ?string $rejectionReason = null): void
     {
-        $this->connection()->executeStatement('UPDATE playback_commands SET outcome=:outcome,acknowledged_at=CURRENT_TIMESTAMP WHERE id=:id AND acknowledged_at IS NULL', ['outcome' => $outcome, 'id' => $commandId]);
+        $this->connection()->executeStatement('UPDATE playback_commands SET outcome=:outcome,rejection_reason=:reason,acknowledged_at=CURRENT_TIMESTAMP WHERE id=:id AND acknowledged_at IS NULL', ['outcome' => $outcome, 'reason' => $rejectionReason, 'id' => $commandId]);
     }
 
     public function requestedCommand(string $sessionId, string $requestId): ?array
     {
         $row = $this->connection()->fetchAssociative(
-            'SELECT id,request_id,outcome FROM playback_commands WHERE session_id=:session AND request_id=:request ORDER BY created_at,id LIMIT 1',
+            'SELECT id,request_id,outcome,rejection_reason FROM playback_commands WHERE session_id=:session AND request_id=:request ORDER BY created_at,id LIMIT 1',
             ['session' => $sessionId, 'request' => $requestId],
         );
+        return $row === false ? null : $row;
+    }
+
+    public function requestedTransfer(string $sessionId, string $requestId): ?array
+    {
+        $row = $this->connection()->fetchAssociative(<<<'SQL'
+            SELECT t.id,t.request_id,t.state,
+                (SELECT c.rejection_reason FROM playback_commands c
+                 WHERE c.session_id=t.session_id AND c.attempt_id=t.id AND c.outcome='rejected'
+                 ORDER BY c.created_at,c.id LIMIT 1) AS rejection_reason
+            FROM playback_transfers t WHERE t.session_id=:session AND t.request_id=:request
+            SQL, ['session' => $sessionId, 'request' => $requestId]);
         return $row === false ? null : $row;
     }
 

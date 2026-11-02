@@ -21,6 +21,7 @@ final readonly class DeliverySource
         public ?bool $hdr = null,
         public ?string $pixelFormat = null,
         public bool $audioSelectionRequiresRemux = false,
+        public bool $hasSubtitles = false,
     ) {
     }
 }

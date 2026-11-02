@@ -32,6 +32,7 @@ final readonly class DeliveryRequest
         public bool $supportsHdr = false,
         #[Assert\Count(max: 32)] public array $pixelFormats = ['yuv420p', 'yuvj420p', 'nv12'],
         #[Assert\Uuid] public ?string $requestId = null,
+        public bool $sourcePlaybackFailed = false,
     ) {
     }
 }

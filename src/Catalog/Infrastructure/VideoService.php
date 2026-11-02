@@ -64,6 +64,7 @@ final readonly class VideoService implements VideoPortInterface
                 colorSpace: $probe['colorSpace'] ?? null,
                 colorRange: $probe['colorRange'] ?? null,
                 sourceTimestampOrigin: $probe['sourceTimestampOrigin'] ?? null,
+                hasSubtitles: ($probe['subtitleStreams'] ?? []) !== [],
             );
         }
 

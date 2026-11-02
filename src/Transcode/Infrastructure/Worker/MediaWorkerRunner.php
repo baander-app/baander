@@ -127,7 +127,7 @@ final class MediaWorkerRunner
             'BAANDER_NATIVE_CLIENT_GENERATION' => (string) $generation,
         ]);
         // Fresh children inherit authority, with a bounded native slot and launch fence.
-        $process = proc_open([$this->phpBinary, $this->jobScript, $kind, $key], [0 => ['file', '/dev/null', 'r'], 1 => ['file', '/dev/null', 'w'], 2 => ['file', '/dev/null', 'w']], $pipes, env_vars: $environment);
+        $process = proc_open([$this->phpBinary, $this->jobScript, $kind, $key], [0 => ['file', '/dev/null', 'r'], 1 => ['file', '/dev/null', 'w'], 2 => ['file', '/dev/null', 'w'], 3 => STDERR], $pipes, env_vars: $environment);
         if (!is_resource($process)) {
             throw new \RuntimeException('Media execution child could not launch.');
         }
@@ -162,6 +162,15 @@ final class MediaWorkerRunner
             }
             $exit = $status['exitcode'];
             $signalled = $status['signaled'];
+            if ($requireSuccess && ($signalled || $exit !== 0)) {
+                fwrite(STDERR, json_encode([
+                    'event' => 'worker_media_child_exit',
+                    'kind' => $child['kind'],
+                    'exitCode' => $exit,
+                    'signalled' => $signalled,
+                    'signal' => $status['termsig'],
+                ], JSON_THROW_ON_ERROR) . "\n");
+            }
             proc_close($child['process']);
             unset($this->children[$key]);
             $failed = $failed || $signalled || $exit !== 0;

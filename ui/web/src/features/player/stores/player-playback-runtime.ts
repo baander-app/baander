@@ -1,3 +1,5 @@
+import { assignMusicSource, resolveMusicSource, type TranscodeFormat } from '../services/music-delivery'
+import { MediaCompatibilityError } from '../services/media-delivery'
 import { toast } from 'sonner'
 import { audioService } from '../services/audio-service'
 import { activityService } from '../services/activity-service'
@@ -6,8 +8,11 @@ import { updateTime } from './player-time-tracker'
 import { cancelPlaybackRecovery } from './player-playback-recovery'
 import type { PlayerState, Track } from './player-types'
 
+export { buildStreamUrl, chooseTranscodeFormat, type TranscodeFormat } from '../services/music-delivery'
+
 const logger = createLogger('PlayerStore')
 let playbackSelectionGeneration = 0
+let selectionController: AbortController | undefined
 /** The selection whose native play is still pending, and with it the play record. */
 let pendingPlayRecord: number | null = null
 
@@ -31,6 +36,7 @@ export function syncPlaybackVolume(elements: HTMLAudioElement[], volume: number,
 
 export function invalidatePlaybackSelection(): void {
   playbackSelectionGeneration++
+  selectionController?.abort()
   cancelPlaybackRecovery()
 }
 
@@ -39,27 +45,7 @@ export function hasPendingPlayRecord(): boolean {
   return pendingPlayRecord === playbackSelectionGeneration
 }
 
-export type TranscodeFormat = 'opus' | 'aac' | 'mp3'
-
 const STREAM_PATH = '/api/stream/track'
-
-/** Stable preference order; each MIME type matches the server's transcoded response. */
-const TRANSCODE_FORMATS: ReadonlyArray<readonly [TranscodeFormat, string]> = [
-  ['opus', 'audio/ogg; codecs=opus'],
-  ['aac', 'audio/aac'],
-  ['mp3', 'audio/mpeg'],
-]
-
-/** Without a bitrate the server applies its own transcoding cap. */
-export function buildStreamUrl(publicId: string, format?: TranscodeFormat): string {
-  const url = `${STREAM_PATH}?id=${encodeURIComponent(publicId)}`
-  return format ? `${url}&format=${format}` : url
-}
-
-/** MP3 remains the last resort when the browser reports no transcoded format as playable. */
-export function chooseTranscodeFormat(element: HTMLAudioElement): TranscodeFormat {
-  return TRANSCODE_FORMATS.find(([, type]) => element.canPlayType(type) !== '')?.[0] ?? 'mp3'
-}
 
 function resolveSource(src: string): URL {
   return new URL(src, document.baseURI)
@@ -69,20 +55,21 @@ function resolveSource(src: string): URL {
 export function isTrackStream(src: string, publicId: string): boolean {
   if (!src) return false
   const url = resolveSource(src)
-  return url.pathname === STREAM_PATH && url.searchParams.get('id') === publicId
+  return (url.pathname === STREAM_PATH || url.pathname === '/api/stream/original/track')
+    && url.searchParams.get('id') === publicId
 }
 
 export function isTranscodedStream(src: string): boolean {
   if (!src) return false
   const url = resolveSource(src)
-  return url.pathname === STREAM_PATH && url.searchParams.has('format')
+  return url.pathname === STREAM_PATH && url.searchParams.has('format') && url.searchParams.get('mode') !== 'copy'
 }
 
 /** The browser rejected this track's original stream, so a transcoded stream may still play. */
 export function isUnsupportedOriginalStream(element: HTMLAudioElement, publicId: string): boolean {
   const error = element.error
   return error !== null && error.code === error.MEDIA_ERR_SRC_NOT_SUPPORTED && element.src !== ''
-    && resolveSource(element.src).href === resolveSource(buildStreamUrl(publicId)).href
+    && isTrackStream(element.src, publicId) && !isTranscodedStream(element.src)
 }
 
 /**
@@ -90,7 +77,9 @@ export function isUnsupportedOriginalStream(element: HTMLAudioElement, publicId:
  * until the server has cached it; the browser cannot report its duration then.
  */
 export function canSeekStream(element: HTMLAudioElement): boolean {
-  return !isTranscodedStream(element.src) || Number.isFinite(element.duration)
+  const progressive = isTranscodedStream(element.src)
+    || (element.src !== '' && resolveSource(element.src).searchParams.get('mode') === 'copy')
+  return !progressive || Number.isFinite(element.duration)
 }
 
 export function notifySeekUnavailable(): void {
@@ -113,43 +102,70 @@ export function requestSelectedTrackPlayback(
   track: Track,
   get: () => PlayerState,
   set: (state: Partial<PlayerState>) => void,
-  sourceMode: 'replace' | 'preserve' | 'reload' = 'replace',
-  format?: TranscodeFormat,
+  { sourceMode = 'replace', format, autoplay = true, position = 0 }: {
+    sourceMode?: 'replace' | 'preserve' | 'reload'
+    format?: TranscodeFormat
+    autoplay?: boolean
+    position?: number
+  } = {},
 ) {
   if (track.available !== true) return
   const generation = ++playbackSelectionGeneration
+  selectionController?.abort()
+  const controller = new AbortController()
+  selectionController = controller
   cancelPlaybackRecovery()
   const el = get().audioElement
-  set({ isPlaying: true })
+  if (sourceMode === 'replace') el?.pause()
+  set({ isPlaying: autoplay })
   if (!el) return
   pendingPlayRecord = generation
   const settle = () => {
     if (pendingPlayRecord === generation) pendingPlayRecord = null
   }
-  if (sourceMode === 'replace') {
-    el.src = buildStreamUrl(track.publicId, format)
-  } else {
-    // Reloading restarts a stream that cannot seek back to its start.
-    if (sourceMode === 'reload') el.load()
-    else el.currentTime = 0
-    updateTime(0)
-  }
-  const src = el.src
-  const ownsSelection = () => generation === playbackSelectionGeneration
-    && get().audioElement === el && el.src === src && get().currentTrack === track
-  el.play().then(() => {
-    settle()
-    if (!ownsSelection()) {
-      if (el.src === src && !get().playbackExecutionActive) el.pause()
-      return
+  const prepare = async () => {
+    if (sourceMode !== 'preserve') {
+      const previousFormat = sourceMode === 'reload' ? resolveSource(el.src).searchParams.get('format') : null
+      const preferredFormat = format ?? (previousFormat === 'opus' || previousFormat === 'aac' || previousFormat === 'mp3' ? previousFormat : undefined)
+      const url = await resolveMusicSource(el, track.publicId, controller.signal, preferredFormat, format ? el.src : undefined)
+      if (generation !== playbackSelectionGeneration || get().audioElement !== el || get().currentTrack !== track) return false
+      assignMusicSource(el, track.publicId, url)
+      if (sourceMode === 'reload') {
+        el.load()
+        updateTime(0)
+      }
+    } else {
+      el.currentTime = 0
+      updateTime(0)
     }
-    if (!get().isPlaying || el.paused || el.ended) return
-    // ActivityService handles its own request errors; those are not playback errors.
-    activityService.recordPlay({ songId: track.publicId, albumId: track.albumPublicId })
-  }, (err) => {
+    return true
+  }
+  prepare().then(ready => {
+    if (!ready || controller.signal.aborted || generation !== playbackSelectionGeneration
+      || get().audioElement !== el || get().currentTrack !== track) return
+    if (position > 0) { el.currentTime = position; updateTime(position) }
+    if (!autoplay) { settle(); return }
+    const src = el.src
+    const ownsSelection = () => generation === playbackSelectionGeneration
+      && get().audioElement === el && el.src === src && get().currentTrack === track
+    el.play().then(() => {
+      settle()
+      if (!ownsSelection()) {
+        if (el.src === src && !get().playbackExecutionActive) el.pause()
+        return
+      }
+      if (!get().isPlaying || el.paused || el.ended) return
+      activityService.recordPlay({ songId: track.publicId, albumId: track.albumPublicId })
+    }, (err) => {
+      settle()
+      if (!ownsSelection()) return
+      logger.warn('Autoplay blocked or failed:', err)
+      set({ isPlaying: false })
+    })
+  }).catch((error: unknown) => {
     settle()
-    if (!ownsSelection()) return
-    logger.warn('Autoplay blocked or failed:', err)
+    if (controller.signal.aborted || generation !== playbackSelectionGeneration) return
     set({ isPlaying: false })
+    toast.error(error instanceof MediaCompatibilityError ? error.message : 'This track could not be played.', { id: 'player-playback-failure' })
   })
 }

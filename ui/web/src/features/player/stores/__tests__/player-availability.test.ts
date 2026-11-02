@@ -6,6 +6,22 @@ import { usePlayerStore, type Track } from '../player-store'
 import { getCurrentTime, updateTime } from '../player-time-tracker'
 import { getSongIndex } from '@/shared/api-client/gen/endpoints'
 
+
+vi.mock('../../services/media-delivery', () => ({
+  detectDestinationCapabilities: vi.fn(async (element: HTMLAudioElement) => ({ encoded: element.src.includes('format=') })),
+  negotiateMediaDelivery: vi.fn(async ({ id, capabilities }: { id: string; capabilities: { encoded: boolean } }) => ({
+    kind: capabilities.encoded ? 'encoded' : 'original',
+    url: capabilities.encoded ? null : `/api/stream/track?id=${encodeURIComponent(id)}`,
+    reason: null, selection: null, requestId: null, jobId: null,
+  })),
+  MediaCompatibilityError: class extends Error {},
+}))
+
+/** Flush negotiation and native play callbacks without waiting on deliberately deferred play promises. */
+async function settleDelivery() {
+  await new Promise<void>(resolve => setTimeout(resolve, 0))
+}
+
 vi.mock('@/shared/api-client/gen/endpoints', () => ({ getSongIndex: vi.fn() }))
 vi.mock('../../services/audio-service', () => ({ audioService: { getProcessor: () => null } }))
 
@@ -58,6 +74,7 @@ describe('restored music availability', () => {
   it('loads the music stream after an unknown restore clears a real DOM audio source', async () => {
     const audio = document.createElement('audio')
     vi.spyOn(audio, 'pause').mockImplementation(() => {})
+    vi.spyOn(audio, 'play').mockResolvedValue()
     usePlayerStore.getState().setAudioElement(audio)
     restore()
     expect(audio.getAttribute('src')).toBe('')
@@ -65,8 +82,7 @@ describe('restored music availability', () => {
     lookup.mockResolvedValueOnce({ meta, data: [{ publicId: 'song-1', available: true }] })
 
     usePlayerStore.getState().runtimeActions.setIsPlaying(true)
-    await settle()
-    await settle()
+    await settleDelivery()
 
     expect(audio.getAttribute('src')).toBe('/api/stream/track?id=song-1')
     expect(audio.currentTime).toBe(42)
@@ -79,8 +95,7 @@ describe('restored music availability', () => {
     usePlayerStore.getState().runtimeActions.playTrack(queue[1])
     expect(usePlayerStore.getState().currentTrack).toBe(queue[0])
     expect(usePlayerStore.getState().isPlaying).toBe(false)
-    await settle()
-    await settle()
+    await settleDelivery()
     expect(usePlayerStore.getState().currentTrack?.publicId).toBe('song-2')
     expect(usePlayerStore.getState().isPlaying).toBe(true)
   })
@@ -93,8 +108,7 @@ describe('restored music availability', () => {
       data: (params?.publicIds ?? '').split(',').map((publicId) => ({ publicId, available: true })),
     }))
     usePlayerStore.getState().runtimeActions.setIsPlaying(true)
-    await settle()
-    await settle()
+    await settleDelivery()
     expect(lookup.mock.calls.map(([params]) => params?.limit)).toEqual([100, 100, 5])
     expect(usePlayerStore.getState().queue).toHaveLength(205)
     expect(usePlayerStore.getState().currentTrack).toEqual({ ...queue[204], available: true })
@@ -139,8 +153,7 @@ describe('restored music availability', () => {
     usePlayerStore.getState().runtimeActions.setIsPlaying(true)
     mediator.dispatch(RADIO_ACTIONS.STARTED, {}, 'radio')
     complete({ meta, data: [{ publicId: 'song-1', available: true }] })
-    await settle()
-    await settle()
+    await settleDelivery()
     expect(usePlayerStore.getState().queue).toBe(queue)
     expect(usePlayerStore.getState().isPlaying).toBe(false)
   })

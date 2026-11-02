@@ -39,10 +39,17 @@ use OpenApi\Attributes as OA;
             new OA\Property(property: 'outcome', type: 'string', enum: ['recovered']),
             new OA\Property(property: 'revision', type: 'integer', minimum: 0),
         ], type: 'object', nullable: true),
-        new OA\Property(property: 'requestResult', required: ['requestId', 'commandId', 'outcome'], properties: [
+        new OA\Property(property: 'transferResult', required: ['requestId', 'attemptId', 'state', 'rejectionReason'], properties: [
+            new OA\Property(property: 'requestId', type: 'string', format: 'uuid'),
+            new OA\Property(property: 'attemptId', type: 'string', format: 'uuid'),
+            new OA\Property(property: 'state', type: 'string', enum: ['preparing', 'quiescing', 'starting', 'committed', 'failed', 'uncertain']),
+            new OA\Property(property: 'rejectionReason', type: 'string', nullable: true),
+        ], type: 'object', nullable: true),
+        new OA\Property(property: 'requestResult', required: ['requestId', 'commandId', 'outcome', 'rejectionReason'], properties: [
             new OA\Property(property: 'requestId', type: 'string', format: 'uuid'),
             new OA\Property(property: 'commandId', type: 'string', format: 'uuid'),
             new OA\Property(property: 'outcome', type: 'string', nullable: true),
+            new OA\Property(property: 'rejectionReason', type: 'string', nullable: true),
         ], type: 'object', nullable: true),
     ],
 )]
@@ -78,6 +85,16 @@ final class PlaybackSnapshotResource extends AbstractResource
                 'requestId' => $source['requestResult']['requestId'],
                 'commandId' => $source['requestResult']['commandId'],
                 'outcome' => $source['requestResult']['outcome'],
+                'rejectionReason' => $source['requestResult']['rejectionReason'] ?? null,
+            ];
+        }
+
+        if (isset($source['transferResult'])) {
+            $result['transferResult'] = [
+                'requestId' => $source['transferResult']['requestId'],
+                'attemptId' => $source['transferResult']['attemptId'],
+                'state' => $source['transferResult']['state'],
+                'rejectionReason' => $source['transferResult']['rejectionReason'],
             ];
         }
 

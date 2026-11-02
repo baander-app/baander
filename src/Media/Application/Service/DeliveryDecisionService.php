@@ -76,10 +76,11 @@ final readonly class DeliveryDecisionService implements DeliveryDecisionPortInte
             bitDepth: $this->bitDepth($source->pixFmt),
             hdr: $this->hdr($source->colorSpace),
             pixelFormat: $source->pixFmt,
-            audioSelectionRequiresRemux: $destination->audioStreamIndex !== null && $destination->audioStreamIndex !== ($defaultAudio['streamIndex'] ?? null)
+            audioSelectionRequiresRemux: $destination->audioStreamIndex !== null && $destination->audioStreamIndex !== ($defaultAudio['streamIndex'] ?? null),
+            hasSubtitles: $source->hasSubtitles,
         );
         $decision = $this->compatibility->decide($media, $destination);
-        if ($decision->kind === DeliveryKind::Original || $destination->subtitleBurnIn) {
+        if ($decision->kind === DeliveryKind::Original || $destination->subtitleBurnIn || $destination->sourcePlaybackFailed) {
             return $decision;
         }
         $artifacts = $media->videoStreamIndex === null ? [] : ($this->videoArtifacts?->findComplete($owner, $source->videoId, $source->hash, $media->videoStreamIndex, $media->audioStreamIndex) ?? []);
@@ -186,6 +187,9 @@ final readonly class DeliveryDecisionService implements DeliveryDecisionPortInte
         if ($this->policy->permits(MediaOperation::AudioEncode) && $this->settings->get(TranscodeSettingDefinitions::ENABLED) !== true) {
             return $decision->kind === DeliveryKind::Encoded
                 ? new DeliveryDecision(DeliveryKind::Incompatible, 'audio_transcoding_disabled') : $decision;
+        }
+        if ($destination->sourcePlaybackFailed) {
+            return $decision;
         }
         $bitrate = (int) $this->settings->get(TranscodeSettingDefinitions::MAX_BITRATE) * 1000;
         foreach (AudioRenditionFormat::cases() as $format) {

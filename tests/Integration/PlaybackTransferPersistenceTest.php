@@ -299,14 +299,14 @@ final class PlaybackTransferPersistenceTest extends TestCase
         $request = ['requestId' => new Uuid()->toString(), 'expectedRevision' => $snapshot['revision'], 'action' => 'stop'];
         $pending = $service->execute($owner, PlaybackOperation::Control, $request);
         $command = $this->pending($service, $owner, $source)['commands'][0];
-        self::assertSame(['requestId' => $request['requestId'], 'commandId' => $command['id'], 'outcome' => null], $pending['requestResult']);
+        self::assertSame(['requestId' => $request['requestId'], 'commandId' => $command['id'], 'outcome' => null, 'rejectionReason' => null], $pending['requestResult']);
         $acknowledged = $this->ack($service, $owner, $source, $command, 'stopped');
         self::assertGreaterThan($pending['revision'], $acknowledged['revision']);
         self::assertArrayNotHasKey('requestResult', $service->execute($owner, PlaybackOperation::Snapshot, []));
         $target = $this->endpoint($service, $owner);
         $service->execute($owner, PlaybackOperation::Transfer, ['requestId' => new Uuid()->toString(), 'expectedRevision' => $acknowledged['revision'], 'targetIncarnationId' => $target['incarnationId']]);
         $replay = $service->execute($owner, PlaybackOperation::Control, $request);
-        self::assertSame(['requestId' => $request['requestId'], 'commandId' => $command['id'], 'outcome' => 'stopped'], $replay['requestResult']);
+        self::assertSame(['requestId' => $request['requestId'], 'commandId' => $command['id'], 'outcome' => 'stopped', 'rejectionReason' => null], $replay['requestResult']);
         self::assertSame('preparing', $replay['transfer']['state']);
     }
 
@@ -739,6 +739,64 @@ final class PlaybackTransferPersistenceTest extends TestCase
         self::assertSame('start', $start['type']);
         self::assertSame(71.625, $start['payload']['position']);
         self::assertSame([], $this->pending($service, $owner, $old)['commands']);
+    }
+
+    public function testRejectedTransferReasonSurvivesLaterTransfersAndExactReplay(): void
+    {
+        $owner = $this->createUser();
+        $service = $this->coordinator();
+        $source = $this->endpoint($service, $owner);
+        $active = $this->activate($service, $owner, $source);
+        $target = $this->endpoint($service, $owner);
+        $request = ['requestId' => new Uuid()->toString(), 'expectedRevision' => $active['revision'], 'targetIncarnationId' => $target['incarnationId']];
+        $pending = $service->execute($owner, PlaybackOperation::Transfer, $request);
+        $command = $this->pending($service, $owner, $target)['commands'][0];
+        $payload = ['commandId' => $command['id'], 'attemptId' => $command['attemptId'], 'revision' => $command['revision'],
+            'incarnationId' => $target['incarnationId'], 'epoch' => $command['epoch'], 'outcome' => 'rejected', 'rejectionReason' => 'video_codec_unsupported'];
+        $rejected = $service->execute($owner, PlaybackOperation::Acknowledge, $payload, $target['capability']);
+        self::assertSame($source['incarnationId'], $rejected['activeIncarnationId']);
+        self::assertNull($rejected['transfer']);
+        self::assertSame('video_codec_unsupported', $this->observer->fetchOne('SELECT rejection_reason FROM playback_commands WHERE id=?', [$command['id']]));
+        $service->execute($owner, PlaybackOperation::Acknowledge, $payload, $target['capability']);
+        $later = $service->execute($owner, PlaybackOperation::Transfer, ['requestId' => new Uuid()->toString(),
+            'expectedRevision' => $rejected['revision'], 'targetIncarnationId' => $target['incarnationId']]);
+        $replay = $service->execute($owner, PlaybackOperation::Transfer, $request);
+        self::assertSame(['requestId' => $request['requestId'], 'attemptId' => $pending['transfer']['attemptId'],
+            'state' => 'failed', 'rejectionReason' => 'video_codec_unsupported'], $replay['transferResult']);
+        self::assertSame($later['transfer']['attemptId'], $replay['transfer']['attemptId']);
+        self::assertNotSame($later['transfer']['attemptId'], $replay['transferResult']['attemptId']);
+        $payload['rejectionReason'] = 'unknown';
+        $this->expectException(ConflictException::class);
+        $service->execute($owner, PlaybackOperation::Acknowledge, $payload, $target['capability']);
+    }
+
+    public function testRejectedControlReasonIsReturnedOnRequestReplay(): void
+    {
+        $owner = $this->createUser();
+        $service = $this->coordinator();
+        $source = $this->endpoint($service, $owner);
+        $active = $this->activate($service, $owner, $source);
+        $request = ['requestId' => new Uuid()->toString(), 'expectedRevision' => $active['revision'], 'action' => 'play'];
+        $service->execute($owner, PlaybackOperation::Control, $request);
+        $command = $this->pending($service, $owner, $source)['commands'][0];
+        $service->execute($owner, PlaybackOperation::Acknowledge, ['commandId' => $command['id'], 'attemptId' => $command['attemptId'],
+            'revision' => $command['revision'], 'incarnationId' => $source['incarnationId'], 'epoch' => $command['epoch'],
+            'outcome' => 'rejected', 'rejectionReason' => 'browser_rejected_source'], $source['capability']);
+        $replay = $service->execute($owner, PlaybackOperation::Control, $request);
+        self::assertSame('rejected', $replay['requestResult']['outcome']);
+        self::assertSame('browser_rejected_source', $replay['requestResult']['rejectionReason']);
+    }
+
+    public function testDatabaseRejectsAReasonOnANonRejectedOutcome(): void
+    {
+        $owner = $this->createUser();
+        $service = $this->coordinator();
+        $target = $this->endpoint($service, $owner);
+        $service->execute($owner, PlaybackOperation::Transfer, ['requestId' => new Uuid()->toString(), 'expectedRevision' => 0,
+            'targetIncarnationId' => $target['incarnationId']]);
+        $command = $this->pending($service, $owner, $target)['commands'][0];
+        $this->expectException(\Doctrine\DBAL\Exception\DriverException::class);
+        $this->observer->executeStatement("UPDATE playback_commands SET rejection_reason='unknown' WHERE id=?", [$command['id']]);
     }
 
     public function testAdditiveMigrationPreservesPopulatedSessionAndMapsOnlyItsOwnedDevice(): void

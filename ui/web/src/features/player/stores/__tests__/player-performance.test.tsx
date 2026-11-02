@@ -4,6 +4,22 @@ import { usePlayerStore } from '../player-store'
 import { getCurrentTime, updateTime, useCurrentTime } from '../player-time-tracker'
 import { activityService } from '../../services/activity-service'
 
+
+vi.mock('../../services/media-delivery', () => ({
+  detectDestinationCapabilities: vi.fn(async (element: HTMLAudioElement) => ({ encoded: element.src.includes('format=') })),
+  negotiateMediaDelivery: vi.fn(async ({ id, capabilities }: { id: string; capabilities: { encoded: boolean } }) => ({
+    kind: capabilities.encoded ? 'encoded' : 'original',
+    url: capabilities.encoded ? null : `/api/stream/track?id=${encodeURIComponent(id)}`,
+    reason: null, selection: null, requestId: null, jobId: null,
+  })),
+  MediaCompatibilityError: class extends Error {},
+}))
+
+/** Flush negotiation and native play callbacks without waiting on deliberately deferred play promises. */
+async function settleDelivery() {
+  await new Promise<void>(resolve => setTimeout(resolve, 0))
+}
+
 vi.mock('../../services/audio-service', () => ({ audioService: { getProcessor: () => null } }))
 vi.mock('../../services/activity-service', () => ({ activityService: { recordPlay: vi.fn(() => Promise.resolve()) } }))
 
@@ -94,7 +110,9 @@ it('restoration invalidates pending native ownership and loads the restored sour
     pause: vi.fn(), play: vi.fn(() => new Promise<void>((_, reject) => { rejectPlay = reject })) } as unknown as HTMLAudioElement
   usePlayerStore.getState().setAudioElement(audio)
   usePlayerStore.getState().runtimeActions.playTrack(tracks[0], tracks)
+  await settleDelivery()
   usePlayerStore.getState().runtimeActions.restoreQueue(tracks, 1, 12)
+  await settleDelivery()
   expect(usePlayerStore.getState().currentTrack).toBe(tracks[1])
   expect(usePlayerStore.getState().isPlaying).toBe(false)
   expect(audio.src).toContain('second')

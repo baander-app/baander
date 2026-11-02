@@ -11,6 +11,22 @@ import {
   type PlayerState,
 } from '../player-store'
 
+
+vi.mock('../../services/media-delivery', () => ({
+  detectDestinationCapabilities: vi.fn(async (element: HTMLAudioElement) => ({ encoded: element.src.includes('format=') })),
+  negotiateMediaDelivery: vi.fn(async ({ id, capabilities }: { id: string; capabilities: { encoded: boolean } }) => ({
+    kind: capabilities.encoded ? 'encoded' : 'original',
+    url: capabilities.encoded ? null : `/api/stream/track?id=${encodeURIComponent(id)}`,
+    reason: null, selection: null, requestId: null, jobId: null,
+  })),
+  MediaCompatibilityError: class extends Error {},
+}))
+
+/** Flush negotiation and native play callbacks without waiting on deliberately deferred play promises. */
+async function settleDelivery() {
+  await new Promise<void>(resolve => setTimeout(resolve, 0))
+}
+
 vi.mock('../../services/audio-service', () => ({
   audioService: { getProcessor: vi.fn(() => null) },
 }))
@@ -85,7 +101,7 @@ describe('player-store', () => {
   })
 
   describe('catalogue availability', () => {
-    it('blocks missing and unconfirmed tracks without changing playback', () => {
+    it('blocks missing and unconfirmed tracks without changing playback', async () => {
       const queue = seedQueue()
       const before = usePlayerStore.getState()
       for (const available of [false, undefined]) {
@@ -98,19 +114,21 @@ describe('player-store', () => {
       expect(usePlayerStore.getState().queue).toEqual(queue)
     })
 
-    it('refreshes an existing queue row with the selected current observation', () => {
+    it('refreshes an existing queue row with the selected current observation', async () => {
       const oldTrack = { ...track('song'), available: false }
       usePlayerStore.getState().runtimeActions.restoreQueue([oldTrack], 0, 0)
       const fresh = { ...oldTrack, available: true, title: 'Fresh title' }
       usePlayerStore.getState().runtimeActions.playTrack(fresh)
+      await settleDelivery()
       expect(usePlayerStore.getState().queue).toEqual([fresh])
       expect(usePlayerStore.getState().queue[0]).toBe(usePlayerStore.getState().currentTrack)
       usePlayerStore.getState().setRepeat('all')
       usePlayerStore.getState().runtimeActions.playNext()
+      await settleDelivery()
       expect(usePlayerStore.getState().currentTrack).toBe(fresh)
     })
 
-    it('removes the playing song and pauses when all remaining songs are unavailable', () => {
+    it('removes the playing song and pauses when all remaining songs are unavailable', async () => {
       const queue = [track('playing'), { ...track('missing'), available: false }]
       usePlayerStore.getState().runtimeActions.restoreQueue(queue, 0, 0)
       usePlayerStore.getState().runtimeActions.setIsPlaying(true)
@@ -121,7 +139,7 @@ describe('player-store', () => {
       expect(usePlayerStore.getState().isPlaying).toBe(false)
     })
 
-    it('skips an unavailable adjacent song after removing the playing song', () => {
+    it('skips an unavailable adjacent song after removing the playing song', async () => {
       const queue = [track('playing'), { ...track('missing'), available: false }, track('next')]
       usePlayerStore.getState().runtimeActions.restoreQueue(queue, 0, 0)
       usePlayerStore.getState().runtimeActions.setIsPlaying(true)
@@ -132,7 +150,7 @@ describe('player-store', () => {
       expect(usePlayerStore.getState().isPlaying).toBe(true)
     })
 
-    it('filters a mixed queue and preserves the requested song by public ID', () => {
+    it('filters a mixed queue and preserves the requested song by public ID', async () => {
       const songs = [
         { ...track('missing'), available: false },
         track('first'),
@@ -146,7 +164,7 @@ describe('player-store', () => {
   })
 
   describe('adoptPreloadedNext', () => {
-    it('adopts the playing element without reloading or playing it again', () => {
+    it('adopts the playing element without reloading or playing it again', async () => {
       const queue = seedQueue()
       const incoming = makeAudioStub()
       incoming.src = '/api/stream/track?id=t1'
@@ -183,7 +201,7 @@ describe('player-store', () => {
       expect(usePlayerStore.getState()).toBe(before)
     })
 
-    it('rejects the last track without repeat', () => {
+    it('rejects the last track without repeat', async () => {
       seedQueue(2)
       const before = usePlayerStore.getState()
       expect(before.adoptPreloadedNext(makeAudioStub(), 't2', 't0')).toBe(false)
@@ -205,7 +223,7 @@ describe('player-store', () => {
     })
   })
 
-  it('keeps stored volume when attaching muted audio so unmute restores sound', () => {
+  it('keeps stored volume when attaching muted audio so unmute restores sound', async () => {
     usePlayerStore.setState({ volume: 40, muted: true })
     const audio = makeAudioStub()
     usePlayerStore.getState().setAudioElement(audio)
@@ -216,7 +234,7 @@ describe('player-store', () => {
     expect(audio.muted).toBe(false)
   })
 
-  it('keeps active graph input at unity across attachment, mute, volume and adoption', () => {
+  it('keeps active graph input at unity across attachment, mute, volume and adoption', async () => {
     const processor = { isActive: true, passive: false, setVolume: vi.fn(), setMuted: vi.fn() }
     vi.mocked(audioService.getProcessor).mockReturnValue(processor as unknown as NonNullable<ReturnType<typeof audioService.getProcessor>>)
     seedQueue()
@@ -237,7 +255,7 @@ describe('player-store', () => {
     recordPlay.mockRestore()
   })
 
-  it('updates volume while muted with a passive processor', () => {
+  it('updates volume while muted with a passive processor', async () => {
     const processor = { isActive: true, passive: true, setVolume: vi.fn(), setMuted: vi.fn() }
     vi.mocked(audioService.getProcessor).mockReturnValue(processor as unknown as NonNullable<ReturnType<typeof audioService.getProcessor>>)
     const audio = makeAudioStub()
@@ -255,27 +273,27 @@ describe('player-store', () => {
   // resolveNextIndex
   // =========================================================================
   describe('resolveNextIndex', () => {
-    it('returns null for an empty queue regardless of mode', () => {
+    it('returns null for an empty queue regardless of mode', async () => {
       expect(resolveNextIndex([], -1, false, 'off', [])).toBeNull()
       expect(resolveNextIndex([], -1, true, 'all', [])).toBeNull()
     })
 
-    it('advances linearly when shuffle is off and not at the end', () => {
+    it('advances linearly when shuffle is off and not at the end', async () => {
       const q = tracks('a', 'b', 'c')
       expect(resolveNextIndex(q, 1, false, 'off', [])).toBe(2)
     })
 
-    it('returns null at end of queue with repeat off (stop)', () => {
+    it('returns null at end of queue with repeat off (stop)', async () => {
       const q = tracks('a', 'b', 'c')
       expect(resolveNextIndex(q, 2, false, 'off', [])).toBeNull()
     })
 
-    it('wraps to 0 at end of queue with repeat all', () => {
+    it('wraps to 0 at end of queue with repeat all', async () => {
       const q = tracks('a', 'b', 'c')
       expect(resolveNextIndex(q, 2, false, 'all', [])).toBe(0)
     })
 
-    it('repeat one returns the same index', () => {
+    it('repeat one returns the same index', async () => {
       const q = tracks('a', 'b', 'c')
       // repeat === 'one' is handled by linear branch: currentIndex < length-1
       // so at index 0 it returns 1. The store's playNext with repeat 'one'
@@ -283,7 +301,7 @@ describe('player-store', () => {
       expect(resolveNextIndex(q, 0, false, 'one', [])).toBe(1)
     })
 
-    it('shuffle: follows the bag order', () => {
+    it('shuffle: follows the bag order', async () => {
       const q = tracks('a', 'b', 'c', 'd')
       // bag visits 0 -> 2 -> 1 -> 3
       const bag = [0, 2, 1, 3]
@@ -292,19 +310,19 @@ describe('player-store', () => {
       expect(resolveNextIndex(q, 1, true, 'off', bag)).toBe(3)
     })
 
-    it('shuffle: returns null at end of bag with repeat off', () => {
+    it('shuffle: returns null at end of bag with repeat off', async () => {
       const q = tracks('a', 'b')
       const bag = [0, 1]
       expect(resolveNextIndex(q, 1, true, 'off', bag)).toBeNull()
     })
 
-    it('shuffle: wraps to bag[0] at end of bag with repeat all', () => {
+    it('shuffle: wraps to bag[0] at end of bag with repeat all', async () => {
       const q = tracks('a', 'b', 'c')
       const bag = [2, 0, 1]
       expect(resolveNextIndex(q, 1, true, 'all', bag)).toBe(2)
     })
 
-    it('shuffle: current index not in bag returns null or wraps on all', () => {
+    it('shuffle: current index not in bag returns null or wraps on all', async () => {
       const q = tracks('a', 'b', 'c')
       const bag = [0, 1]
       // currentIndex 2 absent from bag -> indexOf returns -1, nextBagIdx 0
@@ -317,7 +335,7 @@ describe('player-store', () => {
   // generateShuffleBag
   // =========================================================================
   describe('generateShuffleBag', () => {
-    it('produces a permutation of all indices', () => {
+    it('produces a permutation of all indices', async () => {
       vi.spyOn(Math, 'random').mockReturnValue(0.5)
       const bag = generateShuffleBag(5)
       vi.restoreAllMocks()
@@ -325,11 +343,11 @@ describe('player-store', () => {
       expect(bag).toHaveLength(5)
     })
 
-    it('returns empty array for zero-length queue', () => {
+    it('returns empty array for zero-length queue', async () => {
       expect(generateShuffleBag(0)).toEqual([])
     })
 
-    it('places excludeIndex first when provided', () => {
+    it('places excludeIndex first when provided', async () => {
       vi.spyOn(Math, 'random').mockReturnValue(0.5)
       const bag = generateShuffleBag(5, 2)
       vi.restoreAllMocks()
@@ -338,19 +356,19 @@ describe('player-store', () => {
       expect(bag.slice().sort((a, b) => a - b)).toEqual([0, 1, 2, 3, 4])
     })
 
-    it('ignore excludeIndex out of range', () => {
+    it('ignore excludeIndex out of range', async () => {
       vi.spyOn(Math, 'random').mockReturnValue(0.5)
       const bag = generateShuffleBag(3, 99)
       vi.restoreAllMocks()
       expect(bag.slice().sort((a, b) => a - b)).toEqual([0, 1, 2])
     })
 
-    it('handles single-element queue', () => {
+    it('handles single-element queue', async () => {
       expect(generateShuffleBag(1)).toEqual([0])
       expect(generateShuffleBag(1, 0)).toEqual([0])
     })
 
-    it('with excludeIndex, remaining indices are still all present', () => {
+    it('with excludeIndex, remaining indices are still all present', async () => {
       vi.spyOn(Math, 'random').mockReturnValue(0.1)
       const bag = generateShuffleBag(6, 3)
       vi.restoreAllMocks()
@@ -382,7 +400,7 @@ describe('player-store', () => {
       Object.defineProperty(audio, 'src', { get: () => '/api/stream/track?id=t1', set: sourceSetter })
       for (let count = 1; count <= 3; count++) {
         usePlayerStore.getState().runtimeActions.replayCurrentTrack()
-        await Promise.resolve()
+        await settleDelivery()
         expect(activityService.recordPlay).toHaveBeenCalledTimes(count)
       }
       expect(audio.currentTime).toBe(0)
@@ -398,7 +416,7 @@ describe('player-store', () => {
       const { audio } = prepareReplay()
       vi.mocked(audio.play).mockRejectedValueOnce(new Error('Repeat unavailable'))
       usePlayerStore.getState().runtimeActions.replayCurrentTrack()
-      await Promise.resolve()
+      await settleDelivery()
       expect(usePlayerStore.getState().isPlaying).toBe(false)
       expect(activityService.recordPlay).not.toHaveBeenCalled()
     })
@@ -412,10 +430,11 @@ describe('player-store', () => {
           settle = () => outcome === 'resolve' ? resolve() : reject(new Error('Obsolete repeat failed'))
         }))
         usePlayerStore.getState().runtimeActions.replayCurrentTrack()
+        await settleDelivery()
         if (replay) usePlayerStore.getState().runtimeActions.replayCurrentTrack()
         else usePlayerStore.getState().runtimeActions.playTrack(queue[2])
         settle()
-        await Promise.resolve()
+        await settleDelivery()
         expect(usePlayerStore.getState().isPlaying).toBe(true)
         expect(activityService.recordPlay).toHaveBeenCalledExactlyOnceWith({ songId: replay ? 't1' : 't2', albumId: undefined })
       }
@@ -430,24 +449,26 @@ describe('player-store', () => {
           settle = () => outcome === 'resolve' ? resolve() : reject(new Error('Interrupted repeat failed'))
         }))
         usePlayerStore.getState().runtimeActions.replayCurrentTrack()
+        await settleDelivery()
         if (interruption === 'element') usePlayerStore.getState().setAudioElement(makeAudioStub())
         else {
           usePlayerStore.getState().runtimeActions.setIsPlaying(false)
           usePlayerStore.getState().runtimeActions.setIsPlaying(true)
         }
         settle()
-        await Promise.resolve()
+        await settleDelivery()
         expect(usePlayerStore.getState().isPlaying).toBe(true)
         expect(activityService.recordPlay).not.toHaveBeenCalled()
       }
     })
 
-    it.each(['track', 'element', 'source'] as const)('ignores repeat without selected %s', (missing) => {
+    it.each(['track', 'element', 'source'] as const)('ignores repeat without selected %s', async (missing) => {
       const { audio } = prepareReplay()
       if (missing === 'track') usePlayerStore.setState({ currentTrack: null })
       if (missing === 'element') usePlayerStore.getState().setAudioElement(null)
       if (missing === 'source') audio.src = ''
       usePlayerStore.getState().runtimeActions.replayCurrentTrack()
+      await settleDelivery()
       expect(audio.play).not.toHaveBeenCalled()
       expect(audio.currentTime).toBe(42)
       expect(activityService.recordPlay).not.toHaveBeenCalled()
@@ -472,7 +493,7 @@ describe('player-store', () => {
       return audio
     }
 
-    it('keeps the position and explains why seeking is unavailable while the stream is converted', () => {
+    it('keeps the position and explains why seeking is unavailable while the stream is converted', async () => {
       const audio = prepareTranscoded(Infinity)
       usePlayerStore.getState().runtimeActions.seekTo(60)
       expect(audio.currentTime).toBe(12)
@@ -482,7 +503,7 @@ describe('player-store', () => {
       }))
     })
 
-    it('seeks in a converted stream once the browser knows its duration', () => {
+    it('seeks in a converted stream once the browser knows its duration', async () => {
       const audio = prepareTranscoded(200)
       usePlayerStore.getState().runtimeActions.seekTo(60)
       expect(audio.currentTime).toBe(60)
@@ -495,7 +516,7 @@ describe('player-store', () => {
       const load = vi.fn()
       Object.assign(audio, { load })
       usePlayerStore.getState().runtimeActions.replayCurrentTrack()
-      await Promise.resolve()
+      await settleDelivery()
       expect(audio.src).toBe(TRANSCODED)
       expect(load).toHaveBeenCalledOnce()
       expect(load.mock.invocationCallOrder[0]).toBeLessThan(vi.mocked(audio.play).mock.invocationCallOrder[0])
@@ -524,7 +545,7 @@ describe('player-store', () => {
         return Promise.resolve()
       })
       usePlayerStore.getState().runtimeActions[action]()
-      await Promise.resolve()
+      await settleDelivery()
       expect(activityService.recordPlay).toHaveBeenCalledExactlyOnceWith({ songId: selected.publicId, albumId: selected.albumPublicId })
     })
 
@@ -532,7 +553,7 @@ describe('player-store', () => {
       const { audio, selected } = prepare()
       vi.mocked(audio.play).mockRejectedValueOnce(new Error('Current navigation playback failed'))
       usePlayerStore.getState().runtimeActions[action]()
-      await Promise.resolve()
+      await settleDelivery()
       expect(usePlayerStore.getState().currentTrack).toBe(selected)
       expect(usePlayerStore.getState().isPlaying).toBe(false)
       expect(activityService.recordPlay).not.toHaveBeenCalled()
@@ -547,10 +568,11 @@ describe('player-store', () => {
           settle = () => outcome === 'resolve' ? resolve() : reject(new Error('Obsolete navigation failed'))
         }))
         usePlayerStore.getState().runtimeActions[action]()
+        await settleDelivery()
         usePlayerStore.getState().runtimeActions.playTrack(queue[3])
         if (aba) usePlayerStore.getState().runtimeActions.playTrack(selected)
         settle()
-        await Promise.resolve()
+        await settleDelivery()
         expect(usePlayerStore.getState().currentTrack).toBe(aba ? selected : queue[3])
         expect(usePlayerStore.getState().isPlaying).toBe(true)
         expect(activityService.recordPlay).toHaveBeenCalledExactlyOnceWith({ songId: (aba ? selected : queue[3]).publicId, albumId: undefined })
@@ -566,11 +588,12 @@ describe('player-store', () => {
           settle = () => outcome === 'resolve' ? resolve() : reject(new Error('Detached media failed'))
         }))
         usePlayerStore.getState().runtimeActions[action]()
+        await settleDelivery()
         const replacement = makeAudioStub()
         usePlayerStore.getState().setAudioElement(replacement)
         if (aba) usePlayerStore.getState().setAudioElement(audio)
         settle()
-        await Promise.resolve()
+        await settleDelivery()
         expect(usePlayerStore.getState().isPlaying).toBe(true)
         expect(activityService.recordPlay).not.toHaveBeenCalled()
       }
@@ -583,10 +606,11 @@ describe('player-store', () => {
         settle = () => outcome === 'resolve' ? resolve() : reject(new Error('Paused request failed late'))
       }))
       usePlayerStore.getState().runtimeActions[action]()
+      await settleDelivery()
       usePlayerStore.getState().runtimeActions.setIsPlaying(false)
       usePlayerStore.getState().runtimeActions.setIsPlaying(true)
       settle()
-      await Promise.resolve()
+      await settleDelivery()
       expect(usePlayerStore.getState().isPlaying).toBe(true)
       expect(activityService.recordPlay).not.toHaveBeenCalled()
     })
@@ -598,11 +622,13 @@ describe('player-store', () => {
         settle = () => outcome === 'resolve' ? resolve() : reject(new Error('Stopped queue request failed late'))
       }))
       usePlayerStore.getState().runtimeActions.playTrack(queue[queue.length - 1])
+      await settleDelivery()
       usePlayerStore.getState().runtimeActions.playNext()
+      await settleDelivery()
       expect(usePlayerStore.getState().isPlaying).toBe(false)
       usePlayerStore.getState().runtimeActions.setIsPlaying(true)
       settle()
-      await Promise.resolve()
+      await settleDelivery()
       expect(usePlayerStore.getState().isPlaying).toBe(true)
       expect(activityService.recordPlay).not.toHaveBeenCalled()
     })
@@ -612,12 +638,13 @@ describe('player-store', () => {
       let settle!: () => void
       vi.mocked(audio.play).mockReturnValueOnce(new Promise<void>((resolve) => { settle = resolve }))
       usePlayerStore.getState().runtimeActions[action]()
+      await settleDelivery()
       if (interruption === 'pause') usePlayerStore.getState().runtimeActions.setIsPlaying(false)
       if (interruption === 'native pause') Object.defineProperty(audio, 'paused', { value: true })
       if (interruption === 'disconnect') usePlayerStore.getState().setAudioElement(null)
       if (interruption === 'source change') audio.src = '/api/stream/track?id=other'
       settle()
-      await Promise.resolve()
+      await settleDelivery()
       expect(activityService.recordPlay).not.toHaveBeenCalled()
     })
   })
@@ -626,52 +653,59 @@ describe('player-store', () => {
       usePlayerStore.setState({ audioElement: makeAudioStub() })
     })
 
-    it('advances currentIndex by 1 with repeat off', () => {
+    it('advances currentIndex by 1 with repeat off', async () => {
       seedQueue(0, 3)
       usePlayerStore.getState().runtimeActions.playNext()
+      await settleDelivery()
       const s = usePlayerStore.getState()
       expect(s.currentIndex).toBe(1)
       expect(s.currentTrack?.publicId).toBe('t1')
       expect(s.isPlaying).toBe(true)
     })
 
-    it('stops (isPlaying false) at end of queue with repeat off', () => {
+    it('stops (isPlaying false) at end of queue with repeat off', async () => {
       seedQueue(2, 3)
       usePlayerStore.getState().runtimeActions.playNext()
+      await settleDelivery()
       const s = usePlayerStore.getState()
       expect(s.currentIndex).toBe(2) // unchanged
       expect(s.isPlaying).toBe(false)
     })
 
-    it('wraps to 0 with repeat all at end', () => {
+    it('wraps to 0 with repeat all at end', async () => {
       seedQueue(2, 3)
       usePlayerStore.setState({ repeat: 'all' })
       usePlayerStore.getState().runtimeActions.playNext()
+      await settleDelivery()
       const s = usePlayerStore.getState()
       expect(s.currentIndex).toBe(0)
       expect(s.currentTrack?.publicId).toBe('t0')
     })
 
-    it('returns null and stops when queue is empty', () => {
+    it('returns null and stops when queue is empty', async () => {
       usePlayerStore.setState({ queue: [], currentIndex: -1 })
       usePlayerStore.getState().runtimeActions.playNext()
+      await settleDelivery()
       const s = usePlayerStore.getState()
       expect(s.currentIndex).toBe(-1)
       expect(s.isPlaying).toBe(false)
     })
 
-    it('follows the shuffle bag when shuffle is on', () => {
+    it('follows the shuffle bag when shuffle is on', async () => {
       seedQueue(0, 4)
       usePlayerStore.setState({ shuffle: true, shuffleBag: [0, 2, 1, 3] })
       usePlayerStore.getState().runtimeActions.playNext()
+      await settleDelivery()
       expect(usePlayerStore.getState().currentIndex).toBe(2)
       usePlayerStore.getState().runtimeActions.playNext()
+      await settleDelivery()
       expect(usePlayerStore.getState().currentIndex).toBe(1)
       usePlayerStore.getState().runtimeActions.playNext()
+      await settleDelivery()
       expect(usePlayerStore.getState().currentIndex).toBe(3)
     })
 
-    it('shuffle at bag end with repeat all wraps to bag[0]', () => {
+    it('shuffle at bag end with repeat all wraps to bag[0]', async () => {
       seedQueue(3, 4)
       usePlayerStore.setState({
         shuffle: true,
@@ -679,23 +713,26 @@ describe('player-store', () => {
         repeat: 'all',
       })
       usePlayerStore.getState().runtimeActions.playNext()
+      await settleDelivery()
       expect(usePlayerStore.getState().currentIndex).toBe(0)
     })
 
-    it('shuffle at bag end with repeat off stops', () => {
+    it('shuffle at bag end with repeat off stops', async () => {
       seedQueue(3, 4)
       usePlayerStore.setState({ shuffle: true, shuffleBag: [0, 2, 1, 3] })
       usePlayerStore.getState().runtimeActions.playNext()
+      await settleDelivery()
       const s = usePlayerStore.getState()
       expect(s.currentIndex).toBe(3) // unchanged
       expect(s.isPlaying).toBe(false)
     })
 
-    it('sets the audio element src and calls play', () => {
+    it('sets the audio element src and calls play', async () => {
       const audio = makeAudioStub()
       seedQueue(0, 3)
       usePlayerStore.setState({ audioElement: audio })
       usePlayerStore.getState().runtimeActions.playNext()
+      await settleDelivery()
       expect(audio.src).toContain('id=t1')
       expect(audio.play).toHaveBeenCalledTimes(1)
     })
@@ -709,13 +746,14 @@ describe('player-store', () => {
       usePlayerStore.setState({ audioElement: makeAudioStub() })
     })
 
-    it('restarts current track when currentTime > 3', () => {
+    it('restarts current track when currentTime > 3', async () => {
       seedQueue(1, 3)
       const audio = makeAudioStub()
       audio.currentTime = 5
       updateTime(5)
       usePlayerStore.setState({ audioElement: audio })
       usePlayerStore.getState().runtimeActions.playPrevious()
+      await settleDelivery()
       const s = usePlayerStore.getState()
       // index unchanged, track unchanged
       expect(s.currentIndex).toBe(1)
@@ -723,56 +761,63 @@ describe('player-store', () => {
       expect(audio.currentTime).toBe(0)
     })
 
-    it('at exactly 3 seconds (boundary, not > 3) goes to previous track', () => {
+    it('at exactly 3 seconds (boundary, not > 3) goes to previous track', async () => {
       seedQueue(1, 3)
       updateTime(3)
       usePlayerStore.getState().runtimeActions.playPrevious()
+      await settleDelivery()
       expect(usePlayerStore.getState().currentIndex).toBe(0)
     })
 
-    it('goes to previous track when currentTime <= 3', () => {
+    it('goes to previous track when currentTime <= 3', async () => {
       seedQueue(2, 3)
       updateTime(1)
       usePlayerStore.getState().runtimeActions.playPrevious()
+      await settleDelivery()
       expect(usePlayerStore.getState().currentIndex).toBe(1)
       expect(usePlayerStore.getState().currentTrack?.publicId).toBe('t1')
     })
 
-    it('wraps to last track when at index 0 and currentTime <= 3', () => {
+    it('wraps to last track when at index 0 and currentTime <= 3', async () => {
       seedQueue(0, 3)
       updateTime(1)
       usePlayerStore.getState().runtimeActions.playPrevious()
+      await settleDelivery()
       expect(usePlayerStore.getState().currentIndex).toBe(2)
       expect(usePlayerStore.getState().currentTrack?.publicId).toBe('t2')
     })
 
-    it('no-ops when queue is empty', () => {
+    it('no-ops when queue is empty', async () => {
       usePlayerStore.setState({ queue: [], currentIndex: -1 })
       usePlayerStore.getState().runtimeActions.playPrevious()
+      await settleDelivery()
       expect(usePlayerStore.getState().currentIndex).toBe(-1)
     })
 
-    it('restart rule does NOT depend on repeat mode (still restarts > 3s)', () => {
+    it('restart rule does NOT depend on repeat mode (still restarts > 3s)', async () => {
       seedQueue(1, 3)
       updateTime(10)
       usePlayerStore.setState({ repeat: 'all' })
       usePlayerStore.getState().runtimeActions.playPrevious()
+      await settleDelivery()
       expect(usePlayerStore.getState().currentIndex).toBe(1)
     })
 
-    it('at index 0 with currentTime > 3 restarts instead of wrapping', () => {
+    it('at index 0 with currentTime > 3 restarts instead of wrapping', async () => {
       seedQueue(0, 3)
       updateTime(10)
       usePlayerStore.getState().runtimeActions.playPrevious()
+      await settleDelivery()
       expect(usePlayerStore.getState().currentIndex).toBe(0)
     })
 
-    it('sets audio src + play when moving to a previous track', () => {
+    it('sets audio src + play when moving to a previous track', async () => {
       const audio = makeAudioStub()
       seedQueue(2, 3)
       updateTime(0)
       usePlayerStore.setState({ audioElement: audio })
       usePlayerStore.getState().runtimeActions.playPrevious()
+      await settleDelivery()
       expect(audio.src).toContain('id=t1')
       expect(audio.play).toHaveBeenCalledTimes(1)
     })
@@ -782,7 +827,7 @@ describe('player-store', () => {
   // toggleShuffle / toggleRepeat
   // =========================================================================
   describe('toggleShuffle', () => {
-    it('enables shuffle and generates a bag with currentIndex first', () => {
+    it('enables shuffle and generates a bag with currentIndex first', async () => {
       seedQueue(1, 4)
       vi.spyOn(Math, 'random').mockReturnValue(0.5)
       usePlayerStore.getState().toggleShuffle()
@@ -793,7 +838,7 @@ describe('player-store', () => {
       expect(s.shuffleBag.slice().sort((a, b) => a - b)).toEqual([0, 1, 2, 3])
     })
 
-    it('disables shuffle and clears the bag', () => {
+    it('disables shuffle and clears the bag', async () => {
       seedQueue(1, 4)
       usePlayerStore.setState({ shuffle: true, shuffleBag: [1, 0, 2, 3] })
       usePlayerStore.getState().toggleShuffle()
@@ -802,14 +847,14 @@ describe('player-store', () => {
       expect(s.shuffleBag).toEqual([])
     })
 
-    it('enabling shuffle resets repeat to off', () => {
+    it('enabling shuffle resets repeat to off', async () => {
       seedQueue(0, 3)
       usePlayerStore.setState({ repeat: 'all' })
       usePlayerStore.getState().toggleShuffle()
       expect(usePlayerStore.getState().repeat).toBe('off')
     })
 
-    it('disabling shuffle preserves the current repeat mode', () => {
+    it('disabling shuffle preserves the current repeat mode', async () => {
       seedQueue(0, 3)
       usePlayerStore.setState({ shuffle: true, repeat: 'off' })
       usePlayerStore.setState({ repeat: 'all' }) // simulating user setting repeat while shuffled
@@ -817,7 +862,7 @@ describe('player-store', () => {
       expect(usePlayerStore.getState().repeat).toBe('all')
     })
 
-    it('on empty queue enables shuffle but produces empty bag', () => {
+    it('on empty queue enables shuffle but produces empty bag', async () => {
       usePlayerStore.getState().toggleShuffle()
       const s = usePlayerStore.getState()
       expect(s.shuffle).toBe(true)
@@ -826,7 +871,7 @@ describe('player-store', () => {
   })
 
   describe('toggleRepeat', () => {
-    it('cycles off -> all -> one -> off', () => {
+    it('cycles off -> all -> one -> off', async () => {
       usePlayerStore.getState().toggleRepeat()
       expect(usePlayerStore.getState().repeat).toBe('all')
       usePlayerStore.getState().toggleRepeat()
@@ -835,13 +880,13 @@ describe('player-store', () => {
       expect(usePlayerStore.getState().repeat).toBe('off')
     })
 
-    it('turning repeat on disables shuffle', () => {
+    it('turning repeat on disables shuffle', async () => {
       usePlayerStore.setState({ shuffle: true, shuffleBag: [0, 1] })
       usePlayerStore.getState().toggleRepeat() // off -> all
       expect(usePlayerStore.getState().shuffle).toBe(false)
     })
 
-    it('toggling back to off preserves whatever shuffle was (false here)', () => {
+    it('toggling back to off preserves whatever shuffle was (false here)', async () => {
       usePlayerStore.setState({ repeat: 'one', shuffle: false })
       usePlayerStore.getState().toggleRepeat() // one -> off
       expect(usePlayerStore.getState().repeat).toBe('off')
@@ -853,7 +898,7 @@ describe('player-store', () => {
   // reorderQueue — currentIndex adjustment branches
   // =========================================================================
   describe('reorderQueue', () => {
-    it('no-op when from === to', () => {
+    it('no-op when from === to', async () => {
       seedQueue(1, 4)
       const before = usePlayerStore.getState().queue
       usePlayerStore.getState().runtimeActions.reorderQueue(1, 1)
@@ -861,7 +906,7 @@ describe('player-store', () => {
       expect(usePlayerStore.getState().currentIndex).toBe(1)
     })
 
-    it('moves the current track with the item (from === currentIndex)', () => {
+    it('moves the current track with the item (from === currentIndex)', async () => {
       seedQueue(1, 4) // queue [t0,t1,t2,t3], current 1
       usePlayerStore.getState().runtimeActions.reorderQueue(1, 3)
       const s = usePlayerStore.getState()
@@ -869,7 +914,7 @@ describe('player-store', () => {
       expect(s.currentIndex).toBe(3)
     })
 
-    it('moved-range passes over current from above (from < current, to >= current) -> current -1', () => {
+    it('moved-range passes over current from above (from < current, to >= current) -> current -1', async () => {
       seedQueue(2, 4) // current 2
       usePlayerStore.getState().runtimeActions.reorderQueue(0, 3)
       const s = usePlayerStore.getState()
@@ -878,7 +923,7 @@ describe('player-store', () => {
       expect(s.currentIndex).toBe(1)
     })
 
-    it('moved item from below current (from > current, to <= current) -> current +1', () => {
+    it('moved item from below current (from > current, to <= current) -> current +1', async () => {
       seedQueue(1, 4) // current 1
       usePlayerStore.getState().runtimeActions.reorderQueue(3, 0)
       const s = usePlayerStore.getState()
@@ -887,7 +932,7 @@ describe('player-store', () => {
       expect(s.currentIndex).toBe(2)
     })
 
-    it('move within the same side of current does not change currentIndex', () => {
+    it('move within the same side of current does not change currentIndex', async () => {
       seedQueue(0, 4) // current 0
       usePlayerStore.getState().runtimeActions.reorderQueue(2, 3)
       const s = usePlayerStore.getState()
@@ -895,7 +940,7 @@ describe('player-store', () => {
       expect(s.currentIndex).toBe(0)
     })
 
-    it('regenerates shuffle bag when shuffle is on', () => {
+    it('regenerates shuffle bag when shuffle is on', async () => {
       seedQueue(1, 4)
       const audio = makeAudioStub()
       usePlayerStore.setState({ shuffle: true, shuffleBag: [1, 0, 2, 3], audioElement: audio })
@@ -911,7 +956,7 @@ describe('player-store', () => {
   // removeFromQueue — currentIndex adjustment
   // =========================================================================
   describe('removeFromQueue', () => {
-    it('removing before current decrements currentIndex', () => {
+    it('removing before current decrements currentIndex', async () => {
       seedQueue(2, 4) // current 2 (t2)
       usePlayerStore.getState().runtimeActions.removeFromQueue(0)
       const s = usePlayerStore.getState()
@@ -920,7 +965,7 @@ describe('player-store', () => {
       expect(s.currentTrack?.publicId).toBe('t2')
     })
 
-    it('removing after current leaves currentIndex unchanged', () => {
+    it('removing after current leaves currentIndex unchanged', async () => {
       seedQueue(1, 4)
       usePlayerStore.getState().runtimeActions.removeFromQueue(3)
       const s = usePlayerStore.getState()
@@ -928,7 +973,7 @@ describe('player-store', () => {
       expect(s.currentIndex).toBe(1)
     })
 
-    it('removing the current track clamps to the new tail (min(index, len-1))', () => {
+    it('removing the current track clamps to the new tail (min(index, len-1))', async () => {
       seedQueue(2, 4) // current 2
       usePlayerStore.getState().runtimeActions.removeFromQueue(2)
       const s = usePlayerStore.getState()
@@ -938,7 +983,7 @@ describe('player-store', () => {
       expect(s.currentTrack?.publicId).toBe('t3')
     })
 
-    it('removing the last item when it is current moves current to new tail', () => {
+    it('removing the last item when it is current moves current to new tail', async () => {
       seedQueue(2, 3) // current at last (2)
       usePlayerStore.getState().runtimeActions.removeFromQueue(2)
       const s = usePlayerStore.getState()
@@ -948,7 +993,7 @@ describe('player-store', () => {
       expect(s.currentTrack?.publicId).toBe('t1')
     })
 
-    it('removing down to empty sets currentIndex -1 and currentTrack null', () => {
+    it('removing down to empty sets currentIndex -1 and currentTrack null', async () => {
       seedQueue(0, 1) // single item, current 0
       usePlayerStore.getState().runtimeActions.removeFromQueue(0)
       const s = usePlayerStore.getState()
@@ -958,7 +1003,7 @@ describe('player-store', () => {
       expect(s.currentTrack).toBeNull()
     })
 
-    it('regenerates shuffle bag when shuffle is on', () => {
+    it('regenerates shuffle bag when shuffle is on', async () => {
       seedQueue(1, 4)
       usePlayerStore.setState({ shuffle: true, shuffleBag: [1, 0, 2, 3] })
       usePlayerStore.getState().runtimeActions.removeFromQueue(0)
@@ -972,7 +1017,7 @@ describe('player-store', () => {
   // clearQueue
   // =========================================================================
   describe('clearQueue', () => {
-    it('resets queue, index, track, and shuffleBag', () => {
+    it('resets queue, index, track, and shuffleBag', async () => {
       const audio = makeAudioStub()
       seedQueue(1, 3)
       usePlayerStore.setState({
@@ -1001,10 +1046,11 @@ describe('player-store', () => {
       vi.mocked(audio.play).mockReturnValueOnce(new Promise<void>((_, reject) => { rejectFirst = reject }))
       usePlayerStore.setState({ audioElement: audio })
       usePlayerStore.getState().runtimeActions.playTrack(track('first'))
+      await settleDelivery()
       usePlayerStore.getState().runtimeActions.playTrack(track('third'))
+      await settleDelivery()
       rejectFirst(new Error('Playback interrupted by source replacement'))
-      await Promise.resolve()
-      await Promise.resolve()
+      await settleDelivery()
       expect(usePlayerStore.getState().currentTrack?.publicId).toBe('third')
       expect(usePlayerStore.getState().isPlaying).toBe(true)
     })
@@ -1016,10 +1062,11 @@ describe('player-store', () => {
       vi.mocked(audio.play).mockReturnValueOnce(new Promise<void>((_, reject) => { rejectFirst = reject }))
       usePlayerStore.setState({ audioElement: audio })
       usePlayerStore.getState().runtimeActions.playTrack(selected)
+      await settleDelivery()
       usePlayerStore.getState().runtimeActions.playTrack(selected)
+      await settleDelivery()
       rejectFirst(new Error('Earlier replay interrupted'))
-      await Promise.resolve()
-      await Promise.resolve()
+      await settleDelivery()
       expect(usePlayerStore.getState().isPlaying).toBe(true)
     })
 
@@ -1030,9 +1077,12 @@ describe('player-store', () => {
       vi.mocked(audio.play).mockReturnValueOnce(new Promise<void>((_, reject) => { rejectFirst = reject }))
       usePlayerStore.setState({ audioElement: audio })
       usePlayerStore.getState().runtimeActions.playTrack(q[0], q)
+      await settleDelivery()
       if (transition === 'navigation') {
         usePlayerStore.getState().runtimeActions.playNext()
+        await settleDelivery()
         usePlayerStore.getState().runtimeActions.playPrevious()
+        await settleDelivery()
       } else {
         const incoming = makeAudioStub()
         usePlayerStore.setState({ repeat: 'all' })
@@ -1040,8 +1090,7 @@ describe('player-store', () => {
         expect(usePlayerStore.getState().adoptPreloadedNext(audio, 'second', 'first')).toBe(true)
       }
       rejectFirst(new Error('Obsolete selection interrupted'))
-      await Promise.resolve()
-      await Promise.resolve()
+      await settleDelivery()
       expect(usePlayerStore.getState().audioElement).toBe(audio)
       expect(usePlayerStore.getState().currentTrack).toBe(q[0])
       expect(usePlayerStore.getState().isPlaying).toBe(true)
@@ -1052,8 +1101,8 @@ describe('player-store', () => {
       vi.mocked(audio.play).mockRejectedValueOnce(new Error('Current playback failed'))
       usePlayerStore.setState({ audioElement: audio })
       usePlayerStore.getState().runtimeActions.playTrack(track('first'))
-      await Promise.resolve()
-      await Promise.resolve()
+      await settleDelivery()
+      await settleDelivery()
       expect(usePlayerStore.getState().isPlaying).toBe(false)
     })
 
@@ -1063,23 +1112,25 @@ describe('player-store', () => {
       vi.mocked(audio.play).mockReturnValueOnce(new Promise<void>((_, reject) => { rejectPlay = reject }))
       usePlayerStore.setState({ audioElement: audio })
       usePlayerStore.getState().runtimeActions.playTrack(track('first'), tracks('first', 'second'))
+      await settleDelivery()
       if (operation === 'rewind') {
         updateTime(4)
         usePlayerStore.getState().runtimeActions.playPrevious()
+        await settleDelivery()
       } else {
         expect(usePlayerStore.getState().adoptPreloadedNext(makeAudioStub(), 'first', 'unexpected')).toBe(false)
       }
       rejectPlay(new Error('Current pending selection failed'))
-      await Promise.resolve()
-      await Promise.resolve()
+      await settleDelivery()
       expect(usePlayerStore.getState().isPlaying).toBe(false)
     })
 
-    it('replaces queue and locates the track index when queue given', () => {
+    it('replaces queue and locates the track index when queue given', async () => {
       const audio = makeAudioStub()
       usePlayerStore.setState({ audioElement: audio })
       const q = tracks('a', 'b', 'c')
       usePlayerStore.getState().runtimeActions.playTrack(q[1], q)
+      await settleDelivery()
       const s = usePlayerStore.getState()
       expect(s.queue).toBe(q)
       expect(s.currentIndex).toBe(1)
@@ -1089,29 +1140,32 @@ describe('player-store', () => {
       expect(audio.play).toHaveBeenCalledTimes(1)
     })
 
-    it('appends to queue when track not present and no queue given', () => {
+    it('appends to queue when track not present and no queue given', async () => {
       seedQueue(0, 2)
       usePlayerStore.getState().runtimeActions.playTrack(track('new'))
+      await settleDelivery()
       const s = usePlayerStore.getState()
       expect(s.queue.map((t) => t.publicId)).toEqual(['t0', 't1', 'new'])
       expect(s.currentIndex).toBe(2)
       expect(s.currentTrack?.publicId).toBe('new')
     })
 
-    it('jumps to existing track without duplicating when already in queue', () => {
+    it('jumps to existing track without duplicating when already in queue', async () => {
       const q = tracks('a', 'b', 'c')
       usePlayerStore.setState({ queue: q, currentIndex: 0 })
       usePlayerStore.getState().runtimeActions.playTrack(q[2])
+      await settleDelivery()
       const s = usePlayerStore.getState()
       expect(s.queue).toHaveLength(3)
       expect(s.currentIndex).toBe(2)
     })
 
-    it('regenerates shuffle bag when shuffle is on and queue mutates', () => {
+    it('regenerates shuffle bag when shuffle is on and queue mutates', async () => {
       const audio = makeAudioStub()
       usePlayerStore.setState({ shuffle: true, audioElement: audio })
       vi.spyOn(Math, 'random').mockReturnValue(0.5)
       usePlayerStore.getState().runtimeActions.playTrack(track('solo'), tracks('solo'))
+      await settleDelivery()
       vi.restoreAllMocks()
       const bag = usePlayerStore.getState().shuffleBag
       expect(bag).toHaveLength(1)

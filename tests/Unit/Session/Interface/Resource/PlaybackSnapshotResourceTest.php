@@ -28,6 +28,12 @@ final class PlaybackSnapshotResourceTest extends TestCase
             'transfer' => null,
             'destinations' => [],
             'commands' => [],
+            'requestResult' => ['requestId' => '019aa4dd-20f8-79a7-9b88-a0f38222b016',
+                'commandId' => '019aa4dd-20f8-79a7-9b88-a0f38222b017', 'outcome' => 'rejected',
+                'rejectionReason' => 'browser_rejected_source'],
+            'transferResult' => ['requestId' => '019aa4dd-20f8-79a7-9b88-a0f38222b018',
+                'attemptId' => '019aa4dd-20f8-79a7-9b88-a0f38222b019', 'state' => 'failed',
+                'rejectionReason' => 'video_codec_unsupported'],
         ];
 
         self::assertSame($snapshot, PlaybackSnapshotResource::from($snapshot + [

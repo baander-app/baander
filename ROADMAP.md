@@ -61,6 +61,22 @@ The browser coordinator, recovery and video-hook tests passed all 300 cases; the
 
 The broader gate also found six existing playback foreign keys without supporting indexes; an additive migration now supplies them. Historical migration tests retain their original schema boundaries before separately checking the current schema. A compiled-container regression verifies that admission does not require a media worker's encoder state. Player delivery negotiation, the deployment preset, whole-stack qualification and measured operator guidance remain open; no host-memory or Raspberry Pi capacity claim is made by this checkpoint.
 
+Player delivery checkpoint, 2026-11-02 (U5): music and video negotiate delivery against the receiving browser's media capabilities before assigning a source. Music preparation, queue preloading, recovery and native-source fallback use the same decision path. Video selects native original delivery, immutable completed media, owned copy jobs or the full profile's encoded path while preserving the client session's request ID.
+
+Compatibility failures reach both the receiving player and the controlling browser. Command acknowledgements retain a bounded rejection reason, and transfer replay reads the result of the exact request and attempt. A failed native source can request encoding only when the deployment profile and audio settings allow it. Videos with subtitles retain the adaptive delivery path and subtitle controls.
+
+Browser verification exposed stale Doctrine metadata in Redis and missing audio pre-roll at copied-video seek boundaries. Code metadata and compiled queries now use Symfony's local system cache. Application and result caches remain in Redis. Copied video retains an additional verified GOP before positive seek positions; publication still requires both tracks to cover the requested time. Worker failures report a bounded exception or fatal-error location without exposing messages or credentials.
+
+Verification: the full web suite passed 3,179 tests across 247 files. After consolidating the music format chooser, all 536 player tests across 23 files passed. Web type checking and lint passed with zero errors and eight existing warnings. The CI image passed 90 focused backend tests with 482 assertions, 22 migration tests with 298 assertions, and a 52-test media/transfer run with 297 assertions. The final cache, diagnostic and boundary gate passed 32 tests with 184 assertions. Native copy verification passed two tests with 105 assertions, covering paused exact-keyframe and fractional seeks with unchanged audio/video packet hashes. OpenAPI export and client generation passed.
+
+The five-part simplification review consolidated music URL and format selection, replaced trailing playback arguments with named options and avoided loading HLS support when native playback is available. It preserved the behavior tests. Household deployment configuration, whole-stack resource qualification and measured operator guidance remain open; these player checks make no host-memory or Raspberry Pi capacity claim.
+
+Browser verification passed original and copy playback, paused seeking and stable client identity across reloads. A separate encoded-video check passed paused transfer, remote reopening, return to the original browser and reload recovery in 39 seconds. Music transfer and six song switches also passed; measured switches reached playback in 136–276 ms. These checks used the isolated preview and synthetic media.
+
+The encoded check exposed two further defects: lazy encoder bindings returned service-name strings, and admission created unnecessary higher-resolution tiers for a small source. Both bindings now resolve the encoder service. Admission limits the existing tier set to source height, retaining the minimum tier fallback. The compiled-container regression passed one test with 15 assertions; admission and adaptive-delivery checks passed 24 tests with 437 assertions. PostgreSQL review found no issue with the parameterized primary-key lookup. Capacity refusal remains possible when all required encoder slots are occupied.
+
+Backend PHPStan and Deptrac passed with no new violations; Deptrac retained 482 existing skips. Subsequent PHPStan checks passed for the added container and admission regressions.
+
 ## Playback destinations and notifications
 
 Requirements checkpoint, 2026-11-01: the user confirmed the

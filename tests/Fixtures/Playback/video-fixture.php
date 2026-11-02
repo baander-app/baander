@@ -35,7 +35,7 @@ final class PlaybackVideoFixture
             throw new InvalidArgumentException('Invalid video fixture run.');
         }
         return match ($command['op'] ?? '') {
-            'create' => $this->create($run),
+            'create' => $this->create($run, $command['delivery'] ?? 'encoded'),
             'cleanup' => $this->cleanup($run),
             'inspect' => $this->inspect($run),
             default => throw new InvalidArgumentException('Unknown video fixture operation.'),
@@ -43,11 +43,15 @@ final class PlaybackVideoFixture
     }
 
     /** @return array<string, mixed> */
-    private function create(string $run): array
+    private function create(string $run, string $delivery): array
     {
+        if (!in_array($delivery, ['encoded', 'original', 'copy'], true)) {
+            throw new InvalidArgumentException('Unknown fixture delivery mode.');
+        }
         $manifest = $this->base->execute(['op' => 'create', 'run' => $run]);
         $manifest['movie'] = ['id' => (string) new Uuid(), 'publicId' => (string) new PublicId()];
-        $manifest['video'] = ['id' => (string) new Uuid(), 'publicId' => (string) new PublicId(), 'path' => $this->mediaRoot . '/' . $run . '/owned.mp4'];
+        $extension = $delivery === 'copy' ? 'mkv' : 'mp4';
+        $manifest['video'] = ['id' => (string) new Uuid(), 'publicId' => (string) new PublicId(), 'path' => $this->mediaRoot . '/' . $run . '/owned.' . $extension];
         $manifest['movieVideoId'] = (string) new Uuid();
         // Persist exact ownership before creating files or rows, including failed runs.
         $this->save($run, $manifest);
@@ -55,8 +59,13 @@ final class PlaybackVideoFixture
             '/usr/bin/ffmpeg', '-nostdin', '-v', 'error', '-y', '-filter_threads', '1',
             '-f', 'lavfi', '-i', 'color=c=black:size=320x180:rate=24',
             '-f', 'lavfi', '-i', 'anullsrc=r=48000:cl=stereo', '-t', '30',
-            '-c:v', 'libx264', '-threads', '1', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p',
-            '-g', '24', '-c:a', 'aac', '-movflags', '+faststart', '-metadata', 'title=Owned playback ' . $run,
+            '-c:v', $delivery === 'encoded' ? 'mpeg4' : 'libx264', '-threads', '1',
+            ...($delivery === 'encoded' ? [] : ['-preset', 'ultrafast']),
+            '-pix_fmt', 'yuv420p',
+            '-g', '24', '-c:a', 'aac',
+            ...($extension === 'mp4' ? ['-movflags', '+faststart'] : []),
+            ...($delivery === 'encoded' ? [] : ['-colorspace', 'bt709', '-color_primaries', 'bt709', '-color_trc', 'bt709']),
+            '-metadata', 'title=Owned playback ' . $run,
             $manifest['video']['path'],
         ], timeout: 60);
         $process->mustRun();
@@ -119,6 +128,11 @@ SQL, ['video' => $video['id']]),
     {
         $manifest = json_decode((string) file_get_contents($this->root . '/' . $run . '/manifest.json'), true, flags: JSON_THROW_ON_ERROR);
         if (isset($manifest['video'])) {
+            $path = $manifest['video']['path'];
+            $basePath = $this->mediaRoot . '/' . $run . '/owned.';
+            if (!in_array($path, [$basePath . 'mp4', $basePath . 'mkv'], true)) {
+                throw new RuntimeException('Video ownership path does not match its fixture scope.');
+            }
             $videoId = $manifest['video']['id'];
             $this->connection->executeStatement(<<<'SQL'
 UPDATE transcode_runtime_state r
@@ -151,10 +165,6 @@ SQL, ['video' => $videoId]);
                 $this->connection->delete('movies', ['id' => $manifest['movie']['id']]);
                 $this->connection->delete('videos', ['id' => $videoId]);
             });
-            $path = $this->mediaRoot . '/' . $run . '/owned.mp4';
-            if ($manifest['video']['path'] !== $path) {
-                throw new RuntimeException('Video ownership path does not match its fixture scope.');
-            }
             if (is_file($path) && !unlink($path)) {
                 throw new RuntimeException('Cannot remove the owned video; manifest retained.');
             }

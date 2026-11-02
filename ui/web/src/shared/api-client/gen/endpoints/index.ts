@@ -664,6 +664,7 @@ export interface DeliveryRequest {
   pixelFormats?: string[];
   /** @nullable */
   requestId?: string | null;
+  sourcePlaybackFailed?: boolean;
 }
 
 export interface ExtractMetadataRequest {
@@ -921,6 +922,33 @@ export const AcknowledgePlaybackRequestOutcome = {
   rejected: 'rejected',
 } as const;
 
+/**
+ * @nullable
+ */
+export type AcknowledgePlaybackRequestRejectionReason = typeof AcknowledgePlaybackRequestRejectionReason[keyof typeof AcknowledgePlaybackRequestRejectionReason] | null;
+
+
+export const AcknowledgePlaybackRequestRejectionReason = {
+  source_color_metadata_unavailable: 'source_color_metadata_unavailable',
+  video_pixel_format_unsupported: 'video_pixel_format_unsupported',
+  video_bit_depth_unsupported: 'video_bit_depth_unsupported',
+  video_hdr_unsupported: 'video_hdr_unsupported',
+  subtitle_burn_in_required: 'subtitle_burn_in_required',
+  video_codec_unsupported: 'video_codec_unsupported',
+  video_dimensions_unsupported: 'video_dimensions_unsupported',
+  audio_codec_unsupported: 'audio_codec_unsupported',
+  audio_channels_unsupported: 'audio_channels_unsupported',
+  source_stream_metadata_unavailable: 'source_stream_metadata_unavailable',
+  audio_stream_selection_requires_remux: 'audio_stream_selection_requires_remux',
+  container_unsupported: 'container_unsupported',
+  audio_stream_unavailable: 'audio_stream_unavailable',
+  audio_transcoding_disabled: 'audio_transcoding_disabled',
+  destination_media_unsupported: 'destination_media_unsupported',
+  subtitle_delivery_unsupported: 'subtitle_delivery_unsupported',
+  browser_rejected_source: 'browser_rejected_source',
+  unknown: 'unknown',
+} as const;
+
 export interface AcknowledgePlaybackRequest {
   commandId: string;
   attemptId: string;
@@ -941,6 +969,8 @@ export interface AcknowledgePlaybackRequest {
      * @nullable
      */
   volume?: number | null;
+  /** @nullable */
+  rejectionReason?: AcknowledgePlaybackRequestRejectionReason;
 }
 
 export type ObservePlaybackRequestObservedState = typeof ObservePlaybackRequestObservedState[keyof typeof ObservePlaybackRequestObservedState];
@@ -3078,6 +3108,29 @@ export type PlaybackSnapshotResourceRecoveryResult = {
   revision: number;
 } | null;
 
+export type PlaybackSnapshotResourceTransferResultState = typeof PlaybackSnapshotResourceTransferResultState[keyof typeof PlaybackSnapshotResourceTransferResultState];
+
+
+export const PlaybackSnapshotResourceTransferResultState = {
+  preparing: 'preparing',
+  quiescing: 'quiescing',
+  starting: 'starting',
+  committed: 'committed',
+  failed: 'failed',
+  uncertain: 'uncertain',
+} as const;
+
+/**
+ * @nullable
+ */
+export type PlaybackSnapshotResourceTransferResult = {
+  requestId: string;
+  attemptId: string;
+  state: PlaybackSnapshotResourceTransferResultState;
+  /** @nullable */
+  rejectionReason: string | null;
+} | null;
+
 /**
  * @nullable
  */
@@ -3086,6 +3139,8 @@ export type PlaybackSnapshotResourceRequestResult = {
   commandId: string;
   /** @nullable */
   outcome: string | null;
+  /** @nullable */
+  rejectionReason: string | null;
 } | null;
 
 export interface PlaybackSnapshotResource {
@@ -3114,6 +3169,8 @@ export interface PlaybackSnapshotResource {
   endpoint?: PlaybackEndpointResource | null;
   /** @nullable */
   recoveryResult?: PlaybackSnapshotResourceRecoveryResult;
+  /** @nullable */
+  transferResult?: PlaybackSnapshotResourceTransferResult;
   /** @nullable */
   requestResult?: PlaybackSnapshotResourceRequestResult;
 }

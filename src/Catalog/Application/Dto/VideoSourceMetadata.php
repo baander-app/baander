@@ -35,6 +35,7 @@ final readonly class VideoSourceMetadata
         public ?array $colorSpace = null,
         public ?string $colorRange = null,
         public ?float $sourceTimestampOrigin = null,
+        public bool $hasSubtitles = false,
     ) {
     }
 }
