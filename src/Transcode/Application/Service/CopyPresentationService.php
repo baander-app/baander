@@ -83,7 +83,15 @@ final readonly class CopyPresentationService implements CopyPresentationPortInte
             }
             $this->sleeper->sleep(0.1);
         }
-        $this->ownership->expireAdmission($session->getJobId(), $session->getId(), $requestId);
+        $expired = $this->ownership->expireAdmission($session->getJobId(), $session->getId(), $requestId);
+        if (!$expired) {
+            $runtime = $this->ownership->find($session->getJobId());
+            if ($runtime !== null && $runtime->sessionId->equals($session->getId()) && $runtime->requestId === $requestId
+                && ($runtime->outcome === 'complete' || ($runtime->ownershipLive && in_array($runtime->outcome, ['accepted', 'ready'], true)))) {
+                $job = $this->jobs->findByUuid($session->getJobId()) ?? throw new TranscodeStartupUnavailableException();
+                return new CopyPresentation($job->getPublicId(), $session->getPublicId(), $requestId);
+            }
+        }
         throw new TranscodeStartupUnavailableException();
     }
 }

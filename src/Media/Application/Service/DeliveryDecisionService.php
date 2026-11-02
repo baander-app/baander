@@ -112,8 +112,9 @@ final readonly class DeliveryDecisionService implements DeliveryDecisionPortInte
             }
             $presentation = $this->copyPresentations->start(new CopyPresentationInput($owner, $source->videoId, $source->hash, $decision->selection->videoStreamIndex,
                 $decision->selection->audioStreamIndex, $decision->selection->container, $source->width, $source->height, $requestId));
+            $manifest = $decision->selection->transport === 'dash' ? 'manifest.mpd' : 'master.m3u8';
             return new DeliveryDecision(DeliveryKind::Copy, selection: $decision->selection,
-                url: '/api/transcode/' . $id->toString() . '/master.m3u8', requestId: $requestId, jobId: $presentation->jobId->toString());
+                url: '/api/transcode/' . $id->toString() . '/' . $manifest, requestId: $requestId, jobId: $presentation->jobId->toString());
         }
         return $decision;
     }

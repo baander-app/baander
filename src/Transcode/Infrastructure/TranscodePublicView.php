@@ -10,15 +10,17 @@ use App\Shared\Domain\Model\Uuid;
 use App\Transcode\Application\DTO\TranscodeJobDto;
 use App\Transcode\Application\DTO\TranscodeSessionDto;
 use App\Transcode\Application\Port\TranscodePublicViewInterface;
+use App\Transcode\Application\Port\TranscodeExecutionOwnershipPort;
 use App\Transcode\Application\Port\TranscodeStreamingPortInterface;
 use App\Transcode\Application\Port\StreamAuthPortInterface;
 use App\Transcode\Domain\Model\TranscodeJob;
 use App\Transcode\Domain\Model\TranscodeSession;
+use App\Transcode\Domain\ValueObject\SessionState;
 use Doctrine\DBAL\Connection;
 
 final readonly class TranscodePublicView implements TranscodePublicViewInterface
 {
-    public function __construct(private Connection $connection, private TranscodeStreamingPortInterface $streaming, private StreamAuthPortInterface $streamAuth)
+    public function __construct(private Connection $connection, private TranscodeStreamingPortInterface $streaming, private StreamAuthPortInterface $streamAuth, private TranscodeExecutionOwnershipPort $ownership)
     {
     }
 
@@ -47,7 +49,10 @@ final readonly class TranscodePublicView implements TranscodePublicViewInterface
                 ? $this->streamAuth->signUrl('/api/transcode/'.$row['video_id'].'/master.m3u8?'.http_build_query(['set' => $playback['renditionSet']]))['url']
                 : null;
         }
-        return TranscodeSessionDto::fromModel($session, PublicId::fromString($row['user_id']), PublicId::fromString($row['job_id']), PublicId::fromString($row['video_id']), $playback);
+        $runtime = $this->ownership->find($session->getJobId());
+        $state = $runtime !== null && $runtime->sessionId->equals($session->getId()) && in_array($runtime->outcome, ['failed', 'refused'], true)
+            ? SessionState::Failed : null;
+        return TranscodeSessionDto::fromModel($session, PublicId::fromString($row['user_id']), PublicId::fromString($row['job_id']), PublicId::fromString($row['video_id']), $playback, $state);
     }
 
     public function job(TranscodeJob $job): TranscodeJobDto

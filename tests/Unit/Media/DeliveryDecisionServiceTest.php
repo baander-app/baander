@@ -22,6 +22,8 @@ use App\Shared\Domain\Model\Uuid;
 use App\Shared\Domain\ValueObject\LibraryReadScope;
 use App\Shared\Domain\ValueObject\MediaReadScope;
 use App\Transcode\Application\DTO\CompletedVideoArtifact;
+use App\Transcode\Application\DTO\CopyPresentation;
+use App\Transcode\Application\Port\CopyPresentationPortInterface;
 use App\Transcode\Application\Port\CompletedVideoArtifactPort;
 use App\Transcode\Application\Port\AudioRendition;
 use App\Transcode\Application\Port\AudioRenditionFormat;
@@ -32,6 +34,26 @@ use PHPUnit\Framework\TestCase;
 
 final class DeliveryDecisionServiceTest extends TestCase
 {
+    public function testDashOnlyCopyReturnsTheSelectedManifest(): void
+    {
+        $videos = $this->createStub(VideoPortInterface::class);
+        $videos->method('getSourceMetadata')->willReturn(new VideoSourceMetadata(new Uuid(), (new PublicId())->toString(), '/library/movie.mkv', 'movie.mkv', 100, 'video/x-matroska', 'hash', 'matroska', 'h264', 3,
+            [['codec' => 'aac', 'channels' => 2, 'streamIndex' => 8, 'isDefault' => true]], 1920, 1080, 24.0, 100.0, pixFmt: 'yuv420p', colorSpace: ['transfer' => 'bt709']));
+        $requestId = (new Uuid())->toString();
+        $presentation = new CopyPresentation(new PublicId(), new PublicId(), $requestId);
+        $copies = $this->createMock(CopyPresentationPortInterface::class);
+        $copies->expects(self::once())->method('start')->willReturn($presentation);
+        $videoId = new PublicId();
+        $decision = $this->service(videos: $videos, copies: $copies)->video(new Uuid(), $videoId,
+            new DeliveryDestination(['mp4'], ['h264'], ['aac'], transports: ['dash']), $requestId);
+
+        self::assertSame(DeliveryKind::Copy, $decision->kind);
+        self::assertSame('dash', $decision->selection?->transport);
+        self::assertSame('/api/transcode/'.$videoId->toString().'/manifest.mpd', $decision->url);
+        self::assertSame($requestId, $decision->requestId);
+        self::assertSame($presentation->jobId->toString(), $decision->jobId);
+    }
+
     public function testFailedNativeSourceCanOnlyFallBackToPermittedEncoding(): void
     {
         $metadata = new TrackStreamMetadata('track', 'song.mp3', '/library/song.mp3', 'audio/mpeg', 100, 'mp3', 128000, 48000, 2, 10.0,
@@ -170,7 +192,7 @@ final class DeliveryDecisionServiceTest extends TestCase
         self::assertSame('/accepted', $result->url);
     }
 
-    private function service(?PlaybackMediaAccessInterface $access = null, ?VideoPortInterface $videos = null, ?AudioRenditionPortInterface $audio = null, bool $enabled = true, string $profile = 'household', ?CompletedVideoArtifactPort $artifacts = null, ?TrackStreamMetadata $metadata = null): DeliveryDecisionService
+    private function service(?PlaybackMediaAccessInterface $access = null, ?VideoPortInterface $videos = null, ?AudioRenditionPortInterface $audio = null, bool $enabled = true, string $profile = 'household', ?CompletedVideoArtifactPort $artifacts = null, ?TrackStreamMetadata $metadata = null, ?CopyPresentationPortInterface $copies = null): DeliveryDecisionService
     {
         $scopes = $this->createStub(MediaReadScopeProviderInterface::class);
         $scopes->method('forUser')->willReturn(MediaReadScope::authenticated(new Uuid(), LibraryReadScope::unrestricted()));
@@ -183,6 +205,6 @@ final class DeliveryDecisionServiceTest extends TestCase
             $videos ?? $this->createStub(VideoPortInterface::class), $streams,
             new DeliveryCompatibility(new MediaExecutionPolicy(DeploymentProfile::resolve($profile))),
             new MediaExecutionPolicy(DeploymentProfile::resolve($profile)),
-            $audio ?? $this->createStub(AudioRenditionPortInterface::class), $settings, $artifacts);
+            $audio ?? $this->createStub(AudioRenditionPortInterface::class), $settings, $artifacts, $copies);
     }
 }

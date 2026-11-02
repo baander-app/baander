@@ -35,29 +35,34 @@ final class DpopBindingListenerTest extends TestCase
     private string $proof;
 
     #[DataProvider('protectedPaths')]
-    public function testAuthenticatedUserCannotBypassProofValidation(string $path): void
+    public function testAuthenticatedUserCannotBypassProofValidation(string $path, ?string $route = null, string $method = 'GET'): void
     {
         $storage = new TokenStorage();
-        $storage->setToken(new UsernamePasswordToken(new SecurityUser('user', 'user@example.test', ''), 'api', ['ROLE_USER']));
+        $storage->setToken(new UsernamePasswordToken(new SecurityUser('user', 'user@baander.app', ''), 'api', ['ROLE_USER']));
         $listener = new DpopBindingListener(
             $storage,
             new DpopProofValidator($this->createStub(DpopJtiCacheInterface::class)),
             $this->logger(),
         );
-        $request = Request::create($path);
+        $request = Request::create($path, $method);
+        $request->attributes->set('_route', $route);
         $request->headers->set('Authorization', 'Bearer invalid-token');
 
         $this->expectException(AccessDeniedException::class);
         $listener->onKernelRequest(new RequestEvent($this->createStub(HttpKernelInterface::class), $request, HttpKernelInterface::MAIN_REQUEST));
     }
 
-    /** @return iterable<array{string}> */
+    /** @return iterable<array{string, 1?: string, 2?: string}> */
     public static function protectedPaths(): iterable
     {
         yield ['/api/catalog/songs'];
         yield ['/api/transcode/sessions/example'];
         yield ['/api/transcode/jobs/cleanup'];
         yield ['/api/transcode/example/quality-ladder'];
+        foreach (['GET', 'HEAD'] as $method) {
+            yield ['/api/stream/video', 'stream_original_video', $method];
+            yield ['/api/stream/original/track', 'stream_original_track', $method];
+        }
     }
 
     /** On any other route a jti store that cannot answer is not a verdict on the proof, so the request is told to wait, not refused. */
@@ -132,7 +137,7 @@ final class DpopBindingListenerTest extends TestCase
         } catch (AccessDeniedException $exception) {
             self::assertSame('DPoP proof "jti" has been reused.', $exception->getMessage());
         }
-        self::assertSame([], array_filter($this->warnings(), static fn (array $record): bool => isset($record['context']['route'])), 'A refused proof is not an accepted one.');
+        self::assertSame([], array_filter($this->warnings(), static fn(array $record): bool => isset($record['context']['route'])), 'A refused proof is not an accepted one.');
     }
 
     /** On the degraded path the proof must still hash the presented token. */
@@ -188,9 +193,7 @@ final class DpopBindingListenerTest extends TestCase
         };
 
         return new class ($record) extends AbstractLogger {
-            public function __construct(private readonly \Closure $record)
-            {
-            }
+            public function __construct(private readonly \Closure $record) {}
 
             /** @param array<string, mixed> $context */
             public function log($level, string|\Stringable $message, array $context = []): void
@@ -203,6 +206,6 @@ final class DpopBindingListenerTest extends TestCase
     /** @return list<array{level: string, message: string, context: array<string, mixed>}> */
     private function warnings(): array
     {
-        return array_values(array_filter($this->logs, static fn (array $record): bool => $record['level'] === 'warning'));
+        return array_values(array_filter($this->logs, static fn(array $record): bool => $record['level'] === 'warning'));
     }
 }

@@ -18,6 +18,27 @@ final class PublishedPresentationReader
 
     public function read(string $directory): ?PublishedPresentation
     {
+        return $this->readPresentation($directory, true);
+    }
+
+    /** Reads the bounded timeline only; callers must validate each file they serve. */
+    public function readIndex(string $directory): ?PublishedPresentation
+    {
+        return $this->readPresentation($directory, false);
+    }
+
+    public function isCompleteInitialization(string $path): bool
+    {
+        return $this->completeFile($path, ['ftyp', 'moov']);
+    }
+
+    public function isCompleteSegment(string $path): bool
+    {
+        return $this->completeFile($path, ['moof', 'mdat']);
+    }
+
+    private function readPresentation(string $directory, bool $validateFiles): ?PublishedPresentation
+    {
         $path = rtrim($directory, '/') . '/manifest.mpd';
         clearstatcache(true, $path);
         if (!is_file($path) || is_link($path)) {
@@ -108,7 +129,7 @@ final class PublishedPresentationReader
                     }
                     for ($index = 0; $index <= $repeat; ++$index) {
                         $file = sprintf('track-%s-seg-%05d.m4s', $id, $number);
-                        if (!$this->completeFile($directory . '/' . $file, ['moof', 'mdat'])) {
+                        if ($validateFiles && !$this->isCompleteSegment($directory . '/' . $file)) {
                             return null;
                         }
                         $segments[] = new PublishedSegment(count($segments), $number++, $start, $duration, $file);
@@ -117,7 +138,7 @@ final class PublishedPresentationReader
                     $end = $start;
                 }
                 $init = 'init-' . $id . '.mp4';
-                if (!$this->completeFile($directory . '/' . $init, ['ftyp', 'moov'])) {
+                if ($validateFiles && !$this->isCompleteInitialization($directory . '/' . $init)) {
                     return null;
                 }
                 $codec = $representation->getAttribute('codecs');

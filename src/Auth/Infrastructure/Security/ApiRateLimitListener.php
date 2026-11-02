@@ -49,8 +49,10 @@ final class ApiRateLimitListener
      * @var list<string>
      */
     public const array EXEMPT_ROUTES = [
-        // Audio stream; the browser issues range requests while a track plays.
+        // Media streams; players issue range requests during playback.
         'stream_track',
+        'stream_original_video',
+        'stream_original_track',
         // HLS/DASH manifests; players re-fetch media playlists while playing.
         'stream_master_manifest',
         'stream_media_manifest',
@@ -77,8 +79,7 @@ final class ApiRateLimitListener
         private readonly TokenStorageInterface $tokenStorage,
         private readonly LoggerInterface $logger,
         private readonly string $environment,
-    ) {
-    }
+    ) {}
 
     #[AsEventListener(event: KernelEvents::REQUEST, priority: 7)]
     public function onKernelRequest(RequestEvent $event): void

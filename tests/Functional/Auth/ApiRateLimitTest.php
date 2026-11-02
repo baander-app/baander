@@ -84,7 +84,8 @@ final class ApiRateLimitTest extends RateLimitTestCase
             $route = $routes->get($name);
             self::assertNotNull($route, sprintf('Exempt route "%s" does not exist.', $name));
             self::assertStringStartsWith('/api/', $route->getPath());
-            self::assertSame(['GET'], $route->getMethods(), sprintf('Exempt route "%s" must be read-only media delivery.', $name));
+            self::assertContains('GET', $route->getMethods(), sprintf('Exempt route "%s" must support media delivery.', $name));
+            self::assertSame([], array_diff($route->getMethods(), ['GET', 'HEAD']), sprintf('Exempt route "%s" must be read-only media delivery.', $name));
         }
     }
 }

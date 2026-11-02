@@ -22,7 +22,7 @@ use Symfony\Component\Routing\RouteCollection;
 use Symfony\Component\Yaml\Yaml;
 
 /**
- * The signed delivery routes are listed three times: the firewall rows that grant them
+ * The adaptive signed delivery routes are listed three times: the firewall rows that grant them
  * public access, the DPoP binding listener's exemption and the rate limiter's exemption.
  * This test derives the set from the application's routes and the firewall rows and holds
  * the two exemptions and the test fixture to it, so none of the copies drifts.
@@ -32,7 +32,7 @@ use Symfony\Component\Yaml\Yaml;
  */
 final class DeliveryRouteInventoryTest extends TestCase
 {
-    /** Every signed delivery route lives under the transcode prefix. */
+    /** Adaptive delivery uses signatures instead of authenticated DPoP requests. */
     private const string DELIVERY_PREFIX = '/api/transcode/';
     private const string VIDEO_ID = '0192f6c8-5b4e-7c3a-9d2e-1f0a8b7c6d5e';
     private const string JOB_ID = 'V1StGXR8_Z5jdHi6B-myT';
@@ -78,13 +78,23 @@ final class DeliveryRouteInventoryTest extends TestCase
         }
     }
 
+    public function testOriginalMediaIsExemptFromGenericLimitsButRetainsAuthenticatedProofChecks(): void
+    {
+        $inventory = $this->publicDeliveryRoutes('/api/stream/');
+
+        self::assertEqualsCanonicalizing(['stream_original_video', 'stream_original_track'], $inventory);
+        self::assertEqualsCanonicalizing($inventory, $this->publicDeliveryRoutes('/api/stream/', 'HEAD'));
+        self::assertSame([], array_values(array_diff($inventory, ApiRateLimitListener::EXEMPT_ROUTES)));
+        self::assertSame([], array_values(array_intersect($inventory, DpopBindingListener::SIGNED_DELIVERY_ROUTES)));
+    }
+
     /**
-     * Route names under the delivery prefix whose first matching firewall row grants a GET
+     * Route names under the delivery prefix whose first matching firewall row grants the
      * request public access. Symfony applies only the first matching row.
      *
      * @return list<string>
      */
-    private function publicDeliveryRoutes(): array
+    private function publicDeliveryRoutes(string $prefix = self::DELIVERY_PREFIX, string $method = 'GET'): array
     {
         /** @var array{security: array{access_control: list<array{path: string, methods?: list<string>|string, roles?: list<string>|string}>}} $config */
         $config = Yaml::parseFile(self::projectDir() . '/config/packages/security.yaml');
@@ -92,15 +102,15 @@ final class DeliveryRouteInventoryTest extends TestCase
 
         $names = [];
         foreach (self::$routes as $name => $route) {
-            if (!str_starts_with($route->getPath(), self::DELIVERY_PREFIX)) {
+            if (!str_starts_with($route->getPath(), $prefix)) {
                 continue;
             }
-            if ($route->getMethods() !== [] && !in_array('GET', $route->getMethods(), true)) {
+            if ($route->getMethods() !== [] && !in_array($method, $route->getMethods(), true)) {
                 continue;
             }
             foreach ($rules as $rule) {
                 $methods = array_map(strtoupper(...), (array) ($rule['methods'] ?? []));
-                if ($methods !== [] && !in_array('GET', $methods, true)) {
+                if ($methods !== [] && !in_array($method, $methods, true)) {
                     continue;
                 }
                 if (preg_match('{' . $rule['path'] . '}', str_replace(['{track}', '{generation}'], ['video', '3'], $route->getPath())) !== 1) {

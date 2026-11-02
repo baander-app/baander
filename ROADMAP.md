@@ -83,6 +83,10 @@ Verification: the deployment tests passed 10 tests with 102 assertions. The work
 
 The isolated preview refreshed successfully. A separate production-image household deployment started and served its page and compiled JavaScript. Normal stop, restart and final stop passed; all seven data volumes, both OAuth signing keys, a storage marker and the PostgreSQL cluster identity survived the restart. These checks verify deployment behavior. Whole-stack workload qualification and measured memory guidance remain open; the configured reservations are not a tested host minimum or evidence of Raspberry Pi support.
 
+Playback review checkpoint, 2026-11-02 (U3–U4): signed original media requests now bypass the generic API limiter while retaining signature, access and DPoP checks. Copy delivery returns the negotiated DASH manifest when requested and rechecks admission after losing an expiry race. Public session state reports failure when the matching execution is refused or fails. Completed-video segment requests validate the requested media file without reopening every other segment; manifest, authorization, retention and generation checks remain.
+
+Verification: the combined CI-image run passed 109 tests with 958 assertions, including the database-backed limiter checks. Backend PHPStan and Deptrac passed; Deptrac retained 482 existing skips. The focused review accepted all five backend fixes without new findings. In a filesystem trace of 20 segment requests, media-file opens fell from 4,000 to 20 for 100 segments per track, and from 12,000 to 20 for 300 segments per track. Bounded manifest parsing remains proportional to presentation length. These results do not establish household host capacity; complete workload measurement and operator guidance remain open.
+
 ## Playback destinations and notifications
 
 Requirements checkpoint, 2026-11-01: the user confirmed the

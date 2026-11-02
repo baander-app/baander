@@ -149,6 +149,21 @@ final class PublishedPresentationReaderTest extends TestCase
         yield 'non-native representation' => ['id="0" mimeType', 'id="2" mimeType'];
     }
 
+    public function testIndexReadingPreservesStructureWithoutOpeningMediaFiles(): void
+    {
+        foreach (glob($this->directory . '/*.m4s') as $path) {
+            unlink($path);
+        }
+        unlink($this->directory . '/init-0.mp4');
+        $reader = new PublishedPresentationReader();
+        $index = $reader->readIndex($this->directory);
+        self::assertNotNull($index);
+        self::assertCount(3, $index->track(MediaTrack::Video)->segments);
+        self::assertNull($reader->read($this->directory));
+        $this->write(str_replace('$Number%05d$', '../$Number%05d$', $this->manifest()));
+        self::assertNull($reader->readIndex($this->directory));
+    }
+
     public function testRejectsOversizeIndex(): void
     {
         $this->write(str_repeat(' ', 4_194_305));

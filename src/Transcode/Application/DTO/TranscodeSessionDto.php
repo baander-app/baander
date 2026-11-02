@@ -6,6 +6,7 @@ namespace App\Transcode\Application\DTO;
 
 use App\Shared\Domain\Model\PublicId;
 use App\Transcode\Domain\Model\TranscodeSession;
+use App\Transcode\Domain\ValueObject\SessionState;
 
 final readonly class TranscodeSessionDto
 {
@@ -32,14 +33,14 @@ final readonly class TranscodeSessionDto
     }
 
     /** @param array<string, mixed>|null $playback */
-    public static function fromModel(TranscodeSession $session, PublicId $userId, PublicId $jobId, PublicId $videoId, ?array $playback = null): self
+    public static function fromModel(TranscodeSession $session, PublicId $userId, PublicId $jobId, PublicId $videoId, ?array $playback = null, ?SessionState $state = null): self
     {
         return new self(
             publicId: $session->getPublicId()->toString(),
             userId: $userId->toString(),
             jobId: $jobId->toString(),
             videoId: $videoId->toString(),
-            state: $session->getSessionState()->value,
+            state: ($state ?? $session->getSessionState())->value,
             priority: $session->getPriority()->value,
             audioProfile: $session->getAudioProfile()->jsonSerialize(),
             currentSegmentIndex: $session->getCurrentSegmentIndex(),

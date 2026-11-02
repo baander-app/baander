@@ -17,7 +17,7 @@ use App\Transcode\Infrastructure\Packaging\PublishedPresentation;
 use App\Transcode\Infrastructure\Packaging\PublishedPresentationReader;
 use Throwable;
 
-/** @phpstan-type ArtifactContext array{directory: string, presentation: PublishedPresentation, width: int, height: int, channels: int, targetDuration: float} */
+/** @phpstan-type ArtifactContext array{directory: string, presentation: PublishedPresentation, width: int, height: int, channels: int, targetDuration: float, storage: TranscodeStoragePortInterface} */
 final readonly class CompletedVideoDeliveryAdapter implements CompletedVideoDeliveryPort
 {
     public function __construct(
@@ -93,7 +93,7 @@ final readonly class CompletedVideoDeliveryAdapter implements CompletedVideoDeli
 
     public function path(PublicId $jobId, int $generation, MediaTrack $track, ?int $index, int $expiresAt): ?string
     {
-        $context = $this->context($jobId, $generation, $expiresAt);
+        $context = $this->context($jobId, $generation, $expiresAt, validateFiles: false);
         if ($context === null) {
             return null;
         }
@@ -101,19 +101,26 @@ final readonly class CompletedVideoDeliveryAdapter implements CompletedVideoDeli
         if ($published === null) {
             return null;
         }
-        if ($index === null) {
-            return $context['directory'] . '/' . $published->initFile;
+        $file = $index === null ? $published->initFile : ($published->segments[$index]->file ?? null);
+        if ($file === null) {
+            return null;
         }
-        foreach ($published->segments as $segment) {
-            if ($segment->ordinal === $index) {
-                return $context['directory'] . '/' . $segment->file;
+        $path = $context['directory'] . '/' . $file;
+        try {
+            if (is_link($path) || !$context['storage']->exists($path)) {
+                return null;
             }
+            $complete = $index === null
+                ? $this->presentations->isCompleteInitialization($path)
+                : $this->presentations->isCompleteSegment($path);
+            return $complete ? $path : null;
+        } catch (Throwable) {
+            return null;
         }
-        return null;
     }
 
     /** @return ArtifactContext|null */
-    private function context(PublicId $jobId, int $generation, int $expiresAt, bool $requireRetention = true): ?array
+    private function context(PublicId $jobId, int $generation, int $expiresAt, bool $requireRetention = true, bool $validateFiles = true): ?array
     {
         if ($generation < 1 || $expiresAt < time()) {
             return null;
@@ -143,11 +150,11 @@ final readonly class CompletedVideoDeliveryAdapter implements CompletedVideoDeli
                 || ($metadata['presentationSelection'] ?? null) !== $selection->jsonSerialize() || ($metadata['startTime'] ?? -1) != 0) {
                 return null;
             }
-            $presentation = $this->presentations->read($directory);
+            $presentation = $validateFiles ? $this->presentations->read($directory) : $this->presentations->readIndex($directory);
             if ($presentation === null || !$presentation->complete || $presentation->track(MediaTrack::Video) === null) {
                 return null;
             }
-            foreach ($presentation->tracks as $track) {
+            foreach ($validateFiles ? $presentation->tracks : [] as $track) {
                 foreach ([$track->initFile, ...array_map(static fn ($segment): string => $segment->file, $track->segments)] as $file) {
                     $path = $directory . '/' . $file;
                     if (!$scoped->exists($path) || is_link($path) || !is_file($path) || filesize($path) < 1) {
@@ -156,7 +163,7 @@ final readonly class CompletedVideoDeliveryAdapter implements CompletedVideoDeli
                 }
             }
             return ['directory' => $directory, 'presentation' => $presentation, 'width' => $job->getWidth(), 'height' => $job->getHeight(),
-                'channels' => (int) ($metadata['audioChannels'] ?? 2), 'targetDuration' => (float) ($metadata['hlsTargetDuration'] ?? 7)];
+                'channels' => (int) ($metadata['audioChannels'] ?? 2), 'targetDuration' => (float) ($metadata['hlsTargetDuration'] ?? 7), 'storage' => $scoped];
         } catch (Throwable) {
             return null;
         }
