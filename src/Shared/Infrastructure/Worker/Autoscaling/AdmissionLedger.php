@@ -18,7 +18,7 @@ final class AdmissionLedger
     private readonly string $directory;
     private readonly string $profileHash;
 
-    public function __construct(string $ipcDirectory, private readonly DeploymentLease $lease, private readonly WorkerAutoscalingProfile $profile, private readonly DeploymentProfile $deploymentProfile = new DeploymentProfile())
+    public function __construct(string $ipcDirectory, private readonly DeploymentLease $lease, private readonly WorkerAutoscalingProfile $profile, private readonly DeploymentProfile $deploymentProfile)
     {
         $this->directory = rtrim($ipcDirectory, '/') . '/' . $lease->bootId;
         $this->profileHash = hash('sha256', $profile->toJson() . "\n" . $deploymentProfile->toJson());

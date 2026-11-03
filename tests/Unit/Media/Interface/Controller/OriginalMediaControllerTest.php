@@ -219,6 +219,6 @@ final class OriginalMediaControllerTest extends TestCase
             '0123456789abcdef',
         ));
         $tracks->method('resolveTrackPath')->willReturn($this->file);
-        return new OriginalMediaController(new MediaExecutionPolicy(new DeploymentProfile()), $this->createStub(SystemSettingsPortInterface::class), $scopes, $access ?? $this->createStub(PlaybackMediaAccessInterface::class), $videos, $tracks, $audio ?? $this->createStub(AudioRenditionPortInterface::class), $this->signatures);
+        return new OriginalMediaController(new MediaExecutionPolicy(new DeploymentProfile('full')), $this->createStub(SystemSettingsPortInterface::class), $scopes, $access ?? $this->createStub(PlaybackMediaAccessInterface::class), $videos, $tracks, $audio ?? $this->createStub(AudioRenditionPortInterface::class), $this->signatures);
     }
 }

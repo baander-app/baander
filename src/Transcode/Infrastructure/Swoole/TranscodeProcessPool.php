@@ -28,7 +28,7 @@ final class TranscodeProcessPool
         private readonly NativeExecutionClientInterface $client,
         private readonly LoggerInterface $logger,
         private readonly JsonEncoder $jsonEncoder,
-        private readonly DeploymentProfile $deploymentProfile = new DeploymentProfile(),
+        private readonly DeploymentProfile $deploymentProfile,
         private readonly string $ffprobePath = '/usr/bin/ffprobe',
     ) {}
 

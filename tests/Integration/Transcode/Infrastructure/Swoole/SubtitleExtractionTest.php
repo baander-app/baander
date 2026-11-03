@@ -28,7 +28,7 @@ final class SubtitleExtractionTest extends TestCase
         $this->directory = sys_get_temp_dir().'/baander-subtitles-'.bin2hex(random_bytes(6));
         mkdir($this->directory, 0700);
         $this->native = new NativeExecutionFixture('baander.app:workers', bin2hex(random_bytes(16)));
-        $this->pool = new TranscodeProcessPool($this->native->client, new NullLogger(), new JsonEncoder());
+        $this->pool = new TranscodeProcessPool($this->native->client, new NullLogger(), new JsonEncoder(), new \App\Shared\Application\DTO\DeploymentProfile('full'));
         $this->job = TranscodeJob::create(Uuid::generate(), QualityTier::p720(), $this->directory, Uuid::generate());
     }
 

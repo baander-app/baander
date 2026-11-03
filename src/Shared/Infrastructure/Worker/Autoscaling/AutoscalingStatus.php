@@ -15,7 +15,7 @@ final readonly class AutoscalingStatus
     private AdmissionLedger $ledger;
     private ResourceChannel $resources;
 
-    public function __construct(string $ipcDirectory, DeploymentLease $lease, private WorkerAutoscalingProfile $profile, DeploymentProfile $deploymentProfile = new DeploymentProfile())
+    public function __construct(string $ipcDirectory, DeploymentLease $lease, private WorkerAutoscalingProfile $profile, DeploymentProfile $deploymentProfile)
     {
         $this->ledger = new AdmissionLedger($ipcDirectory, $lease, $profile, $deploymentProfile);
         $this->resources = new ResourceChannel($ipcDirectory, $lease);

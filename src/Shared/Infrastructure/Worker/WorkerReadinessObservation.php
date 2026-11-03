@@ -73,7 +73,7 @@ final class WorkerReadinessObservation
      * @param list<array{command:list<string>,status:string,environment:string}> $processes
      * @return array<string,int>
      */
-    public static function verifyProcesses(array $processes, DeploymentLease $lease, string $unit, WorkerAutoscalingProfile $profile, string $appHome, DeploymentProfile $deploymentProfile = new DeploymentProfile()): array
+    public static function verifyProcesses(array $processes, DeploymentLease $lease, string $unit, WorkerAutoscalingProfile $profile, string $appHome, DeploymentProfile $deploymentProfile): array
     {
         $roles = [];
         foreach ($processes as $process) {

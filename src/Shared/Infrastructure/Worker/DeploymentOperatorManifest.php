@@ -123,7 +123,7 @@ final readonly class DeploymentOperatorManifest
                 '--autoscaling-profile=' . $this->autoscaling->toJson(),
                 '--deployment-profile=' . $this->deploymentProfile->toJson(),
                 '--lock-dir=/tmp/baander-worker-locks', '--ipc-dir=/run/baander-worker'],
-            $this->network, $budget->memoryBytes, $budget->nanoCpus, $budget->pidsLimit, $unit, $budget->cpuSet, $this->ipcVolume, $this->appHome, $environment, $this->mediaMounts, $this->sourceMountPolicy, $this->deploymentProfile);
+            $this->network, $budget->memoryBytes, $budget->nanoCpus, $budget->pidsLimit, $unit, $budget->cpuSet, $this->ipcVolume, $this->appHome, $this->deploymentProfile, $environment, $this->mediaMounts, $this->sourceMountPolicy);
         if (!in_array('source', array_column($recipe->mediaMounts, 'role'), true)) {
             throw new InvalidArgumentException('Operator media topology requires an explicitly authorized source storage.');
         }

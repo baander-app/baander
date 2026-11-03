@@ -62,6 +62,7 @@ final class MessengerAdmissionLifecycleTest extends TestCase
             $this->directory,
             new DeploymentLease('worker.baander.app', $this->boot, 1),
             new WorkerAutoscalingProfile(maximumConcurrency: 2),
+            new \App\Shared\Application\DTO\DeploymentProfile('full'),
         );
         $this->ledger->initialize(hrtime(true) / 1e9);
         $this->publishTarget(2);
@@ -431,7 +432,7 @@ final class MessengerAdmissionLifecycleTest extends TestCase
     {
         $now = hrtime(true) / 1e9;
         foreach (['control', 'execution'] as $unit) {
-            (new \App\Shared\Infrastructure\Worker\WorkerPeerHandshake($this->directory, 'worker.baander.app', $this->boot, $unit, $now))->publish(1, true, false, $now);
+            (new \App\Shared\Infrastructure\Worker\WorkerPeerHandshake($this->directory, 'worker.baander.app', $this->boot, $unit, $now, new \App\Shared\Application\DTO\DeploymentProfile('full')))->publish(1, true, false, $now);
         }
         $this->ledger->publishDecision($target, 'test-demand', [], $now);
     }

@@ -193,7 +193,7 @@ final class NativeExecutionDaemonTest extends TestCase
 
     public function testWrongBootCannotInspectOrSignalCurrentAttempt(): void
     {
-        $wrong = new NativeExecutionClient($this->directory . '/native.sock', 'baander.app:workers', str_repeat('b', 32), 1, 'media', 1);
+        $wrong = new NativeExecutionClient($this->directory . '/native.sock', 'baander.app:workers', str_repeat('b', 32), 1, 'media', 1, new \App\Shared\Application\DTO\DeploymentProfile('full'));
         $this->expectException(NativeExecutionException::class);
         $wrong->handshake();
     }
@@ -204,7 +204,7 @@ final class NativeExecutionDaemonTest extends TestCase
         self::assertIsResource($socket);
         $request = ['id' => str_repeat('c', 32), 'namespace' => 'baander.app:workers', 'bootId' => str_repeat('a', 32),
             'epoch' => 1, 'clientId' => 'media', 'generation' => 1, 'operation' => 'submit', 'attempt' => 1,
-            'deploymentProfile' => (new \App\Shared\Application\DTO\DeploymentProfile())->toJson(),
+            'deploymentProfile' => (new \App\Shared\Application\DTO\DeploymentProfile('full'))->toJson(),
             'limits' => ['commands' => 8, 'results' => 32, 'clients' => 64],
             'argv' => ['ffmpeg', '-version'], 'timeout' => 5];
         $frame = json_encode($request, JSON_THROW_ON_ERROR) . "\n";
@@ -240,7 +240,7 @@ final class NativeExecutionDaemonTest extends TestCase
     {
         $old = $this->client->submit(['ffmpeg', '-version'], 5);
         $this->finish($old);
-        $replacement = new NativeExecutionClient($this->directory . '/native.sock', 'baander.app:workers', str_repeat('a', 32), 1, 'media', 2);
+        $replacement = new NativeExecutionClient($this->directory . '/native.sock', 'baander.app:workers', str_repeat('a', 32), 1, 'media', 2, new \App\Shared\Application\DTO\DeploymentProfile('full'));
         self::assertTrue($replacement->handshake()['ready']);
         self::assertSame('unknown', $replacement->signal($old, 'stop')['state']);
         $this->expectException(NativeExecutionException::class);
@@ -276,7 +276,7 @@ final class NativeExecutionDaemonTest extends TestCase
     public function testClientLedgerIsBoundedWithoutForgettingReleasedClientIdentities(): void
     {
         for ($index = 0; $index < 64; ++$index) {
-            $client = new NativeExecutionClient($this->directory . '/native.sock', 'baander.app:workers', str_repeat('a', 32), 1, 'slot-' . $index, 1);
+            $client = new NativeExecutionClient($this->directory . '/native.sock', 'baander.app:workers', str_repeat('a', 32), 1, 'slot-' . $index, 1, new \App\Shared\Application\DTO\DeploymentProfile('full'));
             self::assertTrue($client->handshake()['ready']);
         }
         try {
@@ -285,14 +285,14 @@ final class NativeExecutionDaemonTest extends TestCase
         } catch (NativeExecutionException $error) {
             self::assertFalse($error->uncertain);
         }
-        $known = new NativeExecutionClient($this->directory . '/native.sock', 'baander.app:workers', str_repeat('a', 32), 1, 'slot-0', 1);
+        $known = new NativeExecutionClient($this->directory . '/native.sock', 'baander.app:workers', str_repeat('a', 32), 1, 'slot-0', 1, new \App\Shared\Application\DTO\DeploymentProfile('full'));
         self::assertTrue($known->handshake()['ready']);
     }
 
     public function testGenerationCannotReplaceAnUnreapedRunningCommand(): void
     {
         $this->client->submit(['ffmpeg', '-nostdin', '-re', '-f', 'lavfi', '-i', 'anullsrc', '-f', 'null', '-'], 10);
-        $replacement = new NativeExecutionClient($this->directory . '/native.sock', 'baander.app:workers', str_repeat('a', 32), 1, 'media', 2);
+        $replacement = new NativeExecutionClient($this->directory . '/native.sock', 'baander.app:workers', str_repeat('a', 32), 1, 'media', 2, new \App\Shared\Application\DTO\DeploymentProfile('full'));
         try {
             $replacement->handshake();
             self::fail('A replacement generation cannot supersede owned native work.');
@@ -316,7 +316,7 @@ final class NativeExecutionDaemonTest extends TestCase
     {
         $first = null;
         for ($generation = 1; $generation <= 66; ++$generation) {
-            $this->client = new NativeExecutionClient($this->directory . '/native.sock', 'baander.app:workers', str_repeat('a', 32), 1, 'media-slot-0', $generation);
+            $this->client = new NativeExecutionClient($this->directory . '/native.sock', 'baander.app:workers', str_repeat('a', 32), 1, 'media-slot-0', $generation, new \App\Shared\Application\DTO\DeploymentProfile('full'));
             $handle = $this->client->submit(['ffprobe', '-version'], 5);
             $first ??= $handle;
             self::assertSame(0, $this->finish($handle)['exitCode']);
@@ -426,7 +426,7 @@ function mkdir(string $path, int $mode, bool $recursive): bool
 }
 require $argv[1] . '/vendor/autoload.php';
 try {
-    exit((new NativeExecutionDaemon('baander.app:workers', str_repeat('a', 32), 1))->run($argv[2]));
+    exit((new NativeExecutionDaemon('baander.app:workers', str_repeat('a', 32), 1, new \App\Shared\Application\DTO\DeploymentProfile('full')))->run($argv[2]));
 } catch (\Throwable $error) {
     fwrite(STDERR, $error->getMessage());
     exit(1);
@@ -443,7 +443,7 @@ PHP;
                 usleep(10_000);
             }
             self::assertFileExists($socketPath, (string) file_get_contents($this->directory . '/peer-log'));
-            $peer = new NativeExecutionClient($socketPath, 'baander.app:workers', str_repeat('a', 32), 1, 'peer', 1);
+            $peer = new NativeExecutionClient($socketPath, 'baander.app:workers', str_repeat('a', 32), 1, 'peer', 1, new \App\Shared\Application\DTO\DeploymentProfile('full'));
             self::assertTrue($peer->handshake()['ready']);
         } finally {
             proc_terminate($process);
@@ -500,7 +500,7 @@ PHP;
 
     private function newClient(): NativeExecutionClient
     {
-        return new NativeExecutionClient($this->directory . '/native.sock', 'baander.app:workers', str_repeat('a', 32), 1, 'media', 1);
+        return new NativeExecutionClient($this->directory . '/native.sock', 'baander.app:workers', str_repeat('a', 32), 1, 'media', 1, new \App\Shared\Application\DTO\DeploymentProfile('full'));
     }
 
     /** @return array<string, mixed> */

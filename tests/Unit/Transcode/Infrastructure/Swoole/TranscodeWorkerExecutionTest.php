@@ -182,9 +182,9 @@ final class TranscodeWorkerExecutionTest extends TestCase
         $lazyEncoder = fn(): SegmentEncoder => $this->forbidEncoder ? throw new \RuntimeException('Copy resolved an encoder') : $encoder;
         $this->spawner = new VideoExecutionSpawner();
         $streams = new TranscodeStreamManager($this->createStub(SegmentAvailabilityInterface::class), $storage, $lazyEncoder, new NullLogger(), $this->spawner);
-        $this->helpers = new TranscodeProcessPool($pool, new NullLogger(), new JsonEncoder());
+        $this->helpers = new TranscodeProcessPool($pool, new NullLogger(), new JsonEncoder(), new \App\Shared\Application\DTO\DeploymentProfile('full'));
         $this->workerForPolicy = fn(\App\Transcode\Application\Service\MediaExecutionPolicy $policy): TranscodeSessionSubscriber => new TranscodeSessionSubscriber($policy, $jobs, $sessions, $storage, $this->helpers, $lazyEncoder, $videos, new NullLogger(), $ownership, $control, $streams, $this->timer, $admission);
-        $this->worker = ($this->workerForPolicy)(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile()));
+        $this->worker = ($this->workerForPolicy)(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile('full')));
     }
 
     protected function tearDown(): void

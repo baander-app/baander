@@ -279,7 +279,7 @@ final class AudioRenditionCacheTest extends TestCase
 
     private function cache(): AudioRenditionCache
     {
-        return new AudioRenditionCache(new MediaExecutionPolicy(new DeploymentProfile()), new SegmentFileResolver($this->root), $this->runtime, new NullLogger(), pollIntervalSeconds: .001, startTimeoutSeconds: .01);
+        return new AudioRenditionCache(new MediaExecutionPolicy(new DeploymentProfile('full')), new SegmentFileResolver($this->root), $this->runtime, new NullLogger(), pollIntervalSeconds: .001, startTimeoutSeconds: .01);
     }
 
     private function snapshot(string $state, int $generation = 1, bool $live = true): AudioRenditionRuntimeSnapshot

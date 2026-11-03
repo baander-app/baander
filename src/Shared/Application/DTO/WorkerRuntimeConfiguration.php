@@ -21,8 +21,8 @@ final readonly class WorkerRuntimeConfiguration
         public int $scheduledConsoleReservationBytes,
         public string $lockDirectory,
         public string $ipcDirectory,
+        public DeploymentProfile $deploymentProfile,
         public WorkerAutoscalingProfile $autoscaling = new WorkerAutoscalingProfile(),
-        public DeploymentProfile $deploymentProfile = new DeploymentProfile(),
     ) {
         $this->managementReservationBytes = $deploymentProfile->managementMemoryMiB($unit) * 1024 * 1024;
         $minimum = $autoscaling->minimumMemoryMiB($unit, $deploymentProfile) * 1024 * 1024;

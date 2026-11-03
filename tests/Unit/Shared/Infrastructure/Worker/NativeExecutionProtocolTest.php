@@ -42,7 +42,7 @@ final class NativeExecutionProtocolTest extends TestCase
         $path = sys_get_temp_dir() . '/baander-native-silent-' . bin2hex(random_bytes(6)) . '.sock';
         $server = stream_socket_server('unix://' . $path, $errno, $error);
         self::assertIsResource($server);
-        $client = new NativeExecutionClient($path, 'baander.app:workers', str_repeat('a', 32), 1, 'test', 1);
+        $client = new NativeExecutionClient($path, 'baander.app:workers', str_repeat('a', 32), 1, 'test', 1, new \App\Shared\Application\DTO\DeploymentProfile('full'));
         $start = hrtime(true);
         try {
             $client->handshake();
@@ -75,7 +75,7 @@ final class NativeExecutionProtocolTest extends TestCase
                     }
                 });
                 try {
-                    (new NativeExecutionClient($path, 'baander.app:workers', str_repeat('a', 32), 1, 'test', 1))->handshake();
+                    (new NativeExecutionClient($path, 'baander.app:workers', str_repeat('a', 32), 1, 'test', 1, new \App\Shared\Application\DTO\DeploymentProfile('full')))->handshake();
                     self::fail('Silent peer must time out.');
                 } catch (NativeExecutionException) {
                     self::assertSame(10, $ticks);

@@ -237,6 +237,6 @@ final class DeploymentMediaMountsTest extends TestCase
     /** @param list<array<string,mixed>> $mounts */
     public static function recipe(array $mounts, string $sourceMountPolicy = 'production'): DeploymentContainerRecipe
     {
-        return new DeploymentContainerRecipe('worker.baander.app', str_repeat('a', 32), 'daemon', 'sha256:' . str_repeat('b', 64), ['/usr/local/bin/php', '/var/www/html/bin/console', 'app:worker'], 'none', 2 * 1024 * 1024 * 1024, 1000000000, 64, DeploymentUnit::Control, [0], 'worker-ipc', '/var/www/html', mediaMounts: $mounts, sourceMountPolicy: $sourceMountPolicy);
+        return new DeploymentContainerRecipe('worker.baander.app', str_repeat('a', 32), 'daemon', 'sha256:' . str_repeat('b', 64), ['/usr/local/bin/php', '/var/www/html/bin/console', 'app:worker'], 'none', 2 * 1024 * 1024 * 1024, 1000000000, 64, DeploymentUnit::Control, [0], 'worker-ipc', '/var/www/html', new \App\Shared\Application\DTO\DeploymentProfile('full'), mediaMounts: $mounts, sourceMountPolicy: $sourceMountPolicy);
     }
 }

@@ -35,6 +35,14 @@ final class MediaExecutionPolicyTest extends TestCase
         $policy->assertAllowed($operation);
     }
 
+    public function testFullProfileWithZeroAudioSlotsReportsAudioEncodingDisabled(): void
+    {
+        $policy = new MediaExecutionPolicy(new DeploymentProfile('full', 2, 0));
+
+        self::assertFalse($policy->permits(MediaOperation::AudioEncode));
+        self::assertTrue($policy->permits(MediaOperation::VideoEncode));
+    }
+
     /** @return iterable<string, array{MediaOperation}> */
     public static function operations(): iterable
     {

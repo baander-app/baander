@@ -735,7 +735,7 @@ foreach (['messages' => ($profile ?? throw new RuntimeException('No resident aut
 }
 if ($mode === 'readiness-observation') {
     try {
-        $observed = \App\Shared\Infrastructure\Worker\WorkerReadinessObservation::observe($namespace, $bootId, $expectedEpoch, $unit, $profile->toJson(), dirname(__DIR__, 3), (new \App\Shared\Application\DTO\DeploymentProfile())->toJson());
+        $observed = \App\Shared\Infrastructure\Worker\WorkerReadinessObservation::observe($namespace, $bootId, $expectedEpoch, $unit, $profile->toJson(), dirname(__DIR__, 3), (new \App\Shared\Application\DTO\DeploymentProfile('full'))->toJson());
         $observation = ['success' => true, 'roles' => $observed];
     } catch (Throwable $error) {
         $safeMessages = [

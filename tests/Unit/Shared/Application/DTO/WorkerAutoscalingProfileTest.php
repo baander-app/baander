@@ -14,9 +14,9 @@ final class WorkerAutoscalingProfileTest extends TestCase
     {
         foreach ([1 => 4160, 2 => 4480, 4 => 5120] as $maximum => $memoryMiB) {
             $profile = new WorkerAutoscalingProfile(maximumConcurrency: $maximum);
-            self::assertSame($memoryMiB, $profile->minimumMemoryMiB('execution'));
+            self::assertSame($memoryMiB, $profile->minimumMemoryMiB('execution', new \App\Shared\Application\DTO\DeploymentProfile('full', 3, 1)));
             self::assertSame(256 + $maximum - 1, $profile->minimumPids('execution'));
-            self::assertSame(2944, $profile->minimumMemoryMiB('control'));
+            self::assertSame(2944, $profile->minimumMemoryMiB('control', new \App\Shared\Application\DTO\DeploymentProfile('full', 3, 1)));
             self::assertSame(129, $profile->minimumPids('control'));
             self::assertCount($maximum, array_unique($profile->consumerIds()));
         }
@@ -45,7 +45,7 @@ final class WorkerAutoscalingProfileTest extends TestCase
         $this->expectException(\InvalidArgumentException::class);
         new WorkerRuntimeConfiguration('worker.baander.app', str_repeat('a', 32), 'execution',
             4480 * 1024 * 1024, 259, 320 * 1024 * 1024, '/tmp/worker-locks', '/run/baander-worker',
-            new WorkerAutoscalingProfile(maximumConcurrency: 4));
+            new \App\Shared\Application\DTO\DeploymentProfile('full', 3, 1), new WorkerAutoscalingProfile(maximumConcurrency: 4));
     }
 
     public function testPolicyRejectsInvalidBoundsAndInconsistentTiming(): void

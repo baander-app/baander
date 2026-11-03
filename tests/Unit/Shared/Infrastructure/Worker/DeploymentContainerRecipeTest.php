@@ -115,7 +115,7 @@ final class DeploymentContainerRecipeTest extends TestCase
             '--label', 'app.baander.worker.role=control', '--env', 'BAANDER_WORKER_NAMESPACE=recipe.baander.app',
             '--env', 'BAANDER_WORKER_BOOT_ID=' . self::BOOT, '--env', 'BAANDER_WORKER_UNIT=control',
             '--env', 'BAANDER_DEPLOYMENT_PROFILE=full',
-            '--env', 'BAANDER_DEPLOYMENT_PROFILE_JSON=' . (new \App\Shared\Application\DTO\DeploymentProfile())->toJson(),
+            '--env', 'BAANDER_DEPLOYMENT_PROFILE_JSON=' . (new \App\Shared\Application\DTO\DeploymentProfile('full'))->toJson(),
             '--mount', 'type=volume,src=worker-ipc,dst=/run/baander-worker,volume-nocopy', '--entrypoint', '/usr/local/bin/php', self::IMAGE,
             '/app/bin/worker.php', '--name=literal $(touch /tmp/unsafe);`echo unsafe`',
         ], $recipe->createArguments());
@@ -223,6 +223,7 @@ final class DeploymentContainerRecipeTest extends TestCase
             'appHome' => '/var/www/html', 'namespace' => 'recipe.baander.app', 'bootId' => self::BOOT, 'daemonId' => 'docker-daemon', 'imageId' => self::IMAGE,
             'command' => ['/usr/local/bin/php', '/app/bin/worker.php'], 'network' => 'none', 'memoryBytes' => 64 * 1024 * 1024,
             'nanoCpus' => 1_000_000_000, 'pidsLimit' => 32, 'unit' => DeploymentUnit::Control, 'cpuSet' => [0], 'ipcVolume' => 'worker-ipc',
+            'deploymentProfile' => new \App\Shared\Application\DTO\DeploymentProfile('full'),
         ], $overrides));
     }
 }

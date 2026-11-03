@@ -50,8 +50,8 @@ final class WorkerCommand extends Command
                 $this->bytes($input, 'memory-mib'), $this->pids($input),
                 $input->getOption('scheduled-console-mib') === '0' ? 0 : $this->bytes($input, 'scheduled-console-mib'),
                 $this->stringOption($input, 'lock-dir'), $this->stringOption($input, 'ipc-dir'),
-                WorkerAutoscalingProfile::fromJson($this->stringOption($input, 'autoscaling-profile')),
                 $this->deploymentProfile($input),
+                WorkerAutoscalingProfile::fromJson($this->stringOption($input, 'autoscaling-profile')),
             );
         } catch (\InvalidArgumentException $error) {
             $io->error($error->getMessage());

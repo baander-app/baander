@@ -20,7 +20,7 @@ final class NativeExecutionClient implements NativeExecutionClientInterface
         private readonly int $leaseEpoch,
         private readonly string $clientId,
         private readonly int $clientGeneration,
-        private readonly DeploymentProfile $deploymentProfile = new DeploymentProfile(),
+        private readonly DeploymentProfile $deploymentProfile,
     ) {
         if ($namespace === '' || preg_match('/^[a-f0-9]{32}$/D', $bootId) !== 1
             || $leaseEpoch < 1 || preg_match('/^[A-Za-z0-9_.:-]{1,128}$/D', $clientId) !== 1 || $clientGeneration < 1

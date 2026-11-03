@@ -46,7 +46,7 @@ function mkdir(string $path, int $mode, bool $recursive): bool
 }
 require $argv[1] . '/vendor/autoload.php';
 try {
-    new WorkerPeerHandshake($argv[2], 'worker.baander.app', str_repeat('a', 32), $argv[3], hrtime(true) / 1e9);
+    new WorkerPeerHandshake($argv[2], 'worker.baander.app', str_repeat('a', 32), $argv[3], hrtime(true) / 1e9, new \App\Shared\Application\DTO\DeploymentProfile('full'));
     exit(0);
 } catch (\Throwable $error) {
     fwrite(STDERR, $error->getMessage());
@@ -152,6 +152,6 @@ PHP;
 
     private function peer(string $unit): WorkerPeerHandshake
     {
-        return new WorkerPeerHandshake($this->directory, 'worker.baander.app', str_repeat('a', 32), $unit, 10);
+        return new WorkerPeerHandshake($this->directory, 'worker.baander.app', str_repeat('a', 32), $unit, 10, new \App\Shared\Application\DTO\DeploymentProfile('full'));
     }
 }

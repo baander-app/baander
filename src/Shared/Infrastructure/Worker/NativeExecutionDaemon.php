@@ -18,7 +18,7 @@ final class NativeExecutionDaemon
     private bool $stopping = false;
     private bool $poisoned = false;
 
-    public function __construct(private readonly string $namespace, private readonly string $bootId, private readonly int $epoch, private readonly DeploymentProfile $deploymentProfile = new DeploymentProfile())
+    public function __construct(private readonly string $namespace, private readonly string $bootId, private readonly int $epoch, private readonly DeploymentProfile $deploymentProfile)
     {
         if ($namespace === '' || preg_match('/^[a-f0-9]{32}$/D', $bootId) !== 1 || $epoch < 1) {
             throw new \InvalidArgumentException('Invalid native launcher identity.');

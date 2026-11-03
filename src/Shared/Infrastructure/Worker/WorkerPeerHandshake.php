@@ -14,7 +14,7 @@ final class WorkerPeerHandshake
     private readonly string $directory;
     private bool $established = false;
 
-    public function __construct(string $directory, private readonly string $namespace, private readonly string $bootId, private readonly string $unit, private readonly float $startedAt, private readonly DeploymentProfile $deploymentProfile = new DeploymentProfile())
+    public function __construct(string $directory, private readonly string $namespace, private readonly string $bootId, private readonly string $unit, private readonly float $startedAt, private readonly DeploymentProfile $deploymentProfile)
     {
         DeploymentLease::validateIdentity($namespace, $bootId);
         if (!in_array($unit, ['control', 'execution'], true) || !str_starts_with($directory, '/')) {

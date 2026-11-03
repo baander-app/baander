@@ -34,7 +34,7 @@ final class AutoscalingRunnerTest extends TestCase
         $this->heartbeat(10);
         $lease = new DeploymentLease('worker.baander.app', $this->boot, 4);
         $this->profile = new WorkerAutoscalingProfile(maximumConcurrency: 2);
-        $this->ledger = new AdmissionLedger($this->directory, $lease, $this->profile);
+        $this->ledger = new AdmissionLedger($this->directory, $lease, $this->profile, new \App\Shared\Application\DTO\DeploymentProfile('full'));
         $this->ledger->initialize(10);
         $this->channel = new ResourceChannel($this->directory, $lease);
         $this->policy = new AutoscalingPolicy($this->profile);
@@ -119,7 +119,7 @@ final class AutoscalingRunnerTest extends TestCase
     private function heartbeat(float $now): void
     {
         foreach (['control', 'execution'] as $unit) {
-            (new WorkerPeerHandshake($this->directory, 'worker.baander.app', $this->boot, $unit, $now))->publish(4, true, false, $now);
+            (new WorkerPeerHandshake($this->directory, 'worker.baander.app', $this->boot, $unit, $now, new \App\Shared\Application\DTO\DeploymentProfile('full')))->publish(4, true, false, $now);
         }
     }
 }

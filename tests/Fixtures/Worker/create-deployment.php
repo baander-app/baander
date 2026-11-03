@@ -6,6 +6,7 @@ declare(strict_types=1);
 require dirname(__DIR__, 3) . '/vendor/autoload.php';
 require_once dirname(__DIR__, 2) . '/Support/FinalSchemaBootstrap.php';
 
+use App\Shared\Application\DTO\DeploymentProfile;
 use App\Shared\Application\DTO\DeploymentUnit;
 use App\Shared\Infrastructure\Worker\DeploymentContainerRecipe;
 use App\Shared\Infrastructure\Worker\DeploymentRuntimeEnvironment;
@@ -69,6 +70,7 @@ try {
                 [$unit === DeploymentUnit::Control ? 0 : 1],
                 $ipcVolume,
                 $appHome,
+                new DeploymentProfile('full'),
                 $runtime,
             );
         }
@@ -148,6 +150,7 @@ try {
         $original->cpuSet,
         $ipcVolume,
         $appHome,
+        $original->deploymentProfile,
         $runtime,
     );
     try {

@@ -41,10 +41,10 @@ final readonly class DeploymentContainerRecipe
         array $cpuSet,
         public string $ipcVolume,
         public string $appHome,
+        public DeploymentProfile $deploymentProfile,
         public DeploymentRuntimeEnvironment $runtimeEnvironment = new DeploymentRuntimeEnvironment(),
         array $mediaMounts = [],
         public string $sourceMountPolicy = 'production',
-        public DeploymentProfile $deploymentProfile = new DeploymentProfile(),
     ) {
         DeploymentLease::validateIdentity($namespace, $bootId);
         if (strlen($appHome) > 4096 || preg_match('~\A/(?:[A-Za-z0-9_.-]+/)*[A-Za-z0-9_.-]+\z~D', $appHome) !== 1

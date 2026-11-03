@@ -22,7 +22,7 @@ final class AdmissionLedgerTest extends TestCase
         $this->directory = sys_get_temp_dir() . '/baander-admission-' . bin2hex(random_bytes(8));
         $this->boot = str_repeat('a', 32);
         $this->heartbeat(10);
-        $this->ledger = new AdmissionLedger($this->directory, new DeploymentLease('worker.baander.app', $this->boot, 4), new WorkerAutoscalingProfile(maximumConcurrency: 4));
+        $this->ledger = new AdmissionLedger($this->directory, new DeploymentLease('worker.baander.app', $this->boot, 4), new WorkerAutoscalingProfile(maximumConcurrency: 4), new \App\Shared\Application\DTO\DeploymentProfile('full'));
         $this->ledger->initialize(10);
         $this->ledger->publishDecision(4, 'demand', [], 10);
     }
@@ -186,7 +186,7 @@ final class AdmissionLedgerTest extends TestCase
 
     public function testForeignLeaseCannotReadState(): void
     {
-        $foreign = new AdmissionLedger($this->directory, new DeploymentLease('worker.baander.app', $this->boot, 5), new WorkerAutoscalingProfile(maximumConcurrency: 4));
+        $foreign = new AdmissionLedger($this->directory, new DeploymentLease('worker.baander.app', $this->boot, 5), new WorkerAutoscalingProfile(maximumConcurrency: 4), new \App\Shared\Application\DTO\DeploymentProfile('full'));
         $this->expectException(\RuntimeException::class);
         $foreign->snapshot(10);
     }
@@ -253,7 +253,7 @@ final class AdmissionLedgerTest extends TestCase
     private function heartbeat(float $now): void
     {
         foreach (['control', 'execution'] as $unit) {
-            (new WorkerPeerHandshake($this->directory, 'worker.baander.app', $this->boot, $unit, 0))->publish(4, true, false, $now);
+            (new WorkerPeerHandshake($this->directory, 'worker.baander.app', $this->boot, $unit, 0, new \App\Shared\Application\DTO\DeploymentProfile('full')))->publish(4, true, false, $now);
         }
     }
 }

@@ -202,7 +202,7 @@ final class AudioRenditionWorkerHandoffTest extends TestCase
 
     private function cache(): AudioRenditionCache
     {
-        return new AudioRenditionCache(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile()), new SegmentFileResolver($this->root . '/cache'), new AudioRenditionRuntime($this->first), new NullLogger(), pollIntervalSeconds: .005, startTimeoutSeconds: 3);
+        return new AudioRenditionCache(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile('full')), new SegmentFileResolver($this->root . '/cache'), new AudioRenditionRuntime($this->first), new NullLogger(), pollIntervalSeconds: .005, startTimeoutSeconds: 3);
     }
 
     private function startWorker(float $delay): void

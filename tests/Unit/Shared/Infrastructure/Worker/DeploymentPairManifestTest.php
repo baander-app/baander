@@ -96,7 +96,7 @@ final class DeploymentPairManifestTest extends TestCase
             'controlNanoCpus' => 1000000000, 'executionNanoCpus' => 2000000000,
             'controlCpuSet' => [0], 'executionCpuSet' => [1, 2],
             'controlPidsLimit' => 129, 'executionPidsLimit' => 256,
-            'deploymentProfile' => json_decode((new \App\Shared\Application\DTO\DeploymentProfile())->toJson(), true, flags: JSON_THROW_ON_ERROR),
+            'deploymentProfile' => json_decode((new \App\Shared\Application\DTO\DeploymentProfile('full'))->toJson(), true, flags: JSON_THROW_ON_ERROR),
             'autoscaling' => json_decode((new \App\Shared\Application\DTO\WorkerAutoscalingProfile())->toJson(), true, flags: JSON_THROW_ON_ERROR),
             'scheduledConsoleMiB' => 320, 'ipcVolume' => 'worker-ipc',
             'mediaMounts' => [

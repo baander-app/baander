@@ -25,8 +25,8 @@ final class WorkerRuntimeConfigurationTest extends TestCase
         $this->expectException(\InvalidArgumentException::class);
         new WorkerRuntimeConfiguration('worker.baander.app', str_repeat('a', 32), 'execution', 4480 * 1024 * 1024,
             257, 0, '/tmp/locks', '/run/baander-worker',
-            new \App\Shared\Application\DTO\WorkerAutoscalingProfile(maximumConcurrency: 2),
-            new \App\Shared\Application\DTO\DeploymentProfile('household'));
+            new \App\Shared\Application\DTO\DeploymentProfile('household'),
+            new \App\Shared\Application\DTO\WorkerAutoscalingProfile(maximumConcurrency: 2));
     }
 
     #[DataProvider('householdExecutionBudgets')]
@@ -65,7 +65,7 @@ final class WorkerRuntimeConfigurationTest extends TestCase
     public function testTraversalDirectoryIsRejected(): void
     {
         $this->expectException(\InvalidArgumentException::class);
-        new WorkerRuntimeConfiguration('worker.baander.app', str_repeat('a', 32), 'control', 2944 * 1024 * 1024, 129, 0, '/tmp/../tmp/locks', '/run/baander-worker');
+        new WorkerRuntimeConfiguration('worker.baander.app', str_repeat('a', 32), 'control', 2944 * 1024 * 1024, 129, 0, '/tmp/../tmp/locks', '/run/baander-worker', new \App\Shared\Application\DTO\DeploymentProfile('full', 3, 1));
     }
 
     #[DataProvider('invalidFields')]
@@ -76,6 +76,7 @@ final class WorkerRuntimeConfigurationTest extends TestCase
             'namespace' => 'worker.baander.app', 'bootId' => str_repeat('a', 32), 'unit' => 'execution',
             'memoryLimitBytes' => 4160 * 1024 * 1024, 'pidsLimit' => 256, 'scheduledConsoleReservationBytes' => 0,
             'lockDirectory' => '/tmp/worker-locks', 'ipcDirectory' => '/run/baander-worker',
+            'deploymentProfile' => new \App\Shared\Application\DTO\DeploymentProfile('full', 3, 1),
         ], [$field => $value]));
     }
 
@@ -134,6 +135,6 @@ final class WorkerRuntimeConfigurationTest extends TestCase
 
     private function configuration(string $unit, int $mib, int $pids, int $console = 0): WorkerRuntimeConfiguration
     {
-        return new WorkerRuntimeConfiguration('worker.baander.app', str_repeat('a', 32), $unit, $mib * 1024 * 1024, $pids, $console * 1024 * 1024, '/tmp/worker-locks', '/run/baander-worker');
+        return new WorkerRuntimeConfiguration('worker.baander.app', str_repeat('a', 32), $unit, $mib * 1024 * 1024, $pids, $console * 1024 * 1024, '/tmp/worker-locks', '/run/baander-worker', new \App\Shared\Application\DTO\DeploymentProfile('full', 3, 1));
     }
 }

@@ -22,9 +22,9 @@ final class MediaWorkerRunner
         private readonly TranscodeExecutionOwnershipPort $video,
         private readonly AudioRenditionRuntimePort $audio,
         private readonly MediaWorkerAuthorityInterface $authority,
+        private readonly DeploymentProfile $deploymentProfile,
         private readonly string $jobScript = __DIR__ . '/../../../../bin/worker-media-job.php',
         private readonly string $phpBinary = PHP_BINARY,
-        private readonly DeploymentProfile $deploymentProfile = new DeploymentProfile(),
     ) {}
 
     /** @param Closure():void|null $ready */

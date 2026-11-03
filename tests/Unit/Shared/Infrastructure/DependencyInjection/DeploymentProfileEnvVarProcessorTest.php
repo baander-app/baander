@@ -41,7 +41,7 @@ final class DeploymentProfileEnvVarProcessorTest extends TestCase
 
     public function testWebCapacityRejectsConflictingInheritedSettings(): void
     {
-        $serialized = new DeploymentProfile()->toJson();
+        $serialized = new DeploymentProfile('full')->toJson();
         $environment = static fn (string $name): string => $name === 'BAANDER_DEPLOYMENT_PROFILE' ? 'household' : $serialized;
 
         $this->expectException(\InvalidArgumentException::class);

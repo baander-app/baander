@@ -14,7 +14,7 @@ final class NativeExecutionFixture
     private readonly Process $daemon;
     public readonly NativeExecutionClient $client;
 
-    public function __construct(string $namespace, string $bootId, int $epoch = 1, DeploymentProfile $profile = new DeploymentProfile())
+    public function __construct(string $namespace, string $bootId, int $epoch = 1, DeploymentProfile $profile = new DeploymentProfile('full'))
     {
         $this->directory = sys_get_temp_dir() . '/baander-native-' . bin2hex(random_bytes(8));
         if (!mkdir($this->directory, 0700)) {
