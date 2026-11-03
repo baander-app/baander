@@ -87,6 +87,7 @@ final class MutationRouteInventoryTest extends TestCase
         'QoL administration' => ['admin_qol_profile', 'admin_qol_reset'],
         'media and metadata administration' => ['admin_media_prune_missing', 'admin_metadata_trigger_sync', 'metadata_extract', 'metadata_match'],
         'the signing endpoint, SignedDeliveryFirewallTest' => ['stream_signing_sign'],
+        'media delivery negotiation' => ['stream_delivery'],
         'transcode sessions and jobs' => [
             'transcode_session_create', 'transcode_session_update', 'transcode_session_cancel',
             'transcode_session_pause', 'transcode_session_resume', 'transcode_session_position',
