@@ -108,8 +108,8 @@ export function initServiceWorkerListener(): void {
         return;
       }
       if (typeof nonce === 'string' && nonce) setDpopNonce(nonce);
-      // Match the backend's existing scheme normalization after origin validation.
-      const proof = await createDpopProof(keyPair, method, url.replace(/^http:/, 'https:'), {
+      // The backend binds proofs to the actual request scheme, so sign the validated URL unchanged.
+      const proof = await createDpopProof(keyPair, method, url, {
         accessToken, nonce: getDpopNonce() ?? undefined,
       });
       // Signing may finish after logout, login, or token rotation.
