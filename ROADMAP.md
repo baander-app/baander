@@ -1,6 +1,6 @@
 # Baander roadmap
 
-Updated: 2026-11-02. This roadmap selects future work and records unresolved
+Updated: 2026-11-03. This roadmap selects future work and records unresolved
 acceptance. Current operating contracts belong in the linked guides; completed
 milestones and their verification evidence remain in Git history.
 
@@ -86,6 +86,31 @@ The isolated preview refreshed successfully. A separate production-image househo
 Playback review checkpoint, 2026-11-02 (U3–U4): signed original media requests now bypass the generic API limiter while retaining signature, access and DPoP checks. Copy delivery returns the negotiated DASH manifest when requested and rechecks admission after losing an expiry race. Public session state reports failure when the matching execution is refused or fails. Completed-video segment requests validate the requested media file without reopening every other segment; manifest, authorization, retention and generation checks remain.
 
 Verification: the combined CI-image run passed 109 tests with 958 assertions, including the database-backed limiter checks. Backend PHPStan and Deptrac passed; Deptrac retained 482 existing skips. The focused review accepted all five backend fixes without new findings. In a filesystem trace of 20 segment requests, media-file opens fell from 4,000 to 20 for 100 segments per track, and from 12,000 to 20 for 300 segments per track. Bounded manifest parsing remains proportional to presentation length. These results do not establish household host capacity; complete workload measurement and operator guidance remain open.
+
+Qualification checkpoint, 2026-11-03 (U7–U8): the measurement harness (`scripts/qualify-household.php`, 3f9c0db27) drove complete disposable deployments through cold import and 30-minute overlap scenarios with two real browser players. By user decision it ran on the 62.7 GiB development workstation with per-service cgroup limits only, no whole-host cap. Measured deployments ran concurrently, each worker pair on its own physical cores. Receipts for every attempt, including failed ones, are retained locally under `var/household-qualification/`.
+
+Qualification found and fixed these defects before producing usable receipts:
+
+- Original media and covers failed with 403 over plain HTTP: the service-worker bridge still signed DPoP proofs as `https:` (9813ad1c7).
+- The household web server exhausted a 192 MiB PHP heap on its first page; both profiles now use 256 MiB, raising the household worker floors to 2304 MiB (control) and 1536 MiB (execution) (61f0908ab).
+- PostgreSQL was OOM-killed in every profile once pooled connections touched PGroonga: each such backend keeps about 22 MiB, and transparent huge pages inflated that to about 95 MiB. The database image now starts PostgreSQL with THP disabled (3c1e3443b). The preset sizes PostgreSQL per profile (household 1152 MiB, full 2816 MiB) and gives full a 128-process limit (f05160e72).
+- Live-update capture missed the stream-copy columns, and the delivery route was unclassified (0d2457148, e95774bb5). Three test inventories inherited from master were stale (307e9cfee).
+- Harness defects: a sampler race on exiting processes, login before session persistence, readiness polls counted as failures, cleanup after an early start failure, missing failed-start evidence, a mixed-scenario contract mismatch and unanswered statistics samples (554c90e2d, 31bb5199f, d6a9d0aa3, 90a46da76, afa1c02c7).
+
+Measured result (attempt 5, images at f05160e72): the household reservation is 8,320 MiB against 13,248 MiB for full. Across the cold import and the original and stream-copy scenarios, simultaneous deployment peaks were 2,149–3,029 MiB for household and 2,208–3,286 MiB for full, with no OOM kill, swap growth or playback stall. The deliberately undersized deployment (256 MiB web) failed its start; its receipt records the health check killed with exit 137. [System Requirements](docs-book/part-1-operator-guide/system-requirements.md) publishes these figures and their limits.
+
+Verification: the tooling suite passed 1,382 tests at 3f9c0db27, and the household tooling tests and tooling static gates passed after each later change. Backend unit tests for the changed areas passed in the CI image, with PHPStan, Deptrac and the container lint clean. The web player suite passed 240 tests, the household driver suite 12, and typecheck and lint passed with 8 existing warnings.
+
+Open items for this plan:
+
+- Qualification is incomplete. No deployment finished the mixed music-and-video scenario, the household profile lacks three complete repetitions, and the restart and cleanup steps of a complete chain, profile replacement and recovery checks were not run. The smallest host size, a 4 GB fit and Raspberry Pi support remain unqualified.
+- The web control socket twice closed an `app:server:stats` request without answering under load (household repeats 1 and 2, 2026-11-03); the cause is unknown. The harness now retries and records such samples.
+- The preset inherits `OTEL_ENABLED=true` with an unreachable `host.docker.internal` endpoint from `.env`, so web workers spend time on failing span exports. The preset should disable export unless the operator configures a collector.
+- After a PostgreSQL crash the worker pair stops ("deployment reconciliation is required") and stays stopped until an operator intervenes.
+- `CaptureCoverageTest` still fails on master's playback-destination tables and six `listening_sessions` columns; whether to capture or exclude each needs a decision.
+- Shipping gates not yet run: `ce-simplify-code` (in progress on branch `simplify/household-deployment`), `ce-code-review`, the full backend suites, worker runtime container suites, affected browser playback specs and a documentation build. `baander-database:latest` has not been rebuilt, so existing instances still run PostgreSQL without the THP launcher.
+
+Configurable media capacity, 2026-11-03: the full profile admits only 3 video and 1 audio conversion jobs, and some households run 8 video and 12 audio streams at once. The user chose operator-set job slots, with the worker reservation and manifest derived from them, as a separate follow-up plan rather than part of this branch.
 
 ## Playback destinations and notifications
 

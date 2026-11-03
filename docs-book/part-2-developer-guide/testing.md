@@ -1874,6 +1874,101 @@ These cases qualify the selected software movie path and Chromium HLS, not
 arbitrary discontinuities, additional source origins, hardware, other browsers,
 DASH browser playback or formal CMAF conformance.
 
+### Household deployment qualification
+
+`scripts/qualify-household.php` measures a complete disposable deployment on a
+constrained Linux host or VM. The browser driver runs on the invoking machine;
+run that machine outside the measured host. Limiting one container on a larger host does not test
+whether the complete deployment fits that memory size.
+
+The private JSON configuration has these fields:
+
+| Field | Meaning |
+| --- | --- |
+| `version` | `1`. |
+| `name` | The disposable deployment name; it must match `deployment.name`. |
+| `deployment` | A complete deployment configuration in the format of `deploy/household/example.json`, with private secrets and selected production images. |
+| `datasetRun` | A stable lowercase fixture identifier, reused for comparable datasets. |
+| `host.constraintBytes` | The actual memory constraint of the complete target host or VM. |
+| `host.description`, `host.storage` | Hardware, operating-system and storage details for the receipt. |
+| `durationSeconds` | Playback observation length; at least `1800`. |
+| `fixtureTimeoutSeconds`, `maintenanceDeadlineSeconds` | Preparation and maintenance deadlines; each is at least 3,600 seconds and defaults to `7200`. Maintenance must also cover `durationSeconds`. |
+| `observerMemoryMiB` | The measured observer's memory limit; at least 64 MiB, default `128`. |
+| `nodeExecutable` | Absolute path to the invoking machine's Node executable. |
+| `chromiumExecutablePath` | Optional absolute path to its compatible Chromium executable. |
+
+Keep the selected base images available by a verified tag or repository digest.
+Temporary build aliases must not become their only references. Configure the
+Docker target through the normal tooling settings; subsequent stages use the
+captured target. The target needs usable host `/proc` and cgroup v2 mounts, and
+the browser needs access to the configured application origin.
+
+Preparation creates 2,000 songs, 50 movies and 250 episode-shaped video files
+before measurement. The episode files use a separate movie-type library; this
+does not qualify a TV-library feature. The first scan starts with an empty
+catalog, but generation may leave a warm filesystem cache. Provider fixtures
+exercise music metadata adapters without external HTTP requests. MusicBrainz
+rate limiting remains active, so metadata work can outlast the playback window.
+Video coverage includes probing and catalog ingestion. The current normal sync
+does not enrich movies through TMDB; the report retains those counts without
+claiming that movie metadata enrichment was exercised.
+
+```bash
+fixture_state=/absolute/private/household-fixtures
+fixture_config=/absolute/private/household-fixtures.json
+qualification_state=/absolute/private/household-run
+qualification_config=/absolute/private/household-qualification.json
+php scripts/qualify-household.php prepare --config "$fixture_config" --state "$fixture_state"
+php scripts/qualify-household.php prepare --from "$fixture_state" --config "$qualification_config" --state "$qualification_state"
+php scripts/qualify-household.php start --state "$qualification_state"
+php scripts/qualify-household.php scenario --state "$qualification_state" --scenario original-overlap --repeat 1
+php scripts/qualify-household.php scenario --state "$qualification_state" --scenario fresh-copy-overlap --repeat 1
+php scripts/qualify-household.php scenario --state "$qualification_state" --scenario mixed-overlap --repeat 1
+php scripts/qualify-household.php stop --state "$qualification_state"
+php scripts/qualify-household.php start --state "$qualification_state"
+php scripts/qualify-household.php stop --state "$qualification_state" --cleanup
+php scripts/qualify-household.php report --state "$qualification_state"
+```
+
+Each overlap observes two real players while normal scan and metadata work runs.
+A non-playing song and its lyrics file are renamed before the scan, preserving
+their bytes and catalog identity while exercising source-path reconciliation.
+The old unavailable index entry remains visible in the evidence; it is not a
+missing import. Fresh-copy sources are consumed once per deployment. Use fresh
+deployment names and state directories for repetitions two and three, retaining
+the image, dataset and workload timing needed to compare them. Prepare each run
+with `--from` pointing to the same fixture state. This copies and verifies the
+media in a fresh owned volume and borrows the exact images; it does not regenerate
+the fixtures. The fixture and run configurations need distinct deployment names
+and the same selected Docker daemon. Record resource changes as separate candidates.
+
+A fixture source must have no attempted overlap or pending source rename. Once
+it has borrowers, run the source-changing scenarios only in those child deployments.
+Each child's `stop --cleanup` removes its own data while retaining the shared
+images. After every child has completed cleanup, remove the fixture source:
+
+```bash
+php scripts/qualify-household.php stop --state "$fixture_state" --cleanup
+```
+
+Reports retain host and cgroup memory, swap, pressure, process samples, database
+and Redis observations, browser progress and native launch records. Native
+concurrency samples are a lower bound because a short process can run between
+samples; cgroup memory peaks and the launch journal provide separate evidence.
+Short-lived controller actions record their own cgroup peaks and Docker exit
+state before cleanup. The report lists those lifetime peaks separately from
+simultaneous samples; their sum does not measure concurrent consumption.
+Missing observations, prohibited encoding, unfinished maintenance and failed
+cleanup prevent a passing report. Growing deployment swap prevents a memory-fit
+claim even when total host swap remains stable.
+
+Plain `stop` retains data for restart checks. `stop --cleanup` verifies retirement
+and retention, then removes only the owned fixture resources. Keep the private
+receipts, including failed runs. A published capacity result also needs the
+full-profile comparison, recovery and profile-replacement checks, an insufficient
+memory case, and three comparable successful repetitions. Setup success alone
+does not establish a minimum memory requirement or Raspberry Pi support.
+
 ### Ordinary worker autoscaling qualification
 
 Build the current worker image as above. The bounded comparison runner creates

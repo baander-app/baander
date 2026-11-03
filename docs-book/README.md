@@ -11,6 +11,7 @@ an instance, or the developer guide to work on its code.
 ## Quick Links
 
 - [Understanding Baander](part-1-operator-guide/understanding-baander.md) — how web, workers, storage and the optional registry fit together
+- [System Requirements](part-1-operator-guide/system-requirements.md) — host software, deployment profiles and measured memory
 - [Getting Started](part-1-operator-guide/getting-started.md) — source installation, worker deployment and your first library
 - [Configuration](part-1-operator-guide/configuration.md) — environment variables and runtime settings
 - [Monitoring](part-1-operator-guide/monitoring.md) and [Troubleshooting](part-1-operator-guide/troubleshooting.md) — find evidence for a stalled or failing task

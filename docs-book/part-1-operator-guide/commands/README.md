@@ -23,12 +23,16 @@ before changing targets. Paths used by a console command are container paths.
 
 Read [Background work](../background-work.md) for lifecycle and observation
 procedures. This section defines the host manifest and credentials contract.
+The complete-stack controller, `php scripts/deploy-household.php`, uses this worker
+lifecycle for both startup profiles. Its `render`, `start`, `status` and `stop`
+actions manage the surrounding services too; see
+[Deployment profiles](../configuration.md#deployment-profiles).
 
 Run `bin/worker-deployment.php` from a trusted host checkout with Composer dependencies,
 PHP 8.5 with extensions `posix` and `pdo_pgsql`, and an absolute Docker executable connected
 to a local Unix socket. The application container receives no Docker authority.
 Provision the migrated database, Redis and a private Docker network first; use a
-locally available immutable image ID. The version 5 recipe admits a fixed pair
+locally available immutable image ID. The version 6 recipe admits a fixed pair
 of control and execution containers,
 with separate resource ceilings and disjoint CPU sets. It requires explicitly
 authorized shared media volumes and a private named IPC volume. Devices are
@@ -50,12 +54,12 @@ keep the corresponding `APP_HOME` exported for each controller invocation. The
 controller rejects an unset `APP_HOME`. The storage targets below illustrate the
 current `/var/www/html` image layout; align them with the selected image's layout.
 
-The manifest is a JSON object of at most 8192 bytes. Version 5 requires exactly
+The manifest is a JSON object of at most 8192 bytes. Version 6 requires exactly
 these fields, with JSON integers for version and resource values:
 
 ```json
 {
-  "version": 5,
+  "version": 6,
   "sourceMountPolicy": "production",
   "namespace": "worker.baander.app",
   "bootId": "0123456789abcdef0123456789abcdef",
@@ -73,6 +77,15 @@ these fields, with JSON integers for version and resource values:
   "controlCpuSet": [0],
   "executionCpuSet": [1, 2],
   "scheduledConsoleMiB": 320,
+  "deploymentProfile": {
+    "identifier": "full",
+    "webWorkers": 4,
+    "doctrinePoolSlots": 10,
+    "ordinaryConsumerLimit": 4,
+    "sharedCopySlots": 0,
+    "videoEncoderSlots": 3,
+    "audioEncoderSlots": 1
+  },
   "autoscaling": {
     "minimumConcurrency": 1,
     "maximumConcurrency": 2,
@@ -102,8 +115,8 @@ these fields, with JSON integers for version and resource values:
 Replace the daemon/image examples with `docker info --format '{{.ID}}'` and the
 local image's `docker image inspect --format '{{.Id}}'` values on the same endpoint.
 Generate a fresh 32-character lowercase hexadecimal boot ID for each deployment
-attempt. Control requires at least 2944 MiB and 129 PID slots, including a 320 MiB
-reservation for its independent autoscaler. With maximum ordinary concurrency
+attempt. In the `full` profile, control requires at least 2944 MiB and 129 PID slots,
+including a 320 MiB reservation for its independent autoscaler. With maximum ordinary concurrency
 `max`, execution requires at least `4160 + 320 * (max - 1)` MiB plus its scheduled
 console reservation, and `256 + max - 1` PID slots.
 Scheduled console execution is disabled at `0` or reserves at least 320 MiB in
@@ -115,13 +128,21 @@ PID ceiling.
 Creation also requires host memory for both ceilings plus 1 GiB and verifies that
 the declared CPU identifiers are available on that daemon.
 
+The `deploymentProfile` object is required. Its complete settings must match one
+of the supported profiles and the worker's runtime environment. `full` permits up
+to four resident ordinary consumers, three video jobs and one audio rendition.
+`household` permits one ordinary consumer and two shared audio/video copy jobs;
+it does not permit encoding. Its media and ordinary reservations are calculated
+from those limits. Both profiles currently retain conservative native headroom.
+These limits do not establish measured memory use or a minimum host size.
+
 The `autoscaling` object is required. Every field must be a JSON integer; missing
 or unknown fields are rejected. All fields contribute to both unit recipe
 fingerprints, including timing and pressure thresholds. There is no compatibility
 parser for older manifests. Changing any profile field requires retirement and a
 fresh boot; see [Upgrading](../upgrading.md#standard-update).
 
-The example recommends minimum one and maximum two for ordinary work on the
+The `full` example recommends minimum one and maximum two for ordinary work on the
 measured envelope: an AMD Ryzen 7 5800X3D host with eight cores, sixteen threads
 and 64 GiB of physical RAM, with one CPU reserved for control, two disjoint CPUs
 for execution, and dependencies/web on another CPU.
@@ -145,8 +166,8 @@ uninterrupted audio throughput during pressure was not measured. See the
 for results and limits. The internal profile constructor remains conservative at
 maximum one; every production manifest must supply all fourteen fields explicitly.
 
-Concurrency bounds must satisfy `1 <= minimumConcurrency <= maximumConcurrency <= 4`. Durations are
-100 through 3600000 milliseconds. Sample age must cover at least two intervals;
+Concurrency bounds must satisfy `1 <= minimumConcurrency <= maximumConcurrency`,
+with a maximum of 4 for `full` and 1 for `household`. Durations are 100 through 3600000 milliseconds. Sample age must cover at least two intervals;
 scale-up sustain and cooldown must cover an interval; scale-down sustain must
 exceed scale-up sustain. Percentages are 1 through 100, with memory/PID stop
 thresholds strictly above their growth ceilings.
@@ -158,7 +179,7 @@ permits remain held through handling and completion. After a shrink, new receive
 wait until occupied permits fall below the new target. The scheduler consumer and
 media slots retain separate reservations.
 
-The fixed media workload admits three video jobs, one audio rendition and no devices.
+The media workload follows `deploymentProfile`; neither profile admits devices.
 The worker argv,
 PHP management limit, identity and lock directory are fixed by the manifest parser;
 arbitrary commands, environment fields and secret paths are rejected.
@@ -205,6 +226,7 @@ invoking user, with mode `0600`, no symlink components and at most 8192 bytes:
   "runtimeEnvironment": {
     "APP_ENV": "prod",
     "APP_DEBUG": "0",
+    "BAANDER_DEPLOYMENT_PROFILE": "full",
     "APP_SECRET": "replace-with-runtime-secret",
     "DATABASE_URL": "postgresql://worker:replace-password@db-worker.baander.app/baander?serverVersion=18&charset=utf8",
     "REDIS_URL": "redis://:replace-password@redis.baander.app:6379",
@@ -214,6 +236,12 @@ invoking user, with mode `0600`, no symlink components and at most 8192 bytes:
   }
 }
 ```
+
+The runtime `BAANDER_DEPLOYMENT_PROFILE` must agree with the manifest's
+`deploymentProfile`. `BAANDER_DEPLOYMENT_PROFILE_JSON`, when supplied, must contain
+that same complete profile. The controller supplies each profile variable once,
+using the admitted environment or a generated default. Switching profiles requires
+a fresh boot after retirement, not an edit to a running container.
 
 The two database addresses must reach the same database from the host and worker
 network respectively. The controller URL and credentials file stay on the host.

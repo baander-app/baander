@@ -1,10 +1,12 @@
-# Household deployment candidate
+# Household deployment preset
 
 This preset runs a gateway, web server, PostgreSQL, Redis and the managed worker
-pair. Its current limits are conservative qualification inputs. They are not
-measured consumption, a minimum host specification or evidence of a 4 GB fit.
-The `full` profile uses the same service limits for comparison and preserves its
-existing worker budget. ARM builds and Raspberry Pi hardware remain unqualified.
+pair. Its limits are enforced reservations, not measured consumption or a minimum
+host size. The `full` profile shares the web, Redis and gateway limits, sizes
+PostgreSQL for its larger connection pool and preserves its existing worker
+budget. [System Requirements](../../docs-book/part-1-operator-guide/system-requirements.md)
+lists each reservation beside the consumption measured on 3 November 2026. A 4 GB
+host, ARM builds and Raspberry Pi hardware remain unqualified.
 
 ## Prepare
 
@@ -14,9 +16,22 @@ the repository's existing image conventions; the worker and operator references
 are local build tags. Set all six references to images available on the selected
 Docker daemon. The deployment command resolves each reference to an immutable
 image ID; it does not build or pull images.
-The application image must include the compiled web assets. Follow the image-build
-steps in [Getting started](../../docs-book/part-1-operator-guide/getting-started.md)
-before using this preset.
+The application image must include the compiled web assets in `public/`. From a
+clean source checkout, first [build the frontend](../../docs-book/part-1-operator-guide/getting-started.md#6-install-and-build-the-web-frontend),
+then build the three application images with the same revision:
+
+```sh
+revision=$(git rev-parse HEAD)
+php scripts/build-application.php --target production --revision "$revision" --tag baander-app:local
+php scripts/build-application.php --target worker --revision "$revision" --tag baander-worker:local
+php scripts/build-application.php --target dev-operator --revision "$revision" --tag baander-operator:local
+```
+
+Set the example's application reference to `baander-app:local`. The `dev-operator`
+target contains the trusted worker controller and Docker client; it uses the
+production application layer. These builds do not compile the frontend. Keep the
+checkout and compiled assets unchanged between them so all three contain the same
+application code.
 
 Copy `example.json` to a private file, replace every secret and set the origin and
 listening address for your installation. The gateway serves HTTP. For an HTTPS

@@ -1,25 +1,56 @@
 # Transcoding
 
-Baander converts video files into streamable CMAF segments on-the-fly using FFmpeg. Segments are served via HLS v6 and DASH manifests, with per-segment adaptive bitrate selection across multiple quality tiers.
+Baander selects a delivery path from the receiving client's media capabilities and
+the deployment's startup profile. Compatible files can play directly; other sources
+may use an existing artifact, stream copy or encoding.
 
-Music tracks can also be transcoded to Opus, AAC or MP3 for clients that cannot play the original. That is off until you turn it on; see [Audio Transcoding](#audio-transcoding).
+Under `full`, video encoding produces CMAF segments served through HLS v6 and DASH.
+Music can be encoded to Opus, AAC or MP3 when audio transcoding is enabled.
+Under `household`, audio and video re-encoding are prohibited. See
+[Deployment profiles](configuration.md#deployment-profiles) and
+[Audio Transcoding](#audio-transcoding).
 
 Before testing conversion, confirm that the media is in the catalog, its source path is readable, and the independent worker deployment is running with shared output storage. A healthy web endpoint alone does not establish encoder availability. [Storage and Data](storage-and-data.md#shared-media-paths) explains the mounts; [Background Work](background-work.md) explains the deployment and its recovery boundary.
 
-For a playback failure, first distinguish original-file audio from converted audio or video. Original audio can stream without an encoder. Converted playback needs the worker, source access and writable derived storage. Use [Monitoring](monitoring.md) to check the responsible job and worker before changing playback settings or restarting services.
+For a playback failure, first identify the selected delivery path. Original audio
+and video need no encoder; active copy or encoding jobs need an admitted worker,
+source access and writable derived storage. A compatibility refusal differs from a
+job waiting for capacity. Use [Monitoring](monitoring.md) to check the responsible
+job and worker before changing playback settings or restarting services.
 
 ## How It Works
 
-When a client requests a video stream, web commits the session and its durable execution intent together. The independent worker claims that intent, probes the source and starts FFmpeg under its media role. Web serves the published files and keeps the client connections.
+The receiving browser reports supported containers, codecs and transports before
+it receives a media URL. A remote destination uses its own capabilities. Negotiation
+checks the source and access rights, then returns one of these outcomes:
 
-1. The worker probes the source and resolves its encoder capabilities.
-2. It publishes generation metadata, including the selected codecs, source duration and timeline start.
-3. It writes the init and six-second CMAF media segments into that generation's directory.
-4. Web serves HLS or DASH manifests and segments only for the current execution generation.
+| Outcome | Playback behavior |
+|---------|-------------------|
+| Original | A signed source file plays through the native media element. |
+| Cached | A compatible completed artifact plays without starting a producer. |
+| Copy | An owned job repackages selected streams without audio or video re-encoding. Video uses adaptive delivery. |
+| Encoded | The `full` profile may start the existing encoding path, subject to audio settings where applicable. |
+| Incompatible | Playback stops with an explanation; capacity retries cannot enable a prohibited conversion. |
 
-Video jobs are scoped to the playback owner, video and quality tier. Their output
-paths include the job UUID and execution generation, so two users watching the
-same source do not share controls or generation directories. Adaptive HLS and DASH
+A cached artifact authorizes delivery only. Missing, partial or evicted output
+returns to negotiation; it does not grant permission to regenerate encoded media
+in `household`. Text subtitles keep their adaptive delivery path. A subtitle
+burn-in request requires re-encoding and is incompatible with `household`.
+
+For an active video job, web commits the session and its durable execution intent
+together. The independent worker claims that intent, probes the source and starts
+FFmpeg under its media role. Web serves the published files and keeps the client
+connections. The worker publishes the selected codecs, source duration and timeline
+start, then writes init and media fragments into the execution generation's
+directory. Encoded output uses six-second CMAF segments; copied output retains
+source timestamps and keyframe boundaries.
+
+Video jobs are scoped to the playback user, client session, video, selected
+presentation and quality tier. Their output paths include the job UUID and
+execution generation. Two clients keep independent controls and jobs even when
+they use the same account. The client-session request ID remains stable through
+negotiation, signing, refresh and reconnect. New seek commands use fresh request
+identities; a retry retains that command's identity. Adaptive HLS and DASH
 requests sign an immutable rendition set containing each owned job and its own
 generation; a manifest cannot substitute another user's job or assume all tiers
 share one generation.
@@ -39,8 +70,10 @@ refused from the following second. Expiry does not interrupt a response admitted
 before the deadline or remove bytes already buffered by the player.
 
 The web video player obtains a newer signed URL near expiry while preserving its
-local position and play or pause intent. Renewal waits for an active seek or
-position restoration to finish and does not start a new execution. A media network
+local position and play or pause intent. For an active job, renewal waits for an
+active seek or position restoration to finish and refreshes the same owned job.
+Original and cached delivery renew through negotiation, which may select another
+permitted path if the prior artifact is no longer available. A media network
 failure after expiry or an observed signing outage permits one replacement of
 the affected attachment. An authenticated report of unavailable media also
 permits one replacement after a media network failure, provided the attachment
@@ -53,7 +86,7 @@ remain playback failures.
 
 ## Quality Tiers
 
-The quality ladder defines six HEVC tiers. The client selects a tier at session creation time based on its capabilities and available bandwidth.
+The `full` profile's encoded quality ladder defines six HEVC tiers. The client selects a tier at session creation time based on its capabilities and available bandwidth. Original and copied video retain the source's encoded quality.
 
 | Tier | Resolution | Video Bitrate | Max Bitrate | Buffer Size | Codec |
 |------|-----------|---------------|-------------|-------------|-------|
@@ -68,7 +101,7 @@ The table describes the HEVC ladder. Published manifests describe the actual wor
 
 ### Audio Profiles
 
-Each session is assigned an audio profile that controls codec, bitrate, channel layout, sample rate, loudness target, and dynamic range compression.
+An encoded session is assigned an audio profile that controls codec, bitrate, channel layout, sample rate, loudness target, and dynamic range compression. Stream copy preserves the selected source audio instead of applying these transformations.
 
 | Profile | Codec | Bitrate | Channels | Sample Rate | Loudness Standard | DRC |
 |---------|-------|---------|----------|-------------|-------------------|-----|
@@ -83,20 +116,28 @@ Each session is assigned an audio profile that controls codec, bitrate, channel 
 
 ## Worker execution capacity
 
-The media role admits at most three video jobs and one audio rendition at once. Each video job has a fresh PHP kernel and one private CPU helper, started before any database or Redis connection opens. FFmpeg processes and their process groups belong to the worker deployment. Web has no CPU pool or encoder fallback.
+Under `full`, the media role admits at most three video jobs and one audio rendition
+at once. Under `household`, audio and video copy jobs share two slots, and encoding
+is refused. Each video job has a fresh PHP kernel and one private CPU helper,
+started before any database or Redis connection opens. FFmpeg processes and their
+process groups belong to the worker deployment. Web has no CPU pool or encoder
+fallback.
 
 Private media jobs use one asynchronous file-I/O thread, configured before helper
 forks or reactor startup. The shipped Swoole build uses its thread backend for
 coroutine file reads under the worker's default Docker security restrictions.
 AIO threads and encoder threads both count toward the container PID ceiling.
 
-The version 5 host manifest reserves at least 2944 MiB and 129 PID slots for control.
+For `full`, the version 6 host manifest reserves at least 2944 MiB and 129 PID slots for control.
 Execution requires at least `4160 + 320 * (maximumConcurrency - 1)` MiB plus any
 scheduled console reservation, and `256 + maximumConcurrency - 1` PID slots,
 including encoder threads. Ordinary admission can change within the profile's
 bounds; all ordinary consumers remain resident and fully reserved when parked.
-The three video slots and one audio slot remain independent of that target.
-These are admission reservations, not measured capacity guarantees. See [Worker deployment](commands/README.md#worker-deployment) for the complete memory and storage recipe.
+Media slots remain independent of the ordinary target. The selected profile sets
+its resident-consumer and media-slot bounds; the controller derives the required
+reservations from them. Current household reservations retain conservative native
+headroom while whole-stack qualification is open. These are admission reservations,
+not measured capacity guarantees. See [Worker deployment](commands/README.md#worker-deployment) for the complete memory and storage recipe.
 
 ## Job Monitoring and State
 
@@ -110,8 +151,8 @@ State transitions for a transcode job: `pending` -> `in_progress` -> `completed`
 
 Pause, resume, seek, audio-profile changes, progress and cancellation update
 durable desired state synchronously. The transaction applies each change to
-sibling renditions of the same playback owner and video. Other users' sessions
-remain independent. Durable per-session/request receipts prevent a repeated
+sibling renditions of the same client session and video. Other clients' sessions
+remain independent, including clients signed in to the same account. Durable per-session/request receipts prevent a repeated
 request from applying again after an intervening control. Controls have ordered revisions; playback progress includes the currently attached generation and revision so an old player cannot overwrite a later seek. Cancellation is terminal. Seeking while paused preserves the paused state.
 
 Native seek events carry the generation captured when the media element was
@@ -184,11 +225,13 @@ See [Monitoring](monitoring.md) for job status and [Worker deployment](commands/
 
 ## Hardware Acceleration
 
-The worker probes encoder capabilities and publishes its selected profile for media execution. The current admitted deployment recipe rejects devices and device requests, so it does not provide GPU passthrough. Do not add GPU access to the web container to enable background encoding.
+The `full` worker probes encoder capabilities and publishes its selected profile for media execution. The household profile skips encoder qualification because it cannot admit re-encoding. The current admitted deployment recipe rejects devices and device requests, so it does not provide GPU passthrough. Do not add GPU access to the web container to enable background encoding.
 
 ## Audio Transcoding
 
-Music tracks stream as their original files unless a client asks for another format. A client that cannot play a track's format, such as a browser without FLAC support, asks for it transcoded:
+Music playback first negotiates original, cached or copied delivery. If encoding
+is needed, `full` and the audio setting must both allow it. Direct API clients can
+request an encoded format explicitly:
 
 ```
 GET /api/stream/track?id=<track public ID>&format=opus
@@ -199,18 +242,18 @@ GET /api/stream/track?id=<track public ID>&format=mp3&bitrate=192000
 
 ### Settings
 
-Two [server settings](configuration.md#server-settings) govern audio transcoding. Baander reads them on every request. Video transcoding is outside both.
+Two [server settings](configuration.md#server-settings) govern audio transcoding. Baander reads them on every request. Video transcoding is outside both. In `full`, a direct format request while `transcode.enabled` is off receives `403`; enabling it still cannot authorize encoding in `household`.
 
 | Setting | Default | Effect |
 |---------|---------|--------|
-| `transcode.enabled` | `false` | While off, a request that names a format gets `403` saying transcoding is turned off, and no encode starts. Requests without a format stream the original either way. |
+| `transcode.enabled` | `false` | Allows audio encoding only when the startup profile also permits it. Original and negotiated stream-copy delivery do not enable encoding. |
 | `transcode.max_bitrate` | `320` | The highest bitrate, in kbps: `128`, `192`, `256` or `320`. A higher requested bitrate is lowered to it, and a request without a bitrate gets it. |
 
 Baander then rounds the bitrate down to the highest step of a fixed ladder that does not exceed it: 64, 96, 128, 160, 192, 256 and 320 kbps. A request below 64 kbps gets 64 kbps. The Opus ladder stops at 256 kbps, so an Opus stream never exceeds 256 kbps, whatever the maximum. Because only these steps exist, each track has at most seven renditions per format.
 
 An unsupported format, a bitrate that is not a positive whole number, or a bitrate without a format gets `400`. A failed encode gets `500` and is logged with the track, format and bitrate.
 
-Renditions are admitted through durable PostgreSQL runtime state. The media role runs one audio encode at a time, independently of its three video slots. Requests for the same source fingerprint, format and bitrate join the same accepted work. Web waits up to 60 seconds for output to start; an unavailable worker or failed generation produces an encode failure rather than an inline web encode.
+Renditions are admitted through durable PostgreSQL runtime state. Under `full`, the media role runs one audio encode at a time, independently of its three video slots. Requests for the same source fingerprint, format and bitrate join the same accepted work. Web waits up to 60 seconds for output to start; an unavailable worker or failed generation produces an encode failure rather than an inline web encode.
 
 ### Cached renditions
 
@@ -219,15 +262,23 @@ Each track, format and bitrate has one cached rendition under `CONVERT_STORAGE_P
 The first request for a rendition starts the encode and streams the output while FFmpeg writes it. Its length is not known yet, so that response carries `Accept-Ranges: none` and the listener cannot seek. A second request for the same rendition while it is encoding joins that encode instead of starting another. Once the rendition is complete, later requests get the cached file with full byte-range support, so seeking works. Each encode has a worker-owned claim and generation. Web follows only that accepted generation, checks live ownership while output is growing and accepts its final file only after completion is committed. Lost ownership or a changed generation cuts the stream as an error.
 
 If a completed cache file has been evicted, a compare-and-swap against its
-completed generation resets the same canonical runtime row to pending. The next
-worker claim advances its generation and rebuilds the file; concurrent readers do
-not create another canonical row.
+completed generation resets the same canonical runtime row to pending when the
+requested execution is permitted. The next worker claim advances its generation
+and rebuilds the file; concurrent readers do not create another canonical row.
+Completed-artifact reuse in `household` does not authorize an encoded rebuild.
 
 The transcode cache sweep (`app:transcode:cache-sweep`) treats each track's renditions, all formats and bitrates together, as one cache unit under the same age limit and size budget as video segments. A track's renditions count as in use while an encode has written to a partial rendition recently.
 
 ### Web player
 
-The web player always asks for the original file first. When the browser rejects it as an unsupported source, the player asks for the same track as Opus, then AAC, then MP3, without a bitrate, so the server applies `transcode.max_bitrate`. While a transcoded stream is still encoding, the player refuses to seek and says so. If the transcoded stream fails as well, playback stops with an error message. With `transcode.enabled` off, a track the browser cannot play therefore does not play in the web player.
+The web player negotiates with the receiving browser's capabilities before loading
+a track. If that source fails, it reports the failure to negotiation before trying
+an encoding fallback. An incompatible result stops playback with its explanation.
+When encoding is allowed, the existing Opus, AAC and MP3 fallback uses the server's
+`transcode.max_bitrate`. A growing encoded rendition has no byte-range seeking;
+the player restores position after reconnect once a seekable source is available. Original and
+completed-file playback use native seeking; copied playback follows the actual
+output's seeking support.
 
 When the web server restarts during a transcoded stream, the connection is cut as an error while the worker continues encoding. The next request joins the accepted rendition or reads its completed file. The player keeps the listener's position and continues once byte-range seeking is available; see [Listeners during a restart](upgrading.md#listeners-during-a-restart).
 
@@ -238,11 +289,15 @@ Audio transcoding is switched on and capped with the [server settings](#settings
 - **Derived output** uses `CONVERT_STORAGE_PATH`, default `/storage/conversions`, mounted at the same path in web and worker.
 - **Application storage and state** require shared writable worker volumes covering `APP_HOME/storage` and `APP_HOME/var/transcode_state`, where `APP_HOME` is the image application path generated during [installation](getting-started.md).
 - **Source media** uses an explicit `MEDIA_STORAGE_PATH`, for example `/media/library`, covered by a read-only worker source volume. Use the identical source root in both roles. Preserve web access needed for authorized library deletion.
-- **Capacity** is fixed at three video jobs and one audio rendition in the current media role; configure its explicit memory and descendant reservations in the [host manifest](commands/README.md#worker-deployment).
+- **Capacity** comes from the startup profile: `full` permits three video jobs and one audio rendition; `household` permits two shared copy jobs and no encoding. Configure the matching memory and descendant reservations in the [host manifest](commands/README.md#worker-deployment).
 
 ## Checking playback
 
-Start with one known catalog item. For audio, try its original format before enabling a conversion fallback. For video or converted audio, confirm that the job leaves `pending`, output becomes available and the player actually plays it. A completed job with missing cached files is different from a pending job with no worker capacity.
+Start with one known catalog item and check its negotiated delivery kind. For an
+active copy or encoding job, confirm that the job leaves `pending`, output becomes
+available and the player's source position advances. For original or cached delivery,
+check playback progress without expecting a live job. A missing artifact, a pending
+job and a terminal compatibility refusal require different fixes.
 
 If playback stops during a restart, identify which role restarted. Web owns the client connection; the worker owns FFmpeg. Restarting web does not restart encoders or repair an unavailable worker. Follow [Troubleshooting](troubleshooting.md) for evidence collection and [Background Work](background-work.md) for worker recovery. Do not remove runtime rows or generation files to force replacement work.
 

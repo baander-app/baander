@@ -38,6 +38,55 @@ must reach the same main database through addresses appropriate to their network
 Web and workers must also agree on shared media paths and Redis transport settings.
 See [Shared media paths](storage-and-data.md#shared-media-paths).
 
+## Deployment profiles
+
+Choose `full` or `household` before starting the deployment. The default is `full`.
+The profile sets web and worker capacity together; it is not a live server setting.
+
+| Startup capability | `full` | `household` |
+|--------------------|--------|-------------|
+| Web workers | 4 | 2 |
+| Doctrine connection slots per web worker | 10 | 4 |
+| Maximum resident ordinary consumers | 4 | 1 |
+| Shared audio/video copy slots | 0 | 2 |
+| Video encoding slots | 3 | 0 |
+| Audio encoding slots | 1 | 0 |
+
+In `full`, copy work uses the existing video or audio slots; it does not have a
+separate shared pool. The household profile permits original-file delivery,
+compatible completed cache entries and stream copy without audio or video
+re-encoding. It retains ordinary library maintenance, scheduling, relay and media
+coordination. When original, cached and copied media cannot meet the receiving
+browser's requirements, playback returns a compatibility explanation. Subtitle burn-in
+requires re-encoding. Changing the audio transcoding setting does not enable an
+encoder in this profile. See [Transcoding](transcoding.md#how-it-works) for delivery selection.
+
+`BAANDER_DEPLOYMENT_PROFILE` selects the profile. The generated
+`BAANDER_DEPLOYMENT_PROFILE_JSON` records its complete effective settings. If that
+JSON is supplied, it must agree with the selected identifier. Web, workers and the
+version 6 worker manifest must agree; conflicting settings fail startup.
+
+For the managed complete-stack preset, set `profile` in its private configuration
+and run the host controller:
+
+```bash
+php scripts/deploy-household.php render --config /srv/baander/household.json --state /srv/baander/household-state
+php scripts/deploy-household.php start --config /srv/baander/household.json --state /srv/baander/household-state
+php scripts/deploy-household.php status --state /srv/baander/household-state
+php scripts/deploy-household.php stop --state /srv/baander/household-state
+```
+
+The controller resolves available images to immutable IDs and starts the gateway,
+web, PostgreSQL, Redis and worker pair. It does not build or pull images. A later
+`start` retires the saved workers and stops the saved services before installing
+the selected configuration. `stop` retains named data volumes. Preserve the
+private state directory to recover an interrupted operation. See
+[Getting started](getting-started.md) for image preparation and account setup.
+
+The preset's reservations are enforced limits, not a minimum host size.
+[System Requirements](system-requirements.md) lists them per profile beside the
+measured consumption. A 4 GB host and Raspberry Pi support remain unqualified.
+
 ## Application
 
 The application name is fixed as Bånder. Environment variables cannot change the
@@ -388,7 +437,17 @@ and encoder threads in container PID accounting.
 
 ### PHP memory limit
 
-The production image sets `memory_limit` to `512M` in `/usr/local/etc/php/conf.d/zz-baander-production-memory.ini`. Every PHP process in the image reads it: the web server, the `app:health:check` HEALTHCHECK and console commands. The web server's [memory check](monitoring.md#what-is-checked) measures each HTTP worker against this limit. The worker supervisor (`app:worker`) sets its children's limits itself with `-d`. To change the limit, override the file or add a later one in `conf.d`.
+The production image sets `memory_limit` to `512M` in
+`/usr/local/etc/php/conf.d/zz-baander-production-memory.ini`. Processes use that
+image default unless their launch command supplies an override. The
+`app:health:check` HEALTHCHECK reads this default too. To change the image default,
+override the file or add a later one in `conf.d`; explicit launch limits still take
+precedence. The managed preset starts web with the selected profile's PHP heap limit; the worker supervisor
+(`app:worker`) sets its children's limits with `-d`. Current profiles use a 256 MiB
+PHP heap while reserving additional native and management memory. The web server's
+[memory check](monitoring.md#what-is-checked) measures each HTTP worker against its
+effective limit. Changing PHP's heap limit alone does not change container ceilings
+or the worker's admission reservation.
 
 ## Library Scanner Security
 
@@ -484,7 +543,7 @@ A stored value can stop being allowed, for example when a setting's allowed valu
 | `notifications.admin_alerts` | `true` | Alert administrators when a component's health check reads unhealthy. The web server runs the checks every 60 seconds. See [Health alerts](notifications.md#health-alerts). |
 | `notifications.push_enabled` | `true` | Deliver browser push notifications. See [Notifications](notifications.md#server-settings). |
 | `recommendations.auto_generate` | `false` | Let the daily **Generate recommendations** job generate. See [Scheduled recommendations](#scheduled-recommendations). |
-| `transcode.enabled` | `false` | Allow on-the-fly audio transcoding. See [Audio transcoding](transcoding.md#audio-transcoding). |
+| `transcode.enabled` | `false` | Allow on-the-fly audio transcoding when the startup profile permits encoding. It cannot enable encoding in `household`. See [Audio transcoding](transcoding.md#audio-transcoding). |
 | `transcode.max_bitrate` | `320` | The highest bitrate of a transcoded audio stream, in kbps: `128`, `192`, `256` or `320`. It is also the bitrate used when a client asks for none. |
 
 Every setting in the table is enforced. Four features arrived with server settings and start switched off: audio transcoding, metadata sync for new albums, lyrics fetch for new tracks, and scheduled recommendations. Turn on the ones you want.

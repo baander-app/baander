@@ -139,6 +139,47 @@ Conversion drains older readers before replacing their saved-record contract;
 unleased legacy dispatchers require an established invocation fence before that
 conversion can proceed.
 
+## Household deployment and qualification
+
+`Deployment\Household` starts the gateway, web service, PostgreSQL, Redis and
+worker pair from one deployment configuration. It reads the selected profile from
+the immutable application, worker and operator images, checks their agreement,
+and uses the shared worker lifecycle. Application paths come from image metadata.
+The application does not receive the Docker socket.
+
+Prepare a private configuration from
+[`deploy/household/example.json`](../../deploy/household/example.json), following
+the [deployment instructions](../../deploy/household/README.md). Then run:
+
+```bash
+php scripts/deploy-household.php start --config /path/to/household.json --state /path/to/household-state
+php scripts/deploy-household.php status --state /path/to/household-state
+php scripts/deploy-household.php stop --state /path/to/household-state
+```
+
+Normal stop retains the database, media, derived files and signing keys. Change a
+profile by stopping the deployment, updating its configuration and starting it
+again with the same state directory. A different deployment name or volume
+inventory needs a separate state directory. Configured limits describe resource
+admission; they are not measurements or a minimum host requirement.
+
+`Fixtures\Household\Qualification` is the separate disposable workload harness.
+`scripts/qualify-household.php` provides `prepare`, `start`, `scenario`, `stop`
+and `report` actions. Preparation generates media before measurement and adds
+fixture-only provider responses and native launch logging to the production
+images. `prepare --from` copies an unchanged fixture dataset into a new owned
+volume and borrows its exact images for another run. Run the invoking machine
+and browser outside the measured host. See the
+[qualification procedure](../../docs-book/part-2-developer-guide/testing.md#household-deployment-qualification)
+for the configuration and evidence required.
+
+Qualification `stop` retains data for a restart check. Its `--cleanup` option
+removes owned fixture data and images after confirming worker retirement and
+volume retention. Borrowed images remain until every child is cleaned up; clean
+the fixture source last. Reports and failed-run evidence remain in the private
+state directory. A successful setup or functional check alone does not establish
+a whole-host memory fit.
+
 ## Process and resource ownership
 
 `Process\CommandExecutor` is the workflow execution contract;

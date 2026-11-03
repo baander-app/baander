@@ -15,15 +15,23 @@ lease expiry is insufficient. Resolve these through the old controller while its
 schema is still installed. Preserve the database, pending work and media; no reset
 is required or authorized by this upgrade.
 
-Version 5 manifests require `sourceMountPolicy` and the complete ordinary
-autoscaling profile. The new controller refuses earlier manifest versions, including
-recovery actions. Keep the old checkout, controller, manifest and credentials to
-retire an existing pair before switching code. Confirm both units' retirement and
-the joint reservation release, then create a version 5 manifest with a fresh boot
-ID, the new image and `sourceMountPolicy: production` for the named-volume recipe.
-Lease expiry or a stopped container is insufficient. Preserve the database, pending
-work and media. This manifest change requires no data reset and provides no
-compatibility path.
+Version 6 manifests require `sourceMountPolicy`, the complete startup
+`deploymentProfile` and the ordinary autoscaling profile. The selected startup
+profile must agree with web and the worker runtime environment. The new controller
+refuses earlier manifest versions, including recovery actions. Keep the old
+checkout, controller, manifest and credentials to retire an existing pair before
+switching code. Confirm both units' retirement and the joint reservation release,
+then create a version 6 manifest with a fresh boot ID, the new image and
+`sourceMountPolicy: production` for the named-volume recipe. Lease expiry or a
+stopped container is insufficient. Preserve the database, pending work and media.
+This manifest change requires no data reset and provides no compatibility path.
+
+The source-installation procedure below uses the `dc` shell function. For the
+managed complete-stack preset, keep its private state directory and use
+`scripts/deploy-household.php` to replace the deployment. Select `full` or
+`household` in its configuration; a later `start` retires the old pair and stops the
+saved services before starting the selected release. `stop` retains named data
+volumes. See [Deployment profiles](configuration.md#deployment-profiles).
 
 Use the `dc` function and private environment file defined in
 [Getting Started](getting-started.md#1-prepare-configuration-and-the-browser-address).
@@ -136,10 +144,11 @@ playback owners without rewriting the initial migration or existing histories.
 the control/execution journals and joint retirement barrier. It is irreversible.
 `Version20261021120000` retains the last observed availability of indexed source
 files and is also irreversible.
-New deployments require a version 5 manifest with separate budgets, disjoint CPU
-sets, a private IPC volume and a complete autoscaling profile; earlier manifest
-versions are refused. Every profile field is fingerprinted in both recipes, so
-changing thresholds or concurrency also requires retirement and a fresh boot.
+New deployments require a version 6 manifest with separate budgets, disjoint CPU
+sets, a private IPC volume and complete deployment and autoscaling profiles;
+earlier manifest versions are refused. Every profile field is fingerprinted in
+both recipes. Changing thresholds, concurrency or the startup profile requires
+retirement and a fresh boot, with matching web and worker runtime settings.
 
 Ownership is derived from the recorded runtime session or an unambiguous session
 owner. Ambiguous or unattached historical jobs retain a null owner. Existing

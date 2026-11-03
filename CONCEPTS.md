@@ -341,9 +341,14 @@ lease and owns native processes. A private IPC volume connects the pair.
 
 ### Small-host household profile
 
-A proposed deployment profile for household playback and ordinary library maintenance with bounded resource use.
-It permits original-file playback and remuxing but no server-side audio or video re-encoding.
-Its supported host capacity comes from whole-stack qualification; Raspberry Pi support is a separate hardware qualification.
+A startup profile for household playback and ordinary library maintenance with
+bounded resource admission. It permits original-file playback, compatible
+completed artifacts and two shared audio/video copy jobs, but no server-side audio
+or video re-encoding. Web and worker processes use the same profile; changing it
+requires deployment replacement.
+
+Per-service consumption has been measured on a large host; the smallest host
+size, a 4 GB fit and Raspberry Pi support remain unqualified.
 
 ### Ordinary admission target
 

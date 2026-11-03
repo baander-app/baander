@@ -6,7 +6,7 @@ coordination. Execution runs resident ordinary `async` consumers, one separate
 `scheduler` consumer and the native execution daemon.
 Native probes, encoders, CPU helpers and scheduled console children run in
 execution. The host `bin/worker-deployment.php` supplies the options from a version
-5 manifest; see [Worker deployment](README.md#worker-deployment).
+6 manifest; see [Worker deployment](README.md#worker-deployment).
 
 ## Quick start
 
@@ -24,16 +24,22 @@ start, stop, replacement and uncertain outcomes.
 | `--deployment` | `BAANDER_WORKER_NAMESPACE` | Deployment namespace |
 | `--boot-id` | `BAANDER_WORKER_BOOT_ID` | Fresh 32-character hexadecimal boot identity |
 | `--unit` | `BAANDER_WORKER_UNIT` | Required unit identity: `control` or `execution` |
-| `--memory-mib` | — | Required unit ceiling: at least 2944 MiB for control or `4160 + 320 * (maximumConcurrency - 1)` MiB plus the scheduled console reservation for execution |
+| `--memory-mib` | — | Required unit ceiling, validated against the selected deployment profile, resident consumers and scheduled console reservation; see the [manifest reference](README.md#worker-deployment) |
 | `--pids-limit` | — | Required unit PID capacity: at least 129 for control or `256 + maximumConcurrency - 1` for execution; at most 4096 |
 | `--scheduled-console-mib` | `0` | Execution reservation for one synchronous scheduled console child; `0` disables it, otherwise at least 320 MiB; control requires `0` |
-| `--autoscaling-profile` | — | Required complete JSON profile from the version 5 manifest; all fields bind both unit recipes |
+| `--deployment-profile` | — | Required complete startup profile JSON; it must agree with the runtime environment and version 6 manifest |
+| `--autoscaling-profile` | — | Required complete ordinary-admission profile JSON from the version 6 manifest; all fields bind both unit recipes |
 | `--lock-dir` | `/tmp/baander-worker-locks` | Private unit lock directory |
 | `--ipc-dir` | `/run/baander-worker` | Private IPC directory shared by the pair |
 
 ## Details
 
 When the environment sets `BAANDER_WORKER_NAMESPACE`, `BAANDER_WORKER_BOOT_ID` or `BAANDER_WORKER_UNIT`, the matching option must be absent or equal to it. Memory values are whole MiB up to 1048576. The host manifest binds these admission values to separate Docker memory, CPU and PID ceilings and disjoint CPU sets. They do not certify measured usage or capacity.
+
+The deployment profile is fixed at startup. `full` allows up to four ordinary
+consumers and encoding; `household` allows one ordinary consumer and two shared
+copy jobs, with no audio or video encoding. Web and workers must select the same
+profile. Profile replacement requires retirement and a new admitted boot.
 
 Execution starts `consumer-0` through `consumer-(maximumConcurrency - 1)` for
 `async`, plus one separate `scheduler` consumer. Every ordinary slot remains
@@ -45,8 +51,8 @@ execution cgroup evidence and updates admission through boot/epoch-fenced IPC;
 it does not consume ordinary work. It reserves 320 MiB within control's ceiling.
 
 The [manifest reference](README.md#worker-deployment) defines profile bounds and
-the measured maximum-two example and its workload limits. Missing measurements prevent growth and reduce
-ordinary admission to at most one. Severe memory/PID pressure closes admission;
+the measured `full` maximum-two example and its workload limits. Missing
+measurements prevent growth and reduce ordinary admission to at most one. Severe memory/PID pressure closes admission;
 recovery needs fresh samples. Status exposes slot counts, decision reason and
 freshness without treating missing consumers as idle.
 
@@ -74,7 +80,9 @@ peer failure and the 35-second drain deadline; the
 startup admission deadline. A `worker_supervisor_stopped` log entry is neither
 a readiness result nor a containment receipt.
 
-The media coordinator admits at most three video jobs and one audio rendition.
+The `full` media coordinator admits at most three video jobs and one audio rendition.
+In `household`, audio and video copy jobs share two slots. Completed artifacts can
+be delivered without a producer, but their reuse never authorizes re-encoding.
 Each job uses a fresh kernel in control and sends bounded native requests over
 the private Unix socket to execution. Hardware probing, FFmpeg, video CPU helpers
 and scheduled console children belong to execution; no devices are admitted.
