@@ -331,6 +331,7 @@ class VideoProbeResultTest extends TestCase
             'extra rational part' => ['video', 'r_frame_rate', '1/10/2'],
             'malformed decimal rate' => ['video', 'r_frame_rate', '0.1garbage'],
             'nonfinite rate' => ['video', 'r_frame_rate', '1e999'],
+            'ordinary average rate' => ['video', 'avg_frame_rate', '1/1'],
             'missing stream index' => ['video', 'index', null],
             'negative stream index' => ['video', 'index', -1],
             'untyped stream' => ['video', 'codec_type', null],
@@ -666,6 +667,38 @@ class VideoProbeResultTest extends TestCase
 
         $result = VideoProbeResult::fromProbeOutput($raw);
         $this->assertSame(25.0, $result->framerate);
+    }
+
+    #[DataProvider('frameRateFields')]
+    public function testFramerateUsesTheAverageRateAndFallsBackToTheGuessedRate(?string $average, ?string $guessed, float $expected): void
+    {
+        $stream = array_filter(['codec_type' => 'video', 'avg_frame_rate' => $average, 'r_frame_rate' => $guessed], static fn (?string $value): bool => $value !== null);
+        $result = VideoProbeResult::fromProbeOutput(['streams' => [$stream], 'format' => []]);
+        $this->assertEqualsWithDelta($expected, $result->framerate, 0.0001);
+    }
+
+    /** @return iterable<string, array{?string, ?string, float}> */
+    public static function frameRateFields(): iterable
+    {
+        // Pairs as ffprobe reports them for real encodes.
+        yield 'sparse Matroska guessed at twice its rate' => ['1/10', '1/5', 0.1];
+        yield 'sparse MPEG-TS guessed at five times its rate' => ['1/10', '1/2', 0.1];
+        yield 'variable rate averages below its base rate' => ['45/2', '30/1', 22.5];
+        yield 'ordinary NTSC rate' => ['30000/1001', '30000/1001', 29.97];
+        yield 'unknown average' => ['0/0', '24/1', 24.0];
+        yield 'missing average' => [null, '25/1', 25.0];
+        yield 'nonfinite average' => ['1e999', '25/1', 25.0];
+        yield 'no rate' => [null, null, 0.0];
+    }
+
+    public function testSparseMatroskaOriginIsVerifiedByItsAverageRate(): void
+    {
+        $raw = self::anchoredMovie();
+        $raw['streams'][0]['r_frame_rate'] = '1/1';
+        $raw['streams'][0]['avg_frame_rate'] = '1/2';
+        $probe = VideoProbeResult::fromProbeOutput($raw);
+        self::assertSame(4.0, $probe->sourceTimestampOrigin);
+        self::assertSame(0.5, $probe->framerate);
     }
 
     public function testJsonSerialize(): void

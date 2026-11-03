@@ -132,7 +132,7 @@ final readonly class VideoProbeResult implements JsonSerializable
                 ?? (float) ($format['duration'] ?? 0.0) - ($sourceTimestampOrigin ?? 0.0),
             width: (int) ($videoStream['width'] ?? 0),
             height: (int) ($videoStream['height'] ?? 0),
-            framerate: self::parseFramerate($videoStream['r_frame_rate'] ?? null),
+            framerate: self::streamFramerate($videoStream),
             colorSpace: $colorSpace,
             colorRange: $videoStream['color_range'] ?? null,
             pixFmt: $pixFmt,
@@ -217,7 +217,7 @@ final readonly class VideoProbeResult implements JsonSerializable
     private static function verifiedSourceTimestampOrigin(array $format, array $videoStream, mixed $packets): ?float
     {
         $formatName = $format['format_name'] ?? null;
-        $rate = self::parseFramerate($videoStream['r_frame_rate'] ?? null);
+        $rate = self::streamFramerate($videoStream);
         $start = self::nonnegativeTimestamp($format['start_time'] ?? null);
         $end = self::nonnegativeTimestamp($format['duration'] ?? null);
         if (!is_string($formatName) || !in_array('matroska', explode(',', $formatName), true)
@@ -327,6 +327,22 @@ final readonly class VideoProbeResult implements JsonSerializable
         $timestamp = self::finiteTimestamp($value);
 
         return $timestamp !== null && $timestamp >= 0.0 ? $timestamp : null;
+    }
+
+    /**
+     * Prefer the average rate ffprobe derives from the stream's frames and
+     * duration. Its r_frame_rate is a guessed base rate that overstates
+     * sub-1 fps streams: in Matroska from FFmpeg 7 on, and in MPEG-TS on every
+     * version. Both agree for ordinary, interlaced and B-frame sources. The
+     * guessed rate remains the fallback when no average is known.
+     *
+     * @param array<string, mixed> $videoStream
+     */
+    private static function streamFramerate(array $videoStream): float
+    {
+        $average = self::parseFramerate($videoStream['avg_frame_rate'] ?? null);
+
+        return is_finite($average) && $average > 0.0 ? $average : self::parseFramerate($videoStream['r_frame_rate'] ?? null);
     }
 
     private static function parseFramerate(mixed $rate): float
