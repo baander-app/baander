@@ -39,7 +39,6 @@ class QoLValueObjectsTest extends TestCase
     {
         $original = new UtilizationSample(
             cpuPercent: 45.5,
-            gpuPercent: 30.2,
             encodeFps: 60.0,
             sourceHeight: 1080,
             sourceCodec: 'h264',
@@ -53,7 +52,6 @@ class QoLValueObjectsTest extends TestCase
         $restored = UtilizationSample::fromArray($json);
 
         $this->assertSame($original->cpuPercent, $restored->cpuPercent);
-        $this->assertSame($original->gpuPercent, $restored->gpuPercent);
         $this->assertSame($original->encodeFps, $restored->encodeFps);
         $this->assertSame($original->sourceHeight, $restored->sourceHeight);
         $this->assertSame($original->sourceCodec, $restored->sourceCodec);

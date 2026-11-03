@@ -7,11 +7,16 @@ namespace App\QoL\Application\Port;
 use App\Shared\Domain\Model\Uuid;
 
 /**
- * Stream admission and completion published by QoL for transcode sessions.
+ * Stream admission, observation and completion published by QoL for transcode sessions.
  *
  * Admission is the synchronous budget veto: callers must invoke it before the
- * encoding loop starts and must not start the loop when it throws. Completion
- * feeds the learning model and releases the job's stream allocation.
+ * encoding loop starts and must not start the loop when it throws. While the stream
+ * runs, callers report the encoder's own work so far; completion feeds that work to
+ * the learning model and releases the job's stream allocation.
+ *
+ * Encoder work is the encoder process's cumulative CPU seconds and the seconds of
+ * output it has produced. Their ratio does not shrink when other encodes contend for
+ * the host, so it measures this stream alone.
  */
 interface StreamAdmissionPortInterface
 {
@@ -29,7 +34,12 @@ interface StreamAdmissionPortInterface
     ): void;
 
     /**
-     * Record the finished stream as a learning sample and release its allocation.
+     * Record the running stream's encoder work so far for the mid-stream budget check.
+     */
+    public function observe(Uuid $jobId, float $encoderCpuSeconds, float $outputSeconds): void;
+
+    /**
+     * Record the finished stream's encoder work as a learning sample and release its allocation.
      */
     public function complete(
         Uuid   $jobId,
@@ -38,5 +48,7 @@ interface StreamAdmissionPortInterface
         int    $sourceHeight,
         string $sourceCodec,
         bool   $hardwareAccelerated,
+        float  $encoderCpuSeconds,
+        float  $outputSeconds,
     ): void;
 }

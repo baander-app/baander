@@ -16,8 +16,21 @@ final readonly class StreamAllocation implements JsonSerializable
         public readonly string            $qualityTier,
         public readonly float             $predictedCost,
         public readonly DateTimeImmutable $allocatedAt = new DateTimeImmutable(),
+        public readonly ?float            $measuredCost = null,
     )
     {
+    }
+
+    /** The same allocation with the cost measured from the stream's own encoder work. */
+    public function withMeasuredCost(float $measuredCost): self
+    {
+        return new self($this->jobId, $this->qualityTier, $this->predictedCost, $this->allocatedAt, $measuredCost);
+    }
+
+    /** The measured cost once the stream has reported one, otherwise the predicted cost. */
+    public function cost(): float
+    {
+        return $this->measuredCost ?? $this->predictedCost;
     }
 
     /**

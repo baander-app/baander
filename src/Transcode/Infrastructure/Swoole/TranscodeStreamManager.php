@@ -43,8 +43,11 @@ final class TranscodeStreamManager
     private const int DEFAULT_MAX_CONCURRENT = 4;
     private const float POLL_INTERVAL_SECONDS = 0.1;
 
-    /** @var array<string, array{identity: \stdClass, handle: mixed, output_dir: string, tier_name: string, availability_tier: string, marked: array<string, bool>, publication: ?PublishedPresentation}> */
+    /** @var array<string, array{identity: \stdClass, handle: mixed, output_dir: string, tier_name: string, availability_tier: string, marked: array<string, bool>, publication: ?PublishedPresentation, cpu_seconds: float}> */
     private array $streams = [];
+
+    /** @var array<string, array{cpuSeconds: float, outputSeconds: float}> encoder work of each job's stopped attempts */
+    private array $retiredWork = [];
 
     public function __construct(
         private readonly SegmentAvailabilityInterface $availability,
@@ -135,6 +138,7 @@ final class TranscodeStreamManager
             'availability_tier' => $generation === null ? $tierName : $tierName . '/generation-' . $generation,
             'marked' => [],
             'publication' => null,
+            'cpu_seconds' => 0.0,
         ];
 
         return $outputDir;
@@ -171,6 +175,7 @@ final class TranscodeStreamManager
             $this->streams[$jobKey] = $entry;
 
             $status = $this->spawner->status($entry['handle']);
+            $entry['cpu_seconds'] = max($entry['cpu_seconds'], $status['cpuSeconds']);
             $running = $status['state'] === 'running';
             if (!in_array($status['state'], ['running', 'exited'], true)) {
                 throw new RuntimeException('Native video attempt outcome is uncertain.');
@@ -236,12 +241,66 @@ final class TranscodeStreamManager
         // Detach before any callback/I/O can yield and start a replacement.
         // This stop operation owns only the captured process, not the job slot.
         unset($this->streams[$jobKey]);
+        $cpuSeconds = $entry['cpu_seconds'];
         try {
             $this->logger->info('Stopping video stream', ['jobId' => $jobKey]);
             $this->spawner->signal($entry['handle'], 'stop');
         } finally {
-            $this->spawner->close($entry['handle']);
+            try {
+                $cpuSeconds = max($cpuSeconds, $this->spawner->close($entry['handle']));
+            } finally {
+                $retired = $this->retiredWork[$jobKey] ?? ['cpuSeconds' => 0.0, 'outputSeconds' => 0.0];
+                $this->retiredWork[$jobKey] = ['cpuSeconds' => $retired['cpuSeconds'] + $cpuSeconds,
+                    'outputSeconds' => $retired['outputSeconds'] + self::outputSeconds($entry['publication'])];
+            }
         }
+    }
+
+    /**
+     * The encoder work a job has done so far, over its stopped attempts and the running one:
+     * the encoder's CPU seconds as the execution daemon reports them, and the seconds of video
+     * the attempts have published as segments.
+     *
+     * @return array{cpuSeconds: float, outputSeconds: float}
+     */
+    public function encoderWork(Uuid $jobId): array
+    {
+        $jobKey = $jobId->toString();
+        $work = $this->retiredWork[$jobKey] ?? ['cpuSeconds' => 0.0, 'outputSeconds' => 0.0];
+        $entry = $this->streams[$jobKey] ?? null;
+        if ($entry !== null) {
+            $work['cpuSeconds'] += $entry['cpu_seconds'];
+            $work['outputSeconds'] += self::outputSeconds($entry['publication']);
+        }
+
+        return $work;
+    }
+
+    /**
+     * Returns the job's encoder work and forgets it; call after the job's stream has stopped.
+     *
+     * @return array{cpuSeconds: float, outputSeconds: float}
+     */
+    public function takeEncoderWork(Uuid $jobId): array
+    {
+        $work = $this->encoderWork($jobId);
+        unset($this->retiredWork[$jobId->toString()]);
+
+        return $work;
+    }
+
+    private static function outputSeconds(?PublishedPresentation $publication): float
+    {
+        $track = $publication?->track(MediaTrack::Video);
+        if ($track === null || $track->timescale <= 0) {
+            return 0.0;
+        }
+        $ticks = 0;
+        foreach ($track->segments as $segment) {
+            $ticks += $segment->duration;
+        }
+
+        return $ticks / $track->timescale;
     }
 
     /**
@@ -311,7 +370,7 @@ final class TranscodeStreamManager
     }
 
     /**
-     * @param array{identity: \stdClass, handle: mixed, output_dir: string, tier_name: string, availability_tier: string, marked: array<string,bool>, publication: ?PublishedPresentation} $entry
+     * @param array{identity: \stdClass, handle: mixed, output_dir: string, tier_name: string, availability_tier: string, marked: array<string,bool>, publication: ?PublishedPresentation, cpu_seconds: float} $entry
      */
     private function scanForNewSegments(string $jobKey, array &$entry): void
     {

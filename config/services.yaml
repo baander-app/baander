@@ -1494,10 +1494,6 @@ services:
     App\QoL\Domain\Port\AlgorithmProfileStoreInterface:
         alias: App\QoL\Infrastructure\Swoole\AlgorithmProfileTable
 
-    # Sampling is never started by the web runtime.
-    App\QoL\Infrastructure\Swoole\CpuGpuSampler:
-        autoconfigure: false
-
     App\QoL\Infrastructure\Swoole\QoLWorkerStartupSubscriber:
         autoconfigure: false
         arguments:

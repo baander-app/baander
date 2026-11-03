@@ -55,13 +55,14 @@ final class TranscodeStreamManagerOwnershipTest extends TestCase
             $callback = $this->onExit;
             $this->onExit = null;
             $callback?->__invoke();
-            return ['state' => $this->running ? 'running' : 'exited', 'stdout' => '', 'stderr' => '', 'exitCode' => -1, 'error' => null];
+            return ['state' => $this->running ? 'running' : 'exited', 'stdout' => '', 'stderr' => '', 'exitCode' => -1, 'error' => null, 'cpuSeconds' => 0.0];
         });
-        $spawner->method('close')->willReturnCallback(function (mixed $resource): void {
+        $spawner->method('close')->willReturnCallback(function (mixed $resource): float {
             $this->closed[] = $resource;
             $callback = $this->onClose;
             $this->onClose = null;
             $callback?->__invoke();
+            return 0.0;
         });
         $availability = $this->createStub(SegmentAvailabilityInterface::class);
         $availability->method('markReady')->willReturnCallback(function (Uuid $jobId, string $tier, int $index): void {

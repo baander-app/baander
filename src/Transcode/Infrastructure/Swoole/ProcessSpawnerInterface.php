@@ -10,11 +10,19 @@ interface ProcessSpawnerInterface
     /** @param list<string> $command */
     public function spawn(array $command): mixed;
 
-    /** @return array{state: string, stdout: string, stderr: string, exitCode: ?int, error: ?string} */
+    /**
+     * The attempt's outcome so far; cpuSeconds is the encoder's cumulative CPU time.
+     *
+     * @return array{state: string, stdout: string, stderr: string, exitCode: ?int, error: ?string, cpuSeconds: float}
+     */
     public function status(mixed $handle): array;
 
     public function signal(mixed $handle, string $operation): void;
 
-    /** Release only after terminal process-tree exit has been confirmed. */
-    public function close(mixed $handle): void;
+    /**
+     * Release only after terminal process-tree exit has been confirmed.
+     *
+     * @return float the exited attempt's total CPU seconds
+     */
+    public function close(mixed $handle): float;
 }

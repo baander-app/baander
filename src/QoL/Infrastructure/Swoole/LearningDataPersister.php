@@ -18,11 +18,17 @@ use Symfony\Component\Serializer\Encoder\JsonEncoder;
  * Persists governor learning independently of the algorithm profile and active streams.
  * Fresh media children restore a revision and merge only their new samples under a lock.
  * An explicit save outside that lifecycle replaces the learning revision, fencing old children.
+ *
+ * Every file carries the learning format version. A file of another version, such as one
+ * whose samples measured host-wide utilization instead of each stream's own encoder cost,
+ * loads as absent, so the next worker starts learning afresh instead of misreading it.
  */
 final class LearningDataPersister
 {
     private const int PERSIST_INTERVAL_SAMPLES = 10;
     private const float PERSIST_INTERVAL_SECONDS = 5.0;
+    /** Version 2 samples are each stream's own encoder CPU per output second against the host's CPUs. */
+    public const int FORMAT_VERSION = 2;
 
     private ?string $workerRevision = null;
     private ?string $workerFingerprint = null;
@@ -140,7 +146,7 @@ final class LearningDataPersister
     {
         $filePath = $this->stateFilePath();
         $temporary = sprintf('%s.%s.tmp', $filePath, bin2hex(random_bytes(6)));
-        $json = $this->jsonEncoder->encode($data, 'json', [JsonEncode::OPTIONS => JSON_PRETTY_PRINT]);
+        $json = $this->jsonEncoder->encode(['version' => self::FORMAT_VERSION, ...$data], 'json', [JsonEncode::OPTIONS => JSON_PRETTY_PRINT]);
         try {
             if (file_put_contents($temporary, $json) === false || !rename($temporary, $filePath)) {
                 throw new RuntimeException(sprintf('Cannot save the QoL learning state to %s.', $filePath));
@@ -183,6 +189,8 @@ final class LearningDataPersister
     }
 
     /**
+     * The saved learning state, or null when none exists in the current format version.
+     *
      * @return array<string, mixed>|null
      */
     public function load(): ?array
@@ -197,7 +205,12 @@ final class LearningDataPersister
             return null;
         }
 
-        return $this->jsonEncoder->decode($content, 'json');
+        $saved = $this->jsonEncoder->decode($content, 'json');
+        if (!is_array($saved) || ($saved['version'] ?? null) !== self::FORMAT_VERSION) {
+            return null;
+        }
+
+        return $saved;
     }
 
     public function cleanup(): void

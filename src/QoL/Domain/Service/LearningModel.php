@@ -7,88 +7,85 @@ namespace App\QoL\Domain\Service;
 use App\QoL\Domain\ValueObject\UtilizationSample;
 
 /**
- * Linear regression model predicting per-stream CPU cost from transcode parameters.
+ * Linear regression model predicting a stream's encoder cost from its transcode parameters.
  *
- * Features: [intercept, normalized_height, normalized_bitrate, hwaccel]
- * Target: cpu_percent (0-100)
+ * Cost is the stream's own encoder CPU seconds per output second as a percentage of the
+ * host's CPUs. Software and hardware-accelerated encodes are learned apart, each with its
+ * own regression and per-tier averages, so one kind's samples never move the other's
+ * predictions.
  *
- * Trains via ordinary least squares (normal equation) once MIN_SAMPLES reached.
- * Falls back to per-tier averaging when model is not yet trained.
+ * Features: [intercept, normalized_height, normalized_bitrate]
+ * Target: cpu_percent
+ *
+ * Each kind trains via ordinary least squares (normal equation) once it has MIN_SAMPLES
+ * samples. Until then, or when its samples cannot separate height from bitrate, callers
+ * fall back to per-tier averaging.
  */
 final class LearningModel
 {
     public const int MIN_SAMPLES = 50;
 
+    private const int FEATURES = 3;
+
     /** @var list<UtilizationSample> */
     private array $samples = [];
 
     /**
-     * Regression coefficients: [beta0, beta1, beta2, beta3]
-     * beta0 = intercept, beta1 = height, beta2 = bitrate, beta3 = hwaccel
+     * Regression coefficients per encode kind: [beta0, beta1, beta2]
+     * beta0 = intercept, beta1 = height, beta2 = bitrate
      *
-     * @var list<float>|null
+     * @var array{software: list<float>|null, hardware: list<float>|null}
      */
-    private ?array $coefficients = null;
+    private array $coefficients = ['software' => null, 'hardware' => null];
 
     public function addSample(UtilizationSample $sample): void
     {
         $this->samples[] = $sample;
 
-        if (count($this->samples) >= self::MIN_SAMPLES && $this->coefficients === null) {
-            $this->train();
+        $kind = self::kind($sample->hardwareAccelerated);
+        if ($this->coefficients[$kind] === null) {
+            $this->train($sample->hardwareAccelerated);
         }
     }
 
     /**
-     * Train via normal equation: β = (X'X)⁻¹X'y
-     *
-     * 4-feature OLS with Gaussian elimination for the 4×4 system.
+     * Train one encode kind via normal equation: β = (X'X)⁻¹X'y
      */
-    private function train(): void
+    private function train(bool $hardwareAccelerated): void
     {
-        $n = count($this->samples);
-        if ($n < self::MIN_SAMPLES) {
+        $samples = $this->samplesOf($hardwareAccelerated);
+        if (count($samples) < self::MIN_SAMPLES) {
             return;
         }
 
-        // Build X'X (4×4) and X'y (4×1)
-        $xtx = array_fill(0, 4, array_fill(0, 4, 0.0));
-        $xty = array_fill(0, 4, 0.0);
+        $xtx = array_fill(0, self::FEATURES, array_fill(0, self::FEATURES, 0.0));
+        $xty = array_fill(0, self::FEATURES, 0.0);
 
-        foreach ($this->samples as $sample) {
-            $row = [
-                1.0,
-                $sample->sourceHeight / 2160.0,
-                $sample->targetBitrate / 20_000_000.0,
-                $sample->hardwareAccelerated ? 1.0 : 0.0,
-            ];
+        foreach ($samples as $sample) {
+            $row = self::features($sample->sourceHeight, $sample->targetBitrate);
 
-            for ($i = 0; $i < 4; $i++) {
-                for ($j = 0; $j < 4; $j++) {
+            for ($i = 0; $i < self::FEATURES; $i++) {
+                for ($j = 0; $j < self::FEATURES; $j++) {
                     $xtx[$i][$j] += $row[$i] * $row[$j];
                 }
                 $xty[$i] += $row[$i] * $sample->cpuPercent;
             }
         }
 
-        $beta = $this->solve4x4($xtx, $xty);
-
-        if ($beta !== null) {
-            $this->coefficients = $beta;
-        }
+        $this->coefficients[self::kind($hardwareAccelerated)] = $this->solve($xtx, $xty);
     }
 
     /**
-     * Solve 4×4 linear system Ax=b using Gaussian elimination with partial pivoting.
+     * Solve the linear system Ax=b using Gaussian elimination with partial pivoting.
      *
-     * @param list<list<float>> $a 4×4 matrix
-     * @param list<float> $b 4-element vector
+     * @param list<list<float>> $a square matrix
+     * @param list<float> $b vector
      *
      * @return list<float>|null Solution vector, or null if singular
      */
-    private function solve4x4(array $a, array $b): ?array
+    private function solve(array $a, array $b): ?array
     {
-        $n = 4;
+        $n = count($b);
 
         // Augmented matrix
         for ($i = 0; $i < $n; $i++) {
@@ -97,7 +94,6 @@ final class LearningModel
 
         // Forward elimination with partial pivoting
         for ($col = 0; $col < $n; $col++) {
-            // Find pivot
             $maxRow = $col;
             $maxVal = abs($a[$col][$col]);
             for ($row = $col + 1; $row < $n; $row++) {
@@ -111,12 +107,10 @@ final class LearningModel
                 return null; // Singular matrix
             }
 
-            // Swap rows
             if ($maxRow !== $col) {
                 [$a[$col], $a[$maxRow]] = [$a[$maxRow], $a[$col]];
             }
 
-            // Eliminate below
             for ($row = $col + 1; $row < $n; $row++) {
                 $factor = $a[$row][$col] / $a[$col][$col];
                 for ($j = $col; $j <= $n; $j++) {
@@ -139,33 +133,35 @@ final class LearningModel
     }
 
     /**
-     * Predict CPU% cost for given stream parameters.
+     * Predict the cost of a stream with the given parameters from its own kind's regression.
      *
-     * Returns null if model has not been trained yet.
-     * Returns predicted CPU% (0-100 range, may slightly exceed due to linear extrapolation).
+     * Returns null if that kind has not been trained yet. The value may slightly exceed the
+     * observed range due to linear extrapolation.
      */
     public function predict(int $sourceHeight, int $targetBitrate, bool $hardwareAccelerated): ?float
     {
-        if ($this->coefficients === null) {
+        $coefficients = $this->coefficients[self::kind($hardwareAccelerated)];
+        if ($coefficients === null) {
             return null;
         }
 
-        [$b0, $b1, $b2, $b3] = $this->coefficients;
+        $row = self::features($sourceHeight, $targetBitrate);
+        $cost = 0.0;
+        for ($i = 0; $i < self::FEATURES; $i++) {
+            $cost += $coefficients[$i] * $row[$i];
+        }
 
-        return $b0
-            + $b1 * ($sourceHeight / 2160.0)
-            + $b2 * ($targetBitrate / 20_000_000.0)
-            + $b3 * ($hardwareAccelerated ? 1.0 : 0.0);
+        return $cost;
     }
 
     /**
-     * Per-tier fallback: average CPU% for samples matching the given tier.
-     * Used when the regression model hasn't been trained yet.
+     * Per-tier fallback: average cost of samples at the given tier. Given an encode kind,
+     * only that kind's samples count; without one, the average is source-agnostic.
      */
-    public function averageCostForTier(string $qualityTier): ?float
+    public function averageCostForTier(string $qualityTier, ?bool $hardwareAccelerated = null): ?float
     {
         $matching = array_filter(
-            $this->samples,
+            $hardwareAccelerated === null ? $this->samples : $this->samplesOf($hardwareAccelerated),
             static fn(UtilizationSample $s): bool => $s->qualityTier === $qualityTier,
         );
 
@@ -192,12 +188,12 @@ final class LearningModel
     public function reset(): void
     {
         $this->samples = [];
-        $this->coefficients = null;
+        $this->coefficients = ['software' => null, 'hardware' => null];
     }
 
     /**
      * Serialize model state for persistence.
-     * @return array{samples: array<array-key, array<string, int|float|string|bool>>, coefficients: list<float>|null}
+     * @return array{samples: array<array-key, array<string, int|float|string|bool>>, coefficients: array{software: list<float>|null, hardware: list<float>|null}}
      */
     public function getState(): array
     {
@@ -217,6 +213,41 @@ final class LearningModel
             static fn(array $data): UtilizationSample => UtilizationSample::fromArray($data),
             $state['samples'] ?? [],
         );
-        $this->coefficients = $state['coefficients'] ?? null;
+        $coefficients = $state['coefficients'] ?? [];
+        $this->coefficients = [
+            'software' => self::coefficientsFrom($coefficients['software'] ?? null),
+            'hardware' => self::coefficientsFrom($coefficients['hardware'] ?? null),
+        ];
+    }
+
+    /** @return list<float>|null */
+    private static function coefficientsFrom(mixed $value): ?array
+    {
+        if (!is_array($value) || !array_is_list($value) || count($value) !== self::FEATURES) {
+            return null;
+        }
+
+        return array_map(static fn(mixed $beta): float => (float) $beta, $value);
+    }
+
+    /** @return list<UtilizationSample> */
+    private function samplesOf(bool $hardwareAccelerated): array
+    {
+        return array_values(array_filter(
+            $this->samples,
+            static fn(UtilizationSample $s): bool => $s->hardwareAccelerated === $hardwareAccelerated,
+        ));
+    }
+
+    /** @return list<float> */
+    private static function features(int $sourceHeight, int $targetBitrate): array
+    {
+        return [1.0, $sourceHeight / 2160.0, $targetBitrate / 20_000_000.0];
+    }
+
+    /** @return 'software'|'hardware' */
+    private static function kind(bool $hardwareAccelerated): string
+    {
+        return $hardwareAccelerated ? 'hardware' : 'software';
     }
 }

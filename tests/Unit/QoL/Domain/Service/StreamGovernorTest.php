@@ -100,10 +100,10 @@ class StreamGovernorTest extends TestCase
     public function testActiveStateAllowsRequestedTierWhenBudgetAvailable(): void
     {
         // Coefficients: predict ≈ 5 + 40*(bitrate/20M), low cost everywhere
-        $governor = $this->createActiveGovernor(coefficients: [5.0, 0.0, 1.0, 0.0]);
+        $governor = $this->createActiveGovernor(coefficients: [5.0, 0.0, 1.0]);
 
         // Balanced cap = 80, no active streams, remaining = 80
-        // predict(1080, 5M, false) = 5 + 0 + 1*0.25 + 0 = 5.25 → well within budget
+        // predict(1080, 5M, false) = 5 + 0 + 1*0.25 = 5.25 → well within budget
         $this->assertSame('1080p', $governor->evaluateBudget(1080, 5_000_000, false, '1080p'));
     }
 
@@ -113,7 +113,7 @@ class StreamGovernorTest extends TestCase
         // 4K (20M):   75 + 20*1.0  = 95 → rejected (> 80)
         // 1440p (10M): 75 + 20*0.5  = 85 → rejected (> 80)
         // 1080p (5M):  75 + 20*0.25 = 80 → fits (<= 80)
-        $governor = $this->createActiveGovernor(coefficients: [75.0, 0.0, 20.0, 0.0]);
+        $governor = $this->createActiveGovernor(coefficients: [75.0, 0.0, 20.0]);
 
         $allowed = $governor->evaluateBudget(1080, 20_000_000, false, '4K');
 
@@ -125,7 +125,7 @@ class StreamGovernorTest extends TestCase
         // Same coefficients as walk-down test, but Conservative cap = 70
         // Even 1080p (80) > 70 → all tiers rejected
         $governor = $this->createActiveGovernor(
-            coefficients: [75.0, 0.0, 20.0, 0.0],
+            coefficients: [75.0, 0.0, 20.0],
             profile: AlgorithmProfile::Conservative,
         );
 
@@ -138,7 +138,7 @@ class StreamGovernorTest extends TestCase
     public function testStreamBudgetExhaustedCarriesContextData(): void
     {
         $governor = $this->createActiveGovernor(
-            coefficients: [75.0, 0.0, 20.0, 0.0],
+            coefficients: [75.0, 0.0, 20.0],
             profile: AlgorithmProfile::Conservative,
         );
         $jobId = new Uuid();
@@ -152,6 +152,24 @@ class StreamGovernorTest extends TestCase
             $this->assertGreaterThan(0.0, $e->budgetUsed);
             $this->assertSame('360p', $e->requestedTier);
         }
+    }
+
+    public function testObservedLoadUsesEachStreamsMeasuredCostOnceReported(): void
+    {
+        $governor = $this->createGovernor();
+        $measured = new Uuid();
+        $governor->allocateStream($measured, '1080p', 30.0);
+        $governor->allocateStream(new Uuid(), '720p', 20.0);
+
+        self::assertEqualsWithDelta(50.0, $governor->observedLoad(), 0.000001);
+
+        $governor->recordStreamCost($measured, 12.5);
+        self::assertEqualsWithDelta(32.5, $governor->observedLoad(), 0.000001);
+
+        $governor->releaseStream($measured);
+        $governor->recordStreamCost($measured, 90.0);
+        self::assertEqualsWithDelta(20.0, $governor->observedLoad(), 0.000001);
+        self::assertSame(1, $governor->getActiveStreamCount());
     }
 
     public function testSetProfileChangesBudgetCap(): void
@@ -240,7 +258,6 @@ class StreamGovernorTest extends TestCase
         for ($i = 0; $i < LearningModel::MIN_SAMPLES; $i++) {
             $model->addSample(new UtilizationSample(
                 cpuPercent: 50.0,
-                gpuPercent: 0.0,
                 encodeFps: 30.0,
                 sourceHeight: 1080,
                 sourceCodec: 'h264',
@@ -255,10 +272,10 @@ class StreamGovernorTest extends TestCase
     }
 
     /**
-     * Create an Active governor with deterministic coefficients for predictable predict() output.
-     * Coefficients: [intercept, heightCoef, bitrateCoef, hwaccelCoef].
+     * Create an Active governor with deterministic software coefficients for predictable
+     * predict() output. Coefficients: [intercept, heightCoef, bitrateCoef].
      *
-     * @param array{float, float, float, float} $coefficients
+     * @param array{float, float, float} $coefficients
      */
     private function createActiveGovernor(
         array $coefficients,
@@ -269,7 +286,7 @@ class StreamGovernorTest extends TestCase
         // Override coefficients for deterministic predict() behavior while keeping 50 samples
         $model->restoreState([
             'samples' => $model->getState()['samples'],
-            'coefficients' => $coefficients,
+            'coefficients' => ['software' => $coefficients, 'hardware' => null],
         ]);
 
         $governor = new StreamGovernor($model, $this->qualityLadderPort(), new InMemoryAlgorithmProfileStore());

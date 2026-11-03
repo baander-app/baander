@@ -137,11 +137,15 @@ try {
                     throw new RuntimeException('Media worker QoL lifecycle is not configured.');
                 }
                 \Swoole\Coroutine\run(static function () use ($executor, $claim, $stopRequested, $qol, $copy): void {
-                    $copy ? $qol->startCopy() : $qol->start();
+                    if ($copy) {
+                        $executor->run($claim, $stopRequested);
+                        return;
+                    }
+                    $qol->start();
                     try {
                         $executor->run($claim, $stopRequested);
                     } finally {
-                        $copy ? $qol->stopCopy() : $qol->stop();
+                        $qol->stop();
                     }
                 });
             }

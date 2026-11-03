@@ -15,13 +15,13 @@ use SwooleBundle\SwooleBundle\Bridge\Symfony\Event\WorkerStartedEvent;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 
 /**
- * Restores the saved learning state in every HTTP worker, and starts the sampler
- * and mid-stream monitor in worker zero. Saved state carries no active streams and
- * no profile: the profile is shared through AlgorithmProfileTable.
+ * Restores the saved learning state in every HTTP worker, and starts the mid-stream
+ * monitor in worker zero. Saved state carries no active streams and no profile: the
+ * profile is shared through AlgorithmProfileTable.
  *
  * When the server drains, worker zero saves its learning state, and as the worker
- * exits the sampler and monitor timers stop, so they do not hold the worker until
- * Swoole kills it. A reload does neither.
+ * exits the monitor timer stops, so it does not hold the worker until Swoole kills it.
+ * A reload does neither.
  */
 final class QoLWorkerStartupSubscriber implements EventSubscriberInterface
 {
@@ -66,9 +66,6 @@ final class QoLWorkerStartupSubscriber implements EventSubscriberInterface
             return;
         }
 
-        if ($this->services->has(CpuGpuSampler::class)) {
-            $this->services->get(CpuGpuSampler::class)->stopSampling();
-        }
         if ($this->services->has(MidStreamMonitor::class)) {
             $this->services->get(MidStreamMonitor::class)->stopMonitoring();
         }
@@ -82,10 +79,6 @@ final class QoLWorkerStartupSubscriber implements EventSubscriberInterface
         $firstWorker = $event->getWorkerId() === 0;
 
         try {
-            if ($firstWorker && $this->services->has(CpuGpuSampler::class)) {
-                $this->services->get(CpuGpuSampler::class)->startSampling();
-            }
-
             if ($firstWorker && $this->services->has(MidStreamMonitor::class)) {
                 $this->services->get(MidStreamMonitor::class)->startMonitoring();
             }

@@ -8,18 +8,17 @@ use App\QoL\Application\Port\BudgetGuardInterface;
 use App\QoL\Domain\Exception\StreamBudgetExhausted;
 use App\QoL\Domain\Model\GovernorState;
 use App\QoL\Domain\Service\StreamGovernor;
-use App\QoL\Infrastructure\Swoole\CpuGpuSampler;
 use App\Shared\Domain\Model\Uuid;
 
 /**
  * Implements the mid-stream capacity guard.
- * Checks real-time CPU utilization against the profile's budget cap.
+ * Checks the governed streams' observed load, each stream's measured encoder cost or
+ * its prediction until it has one, against the profile's budget cap.
  */
 final class BudgetGuard implements BudgetGuardInterface
 {
     public function __construct(
         private readonly StreamGovernor $governor,
-        private readonly CpuGpuSampler  $sampler,
     )
     {
     }
@@ -30,14 +29,13 @@ final class BudgetGuard implements BudgetGuardInterface
             return; // During learning, never gate
         }
 
-        $utilization = $this->sampler->getLatest() ?? [];
-        $cpuPercent = (float)($utilization['cpu_percent'] ?? 0.0);
+        $load = $this->governor->observedLoad();
         $budgetCap = $this->governor->getProfile()->budgetCap() * 100.0;
 
-        if ($cpuPercent > $budgetCap) {
+        if ($load > $budgetCap) {
             throw new StreamBudgetExhausted(
                 activeStreams: $this->governor->getActiveStreamCount(),
-                budgetUsed: $cpuPercent / 100.0,
+                budgetUsed: $load / 100.0,
                 requestedTier: 'mid_stream_guard',
             );
         }

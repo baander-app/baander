@@ -56,7 +56,7 @@ class LearningModelTest extends TestCase
         $predicted = $model->predict(1080, 5_000_000, false);
 
         $this->assertNotNull($predicted);
-        // Known formula: 5 + 20*(1080/2160) + 40*(5M/20M) - 10*0 = 5 + 10 + 10 = 25
+        // Known formula: 5 + 20*(1080/2160) + 40*(5M/20M) = 5 + 10 + 10 = 25
         $this->assertEqualsWithDelta(25.0, $predicted, 2.0);
     }
 
@@ -82,6 +82,40 @@ class LearningModelTest extends TestCase
         $this->assertNotNull($softwareCost);
         $this->assertNotNull($hardwareCost);
         $this->assertLessThan($softwareCost, $hardwareCost, 'Hardware acceleration should predict lower CPU cost');
+    }
+
+    public function testHardwareSamplesDoNotRaiseTheSoftwarePrediction(): void
+    {
+        $software = $this->trainModelWithKnownRelationship(hardwareAccelerated: false);
+        $isolated = $software->predict(1080, 5_000_000, false);
+
+        $mixed = $this->trainModelWithKnownRelationship(hardwareAccelerated: false);
+        // Hardware encodes that cost far more CPU than the software relationship.
+        $this->addKnownRelationship($mixed, hardwareAccelerated: true, offset: 60.0);
+
+        $this->assertNotNull($isolated);
+        $this->assertEqualsWithDelta($isolated, $mixed->predict(1080, 5_000_000, false), 0.000001);
+        $this->assertEqualsWithDelta($isolated + 60.0, $mixed->predict(1080, 5_000_000, true), 0.01);
+    }
+
+    public function testEncodeKindIsUntrainedUntilItHasItsOwnMinimumSamples(): void
+    {
+        $model = $this->trainModelWithKnownRelationship(hardwareAccelerated: false);
+
+        $this->assertNotNull($model->predict(1080, 5_000_000, false));
+        $this->assertNull($model->predict(1080, 5_000_000, true));
+    }
+
+    public function testTierAverageForAnEncodeKindIgnoresTheOtherKind(): void
+    {
+        $model = new LearningModel();
+
+        $model->addSample($this->createSample(cpuPercent: 30.0, qualityTier: '1080p'));
+        $model->addSample($this->createSample(cpuPercent: 4.0, hardwareAccelerated: true, qualityTier: '1080p'));
+
+        $this->assertEqualsWithDelta(30.0, $model->averageCostForTier('1080p', false), 0.01);
+        $this->assertEqualsWithDelta(4.0, $model->averageCostForTier('1080p', true), 0.01);
+        $this->assertEqualsWithDelta(17.0, $model->averageCostForTier('1080p'), 0.01);
     }
 
     public function testAverageCostForTierReturnsAverageForMatchingSamples(): void
@@ -133,35 +167,40 @@ class LearningModelTest extends TestCase
     }
 
     /**
-     * Train a model with a known linear relationship so predict() outputs are deterministic.
-     * Formula: cpu = 5 + 20*(height/2160) + 40*(bitrate/20M) - 10*hwaccel
+     * Train both encode kinds with known linear relationships so predict() outputs are deterministic.
+     * Formula: cpu = 5 + 20*(height/2160) + 40*(bitrate/20M), 10 lower for hardware encodes.
      */
-    private function trainModelWithKnownRelationship(): LearningModel
+    private function trainModelWithKnownRelationship(?bool $hardwareAccelerated = null): LearningModel
     {
         $model = new LearningModel();
+        foreach ($hardwareAccelerated === null ? [false, true] : [$hardwareAccelerated] as $kind) {
+            $this->addKnownRelationship($model, $kind, $kind ? -10.0 : 0.0);
+        }
 
+        return $model;
+    }
+
+    private function addKnownRelationship(LearningModel $model, bool $hardwareAccelerated, float $offset): void
+    {
         $heights = [360, 480, 720, 1080, 1440, 2160];
         $bitrates = [800_000, 1_400_000, 2_800_000, 5_000_000, 10_000_000, 20_000_000];
 
         for ($i = 0; $i < LearningModel::MIN_SAMPLES; $i++) {
             $height = $heights[$i % 6];
-            $bitrate = $bitrates[($i + 1) % 6];
-            $hwaccel = $i % 2 === 0;
+            $bitrate = $bitrates[intdiv($i, 6) % 6];
 
             $cpu = 5.0
                 + 20.0 * ($height / 2160.0)
                 + 40.0 * ($bitrate / 20_000_000.0)
-                - ($hwaccel ? 10.0 : 0.0);
+                + $offset;
 
             $model->addSample($this->createSample(
                 cpuPercent: $cpu,
                 sourceHeight: $height,
                 targetBitrate: $bitrate,
-                hardwareAccelerated: $hwaccel,
+                hardwareAccelerated: $hardwareAccelerated,
             ));
         }
-
-        return $model;
     }
 
     private function createSample(
@@ -173,7 +212,6 @@ class LearningModelTest extends TestCase
     ): UtilizationSample {
         return new UtilizationSample(
             cpuPercent: $cpuPercent,
-            gpuPercent: 0.0,
             encodeFps: 30.0,
             sourceHeight: $sourceHeight,
             sourceCodec: 'h264',

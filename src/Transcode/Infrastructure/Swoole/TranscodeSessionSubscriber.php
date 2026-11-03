@@ -262,6 +262,10 @@ final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
                     }
                     $this->pollSubtitles($active, $job, $source, $scoped, $startTime, $probe->sourceTimestampOrigin, $subtitleQueue, $subtitleActive, $subtitleDeadline);
                     $publication = $this->streamManager->publication($jobId);
+                    if ($admitted) {
+                        $work = $this->streamManager->encoderWork($jobId);
+                        $this->admission?->observe($jobId, $work['cpuSeconds'], $work['outputSeconds']);
+                    }
                     if (!$nativeClockCaptured && $publication !== null && !$publication->complete
                         && isset($publication->mpdAttributes['availabilityStartTime'])) {
                         $this->captureNativeClock($output, $publication->mpdAttributes['availabilityStartTime']);
@@ -369,7 +373,11 @@ final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
             if ($admitted && $tier instanceof QualityTier) {
                 $sourceHeight = $probe === null ? 1080 : $probe->height;
                 $sourceCodec = $probe === null ? '' : $probe->videoCodec;
-                $cleanup[] = fn() => $this->admission?->complete($jobId, $tier->name, $tier->videoBitrate, $sourceHeight, $sourceCodec, $this->encoder()->getEncoderProfile()->isHardware());
+                $cleanup[] = function () use ($jobId, $tier, $sourceHeight, $sourceCodec): void {
+                    $work = $this->streamManager->takeEncoderWork($jobId);
+                    $this->admission?->complete($jobId, $tier->name, $tier->videoBitrate, $sourceHeight, $sourceCodec,
+                        $this->encoder()->getEncoderProfile()->isHardware(), $work['cpuSeconds'], $work['outputSeconds']);
+                };
             }
             foreach ($cleanup as $operation) {
                 try {

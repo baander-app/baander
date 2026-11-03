@@ -18,6 +18,8 @@ final class NativeExecutionAttempt
     public ?float $stopDeadline = null;
     public ?int $pendingSignal = null;
     public ?float $signalDeadline = null;
+    /** CPU time the command and its reaped descendants have consumed, user and system together. */
+    public float $cpuSeconds = 0.0;
 
     /**
      * @param resource $process
@@ -35,10 +37,11 @@ final class NativeExecutionAttempt
     ) {
     }
 
-    /** @return array{token:string, attempt:int, state:string, stdout:string, stderr:string, exitCode:?int, error:?string} */
+    /** @return array{token:string, attempt:int, state:string, stdout:string, stderr:string, exitCode:?int, error:?string, cpuSeconds:float} */
     public function snapshot(): array
     {
         return ['token' => $this->token, 'attempt' => $this->attempt, 'state' => $this->state,
-            'stdout' => $this->stdout, 'stderr' => $this->stderr, 'exitCode' => $this->exitCode, 'error' => $this->error];
+            'stdout' => $this->stdout, 'stderr' => $this->stderr, 'exitCode' => $this->exitCode, 'error' => $this->error,
+            'cpuSeconds' => $this->cpuSeconds];
     }
 }

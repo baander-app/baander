@@ -6,19 +6,26 @@ namespace App\QoL\Infrastructure\Swoole;
 
 use App\QoL\Domain\Model\GovernorState;
 use App\QoL\Domain\Service\StreamGovernor;
+use App\QoL\Domain\ValueObject\StreamAllocation;
 use Psr\Log\LoggerInterface;
 use Swoole\Timer;
 use Throwable;
 
 /**
- * Monitors CPU utilization every 5 seconds and tracks consecutive over-budget readings.
+ * Checks the governed streams' own encoder cost every 5 seconds and tracks consecutive
+ * over-budget readings.
+ *
+ * The load is the sum of each active stream's measured cost (its encoder CPU seconds
+ * per output second against the host's CPUs), or its predicted cost until it has
+ * reported one. Host-wide utilization plays no part, so other encodes saturating the
+ * host do not count against this child's stream.
  *
  * If over-budget is sustained for 10 consecutive seconds (2 checks),
  * triggers emergency stream release of the highest-cost stream.
  *
- * Timer callback uses error_log() only — no pooled services. The governor, the
- * sampler and the profile table it reads are not pooled either, so the tick needs
- * no CoWrapper::defer(). Add one before the tick uses the logger or a repository.
+ * Timer callback uses error_log() only — no pooled services. The governor and the
+ * profile table it reads are not pooled either, so the tick needs no
+ * CoWrapper::defer(). Add one before the tick uses the logger or a repository.
  */
 final class MidStreamMonitor
 {
@@ -29,7 +36,6 @@ final class MidStreamMonitor
 
     public function __construct(
         private readonly StreamGovernor  $governor,
-        private readonly CpuGpuSampler   $sampler,
         private readonly LoggerInterface $logger,
     )
     {
@@ -71,7 +77,8 @@ final class MidStreamMonitor
         $this->timerId = null;
     }
 
-    private function check(): void
+    /** One budget check; the timer runs it every five seconds. */
+    public function check(): void
     {
         try {
             if ($this->governor->getState() === GovernorState::Learning) {
@@ -79,15 +86,14 @@ final class MidStreamMonitor
                 return;
             }
 
-            $utilization = $this->sampler->getLatest() ?? [];
-            $cpuPercent = (float)($utilization['cpu_percent'] ?? 0.0);
+            $load = $this->governor->observedLoad();
             $budgetCap = $this->governor->getProfile()->budgetCap() * 100.0;
 
-            if ($cpuPercent > $budgetCap) {
+            if ($load > $budgetCap) {
                 $this->consecutiveOverBudget++;
                 error_log(sprintf(
                     '[MidStreamMonitor] Over-budget: %.1f%% > %.1f%% cap (consecutive: %d)',
-                    $cpuPercent, $budgetCap, $this->consecutiveOverBudget,
+                    $load, $budgetCap, $this->consecutiveOverBudget,
                 ));
 
                 if ($this->consecutiveOverBudget >= self::OVERBUDGET_THRESHOLD) {
@@ -112,17 +118,16 @@ final class MidStreamMonitor
             return;
         }
 
-        // Sort by predictedCost descending
-        usort($streams, static fn($a, $b): int => $b->predictedCost <=> $a->predictedCost);
+        usort($streams, static fn(StreamAllocation $a, StreamAllocation $b): int => $b->cost() <=> $a->cost());
         $victim = $streams[0];
 
         $this->governor->releaseStream($victim->jobId);
 
         error_log(sprintf(
-            '[MidStreamMonitor] Emergency released stream %s (tier: %s, predicted: %.1f%%)',
+            '[MidStreamMonitor] Emergency released stream %s (tier: %s, cost: %.1f%%)',
             $victim->jobId->toString(),
             $victim->qualityTier,
-            $victim->predictedCost,
+            $victim->cost(),
         ));
     }
 }

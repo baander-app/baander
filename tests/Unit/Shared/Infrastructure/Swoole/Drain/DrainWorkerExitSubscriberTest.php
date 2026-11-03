@@ -8,7 +8,6 @@ use App\QoL\Application\Port\EncoderProfileFingerprintPortInterface;
 use App\QoL\Domain\Port\QualityLadderPortInterface;
 use App\QoL\Domain\Service\LearningModel;
 use App\QoL\Domain\Service\StreamGovernor;
-use App\QoL\Infrastructure\Swoole\CpuGpuSampler;
 use App\QoL\Infrastructure\Swoole\LearningDataPersister;
 use App\QoL\Infrastructure\Swoole\MidStreamMonitor;
 use App\QoL\Infrastructure\Swoole\QoLWorkerStartupSubscriber;
@@ -59,10 +58,10 @@ use Symfony\Component\Serializer\Encoder\JsonEncoder;
 final class DrainWorkerExitSubscriberTest extends TestCase
 {
     /**
-     * The drain tick, the health monitor, the memory report, the coroutine watchdog, the CPU
-     * sampler, the mid-stream monitor and the socket reconciliation (a tagged timer port).
+     * The drain tick, the health monitor, the memory report, the coroutine watchdog, the
+     * mid-stream monitor and the socket reconciliation (a tagged timer port).
      */
-    private const int WORKER_ZERO_TIMERS = 7;
+    private const int WORKER_ZERO_TIMERS = 6;
 
     private string $directory;
     private DrainStateTable $state;
@@ -146,13 +145,10 @@ final class DrainWorkerExitSubscriberTest extends TestCase
         $fingerprint = $this->createStub(EncoderProfileFingerprintPortInterface::class);
         $fingerprint->method('getName')->willReturn('software');
         $governor = new StreamGovernor(new LearningModel(), $this->createStub(QualityLadderPortInterface::class), new InMemoryAlgorithmProfileStore());
-        $sampler = new CpuGpuSampler(new NullLogger());
-        $sampler->boot();
-        $monitor = new MidStreamMonitor($governor, $sampler, new NullLogger());
+        $monitor = new MidStreamMonitor($governor, new NullLogger());
         $persister = new LearningDataPersister($governor, $fingerprint, new NullLogger(), $this->directory, new JsonEncoder());
 
         return new QoLWorkerStartupSubscriber(new ServiceLocator([
-            CpuGpuSampler::class => static fn(): CpuGpuSampler => $sampler,
             MidStreamMonitor::class => static fn(): MidStreamMonitor => $monitor,
             LearningDataPersister::class => static fn(): LearningDataPersister => $persister,
             StreamGovernor::class => static fn(): StreamGovernor => $governor,

@@ -90,6 +90,44 @@ final class NativeExecutionDaemonTest extends TestCase
         self::assertTrue($this->client->release($handle));
     }
 
+    public function testSnapshotsReportTheCommandsCumulativeCpuTime(): void
+    {
+        // A real-time single-threaded encode that runs until stopped.
+        $handle = $this->client->submit(['ffmpeg', '-nostdin', '-threads', '1', '-filter_threads', '1', '-re',
+            '-f', 'lavfi', '-i', 'testsrc2=size=1280x720:rate=30', '-c:v', 'mpeg4', '-f', 'null', '-'], 10);
+        $polled = 0.0;
+        $deadline = microtime(true) + 5;
+        do {
+            usleep(100_000);
+            $snapshot = $this->client->inspect($handle);
+            self::assertSame('running', $snapshot['state']);
+            self::assertIsFloat($snapshot['cpuSeconds']);
+            self::assertGreaterThanOrEqual($polled, $snapshot['cpuSeconds']);
+            $polled = $snapshot['cpuSeconds'];
+        } while ($polled < 0.05 && microtime(true) < $deadline);
+        self::assertGreaterThan(0.0, $polled);
+
+        $this->client->signal($handle, 'stop');
+        $result = $this->finish($handle);
+
+        self::assertGreaterThanOrEqual($polled, $result['cpuSeconds']);
+        // Wall time bounds the CPU time of a single-threaded encode.
+        self::assertLessThan(10.0, $result['cpuSeconds']);
+        self::assertTrue($this->client->release($handle));
+    }
+
+    public function testShortCommandReportsItsCpuTimeInTheTerminalReceipt(): void
+    {
+        $handle = $this->client->submit(['ffmpeg', '-nostdin', '-f', 'lavfi', '-i', 'testsrc2=size=1280x720:rate=30',
+            '-frames:v', '120', '-c:v', 'mpeg4', '-f', 'null', '-'], 10);
+
+        $result = $this->finish($handle);
+
+        self::assertSame(0, $result['exitCode']);
+        self::assertGreaterThan(0.0, $result['cpuSeconds']);
+        self::assertTrue($this->client->release($handle));
+    }
+
     public function testOnlyFixedNativeExecutablesAreAccepted(): void
     {
         try {

@@ -10,7 +10,6 @@ use App\QoL\Domain\Model\GovernorState;
 use App\QoL\Domain\Service\LearningModel;
 use App\QoL\Domain\Service\StreamGovernor;
 use App\QoL\Domain\ValueObject\UtilizationSample;
-use App\QoL\Infrastructure\Swoole\CpuGpuSampler;
 use App\QoL\Infrastructure\Swoole\LearningDataPersister;
 use App\QoL\Infrastructure\Swoole\MidStreamMonitor;
 use App\QoL\Infrastructure\Swoole\QoLWorkerStartupSubscriber;
@@ -59,7 +58,7 @@ final class QoLWorkerStartupSubscriberTest extends TestCase
     public function testEveryHttpWorkerRestoresLearningButOnlyWorkerZeroStartsTimers(): void
     {
         [$subscriber, $governor, $persister] = $this->fixture();
-        $governor->getModel()->addSample(new UtilizationSample(10.0, 0.0, 30.0, 1080, 'h264', false, 1000000, 'high', 1));
+        $governor->getModel()->addSample(new UtilizationSample(10.0, 30.0, 1080, 'h264', false, 1000000, 'high', 1));
         $governor->importState(['state' => 'active']);
         $persister->persist();
         $governor->resetLearning();
@@ -89,6 +88,7 @@ final class QoLWorkerStartupSubscriberTest extends TestCase
     {
         [$subscriber, $governor] = $this->fixture();
         file_put_contents($this->directory . '/governor_state.json', json_encode([
+            'version' => LearningDataPersister::FORMAT_VERSION,
             'encoder_profile' => 'software',
             'governor' => ['state' => 'learning', 'active_streams' => [[
                 'job_id' => 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
@@ -106,6 +106,7 @@ final class QoLWorkerStartupSubscriberTest extends TestCase
     {
         [$subscriber, $governor] = $this->fixture();
         file_put_contents($this->directory . '/governor_state.json', json_encode([
+            'version' => LearningDataPersister::FORMAT_VERSION,
             'encoder_profile' => 'previous-encoder',
             'governor' => ['state' => 'active'],
         ], JSON_THROW_ON_ERROR));
@@ -116,7 +117,7 @@ final class QoLWorkerStartupSubscriberTest extends TestCase
         self::assertFileExists($this->directory . '/governor_state.json');
     }
 
-    public function testMatchingEncoderRestoresStateAndStartsBothTimers(): void
+    public function testMatchingEncoderRestoresStateAndStartsTheMonitor(): void
     {
         [$subscriber, $governor, $persister] = $this->fixture();
         $governor->importState(['state' => 'active']);
@@ -127,15 +128,16 @@ final class QoLWorkerStartupSubscriberTest extends TestCase
 
         self::assertSame(GovernorState::Active, $governor->getState());
         self::assertFileExists($this->directory . '/governor_state.json');
-        self::assertSame(2, $this->timerCount());
+        self::assertSame(1, $this->timerCount());
     }
 
     public function testChangedEncoderResetsLearningAndRemovesStaleState(): void
     {
         [$subscriber, $governor] = $this->fixture();
-        $governor->getModel()->addSample(new UtilizationSample(10.0, 0.0, 30.0, 1080, 'h264', false, 1000000, 'high', 1));
+        $governor->getModel()->addSample(new UtilizationSample(10.0, 30.0, 1080, 'h264', false, 1000000, 'high', 1));
         $governor->importState(['state' => 'active']);
         file_put_contents($this->directory . '/governor_state.json', json_encode([
+            'version' => LearningDataPersister::FORMAT_VERSION,
             'encoder_profile' => 'previous-encoder',
             'governor' => ['state' => 'active'],
         ], JSON_THROW_ON_ERROR));
@@ -145,17 +147,34 @@ final class QoLWorkerStartupSubscriberTest extends TestCase
         self::assertSame(GovernorState::Learning, $governor->getState());
         self::assertSame(0, $governor->getModel()->sampleCount());
         self::assertFileDoesNotExist($this->directory . '/governor_state.json');
-        self::assertSame(2, $this->timerCount());
+        self::assertSame(1, $this->timerCount());
     }
 
     public function testMissingSavedEncoderRetainsExistingRestorationBehavior(): void
     {
         [$subscriber, $governor] = $this->fixture();
-        file_put_contents($this->directory . '/governor_state.json', '{"governor":{"state":"active"}}');
+        file_put_contents($this->directory . '/governor_state.json', '{"version":2,"governor":{"state":"active"}}');
 
         $subscriber->onWorkerStarted(new WorkerStartedEvent(new Server('127.0.0.1', 0), 0));
 
         self::assertSame(GovernorState::Active, $governor->getState());
+    }
+
+    public function testLearningSavedBeforeStreamCostsWereMeasuredIsNotRestored(): void
+    {
+        [$subscriber, $governor] = $this->fixture();
+        // Host-wide utilization samples, saved without a format version.
+        file_put_contents($this->directory . '/governor_state.json', json_encode([
+            'encoder_profile' => 'software',
+            'governor' => ['state' => 'active', 'model' => ['samples' => [[
+                'cpu_percent' => 97.0, 'gpu_percent' => 0.0, 'quality_tier' => '1080p', 'hardware_accelerated' => false,
+            ]], 'coefficients' => [1.0, 2.0, 3.0, 4.0]]],
+        ], JSON_THROW_ON_ERROR));
+
+        $subscriber->onWorkerStarted(new WorkerStartedEvent(new Server('127.0.0.1', 0), 0));
+
+        self::assertSame(GovernorState::Learning, $governor->getState());
+        self::assertSame(0, $governor->getModel()->sampleCount());
     }
 
     public function testFirstStartupStartsTimersWithoutPersistedState(): void
@@ -166,7 +185,7 @@ final class QoLWorkerStartupSubscriberTest extends TestCase
 
         self::assertSame(GovernorState::Learning, $governor->getState());
         self::assertFileDoesNotExist($this->directory . '/governor_state.json');
-        self::assertSame(2, $this->timerCount());
+        self::assertSame(1, $this->timerCount());
     }
 
     /** @return iterable<string, array{bool}> */
@@ -200,7 +219,7 @@ final class QoLWorkerStartupSubscriberTest extends TestCase
         $dispatcher->dispatch(new WorkerStartedEvent($server, 0), WorkerStartedEvent::NAME);
 
         self::assertSame(7, $registry->getWorkerId());
-        self::assertSame(2, $this->timerCount());
+        self::assertSame(1, $this->timerCount());
     }
 
     public function testWorkerZeroSavesItsLearningStateWhenTheDrainStarts(): void
@@ -231,17 +250,17 @@ final class QoLWorkerStartupSubscriberTest extends TestCase
         self::assertFileDoesNotExist($this->directory . '/governor_state.json');
     }
 
-    public function testADrainingWorkerZeroStopsTheSamplerAndMonitorAsItExits(): void
+    public function testADrainingWorkerZeroStopsTheMonitorAsItExits(): void
     {
         $drain = new SwitchableDrainState();
         [$subscriber] = $this->fixture(drain: $drain);
         $server = new Server('127.0.0.1', 0);
         $subscriber->onWorkerStarted(new WorkerStartedEvent($server, 0));
-        self::assertSame(2, $this->timerCount());
+        self::assertSame(1, $this->timerCount());
 
         // A reload: WorkerExit without the drain stops nothing.
         $subscriber->onWorkerExited(new WorkerExitedEvent($server, 0));
-        self::assertSame(2, $this->timerCount());
+        self::assertSame(1, $this->timerCount());
 
         $drain->draining = true;
         $subscriber->onWorkerExited(new WorkerExitedEvent($server, 0));
@@ -266,11 +285,8 @@ final class QoLWorkerStartupSubscriberTest extends TestCase
         }
         $governor = new StreamGovernor(new LearningModel(), $this->createStub(QualityLadderPortInterface::class), new InMemoryAlgorithmProfileStore());
         $persister = new LearningDataPersister($governor, $fingerprint, new NullLogger(), $this->directory, new JsonEncoder());
-        $sampler = new CpuGpuSampler(new NullLogger());
-        $sampler->boot();
-        $monitor = new MidStreamMonitor($governor, $sampler, new NullLogger());
+        $monitor = new MidStreamMonitor($governor, new NullLogger());
         $locator = new ServiceLocator([
-            CpuGpuSampler::class => static fn(): CpuGpuSampler => $sampler,
             MidStreamMonitor::class => static fn(): MidStreamMonitor => $monitor,
             LearningDataPersister::class => static fn(): LearningDataPersister => $persister,
             StreamGovernor::class => static fn(): StreamGovernor => $governor,

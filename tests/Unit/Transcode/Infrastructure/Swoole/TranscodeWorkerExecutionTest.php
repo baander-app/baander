@@ -53,6 +53,10 @@ final class TranscodeWorkerExecutionTest extends TestCase
     /** @var list<string> */
     private array $observed = [];
     private int $allocations = 0;
+    /** @var list<array{float, float}> encoder CPU and output seconds reported while running */
+    private array $observedWork = [];
+    /** @var array{float, float}|null encoder CPU and output seconds reported at completion */
+    private ?array $completedWork = null;
     private int $releases = 0;
     private int $savesAfterLoss = 0;
     private ?Closure $onDispatch = null;
@@ -125,16 +129,16 @@ final class TranscodeWorkerExecutionTest extends TestCase
                 ++$this->subtitlePolls;
                 ($this->onSubtitlePoll)?->__invoke();
                 if (in_array($handle->attempt, $this->subtitleStopped, true)) {
-                    return ['state' => 'exited', 'exitCode' => 1, 'stderr' => 'Stopped', 'error' => null, 'stdout' => ''];
+                    return ['state' => 'exited', 'exitCode' => 1, 'stderr' => 'Stopped', 'error' => null, 'stdout' => '', 'cpuSeconds' => 0.0];
                 }
                 if ($this->subtitlePolls <= $this->subtitleDelay) {
-                    return ['state' => 'running'];
+                    return ['state' => 'running', 'stdout' => '', 'stderr' => '', 'exitCode' => null, 'error' => null, 'cpuSeconds' => 0.0];
                 }
                 $arguments = $this->subtitleCommands[$handle->attempt];
                 file_put_contents($arguments[array_key_last($arguments)], "WEBVTT\n\n00:01.000 --> 00:02.000\nCue\n");
-                return ['state' => 'exited', 'exitCode' => $this->subtitleFails ? 1 : 0, 'stderr' => $this->subtitleFails ? 'Failed subtitle conversion' : '', 'error' => null, 'stdout' => ''];
+                return ['state' => 'exited', 'exitCode' => $this->subtitleFails ? 1 : 0, 'stderr' => $this->subtitleFails ? 'Failed subtitle conversion' : '', 'error' => null, 'stdout' => '', 'cpuSeconds' => 0.0];
             }
-            return ['state' => 'exited', 'exitCode' => 0, 'stderr' => '', 'error' => null, 'stdout' => json_encode($this->sourceProbeOutput ?? [
+            return ['state' => 'exited', 'exitCode' => 0, 'stderr' => '', 'error' => null, 'cpuSeconds' => 0.0, 'stdout' => json_encode($this->sourceProbeOutput ?? [
                 'format' => ['duration' => $this->sourceDuration + ($this->sourceTimestampOrigin ?? 0.0),
                     'format_name' => 'matroska,webm', 'start_time' => ($this->sourceTimestampOrigin ?? 0.0) + 8.0],
                 'packets' => $this->sourceTimestampOrigin === null ? [] : [['stream_index' => 0, 'pts_time' => $this->sourceTimestampOrigin, 'flags' => 'K_']],
@@ -176,7 +180,11 @@ final class TranscodeWorkerExecutionTest extends TestCase
         $this->timer = new VideoExecutionRenewalTimer();
         $admission = $this->createStub(StreamAdmissionPortInterface::class);
         $admission->method('admit')->willReturnCallback(function (): void { ++$this->allocations; });
-        $admission->method('complete')->willReturnCallback(function (): void { --$this->allocations; });
+        $admission->method('observe')->willReturnCallback(function (Uuid $jobId, float $cpu, float $output): void { $this->observedWork[] = [$cpu, $output]; });
+        $admission->method('complete')->willReturnCallback(function (Uuid $jobId, string $tier, int $bitrate, int $height, string $codec, bool $hardware, float $cpu, float $output): void {
+            --$this->allocations;
+            $this->completedWork = [$cpu, $output];
+        });
         $storage = new TranscodeFileStorage(new SegmentFileResolver($this->root));
         $encoder = new SegmentEncoder(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile('full')), $ffmpeg, $storage, EncoderProfile::software('libx264'));
         $lazyEncoder = fn(): SegmentEncoder => $this->forbidEncoder ? throw new \RuntimeException('Copy resolved an encoder') : $encoder;
@@ -284,7 +292,13 @@ final class TranscodeWorkerExecutionTest extends TestCase
 
     public function testCompletionPublishesActualCodecAndGenerationAndReleasesAllocation(): void
     {
+        $this->spawner->cpuSeconds = 3.5;
         $this->worker->run($this->current, static fn(): bool => false);
+        self::assertNotNull($this->completedWork);
+        self::assertSame(3.5, $this->completedWork[0]);
+        self::assertGreaterThan(0.0, $this->completedWork[1]);
+        self::assertNotSame([], $this->observedWork);
+        self::assertSame(3.5, $this->observedWork[array_key_last($this->observedWork)][0]);
         self::assertSame(['accepted', 'ready', 'complete'], $this->observed);
         self::assertSame(TranscodeStatus::Completed, $this->job->getStatus());
         self::assertStringEndsWith('/generation-1', $this->job->getOutputDirectory());
@@ -1015,6 +1029,7 @@ final class VideoExecutionSpawner implements ProcessSpawnerInterface
     public string $initBytes = "\0\0\0\x0cftypisom\0\0\0\x08moov";
     public ?Closure $onRunning = null;
     public ?Closure $onSpawn = null;
+    public float $cpuSeconds = 0.0;
 
     public function spawn(array $command): mixed
     {
@@ -1033,9 +1048,9 @@ final class VideoExecutionSpawner implements ProcessSpawnerInterface
         PublishedPresentationFixture::write($directory, $count, $this->publishAudio ?? array_any($command, static fn (string $argument): bool => preg_match('/^1:a:[0-9]+$/D', $argument) === 1), $complete ?? !$this->running);
         file_put_contents($directory . '/init-0.mp4', $this->initBytes);
     }
-    public function status(mixed $handle): array { ($this->onRunning)?->__invoke(); return ['state' => $this->running ? 'running' : 'exited', 'exitCode' => 0, 'stdout' => '', 'stderr' => '', 'error' => null]; }
+    public function status(mixed $handle): array { ($this->onRunning)?->__invoke(); return ['state' => $this->running ? 'running' : 'exited', 'exitCode' => 0, 'stdout' => '', 'stderr' => '', 'error' => null, 'cpuSeconds' => $this->cpuSeconds]; }
     public function signal(mixed $pid, string $signal): void { $this->events[] = ($signal === 'stop' ? 'kill:' : 'signal-' . ($signal === 'pause' ? '19' : '18') . ':') . $pid; }
-    public function close(mixed $resource): void { $this->events[] = 'close:' . $resource; }
+    public function close(mixed $resource): float { $this->events[] = 'close:' . $resource; return $this->cpuSeconds; }
 }
 
 final class VideoExecutionRenewalTimer implements LoopLockRenewalTimerInterface

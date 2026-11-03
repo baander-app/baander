@@ -133,10 +133,10 @@ final class SegmentEncoderVideoEndpointMediaTest extends TestCase
             }
             public function status(mixed $handle): array
             {
-                return ['state' => 'exited', 'stdout' => '', 'stderr' => '', 'exitCode' => 0, 'error' => null];
+                return ['state' => 'exited', 'stdout' => '', 'stderr' => '', 'exitCode' => 0, 'error' => null, 'cpuSeconds' => 0.0];
             }
             public function signal(mixed $handle, string $operation): void {}
-            public function close(mixed $handle): void {}
+            public function close(mixed $handle): float { return 0.0; }
         };
         $output = $this->directory.'/output';
         $manager = new TranscodeStreamManager($this->createStub(SegmentAvailabilityInterface::class),

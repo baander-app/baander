@@ -106,6 +106,6 @@ final class WorkerLearningPersistenceTest extends TestCase
 
     private function sample(float $cpu): UtilizationSample
     {
-        return new UtilizationSample($cpu, 0.0, 30.0, 1080, 'h264', false, 5000000, '1080p', 1);
+        return new UtilizationSample($cpu, 30.0, 1080, 'h264', false, 5000000, '1080p', 1);
     }
 }

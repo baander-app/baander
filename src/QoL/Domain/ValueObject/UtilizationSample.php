@@ -8,11 +8,14 @@ use DateTimeImmutable;
 use DateTimeInterface;
 use JsonSerializable;
 
+/**
+ * A finished stream's learning sample. cpuPercent is the stream's own encoder cost: CPU
+ * seconds per output second as a percentage of the host's CPUs (see EncoderWork).
+ */
 final readonly class UtilizationSample implements JsonSerializable
 {
     public function __construct(
         public readonly float             $cpuPercent,
-        public readonly float             $gpuPercent,
         public readonly float             $encodeFps,
         public readonly int               $sourceHeight,
         public readonly string            $sourceCodec,
@@ -32,7 +35,6 @@ final readonly class UtilizationSample implements JsonSerializable
     {
         return new self(
             cpuPercent: (float)($data['cpu_percent'] ?? 0.0),
-            gpuPercent: (float)($data['gpu_percent'] ?? 0.0),
             encodeFps: (float)($data['encode_fps'] ?? 0.0),
             sourceHeight: (int)($data['source_height'] ?? 0),
             sourceCodec: (string)($data['source_codec'] ?? ''),
@@ -53,7 +55,6 @@ final readonly class UtilizationSample implements JsonSerializable
     {
         return [
             'cpu_percent' => $this->cpuPercent,
-            'gpu_percent' => $this->gpuPercent,
             'encode_fps' => $this->encodeFps,
             'source_height' => $this->sourceHeight,
             'source_codec' => $this->sourceCodec,

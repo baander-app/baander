@@ -14,7 +14,6 @@ final class UtilizationSampleTest extends TestCase
     {
         $sample = new UtilizationSample(
             cpuPercent: 45.5,
-            gpuPercent: 30.2,
             encodeFps: 60.0,
             sourceHeight: 1080,
             sourceCodec: 'h264',
@@ -25,7 +24,6 @@ final class UtilizationSampleTest extends TestCase
         );
 
         $this->assertSame(45.5, $sample->cpuPercent);
-        $this->assertSame(30.2, $sample->gpuPercent);
         $this->assertSame(60.0, $sample->encodeFps);
         $this->assertSame(1080, $sample->sourceHeight);
         $this->assertSame('h264', $sample->sourceCodec);
@@ -40,7 +38,6 @@ final class UtilizationSampleTest extends TestCase
     {
         $sample = new UtilizationSample(
             cpuPercent: 1.0,
-            gpuPercent: 2.0,
             encodeFps: 3.0,
             sourceHeight: 480,
             sourceCodec: 'vp9',
@@ -53,7 +50,6 @@ final class UtilizationSampleTest extends TestCase
         $json = $sample->jsonSerialize();
 
         $this->assertSame(1.0, $json['cpu_percent']);
-        $this->assertSame(2.0, $json['gpu_percent']);
         $this->assertSame(3.0, $json['encode_fps']);
         $this->assertSame(480, $json['source_height']);
         $this->assertSame('vp9', $json['source_codec']);
@@ -70,7 +66,6 @@ final class UtilizationSampleTest extends TestCase
         $measuredAt = new DateTimeImmutable('2026-06-13T10:30:00+00:00');
         $original = new UtilizationSample(
             cpuPercent: 50.0,
-            gpuPercent: 10.0,
             encodeFps: 30.0,
             sourceHeight: 720,
             sourceCodec: 'h265',
@@ -99,7 +94,6 @@ final class UtilizationSampleTest extends TestCase
         $this->assertSame(12.5, $restored->cpuPercent);
         $this->assertSame(2160, $restored->sourceHeight);
         // Untouched fields receive defaults
-        $this->assertSame(0.0, $restored->gpuPercent);
         $this->assertSame(0.0, $restored->encodeFps);
         $this->assertSame('', $restored->sourceCodec);
         $this->assertFalse($restored->hardwareAccelerated);
@@ -114,7 +108,6 @@ final class UtilizationSampleTest extends TestCase
 
         $sample = new UtilizationSample(
             cpuPercent: 1.0,
-            gpuPercent: 0.0,
             encodeFps: 1.0,
             sourceHeight: 360,
             sourceCodec: 'h264',

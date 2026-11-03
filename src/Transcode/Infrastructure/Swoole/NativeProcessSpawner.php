@@ -26,11 +26,12 @@ final class NativeProcessSpawner implements ProcessSpawnerInterface
             || !is_string($status['stdout'] ?? null) || !is_string($status['stderr'] ?? null)
             || (!is_int($status['exitCode'] ?? null) && ($status['exitCode'] ?? null) !== null)
             || (!is_string($status['error'] ?? null) && ($status['error'] ?? null) !== null)
+            || (!is_float($status['cpuSeconds'] ?? null) && !is_int($status['cpuSeconds'] ?? null)) || $status['cpuSeconds'] < 0
         ) {
             throw new NativeExecutionException('Native video attempt has no confirmed outcome.');
         }
         return ['state' => $status['state'], 'stdout' => $status['stdout'], 'stderr' => $status['stderr'],
-            'exitCode' => $status['exitCode'] ?? null, 'error' => $status['error'] ?? null];
+            'exitCode' => $status['exitCode'] ?? null, 'error' => $status['error'] ?? null, 'cpuSeconds' => (float) $status['cpuSeconds']];
     }
 
     public function signal(mixed $handle, string $operation): void
@@ -41,7 +42,7 @@ final class NativeProcessSpawner implements ProcessSpawnerInterface
         }
     }
 
-    public function close(mixed $handle): void
+    public function close(mixed $handle): float
     {
         $handle = $this->handle($handle);
         $deadline = hrtime(true) + 1_000_000_000;
@@ -51,7 +52,7 @@ final class NativeProcessSpawner implements ProcessSpawnerInterface
                 if (!$this->client->release($handle)) {
                     throw new NativeExecutionException('Native video attempt release is unconfirmed.');
                 }
-                return;
+                return $status['cpuSeconds'];
             }
             Async::sleep(0.01);
         } while (hrtime(true) < $deadline);

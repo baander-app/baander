@@ -64,7 +64,7 @@ final class StreamGovernor
 
         // Fallback: if model returns null (shouldn't happen in Active state), use per-tier average
         if ($predictedCost === null) {
-            $predictedCost = $this->model->averageCostForTier($requestedTier) ?? 50.0;
+            $predictedCost = $this->model->averageCostForTier($requestedTier, $hardwareAccelerated) ?? 50.0;
         }
 
         $budgetCap = $this->profiles->get()->budgetCap() * 100.0; // e.g., 80.0
@@ -91,7 +91,7 @@ final class StreamGovernor
             $costAtTier = $this->model->predict($sourceHeight, $tier['videoBitrate'], $hardwareAccelerated);
 
             if ($costAtTier === null) {
-                $costAtTier = $this->model->averageCostForTier($tier['name']) ?? $predictedCost * ($tier['videoBitrate'] / max($targetBitrate, 1));
+                $costAtTier = $this->model->averageCostForTier($tier['name'], $hardwareAccelerated) ?? $predictedCost * ($tier['videoBitrate'] / max($targetBitrate, 1));
             }
 
             if ($costAtTier <= $remainingBudget) {
@@ -133,6 +133,30 @@ final class StreamGovernor
         if ($this->state === GovernorState::Learning && $this->model->isReady()) {
             $this->state = GovernorState::Active;
         }
+    }
+
+    /**
+     * Record the cost measured from an active stream's own encoder work. A stream that is
+     * no longer active is ignored.
+     */
+    public function recordStreamCost(Uuid $jobId, float $measuredCost): void
+    {
+        $allocation = $this->activeStreams[$jobId->toString()] ?? null;
+        if ($allocation !== null) {
+            $this->activeStreams[$jobId->toString()] = $allocation->withMeasuredCost($measuredCost);
+        }
+    }
+
+    /**
+     * The active streams' load: each stream's measured cost, or its predicted cost until
+     * it has reported one.
+     */
+    public function observedLoad(): float
+    {
+        return array_sum(array_map(
+            static fn(StreamAllocation $a): float => $a->cost(),
+            $this->activeStreams,
+        ));
     }
 
     /**

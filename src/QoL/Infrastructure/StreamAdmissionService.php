@@ -6,8 +6,8 @@ namespace App\QoL\Infrastructure;
 
 use App\QoL\Application\Port\StreamAdmissionPortInterface;
 use App\QoL\Domain\Service\StreamGovernor;
+use App\QoL\Domain\ValueObject\EncoderWork;
 use App\QoL\Domain\ValueObject\UtilizationSample;
-use App\QoL\Infrastructure\Swoole\CpuGpuSampler;
 use App\QoL\Infrastructure\Swoole\LearningDataPersister;
 use App\Shared\Domain\Model\Uuid;
 use Psr\Log\LoggerInterface;
@@ -16,7 +16,8 @@ use Psr\Log\LoggerInterface;
  * Backs stream admission and completion with the in-memory StreamGovernor.
  *
  * Admission performs no I/O, so the synchronous veto never blocks the
- * video child. Completion records a learning sample, releases the allocation and
+ * video child. Observation turns the stream's encoder work into its measured cost.
+ * Completion records that cost as a learning sample, releases the allocation and
  * persists learning state when the persister's threshold is reached.
  */
 final class StreamAdmissionService implements StreamAdmissionPortInterface
@@ -25,9 +26,9 @@ final class StreamAdmissionService implements StreamAdmissionPortInterface
 
     public function __construct(
         private readonly StreamGovernor        $governor,
-        private readonly CpuGpuSampler         $sampler,
         private readonly LearningDataPersister $persister,
         private readonly LoggerInterface       $logger,
+        private readonly HostCpus              $hostCpus,
     )
     {
     }
@@ -50,7 +51,7 @@ final class StreamAdmissionService implements StreamAdmissionPortInterface
 
         $model = $this->governor->getModel();
         $predictedCost = $model->predict($sourceHeight, $targetBitrate, $hardwareAccelerated)
-            ?? $model->averageCostForTier($qualityTier)
+            ?? $model->averageCostForTier($qualityTier, $hardwareAccelerated)
             ?? self::DEFAULT_PREDICTED_COST;
 
         $this->governor->allocateStream($jobId, $allowedTier, $predictedCost);
@@ -64,6 +65,14 @@ final class StreamAdmissionService implements StreamAdmissionPortInterface
         ]);
     }
 
+    public function observe(Uuid $jobId, float $encoderCpuSeconds, float $outputSeconds): void
+    {
+        $cost = new EncoderWork($encoderCpuSeconds, $outputSeconds)->costPercent($this->hostCpus->count());
+        if ($cost !== null) {
+            $this->governor->recordStreamCost($jobId, $cost);
+        }
+    }
+
     public function complete(
         Uuid   $jobId,
         string $qualityTier,
@@ -71,23 +80,23 @@ final class StreamAdmissionService implements StreamAdmissionPortInterface
         int    $sourceHeight,
         string $sourceCodec,
         bool   $hardwareAccelerated,
+        float  $encoderCpuSeconds,
+        float  $outputSeconds,
     ): void
     {
-        $utilization = $this->sampler->getLatest();
-        if ($utilization === null) {
+        $cost = new EncoderWork($encoderCpuSeconds, $outputSeconds)->costPercent($this->hostCpus->count());
+        if ($cost === null) {
             $this->governor->releaseStream($jobId);
-            $this->logger->info('StreamAdmission: utilization unavailable; allocation released without learning', [
+            $this->logger->info('StreamAdmission: too little encoder output; allocation released without learning', [
                 'jobId' => $jobId->toString(),
+                'outputSeconds' => $outputSeconds,
             ]);
 
             return;
         }
-        $cpuPercent = $utilization['cpu_percent'];
-        $gpuPercent = $utilization['gpu_percent'];
 
         $this->governor->recordSample(new UtilizationSample(
-            cpuPercent: $cpuPercent,
-            gpuPercent: $gpuPercent,
+            cpuPercent: $cost,
             encodeFps: 0.0, // Not available at completion
             sourceHeight: $sourceHeight,
             sourceCodec: $sourceCodec,
@@ -99,11 +108,13 @@ final class StreamAdmissionService implements StreamAdmissionPortInterface
 
         $this->governor->releaseStream($jobId);
 
-        $this->logger->info('StreamAdmission: recorded utilization sample', [
+        $this->logger->info('StreamAdmission: recorded encoder cost sample', [
             'jobId' => $jobId->toString(),
             'tier' => $qualityTier,
-            'cpu' => $cpuPercent,
-            'gpu' => $gpuPercent,
+            'cost' => $cost,
+            'encoderCpuSeconds' => $encoderCpuSeconds,
+            'outputSeconds' => $outputSeconds,
+            'hardwareAccelerated' => $hardwareAccelerated,
             'totalSamples' => $this->governor->getModel()->sampleCount(),
             'governorState' => $this->governor->getState()->value,
         ]);

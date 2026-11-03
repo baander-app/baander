@@ -184,7 +184,7 @@ final class QoLAdminServiceTest extends TestCase
     private function train(LearningModel $model): void
     {
         for ($i = 0; $i < LearningModel::MIN_SAMPLES; $i++) {
-            $model->addSample(new UtilizationSample(50.0, 0.0, 30.0, 1080, 'h264', false, 5_000_000, '1080p', 1));
+            $model->addSample(new UtilizationSample(50.0, 30.0, 1080, 'h264', false, 5_000_000, '1080p', 1));
         }
     }
 }

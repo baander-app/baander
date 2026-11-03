@@ -52,7 +52,7 @@ final class TranscodeProcessPoolTest extends TestCase
         $client = $this->createMock(NativeExecutionClientInterface::class);
         $client->expects(self::once())->method('submit')->willReturn(new NativeExecutionHandle(str_repeat('a', 64), 1));
         $client->expects(self::once())->method('signal')->willReturn(['state' => 'exited']);
-        $client->method('inspect')->willReturn(['state' => 'exited', 'stdout' => '', 'stderr' => '', 'exitCode' => 0]);
+        $client->method('inspect')->willReturn(['state' => 'exited', 'stdout' => '', 'stderr' => '', 'exitCode' => 0, 'cpuSeconds' => 0.0]);
         $client->expects(self::once())->method('release')->willReturn(true);
         $pool = new TranscodeProcessPool($client, new NullLogger(), new JsonEncoder(), new DeploymentProfile('household'));
         $job = TranscodeJob::create(Uuid::generate(), QualityTier::p720(), '/cache', Uuid::generate());

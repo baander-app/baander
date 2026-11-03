@@ -17,13 +17,13 @@ use App\QoL\Domain\Service\LearningModel;
 use App\QoL\Domain\Service\StreamGovernor;
 use App\QoL\Domain\ValueObject\UtilizationSample;
 use App\QoL\Infrastructure\QoLAdminService;
+use App\QoL\Infrastructure\HostCpus;
 use App\QoL\Infrastructure\StreamAdmissionService;
 use App\QoL\Infrastructure\Swoole\AlgorithmProfileTable;
 use App\QoL\Infrastructure\Swoole\Control\QoLLearningResetOperation;
 use App\QoL\Infrastructure\Swoole\Control\QoLProfileSetOperation;
 use App\QoL\Infrastructure\Swoole\Control\QoLStatusOperation;
 use App\QoL\Infrastructure\Swoole\Control\QoLStreamsOperation;
-use App\QoL\Infrastructure\Swoole\CpuGpuSampler;
 use App\QoL\Infrastructure\Swoole\LearningDataPersister;
 use App\QoL\Infrastructure\Swoole\QoLWorkerStartupSubscriber;
 use App\QoL\Interface\Console\QoLProfileCommand;
@@ -120,7 +120,7 @@ $fingerprint = new class implements EncoderProfileFingerprintPortInterface {
     }
 };
 $persister = new LearningDataPersister($governor, $fingerprint, new NullLogger(), $stateDir, new JsonEncoder());
-$admission = new StreamAdmissionService($governor, new CpuGpuSampler(new NullLogger()), $persister, new NullLogger());
+$admission = new StreamAdmissionService($governor, $persister, new NullLogger(), new HostCpus(4));
 $startup = new QoLWorkerStartupSubscriber(new ServiceLocator([
     LearningDataPersister::class => static fn (): LearningDataPersister => $persister,
     StreamGovernor::class => static fn (): StreamGovernor => $governor,
@@ -151,8 +151,8 @@ $registry = new ServerControlOperationRegistry([
         }
         $jobId = new Uuid();
         $admission->admit($jobId, '1080p', 5_000_000, 1080, false);
-        $admission->complete($jobId, '1080p', 5_000_000, 1080, 'h264', false);
-        $governor->recordSample(new UtilizationSample(25.0, 0.0, 30.0, 1080, 'h264', false, 5_000_000, '1080p', $governor->getActiveStreamCount()));
+        $admission->complete($jobId, '1080p', 5_000_000, 1080, 'h264', false, 0.0, 0.0);
+        $governor->recordSample(new UtilizationSample(25.0, 30.0, 1080, 'h264', false, 5_000_000, '1080p', $governor->getActiveStreamCount()));
         $persister->save();
 
         return true;

@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Tests\Functional;
 
 use App\Kernel;
-use App\QoL\Infrastructure\Swoole\CpuGpuSampler;
 use App\QoL\Infrastructure\Swoole\QoLWorkerStartupSubscriber;
 use App\Shared\Application\Port\ServerControlPortInterface;
 use App\Shared\Infrastructure\Health\HealthMonitorSubscriber;
@@ -85,7 +84,6 @@ final class WebExecutionOwnershipTest extends TestCase
             self::assertNotEmpty($bootableClasses);
             self::assertNotContains(CpuProcessPool::class, $bootableClasses);
             self::assertNotContains(HardwareCapabilitiesProber::class, $bootableClasses);
-            self::assertNotContains(CpuGpuSampler::class, $bootableClasses);
 
             $dispatcher = $container->get('event_dispatcher');
             self::assertInstanceOf(EventDispatcherInterface::class, $dispatcher);

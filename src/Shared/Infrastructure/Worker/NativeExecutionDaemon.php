@@ -255,6 +255,9 @@ final class NativeExecutionDaemon
                 }
             }
         }
+        if ($attempt->state === 'running') {
+            self::readCpu($attempt);
+        }
 
         return $attempt->snapshot();
     }
@@ -369,8 +372,12 @@ final class NativeExecutionDaemon
                 @posix_kill(-$attempt->pid, SIGKILL);
                 $attempt->stopDeadline = self::now() + 1;
             }
+            $reapedBefore = self::reapedChildrenCpu();
             $status = proc_get_status($attempt->process);
             if (!$status['running']) {
+                // This status call reaped the command, so the growth of the reaped children's
+                // CPU time is exactly what the command and its waited descendants consumed.
+                $attempt->cpuSeconds = max($attempt->cpuSeconds, self::reapedChildrenCpu() - $reapedBefore);
                 // Drain the remaining bounded pipe buffers before publishing the terminal receipt.
                 foreach ([1 => 'stdout', 2 => 'stderr'] as $index => $field) {
                     $tail = stream_get_contents($attempt->pipes[$index], NativeExecutionProtocol::OUTPUT_BYTES + 1);
@@ -420,6 +427,49 @@ final class NativeExecutionDaemon
         } while (self::now() < $deadline);
         $this->poisoned = true;
         // Container containment owns any child the kernel has not made reapable.
+    }
+
+    /**
+     * Reads a running command's CPU time from /proc/<pid>/stat: user and system time of all
+     * its threads plus that of descendants it has waited for. The launcher's setsid is not a
+     * group leader, so it executes the command in place and the PID is the command itself.
+     */
+    private static function readCpu(NativeExecutionAttempt $attempt): void
+    {
+        $stat = @file_get_contents('/proc/' . $attempt->pid . '/stat');
+        $close = $stat === false ? false : strrpos($stat, ')');
+        if ($stat === false || $close === false) {
+            return;
+        }
+        // Fields after the command name start at the state (field 3); utime is field 14.
+        $fields = explode(' ', trim(substr($stat, $close + 2)));
+        if (count($fields) < 15) {
+            return;
+        }
+        $ticks = (int) $fields[11] + (int) $fields[12] + (int) $fields[13] + (int) $fields[14];
+        $attempt->cpuSeconds = max($attempt->cpuSeconds, $ticks / self::clockTicks());
+    }
+
+    private static function clockTicks(): int
+    {
+        static $ticks = null;
+        if ($ticks === null) {
+            $configured = posix_sysconf(POSIX_SC_CLK_TCK);
+            $ticks = $configured > 0 ? $configured : 100;
+        }
+
+        return $ticks;
+    }
+
+    private static function reapedChildrenCpu(): float
+    {
+        $usage = getrusage(1);
+        if ($usage === false) {
+            return 0.0;
+        }
+
+        return $usage['ru_utime.tv_sec'] + $usage['ru_stime.tv_sec']
+            + ($usage['ru_utime.tv_usec'] + $usage['ru_stime.tv_usec']) / 1_000_000;
     }
 
     private static function now(): float
