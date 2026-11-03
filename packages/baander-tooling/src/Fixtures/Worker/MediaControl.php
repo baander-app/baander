@@ -13,7 +13,7 @@ final class MediaControl
     {
         if ($arguments === []) {
             $runtime = new Runtime($root, budget: 'workerCapacity');
-            $artifacts = Runtime::artifacts($root, 'media-control');
+            $artifacts = Runtime::artifacts($root, getenv('BAANDER_TEST_MEDIA_COST') === '1' ? 'media-cost' : 'media-control');
             try {
                 $runtime->run(
                     [PHP_BINARY, 'scripts/test-worker-operator-container.php'],
@@ -36,6 +36,9 @@ final class MediaControl
             } finally {
                 $runtime->close();
             }
+        }
+        if (getenv('BAANDER_TEST_MEDIA_COST') === '1') {
+            return self::cost(new Checkpoint($arguments, $root, 600), $root);
         }
         $checkpoint = new Checkpoint($arguments, $root, 300);
         $runtime = $checkpoint->runtime;
@@ -162,6 +165,66 @@ final class MediaControl
             );
             $checkpoint->inspectAfter();
             return MediaControlVerifier::main([$checkpoint->artifacts]);
+        } finally {
+            $runtime->close();
+        }
+    }
+
+    /** Measure per-job native and media child cost without the control drill's CPU pressure. */
+    private static function cost(Checkpoint $checkpoint, string $root): int
+    {
+        $runtime = $checkpoint->runtime;
+        try {
+            $checkpoint->inspectBefore();
+            $services = [];
+            foreach (['web' => $checkpoint->web, 'postgres' => $checkpoint->postgres, 'redis' => preg_replace('/-postgres$/D', '-redis', $checkpoint->postgres),
+                'control' => $checkpoint->control, 'execution' => $checkpoint->execution] as $role => $container) {
+                $services[] = $role . '=' . trim($checkpoint->docker->run(['inspect', '--format', '{{.Id}}', $container])->stdout);
+            }
+            $checkpoint->measurements->host(
+                [PHP_BINARY, $root . '/tests/Fixtures/Worker/media-cost-host-sample.php', '580', ...$services],
+                'cost-host-samples.jsonl',
+                'cost-host-sampler.log',
+                585,
+            );
+            foreach (['control' => $checkpoint->control, 'execution' => $checkpoint->execution] as $unit => $container) {
+                $checkpoint->measurements->container(
+                    ['exec', $container, 'php', 'tests/Fixtures/Worker/media-cost-sample.php', '580', $unit],
+                    'cost-' . $unit . '-samples.jsonl',
+                    'cost-' . $unit . '-sampler.log',
+                    585,
+                );
+            }
+            $client = $checkpoint->background(
+                ['exec', $checkpoint->web, 'php', '-d', 'memory_limit=1G', 'tests/Fixtures/TwoCommand/deployment.php', 'media-cost'],
+                'media-cost-client.log',
+                'media-cost-client.log.stderr',
+                570,
+            );
+            $runtime->wait($client);
+            // The media role admits only its configured slots; replaying the recorded
+            // encoder measures the per-encode cost at the larger target slot count.
+            $encoder = getenv('BAANDER_TEST_MEDIA_COST_ENCODER') ?: 'libx264';
+            $perEncoder = (int) ceil(MediaCost::peakNativeRssMiB($checkpoint->artifacts . '/cost-execution-samples.jsonl', 'video-encode') * 1.15);
+            $checkpoint->capture(
+                ['exec', $checkpoint->execution, 'php', 'tests/Fixtures/Worker/media-cost-replay.php', '8', '45', $encoder, (string) max($perEncoder, 64)],
+                'media-cost-replay.json',
+                75,
+            );
+            $checkpoint->measurements->finish();
+            $checkpoint->copy(
+                $checkpoint->web . ':' . $runtime->layout()->path('storage/two-command/result-media-cost.json'),
+                'media-cost-client.json',
+            );
+            $checkpoint->copy(
+                $checkpoint->web . ':' . $runtime->layout()->path('storage/two-command/native-launches.jsonl'),
+                'native-launches.jsonl',
+            );
+            $checkpoint->inspectAfter();
+            $receipt = MediaCost::receipt($checkpoint->artifacts);
+            Reports::publish($checkpoint->artifacts . '/media-cost.json', $receipt);
+            echo json_encode($receipt['summary'], JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR), "\n";
+            return 0;
         } finally {
             $runtime->close();
         }

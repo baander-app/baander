@@ -86,7 +86,8 @@ final readonly class OperatorProvisioning
         $this->qualification->state->appHome = $this->qualification->commands->runtime->layout()->root;
         $this->qualification->docker(['info', '--format', '{{json .}}'], stdout: $this->qualification->work('host.json'));
         $host = OperatorConfiguration::json($this->qualification->work('host.json'));
-        $minimum = ($this->qualification->configuration->twoCommand ? 15 : 13) + (($environment['BAANDER_TEST_AUTOSCALING_MAXIMUM'] ?? '1') === '4' ? 1 : 0);
+        $minimum = ($this->qualification->configuration->twoCommand ? 15 : 13) + (($environment['BAANDER_TEST_AUTOSCALING_MAXIMUM'] ?? '1') === '4' ? 1 : 0)
+            + intdiv($this->qualification->configuration->executionMemoryMiB() - 4480 + 1023, 1024);
         $this->qualification->expect(
             $host['NCPU'] >= 4 && $host['MemTotal'] >= $minimum * 1024 ** 3,
             'Worker qualification requires four CPUs and ' . $minimum . ' GiB',
@@ -105,7 +106,9 @@ final readonly class OperatorProvisioning
             true,
             flags: JSON_THROW_ON_ERROR,
         );
-        $this->qualification->expect(count($cpus) === 4, 'Four permitted CPUs are required');
+        $required = $this->qualification->configuration->executionCpus() + 2;
+        $this->qualification->expect(count($cpus) >= $required, $required . ' permitted CPUs are required');
+        $cpus = array_slice($cpus, 0, $required);
         $s->fixtureBase = $s->baseId;
         $this->qualification->expect(
             $this->qualification->output(['image', 'inspect', '--format', '{{json (index .Config "Volumes")}}', $s->baseId]) === 'null',
@@ -159,7 +162,7 @@ final readonly class OperatorProvisioning
         $capacity = $this->qualification->configuration->checkpoint !== null;
         $limits = [];
         if ($capacity) {
-            $this->qualification->state->dependencyCpu = (string) $cpus[3];
+            $this->qualification->state->dependencyCpu = (string) $cpus[array_key_last($cpus)];
             $limits = ['--cpuset-cpus', $this->qualification->state->dependencyCpu, '--cpus', '0.5', '--pids-limit', '64'];
         }
         $this->qualification->resources->startContainer($s->runId . '-redis', [
@@ -333,6 +336,10 @@ final readonly class OperatorProvisioning
         if ($this->qualification->configuration->checkpoint?->name === 'autoscaling') {
             $this->qualification->write($checkout . '/config/services_prod.yaml', self::AUTOSCALING_SERVICES);
         }
+        if ($this->qualification->configuration->mediaCost) {
+            // Worker units read the encoder choice from the image's production dotenv files.
+            $this->qualification->write($checkout . '/.env.prod.local', 'VIDEO_ENCODER=' . $this->qualification->configuration->mediaCostEncoder . "\n");
+        }
         $this->qualification->write($this->qualification->work('Dockerfile'), self::FIXTURE_DOCKERFILE);
         $this->buildImage(
             $s->fixtureImage,
@@ -464,13 +471,13 @@ final readonly class OperatorProvisioning
             'dockerBinary' => $this->qualification->configuration->container ? '/usr/local/bin/docker' : $this->qualification->topology->operatorTarget()->executable,
             'dockerEndpoint' => $this->qualification->topology->operatorTarget()->endpoint,
             'controlMemoryMiB' => 2944,
-            'executionMemoryMiB' => 4480 + 320 * ($maximum - 1),
+            'executionMemoryMiB' => $this->qualification->configuration->executionMemoryMiB() + 320 * ($maximum - 1),
             'controlNanoCpus' => 1_000_000_000,
-            'executionNanoCpus' => 2_000_000_000,
+            'executionNanoCpus' => $this->qualification->configuration->executionCpus() * 1_000_000_000,
             'controlPidsLimit' => 129,
             'executionPidsLimit' => 256 + $maximum - 1,
             'controlCpuSet' => array_slice($cpus, 0, 1),
-            'executionCpuSet' => array_slice($cpus, 1, 2),
+            'executionCpuSet' => array_slice($cpus, 1, $this->qualification->configuration->executionCpus()),
             'autoscaling' => $profile,
             'deploymentProfile' => OperatorConfiguration::json($this->qualification->root . '/tests/Fixtures/Worker/deployment-profile.json'),
             'scheduledConsoleMiB' => 320,
@@ -580,6 +587,8 @@ final readonly class OperatorProvisioning
                 'BAANDER_TEST_TWO_COMMAND=' . ($this->qualification->configuration->twoCommand ? '1' : '0'),
                 '-e',
                 'BAANDER_TEST_MOVIE_ENDPOINT=' . ($this->qualification->configuration->movieEndpoint ? '1' : '0'),
+                '-e',
+                'BAANDER_TEST_MEDIA_COST=' . ($this->qualification->configuration->mediaCost ? '1' : '0'),
                 '--entrypoint',
                 '/bin/sh',
                 $s->imageId,
@@ -656,10 +665,7 @@ foreach (explode(',', trim($match[1])) as $range) {
         $cpus[] = $cpu;
     }
 }
-if (count($cpus) < 4) {
-    exit(1);
-}
-echo json_encode(array_slice($cpus, 0, 4), JSON_THROW_ON_ERROR);
+echo json_encode($cpus, JSON_THROW_ON_ERROR);
 PHP_PROBE;
 
     private const string MEDIA_PREPARATION = <<<'SH'

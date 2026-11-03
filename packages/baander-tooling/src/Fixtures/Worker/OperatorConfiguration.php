@@ -14,6 +14,8 @@ final readonly class OperatorConfiguration
     public bool $twoCommand;
     public bool $developmentSource;
     public bool $mediaObservation;
+    public bool $mediaCost;
+    public string $mediaCostEncoder;
     public bool $browserControls;
     public bool $movieEndpoint;
     public bool $useImage;
@@ -27,6 +29,14 @@ final readonly class OperatorConfiguration
         $this->twoCommand = $this->flag('BAANDER_TEST_TWO_COMMAND');
         $this->developmentSource = $this->flag('BAANDER_TEST_DEV_SOURCE_BIND');
         $this->mediaObservation = $this->flag('BAANDER_TEST_MEDIA_CONTROL_OBSERVATION');
+        $this->mediaCost = $this->flag('BAANDER_TEST_MEDIA_COST');
+        $this->mediaCostEncoder = $environment['BAANDER_TEST_MEDIA_COST_ENCODER'] ?? 'libx264';
+        if (!in_array($this->mediaCostEncoder, ['libx264', 'libx265'], true)) {
+            throw new InvalidArgumentException('BAANDER_TEST_MEDIA_COST_ENCODER must be libx264 or libx265', 2);
+        }
+        if ($this->mediaCost && !$this->mediaObservation) {
+            throw new InvalidArgumentException('Media cost measurement requires native launch observation', 2);
+        }
         $this->browserControls = $this->flag('BAANDER_TEST_BROWSER_CLIENT_CONTROLS');
         $this->movieEndpoint = $this->flag('BAANDER_TEST_MOVIE_ENDPOINT');
         $this->useImage = $this->flag('BAANDER_TEST_USE_IMAGE', 1);
@@ -62,6 +72,18 @@ final readonly class OperatorConfiguration
             throw new InvalidArgumentException('Movie endpoint qualification requires only two-command mode and an executable browser checkpoint');
         }
 
+    }
+
+    /** Logical CPUs given to the execution unit; cost measurement keeps concurrent encoders unthrottled. */
+    public function executionCpus(): int
+    {
+        return $this->mediaCost ? 8 : 2;
+    }
+
+    /** Base execution memory; cost measurement holds eight 1080p encoders at about 510 MiB each. */
+    public function executionMemoryMiB(): int
+    {
+        return $this->mediaCost ? 9216 : 4480;
     }
 
     private function flag(string $name, int $status = 2): bool

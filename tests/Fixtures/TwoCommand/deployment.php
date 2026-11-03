@@ -35,6 +35,9 @@ const STATE = ROOT . '/state.json';
 const EMAIL = 'two-command-admin@baander.app';
 const VIDEO = '/media/source/video.mkv';
 const AUDIO = '/media/source/track.flac';
+const COST_VIDEO = '/media/source/cost-1080p.mkv';
+const COST_VIDEO_SECONDS = 120;
+const COST_TRACK_SECONDS = 600;
 
 function ensure(bool $condition, string $message): void
 {
@@ -584,8 +587,46 @@ if ($mode === 'prepare') {
     $image = new ImageEntity('two-command/cover.png', 'png', 'image/png', new PublicId(), (int) filesize($imageRoot . '/cover.png'), 640, 480, 'album');
     $image->setAlbum($album);
     foreach ([$library, $movies, $album, $song, $video, $movie, $movieVideo, $image] as $entity) { $manager->persist($entity); }
+    $cost = null;
+    if (getenv('BAANDER_TEST_MEDIA_COST') === '1') {
+        // Cost sources are generated here so no measured window includes their encoding.
+        // Mild temporal noise gives the 1080p pattern texture; the tracks carry
+        // independent pink noise per channel over a tone at a common music sample rate.
+        command(['ffmpeg', '-nostdin', '-v', 'error', '-y',
+            '-f', 'lavfi', '-i', 'testsrc2=size=1920x1080:rate=30:duration=' . COST_VIDEO_SECONDS . ',noise=alls=3:allf=t',
+            '-f', 'lavfi', '-i', 'sine=frequency=330:sample_rate=48000:duration=' . COST_VIDEO_SECONDS,
+            '-map', '0:v', '-map', '1:a', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '21', '-g', '120', '-threads', '8',
+            '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '160k', '-ac', '2', COST_VIDEO], 300);
+        // Copy execution verifies the catalog's scanner hash before repackaging.
+        $costVideo = new VideoEntity(new PublicId(), COST_VIDEO, hash_file('xxh3', COST_VIDEO));
+        $costProbe = new Process(\App\Transcode\Infrastructure\FFmpeg\FFprobeArguments::video(COST_VIDEO, 'ffprobe'), timeout: 30);
+        $costProbe->mustRun();
+        $costVideo->setProbe(\App\Transcode\Domain\ValueObject\VideoProbeResult::fromProbeOutput(
+            json_decode($costProbe->getOutput(), true, flags: JSON_THROW_ON_ERROR),
+        )->jsonSerialize());
+        $costVideo->setDuration(COST_VIDEO_SECONDS); $costVideo->setWidth(1920); $costVideo->setHeight(1080); $costVideo->setFramerate(30);
+        $costMovie = new MovieEntity(new PublicId(), $movies, 'Two command cost playback');
+        $costTracks = [];
+        foreach (['isolated', 'concurrent', 'queued'] as $name) {
+            $path = '/media/source/cost-' . $name . '.flac';
+            command(['ffmpeg', '-nostdin', '-v', 'error', '-y',
+                '-f', 'lavfi', '-i', 'anoisesrc=color=pink:amplitude=0.2:seed=1:sample_rate=44100:duration=' . COST_TRACK_SECONDS,
+                '-f', 'lavfi', '-i', 'anoisesrc=color=pink:amplitude=0.2:seed=2:sample_rate=44100:duration=' . COST_TRACK_SECONDS,
+                '-f', 'lavfi', '-i', 'sine=frequency=220:sample_rate=44100:duration=' . COST_TRACK_SECONDS,
+                '-filter_complex', '[2:a]asplit[left][right];[0:a][left]amix=inputs=2[l];[1:a][right]amix=inputs=2[r];[l][r]amerge=inputs=2',
+                '-threads', '1', '-c:a', 'flac', $path], 120);
+            $costSong = new SongEntity(new PublicId(), $album, 'Worker cost ' . $name, $path, (int) filesize($path), 'audio/flac');
+            $manager->persist($costSong);
+            $costTracks[$name] = (string) $costSong->getPublicId();
+        }
+        foreach ([$costVideo, $costMovie, new MovieVideoEntity($costMovie, $costVideo)] as $entity) { $manager->persist($entity); }
+        $cost = ['video' => (string) $costVideo->getPublicId(), 'videoSeconds' => COST_VIDEO_SECONDS, 'videoFrameRate' => 30, 'tracks' => $costTracks, 'trackSeconds' => COST_TRACK_SECONDS];
+    }
     $manager->flush();
     $prepared = ['requestId' => \App\Shared\Domain\Model\Uuid::generate()->toString(), 'video' => (string) $video->getPublicId(), 'movie' => (string) $movie->getPublicId(), 'track' => (string) $song->getPublicId(), 'image' => (string) $image->getPublicId()];
+    if ($cost !== null) {
+        $prepared['cost'] = $cost;
+    }
     if ($movieEndpoint) {
         $prepared['scenario'] = 'movie-endpoint';
         $prepared['endpoint'] = ['videoEnd' => 42, 'containerEnd' => 48];
@@ -610,6 +651,8 @@ if ($mode === 'prepare') {
     $result = ['videoStatus' => $video->status(), 'audioStatus' => $status, 'directStatus' => $direct->status()];
 } elseif ($mode === 'media-control') {
     require __DIR__ . '/media-control.php';
+} elseif ($mode === 'media-cost') {
+    require __DIR__ . '/media-cost.php';
 } elseif ($mode === 'capacity') {
     $state = state(); $auth = $client(); $sessions = [];
     foreach (['360p', '480p', '720p'] as $quality) {

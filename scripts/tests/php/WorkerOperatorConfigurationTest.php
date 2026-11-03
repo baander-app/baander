@@ -67,6 +67,35 @@ final class WorkerOperatorConfigurationTest extends TestCase
         self::assertFalse($configuration->useImage);
     }
 
+    public function testMediaCostWidensTheExecutionUnitAndSelectsItsEncoder(): void
+    {
+        $default = new OperatorConfiguration(['BAANDER_TEST_MEDIA_CONTROL_OBSERVATION' => '1']);
+        self::assertFalse($default->mediaCost);
+        self::assertSame(2, $default->executionCpus());
+        $cost = new OperatorConfiguration(['BAANDER_TEST_MEDIA_CONTROL_OBSERVATION' => '1', 'BAANDER_TEST_MEDIA_COST' => '1', 'BAANDER_TEST_MEDIA_COST_ENCODER' => 'libx265']);
+        self::assertSame(8, $cost->executionCpus());
+        self::assertSame(4480, $default->executionMemoryMiB());
+        self::assertSame(9216, $cost->executionMemoryMiB());
+        self::assertSame('libx265', $cost->mediaCostEncoder);
+    }
+
+    /** @return iterable<string,array{array<string,string>,string}> */
+    public static function invalidMediaCost(): iterable
+    {
+        yield 'without native observation' => [['BAANDER_TEST_MEDIA_COST' => '1'], 'Media cost measurement requires native launch observation'];
+        yield 'unknown encoder' => [['BAANDER_TEST_MEDIA_CONTROL_OBSERVATION' => '1', 'BAANDER_TEST_MEDIA_COST' => '1', 'BAANDER_TEST_MEDIA_COST_ENCODER' => 'libsvtav1'],
+            'BAANDER_TEST_MEDIA_COST_ENCODER must be libx264 or libx265'];
+    }
+
+    /** @param array<string,string> $environment */
+    #[DataProvider('invalidMediaCost')]
+    public function testMediaCostRejectsAnUnobservableOrUnknownEncoder(array $environment, string $message): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage($message);
+        new OperatorConfiguration($environment);
+    }
+
     public function testAutoscalingRejectsAnUnmodifiedProductionImage(): void
     {
         $this->expectException(\InvalidArgumentException::class);
