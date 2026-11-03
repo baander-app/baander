@@ -11,28 +11,10 @@ final readonly class HouseholdConfiguration
     public const array IMAGE_ROLES = ['application', 'worker', 'operator', 'postgres', 'gateway', 'redis'];
     public const array VOLUME_ROLES = ['media', 'storage', 'conversions', 'transcode_state', 'postgres', 'redis', 'secrets', 'pooler_credentials'];
     public const array RESOURCE_DEFAULTS = [
-        'webMemoryMiB' => 1536, 'postgresMemoryMiB' => 512, 'poolerMemoryMiB' => 64, 'redisMemoryMiB' => 384,
+        'webMemoryMiB' => 1536, 'redisMemoryMiB' => 384,
         'redisMaxmemoryMiB' => 192, 'gatewayMemoryMiB' => 64, 'operatorMemoryMiB' => 512,
         'hostHeadroomMiB' => 512,
     ];
-    /** shared_buffers and superuser_reserved_connections of each profile's PostgreSQL configuration file. */
-    public const array POSTGRES_SHARED_BUFFERS_MIB = ['household' => 128, 'full' => 256];
-    public const int POSTGRES_SUPERUSER_SLOTS = 3;
-
-    /**
-     * Default PostgreSQL and pooler memory limits, derived from the profile's pooler server pools.
-     *
-     * @return array{postgresMemoryMiB:int,poolerMemoryMiB:int}
-     */
-    public static function databaseMemoryMiB(string $profile): array
-    {
-        $pools = Pooler::POOLS[$profile];
-        return [
-            'postgresMemoryMiB' => Pooler::postgresMemoryMiB(self::POSTGRES_SHARED_BUFFERS_MIB[$profile], Pooler::maxConnections($pools, self::POSTGRES_SUPERUSER_SLOTS)),
-            'poolerMemoryMiB' => Pooler::memoryMiB($pools),
-        ];
-    }
-
     /** @param array<string,ImageSelection> $images
      * @param array<string,string> $environment
      * @param array<string,int> $resources
@@ -106,7 +88,7 @@ final readonly class HouseholdConfiguration
             throw new \InvalidArgumentException('Resources must be an object.');
         }
         JsonObject::keys($resources, array_keys(self::RESOURCE_DEFAULTS), 'deployment resources');
-        $resources = array_replace(self::RESOURCE_DEFAULTS, self::databaseMemoryMiB($profile), $resources);
+        $resources = array_replace(self::RESOURCE_DEFAULTS, $resources);
         foreach ($resources as $value) {
             if (!is_int($value) || $value < 1 || $value > 1048576) {
                 throw new \InvalidArgumentException('Memory reservations must be positive integer MiB.');

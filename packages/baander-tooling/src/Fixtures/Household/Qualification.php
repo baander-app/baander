@@ -984,9 +984,11 @@ CODE;
         $deployment = $this->deploymentState();
         $profile = ImageProfile::fromArray($deployment['profile']);
         $limits = [];
-        foreach (['web', 'postgres', 'redis', 'gateway'] as $role) {
+        foreach (['web', 'redis', 'gateway'] as $role) {
             $limits[$role] = ['memoryMaxBytes' => $state['effectiveDeployment']['resources'][$role . 'MemoryMiB'] * 1024 ** 2];
         }
+        // PostgreSQL runs without a container memory limit.
+        $limits['postgres'] = ['memoryMaxBytes' => 'max'];
         $limits['control'] = ['memoryMaxBytes' => $profile->controlMemoryMiB * 1024 ** 2];
         $limits['execution'] = ['memoryMaxBytes' => $profile->executionMemoryMiB * 1024 ** 2];
         $limits['observer'] = ['memoryMaxBytes' => $this->configuration['observerMemoryMiB'] * 1024 ** 2];

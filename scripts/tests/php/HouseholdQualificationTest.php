@@ -98,10 +98,10 @@ final class HouseholdQualificationTest extends TestCase
         $seed = ['version' => 1, 'phase' => 'running', 'configuration' => $seedConfiguration, 'target' => $target, 'runs' => ['cold-startup' => 'receipt']];
         Qualification::validateSeed($seed, $configuration, $target);
         $tuned = $configuration;
-        $tuned['deployment']['resources']['postgresMemoryMiB'] = 768;
+        $tuned['deployment']['resources']['webMemoryMiB'] = 2048;
         $tuned['host']['constraintBytes'] = 8 * 1024 ** 3;
         Qualification::validateSeed($seed, $tuned, $target);
-        self::assertSame(768, $tuned['deployment']['resources']['postgresMemoryMiB']);
+        self::assertSame(2048, $tuned['deployment']['resources']['webMemoryMiB']);
         foreach ([['borrowedFrom' => []], ['changedSourcePath' => 'renamed.flac'], ['activeRun' => 'cold-startup'], ['phase' => 'cleaned'], ['target' => ['daemonId' => 'foreign', 'endpoint' => $target['endpoint']]]] as $change) {
             try {
                 Qualification::validateSeed(array_replace($seed, $change), $configuration, $target);

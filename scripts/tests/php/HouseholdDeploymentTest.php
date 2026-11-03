@@ -32,63 +32,47 @@ final class HouseholdDeploymentTest extends TestCase
         ];
     }
 
-    public function testProfilesSizePostgresForTheirConnectionsAndShareOtherServiceLimits(): void
+    public function testProfilesShareServiceLimitsAndLeavePostgresAndThePoolerUnlimited(): void
     {
         $household = HouseholdConfiguration::fromArray(self::configuration());
         $full = HouseholdConfiguration::fromArray(array_replace(self::configuration(), ['profile' => 'full']));
-        self::assertSame(768, $household->resources['postgresMemoryMiB']);
-        self::assertSame(1280, $full->resources['postgresMemoryMiB']);
-        self::assertSame(64, $household->resources['poolerMemoryMiB']);
-        self::assertSame(array_diff_key($household->resources, ['postgresMemoryMiB' => true]), array_diff_key($full->resources, ['postgresMemoryMiB' => true]));
+        self::assertSame($household->resources, $full->resources);
+        self::assertArrayNotHasKey('postgresMemoryMiB', $household->resources);
         $explicit = self::configuration();
         $explicit['resources'] = ['postgresMemoryMiB' => 1536];
-        self::assertSame(1536, HouseholdConfiguration::fromArray($explicit)->resources['postgresMemoryMiB']);
+        try {
+            HouseholdConfiguration::fromArray($explicit);
+            self::fail('Accepted a PostgreSQL memory limit.');
+        } catch (\InvalidArgumentException $error) {
+            self::assertStringContainsString('Unknown key', $error->getMessage());
+        }
         self::assertSame('household', $household->profile);
         self::assertSame('full', $full->profile);
         self::assertSame('baander-household-media', $household->volumes['media']);
         self::assertSame('private-database-secret', $household->environment['DB_PASSWORD']);
+        $compose = HouseholdRenderer::render($household, $this->images(), ApplicationLayout::fromArray(['version' => 1, 'root' => '/srv/baander']), $this->profile(), 'max_connections = 20', 'owner');
+        foreach (['postgres', 'pooler'] as $service) {
+            self::assertArrayNotHasKey('mem_limit', $compose['services'][$service], $service);
+            self::assertArrayNotHasKey('memswap_limit', $compose['services'][$service], $service);
+            self::assertArrayNotHasKey('cpus', $compose['services'][$service], $service);
+        }
+        self::assertArrayNotHasKey('pids_limit', $compose['services']['pooler']);
+        self::assertSame($compose['services']['web']['mem_limit'], $compose['services']['web']['memswap_limit']);
     }
 
-    public function testPostgresIsSizedFromThePoolerServerPools(): void
+    public function testPostgresConnectionsAreSizedFromThePoolerServerPools(): void
     {
+        self::assertSame(20, Pooler::maxConnections(['application' => 10, 'control' => 4, 'direct' => 3], 3));
+        self::assertSame(35, Pooler::maxConnections(['application' => 20, 'control' => 8, 'direct' => 4], 3));
+        self::assertSame(9, Pooler::maxConnections(['application' => 1, 'control' => 1, 'direct' => 0], 7));
         foreach (['household' => '/deploy/household/postgresql.conf', 'full' => '/docker/postgres/conf/postgresql.conf'] as $profile => $path) {
             $configuration = HouseholdConfiguration::fromArray(array_replace(self::configuration(), ['profile' => $profile]));
             $content = file_get_contents(dirname(__DIR__, 3) . $path);
             self::assertIsString($content);
             $rendered = HouseholdRenderer::configurationFiles($configuration, $content)['postgres_configuration']['content'];
             $settings = new PostgresSettings($rendered)->expectedSettings();
-            $pools = Pooler::POOLS[$profile];
-            $connections = (int) $settings['max_connections'];
-            self::assertSame($pools['application'] + $pools['control'] + $pools['direct'] + (int) $settings['superuser_reserved_connections'], $connections, $profile);
-            self::assertSame(Pooler::maxConnections($pools, (int) $settings['superuser_reserved_connections']), $connections);
-            self::assertSame(HouseholdConfiguration::POSTGRES_SUPERUSER_SLOTS, (int) $settings['superuser_reserved_connections']);
-            self::assertSame(HouseholdConfiguration::POSTGRES_SHARED_BUFFERS_MIB[$profile] . 'MB', $settings['shared_buffers']);
-            self::assertSame(Pooler::postgresMemoryMiB(HouseholdConfiguration::POSTGRES_SHARED_BUFFERS_MIB[$profile], $connections), $configuration->resources['postgresMemoryMiB'], $profile);
-            self::assertSame(Pooler::memoryMiB($pools), $configuration->resources['poolerMemoryMiB'], $profile);
+            self::assertSame(Pooler::maxConnections(Pooler::POOLS[$profile], (int) $settings['superuser_reserved_connections']), (int) $settings['max_connections'], $profile);
         }
-    }
-
-    public function testDatabaseSizesAreDerivedFromThePools(): void
-    {
-        $pools = ['application' => 10, 'control' => 4, 'direct' => 3];
-        self::assertSame(20, Pooler::maxConnections($pools, 3));
-        self::assertSame(35, Pooler::maxConnections(['application' => 20, 'control' => 8, 'direct' => 4], 3));
-        // 128 + 128 + 24 * 20 = 736, rounded up to 768; 256 + 128 + 24 * 35 = 1224, rounded up to 1280.
-        self::assertSame(768, Pooler::postgresMemoryMiB(128, 20));
-        self::assertSame(1280, Pooler::postgresMemoryMiB(256, 35));
-        self::assertSame(128, Pooler::postgresMemoryMiB(0, 0));
-        self::assertSame(1408, Pooler::postgresMemoryMiB(256, 40));
-        // 24 + ceil(514 * 64 / 1024) = 57, rounded up to 64; a larger client limit needs more.
-        self::assertSame(64, Pooler::memoryMiB($pools));
-        self::assertSame(32, Pooler::memoryMiB($pools, 0));
-        self::assertSame(96, Pooler::memoryMiB(['application' => 40, 'control' => 16, 'direct' => 4], 1000));
-        $template = file_get_contents(dirname(__DIR__, 3) . '/docker/postgres/pooler/pgbouncer.ini');
-        self::assertIsString($template);
-        self::assertStringContainsString("\nmax_client_conn = " . Pooler::CLIENT_CONNECTIONS . "\n", $template);
-        $household = HouseholdConfiguration::databaseMemoryMiB('household');
-        $full = HouseholdConfiguration::databaseMemoryMiB('full');
-        self::assertSame(['postgresMemoryMiB' => 768, 'poolerMemoryMiB' => 64], $household);
-        self::assertSame(['postgresMemoryMiB' => 1280, 'poolerMemoryMiB' => 64], $full);
     }
 
     public function testConfigurationRejectsUnknownProfilesAndHostSourceMounts(): void
@@ -146,7 +130,7 @@ final class HouseholdDeploymentTest extends TestCase
         foreach ($compose['services'] as $name => $service) {
             self::assertSame($images[$roles[$name]]['id'], $service['image']);
             self::assertArrayNotHasKey('privileged', $service);
-            self::assertSame($service['mem_limit'], $service['memswap_limit']);
+            self::assertSame($service['mem_limit'] ?? null, $service['memswap_limit'] ?? null);
             foreach ($service['volumes'] ?? [] as $mount) {
                 self::assertSame('volume', $mount['type']);
                 self::assertNotSame('/var/run/docker.sock', $mount['target']);
@@ -162,8 +146,8 @@ final class HouseholdDeploymentTest extends TestCase
         $reservations = HouseholdRenderer::reservations($configuration, $profile);
         self::assertSame(2304, $reservations['controlMemoryMiB']);
         self::assertSame(4480, $reservations['executionMemoryMiB']);
-        self::assertSame(64, $reservations['poolerMemoryMiB']);
-        self::assertSame(10624, $reservations['totalMiB']);
+        self::assertArrayNotHasKey('postgresMemoryMiB', $reservations);
+        self::assertSame(9792, $reservations['totalMiB']);
         self::assertArrayNotHasKey('DB_PASSWORD', $workerEnvironment);
         self::assertArrayNotHasKey('APP_DOMAIN', $workerEnvironment);
         self::assertSame('household', $compose['services']['web']['environment']['BAANDER_DEPLOYMENT_PROFILE']);
@@ -183,7 +167,6 @@ final class HouseholdDeploymentTest extends TestCase
         self::assertArrayNotHasKey('postgres', $compose['services']['web']['depends_on']);
         self::assertSame(['BAANDER_POOLER_USER' => 'baander', 'BAANDER_POOLER_DATABASE' => 'baander', 'BAANDER_POOLER_SERVER_HOST' => 'postgres',
             'BAANDER_POOLER_APPLICATION_POOL_SIZE' => '10', 'BAANDER_POOLER_CONTROL_POOL_SIZE' => '4'], $pooler['environment']);
-        self::assertSame('64m', $pooler['mem_limit']);
         self::assertSame([['type' => 'volume', 'source' => 'pooler_credentials', 'target' => '/etc/baander-pooler/credentials', 'read_only' => true]], $pooler['volumes']);
         self::assertSame(['name' => 'baander-household-pooler-credentials', 'external' => true], $compose['volumes']['pooler_credentials']);
         self::assertArrayNotHasKey('pooler_credentials', HouseholdRenderer::configurationFiles($configuration, 'max_connections = 20'));

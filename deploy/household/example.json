@@ -23,7 +23,6 @@
     },
     "resources": {
         "webMemoryMiB": 1536,
-        "postgresMemoryMiB": 1152,
         "redisMemoryMiB": 384,
         "redisMaxmemoryMiB": 192,
         "gatewayMemoryMiB": 64,
