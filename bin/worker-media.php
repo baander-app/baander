@@ -36,7 +36,7 @@ try {
     $kernel->boot();
     $container = $kernel->getContainer();
     $container->set(\App\Shared\Infrastructure\Worker\NativeExecutionClientInterface::class, $native);
-    if ($deploymentProfile->videoEncoderSlots + $deploymentProfile->audioEncoderSlots > 0) {
+    if ($deploymentProfile->videoEncoderSlots > 0) {
         $prober = $container->get('worker.media.hardware_prober');
         if (!$prober instanceof \App\Transcode\Infrastructure\FFmpeg\HardwareCapabilitiesProber) {
             throw new RuntimeException('Media hardware prober is not configured.');
