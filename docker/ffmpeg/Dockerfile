@@ -1,5 +1,5 @@
 # Stage: System dependencies + Rust toolchain (shared base for all builder stages)
-FROM buildpack-deps:bookworm AS base-builder
+FROM buildpack-deps:trixie AS base-builder
 
 RUN set -xe \
     && DEBIAN_FRONTEND=noninteractive apt-get update -qq \
@@ -16,7 +16,7 @@ RUN set -xe \
       libfontconfig1-dev \
       libcairo2-dev \
       libpango1.0-dev \
-      libgdk-pixbuf2.0-dev \
+      libgdk-pixbuf-2.0-dev \
       libfftw3-dev \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
@@ -190,7 +190,7 @@ RUN set -xe \
 # ============================================================
 # Runtime image
 # ============================================================
-FROM debian:bookworm-slim
+FROM debian:trixie-slim
 
 COPY --from=ffmpeg-final /usr/src/ffmpeg-build-script/workspace/bin/ffmpeg /usr/local/bin/ffmpeg
 COPY --from=ffmpeg-final /usr/src/ffmpeg-build-script/workspace/bin/ffprobe /usr/local/bin/ffprobe
