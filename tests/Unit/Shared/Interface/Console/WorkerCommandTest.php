@@ -136,6 +136,20 @@ final class WorkerCommandTest extends TestCase
         self::assertStringNotContainsString('reconciled', $tester->getDisplay());
     }
 
+    public function testNonUtcDatabaseDefaultRefusesWithTheZoneNamed(): void
+    {
+        $runner = new class implements WorkerSupervisorRunnerInterface {
+            public function run(WorkerRuntimeConfiguration $configuration): int
+            {
+                throw \App\Shared\Application\Exception\DatabaseTimeZoneException::notUtc('Europe/Copenhagen');
+            }
+        };
+        $tester = new CommandTester(new WorkerCommand($runner));
+        self::assertSame(1, $tester->execute($this->options()));
+        self::assertStringContainsString('Europe/Copenhagen', $tester->getDisplay());
+        self::assertStringNotContainsString('reconciled', $tester->getDisplay());
+    }
+
     /** @return array<string, string> */
     private function options(): array
     {

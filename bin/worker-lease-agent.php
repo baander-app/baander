@@ -38,14 +38,7 @@ try {
     $connection = \App\Shared\Infrastructure\Doctrine\DedicatedConnectionFactory::fromParams($params);
     $repository = new \App\Shared\Infrastructure\Worker\DoctrineDeploymentLease($connection);
     if ($request['action'] === 'observe') {
-        $connection->executeStatement("SET statement_timeout = '1000ms'");
-        $epoch = $connection->fetchOne(<<<'SQL'
-            SELECT epoch FROM worker_deployment_leases l
-            WHERE namespace = :namespace AND owner_boot_id = :boot AND state = 'active'
-                AND expires_at > clock_timestamp() + make_interval(secs => :ttl)
-                AND EXISTS (SELECT 1 FROM worker_deployment_boots b WHERE b.namespace = l.namespace AND b.boot_id = l.owner_boot_id AND b.retirement_requested_at IS NULL AND b.retired_at IS NULL)
-            SQL, ['namespace' => $request['namespace'], 'boot' => $request['bootId'], 'ttl' => $request['ttlSeconds']]);
-        $lease = $epoch === false ? null : new \App\Shared\Infrastructure\Worker\DeploymentLease($request['namespace'], $request['bootId'], (int) $epoch);
+        $lease = $repository->observe($request['namespace'], $request['bootId'], $request['ttlSeconds']);
         $success = $lease !== null && ($request['epoch'] === null || $lease->epoch === $request['epoch']);
     } else {
         $lease = $request['action'] === 'acquire'

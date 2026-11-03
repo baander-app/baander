@@ -6,6 +6,7 @@ namespace App\Shared\Infrastructure\Worker;
 
 use App\Shared\Application\DTO\WorkerRuntimeConfiguration;
 use App\Shared\Application\Port\WorkerSupervisorRunnerInterface;
+use App\Shared\Infrastructure\Doctrine\DatabaseTimeZoneGuard;
 use App\Shared\Infrastructure\Messaging\AsyncWorkloadCatalog;
 use App\Shared\Infrastructure\Messaging\WorkerTransportConfiguration;
 use App\Shared\Infrastructure\Worker\Autoscaling\AdmissionLedger;
@@ -36,6 +37,11 @@ final readonly class WorkerSupervisorRunner implements WorkerSupervisorRunnerInt
             throw new \RuntimeException('Worker supervisor must run as deployment PID 1 with pcntl and posix support.');
         }
         $environment = $this->environment();
+        // Children connect through both URLs (the control URL logs in as its own role), so
+        // neither may default to another zone. Once per unit start, before any child exists.
+        foreach (array_unique([$this->databaseUrl, $this->controlDatabaseUrl]) as $databaseUrl) {
+            DatabaseTimeZoneGuard::assertUtcDefaultAt($databaseUrl);
+        }
         if (!is_dir($configuration->lockDirectory) && !mkdir($configuration->lockDirectory, 0700)) {
             throw new \RuntimeException('Cannot create private worker lock directory.');
         }

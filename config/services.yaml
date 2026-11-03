@@ -1125,6 +1125,11 @@ services:
     App\Transcode\Application\Port\AudioRenditionPortInterface:
         alias: App\Transcode\Infrastructure\Transcode\AudioRenditionCache
 
+    # The server master refuses to start when the database's default time zone is not UTC.
+    App\Shared\Infrastructure\Swoole\DatabaseTimeZoneStartupCheck:
+        arguments:
+            $databaseUrl: '%env(DATABASE_URL)%'
+
     # --- Web server drain (stop and restart) ---
     # One drain path from onBeforeShutdown; see DrainCoordinator.
     App\Shared\Infrastructure\Swoole\Drain\DrainBudget:

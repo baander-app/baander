@@ -17,6 +17,7 @@ use Doctrine\DBAL\Tools\DsnParser;
 use Doctrine\Migrations\Configuration\Connection\ExistingConnection;
 use Doctrine\Migrations\Configuration\Migration\ConfigurationArray;
 use Doctrine\Migrations\DependencyFactory;
+use Doctrine\Migrations\Tools\Console\Command\ExecuteCommand;
 use Doctrine\Migrations\Tools\Console\Command\MigrateCommand;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -108,10 +109,11 @@ final class InitialSchemaMigrationTest extends TestCase
         }
         $factory = $this->factory();
         $factory->getMetadataStorage()->ensureInitialized();
-        self::assertCount(16, $factory->getMigrationRepository()->getMigrations());
+        self::assertCount(17, $factory->getMigrationRepository()->getMigrations());
         self::assertSame(0, $this->migrate($factory));
-        self::assertSame(['DoctrineMigrations\\Version20261017000000', 'DoctrineMigrations\\Version20261017130000', 'DoctrineMigrations\\Version20261017150000', 'DoctrineMigrations\\Version20261017160000', 'DoctrineMigrations\\Version20261017170000', 'DoctrineMigrations\\Version20261018130000', 'DoctrineMigrations\\Version20261021120000', 'DoctrineMigrations\\Version20261030210000', 'DoctrineMigrations\\Version20261031120000', 'DoctrineMigrations\\Version20261101190000', 'DoctrineMigrations\\Version20261101203000', 'DoctrineMigrations\\Version20261101210000', 'DoctrineMigrations\\Version20261102190000', 'DoctrineMigrations\\Version20261102191000', 'DoctrineMigrations\\Version20261102200000', 'DoctrineMigrations\\Version20261103120000'], $this->connection->fetchFirstColumn('SELECT version FROM doctrine_migration_versions ORDER BY version'));
+        self::assertSame(['DoctrineMigrations\\Version20261017000000', 'DoctrineMigrations\\Version20261017130000', 'DoctrineMigrations\\Version20261017150000', 'DoctrineMigrations\\Version20261017160000', 'DoctrineMigrations\\Version20261017170000', 'DoctrineMigrations\\Version20261018130000', 'DoctrineMigrations\\Version20261021120000', 'DoctrineMigrations\\Version20261030210000', 'DoctrineMigrations\\Version20261031120000', 'DoctrineMigrations\\Version20261101190000', 'DoctrineMigrations\\Version20261101203000', 'DoctrineMigrations\\Version20261101210000', 'DoctrineMigrations\\Version20261102190000', 'DoctrineMigrations\\Version20261102191000', 'DoctrineMigrations\\Version20261102200000', 'DoctrineMigrations\\Version20261103120000', 'DoctrineMigrations\\Version20261103210000'], $this->connection->fetchFirstColumn('SELECT version FROM doctrine_migration_versions ORDER BY version'));
         self::assertSame(90, (int) $this->connection->fetchOne("SELECT count(*) FROM pg_tables WHERE schemaname = 'public' AND tablename <> 'doctrine_migration_versions'"));
+        self::assertSame(['TimeZone=UTC'], $this->databaseSettings($this->connection));
         $this->assertSchedules();
         $this->assertIdentitiesAllocate();
         $catalog = $this->catalog('public');
@@ -129,7 +131,7 @@ final class InitialSchemaMigrationTest extends TestCase
         self::assertSame($history, $this->connection->fetchAllAssociative('SELECT * FROM doctrine_migration_versions'));
 
         self::assertSame(0, $this->migrate($this->factory(true)));
-        self::assertSame(17, (int) $this->connection->fetchOne('SELECT count(*) FROM doctrine_migration_versions'));
+        self::assertSame(18, (int) $this->connection->fetchOne('SELECT count(*) FROM doctrine_migration_versions'));
         self::assertSame('future_migration_probe', $this->connection->fetchOne("SELECT to_regclass('future_migration_probe')::text"));
     }
 
@@ -389,6 +391,56 @@ SQL, [$jobs[0], $runtimeSession, $desired, str_repeat('a', 32)]);
         }
         self::assertSame(17, (int) $this->connection->fetchOne('SELECT id FROM saved'));
         self::assertNull($this->connection->fetchOne("SELECT to_regclass('fixture.users')") ?: null);
+    }
+
+    public function testTimeZoneMigrationSetsTheDatabaseDefaultAndDownRestoresIt(): void
+    {
+        // Upper case and a hyphen: the statement must quote the database name.
+        $database = 'Time-Zone-' . bin2hex(random_bytes(6));
+        $this->admin->executeStatement('CREATE DATABASE ' . $this->admin->quoteIdentifier($database));
+        $connection = DriverManager::getConnection(['dbname' => $database] + $this->connection->getParams());
+        try {
+            $serverDefault = $this->defaultZone($connection);
+            self::assertSame([], $this->databaseSettings($connection));
+
+            self::assertSame(0, $this->executeTimeZoneMigration($connection, '--up'));
+            self::assertSame(['TimeZone=UTC'], $this->databaseSettings($connection));
+            self::assertSame('UTC', $this->defaultZone($connection), 'New sessions start in UTC.');
+
+            self::assertSame(0, $this->executeTimeZoneMigration($connection, '--down'));
+            self::assertSame([], $this->databaseSettings($connection));
+            self::assertSame($serverDefault, $this->defaultZone($connection), 'The server configuration applies again.');
+        } finally {
+            $connection->close();
+            $this->admin->executeStatement('DROP DATABASE ' . $this->admin->quoteIdentifier($database) . ' WITH (FORCE)');
+        }
+    }
+
+    private function executeTimeZoneMigration(Connection $connection, string $direction): int
+    {
+        $factory = DependencyFactory::fromConnection(new ConfigurationArray([
+            'migrations_paths' => ['DoctrineMigrations' => dirname(__DIR__, 2) . '/migrations'],
+            'table_storage' => ['table_name' => 'doctrine_migration_versions'],
+        ]), new ExistingConnection($connection));
+
+        return (new CommandTester(new ExecuteCommand($factory)))->execute(['versions' => ['DoctrineMigrations\\Version20261103210000'], $direction => true], ['interactive' => false]);
+    }
+
+    /** @return list<string> the current database's own settings, for every role */
+    private function databaseSettings(Connection $connection): array
+    {
+        return $connection->fetchFirstColumn('SELECT unnest(setconfig) FROM pg_db_role_setting WHERE setrole = 0 AND setdatabase = (SELECT oid FROM pg_database WHERE datname = current_database())');
+    }
+
+    /** The zone a new session of $connection's database starts with. */
+    private function defaultZone(Connection $connection): string
+    {
+        $session = DriverManager::getConnection($connection->getParams());
+        try {
+            return (string) $session->fetchOne("SELECT reset_val FROM pg_settings WHERE name = 'TimeZone'");
+        } finally {
+            $session->close();
+        }
     }
 
     private function assertSchedules(): void

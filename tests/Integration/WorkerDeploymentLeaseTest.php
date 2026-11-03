@@ -62,6 +62,34 @@ final class WorkerDeploymentLeaseTest extends TestCase
         self::assertSame('0', $this->first->fetchOne('SHOW lock_timeout'), 'Transaction-local timeouts do not leak into later work.');
     }
 
+    public function testObservationAndRenewalKeepTheirTimeoutsInsideTheirTransaction(): void
+    {
+        $session = fn (): array => $this->first->fetchAssociative("SELECT current_setting('statement_timeout') AS statement, current_setting('lock_timeout') AS lock");
+        $before = $session();
+        $observer = new DoctrineDeploymentLease($this->first, 500, 50);
+        $lease = (new DoctrineDeploymentLease($this->second))->acquire('baander.app:workers', str_repeat('a', 32), 60);
+        self::assertNotNull($lease);
+        self::assertEquals($lease, $observer->observe($lease->namespace, $lease->bootId, 3));
+        self::assertNull($observer->observe($lease->namespace, $lease->bootId, 120), 'A lease that ends within the window is not observed.');
+        self::assertNull($observer->observe($lease->namespace, str_repeat('b', 32), 3));
+        self::assertTrue($observer->renew($lease, 60));
+        self::assertSame($before, $session(), 'Observation and renewal leave no timeout on the session a pooler hands to other clients.');
+
+        // The timeouts still bound the observation: an exclusive lock held elsewhere fails it within the lock timeout.
+        $this->second->beginTransaction();
+        $this->second->executeStatement('LOCK TABLE worker_deployment_boots IN ACCESS EXCLUSIVE MODE');
+        $started = microtime(true);
+        try {
+            $observer->observe($lease->namespace, $lease->bootId, 3);
+            self::fail('Observation must hit the real PostgreSQL lock timeout.');
+        } catch (DriverException $error) {
+            self::assertSame('55P03', $error->getSQLState());
+            self::assertLessThan(2.0, microtime(true) - $started);
+        } finally {
+            $this->second->rollBack();
+        }
+    }
+
     public function testExpiryAloneNeverAllowsTakeoverAndContainmentAdvancesEpoch(): void
     {
         $first = new DoctrineDeploymentLease($this->first);

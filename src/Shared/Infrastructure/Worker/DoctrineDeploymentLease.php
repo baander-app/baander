@@ -69,6 +69,24 @@ final class DoctrineDeploymentLease
         return $row === false ? null : new DeploymentLease($namespace, $row['owner_boot_id'], (int) $row['epoch']);
     }
 
+    /**
+     * The boot's active lease, when it stays valid for more than $ttlSeconds and the boot is not
+     * retiring. Reads without locking or renewing; observing grants no admission of its own.
+     */
+    public function observe(string $namespace, string $bootId, int $ttlSeconds): ?DeploymentLease
+    {
+        DeploymentLease::validateIdentity($namespace, $bootId);
+        $this->validateTtl($ttlSeconds);
+        $epoch = $this->operation(fn (): mixed => $this->connection->fetchOne(<<<'SQL'
+            SELECT epoch FROM worker_deployment_leases l
+            WHERE namespace = :namespace AND owner_boot_id = :boot AND state = 'active'
+                AND expires_at > clock_timestamp() + make_interval(secs => :ttl)
+                AND EXISTS (SELECT 1 FROM worker_deployment_boots b WHERE b.namespace = l.namespace AND b.boot_id = l.owner_boot_id AND b.retirement_requested_at IS NULL AND b.retired_at IS NULL)
+            SQL, ['namespace' => $namespace, 'boot' => $bootId, 'ttl' => $ttlSeconds]));
+
+        return $epoch === false ? null : new DeploymentLease($namespace, $bootId, (int) $epoch);
+    }
+
     public function renew(DeploymentLease $lease, int $ttlSeconds): bool
     {
         $this->validateTtl($ttlSeconds);

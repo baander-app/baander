@@ -7,6 +7,7 @@ namespace App\Shared\Interface\Console;
 use App\Shared\Application\DTO\WorkerRuntimeConfiguration;
 use App\Shared\Application\DTO\DeploymentProfile;
 use App\Shared\Application\DTO\WorkerAutoscalingProfile;
+use App\Shared\Application\Exception\DatabaseTimeZoneException;
 use App\Shared\Application\Exception\WorkerTransportConfigurationException;
 use App\Shared\Application\Port\WorkerSupervisorRunnerInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
@@ -62,6 +63,9 @@ final class WorkerCommand extends Command
         } catch (WorkerTransportConfigurationException $error) {
             $io->error($error->getMessage());
             return Command::INVALID;
+        } catch (DatabaseTimeZoneException $error) {
+            $io->error($error->getMessage());
+            return Command::FAILURE;
         } catch (\Throwable) {
             // Environment, transport and database diagnostics can contain secrets.
             $io->error('Worker supervisor failed; the deployment must be reconciled before replacement.');
