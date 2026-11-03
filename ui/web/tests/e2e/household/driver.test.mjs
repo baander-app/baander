@@ -7,7 +7,7 @@ const config = () => ({
   email: 'first@baander.app', password: 'private-first',
   slots: [
     { kind: 'audio', publicId: 'original-song', songTitle: 'Household original', expectedDelivery: 'original' },
-    { kind: 'video', publicId: 'copy-video', pagePath: '/movies/copy-movie', expectedDelivery: 'copy', email: 'second@baander.app', password: 'private-second' },
+    { kind: 'video', publicId: 'original-video', pagePath: '/movies/original-movie', expectedDelivery: 'original', email: 'second@baander.app', password: 'private-second' },
   ],
   outputPath: '/tmp/baander.app-observation.jsonl', readyPath: '/tmp/baander.app-ready.json', stopPath: '/tmp/baander.app-stop',
 })
@@ -22,8 +22,8 @@ test('normalizes per-slot credentials and keeps movie route distinct from delive
   const parsed = validateConfiguration(config())
   assert.equal(parsed.slots[0].email, 'first@baander.app')
   assert.equal(parsed.slots[1].email, 'second@baander.app')
-  assert.equal(parsed.slots[1].publicId, 'copy-video')
-  assert.equal(parsed.slots[1].pagePath, '/movies/copy-movie')
+  assert.equal(parsed.slots[1].publicId, 'original-video')
+  assert.equal(parsed.slots[1].pagePath, '/movies/original-movie')
   assert.equal(parsed.startupTimeoutSeconds, 180)
 })
 
@@ -35,7 +35,7 @@ test('rejects a shared canonical account, short qualification and escaping navig
   const escaping = config()
   escaping.slots[1].pagePath = '//outside.baander.app/movie'
   assert.throws(() => validateConfiguration(escaping), /pagePath/)
-  assert.throws(() => validateConfiguration({ ...config(), scenario: 'original-overlap' }), /disagree/)
+  assert.throws(() => validateConfiguration({ ...config(), scenario: 'fresh-copy-overlap' }), /disagree/)
 })
 
 test('accepts a full advancing native-video window with frame evidence', () => {
@@ -106,4 +106,13 @@ test('video startup cannot claim readiness without decoded frame advancement', (
   const after = [samples()[1], samples()[1]]
   after[0].media.decodedFrames = 0
   assert.equal(playersAdvancing(after, before, slots), false)
+})
+
+test('mixed playback pairs original music with an original video', () => {
+  const copyVideo = config()
+  copyVideo.slots[1].expectedDelivery = 'copy'
+  assert.throws(() => validateConfiguration(copyVideo), /Slot deliveries disagree with scenario/)
+  const twoVideos = config()
+  twoVideos.slots[0] = { ...twoVideos.slots[1], email: 'first@baander.app', password: 'private-first' }
+  assert.throws(() => validateConfiguration(twoVideos), /one audio and one video/)
 })

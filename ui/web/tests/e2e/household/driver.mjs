@@ -44,7 +44,8 @@ export function validateConfiguration(value) {
   })
   requireValue(slots[0].email.toLowerCase() !== slots[1].email.toLowerCase(), 'Two distinct accounts are required to preserve independent playback ownership')
   const deliveries = slots.map(slot => slot.expectedDelivery).sort().join(',')
-  requireValue(deliveries === ({ 'original-overlap': 'original,original', 'fresh-copy-overlap': 'copy,copy', 'mixed-overlap': 'copy,original' })[value.scenario], 'Slot deliveries disagree with scenario')
+  requireValue(deliveries === ({ 'original-overlap': 'original,original', 'fresh-copy-overlap': 'copy,copy', 'mixed-overlap': 'original,original' })[value.scenario], 'Slot deliveries disagree with scenario')
+  if (value.scenario === 'mixed-overlap') requireValue(slots.map(slot => slot.kind).sort().join(',') === 'audio,video', 'Mixed playback requires one audio and one video slot')
   for (const key of ['outputPath', 'readyPath', 'stopPath']) {
     requireValue(typeof value[key] === 'string' && isAbsolute(value[key]), `${key} must be an absolute path`)
   }
