@@ -247,11 +247,24 @@ final class SegmentEncoderTimestampOriginMediaTest extends TestCase
             '-map', '0:v', '-map', '1:a', '-t', '30', '-c:v', 'libx264', '-threads', $lateMoviePacket ? '2' : '1',
             '-preset', 'ultrafast', '-g', '1', '-bf', '0', '-pix_fmt', 'yuv420p',
             '-c:a', 'pcm_s16le', '-ac', $lateMoviePacket ? '1' : '2', $base]);
+        $restoreAudio = [];
+        if ($lateMoviePacket) {
+            // Muxers interleave by timestamp, so a delayed track never precedes the movie
+            // on its own. Interleave the audio one second ahead of the movie, then restore
+            // its timestamps in a copy that writes packets in their demuxed order.
+            $lead = $audioDelay + 1;
+            $early = $this->directory.'/early.mkv';
+            $this->runMedia(['/usr/bin/ffmpeg', '-hide_banner', '-loglevel', 'error', '-y', '-copyts',
+                '-i', $base, '-map', '0', '-c', 'copy', '-bsf:a', sprintf('setts=ts=TS-%s/TB', $lead),
+                '-avoid_negative_ts', 'disabled', $early]);
+            $base = $early;
+            $restoreAudio = ['-bsf:a', sprintf('setts=ts=TS+%s/TB', $lead), '-max_interleave_delta', '1'];
+        }
         $cues = $this->directory.'/cues.srt';
         file_put_contents($cues, "1\n00:00:02,000 --> 00:00:04,000\nEARLY\n\n2\n00:00:12,000 --> 00:00:14,000\nLATE\n");
         $source = $this->directory.'/source.mkv';
         $this->runMedia(['/usr/bin/ffmpeg', '-hide_banner', '-loglevel', 'error', '-y', '-copyts',
-            '-i', $base, '-i', $cues, '-map', '0', '-map', '1:0', '-c', 'copy',
+            '-i', $base, '-i', $cues, '-map', '0', '-map', '1:0', '-c', 'copy', ...$restoreAudio,
             '-output_ts_offset', (string) $origin, '-avoid_negative_ts', 'disabled', $source]);
         return $source;
     }

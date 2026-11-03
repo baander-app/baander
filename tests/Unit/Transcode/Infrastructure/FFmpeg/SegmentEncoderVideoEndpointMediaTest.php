@@ -60,7 +60,11 @@ final class SegmentEncoderVideoEndpointMediaTest extends TestCase
         $raw = json_decode($json, true, 512, JSON_THROW_ON_ERROR);
         $video = $raw['streams'][0];
         self::assertSame('video', $video['codec_type']);
-        self::assertEqualsWithDelta($fixture['containerEnd'], (float) $raw['format']['duration'], 0.002);
+        $formatDuration = (float) $raw['format']['duration'];
+        // FFmpeg 7 reports a MOV container's span from its start time; earlier versions report its end.
+        self::assertTrue(abs($fixture['containerEnd'] - $formatDuration) <= 0.002
+            || (!$fixture['matroska'] && abs($fixture['containerEnd'] - (float) $raw['format']['start_time'] - $formatDuration) <= 0.002),
+            sprintf('Container duration %.6f must reach the source end %.6f.', $formatDuration, $fixture['containerEnd']));
         self::assertEqualsWithDelta($fixture['clockOrigin'] === 4.0 && !$fixture['sparse'] ? 4.0
             : ($fixture['timestampOrigin'] !== null ? 12.0 : 0.0), (float) $raw['format']['start_time'], 0.002);
         if ($fixture['matroska']) {
@@ -80,13 +84,15 @@ final class SegmentEncoderVideoEndpointMediaTest extends TestCase
         self::assertNotEmpty($sourcePackets);
         self::assertEqualsWithDelta($fixture['videoStart'], (float) $sourcePackets[0]['pts_time'], 0.002);
         $frameJson = $this->runMedia(['/usr/bin/ffprobe', '-v', 'error', '-threads', '2', '-select_streams', 'V:0',
-            '-show_frames', '-show_entries', 'frame=pts_time,pkt_duration_time,pict_type', '-of', 'json', $source]);
+            '-show_frames', '-show_entries', 'frame=pts_time,duration_time,pkt_duration_time,pict_type', '-of', 'json', $source]);
         file_put_contents($this->directory.'/source-decoded-frames.json', $frameJson);
         $frames = json_decode($frameJson, true, 512, JSON_THROW_ON_ERROR)['frames'];
         $sourceEnd = 0.0;
         foreach ($frames as $frame) {
-            self::assertGreaterThan(0.0, (float) $frame['pkt_duration_time']);
-            $sourceEnd = max($sourceEnd, (float) $frame['pts_time'] + (float) $frame['pkt_duration_time']);
+            // FFmpeg 6 renamed the frame duration from pkt_duration_time to duration_time.
+            $duration = (float) ($frame['duration_time'] ?? $frame['pkt_duration_time'] ?? 0.0);
+            self::assertGreaterThan(0.0, $duration);
+            $sourceEnd = max($sourceEnd, (float) $frame['pts_time'] + $duration);
         }
         self::assertEqualsWithDelta($fixture['videoStart'] + $fixture['span'], $sourceEnd, 0.002);
         self::assertCount((int) round($fixture['span'] * $fixture['rate']), $frames);

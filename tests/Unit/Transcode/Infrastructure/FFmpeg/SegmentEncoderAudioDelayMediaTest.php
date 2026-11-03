@@ -170,7 +170,7 @@ final class SegmentEncoderAudioDelayMediaTest extends TestCase
                     // A terminal codec packet can contain only encoder padding after the audible tail.
                     $paddingOnlyTail = $segment === $track->segments[array_key_last($track->segments)]
                         && count($packets) === 1 && $segment->duration / $track->timescale <= $codecFrameDuration + 0.0001;
-                    $pcm = $this->decodeAudio($combined);
+                    $pcm = $this->decodeAudio($combined, $paddingOnlyTail);
                     $decodedDuration = strlen($pcm) / 4 / 48_000;
                     self::assertEqualsWithDelta($segment->duration / $track->timescale, $decodedDuration, 0.05);
                     $pcmSeconds += $decodedDuration;
@@ -457,7 +457,7 @@ final class SegmentEncoderAudioDelayMediaTest extends TestCase
         return $markers;
     }
 
-    private function decodeAudio(string $path): string
+    private function decodeAudio(string $path, bool $paddingOnly = false): string
     {
         $decoded = $path . '.f32le';
         $this->runMedia(['/usr/bin/ffmpeg', '-hide_banner', '-loglevel', 'error', '-xerror', '-y',
@@ -466,7 +466,11 @@ final class SegmentEncoderAudioDelayMediaTest extends TestCase
         self::assertNotFalse($pcm);
         $samples = unpack('g*', $pcm);
         self::assertIsArray($samples);
-        self::assertNotEmpty($samples);
+        // FFmpeg 7 drops the encoder padding a padding-only terminal packet carries,
+        // so that packet may decode to no samples at all.
+        if (!$paddingOnly) {
+            self::assertNotEmpty($samples);
+        }
         return $pcm;
     }
 

@@ -65,7 +65,9 @@ final class VideoCopyPresentationTest extends TestCase
                 '-f', 'lavfi', '-i', 'testsrc2=size=320x180:rate=25',
                 ...($hasAudio ? ['-f', 'lavfi', '-i', 'sine=frequency=440:sample_rate=48000'] : []),
                 '-t', '17.37', '-c:v', 'libx264', '-threads', '1', '-bf', '0', '-g', '1000', '-keyint_min', '1000', '-sc_threshold', '0',
-                '-force_key_frames', '0,2.92,8.20,11.16,14.76', '-color_primaries', 'bt709', '-color_trc', 'bt709', '-colorspace', 'bt709', '-c:a', 'aac', '-output_ts_offset', '3.25', $source]);
+                // FFmpeg 7 ignores encoder-side colour options, so tag the frames instead.
+                '-force_key_frames', '0,2.92,8.20,11.16,14.76', '-vf', 'setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709',
+                '-c:a', 'aac', '-output_ts_offset', '3.25', $source]);
             $fixture->mustRun();
             $profile = new DeploymentProfile('household');
             $native = new NativeExecutionFixture('baander.app:test', str_repeat('c', 32), profile: $profile);

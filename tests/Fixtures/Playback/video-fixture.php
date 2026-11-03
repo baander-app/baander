@@ -64,7 +64,8 @@ final class PlaybackVideoFixture
             '-pix_fmt', 'yuv420p',
             '-g', '24', '-c:a', 'aac',
             ...($extension === 'mp4' ? ['-movflags', '+faststart'] : []),
-            ...($delivery === 'encoded' ? [] : ['-colorspace', 'bt709', '-color_primaries', 'bt709', '-color_trc', 'bt709']),
+            // Tag frames in the filter graph: FFmpeg 7 ignores encoder-side colour options.
+            ...($delivery === 'encoded' ? [] : ['-vf', 'setparams=colorspace=bt709:color_primaries=bt709:color_trc=bt709']),
             '-metadata', 'title=Owned playback ' . $run,
             $manifest['video']['path'],
         ], timeout: 60);

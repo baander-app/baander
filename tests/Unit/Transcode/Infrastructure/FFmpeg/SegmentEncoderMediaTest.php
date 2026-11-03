@@ -233,10 +233,12 @@ final class SegmentEncoderMediaTest extends TestCase
             }
             $raw = $this->directory.'/source.yuv';
             file_put_contents($raw, $frame);
+            // Tag the raw input: FFmpeg 7 encodes the colour properties of the decoded
+            // frames and ignores encoder-side colour options.
             $this->runColorMedia(['/usr/bin/ffmpeg', '-hide_banner', '-loglevel', 'error', '-y',
                 '-stream_loop', '-1', '-f', 'rawvideo', '-pixel_format', 'yuv420p10le', '-video_size', '64x64',
-                '-framerate', '4', '-i', $raw, '-t', $hdr ? '0.5' : '6.5', '-c:v', 'ffv1', '-threads', '1',
-                '-color_primaries', 'bt2020', '-color_trc', $transfer, '-colorspace', 'bt2020nc', '-color_range', 'tv', $source]);
+                '-framerate', '4', '-color_primaries', 'bt2020', '-color_trc', $transfer, '-colorspace', 'bt2020nc',
+                '-color_range', 'tv', '-i', $raw, '-t', $hdr ? '0.5' : '6.5', '-c:v', 'ffv1', '-threads', '1', $source]);
             $sourceProbe = $this->probeColorMedia($source);
             $probe = VideoProbeResult::fromProbeOutput($sourceProbe);
             $encoder = new SegmentEncoder(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile('full')), $this->createStub(FFmpegPortInterface::class), $this->createStub(TranscodeStoragePortInterface::class), EncoderProfile::software($codec));
