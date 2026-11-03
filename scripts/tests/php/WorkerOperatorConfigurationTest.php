@@ -67,16 +67,18 @@ final class WorkerOperatorConfigurationTest extends TestCase
         self::assertFalse($configuration->useImage);
     }
 
-    public function testMediaCostWidensTheExecutionUnitAndSelectsItsEncoder(): void
+    public function testMediaCostRaisesTheHostRequirementAndSelectsItsEncoder(): void
     {
         $default = new OperatorConfiguration(['BAANDER_TEST_MEDIA_CONTROL_OBSERVATION' => '1']);
         self::assertFalse($default->mediaCost);
-        self::assertSame(2, $default->executionCpus());
+        self::assertSame(4, $default->minimumCpus());
+        self::assertSame(13, $default->minimumHostMemoryGiB());
         $cost = new OperatorConfiguration(['BAANDER_TEST_MEDIA_CONTROL_OBSERVATION' => '1', 'BAANDER_TEST_MEDIA_COST' => '1', 'BAANDER_TEST_MEDIA_COST_ENCODER' => 'libx265']);
-        self::assertSame(8, $cost->executionCpus());
-        self::assertSame(4480, $default->executionMemoryMiB());
-        self::assertSame(9216, $cost->executionMemoryMiB());
+        self::assertSame(10, $cost->minimumCpus());
+        self::assertSame(18, $cost->minimumHostMemoryGiB());
         self::assertSame('libx265', $cost->mediaCostEncoder);
+        $twoCommand = new OperatorConfiguration(['BAANDER_TEST_TWO_COMMAND' => '1', 'BAANDER_TEST_AUTOSCALING_MAXIMUM' => '4']);
+        self::assertSame(16, $twoCommand->minimumHostMemoryGiB());
     }
 
     /** @return iterable<string,array{array<string,string>,string}> */

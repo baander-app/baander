@@ -12,6 +12,7 @@ namespace Baander\Tooling\Fixtures\Worker;
 final class MediaCost
 {
     private const float CLOCK_TICKS = 100.0;
+    private const int NATIVE_NICENESS = KillOrderEvidence::NATIVE_COMMAND_NICENESS;
     /** Encoder warm-up excluded from the steady-state window, in seconds of output. */
     private const float WARM_UP_OUTPUT_SECONDS = 3.0;
 
@@ -40,13 +41,13 @@ final class MediaCost
                 if ($kind === null || !self::overlaps($process, $start, $end)) {
                     continue;
                 }
-                $jobs[] = $kind + self::nativeCost($process, $kind, $sources);
+                $jobs[] = $kind + self::nativeCost($process, $kind, $sources) + ['priority' => self::priority($process, self::NATIVE_NICENESS)];
             }
             $media = [];
             foreach ($children as $process) {
                 $role = self::childRole($process, $children);
                 if ($role !== null && self::overlaps($process, $start, $end)) {
-                    $media[] = $role + self::memory($process);
+                    $media[] = $role + self::memory($process) + ['priority' => self::priority($process, 0)];
                 }
             }
             $window = Reports::window($execution['samples'], $start, $end);
@@ -65,8 +66,10 @@ final class MediaCost
                 'client' => array_diff_key($phase, array_flip(['name', 'startedAt', 'endedAt'])),
             ];
         }
+        $units = Reports::json($artifacts . '/containers-before.json');
         return [
             'version' => 1,
+            'unitResources' => KillOrderEvidence::unlimitedPair($units[0], $units[1]),
             'host' => $execution['header'],
             'controlUnit' => $control['header']['cgroup'] ?? null,
             'serviceCgroups' => $host[0]['header']['cgroups'] ?? null,
@@ -129,14 +132,44 @@ final class MediaCost
     }
 
     /**
-     * Strip the observation wrapper and its progress options so classification
-     * sees the arguments the application passed.
+     * Requires a media process to run with the media work out-of-memory score and the given
+     * niceness, as of its last sample.
+     *
+     * @param array{id:string,arguments:list<string>,samples:list<array<string,mixed>>} $process
+     * @return array{nice:int,oomScoreAdj:int}
+     */
+    private static function priority(array $process, int $nice): array
+    {
+        $last = $process['samples'][array_key_last($process['samples'])];
+        Reports::require(
+            ($last['nice'] ?? null) === $nice && ($last['oomScoreAdj'] ?? null) === KillOrderEvidence::MEDIA_WORK,
+            'Media process ' . $process['id'] . ' does not run at nice ' . $nice . ' with the media work out-of-memory score',
+        );
+        return ['nice' => $nice, 'oomScoreAdj' => KillOrderEvidence::MEDIA_WORK];
+    }
+
+    /**
+     * Strip the native launcher, the observation wrapper and its progress options so
+     * classification sees the arguments the application passed. Each launcher step replaces
+     * itself in place, so a process first sampled mid-launch keeps those steps in its arguments.
      *
      * @param list<string> $arguments
      * @return list<string>
      */
     public static function nativeArguments(array $arguments): array
     {
+        while (true) {
+            $program = basename($arguments[0] ?? '');
+            if ($program === 'setsid') {
+                $arguments = array_slice($arguments, 1);
+            } elseif ($program === 'nice' && ($arguments[1] ?? null) === '-n') {
+                $arguments = array_slice($arguments, 3);
+            } elseif ($program === 'choom' && ($arguments[1] ?? null) === '-n' && ($arguments[3] ?? null) === '--') {
+                $arguments = array_slice($arguments, 4);
+            } else {
+                break;
+            }
+        }
         if (str_ends_with($arguments[1] ?? '', '/ffmpeg') || str_ends_with($arguments[1] ?? '', 'media-control-ffmpeg.php')) {
             $arguments = ['ffmpeg', ...array_slice($arguments, 2)];
         }

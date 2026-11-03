@@ -398,25 +398,13 @@ final class AutoscalingVerifier
         $pressureEnd = $media['pressureEndedAt'];
         Reports::require($pressureEnd - $pressureStart >= 60, 'Pressure window lasted less than sixty seconds');
         self::streamWindow($values, $pressureStart, $pressureEnd, 'control');
+        // The execution unit has no CPU quota, so media load is measured against every host CPU and
+        // rarely crosses the CPU ceiling; the policy tests cover blocked growth. The drill requires
+        // host-relative measurement under media load, and that admission never grows on high CPU evidence.
         $pressure = Reports::window($values, $pressureStart + 5, $pressureEnd);
-        Reports::require(
-            $pressure !== [] && array_any(
-                $pressure,
-                static fn(array $sample): bool => in_array(
-                    $sample['admission']['reason'],
-                    [
-                        'resource_growth_blocked',
-                        'resource_pressure',
-                        'severe_resource_pressure',
-                    ],
-                    true,
-                ),
-            ),
-            'CPU pressure did not block growth',
-        );
+        Reports::require($pressure !== [], 'Missing control samples under media CPU load');
         $high = static fn(array $sample): bool => ($sample['admission']['evidence']['cpuUtilization'] ?? 0) >= .85
             || ($sample['admission']['evidence']['cpuThrottledRatio'] ?? 0) >= .1;
-        Reports::require(array_any($pressure, $high), 'No measured CPU pressure');
         foreach (array_slice($pressure, 1) as $index => $after) {
             Reports::require(
                 !$high($after) || $after['admission']['target'] <= $pressure[$index]['admission']['target'],
@@ -472,6 +460,9 @@ final class AutoscalingVerifier
             'Missing execution measurements',
         );
         $executionWindow = self::streamWindow($execution, $pressureStart, $pressureEnd, 'execution');
+        $hostRelative = self::hostRelative($pressure, Reports::window($execution, $pressureStart + 5, $pressureEnd));
+        $units = Reports::json($root . '/containers-before.json');
+        $unitResources = KillOrderEvidence::unlimitedPair($units[0], $units[1]);
         foreach ($execution as $sample) {
             self::currentAuthority($sample, $identity);
         }
@@ -559,9 +550,21 @@ final class AutoscalingVerifier
             $completionTimes[] = $duration;
         }
         $nativeCounts = [];
+        $prioritized = 0;
         $audioIdentities = null;
         foreach ($executionWindow as $sample) {
             $native = self::nativeProcesses($sample);
+            foreach ($native as [$process, $arguments]) {
+                if (!KillOrderEvidence::nativeCommand($arguments)) {
+                    continue;
+                }
+                Reports::require(
+                    ($process['nice'] ?? null) === KillOrderEvidence::NATIVE_COMMAND_NICENESS
+                        && ($process['oomScoreAdj'] ?? null) === KillOrderEvidence::MEDIA_WORK,
+                    'Native command did not run at nice 10 with the media work out-of-memory score',
+                );
+                ++$prioritized;
+            }
             $videos = array_filter(
                 $native,
                 static fn(array $entry): bool => in_array(
@@ -596,6 +599,7 @@ final class AutoscalingVerifier
             $nativeCounts[] = count($native);
         }
         Reports::require(!empty($audioIdentities), 'Admitted held audio PID identity changed during pressure');
+        Reports::require($prioritized > 0, 'No running native command was sampled under media CPU load');
         $heldAudio = array_values($audioIdentities);
         sort($heldAudio);
         foreach ([$values, $execution] as $source) {
@@ -648,7 +652,11 @@ final class AutoscalingVerifier
                 'samples' => count($executionWindow),
                 'minimumProcesses' => min($nativeCounts),
                 'heldAudioIdentities' => $heldAudio,
+                'prioritizedCommandSamples' => $prioritized,
             ],
+            'hostRelativeMeasurement' => $hostRelative,
+            'unitResources' => $unitResources,
+            'cpuPressure' => KillOrderEvidence::pressureProcesses(Reports::samples($root . '/pressure.log')),
             'peakResidentRssBytes' => max(array_map(
                 static fn(array $sample): int|float => array_column(
                     $sample['processes'],
@@ -667,6 +675,63 @@ final class AutoscalingVerifier
         ];
         Reports::publish($root . '/qualification.json', $result);
         return $result;
+    }
+
+    /**
+     * Worker units carry no CPU, memory or PID limit, so the execution cgroup is measured against
+     * the host: every known observation carries the host's CPU count, memory and task bound, and
+     * the utilization it reports matches the cgroup's own CPU time over all host CPUs.
+     *
+     * @param list<array<string,mixed>> $control
+     * @param list<array<string,mixed>> $execution
+     * @return array{hostCpus:int,observations:int,meanUtilization:float,cgroupUtilization:float}
+     */
+    public static function hostRelative(array $control, array $execution): array
+    {
+        Reports::require(count($execution) > 1, 'Missing execution samples for host-relative measurement');
+        $host = $execution[0]['host'] ?? null;
+        Reports::require(
+            is_array($host) && is_int($host['cpus'] ?? null) && $host['cpus'] > 0
+                && is_int($host['memoryBytes'] ?? null) && is_int($host['tasks'] ?? null),
+            'Execution sampler lacks the host figures',
+        );
+        foreach ($execution as $sample) {
+            Reports::require(
+                str_starts_with(trim((string) $sample['cpu.max']), 'max ') && trim((string) $sample['memory.max']) === 'max'
+                    && trim((string) $sample['pids.max']) === 'max',
+                'Execution cgroup carries a CPU, memory or PID limit',
+            );
+        }
+        $utilizations = [];
+        foreach ($control as $sample) {
+            $observation = $sample['resource']['observation'];
+            if ($observation['state'] !== 'known') {
+                continue;
+            }
+            Reports::require(
+                (float) ($observation['cpuQuotaCores'] ?? 0) === (float) $host['cpus']
+                    && ($observation['memoryMax'] ?? null) === $host['memoryBytes'] && ($observation['pidsMax'] ?? null) === $host['tasks'],
+                'Resource observation is not measured against the host',
+            );
+            $utilizations[(string) $observation['sampledAt']] = Reports::number($observation['cpuUtilization']);
+        }
+        Reports::require($utilizations !== [], 'No known resource observation under media CPU load');
+        $observed = array_sum($utilizations) / count($utilizations);
+        $first = $execution[0];
+        $last = $execution[array_key_last($execution)];
+        $measured = (Reports::counters($last['cpu.stat'])['usage_usec'] - Reports::counters($first['cpu.stat'])['usage_usec'])
+            / 1e6 / (($last['monotonic'] - $first['monotonic']) * $host['cpus']);
+        // A quota- or single-CPU-relative figure would differ from the host-relative one by the host's CPU count.
+        Reports::require(
+            $measured > 0 && $observed >= $measured / 2 && $observed <= $measured * 2,
+            'Measured CPU utilization is not relative to the host CPUs',
+        );
+        return [
+            'hostCpus' => $host['cpus'],
+            'observations' => count($utilizations),
+            'meanUtilization' => round($observed, 4),
+            'cgroupUtilization' => round($measured, 4),
+        ];
     }
 
     /** @return array<string,mixed> */

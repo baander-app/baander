@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 // Bounded per-process cost sampler inside one disposable worker unit. The first
-// line describes the host and unit limits; every later line is one sample.
+// line describes the host and the unit's cgroup; every later line is one sample.
 // A process's arguments are written once, the first time its identity is seen.
 
 $seconds = (float) ($argv[1] ?? 60);
@@ -89,6 +89,8 @@ while (hrtime(true) < $deadline) {
             'cpuTicks' => (int) $fields[11] + (int) $fields[12],
             'startTicks' => (int) $fields[19],
             'threads' => (int) $fields[17],
+            'nice' => (int) $fields[16],
+            'oomScoreAdj' => is_string($score = $read($path . '/oom_score_adj', 32)) ? (int) trim($score) : null,
             'rssKib' => $kib('VmRSS'),
             'hwmKib' => $kib('VmHWM'),
         ];

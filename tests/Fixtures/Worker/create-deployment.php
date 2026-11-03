@@ -63,11 +63,7 @@ try {
                 $arguments[3],
                 ['/usr/local/bin/php', '-r', $sleeper],
                 'none',
-                64 * 1024 * 1024,
-                1_000_000_000,
-                32,
                 $unit,
-                [$unit === DeploymentUnit::Control ? 0 : 1],
                 $ipcVolume,
                 $appHome,
                 new DeploymentProfile('full'),
@@ -141,13 +137,9 @@ try {
         $boot,
         $daemon,
         $original->imageId,
-        $original->command,
+        [...$original->command, 'changed'],
         $original->network,
-        $original->memoryBytes + 16 * 1024 * 1024,
-        $original->nanoCpus,
-        $original->pidsLimit,
         $original->unit,
-        $original->cpuSet,
         $ipcVolume,
         $appHome,
         $original->deploymentProfile,
@@ -167,6 +159,13 @@ try {
     foreach ([$control, $execution] as $binding) {
         if (trim($command->execute(['container', 'inspect', '--format', '{{.State.Status}} {{.State.Pid}}', $binding->containerId])) !== 'created 0') {
             throw new RuntimeException('Create/reconciliation started a unit automatically.');
+        }
+        $resources = trim($command->execute(['container', 'inspect', '--format',
+            '{{.HostConfig.Memory}} {{.HostConfig.MemorySwap}} {{.HostConfig.NanoCpus}} {{json .HostConfig.PidsLimit}} {{json .HostConfig.CpusetCpus}} {{.HostConfig.OomScoreAdj}}',
+            $binding->containerId]));
+        $score = $recipes[$binding->unit->value]->oomScoreAdj;
+        if (!in_array($resources, ['0 0 0 null "" ' . $score, '0 0 0 0 "" ' . $score], true)) {
+            throw new RuntimeException('Created unit carries a resource limit or a different out-of-memory score: ' . $resources);
         }
         if (!$start($binding, $recipes[$binding->unit->value])) {
             throw new RuntimeException('Registered unit start denied.');

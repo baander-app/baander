@@ -144,6 +144,8 @@ final class WorkerFixtureTest extends TestCase
                     'startTicks' => '100',
                     'rssBytes' => 4096,
                     'cmdline' => "/usr/bin/ffmpeg\0-i\0/media/source/" . ($index < 3 ? 'video.mkv' : 'track.flac') . "\0",
+                    'nice' => 10,
+                    'oomScoreAdj' => 600,
                 ];
             }
             $receipts = array_filter($completed, static fn(array $receipt): bool => $receipt['finished'] <= $at);
@@ -187,6 +189,9 @@ final class WorkerFixtureTest extends TestCase
                         'cpuUtilization' => .1,
                         'memoryRatio' => .3,
                         'pidsRatio' => .1,
+                        'cpuQuotaCores' => 16.0,
+                        'memoryMax' => 64 * 1024 ** 3,
+                        'pidsMax' => 4_194_304,
                     ],
                 ],
                 'status' => [
@@ -198,9 +203,13 @@ final class WorkerFixtureTest extends TestCase
                     'resources' => ['state' => 'known'],
                 ],
                 'connections' => 10,
+                'host' => ['cpus' => 16, 'memoryBytes' => 64 * 1024 ** 3, 'tasks' => 4_194_304],
                 'memory.current' => '1234',
                 'pids.current' => '4',
                 'cpu.stat' => 'usage_usec ' . (200 + $at * 2_000_000),
+                'cpu.max' => "max 100000\n",
+                'memory.max' => "max\n",
+                'pids.max' => "max\n",
                 'processes' => $processes,
             ];
         }
@@ -237,8 +246,12 @@ final class WorkerFixtureTest extends TestCase
         );
         $this->json(
             'containers-before.json',
-            array_fill(0, 2, ['Created' => '1970-01-01T00:15:00Z', 'State' => ['StartedAt' => '1970-01-01T00:15:50Z']]),
+            array_map(
+                static fn(int $score): array => ['Created' => '1970-01-01T00:15:00Z', 'State' => ['StartedAt' => '1970-01-01T00:15:50Z'], 'HostConfig' => self::unlimited($score)],
+                [-500, 300],
+            ),
         );
+        $this->lines('pressure.log', self::cpuPressure());
         $this->writeValues();
     }
 
@@ -258,6 +271,9 @@ final class WorkerFixtureTest extends TestCase
         self::assertSame(64.0, $result['ordinaryCpu']['executionCpuSeconds']);
         self::assertSame(4, $result['nativePressure']['minimumProcesses']);
         self::assertSame(['known' => 400, 'unknown' => 0, 'unavailable' => 0], $result['resourceStates']);
+        self::assertSame(['hostCpus' => 16, 'observations' => 56, 'meanUtilization' => .1, 'cgroupUtilization' => .125], $result['hostRelativeMeasurement']);
+        self::assertSame(61 * 4, $result['nativePressure']['prioritizedCommandSamples']);
+        self::assertSame(4, $result['cpuPressure']['processes']);
         self::assertFileExists($this->root . '/qualification.json');
     }
 
@@ -269,7 +285,12 @@ final class WorkerFixtureTest extends TestCase
             'overadmission',
             'foreign-lease',
             'stalled-control',
-            'unmeasured-pressure',
+            'quota-relative',
+            'unhosted-utilization',
+            'limited-execution',
+            'limited-unit',
+            'unprioritized-native',
+            'unprioritized-burner',
             'stale-controller',
             'stale-status',
             'truncated-execution',
@@ -331,11 +352,26 @@ final class WorkerFixtureTest extends TestCase
                 break;
             case 'stalled-control': $this->values[10]['monotonic'] = 20;
                 break;
-            case 'unmeasured-pressure':
-                foreach ($this->values as &$value) {
-                    $value['admission']['reason'] = 'stable';
+            case 'quota-relative': $this->values[320]['resource']['observation']['cpuQuotaCores'] = 2.0;
+                break;
+            case 'unhosted-utilization':
+                for ($at = 305; $at <= 360; ++$at) {
+                    $this->values[$at]['resource']['observation']['cpuUtilization'] = 1.0;
                 }
-                unset($value);
+                break;
+            case 'limited-execution': $this->values[320]['memory.max'] = "4697620480\n";
+                break;
+            case 'limited-unit':
+                $units = Reports::json($this->root . '/containers-before.json');
+                $units[1]['HostConfig']['NanoCpus'] = 2_000_000_000;
+                $this->json('containers-before.json', $units);
+                break;
+            case 'unprioritized-native': $this->values[320]['processes'][0]['nice'] = 0;
+                break;
+            case 'unprioritized-burner':
+                $pressure = self::cpuPressure();
+                $pressure[2]['oomScoreAdj'] = 300;
+                $this->lines('pressure.log', $pressure);
                 break;
             case 'stale-controller': $this->values[399]['admission']['controllerAt'] = 0;
                 break;
@@ -479,7 +515,7 @@ final class WorkerFixtureTest extends TestCase
         if ($verifier === 'autoscaling') {
             $this->autoscalingFixture();
         } else {
-            $this->capacityFixture('memory');
+            $this->capacityFixture('native-loss');
         }
         $path = $this->root . '/control-samples.jsonl';
         if (str_ends_with($suffix, "\n")) {
@@ -494,7 +530,7 @@ final class WorkerFixtureTest extends TestCase
         if ($verifier === 'autoscaling') {
             AutoscalingVerifier::verify($this->root, 2);
         } else {
-            ControlCapacityVerifier::verify($this->root, 'memory');
+            ControlCapacityVerifier::verify($this->root, 'native-loss');
         }
     }
 
@@ -589,12 +625,7 @@ final class WorkerFixtureTest extends TestCase
                 'Id' => $name,
                 'Config' => ['Env' => ['BAANDER_WORKER_BOOT_ID=boot']],
                 'Mounts' => [['Type' => 'volume', 'Name' => 'worker-ipc', 'Destination' => '/run/baander-worker']],
-                'HostConfig' => [
-                    'Memory' => ($index === 0 ? 2944 : ($index === 1 ? 4480 : 256)) * 1024 * 1024,
-                    'PidsLimit' => $index === 0 ? 129 : 256,
-                    'NanoCpus' => $index === 1 ? 2_000_000_000 : 1_000_000_000,
-                    'CpusetCpus' => $index === 0 ? '1' : '2,3',
-                ],
+                'HostConfig' => self::unlimited($index === 0 ? -500 : ($index === 1 ? 300 : 0)),
                 'State' => ['Running' => true, 'OOMKilled' => false],
                 'RestartCount' => 0,
             ];
@@ -609,7 +640,7 @@ final class WorkerFixtureTest extends TestCase
         $this->json('containers-after-pressure.json', array_slice($containers, 0, 2));
         $this->json('containers-after.json', array_slice($containers, 0, 2));
         file_put_contents($this->root . '/drain-seconds.txt', '2');
-        file_put_contents($this->root . '/drain-trigger.txt', 'automatic-execution-exhaustion');
+        file_put_contents($this->root . '/drain-trigger.txt', 'automatic-native-loss');
         $capture = [
             'containerIds' => ['control' => 'control', 'execution' => 'execution'],
             'captureExitCode' => 0,
@@ -638,21 +669,22 @@ final class WorkerFixtureTest extends TestCase
                 'monotonic' => $at,
                 'heartbeat' => ['namespace' => 'worker.baander.app', 'bootId' => 'boot', 'unit' => 'control', 'epoch' => 1, 'draining' => false, 'time' => $at - .1],
                 'lease' => ['owner_boot_id' => 'boot', 'epoch' => 1, 'state' => 'active', 'unexpired' => true],
-                'memory.events' => 'oom_kill ' . ($phase === 'memory' && $at > 5 ? 1 : 0) . "\nmax 0",
-                'pids.events' => 'max ' . ($phase === 'pid' && $at > 5 ? 1 : 0),
-                'pids.max' => '256',
-                'memory.max' => (string) (4480 * 1024 * 1024),
+                'memory.events' => "oom_kill 0\nmax 0",
+                'pids.events' => 'max 0',
+                'pids.max' => 'max',
+                'memory.max' => 'max',
                 'memory.current' => '1234',
                 'cpu.stat' => 'usage_usec ' . ($at * 2_000_000),
                 'ordinaryReceiverDepth' => 2000,
                 'nativeProcesses' => $native,
+                'killOrder' => self::killOrder('execution'),
                 'cgroup' => '/qualification/execution',
             ];
             $backlog[] = ['monotonic' => $at, 'receiverDepth' => 2000, 'acknowledged' => $at, 'relayedEvents' => $at];
         }
         $control = $this->values;
         foreach ($control as &$sample) {
-            $sample['memory.events'] = "oom_kill 0\nmax 0";
+            $sample['killOrder'] = self::killOrder('control');
         }
         unset($sample);
         $this->lines('control-samples.jsonl', $control);
@@ -668,22 +700,57 @@ final class WorkerFixtureTest extends TestCase
         ];
         $this->json('media.json', ['evidence' => $media]);
         $this->lines('owned-failure.jsonl', [['ownedTerminal' => ['state' => 'exited', 'exitCode' => 137]]]);
-        $this->lines(
-            'pressure.log',
-            $phase === 'memory' ? [
-                ['oomTarget' => ['pid' => 20, 'startTicks' => '100']],
-                ['oomTargetDied' => ['pid' => 20, 'startTicks' => '100']],
-            ] : [['forkRefused' => true]],
-        );
+        $this->lines('pressure.log', $phase === 'native-loss' ? self::nativeLoss() : self::cpuPressure());
         return $media;
+    }
+
+    /** @return array<string,mixed> */
+    private static function unlimited(int $score): array
+    {
+        return ['Memory' => 0, 'MemorySwap' => 0, 'NanoCpus' => 0, 'CpuQuota' => 0, 'CpuShares' => 0, 'PidsLimit' => null, 'CpusetCpus' => '', 'OomScoreAdj' => $score];
+    }
+
+    /** @return list<array<string,mixed>> */
+    private static function killOrder(string $unit): array
+    {
+        if ($unit === 'control') {
+            return [
+                ['pid' => 1, 'startTicks' => '10', 'role' => 'supervisor', 'nice' => 0, 'oomScoreAdj' => -500, 'argv' => ['php', 'bin/console', 'app:worker']],
+                ['pid' => 30, 'startTicks' => '200', 'role' => 'media-child', 'nice' => 0, 'oomScoreAdj' => 600, 'argv' => ['php', '/opt/baander/bin/worker-media-job.php']],
+            ];
+        }
+        return [
+            ['pid' => 1, 'startTicks' => '10', 'role' => 'supervisor', 'nice' => 0, 'oomScoreAdj' => 300, 'argv' => ['php', 'bin/console', 'app:worker']],
+            ['pid' => 20, 'startTicks' => '100', 'role' => 'native', 'nice' => 0, 'oomScoreAdj' => 300, 'argv' => ['php', '/opt/baander/bin/worker-native.php']],
+            ['pid' => 40, 'startTicks' => '300', 'role' => 'native-command', 'nice' => 10, 'oomScoreAdj' => 600, 'argv' => ['/usr/bin/ffmpeg', '-i', '/media/source/video.mkv']],
+        ];
+    }
+
+    /** @return list<array<string,mixed>> */
+    private static function cpuPressure(): array
+    {
+        $rows = [['heldAudioIdentities' => ['50' => '400']]];
+        foreach ([61, 62, 63, 64] as $pid) {
+            $rows[] = ['burner' => $pid, 'nice' => 10, 'oomScoreAdj' => 600];
+        }
+        return $rows;
+    }
+
+    /** @return list<array<string,mixed>> */
+    private static function nativeLoss(): array
+    {
+        $target = ['pid' => 20, 'startTicks' => '100', 'argv' => ['/usr/local/bin/php', ApplicationLayout::load()->path('bin/worker-native.php')]];
+        return [
+            ['nativeTarget' => $target, 'killOrder' => ['supervisor' => ['pid' => 1, 'nice' => 0, 'oomScoreAdj' => 300], 'native' => ['pid' => 20, 'nice' => 0, 'oomScoreAdj' => 300]]],
+            ['nativeDied' => $target, 'monotonic' => 65],
+        ];
     }
 
     /** @return iterable<string,array{string}> */
     public static function capacityPhases(): iterable
     {
         yield 'cpu' => ['cpu'];
-        yield 'memory' => ['memory'];
-        yield 'pid' => ['pid'];
+        yield 'native-loss' => ['native-loss'];
     }
 
     #[DataProvider('capacityPhases')]
@@ -696,25 +763,27 @@ final class WorkerFixtureTest extends TestCase
         if ($phase === 'cpu') {
             self::assertSame(61, $report['occupiedSlotSamples']);
             self::assertSame(130.0, $report['executionCpuSeconds']);
+            self::assertSame(['processes' => 4, 'nice' => 10, 'oomScoreAdj' => 600], $report['cpuPressure']);
+            self::assertSame(['supervisor' => -500, 'media-child' => 600], $report['killOrder']['control']['scores']);
+            self::assertSame(10, $report['killOrder']['execution']['niceness']['native-command']);
         } else {
-            self::assertSame('execution-cgroup-counter', $report['exhaustion']['source']);
-            self::assertTrue($report['controlSurvivedExecutionExhaustion']);
+            self::assertSame('execution-native-role-killed', $report['nativeLoss']['source']);
+            self::assertTrue($report['controlSurvivedNativeLoss']);
         }
+        self::assertSame(['control' => ['limits' => 'none', 'oomScoreAdj' => -500], 'execution' => ['limits' => 'none', 'oomScoreAdj' => 300]], $report['unitResources']);
     }
 
     /** @return iterable<string,array{string,string,bool}> */
     public static function containedSamplerOutcomes(): iterable
     {
-        yield 'memory drain' => ['memory', 'complete', true];
-        yield 'pid drain' => ['pid', 'complete', true];
-        yield 'clean completion after drain' => ['memory', 'zero', true];
-        yield 'bounded event fallback' => ['memory', 'fallback', true];
-        yield 'pid pressure retired' => ['pid', 'pressure', true];
-        yield 'pid pressure clean' => ['pid', 'pressure-zero', true];
-        yield 'pid pressure missing refusal' => ['pid', 'pressure-no-refusal', false];
-        yield 'pid pressure truncated' => ['pid', 'pressure-truncated', false];
-        foreach (['early-control', 'early-zero', 'early-execution', 'changed-drain-boot', 'gap', 'truncated', 'malformed', 'wrong-container', 'wrong-id', 'running', 'missing-events', 'other-exit', 'timeout', 'cancelled', 'signal', 'fallback-truncated', 'fallback-no-terminal', 'pressure'] as $case) {
-            yield $case => ['memory', $case, false];
+        yield 'native loss drain' => ['native-loss', 'complete', true];
+        yield 'clean completion after drain' => ['native-loss', 'zero', true];
+        yield 'native pressure retired' => ['native-loss', 'pressure', true];
+        yield 'native pressure clean' => ['native-loss', 'pressure-zero', true];
+        yield 'native pressure missing death' => ['native-loss', 'pressure-no-death', false];
+        yield 'native pressure truncated' => ['native-loss', 'pressure-truncated', false];
+        foreach (['early-control', 'early-zero', 'early-execution', 'changed-drain-boot', 'gap', 'truncated', 'malformed', 'wrong-container', 'wrong-id', 'running', 'missing-events', 'other-exit', 'timeout', 'cancelled', 'signal', 'no-terminal'] as $case) {
+            yield $case => ['native-loss', $case, false];
         }
     }
 
@@ -723,11 +792,11 @@ final class WorkerFixtureTest extends TestCase
     {
         $this->capacityFixture($phase);
         $control = Reports::samples($this->root . '/control-samples.jsonl');
-        $control[array_key_last($control)]['heartbeat']['draining'] = !in_array($case, ['early-control', 'early-zero', 'fallback-no-terminal'], true);
+        $control[array_key_last($control)]['heartbeat']['draining'] = !in_array($case, ['early-control', 'early-zero', 'no-terminal'], true);
         if (in_array($case, ['early-control', 'early-zero'], true)) {
             $control = array_slice($control, 0, 60);
         }
-        if ($case === 'fallback-no-terminal') {
+        if ($case === 'no-terminal') {
             unlink($this->root . '/control-drain-capture.json');
         }
         if ($case === 'changed-drain-boot') {
@@ -740,15 +809,7 @@ final class WorkerFixtureTest extends TestCase
         if ($case === 'early-execution') {
             $this->lines('execution-samples.jsonl', array_slice($this->values, 0, 5));
         }
-        if (str_starts_with($case, 'fallback')) {
-            foreach ($this->values as &$sample) {
-                $sample['memory.events'] = 'oom_kill 0' . "\nmax " . ($sample['monotonic'] > 5 ? '1' : '0');
-            }
-            unset($sample);
-            $this->lines('execution-samples.jsonl', $this->values);
-            $this->lines('worker-oom-events-final.jsonl', [['Type' => 'container', 'Action' => 'oom', 'Actor' => ['ID' => 'execution']]]);
-        }
-        if (in_array($case, ['truncated', 'malformed', 'fallback-truncated'], true)) {
+        if (in_array($case, ['truncated', 'malformed'], true)) {
             file_put_contents($this->root . '/control-samples.jsonl', $case === 'malformed' ? "{broken}\n" : '{', FILE_APPEND);
         }
         if ($case === 'running') {
@@ -759,8 +820,8 @@ final class WorkerFixtureTest extends TestCase
         if ($case === 'missing-events') {
             unlink($this->root . '/worker-oom-events-capture.json');
         }
-        if ($case === 'pressure-no-refusal') {
-            $this->lines('pressure.log', [['holdFinished' => true]]);
+        if ($case === 'pressure-no-death') {
+            $this->lines('pressure.log', array_slice(self::nativeLoss(), 0, 1));
         } elseif ($case === 'pressure-truncated') {
             file_put_contents($this->root . '/pressure.log', '{', FILE_APPEND);
         }
@@ -794,7 +855,7 @@ final class WorkerFixtureTest extends TestCase
 
     public function testMeasurementsAcceptContainerTerminationOnlyAfterVerifiedContainedDrain(): void
     {
-        $this->capacityFixture('memory');
+        $this->capacityFixture('native-loss');
         $control = Reports::samples($this->root . '/control-samples.jsonl');
         $control[array_key_last($control)]['heartbeat']['draining'] = true;
         $this->lines('source-control.jsonl', $control);
@@ -815,7 +876,7 @@ final class WorkerFixtureTest extends TestCase
         try {
             $process = $measurements->container(['exec', 'control-name', 'sampler'], 'control-samples.jsonl', 'errors.log', 3);
             $runtime->await(static fn(): bool => !$runtime->alive($process), 2, .01);
-            $measurements->finish(new \Baander\Tooling\Fixtures\Worker\ContainedSamplerDrain($this->root, 'memory', [
+            $measurements->finish(new \Baander\Tooling\Fixtures\Worker\ContainedSamplerDrain($this->root, 'native-loss', [
                 'control' => ['name' => 'control-name', 'id' => 'control'],
                 'execution' => ['name' => 'execution-name', 'id' => 'execution'],
             ]));
@@ -838,7 +899,7 @@ final class WorkerFixtureTest extends TestCase
     #[DataProvider('terminalHeartbeatOutcomes')]
     public function testPersistedDrainHeartbeatProvesTransitionAfterFinalSamplerRow(string $case, bool $success): void
     {
-        $this->capacityFixture('memory');
+        $this->capacityFixture('native-loss');
         $frame = Reports::json($this->root . '/control-drain-heartbeat.json');
         match ($case) {
             'wrong-namespace' => $frame['namespace'] = 'foreign.baander.app',
@@ -867,7 +928,7 @@ final class WorkerFixtureTest extends TestCase
             }
             $this->json('control-drain-capture.json', $receipt);
         }
-        $completion = new \Baander\Tooling\Fixtures\Worker\ContainedSamplerDrain($this->root, 'memory', [
+        $completion = new \Baander\Tooling\Fixtures\Worker\ContainedSamplerDrain($this->root, 'native-loss', [
             'control' => ['name' => 'control-name', 'id' => 'control'],
             'execution' => ['name' => 'execution-name', 'id' => 'execution'],
         ]);
@@ -883,7 +944,7 @@ final class WorkerFixtureTest extends TestCase
     }
 
     /** @return iterable<string,array{string,bool}> */
-    public static function memoryPressureOutcomes(): iterable
+    public static function nativeLossOutcomes(): iterable
     {
         yield 'terminal native death' => ['complete', true];
         yield 'clean native death' => ['zero', true];
@@ -893,10 +954,10 @@ final class WorkerFixtureTest extends TestCase
         }
     }
 
-    #[DataProvider('memoryPressureOutcomes')]
-    public function testMemoryPressureKilledAfterTerminalEvidenceRetainsStrictCompletion(string $case, bool $success): void
+    #[DataProvider('nativeLossOutcomes')]
+    public function testNativeLossKilledAfterTerminalEvidenceRetainsStrictCompletion(string $case, bool $success): void
     {
-        $this->capacityFixture('memory');
+        $this->capacityFixture('native-loss');
         $control = Reports::samples($this->root . '/control-samples.jsonl');
         $control[array_key_last($control)]['heartbeat']['draining'] = true;
         $this->lines('control-samples.jsonl', $control);
@@ -912,7 +973,8 @@ final class WorkerFixtureTest extends TestCase
             'wrong-argv' => $dead['argv'] = ['/usr/local/bin/php', $layout->path('bin/console')],
             default => null,
         };
-        $records = [['oomTarget' => $target], ['oomTargetDied' => $dead, 'monotonic' => 65]];
+        $killOrder = self::nativeLoss()[0]['killOrder'];
+        $records = [['nativeTarget' => $target, 'killOrder' => $killOrder], ['nativeDied' => $dead, 'monotonic' => 65]];
         if (in_array($case, ['no-terminal', 'no-terminal-zero'], true)) {
             array_pop($records);
         } elseif ($case === 'reversed') {
@@ -931,7 +993,7 @@ final class WorkerFixtureTest extends TestCase
             if (in_array($case, ['timeout', 'cancelled', 'signal'], true)) {
                 $result = new \Baander\Tooling\Process\ProcessResult(137, $case === 'signal' ? 9 : null, $case === 'timeout', $case === 'cancelled', '', '', 1);
             }
-            $completion = new \Baander\Tooling\Fixtures\Worker\ContainedSamplerDrain($this->root, 'memory', [
+            $completion = new \Baander\Tooling\Fixtures\Worker\ContainedSamplerDrain($this->root, 'native-loss', [
                 'control' => ['name' => 'control-name', 'id' => 'control'],
                 'execution' => ['name' => 'execution-name', 'id' => 'execution'],
             ]);
@@ -959,9 +1021,9 @@ final class WorkerFixtureTest extends TestCase
     #[DataProvider('unexpectedContainedProbeExits')]
     public function testUnexpectedPressureExitPrecedesSamplerProofFailure(int $status): void
     {
-        $this->capacityFixture('memory');
+        $this->capacityFixture('native-loss');
         $this->lines('pressure.log', []);
-        $completion = new \Baander\Tooling\Fixtures\Worker\ContainedSamplerDrain($this->root, 'memory', [
+        $completion = new \Baander\Tooling\Fixtures\Worker\ContainedSamplerDrain($this->root, 'native-loss', [
             'control' => ['name' => 'control-name', 'id' => 'control'],
             'execution' => ['name' => 'execution-name', 'id' => 'execution'],
         ]);
@@ -993,7 +1055,7 @@ final class WorkerFixtureTest extends TestCase
     /** @return iterable<string,array{string,int,bool}> */
     public static function ownedProbeOutcomes(): iterable
     {
-        foreach (['native-error', 'terminal-reply', 'native-error-pid'] as $case) {
+        foreach (['native-error', 'terminal-reply'] as $case) {
             yield $case . ' clean' => [$case, 0, true];
             yield $case . ' contained' => [$case, 137, true];
         }
@@ -1006,7 +1068,7 @@ final class WorkerFixtureTest extends TestCase
     #[DataProvider('ownedProbeOutcomes')]
     public function testOwnedProbeCompletionRequiresTerminalCurrentAuthority(string $case, int $status, bool $success): void
     {
-        $phase = $case === 'native-error-pid' ? 'pid' : 'memory';
+        $phase = 'native-loss';
         $this->capacityFixture($phase);
         $identity = ['namespace' => 'worker.baander.app', 'bootId' => 'boot', 'epoch' => 1];
         $control = Reports::samples($this->root . '/control-samples.jsonl');
@@ -1026,7 +1088,7 @@ final class WorkerFixtureTest extends TestCase
         } elseif ($case === 'wrong-boot') {
             $terminal['identity']['bootId'] = 'foreign';
         } elseif ($case === 'wrong-phase') {
-            $terminal['phase'] = 'pid';
+            $terminal['phase'] = 'cpu';
         } elseif ($case === 'no-attempt') {
             $terminal['attempts'] = 0;
         }
@@ -1053,18 +1115,20 @@ final class WorkerFixtureTest extends TestCase
             'changed-event-identity',
             'interrupted-monitor',
             'control-oom',
-            'wrong-budget',
-            'overlapping-cpus',
+            'limited-unit',
+            'pinned-unit',
+            'wrong-unit-score',
             'changed-boot',
             'expired-lease',
             'drain-timeout',
             'changed-container',
             'restarted',
-            'no-exhaustion',
+            'no-native-loss',
+            'unprotected-native',
             'missing-owned-failure',
             'requested-drain',
             'still-running',
-            'wrong-oom-target',
+            'wrong-native-target',
         ] as $case) {
             yield $case => [$case];
         }
@@ -1073,7 +1137,7 @@ final class WorkerFixtureTest extends TestCase
     #[DataProvider('invalidCapacity')]
     public function testCapacityNegativeControlsFail(string $case): void
     {
-        $this->capacityFixture('memory');
+        $this->capacityFixture('native-loss');
         $before = Reports::json($this->root . '/containers-before.json');
         $capture = Reports::json($this->root . '/worker-oom-events-capture.json');
         $final = Reports::json($this->root . '/drain.json');
@@ -1087,9 +1151,11 @@ final class WorkerFixtureTest extends TestCase
                 [['Type' => 'container', 'Action' => 'oom', 'Actor' => ['ID' => 'control']]],
             );
                 break;
-            case 'wrong-budget': $before[0]['HostConfig']['PidsLimit'] = 128;
+            case 'limited-unit': $before[0]['HostConfig']['PidsLimit'] = 128;
                 break;
-            case 'overlapping-cpus': $before[1]['HostConfig']['CpusetCpus'] = '1';
+            case 'pinned-unit': $before[1]['HostConfig']['CpusetCpus'] = '1';
+                break;
+            case 'wrong-unit-score': $before[0]['HostConfig']['OomScoreAdj'] = 0;
                 break;
             case 'changed-boot':
             case 'expired-lease':
@@ -1107,12 +1173,12 @@ final class WorkerFixtureTest extends TestCase
                 break;
             case 'restarted': $final[1]['RestartCount'] = 1;
                 break;
-            case 'no-exhaustion':
-                foreach ($this->values as &$sample) {
-                    $sample['memory.events'] = "oom_kill 0\nmax 0";
-                }
-                unset($sample);
-                $this->lines('execution-samples.jsonl', $this->values);
+            case 'no-native-loss': $this->lines('pressure.log', array_slice(self::nativeLoss(), 0, 1));
+                break;
+            case 'unprotected-native':
+                $records = self::nativeLoss();
+                $records[0]['killOrder']['native']['oomScoreAdj'] = 600;
+                $this->lines('pressure.log', $records);
                 break;
             case 'missing-owned-failure': $this->lines('owned-failure.jsonl', []);
                 break;
@@ -1120,56 +1186,70 @@ final class WorkerFixtureTest extends TestCase
                 break;
             case 'still-running': $final[0]['State']['Running'] = true;
                 break;
-            case 'wrong-oom-target': $this->lines('pressure.log', [['oomTarget' => ['pid' => 20]], ['oomTargetDied' => ['pid' => 21]]]);
+            case 'wrong-native-target':
+                $records = self::nativeLoss();
+                $records[1]['nativeDied']['pid'] = 21;
+                $this->lines('pressure.log', $records);
                 break;
         }
         $this->json('containers-before.json', $before);
         $this->json('worker-oom-events-capture.json', $capture);
         $this->json('drain.json', $final);
         $this->expectException(RuntimeException::class);
-        ControlCapacityVerifier::verify($this->root, 'memory');
+        ControlCapacityVerifier::verify($this->root, 'native-loss');
     }
 
-    public function testPidExhaustionFallbackRequiresMatchingContemporaneousKernelCounter(): void
+    /** @return iterable<string,array{string,bool}> */
+    public static function cpuKillOrder(): iterable
     {
-        $this->capacityFixture('cpu');
-        $kernel = [
-            'cgroup' => '/qualification/execution',
-            'pids.max' => '256',
-            'pids.events' => 'max 1',
-            'monotonic' => 1,
-            'pids.current' => '256',
-        ];
-        $this->lines('pressure.log', [['forkRefused' => true, 'executionCgroup' => $kernel]]);
-        self::assertSame(
-            'execution-pressure-process-kernel-counter',
-            ControlCapacityVerifier::exhausted($this->root, 'pid')['source'],
-        );
-        $kernel['cgroup'] = '/foreign';
-        $this->lines('pressure.log', [['forkRefused' => true, 'executionCgroup' => $kernel]]);
-        $this->expectException(RuntimeException::class);
-        ControlCapacityVerifier::exhausted($this->root, 'pid');
+        yield 'media child raised after start' => ['inherited-child', true];
+        foreach (['unprioritized-encoder', 'lowered-child', 'missing-child', 'control-score', 'unprioritized-burner', 'missing-burner', 'missing-native'] as $case) {
+            yield $case => [$case, false];
+        }
     }
 
-    public function testMemoryOomFallbackRequiresExactContainerAndCeilingFailures(): void
+    #[DataProvider('cpuKillOrder')]
+    public function testCpuPhaseRequiresTheKillOrderAndEncoderPriority(string $case, bool $success): void
     {
         $this->capacityFixture('cpu');
-        $this->values[10]['memory.events'] = "oom_kill 0\nmax 1";
+        $control = Reports::samples($this->root . '/control-samples.jsonl');
+        $pressure = self::cpuPressure();
+        $child = static fn(int $score): array => ['pid' => 31, 'startTicks' => '210', 'role' => 'media-child', 'nice' => 0, 'oomScoreAdj' => $score, 'argv' => ['php', '/opt/baander/bin/worker-media-job.php']];
+        switch ($case) {
+            case 'inherited-child':
+                $control[10]['killOrder'][] = $child(-500);
+                $control[11]['killOrder'][] = $child(600);
+                break;
+            case 'lowered-child':
+                $control[10]['killOrder'][] = $child(600);
+                $control[11]['killOrder'][] = $child(-500);
+                break;
+            case 'missing-child':
+                foreach ($control as &$sample) {
+                    $sample['killOrder'] = array_slice($sample['killOrder'], 0, 1);
+                }
+                unset($sample);
+                break;
+            case 'control-score': $control[10]['killOrder'][0]['oomScoreAdj'] = 300;
+                break;
+            case 'unprioritized-encoder': $this->values[10]['killOrder'][2]['nice'] = 0;
+                break;
+            case 'missing-native': unset($this->values[10]['killOrder'][1]);
+                $this->values[10]['killOrder'] = array_values($this->values[10]['killOrder']);
+                break;
+            case 'unprioritized-burner': $pressure[1]['nice'] = 0;
+                break;
+            case 'missing-burner': array_pop($pressure);
+                break;
+        }
+        $this->lines('control-samples.jsonl', $control);
         $this->lines('execution-samples.jsonl', $this->values);
-        $this->lines(
-            'worker-oom-events.jsonl',
-            [['Type' => 'container', 'Action' => 'oom', 'Actor' => ['ID' => 'execution']]],
-        );
-        self::assertSame(
-            'exact-container-docker-oom-event',
-            ControlCapacityVerifier::exhausted($this->root, 'memory')['source'],
-        );
-        $this->lines(
-            'worker-oom-events.jsonl',
-            [['Type' => 'container', 'Action' => 'oom', 'Actor' => ['ID' => 'foreign']]],
-        );
-        $this->expectException(RuntimeException::class);
-        ControlCapacityVerifier::exhausted($this->root, 'memory');
+        $this->lines('pressure.log', $pressure);
+        if (!$success) {
+            $this->expectException(RuntimeException::class);
+        }
+        $report = ControlCapacityVerifier::verify($this->root, 'cpu');
+        self::assertGreaterThan(0, $report['killOrder']['control']['roles']['media-child']);
     }
 
     private function mediaFixture(): void
@@ -1340,10 +1420,10 @@ final class WorkerFixtureTest extends TestCase
         $this->autoscalingFixture();
         $autoscaling = $runner->run(new ProcessSpec([PHP_BINARY, $directory . 'autoscaling-verify.php', 'verify', $this->root, '2']));
         self::assertSame(400, json_decode($autoscaling->stdout, true, flags: JSON_THROW_ON_ERROR)['samples']);
-        $this->capacityFixture('memory');
-        $capacity = $runner->run(new ProcessSpec([PHP_BINARY, $directory . 'control-capacity-verify.php', 'verify', $this->root, 'memory']));
-        self::assertTrue(json_decode($capacity->stdout, true, flags: JSON_THROW_ON_ERROR)['controlSurvivedExecutionExhaustion']);
-        self::assertSame('memory', Reports::json($this->root . '/qualification.json')['phase']);
+        $this->capacityFixture('native-loss');
+        $capacity = $runner->run(new ProcessSpec([PHP_BINARY, $directory . 'control-capacity-verify.php', 'verify', $this->root, 'native-loss']));
+        self::assertTrue(json_decode($capacity->stdout, true, flags: JSON_THROW_ON_ERROR)['controlSurvivedNativeLoss']);
+        self::assertSame('native-loss', Reports::json($this->root . '/qualification.json')['phase']);
         $this->mediaFixture();
         $media = $runner->run(new ProcessSpec([PHP_BINARY, $directory . 'media-control-verify.php', $this->root]));
         self::assertSame(2, json_decode($media->stdout, true, flags: JSON_THROW_ON_ERROR)['nativeLaunches']);

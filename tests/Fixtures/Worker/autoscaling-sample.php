@@ -14,9 +14,16 @@ $db = $unit === 'control' ? Doctrine\DBAL\DriverManager::getConnection((new Doct
 $directory = (getenv('BAANDER_WORKER_IPC_DIRECTORY') ?: '/run/baander-worker') . '/' . getenv('BAANDER_WORKER_BOOT_ID');
 $completions = new \Baander\Tooling\Fixtures\Worker\CompletionCursor($directory . '/autoscaling-completions.jsonl');
 $deadline = hrtime(true) / 1e9 + $seconds;
+// The figures an unlimited cgroup is measured against: the host's CPUs, memory and task bound.
+$kernel = static fn(string $name): int => (int) trim((string) @file_get_contents('/proc/sys/kernel/' . $name));
+$host = [
+    'cpus' => preg_match_all('/^cpu[0-9]+ /m', (string) @file_get_contents('/proc/stat')),
+    'memoryBytes' => preg_match('/^MemTotal:\s+([0-9]+) kB$/m', (string) @file_get_contents('/proc/meminfo'), $total) === 1 ? (int) $total[1] * 1024 : null,
+    'tasks' => min($kernel('pid_max'), $kernel('threads-max')),
+];
 while (true) {
     $stopping = hrtime(true) / 1e9 >= $deadline || (($stopFile = getenv('BAANDER_TEST_SAMPLER_STOP_FILE')) !== false && is_file($stopFile));
-    $sample = ['monotonic' => hrtime(true) / 1e9, 'wallTime' => microtime(true), 'unit' => $unit];
+    $sample = ['monotonic' => hrtime(true) / 1e9, 'wallTime' => microtime(true), 'unit' => $unit, 'host' => $host];
     foreach (['cpu.stat', 'memory.current', 'memory.events', 'memory.peak', 'pids.current', 'pids.events', 'cpuset.cpus.effective', 'cpu.max', 'memory.max', 'pids.max'] as $name) {
         $sample[$name] = @file_get_contents('/sys/fs/cgroup/' . $name);
     }
@@ -50,8 +57,10 @@ while (true) {
             continue;
         }
         $rssKiB = is_string($status) && preg_match('/^VmRSS:\s+([0-9]+) kB$/m', $status, $match) === 1 ? (int) $match[1] : null;
+        $score = @file_get_contents(dirname($path) . '/oom_score_adj');
         $sample['processes'][] = ['pid' => (int) basename(dirname($path)), 'userTicks' => $fields[11], 'systemTicks' => $fields[12],
-            'startTicks' => $fields[19], 'rssPages' => $fields[21], 'rssBytes' => $rssKiB === null ? null : $rssKiB * 1024, 'cmdline' => $arguments];
+            'startTicks' => $fields[19], 'rssPages' => $fields[21], 'rssBytes' => $rssKiB === null ? null : $rssKiB * 1024, 'cmdline' => $arguments,
+            'nice' => (int) $fields[16], 'oomScoreAdj' => is_string($score) ? (int) trim($score) : null];
     }
     if ($db !== null) {
         $sample['lease'] = $db->fetchAssociative('SELECT owner_boot_id, epoch, state, expires_at > clock_timestamp() AS unexpired FROM worker_deployment_leases WHERE namespace = ?', [getenv('BAANDER_WORKER_NAMESPACE')]);

@@ -121,14 +121,14 @@ final readonly class LifecycleCheckpoint
         }
         ksort($expected);
         ksort($profile);
+        $limits = array_filter(
+            array_keys($manifest),
+            static fn(int|string $field): bool => preg_match('/\A(control|execution)(MemoryMiB|NanoCpus|PidsLimit|CpuSet)\z/D', (string) $field) === 1,
+        );
         $this->qualification->expect(
-            ($manifest['version'] ?? null) === 6 && ($manifest['autoscaling']['maximumConcurrency'] ?? null) === 2
-            && ($expected['identifier'] ?? null) === 'full' && $profile === $expected
-            && ($manifest['controlMemoryMiB'] ?? null) === 2944
-            && ($manifest['controlPidsLimit'] ?? null) === 129
-            && ($manifest['executionMemoryMiB'] ?? null) === 4800
-            && ($manifest['executionPidsLimit'] ?? null) === 257,
-            'Lifecycle requires the two-slot bounded full-profile worker pair',
+            ($manifest['version'] ?? null) === 7 && ($manifest['autoscaling']['maximumConcurrency'] ?? null) === 2
+            && ($expected['identifier'] ?? null) === 'full' && $profile === $expected && $limits === [],
+            'Lifecycle requires the two-slot full-profile worker pair without container limits',
         );
     }
 
@@ -152,6 +152,9 @@ final readonly class LifecycleCheckpoint
         );
         $manifest = OperatorConfiguration::json($q->artifact('manifest.json'));
         $this->assertManifest($manifest);
+        $pair = OperatorConfiguration::json($q->artifact('predecessor-containers.json'));
+        $q->expect(count($pair) === 2, 'Lifecycle requires the inspected predecessor pair');
+        $resources = KillOrderEvidence::unlimitedPair($pair[0], $pair[1]);
         $q->expect(
             !in_array($s->webName, explode("\n", $q->read($q->artifact('containers-before.txt'))), true),
             'HTTP must be absent',
@@ -317,6 +320,7 @@ final readonly class LifecycleCheckpoint
             ),
             'Successor pair is not a fresh running pair',
         );
+        KillOrderEvidence::unlimitedPair($units[0], $units[1]);
         $this->retired(
             'successor',
             $q->output(['inspect', '--format', '{{.Id}}', $s->controlName]),
@@ -334,6 +338,7 @@ final readonly class LifecycleCheckpoint
                 'httpAbsent' => true,
                 'predecessorEpoch' => 1,
                 'successorEpoch' => 2,
+                'unitResources' => $resources,
             ],
         );
         echo 'PASS: ' . $phase . " outage retained ownership, drained the pair and recovered exact work under a successor without HTTP.\n";

@@ -9,6 +9,12 @@ use Throwable;
 
 final class ControlCapacity
 {
+    /**
+     * Media CPU load next to control traffic, then the loss of the native role. Worker units carry
+     * no memory or PID limit, so no phase may exhaust memory or PIDs: those would exhaust the host.
+     */
+    public const array PHASES = ['cpu', 'native-loss'];
+
     /** @return array<string,array{validBaselineSamples:int,firstMonotonic:int|float,lastMonotonic:int|float}> */
     public static function baseline(string $artifacts): array
     {
@@ -47,7 +53,7 @@ final class ControlCapacity
             $runtime = new Runtime($root, budget: 'workerCapacity');
             $artifacts = Runtime::artifacts($root, 'control-capacity');
             try {
-                foreach (['cpu', 'memory', 'pid'] as $phase) {
+                foreach (self::PHASES as $phase) {
                     Checkpoint::operator(
                         $runtime,
                         $artifacts . '/' . $phase,
@@ -69,8 +75,8 @@ final class ControlCapacity
         $docker = $checkpoint->docker;
         $phase = $runtime->environment['BAANDER_TEST_CAPACITY_PHASE'] ?? '';
         Runtime::require(
-            in_array($phase, ['cpu', 'memory', 'pid'], true),
-            'Set BAANDER_TEST_CAPACITY_PHASE to cpu, memory or pid',
+            in_array($phase, self::PHASES, true),
+            'Set BAANDER_TEST_CAPACITY_PHASE to ' . implode(' or ', self::PHASES),
         );
         try {
             $checkpoint->capture(['info', '--format', '{{json .}}'], 'daemon.json');
@@ -190,7 +196,7 @@ final class ControlCapacity
                 'Capacity samplers did not establish eleven valid baseline samples within ten seconds',
             );
             Runtime::require($runtime->alive($subscriber), 'Docker OOM subscriber exited');
-            $exhaustionStarted = Runtime::now();
+            $lossStarted = Runtime::now();
             $failure = null;
             if ($phase !== 'cpu') {
                 $failure = $checkpoint->background(
@@ -211,8 +217,6 @@ final class ControlCapacity
                     'exec',
                     $checkpoint->execution,
                     'php',
-                    '-d',
-                    'memory_limit=-1',
                     'tests/Fixtures/Worker/control-capacity-pressure.php',
                     $phase,
                 ],
@@ -232,9 +236,9 @@ final class ControlCapacity
                 $runtime->wait($pressure);
             } else {
                 $runtime->await(
-                    static function () use ($checkpoint, $phase): bool {
+                    static function () use ($checkpoint): bool {
                         try {
-                            ControlCapacityVerifier::exhausted($checkpoint->artifacts, $phase);
+                            ControlCapacityVerifier::nativeLost($checkpoint->artifacts);
                             return true;
                         } catch (Throwable) {
                             return false;
@@ -242,18 +246,18 @@ final class ControlCapacity
                     },
                     15,
                     .1,
-                    'Execution capacity was not exhausted',
+                    'The native role did not end',
                 );
-                ControlCapacityVerifier::exhausted($checkpoint->artifacts, $phase);
+                ControlCapacityVerifier::nativeLost($checkpoint->artifacts);
                 $checkpoint->inspectAfter('containers-after-pressure.json');
             }
             if ($phase === 'cpu') {
                 $checkpoint->measurements->finish();
             }
-            $started = $phase === 'cpu' ? Runtime::now() : $exhaustionStarted;
+            $started = $phase === 'cpu' ? Runtime::now() : $lossStarted;
             file_put_contents(
                 $checkpoint->artifacts . '/drain-trigger.txt',
-                ($phase === 'cpu' ? 'requested-graceful-shutdown-after-contained-pressure' : 'automatic-execution-exhaustion') . "\n",
+                ($phase === 'cpu' ? 'requested-graceful-shutdown-after-contained-pressure' : 'automatic-native-loss') . "\n",
             );
             if ($phase === 'cpu') {
                 $docker->run(['kill', '--signal', 'TERM', $checkpoint->control], check: false);

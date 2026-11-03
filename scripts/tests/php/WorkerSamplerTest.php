@@ -8,7 +8,7 @@ use Baander\Tooling\Process\{EngineExecutor, ExecutionContext};
 use Baander\Tooling\Development\Environment;
 use Baander\Tooling\Docker\{Client, Target};
 use Baander\Tooling\Process\{CommandExecutor, CompletionPolicy, ProcessSpec, RunningProcess};
-use Baander\Tooling\Fixtures\Worker\{PostgresSampler, CompletionCursor, EvidenceMode, AutoscalingStatusObservation};
+use Baander\Tooling\Fixtures\Worker\{PostgresSampler, CompletionCursor, EvidenceMode, AutoscalingStatusObservation, KillOrderEvidence};
 use Baander\Tooling\Process\ProcessResult;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
@@ -318,6 +318,65 @@ final class WorkerSamplerTest extends TestCase
         } finally {
             $runner->run(new ProcessSpec(['rm', '-rf', '--', $directory]));
         }
+    }
+
+    public function testKillOrderSampleReadsRankedRolesAndSkipsLauncherSteps(): void
+    {
+        $proc = sys_get_temp_dir() . '/baander-kill-order-' . bin2hex(random_bytes(6));
+        $process = static function (int $pid, array $arguments, int $nice, int $score) use ($proc): void {
+            mkdir($proc . '/' . $pid, 0700, true);
+            file_put_contents($proc . '/' . $pid . '/cmdline', $arguments === [] ? '' : implode("\0", $arguments) . "\0");
+            // Fields after the command name: state first, niceness 17th and start time 20th.
+            $fields = array_fill(0, 40, '0');
+            $fields[0] = 'S';
+            $fields[16] = (string) $nice;
+            $fields[19] = (string) (1000 + $pid);
+            file_put_contents($proc . '/' . $pid . '/stat', $pid . ' (php worker) ' . implode(' ', $fields));
+            file_put_contents($proc . '/' . $pid . '/oom_score_adj', $score . "\n");
+        };
+        try {
+            $process(1, ['/usr/local/bin/php', '/opt/baander/bin/console', 'app:worker', '--unit=execution'], 0, 300);
+            $process(2, ['/usr/local/bin/php', '/opt/baander/bin/console', 'app:worker'], 0, 300);
+            $process(3, [], 0, 0);
+            $process(20, ['/usr/local/bin/php', '-d', 'memory_limit=64M', '/opt/baander/bin/worker-native.php'], 0, 300);
+            $process(30, ['/usr/local/bin/php', '/opt/baander/src/Transcode/Infrastructure/Worker/../../../../bin/worker-media-job.php', 'video'], 0, 600);
+            $process(40, ['/usr/lib/baander-fixture/ffmpeg', '-i', '/media/source/video.mkv'], 10, 600);
+            $process(41, ['/usr/local/bin/php', '/usr/bin/ffmpeg', '-i', '/media/source/track.flac'], 10, 600);
+            $process(42, ['/usr/bin/choom', '-n', '600', '--', 'ffmpeg', '-i', '/media/source/video.mkv'], 10, 300);
+            $process(43, ['php', 'tests/Fixtures/Worker/control-capacity-sample.php', '240', 'execution'], 0, 300);
+            // The sampler runs as a standalone script inside a worker unit, so it is loaded the same way here.
+            $code = 'require $argv[1]; echo json_encode(KillOrderSample::processes($argv[2]), JSON_THROW_ON_ERROR);';
+            $sampled = (new EngineExecutor(ExecutionContext::bounded(30, getenv(), dirname(__DIR__, 3))))->run(new ProcessSpec(
+                [PHP_BINARY, '-r', $code, dirname(__DIR__, 3) . '/tests/Fixtures/Worker/KillOrderSample.php', $proc],
+            ));
+            $records = json_decode($sampled->stdout, true, flags: JSON_THROW_ON_ERROR);
+            self::assertIsArray($records);
+            usort($records, static fn(array $left, array $right): int => $left['pid'] <=> $right['pid']);
+            self::assertSame(
+                [[1, 'supervisor', 0, 300], [20, 'native', 0, 300], [30, 'media-child', 0, 600], [40, 'native-command', 10, 600], [41, 'native-command', 10, 600]],
+                array_map(static fn(array $record): array => [$record['pid'], $record['role'], $record['nice'], $record['oomScoreAdj']], $records),
+            );
+            self::assertSame('1040', $records[3]['startTicks']);
+        } finally {
+            (new EngineExecutor(ExecutionContext::bounded(30, getenv(), dirname(__DIR__, 3))))->run(new ProcessSpec(['rm', '-rf', '--', $proc]));
+        }
+    }
+
+    public function testKillOrderEvidenceMatchesTheApplicationAndTheStandInEncoders(): void
+    {
+        self::assertSame(\App\Shared\Infrastructure\Worker\OutOfMemoryKillOrder::CONTROL_UNIT, KillOrderEvidence::CONTROL_UNIT);
+        self::assertSame(\App\Shared\Infrastructure\Worker\OutOfMemoryKillOrder::EXECUTION_UNIT, KillOrderEvidence::EXECUTION_UNIT);
+        self::assertSame(\App\Shared\Infrastructure\Worker\OutOfMemoryKillOrder::MEDIA_WORK, KillOrderEvidence::MEDIA_WORK);
+        self::assertSame(\App\Shared\Infrastructure\Worker\NativeExecutionDaemon::COMMAND_NICENESS, KillOrderEvidence::NATIVE_COMMAND_NICENESS);
+        $launcher = \App\Shared\Infrastructure\Worker\NativeExecutionDaemon::launcher();
+        self::assertSame(['/usr/bin/setsid', '/usr/bin/nice', '-n', '10', '/usr/bin/choom', '-n', '600', '--'], $launcher);
+        $fixtures = dirname(__DIR__, 3) . '/tests/Fixtures/Worker/';
+        $replay = (string) file_get_contents($fixtures . 'media-cost-replay.php');
+        self::assertStringContainsString("['/usr/bin/nice', '-n', '10', '/usr/bin/choom', '-n', '600', '--', '/usr/bin/ffmpeg'", $replay);
+        $pressure = (string) file_get_contents($fixtures . 'control-capacity-pressure.php');
+        self::assertStringContainsString("pcntl_setpriority(10)", $pressure);
+        self::assertStringContainsString("file_put_contents('/proc/self/oom_score_adj', '600')", $pressure);
+        self::assertSame(KillOrderEvidence::CPU_PRESSURE_PROCESSES, preg_match('/range\(1, ([0-9]+)\)/', $pressure, $match) === 1 ? (int) $match[1] : 0);
     }
 }
 

@@ -74,16 +74,24 @@ final readonly class OperatorConfiguration
 
     }
 
-    /** Logical CPUs given to the execution unit; cost measurement keeps concurrent encoders unthrottled. */
-    public function executionCpus(): int
+    /**
+     * Logical CPUs a container must be allowed to use. Worker units run on every CPU; cost
+     * measurement needs room for eight concurrent encoders beside the control traffic.
+     */
+    public function minimumCpus(): int
     {
-        return $this->mediaCost ? 8 : 2;
+        return $this->mediaCost ? 10 : 4;
     }
 
-    /** Base execution memory; cost measurement holds eight 1080p encoders at about 510 MiB each. */
-    public function executionMemoryMiB(): int
+    /**
+     * Host memory the qualification needs in GiB. Worker units carry no memory limit, so the host
+     * must hold the pair, its dependencies and, for cost measurement, eight 1080p encoders at
+     * about 510 MiB each.
+     */
+    public function minimumHostMemoryGiB(): int
     {
-        return $this->mediaCost ? 9216 : 4480;
+        return ($this->twoCommand ? 15 : 13) + ($this->mediaCost ? 5 : 0)
+            + (($this->environment['BAANDER_TEST_AUTOSCALING_MAXIMUM'] ?? '1') === '4' ? 1 : 0);
     }
 
     private function flag(string $name, int $status = 2): bool

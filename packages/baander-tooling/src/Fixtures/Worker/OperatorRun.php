@@ -10,7 +10,6 @@ final class OperatorRun
     /** @var list<string> */
     public array $mediaMounts = [];
     public string $controllerId = '';
-    public string $dependencyCpu = '';
     public string $webPort = '';
     public string $artifacts = '';
     public string $baseId = '';

@@ -39,6 +39,14 @@ if ($mode === 'cpu') {
         $pid = pcntl_fork();
         if ($pid === -1) { throw new RuntimeException('Cannot create CPU pressure process.'); }
         if ($pid === 0) {
+            // Each burner stands in for an encode: the native daemon starts encodes at nice 10
+            // with the media work out-of-memory score, so the burners run the same way.
+            if (!pcntl_setpriority(10) || file_put_contents('/proc/self/oom_score_adj', '600') === false) {
+                throw new RuntimeException('Cannot lower the CPU pressure priority.');
+            }
+            echo json_encode(['burner' => getmypid(), 'nice' => pcntl_getpriority(),
+                'oomScoreAdj' => (int) trim((string) file_get_contents('/proc/self/oom_score_adj'))], JSON_THROW_ON_ERROR) . "\n";
+            flush();
             $digest = str_repeat('capacity', 4096);
             while (hrtime(true) < $deadline) { $digest = hash('sha256', $digest . str_repeat('capacity', 4096)); }
             echo json_encode(['cpuDigest' => $digest], JSON_THROW_ON_ERROR) . "\n";
@@ -48,7 +56,9 @@ if ($mode === 'cpu') {
     }
     foreach ($children as $pid) { pcntl_waitpid($pid, $status); }
     $resumeAudio();
-} elseif ($mode === 'memory') {
+} elseif ($mode === 'native-loss') {
+    // Ends the exact native role with SIGKILL, as the kernel's out-of-memory killer would end a
+    // victim, without exhausting memory or PIDs on a host whose worker units carry no limits.
     $target = null;
     foreach (glob('/proc/[0-9]*/cmdline') ?: [] as $path) {
         $raw = @file_get_contents($path);
@@ -62,59 +72,28 @@ if ($mode === 'cpu') {
         }
     }
     if ($target === null) { throw new RuntimeException('Native supervisor role is missing.'); }
-    $scorePath = '/proc/' . $target['pid'] . '/oom_score_adj';
-    if ($startTicks($target['pid']) !== $target['startTicks'] || file_put_contents($scorePath, '1000') !== 4
-        || trim((string) file_get_contents($scorePath)) !== '1000') {
-        throw new RuntimeException('Cannot select the exact native role as the execution OOM victim.');
-    }
-    echo json_encode(['oomTarget' => $target, 'oomScoreAdj' => 1000], JSON_THROW_ON_ERROR) . "\n";
+    $priority = static function (int $pid): array {
+        $stat = (string) @file_get_contents('/proc/' . $pid . '/stat');
+        $end = strrpos($stat, ') ');
+        return ['nice' => $end === false ? null : (int) (explode(' ', substr($stat, $end + 2))[16] ?? 0),
+            'oomScoreAdj' => (int) trim((string) @file_get_contents('/proc/' . $pid . '/oom_score_adj'))];
+    };
+    $killOrder = ['supervisor' => ['pid' => 1, ...$priority(1)], 'native' => ['pid' => $target['pid'], ...$priority($target['pid'])]];
+    // The target is recorded first: the pair drains, and may end this process, once the role dies.
+    echo json_encode(['nativeTarget' => $target, 'killOrder' => $killOrder], JSON_THROW_ON_ERROR) . "\n";
     flush();
-    $blocks = [];
+    if ($startTicks($target['pid']) !== $target['startTicks'] || !posix_kill($target['pid'], SIGKILL)) {
+        throw new RuntimeException('Cannot end the exact native role.');
+    }
     while (hrtime(true) < $deadline) {
         if ($startTicks($target['pid']) !== $target['startTicks']) {
-            echo json_encode(['oomTargetDied' => $target, 'monotonic' => hrtime(true) / 1e9], JSON_THROW_ON_ERROR) . "\n";
+            echo json_encode(['nativeDied' => $target, 'monotonic' => hrtime(true) / 1e9], JSON_THROW_ON_ERROR) . "\n";
             flush();
-            $blocks = [];
             exit(0);
         }
-        $blocks[] = str_repeat('m', 16 * 1024 * 1024);
         usleep(10000);
     }
-    throw new RuntimeException('Selected native role survived memory pressure.');
-} elseif ($mode === 'pid') {
-    $children = [];
-    $holdUntil = null;
-    $refusals = 0;
-    while (hrtime(true) < $deadline && ($holdUntil === null || hrtime(true) < $holdUntil)) {
-        $pid = @pcntl_fork();
-        if ($pid === -1) {
-            ++$refusals;
-            if ($holdUntil === null) {
-                $holdUntil = hrtime(true) + 5_000_000_000;
-                $kernel = ['monotonic' => hrtime(true) / 1e9];
-                foreach (['pids.events', 'pids.current', 'pids.max'] as $file) {
-                    $kernel[$file] = file_get_contents('/sys/fs/cgroup/' . $file);
-                }
-                $kernel['cgroup'] = file_get_contents('/proc/self/cgroup');
-                echo json_encode(['forkRefused' => true, 'children' => count($children), 'monotonic' => hrtime(true) / 1e9,
-                    'executionCgroup' => $kernel], JSON_THROW_ON_ERROR) . "\n";
-                flush();
-            }
-            // Refill slots released by short-lived probes and lease observers.
-            // Sleeping at the first refusal would let them reuse that free slot.
-            usleep(1000);
-            continue;
-        }
-        if ($pid === 0) { sleep(15); exit(0); }
-        $children[] = $pid;
-        if ($holdUntil !== null) {
-            echo json_encode(['refilledPid' => $pid, 'startTicks' => $startTicks($pid), 'monotonic' => hrtime(true) / 1e9], JSON_THROW_ON_ERROR) . "\n";
-            flush();
-        }
-    }
-    echo json_encode(['holdFinished' => true, 'forkRefusals' => $refusals, 'children' => count($children), 'monotonic' => hrtime(true) / 1e9], JSON_THROW_ON_ERROR) . "\n";
-    flush();
-    foreach ($children as $pid) { pcntl_waitpid($pid, $status); }
+    throw new RuntimeException('Selected native role survived SIGKILL.');
 } else {
-    throw new InvalidArgumentException('Expected cpu, memory or pid pressure.');
+    throw new InvalidArgumentException('Expected cpu or native-loss pressure.');
 }

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require dirname(__DIR__, 3) . '/vendor/autoload.php';
+require_once __DIR__ . '/KillOrderSample.php';
 
 $seconds = (float) ($argv[1] ?? 65);
 $mode = $argv[2] ?? 'control';
@@ -23,6 +24,7 @@ while (hrtime(true) < $deadline) {
         $sample[$file] = @file_get_contents('/sys/fs/cgroup/' . $file);
     }
     $sample['cgroup'] = @file_get_contents('/proc/self/cgroup');
+    $sample['killOrder'] = KillOrderSample::processes();
     if ($db === null) {
         $sample['nativeProcesses'] = [];
         foreach (glob('/proc/[0-9]*/cmdline') ?: [] as $path) {

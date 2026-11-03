@@ -26,23 +26,7 @@ final class MediaControlVerifier
             'Container stopped or restarted',
         );
         [$control, $execution] = $before;
-        foreach ($before as $unit) {
-            $config = $unit['HostConfig'];
-            Reports::require(
-                $config['Memory'] > 0 && $config['PidsLimit'] > 0 && $config['NanoCpus'] > 0,
-                'Unbounded container capacity',
-            );
-        }
-        Reports::require(
-            array_intersect(
-                explode(',', $control['HostConfig']['CpusetCpus']),
-                explode(
-                    ',',
-                    $execution['HostConfig']['CpusetCpus'],
-                ),
-            ) === [],
-            'Control and execution CPU sets overlap',
-        );
+        $units = KillOrderEvidence::unlimitedPair($control, $execution);
         $start = $media['pressureStartedAt'];
         $end = $media['pressureEndedAt'];
         Reports::require($end - $start >= 60, 'Missing sixty-second pressure period');
@@ -70,6 +54,8 @@ final class MediaControlVerifier
             'socketReconnectReplay' => $media['socketReconnectReplay'],
             'pendingCancellation' => $media['pendingCancellation'],
             'containerIds' => ['control' => $control['Id'], 'execution' => $execution['Id']],
+            'unitResources' => $units,
+            'cpuPressure' => KillOrderEvidence::pressureProcesses(Reports::samples($root . '/pressure.log', EvidenceMode::Completed)),
         ];
         Reports::require(
             $report['controlAcknowledgement']['p99Seconds'] <= 1 && $report['controlAcknowledgement']['maxSeconds'] <= 2,
@@ -142,6 +128,7 @@ final class MediaControlVerifier
                 'Truncated pressure sampling window',
             );
             $report['sampling'][$name] = ['count' => count($window), 'maximumGapSeconds' => max($gaps)];
+            $report['killOrder'][$name] = KillOrderEvidence::processes($window, $name);
             if ($name === 'execution') {
                 $saturated = $cancellation = 0;
                 foreach ($window as $sample) {

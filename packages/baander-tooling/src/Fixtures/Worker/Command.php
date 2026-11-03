@@ -281,12 +281,8 @@ final class Command
         }
         foreach (['control', 'execution'] as $unit) {
             $name = $container . ($unit === 'execution' ? '-execution' : '');
-            [$memory, $pids, $cpus, $console] = $unit === 'control' ? ['2944', '129', '0', '0'] : [
-                '4480',
-                '256',
-                '1,2',
-                '320',
-            ];
+            // Worker units carry no CPU, memory or PID limit; the kill order protects control.
+            $console = $unit === 'control' ? '0' : '320';
 
             if (!$denied) {
                 $this->journal('claim-unit', [$namespace, $boot, $unit]);
@@ -299,10 +295,7 @@ final class Command
                 'BAANDER_WORKER_LEASE_EPOCH=9999',
                 '-e',
                 'BAANDER_WORKER_UNIT=' . $unit,
-                '--memory=' . $memory . 'm',
-                '--memory-swap=' . $memory . 'm',
-                '--cpuset-cpus=' . $cpus,
-                '--pids-limit=' . $pids,
+                '--oom-score-adj=' . KillOrderEvidence::unitScore($unit),
                 '--restart=no',
                 '--entrypoint',
                 'sh',
@@ -311,15 +304,13 @@ final class Command
                 <<<'SH'
                     mkdir -m 700 /tmp/baander-worker-locks
                     exec php -d memory_limit=256M bin/console app:worker --deployment="$1" --boot-id="$2" \
-                        --unit="$3" --memory-mib="$4" --pids-limit="$5" --scheduled-console-mib="$6" \
-                        --autoscaling-profile="$7" --deployment-profile="$8" --lock-dir=/tmp/baander-worker-locks --ipc-dir=/run/baander-worker --no-interaction
+                        --unit="$3" --scheduled-console-mib="$4" \
+                        --autoscaling-profile="$5" --deployment-profile="$6" --lock-dir=/tmp/baander-worker-locks --ipc-dir=/run/baander-worker --no-interaction
                     SH,
                 'worker-unit',
                 $namespace,
                 $boot,
                 $unit,
-                $memory,
-                $pids,
                 $console,
                 $this->profile,
                 $this->deploymentProfile,
@@ -430,6 +421,15 @@ final class Command
             .2,
             'Production worker roles / initialized media / lease / Redis consumer did not become ready',
         );
+        $units = json_decode($this->docker(['inspect', $container, $container . '-execution'])->stdout, true, flags: JSON_THROW_ON_ERROR);
+        Runtime::require(is_array($units) && array_is_list($units) && count($units) === 2, 'Worker pair inspection is incomplete');
+        KillOrderEvidence::unlimitedPair($units[0], $units[1]);
+        foreach (['control' => $container, 'execution' => $container . '-execution'] as $unit => $name) {
+            Runtime::require(
+                trim($this->docker(['exec', $name, 'cat', '/proc/1/oom_score_adj'])->stdout) === (string) KillOrderEvidence::unitScore($unit),
+                'Worker ' . $unit . ' supervisor does not run at its out-of-memory score',
+            );
+        }
     }
 
     private function exited(string $container, int $expected, int $launches = 6, float $seconds = 45): void
@@ -529,8 +529,6 @@ final class Command
                     32,
                 ),
                 '--unit=control',
-                '--memory-mib=2944',
-                '--pids-limit=129',
                 '--scheduled-console-mib=0',
                 '--autoscaling-profile=' . $this->profile,
                 '--deployment-profile=' . $this->deploymentProfile,

@@ -8,108 +8,35 @@ use InvalidArgumentException;
 
 final class ControlCapacityVerifier
 {
-    /** @return array<string,mixed> */
-    public static function exhausted(string $root, string $phase, bool $final = false): array
+    /**
+     * Evidence that the native-loss phase ended the exact native role: one recorded target, its
+     * observed death and the execution unit's kill order just before the role ended.
+     *
+     * @return array<string,mixed>
+     */
+    public static function nativeLost(string $root, bool $final = false): array
     {
-        $execution = Reports::samples($root . '/execution-samples.jsonl', $final ? EvidenceMode::Completed : EvidenceMode::Live);
-        [$key, $event] = $phase === 'memory' ? ['memory.events', 'oom_kill'] : ['pids.events', 'max'];
-        Reports::require(count($execution) > 1, 'Missing execution cgroup samples');
-        $baseline = Reports::counters($execution[0][$key])[$event] ?? 0;
-        $latest = max(array_map(
-            static fn(array $sample): int => Reports::counters($sample[$key])[$event] ?? 0,
-            $execution,
-        ));
-        if ($latest > $baseline) {
-            return [
-                'source' => 'execution-cgroup-counter',
-                'counter' => $event,
-                'baseline' => $baseline,
-                'maximum' => $latest,
-            ];
-        }
-        $before = Reports::json($root . '/containers-before.json');
-        if ($phase === 'pid') {
-            $pressure = is_file($root . '/pressure.log') ? Reports::samples($root . '/pressure.log', $final ? EvidenceMode::Completed : EvidenceMode::Live) : [];
-            $configured = $before[1]['HostConfig']['PidsLimit'];
-            Reports::require(
-                Reports::integer($execution[0]['pids.max']) === $configured,
-                'Sampled execution PID ceiling differs from configured limit',
-            );
-            foreach ($pressure as $entry) {
-                $kernel = $entry['executionCgroup'] ?? null;
-                if (($entry['forkRefused'] ?? null) !== true
-                    || !is_array($kernel)
-                    || ($kernel['cgroup'] ?? null) !== $execution[0]['cgroup']
-                    || Reports::integer($kernel['pids.max']) !== $configured
-                ) {
-                    continue;
-                }
-                $observed = Reports::counters($kernel['pids.events'])['max'] ?? 0;
-                if ($observed <= $baseline) {
-                    continue;
-                }
-                Reports::require(
-                    $kernel['monotonic'] >= $execution[0]['monotonic'],
-                    'PID refusal kernel evidence predates execution baseline',
-                );
-                $currentPids = Reports::integer($kernel['pids.current']);
-                Reports::require(
-                    $currentPids > 0 && $currentPids <= $configured,
-                    'Invalid contemporaneous execution PID count',
-                );
-                return [
-                    'source' => 'execution-pressure-process-kernel-counter',
-                    'counter' => 'max',
-                    'baseline' => $baseline,
-                    'observed' => $observed,
-                    'executionCgroup' => $kernel,
-                    'configuredPidsLimit' => $configured,
-                ];
-            }
-            throw new \RuntimeException('No increased execution PID max counter observed by sampler or refusing process');
-        }
-        Reports::require($phase === 'memory', 'No execution ' . $event . ' event observed');
-        $identity = $before[1]['Id'];
-        $eventPath = $root . ($final ? '/worker-oom-events-final.jsonl' : '/worker-oom-events.jsonl');
-        $events = is_file($eventPath) ? Reports::samples($eventPath, $final ? EvidenceMode::Completed : EvidenceMode::Live) : [];
-        $matches = array_filter(
-            $events,
-            static fn(array $entry): bool => self::oomEvent(
-                $entry,
-                $identity,
+        $path = $root . '/pressure.log';
+        $pressure = is_file($path) ? Reports::samples($path, $final ? EvidenceMode::Completed : EvidenceMode::Live) : [];
+        $targets = array_values(array_filter($pressure, static fn(array $row): bool => array_key_exists('nativeTarget', $row)));
+        $deaths = array_values(array_filter($pressure, static fn(array $row): bool => array_key_exists('nativeDied', $row)));
+        Reports::require(
+            count($targets) === 1 && $deaths !== [] && $targets[0]['nativeTarget'] == $deaths[0]['nativeDied'],
+            'Selected exact native role death was not observed',
+        );
+        $killOrder = $targets[0]['killOrder'] ?? null;
+        Reports::require(
+            is_array($killOrder) && array_all(
+                ['supervisor', 'native'],
+                static fn(string $role): bool => ($killOrder[$role]['oomScoreAdj'] ?? null) === KillOrderEvidence::EXECUTION_UNIT
+                    && ($killOrder[$role]['nice'] ?? null) === 0,
             ),
-        )
-            |> array_values(...);
-        Reports::require(
-            $matches !== [],
-            'Neither execution oom_kill counter nor exact-container Docker OOM event was observed',
-        );
-        $memoryMax = Reports::integer($execution[0]['memory.max']);
-        Reports::require(
-            $memoryMax === $before[1]['HostConfig']['Memory'],
-            'Observed execution memory ceiling differs from configured limit',
-        );
-        $maxBaseline = Reports::counters($execution[0]['memory.events'])['max'] ?? 0;
-        $maxEvents = max(array_map(
-            static fn(array $sample): int => Reports::counters($sample['memory.events'])['max'] ?? 0,
-            $execution,
-        ));
-        $peak = max(array_map(
-            static fn(array $sample): int => Reports::integer(($sample['memory.peak'] ?? null) ?: $sample['memory.current']),
-            $execution,
-        ));
-        Reports::require(
-            $maxEvents > $maxBaseline,
-            'Docker OOM event lacks observed execution memory-ceiling charge failures',
+            'Execution supervisor and native role did not run at the execution unit score',
         );
         return [
-            'source' => 'exact-container-docker-oom-event',
-            'containerId' => $identity,
-            'events' => $matches,
-            'memoryLimitBytes' => $memoryMax,
-            'observedPeakBytes' => $peak,
-            'memoryMaxEventsBaseline' => $maxBaseline,
-            'memoryMaxEventsMaximum' => $maxEvents,
+            'source' => 'execution-native-role-killed',
+            'target' => $targets[0]['nativeTarget'],
+            'killOrder' => $killOrder,
         ];
     }
 
@@ -124,7 +51,7 @@ final class ControlCapacityVerifier
     /** @return array<string,mixed> */
     public static function verify(string $root, string $phase): array
     {
-        [$control, $execution, $postgres, $redis] = Reports::json($root . '/containers-before.json');
+        [$control, $execution] = Reports::json($root . '/containers-before.json');
         Reports::require(
             is_file($root . '/worker-oom-events-capture.json'),
             'Missing successful bounded Docker OOM event capture receipt',
@@ -171,34 +98,7 @@ final class ControlCapacityVerifier
             ),
             'Control container emitted Docker OOM event',
         );
-        foreach ([[$control, 2944, 129, 1_000_000_000], [$execution, 4480, 256, 2_000_000_000]] as [
-            $unit,
-            $memory,
-            $pids,
-            $cpu,
-        ]) {
-            $config = $unit['HostConfig'];
-            Reports::require(
-                $config['Memory'] === $memory * 1024 * 1024 && $config['PidsLimit'] === $pids && $config['NanoCpus'] === $cpu,
-                'Container capacity differs from qualification recipe',
-            );
-        }
-        Reports::require(
-            array_intersect(
-                explode(',', $control['HostConfig']['CpusetCpus']),
-                explode(
-                    ',',
-                    $execution['HostConfig']['CpusetCpus'],
-                ),
-            ) === [],
-            'Control and execution CPU sets overlap',
-        );
-        foreach ([$postgres, $redis] as $unit) {
-            Reports::require(
-                $unit['HostConfig']['Memory'] > 0 && $unit['HostConfig']['PidsLimit'] > 0 && $unit['HostConfig']['NanoCpus'] > 0,
-                'Unbounded dependency capacity',
-            );
-        }
+        $units = KillOrderEvidence::unlimitedPair($control, $execution);
         $samples = Reports::samples($root . '/control-samples.jsonl');
         Reports::require(count($samples) > 10, 'Insufficient control samples');
         $initial = $samples[0];
@@ -251,6 +151,7 @@ final class ControlCapacityVerifier
             'heartbeat' => Reports::bounds($ages),
             'drainSeconds' => Reports::integer(Reports::text($root . '/drain-seconds.txt')),
             'containerIds' => ['control' => $control['Id'], 'execution' => $execution['Id']],
+            'unitResources' => $units,
         ];
         Reports::require($report['drainSeconds'] <= 35, 'Pair exceeded drain deadline');
         $final = Reports::json($root . '/drain.json');
@@ -271,9 +172,9 @@ final class ControlCapacityVerifier
                 );
             }
         } else {
-            $report['exhaustion'] = self::exhausted($root, $phase, true);
+            $report['nativeLoss'] = self::nativeLost($root, true);
             $after = Reports::json($root . '/containers-after-pressure.json');
-            Reports::require(!$after[0]['State']['OOMKilled'], 'Control OOM during execution exhaustion');
+            Reports::require(!$after[0]['State']['OOMKilled'], 'Control OOM during native role loss');
             $failures = Reports::samples($root . '/owned-failure.jsonl');
             $terminal = array_filter(
                 $failures,
@@ -291,48 +192,16 @@ final class ControlCapacityVerifier
             Reports::require($terminal !== [] || $uncertain !== [], 'No actual owned execution failure observed');
             $trigger = trim(Reports::text($root . '/drain-trigger.txt'));
             Reports::require(
-                $trigger === 'automatic-execution-exhaustion',
-                'Exhaustion must cause automatic joint drain',
+                $trigger === 'automatic-native-loss',
+                'Native role loss must cause automatic joint drain',
             );
             Reports::require(
                 array_all($final, static fn(array $unit): bool => !$unit['State']['Running']),
                 'Automatic pair drain missing',
             );
-            $pressure = Reports::samples($root . '/pressure.log');
-            if ($phase === 'memory') {
-                $targets = array_filter(
-                    $pressure,
-                    static fn(array $sample): bool => array_key_exists(
-                        'oomTarget',
-                        $sample,
-                    ),
-                )
-                    |> array_values(...);
-                $deaths = array_filter(
-                    $pressure,
-                    static fn(array $sample): bool => array_key_exists(
-                        'oomTargetDied',
-                        $sample,
-                    ),
-                )
-                    |> array_values(...);
-                Reports::require(
-                    count($targets) === 1 && $deaths !== [] && $targets[0]['oomTarget'] == $deaths[0]['oomTargetDied'],
-                    'Selected exact native role death was not observed after OOM',
-                );
-                $report['executionOomTarget'] = $targets[0];
-            } else {
-                Reports::require(
-                    array_any(
-                        $pressure,
-                        static fn(array $sample): bool => (bool) ($sample['forkRefused'] ?? false),
-                    ),
-                    'PID fork refusal missing',
-                );
-            }
             $report['ownedFailures'] = [...$terminal, ...$uncertain];
             $report['drainTrigger'] = $trigger;
-            $report['controlSurvivedExecutionExhaustion'] = !$after[0]['State']['OOMKilled'];
+            $report['controlSurvivedNativeLoss'] = !$after[0]['State']['OOMKilled'];
         }
         return $report;
     }
@@ -454,29 +323,26 @@ final class ControlCapacityVerifier
             );
         }
         $report['occupiedSlotSamples'] = count($occupied);
+        $report['killOrder'] = [
+            'control' => KillOrderEvidence::processes(Reports::window($preDrain, $start, $end), 'control'),
+            'execution' => KillOrderEvidence::processes($occupied, 'execution'),
+        ];
+        $report['cpuPressure'] = KillOrderEvidence::pressureProcesses(Reports::samples($root . '/pressure.log'));
         $report['audioPressureMethod'] = 'Admitted FFmpeg process held with SIGSTOP; resumed after pressure';
         $usage = Reports::counters($execution[array_key_last($execution)]['cpu.stat'])['usage_usec'] - Reports::counters($execution[0]['cpu.stat'])['usage_usec'];
         $report['executionCpuSeconds'] = $usage / 1e6;
-        Reports::require($usage >= 100_000_000, 'Execution did not sustain CPU pressure on its two CPUs');
+        Reports::require($usage >= 100_000_000, 'Execution did not sustain media CPU load');
         return $report;
     }
 
     /** @param list<string> $arguments */
     public static function main(array $arguments): int
     {
-        if (count($arguments) !== 3 || !in_array($arguments[0], ['exhausted', 'verify'], true) || !in_array(
-            $arguments[2],
-            [
-                'cpu',
-                'memory',
-                'pid',
-            ],
-            true,
-        )) {
-            throw new InvalidArgumentException('Usage: control-capacity-verify.php exhausted|verify DIRECTORY cpu|memory|pid');
+        if (count($arguments) !== 3 || !in_array($arguments[0], ['native-lost', 'verify'], true) || !in_array($arguments[2], ControlCapacity::PHASES, true)) {
+            throw new InvalidArgumentException('Usage: control-capacity-verify.php native-lost|verify DIRECTORY ' . implode('|', ControlCapacity::PHASES));
         }
-        if ($arguments[0] === 'exhausted') {
-            self::exhausted($arguments[1], $arguments[2]);
+        if ($arguments[0] === 'native-lost') {
+            self::nativeLost($arguments[1]);
         } else {
             $report = self::verify($arguments[1], $arguments[2]);
             Reports::publish($arguments[1] . '/qualification.json', $report);

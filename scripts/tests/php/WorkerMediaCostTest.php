@@ -37,6 +37,9 @@ final class WorkerMediaCostTest extends TestCase
         ));
         self::assertSame(['kind' => 'native-helper', 'codec' => null], MediaCost::nativeKind(['ffmpeg', '-i', 'in.mkv', '-f', 'null', '-']));
         self::assertNull(MediaCost::nativeKind(['/usr/local/bin/php', 'bin/worker-native.php']));
+        $launching = MediaCost::nativeArguments(['/usr/bin/setsid', '/usr/bin/nice', '-n', '10', '/usr/bin/choom', '-n', '600', '--', 'ffmpeg', '-c', 'copy', '-f', 'dash', 'm.mpd']);
+        self::assertSame(['ffmpeg', '-c', 'copy', '-f', 'dash', 'm.mpd'], $launching);
+        self::assertSame(['ffmpeg', '-i', 'in.mkv'], MediaCost::nativeArguments(['/usr/bin/choom', '-n', '600', '--', 'ffmpeg', '-i', 'in.mkv']));
     }
 
     public function testSteadyWindowExcludesWarmUpAndEndsWhenOutputStopsAdvancing(): void
@@ -97,7 +100,7 @@ final class WorkerMediaCostTest extends TestCase
 
     public function testReceiptAttributesProcessesToPhasesAndSeparatesMediaHelpers(): void
     {
-        $job = ['/usr/local/bin/php', '/var/www/html/bin/worker-media-job.php', 'video', 'key'];
+        $job = ['/usr/local/bin/php', '/opt/baander/bin/worker-media-job.php', 'video', 'key'];
         $encoder = ['/usr/lib/baander-fixture/ffmpeg', '-c:a', 'libmp3lame', '-f', 'mp3', '/s/audio-renditions/k/mp3.partial'];
         $this->stream('cost-control-samples.jsonl', [['id' => '20:5', 'ppid' => 10, 'arguments' => $job, 'hwm' => 90_000], ['id' => '21:6', 'ppid' => 20, 'arguments' => $job, 'hwm' => 40_000]]);
         $this->stream('cost-execution-samples.jsonl', [['id' => '30:7', 'ppid' => 11, 'arguments' => $encoder, 'hwm' => 20_480]]);
@@ -106,6 +109,7 @@ final class WorkerMediaCostTest extends TestCase
             'sources' => ['videoFrameRate' => 30, 'videoSeconds' => 120, 'trackSeconds' => 600],
         ]], JSON_THROW_ON_ERROR));
 
+        $this->units();
         $receipt = MediaCost::receipt($this->directory);
 
         $phase = $receipt['phases'][0];
@@ -117,6 +121,34 @@ final class WorkerMediaCostTest extends TestCase
         self::assertSame(['peakRssMiB' => 87.9, 'peakThreads' => 2], $receipt['summary']['mediaChildren']['job:video']);
         self::assertSame(20.0, $receipt['summary']['native']['audio-encode:libmp3lame']['isolated']['peakRssMiB']);
         self::assertSame('Test CPU', $receipt['host']['cpuModel']);
+        self::assertSame(['nice' => 10, 'oomScoreAdj' => 600], $phase['native'][0]['priority']);
+        self::assertSame(['nice' => 0, 'oomScoreAdj' => 600], $phase['mediaChildren'][0]['priority']);
+        self::assertSame(['limits' => 'none', 'oomScoreAdj' => -500], $receipt['unitResources']['control']);
+    }
+
+    /** @return iterable<string,array{string}> */
+    public static function unprioritizedMedia(): iterable
+    {
+        yield 'encoder at the default priority' => ['encoder'];
+        yield 'media child at the control score' => ['child'];
+        yield 'limited execution unit' => ['unit'];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('unprioritizedMedia')]
+    public function testReceiptRequiresMediaPriorityAndUnlimitedUnits(string $case): void
+    {
+        $job = ['/usr/local/bin/php', '/opt/baander/bin/worker-media-job.php', 'video', 'key'];
+        $encoder = ['/usr/lib/baander-fixture/ffmpeg', '-c:a', 'libmp3lame', '-f', 'mp3', '/s/audio-renditions/k/mp3.partial'];
+        $this->stream('cost-control-samples.jsonl', [['id' => '20:5', 'ppid' => 10, 'arguments' => $job, 'hwm' => 90_000] + ($case === 'child' ? ['oomScoreAdj' => -500] : [])]);
+        $this->stream('cost-execution-samples.jsonl', [['id' => '30:7', 'ppid' => 11, 'arguments' => $encoder, 'hwm' => 20_480] + ($case === 'encoder' ? ['nice' => 0] : [])]);
+        file_put_contents($this->directory . '/media-cost-client.json', json_encode(['evidence' => [
+            'phases' => [['name' => 'isolated-audio-mp3', 'startedAt' => 50.0, 'endedAt' => 60.0]],
+            'sources' => ['videoFrameRate' => 30, 'videoSeconds' => 120, 'trackSeconds' => 600],
+        ]], JSON_THROW_ON_ERROR));
+        $this->units($case === 'unit' ? 4096 * 1048576 : 0);
+
+        $this->expectException(RuntimeException::class);
+        MediaCost::receipt($this->directory);
     }
 
     public function testServiceFiguresSeparateMeanFromBurstAndAnonymousFromCache(): void
@@ -141,7 +173,14 @@ final class WorkerMediaCostTest extends TestCase
         MediaCost::receipt($this->directory);
     }
 
-    /** @param list<array{id:string,ppid:int,arguments:list<string>,hwm:int}> $processes */
+    private function units(int $executionMemory = 0): void
+    {
+        $unit = static fn(int $score, int $memory): array => ['HostConfig' => ['Memory' => $memory, 'MemorySwap' => $memory, 'NanoCpus' => 0,
+            'PidsLimit' => null, 'CpusetCpus' => '', 'OomScoreAdj' => $score]];
+        file_put_contents($this->directory . '/containers-before.json', json_encode([$unit(-500, 0), $unit(300, $executionMemory)], JSON_THROW_ON_ERROR));
+    }
+
+    /** @param list<array{id:string,ppid:int,arguments:list<string>,hwm:int,nice?:int,oomScoreAdj?:int}> $processes */
     private function stream(string $name, array $processes): void
     {
         $lines = [json_encode(['header' => ['cpuModel' => 'Test CPU', 'cgroup' => ['cpu.max' => 'max 100000']]], JSON_THROW_ON_ERROR)];
@@ -153,8 +192,10 @@ final class WorkerMediaCostTest extends TestCase
                 if ($index === 0) {
                     $sample['started'][$process['id']] = $process['arguments'];
                 }
+                $native = str_ends_with($process['arguments'][0], 'ffmpeg');
                 $sample['processes'][] = ['id' => $process['id'], 'ppid' => $process['ppid'], 'cpuTicks' => $index * 50, 'startTicks' => 49_000,
-                    'threads' => 2, 'rssKib' => 1000, 'hwmKib' => $process['hwm']];
+                    'threads' => 2, 'rssKib' => 1000, 'hwmKib' => $process['hwm'],
+                    'nice' => $process['nice'] ?? ($native ? 10 : 0), 'oomScoreAdj' => $process['oomScoreAdj'] ?? 600];
             }
             $lines[] = json_encode($sample, JSON_THROW_ON_ERROR);
         }

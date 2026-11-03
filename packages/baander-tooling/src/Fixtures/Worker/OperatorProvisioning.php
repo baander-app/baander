@@ -15,7 +15,6 @@ final readonly class OperatorProvisioning
     {
         $s = $this->qualification->state;
         $s->webName = $s->runId . '-web-' . bin2hex(random_bytes(4));
-        $limits = $this->qualification->state->dependencyCpu === '' ? [] : ['--cpuset-cpus', $this->qualification->state->dependencyCpu, '--cpus', '0.5'];
         $this->qualification->resources->startContainer($s->webName, [
             '--network',
             $s->runId . '-control',
@@ -31,7 +30,6 @@ final readonly class OperatorProvisioning
             '2g',
             '--memory-swap',
             '2g',
-            ...$limits,
             '--env-file',
             $this->qualification->work('runtime.env'),
             '-e',
@@ -86,11 +84,11 @@ final readonly class OperatorProvisioning
         $this->qualification->state->appHome = $this->qualification->commands->runtime->layout()->root;
         $this->qualification->docker(['info', '--format', '{{json .}}'], stdout: $this->qualification->work('host.json'));
         $host = OperatorConfiguration::json($this->qualification->work('host.json'));
-        $minimum = ($this->qualification->configuration->twoCommand ? 15 : 13) + (($environment['BAANDER_TEST_AUTOSCALING_MAXIMUM'] ?? '1') === '4' ? 1 : 0)
-            + intdiv($this->qualification->configuration->executionMemoryMiB() - 4480 + 1023, 1024);
+        $minimum = $this->qualification->configuration->minimumHostMemoryGiB();
+        $required = $this->qualification->configuration->minimumCpus();
         $this->qualification->expect(
-            $host['NCPU'] >= 4 && $host['MemTotal'] >= $minimum * 1024 ** 3,
-            'Worker qualification requires four CPUs and ' . $minimum . ' GiB',
+            $host['NCPU'] >= $required && $host['MemTotal'] >= $minimum * 1024 ** 3,
+            'Worker qualification requires ' . $required . ' CPUs and ' . $minimum . ' GiB',
         );
         $this->qualification->expect($host['CgroupVersion'] === '2', 'Worker qualification requires cgroup v2');
         $cpus = json_decode(
@@ -106,9 +104,7 @@ final readonly class OperatorProvisioning
             true,
             flags: JSON_THROW_ON_ERROR,
         );
-        $required = $this->qualification->configuration->executionCpus() + 2;
         $this->qualification->expect(count($cpus) >= $required, $required . ' permitted CPUs are required');
-        $cpus = array_slice($cpus, 0, $required);
         $s->fixtureBase = $s->baseId;
         $this->qualification->expect(
             $this->qualification->output(['image', 'inspect', '--format', '{{json (index .Config "Volumes")}}', $s->baseId]) === 'null',
@@ -159,18 +155,11 @@ final readonly class OperatorProvisioning
         ];
         $this->qualification->resources->createNetwork($s->runId, ['--internal']);
         $this->qualification->resources->createNetwork($s->runId . '-control');
-        $capacity = $this->qualification->configuration->checkpoint !== null;
-        $limits = [];
-        if ($capacity) {
-            $this->qualification->state->dependencyCpu = (string) $cpus[array_key_last($cpus)];
-            $limits = ['--cpuset-cpus', $this->qualification->state->dependencyCpu, '--cpus', '0.5', '--pids-limit', '64'];
-        }
         $this->qualification->resources->startContainer($s->runId . '-redis', [
             '--network',
             $s->runId,
             '--network-alias',
             'redis',
-            ...$limits,
             '--memory',
             '256m',
             '--memory-swap',
@@ -185,7 +174,6 @@ final readonly class OperatorProvisioning
             $s->runId . '-control',
             '--network-alias',
             'postgres',
-            ...$limits,
             '--memory',
             '4g',
             '--memory-swap',
@@ -230,7 +218,7 @@ final readonly class OperatorProvisioning
         if (!$this->qualification->configuration->container) {
             $port = substr($port, strrpos($port, ':') + 1);
         }
-        $this->createManifest($cpus, $port);
+        $this->createManifest($port);
         $this->prepareMediaAndApplication();
         if ($this->qualification->configuration->container) {
             $this->qualification->resources->startContainer($s->runId . '-controller', [
@@ -443,8 +431,7 @@ final readonly class OperatorProvisioning
         ];
     }
 
-    /** @param list<int> $cpus */
-    private function createManifest(array $cpus, string $port): void
+    private function createManifest(string $port): void
     {
         $s = $this->qualification->state;
         $s->daemonId = $this->qualification->output(['info', '--format', '{{.ID}}']);
@@ -461,7 +448,7 @@ final readonly class OperatorProvisioning
         $maximum = (int) $value;
         $profile['maximumConcurrency'] = $maximum;
         $manifest = [
-            'version' => 6,
+            'version' => 7,
             'sourceMountPolicy' => $this->qualification->configuration->developmentSource ? 'local-development' : 'production',
             'namespace' => $s->namespace,
             'bootId' => $s->boot,
@@ -470,14 +457,6 @@ final readonly class OperatorProvisioning
             'network' => $s->runId,
             'dockerBinary' => $this->qualification->configuration->container ? '/usr/local/bin/docker' : $this->qualification->topology->operatorTarget()->executable,
             'dockerEndpoint' => $this->qualification->topology->operatorTarget()->endpoint,
-            'controlMemoryMiB' => 2944,
-            'executionMemoryMiB' => $this->qualification->configuration->executionMemoryMiB() + 320 * ($maximum - 1),
-            'controlNanoCpus' => 1_000_000_000,
-            'executionNanoCpus' => $this->qualification->configuration->executionCpus() * 1_000_000_000,
-            'controlPidsLimit' => 129,
-            'executionPidsLimit' => 256 + $maximum - 1,
-            'controlCpuSet' => array_slice($cpus, 0, 1),
-            'executionCpuSet' => array_slice($cpus, 1, $this->qualification->configuration->executionCpus()),
             'autoscaling' => $profile,
             'deploymentProfile' => OperatorConfiguration::json($this->qualification->root . '/tests/Fixtures/Worker/deployment-profile.json'),
             'scheduledConsoleMiB' => 320,

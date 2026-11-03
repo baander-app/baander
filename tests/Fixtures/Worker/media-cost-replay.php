@@ -22,10 +22,13 @@ foreach (MediaControlObservation::records() as $record) {
 if ($source === null) {
     throw new RuntimeException('No recorded 1080p ' . $encoder . ' encode to replay.');
 }
-// Stay inside the unit's memory limit so the replay cannot contain the deployment.
-$limit = (int) file_get_contents('/sys/fs/cgroup/memory.max');
-$current = (int) file_get_contents('/sys/fs/cgroup/memory.current');
-$count = max(1, min($requested, intdiv($limit - $current - 512 * 1048576, $perEncoderMiB * 1048576)));
+// Worker units carry no memory limit, so the replay sizes itself from the memory the host has
+// available and leaves a reserve for the other services sharing it.
+if (preg_match('/^MemAvailable:\s+(\d+) kB$/m', (string) file_get_contents('/proc/meminfo'), $match) !== 1) {
+    throw new RuntimeException('Cannot read the available host memory.');
+}
+$available = (int) $match[1] * 1024;
+$count = max(1, min($requested, intdiv($available - 4096 * 1048576, $perEncoderMiB * 1048576)));
 $root = dirname(__DIR__, 3) . '/storage/two-command/cost-replay';
 $processes = [];
 $startedAt = hrtime(true) / 1e9;
@@ -36,8 +39,10 @@ foreach (range(1, $count) as $index) {
     }
     $arguments = $source;
     $arguments[array_key_last($arguments)] = $directory . '/manifest.mpd';
-    // The observation wrapper adds progress reporting and executes the native binary.
-    $process = proc_open(['/usr/bin/ffmpeg', ...$arguments], [0 => ['file', '/dev/null', 'r'], 1 => ['file', '/dev/null', 'w'], 2 => ['file', '/dev/null', 'w']], $pipes);
+    // Replayed encodes start the way the native daemon starts encodes: at nice 10 and with the
+    // media work out-of-memory score. The observation wrapper adds progress reporting and
+    // executes the native binary.
+    $process = proc_open(['/usr/bin/nice', '-n', '10', '/usr/bin/choom', '-n', '600', '--', '/usr/bin/ffmpeg', ...$arguments], [0 => ['file', '/dev/null', 'r'], 1 => ['file', '/dev/null', 'w'], 2 => ['file', '/dev/null', 'w']], $pipes);
     if (!is_resource($process)) {
         throw new RuntimeException('Replay encoder did not start.');
     }
@@ -69,7 +74,7 @@ echo json_encode([
     'endedAt' => $endedAt,
     'requested' => $requested,
     'encoders' => $count,
-    'memoryLimitMiB' => intdiv($limit, 1048576),
+    'hostAvailableMiB' => intdiv($available, 1048576),
     'perEncoderMiB' => $perEncoderMiB,
     'killedAfterGrace' => count(array_filter($running)),
     'arguments' => $source,

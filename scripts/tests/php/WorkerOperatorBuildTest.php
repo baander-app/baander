@@ -192,7 +192,7 @@ final class WorkerOperatorBuildTest extends TestCase
         $provisioning = new OperatorProvisioning($qualification);
         try {
             $reflection->getProperty('topology')->setValue($qualification, new OperatorTopology($commands->client()->target, false, $environment));
-            new \ReflectionMethod($provisioning, 'createManifest')->invoke($provisioning, [0, 1, 2, 3], '5432');
+            new \ReflectionMethod($provisioning, 'createManifest')->invoke($provisioning, '5432');
             if ($parseCredentials) {
                 $credentials = DeploymentOperatorCredentials::fromFile($directory . '/work/credentials.json');
                 self::assertSame($appHome . '/storage/conversions', $credentials->runtimeEnvironment->variables['CONVERT_STORAGE_PATH']);
@@ -204,6 +204,9 @@ final class WorkerOperatorBuildTest extends TestCase
             self::assertStringContainsString('APP_HOME=' . $appHome . "\n", file_get_contents($directory . '/work/runtime.env'));
             $manifest = DeploymentOperatorManifest::fromJson(file_get_contents($directory . '/work/manifest.json'), $appHome);
             self::assertSame($appHome, $manifest->appHome);
+            $written = AtomicFile::readJson($directory . '/work/manifest.json');
+            self::assertSame(7, $written['version']);
+            self::assertSame([], preg_grep('/(MemoryMiB|NanoCpus|PidsLimit|CpuSet)\z/', array_keys($written)));
             new \ReflectionMethod($provisioning, 'prepareMediaAndApplication')->invoke($provisioning);
             $fake = AtomicFile::readJson($directory . '/state.json');
             $creates = array_values(array_filter($fake['calls'], static fn(array $call): bool => $call[0] === 'create'));

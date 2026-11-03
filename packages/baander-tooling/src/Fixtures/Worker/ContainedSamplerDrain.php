@@ -12,7 +12,7 @@ final readonly class ContainedSamplerDrain
     /** @param array{control:array{name:string,id:string},execution:array{name:string,id:string}} $units */
     public function __construct(private string $artifacts, private string $phase, private array $units)
     {
-        Reports::require(in_array($phase, ['memory', 'pid'], true), 'Contained sampler completion requires an exhaustion phase');
+        Reports::require($phase === 'native-loss', 'Contained sampler completion requires the native-loss phase');
     }
 
     public function complete(string $container, string $output, ProcessResult $result): void
@@ -28,24 +28,22 @@ final readonly class ContainedSamplerDrain
     public function completePressure(ProcessResult $result): void
     {
         $this->completeProbe($result, function (): void {
-            if ($this->phase === 'memory') {
-                $records = Reports::samples($this->artifacts . '/pressure.log');
-                $targets = array_filter($records, static fn(array $row): bool => isset($row['oomTarget']));
-                $deaths = array_filter($records, static fn(array $row): bool => isset($row['oomTargetDied']));
-                Reports::require(count($targets) === 1 && count($deaths) === 1, 'Memory pressure lacks one exact native target and terminal death');
-                $targetIndex = array_key_first($targets);
-                $deathIndex = array_key_first($deaths);
-                $target = $targets[$targetIndex]['oomTarget'];
-                $dead = $deaths[$deathIndex]['oomTargetDied'];
-                Reports::require(
-                    is_array($target) && is_int($target['pid'] ?? null) && $target['pid'] > 0
-                    && is_string($target['startTicks'] ?? null) && ctype_digit($target['startTicks'])
-                    && is_array($target['argv'] ?? null) && array_is_list($target['argv']) && $target['argv'] !== []
-                    && array_all($target['argv'], static fn(mixed $argument): bool => is_string($argument) && $argument !== '')
-                    && $targetIndex < $deathIndex && $target === $dead,
-                    'Memory pressure terminal death differs from the selected native identity',
-                );
-            }
+            $records = Reports::samples($this->artifacts . '/pressure.log');
+            $targets = array_filter($records, static fn(array $row): bool => isset($row['nativeTarget']));
+            $deaths = array_filter($records, static fn(array $row): bool => isset($row['nativeDied']));
+            Reports::require(count($targets) === 1 && count($deaths) === 1, 'Native loss lacks one exact native target and terminal death');
+            $targetIndex = array_key_first($targets);
+            $deathIndex = array_key_first($deaths);
+            $target = $targets[$targetIndex]['nativeTarget'];
+            $dead = $deaths[$deathIndex]['nativeDied'];
+            Reports::require(
+                is_array($target) && is_int($target['pid'] ?? null) && $target['pid'] > 0
+                && is_string($target['startTicks'] ?? null) && ctype_digit($target['startTicks'])
+                && is_array($target['argv'] ?? null) && array_is_list($target['argv']) && $target['argv'] !== []
+                && array_all($target['argv'], static fn(mixed $argument): bool => is_string($argument) && $argument !== '')
+                && $targetIndex < $deathIndex && $target === $dead,
+                'Native loss terminal death differs from the selected native identity',
+            );
             $this->verify();
         });
     }
@@ -164,14 +162,7 @@ final readonly class ContainedSamplerDrain
             'Terminal heartbeat lies outside continuous sampler coverage',
         );
         Reports::require(abs($execution['monotonic'] - $control['monotonic']) <= 2, 'Execution sampler ended before contained drain');
-        $exhaustion = ControlCapacityVerifier::exhausted($this->artifacts, $this->phase, true);
-        if ($exhaustion['source'] === 'execution-cgroup-counter') {
-            [$key, $counter] = $this->phase === 'memory' ? ['memory.events', 'oom_kill'] : ['pids.events', 'max'];
-            Reports::require(
-                (Reports::counters($execution[$key])[$counter] ?? 0) === $exhaustion['maximum'],
-                'Execution sampler ended before exhaustion',
-            );
-        }
+        ControlCapacityVerifier::nativeLost($this->artifacts, true);
         ControlCapacityVerifier::verify($this->artifacts, $this->phase);
     }
 }

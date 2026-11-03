@@ -115,8 +115,6 @@ final class MediaControl
                     'exec',
                     $checkpoint->execution,
                     'php',
-                    '-d',
-                    'memory_limit=-1',
                     'tests/Fixtures/Worker/control-capacity-pressure.php',
                     'cpu',
                     '180',
