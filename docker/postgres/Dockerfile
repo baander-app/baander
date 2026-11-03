@@ -1,17 +1,17 @@
 # Builds the launcher that starts PostgreSQL with transparent huge pages
 # disabled; see postgres/thp-disabled-exec.c.
-FROM postgres:18-bookworm AS thp-helper
+FROM postgres:18-trixie AS thp-helper
 RUN apt-get update && apt-get install -y --no-install-recommends gcc libc6-dev \
     && rm -rf /var/lib/apt/lists/*
 COPY ./postgres/thp-disabled-exec.c /src/thp-disabled-exec.c
 RUN gcc -O2 -Wall -Wextra -Werror -o /thp-disabled-exec /src/thp-disabled-exec.c
 
-FROM postgres:18-bookworm AS base
+FROM postgres:18-trixie AS base
 
 # Set versions as build args for easy updates
 ARG PGROONGA_VERSION=4.0.5-1
 ARG POSTGRESQL_VERSION=18
-ARG PGBOUNCER_VERSION=1.26.1-1.pgdg12+1
+ARG PGBOUNCER_VERSION=1.26.1-1.pgdg13+1
 
 ENV PGROONGA_VERSION=${PGROONGA_VERSION}
 ENV POSTGRESQL_VERSION=${POSTGRESQL_VERSION}

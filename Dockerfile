@@ -13,7 +13,7 @@
 # FFmpeg is installed from Debian apt (build with: make build-ffmpeg for static).
 # -----------------------------------------------------------------------------
 ARG OPERATOR_HELPER_IMAGE=scratch
-FROM php:8.5.12-zts-bookworm AS base
+FROM php:8.5.12-zts-trixie AS base
 
 ARG LIBURING_VERSION=2.13
 ARG TARGETPLATFORM
@@ -396,36 +396,38 @@ RUN set -xe && \
         git \
         # Runtime library packages for compiled extensions
         libpq5 \
-        libssl3 \
-        libmagickwand-6.q16-6 \
+        libssl3t64 \
+        libmagickwand-7.q16-10 \
         libjpeg62-turbo \
-        libpng16-16 \
+        libpng16-16t64 \
         libwebp7 \
         libxpm4 \
         libfreetype6 \
-        libzip4 \
+        libzip5 \
         libbrotli1 \
         liblz4-1 \
         libzstd1 \
         zlib1g \
-        libcurl4 \
+        libcurl4t64 \
         libxml2 \
-        libicu72 \
+        libicu76 \
         libsqlite3-0 \
         libyaml-0-2 \
-        libuv1 \
+        libuv1t64 \
         libc-ares2 \
-        libssh2-1 \
+        libssh2-1t64 \
         # libavif runtime
-        libavif15 \
+        libavif16 \
         # TSDuck runtime dependencies
         libedit2 \
         libpcsclite1 \
         librist4 \
         libsrt1.5-openssl \
-        # Intel QSV / VAAPI hardware transcoding
+        # Intel QSV / VAAPI hardware transcoding; Mesa's VAAPI driver
+        # serves AMD GPUs
         libva2 \
         libdrm2 \
+        mesa-va-drivers \
         vainfo \
         && rm -rf /var/lib/apt/lists/* && \
     apt-get clean
@@ -638,7 +640,7 @@ RUN COMPOSER_MEMORY_LIMIT=-1 composer install --optimize-autoloader --no-interac
 
 USER www-data
 
-FROM node:24.22.2-bookworm-slim AS dev-tools
+FROM node:24.22.2-trixie-slim AS dev-tools
 RUN corepack enable && corepack prepare yarn@4.18.1 --activate && mkdir -p /work
 WORKDIR /work
 
