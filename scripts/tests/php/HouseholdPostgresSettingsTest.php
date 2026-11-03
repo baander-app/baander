@@ -78,6 +78,23 @@ final class HouseholdPostgresSettingsTest extends TestCase
         self::assertStringContainsString('work_mem', $errors);
     }
 
+    public function testTimeZonePinnedOnTheDatabaseIsAcceptedWhileOtherDatabaseOverridesAreNot(): void
+    {
+        $snapshot = $this->snapshot();
+        $snapshot['settings']['timezone'] = ['setting' => 'UTC', 'unit' => null, 'source' => 'database', 'sourcefile' => null, 'pending_restart' => false];
+        self::assertSame([], $this->household()->verify($snapshot, '/etc/baander/postgresql.conf'));
+        $snapshot['settings']['timezone']['setting'] = 'Europe/Copenhagen';
+        self::assertStringContainsString('timezone', implode("\n", $this->household()->verify($snapshot, '/etc/baander/postgresql.conf')));
+        $snapshot = $this->snapshot();
+        $snapshot['settings']['work_mem'] = ['setting' => '4MB', 'unit' => null, 'source' => 'database', 'sourcefile' => null, 'pending_restart' => false];
+        self::assertStringContainsString('work_mem', implode("\n", $this->household()->verify($snapshot, '/etc/baander/postgresql.conf')));
+    }
+
+    public function testVerificationSqlMatchesCatalogNamesWithoutRegardToCase(): void
+    {
+        self::assertStringContainsString('lower(s.name) = r.name', $this->household()->verificationSql());
+    }
+
     public function testVerificationSqlCapturesSettingsAndExercisesExtensionsWithoutCredentials(): void
     {
         $sql = $this->household()->verificationSql();

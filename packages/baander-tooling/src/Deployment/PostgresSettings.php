@@ -8,6 +8,12 @@ use InvalidArgumentException;
 
 final class PostgresSettings
 {
+    /**
+     * Settings a migration also pins on the database itself, so the session
+     * reports the database as their source; the value must still match the file.
+     */
+    private const array DATABASE_DEFAULTS = ['timezone'];
+
     /** @var array<string,string> */
     private array $settings = [];
 
@@ -53,9 +59,9 @@ SELECT json_build_object(
  'config_file', current_setting('config_file'),
  'settings', (SELECT json_object_agg(r.name, json_build_object(
    'setting', coalesce(s.setting, current_setting(r.name, true)),
-   'unit', s.unit, 'sourcefile', s.sourcefile,
+   'unit', s.unit, 'source', s.source, 'sourcefile', s.sourcefile,
    'pending_restart', s.pending_restart))
-   FROM requested r LEFT JOIN pg_settings s USING (name)),
+   FROM requested r LEFT JOIN pg_settings s ON lower(s.name) = r.name),
  'file_errors', (SELECT coalesce(json_agg(json_build_object(
    'sourcefile', sourcefile, 'sourceline', sourceline, 'error', error)), '[]'::json)
    FROM pg_file_settings WHERE error IS NOT NULL),
@@ -101,7 +107,8 @@ SQL;
             if (!is_string($unit) || self::normalize($actual['setting'], $unit) !== self::normalize($expected)) {
                 $errors[] = 'Unexpected effective PostgreSQL setting: ' . $name;
             }
-            if (($actual['sourcefile'] ?? null) !== $expectedConfigPath) {
+            $databaseDefault = in_array($name, self::DATABASE_DEFAULTS, true) && ($actual['source'] ?? null) === 'database';
+            if (($actual['sourcefile'] ?? null) !== $expectedConfigPath && !$databaseDefault) {
                 $errors[] = 'PostgreSQL setting does not originate in the deployment configuration: ' . $name;
             }
             if (($actual['pending_restart'] ?? null) !== false) {
