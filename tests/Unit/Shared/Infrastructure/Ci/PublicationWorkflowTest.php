@@ -436,6 +436,8 @@ PHP;
         foreach ([
             'test_cluster_cleanup',
             'test_storage_cleanup',
+            'test_runtime_lifecycle',
+            'test_cluster_convergence',
             'run_rqlite_contract',
             'run_transport_contract',
             'run_http_contract',

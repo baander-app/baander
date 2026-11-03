@@ -62,7 +62,10 @@ final class MutationRouteInventoryTest extends TestCase
             'oauth_token', 'oauth_revoke', 'oauth_authorize_decision', 'oauth_clients_create', 'oauth_clients_revoke',
             'oauth_device_authorize', 'oauth_device_approve',
         ],
-        'sessions and devices' => ['session_new', 'session_claim', 'session_sync', 'device_register', 'device_rename', 'device_forget'],
+        'playback sessions and devices' => [
+            'playback_endpoint', 'playback_transfer', 'playback_ack', 'playback_observe', 'playback_control',
+            'playback_reconcile', 'playback_recover_local', 'device_register', 'device_rename', 'device_forget',
+        ],
         'radio' => [
             'radio_session_start', 'radio_session_stop', 'radio_source_create',
             'radio_starred_star', 'radio_starred_unstar',
