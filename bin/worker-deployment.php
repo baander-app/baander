@@ -136,7 +136,8 @@ try {
                 try {
                     $status = json_decode($docker->execute(['exec', $boot->control->binding->containerId,
                         '/usr/local/bin/php', '-d', 'memory_limit=64M', $manifest->appHome . '/bin/worker-autoscaling-status.php',
-                        $manifest->namespace, $manifest->bootId, (string) $lease->epoch, $manifest->autoscaling->toJson()]), true, 8, JSON_THROW_ON_ERROR);
+                        $manifest->namespace, $manifest->bootId, (string) $lease->epoch, $manifest->autoscaling->toJson(),
+                        $manifest->deploymentProfile->toJson()]), true, 8, JSON_THROW_ON_ERROR);
                     if (!is_array($status)) {
                         throw new RuntimeException('Invalid autoscaling status.');
                     }
