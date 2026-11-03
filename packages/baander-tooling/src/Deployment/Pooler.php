@@ -35,10 +35,42 @@ final class Pooler
         'full' => ['application' => 20, 'control' => 8, 'direct' => 4],
     ];
 
-    /** PostgreSQL's max_connections for a profile: both pools, the direct reserve and the superuser slots. */
-    public static function maxConnections(string $profile, int $superuserSlots): int
+    /** The pooler's client limit, max_client_conn in docker/postgres/pooler/pgbouncer.ini. */
+    public const int CLIENT_CONNECTIONS = 500;
+
+    /** PostgreSQL's max_connections: both pools, the direct reserve and the superuser slots.
+     * @param array{application:int,control:int,direct:int} $pools
+     */
+    public static function maxConnections(array $pools, int $superuserSlots): int
     {
-        return array_sum(self::POOLS[$profile]) + $superuserSlots;
+        return $pools['application'] + $pools['control'] + $pools['direct'] + $superuserSlots;
+    }
+
+    /**
+     * PostgreSQL's memory limit: shared buffers, about 128 MiB for auxiliary processes and
+     * mapped libraries, and about 24 MiB of private memory for every connection that may load
+     * PGroonga, rounded up to 128 MiB.
+     */
+    public static function postgresMemoryMiB(int $sharedBuffersMiB, int $maxConnections): int
+    {
+        return self::roundUp($sharedBuffersMiB + 128 + 24 * $maxConnections, 128);
+    }
+
+    /**
+     * The pooler's memory limit: 24 MiB for the process and its headroom, and 64 KiB for each
+     * client and server connection's buffers, rounded up to 16 MiB. PgBouncer 1.26.1 measured
+     * 15 MiB resident while idle and 17 MiB with 300 queued clients.
+     *
+     * @param array{application:int,control:int,direct:int} $pools
+     */
+    public static function memoryMiB(array $pools, int $clientConnections = self::CLIENT_CONNECTIONS): int
+    {
+        return self::roundUp(24 + intdiv(($clientConnections + $pools['application'] + $pools['control']) * 64 + 1023, 1024), 16);
+    }
+
+    private static function roundUp(int $value, int $step): int
+    {
+        return intdiv($value + $step - 1, $step) * $step;
     }
 
     /** @return array{DATABASE_URL:string,DATABASE_CONTROL_URL:string} */

@@ -60,10 +60,35 @@ final class HouseholdDeploymentTest extends TestCase
             $pools = Pooler::POOLS[$profile];
             $connections = (int) $settings['max_connections'];
             self::assertSame($pools['application'] + $pools['control'] + $pools['direct'] + (int) $settings['superuser_reserved_connections'], $connections, $profile);
-            self::assertSame(Pooler::maxConnections($profile, (int) $settings['superuser_reserved_connections']), $connections);
-            $buffers = (int) rtrim($settings['shared_buffers'], 'MB');
-            self::assertSame((int) ceil(($buffers + 128 + 24 * $connections) / 128) * 128, HouseholdConfiguration::POSTGRES_MEMORY_MIB[$profile], $profile);
+            self::assertSame(Pooler::maxConnections($pools, (int) $settings['superuser_reserved_connections']), $connections);
+            self::assertSame(HouseholdConfiguration::POSTGRES_SUPERUSER_SLOTS, (int) $settings['superuser_reserved_connections']);
+            self::assertSame(HouseholdConfiguration::POSTGRES_SHARED_BUFFERS_MIB[$profile] . 'MB', $settings['shared_buffers']);
+            self::assertSame(Pooler::postgresMemoryMiB(HouseholdConfiguration::POSTGRES_SHARED_BUFFERS_MIB[$profile], $connections), $configuration->resources['postgresMemoryMiB'], $profile);
+            self::assertSame(Pooler::memoryMiB($pools), $configuration->resources['poolerMemoryMiB'], $profile);
         }
+    }
+
+    public function testDatabaseSizesAreDerivedFromThePools(): void
+    {
+        $pools = ['application' => 10, 'control' => 4, 'direct' => 3];
+        self::assertSame(20, Pooler::maxConnections($pools, 3));
+        self::assertSame(35, Pooler::maxConnections(['application' => 20, 'control' => 8, 'direct' => 4], 3));
+        // 128 + 128 + 24 * 20 = 736, rounded up to 768; 256 + 128 + 24 * 35 = 1224, rounded up to 1280.
+        self::assertSame(768, Pooler::postgresMemoryMiB(128, 20));
+        self::assertSame(1280, Pooler::postgresMemoryMiB(256, 35));
+        self::assertSame(128, Pooler::postgresMemoryMiB(0, 0));
+        self::assertSame(1408, Pooler::postgresMemoryMiB(256, 40));
+        // 24 + ceil(514 * 64 / 1024) = 57, rounded up to 64; a larger client limit needs more.
+        self::assertSame(64, Pooler::memoryMiB($pools));
+        self::assertSame(32, Pooler::memoryMiB($pools, 0));
+        self::assertSame(96, Pooler::memoryMiB(['application' => 40, 'control' => 16, 'direct' => 4], 1000));
+        $template = file_get_contents(dirname(__DIR__, 3) . '/docker/postgres/pooler/pgbouncer.ini');
+        self::assertIsString($template);
+        self::assertStringContainsString("\nmax_client_conn = " . Pooler::CLIENT_CONNECTIONS . "\n", $template);
+        $household = HouseholdConfiguration::databaseMemoryMiB('household');
+        $full = HouseholdConfiguration::databaseMemoryMiB('full');
+        self::assertSame(['postgresMemoryMiB' => 768, 'poolerMemoryMiB' => 64], $household);
+        self::assertSame(['postgresMemoryMiB' => 1280, 'poolerMemoryMiB' => 64], $full);
     }
 
     public function testConfigurationRejectsUnknownProfilesAndHostSourceMounts(): void

@@ -15,13 +15,23 @@ final readonly class HouseholdConfiguration
         'redisMaxmemoryMiB' => 192, 'gatewayMemoryMiB' => 64, 'operatorMemoryMiB' => 512,
         'hostHeadroomMiB' => 512,
     ];
+    /** shared_buffers and superuser_reserved_connections of each profile's PostgreSQL configuration file. */
+    public const array POSTGRES_SHARED_BUFFERS_MIB = ['household' => 128, 'full' => 256];
+    public const int POSTGRES_SUPERUSER_SLOTS = 3;
+
     /**
-     * PostgreSQL limits sized for each profile's configuration file: shared buffers, about 128 MiB for auxiliary
-     * processes and mapped libraries, and about 24 MiB of private memory for every server connection that may load
-     * PGroonga, rounded up to 128 MiB. The connections are the pooler's server pools, the direct reserve and the
-     * superuser slots (household: 128 MiB buffers, 20 connections; full: 256 MiB buffers, 35 connections).
+     * Default PostgreSQL and pooler memory limits, derived from the profile's pooler server pools.
+     *
+     * @return array{postgresMemoryMiB:int,poolerMemoryMiB:int}
      */
-    public const array POSTGRES_MEMORY_MIB = ['household' => 768, 'full' => 1280];
+    public static function databaseMemoryMiB(string $profile): array
+    {
+        $pools = Pooler::POOLS[$profile];
+        return [
+            'postgresMemoryMiB' => Pooler::postgresMemoryMiB(self::POSTGRES_SHARED_BUFFERS_MIB[$profile], Pooler::maxConnections($pools, self::POSTGRES_SUPERUSER_SLOTS)),
+            'poolerMemoryMiB' => Pooler::memoryMiB($pools),
+        ];
+    }
 
     /** @param array<string,ImageSelection> $images
      * @param array<string,string> $environment
@@ -96,7 +106,7 @@ final readonly class HouseholdConfiguration
             throw new \InvalidArgumentException('Resources must be an object.');
         }
         JsonObject::keys($resources, array_keys(self::RESOURCE_DEFAULTS), 'deployment resources');
-        $resources = array_replace(self::RESOURCE_DEFAULTS, ['postgresMemoryMiB' => self::POSTGRES_MEMORY_MIB[$profile]], $resources);
+        $resources = array_replace(self::RESOURCE_DEFAULTS, self::databaseMemoryMiB($profile), $resources);
         foreach ($resources as $value) {
             if (!is_int($value) || $value < 1 || $value > 1048576) {
                 throw new \InvalidArgumentException('Memory reservations must be positive integer MiB.');
