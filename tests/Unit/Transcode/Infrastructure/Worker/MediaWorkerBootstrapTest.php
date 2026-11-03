@@ -124,6 +124,7 @@ PHP);
             'APP_ENV' => 'test',
             'APP_DEBUG' => '0',
             'DATABASE_URL' => 'postgresql://baander@baander.app/database',
+            'DATABASE_CONTROL_URL' => 'postgresql://baander_control@baander.app/database',
         ];
         $key = $kind === 'video' ? '019a9e53-8192-72dd-a50a-9f15553cecaf' : str_repeat('a', 64);
         $process = proc_open([PHP_BINARY, dirname(__DIR__, 5) . '/bin/worker-media-job.php', $kind, $key],

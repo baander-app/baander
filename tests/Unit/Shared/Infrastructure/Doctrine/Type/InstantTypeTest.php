@@ -120,7 +120,7 @@ final class InstantTypeTest extends TestCase
     /** The Swoole kernel reads the registrar; DoctrineBundle reads the configuration. */
     public function testTheRegistrarAndTheConfigurationNameTheSameTypes(): void
     {
-        $config = Yaml::parseFile(dirname(__DIR__, 6) . '/config/packages/doctrine.yaml');
+        $config = Yaml::parseFile(dirname(__DIR__, 6) . '/config/packages/doctrine.yaml', Yaml::PARSE_CONSTANT);
         $registrar = (new \ReflectionClassConstant(CustomTypesRegistrar::class, 'TYPES'))->getValue();
         self::assertIsArray($registrar);
         ksort($registrar);
