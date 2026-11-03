@@ -108,7 +108,7 @@ Open items for this plan:
 - The preset inherits `OTEL_ENABLED=true` with an unreachable `host.docker.internal` endpoint from `.env`, so web workers spend time on failing span exports. The preset should disable export unless the operator configures a collector.
 - After a PostgreSQL crash the worker pair stops ("deployment reconciliation is required") and stays stopped until an operator intervenes.
 - `CaptureCoverageTest` still fails on master's playback-destination tables and six `listening_sessions` columns; whether to capture or exclude each needs a decision.
-- Shipping gates not yet run: `ce-simplify-code` (in progress on branch `simplify/household-deployment`), `ce-code-review`, the full backend suites, worker runtime container suites, affected browser playback specs and a documentation build. `baander-database:latest` has not been rebuilt, so existing instances still run PostgreSQL without the THP launcher.
+- `ce-simplify-code` ran (4c24a9bb5); its affected tooling, backend and web tests passed. Shipping gates not yet run: `ce-code-review`, the full backend suites, worker runtime container suites, affected browser playback specs and a documentation build. `baander-database:latest` has not been rebuilt, so existing instances still run PostgreSQL without the THP launcher.
 
 Configurable media capacity, 2026-11-03: the full profile admits only 3 video and 1 audio conversion jobs, and some households run 8 video and 12 audio streams at once. The user chose operator-set job slots, with the worker reservation and manifest derived from them, as a separate follow-up plan rather than part of this branch.
 
