@@ -78,24 +78,6 @@ final readonly class WorkerAutoscalingProfile
         return json_encode(get_object_vars($this), JSON_THROW_ON_ERROR);
     }
 
-    public function minimumMemoryMiB(string $unit, DeploymentProfile $deploymentProfile): int
-    {
-        return $deploymentProfile->managementMemoryMiB($unit) + match ($unit) {
-            'control' => 3 * $deploymentProfile->phpProcessMemoryMiB() + $deploymentProfile->mediaMemoryMiB(),
-            'execution' => $deploymentProfile->phpProcessMemoryMiB() * ($this->maximumConcurrency + 1),
-            default => throw new \InvalidArgumentException('Unknown worker unit.'),
-        };
-    }
-
-    public function minimumPids(string $unit): int
-    {
-        return match ($unit) {
-            'control' => 129,
-            'execution' => 256 + $this->maximumConcurrency - 1,
-            default => throw new \InvalidArgumentException('Unknown worker unit.'),
-        };
-    }
-
     /** @return list<string> */
     public function consumerIds(): array
     {

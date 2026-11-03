@@ -40,8 +40,8 @@ if ($role !== 'supervisor' || getmypid() !== 1) {
 $stop = false;
 pcntl_signal(SIGTERM, static function () use (&$stop): void { $stop = true; });
 pcntl_signal(SIGINT, static function () use (&$stop): void { $stop = true; });
-$definition = new WorkerDefinition('containment', [PHP_BINARY, __FILE__, 'child'], dirname(__DIR__, 3), 32 * 1024 * 1024, 0.2);
-$supervisor = new WorkerSupervisor([$definition], 1, 64 * 1024 * 1024, 16 * 1024 * 1024,
+$definition = new WorkerDefinition('containment', [PHP_BINARY, __FILE__, 'child'], dirname(__DIR__, 3), 0.2);
+$supervisor = new WorkerSupervisor([$definition], 1,
     static fn (WorkerDefinition $worker, WorkerLaunchIdentity $identity): WorkerChildProcess => WorkerChildProcess::start($worker->argv, $worker->directory, STDOUT, STDERR, $worker->environment), 'containment-fixture');
 for (;;) {
     $now = hrtime(true) / 1e9;

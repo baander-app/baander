@@ -14,6 +14,9 @@ final class NativeExecutionDaemon
     /** Open connections beyond one per admitted client, for overlapping requests and stray peers. */
     private const int PEER_MARGIN = 4;
 
+    /** Commands yield CPU to the unit's supervisor, lease helper, consumers and this daemon. */
+    public const int COMMAND_NICENESS = 10;
+
     /** @var array<string, NativeExecutionAttempt> */
     private array $attempts = [];
     /** @var array<string, array{generation:int, highest:int}> */
@@ -323,7 +326,7 @@ final class NativeExecutionDaemon
         if ($active >= $this->deploymentProfile->nativeCommandLimit() || count($this->attempts) >= $this->deploymentProfile->nativeResultLimit()) {
             throw new NativeExecutionException('Native command or result capacity is exhausted.', false);
         }
-        $process = @proc_open(['/usr/bin/setsid', ...$argv], [0 => ['file', '/dev/null', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
+        $process = @proc_open([...self::launcher(), ...$argv], [0 => ['file', '/dev/null', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
             $pipes, null, ['PATH' => '/usr/bin:/bin', 'LANG' => 'C', 'LC_ALL' => 'C'], ['bypass_shell' => true]);
         if ($process === false) {
             $this->poisoned = true;
@@ -430,9 +433,23 @@ final class NativeExecutionDaemon
     }
 
     /**
+     * The command starts in its own session at a lower CPU priority and with the media work
+     * out-of-memory score, so host memory pressure kills it before this daemon. Each launcher
+     * step replaces itself with the next one: setsid is not a group leader, so the command
+     * keeps the launched PID and leads its own process group.
+     *
+     * @return list<string>
+     */
+    public static function launcher(): array
+    {
+        return ['/usr/bin/setsid', '/usr/bin/nice', '-n', (string) self::COMMAND_NICENESS,
+            '/usr/bin/choom', '-n', (string) OutOfMemoryKillOrder::MEDIA_WORK, '--'];
+    }
+
+    /**
      * Reads a running command's CPU time from /proc/<pid>/stat: user and system time of all
-     * its threads plus that of descendants it has waited for. The launcher's setsid is not a
-     * group leader, so it executes the command in place and the PID is the command itself.
+     * its threads plus that of descendants it has waited for. The launched PID is the command
+     * itself because every launcher step executes the next one in place.
      */
     private static function readCpu(NativeExecutionAttempt $attempt): void
     {

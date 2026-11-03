@@ -123,8 +123,8 @@ CODE;
     /** @param \Closure(WorkerDefinition, WorkerLaunchIdentity): WorkerChildProcess $launcher */
     private function supervisor(\Closure $launcher): WorkerSupervisor
     {
-        $definition = new WorkerDefinition('worker', [PHP_BINARY, '-r', 'exit(0);'], $this->directory, 100, 0, restartPolicy: new RestartPolicy(3, 1000, 1, 4, 0));
-        return new WorkerSupervisor([$definition], 1, 200, 100, $launcher, 'baander.app-containment', str_repeat('a', 32));
+        $definition = new WorkerDefinition('worker', [PHP_BINARY, '-r', 'exit(0);'], $this->directory, 0, restartPolicy: new RestartPolicy(3, 1000, 1, 4, 0));
+        return new WorkerSupervisor([$definition], 1, $launcher, 'baander.app-containment', str_repeat('a', 32));
     }
 
     /** @param list<string> $arguments */

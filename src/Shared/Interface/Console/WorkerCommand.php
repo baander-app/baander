@@ -29,9 +29,7 @@ final class WorkerCommand extends Command
     {
         $this->addOption('deployment', null, InputOption::VALUE_REQUIRED, 'Deployment namespace; defaults to BAANDER_WORKER_NAMESPACE.')
             ->addOption('boot-id', null, InputOption::VALUE_REQUIRED, 'Fresh 32-hex boot identity; defaults to BAANDER_WORKER_BOOT_ID.')
-            ->addOption('memory-mib', null, InputOption::VALUE_REQUIRED, 'Required total admission ceiling in MiB.')
             ->addOption('unit', null, InputOption::VALUE_REQUIRED, 'Worker unit: control or execution.')
-            ->addOption('pids-limit', null, InputOption::VALUE_REQUIRED, 'Enforced unit PID capacity.')
             ->addOption('deployment-profile', null, InputOption::VALUE_REQUIRED, 'Complete deployment startup profile as JSON.')
             ->addOption('autoscaling-profile', null, InputOption::VALUE_REQUIRED, 'Complete admitted ordinary autoscaling profile as JSON.')
             ->addOption('scheduled-console-mib', null, InputOption::VALUE_REQUIRED, 'Execution reservation for one scheduled console child (0 disables).', '0')
@@ -48,7 +46,6 @@ final class WorkerCommand extends Command
                 $this->identity($input, 'deployment', 'BAANDER_WORKER_NAMESPACE'),
                 $this->identity($input, 'boot-id', 'BAANDER_WORKER_BOOT_ID'),
                 $this->identity($input, 'unit', 'BAANDER_WORKER_UNIT'),
-                $this->bytes($input, 'memory-mib'), $this->pids($input),
                 $input->getOption('scheduled-console-mib') === '0' ? 0 : $this->bytes($input, 'scheduled-console-mib'),
                 $this->stringOption($input, 'lock-dir'), $this->stringOption($input, 'ipc-dir'),
                 $this->deploymentProfile($input),
@@ -83,15 +80,6 @@ final class WorkerCommand extends Command
         return $profile;
     }
 
-    private function pids(InputInterface $input): int
-    {
-        $value = $this->stringOption($input, 'pids-limit');
-        if (preg_match('/\A[1-9][0-9]{0,3}\z/D', $value) !== 1 || (int) $value > 4096) {
-            throw new \InvalidArgumentException('Worker PID capacity must be a positive integer at most 4096.');
-        }
-        return (int) $value;
-    }
-
     private function identity(InputInterface $input, string $option, string $environment): string
     {
         $value = $input->getOption($option);
@@ -112,7 +100,7 @@ final class WorkerCommand extends Command
     {
         $value = $this->stringOption($input, $option);
         if (!preg_match('/\A[1-9][0-9]{0,6}\z/D', $value) || (int) $value > 1_048_576) {
-            throw new \InvalidArgumentException('Worker memory options require positive integer MiB values of at most 1048576.');
+            throw new \InvalidArgumentException('The scheduled console reservation requires a positive integer MiB value of at most 1048576.');
         }
         return (int) $value * 1024 * 1024;
     }
@@ -121,7 +109,7 @@ final class WorkerCommand extends Command
     {
         $value = $input->getOption($option);
         if (!is_string($value) || $value === '') {
-            throw new \InvalidArgumentException('All worker memory budgets and the lock directory are required.');
+            throw new \InvalidArgumentException('Worker profiles and private directories are required.');
         }
         return $value;
     }

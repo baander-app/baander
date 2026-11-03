@@ -121,27 +121,6 @@ final readonly class DeploymentProfile
         return 128;
     }
 
-    public function nativeEnvelopeMiB(): int
-    {
-        return $this->identifier === 'household' ? 512 : 3136;
-    }
-
-    public function managementMemoryMiB(string $unit): int
-    {
-        // Supervisor heap, lease helper, and native headroom are resident in both units.
-        $management = $this->phpHeapMiB() + 64 + 64;
-        return $management + match ($unit) {
-            'control' => 0,
-            'execution' => $this->nativeEnvelopeMiB(),
-            default => throw new \InvalidArgumentException('Unknown worker unit.'),
-        };
-    }
-
-    public function mediaMemoryMiB(): int
-    {
-        return $this->phpProcessMemoryMiB() * (1 + $this->mediaChildSlots());
-    }
-
     public function mediaChildSlots(): int
     {
         return $this->sharedCopySlots + $this->videoEncoderSlots + $this->audioEncoderSlots;

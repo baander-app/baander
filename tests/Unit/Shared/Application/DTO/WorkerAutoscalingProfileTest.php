@@ -10,27 +10,12 @@ use PHPUnit\Framework\TestCase;
 
 final class WorkerAutoscalingProfileTest extends TestCase
 {
-    public function testEveryResidentSlotHasMemoryAndPidReservations(): void
+    public function testEveryResidentSlotHasAConsumerIdentity(): void
     {
-        foreach ([1 => 4160, 2 => 4480, 4 => 5120] as $maximum => $memoryMiB) {
+        foreach ([1, 2, 4] as $maximum) {
             $profile = new WorkerAutoscalingProfile(maximumConcurrency: $maximum);
-            self::assertSame($memoryMiB, $profile->minimumMemoryMiB('execution', new \App\Shared\Application\DTO\DeploymentProfile('full', 3, 1)));
-            self::assertSame(256 + $maximum - 1, $profile->minimumPids('execution'));
-            self::assertSame(2944, $profile->minimumMemoryMiB('control', new \App\Shared\Application\DTO\DeploymentProfile('full', 3, 1)));
-            self::assertSame(129, $profile->minimumPids('control'));
             self::assertCount($maximum, array_unique($profile->consumerIds()));
         }
-    }
-
-    public function testHouseholdReservesOnlyItsResidentMediaChildren(): void
-    {
-        $deployment = new \App\Shared\Application\DTO\DeploymentProfile('household');
-        $profile = new WorkerAutoscalingProfile();
-        self::assertSame(2304, $profile->minimumMemoryMiB('control', $deployment));
-        self::assertSame(1536, $profile->minimumMemoryMiB('execution', $deployment));
-        $configuration = new WorkerRuntimeConfiguration('worker.baander.app', str_repeat('a', 32), 'control',
-            2304 * 1024 * 1024, 129, 0, '/tmp/worker-locks', '/run/baander-worker', deploymentProfile: $deployment);
-        self::assertSame(384 * 1024 * 1024, $configuration->managementReservationBytes);
     }
 
     public function testProfileRoundTripPreservesEveryPolicyInput(): void
@@ -40,12 +25,11 @@ final class WorkerAutoscalingProfileTest extends TestCase
         self::assertNotSame((new WorkerAutoscalingProfile(maximumConcurrency: 4))->toJson(), $profile->toJson());
     }
 
-    public function testPoolCannotUseSingleConsumerMemoryReservation(): void
+    public function testPoolCannotExceedTheProfileConsumerLimit(): void
     {
         $this->expectException(\InvalidArgumentException::class);
-        new WorkerRuntimeConfiguration('worker.baander.app', str_repeat('a', 32), 'execution',
-            4480 * 1024 * 1024, 259, 320 * 1024 * 1024, '/tmp/worker-locks', '/run/baander-worker',
-            new \App\Shared\Application\DTO\DeploymentProfile('full', 3, 1), new WorkerAutoscalingProfile(maximumConcurrency: 4));
+        new WorkerRuntimeConfiguration('worker.baander.app', str_repeat('a', 32), 'execution', 0, '/tmp/worker-locks', '/run/baander-worker',
+            new \App\Shared\Application\DTO\DeploymentProfile('household'), new WorkerAutoscalingProfile(maximumConcurrency: 2));
     }
 
     public function testPolicyRejectsInvalidBoundsAndInconsistentTiming(): void

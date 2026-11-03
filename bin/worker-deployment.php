@@ -64,13 +64,11 @@ try {
                 $result = ['state' => 'creation_already_attempted'];
                 break;
             }
-            $host = json_decode($docker->execute(['info', '--format', '{"id":{{json .ID}},"cpus":{{.NCPU}},"memory":{{.MemTotal}},"cgroupVersion":{{json .CgroupVersion}}}']), true, 8, JSON_THROW_ON_ERROR);
-            if (!is_array($host) || ($host['id'] ?? null) !== $manifest->daemonId
-                || ($host['cgroupVersion'] ?? null) !== '2' || !is_int($host['cpus'] ?? null) || !is_int($host['memory'] ?? null)
-                || max([...$manifest->control->cpuSet, ...$manifest->execution->cpuSet]) >= $host['cpus']
-                || $manifest->control->memoryBytes + $manifest->execution->memoryBytes + 1024 * 1024 * 1024 > $host['memory']) {
-                throw new RuntimeException('Docker host cannot admit the declared worker resource pair.');
+            $host = json_decode($docker->execute(['info', '--format', '{"id":{{json .ID}},"cgroupVersion":{{json .CgroupVersion}},"securityOptions":{{json .SecurityOptions}}}']), true, 8, JSON_THROW_ON_ERROR);
+            if (!is_array($host) || ($host['id'] ?? null) !== $manifest->daemonId || ($host['cgroupVersion'] ?? null) !== '2') {
+                throw new RuntimeException('Docker host does not match the worker manifest or lacks cgroup v2.');
             }
+            \App\Shared\Infrastructure\Worker\OutOfMemoryKillOrder::assertApplicable($host['securityOptions'] ?? null);
             if (!$inventory->reserveBoot($manifest->namespace, $manifest->bootId, $manifestHash, $manifest->daemonId,
                 $recipes['control']->fingerprint(), $recipes['execution']->fingerprint())) {
                 $success = false;

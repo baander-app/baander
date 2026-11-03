@@ -21,8 +21,8 @@ final class WorkerSupervisor
     private ?float $lastTime = null;
 
     /**
-     * Admission uses declared reservations only. Deployment containment must enforce actual resources and own descendants.
-     * Process and memory slots stay reserved for the fixed worker set, including while containment is pending.
+     * Admission counts declared process reservations only; deployment containment owns descendants.
+     * Process slots stay reserved for the fixed worker set, including while containment is pending.
      *
      * @param list<WorkerDefinition> $definitions
      * @param int $maxChildren Ceiling for direct worker processes and their reserved descendants.
@@ -31,19 +31,14 @@ final class WorkerSupervisor
     public function __construct(
         array $definitions,
         int $maxChildren,
-        int $memoryLimitBytes,
-        int $supervisorReservationBytes,
         private readonly Closure $launcher,
         private readonly string $deploymentId,
         ?string $supervisorBootId = null,
     ) {
         $this->supervisorBootId = $supervisorBootId ?? bin2hex(random_bytes(16));
-        if ($definitions === [] || $maxChildren < 1 || count($definitions) > $maxChildren
-            || $memoryLimitBytes < 1 || $supervisorReservationBytes < 1 || $supervisorReservationBytes > $memoryLimitBytes
-        ) {
-            throw new InvalidArgumentException('Worker set and supervisor reservations must fit positive admission ceilings.');
+        if ($definitions === [] || $maxChildren < 1 || count($definitions) > $maxChildren) {
+            throw new InvalidArgumentException('Worker set must fit a positive process ceiling.');
         }
-        $reserved = $supervisorReservationBytes;
         $reservedProcesses = 0;
         $policies = [];
         foreach ($definitions as $definition) {
@@ -52,14 +47,10 @@ final class WorkerSupervisor
             if (isset($this->workers[$definition->id]) || isset($policies[$policyId])) {
                 throw new InvalidArgumentException('Worker IDs and restart policy instances must be unique.');
             }
-            if ($definition->memoryReservationBytes > $memoryLimitBytes - $reserved) {
-                throw new InvalidArgumentException('Worker memory reservations exceed the admission ceiling.');
-            }
             $processReservation = 1 + $definition->descendantProcessReservation;
             if ($processReservation > $maxChildren - $reservedProcesses) {
                 throw new InvalidArgumentException('Worker process reservations exceed the admission ceiling.');
             }
-            $reserved += $definition->memoryReservationBytes;
             $reservedProcesses += $processReservation;
             $policies[$policyId] = true;
             $this->workers[$definition->id] = [

@@ -30,21 +30,13 @@ final class DeploymentProfileTest extends TestCase
         self::assertEquals($household, DeploymentProfile::resolve('household', $household->toJson()));
     }
 
-    public function testProfilesReserveTheirOwnHeapAndNativeEnvelope(): void
+    public function testProfilesSetTheirPhpHeaps(): void
     {
-        $full = new DeploymentProfile('full', 3, 1);
-        self::assertSame(256, $full->phpHeapMiB());
-        self::assertSame(320, $full->phpProcessMemoryMiB());
-        self::assertSame(3136, $full->nativeEnvelopeMiB());
-        self::assertSame(128, $full->nativeManagerHeapMiB());
-        self::assertSame(1600, $full->mediaMemoryMiB());
-
-        $household = new DeploymentProfile('household');
-        self::assertSame(256, $household->phpHeapMiB());
-        self::assertSame(320, $household->phpProcessMemoryMiB());
-        self::assertSame(512, $household->nativeEnvelopeMiB());
-        self::assertSame(128, $household->nativeManagerHeapMiB());
-        self::assertSame(960, $household->mediaMemoryMiB());
+        foreach ([new DeploymentProfile('full', 3, 1), new DeploymentProfile('household')] as $profile) {
+            self::assertSame(256, $profile->phpHeapMiB());
+            self::assertSame(320, $profile->phpProcessMemoryMiB());
+            self::assertSame(128, $profile->nativeManagerHeapMiB());
+        }
     }
 
     public function testHouseholdNativeLimitsKeepTheirSharedCopyValues(): void
@@ -67,7 +59,6 @@ final class DeploymentProfileTest extends TestCase
             'media-audio-0' => 1,
         ], $full->nativeClientCommandCaps());
         self::assertSame([8, 18, 6, 1], [$full->nativeCommandLimit(), $full->nativeResultLimit(), $full->nativeClientLimit(), $full->mediaHelperLimit()]);
-        self::assertSame([3136, 1600], [$full->nativeEnvelopeMiB(), $full->mediaMemoryMiB()]);
     }
 
     public function testEightVideoAndTwelveAudioSlotsDeriveTheirNativeLimits(): void

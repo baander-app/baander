@@ -195,26 +195,19 @@ final class WorkerSupervisorTest extends TestCase
         self::assertNotSame($first->snapshot()['worker']['identity']['supervisorBootId'], $second->snapshot()['worker']['identity']['supervisorBootId']);
     }
 
-    public function testExactMemoryCeilingIsAdmitted(): void
+    public function testExactChildCeilingIsAdmitted(): void
     {
-        $supervisor = new WorkerSupervisor([$this->definition('first'), $this->definition('second')], 2, 300, 100, $this->launch(...), 'unit-workers');
+        $supervisor = new WorkerSupervisor([$this->definition('first'), $this->definition('second')], 2, $this->launch(...), 'unit-workers');
         self::assertCount(2, $supervisor->snapshot());
         self::assertSame([], $this->children, 'Admission does not launch before tick.');
     }
 
-    public function testOverflowingReservationCannotBypassMemoryCeiling(): void
-    {
-        $worker = new WorkerDefinition('huge', [PHP_BINARY, '-r', 'exit(0);'], $this->directory, PHP_INT_MAX);
-        $this->expectException(\InvalidArgumentException::class);
-        new WorkerSupervisor([$worker], 1, PHP_INT_MAX, 100, $this->launch(...), 'unit-workers');
-    }
-
     public function testExactProcessCeilingIncludesDescendantsAndDefaultsToDirectChildrenOnly(): void
     {
-        $first = new WorkerDefinition('first', [PHP_BINARY, '-r', 'exit(0);'], $this->directory, 100, descendantProcessReservation: 2);
+        $first = new WorkerDefinition('first', [PHP_BINARY, '-r', 'exit(0);'], $this->directory, descendantProcessReservation: 2);
         $second = $this->definition('second');
         self::assertSame(0, $second->descendantProcessReservation);
-        $supervisor = new WorkerSupervisor([$first, $second], 4, 300, 100, $this->launch(...), 'unit-workers');
+        $supervisor = new WorkerSupervisor([$first, $second], 4, $this->launch(...), 'unit-workers');
         self::assertCount(2, $supervisor->snapshot());
         self::assertSame([], $this->children, 'Admission reserves descendant slots before launching.');
         $supervisor->tick(0, true);
@@ -223,11 +216,11 @@ final class WorkerSupervisorTest extends TestCase
 
     public function testDescendantReservationRejectsProcessBudgetBeforeAnyLaunch(): void
     {
-        $first = new WorkerDefinition('first', [PHP_BINARY, '-r', 'exit(0);'], $this->directory, 100, descendantProcessReservation: 2);
+        $first = new WorkerDefinition('first', [PHP_BINARY, '-r', 'exit(0);'], $this->directory, descendantProcessReservation: 2);
         $second = $this->definition('second');
         $launches = 0;
         try {
-            new WorkerSupervisor([$first, $second], 3, 300, 100, static function () use (&$launches): WorkerChildProcess {
+            new WorkerSupervisor([$first, $second], 3, static function () use (&$launches): WorkerChildProcess {
                 ++$launches;
                 throw new \RuntimeException('Admission must finish before launch.');
             }, 'unit-workers');
@@ -242,7 +235,7 @@ final class WorkerSupervisorTest extends TestCase
     public function testDescendantReservationMustBeNonnegativeAndBounded(int $reservation): void
     {
         $this->expectException(\InvalidArgumentException::class);
-        new WorkerDefinition('worker', [PHP_BINARY, '-r', 'exit(0);'], $this->directory, 100, descendantProcessReservation: $reservation);
+        new WorkerDefinition('worker', [PHP_BINARY, '-r', 'exit(0);'], $this->directory, descendantProcessReservation: $reservation);
     }
 
     /** @return iterable<string, array{int}> */
@@ -253,20 +246,20 @@ final class WorkerSupervisorTest extends TestCase
         yield 'integer maximum' => [PHP_INT_MAX];
     }
 
-    public function testMaximumDescendantReservationFitsWithoutMultiplyingRoleMemory(): void
+    public function testMaximumDescendantReservationFitsItsCeiling(): void
     {
-        $worker = new WorkerDefinition('worker', [PHP_BINARY, '-r', 'exit(0);'], $this->directory, 100, descendantProcessReservation: 4096);
-        $supervisor = new WorkerSupervisor([$worker], 4097, 200, 100, $this->launch(...), 'unit-workers');
+        $worker = new WorkerDefinition('worker', [PHP_BINARY, '-r', 'exit(0);'], $this->directory, descendantProcessReservation: 4096);
+        $supervisor = new WorkerSupervisor([$worker], 4097, $this->launch(...), 'unit-workers');
         self::assertCount(1, $supervisor->snapshot());
     }
 
     public function testChildrenCannotShareMutableRestartPolicy(): void
     {
         $policy = new RestartPolicy();
-        $first = new WorkerDefinition('first', [PHP_BINARY, '-r', 'exit(0);'], $this->directory, 100, restartPolicy: $policy);
-        $second = new WorkerDefinition('second', [PHP_BINARY, '-r', 'exit(0);'], $this->directory, 100, restartPolicy: $policy);
+        $first = new WorkerDefinition('first', [PHP_BINARY, '-r', 'exit(0);'], $this->directory, restartPolicy: $policy);
+        $second = new WorkerDefinition('second', [PHP_BINARY, '-r', 'exit(0);'], $this->directory, restartPolicy: $policy);
         $this->expectException(\InvalidArgumentException::class);
-        new WorkerSupervisor([$first, $second], 2, 1000, 100, $this->launch(...), 'unit-workers');
+        new WorkerSupervisor([$first, $second], 2, $this->launch(...), 'unit-workers');
     }
 
     public function testLaunchFailuresAreBoundedAndDoNotExposeExceptionSecrets(): void
@@ -300,7 +293,7 @@ final class WorkerSupervisorTest extends TestCase
         $policy = new RestartPolicy(random: static function () use ($original): float {
             throw $original;
         });
-        $crasher = new WorkerDefinition('crasher', [PHP_BINARY, '-r', 'exit(23);'], $this->directory, 100, 1.0, restartPolicy: $policy);
+        $crasher = new WorkerDefinition('crasher', [PHP_BINARY, '-r', 'exit(23);'], $this->directory, 1.0, restartPolicy: $policy);
         $code = <<<'PHP'
 pcntl_async_signals(true);
 pcntl_signal(SIGTERM, static function () use ($argv) { file_put_contents($argv[1].'.term', 'term'); exit(0); });
@@ -448,29 +441,27 @@ PHP;
 
     /** @param list<string> $ids */
     #[DataProvider('invalidBudgets')]
-    public function testRejectsImpossibleDesiredSets(array $ids, int $maximum, int $memory, int $reserved): void
+    public function testRejectsImpossibleDesiredSets(array $ids, int $maximum): void
     {
         $definitions = array_map(fn (string $id): WorkerDefinition => $this->definition($id), $ids);
         $this->expectException(\InvalidArgumentException::class);
-        new WorkerSupervisor($definitions, $maximum, $memory, $reserved, static function (): WorkerChildProcess {
+        new WorkerSupervisor($definitions, $maximum, static function (): WorkerChildProcess {
             self::fail('Budget validation must precede launch.');
         }, 'unit-workers');
     }
 
-    /** @return iterable<string, array{list<string>, int, int, int}> */
+    /** @return iterable<string, array{list<string>, int}> */
     public static function invalidBudgets(): iterable
     {
-        yield 'child count' => [['first', 'second'], 1, 1000, 100];
-        yield 'memory reservations' => [['first', 'second'], 2, 299, 100];
-        yield 'duplicate IDs' => [['same', 'same'], 2, 1000, 100];
-        yield 'zero children budget' => [['first'], 0, 1000, 100];
-        yield 'supervisor exceeds total' => [['first'], 1, 100, 101];
+        yield 'child count' => [['first', 'second'], 1];
+        yield 'duplicate IDs' => [['same', 'same'], 2];
+        yield 'zero children budget' => [['first'], 0];
     }
 
     /** @param list<string> $arguments */
     private function definition(string $id, string $code = 'while (true) { usleep(1000); }', array $arguments = []): WorkerDefinition
     {
-        return new WorkerDefinition($id, [PHP_BINARY, '-r', $code, '--', ...$arguments], $this->directory, 100, 1.0, null, new RestartPolicy(2, 100, 1, 4, 0));
+        return new WorkerDefinition($id, [PHP_BINARY, '-r', $code, '--', ...$arguments], $this->directory, 1.0, null, new RestartPolicy(2, 100, 1, 4, 0));
     }
 
     /** @param list<WorkerDefinition> $definitions
@@ -478,7 +469,7 @@ PHP;
      */
     private function supervisor(array $definitions, ?\Closure $launcher = null): WorkerSupervisor
     {
-        $supervisor = new WorkerSupervisor($definitions, count($definitions), 1000, 100, $launcher ?? $this->launch(...), 'unit-workers');
+        $supervisor = new WorkerSupervisor($definitions, count($definitions), $launcher ?? $this->launch(...), 'unit-workers');
         return $supervisor;
     }
 

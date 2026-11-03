@@ -178,7 +178,7 @@ final class RegisteredDeploymentStartTest extends TestCase
     {
         return new DeploymentContainerRecipe('baander.app:startup', str_repeat('a', 32), 'baander.app-daemon', 'sha256:' . str_repeat('f', 64),
             ['/usr/local/bin/php', '/var/www/html/bin/console', 'app:worker', '--unit=' . $unit->value],
-            'none', 67108864, 1000000000, 32, $unit, $unit === DeploymentUnit::Control ? [0] : [1], 'worker-ipc', '/var/www/html', new \App\Shared\Application\DTO\DeploymentProfile('full'));
+            'none', $unit, 'worker-ipc', '/var/www/html', new \App\Shared\Application\DTO\DeploymentProfile('full'));
     }
 
     private function binding(): DeploymentContainer
@@ -225,7 +225,7 @@ final class RegisteredDeploymentStartTest extends TestCase
                     'status' => 'created', 'running' => false, 'pid' => 0, 'restart' => 'no', 'restarting' => false, 'retryCount' => 0], $override), JSON_THROW_ON_ERROR);
             }
             return json_encode(['id' => $binding->containerId, 'namespace' => $binding->namespace, 'bootId' => $binding->bootId, 'role' => $binding->unit->value,
-                'memory' => 67108864, 'memorySwap' => 67108864, 'nanoCpus' => 1000000000, 'pidsLimit' => 32, 'cpuSet' => '0', 'restart' => 'no', 'retryCount' => 0,
+                'memory' => 0, 'memorySwap' => 0, 'nanoCpus' => 0, 'cpuQuota' => 0, 'cpuShares' => 0, 'pidsLimit' => null, 'cpuSet' => '', 'oomScoreAdj' => \App\Shared\Infrastructure\Worker\OutOfMemoryKillOrder::unit($binding->unit), 'restart' => 'no', 'retryCount' => 0,
                 'privileged' => false, 'pidMode' => '', 'cgroupnsMode' => 'private', 'mounts' => [['Type' => 'volume', 'Name' => 'worker-ipc', 'Driver' => 'local', 'Source' => '/var/lib/docker/volumes/worker-ipc/_data', 'Destination' => '/run/baander-worker', 'RW' => true]], 'binds' => null, 'tmpfs' => null,
                 'devices' => [], 'deviceRequests' => [], 'capAdd' => null, 'capDrop' => ['ALL'], 'securityOpt' => ['no-new-privileges']], JSON_THROW_ON_ERROR);
         };

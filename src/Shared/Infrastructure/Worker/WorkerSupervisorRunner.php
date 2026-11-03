@@ -76,7 +76,7 @@ final readonly class WorkerSupervisorRunner implements WorkerSupervisorRunnerInt
             $launchAttempts = 0;
             $definitions = $this->definitions($configuration);
             $authority = new LeaseAuthority($configuration->namespace, $configuration->bootId, $configuration->unit === 'control' ? 30 : 3, $configuration->unit === 'control' ? 10 : 2, 0.1, $configuration->unit === 'execution');
-            $runtime = new LeasedWorkerRuntime($definitions, $configuration->pidsLimit - ($configuration->unit === 'execution' ? 16 : 1), $configuration->memoryLimitBytes, $configuration->managementReservationBytes,
+            $runtime = new LeasedWorkerRuntime($definitions, $configuration->childProcessCeiling,
                 $authority,
                 function (WorkerDefinition $definition, WorkerLaunchIdentity $identity) use ($authority, $environment, $configuration, &$stopRequested, &$launchAttempts): WorkerChildProcess {
                     if ($stopRequested) {
@@ -223,26 +223,26 @@ final readonly class WorkerSupervisorRunner implements WorkerSupervisorRunnerInt
             throw new \RuntimeException('Worker units require the async and scheduler receiver catalog.');
         }
         $heap = $configuration->deploymentProfile->phpHeapMiB() . 'M';
-        $reservation = $configuration->deploymentProfile->phpProcessMemoryMiB() * 1024 * 1024;
+        $helpers = WorkerRuntimeConfiguration::CONSUMER_DESCENDANTS;
         if ($configuration->unit === 'execution') {
             $roles = [];
             foreach ($configuration->autoscaling->consumerIds() as $id) {
                 $roles[] = new WorkerDefinition($id, [PHP_BINARY, '-d', 'memory_limit=' . $heap, $this->projectDirectory . '/bin/console',
                     'messenger:consume', 'async', '--memory-limit=' . $heap, '--keepalive=30', '--no-interaction'],
-                    $this->projectDirectory, $reservation, 30.0);
+                    $this->projectDirectory, 30.0, descendantProcessReservation: $helpers);
             }
             $roles[] = new WorkerDefinition('scheduled-consumer', [PHP_BINARY, '-d', 'memory_limit=' . $heap, $this->projectDirectory . '/bin/console',
                     'messenger:consume', 'scheduler', '--memory-limit=' . $heap, '--keepalive=30', '--no-interaction'],
-                    $this->projectDirectory, $reservation + $configuration->scheduledConsoleReservationBytes, 30.0);
+                    $this->projectDirectory, 30.0, descendantProcessReservation: $helpers + ($configuration->scheduledConsoleReservationBytes > 0 ? 1 : 0));
             return $roles;
         }
         return [
             new WorkerDefinition('relay', [PHP_BINARY, '-d', 'memory_limit=' . $heap, $this->projectDirectory . '/bin/console',
-                'app:outbox:consume', '--time-limit=86400', '--no-interaction'], $this->projectDirectory, $reservation, 30.0),
-            new WorkerDefinition('scheduler', [PHP_BINARY, '-d', 'memory_limit=' . $heap, $this->projectDirectory . '/bin/worker-scheduler.php'], $this->projectDirectory, $reservation, 30.0),
-            // Media includes its manager and every admitted kernel child.
-            new WorkerDefinition('media', [PHP_BINARY, '-d', 'memory_limit=' . $heap, $this->projectDirectory . '/bin/worker-media.php'], $this->projectDirectory, $configuration->deploymentProfile->mediaMemoryMiB() * 1024 * 1024, 30.0, descendantProcessReservation: $configuration->deploymentProfile->mediaChildSlots()),
-            new WorkerDefinition('autoscaler', [PHP_BINARY, '-d', 'memory_limit=' . $heap, $this->projectDirectory . '/bin/worker-autoscaler.php'], $this->projectDirectory, $reservation, 30.0),
+                'app:outbox:consume', '--time-limit=86400', '--no-interaction'], $this->projectDirectory, 30.0),
+            new WorkerDefinition('scheduler', [PHP_BINARY, '-d', 'memory_limit=' . $heap, $this->projectDirectory . '/bin/worker-scheduler.php'], $this->projectDirectory, 30.0),
+            // Media children run every command through the native daemon, so each slot adds one process.
+            new WorkerDefinition('media', [PHP_BINARY, '-d', 'memory_limit=' . $heap, $this->projectDirectory . '/bin/worker-media.php'], $this->projectDirectory, 30.0, descendantProcessReservation: $configuration->deploymentProfile->mediaChildSlots()),
+            new WorkerDefinition('autoscaler', [PHP_BINARY, '-d', 'memory_limit=' . $heap, $this->projectDirectory . '/bin/worker-autoscaler.php'], $this->projectDirectory, 30.0),
         ];
     }
 

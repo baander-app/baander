@@ -361,7 +361,7 @@ final class DockerWorkerContainmentTest extends TestCase
     private static function inspection(): array
     {
         return ['id' => self::ID, 'namespace' => 'worker.baander.app', 'bootId' => self::BOOT, 'role' => 'control',
-            'memory' => 67108864, 'memorySwap' => 67108864, 'nanoCpus' => 1000000000, 'pidsLimit' => 32, 'cpuSet' => '0', 'restart' => 'no', 'retryCount' => 0,
+            'memory' => 0, 'memorySwap' => 0, 'nanoCpus' => 0, 'cpuQuota' => 0, 'cpuShares' => 0, 'pidsLimit' => null, 'cpuSet' => '', 'oomScoreAdj' => -500, 'restart' => 'no', 'retryCount' => 0,
             'privileged' => false, 'pidMode' => '', 'cgroupnsMode' => 'private', 'mounts' => [], 'binds' => [], 'tmpfs' => [],
             'devices' => [], 'deviceRequests' => [], 'capAdd' => [], 'capDrop' => ['ALL'], 'securityOpt' => ['no-new-privileges']];
     }

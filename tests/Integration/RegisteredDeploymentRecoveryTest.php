@@ -330,7 +330,7 @@ final class RegisteredDeploymentRecoveryTest extends TestCase
 
     private function recipe(DeploymentUnit $unit, string $ipcVolume = 'worker-ipc'): \App\Shared\Infrastructure\Worker\DeploymentContainerRecipe
     {
-        return new \App\Shared\Infrastructure\Worker\DeploymentContainerRecipe(self::NAMESPACE, self::BOOT, self::DAEMON, 'sha256:' . str_repeat('f', 64), ['/usr/local/bin/php', '/app/bin/worker.php'], 'none', 67108864, 1000000000, 32, $unit, $unit === DeploymentUnit::Control ? [0] : [1], $ipcVolume, '/app', new \App\Shared\Application\DTO\DeploymentProfile('full'));
+        return new \App\Shared\Infrastructure\Worker\DeploymentContainerRecipe(self::NAMESPACE, self::BOOT, self::DAEMON, 'sha256:' . str_repeat('f', 64), ['/usr/local/bin/php', '/app/bin/worker.php'], 'none', $unit, $ipcVolume, '/app', new \App\Shared\Application\DTO\DeploymentProfile('full'));
     }
 
     /** @return array{control:\App\Shared\Infrastructure\Worker\DeploymentContainerRecipe,execution:\App\Shared\Infrastructure\Worker\DeploymentContainerRecipe} */
@@ -406,7 +406,7 @@ final class RegisteredDeploymentRecoveryTest extends TestCase
             return json_encode(['id' => $target, 'namespace' => self::NAMESPACE, 'bootId' => self::BOOT, 'role' => $unit->value,
                 'privileged' => false, 'pidMode' => '', 'cgroupnsMode' => 'private', 'binds' => null, 'tmpfs' => null,
                 'devices' => [], 'deviceRequests' => [], 'capAdd' => null, 'capDrop' => ['ALL'], 'securityOpt' => ['no-new-privileges'],
-                'memory' => $recipe->memoryBytes, 'memorySwap' => $recipe->memoryBytes, 'nanoCpus' => $recipe->nanoCpus, 'pidsLimit' => $recipe->pidsLimit, 'cpuSet' => implode(',', $recipe->cpuSet), 'restart' => 'no', 'retryCount' => 0,
+                'memory' => 0, 'memorySwap' => 0, 'nanoCpus' => 0, 'cpuQuota' => 0, 'cpuShares' => 0, 'pidsLimit' => null, 'cpuSet' => '', 'oomScoreAdj' => $recipe->oomScoreAdj, 'restart' => 'no', 'retryCount' => 0,
                 'mounts' => [['Type' => 'volume', 'Name' => 'worker-ipc', 'Driver' => 'local', 'Source' => '/var/lib/docker/volumes/worker-ipc/_data', 'Destination' => '/run/baander-worker', 'RW' => true]],
             ], JSON_THROW_ON_ERROR);
         };

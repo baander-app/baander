@@ -196,12 +196,15 @@ final class DockerDeploymentCreateTest extends TestCase
         yield 'wrong command' => [['cmd' => ['/app/bin/other.php']], []];
         yield 'wrong network' => [['network' => 'host'], []];
         yield 'unexpected attachment' => [['networks' => ['none' => [], 'baander.app-extra' => []]], []];
-        yield 'wrong memory' => [['memory' => 1], []];
-        yield 'unbounded swap' => [['memorySwap' => -1], []];
-        yield 'wrong CPU' => [['nanoCpus' => 0], []];
-        yield 'wrong CPU affinity' => [['cpuSet' => '1'], []];
+        yield 'memory limit' => [['memory' => 1], []];
+        yield 'swap limit' => [['memorySwap' => -1], []];
+        yield 'CPU limit' => [['nanoCpus' => 1000000000], []];
+        yield 'CPU quota' => [['cpuQuota' => 100000], []];
+        yield 'CPU weight' => [['cpuShares' => 512], []];
+        yield 'CPU affinity' => [['cpuSet' => '1'], []];
+        yield 'default out-of-memory score' => [['oomScoreAdj' => 0], []];
         yield 'wrong unit environment' => [['env' => ['BAANDER_WORKER_NAMESPACE=baander.app:create', 'BAANDER_WORKER_BOOT_ID=' . str_repeat('a', 32), 'BAANDER_WORKER_UNIT=execution']], []];
-        yield 'wrong PID cap' => [['pidsLimit' => 0], []];
+        yield 'PID limit' => [['pidsLimit' => 32], []];
         yield 'already exited' => [['status' => 'exited'], []];
         yield 'duplicate identity environment' => [['env' => ['BAANDER_WORKER_NAMESPACE=baander.app:create', 'BAANDER_WORKER_NAMESPACE=baander.app:create', 'BAANDER_WORKER_BOOT_ID=' . str_repeat('a', 32)]], []];
         yield 'wrong boot label' => [[], ['bootId' => str_repeat('b', 32)]];
@@ -351,7 +354,7 @@ final class DockerDeploymentCreateTest extends TestCase
     /** @param array<string, string> $environment */
     private function recipe(array $environment = [], DeploymentUnit $unit = DeploymentUnit::Control): DeploymentContainerRecipe
     {
-        return new DeploymentContainerRecipe('baander.app:create', str_repeat('a', 32), 'baander.app-daemon', 'sha256:' . str_repeat('f', 64), ['/usr/local/bin/php', '/app/bin/worker.php'], 'none', 67108864, 1000000000, 32, $unit, $unit === DeploymentUnit::Control ? [0] : [1], 'worker-ipc', '/app', new \App\Shared\Application\DTO\DeploymentProfile('full'), new DeploymentRuntimeEnvironment($environment));
+        return new DeploymentContainerRecipe('baander.app:create', str_repeat('a', 32), 'baander.app-daemon', 'sha256:' . str_repeat('f', 64), ['/usr/local/bin/php', '/app/bin/worker.php'], 'none', $unit, 'worker-ipc', '/app', new \App\Shared\Application\DTO\DeploymentProfile('full'), new DeploymentRuntimeEnvironment($environment));
     }
 
     private function reserve(DeploymentContainerRecipe $recipe): void
@@ -416,14 +419,14 @@ final class DockerDeploymentCreateTest extends TestCase
                     'image' => $recipe->imageId, 'entrypoint' => [$recipe->command[0]], 'cmd' => array_slice($recipe->command, 1),
                     'env' => ['PATH=/usr/local/bin:/usr/bin', 'BAANDER_WORKER_NAMESPACE=' . $recipe->namespace, 'BAANDER_WORKER_BOOT_ID=' . $recipe->bootId, 'BAANDER_WORKER_UNIT=' . $recipe->unit->value,
                         ...array_map(static fn (string $key, string $value): string => $key . '=' . $value, array_keys($recipe->runtimeEnvironment->variables), array_values($recipe->runtimeEnvironment->variables))],
-                    'network' => $recipe->network, 'networks' => [$recipe->network => []], 'memory' => $recipe->memoryBytes, 'memorySwap' => $recipe->memoryBytes,
-                    'nanoCpus' => $recipe->nanoCpus, 'pidsLimit' => $recipe->pidsLimit, 'cpuSet' => implode(',', $recipe->cpuSet),
+                    'network' => $recipe->network, 'networks' => [$recipe->network => []],
+                    'memory' => 0, 'memorySwap' => 0, 'nanoCpus' => 0, 'cpuQuota' => 0, 'cpuShares' => 0, 'pidsLimit' => null, 'cpuSet' => '', 'oomScoreAdj' => $recipe->oomScoreAdj,
                     'status' => 'created', 'running' => false, 'pid' => 0, 'restarting' => false, 'restart' => 'no', 'retryCount' => 0,
                 ], $state), JSON_THROW_ON_ERROR);
             }
             return json_encode(array_replace([
                 'id' => $state['id'] ?? $this->containerId($recipe->unit), 'namespace' => $recipe->namespace, 'bootId' => $recipe->bootId, 'role' => $recipe->unit->value,
-                'memory' => $recipe->memoryBytes, 'memorySwap' => $recipe->memoryBytes, 'nanoCpus' => $recipe->nanoCpus, 'pidsLimit' => $recipe->pidsLimit, 'cpuSet' => implode(',', $recipe->cpuSet), 'restart' => 'no', 'retryCount' => 0,
+                'memory' => 0, 'memorySwap' => 0, 'nanoCpus' => 0, 'cpuQuota' => 0, 'cpuShares' => 0, 'pidsLimit' => null, 'cpuSet' => '', 'oomScoreAdj' => $recipe->oomScoreAdj, 'restart' => 'no', 'retryCount' => 0,
                 'privileged' => false, 'pidMode' => '', 'cgroupnsMode' => 'private', 'mounts' => [['Type' => 'volume', 'Name' => 'worker-ipc', 'Driver' => 'local', 'Source' => '/var/lib/docker/volumes/worker-ipc/_data', 'Destination' => '/run/baander-worker', 'RW' => true]], 'binds' => null, 'tmpfs' => null,
                 'devices' => null, 'deviceRequests' => null, 'capAdd' => null, 'capDrop' => ['ALL'], 'securityOpt' => ['no-new-privileges:true'],
             ], $isolation), JSON_THROW_ON_ERROR);

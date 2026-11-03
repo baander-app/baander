@@ -32,43 +32,52 @@ final class WorkerSupervisorRunnerTest extends TestCase
         );
     }
 
-    #[\PHPUnit\Framework\Attributes\DataProvider('residentReservations')]
-    public function testLaunchReservationsExactlyMatchTheValidatedFloor(string $profileName, string $unit, int $concurrency, int $expectedMiB): void
+    #[\PHPUnit\Framework\Attributes\DataProvider('profileCeilings')]
+    public function testSupervisorAdmitsEveryRoleUpToTheProfileDerivedCeiling(string $unit, \App\Shared\Application\DTO\DeploymentProfile $profile, int $concurrency, int $consoleMiB, int $ceiling): void
     {
         $project = dirname(__DIR__, 5);
         $runner = new \App\Shared\Infrastructure\Worker\WorkerSupervisorRunner($project, 'postgresql://worker:private@db.baander.app/worker', 'postgresql://worker_control:private@db.baander.app/worker_control', self::catalog());
-        $profile = new \App\Shared\Application\DTO\DeploymentProfile($profileName);
         $autoscaling = new \App\Shared\Application\DTO\WorkerAutoscalingProfile(maximumConcurrency: $concurrency);
         $configuration = new \App\Shared\Application\DTO\WorkerRuntimeConfiguration('worker.baander.app', str_repeat('a', 32), $unit,
-            $expectedMiB * 1024 * 1024, 300, 0, '/tmp/baander-worker-locks', '/run/baander-worker', $profile, $autoscaling);
+            $consoleMiB * 1024 * 1024, '/tmp/baander-worker-locks', '/run/baander-worker', $profile, $autoscaling);
         $definitions = (new \ReflectionMethod($runner, 'definitions'))->invoke($runner, $configuration);
-        $reservedBytes = $configuration->managementReservationBytes;
+        $processes = 1;
         foreach ($definitions as $definition) {
-            $reservedBytes += $definition->memoryReservationBytes;
+            $processes += 1 + $definition->descendantProcessReservation;
             self::assertContains('memory_limit=' . $profile->phpHeapMiB() . 'M', $definition->argv);
         }
-        self::assertSame($expectedMiB * 1024 * 1024, $reservedBytes);
-        self::assertSame($expectedMiB, $autoscaling->minimumMemoryMiB($unit, $profile));
+        self::assertSame($ceiling, $configuration->childProcessCeiling);
+        self::assertSame($ceiling, $processes, 'The fixed roles and their descendants fill the ceiling exactly.');
+        $launcher = static fn (): WorkerChildProcess => throw new \LogicException('Admission only.');
+        $authority = new \App\Shared\Infrastructure\Worker\LeaseAuthority($configuration->namespace, $configuration->bootId, 30, 10, 1);
+        new \App\Shared\Infrastructure\Worker\LeasedWorkerRuntime($definitions, $configuration->childProcessCeiling, $authority, $launcher,
+            static fn (): \App\Shared\Infrastructure\Worker\LeaseAgentProcess => throw new \LogicException('Admission only.'));
+        try {
+            new \App\Shared\Infrastructure\Worker\LeasedWorkerRuntime($definitions, $configuration->childProcessCeiling - 1, $authority, $launcher,
+                static fn (): \App\Shared\Infrastructure\Worker\LeaseAgentProcess => throw new \LogicException('Admission only.'));
+            self::fail('A ceiling below the fixed roles and their descendants was accepted.');
+        } catch (\InvalidArgumentException $error) {
+            self::assertStringContainsString('process', $error->getMessage());
+        }
     }
 
-    /** @return iterable<string,array{string,string,int,int}> */
-    public static function residentReservations(): iterable
+    /** @return iterable<string,array{string,\App\Shared\Application\DTO\DeploymentProfile,int,int,int}> */
+    public static function profileCeilings(): iterable
     {
-        yield 'full control' => ['full', 'control', 4, 2944];
-        yield 'full execution' => ['full', 'execution', 4, 5120];
-        yield 'household control' => ['household', 'control', 1, 2304];
-        yield 'household execution' => ['household', 'execution', 1, 1536];
+        yield 'full control at eight and twelve' => ['control', new \App\Shared\Application\DTO\DeploymentProfile('full', 8, 12), 1, 0, 4 + 20 + 1];
+        yield 'full execution with four consumers and a console' => ['execution', new \App\Shared\Application\DTO\DeploymentProfile('full', 8, 12), 4, 320, 5 * 2 + 1 + 1];
+        yield 'household control' => ['control', new \App\Shared\Application\DTO\DeploymentProfile('household'), 1, 0, 4 + 2 + 1];
+        yield 'household execution' => ['execution', new \App\Shared\Application\DTO\DeploymentProfile('household'), 1, 0, 2 * 2 + 1];
     }
 
-    public function testHouseholdMediaReservationMatchesItsTwoChildSlots(): void
+    public function testHouseholdMediaReservesItsTwoChildSlots(): void
     {
         $project = dirname(__DIR__, 5);
         $runner = new \App\Shared\Infrastructure\Worker\WorkerSupervisorRunner($project, 'postgresql://worker:private@db.baander.app/worker', 'postgresql://worker_control:private@db.baander.app/worker_control', self::catalog());
         $configuration = new \App\Shared\Application\DTO\WorkerRuntimeConfiguration('worker.baander.app', str_repeat('a', 32), 'control',
-            2304 * 1024 * 1024, 129, 0, '/tmp/baander-worker-locks', '/run/baander-worker', deploymentProfile: new \App\Shared\Application\DTO\DeploymentProfile('household'));
+            0, '/tmp/baander-worker-locks', '/run/baander-worker', deploymentProfile: new \App\Shared\Application\DTO\DeploymentProfile('household'));
         $definitions = (new \ReflectionMethod($runner, 'definitions'))->invoke($runner, $configuration);
         $media = array_values(array_filter($definitions, static fn ($definition): bool => $definition->id === 'media'))[0];
-        self::assertSame(960 * 1024 * 1024, $media->memoryReservationBytes);
         self::assertSame(2, $media->descendantProcessReservation);
     }
 
@@ -149,9 +158,9 @@ PHP;
         $environment = ['BAANDER_SCHEDULED_CONSOLE_RESERVATION_BYTES' => '999999999'];
         $method = new \ReflectionMethod($runner, 'roleEnvironment');
         foreach ([0, 320 * 1024 * 1024] as $reservation) {
-            $configuration = new \App\Shared\Application\DTO\WorkerRuntimeConfiguration('worker.baander.app', str_repeat('a', 32), 'execution', (4160 * 1024 * 1024) + $reservation, 256, $reservation, '/tmp/baander-worker-locks', '/run/baander-worker', new \App\Shared\Application\DTO\DeploymentProfile('full'));
+            $configuration = new \App\Shared\Application\DTO\WorkerRuntimeConfiguration('worker.baander.app', str_repeat('a', 32), 'execution', $reservation, '/tmp/baander-worker-locks', '/run/baander-worker', new \App\Shared\Application\DTO\DeploymentProfile('full'));
             foreach (['consumer', 'scheduled-consumer', 'relay', 'scheduler', 'media'] as $role) {
-                $definition = new \App\Shared\Infrastructure\Worker\WorkerDefinition($role, [PHP_BINARY, '-r', 'exit(0);'], $project, 320 * 1024 * 1024);
+                $definition = new \App\Shared\Infrastructure\Worker\WorkerDefinition($role, [PHP_BINARY, '-r', 'exit(0);'], $project);
                 $granted = $method->invoke($runner, $environment, $definition, $configuration);
                 self::assertSame((string) ($role === 'scheduled-consumer' ? $reservation : 0), $granted['BAANDER_SCHEDULED_CONSOLE_RESERVATION_BYTES']);
             }
@@ -267,7 +276,7 @@ PHP;
     {
         $project = dirname(__DIR__, 5);
         $runner = new \App\Shared\Infrastructure\Worker\WorkerSupervisorRunner($project, 'postgresql://worker:private@db.baander.app/worker', 'postgresql://worker_control:private@db.baander.app/worker_control', self::catalog());
-        $configuration = new \App\Shared\Application\DTO\WorkerRuntimeConfiguration('worker.baander.app', str_repeat('a', 32), 'control', 2944 * 1024 * 1024, 129, 0, '/tmp/baander-worker-locks', '/run/baander-worker', new \App\Shared\Application\DTO\DeploymentProfile('full'));
+        $configuration = new \App\Shared\Application\DTO\WorkerRuntimeConfiguration('worker.baander.app', str_repeat('a', 32), 'control', 0, '/tmp/baander-worker-locks', '/run/baander-worker', new \App\Shared\Application\DTO\DeploymentProfile('full'));
         $definition = (new \ReflectionMethod($runner, 'definitions'))->invoke($runner, $configuration)[1];
         $identity = new \App\Shared\Infrastructure\Worker\WorkerLaunchIdentity($configuration->namespace, $configuration->bootId, 'scheduler', 7);
         $authority = new \App\Shared\Infrastructure\Worker\LeaseAuthority($configuration->namespace, $configuration->bootId, 30, 10, 1);
@@ -301,7 +310,7 @@ PHP;
         $runner = new \App\Shared\Infrastructure\Worker\WorkerSupervisorRunner(dirname(__DIR__, 5), 'postgresql://worker:private@db.baander.app/worker', 'postgresql://worker_control:private@db.baander.app/worker_control', self::catalog());
         $names = [];
         foreach ([['one.baander.app', 'a', 1], ['two.baander.app', 'a', 1], ['one.baander.app', 'b', 1], ['one.baander.app', 'a', 2]] as [$namespace, $boot, $generation]) {
-            $configuration = new \App\Shared\Application\DTO\WorkerRuntimeConfiguration($namespace, str_repeat($boot, 32), 'execution', 4160 * 1024 * 1024, 256, 0, '/tmp/baander-worker-locks', '/run/baander-worker', new \App\Shared\Application\DTO\DeploymentProfile('full'));
+            $configuration = new \App\Shared\Application\DTO\WorkerRuntimeConfiguration($namespace, str_repeat($boot, 32), 'execution', 0, '/tmp/baander-worker-locks', '/run/baander-worker', new \App\Shared\Application\DTO\DeploymentProfile('full'));
             $definition = (new \ReflectionMethod($runner, 'definitions'))->invoke($runner, $configuration)[0];
             $identity = new \App\Shared\Infrastructure\Worker\WorkerLaunchIdentity($namespace, $configuration->bootId, 'consumer-0', $generation);
             $authority = new \App\Shared\Infrastructure\Worker\LeaseAuthority($namespace, $configuration->bootId, 30, 10, 1);
@@ -321,16 +330,14 @@ PHP;
     {
         $runner = new \App\Shared\Infrastructure\Worker\WorkerSupervisorRunner(dirname(__DIR__, 5), 'postgresql://worker:private@db.baander.app/worker', 'postgresql://worker_control:private@db.baander.app/worker_control', self::catalog());
         $definitions = new \ReflectionMethod($runner, 'definitions');
-        $control = new \App\Shared\Application\DTO\WorkerRuntimeConfiguration('worker.baander.app', str_repeat('a', 32), 'control', 2944 * 1024 * 1024, 129, 0, '/tmp/locks', '/run/baander-worker', new \App\Shared\Application\DTO\DeploymentProfile('full'));
+        $control = new \App\Shared\Application\DTO\WorkerRuntimeConfiguration('worker.baander.app', str_repeat('a', 32), 'control', 0, '/tmp/locks', '/run/baander-worker', new \App\Shared\Application\DTO\DeploymentProfile('full'));
         self::assertSame(['relay', 'scheduler', 'media', 'autoscaler'], array_column($definitions->invoke($runner, $control), 'id'));
         $controlRoles = $definitions->invoke($runner, $control);
         self::assertSame([PHP_BINARY, '-d', 'memory_limit=256M', dirname(__DIR__, 5) . '/bin/worker-scheduler.php'], $controlRoles[1]->argv);
-        self::assertSame([320, 320, 1600, 320], array_map(static fn (\App\Shared\Infrastructure\Worker\WorkerDefinition $role): int => intdiv($role->memoryReservationBytes, 1024 * 1024), $controlRoles));
         self::assertSame([0, 0, 4, 0], array_column($controlRoles, 'descendantProcessReservation'));
-        self::assertSame(0, $control->memoryLimitBytes - $control->managementReservationBytes - array_sum(array_column($controlRoles, 'memoryReservationBytes')));
-        $execution = new \App\Shared\Application\DTO\WorkerRuntimeConfiguration('worker.baander.app', str_repeat('a', 32), 'execution', 4480 * 1024 * 1024, 256, 320 * 1024 * 1024, '/tmp/locks', '/run/baander-worker', new \App\Shared\Application\DTO\DeploymentProfile('full'));
+        $execution = new \App\Shared\Application\DTO\WorkerRuntimeConfiguration('worker.baander.app', str_repeat('a', 32), 'execution', 320 * 1024 * 1024, '/tmp/locks', '/run/baander-worker', new \App\Shared\Application\DTO\DeploymentProfile('full'));
         $roles = $definitions->invoke($runner, $execution);
-        self::assertSame($execution->memoryLimitBytes, $execution->managementReservationBytes + array_sum(array_column($roles, 'memoryReservationBytes')));
+        self::assertSame([1, 2], array_column($roles, 'descendantProcessReservation'));
         self::assertSame(['consumer-0', 'scheduled-consumer'], array_column($roles, 'id'));
         self::assertContains('async', $roles[0]->argv);
         self::assertNotContains('scheduler', $roles[0]->argv);
@@ -341,17 +348,16 @@ PHP;
         self::assertSame((string) (320 * 1024 * 1024), $environment->invoke($runner, [], $roles[1], $execution)['BAANDER_SCHEDULED_CONSOLE_RESERVATION_BYTES']);
     }
 
-    public function testEveryResidentSlotRetainsItsFullReservation(): void
+    public function testEveryResidentSlotIsAnOrdinaryConsumer(): void
     {
         $runner = new \App\Shared\Infrastructure\Worker\WorkerSupervisorRunner(dirname(__DIR__, 5), 'postgresql://worker:private@db.baander.app/worker', 'postgresql://worker_control:private@db.baander.app/worker_control', self::catalog());
         $profile = new \App\Shared\Application\DTO\WorkerAutoscalingProfile(maximumConcurrency: 4);
         $configuration = new \App\Shared\Application\DTO\WorkerRuntimeConfiguration('worker.baander.app', str_repeat('a', 32), 'execution',
-            5440 * 1024 * 1024, 259, 320 * 1024 * 1024, '/tmp/locks', '/run/baander-worker', new \App\Shared\Application\DTO\DeploymentProfile('full'), $profile);
+            320 * 1024 * 1024, '/tmp/locks', '/run/baander-worker', new \App\Shared\Application\DTO\DeploymentProfile('full'), $profile);
         $roles = (new \ReflectionMethod($runner, 'definitions'))->invoke($runner, $configuration);
         self::assertSame(['consumer-0', 'consumer-1', 'consumer-2', 'consumer-3', 'scheduled-consumer'], array_column($roles, 'id'));
-        self::assertSame($configuration->memoryLimitBytes, $configuration->managementReservationBytes + array_sum(array_column($roles, 'memoryReservationBytes')));
         foreach (array_slice($roles, 0, 4) as $role) {
-            self::assertSame(320 * 1024 * 1024, $role->memoryReservationBytes);
+            self::assertSame(1, $role->descendantProcessReservation);
             self::assertContains('async', $role->argv);
         }
     }
@@ -362,7 +368,7 @@ PHP;
         $project = dirname(__DIR__, 5);
         $code = <<<'PHP'
 require $argv[1] . '/vendor/autoload.php';
-$configuration = new \App\Shared\Application\DTO\WorkerRuntimeConfiguration('worker.baander.app', str_repeat('a', 32), 'control', 2944 * 1024 * 1024, 129, 0, $argv[2], '/run/baander-worker', new \App\Shared\Application\DTO\DeploymentProfile('full'));
+$configuration = new \App\Shared\Application\DTO\WorkerRuntimeConfiguration('worker.baander.app', str_repeat('a', 32), 'control', 0, $argv[2], '/run/baander-worker', new \App\Shared\Application\DTO\DeploymentProfile('full'));
 $metadata = \App\Tests\Fixtures\Messaging\MessengerConfiguration::container();
 $catalog = new \App\Shared\Infrastructure\Messaging\AsyncWorkloadCatalog($metadata->getParameter('app.messenger.workloads'), $metadata->getParameter('app.messenger.transport_policies'));
 $runner = new \App\Shared\Infrastructure\Worker\WorkerSupervisorRunner($argv[1], 'postgresql://worker:private@db.baander.app/worker', 'postgresql://worker_control:private@db.baander.app/worker_control', $catalog);

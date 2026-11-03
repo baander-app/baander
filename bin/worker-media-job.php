@@ -44,6 +44,8 @@ try {
         throw new RuntimeException('Media job requires a canonical runtime key.');
     }
     ini_set('memory_limit', $profile->phpHeapMiB() . 'M');
+    // Host memory pressure kills media children before the control unit's other processes.
+    \App\Shared\Infrastructure\Worker\OutOfMemoryKillOrder::raiseToMediaWork();
     pcntl_async_signals(true);
     $stop = static function () use (&$stopping): void { $stopping = true; };
     pcntl_signal(SIGTERM, $stop);

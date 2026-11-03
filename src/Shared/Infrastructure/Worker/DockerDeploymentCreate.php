@@ -12,7 +12,7 @@ use Symfony\Component\DependencyInjection\Attribute\Exclude;
 final readonly class DockerDeploymentCreate
 {
     private const string FORMAT = <<<'FORMAT'
-{"id":{{json .Id}},"name":{{json .Name}},"image":{{json .Image}},"entrypoint":{{json .Config.Entrypoint}},"cmd":{{json .Config.Cmd}},"env":{{json .Config.Env}},"network":{{json .HostConfig.NetworkMode}},"networks":{{json .NetworkSettings.Networks}},"memory":{{json .HostConfig.Memory}},"memorySwap":{{json .HostConfig.MemorySwap}},"nanoCpus":{{json .HostConfig.NanoCpus}},"pidsLimit":{{json .HostConfig.PidsLimit}},"cpuSet":{{json .HostConfig.CpusetCpus}},"status":{{json .State.Status}},"running":{{json .State.Running}},"pid":{{json .State.Pid}},"restarting":{{json .State.Restarting}},"restart":{{json .HostConfig.RestartPolicy.Name}},"retryCount":{{json .HostConfig.RestartPolicy.MaximumRetryCount}}}
+{"id":{{json .Id}},"name":{{json .Name}},"image":{{json .Image}},"entrypoint":{{json .Config.Entrypoint}},"cmd":{{json .Config.Cmd}},"env":{{json .Config.Env}},"network":{{json .HostConfig.NetworkMode}},"networks":{{json .NetworkSettings.Networks}},"memory":{{json .HostConfig.Memory}},"memorySwap":{{json .HostConfig.MemorySwap}},"nanoCpus":{{json .HostConfig.NanoCpus}},"cpuQuota":{{json .HostConfig.CpuQuota}},"cpuShares":{{json .HostConfig.CpuShares}},"pidsLimit":{{json .HostConfig.PidsLimit}},"cpuSet":{{json .HostConfig.CpusetCpus}},"oomScoreAdj":{{json .HostConfig.OomScoreAdj}},"status":{{json .State.Status}},"running":{{json .State.Running}},"pid":{{json .State.Pid}},"restarting":{{json .State.Restarting}},"restart":{{json .HostConfig.RestartPolicy.Name}},"retryCount":{{json .HostConfig.RestartPolicy.MaximumRetryCount}}}
 FORMAT;
 
     /** @param Closure(list<string>): string $dockerExecutor Fixed trusted endpoint; bounded output and deadlines; failures throw. */
@@ -60,7 +60,7 @@ FORMAT;
         } catch (\JsonException $error) {
             throw new \RuntimeException('Invalid deployment creation inspection.', 0, $error);
         }
-        if (!is_array($state) || count($state) !== 19 || !is_string($state['id'] ?? null)
+        if (!is_array($state) || count($state) !== 22 || !is_string($state['id'] ?? null)
             || preg_match('/\A[0-9a-f]{64}\z/D', $state['id']) !== 1
             || ($target !== RegisteredDeploymentStart::containerName($recipe->namespace, $recipe->bootId, $recipe->unit) && $state['id'] !== $target)
             || ($state['name'] ?? null) !== '/' . RegisteredDeploymentStart::containerName($recipe->namespace, $recipe->bootId, $recipe->unit)
@@ -69,11 +69,7 @@ FORMAT;
             || !array_key_exists('cmd', $state) || ($state['cmd'] ?? []) !== array_slice($recipe->command, 1)
             || ($state['network'] ?? null) !== $recipe->network
             || !is_array($state['networks'] ?? null) || array_keys($state['networks']) !== [$recipe->network]
-            || ($state['memory'] ?? null) !== $recipe->memoryBytes
-            || ($state['memorySwap'] ?? null) !== $recipe->memoryBytes
-            || ($state['nanoCpus'] ?? null) !== $recipe->nanoCpus
-            || ($state['pidsLimit'] ?? null) !== $recipe->pidsLimit
-            || ($state['cpuSet'] ?? null) !== implode(',', $recipe->cpuSet)
+            || !$recipe->matchesResources($state)
             || ($state['status'] ?? null) !== 'created' || ($state['running'] ?? null) !== false
             || ($state['pid'] ?? null) !== 0 || ($state['restarting'] ?? null) !== false
             || ($state['restart'] ?? null) !== 'no' || ($state['retryCount'] ?? null) !== 0

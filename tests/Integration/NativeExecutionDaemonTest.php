@@ -6,9 +6,11 @@ namespace App\Tests\Integration;
 
 use App\Shared\Application\DTO\DeploymentProfile;
 use App\Shared\Infrastructure\Worker\NativeExecutionClient;
+use App\Shared\Infrastructure\Worker\NativeExecutionDaemon;
 use App\Shared\Infrastructure\Worker\NativeExecutionException;
 use App\Shared\Infrastructure\Worker\NativeExecutionHandle;
 use App\Shared\Infrastructure\Worker\NativeExecutionProtocol;
+use App\Shared\Infrastructure\Worker\OutOfMemoryKillOrder;
 use PHPUnit\Framework\TestCase;
 
 final class NativeExecutionDaemonTest extends TestCase
@@ -198,6 +200,52 @@ final class NativeExecutionDaemonTest extends TestCase
                 }
             }
         }
+    }
+
+    public function testCommandsRunAtLowerPriorityAndAreKilledBeforeTheDaemon(): void
+    {
+        if (!is_readable('/proc/self/oom_score_adj')) {
+            self::markTestSkipped('Requires Linux process priority observations.');
+        }
+        $daemonPid = proc_get_status($this->daemon)['pid'];
+        $handle = $this->client->submit(['ffmpeg', '-nostdin', '-threads', '1', '-filter_threads', '1',
+            '-re', '-f', 'lavfi', '-i', 'anullsrc=r=8000:cl=mono', '-threads', '1', '-f', 'null', '-'], 20);
+        try {
+            $command = null;
+            $deadline = microtime(true) + 3;
+            do {
+                foreach (glob('/proc/[0-9]*/stat') ?: [] as $path) {
+                    $pid = (int) basename(dirname($path));
+                    $process = $this->processObservation($pid);
+                    if ($process !== null && $process['parent'] === $daemonPid && $process['group'] === $pid
+                        && @readlink('/proc/' . $pid . '/exe') === '/usr/bin/ffmpeg') {
+                        $command = $pid;
+                        break 2;
+                    }
+                }
+                usleep(10_000);
+            } while (microtime(true) < $deadline);
+            self::assertNotNull($command, 'The launched FFmpeg command keeps the launched PID and leads its process group.');
+            self::assertSame(NativeExecutionDaemon::COMMAND_NICENESS, $this->niceness($command));
+            self::assertSame(OutOfMemoryKillOrder::MEDIA_WORK, $this->oomScoreAdj($command));
+            self::assertSame($this->niceness(getmypid()), $this->niceness($daemonPid), 'The daemon keeps its own priority.');
+            self::assertSame($this->oomScoreAdj(getmypid()), $this->oomScoreAdj($daemonPid), 'The daemon keeps its own out-of-memory score.');
+            self::assertGreaterThan($this->oomScoreAdj($daemonPid), $this->oomScoreAdj($command));
+        } finally {
+            $this->client->signal($handle, 'stop');
+        }
+    }
+
+    private function niceness(int $pid): int
+    {
+        $stat = (string) file_get_contents('/proc/' . $pid . '/stat');
+        // Fields after the command name start at the state (field 3); nice is field 19.
+        return (int) explode(' ', substr($stat, (int) strrpos($stat, ') ') + 2))[16];
+    }
+
+    private function oomScoreAdj(int $pid): int
+    {
+        return (int) trim((string) file_get_contents('/proc/' . $pid . '/oom_score_adj'));
     }
 
     /** @return array{parent:int, group:int, state:string, startTicks:string}|null */

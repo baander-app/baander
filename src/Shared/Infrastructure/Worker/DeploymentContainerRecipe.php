@@ -19,13 +19,12 @@ final readonly class DeploymentContainerRecipe
     /** @var list<array{volume?:string,source?:string,target:string,readOnly:bool,role:string}> */
     public array $mediaMounts;
 
-    /** @var list<int> */
-    public array $cpuSet;
+    /** Out-of-memory score the container starts with; it carries no CPU, memory or PID limit. */
+    public int $oomScoreAdj;
 
     /**
      * @param array<array-key, mixed> $command Validated argv, never a shell command.
      * @param array<array-key, mixed> $mediaMounts
-     * @param array<array-key, mixed> $cpuSet
      */
     public function __construct(
         public string $namespace,
@@ -34,11 +33,7 @@ final readonly class DeploymentContainerRecipe
         public string $imageId,
         array $command,
         public string $network,
-        public int $memoryBytes,
-        public int $nanoCpus,
-        public int $pidsLimit,
         public DeploymentUnit $unit,
-        array $cpuSet,
         public string $ipcVolume,
         public string $appHome,
         public DeploymentProfile $deploymentProfile,
@@ -51,7 +46,7 @@ final readonly class DeploymentContainerRecipe
             || preg_match('~(?:^|/)\.\.?(?:/|$)~', $appHome) !== 0) {
             throw new InvalidArgumentException('Observed application home requires a canonical absolute path.');
         }
-        $this->cpuSet = (new DeploymentResourceBudget($memoryBytes, $nanoCpus, $pidsLimit, $cpuSet))->cpuSet;
+        $this->oomScoreAdj = OutOfMemoryKillOrder::unit($unit);
         if (preg_match('/\A[A-Za-z0-9][A-Za-z0-9_.-]{0,127}\z/D', $ipcVolume) !== 1) {
             throw new InvalidArgumentException('Worker IPC requires an explicitly named private volume.');
         }
@@ -60,7 +55,7 @@ final readonly class DeploymentContainerRecipe
             || preg_match('/\A[A-Za-z0-9][A-Za-z0-9_.-]{0,127}\z/D', $network) !== 1
             || in_array(strtolower($network), ['host', 'container'], true)
         ) {
-            throw new InvalidArgumentException('Deployment recipe requires bounded identity, immutable image, private network and explicit resource ceilings.');
+            throw new InvalidArgumentException('Deployment recipe requires bounded identity, immutable image and private network.');
         }
         if (!array_is_list($command) || count($command) < 1 || count($command) > 64) {
             throw new InvalidArgumentException('Deployment command requires 1..64 ordered arguments.');
@@ -93,11 +88,28 @@ final readonly class DeploymentContainerRecipe
         return hash('sha256', json_encode([
             'namespace' => $this->namespace, 'bootId' => $this->bootId, 'daemonId' => $this->daemonId,
             'imageId' => $this->imageId, 'appHome' => $this->appHome, 'command' => $this->command, 'network' => $this->network,
-            'memoryBytes' => $this->memoryBytes, 'nanoCpus' => $this->nanoCpus, 'pidsLimit' => $this->pidsLimit,
-            'unit' => $this->unit->value, 'cpuSet' => $this->cpuSet, 'ipcVolume' => $this->ipcVolume,
+            'oomScoreAdj' => $this->oomScoreAdj, 'unit' => $this->unit->value, 'ipcVolume' => $this->ipcVolume,
             'sourceMountPolicy' => $this->sourceMountPolicy, 'deploymentProfile' => $this->deploymentProfile->toJson(),
             'runtimeEnvironment' => $this->runtimeEnvironment->variables, 'mediaMounts' => $this->mediaMounts,
         ], JSON_THROW_ON_ERROR));
+    }
+
+    /**
+     * Docker reports an unset limit as zero, an empty CPU set and a null or zero PID limit.
+     *
+     * @param array<array-key, mixed> $inspection
+     */
+    public function matchesResources(array $inspection): bool
+    {
+        foreach (['memory', 'memorySwap', 'nanoCpus', 'cpuQuota', 'cpuShares'] as $field) {
+            if (($inspection[$field] ?? null) !== 0) {
+                return false;
+            }
+        }
+
+        return array_key_exists('pidsLimit', $inspection) && in_array($inspection['pidsLimit'], [null, 0], true)
+            && ($inspection['cpuSet'] ?? null) === ''
+            && ($inspection['oomScoreAdj'] ?? null) === $this->oomScoreAdj;
     }
 
     /** @return list<string> */
@@ -107,10 +119,6 @@ final readonly class DeploymentContainerRecipe
             || ($environmentFile !== null && (!str_starts_with($environmentFile, '/') || str_contains($environmentFile, "\0")))) {
             throw new InvalidArgumentException('Runtime configuration requires an absolute private environment file.');
         }
-        $wholeCpus = intdiv($this->nanoCpus, 1_000_000_000);
-        $fraction = rtrim(sprintf('%09d', $this->nanoCpus % 1_000_000_000), '0');
-        $cpus = (string) $wholeCpus . ($fraction === '' ? '' : '.' . $fraction);
-
         $profileArguments = [];
         foreach (['BAANDER_DEPLOYMENT_PROFILE' => $this->deploymentProfile->identifier,
             'BAANDER_DEPLOYMENT_PROFILE_JSON' => $this->deploymentProfile->toJson()] as $key => $value) {
@@ -122,8 +130,7 @@ final readonly class DeploymentContainerRecipe
 
         return [
             'container', 'create', '--pull=never', '--name', RegisteredDeploymentStart::containerName($this->namespace, $this->bootId, $this->unit),
-            '--network', $this->network, '--memory', (string) $this->memoryBytes, '--memory-swap', (string) $this->memoryBytes,
-            '--cpus', $cpus, '--cpuset-cpus', implode(',', $this->cpuSet), '--pids-limit', (string) $this->pidsLimit,
+            '--network', $this->network, '--oom-score-adj', (string) $this->oomScoreAdj,
             '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges', '--cgroupns', 'private', '--restart', 'no',
             '--label', 'app.baander.worker.namespace=' . $this->namespace,
             '--label', 'app.baander.worker.boot-id=' . $this->bootId, '--label', 'app.baander.worker.role=' . $this->unit->value,

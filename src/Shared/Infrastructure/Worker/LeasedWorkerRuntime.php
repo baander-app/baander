@@ -20,8 +20,7 @@ final class LeasedWorkerRuntime
     private float $lastTime = 0.0;
 
     /**
-     * The process ceiling reserves one slot for the lease helper. Management memory
-     * includes both the supervisor and helper; deployment containment enforces actual usage.
+     * The process ceiling reserves one slot for the lease helper.
      *
      * @param list<WorkerDefinition> $definitions
      * @param Closure(WorkerDefinition, WorkerLaunchIdentity): WorkerChildProcess $workerLauncher
@@ -31,8 +30,6 @@ final class LeasedWorkerRuntime
     public function __construct(
         array $definitions,
         int $maxChildProcesses,
-        int $memoryLimitBytes,
-        int $managementReservationBytes,
         private readonly LeaseAuthority $authority,
         Closure $workerLauncher,
         private readonly Closure $leaseLauncher,
@@ -40,7 +37,7 @@ final class LeasedWorkerRuntime
         private readonly ?Closure $admissionGate = null,
     ) {
         $this->clock = $clock ?? static fn (): float => hrtime(true) / 1e9;
-        $this->supervisor = new WorkerSupervisor($definitions, $maxChildProcesses - 1, $memoryLimitBytes, $managementReservationBytes,
+        $this->supervisor = new WorkerSupervisor($definitions, $maxChildProcesses - 1,
             function (WorkerDefinition $definition, WorkerLaunchIdentity $identity) use ($workerLauncher): WorkerChildProcess {
                 // Process creation for earlier siblings may consume time. Check each
                 // admission against a fresh clock, not just the tick's initial snapshot.

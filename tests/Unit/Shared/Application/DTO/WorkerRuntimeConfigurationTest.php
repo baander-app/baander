@@ -4,79 +4,58 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Shared\Application\DTO;
 
+use App\Shared\Application\DTO\DeploymentProfile;
+use App\Shared\Application\DTO\WorkerAutoscalingProfile;
 use App\Shared\Application\DTO\WorkerRuntimeConfiguration;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\DataProvider;
 
 final class WorkerRuntimeConfigurationTest extends TestCase
 {
-    public function testUnitQualificationBudgetsAndConsoleReservation(): void
+    public function testUnitsCarryNoResourceLimitAndAConsoleReservation(): void
     {
-        $control = $this->configuration('control', 2944, 129);
+        $control = $this->configuration('control');
         self::assertSame('control', $control->unit);
-        self::assertSame(384 * 1024 * 1024, $control->managementReservationBytes);
-        $execution = $this->configuration('execution', 4480, 256, 320);
+        self::assertSame(0, $control->scheduledConsoleReservationBytes);
+        $execution = $this->configuration('execution', 320);
         self::assertSame(320 * 1024 * 1024, $execution->scheduledConsoleReservationBytes);
-        self::assertSame(3520 * 1024 * 1024, $execution->managementReservationBytes);
+        self::assertArrayNotHasKey('memoryLimitBytes', get_object_vars($execution));
+        self::assertArrayNotHasKey('pidsLimit', get_object_vars($execution));
+    }
+
+    public function testChildCeilingFollowsTheProfileSlots(): void
+    {
+        // Relay, scheduler, autoscaler, the media manager, one media child per slot, and the lease helper.
+        self::assertSame(4 + 20 + 1, $this->configuration('control', profile: new DeploymentProfile('full', 8, 12))->childProcessCeiling);
+        self::assertSame(4 + 4 + 1, $this->configuration('control')->childProcessCeiling);
+        self::assertSame(4 + 2 + 1, $this->configuration('control', profile: new DeploymentProfile('household'))->childProcessCeiling);
+        // Each consumer with one local helper, the scheduled console child, and the lease helper.
+        self::assertSame(2 * 2 + 1, $this->configuration('execution')->childProcessCeiling);
+        self::assertSame(2 * 2 + 1 + 1, $this->configuration('execution', 320)->childProcessCeiling);
+        self::assertSame(5 * 2 + 1 + 1, $this->configuration('execution', 320, autoscaling: new WorkerAutoscalingProfile(maximumConcurrency: 4))->childProcessCeiling);
     }
 
     public function testHouseholdRejectsMoreThanOneOrdinaryConsumer(): void
     {
         $this->expectException(\InvalidArgumentException::class);
-        new WorkerRuntimeConfiguration('worker.baander.app', str_repeat('a', 32), 'execution', 4480 * 1024 * 1024,
-            257, 0, '/tmp/locks', '/run/baander-worker',
-            new \App\Shared\Application\DTO\DeploymentProfile('household'),
-            new \App\Shared\Application\DTO\WorkerAutoscalingProfile(maximumConcurrency: 2));
-    }
-
-    #[DataProvider('householdExecutionBudgets')]
-    public function testHouseholdExecutionReservesOneScheduledConsole(int $memoryMiB, bool $accepted): void
-    {
-        if (!$accepted) {
-            $this->expectException(\InvalidArgumentException::class);
-        }
-        $configuration = new WorkerRuntimeConfiguration('worker.baander.app', str_repeat('a', 32), 'execution',
-            $memoryMiB * 1024 * 1024, 256, 320 * 1024 * 1024, '/tmp/worker-locks', '/run/baander-worker',
-            deploymentProfile: new \App\Shared\Application\DTO\DeploymentProfile('household'));
-        self::assertSame(1856 * 1024 * 1024, $configuration->memoryLimitBytes);
-        self::assertSame(896 * 1024 * 1024, $configuration->managementReservationBytes);
-        self::assertSame(320 * 1024 * 1024, $configuration->scheduledConsoleReservationBytes);
-    }
-
-    /** @return iterable<string, array{int, bool}> */
-    public static function householdExecutionBudgets(): iterable
-    {
-        yield 'exact budget' => [1856, true];
-        yield 'insufficient budget' => [1855, false];
-    }
-
-    public function testWeakerUnitMemoryIsRejected(): void
-    {
-        $this->expectException(\InvalidArgumentException::class);
-        $this->configuration('execution', 4159, 256);
+        $this->configuration('execution', profile: new DeploymentProfile('household'), autoscaling: new WorkerAutoscalingProfile(maximumConcurrency: 2));
     }
 
     public function testControlCannotReserveScheduledConsole(): void
     {
         $this->expectException(\InvalidArgumentException::class);
-        $this->configuration('control', 4480, 129, 320);
-    }
-
-    public function testTraversalDirectoryIsRejected(): void
-    {
-        $this->expectException(\InvalidArgumentException::class);
-        new WorkerRuntimeConfiguration('worker.baander.app', str_repeat('a', 32), 'control', 2944 * 1024 * 1024, 129, 0, '/tmp/../tmp/locks', '/run/baander-worker', new \App\Shared\Application\DTO\DeploymentProfile('full', 3, 1));
+        $this->configuration('control', 320);
     }
 
     #[DataProvider('invalidFields')]
-    public function testIdentityCapacityAndDirectoryBoundariesAreRejected(string $field, mixed $value): void
+    public function testIdentityReservationAndDirectoryBoundariesAreRejected(string $field, mixed $value): void
     {
         $this->expectException(\InvalidArgumentException::class);
         new WorkerRuntimeConfiguration(...array_replace([
             'namespace' => 'worker.baander.app', 'bootId' => str_repeat('a', 32), 'unit' => 'execution',
-            'memoryLimitBytes' => 4160 * 1024 * 1024, 'pidsLimit' => 256, 'scheduledConsoleReservationBytes' => 0,
+            'scheduledConsoleReservationBytes' => 0,
             'lockDirectory' => '/tmp/worker-locks', 'ipcDirectory' => '/run/baander-worker',
-            'deploymentProfile' => new \App\Shared\Application\DTO\DeploymentProfile('full', 3, 1),
+            'deploymentProfile' => new DeploymentProfile('full', 3, 1),
         ], [$field => $value]));
     }
 
@@ -88,17 +67,8 @@ final class WorkerRuntimeConfigurationTest extends TestCase
         yield 'short boot' => ['bootId', 'abcd'];
         yield 'uppercase boot' => ['bootId', str_repeat('A', 32)];
         yield 'unknown unit' => ['unit', 'combined'];
-        yield 'minimum integer memory' => ['memoryLimitBytes', PHP_INT_MIN];
-        yield 'maximum integer memory' => ['memoryLimitBytes', PHP_INT_MAX];
-        yield 'zero memory' => ['memoryLimitBytes', 0];
-        yield 'unbounded memory' => ['memoryLimitBytes', 1024 ** 4 + 1];
-        yield 'below execution memory' => ['memoryLimitBytes', 4160 * 1024 * 1024 - 1];
-        yield 'zero pids' => ['pidsLimit', 0];
-        yield 'below execution pids' => ['pidsLimit', 255];
-        yield 'unbounded pids' => ['pidsLimit', 4097];
         yield 'negative console reservation' => ['scheduledConsoleReservationBytes', -1];
         yield 'insufficient console reservation' => ['scheduledConsoleReservationBytes', 320 * 1024 * 1024 - 1];
-        yield 'console exceeds remaining memory' => ['scheduledConsoleReservationBytes', 320 * 1024 * 1024];
         yield 'oversized console reservation' => ['scheduledConsoleReservationBytes', PHP_INT_MAX];
         foreach (['lockDirectory', 'ipcDirectory'] as $field) {
             yield $field . ' relative' => [$field, 'worker-lock'];
@@ -108,33 +78,15 @@ final class WorkerRuntimeConfigurationTest extends TestCase
         }
     }
 
-    public function testControlMemoryAndPidMinimumsAreEnforcedIndependently(): void
+    public function testConsoleReservationAcceptsOnePhpProcessAndTheLargestValue(): void
     {
-        foreach ([[2943, 129], [2944, 128]] as [$memory, $pids]) {
-            try {
-                $this->configuration('control', $memory, $pids);
-                self::fail('Control resources below either qualification minimum must be rejected.');
-            } catch (\InvalidArgumentException $error) {
-                self::assertStringContainsString('Worker requires', $error->getMessage());
-            }
-        }
+        self::assertSame(320 * 1024 * 1024, $this->configuration('execution', 320, profile: new DeploymentProfile('household'))->scheduledConsoleReservationBytes);
+        self::assertSame(1024 ** 4, $this->configuration('execution', 1048576)->scheduledConsoleReservationBytes);
     }
 
-    public function testBothUnitsAcceptTheirExactMemoryAndPidBoundaries(): void
+    private function configuration(string $unit, int $consoleMiB = 0, ?DeploymentProfile $profile = null, WorkerAutoscalingProfile $autoscaling = new WorkerAutoscalingProfile()): WorkerRuntimeConfiguration
     {
-        foreach ([['control', 2944, 129], ['execution', 4160, 256]] as [$unit, $memory, $pids]) {
-            $configuration = $this->configuration($unit, $memory, $pids);
-            self::assertSame($memory * 1024 * 1024, $configuration->memoryLimitBytes);
-            self::assertSame($pids, $configuration->pidsLimit);
-            self::assertSame(0, $configuration->scheduledConsoleReservationBytes);
-        }
-        $maximum = $this->configuration('execution', 1048576, 4096);
-        self::assertSame(1024 ** 4, $maximum->memoryLimitBytes);
-        self::assertSame(4096, $maximum->pidsLimit);
-    }
-
-    private function configuration(string $unit, int $mib, int $pids, int $console = 0): WorkerRuntimeConfiguration
-    {
-        return new WorkerRuntimeConfiguration('worker.baander.app', str_repeat('a', 32), $unit, $mib * 1024 * 1024, $pids, $console * 1024 * 1024, '/tmp/worker-locks', '/run/baander-worker', new \App\Shared\Application\DTO\DeploymentProfile('full', 3, 1));
+        return new WorkerRuntimeConfiguration('worker.baander.app', str_repeat('a', 32), $unit, $consoleMiB * 1024 * 1024,
+            '/tmp/worker-locks', '/run/baander-worker', $profile ?? new DeploymentProfile('full', 3, 1), $autoscaling);
     }
 }

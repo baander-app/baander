@@ -6,39 +6,45 @@ namespace App\Shared\Application\DTO;
 
 use Symfony\Component\DependencyInjection\Attribute\Exclude;
 
-/** Admission reservations within each independently enforced worker unit. */
+/** Identity and admission inputs of one worker unit; the slots, not container limits, bound its media work. */
 #[Exclude]
 final readonly class WorkerRuntimeConfiguration
 {
-    public int $managementReservationBytes;
+    /** Local helper processes an ordinary or scheduled consumer runs at once, such as one probe or lookup. */
+    public const int CONSUMER_DESCENDANTS = 1;
+
+    /**
+     * Processes the supervisor may own at once: its fixed roles, the media manager with one
+     * media child per slot, consumers with their local helpers, any scheduled console child,
+     * and the lease helper.
+     */
+    public int $childProcessCeiling;
 
     public function __construct(
         public string $namespace,
         public string $bootId,
         public string $unit,
-        public int $memoryLimitBytes,
-        public int $pidsLimit,
         public int $scheduledConsoleReservationBytes,
         public string $lockDirectory,
         public string $ipcDirectory,
         public DeploymentProfile $deploymentProfile,
         public WorkerAutoscalingProfile $autoscaling = new WorkerAutoscalingProfile(),
     ) {
-        $this->managementReservationBytes = $deploymentProfile->managementMemoryMiB($unit) * 1024 * 1024;
-        $minimum = $autoscaling->minimumMemoryMiB($unit, $deploymentProfile) * 1024 * 1024;
         if (preg_match('/\A[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}\z/D', $namespace) !== 1
             || preg_match('/\A[0-9a-f]{32}\z/D', $bootId) !== 1
             || !in_array($unit, ['control', 'execution'], true)
             || $autoscaling->maximumConcurrency > $deploymentProfile->ordinaryConsumerLimit
-            || $memoryLimitBytes < $minimum || $memoryLimitBytes > 1024 ** 4
-            || $pidsLimit < $autoscaling->minimumPids($unit) || $pidsLimit > 4096
-            || $scheduledConsoleReservationBytes < 0
-            || $scheduledConsoleReservationBytes > $memoryLimitBytes - $minimum
+            || $scheduledConsoleReservationBytes < 0 || $scheduledConsoleReservationBytes > 1024 ** 4
             || ($scheduledConsoleReservationBytes !== 0 && ($unit !== 'execution' || $scheduledConsoleReservationBytes < $deploymentProfile->phpProcessMemoryMiB() * 1024 * 1024))
             || !$this->validPath($lockDirectory) || !$this->validPath($ipcDirectory)
         ) {
-            throw new \InvalidArgumentException('Worker requires a bounded identity, absolute private directories and memory/PID capacity for every resident consumer and controller. Scheduled console requires one PHP process reservation in execution.');
+            throw new \InvalidArgumentException('Worker requires a bounded identity, absolute private directories and an ordinary concurrency within the profile. Scheduled console requires one PHP process reservation in execution.');
         }
+        $this->childProcessCeiling = 1 + ($unit === 'control'
+            // Relay, scheduler and autoscaler, then the media manager and its media children.
+            ? 3 + 1 + $deploymentProfile->mediaChildSlots()
+            // Ordinary consumers and the scheduled consumer, then its console child.
+            : ($autoscaling->maximumConcurrency + 1) * (1 + self::CONSUMER_DESCENDANTS) + ($scheduledConsoleReservationBytes > 0 ? 1 : 0));
     }
 
     private function validPath(string $path): bool

@@ -164,11 +164,13 @@ final class DeploymentMediaMountsTest extends TestCase
                     'missing IPC mount' => array_pop($inspection['mounts']),
                     'read-only IPC mount' => $inspection['mounts'][2]['RW'] = false,
                     'wrong IPC volume' => $inspection['mounts'][2]['Name'] = 'foreign-ipc',
-                    'wrong memory ceiling' => $inspection['memory'] = 1,
-                    'unlimited swap' => $inspection['memorySwap'] = -1,
-                    'wrong CPU ceiling' => $inspection['nanoCpus'] = 0,
-                    'wrong PID ceiling' => $inspection['pidsLimit'] = 0,
-                    'wrong CPU set' => $inspection['cpuSet'] = '1',
+                    'memory limit' => $inspection['memory'] = 1,
+                    'swap limit' => $inspection['memorySwap'] = -1,
+                    'CPU limit' => $inspection['nanoCpus'] = 1000000000,
+                    'CPU weight' => $inspection['cpuShares'] = 512,
+                    'PID limit' => $inspection['pidsLimit'] = 64,
+                    'CPU set' => $inspection['cpuSet'] = '1',
+                    'default out-of-memory score' => $inspection['oomScoreAdj'] = 0,
                     'writable source' => $inspection['mounts'][0]['RW'] = true,
                     'different volume' => $inspection['mounts'][0]['Name'] = 'unlisted',
                     'bind mount' => $inspection['mounts'][0]['Type'] = 'bind',
@@ -196,7 +198,7 @@ final class DeploymentMediaMountsTest extends TestCase
     /** @return iterable<string,array{string}> */
     public static function mismatchedStorage(): iterable
     {
-        foreach (['missing IPC mount', 'read-only IPC mount', 'wrong IPC volume', 'wrong memory ceiling', 'unlimited swap', 'wrong CPU ceiling', 'wrong PID ceiling', 'wrong CPU set', 'writable source', 'different volume', 'bind mount', 'missing mount', 'extra mount', 'different target', 'source substitution', 'driver options', 'remote driver', 'global volume'] as $kind) {
+        foreach (['missing IPC mount', 'read-only IPC mount', 'wrong IPC volume', 'memory limit', 'swap limit', 'CPU limit', 'CPU weight', 'PID limit', 'CPU set', 'default out-of-memory score', 'writable source', 'different volume', 'bind mount', 'missing mount', 'extra mount', 'different target', 'source substitution', 'driver options', 'remote driver', 'global volume'] as $kind) {
             yield $kind => [$kind];
         }
     }
@@ -206,8 +208,8 @@ final class DeploymentMediaMountsTest extends TestCase
     {
         return [
             'id' => str_repeat('c', 64), 'namespace' => 'worker.baander.app', 'bootId' => str_repeat('a', 32),
-            'role' => 'control', 'memory' => 2 * 1024 * 1024 * 1024, 'memorySwap' => 2 * 1024 * 1024 * 1024,
-            'nanoCpus' => 1000000000, 'pidsLimit' => 64, 'cpuSet' => '0', 'restart' => 'no', 'retryCount' => 0, 'privileged' => false, 'pidMode' => '', 'cgroupnsMode' => 'private',
+            'role' => 'control', 'memory' => 0, 'memorySwap' => 0, 'nanoCpus' => 0, 'cpuQuota' => 0, 'cpuShares' => 0, 'pidsLimit' => null, 'cpuSet' => '', 'oomScoreAdj' => -500,
+            'restart' => 'no', 'retryCount' => 0, 'privileged' => false, 'pidMode' => '', 'cgroupnsMode' => 'private',
             'capDrop' => ['ALL'], 'securityOpt' => ['no-new-privileges'],
             'binds' => null, 'tmpfs' => null, 'devices' => null, 'deviceRequests' => null, 'capAdd' => null,
             'mounts' => array_map(static fn (array $mount): array => [
@@ -237,6 +239,6 @@ final class DeploymentMediaMountsTest extends TestCase
     /** @param list<array<string,mixed>> $mounts */
     public static function recipe(array $mounts, string $sourceMountPolicy = 'production'): DeploymentContainerRecipe
     {
-        return new DeploymentContainerRecipe('worker.baander.app', str_repeat('a', 32), 'daemon', 'sha256:' . str_repeat('b', 64), ['/usr/local/bin/php', '/var/www/html/bin/console', 'app:worker'], 'none', 2 * 1024 * 1024 * 1024, 1000000000, 64, DeploymentUnit::Control, [0], 'worker-ipc', '/var/www/html', new \App\Shared\Application\DTO\DeploymentProfile('full'), mediaMounts: $mounts, sourceMountPolicy: $sourceMountPolicy);
+        return new DeploymentContainerRecipe('worker.baander.app', str_repeat('a', 32), 'daemon', 'sha256:' . str_repeat('b', 64), ['/usr/local/bin/php', '/var/www/html/bin/console', 'app:worker'], 'none', DeploymentUnit::Control, 'worker-ipc', '/var/www/html', new \App\Shared\Application\DTO\DeploymentProfile('full'), mediaMounts: $mounts, sourceMountPolicy: $sourceMountPolicy);
     }
 }

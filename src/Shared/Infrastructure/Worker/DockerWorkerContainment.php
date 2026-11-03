@@ -15,7 +15,7 @@ use Symfony\Component\DependencyInjection\Attribute\Exclude;
 final readonly class DockerWorkerContainment
 {
     private const string INSPECT_FORMAT = <<<'FORMAT'
-{"id":{{json .Id}},"namespace":{{json (index .Config.Labels "app.baander.worker.namespace")}},"bootId":{{json (index .Config.Labels "app.baander.worker.boot-id")}},"role":{{json (index .Config.Labels "app.baander.worker.role")}},"privileged":{{json .HostConfig.Privileged}},"pidMode":{{json .HostConfig.PidMode}},"cgroupnsMode":{{json .HostConfig.CgroupnsMode}},"mounts":{{json .Mounts}},"binds":{{json (index .HostConfig "Binds")}},"tmpfs":{{json (index .HostConfig "Tmpfs")}},"devices":{{json (index .HostConfig "Devices")}},"deviceRequests":{{json (index .HostConfig "DeviceRequests")}},"capAdd":{{json (index .HostConfig "CapAdd")}},"capDrop":{{json .HostConfig.CapDrop}},"securityOpt":{{json .HostConfig.SecurityOpt}},"memory":{{json .HostConfig.Memory}},"memorySwap":{{json .HostConfig.MemorySwap}},"nanoCpus":{{json .HostConfig.NanoCpus}},"pidsLimit":{{json .HostConfig.PidsLimit}},"cpuSet":{{json .HostConfig.CpusetCpus}},"restart":{{json .HostConfig.RestartPolicy.Name}},"retryCount":{{json .HostConfig.RestartPolicy.MaximumRetryCount}}}
+{"id":{{json .Id}},"namespace":{{json (index .Config.Labels "app.baander.worker.namespace")}},"bootId":{{json (index .Config.Labels "app.baander.worker.boot-id")}},"role":{{json (index .Config.Labels "app.baander.worker.role")}},"privileged":{{json .HostConfig.Privileged}},"pidMode":{{json .HostConfig.PidMode}},"cgroupnsMode":{{json .HostConfig.CgroupnsMode}},"mounts":{{json .Mounts}},"binds":{{json (index .HostConfig "Binds")}},"tmpfs":{{json (index .HostConfig "Tmpfs")}},"devices":{{json (index .HostConfig "Devices")}},"deviceRequests":{{json (index .HostConfig "DeviceRequests")}},"capAdd":{{json (index .HostConfig "CapAdd")}},"capDrop":{{json .HostConfig.CapDrop}},"securityOpt":{{json .HostConfig.SecurityOpt}},"memory":{{json .HostConfig.Memory}},"memorySwap":{{json .HostConfig.MemorySwap}},"nanoCpus":{{json .HostConfig.NanoCpus}},"cpuQuota":{{json .HostConfig.CpuQuota}},"cpuShares":{{json .HostConfig.CpuShares}},"pidsLimit":{{json .HostConfig.PidsLimit}},"cpuSet":{{json .HostConfig.CpusetCpus}},"oomScoreAdj":{{json .HostConfig.OomScoreAdj}},"restart":{{json .HostConfig.RestartPolicy.Name}},"retryCount":{{json .HostConfig.RestartPolicy.MaximumRetryCount}}}
 FORMAT;
 
     /** @param Closure(list<string>): string $execute Successful commands return stdout; every command failure throws. */
@@ -92,7 +92,7 @@ FORMAT;
         } catch (\JsonException $error) {
             throw new RuntimeException('Container inspection is not valid containment evidence.', 0, $error);
         }
-        if (!is_array($inspection) || count($inspection) !== 22
+        if (!is_array($inspection) || count($inspection) !== 25
             || ($inspection['id'] ?? null) !== $containerId
             || ($inspection['namespace'] ?? null) !== $namespace
             || ($inspection['bootId'] ?? null) !== $bootId
@@ -107,13 +107,8 @@ FORMAT;
         ) {
             throw new RuntimeException('Container identity or isolation policy does not match containment requirements.');
         }
-        if ($this->recipe !== null && ($this->recipe->unit !== $unit
-            || ($inspection['memory'] ?? null) !== $this->recipe->memoryBytes
-            || ($inspection['memorySwap'] ?? null) !== $this->recipe->memoryBytes
-            || ($inspection['nanoCpus'] ?? null) !== $this->recipe->nanoCpus
-            || ($inspection['pidsLimit'] ?? null) !== $this->recipe->pidsLimit
-            || ($inspection['cpuSet'] ?? null) !== implode(',', $this->recipe->cpuSet))) {
-            throw new RuntimeException('Container resource ceilings differ from the admitted unit.');
+        if ($this->recipe !== null && ($this->recipe->unit !== $unit || !$this->recipe->matchesResources($inspection))) {
+            throw new RuntimeException('Container resource limits or out-of-memory score differ from the admitted unit.');
         }
         if (!array_key_exists('mounts', $inspection)) {
             throw new RuntimeException('Container inspection does not identify its mounts.');

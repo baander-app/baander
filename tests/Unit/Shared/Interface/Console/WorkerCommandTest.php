@@ -13,7 +13,7 @@ use Symfony\Component\Console\Tester\CommandTester;
 
 final class WorkerCommandTest extends TestCase
 {
-    public function testExplicitUnitBudgetsReachRunner(): void
+    public function testExplicitUnitIdentityReachesRunner(): void
     {
         $runner = new RecordingWorkerRunner();
         self::assertSame(7, (new CommandTester(new WorkerCommand($runner)))->execute($this->options()));
@@ -22,19 +22,35 @@ final class WorkerCommandTest extends TestCase
         self::assertSame('baander.app:workers', $runner->configuration->namespace);
         self::assertSame(str_repeat('a', 32), $runner->configuration->bootId);
         self::assertSame(0, $runner->configuration->scheduledConsoleReservationBytes);
-        self::assertSame(4160 * 1024 * 1024, $runner->configuration->memoryLimitBytes);
-        self::assertSame(256, $runner->configuration->pidsLimit);
     }
 
-    public function testScheduledConsoleRequiresItsAdditionalReservation(): void
+    public function testScheduledConsoleReservationReachesRunner(): void
     {
         $runner = new RecordingWorkerRunner();
         $tester = new CommandTester(new WorkerCommand($runner));
-        self::assertSame(2, $tester->execute(array_replace($this->options(), ['--scheduled-console-mib' => '320'])));
-        self::assertNull($runner->configuration);
-        self::assertSame(7, $tester->execute(array_replace($this->options(), ['--memory-mib' => '4480', '--scheduled-console-mib' => '320'])));
+        self::assertSame(7, $tester->execute(array_replace($this->options(), ['--scheduled-console-mib' => '320'])));
         self::assertNotNull($runner->configuration);
         self::assertSame(320 * 1024 * 1024, $runner->configuration->scheduledConsoleReservationBytes);
+    }
+
+    #[DataProvider('removedResourceOptions')]
+    public function testResourceLimitOptionsNoLongerExist(string $option, string $value): void
+    {
+        $runner = new RecordingWorkerRunner();
+        try {
+            (new CommandTester(new WorkerCommand($runner)))->execute([...$this->options(), $option => $value]);
+            self::fail('A removed resource option was accepted.');
+        } catch (\Symfony\Component\Console\Exception\InvalidOptionException $error) {
+            self::assertStringContainsString(ltrim($option, '-'), $error->getMessage());
+        }
+        self::assertNull($runner->configuration);
+    }
+
+    /** @return iterable<array{string, string}> */
+    public static function removedResourceOptions(): iterable
+    {
+        yield ['--memory-mib', '4160'];
+        yield ['--pids-limit', '256'];
     }
 
     #[DataProvider('invalidOptions')]
@@ -56,24 +72,12 @@ final class WorkerCommandTest extends TestCase
     {
         yield ['--autoscaling-profile', null];
         yield ['--autoscaling-profile', '{}'];
-        yield ['--memory-mib', null];
-        yield ['--memory-mib', '4160.5'];
-        yield ['--memory-mib', '-1'];
-        yield ['--memory-mib', '1048577'];
-        yield ['--pids-limit', null];
-        yield ['--pids-limit', '0'];
-        yield ['--pids-limit', '-1'];
-        yield ['--pids-limit', '4097'];
         yield ['--scheduled-console-mib', '-1'];
         yield ['--scheduled-console-mib', '320.5'];
         yield ['--scheduled-console-mib', '1048577'];
         yield ['--lock-dir', 'locks'];
         yield ['--unit', null];
         yield ['--unit', 'combined'];
-        yield ['--memory-mib', '4159'];
-        yield ['--memory-mib', '0'];
-        yield ['--pids-limit', '255'];
-        yield ['--pids-limit', '256.0'];
         yield ['--scheduled-console-mib', '319'];
         yield ['--scheduled-console-mib', '00'];
         yield ['--ipc-dir', 'relative'];
@@ -156,7 +160,7 @@ final class WorkerCommandTest extends TestCase
         return ['--deployment' => 'baander.app:workers', '--boot-id' => str_repeat('a', 32),
             '--deployment-profile' => (new \App\Shared\Application\DTO\DeploymentProfile('full'))->toJson(),
             '--autoscaling-profile' => (new \App\Shared\Application\DTO\WorkerAutoscalingProfile())->toJson(),
-            '--unit' => 'execution', '--memory-mib' => '4160', '--pids-limit' => '256',
+            '--unit' => 'execution',
             '--lock-dir' => '/tmp/baander-worker-locks', '--ipc-dir' => '/run/baander-worker'];
     }
 }

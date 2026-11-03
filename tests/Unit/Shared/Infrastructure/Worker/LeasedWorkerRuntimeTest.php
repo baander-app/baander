@@ -158,7 +158,7 @@ PHP);
     public function testProcessCeilingReservesCapacityForLeaseHelper(): void
     {
         $this->expectException(\InvalidArgumentException::class);
-        new LeasedWorkerRuntime([$this->definition('first')], 1, 1000, 100,
+        new LeasedWorkerRuntime([$this->definition('first')], 1,
             new LeaseAuthority('baander.app', str_repeat('a', 32), 5, 2),
             static fn (): never => throw new \LogicException('No worker should launch.'),
             static fn (): never => throw new \LogicException('No helper should launch.'));
@@ -170,7 +170,7 @@ PHP);
         if ($workers === 2) {
             $definitions[] = $this->definition('second');
         }
-        return $this->runtime = new LeasedWorkerRuntime($definitions, 3, 1000, 100,
+        return $this->runtime = new LeasedWorkerRuntime($definitions, 3,
             new LeaseAuthority('baander.app', str_repeat('a', 32), 5, 2),
             function (WorkerDefinition $definition, WorkerLaunchIdentity $identity) use ($advanceDuringLaunch): WorkerChildProcess {
                 ++$this->launches;
@@ -187,7 +187,7 @@ PHP);
 
     private function definition(string $id): WorkerDefinition
     {
-        return new WorkerDefinition($id, [PHP_BINARY, '-r', 'while (true) { usleep(10000); }'], $this->directory, 100, 0.1);
+        return new WorkerDefinition($id, [PHP_BINARY, '-r', 'while (true) { usleep(10000); }'], $this->directory, 0.1);
     }
 
     /** @param callable(): bool $condition */

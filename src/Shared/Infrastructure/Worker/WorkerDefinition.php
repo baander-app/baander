@@ -7,7 +7,7 @@ namespace App\Shared\Infrastructure\Worker;
 use InvalidArgumentException;
 use Symfony\Component\DependencyInjection\Attribute\Exclude;
 
-/** Explicit child configuration. Reservations admit resources; deployment containment enforces limits. */
+/** Explicit child configuration. Process reservations admit descendants; deployment containment owns them. */
 #[Exclude]
 final readonly class WorkerDefinition
 {
@@ -16,14 +16,12 @@ final readonly class WorkerDefinition
     /**
      * @param list<string> $argv Fresh-exec argument vector; never interpreted by a shell.
      * @param array<string, string>|null $environment Complete child environment, or null to inherit.
-     * @param int $memoryReservationBytes Total role memory budget, including all descendants.
      * @param int $descendantProcessReservation Additional process slots reserved for this role's descendants.
      */
     public function __construct(
         public string $id,
         public array $argv,
         public string $directory,
-        public int $memoryReservationBytes,
         public float $stopGraceSeconds = 30.0,
         public ?array $environment = null,
         ?RestartPolicy $restartPolicy = null,
@@ -43,8 +41,8 @@ final readonly class WorkerDefinition
         if (!str_starts_with($directory, '/') || !is_dir($directory)) {
             throw new InvalidArgumentException('Worker directory must be an existing absolute directory.');
         }
-        if ($memoryReservationBytes <= 0 || !is_finite($stopGraceSeconds) || $stopGraceSeconds < 0) {
-            throw new InvalidArgumentException('Worker memory reservation must be positive and shutdown grace finite and non-negative.');
+        if (!is_finite($stopGraceSeconds) || $stopGraceSeconds < 0) {
+            throw new InvalidArgumentException('Worker shutdown grace must be finite and non-negative.');
         }
         if ($descendantProcessReservation < 0 || $descendantProcessReservation > 4096) {
             throw new InvalidArgumentException('Worker descendant process reservation must be between 0 and 4096.');

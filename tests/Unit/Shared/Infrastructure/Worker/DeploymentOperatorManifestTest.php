@@ -14,13 +14,28 @@ use PHPUnit\Framework\TestCase;
 
 final class DeploymentOperatorManifestTest extends TestCase
 {
-    public function testHouseholdAcceptsItsReducedControlReservation(): void
+    public function testHouseholdManifestKeepsItsProfile(): void
     {
+        $household = new \App\Shared\Application\DTO\DeploymentProfile('household');
         $manifest = DeploymentOperatorManifest::fromJson($this->json([
-            'deploymentProfile' => json_decode((new \App\Shared\Application\DTO\DeploymentProfile('household'))->toJson(), true, flags: JSON_THROW_ON_ERROR),
-            'controlMemoryMiB' => 2304,
+            'deploymentProfile' => json_decode($household->toJson(), true, flags: JSON_THROW_ON_ERROR),
         ]), '/var/www/html');
-        self::assertSame(2304 * 1024 * 1024, $manifest->control->memoryBytes);
+        self::assertEquals($household, $manifest->deploymentProfile);
+    }
+
+    public function testCreatedUnitsCarryNoResourceLimitAndTheirKillOrderScore(): void
+    {
+        $manifest = DeploymentOperatorManifest::fromJson($this->json(), '/var/www/html');
+        foreach ([[DeploymentUnit::Control, -500], [DeploymentUnit::Execution, 300]] as [$unit, $score]) {
+            $recipe = $manifest->recipe($unit, new DeploymentRuntimeEnvironment());
+            self::assertSame($score, $recipe->oomScoreAdj);
+            $arguments = $recipe->createArguments();
+            foreach (['--memory', '--memory-swap', '--cpus', '--cpuset-cpus', '--cpu-shares', '--pids-limit'] as $limit) {
+                self::assertNotContains($limit, $arguments);
+            }
+            self::assertSame([], array_values(array_filter($recipe->command, static fn (string $argument): bool => str_starts_with($argument, '--memory-mib')
+                || str_starts_with($argument, '--pids-limit'))));
+        }
     }
 
     public function testSavedManifestRemainsInspectableAfterItsSourceDirectoryDisappears(): void
@@ -84,21 +99,19 @@ final class DeploymentOperatorManifestTest extends TestCase
         self::assertSame([
             '/usr/local/bin/php', '-d', 'memory_limit=256M', '/var/www/html/bin/console', 'app:worker', '--no-interaction',
             '--deployment=operator.baander.app', '--boot-id=' . str_repeat('a', 32), '--unit=control',
-            '--memory-mib=2944', '--pids-limit=129', '--scheduled-console-mib=0',
+            '--scheduled-console-mib=0',
             '--autoscaling-profile=' . $manifest->autoscaling->toJson(),
             '--deployment-profile=' . $manifest->deploymentProfile->toJson(),
             '--lock-dir=/tmp/baander-worker-locks', '--ipc-dir=/run/baander-worker',
         ], $recipe->command);
-        self::assertSame(2944 * 1024 * 1024, $recipe->memoryBytes);
-        self::assertSame($manifest->control->memoryBytes, $recipe->memoryBytes);
         self::assertSame($environment, $recipe->runtimeEnvironment);
         self::assertSame('/usr/bin/docker', $manifest->dockerBinary);
         self::assertSame('unix:///var/run/docker.sock', $manifest->dockerEndpoint);
         self::assertSame($recipe->fingerprint(), DeploymentOperatorManifest::fromJson($this->json(), '/var/www/html')->recipe(DeploymentUnit::Control, $environment)->fingerprint());
         $arguments = $recipe->createArguments('/tmp/baander-worker-test.env');
-        $memory = array_search('--memory', $arguments, true);
-        self::assertNotFalse($memory);
-        self::assertSame((string) $manifest->control->memoryBytes, $arguments[$memory + 1]);
+        $score = array_search('--oom-score-adj', $arguments, true);
+        self::assertNotFalse($score);
+        self::assertSame('-500', $arguments[$score + 1]);
     }
 
     public function testManifestMountsAreValidatedAndParticipateInCreateIdentity(): void
@@ -149,10 +162,10 @@ final class DeploymentOperatorManifestTest extends TestCase
     {
         $mounts = self::mounts();
         $mounts[0] = ['source' => '/tmp', 'target' => '/media/library', 'readOnly' => true, 'role' => 'source'];
-        $manifest = DeploymentOperatorManifest::fromJson($this->json(['version' => 6, 'sourceMountPolicy' => 'local-development', 'mediaMounts' => $mounts]), '/var/www/html');
+        $manifest = DeploymentOperatorManifest::fromJson($this->json(['version' => 7, 'sourceMountPolicy' => 'local-development', 'mediaMounts' => $mounts]), '/var/www/html');
         self::assertContains('type=bind,src=/tmp,dst=/media/library,readonly,bind-propagation=rprivate,bind-recursive=readonly', $manifest->recipe(DeploymentUnit::Control, new DeploymentRuntimeEnvironment())->createArguments());
         $this->expectException(InvalidArgumentException::class);
-        DeploymentOperatorManifest::fromJson($this->json(['version' => 6, 'sourceMountPolicy' => 'production', 'mediaMounts' => $mounts]), '/var/www/html');
+        DeploymentOperatorManifest::fromJson($this->json(['version' => 7, 'sourceMountPolicy' => 'production', 'mediaMounts' => $mounts]), '/var/www/html');
     }
 
     /** @return list<array{volume:string,target:string,readOnly:bool,role:string}> */
@@ -161,11 +174,12 @@ final class DeploymentOperatorManifestTest extends TestCase
         return [...DeploymentMediaMountsTest::mounts(), ['volume' => 'baander-state', 'target' => '/var/www/html/var/transcode_state', 'readOnly' => false, 'role' => 'derived']];
     }
 
-    public function testDisabledScheduledConsoleAndMaximumMemoryAreAccepted(): void
+    public function testDisabledAndMaximumScheduledConsoleReservationsAreAccepted(): void
     {
-        $manifest = DeploymentOperatorManifest::fromJson($this->json(['controlMemoryMiB' => 1048576, 'scheduledConsoleMiB' => 0]), '/var/www/html');
-        self::assertSame(1024 * 1024 * 1024 * 1024, $manifest->control->memoryBytes);
-        self::assertContains('--scheduled-console-mib=0', $manifest->recipe(DeploymentUnit::Control, new DeploymentRuntimeEnvironment())->command);
+        $manifest = DeploymentOperatorManifest::fromJson($this->json(['scheduledConsoleMiB' => 0]), '/var/www/html');
+        self::assertContains('--scheduled-console-mib=0', $manifest->recipe(DeploymentUnit::Execution, new DeploymentRuntimeEnvironment())->command);
+        $maximum = DeploymentOperatorManifest::fromJson($this->json(['scheduledConsoleMiB' => 1048576]), '/var/www/html');
+        self::assertContains('--scheduled-console-mib=1048576', $maximum->recipe(DeploymentUnit::Execution, new DeploymentRuntimeEnvironment())->command);
     }
 
     public function testDockerBinaryExistenceIsDeferredToExecutor(): void
@@ -210,7 +224,7 @@ final class DeploymentOperatorManifestTest extends TestCase
             }
         }
         yield 'unsupported version' => ['version', 1];
-        yield 'obsolete manifest version' => ['version', 4];
+        yield 'obsolete manifest version' => ['version', 6];
         yield 'unknown source policy' => ['sourceMountPolicy', 'permissive'];
         yield 'unknown argv' => ['command', ['/bin/sh', '-c', 'arbitrary command']];
         yield 'unknown environment' => ['environment', ['APP_SECRET' => 'test-only-secret']];
@@ -230,23 +244,12 @@ final class DeploymentOperatorManifestTest extends TestCase
         yield 'relative binary' => ['dockerBinary', 'docker'];
         yield 'empty binary' => ['dockerBinary', ''];
         yield 'binary NUL' => ['dockerBinary', "/usr/bin/docker\0"];
-        foreach (['control', 'execution'] as $unit) {
-            yield $unit . ' memory overflow' => [$unit . 'MemoryMiB', PHP_INT_MAX];
-            yield $unit . ' oversized memory' => [$unit . 'MemoryMiB', 1048577];
-            yield $unit . ' negative memory' => [$unit . 'MemoryMiB', -1];
-            yield $unit . ' zero CPU' => [$unit . 'NanoCpus', 0];
-            yield $unit . ' excess CPU' => [$unit . 'NanoCpus', 64000000001];
-            yield $unit . ' excess PIDs' => [$unit . 'PidsLimit', 4097];
-            yield $unit . ' empty affinity' => [$unit . 'CpuSet', []];
-            yield $unit . ' negative affinity' => [$unit . 'CpuSet', [-1]];
-            yield $unit . ' duplicate affinity' => [$unit . 'CpuSet', [4, 4]];
+        yield 'insufficient scheduled console' => ['scheduledConsoleMiB', 319];
+        yield 'oversized scheduled console' => ['scheduledConsoleMiB', 1048577];
+        yield 'negative scheduled console' => ['scheduledConsoleMiB', -1];
+        foreach (['controlMemoryMiB' => 2944, 'executionNanoCpus' => 1000000000, 'controlPidsLimit' => 129, 'executionCpuSet' => [1]] as $field => $value) {
+            yield 'removed resource field ' . $field => [$field, $value];
         }
-        yield 'insufficient control memory' => ['controlMemoryMiB', 2303];
-        yield 'insufficient execution memory' => ['executionMemoryMiB', 4095];
-        yield 'insufficient control PIDs' => ['controlPidsLimit', 127];
-        yield 'insufficient execution PIDs' => ['executionPidsLimit', 255];
-        yield 'insufficient scheduled console' => ['scheduledConsoleMiB', 191];
-        yield 'overlapping affinity' => ['executionCpuSet', [0]];
         yield 'IPC aliases media' => ['ipcVolume', 'baander-source'];
 
     }
@@ -268,7 +271,7 @@ final class DeploymentOperatorManifestTest extends TestCase
         yield 'null' => ['null'];
         yield 'oversized' => [str_repeat(' ', 8193)];
         yield 'excess depth' => [str_repeat('[', 9) . '0' . str_repeat(']', 9)];
-        yield 'numeric overflow' => [str_replace('"version":6', '"version":9223372036854775808', json_encode(self::fields(), JSON_THROW_ON_ERROR))];
+        yield 'numeric overflow' => [str_replace('"version":7', '"version":9223372036854775808', json_encode(self::fields(), JSON_THROW_ON_ERROR))];
     }
 
     /** @param array<string,mixed> $overrides */

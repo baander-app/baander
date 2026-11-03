@@ -109,7 +109,7 @@ final class DeploymentContainerRecipeTest extends TestCase
         $recipe = $this->recipe(['command' => ['/usr/local/bin/php', '/app/bin/worker.php', '--name=literal $(touch /tmp/unsafe);`echo unsafe`']]);
         self::assertSame([
             'container', 'create', '--pull=never', '--name', RegisteredDeploymentStart::containerName('recipe.baander.app', self::BOOT, DeploymentUnit::Control),
-            '--network', 'none', '--memory', '67108864', '--memory-swap', '67108864', '--cpus', '1', '--cpuset-cpus', '0', '--pids-limit', '32',
+            '--network', 'none', '--oom-score-adj', '-500',
             '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges', '--cgroupns', 'private', '--restart', 'no',
             '--label', 'app.baander.worker.namespace=recipe.baander.app', '--label', 'app.baander.worker.boot-id=' . self::BOOT,
             '--label', 'app.baander.worker.role=control', '--env', 'BAANDER_WORKER_NAMESPACE=recipe.baander.app',
@@ -129,48 +129,60 @@ final class DeploymentContainerRecipeTest extends TestCase
         foreach ([
             'namespace' => 'other.baander.app', 'bootId' => str_repeat('f', 32), 'daemonId' => 'other-daemon',
             'imageId' => 'sha256:' . str_repeat('f', 64), 'command' => ['/usr/local/bin/php', '/app/bin/other.php'],
-            'unit' => DeploymentUnit::Execution, 'cpuSet' => [1], 'ipcVolume' => 'other-ipc',
-            'network' => 'worker-network', 'memoryBytes' => 67108865, 'nanoCpus' => 999999999, 'pidsLimit' => 33,
+            'unit' => DeploymentUnit::Execution, 'ipcVolume' => 'other-ipc', 'network' => 'worker-network',
         ] as $field => $value) {
             self::assertNotSame($original, $this->recipe([$field => $value])->fingerprint(), $field . ' must affect durable create identity.');
         }
         self::assertNotSame($this->recipe(['command' => ['/x', 'ab', 'c']])->fingerprint(), $this->recipe(['command' => ['/x', 'a', 'bc']])->fingerprint(), 'Argument boundaries are part of the fingerprint.');
     }
 
-    #[DataProvider('exactCpuValues')]
-    public function testCpuFormattingUsesExactIntegerNanoseconds(int $nanoCpus, string $expected): void
+    public function testUnitsStartWithTheirKillOrderScoreAndNoResourceLimit(): void
     {
-        $arguments = $this->recipe(['nanoCpus' => $nanoCpus, 'cpuSet' => range(0, 63)])->createArguments();
-        $position = array_search('--cpus', $arguments, true);
-        self::assertNotFalse($position);
-        self::assertSame($expected, $arguments[$position + 1]);
+        foreach ([[DeploymentUnit::Control, '-500'], [DeploymentUnit::Execution, '300']] as [$unit, $score]) {
+            $arguments = $this->recipe(['unit' => $unit])->createArguments();
+            $position = array_search('--oom-score-adj', $arguments, true);
+            self::assertNotFalse($position);
+            self::assertSame($score, $arguments[$position + 1]);
+            self::assertSame([], array_values(array_intersect($arguments, ['--memory', '--memory-swap', '--cpus', '--cpuset-cpus', '--cpu-shares', '--pids-limit'])));
+        }
     }
 
-    /** @return iterable<string,array{int,string}> */
-    public static function exactCpuValues(): iterable
+    /** @param array<string,mixed> $overrides */
+    #[DataProvider('inspectedResources')]
+    public function testInspectionMatchesOnlyAnUnlimitedContainerWithTheUnitScore(array $overrides, bool $matches): void
     {
-        yield 'minimum' => [1_000_000, '0.001'];
-        yield 'single nanosecond above minimum' => [1_000_001, '0.001000001'];
-        yield 'fractional CPU' => [123_456_789, '0.123456789'];
-        yield 'one CPU' => [1_000_000_000, '1'];
-        yield 'fraction above integer' => [1_000_000_001, '1.000000001'];
-        yield 'trailing zero fraction' => [1_500_000_000, '1.5'];
-        yield 'maximum' => [64_000_000_000, '64'];
+        $unlimited = ['memory' => 0, 'memorySwap' => 0, 'nanoCpus' => 0, 'cpuQuota' => 0, 'cpuShares' => 0, 'pidsLimit' => null, 'cpuSet' => '', 'oomScoreAdj' => -500];
+        self::assertSame($matches, $this->recipe()->matchesResources(array_replace($unlimited, $overrides)));
     }
 
-    public function testInclusiveResourceAndCommandBoundariesAreAccepted(): void
+    /** @return iterable<string,array{array<string,mixed>,bool}> */
+    public static function inspectedResources(): iterable
     {
-        $minimum = $this->recipe(['memoryBytes' => 16 * 1024 * 1024, 'nanoCpus' => 1_000_000, 'pidsLimit' => 8, 'command' => ['/x']]);
+        yield 'unlimited' => [[], true];
+        yield 'zero PID limit' => [['pidsLimit' => 0], true];
+        yield 'memory limit' => [['memory' => 67108864], false];
+        yield 'swap limit' => [['memorySwap' => 67108864], false];
+        yield 'CPU limit' => [['nanoCpus' => 1_000_000_000], false];
+        yield 'CPU quota' => [['cpuQuota' => 100000], false];
+        yield 'CPU weight' => [['cpuShares' => 512], false];
+        yield 'PID limit' => [['pidsLimit' => 32], false];
+        yield 'CPU set' => [['cpuSet' => '0'], false];
+        yield 'default score' => [['oomScoreAdj' => 0], false];
+        yield 'non-numeric PID limit' => [['pidsLimit' => false], false];
+    }
+
+    public function testInclusiveCommandBoundariesAreAccepted(): void
+    {
+        $minimum = $this->recipe(['command' => ['/x']]);
         self::assertSame(['/x'], $minimum->command);
-        $maximum = $this->recipe(['memoryBytes' => 1024 * 1024 * 1024 * 1024, 'nanoCpus' => 64_000_000_000, 'cpuSet' => range(0, 63), 'pidsLimit' => 4096,
-            'command' => ['/' . str_repeat('x', 4095), str_repeat('x', 4096), str_repeat('x', 4096), str_repeat('x', 4096)]]);
+        $maximum = $this->recipe(['command' => ['/' . str_repeat('x', 4095), str_repeat('x', 4096), str_repeat('x', 4096), str_repeat('x', 4096)]]);
         self::assertSame(16384, array_sum(array_map(strlen(...), $maximum->command)));
         self::assertCount(64, $this->recipe(['command' => ['/x', ...array_fill(0, 63, 'x')]])->command);
         self::assertSame(str_repeat('n', 128), $this->recipe(['network' => str_repeat('n', 128)])->network);
     }
 
     #[DataProvider('invalidFields')]
-    public function testRejectsInvalidIdentityIsolationAndResourceBounds(string $field, mixed $value): void
+    public function testRejectsInvalidIdentityIsolationAndCommandBounds(string $field, mixed $value): void
     {
         $this->expectException(InvalidArgumentException::class);
         $this->recipe([$field => $value]);
@@ -196,14 +208,6 @@ final class DeploymentContainerRecipeTest extends TestCase
         yield 'joined network' => ['network', 'container:other'];
         yield 'network option' => ['network', '--host'];
         yield 'oversized network' => ['network', str_repeat('n', 129)];
-        yield 'memory below minimum' => ['memoryBytes', 16 * 1024 * 1024 - 1];
-        yield 'memory above maximum' => ['memoryBytes', 1024 * 1024 * 1024 * 1024 + 1];
-        yield 'CPU below minimum' => ['nanoCpus', 999_999];
-        yield 'CPU above maximum' => ['nanoCpus', 64_000_000_001];
-        yield 'PID below minimum' => ['pidsLimit', 7];
-        yield 'PID above maximum' => ['pidsLimit', 4097];
-        yield 'empty affinity' => ['cpuSet', []];
-        yield 'negative affinity' => ['cpuSet', [-1]];
         yield 'invalid IPC volume' => ['ipcVolume', '/run/host'];
         yield 'no command' => ['command', []];
         yield 'relative executable' => ['command', ['php']];
@@ -221,8 +225,8 @@ final class DeploymentContainerRecipeTest extends TestCase
     {
         return new DeploymentContainerRecipe(...array_replace([
             'appHome' => '/var/www/html', 'namespace' => 'recipe.baander.app', 'bootId' => self::BOOT, 'daemonId' => 'docker-daemon', 'imageId' => self::IMAGE,
-            'command' => ['/usr/local/bin/php', '/app/bin/worker.php'], 'network' => 'none', 'memoryBytes' => 64 * 1024 * 1024,
-            'nanoCpus' => 1_000_000_000, 'pidsLimit' => 32, 'unit' => DeploymentUnit::Control, 'cpuSet' => [0], 'ipcVolume' => 'worker-ipc',
+            'command' => ['/usr/local/bin/php', '/app/bin/worker.php'], 'network' => 'none',
+            'unit' => DeploymentUnit::Control, 'ipcVolume' => 'worker-ipc',
             'deploymentProfile' => new \App\Shared\Application\DTO\DeploymentProfile('full'),
         ], $overrides));
     }

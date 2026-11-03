@@ -17,7 +17,7 @@ use Symfony\Component\DependencyInjection\Attribute\Exclude;
 final readonly class DeploymentOperatorManifest
 {
     private const array STRING_FIELDS = ['namespace', 'bootId', 'daemonId', 'imageId', 'network', 'dockerBinary', 'dockerEndpoint', 'ipcVolume', 'sourceMountPolicy'];
-    private const array INTEGER_FIELDS = ['version', 'controlMemoryMiB', 'executionMemoryMiB', 'controlNanoCpus', 'executionNanoCpus', 'controlPidsLimit', 'executionPidsLimit', 'scheduledConsoleMiB'];
+    private const array INTEGER_FIELDS = ['version', 'scheduledConsoleMiB'];
     private const int MIB = 1024 * 1024;
 
     /** @param list<array{volume?:string,source?:string,target:string,readOnly:bool,role:string}> $mediaMounts */
@@ -30,8 +30,6 @@ final readonly class DeploymentOperatorManifest
         public string $network,
         public string $dockerBinary,
         public string $dockerEndpoint,
-        public DeploymentResourceBudget $control,
-        public DeploymentResourceBudget $execution,
         public int $scheduledConsoleBytes,
         public string $ipcVolume,
         public array $mediaMounts,
@@ -45,15 +43,9 @@ final readonly class DeploymentOperatorManifest
             || preg_match('~\Aunix:///[^\x00-\x20\x7f]+\z~D', $dockerEndpoint) !== 1) {
             throw new InvalidArgumentException('Operator manifest requires an absolute Docker binary and local Unix endpoint.');
         }
-        if (array_intersect($control->cpuSet, $execution->cpuSet) !== []) {
-            throw new InvalidArgumentException('Control and execution require disjoint CPU sets.');
-        }
         if ($autoscaling->maximumConcurrency > $deploymentProfile->ordinaryConsumerLimit
-            || $control->memoryBytes < $autoscaling->minimumMemoryMiB('control', $deploymentProfile) * self::MIB
-            || $execution->memoryBytes < $autoscaling->minimumMemoryMiB('execution', $deploymentProfile) * self::MIB + $scheduledConsoleBytes
-            || $control->pidsLimit < $autoscaling->minimumPids('control') || $execution->pidsLimit < $autoscaling->minimumPids('execution')
             || ($scheduledConsoleBytes !== 0 && $scheduledConsoleBytes < $deploymentProfile->phpProcessMemoryMiB() * self::MIB)) {
-            throw new InvalidArgumentException('Worker budgets must cover control management, autoscaling, media PHP, every resident consumer, native execution and any scheduled console child.');
+            throw new InvalidArgumentException('Worker manifest requires an ordinary concurrency within the profile and a scheduled console reservation of at least one PHP process.');
         }
         foreach (DeploymentUnit::cases() as $unit) {
             $this->recipe($unit, new DeploymentRuntimeEnvironment(['BAANDER_DEPLOYMENT_PROFILE' => $deploymentProfile->identifier,
@@ -75,21 +67,12 @@ final readonly class DeploymentOperatorManifest
             throw new InvalidArgumentException('Operator manifest must be a JSON object.');
         }
         $fields = get_object_vars($decoded);
-        $expected = [...self::STRING_FIELDS, ...self::INTEGER_FIELDS, 'controlCpuSet', 'executionCpuSet', 'mediaMounts', 'autoscaling', 'deploymentProfile'];
+        $expected = [...self::STRING_FIELDS, ...self::INTEGER_FIELDS, 'mediaMounts', 'autoscaling', 'deploymentProfile'];
         if (array_diff(array_keys($fields), $expected) !== [] || array_diff($expected, array_keys($fields)) !== []) {
             throw new InvalidArgumentException('Operator manifest has unknown or missing fields.');
         }
-        if (self::integer($fields, 'version') !== 6) {
-            throw new InvalidArgumentException('Operator manifest version must be 6.');
-        }
-        $budgets = [];
-        foreach (DeploymentUnit::cases() as $unit) {
-            $prefix = $unit->value;
-            if (!is_array($fields[$prefix . 'CpuSet'])) {
-                throw new InvalidArgumentException('Worker CPU sets require integer lists.');
-            }
-            $budgets[$prefix] = new DeploymentResourceBudget(self::bytes($fields, $prefix . 'MemoryMiB'),
-                self::integer($fields, $prefix . 'NanoCpus'), self::integer($fields, $prefix . 'PidsLimit'), $fields[$prefix . 'CpuSet']);
+        if (self::integer($fields, 'version') !== 7) {
+            throw new InvalidArgumentException('Operator manifest version must be 7.');
         }
         if (!is_array($fields['mediaMounts']) || !array_is_list($fields['mediaMounts'])) {
             throw new InvalidArgumentException('Operator media mounts require an ordered list.');
@@ -103,7 +86,7 @@ final readonly class DeploymentOperatorManifest
         }
         return new self(self::string($fields, 'namespace'), self::string($fields, 'bootId'), self::string($fields, 'daemonId'),
             self::string($fields, 'imageId'), $appHome, self::string($fields, 'network'), self::string($fields, 'dockerBinary'), self::string($fields, 'dockerEndpoint'),
-            $budgets['control'], $budgets['execution'], self::bytes($fields, 'scheduledConsoleMiB'), self::string($fields, 'ipcVolume'), $mounts,
+            self::bytes($fields, 'scheduledConsoleMiB'), self::string($fields, 'ipcVolume'), $mounts,
             WorkerAutoscalingProfile::fromJson(json_encode($fields['autoscaling'], JSON_THROW_ON_ERROR)), self::string($fields, 'sourceMountPolicy'),
             json_encode($fields['deploymentProfile'], JSON_THROW_ON_ERROR) |> DeploymentProfile::fromJson(...));
     }
@@ -114,16 +97,14 @@ final readonly class DeploymentOperatorManifest
             $environment->variables['BAANDER_DEPLOYMENT_PROFILE_JSON'] ?? null) != $this->deploymentProfile) {
             throw new InvalidArgumentException('Worker manifest and web deployment profiles must agree.');
         }
-        $budget = $unit === DeploymentUnit::Control ? $this->control : $this->execution;
         $recipe = new DeploymentContainerRecipe($this->namespace, $this->bootId, $this->daemonId, $this->imageId,
             ['/usr/local/bin/php', '-d', 'memory_limit=' . $this->deploymentProfile->phpHeapMiB() . 'M', $this->appHome . '/bin/console', 'app:worker', '--no-interaction',
                 '--deployment=' . $this->namespace, '--boot-id=' . $this->bootId, '--unit=' . $unit->value,
-                '--memory-mib=' . intdiv($budget->memoryBytes, self::MIB), '--pids-limit=' . $budget->pidsLimit,
                 '--scheduled-console-mib=' . ($unit === DeploymentUnit::Control ? 0 : intdiv($this->scheduledConsoleBytes, self::MIB)),
                 '--autoscaling-profile=' . $this->autoscaling->toJson(),
                 '--deployment-profile=' . $this->deploymentProfile->toJson(),
                 '--lock-dir=/tmp/baander-worker-locks', '--ipc-dir=/run/baander-worker'],
-            $this->network, $budget->memoryBytes, $budget->nanoCpus, $budget->pidsLimit, $unit, $budget->cpuSet, $this->ipcVolume, $this->appHome, $this->deploymentProfile, $environment, $this->mediaMounts, $this->sourceMountPolicy);
+            $this->network, $unit, $this->ipcVolume, $this->appHome, $this->deploymentProfile, $environment, $this->mediaMounts, $this->sourceMountPolicy);
         if (!in_array('source', array_column($recipe->mediaMounts, 'role'), true)) {
             throw new InvalidArgumentException('Operator media topology requires an explicitly authorized source storage.');
         }
@@ -185,7 +166,7 @@ final readonly class DeploymentOperatorManifest
     {
         $value = self::integer($fields, $key);
         if ($value < 0 || $value > 1048576) {
-            throw new InvalidArgumentException('Operator memory fields require MiB values between 0 and 1048576.');
+            throw new InvalidArgumentException('The scheduled console reservation requires a MiB value between 0 and 1048576.');
         }
         return $value * self::MIB;
     }

@@ -6,6 +6,7 @@ namespace App\Tests\Unit\Shared\Infrastructure\Worker\Autoscaling;
 
 use App\Shared\Application\DTO\WorkerAutoscalingProfile;
 use App\Shared\Infrastructure\Worker\Autoscaling\AutoscalingPolicy;
+use App\Shared\Infrastructure\Worker\Autoscaling\CgroupResourceSampler;
 use App\Shared\Infrastructure\Worker\Autoscaling\PoolObservation;
 use App\Shared\Infrastructure\Worker\Autoscaling\QueueObservation;
 use App\Shared\Infrastructure\Worker\Autoscaling\ResourceObservation;
@@ -299,6 +300,43 @@ final class AutoscalingPolicyTest extends TestCase
                 $this->resources($times[1]), new PoolObservation($times[2], 4, 4, 0, 4, 10, 10), 10);
             self::assertSame('measurements_unavailable', $decision->reason);
             self::assertNull($decision->evidence[['queueSampleAgeSeconds', 'resourceSampleAgeSeconds', 'poolSampleAgeSeconds'][$futureSource]]);
+        }
+    }
+
+    public function testUnlimitedCgroupObservationsLetThePoolGrowAboveOneConsumer(): void
+    {
+        $cgroup = sys_get_temp_dir() . '/baander-cgroup-' . bin2hex(random_bytes(8));
+        mkdir($cgroup, 0700);
+        $proc = CgroupResourceSamplerTest::hostFixture(cpus: 16, memTotalKiB: 64 * 1024 * 1024, pidMax: 4194304, threadsMax: 500000);
+        try {
+            foreach (['cpu.max' => "max 100000\n", 'memory.max' => "max\n", 'pids.max' => "max\n",
+                'memory.current' => (string) (2 * 1024 ** 3) . "\n", 'pids.current' => "120\n"] as $file => $content) {
+                file_put_contents($cgroup . '/' . $file, $content);
+            }
+            $sampler = new CgroupResourceSampler($cgroup, $proc);
+            $policy = new AutoscalingPolicy(new WorkerAutoscalingProfile(maximumConcurrency: 4));
+            $target = 1;
+            $decision = null;
+            for ($time = 0; $time <= 20; ++$time) {
+                // Four CPUs of encoding on a sixteen-CPU host stay under the CPU ceiling.
+                file_put_contents($cgroup . '/cpu.stat', 'usage_usec ' . ($time * 4_000_000) . "\nnr_periods 0\nnr_throttled 0\n");
+                $resources = $sampler->sample($time);
+                if ($time > 0) {
+                    self::assertTrue($resources->isKnown());
+                }
+                $decision = $policy->decide(new QueueObservation('known', $time, 100, 0, 0, 0, 20, 0), $resources,
+                    new PoolObservation($time, $target, $target, 4 - $target, 4, 10, 10), $time);
+                $target = $decision->target;
+            }
+            self::assertInstanceOf(ScalingDecision::class, $decision);
+            self::assertGreaterThan(1, $decision->target);
+            self::assertSame('known', $decision->confidence);
+        } finally {
+            foreach (glob($cgroup . '/*') ?: [] as $file) {
+                unlink($file);
+            }
+            rmdir($cgroup);
+            CgroupResourceSamplerTest::removeHostFixture($proc);
         }
     }
 
