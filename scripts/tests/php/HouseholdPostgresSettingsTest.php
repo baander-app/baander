@@ -12,10 +12,10 @@ final class HouseholdPostgresSettingsTest extends TestCase
     public function testHouseholdBudgetAndFullBudgetRemainSeparate(): void
     {
         $household = $this->household();
-        self::assertSame('36', $household->expectedSettings()['max_connections']);
+        self::assertSame('20', $household->expectedSettings()['max_connections']);
         self::assertSame('128MB', $household->expectedSettings()['shared_buffers']);
         $full = new PostgresSettings(file_get_contents(dirname(__DIR__, 3) . '/docker/postgres/conf/postgresql.conf'));
-        self::assertSame('100', $full->expectedSettings()['max_connections']);
+        self::assertSame('35', $full->expectedSettings()['max_connections']);
         self::assertSame('256MB', $full->expectedSettings()['shared_buffers']);
     }
 
