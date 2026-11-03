@@ -9,6 +9,7 @@ use App\Transcode\Application\Service\MediaExecutionPolicy;
 use App\Shared\Infrastructure\Swoole\Async;
 use App\Transcode\Application\DTO\AudioRenditionInput;
 use App\Transcode\Application\DTO\AudioRenditionRuntimeSnapshot;
+use App\Transcode\Application\Exception\AudioRenditionBusyException;
 use App\Transcode\Application\Exception\AudioRenditionFailedException;
 use App\Transcode\Application\Port\AudioRendition;
 use App\Transcode\Application\Port\AudioRenditionFormat;
@@ -162,6 +163,9 @@ final class AudioRenditionCache implements AudioRenditionPortInterface
                 }
             }
             if (microtime(true) >= $deadline) {
+                if ($current->state === 'pending' && !$current->ownershipLive) {
+                    $this->busy();
+                }
                 $this->fail('the encode did not start in time');
             }
             Async::sleep($this->pollIntervalSeconds);
@@ -225,6 +229,13 @@ final class AudioRenditionCache implements AudioRenditionPortInterface
         } catch (Throwable $error) {
             $this->fail($error->getMessage());
         }
+    }
+
+    /** No worker claimed the admitted work within the start wait; it keeps its place in the queue. */
+    private function busy(): never
+    {
+        $this->logger->warning('Audio rendition start waited {seconds} seconds without a free audio slot; the work stays queued', ['seconds' => $this->startTimeoutSeconds]);
+        throw new AudioRenditionBusyException('Every audio slot stayed busy for the whole start wait.');
     }
 
     private function fail(string $reason): never

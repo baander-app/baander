@@ -411,10 +411,12 @@ it('bounds initial re-signing even if another rotation invalidates the second pr
   expect(fetchMock.mock.calls[0][1]).toBeUndefined();
 });
 
-it('tells the requesting tab how long a busy encoder asks it to wait', async () => {
+it.each([
+  ['an encoded rendition', `${api}/api/stream/track?id=t0&format=opus`],
+  ['a stream copy', `${api}/api/stream/original/track?id=t0&format=aac&mode=copy&container=mp4&index=0`],
+])('tells the requesting tab how long busy audio slots ask it to wait for %s', async (_case, url) => {
   const client = configure('a', 'token-a');
   fetchMock.mockResolvedValueOnce(new Response('busy', { status: 503, headers: { 'Retry-After': '5' } }));
-  const url = `${api}/api/stream/track?id=t0&format=opus`;
   const response = await request('a', url);
   expect(response!.status).toBe(503);
   await vi.waitFor(() => {

@@ -22,6 +22,7 @@ interface AudioRenditionPortInterface
     /**
      * Copy selected AAC audio to a completed, Range-capable MP4 file.
      *
+     * @throws AudioRenditionBusyException   when every audio slot stays busy for the whole start wait; the copy stays queued
      * @throws AudioRenditionFailedException when the source changes, copying fails or work cannot complete
      */
     public function openCopy(string $trackKey, string $sourcePath, string $sourceHash, int $streamIndex): AudioRendition;
@@ -34,7 +35,7 @@ interface AudioRenditionPortInterface
      * @param string $sourcePath absolute path of the original audio file
      * @param int    $bitrate    target bitrate in bits per second; it snaps down to the format's bitrate ladder
      *
-     * @throws AudioRenditionBusyException   when a new encode is needed but the server-wide encode limit is reached
+     * @throws AudioRenditionBusyException   when a new encode is needed and every audio slot stays busy for the whole start wait; the encode stays queued
      * @throws AudioRenditionFailedException when the encode fails before any audio is produced or cannot start
      */
     public function open(string $trackKey, string $sourcePath, AudioRenditionFormat $format, int $bitrate): AudioRendition;

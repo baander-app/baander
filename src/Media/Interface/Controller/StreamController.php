@@ -34,9 +34,6 @@ final class StreamController
     use ApiResponsesTrait;
     use TranslatorTrait;
 
-    /** Most track encodes finish within seconds, freeing a slot. */
-    private const int TRANSCODE_BUSY_RETRY_SECONDS = 5;
-
     public function __construct(
         private readonly MediaExecutionPolicyInterface $executionPolicy,
         private readonly StreamPortInterface $streamService,
@@ -71,8 +68,8 @@ final class StreamController
             new OA\Response(response: '500', description: 'Transcoding failed', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(
                 response: '503',
-                description: 'The server already runs as many audio encodes as it allows and this rendition needs a new one; retry after the Retry-After delay',
-                headers: [new OA\Header(header: 'Retry-After', description: 'Seconds to wait before retrying', schema: new OA\Schema(type: 'integer', example: 5))],
+                description: 'Every audio slot stayed busy for the whole start wait, so the rendition or stream copy has not started yet. The work stays queued; retry after the Retry-After delay to follow it. The error details carry reason audio_slots_busy.',
+                headers: [new OA\Header(header: 'Retry-After', description: 'Seconds to wait before retrying', schema: new OA\Schema(type: 'integer', example: AudioRenditionBusyException::RETRY_AFTER_SECONDS))],
                 content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class)),
             ),
         ],
@@ -166,8 +163,9 @@ final class StreamController
             $response = $this->errorResponse(
                 $this->trans('errors.transcode_busy', domain: 'media'),
                 Response::HTTP_SERVICE_UNAVAILABLE,
+                ['reason' => 'audio_slots_busy'],
             );
-            $response->headers->set('Retry-After', (string) self::TRANSCODE_BUSY_RETRY_SECONDS);
+            $response->headers->set('Retry-After', (string) AudioRenditionBusyException::RETRY_AFTER_SECONDS);
 
             return $response;
         } catch (AudioRenditionFailedException) {

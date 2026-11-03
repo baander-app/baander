@@ -9751,6 +9751,18 @@
                     },
                     "409": {
                         "description": "Completed rendition unavailable; negotiate delivery again"
+                    },
+                    "503": {
+                        "description": "Every audio slot stayed busy for the whole start wait, so the stream copy has not started yet. The copy stays queued; retry after the Retry-After delay to follow it. The error details carry reason audio_slots_busy.",
+                        "headers": {
+                            "Retry-After": {
+                                "description": "Seconds to wait before retrying",
+                                "schema": {
+                                    "type": "integer",
+                                    "example": 5
+                                }
+                            }
+                        }
                     }
                 }
             },
@@ -9860,7 +9872,7 @@
                         }
                     },
                     "503": {
-                        "description": "The server already runs as many audio encodes as it allows and this rendition needs a new one; retry after the Retry-After delay",
+                        "description": "Every audio slot stayed busy for the whole start wait, so the rendition or stream copy has not started yet. The work stays queued; retry after the Retry-After delay to follow it. The error details carry reason audio_slots_busy.",
                         "headers": {
                             "Retry-After": {
                                 "description": "Seconds to wait before retrying",

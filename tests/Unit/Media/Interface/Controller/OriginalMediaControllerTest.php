@@ -12,6 +12,7 @@ use App\Media\Application\Port\PlaybackMediaAccessInterface;
 use App\Media\Application\Port\StreamPortInterface;
 use App\Media\Interface\Controller\OriginalMediaController;
 use App\Media\Domain\Model\TrackStreamMetadata;
+use App\Transcode\Application\Exception\AudioRenditionBusyException;
 use App\Transcode\Application\Port\AudioRendition;
 use App\Transcode\Application\Port\AudioRenditionFormat;
 use App\Shared\Application\DTO\DeploymentProfile;
@@ -165,6 +166,21 @@ final class OriginalMediaControllerTest extends TestCase
     {
         yield 'fresh' => [false];
         yield 'complete cache' => [true];
+    }
+
+    public function testCopyWaitingOnBusyAudioSlotsAnswers503WithRetryAfter(): void
+    {
+        $audio = $this->createMock(AudioRenditionPortInterface::class);
+        $audio->method('findCompleteCopy')->willReturn(null);
+        $audio->expects(self::once())->method('openCopy')
+            ->willThrowException(new AudioRenditionBusyException('Every audio slot stayed busy for the whole start wait.'));
+        $response = $this->controller(audio: $audio)->track(Request::create($this->copyUrl()));
+        self::assertSame(503, $response->getStatusCode());
+        self::assertSame('5', $response->headers->get('Retry-After'));
+        $error = json_decode((string) $response->getContent(), true, 512, JSON_THROW_ON_ERROR);
+        self::assertIsArray($error);
+        self::assertSame('Every audio slot is busy. Try again shortly.', $error['error']['message'] ?? null);
+        self::assertSame(['reason' => 'audio_slots_busy'], $error['error']['details'] ?? null);
     }
 
     public function testTamperedCopySelectionCannotAdmitWork(): void

@@ -181,8 +181,9 @@
     headers.set("DPoP", proof);
     return fetch(request, { headers, mode: "cors", credentials: "omit", redirect: "error" });
   }
+  const RETRYABLE_TRACK_PATHS = /* @__PURE__ */ new Set(["/api/stream/track", "/api/stream/original/track"]);
   function relayRetryAfter(clientId, url, response) {
-    if (response.status !== 503 || url.pathname !== "/api/stream/track") return;
+    if (response.status !== 503 || !RETRYABLE_TRACK_PATHS.has(url.pathname)) return;
     const header = response.headers.get("retry-after")?.trim() ?? "";
     if (!/^\d{1,4}$/.test(header)) return;
     self.clients.get(clientId).then((client) => {

@@ -219,12 +219,15 @@ function authorizedFetch(request: Request, auth: ClientAuth, proof: string): Pro
   return fetch(request, { headers, mode: 'cors', credentials: 'omit', redirect: 'error' });
 }
 
+/** Track audio paths whose 503 answers mean every audio slot stayed busy while the work stays queued. */
+const RETRYABLE_TRACK_PATHS = new Set(['/api/stream/track', '/api/stream/original/track']);
+
 /**
- * A media element cannot read the response that failed it. When the server refuses a track
- * stream because its encoders are busy, tell the requesting tab how long it asked to wait.
+ * A media element cannot read the response that failed it. When the server answers a track
+ * stream with busy audio slots, tell the requesting tab how long it asked to wait.
  */
 function relayRetryAfter(clientId: string, url: URL, response: Response): void {
-  if (response.status !== 503 || url.pathname !== '/api/stream/track') return;
+  if (response.status !== 503 || !RETRYABLE_TRACK_PATHS.has(url.pathname)) return;
   const header = response.headers.get('retry-after')?.trim() ?? '';
   if (!/^\d{1,4}$/.test(header)) return;
   self.clients.get(clientId).then(client => {

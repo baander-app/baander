@@ -1968,7 +1968,7 @@ describe('useAudioPlayback', () => {
       expect(usePlayerStore.getState().playbackRecovery).toBe('none')
     })
 
-    it('waits at least the Retry-After of a busy encoder before the next attempt', async () => {
+    it('waits at least the Retry-After of busy audio slots before the next attempt', async () => {
       const { a } = await playAtPosition(TRANSCODED, Infinity)
       answerLiveness('unreachable', 200, 200)
       await act(async () => { errorMedia(a, 2) })

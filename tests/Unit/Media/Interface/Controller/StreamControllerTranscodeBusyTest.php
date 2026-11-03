@@ -25,8 +25,8 @@ use Symfony\Component\Translation\Loader\YamlFileLoader;
 use Symfony\Component\Translation\Translator;
 
 /**
- * When the server already runs as many audio encodes as it allows, a listener
- * who needs a new one is told to come back instead of waiting on a full pool.
+ * When every audio slot stays busy for the whole start wait, a listener who
+ * needs a new rendition learns why and when to ask again; the work stays queued.
  */
 final class StreamControllerTranscodeBusyTest extends TestCase
 {
@@ -47,14 +47,14 @@ final class StreamControllerTranscodeBusyTest extends TestCase
         rmdir($this->directory);
     }
 
-    public function testABusyEncoderAnswers503WithRetryAfterAndATranslatedMessage(): void
+    public function testBusyAudioSlotsAnswer503WithRetryAfterAndATranslatedReason(): void
     {
         $renditions = $this->createMock(AudioRenditionPortInterface::class);
         // The server cap applies before the bitrate snaps to the ladder.
         $renditions->expects(self::once())
             ->method('open')
             ->with(self::anything(), $this->file, AudioRenditionFormat::Opus, 192_000)
-            ->willThrowException(new AudioRenditionBusyException('The server already runs 4 audio rendition encodes.'));
+            ->willThrowException(new AudioRenditionBusyException('Every audio slot stayed busy for the whole start wait.'));
 
         $request = Request::create('https://api.baander.app/api/stream/track?id=' . (new PublicId())->toString() . '&format=opus&bitrate=200000');
         $request->attributes->set(RequestLocale::ATTRIBUTE, 'da');
@@ -65,7 +65,8 @@ final class StreamControllerTranscodeBusyTest extends TestCase
         self::assertSame('5', $response->headers->get('Retry-After'));
         $error = json_decode((string) $response->getContent(), true, 512, JSON_THROW_ON_ERROR);
         self::assertIsArray($error);
-        self::assertSame('Serveren er optaget af at omkode anden lyd. Prøv igen om lidt.', $error['error']['message'] ?? null);
+        self::assertSame('Alle lydpladser er optaget. Dit nummer bliver i køen; prøv igen om lidt.', $error['error']['message'] ?? null);
+        self::assertSame(['reason' => 'audio_slots_busy'], $error['error']['details'] ?? null);
     }
 
     private function controller(AudioRenditionPortInterface $renditions, Request $request): StreamController

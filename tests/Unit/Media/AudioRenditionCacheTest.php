@@ -8,6 +8,7 @@ use App\Transcode\Application\DTO\AudioRenditionInput;
 use App\Shared\Application\DTO\DeploymentProfile;
 use App\Transcode\Application\Service\MediaExecutionPolicy;
 use App\Transcode\Application\DTO\AudioRenditionRuntimeSnapshot;
+use App\Transcode\Application\Exception\AudioRenditionBusyException;
 use App\Transcode\Application\Exception\AudioRenditionFailedException;
 use App\Transcode\Application\Port\AudioRenditionFormat;
 use App\Transcode\Application\Port\AudioRenditionRuntimePort;
@@ -131,17 +132,58 @@ final class AudioRenditionCacheTest extends TestCase
         $this->cache()->open('track', $this->source, AudioRenditionFormat::Mp3, 192000);
     }
 
-    public function testPendingAdmissionWithoutAWorkerFailsWithinTheStartupDeadline(): void
+    #[\PHPUnit\Framework\Attributes\DataProvider('copyAndEncodeStarts')]
+    public function testQueuedWorkThatNoSlotClaimsReportsBusySlotsWhenTheStartWaitExpires(bool $copy): void
+    {
+        $this->runtime->method('find')->willReturnCallback(fn (): AudioRenditionRuntimeSnapshot => $this->snapshot('pending', live: false));
+        $start = microtime(true);
+        try {
+            $copy
+                ? $this->cache()->openCopy('track', $this->source, hash_file('xxh3', $this->source), 0)
+                : $this->cache()->open('track', $this->source, AudioRenditionFormat::Mp3, 192000);
+            self::fail('Work that no audio slot claims must report busy slots.');
+        } catch (AudioRenditionBusyException $error) {
+            self::assertStringContainsString('Every audio slot stayed busy', $error->getMessage());
+            self::assertLessThan(.5, microtime(true) - $start);
+        }
+    }
+
+    /** @return iterable<string, array{bool}> */
+    public static function copyAndEncodeStarts(): iterable
+    {
+        yield 'encode' => [false];
+        yield 'stream copy' => [true];
+    }
+
+    public function testClaimedWorkThatNeverStartsFailsWithinTheStartWait(): void
     {
         $this->runtime->method('find')->willReturnCallback(fn (): AudioRenditionRuntimeSnapshot => $this->snapshot('pending'));
         $start = microtime(true);
         try {
             $this->cache()->open('track', $this->source, AudioRenditionFormat::Mp3, 192000);
-            self::fail('Missing worker must fail.');
+            self::fail('Claimed work that never starts must fail.');
         } catch (AudioRenditionFailedException $error) {
             self::assertStringContainsString('did not start in time', $error->getMessage());
             self::assertLessThan(.5, microtime(true) - $start);
         }
+    }
+
+    public function testQueuedWorkThatGetsASlotWithinTheStartWaitStreamsNormally(): void
+    {
+        $polls = 0;
+        $this->runtime->method('find')->willReturnCallback(function () use (&$polls): AudioRenditionRuntimeSnapshot {
+            if (++$polls <= 3) {
+                return $this->snapshot('pending', live: false);
+            }
+            if ($polls === 4) {
+                $this->write('encoded', true);
+                return $this->snapshot('running');
+            }
+            return $this->complete();
+        });
+        $rendition = $this->cache(startTimeoutSeconds: 5)->open('track', $this->source, AudioRenditionFormat::Mp3, 192000);
+        self::assertFalse($rendition->isComplete());
+        self::assertSame('encoded', implode('', iterator_to_array($rendition->chunks(), false)));
     }
 
     public function testSourceChangesSelectAnotherDurableIdentity(): void
@@ -277,9 +319,18 @@ final class AudioRenditionCacheTest extends TestCase
         self::assertNull($this->cache()->findComplete('track', $this->source, $format, 192000));
     }
 
-    private function cache(): AudioRenditionCache
+    private function cache(float $startTimeoutSeconds = .01): AudioRenditionCache
     {
-        return new AudioRenditionCache(new MediaExecutionPolicy(new DeploymentProfile('full')), new SegmentFileResolver($this->root), $this->runtime, new NullLogger(), pollIntervalSeconds: .001, startTimeoutSeconds: .01);
+        return new AudioRenditionCache(new MediaExecutionPolicy(new DeploymentProfile('full')), new SegmentFileResolver($this->root), $this->runtime, new NullLogger(), pollIntervalSeconds: .001, startTimeoutSeconds: $startTimeoutSeconds);
+    }
+
+    /** The running generation renamed its partial output into place and completed. */
+    private function complete(): AudioRenditionRuntimeSnapshot
+    {
+        if (is_file($this->path() . '.part')) {
+            rename($this->path() . '.part', $this->path());
+        }
+        return $this->snapshot('complete');
     }
 
     private function snapshot(string $state, int $generation = 1, bool $live = true): AudioRenditionRuntimeSnapshot

@@ -2,7 +2,7 @@
  * Retry-After delays from 503 stream answers, keyed by stream URL.
  *
  * A media element never exposes the response that failed it. The stream service worker
- * sees the response, so it reports a busy encoder's Retry-After here, and playback
+ * sees the response, so it reports the Retry-After of busy audio slots here, and playback
  * recovery reads it when the same source fails.
  */
 
