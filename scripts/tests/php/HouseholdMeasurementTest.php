@@ -113,6 +113,30 @@ final class HouseholdMeasurementTest extends TestCase
         self::assertSame([], $sample['missing']);
     }
 
+    public function testChildWhoseKernelExitHasStartedIsNotMissingTelemetry(): void
+    {
+        file_put_contents($this->root . '/cgroup/service/cgroup.procs', "41\n42\n");
+        mkdir($this->root . '/proc/42');
+        $fields = array_fill(0, 18, '0');
+        $fields[5] = (string) 0x400004;
+        file_put_contents($this->root . '/proc/42/stat', '42 (postgres) R ' . implode(' ', $fields) . ' 1000 0');
+        file_put_contents($this->root . '/proc/42/status', "Name:\tpostgres\nState:\tR (running)\nThreads:\t1\n");
+        $sample = new HostSampler($this->root . '/proc', $this->root . '/cgroup')->capture(1, 0, ['postgres' => ['pid' => 41, 'cgroup' => '/service']]);
+        self::assertSame([42], $sample['exitedDuringCapture']);
+        self::assertSame([], $sample['missing']);
+    }
+
+    public function testRunningChildWithoutExecutableRemainsMissingTelemetry(): void
+    {
+        file_put_contents($this->root . '/cgroup/service/cgroup.procs', "41\n42\n");
+        mkdir($this->root . '/proc/42');
+        file_put_contents($this->root . '/proc/42/stat', '42 (postgres) R ' . implode(' ', array_fill(0, 18, '0')) . ' 1000 0');
+        file_put_contents($this->root . '/proc/42/status', "Name:\tpostgres\nState:\tR (running)\nThreads:\t1\nVmRSS:\t8 kB\n");
+        $sample = new HostSampler($this->root . '/proc', $this->root . '/cgroup')->capture(1, 0, ['postgres' => ['pid' => 41, 'cgroup' => '/service']]);
+        self::assertSame([], $sample['exitedDuringCapture']);
+        self::assertSame(['process:42/exe'], $sample['missing']);
+    }
+
     public function testMissingRootServiceIsMissingTelemetry(): void
     {
         $sample = new HostSampler($this->root . '/proc', $this->root . '/cgroup')->capture(1, 0, ['web' => ['pid' => 42, 'cgroup' => '/service']]);

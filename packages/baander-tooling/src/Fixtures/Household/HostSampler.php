@@ -9,6 +9,8 @@ final class HostSampler
 {
     public const int MAX_LINE_BYTES = 1048576;
     private const int MAX_PROCESSES = 4096;
+    /** Kernel task flag set once a process has entered exit and released its memory map. */
+    private const int PF_EXITING = 0x4;
     /** @var list<string> */
     private array $missing = [];
 
@@ -114,12 +116,12 @@ final class HostSampler
         foreach ($processRoles as $pid => $owners) {
             $before = count($this->missing);
             $process = $this->process($pid, array_values(array_unique($owners)));
-            if (!in_array($pid, $rootPids, true) && (!is_dir(rtrim($this->procRoot, '/') . '/' . $pid) || ($process['state'] ?? null) === 'Z')) {
+            if (!in_array($pid, $rootPids, true) && (!is_dir(rtrim($this->procRoot, '/') . '/' . $pid) || ($process['exiting'] ?? false))) {
                 $this->missing = array_slice($this->missing, 0, $before);
                 $exitedDuringCapture[] = $pid;
                 continue;
             }
-            if (in_array($pid, $rootPids, true) && ($process['state'] ?? null) === 'Z') {
+            if (in_array($pid, $rootPids, true) && ($process['exiting'] ?? false)) {
                 $this->missing[] = 'process:' . $pid . '/exited';
             }
             if ($process === null) {
@@ -225,8 +227,9 @@ final class HostSampler
     private function process(int $pid, array $roles): ?array
     {
         $directory = rtrim($this->procRoot, '/') . '/' . $pid;
-        // Read the executable before the state: a process that exits after this point reports a zombie or
-        // vanished state below and is classified as exited instead of as missing telemetry.
+        // Read the executable before the state. The kernel drops the executable link when exit begins, so a
+        // failed read is classified by the state read afterwards: an exiting, zombie or vanished process is
+        // exited during capture; a running process without an executable is missing telemetry.
         $executable = @readlink($directory . '/exe');
         $raw = $this->read($directory . '/stat', 'process:' . $pid . '/stat');
         $boundary = $raw === null ? false : strrpos($raw, ') ');
@@ -247,7 +250,8 @@ final class HostSampler
         }
         $native = in_array(basename($executable ?: (string) $name), ['ffmpeg', 'ffprobe', 'ffmpeg.household-real', 'ffprobe.household-real'], true);
         $command = $native ? $this->read($directory . '/cmdline', 'process:' . $pid . '/cmdline') : null;
-        return ['pid' => $pid, 'startTicks' => (int) $fields[19], 'state' => $fields[0], 'roles' => $roles, 'name' => $name,
+        $exiting = $fields[0] === 'Z' || (ctype_digit($fields[6]) && ((int) $fields[6] & self::PF_EXITING) !== 0);
+        return ['pid' => $pid, 'startTicks' => (int) $fields[19], 'state' => $fields[0], 'exiting' => $exiting, 'roles' => $roles, 'name' => $name,
             'executable' => $executable ?: null, 'threads' => $threads, 'rssBytes' => $rss, 'native' => $native,
             'command' => $command === null ? null : str_replace("\0", ' ', rtrim($command, "\0"))];
     }
