@@ -419,6 +419,12 @@ CODE;
             $state['phase'] = 'running';
         } catch (\Throwable $error) {
             $receipt['failure'] = $error->getMessage();
+            try {
+                $receipt['serviceStates'] = self::serviceStates($this->containers());
+            } catch (\Throwable $inspection) {
+                $receipt['serviceStates'] = null;
+                $receipt['serviceStateFailure'] = $inspection->getMessage();
+            }
             $state['phase'] = 'start-failed';
             throw $error;
         } finally {
@@ -621,7 +627,7 @@ CODE;
         $events = $this->docker->run(['events', '--since', (string) $started, '--until', (string) (time() + 1), '--filter', 'type=container', '--format', '{{json .}}'], timeout: 30)->stdout;
         AtomicFile::write($this->directory . '/shutdown-events.jsonl', $events);
         $normal = self::normalExits($before, $events);
-        $shutdown = $state['shutdown'] ?? ['normalExit' => $normal, 'pairRetired' => ($workers['phase'] ?? null) === 'retired' || ($neverStarted && $workers === null), 'dataVolumesRetained' => $retained, 'fixturesRemoved' => false];
+        $shutdown = $state['shutdown'] ?? ['normalExit' => $normal, 'pairRetired' => self::pairRetired($workers), 'dataVolumesRetained' => $retained, 'fixturesRemoved' => false];
         if ($cleanup) {
             if (!$shutdown['pairRetired'] || (!$retained && !$neverStarted)) {
                 throw new \RuntimeException('Fixture cleanup requires confirmed worker retirement and owned data-volume retention.');
@@ -670,6 +676,39 @@ CODE;
             }
         }
         return $this->publicState($state) + ['reports' => $runs, 'limits' => ['singleDeploymentOnly' => true, 'acceptedConfigurationRequiresThreeFreshRepeats' => true, 'recoveryProfileReplacementAndInsufficientMemoryRequireSeparateLifecycleEvidence' => true]];
+    }
+
+    /**
+     * Keeps the evidence that explains a failed start before teardown removes the containers.
+     *
+     * @param list<array<string,mixed>> $inspections
+     * @return list<array<string,mixed>>
+     */
+    public static function serviceStates(array $inspections): array
+    {
+        return array_map(static fn(array $container): array => [
+            'name' => ltrim((string) ($container['Name'] ?? ''), '/'),
+            'service' => $container['Config']['Labels']['com.docker.compose.service'] ?? null,
+            'running' => $container['State']['Running'] ?? null,
+            'exitCode' => $container['State']['ExitCode'] ?? null,
+            'oomKilled' => $container['State']['OOMKilled'] ?? null,
+            'health' => $container['State']['Health']['Status'] ?? null,
+            'memoryLimitBytes' => $container['HostConfig']['Memory'] ?? null,
+            'healthLog' => array_map(
+                static fn(array $probe): array => ['exitCode' => $probe['ExitCode'] ?? null, 'output' => substr((string) ($probe['Output'] ?? ''), 0, 512)],
+                array_slice($container['State']['Health']['Log'] ?? [], -3),
+            ),
+        ], $inspections);
+    }
+
+    /**
+     * The worker lifecycle saves its record before creating anything, so a missing record means no pair ever existed.
+     *
+     * @param array<string,mixed>|null $workers
+     */
+    public static function pairRetired(?array $workers): bool
+    {
+        return $workers === null || ($workers['phase'] ?? null) === 'retired';
     }
 
     /** @param list<array<string,mixed>> $containers */

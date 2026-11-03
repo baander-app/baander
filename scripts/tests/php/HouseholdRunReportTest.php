@@ -193,6 +193,44 @@ final class HouseholdRunReportTest extends TestCase
         self::assertSame(1, $result['failedExits']);
     }
 
+    public function testNotReadyProbeFollowedByReadyProbeIsAnExpectedPoll(): void
+    {
+        $input = $this->operatorInput(['readiness', 'readiness'], 100, 1900);
+        $input['receipts'][0]['docker']['exitCode'] = 1;
+        $input['receipts'][1]['startedMonotonic'] = 107.0;
+        $input['receipts'][1]['finishedMonotonic'] = 107.8;
+        $result = RunReport::operatorAudit($input['receipts'], $input['context'], ['readiness' => 1], 100, 1900);
+        self::assertTrue($result['complete'], implode(' ', $result['errors']));
+        self::assertSame(0, $result['failedExits']);
+        self::assertSame(1, $result['readinessPolls']);
+    }
+
+    public function testNotReadyProbeWithoutLaterReadyProbeOrWithOomStillFails(): void
+    {
+        $input = $this->operatorInput(['readiness', 'readiness'], 100, 1900);
+        $input['receipts'][1]['docker']['exitCode'] = 1;
+        $input['receipts'][1]['startedMonotonic'] = 107.0;
+        $input['receipts'][1]['finishedMonotonic'] = 107.8;
+        $result = RunReport::operatorAudit($input['receipts'], $input['context'], ['readiness' => 1], 100, 1900);
+        self::assertFalse($result['complete']);
+        self::assertSame(1, $result['failedExits']);
+
+        $input = $this->operatorInput(['readiness', 'readiness'], 100, 1900);
+        $input['receipts'][0]['docker']['exitCode'] = 1;
+        $input['receipts'][0]['docker']['oomKilled'] = true;
+        $input['receipts'][1]['startedMonotonic'] = 107.0;
+        $input['receipts'][1]['finishedMonotonic'] = 107.8;
+        $result = RunReport::operatorAudit($input['receipts'], $input['context'], ['readiness' => 1], 100, 1900);
+        self::assertFalse($result['complete']);
+        self::assertSame(1, $result['failedExits']);
+
+        $input = $this->operatorInput(['start', 'readiness'], 100, 1900);
+        $input['receipts'][0]['docker']['exitCode'] = 1;
+        $input['receipts'][1]['startedMonotonic'] = 107.0;
+        $input['receipts'][1]['finishedMonotonic'] = 107.8;
+        self::assertSame(1, RunReport::operatorAudit($input['receipts'], $input['context'], ['readiness' => 1], 100, 1900)['failedExits']);
+    }
+
     public function testOperatorReceiptsOutsideWindowAreExcludedAndWrongBootCannotPass(): void
     {
         $input = $this->operatorInput(['readiness', 'readiness', 'status'], 100, 1900);

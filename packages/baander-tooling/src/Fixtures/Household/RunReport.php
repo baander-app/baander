@@ -360,6 +360,9 @@ final class RunReport
         $invocationPeaks = [];
         $nonces = [];
         $peak = $swapPeak = $oom = $failedExits = $included = $excluded = $pids = 0;
+        // A not-ready readiness probe is an expected poll only when a later probe confirmed readiness.
+        $notReadyProbes = [];
+        $readyProbes = [];
         $pidsPeakAvailable = true;
         if (!is_finite($from) || !is_finite($until) || $from < 0 || $until < $from || count($receipts) > 4096
             || !is_int($context['memoryMaxBytes'] ?? null) || $context['memoryMaxBytes'] < 1
@@ -431,8 +434,23 @@ final class RunReport
             if (!is_int($docker['exitCode'] ?? null) || ($docker['running'] ?? null) !== false || !is_bool($docker['oomKilled'] ?? null)) {
                 $errors[] = 'Operator final Docker state was not observed.';
             } else {
-                $failedExits += (int) ($docker['exitCode'] !== 0);
+                if ($action === 'readiness' && $docker['exitCode'] === 1 && $docker['oomKilled'] === false) {
+                    $notReadyProbes[] = $start;
+                } else {
+                    $failedExits += (int) ($docker['exitCode'] !== 0);
+                }
+                if ($action === 'readiness' && $docker['exitCode'] === 0) {
+                    $readyProbes[] = $start;
+                }
                 $oom += (int) $docker['oomKilled'];
+            }
+        }
+        $readinessPolls = 0;
+        foreach ($notReadyProbes as $probe) {
+            if (array_any($readyProbes, static fn(float|int $ready): bool => $ready > $probe)) {
+                ++$readinessPolls;
+            } else {
+                ++$failedExits;
             }
         }
         foreach ($requiredActions as $action => $minimum) {
@@ -451,7 +469,7 @@ final class RunReport
         }
         return ['complete' => $errors === [], 'errors' => array_values(array_unique($errors)), 'invocations' => $included,
             'excludedOutsideInterval' => $excluded, 'actions' => $counts, 'configuredMemoryMaxBytes' => $context['memoryMaxBytes'],
-            'invocationPeaks' => $invocationPeaks, 'effectiveMemoryCapsBytes' => array_keys($caps), 'peakMemoryBytes' => $peak, 'peakSwapBytes' => $swapPeak, 'oomEvents' => $oom, 'failedExits' => $failedExits, 'maximumObservedPids' => $pids, 'pidsPeakAvailableForAll' => $pidsPeakAvailable,
+            'invocationPeaks' => $invocationPeaks, 'effectiveMemoryCapsBytes' => array_keys($caps), 'peakMemoryBytes' => $peak, 'peakSwapBytes' => $swapPeak, 'oomEvents' => $oom, 'failedExits' => $failedExits, 'readinessPolls' => $readinessPolls, 'maximumObservedPids' => $pids, 'pidsPeakAvailableForAll' => $pidsPeakAvailable,
             'peakScope' => 'Lifetime peak of each invocation intersecting this phase; reported separately, never added to sampled cgroup totals.'];
     }
 

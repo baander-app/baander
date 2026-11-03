@@ -422,6 +422,31 @@ final class HouseholdQualificationTest extends TestCase
         self::assertFalse(Qualification::normalExits($containers, $first . str_replace('143', '137', $second)));
     }
 
+    public function testFailedStartRecordsEachServiceMemoryAndHealthState(): void
+    {
+        $web = ['Name' => '/baander-household-web-1', 'Config' => ['Labels' => ['com.docker.compose.service' => 'web']],
+            'State' => ['Running' => false, 'ExitCode' => 255, 'OOMKilled' => true, 'Health' => ['Status' => 'unhealthy', 'Log' => [
+                ['ExitCode' => 1, 'Output' => 'first'], ['ExitCode' => 1, 'Output' => 'second'], ['ExitCode' => 1, 'Output' => 'third'], ['ExitCode' => 1, 'Output' => str_repeat('x', 900)],
+            ]]], 'HostConfig' => ['Memory' => 268435456]];
+        $redis = ['Name' => '/baander-household-redis-1', 'Config' => ['Labels' => ['com.docker.compose.service' => 'redis']],
+            'State' => ['Running' => true, 'ExitCode' => 0, 'OOMKilled' => false], 'HostConfig' => ['Memory' => 402653184]];
+        $states = Qualification::serviceStates([$web, $redis]);
+        self::assertSame(['name' => 'baander-household-web-1', 'service' => 'web', 'running' => false, 'exitCode' => 255, 'oomKilled' => true,
+            'health' => 'unhealthy', 'memoryLimitBytes' => 268435456], array_diff_key($states[0], ['healthLog' => true]));
+        self::assertSame(['second', 'third'], array_slice(array_column($states[0]['healthLog'], 'output'), 0, 2));
+        self::assertSame(512, strlen($states[0]['healthLog'][2]['output']));
+        self::assertNull($states[1]['health']);
+        self::assertSame([], $states[1]['healthLog']);
+    }
+
+    public function testOnlyARetiredOrNeverRecordedWorkerPairCountsAsRetired(): void
+    {
+        self::assertTrue(Qualification::pairRetired(null));
+        self::assertTrue(Qualification::pairRetired(['phase' => 'retired']));
+        self::assertFalse(Qualification::pairRetired(['phase' => 'preparing']));
+        self::assertFalse(Qualification::pairRetired(['phase' => 'ready']));
+    }
+
     private function withPreparedQualification(\Closure $test, ?\Closure $configureExecutor = null): void
     {
         $directory = sys_get_temp_dir() . '/baander.app-start-' . bin2hex(random_bytes(8));
