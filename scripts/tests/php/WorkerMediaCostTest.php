@@ -51,8 +51,11 @@ final class WorkerMediaCostTest extends TestCase
                 'threadTicks' => ['9' => (int) (min($wall, 20.0) * 20), '10' => (int) (min($wall, 20.0) * 10)],
                 'progress' => ['frame' => $frames, 'out_time_us' => (int) ($frames / 30 * 1e6)]];
         }
-        $cost = MediaCost::nativeCost(['id' => '9:100000', 'samples' => $samples], ['kind' => 'video-encode', 'codec' => 'libx264'],
-            ['videoFrameRate' => 30, 'videoSeconds' => 120, 'trackSeconds' => 600]);
+        $cost = MediaCost::nativeCost(
+            ['id' => '9:100000', 'samples' => $samples],
+            ['kind' => 'video-encode', 'codec' => 'libx264'],
+            ['videoFrameRate' => 30, 'videoSeconds' => 120, 'trackSeconds' => 600],
+        );
 
         self::assertSame(12, $cost['peakThreads']);
         self::assertSame(round((2048 + 50) / 1024, 1), $cost['peakRssMiB']);
@@ -63,8 +66,11 @@ final class WorkerMediaCostTest extends TestCase
     public function testShortJobWithoutProgressAssumesItsWholeSource(): void
     {
         $samples = [['t' => 1, 'uptime' => 1002.0, 'startTicks' => 100_000, 'ppid' => 7, 'cpuTicks' => 150, 'threads' => 3, 'rssKib' => 100, 'hwmKib' => 51200]];
-        $cost = MediaCost::nativeCost(['id' => '9:100000', 'samples' => $samples], ['kind' => 'video-copy', 'codec' => null],
-            ['videoFrameRate' => 30, 'videoSeconds' => 120, 'trackSeconds' => 600]);
+        $cost = MediaCost::nativeCost(
+            ['id' => '9:100000', 'samples' => $samples],
+            ['kind' => 'video-copy', 'codec' => null],
+            ['videoFrameRate' => 30, 'videoSeconds' => 120, 'trackSeconds' => 600],
+        );
 
         self::assertTrue($cost['outputAssumedComplete']);
         self::assertSame(['speed' => 60.0, 'cpuSecondsPerOutputSecond' => 0.0125], $cost['whole']);
@@ -78,8 +84,11 @@ final class WorkerMediaCostTest extends TestCase
             $samples[] = ['t' => $offset, 'uptime' => 1000 + $offset, 'startTicks' => 100_000, 'ppid' => 7, 'cpuTicks' => 40,
                 'threads' => 1, 'rssKib' => 100, 'hwmKib' => 1024, 'progress' => ['frame' => 0, 'out_time_us' => 72_000_000]];
         }
-        $cost = MediaCost::nativeCost(['id' => '9:100000', 'samples' => $samples], ['kind' => 'video-copy', 'codec' => null],
-            ['videoFrameRate' => 30, 'videoSeconds' => 120, 'trackSeconds' => 600]);
+        $cost = MediaCost::nativeCost(
+            ['id' => '9:100000', 'samples' => $samples],
+            ['kind' => 'video-copy', 'codec' => null],
+            ['videoFrameRate' => 30, 'videoSeconds' => 120, 'trackSeconds' => 600],
+        );
 
         self::assertArrayNotHasKey('steady', $cost);
         self::assertSame(['speed' => 240.0, 'cpuSecondsPerOutputSecond' => 0.0056], $cost['whole']);

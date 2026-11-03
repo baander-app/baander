@@ -60,7 +60,7 @@ final class MediaCost
                 'mediaChildren' => $media,
                 'services' => self::services(array_values(array_filter(
                     array_slice($host, 1),
-                    static fn (array $sample): bool => $start <= $sample['t'] && $sample['t'] <= $end,
+                    static fn(array $sample): bool => $start <= $sample['t'] && $sample['t'] <= $end,
                 ))),
                 'client' => array_diff_key($phase, array_flip(['name', 'startedAt', 'endedAt'])),
             ];
@@ -163,7 +163,7 @@ final class MediaCost
             return $option('-c') === 'copy' ? ['kind' => 'video-copy', 'codec' => null] : ['kind' => 'video-encode', 'codec' => $option('-c:v')];
         }
         $codec = $option('-c:a');
-        if ($codec !== null && array_filter($arguments, static fn (string $value): bool => str_contains($value, '/audio-renditions/')) !== []) {
+        if ($codec !== null && array_filter($arguments, static fn(string $value): bool => str_contains($value, '/audio-renditions/')) !== []) {
             return ['kind' => $codec === 'copy' ? 'audio-copy' : 'audio-encode', 'codec' => $codec];
         }
         return ['kind' => 'native-helper', 'codec' => null];
@@ -229,7 +229,7 @@ final class MediaCost
                 'speed' => round($produced / $wall, 3),
                 'cpuSecondsPerOutputSecond' => round($cpu / $produced, 4),
                 'cpus' => round($cpu / $wall, 3),
-                'threadCpus' => self::threadCpus(array_filter($samples, static fn (array $sample): bool => $first['t'] <= $sample['t'] && $sample['t'] <= $end['t']), $wall),
+                'threadCpus' => self::threadCpus(array_filter($samples, static fn(array $sample): bool => $first['t'] <= $sample['t'] && $sample['t'] <= $end['t']), $wall),
             ];
         } elseif ($end !== null && $output($end) >= self::WARM_UP_OUTPUT_SECONDS) {
             // Short jobs report figures from process start to their last advance; startup is included.
@@ -272,8 +272,8 @@ final class MediaCost
             }
             sort($rates);
             $last = $window[array_key_last($window)];
-            $anon = array_map(static fn (array $sample): int => (int) ($sample['containers'][$role]['anonBytes'] ?? 0), $window);
-            $file = array_map(static fn (array $sample): int => (int) ($sample['containers'][$role]['fileBytes'] ?? 0), $window);
+            $anon = array_map(static fn(array $sample): int => (int) ($sample['containers'][$role]['anonBytes'] ?? 0), $window);
+            $file = array_map(static fn(array $sample): int => (int) ($sample['containers'][$role]['fileBytes'] ?? 0), $window);
             $services[$role] = [
                 'meanCpus' => round(($last['containers'][$role]['usageUsec'] - $window[0]['containers'][$role]['usageUsec']) / 1e6 / ($last['t'] - $window[0]['t']), 3),
                 'p95Cpus' => round($rates[(int) ceil(.95 * count($rates)) - 1], 3),
@@ -315,7 +315,7 @@ final class MediaCost
      */
     private static function memory(array $process): array
     {
-        $hwm = max(array_map(static fn (array $sample): int => (int) ($sample['hwmKib'] ?? $sample['rssKib'] ?? 0), $process['samples']));
+        $hwm = max(array_map(static fn(array $sample): int => (int) ($sample['hwmKib'] ?? $sample['rssKib'] ?? 0), $process['samples']));
         return [
             'peakRssMiB' => round($hwm / 1024, 1),
             'peakThreads' => max(array_column($process['samples'], 'threads')),
@@ -330,7 +330,7 @@ final class MediaCost
      */
     public static function childRole(array $process, array $all): ?array
     {
-        $script = array_search(true, array_map(static fn (string $value): bool => str_ends_with($value, '/bin/worker-media-job.php'), $process['arguments']), true);
+        $script = array_search(true, array_map(static fn(string $value): bool => str_ends_with($value, '/bin/worker-media-job.php'), $process['arguments']), true);
         if ($script === false) {
             return null;
         }
@@ -387,8 +387,8 @@ final class MediaCost
         return [
             'averageCpus' => $wall > 0 ? round(($last['usageUsec'] - $first['usageUsec']) / 1e6 / $wall, 3) : null,
             'throttledSeconds' => round(($last['throttledUsec'] - $first['throttledUsec']) / 1e6, 3),
-            'peakMemoryCurrentMiB' => round(max(array_map(static fn (array $sample): int => (int) $sample['cgroup']['memoryCurrent'], $window)) / 1048576, 1),
-            'peakPids' => max(array_map(static fn (array $sample): int => (int) $sample['cgroup']['pidsCurrent'], $window)),
+            'peakMemoryCurrentMiB' => round(max(array_map(static fn(array $sample): int => (int) $sample['cgroup']['memoryCurrent'], $window)) / 1048576, 1),
+            'peakPids' => max(array_map(static fn(array $sample): int => (int) $sample['cgroup']['pidsCurrent'], $window)),
         ];
     }
 
