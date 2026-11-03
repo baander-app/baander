@@ -130,9 +130,9 @@ final class SegmentEncoderStreamArgsTest extends TestCase
     public function testSoftwareEncoderBoundsItsInternalWorkerPool(): void
     {
         $args = $this->encoder()->buildStreamArgs('/video/source.mkv', QualityTier::p720(), '', '/output');
-        self::assertSame('2', $args[array_search('-threads:v', $args, true) + 1]);
+        self::assertSame('4', $args[array_search('-threads:v', $args, true) + 1]);
         $parameters = $args[array_search('-x265-params', $args, true) + 1];
-        self::assertStringContainsString('pools=2', $parameters);
+        self::assertStringContainsString('pools=4', $parameters);
         self::assertStringContainsString('frame-threads=2', $parameters);
     }
 
@@ -453,7 +453,7 @@ final class SegmentEncoderStreamArgsTest extends TestCase
         }
         self::assertSame('mp4', $args[array_search('-dash_segment_type', $args, true) + 1]);
         self::assertSame('movflags=+negative_cts_offsets', $args[array_search('-format_options', $args, true) + 1]);
-        self::assertSame('2', $args[array_search('-threads:v', $args, true) + 1]);
+        self::assertSame($codec === 'libx265' ? '4' : '2', $args[array_search('-threads:v', $args, true) + 1]);
         self::assertSame('1', $args[array_search('-threads', $args, true) + 1]);
     }
 
@@ -483,7 +483,7 @@ final class SegmentEncoderStreamArgsTest extends TestCase
         if ($codec === 'libx265') {
             self::assertSame(1, count(array_keys($args, '-x265-params', true)));
             $parameters = $args[array_search('-x265-params', $args, true) + 1];
-            self::assertSame('pools=2:frame-threads=2:log-level=error:rc-lookahead=0:no-sao=1:no-deblock=1:no-scenecut=1:keyint=180:min-keyint=180', $parameters);
+            self::assertSame('pools=4:frame-threads=2:log-level=error:rc-lookahead=0:no-sao=1:no-deblock=1:no-scenecut=1:keyint=180:min-keyint=180', $parameters);
         } else {
             self::assertNotContains('-x265-params', $args);
         }

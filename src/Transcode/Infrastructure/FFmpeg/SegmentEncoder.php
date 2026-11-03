@@ -22,6 +22,7 @@ final class SegmentEncoder
 {
     private const float SEGMENT_DURATION = 6.0; // seconds per CMAF segment
     private const string FFMPEG_PATH = '/usr/bin/ffmpeg';
+    private const int X265_POOL_THREADS = 4;
 
     public function __construct(
         private readonly MediaExecutionPolicy $executionPolicy,
@@ -160,7 +161,10 @@ final class SegmentEncoder
         }
         $encoderFlags = VideoProcessingRules::codecFlags($this->encoderProfile->encoder);
         // libx265 and SVT maintain pools independently of FFmpeg's thread limit.
-        $x265Limits = 'pools=2:frame-threads=2:log-level=error';
+        // A 1080p libx265 encode needs four pool threads to stay ahead of real
+        // time; two reach only about 0.7x. libx264 keeps two encoder threads.
+        $videoThreads = $this->encoderProfile->encoder === 'libx265' ? self::X265_POOL_THREADS : 2;
+        $x265Limits = sprintf('pools=%d:frame-threads=2:log-level=error', self::X265_POOL_THREADS);
         if ($sparse && $this->encoderProfile->encoder === 'libx265') {
             $x265Limits .= ':rc-lookahead=0';
         }
@@ -247,7 +251,7 @@ final class SegmentEncoder
             $args[] = (string) $audioProfile->sampleRate;
         }
         $args[] = '-threads:v';
-        $args[] = '2';
+        $args[] = (string) $videoThreads;
         if ($hasAudio) {
             $args[] = '-threads:a';
             $args[] = '1';
