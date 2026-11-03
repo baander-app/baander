@@ -17,7 +17,7 @@ execution: code
 **Means:** Operator-set video and audio job slots in the startup profile with Baander-internal limits derived from them (KTD1–KTD5), no container resource limits (KTD3, KTD16, KTD17), a governor that learns each stream's own cost (KTD18), and a transaction-mode PgBouncer 1.26.1 so PostgreSQL backends stop scaling with clients (KTD8–KTD11).
 
 **Product authority:** The user directed the capacity model, the pooler, and the answers recorded under Key Decisions on 2026-11-03.
-Product behavior is governed by R1–R18; the Planning Contract decides how to deliver it.
+Product behavior is governed by R1–R20; the Planning Contract decides how to deliver it.
 
 **Execution profile:** One branch, `feat/configurable-media-capacity`, with dependency-ordered units landed as local commits.
 U2's measurements set the per-codec encoder thread count and the operator guidance; no measured constant is written before they exist.
@@ -67,6 +67,8 @@ More media slots would therefore grow PostgreSQL's memory with the same multipli
 - **The pooler's credentials get their own volume.** (session-settled: user-directed — chosen over the application secrets volume: the network-facing pooler must not mount the OAuth signing key.) Governs R14.
 - **Household gets the pooler without requalification.** (session-settled: user-directed — chosen over freezing household entirely and over re-running its qualification: the configured values change; the measured figures are labelled as pre-pooler.) Governs R8, R15.
 - **Both profiles drop container limits.** Household keeps its shared copy mode and its rule against encoding. Household requalification without container limits is recorded in the roadmap and is not run in this plan. (session-settled: user-directed — chosen over changing the full profile only.) Governs R8.
+- **Images move to Debian 13.** Every Debian-based image (the PHP application images, the database image and the Node tooling stage) uses its Debian 13 (trixie) base, so the worker's Mesa drives current GPUs such as RDNA4; the RX 9070 XT's VAAPI fails to initialize under Debian 12's Mesa 22.3.6. (session-settled: user-directed — chosen over a Mesa backport on Debian 12 and over a separate follow-up.) Governs R19.
+- **Operators configure the hardware encoder; limits follow the encode path.** The operator names the accelerator and its device path (for example VAAPI at `/dev/dri/renderD128`); the deployment passes that device and its render group to the execution worker. With hardware configured, unset video slots default to a figure measured on hardware and the video maximum rises with it; software keeps 8 video, and audio stays 12 either way. (session-settled: user-directed — chosen over keeping the same defaults with different guidance and over a separate hardware slot pool.) Governs R19, R20.
 - **CPU-based guidance excludes hardware-encoded codecs.** Where a GPU, QuickSync or another hardware encoder handles a codec, that codec's encode costs almost no CPU, so the published per-codec CPU costs apply to software encoding only. (session-settled: user-directed.) Governs R15.
 
 ### Requirements
@@ -83,6 +85,8 @@ More media slots would therefore grow PostgreSQL's memory with the same multipli
 - R8. The household profile keeps its shared copy mode (two shared copy slots, no encoders) and its native execution limits, and rejects slot overrides; like full, it carries no container limits.
 - R16. Worker leases and media authority checks meet their deadlines while every slot encodes.
 - R17. When memory runs short on the host, web workers and media work (FFmpeg processes and PHP media children) are killed before Redis, PostgreSQL, the pooler and the control worker's other processes.
+- R19. Operators configure a hardware encoder by accelerator and device path in the preset and the source install; the device and its render group reach the execution worker, the hardware probe uses it, and a configured device that fails to initialize is reported at worker start instead of silently encoding in software.
+- R20. With a hardware encoder configured, unset video slots default to the measured hardware figure and the video maximum rises accordingly; without one, the software defaults apply.
 - R18. The playback governor learns each stream's own encoder CPU, as a share of the host's CPUs, instead of host-wide utilization; hardware-accelerated streams are learned separately from software ones.
 
 **Database pooling**
@@ -107,6 +111,7 @@ More media slots would therefore grow PostgreSQL's memory with the same multipli
 - AE3. **Covers R2.** Given a source install whose web profile says 8 video slots while the active worker boot was started with 4, when an operator checks web health, then health reports the profile mismatch.
 - AE4. **Covers R7.** Given all audio slots busy, when a listener starts a track that needs a new rendition and no slot frees within the start wait, then the player receives the documented busy response.
 - AE5. **Covers R9, R10.** Given web traffic that saturates the application pool, when a worker renews its lease, then the renewal is served from the control pool within its deadline.
+- AE9. **Covers R19, R20.** Given a full preset configuration with `media.hardware: {accelerator: vaapi, device: /dev/dri/renderD128}` and no slots, when the operator renders and starts the deployment on a host whose GPU supports it, then the execution worker sees the device, the probe selects the hardware encoder, and the profile runs the measured hardware video default.
 - AE6. **Covers R8.** Given a household preset configuration that sets `videoSlots`, when the operator renders it, then rendering fails because household slots are fixed.
 
 ### Success Criteria
@@ -122,7 +127,7 @@ More media slots would therefore grow PostgreSQL's memory with the same multipli
 - Container resource limits of any kind, and a parent cgroup, are out (Key Decisions).
 - Redesigning the one-process-per-job media model is out.
 - Web-side slot admission is out: web receives the configured slot-bearing profile for policy refusal and the health fingerprint, but does not count or admit jobs against slots.
-- GPU encoding and hardware-acceleration selection are unchanged; only the guidance distinguishes hardware from software cost.
+- Hardware encoder selection logic (`HardwareCapabilitiesProber`'s choice among available encoders) is unchanged; this plan adds its configuration, device pass-through and the hardware defaults.
 
 ---
 
@@ -134,7 +139,7 @@ More media slots would therefore grow PostgreSQL's memory with the same multipli
 - KTD2. **Baander's native limits are derived from slots by one set of formulas.** Per-client native caps exist for every profile: a video client may run one encoder and one helper, an audio client one encoder, a household shared copy client one copy command and one helper, media control one command. Commands are the sum of client caps; results are twice the commands plus two; clients are the fixed system clients plus one per slot. The formulas reproduce household's current values exactly, and tests pin both. The video cap counts one helper rather than the helper queue's eight because helpers beyond the first already queue inside the job; today's full command limit of 8 is this formula at 3 + 1. The native envelope and the per-child media reservations only sized container limits and the supervisor's memory admission, so they are removed with them (KTD3); U2's per-kind memory figures become operator guidance. Every video encode runs with a fixed two-thread cap today (`SegmentEncoder`); U2 measured that cap below real time for 1080p HEVC (0.67× in isolation), so the per-codec encoder thread count becomes a measured constant used by `SegmentEncoder`.
 - KTD3. **Containers carry no resource limits.** The preset, the worker units the deployment operator creates, and the source-install manifest render no `cpus`/`NanoCpus`, `cpu_shares`/`CpuShares`, `cpuset`, `mem_limit`/`Memory`, `memswap_limit` or `pids_limit`/`PidsLimit`. `controlCpuSet`, `executionCpuSet`, the one-CPU execution quota, the PID floors and the host-reservation admission check that compares configured reservations with the host are removed, together with the memory reservations that exist only to size those limits. (session-settled: user-directed.) Governs R3, R8.
 - KTD4. **The native daemon admits by derived peer cap with backpressure.** Its open-peer cap is the derived client count plus a small margin, so it follows the slots rather than bounding them. Each loop iteration it accepts pending peers only while the open-peer count is below the cap; above the cap, new peers wait in the listen backlog until a peer closes instead of being closed and escalating to containment. (session-settled: user-directed — chosen over raising the cap but still closing excess peers: a closed peer is treated as uncertain and contains the media role.)
-- KTD5. **Defaults and bounds.** Unset full-profile slots are 8 video and 12 audio. The only fixed resource bound left is the pooler's client limit (`max_client_conn`): the total slot maximum is that limit minus the web, worker-consumer, lease-agent and scheduler clients, divided by each media job's pooled connections, and the per-kind maximum is the same bound for a profile with the other kind at zero. The daemon peer cap and the supervisor's child ceiling follow from the slots. Larger values are rejected with the bound named. (session-settled: user-directed.) Governs R1, R6.
+- KTD5. **Defaults and bounds.** Unset full-profile slots are 8 video and 12 audio; with a hardware encoder configured (KTD20), unset video slots take the measured hardware default instead. The only fixed resource bound left is the pooler's client limit (`max_client_conn`): the total slot maximum is that limit minus the web, worker-consumer, lease-agent and scheduler clients, divided by each media job's pooled connections, and the per-kind maximum is the same bound for a profile with the other kind at zero. The daemon peer cap and the supervisor's child ceiling follow from the slots. Larger values are rejected with the bound named. (session-settled: user-directed.) Governs R1, R6.
 - KTD6. **Web reports profile disagreement through health.** The worker boot row records the profile fingerprint the boot started with; the web health check compares it with its own profile and reports a mismatch. (session-settled: user-directed — chosen over refusing web startup and over documenting only: misconfiguration becomes visible without a restart loop.) Governs R2.
 - KTD7. **Zero slots refuse the kind at the policy.** `MediaOperation::StreamCopy` splits into video and audio stream copy, and in the full profile `MediaExecutionPolicy` refuses encodes and stream copies of a kind whose slot count is zero, so delivery negotiation returns its existing compatibility explanation and nothing reaches the worker queue. Household's shared copy pool is not gated by this rule. Governs R5.
 - KTD8. **PgBouncer runs from the database image as its own service.** PgBouncer 1.26.1 is installed from the PostgreSQL project's packages in `docker/postgres/Dockerfile` and started as a separate service with no resource limits; the preset image list and configuration version stay unchanged. It runs transaction pooling. Every pooled PDO connection, through Doctrine and through the dedicated connection factories, sets `Pdo\Pgsql::ATTR_DISABLE_PREPARES`: the image's pdo_pgsql links libpq 15, which frees named statements with SQL `DEALLOCATE`, and PgBouncer does not map that to its renamed server statements, so it would abort transactions. (session-settled: user-directed — chosen over a separate pooler image role: one database image to build and pin.) Governs R9.
@@ -147,6 +152,8 @@ More media slots would therefore grow PostgreSQL's memory with the same multipli
 - KTD15. **Busy is a documented response, not a new admission path.** The audio rendition start wait keeps queueing; when it expires, the delivery response states that every audio slot is busy, and the obsolete "server-wide encode limit" docblock on `AudioRenditionPortInterface` is corrected. Governs R7.
 - KTD16. **Encoders yield CPU inside their container through process priority.** Across containers, the control worker, the pooler, PostgreSQL and web keep their share through each container's own cgroup at the default CPU weight; nice has no effect between cgroups. Inside the execution container, the native daemon starts FFmpeg encode, copy and helper commands at nice 10, so they yield to the execution worker's lease renewal, supervisor, native daemon and consumers. An idle host still gives encodes all its CPU. Governs R16.
 - KTD17. **The kill order uses `oom_score_adj`.** Web workers carry the highest score; media work the next: the native daemon raises the score of every FFmpeg command it launches above the execution container's base score, in the same launch step that applies nice 10, and each PHP media child in the control container raises its own score above the control container's (raising needs no privilege). The execution container's base score sits between media work and Redis; PostgreSQL, the pooler and the control container's base score are lowest. (session-settled: user-directed.) Governs R17.
+- KTD19. **Debian 13 bases.** `Dockerfile` moves from `php:8.5.12-zts-bookworm` and `node:24.22.2-bookworm-slim` to their trixie variants, and `docker/postgres/Dockerfile` from `postgres:18-bookworm` to `postgres:18-trixie` with the PGDG PgBouncer pin for Debian 13. Package names that changed between releases are updated, and every image's build, the CI image and the existing suites must pass on the new base. Governs R19.
+- KTD20. **Hardware encoder configuration.** The preset's `media` object gains an optional `hardware` entry (`accelerator`: `vaapi`, `qsv`, `nvenc` or `amf`; `device`: a device path where the accelerator needs one), carried in the profile so web, workers and the manifest agree. Rendering and worker creation map the device and add the device's group to the execution worker; the hardware probe is pointed at the configured accelerator and device, and worker start fails with a named reason when the configured hardware does not initialize. The hardware video default is the number of concurrent 1080p hardware encodes U15 measures ahead of real time on the RX 9070 XT, rounded down; the hardware maximum follows the same pooler bound as KTD5. Governs R19, R20.
 - KTD18. **The governor learns each stream's own cost.** The playback governor runs in each PHP media child (`WorkerQoLLifecycle`, started from `bin/worker-media-job.php`) and holds only that child's stream, while the encoder runs under the native daemon in the execution container, out of the child's sight. The native daemon therefore reads each running command's CPU time (`utime` + `stime` from `/proc/<pid>/stat`) and reports cumulative encoder CPU seconds and encoded output seconds in every attempt snapshot, polled and final. The governor's learning samples and the mid-stream monitor's readings become CPU seconds per output second divided by the host's CPUs, which does not shrink when the host is contended, instead of host-wide `/proc/stat` utilization. Samples carry the hardware-accelerated flag the cost model already keys on, so hardware and software encodes are learned apart. The QoL profiles and their caps stay; the aggregate is bounded by the slots. (session-settled: user-directed.) Governs R18.
 
 ### High-Level Technical Design
@@ -232,10 +239,12 @@ flowchart LR
 | U7 | Defaults and bounds | `DeploymentProfile.php`, `deploy/household/example.json` | U3, U8 |
 | U8 | PgBouncer in the database image and deployments | `docker/postgres/`, `HouseholdRenderer.php`, `docker-compose.yml`, config | — |
 | U9 | Pool-safe SQL and UTC guarantee | `bin/worker-lease-agent.php`, migration, convention test | U8 |
-| U10 | 8 + 12 load proof | media-control drill and fixtures | U4, U5, U6, U7, U8, U13 |
+| U10 | 8 + 12 load proof | media-control drill and fixtures | U4, U5, U6, U7, U8, U13, U15 |
 | U11 | Busy response | `AudioRenditionCache.php`, `AudioRenditionPortInterface.php` | U4 |
 | U12 | Documentation and roadmap | `docs-book/`, `deploy/household/README.md`, `CONCEPTS.md`, `ROADMAP.md` | U10 |
 | U13 | Governor learns each stream's own cost | `StreamGovernor.php`, `StreamAdmissionService.php`, `MidStreamMonitor.php` | U1 |
+| U14 | Debian 13 base images | `Dockerfile`, `docker/postgres/Dockerfile` | — |
+| U15 | Hardware encoder configuration and measured hardware defaults | `HouseholdConfiguration.php`, `HouseholdRenderer.php`, `WorkerLifecycle.php`, `HardwareCapabilitiesProber.php`, `DeploymentProfile.php` | U6, U7, U14 |
 
 ### U1. Slots in the startup profile
 
@@ -467,14 +476,14 @@ flowchart LR
 
 **Requirements:** R4, R9, R10, R16, R17, R18; Success Criteria.
 
-**Dependencies:** U4, U5, U6, U7, U8, U13.
+**Dependencies:** U4, U5, U6, U7, U8, U13, U15.
 
 **Files:** `scripts/test-worker-media-control-container.sh` and its PHP driver, `packages/baander-tooling/src/Fixtures/Worker/MediaControl.php`, `packages/baander-tooling/src/Fixtures/Worker/ControlCapacityVerifier.php`, `packages/baander-tooling/src/Fixtures/Worker/AutoscalingVerifier.php`, `tests/Fixtures/TwoCommand/media-control.php`, `tests/Fixtures/TwoCommand/deployment.php`.
 
 **Approach:**
 1. Parameterize the drill's job counts and verifiers from the profile instead of three video jobs.
 2. Bring the playback governor to its Active state before the run, by a warm-up of at least its learning sample count, and record the governor state with every admission decision.
-3. Run 8 video jobs at 1080p and 12 audio jobs concurrently through the pooler with no container limits, recording segment progress against wall time per stream, the hardware or software encode path, governor decisions, native launches, the longest native connect-to-accept wait, OOM events, PostgreSQL backends, lease renewals and web request latency.
+3. Run 8 video jobs at 1080p and 12 audio jobs concurrently through the pooler with no container limits, once with software encoding and once with the RX 9070 XT's hardware encoder, recording segment progress against wall time per stream, the hardware or software encode path, governor decisions, native launches, the longest native connect-to-accept wait, OOM events, PostgreSQL backends, lease renewals and web request latency.
 
 **Test scenarios:**
 - All twenty jobs are admitted with the governor Active and run to completion; a decision made while the governor was still learning fails the receipt.
@@ -514,7 +523,7 @@ flowchart LR
 
 **Files:** `docs-book/part-1-operator-guide/system-requirements.md`, `configuration.md`, `transcoding.md`, `background-work.md`, `commands/README.md`, `commands/app-worker.md`, `getting-started.md`, `docs-book/part-2-developer-guide/testing.md`, `deploy/household/README.md`, `CONCEPTS.md` (media job slot, connection pooler), `ROADMAP.md`.
 
-**Approach:** Replace the fixed 3 + 1 statements, the CPU-set guidance and the per-service memory limits with slot configuration and trial-and-error sizing. Publish U2's per-codec software costs, state that hardware-encoded codecs use almost no CPU, and publish U10's reference margins. Document the kill order, the encoder priority, the pooler and its aliases, and label the household measurements as taken before the pooler and before container limits were removed. Record household requalification as an open roadmap item.
+**Approach:** Replace the fixed 3 + 1 statements, the CPU-set guidance and the per-service memory limits with slot configuration and trial-and-error sizing. Publish U2's per-codec software costs and U15's hardware costs and default, document `media.hardware` and the device pass-through, and publish U10's reference margins for both paths. Document the kill order, the encoder priority, the pooler and its aliases, and label the household measurements as taken before the pooler and before container limits were removed. Record household requalification as an open roadmap item.
 
 **Test expectation:** none -- documentation; verified by `prose-fix`, link checks and `git diff --check`.
 
@@ -540,6 +549,51 @@ flowchart LR
 
 **Verification:** QoL unit tests pass in the CI image.
 
+### U14. Debian 13 base images
+
+**Goal:** Every Debian-based image builds and passes its suites on Debian 13, and the worker image's VAAPI initializes on the RX 9070 XT.
+
+**Requirements:** R19; KTD19.
+
+**Dependencies:** none.
+
+**Files:** `Dockerfile`, `docker/postgres/Dockerfile`, `docker/postgres/thp-disabled-exec.c` build stage if affected, image pins and inventories that name the base (`packages/baander-tooling/src/Build/`, image-inventory tests), the CI image recipe.
+
+**Approach:**
+1. Switch the PHP, Node and PostgreSQL base images to their trixie variants and the PGDG PgBouncer pin to its Debian 13 build; update package names that changed.
+2. Build every target (`worker`, `production`, `ci`, the database image) and run the backend lanes, the tooling suite and the worker runtime drills in the new CI image.
+3. In the new worker image with `/dev/dri` passed through, confirm `vainfo` initializes the RX 9070 XT and lists H.264 and HEVC encode entry points.
+
+**Test scenarios:**
+- Each image target builds on Debian 13.
+- The backend, tooling and worker runtime suites pass in the rebuilt CI image.
+- The worker image's VAAPI driver initializes the RX 9070 XT.
+
+**Verification:** Build logs, suite results and the `vainfo` output are recorded in the unit's commit message.
+
+### U15. Hardware encoder configuration and measured hardware defaults
+
+**Goal:** Operators can point Baander at a hardware encoder, and the video defaults reflect what that hardware sustains.
+
+**Requirements:** R19, R20; KTD5, KTD20.
+
+**Dependencies:** U6, U7, U14.
+
+**Files:** `packages/baander-tooling/src/Deployment/HouseholdConfiguration.php`, `HouseholdRenderer.php`, `WorkerConfiguration.php`, `WorkerLifecycle.php`, `src/Shared/Infrastructure/Worker/DeploymentOperatorManifest.php`, `src/Shared/Application/DTO/DeploymentProfile.php`, `src/Transcode/Infrastructure/FFmpeg/HardwareCapabilitiesProber.php`, `bin/worker-media.php`, `deploy/household/example.json`, the media-cost drill from U2, tests for each.
+
+**Approach:**
+1. Add `media.hardware` to the preset configuration and the profile, map the device and its group into the execution worker at render and creation, and point the probe at the configured accelerator and device, failing worker start with a named reason when it does not initialize.
+2. Extend U2's media-cost drill with a hardware mode and measure, on the RX 9070 XT, the CPU and GPU cost per output second and the speed of 1080p H.264 and HEVC encodes alone and at increasing concurrency.
+3. Set the hardware video default to the largest measured concurrency that stays ahead of real time, and raise the hardware video maximum accordingly.
+
+**Test scenarios:**
+- A preset with `media.hardware` renders the device mapping and group for the execution worker only (Covers AE9).
+- A configured device that fails to initialize stops worker start with a named reason.
+- An unset full profile with hardware configured uses the measured hardware video default; without hardware it uses 8.
+- The receipt records hardware cost and speed at each concurrency step.
+
+**Verification:** Tooling, unit and worker runtime tests pass; the hardware receipt exists and is cited by U12.
+
 ---
 
 ## Verification Contract
@@ -550,7 +604,7 @@ flowchart LR
 | Static analysis | PHPStan, Deptrac and `lint:container` for both profiles through `scripts/check-backend-container.php` | No new violations or weakened baselines |
 | Tooling | `composer run-script --timeout=7200 test:tooling`, `composer analyse:tooling`, `composer check:tooling-format`, `composer check:tooling-architecture` | U5, U6, U7, U8 |
 | Web | in `ui/web`: `corepack yarn vitest run` on affected tests, `corepack yarn typecheck`, `corepack yarn lint` | U11 |
-| Worker runtime | `scripts/test-worker-media-control-container.sh` (U2 measurements, U10 proof), `test-worker-lifecycle-container.sh`, `test-worker-recovery-container.sh` | U2, U4, U5, U10 |
+| Worker runtime | `scripts/test-worker-media-control-container.sh` (U2 and U15 measurements, U10 proof), `test-worker-lifecycle-container.sh`, `test-worker-recovery-container.sh` | U2, U4, U5, U10, U14, U15 |
 | Deployment | A preset deployment of each profile started and stopped through the pooler with no container limits; `make preview-up` with the pooler | U5, U8 |
 | Documentation | `prose-fix` preservation audit, local link check, `git diff --check` | U12 |
 
@@ -558,7 +612,7 @@ flowchart LR
 
 ## Definition of Done
 
-- R1–R18 are satisfied, with AE1–AE8 covered by tests named in their units.
+- R1–R20 are satisfied, with AE1–AE9 covered by tests named in their units.
 - Household's shared copy mode, native limits and slot values are unchanged in tests.
 - No configuration, manifest or rendered service carries a CPU, memory or PID limit, a CPU set or a CPU weight.
 - The U10 receipt shows 8 video and 12 audio jobs completing with no containment or OOM kill, leases within deadline, PostgreSQL backends within the configured pools, and each stream's real-time margin.
