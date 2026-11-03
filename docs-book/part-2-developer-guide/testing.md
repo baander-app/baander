@@ -1535,6 +1535,91 @@ counts alone cannot prove those properties. Keep the container inspections, nati
 control/execution samples, backlog observations, operator log and cleanup receipts
 with these results, including failed runs.
 
+#### Per-job media cost
+
+Cost mode measures each media job kind without the control drill's CPU
+pressure. Add `BAANDER_TEST_MEDIA_COST=1` to the command above, and set
+`BAANDER_TEST_MEDIA_COST_ENCODER` to `libx264` (the shipped default) or
+`libx265`. The runner writes that encoder into the fixture image's
+`.env.prod.local`. The execution unit gets eight logical CPUs and 9216 MiB, so the
+preflight needs ten permitted CPUs.
+
+Preparation generates a 120-second 1920x1080 30 fps H.264/AAC source with mild
+temporal noise and three 600-second 44.1 kHz stereo FLAC tracks before the
+measured window. The client then runs these phases in order:
+
+1. An idle baseline.
+2. One 1080p encode, one stream copy, and one Opus 128k, AAC 192k and MP3 192k
+   rendition, each alone.
+3. Three 1080p encodes with queued renditions and a fourth video waiting.
+4. Four copy requests at once.
+
+The media role admits only three video jobs, so the checkpoint then replays the
+recorded 1080p encoder command eight times at once inside the execution unit.
+
+Samplers in both worker units record each process's peak RSS (`VmHWM`), thread
+count and per-thread CPU ticks. A host sampler records `cpu.stat` and
+`memory.stat` for web, PostgreSQL, Redis, control and execution. The FFmpeg
+wrapper adds `-progress` output, so speed is output seconds per wall second over
+the window in which output advances. The window starts after three seconds of
+output and ends before the worker's 72-second buffer-ahead throttle stops an
+encode. `media-cost.json` holds per-phase figures, a summary and the host's load
+average at each phase boundary.
+
+The recorded run on 2026-11-03 used an AMD Ryzen 7 5800X3D (8 cores, 16 threads,
+`performance` governor, boost on, 3.44 GHz scaling maximum, 62.7 GiB). Other
+heavy host work was paused, and the one-minute load average was 1.4 before each
+run. The execution unit used CPUs 1–8, which are seven cores plus the SMT sibling
+of the control unit's CPU 0. One H.264 run and one HEVC run each measured every
+phase; the table gives the range across both runs:
+
+| Job (1080p30 source) | Peak RSS | Threads | CPU-s per output s: alone / 3 slots / 8 replayed | Speed: alone / 3 slots / 8 replayed |
+|---|---|---|---|---|
+| H.264 encode (`libx264`) | 531 MiB | 8 | 1.49 / 1.65 / 1.72–1.74 | 1.71x / 1.32–1.33x / 0.55–0.58x |
+| HEVC encode (`libx265`) | 535 MiB | 9 | 3.04 / 3.29–3.31 / 3.33–3.56 | 0.70x / 0.62–0.63x / 0.28–0.30x |
+| Video stream copy | 72 MiB | 1 | under 0.001 | over 1000x |
+| Opus 128k rendition | 53 MiB | 1 | 0.008 / 0.009 | 119x / 103–114x |
+| AAC 192k rendition | 56 MiB | 1 | 0.019 / 0.020 | 52x / 47–50x |
+| MP3 192k rendition | 52 MiB | 1 | 0.014–0.015 / 0.015–0.016 | 69–70x / 56–66x |
+
+SegmentEncoder's two-thread cap limits the encoder's own threads to two; the
+FFmpeg process as a whole uses more CPU. An H.264 job used 2.56 CPUs alone. Its two x264
+threads used 0.9 CPU each, one thread 0.43, and decoding, audio and muxing threads
+0.08–0.13 each. An HEVC job used 2.13 CPUs: its two x265 pool threads used 0.99
+CPU each and every other thread 0.05 or less. Under that cap, HEVC at 1080p
+stays below real time.
+
+A libx265 thread sweep ran alone on the same CPUs, outside the drill, with the
+recorded command and `-threads:v` set to the pool size. It gave 0.72x real time
+with `pools=2:frame-threads=2`, 1.02x with `pools=3`, 1.06x with
+`pools=3:frame-threads=3`, 1.29–1.31x with `pools=4` and frame threads 2–4
+(3.93–3.95 CPUs), and 1.72x with `pools=6:frame-threads=3` (5.38 CPUs). Every
+setting cost 2.96–3.13 CPU-s per output second; four pool threads is the
+smallest setting above 1.2x. The one-minute load average was 2.8–4.8 during
+the sweep.
+
+Each media job child in the control unit peaked at 92 MiB with two threads for
+video and 66 MiB with one thread for audio. No separate helper process appeared.
+The 1080p admission limits also held: a fourth video stayed pending with no
+native launch until its startup request returned 503, then ended as `refused`.
+A fourth copy request returned 503 with `Retry-After: 2`. Four queued renditions
+ran one at a time, and all four completed within the 60-second start wait. The
+QoL StreamGovernor reported `learning` with no samples and no active streams in
+every phase, so it admitted everything.
+
+Service cgroups, as mean / p95 CPUs and anonymous memory (page cache in brackets):
+
+| Service | Idle | Three 1080p encodes and one rendition |
+|---|---|---|
+| Web | 0.003 / 0.004, 323 MiB (38 MiB) | 0.023–0.025 / 0.039–0.041, 450 MiB (39 MiB) |
+| PostgreSQL | 0.081 / 0.13–0.14, 1.19 GiB (248 MiB) | 0.20 / 0.34–0.37, 2.06–2.39 GiB (251 MiB) |
+| Redis | 0.003 / 0.003, 11 MiB | 0.004 / 0.005, 11 MiB |
+| Control unit | 0.036 / 0.036–0.089, 336 MiB (16 MiB) | 0.19–0.24 / 0.47–0.56, 483–489 MiB (51 MiB) |
+| Execution unit | 0.12 / 0.19, 355 MiB (16 MiB) | 6.89–7.15 / 7.44–7.68, 1.62–1.72 GiB (274–344 MiB) |
+
+These are measurements of one host and one synthetic source, not derived limits.
+Real film content, other frame rates and other CPUs change the figures.
+
 Run browser controls against the immutable production worker image through the
 combined deployment runner:
 
