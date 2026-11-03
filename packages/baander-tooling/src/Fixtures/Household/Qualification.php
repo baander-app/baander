@@ -19,6 +19,8 @@ final class Qualification
     private array $observedRoles = [];
     /** @var list<string> */
     private array $unexpectedExits = [];
+    /** @var list<array{epochSeconds:float,output:string}> */
+    private array $webControlRetries = [];
     /** @param array<string,mixed> $configuration */
     public function __construct(private readonly Runtime $runtime, private readonly Client $docker, private readonly string $directory, private readonly array $configuration)
     {
@@ -678,6 +680,13 @@ CODE;
         return $this->publicState($state) + ['reports' => $runs, 'limits' => ['singleDeploymentOnly' => true, 'acceptedConfigurationRequiresThreeFreshRepeats' => true, 'recoveryProfileReplacementAndInsufficientMemoryRequireSeparateLifecycleEvidence' => true]];
     }
 
+    /** The web server accepted a control request but returned no answer; a later request can still succeed. */
+    public static function unansweredControlRequest(string $output): bool
+    {
+        return str_contains($output, 'the web server closed the control connection without answering')
+            || preg_match('/the web server did not answer within [0-9.]+ seconds/', $output) === 1;
+    }
+
     /**
      * Keeps the evidence that explains a failed start before teardown removes the containers.
      *
@@ -1171,6 +1180,7 @@ CODE;
             $receipt['metadataProof'] = ['complete' => false, 'errors' => [$error->getMessage()]];
         }
         $receipt['unexpectedExits'] = array_values(array_unique($this->unexpectedExits));
+        $receipt['webControlRetries'] = $this->webControlRetries;
         if (($receipt['observer']['normalExit'] ?? false) !== true) {
             $receipt['unexpectedExits'][] = 'Observer did not exit normally.';
         }
@@ -1479,7 +1489,19 @@ CODE;
         $name = $deployment['configuration']['name'];
         $file = $deployment['composeFile'];
         $home = ApplicationLayout::fromArray($deployment['layout']);
-        $web = $this->docker->compose($name, $file, ['exec', '-T', 'web', 'php', $home->path('bin/console'), 'app:server:stats', '--json', '--no-interaction'], timeout: 30);
+        $arguments = ['exec', '-T', 'web', 'php', $home->path('bin/console'), 'app:server:stats', '--json', '--no-interaction'];
+        for ($attempt = 1; ; ++$attempt) {
+            $web = $this->docker->compose($name, $file, $arguments, timeout: 30, check: false);
+            $output = substr($web->stdout . $web->stderr, 0, 2048);
+            if ($web->exitCode === 0 || $attempt === 3 || !self::unansweredControlRequest($output)) {
+                break;
+            }
+            // Keep every unanswered request as evidence; only the measurement sample is retried.
+            $this->webControlRetries[] = ['epochSeconds' => microtime(true), 'output' => $output];
+        }
+        if ($web->exitCode !== 0) {
+            throw new \RuntimeException('Web server statistics failed: ' . trim($output));
+        }
         $statistics = json_decode(trim($web->stdout), true, flags: JSON_THROW_ON_ERROR);
         if (!is_array($statistics) || ($statistics['missing_workers'] ?? null) !== [] || ($statistics['worker_errors'] ?? null) !== []) {
             throw new \RuntimeException('Web worker or pool diagnostics are incomplete.');

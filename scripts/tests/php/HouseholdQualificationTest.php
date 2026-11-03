@@ -439,6 +439,14 @@ final class HouseholdQualificationTest extends TestCase
         self::assertSame([], $states[1]['healthLog']);
     }
 
+    public function testOnlyUnansweredWebControlRequestsAreRetried(): void
+    {
+        self::assertTrue(Qualification::unansweredControlRequest("\n [ERROR] the web server closed the control connection without answering\n"));
+        self::assertTrue(Qualification::unansweredControlRequest(' [ERROR] the web server did not answer within 5 seconds'));
+        self::assertFalse(Qualification::unansweredControlRequest(' [ERROR] cannot connect to the web server control socket /run/control.sock: Permission denied'));
+        self::assertFalse(Qualification::unansweredControlRequest(''));
+    }
+
     public function testOnlyARetiredOrNeverRecordedWorkerPairCountsAsRetired(): void
     {
         self::assertTrue(Qualification::pairRetired(null));
