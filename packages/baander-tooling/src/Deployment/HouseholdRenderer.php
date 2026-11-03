@@ -72,7 +72,9 @@ final class HouseholdRenderer
                 'command' => ['postgres', '-c', 'config_file=' . self::POSTGRES_CONFIG_PATH],
                 'volumes' => [['type' => 'volume', 'source' => 'postgres_configuration', 'target' => '/etc/baander', 'read_only' => true], ['type' => 'volume', 'source' => 'postgres', 'target' => '/var/lib/postgresql']],
                 'environment' => ['POSTGRES_USER' => $environment['DB_USERNAME'], 'POSTGRES_PASSWORD' => $environment['DB_PASSWORD'], 'POSTGRES_DB' => $environment['DB_DATABASE'], 'PGDATA' => '/var/lib/postgresql/data/baander'],
-                'mem_limit' => $resources['postgresMemoryMiB'] . 'm', 'pids_limit' => 96,
+                'mem_limit' => $resources['postgresMemoryMiB'] . 'm',
+                // Room for every configured connection plus PostgreSQL's background processes.
+                'pids_limit' => $configuration->profile === 'full' ? 128 : 96,
                 'healthcheck' => ['test' => ['CMD-SHELL', 'pg_isready -h 127.0.0.1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"'], 'interval' => '5s', 'timeout' => '5s', 'retries' => 24],
             ],
             'redis' => $common + [

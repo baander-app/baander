@@ -15,6 +15,12 @@ final readonly class HouseholdConfiguration
         'redisMaxmemoryMiB' => 192, 'gatewayMemoryMiB' => 64, 'operatorMemoryMiB' => 512,
         'hostHeadroomMiB' => 512,
     ];
+    /**
+     * PostgreSQL limits sized for each profile's configuration file: shared buffers, about 128 MiB for auxiliary
+     * processes and mapped libraries, and about 24 MiB of private memory for every client connection that may load
+     * PGroonga (household: 128 MiB buffers, 33 client connections; full: 256 MiB buffers, 97 client connections).
+     */
+    public const array POSTGRES_MEMORY_MIB = ['household' => 1152, 'full' => 2816];
 
     /** @param array<string,ImageSelection> $images
      * @param array<string,string> $environment
@@ -89,7 +95,7 @@ final readonly class HouseholdConfiguration
             throw new \InvalidArgumentException('Resources must be an object.');
         }
         JsonObject::keys($resources, array_keys(self::RESOURCE_DEFAULTS), 'deployment resources');
-        $resources = array_replace(self::RESOURCE_DEFAULTS, $resources);
+        $resources = array_replace(self::RESOURCE_DEFAULTS, ['postgresMemoryMiB' => self::POSTGRES_MEMORY_MIB[$profile]], $resources);
         foreach ($resources as $value) {
             if (!is_int($value) || $value < 1 || $value > 1048576) {
                 throw new \InvalidArgumentException('Memory reservations must be positive integer MiB.');

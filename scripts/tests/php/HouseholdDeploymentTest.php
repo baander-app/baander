@@ -30,11 +30,16 @@ final class HouseholdDeploymentTest extends TestCase
         ];
     }
 
-    public function testProfilesShareExplicitServiceLimitsAndRetainDistinctWorkerSelection(): void
+    public function testProfilesSizePostgresForTheirConnectionsAndShareOtherServiceLimits(): void
     {
         $household = HouseholdConfiguration::fromArray(self::configuration());
         $full = HouseholdConfiguration::fromArray(array_replace(self::configuration(), ['profile' => 'full']));
-        self::assertSame($household->resources, $full->resources);
+        self::assertSame(1152, $household->resources['postgresMemoryMiB']);
+        self::assertSame(2816, $full->resources['postgresMemoryMiB']);
+        self::assertSame(array_diff_key($household->resources, ['postgresMemoryMiB' => true]), array_diff_key($full->resources, ['postgresMemoryMiB' => true]));
+        $explicit = self::configuration();
+        $explicit['resources'] = ['postgresMemoryMiB' => 1536];
+        self::assertSame(1536, HouseholdConfiguration::fromArray($explicit)->resources['postgresMemoryMiB']);
         self::assertSame('household', $household->profile);
         self::assertSame('full', $full->profile);
         self::assertSame('baander-household-media', $household->volumes['media']);
@@ -85,6 +90,9 @@ final class HouseholdDeploymentTest extends TestCase
         $compose = HouseholdRenderer::render($configuration, $images, $layout, $profile, 'max_connections = 36', 'owner');
         self::assertSame(['postgres', '-c', 'config_file=/etc/baander/postgresql.conf'], $compose['services']['postgres']['command']);
         self::assertSame('secret$$literal', $compose['services']['postgres']['environment']['POSTGRES_PASSWORD']);
+        self::assertSame(96, $compose['services']['postgres']['pids_limit']);
+        $full = HouseholdConfiguration::fromArray(array_replace($configuration->toArray(), ['profile' => 'full']));
+        self::assertSame(128, HouseholdRenderer::render($full, $images, $layout, $this->profile('full'), 'max_connections = 100', 'owner')['services']['postgres']['pids_limit']);
         self::assertStringContainsString('$http_upgrade', HouseholdRenderer::configurationFiles($configuration, 'max_connections = 36')['gateway_configuration']['content']);
         self::assertStringContainsString('noeviction', $compose['services']['redis']['command'][2]);
         self::assertSame('memory_limit=256M', $compose['services']['web']['command'][1]);
@@ -109,7 +117,7 @@ final class HouseholdDeploymentTest extends TestCase
         $reservations = HouseholdRenderer::reservations($configuration, $profile);
         self::assertSame(2304, $reservations['controlMemoryMiB']);
         self::assertSame(4480, $reservations['executionMemoryMiB']);
-        self::assertSame(10304, $reservations['totalMiB']);
+        self::assertSame(10944, $reservations['totalMiB']);
         self::assertArrayNotHasKey('DB_PASSWORD', $workerEnvironment);
         self::assertArrayNotHasKey('APP_DOMAIN', $workerEnvironment);
         self::assertSame('household', $compose['services']['web']['environment']['BAANDER_DEPLOYMENT_PROFILE']);
@@ -270,11 +278,11 @@ final class HouseholdDeploymentTest extends TestCase
         return $images;
     }
 
-    private function profile(): ImageProfile
+    private function profile(string $identifier = 'household'): ImageProfile
     {
         return ImageProfile::fromArray([
             'version' => 1,
-            'deployment' => ['identifier' => 'household', 'webWorkers' => 2, 'doctrinePoolSlots' => 4],
+            'deployment' => ['identifier' => $identifier, 'webWorkers' => 2, 'doctrinePoolSlots' => 4],
             'autoscaling' => ['minimumConcurrency' => 1, 'maximumConcurrency' => 1],
             'runtime' => ['phpHeapMiB' => 256],
             'budgets' => ['controlMemoryMiB' => 2304, 'executionMemoryMiB' => 4480, 'controlPidsLimit' => 129, 'executionPidsLimit' => 256, 'scheduledConsoleMiB' => 320],
