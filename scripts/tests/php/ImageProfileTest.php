@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Baander\Tooling\Tests;
 
 use Baander\Tooling\Configuration\ApplicationLayout;
-use Baander\Tooling\Deployment\ImageProfile;
+use Baander\Tooling\Deployment\{ContainerMeasurement, ImageProfile};
 use Baander\Tooling\Docker\{Client, Target};
 use Baander\Tooling\Filesystem\AtomicFile;
 use Baander\Tooling\Inventory\Collector;
@@ -70,7 +70,8 @@ final class ImageProfileTest extends TestCase
         $this->withDocker(function (Client $docker, string $directory): void {
             $image = 'sha256:' . str_repeat('a', 64);
             $layout = ApplicationLayout::fromArray(['version' => 1, 'root' => '/srv/baander']);
-            $profile = ImageProfile::resolve($docker, $image, $layout, 'household', $directory . '/resources.json', getenv(), 5, memoryMiB: 512);
+            $measurement = ContainerMeasurement::prepare(['directory' => $directory . '/measurements', 'namespace' => 'fixture', 'boot_id' => 'owner'], 'profile-application', $image);
+            $profile = ImageProfile::resolve($docker, $image, $layout, 'household', $directory . '/resources.json', getenv(), 5, memoryMiB: 512, measurement: $measurement);
             self::assertSame(2304, $profile->controlMemoryMiB);
             $calls = file($directory . '/calls.jsonl', FILE_IGNORE_NEW_LINES);
             self::assertIsArray($calls);
@@ -85,6 +86,9 @@ final class ImageProfileTest extends TestCase
             self::assertContains($image, $created);
             self::assertSame('none', $created[array_search('--network', $created, true) + 1]);
             self::assertContains('--read-only', $created);
+            self::assertContains('--cgroupns', $created);
+            self::assertStringContainsString('BAANDER_OPERATOR_MEASURE_V1', implode(' ', $created));
+            self::assertSame('incomplete', AtomicFile::readJson($measurement['path'])['status']);
             self::assertSame('512m', $created[array_search('--memory', $created, true) + 1]);
             self::assertSame('512m', $created[array_search('--memory-swap', $created, true) + 1]);
             self::assertSame('/srv/baander', $created[array_search('--workdir', $created, true) + 1]);

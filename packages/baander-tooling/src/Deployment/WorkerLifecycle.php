@@ -20,6 +20,9 @@ class WorkerLifecycle
         if ($record && ($record['phase'] ?? null) !== 'retired') {
             throw new \RuntimeException('Retire the saved worker deployment before creating a fresh boot.');
         }
+        if ($record !== null) {
+            $this->cleanupControllerTag($record);
+        }
         $docker = new \Baander\Tooling\Docker\Client($this->runner, \Baander\Tooling\Docker\Target::fromArray($configuration->target), $this->environment);
         $information = $docker->validateIdentity();
         $minimumMemory = $configuration->profile->controlMemoryMiB + $configuration->profile->executionMemoryMiB + ($configuration->operatorMemoryMiB ?? 0);
@@ -81,6 +84,8 @@ class WorkerLifecycle
             '-i',
             '--network',
             'none',
+            '--cgroupns',
+            'private',
             '--user',
             'www-data',
             '--cap-drop',
@@ -94,6 +99,7 @@ class WorkerLifecycle
                 '--memory', $configuration->operatorMemoryMiB . 'm', '--memory-swap', $configuration->operatorMemoryMiB . 'm',
             ]),
         ];
+        $measurement = $this->operatorMeasurement(['directory' => $directory, 'namespace' => $configuration->namespace, 'boot_id' => $boot], 'prepare', $configuration->operatorImage);
         $validator = <<<'CODE'
 try {
 require $argv[1] . '/vendor/autoload.php';
@@ -108,6 +114,7 @@ foreach (\App\Shared\Application\DTO\DeploymentUnit::cases() as $unit) { $manife
     exit(1);
 }
 CODE;
+        $validator = $measurement['bootstrap'] . "\n" . $validator;
         $payload = json_encode(
             ['manifest' => $manifest, 'environment' => $credentials['runtimeEnvironment']],
             JSON_THROW_ON_ERROR,
@@ -115,7 +122,7 @@ CODE;
         if (strlen($payload) > 32768) {
             throw new \RuntimeException('Worker operator input exceeds its bounded transfer size.');
         }
-        $result = \Baander\Tooling\Resources\DisposableContainer::run($docker, $directory . '/validation-resources.json', [...$validation, $configuration->operatorImage, '-r', $validator, $home], $this->environment, $cleanupSeconds, input: $payload, check: false);
+        $result = \Baander\Tooling\Resources\DisposableContainer::run($docker, $directory . '/validation-resources.json', [...$validation, $configuration->operatorImage, '-r', $validator, $home], $this->environment, $cleanupSeconds, input: $payload, check: false, onCompletion: $measurement['onCompletion']);
         if ($result->exitCode !== 0) {
             $log = $directory . '/validation.log';
             $recorded = $this->writeDiagnostic($log, $result, json_encode($credentials, JSON_THROW_ON_ERROR));
@@ -129,6 +136,8 @@ CODE;
             'target' => $configuration->target,
             'directory' => $directory,
             'operator_image' => $configuration->operatorImage,
+            'controller_tag' => 'baander-worker-controller:' . $configuration->namespace . '-' . $boot,
+            'controller_tag_cleaned' => false,
             'layout' => $configuration->layout->toArray(),
             'socket' => substr($endpoint, strlen('unix://')),
             'phase' => 'preparing',
@@ -152,18 +161,22 @@ CODE;
             $ipc,
             $configuration->labelArguments(),
         );
+        $measurement = $this->operatorMeasurement($record, 'ipc-initialize', $configuration->workerImage);
         $initializeIpc = <<<'CODE'
 $directory = '/run/baander-worker';
 $user = posix_getpwnam('www-data');
 if ($user === false || !chmod($directory, 0700)
     || !chgrp($directory, $user['gid']) || !chown($directory, $user['uid'])) { exit(1); }
 CODE;
+        $initializeIpc = $measurement['bootstrap'] . "\n" . $initializeIpc;
         \Baander\Tooling\Resources\DisposableContainer::run($docker, $directory . '/ipc-initialize-resources.json', [
             ...($configuration->operatorMemoryMiB === null ? [] : [
                 '--memory', $configuration->operatorMemoryMiB . 'm', '--memory-swap', $configuration->operatorMemoryMiB . 'm',
             ]),
             '--network',
             'none',
+            '--cgroupns',
+            'private',
             '--read-only',
             '--user',
             '0',
@@ -180,12 +193,12 @@ CODE;
             $configuration->workerImage,
             '-r',
             $initializeIpc,
-        ], $this->environment, $cleanupSeconds);
+        ], $this->environment, $cleanupSeconds, onCompletion: $measurement['onCompletion']);
         $docker->run([
             'image',
             'tag',
             $configuration->operatorImage,
-            'baander-worker-controller:' . $record['namespace'] . '-' . $boot,
+            $record['controller_tag'],
         ]);
         $this->phase($record, 'prepared');
     }
@@ -272,6 +285,8 @@ CODE;
             '-i',
             '--network',
             $record['network'],
+            '--cgroupns',
+            'private',
             '--user',
             '0',
             '--cap-drop',
@@ -321,6 +336,7 @@ CODE;
         } else {
             array_push($arguments, ...self::sourceMountArguments($manifest));
         }
+        $measurement = $this->operatorMeasurement($record, $action, $record['operator_image']);
         $decoder = <<<'CODE'
 try {
 $input = stream_get_contents(STDIN, 32769);
@@ -335,11 +351,13 @@ foreach ($documents as $name => $contents) {
 }
 } catch (Throwable) { exit(1); }
 CODE;
+        $bootstrap = "<?php\n" . $measurement['bootstrap'] . "\n";
+        $decoder .= "\nif (file_put_contents('/operator/measurement.php', base64_decode(" . var_export(base64_encode($bootstrap), true) . ")) === false) { exit(1); }\n";
         array_push(
             $arguments,
             $record['operator_image'],
             '-ec',
-            'php -r ' . escapeshellarg($decoder) . '; exec php "${APP_HOME:?}/bin/worker-deployment.php" "$1" /operator/manifest.json /operator/credentials.json',
+            'php -r ' . escapeshellarg($decoder) . '; exec php -d auto_prepend_file=/operator/measurement.php "${APP_HOME:?}/bin/worker-deployment.php" "$1" /operator/manifest.json /operator/credentials.json',
             'worker-controller',
             $action,
         );
@@ -350,7 +368,7 @@ CODE;
         if (strlen($payload) > 32768) {
             throw new \RuntimeException('Worker operator input exceeds its bounded transfer size.');
         }
-        $result = \Baander\Tooling\Resources\DisposableContainer::run($docker, $record['directory'] . '/operator-' . hash('sha256', $action) . '-resources.json', $arguments, $this->environment, $record['cleanup_budget'] ?? 120.0, input: $payload, timeout: 240, check: false);
+        $result = \Baander\Tooling\Resources\DisposableContainer::run($docker, $record['directory'] . '/operator-' . hash('sha256', $action) . '-resources.json', $arguments, $this->environment, $record['cleanup_budget'] ?? 120.0, input: $payload, timeout: 240, check: false, onCompletion: $measurement['onCompletion']);
         try {
             $response = ($result->stdout
                 |> (static fn(string $output): mixed => json_decode($output, true, flags: JSON_THROW_ON_ERROR)));
@@ -372,6 +390,15 @@ CODE;
                 previous: $error,
             );
         }
+    }
+
+    /** @param array<string,mixed> $context
+     * @return array{bootstrap:string,onCompletion:\Closure,path:string}
+     */
+    private function operatorMeasurement(array $context, string $action, string $image): array
+    {
+        $context['directory'] .= '/operator-measurements';
+        return ContainerMeasurement::prepare($context, $action, $image);
     }
 
     private function writeDiagnostic(string $path, ProcessResult $result, string $credentials): bool
@@ -528,6 +555,7 @@ CODE;
         }
         $this->cleanupIpc($record);
         $this->phase($record, 'retired');
+        $this->cleanupControllerTag($record);
     }
 
     /** @param array<string,mixed> $record */
@@ -562,6 +590,52 @@ CODE;
         }
     }
 
+    /** @param array<string,mixed> $record */
+    private function cleanupControllerTag(array &$record): void
+    {
+        if (($record['controller_tag_cleaned'] ?? false) === true) {
+            return;
+        }
+        $suffix = ($record['namespace'] ?? '') . '-' . ($record['boot_id'] ?? '');
+        $tag = 'baander-worker-controller:' . $suffix;
+        if (preg_match('/^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$/D', $suffix) !== 1
+            || (isset($record['controller_tag']) && $record['controller_tag'] !== $tag)) {
+            throw new \RuntimeException('Worker controller tag does not match the recorded boot.');
+        }
+        $docker = new \Baander\Tooling\Docker\Client($this->runner, \Baander\Tooling\Docker\Target::fromArray($record['target']), $this->environment);
+        $docker->validateIdentity();
+        $inspect = static function () use ($docker, $tag): ?array {
+            $result = $docker->run(['image', 'inspect', $tag], check: false);
+            if ($result->exitCode !== 0) {
+                if ($result->exitCode !== 1 || trim($result->stderr) !== 'Error response from daemon: No such image: ' . $tag) {
+                    throw new \RuntimeException('Worker controller tag absence was not confirmed.');
+                }
+                if (trim($docker->run(['image', 'ls', '--all', '--no-trunc', '--filter', 'reference=' . $tag, '--format', '{{.Repository}}:{{.Tag}}'])->stdout) !== '') {
+                    throw new \RuntimeException('Worker controller tag remains in the daemon image inventory.');
+                }
+                return null;
+            }
+            $images = json_decode($result->stdout, true, flags: JSON_THROW_ON_ERROR);
+            if (!is_array($images) || !array_is_list($images) || count($images) !== 1 || !is_array($images[0])) {
+                throw new \RuntimeException('Worker controller tag identity was not confirmed.');
+            }
+            return $images[0];
+        };
+        $image = $inspect();
+        if ($image !== null) {
+            if (($image['Id'] ?? null) !== $record['operator_image']) {
+                throw new \RuntimeException('Worker controller tag no longer identifies the recorded operator image.');
+            }
+            $docker->run(['image', 'rm', $tag]);
+            if ($inspect() !== null) {
+                throw new \RuntimeException('Worker controller tag remains after removal.');
+            }
+        }
+        $record['controller_tag'] = $tag;
+        $record['controller_tag_cleaned'] = true;
+        $this->store->save($record);
+    }
+
     /** @param array<string,mixed> $first
      * @param array<string,mixed> $second
      */
@@ -584,7 +658,11 @@ CODE;
     /** @param array<string,mixed> $record */
     public function retire(array &$record): void
     {
-        if (empty($record) || ($record['phase'] ?? null) === 'retired') {
+        if (empty($record)) {
+            return;
+        }
+        if (($record['phase'] ?? null) === 'retired') {
+            $this->cleanupControllerTag($record);
             return;
         }
         if (in_array($record['phase'] ?? null, ['preparing', 'prepared'], true) && isset($record['preparation'])) {
@@ -622,6 +700,7 @@ CODE;
             }
             $this->cleanupIpc($record);
             $this->phase($record, 'retired');
+            $this->cleanupControllerTag($record);
             return;
         }
         $result = $this->invoke($record, 'recover');
@@ -630,5 +709,6 @@ CODE;
         }
         $this->cleanupIpc($record);
         $this->phase($record, 'retired');
+        $this->cleanupControllerTag($record);
     }
 }

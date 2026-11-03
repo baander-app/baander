@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Shared\Infrastructure\Event;
 
+use App\Shared\Application\DTO\DeploymentProfile;
 use App\Shared\Domain\Event\Outbox\RelayOutboxCommand;
 use App\Shared\Domain\Event\Outbox\RelayOutboxHandler;
 use Doctrine\Persistence\ManagerRegistry;
@@ -25,6 +26,7 @@ final class RelayOutboxWorkerCommand extends Command implements SignalableComman
         private readonly RelayNotificationDeliveriesHandler $deliveries,
         private readonly ManagerRegistry $doctrine,
         private readonly LoggerInterface $logger,
+        private readonly DeploymentProfile $deploymentProfile,
     ) {
         parent::__construct();
     }
@@ -62,7 +64,7 @@ final class RelayOutboxWorkerCommand extends Command implements SignalableComman
             if (!$this->stopping && microtime(true) < $deadline) {
                 usleep(1_000_000);
             }
-        } while (!$this->stopping && microtime(true) < $deadline && memory_get_usage(true) < 256 * 1024 * 1024);
+        } while (!$this->stopping && microtime(true) < $deadline && memory_get_usage(true) < $this->deploymentProfile->phpHeapMiB() * 1024 * 1024);
 
         return Command::SUCCESS;
     }

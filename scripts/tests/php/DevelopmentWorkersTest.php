@@ -36,7 +36,17 @@ final class DevelopmentWorkersTest extends DevDataTestCase
     /** @param \Closure(non-empty-list<string>,?string,?array<string,string>):(string|\Baander\Tooling\Process\ProcessResult) $callback */
     private function runner(\Closure $callback): WorkerCommandExecutor
     {
-        return new WorkerCommandExecutor($callback);
+        return new WorkerCommandExecutor(static function (array $arguments, ?string $input, ?array $environment) use ($callback): string|\Baander\Tooling\Process\ProcessResult {
+            $command = array_search('image', $arguments, true);
+            if ($command !== false && ($arguments[$command + 1] ?? null) === 'inspect'
+                && str_starts_with($arguments[array_key_last($arguments)], 'baander-worker-controller:')) {
+                return new \Baander\Tooling\Process\ProcessResult(1, null, false, false, '', 'Error response from daemon: No such image: ' . $arguments[array_key_last($arguments)], 0);
+            }
+            if ($command !== false && ($arguments[$command + 1] ?? null) === 'ls') {
+                return '';
+            }
+            return $callback($arguments, $input, $environment);
+        });
     }
 
     /** @param \Closure(array<string,mixed>,string):array<string,mixed> $callback */
@@ -157,7 +167,7 @@ final class DevelopmentWorkersTest extends DevDataTestCase
         $workers->retire($instance);
         self::assertSame(['status'], $actions);
         self::assertSame('retired', $instance['workers']['phase']);
-        self::assertCount(2, $runner->calls);
+        self::assertCount(5, $runner->calls);
         self::assertContains('label=app.baander.worker.boot-id=saved-boot', $runner->calls[1]['arguments']);
     }
 

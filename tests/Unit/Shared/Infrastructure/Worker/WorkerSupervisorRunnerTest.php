@@ -45,7 +45,7 @@ final class WorkerSupervisorRunnerTest extends TestCase
         $reservedBytes = $configuration->managementReservationBytes;
         foreach ($definitions as $definition) {
             $reservedBytes += $definition->memoryReservationBytes;
-            self::assertContains('memory_limit=256M', $definition->argv);
+            self::assertContains('memory_limit=' . $profile->phpHeapMiB() . 'M', $definition->argv);
         }
         self::assertSame($expectedMiB * 1024 * 1024, $reservedBytes);
         self::assertSame($expectedMiB, $autoscaling->minimumMemoryMiB($unit, $profile));
@@ -56,8 +56,8 @@ final class WorkerSupervisorRunnerTest extends TestCase
     {
         yield 'full control' => ['full', 'control', 4, 2944];
         yield 'full execution' => ['full', 'execution', 4, 5120];
-        yield 'household control' => ['household', 'control', 1, 2304];
-        yield 'household execution' => ['household', 'execution', 1, 4160];
+        yield 'household control' => ['household', 'control', 1, 1856];
+        yield 'household execution' => ['household', 'execution', 1, 1344];
     }
 
     public function testHouseholdMediaReservationMatchesItsTwoChildSlots(): void
@@ -65,10 +65,10 @@ final class WorkerSupervisorRunnerTest extends TestCase
         $project = dirname(__DIR__, 5);
         $runner = new \App\Shared\Infrastructure\Worker\WorkerSupervisorRunner($project, 'postgresql://worker:private@db.baander.app/worker', self::catalog());
         $configuration = new \App\Shared\Application\DTO\WorkerRuntimeConfiguration('worker.baander.app', str_repeat('a', 32), 'control',
-            2304 * 1024 * 1024, 129, 0, '/tmp/baander-worker-locks', '/run/baander-worker', deploymentProfile: new \App\Shared\Application\DTO\DeploymentProfile('household'));
+            1856 * 1024 * 1024, 129, 0, '/tmp/baander-worker-locks', '/run/baander-worker', deploymentProfile: new \App\Shared\Application\DTO\DeploymentProfile('household'));
         $definitions = (new \ReflectionMethod($runner, 'definitions'))->invoke($runner, $configuration);
         $media = array_values(array_filter($definitions, static fn ($definition): bool => $definition->id === 'media'))[0];
-        self::assertSame(960 * 1024 * 1024, $media->memoryReservationBytes);
+        self::assertSame(768 * 1024 * 1024, $media->memoryReservationBytes);
         self::assertSame(2, $media->descendantProcessReservation);
     }
 

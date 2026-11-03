@@ -59,6 +59,71 @@ final class DevelopmentDisposableContainerTest extends TestCase
         self::assertSame([], glob($this->root . '/resource-*.json'));
     }
 
+    public function testCompletionObserverRunsBeforeOwnedContainerRemoval(): void
+    {
+        $observed = false;
+        DisposableContainer::run(
+            $this->docker,
+            $this->receipt,
+            ['image'],
+            getenv(),
+            5,
+            onCompletion: function (Client $docker, ?string $container, ?\Baander\Tooling\Process\ProcessResult $result) use (&$observed): void {
+                self::assertSame($this->docker, $docker);
+                self::assertMatchesRegularExpression('/^[a-f0-9]{64}$/D', $container);
+                self::assertSame(0, $result?->exitCode);
+                self::assertCount(1, glob($this->root . '/resource-*.json'));
+                $observed = true;
+            },
+        );
+        self::assertTrue($observed);
+        self::assertSame([], glob($this->root . '/resource-*.json'));
+    }
+
+    public function testCompletionObserverSeesUnknownCreationWithoutReplacingPrimaryFailure(): void
+    {
+        $this->configuration(['failCreate' => true]);
+        $observed = false;
+        try {
+            DisposableContainer::run(
+                $this->docker,
+                $this->receipt,
+                ['image'],
+                getenv(),
+                5,
+                onCompletion: static function (Client $docker, ?string $container, ?\Baander\Tooling\Process\ProcessResult $result) use (&$observed): void {
+                    self::assertNull($container);
+                    self::assertNull($result);
+                    $observed = true;
+                    throw new \RuntimeException('observer failed');
+                },
+            );
+            self::fail('Uncertain creation accepted.');
+        } catch (CommandFailure $error) {
+            self::assertSame(23, $error->getCode());
+        }
+        self::assertTrue($observed);
+        self::assertSame([], glob($this->root . '/resource-*.json'));
+    }
+
+    public function testCompletionObserverCannotReplaceNonzeroExitEvenWithCheckingDisabled(): void
+    {
+        $this->configuration(['exitCode' => 23]);
+        $result = DisposableContainer::run(
+            $this->docker,
+            $this->receipt,
+            ['image'],
+            getenv(),
+            5,
+            check: false,
+            onCompletion: static function (): void {
+                throw new \RuntimeException('observer failed');
+            },
+        );
+        self::assertSame(23, $result->exitCode);
+        self::assertSame([], glob($this->root . '/resource-*.json'));
+    }
+
     public function testAttachedDiagnosticsCanUseSeparateEvidenceFiles(): void
     {
         $this->configuration(['stdout' => '{"complete":true}', 'stderr' => 'independent diagnostic']);

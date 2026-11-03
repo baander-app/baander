@@ -9,6 +9,20 @@ final class SourceExceptions
     /** @var list<array{path:string,rule:string,anchor:string,count:int,reason:string}> */
     private const array CALLSITES = [
         [
+            'path' => 'packages/baander-tooling/src/Fixtures/Household/NativeAudit.php',
+            'rule' => 'process-engine',
+            'anchor' => 'pcntl_exec(REAL_EXECUTABLE, array_slice($argv, 1));',
+            'count' => 1,
+            'reason' => 'The fixture-only native shim replaces itself with the audited binary, preserving the worker-owned PID, signals and cgroup without starting another supervisor.',
+        ],
+        [
+            'path' => 'scripts/tests/php/HouseholdDeploymentTest.php',
+            'rule' => 'manual-loader',
+            'anchor' => 'file_put_contents($console, \'<?php $_SERVER["APP_RUNTIME"] = "Symfony\\\\Component\\\\Runtime\\\\GenericRuntime"; require_once \'',
+            'count' => 1,
+            'reason' => 'The generated console stand-in mirrors the application console bootstrap through the root Composer runtime loader.',
+        ],
+        [
             'path' => 'packages/baander-tooling/src/Website/WebsiteBuilder.php',
             'rule' => 'manual-loader',
             'anchor' => '            include $template;',

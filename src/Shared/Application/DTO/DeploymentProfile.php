@@ -69,7 +69,7 @@ final readonly class DeploymentProfile
 
     public function phpHeapMiB(): int
     {
-        return 256;
+        return $this->identifier === 'household' ? 192 : 256;
     }
 
     public function phpProcessMemoryMiB(): int
@@ -84,8 +84,7 @@ final readonly class DeploymentProfile
 
     public function nativeEnvelopeMiB(): int
     {
-        // Retain the conservative native envelope until workload measurement qualifies a reduction.
-        return 3136;
+        return $this->identifier === 'household' ? 512 : 3136;
     }
 
     public function managementMemoryMiB(string $unit): int

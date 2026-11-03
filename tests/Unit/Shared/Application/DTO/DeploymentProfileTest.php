@@ -22,6 +22,21 @@ final class DeploymentProfileTest extends TestCase
         self::assertSame([2, 4, 1, 2, 0, 0], [$household->webWorkers, $household->doctrinePoolSlots, $household->ordinaryConsumerLimit, $household->sharedCopySlots, $household->videoEncoderSlots, $household->audioEncoderSlots]);
     }
 
+    public function testProfilesReserveTheirOwnHeapAndNativeEnvelope(): void
+    {
+        $full = new DeploymentProfile();
+        self::assertSame(256, $full->phpHeapMiB());
+        self::assertSame(320, $full->phpProcessMemoryMiB());
+        self::assertSame(3136, $full->nativeEnvelopeMiB());
+        self::assertSame(128, $full->nativeManagerHeapMiB());
+
+        $household = new DeploymentProfile('household');
+        self::assertSame(192, $household->phpHeapMiB());
+        self::assertSame(256, $household->phpProcessMemoryMiB());
+        self::assertSame(512, $household->nativeEnvelopeMiB());
+        self::assertSame(128, $household->nativeManagerHeapMiB());
+    }
+
     #[DataProvider('invalidSettings')]
     public function testMissingUnknownAndIncorrectlyTypedSettingsFail(string $kind): void
     {

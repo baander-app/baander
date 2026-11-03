@@ -188,14 +188,23 @@ deptrac:
           type: directory
           value: /packages/baander-tooling/src/Fixtures/Startup/
     -
+      name: FixturesHousehold
+      collectors:
+        -
+          type: classLike
+          value: ^Baander\\Tooling\\Fixtures\\Household\\
+        -
+          type: directory
+          value: /packages/baander-tooling/src/Fixtures/Household/
+    -
       name: Fixtures
       collectors:
         -
           type: classLike
-          value: '^Baander\\Tooling\\Fixtures\\(?!Http\\|Web\\|Worker\\|Messaging\\|Startup\\)'
+          value: '^Baander\\Tooling\\Fixtures\\(?!Http\\|Web\\|Worker\\|Messaging\\|Startup\\|Household\\)'
         -
           type: directory
-          value: '/packages/baander-tooling/src/Fixtures/(?!Http/|Web/|Worker/|Messaging/|Startup/)'
+          value: '/packages/baander-tooling/src/Fixtures/(?!Http/|Web/|Worker/|Messaging/|Startup/|Household/)'
     -
       name: Registry
       collectors:
@@ -362,6 +371,17 @@ deptrac:
       - Configuration
       - Filesystem
       - Fixtures
+    FixturesHousehold:
+      - Build
+      - Configuration
+      - Deployment
+      - Docker
+      - Filesystem
+      - Fixtures
+      - FixturesWorker
+      - Inventory
+      - Process
+      - Resources
     Fixtures:
       - Configuration
       - Docker
@@ -399,6 +419,7 @@ deptrac:
       - Filesystem
       - Fixtures
       - FixturesHttp
+      - FixturesHousehold
       - FixturesMessaging
       - FixturesStartup
       - FixturesWeb
@@ -424,6 +445,7 @@ deptrac:
       - Filesystem
       - Fixtures
       - FixturesHttp
+      - FixturesHousehold
       - FixturesMessaging
       - FixturesWeb
       - FixturesWorker

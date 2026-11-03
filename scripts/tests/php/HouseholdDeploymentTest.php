@@ -145,7 +145,7 @@ final class HouseholdDeploymentTest extends TestCase
             new \ReflectionMethod(Household::class, 'migrate')->invoke(
                 $deployment,
                 $configuration,
-                ['images' => ['application' => ['id' => 'sha256:' . str_repeat('a', 64)]]],
+                ['owner' => 'fixture-owner', 'images' => ['application' => ['id' => 'sha256:' . str_repeat('a', 64)]]],
                 ApplicationLayout::fromArray(['version' => 1, 'root' => '/srv/baander']),
                 $this->profile(),
             );
@@ -154,8 +154,32 @@ final class HouseholdDeploymentTest extends TestCase
             self::assertSame('redis://default:private-redis-secret@redis:6379/messages', $created->environment['MESSENGER_TRANSPORT_DSN']);
             self::assertSame('prod', $created->environment['APP_ENV']);
             self::assertContains('doctrine:migrations:migrate', $created->argv);
+            self::assertContains('--cgroupns', $created->argv);
+            self::assertStringContainsString('BAANDER_OPERATOR_MEASURE_V1', implode(' ', $created->argv));
+            $measurements = glob($directory . '/helper-measurements/fixture-owner/migration-*.json');
+            self::assertCount(1, $measurements);
+            self::assertSame('incomplete', AtomicFile::readJson($measurements[0])['status']);
+            mkdir($directory . '/runtime/bin', 0700, true);
+            $console = $directory . '/runtime/bin/console';
+            file_put_contents($console, '<?php $_SERVER["APP_RUNTIME"] = "Symfony\\Component\\Runtime\\GenericRuntime"; require_once '
+                . var_export(dirname(__DIR__, 3) . '/vendor/autoload_runtime.php', true)
+                . '; return static function (array $context, array $argv): Closure { return static function () use ($context, $argv): int { echo json_encode(["argv" => $argv, "argc" => $context["argc"], "script" => $context["SCRIPT_FILENAME"]], JSON_THROW_ON_ERROR); return 23; }; };');
+            $program = $created->argv[array_search('-r', $created->argv, true) + 1];
             self::assertNotContains('private-database-secret', $created->argv);
             self::assertFileDoesNotExist($directory . '/migration.json');
+            new \ReflectionMethod(Household::class, 'initializeSecrets')->invoke(
+                $deployment,
+                $configuration,
+                ['owner' => 'fixture-owner', 'images' => ['application' => ['id' => 'sha256:' . str_repeat('a', 64)]]],
+                ApplicationLayout::fromArray(['version' => 1, 'root' => '/srv/baander']),
+                $this->profile(),
+            );
+            $secretsProgram = $created->argv[array_search('-r', $created->argv, true) + 1];
+            $migration = $actual->run(new ProcessSpec([PHP_BINARY, '-r', $program, $console, 'doctrine:migrations:migrate', '--no-interaction']), new CompletionPolicy([0, 23]));
+            $secrets = $actual->run(new ProcessSpec([PHP_BINARY, '-r', $secretsProgram, $directory . '/runtime']), new CompletionPolicy([0, 23]));
+            self::assertSame([23, 23], [$migration->exitCode, $secrets->exitCode]);
+            self::assertSame(['argv' => [$console, 'doctrine:migrations:migrate', '--no-interaction'], 'argc' => 3, 'script' => $console], json_decode($migration->stdout, true, flags: JSON_THROW_ON_ERROR));
+            self::assertSame(['argv' => [$console, 'app:oauth:generate-keys', '--no-interaction'], 'argc' => 3, 'script' => $console], json_decode($secrets->stdout, true, flags: JSON_THROW_ON_ERROR));
         } finally {
             $actual->close();
             Collector::remove($directory);

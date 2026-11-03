@@ -235,10 +235,24 @@ final class Runtime
                 $failure = $error;
             } finally {
                 $cleanupDeadline = self::now() + 2;
+                $canceller = null;
                 while (self::coroutineCount() !== 0) {
-                    foreach (iterator_to_array(\Swoole\Coroutine::list(), false) as $id) {
-                        if (\Swoole\Coroutine::exists($id)) {
-                            \Swoole\Coroutine::cancel($id);
+                    if ($canceller === null || !\Swoole\Coroutine::exists($canceller)) {
+                        $coroutines = iterator_to_array(\Swoole\Coroutine::list(), false);
+                        $canceller = \Swoole\Coroutine::create(static function () use ($coroutines, &$failure): void {
+                            foreach ($coroutines as $id) {
+                                try {
+                                    if (\Swoole\Coroutine::exists($id)) {
+                                        \Swoole\Coroutine::cancel($id);
+                                    }
+                                } catch (Throwable $error) {
+                                    $failure ??= $error;
+                                }
+                            }
+                        });
+                        if ($canceller === false) {
+                            $failure ??= new RuntimeException('Cannot start coroutine cancellation.');
+                            $canceller = null;
                         }
                     }
                     if (self::coroutineCount() === 0) {

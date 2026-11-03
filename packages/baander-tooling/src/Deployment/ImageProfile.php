@@ -67,8 +67,10 @@ PHP;
         $this->doctrinePoolSlots = (int) $deployment['doctrinePoolSlots'];
     }
 
-    /** @param array<string,string> $environment */
-    public static function resolve(Client $docker, string $imageId, ApplicationLayout $layout, string $profileId, string $receiptPath, array $environment, float $cleanupSeconds, ?int $memoryMiB = null): self
+    /** @param array<string,string> $environment
+     * @param array{bootstrap:string,onCompletion:\Closure,path:string}|null $measurement
+     */
+    public static function resolve(Client $docker, string $imageId, ApplicationLayout $layout, string $profileId, string $receiptPath, array $environment, float $cleanupSeconds, ?int $memoryMiB = null, ?array $measurement = null): self
     {
         if (preg_match('/^sha256:[a-f0-9]{64}$/D', $imageId) !== 1 || !in_array($profileId, ['full', 'household'], true)) {
             throw new \InvalidArgumentException('Profile resolution requires an immutable image and a supported deployment profile.');
@@ -78,11 +80,11 @@ PHP;
         }
         $docker->validateIdentity();
         $result = DisposableContainer::run($docker, $receiptPath, [
-            '--network', 'none', '--read-only', '--cap-drop', 'ALL',
+            '--network', 'none', '--read-only', '--cap-drop', 'ALL', '--cgroupns', 'private',
             '--security-opt', 'no-new-privileges', '--workdir', $layout->root,
             ...($memoryMiB === null ? [] : ['--memory', $memoryMiB . 'm', '--memory-swap', $memoryMiB . 'm']),
-            '--entrypoint', 'php', $imageId, '-r', self::PROGRAM, $profileId, $layout->root,
-        ], $environment, $cleanupSeconds, timeout: 30);
+            '--entrypoint', 'php', $imageId, '-r', ($measurement['bootstrap'] ?? '') . "\n" . self::PROGRAM, $profileId, $layout->root,
+        ], $environment, $cleanupSeconds, timeout: 30, onCompletion: $measurement['onCompletion'] ?? null);
         if (strlen($result->stdout) > 8192) {
             throw new \RuntimeException('The image deployment profile exceeds its bounded response size.');
         }

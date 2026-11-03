@@ -78,6 +78,7 @@ final readonly class Household
         }
         $this->docker->validateIdentity();
         $this->docker->requireCompose();
+        $owner = $previous['owner'] ?? bin2hex(random_bytes(16));
         $images = [];
         $layout = null;
         $profile = null;
@@ -95,7 +96,8 @@ final readonly class Household
                 throw new \RuntimeException('Application, worker and operator images must declare the same source revision.');
             }
             $revision = $candidateRevision;
-            $candidateProfile = ImageProfile::resolve($this->docker, $resolved->id, $candidateLayout, $configuration->profile, $this->store->directory . '/profile-' . $role . '.json', $this->environment, $this->cleanupSeconds, $configuration->resources['operatorMemoryMiB']);
+            $measurement = $this->measurement($configuration->name, $owner, 'profile-' . $role, $resolved->id);
+            $candidateProfile = ImageProfile::resolve($this->docker, $resolved->id, $candidateLayout, $configuration->profile, $this->store->directory . '/profile-' . $role . '.json', $this->environment, $this->cleanupSeconds, $configuration->resources['operatorMemoryMiB'], $measurement);
             if (($layout !== null && $layout->toArray() !== $candidateLayout->toArray())
                 || ($profile !== null && $profile->fingerprint() !== $candidateProfile->fingerprint())) {
                 throw new \RuntimeException('Application, worker and operator images disagree on layout or deployment profile.');
@@ -112,7 +114,6 @@ final readonly class Household
             throw new \RuntimeException('Cannot read the selected PostgreSQL configuration.');
         }
         new PostgresSettings($postgres);
-        $owner = $previous['owner'] ?? bin2hex(random_bytes(16));
         $compose = HouseholdRenderer::render($configuration, $images, $layout, $profile, $postgres, $owner);
         $content = json_encode($compose, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR) . "\n";
         $state = ['version' => 1, 'phase' => 'prepared', 'owner' => $owner, 'configuration' => $configuration->toArray(),
@@ -193,7 +194,7 @@ final readonly class Household
         $this->store->save($state);
         $workers = $this->store->workers();
         $record = $workers->load();
-        if ($record !== null && ($record['phase'] ?? null) !== 'retired') {
+        if ($record !== null) {
             new WorkerLifecycle($workers, $this->executor, $this->environment)->retire($record);
         }
         $this->docker->compose($configuration->name, $this->composeFile(), ['down', '--timeout', '40'], timeout: 180);
@@ -274,28 +275,33 @@ final readonly class Household
                 $this->docker->run(['volume', 'create', '--label', 'org.baander.household.owner=' . $state['owner'], '--label', 'org.baander.household=' . $configuration->name, $name]);
             }
             if (isset($files[$role])) {
+                $measurement = $this->measurement($configuration->name, $state['owner'], 'seed-' . str_replace('_', '-', $role), $state['images']['application']['id']);
                 DisposableContainer::run($this->docker, $this->store->directory . '/seed-' . $role . '.json', [
+                    '--cgroupns', 'private',
                     '--memory', $configuration->resources['operatorMemoryMiB'] . 'm', '--memory-swap', $configuration->resources['operatorMemoryMiB'] . 'm',
                     '--network', 'none', '--user', '0:0', '--entrypoint', 'php', '--mount', 'type=volume,src=' . $name . ',dst=/seed',
-                    $state['images']['application']['id'], '-r', '$path = "/seed/" . $argv[1]; if (file_put_contents($path, stream_get_contents(STDIN)) === false || !chmod($path, 0644)) { exit(1); }', $files[$role]['name'],
-                ], $this->environment, $this->cleanupSeconds, input: $files[$role]['content']);
+                    $state['images']['application']['id'], '-r', $measurement['bootstrap'] . "\n" . '$path = "/seed/" . $argv[1]; if (file_put_contents($path, stream_get_contents(STDIN)) === false || !chmod($path, 0644)) { exit(1); }', $files[$role]['name'],
+                ], $this->environment, $this->cleanupSeconds, input: $files[$role]['content'], onCompletion: $measurement['onCompletion']);
                 continue;
             }
             if (in_array($role, ['postgres', 'redis'], true)) {
                 continue;
             }
+            $measurement = $this->measurement($configuration->name, $state['owner'], 'seed-' . str_replace('_', '-', $role), $state['images']['application']['id']);
             DisposableContainer::run($this->docker, $this->store->directory . '/seed-' . $role . '.json', [
+                '--cgroupns', 'private',
                 '--memory', $configuration->resources['operatorMemoryMiB'] . 'm', '--memory-swap', $configuration->resources['operatorMemoryMiB'] . 'm',
-                '--network', 'none', '--user', '0:0', '--entrypoint', '/bin/sh', '--mount', 'type=volume,src=' . $name . ',dst=/seed',
-                $state['images']['application']['id'], '-ec', 'chown www-data:www-data /seed',
-            ], $this->environment, $this->cleanupSeconds);
+                '--network', 'none', '--user', '0:0', '--entrypoint', 'php', '--mount', 'type=volume,src=' . $name . ',dst=/seed',
+                $state['images']['application']['id'], '-r', $measurement['bootstrap'] . "\n" . 'if (!chown("/seed", "www-data") || !chgrp("/seed", "www-data")) { exit(1); }',
+            ], $this->environment, $this->cleanupSeconds, onCompletion: $measurement['onCompletion']);
         }
     }
 
     /** @param array<string,mixed> $state */
     private function migrate(HouseholdConfiguration $configuration, array $state, ApplicationLayout $layout, ImageProfile $profile): void
     {
-        $arguments = ['--network', $configuration->name . '-private', '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges',
+        $measurement = $this->measurement($configuration->name, $state['owner'], 'migration', $state['images']['application']['id']);
+        $arguments = ['--cgroupns', 'private', '--network', $configuration->name . '-private', '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges',
             '--memory', $configuration->resources['operatorMemoryMiB'] . 'm', '--memory-swap', $configuration->resources['operatorMemoryMiB'] . 'm', '--entrypoint', 'php'];
         $arguments[] = '--mount';
         $arguments[] = 'type=volume,src=' . $configuration->volumes['secrets'] . ',dst=' . $layout->path('config/secrets');
@@ -303,31 +309,58 @@ final readonly class Household
         foreach ($environment as $key => $_) {
             array_push($arguments, '--env', $key);
         }
-        array_push($arguments, $state['images']['application']['id'], '-d', 'memory_limit=' . $profile->phpHeapMiB . 'M', $layout->path('bin/console'), 'doctrine:migrations:migrate', '--no-interaction');
-        DisposableContainer::run($this->docker, $this->store->directory . '/migration.json', $arguments, array_replace($this->environment, $environment), $this->cleanupSeconds, timeout: 600, containerEnvironment: $environment);
+        $program = $measurement['bootstrap'] . "\n" . 'array_shift($argv); $_SERVER["argv"] = $argv; $_SERVER["argc"] = count($argv); $_SERVER["SCRIPT_FILENAME"] = $_SERVER["SCRIPT_NAME"] = $_SERVER["PHP_SELF"] = $argv[0]; require $argv[0];';
+        array_push($arguments, $state['images']['application']['id'], '-d', 'memory_limit=' . $profile->phpHeapMiB . 'M', '-r', $program, $layout->path('bin/console'), 'doctrine:migrations:migrate', '--no-interaction');
+        DisposableContainer::run($this->docker, $this->store->directory . '/migration.json', $arguments, array_replace($this->environment, $environment), $this->cleanupSeconds, timeout: 600, containerEnvironment: $environment, onCompletion: $measurement['onCompletion']);
     }
 
     /** @param array<string,mixed> $state */
     private function initializeSecrets(HouseholdConfiguration $configuration, array $state, ApplicationLayout $layout, ImageProfile $profile): void
     {
-        $arguments = ['--network', $configuration->name . '-private', '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges',
+        $measurement = $this->measurement($configuration->name, $state['owner'], 'secrets-bootstrap', $state['images']['application']['id']);
+        $arguments = ['--cgroupns', 'private', '--network', $configuration->name . '-private', '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges',
             '--memory', $configuration->resources['operatorMemoryMiB'] . 'm', '--memory-swap', $configuration->resources['operatorMemoryMiB'] . 'm',
-            '--mount', 'type=volume,src=' . $configuration->volumes['secrets'] . ',dst=' . $layout->path('config/secrets'), '--entrypoint', '/bin/sh'];
+            '--mount', 'type=volume,src=' . $configuration->volumes['secrets'] . ',dst=' . $layout->path('config/secrets'), '--entrypoint', 'php'];
         $environment = HouseholdRenderer::environment($configuration, $profile);
         foreach ($environment as $key => $_) {
             array_push($arguments, '--env', $key);
         }
-        $program = <<<'SH'
-private="$1/config/secrets/oauth/private.key"
-public="$1/config/secrets/oauth/public.key"
-if [ -e "$private" ] || [ -L "$private" ] || [ -e "$public" ] || [ -L "$public" ]; then
-    test -f "$private" && test ! -L "$private" && test -f "$public" && test ! -L "$public" || { echo 'Incomplete OAuth key pair; preserve the secret volume for recovery.' >&2; exit 1; }
-else
-    exec php -d "memory_limit=$2" "$1/bin/console" app:oauth:generate-keys --no-interaction
-fi
-SH;
-        array_push($arguments, $state['images']['application']['id'], '-ec', $program, 'household-secrets', $layout->root, $profile->phpHeapMiB . 'M');
-        DisposableContainer::run($this->docker, $this->store->directory . '/secrets-bootstrap.json', $arguments, $this->environment, $this->cleanupSeconds, timeout: 120, containerEnvironment: $environment);
+        $program = $measurement['bootstrap'] . "\n" . <<<'PHP'
+$private = $argv[1] . '/config/secrets/oauth/private.key';
+$public = $argv[1] . '/config/secrets/oauth/public.key';
+if (file_exists($private) || is_link($private) || file_exists($public) || is_link($public)) {
+    if (!is_file($private) || is_link($private) || !is_file($public) || is_link($public)) {
+        fwrite(STDERR, "Incomplete OAuth key pair; preserve the secret volume for recovery.\n"); exit(1);
+    }
+} else {
+    $argv = [$argv[1] . '/bin/console', 'app:oauth:generate-keys', '--no-interaction'];
+    $_SERVER['argv'] = $argv; $_SERVER['argc'] = count($argv);
+    $_SERVER['SCRIPT_FILENAME'] = $_SERVER['SCRIPT_NAME'] = $_SERVER['PHP_SELF'] = $argv[0];
+    require $argv[0];
+}
+PHP;
+        array_push($arguments, $state['images']['application']['id'], '-d', 'memory_limit=' . $profile->phpHeapMiB . 'M', '-r', $program, $layout->root);
+        DisposableContainer::run($this->docker, $this->store->directory . '/secrets-bootstrap.json', $arguments, $this->environment, $this->cleanupSeconds, timeout: 120, containerEnvironment: $environment, onCompletion: $measurement['onCompletion']);
+    }
+
+    /** @return array{bootstrap:string,onCompletion:\Closure,path:string} */
+    private function measurement(string $namespace, string $owner, string $action, string $image): array
+    {
+        return ContainerMeasurement::prepare(['directory' => $this->store->directory . '/helper-measurements/' . $owner,
+            'namespace' => $namespace, 'boot_id' => $owner], $action, $image);
+    }
+
+    /** @return array<string,string> */
+    public static function helperRoles(bool $coldStartup): array
+    {
+        if (!$coldStartup) {
+            return ['rename-source' => 'application'];
+        }
+        return ['profile-application' => 'application', 'profile-worker' => 'worker', 'profile-operator' => 'operator',
+            'verify-wrappers-application' => 'application', 'verify-wrappers-worker' => 'worker', 'verify-wrappers-operator' => 'operator',
+            'seed-media' => 'application', 'seed-storage' => 'application', 'seed-conversions' => 'application',
+            'seed-transcode-state' => 'application', 'seed-secrets' => 'application', 'seed-postgres-configuration' => 'application',
+            'seed-gateway-configuration' => 'application', 'migration' => 'application', 'secrets-bootstrap' => 'application'];
     }
 
     /** @param array<string,mixed> $state */
