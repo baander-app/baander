@@ -350,6 +350,21 @@ requires deployment replacement.
 Per-service consumption has been measured on a large host; the smallest host
 size, a 4 GB fit and Raspberry Pi support remain unqualified.
 
+### Media job slot
+
+One unit of concurrent media work a deployment admits: a video slot runs one
+video conversion or stream copy, an audio slot one audio rendition or stream copy.
+Original-file and completed-artifact playback use no slot. The startup profile
+fixes the slot counts, and worker memory, CPU and native-execution limits are
+derived from them.
+
+### Connection pooler
+
+The transaction-mode PgBouncer between the application and PostgreSQL. Clients
+hold a server connection only for the length of a transaction, so PostgreSQL's
+backend count, and its memory, follow the pooler's server pools rather than the
+number of web, worker and media clients.
+
 ### Ordinary admission target
 
 The desired number of concurrent ordinary asynchronous receives and owned deliveries within a worker deployment pair's admitted resident-consumer maximum. Lowering the target leaves existing occupied permits held until their work completes.
