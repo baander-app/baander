@@ -17,6 +17,8 @@ use App\Shared\Application\DTO\DeploymentProfile;
 use App\Shared\Application\Port\SystemSettingsPortInterface;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
+use App\Transcode\Application\Port\CompletedVideoArtifactPort;
+use App\Transcode\Application\Port\CopyPresentationPortInterface;
 use App\Transcode\Application\Settings\TranscodeSettingDefinitions;
 use App\Transcode\Application\Service\MediaExecutionPolicy;
 use App\Transcode\Infrastructure\Auth\HmacStreamAuthAdapter;
@@ -50,7 +52,8 @@ trait ScannedAudioCopyProof
         $policy = new MediaExecutionPolicy($profile);
         $runtime = new AudioRenditionRuntime($connection);
         $cache = new AudioRenditionCache($policy, new SegmentFileResolver($root . '/copies'), $runtime, new NullLogger(), pollIntervalSeconds: .005, startTimeoutSeconds: 5);
-        $delivery = new DeliveryDecisionService($access, $scopes, $videos, $streams, new DeliveryCompatibility($policy), $policy, $cache, $settings);
+        $delivery = new DeliveryDecisionService($access, $scopes, $videos, $streams, new DeliveryCompatibility($policy), $policy, $cache, $settings,
+            $this->createStub(CompletedVideoArtifactPort::class), $this->createStub(CopyPresentationPortInterface::class));
         $decision = $delivery->track($owner, $track, new DeliveryDestination(['mp4'], audioCodecs: ['aac']));
         self::assertSame(DeliveryKind::Copy, $decision->kind);
         self::assertNotNull($decision->url);

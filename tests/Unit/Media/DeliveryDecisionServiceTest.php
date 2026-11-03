@@ -205,6 +205,7 @@ final class DeliveryDecisionServiceTest extends TestCase
             $videos ?? $this->createStub(VideoPortInterface::class), $streams,
             new DeliveryCompatibility(new MediaExecutionPolicy(DeploymentProfile::resolve($profile))),
             new MediaExecutionPolicy(DeploymentProfile::resolve($profile)),
-            $audio ?? $this->createStub(AudioRenditionPortInterface::class), $settings, $artifacts, $copies);
+            $audio ?? $this->createStub(AudioRenditionPortInterface::class), $settings,
+            $artifacts ?? $this->createStub(CompletedVideoArtifactPort::class), $copies ?? $this->createStub(CopyPresentationPortInterface::class));
     }
 }

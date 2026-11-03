@@ -38,8 +38,8 @@ final readonly class DeliveryDecisionService implements DeliveryDecisionPortInte
         private MediaExecutionPolicyInterface $policy,
         private AudioRenditionPortInterface $audio,
         private SystemSettingsPortInterface $settings,
-        private ?CompletedVideoArtifactPort $videoArtifacts = null,
-        private ?CopyPresentationPortInterface $copyPresentations = null,
+        private CompletedVideoArtifactPort $videoArtifacts,
+        private CopyPresentationPortInterface $copyPresentations,
     ) {
     }
 
@@ -83,7 +83,7 @@ final readonly class DeliveryDecisionService implements DeliveryDecisionPortInte
         if ($decision->kind === DeliveryKind::Original || $destination->subtitleBurnIn || $destination->sourcePlaybackFailed) {
             return $decision;
         }
-        $artifacts = $media->videoStreamIndex === null ? [] : ($this->videoArtifacts?->findComplete($owner, $source->videoId, $source->hash, $media->videoStreamIndex, $media->audioStreamIndex) ?? []);
+        $artifacts = $media->videoStreamIndex === null ? [] : $this->videoArtifacts->findComplete($owner, $source->videoId, $source->hash, $media->videoStreamIndex, $media->audioStreamIndex);
         foreach ($artifacts as $artifact) {
             if ($artifact->sourceVideoStreamIndex !== $media->videoStreamIndex || $artifact->sourceAudioStreamIndex !== $media->audioStreamIndex
                 || !in_array($artifact->transport, $destination->transports, true)) {
@@ -107,9 +107,6 @@ final readonly class DeliveryDecisionService implements DeliveryDecisionPortInte
             }
         }
         if ($decision->kind === DeliveryKind::Copy && $decision->selection !== null && $requestId !== null) {
-            if ($this->copyPresentations === null) {
-                throw new \LogicException('Copy presentation admission is not configured.');
-            }
             $presentation = $this->copyPresentations->start(new CopyPresentationInput($owner, $source->videoId, $source->hash, $decision->selection->videoStreamIndex,
                 $decision->selection->audioStreamIndex, $decision->selection->container, $source->width, $source->height, $requestId));
             $manifest = $decision->selection->transport === 'dash' ? 'manifest.mpd' : 'master.m3u8';

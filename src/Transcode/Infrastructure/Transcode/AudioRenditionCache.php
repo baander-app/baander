@@ -53,21 +53,34 @@ final class AudioRenditionCache implements AudioRenditionPortInterface
         } catch (AudioRenditionFailedException) {
             return null;
         }
-        clearstatcache(true, (string) $current->finalPath);
-        return is_file((string) $current->finalPath) && is_readable((string) $current->finalPath) && filesize((string) $current->finalPath) > 0
-            ? AudioRendition::complete($input->format, (string) $current->finalPath, $input->mode === 'copy' ? 'audio/mp4' : null)
+        return $this->publishedRendition($input, (string) $current->finalPath);
+    }
+
+    private function publishedRendition(AudioRenditionInput $input, string $finalPath): ?AudioRendition
+    {
+        clearstatcache(true, $finalPath);
+        return is_file($finalPath) && is_readable($finalPath) && filesize($finalPath) > 0
+            ? AudioRendition::complete($input->format, $finalPath, $input->mode === 'copy' ? 'audio/mp4' : null)
             : null;
+    }
+
+    /** @return array{int, int}|null modification time and size, or null when the source cannot be read */
+    private static function sourceStat(string $sourcePath): ?array
+    {
+        clearstatcache(true, $sourcePath);
+        $modified = @filemtime($sourcePath);
+        $size = @filesize($sourcePath);
+        return $modified === false || $size === false ? null : [$modified, $size];
     }
 
     private function input(string $trackKey, string $sourcePath, AudioRenditionFormat $format, int $bitrate): ?AudioRenditionInput
     {
         $bitrate = $format->supportedBitrate($bitrate);
-        clearstatcache(true, $sourcePath);
-        $modified = @filemtime($sourcePath);
-        $size = @filesize($sourcePath);
-        if ($modified === false || $size === false) {
+        $stat = self::sourceStat($sourcePath);
+        if ($stat === null) {
             return null;
         }
+        [$modified, $size] = $stat;
         $signature = $format->sourceSignature($sourcePath, $bitrate, $modified, $size);
         return new AudioRenditionInput($trackKey, $signature, $sourcePath, $format, $bitrate, $this->paths->resolveAudioRenditionPath($trackKey, $signature));
     }
@@ -90,12 +103,11 @@ final class AudioRenditionCache implements AudioRenditionPortInterface
 
     private function copyInput(string $trackKey, string $sourcePath, string $sourceHash, int $streamIndex): ?AudioRenditionInput
     {
-        clearstatcache(true, $sourcePath);
-        $modified = @filemtime($sourcePath);
-        $size = @filesize($sourcePath);
-        if ($modified === false || $size === false) {
+        $stat = self::sourceStat($sourcePath);
+        if ($stat === null) {
             return null;
         }
+        [$modified, $size] = $stat;
         $signature = AudioRenditionInput::copySourceSignature($sourcePath, $sourceHash, $streamIndex, $modified, $size);
         return new AudioRenditionInput($trackKey, $signature, $sourcePath, AudioRenditionFormat::Aac, null,
             $this->paths->resolveAudioRenditionPath($trackKey, $signature), 'copy', $streamIndex, 'mp4', $sourceHash);
@@ -132,9 +144,9 @@ final class AudioRenditionCache implements AudioRenditionPortInterface
             }
             if ($current->state === 'complete') {
                 $this->validatePaths($current);
-                clearstatcache(true, (string) $current->finalPath);
-                if (is_file((string) $current->finalPath) && is_readable((string) $current->finalPath) && filesize((string) $current->finalPath) > 0) {
-                    return AudioRendition::complete($input->format, (string) $current->finalPath, $input->mode === 'copy' ? 'audio/mp4' : null);
+                $rendition = $this->publishedRendition($input, (string) $current->finalPath);
+                if ($rendition !== null) {
+                    return $rendition;
                 }
                 $this->runtime->resetCompleted($current->key, $current->generation);
             }

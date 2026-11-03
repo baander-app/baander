@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 namespace Baander\Tooling\Deployment;
 
-use Baander\Tooling\Process\{CommandExecutor, ProcessResult};
-use Baander\Tooling\Filesystem\AtomicFile;
-use Baander\Tooling\Filesystem\PrivateDirectory;
-use Baander\Tooling\Resources\{ResourceKind, ResourceLedger};
+use Baander\Tooling\Configuration\ApplicationLayout;
+use Baander\Tooling\Docker\{Client, Target};
+use Baander\Tooling\Filesystem\{AtomicFile, Paths, PrivateDirectory};
+use Baander\Tooling\Process\{CommandExecutor, CommandFailure, ProcessResult};
+use Baander\Tooling\Resources\{DisposableContainer, ResourceKind, ResourceLedger};
 
 class WorkerLifecycle
 {
@@ -23,7 +24,7 @@ class WorkerLifecycle
         if ($record !== null) {
             $this->cleanupControllerTag($record);
         }
-        $docker = new \Baander\Tooling\Docker\Client($this->runner, \Baander\Tooling\Docker\Target::fromArray($configuration->target), $this->environment);
+        $docker = new Client($this->runner, Target::fromArray($configuration->target), $this->environment);
         $information = $docker->validateIdentity();
         $minimumMemory = $configuration->profile->controlMemoryMiB + $configuration->profile->executionMemoryMiB + ($configuration->operatorMemoryMiB ?? 0);
         if (($information['NCPU'] ?? 0) < 2 || ($information['MemTotal'] ?? 0) < $minimumMemory * 1024 ** 2) {
@@ -95,9 +96,7 @@ class WorkerLifecycle
             '--entrypoint',
             'php',
             ...self::sourceMountArguments($manifest),
-            ...($configuration->operatorMemoryMiB === null ? [] : [
-                '--memory', $configuration->operatorMemoryMiB . 'm', '--memory-swap', $configuration->operatorMemoryMiB . 'm',
-            ]),
+            ...DisposableContainer::memoryArguments($configuration->operatorMemoryMiB),
         ];
         $measurement = $this->operatorMeasurement(['directory' => $directory, 'namespace' => $configuration->namespace, 'boot_id' => $boot], 'prepare', $configuration->operatorImage);
         $validator = <<<'CODE'
@@ -116,13 +115,13 @@ foreach (\App\Shared\Application\DTO\DeploymentUnit::cases() as $unit) { $manife
 CODE;
         $validator = $measurement['bootstrap'] . "\n" . $validator;
         $payload = json_encode(
-            ['manifest' => $manifest, 'environment' => $credentials['runtimeEnvironment']],
+            ['manifest' => $manifest, 'environment' => $environment],
             JSON_THROW_ON_ERROR,
         );
         if (strlen($payload) > 32768) {
             throw new \RuntimeException('Worker operator input exceeds its bounded transfer size.');
         }
-        $result = \Baander\Tooling\Resources\DisposableContainer::run($docker, $directory . '/validation-resources.json', [...$validation, $configuration->operatorImage, '-r', $validator, $home], $this->environment, $cleanupSeconds, input: $payload, check: false, onCompletion: $measurement['onCompletion']);
+        $result = DisposableContainer::run($docker, $directory . '/validation-resources.json', [...$validation, $configuration->operatorImage, '-r', $validator, $home], $this->environment, $cleanupSeconds, input: $payload, check: false, onCompletion: $measurement['onCompletion']);
         if ($result->exitCode !== 0) {
             $log = $directory . '/validation.log';
             $recorded = $this->writeDiagnostic($log, $result, json_encode($credentials, JSON_THROW_ON_ERROR));
@@ -169,10 +168,8 @@ if ($user === false || !chmod($directory, 0700)
     || !chgrp($directory, $user['gid']) || !chown($directory, $user['uid'])) { exit(1); }
 CODE;
         $initializeIpc = $measurement['bootstrap'] . "\n" . $initializeIpc;
-        \Baander\Tooling\Resources\DisposableContainer::run($docker, $directory . '/ipc-initialize-resources.json', [
-            ...($configuration->operatorMemoryMiB === null ? [] : [
-                '--memory', $configuration->operatorMemoryMiB . 'm', '--memory-swap', $configuration->operatorMemoryMiB . 'm',
-            ]),
+        DisposableContainer::run($docker, $directory . '/ipc-initialize-resources.json', [
+            ...DisposableContainer::memoryArguments($configuration->operatorMemoryMiB),
             '--network',
             'none',
             '--cgroupns',
@@ -244,7 +241,7 @@ CODE;
             if (($mount['role'] ?? null) !== 'source' || ($mount['readOnly'] ?? null) !== true
                 || !is_string($source) || strlen($source) > 4096
                 || preg_match('~\A/(?:[A-Za-z0-9_. -]+/)*[A-Za-z0-9_. -]+\z~D', $source) !== 1
-                || \Baander\Tooling\Filesystem\Paths::absolutePath($source) !== $source) {
+                || Paths::absolutePath($source) !== $source) {
                 throw new \RuntimeException('Retirement source declarations require canonical saved read-only directory paths.');
             }
             foreach ([$applicationRoot, '/operator', '/var/run/docker.sock', '/run/docker.sock', '/etc', '/proc', '/sys', '/dev', '/bin', '/sbin', '/usr', '/lib', '/lib64'] as $reserved) {
@@ -277,8 +274,7 @@ CODE;
                 throw new \RuntimeException('Worker admission requires durable creation intent for this boot.');
             }
         }
-        $docker = new \Baander\Tooling\Docker\Client($this->runner, \Baander\Tooling\Docker\Target::fromArray($record['target']), $this->environment);
-        $docker->validateIdentity();
+        $docker = $this->docker($record['target']);
         // The trusted controller needs read access to retained Composer trees owned by www-data.
         // Preserve the daemon socket's existing SELinux label.
         $arguments = [
@@ -306,9 +302,7 @@ CODE;
             '--tmpfs',
             '/tmp:rw,noexec,nosuid,nodev,size=16m,mode=0700',
         ];
-        if (($record['operator_memory_mib'] ?? null) !== null) {
-            array_push($arguments, '--memory', $record['operator_memory_mib'] . 'm', '--memory-swap', $record['operator_memory_mib'] . 'm');
-        }
+        array_push($arguments, ...DisposableContainer::memoryArguments($record['operator_memory_mib'] ?? null));
         $documents = [];
         foreach (['manifest', 'credentials'] as $name) {
             $contents = @file_get_contents($record['directory'] . '/' . $name . '.json', length: 8193);
@@ -332,7 +326,7 @@ CODE;
                 }
                 $layout = ['version' => 1, 'root' => $root];
             }
-            array_push($arguments, '--read-only', ...self::retirementMountArguments($manifest, \Baander\Tooling\Configuration\ApplicationLayout::fromArray($layout)->root));
+            array_push($arguments, '--read-only', ...self::retirementMountArguments($manifest, ApplicationLayout::fromArray($layout)->root));
         } else {
             array_push($arguments, ...self::sourceMountArguments($manifest));
         }
@@ -368,7 +362,7 @@ CODE;
         if (strlen($payload) > 32768) {
             throw new \RuntimeException('Worker operator input exceeds its bounded transfer size.');
         }
-        $result = \Baander\Tooling\Resources\DisposableContainer::run($docker, $record['directory'] . '/operator-' . hash('sha256', $action) . '-resources.json', $arguments, $this->environment, $record['cleanup_budget'] ?? 120.0, input: $payload, timeout: 240, check: false, onCompletion: $measurement['onCompletion']);
+        $result = DisposableContainer::run($docker, $record['directory'] . '/operator-' . hash('sha256', $action) . '-resources.json', $arguments, $this->environment, $record['cleanup_budget'] ?? 120.0, input: $payload, timeout: 240, check: false, onCompletion: $measurement['onCompletion']);
         try {
             $response = ($result->stdout
                 |> (static fn(string $output): mixed => json_decode($output, true, flags: JSON_THROW_ON_ERROR)));
@@ -399,6 +393,27 @@ CODE;
     {
         $context['directory'] .= '/operator-measurements';
         return ContainerMeasurement::prepare($context, $action, $image);
+    }
+
+    /** @param array<string,mixed> $target */
+    private function docker(array $target): Client
+    {
+        $docker = new Client($this->runner, Target::fromArray($target), $this->environment);
+        $docker->validateIdentity();
+        return $docker;
+    }
+
+    /** @param array<string,mixed> $manifest */
+    private function bootContainers(Client $docker, array $manifest): string
+    {
+        return trim($docker->run([
+            'ps',
+            '-aq',
+            '--filter',
+            'label=app.baander.worker.namespace=' . $manifest['namespace'],
+            '--filter',
+            'label=app.baander.worker.boot-id=' . $manifest['bootId'],
+        ])->stdout);
     }
 
     private function writeDiagnostic(string $path, ProcessResult $result, string $credentials): bool
@@ -434,8 +449,7 @@ CODE;
         if ($manifest['namespace'] !== $record['namespace'] || $manifest['bootId'] !== $record['boot_id']) {
             throw new \RuntimeException('Worker observation identity differs from the saved manifest.');
         }
-        $docker = new \Baander\Tooling\Docker\Client($this->runner, \Baander\Tooling\Docker\Target::fromArray($record['target']), $this->environment);
-        $docker->validateIdentity();
+        $docker = $this->docker($record['target']);
         $output = ($docker->run([
             'ps',
             '--all',
@@ -510,7 +524,7 @@ CODE;
                 $this->phase($record, 'ready');
                 return;
             } catch (\RuntimeException $error) {
-                if ($error instanceof \Baander\Tooling\Process\CommandFailure && ($error->getCode() === 124 || $error->result?->cancelled || $error->result?->signal !== null)) {
+                if ($error instanceof CommandFailure && ($error->getCode() === 124 || $error->result?->cancelled || $error->result?->signal !== null)) {
                     throw $error;
                 }
                 if (hrtime(true) / 1e9 >= $deadline) {
@@ -547,10 +561,8 @@ CODE;
             || ($manifest['ipcVolume'] ?? null) !== $record['ipc_volume']) {
             throw new \RuntimeException('Worker preparation identity differs from its verified inputs.');
         }
-        $docker = new \Baander\Tooling\Docker\Client($this->runner, \Baander\Tooling\Docker\Target::fromArray($record['target']), $this->environment);
-        $docker->validateIdentity();
-        if (trim($docker->run(['ps', '-aq', '--filter', 'label=app.baander.worker.namespace=' . $manifest['namespace'],
-            '--filter', 'label=app.baander.worker.boot-id=' . $manifest['bootId']])->stdout) !== '') {
+        $docker = $this->docker($record['target']);
+        if ($this->bootContainers($docker, $manifest) !== '') {
             throw new \RuntimeException('Unadmitted worker containers require investigation before preparation cleanup.');
         }
         $this->cleanupIpc($record);
@@ -602,8 +614,7 @@ CODE;
             || (isset($record['controller_tag']) && $record['controller_tag'] !== $tag)) {
             throw new \RuntimeException('Worker controller tag does not match the recorded boot.');
         }
-        $docker = new \Baander\Tooling\Docker\Client($this->runner, \Baander\Tooling\Docker\Target::fromArray($record['target']), $this->environment);
-        $docker->validateIdentity();
+        $docker = $this->docker($record['target']);
         $inspect = static function () use ($docker, $tag): ?array {
             $result = $docker->run(['image', 'inspect', $tag], check: false);
             if ($result->exitCode !== 0) {
@@ -641,8 +652,8 @@ CODE;
      */
     private static function sameTarget(array $first, array $second): bool
     {
-        $a = \Baander\Tooling\Docker\Target::fromArray($first);
-        $b = \Baander\Tooling\Docker\Target::fromArray($second);
+        $a = Target::fromArray($first);
+        $b = Target::fromArray($second);
         $files = static function (array $items): array {
             $result = [];
             foreach ($items as $path => $digest) {
@@ -685,17 +696,8 @@ CODE;
             ) {
                 throw new \RuntimeException('Worker cleanup identity differs from the saved manifest.');
             }
-            $docker = new \Baander\Tooling\Docker\Client($this->runner, \Baander\Tooling\Docker\Target::fromArray($record['target']), $this->environment);
-            $docker->validateIdentity();
-            if (($docker->run([
-                'ps',
-                '-aq',
-                '--filter',
-                'label=app.baander.worker.namespace=' . $manifest['namespace'],
-                '--filter',
-                'label=app.baander.worker.boot-id=' . $manifest['bootId'],
-            ])->stdout
-                |> trim(...)) !== '') {
+            $docker = $this->docker($record['target']);
+            if ($this->bootContainers($docker, $manifest) !== '') {
                 throw new \RuntimeException('Unregistered worker containers require explicit investigation before cleanup.');
             }
             $this->cleanupIpc($record);

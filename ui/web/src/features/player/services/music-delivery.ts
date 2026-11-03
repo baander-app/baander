@@ -11,6 +11,11 @@ const TRANSCODE_FORMATS: ReadonlyArray<readonly [TranscodeFormat, string]> = [
   ['mp3', 'audio/mpeg'],
 ]
 
+/** Narrows a `format` query value to a transcoded format; anything else is undefined. */
+export function parseTranscodeFormat(value: string | null): TranscodeFormat | undefined {
+  return TRANSCODE_FORMATS.find(([format]) => format === value)?.[0]
+}
+
 /** MP3 remains the last resort when the browser reports no transcoded format as playable. */
 export function chooseTranscodeFormat(element: HTMLAudioElement): TranscodeFormat {
   return TRANSCODE_FORMATS.find(([, type]) => element.canPlayType(type) !== '')?.[0] ?? 'mp3'

@@ -29,7 +29,8 @@ class Workers
     public function prepare(array &$instance, array $release): void
     {
         $this->guard(function () use (&$instance, $release): void {
-            $home = ApplicationLayout::fromArray($release['layout'])->root;
+            $layout = ApplicationLayout::fromArray($release['layout']);
+            $home = $layout->root;
             $mounts = [];
             foreach ($instance['media'] ?? [] as $item) {
                 $mounts[] = [
@@ -103,7 +104,7 @@ class Workers
             $profile = ImageProfile::resolve(
                 $this->connections->client($instance['docker']),
                 $release['images']['worker_image']['resolvedId'],
-                ApplicationLayout::fromArray($release['layout']),
+                $layout,
                 'full',
                 $this->store->directory($instance['id']) . '/worker-profile-resources.json',
                 $this->connections->environment(),
@@ -115,7 +116,7 @@ class Workers
                 network: Runtime::networkName($instance),
                 workerImage: $release['images']['worker_image']['resolvedId'],
                 operatorImage: $release['images']['operator_image']['resolvedId'],
-                layout: ApplicationLayout::fromArray($release['layout']),
+                layout: $layout,
                 runtimeEnvironment: $environment,
                 sourceMountPolicy: 'local-development',
                 mediaMounts: $mounts,

@@ -1,4 +1,4 @@
-import { assignMusicSource, resolveMusicSource, type TranscodeFormat } from '../services/music-delivery'
+import { assignMusicSource, parseTranscodeFormat, resolveMusicSource, type TranscodeFormat } from '../services/music-delivery'
 import { MediaCompatibilityError } from '../services/media-delivery'
 import { toast } from 'sonner'
 import { audioService } from '../services/audio-service'
@@ -126,7 +126,7 @@ export function requestSelectedTrackPlayback(
   const prepare = async () => {
     if (sourceMode !== 'preserve') {
       const previousFormat = sourceMode === 'reload' ? resolveSource(el.src).searchParams.get('format') : null
-      const preferredFormat = format ?? (previousFormat === 'opus' || previousFormat === 'aac' || previousFormat === 'mp3' ? previousFormat : undefined)
+      const preferredFormat = format ?? parseTranscodeFormat(previousFormat)
       const url = await resolveMusicSource(el, track.publicId, controller.signal, preferredFormat, format ? el.src : undefined)
       if (generation !== playbackSelectionGeneration || get().audioElement !== el || get().currentTrack !== track) return false
       assignMusicSource(el, track.publicId, url)

@@ -1,4 +1,4 @@
-import { assignMusicSource, resolveMusicSource } from '../services/music-delivery'
+import { assignMusicSource, parseTranscodeFormat, resolveMusicSource } from '../services/music-delivery'
 import { MediaCompatibilityError } from '../services/media-delivery'
 import { toast } from 'sonner'
 import { activityService } from '../services/activity-service'
@@ -177,8 +177,7 @@ function reload(ep: Episode, patch?: Partial<PlayerState>): void {
   const controller = new AbortController()
   const release = ep.release
   ep.release = () => { controller.abort(); release?.() }
-  const previousFormat = new URL(ep.src, document.baseURI).searchParams.get('format')
-  const format = previousFormat === 'opus' || previousFormat === 'aac' || previousFormat === 'mp3' ? previousFormat : undefined
+  const format = parseTranscodeFormat(new URL(ep.src, document.baseURI).searchParams.get('format'))
   resolveMusicSource(element, ep.track.publicId, controller.signal, format).then(url => {
     if (!current(ep, step)) return
     assignMusicSource(element, ep.track.publicId, url)

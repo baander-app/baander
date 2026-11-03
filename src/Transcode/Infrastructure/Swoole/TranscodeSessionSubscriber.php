@@ -38,13 +38,14 @@ final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
 {
     private const int LEASE_SECONDS = 15;
 
+    /** @param Closure(): SegmentEncoder $segmentEncoder resolved lazily so copy sessions never build an encoder */
     public function __construct(
         private readonly MediaExecutionPolicy $executionPolicy,
         private readonly TranscodeJobPortInterface $jobPort,
         private readonly TranscodeSessionPortInterface $sessionPort,
         private readonly TranscodeStoragePortInterface $storage,
         private readonly TranscodeProcessPool $processPool,
-        private readonly SegmentEncoder|Closure $segmentEncoder,
+        private readonly Closure $segmentEncoder,
         private readonly VideoRepositoryInterface $videoRepository,
         private readonly LoggerInterface $logger,
         private readonly TranscodeExecutionOwnershipPort $ownership,
@@ -419,7 +420,7 @@ final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
 
     private function encoder(): SegmentEncoder
     {
-        return $this->segmentEncoder instanceof Closure ? ($this->segmentEncoder)() : $this->segmentEncoder;
+        return ($this->segmentEncoder)();
     }
 
     /** @param callable(): bool $stopRequested */

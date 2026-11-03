@@ -82,7 +82,7 @@ PHP;
         $result = DisposableContainer::run($docker, $receiptPath, [
             '--network', 'none', '--read-only', '--cap-drop', 'ALL', '--cgroupns', 'private',
             '--security-opt', 'no-new-privileges', '--workdir', $layout->root,
-            ...($memoryMiB === null ? [] : ['--memory', $memoryMiB . 'm', '--memory-swap', $memoryMiB . 'm']),
+            ...DisposableContainer::memoryArguments($memoryMiB),
             '--entrypoint', 'php', $imageId, '-r', ($measurement['bootstrap'] ?? '') . "\n" . self::PROGRAM, $profileId, $layout->root,
         ], $environment, $cleanupSeconds, timeout: 30, onCompletion: $measurement['onCompletion'] ?? null);
         if (strlen($result->stdout) > 8192) {
