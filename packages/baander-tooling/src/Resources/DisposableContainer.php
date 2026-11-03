@@ -11,14 +11,6 @@ use Baander\Tooling\Process\{CompletionPolicy, ProcessResult};
 /** A single attached container whose ownership survives lost creation or removal replies. */
 final class DisposableContainer
 {
-    /** Create arguments that cap memory and memory plus swap at the same limit; none when the limit is unset.
-     * @return list<string>
-     */
-    public static function memoryArguments(?int $memoryMiB): array
-    {
-        return $memoryMiB === null ? [] : ['--memory', $memoryMiB . 'm', '--memory-swap', $memoryMiB . 'm'];
-    }
-
     /** @param list<string> $arguments Docker create arguments, without lifecycle/name/ownership flags.
      * @param array<string,string> $environment
      * @param array<string,string> $containerEnvironment

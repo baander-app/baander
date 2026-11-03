@@ -26,10 +26,10 @@ final class HouseholdRunReportTest extends TestCase
     {
         return RunContract::fromArray([
             'version' => 1, 'scenario' => 'original-overlap', 'profile' => 'household', 'imageId' => 'sha256:' . str_repeat('a', 64),
-            'operatorMemoryMiB' => 1, 'deploymentOwner' => 'boot', 'workerNamespace' => 'fixture', 'operatorImageId' => 'sha256:' . str_repeat('c', 64), 'workerImageId' => 'sha256:' . str_repeat('d', 64),
+            'deploymentOwner' => 'boot', 'workerNamespace' => 'fixture', 'operatorImageId' => 'sha256:' . str_repeat('c', 64), 'workerImageId' => 'sha256:' . str_repeat('d', 64),
             'startedMonotonic' => 100.0, 'sampleIntervalSeconds' => 1.0, 'maxSampleGapSeconds' => 3.0,
             'durationSeconds' => 1800.0, 'maintenanceDeadlineSeconds' => 2400.0,
-            'requiredRoles' => ['web', 'observer'], 'configuredLimits' => ['web' => ['memoryMaxBytes' => 1024], 'observer' => ['memoryMaxBytes' => 1024]],
+            'requiredRoles' => ['web', 'observer'], 'configuredLimits' => ['web' => ['memoryMaxBytes' => 'max'], 'observer' => ['memoryMaxBytes' => 1024]],
             'dataset' => ['songs' => 2000, 'movies' => 50, 'episodes' => 250, 'fixtureDigest' => str_repeat('b', 64), 'preparedBeforeRun' => true],
             'schedule' => [['atSeconds' => 0, 'action' => 'two-original-streams-and-maintenance']],
         ]);
@@ -69,15 +69,15 @@ final class HouseholdRunReportTest extends TestCase
      */
     private function operatorInput(array $actions, float $from, float $until): array
     {
-        $context = ['namespace' => 'fixture', 'bootId' => 'boot', 'operatorImage' => 'sha256:' . str_repeat('c', 64), 'workerImage' => 'sha256:' . str_repeat('d', 64), 'memoryMaxBytes' => 1048576];
+        $context = ['namespace' => 'fixture', 'bootId' => 'boot', 'operatorImage' => 'sha256:' . str_repeat('c', 64), 'workerImage' => 'sha256:' . str_repeat('d', 64)];
         $receipts = [];
         foreach ($actions as $index => $action) {
             $receipts[] = ['version' => 1, 'action' => $action, 'namespace' => 'fixture', 'bootId' => 'boot', 'nonce' => str_pad(dechex($index + 1), 32, '0', STR_PAD_LEFT),
                 'containerId' => str_repeat('a', 64), 'imageId' => $action === 'ipc-initialize' ? $context['workerImage'] : $context['operatorImage'],
                 'status' => 'complete', 'startedMonotonic' => $from + 0.1, 'finishedMonotonic' => $from + 0.2, 'errors' => [],
-                'limits' => ['memoryMaxBytes' => 1024, 'memorySwapMaxBytes' => 1024, 'cgroupNamespace' => 'private'], 'cgroup' => ['memoryMaxBytes' => 1024, 'memoryPeakBytes' => 300, 'swapPeakBytes' => 0, 'swapMaxBytes' => 0, 'pidsCurrent' => 1, 'pidsPeak' => null,
+                'cgroup' => ['memoryMaxBytes' => 'max', 'memoryPeakBytes' => 300, 'swapPeakBytes' => 0, 'swapMaxBytes' => 'max', 'pidsCurrent' => 1, 'pidsPeak' => null,
                     'identity' => '1:' . $index, 'path' => '/', 'memoryEvents' => ['oom' => 0, 'oom_kill' => 0]],
-                'docker' => ['exitCode' => 0, 'running' => false, 'oomKilled' => false]];
+                'docker' => ['exitCode' => 0, 'running' => false, 'oomKilled' => false, 'cgroupNamespace' => 'private']];
         }
         return ['boundaryVerified' => true, 'receipts' => $receipts, 'context' => $context, 'requiredActions' => array_count_values($actions), 'from' => $from, 'until' => $until];
     }
@@ -113,27 +113,25 @@ final class HouseholdRunReportTest extends TestCase
         self::assertContains('Scenario helper measurement is incomplete or failed.', RunReport::evaluate($contract, $this->path, $evidence)['failures']);
     }
 
-    private function samples(?int $missingSequence = null, bool $oom = false, bool $swapGrowth = false, bool $groupSwapGrowth = false): void
+    private function samples(?int $missingSequence = null, bool $oom = false, bool $swapGrowth = false, bool $groupSwapGrowth = false, int|string $webMemoryMaxBytes = 'max'): void
     {
         $stream = fopen($this->path, 'wb');
         for ($index = 0; $index <= 1800; ++$index) {
             if ($index === $missingSequence) {
                 continue;
             }
-            $group = ['path' => '/web', 'roles' => ['web'], 'memoryCurrentBytes' => 100, 'memoryPeakBytes' => 120, 'memoryMaxBytes' => 1024,
-                'memoryEvents' => ['oom' => $oom && $index === 1800 ? 1 : 0, 'oom_kill' => 0], 'swapCurrentBytes' => 0, 'swapPeakBytes' => 0, 'swapMaxBytes' => 0, 'pidsCurrent' => 1, 'pidsMax' => 30];
+            $group = ['path' => '/web', 'roles' => ['web'], 'memoryCurrentBytes' => 100, 'memoryPeakBytes' => 120, 'memoryMaxBytes' => $webMemoryMaxBytes,
+                'memoryEvents' => ['oom' => $oom && $index === 1800 ? 1 : 0, 'oom_kill' => 0], 'swapCurrentBytes' => 0, 'swapPeakBytes' => 0, 'swapMaxBytes' => 'max', 'pidsCurrent' => 1, 'pidsMax' => 'max'];
+            $observer = array_replace($group, ['path' => '/observer', 'roles' => ['observer'], 'memoryMaxBytes' => 1024, 'swapMaxBytes' => 0, 'pidsMax' => 32]);
             $sample = ['version' => 1, 'captureWindowSeconds' => 0.01, 'sequence' => $index, 'monotonic' => 100 + $index,
                 'host' => ['memTotalBytes' => 4096, 'memAvailableBytes' => 3000, 'swapTotalBytes' => 1000, 'swapFreeBytes' => $swapGrowth ? 1000 - $index / 2 : 1000,
                     'vmstat' => ['pswpin' => 0, 'pswpout' => 0], 'memoryPressure' => ['some' => ['avg10' => 0.0, 'avg60' => 0.0, 'avg300' => 0.0, 'total' => 0], 'full' => ['avg10' => 0.0, 'avg60' => 0.0, 'avg300' => 0.0, 'total' => 0]]],
-                'cgroups' => ['1:2' => $group, '1:3' => array_replace($group, ['path' => '/observer', 'roles' => ['observer']])],
+                'cgroups' => ['1:2' => $group, '1:3' => $observer],
                 'processes' => ['41:99' => ['pid' => 41, 'threads' => 1, 'native' => false]], 'nativeProcessCount' => 0, 'nativeThreadCount' => 0, 'missing' => []];
             if ($groupSwapGrowth) {
                 $sample['host']['swapTotalBytes'] = 2000;
                 $sample['host']['swapFreeBytes'] = 1000;
-                $sample['cgroups'] = ['1:2' => array_replace($group, [
-                    'roles' => ['web', 'observer'], 'swapCurrentBytes' => intdiv($index, 2),
-                    'swapPeakBytes' => intdiv($index, 2), 'swapMaxBytes' => 1000,
-                ])];
+                $sample['cgroups']['1:2'] = array_replace($group, ['swapCurrentBytes' => intdiv($index, 2), 'swapPeakBytes' => intdiv($index, 2)]);
             }
             fwrite($stream, json_encode($sample, JSON_THROW_ON_ERROR) . "\n");
         }
@@ -165,17 +163,29 @@ final class HouseholdRunReportTest extends TestCase
         self::assertContains('Operator workload measurement is incomplete or failed.', $result['failures']);
     }
 
-    public function testOperatorPeakIsSeparateFromSimultaneousCgroupTotalsAndAllowsTighterCaps(): void
+    public function testOperatorPeakIsSeparateFromSimultaneousCgroupTotals(): void
     {
         $input = $this->operatorInput(['readiness', 'readiness'], 100, 1900);
-        $input['receipts'][0]['limits']['memoryMaxBytes'] = 512;
-        $input['receipts'][0]['limits']['memorySwapMaxBytes'] = 512;
-        $input['receipts'][0]['cgroup']['memoryMaxBytes'] = 512;
+        $input['receipts'][1]['cgroup']['memoryPeakBytes'] = 500;
         $result = RunReport::operatorAudit($input['receipts'], $input['context'], ['readiness' => 2], 100, 1900);
         self::assertTrue($result['complete']);
-        self::assertSame(300, $result['peakMemoryBytes']);
-        self::assertSame([512, 1024], $result['effectiveMemoryCapsBytes']);
+        self::assertSame(500, $result['peakMemoryBytes']);
+        self::assertSame([300, 500], array_column($result['invocationPeaks'], 'peakMemoryBytes'));
         self::assertFalse($result['pidsPeakAvailableForAll']);
+    }
+
+    public function testOperatorInvocationsMustRunWithoutAMemoryLimit(): void
+    {
+        foreach ([['memoryMaxBytes' => 1024], ['swapMaxBytes' => 0]] as $limit) {
+            $input = $this->operatorInput(['readiness', 'readiness'], 100, 1900);
+            $input['receipts'][0]['cgroup'] = array_replace($input['receipts'][0]['cgroup'], $limit);
+            $result = RunReport::operatorAudit($input['receipts'], $input['context'], ['readiness' => 2], 100, 1900);
+            self::assertFalse($result['complete']);
+            self::assertContains('Operator unlimited cgroup, peak or cgroup event evidence is missing or inconsistent.', $result['errors']);
+        }
+        $input = $this->operatorInput(['readiness', 'readiness'], 100, 1900);
+        $input['receipts'][0]['docker']['cgroupNamespace'] = 'host';
+        self::assertFalse(RunReport::operatorAudit($input['receipts'], $input['context'], ['readiness' => 2], 100, 1900)['complete']);
     }
 
     public function testUnknownOperatorMarkersOomAndBadExitFailEvenWithHealthyPlayback(): void
@@ -341,6 +351,14 @@ final class HouseholdRunReportTest extends TestCase
         $document['configuredLimits']['web']['memoryMaxBytes'] = 2048;
         $contract = RunContract::fromArray($document);
         $this->samples();
+        $result = RunReport::evaluate($contract, $this->path, $this->evidence($contract));
+        self::assertContains('Effective cgroup limits differ from the declared configuration.', $result['failures']);
+    }
+
+    public function testAMemoryLimitOnADeploymentServiceFailsTheRun(): void
+    {
+        $contract = $this->contract();
+        $this->samples(webMemoryMaxBytes: 1024);
         $result = RunReport::evaluate($contract, $this->path, $this->evidence($contract));
         self::assertContains('Effective cgroup limits differ from the declared configuration.', $result['failures']);
     }

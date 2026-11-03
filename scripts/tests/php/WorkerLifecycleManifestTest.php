@@ -21,7 +21,10 @@ final class WorkerLifecycleManifestTest extends TestCase
     {
         $manifest = $this->manifest();
         match ($change) {
-            'version' => $manifest['version'] = 5,
+            'version' => $manifest['version'] = 6,
+            'memory' => $manifest['controlMemoryMiB'] = 2944,
+            'pids' => $manifest['executionPidsLimit'] = 257,
+            'cpus' => $manifest['executionCpuSet'] = [1],
             'identifier' => $manifest['deploymentProfile']['identifier'] = 'household',
             'capacity' => $manifest['deploymentProfile']['webWorkers'] = 99,
             'unknown' => $manifest['deploymentProfile']['unknown'] = true,
@@ -35,7 +38,7 @@ final class WorkerLifecycleManifestTest extends TestCase
     /** @return iterable<string,array{string}> */
     public static function invalidManifests(): iterable
     {
-        foreach (['version', 'identifier', 'capacity', 'unknown', 'type'] as $change) {
+        foreach (['version', 'memory', 'pids', 'cpus', 'identifier', 'capacity', 'unknown', 'type'] as $change) {
             yield $change => [$change];
         }
     }
@@ -43,8 +46,7 @@ final class WorkerLifecycleManifestTest extends TestCase
     /** @return array<string,mixed> */
     private function manifest(): array
     {
-        return ['version' => 6, 'autoscaling' => ['maximumConcurrency' => 2],
-            'controlMemoryMiB' => 2944, 'controlPidsLimit' => 129, 'executionMemoryMiB' => 4800, 'executionPidsLimit' => 257,
+        return ['version' => 7, 'autoscaling' => ['maximumConcurrency' => 2],
             'deploymentProfile' => OperatorConfiguration::json(dirname(__DIR__, 3) . '/tests/Fixtures/Worker/deployment-profile.json')];
     }
 

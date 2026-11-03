@@ -10,17 +10,12 @@ final readonly class HouseholdConfiguration
 {
     public const array IMAGE_ROLES = ['application', 'worker', 'operator', 'postgres', 'gateway', 'redis'];
     public const array VOLUME_ROLES = ['media', 'storage', 'conversions', 'transcode_state', 'postgres', 'redis', 'secrets', 'pooler_credentials'];
-    public const array RESOURCE_DEFAULTS = [
-        'webMemoryMiB' => 1536, 'redisMemoryMiB' => 384,
-        'redisMaxmemoryMiB' => 192, 'gatewayMemoryMiB' => 64, 'operatorMemoryMiB' => 512,
-        'hostHeadroomMiB' => 512,
-    ];
+    /** Redis's own dataset bound, enforced by Redis itself rather than by a container limit. */
+    public const array RESOURCE_DEFAULTS = ['redisMaxmemoryMiB' => 192];
     /** @param array<string,ImageSelection> $images
      * @param array<string,string> $environment
      * @param array<string,int> $resources
      * @param array<string,string> $volumes
-     * @param list<int> $controlCpuSet
-     * @param list<int> $executionCpuSet
      */
     private function __construct(
         public string $name,
@@ -32,14 +27,12 @@ final readonly class HouseholdConfiguration
         public array $environment,
         public array $resources,
         public array $volumes,
-        public array $controlCpuSet,
-        public array $executionCpuSet,
     ) {}
 
     /** @param array<string,mixed> $data */
     public static function fromArray(array $data): self
     {
-        JsonObject::keys($data, ['version', 'name', 'profile', 'origin', 'listen', 'images', 'environment', 'resources', 'volumes', 'controlCpuSet', 'executionCpuSet'], 'household configuration');
+        JsonObject::keys($data, ['version', 'name', 'profile', 'origin', 'listen', 'images', 'environment', 'resources', 'volumes'], 'household configuration');
         if (($data['version'] ?? null) !== 1) {
             throw new \InvalidArgumentException('Unsupported household configuration version.');
         }
@@ -91,11 +84,8 @@ final readonly class HouseholdConfiguration
         $resources = array_replace(self::RESOURCE_DEFAULTS, $resources);
         foreach ($resources as $value) {
             if (!is_int($value) || $value < 1 || $value > 1048576) {
-                throw new \InvalidArgumentException('Memory reservations must be positive integer MiB.');
+                throw new \InvalidArgumentException('The Redis dataset bound must be a positive integer MiB.');
             }
-        }
-        if ($resources['redisMaxmemoryMiB'] >= $resources['redisMemoryMiB']) {
-            throw new \InvalidArgumentException('Redis needs memory beyond its dataset limit for persistence and overhead.');
         }
         $volumes = $data['volumes'] ?? [];
         if (!is_array($volumes)) {
@@ -111,12 +101,7 @@ final readonly class HouseholdConfiguration
         if (count(array_unique($volumes)) !== count($volumes)) {
             throw new \InvalidArgumentException('Persistent volume roles must have distinct names.');
         }
-        $control = self::cpuSet($data['controlCpuSet'] ?? [0]);
-        $execution = self::cpuSet($data['executionCpuSet'] ?? [1]);
-        if (array_intersect($control, $execution) !== []) {
-            throw new \InvalidArgumentException('Control and execution CPU sets must be disjoint.');
-        }
-        return new self($name, $profile, rtrim($origin, '/'), $address, $listen['port'], $selections, $environment, $resources, $volumes, $control, $execution);
+        return new self($name, $profile, rtrim($origin, '/'), $address, $listen['port'], $selections, $environment, $resources, $volumes);
     }
 
     /** @return array<string,mixed> */
@@ -125,8 +110,7 @@ final readonly class HouseholdConfiguration
         return ['version' => 1, 'name' => $this->name, 'profile' => $this->profile, 'origin' => $this->origin,
             'listen' => ['address' => $this->listenAddress, 'port' => $this->listenPort],
             'images' => array_map(static fn(ImageSelection $image): string => $image->reference, $this->images),
-            'environment' => $this->environment, 'resources' => $this->resources, 'volumes' => $this->volumes,
-            'controlCpuSet' => $this->controlCpuSet, 'executionCpuSet' => $this->executionCpuSet];
+            'environment' => $this->environment, 'resources' => $this->resources, 'volumes' => $this->volumes];
     }
 
     /** @param array<string,mixed> $data */
@@ -147,23 +131,6 @@ final readonly class HouseholdConfiguration
         $value = $data[$key] ?? null;
         if (!is_array($value) || ($value !== [] && array_is_list($value))) {
             throw new \InvalidArgumentException($key . ' must be an object.');
-        }
-        return $value;
-    }
-
-    /** @return non-empty-list<int> */
-    private static function cpuSet(mixed $value): array
-    {
-        if (!is_array($value) || !array_is_list($value) || $value === []) {
-            throw new \InvalidArgumentException('CPU sets must be nonempty integer lists.');
-        }
-        foreach ($value as $cpu) {
-            if (!is_int($cpu) || $cpu < 0) {
-                throw new \InvalidArgumentException('CPU identifiers must be nonnegative integers.');
-            }
-        }
-        if (count(array_unique($value)) !== count($value)) {
-            throw new \InvalidArgumentException('CPU identifiers must be unique.');
         }
         return $value;
     }

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Baander\Tooling\Fixtures\Household;
 
 use Baander\Tooling\Configuration\{ApplicationLayout, JsonObject, ToolingConfiguration};
-use Baander\Tooling\Deployment\{ContainerMeasurement, Household, HouseholdConfiguration, HouseholdStateStore, ImageProfile, WorkerLifecycle};
+use Baander\Tooling\Deployment\{ContainerMeasurement, Household, HouseholdConfiguration, HouseholdStateStore, WorkerLifecycle};
 use Baander\Tooling\Docker\{Client, Target, TargetResolver};
 use Baander\Tooling\Filesystem\{AtomicFile, FileLock, PrivateDirectory};
 use Baander\Tooling\Fixtures\Runtime;
@@ -174,7 +174,6 @@ final class Qualification
         foreach (['application' => 'app', 'worker' => 'worker', 'operator' => 'operator'] as $role => $image) {
             $effective['images'][$role] = $images[$image];
         }
-        $effective['resources']['hostHeadroomMiB'] += $this->configuration['observerMemoryMiB'];
         $household->render(HouseholdConfiguration::fromArray($effective));
         AtomicFile::writeJson($this->directory . '/deployment-configuration.json', $effective);
         $state['effectiveDeployment'] = $effective;
@@ -280,7 +279,6 @@ final class Qualification
         foreach (['postgres', 'gateway', 'redis'] as $role) {
             $effective['images'][$role] = $seedDeployment['images'][$role]['id'];
         }
-        $effective['resources']['hostHeadroomMiB'] += $this->configuration['observerMemoryMiB'];
         if (array_intersect(array_values($effective['volumes']), array_values($seedDeployment['configuration']['volumes'])) !== []) {
             throw new \RuntimeException('Every child data volume must be separate from the seed.');
         }
@@ -702,7 +700,6 @@ CODE;
             'exitCode' => $container['State']['ExitCode'] ?? null,
             'oomKilled' => $container['State']['OOMKilled'] ?? null,
             'health' => $container['State']['Health']['Status'] ?? null,
-            'memoryLimitBytes' => $container['HostConfig']['Memory'] ?? null,
             'healthLog' => array_map(
                 static fn(array $probe): array => ['exitCode' => $probe['ExitCode'] ?? null, 'output' => substr((string) ($probe['Output'] ?? ''), 0, 512)],
                 array_slice($container['State']['Health']['Log'] ?? [], -3),
@@ -791,10 +788,8 @@ CODE;
         $state['pendingRename'] = $change;
         $this->save($state);
         $measurement = $this->helperMeasurement('rename-source', $state['images']['app']);
-        $memory = $state['effectiveDeployment']['resources']['operatorMemoryMiB'];
         $output = DisposableContainer::run($this->docker, $directory . '/file-change-resource.json', [
-            '--network', 'none', '--read-only', '--user', '0:0', '--cap-drop', 'ALL', '--cgroupns', 'private',
-            '--memory', $memory . 'm', '--memory-swap', $memory . 'm', '--entrypoint', 'php',
+            '--network', 'none', '--read-only', '--user', '0:0', '--cap-drop', 'ALL', '--cgroupns', 'private', '--entrypoint', 'php',
             '--mount', 'type=volume,src=' . $state['effectiveDeployment']['volumes']['media'] . ',dst=/source',
             $state['images']['app'], '-d', 'memory_limit=64M', '-r', $measurement['bootstrap'] . "\n" . self::renameProgram(), '/source',
         ], $this->runtime->environment, $this->runtime->configuration->budgets->seconds('cleanup'), input: json_encode($change, JSON_THROW_ON_ERROR), timeout: 30, onCompletion: $measurement['onCompletion'])->stdout;
@@ -982,15 +977,8 @@ CODE;
     private function contract(array $state, string $scenario, float $started): RunContract
     {
         $deployment = $this->deploymentState();
-        $profile = ImageProfile::fromArray($deployment['profile']);
-        $limits = [];
-        foreach (['web', 'redis', 'gateway'] as $role) {
-            $limits[$role] = ['memoryMaxBytes' => $state['effectiveDeployment']['resources'][$role . 'MemoryMiB'] * 1024 ** 2];
-        }
-        // PostgreSQL runs without a container memory limit.
-        $limits['postgres'] = ['memoryMaxBytes' => 'max'];
-        $limits['control'] = ['memoryMaxBytes' => $profile->controlMemoryMiB * 1024 ** 2];
-        $limits['execution'] = ['memoryMaxBytes' => $profile->executionMemoryMiB * 1024 ** 2];
+        // Deployment services and worker units run without a container memory limit; only the harness's own observer keeps one.
+        $limits = array_fill_keys(['web', 'redis', 'gateway', 'postgres', 'control', 'execution'], ['memoryMaxBytes' => 'max']);
         $limits['observer'] = ['memoryMaxBytes' => $this->configuration['observerMemoryMiB'] * 1024 ** 2];
         return RunContract::fromArray(['version' => 1, 'scenario' => $scenario, 'profile' => $deployment['configuration']['profile'], 'imageId' => $state['images']['app'],
             'startedMonotonic' => $started, 'sampleIntervalSeconds' => 1, 'maxSampleGapSeconds' => 3, 'durationSeconds' => $scenario === 'cold-startup' ? self::COLD_MINIMUM_SECONDS : $this->configuration['durationSeconds'],
@@ -1001,7 +989,6 @@ CODE;
             'initialConditions' => ['catalog' => $scenario === 'cold-startup' ? 'empty-catalog-first-import' : 'previously-imported-catalog',
                 'filesystemCache' => 'not-cleared-generation-may-have-warmed-page-cache', 'overlayDigest' => $state['images']['manifestDigest'],
                 'sourceRevision' => $state['images']['manifest']['sourceRevision']],
-            'operatorMemoryMiB' => $state['effectiveDeployment']['resources']['operatorMemoryMiB'],
             'deploymentOwner' => $deployment['owner'],
             'workerNamespace' => $state['effectiveDeployment']['name'], 'operatorImageId' => $state['images']['operator'], 'workerImageId' => $state['images']['worker']]);
     }
@@ -1091,8 +1078,7 @@ CODE;
         $times = array_values(array_filter(array_column($receipts, 'startedMonotonic'), static fn(mixed $value): bool => is_int($value) || is_float($value)));
         $ends = array_values(array_filter(array_column($receipts, 'finishedMonotonic'), static fn(mixed $value): bool => is_int($value) || is_float($value)));
         $context = ['namespace' => $deployment['configuration']['name'], 'bootId' => $helpers ? $deployment['owner'] : ($worker['boot_id'] ?? ''),
-            'operatorImage' => $deployment['images']['operator']['id'] ?? null, 'workerImage' => $deployment['images']['worker']['id'] ?? null,
-            'memoryMaxBytes' => $deployment['configuration']['resources']['operatorMemoryMiB'] * 1024 ** 2];
+            'operatorImage' => $deployment['images']['operator']['id'] ?? null, 'workerImage' => $deployment['images']['worker']['id'] ?? null];
         if ($helpers) {
             $context['actionImages'] = array_map(static fn(string $role): string => $deployment['images'][$role]['id'] ?? throw new \RuntimeException('Helper image identity is unavailable.'), Household::helperRoles(true) + Household::helperRoles(false));
         }
@@ -1264,11 +1250,10 @@ CODE;
         $program = 'echo json_encode(["ffmpeg"=>hash_file("sha256","/usr/bin/ffmpeg"),"ffprobe"=>hash_file("sha256","/usr/bin/ffprobe")],JSON_THROW_ON_ERROR);';
         foreach (['app', 'worker', 'operator'] as $role) {
             $measurement = $this->helperMeasurement('verify-wrappers-' . ($role === 'app' ? 'application' : $role), $state['images'][$role]);
-            $memory = $state['effectiveDeployment']['resources']['operatorMemoryMiB'];
             $output = DisposableContainer::run(
                 $this->docker,
                 $directory . '/wrapper-' . $role . '.json',
-                ['--network', 'none', '--read-only', '--cgroupns', 'private', '--memory', $memory . 'm', '--memory-swap', $memory . 'm', '--entrypoint', 'php', $state['images'][$role], '-r', $measurement['bootstrap'] . "\n" . $program],
+                ['--network', 'none', '--read-only', '--cgroupns', 'private', '--entrypoint', 'php', $state['images'][$role], '-r', $measurement['bootstrap'] . "\n" . $program],
                 $this->runtime->environment,
                 $this->runtime->configuration->budgets->seconds('cleanup'),
                 timeout: 30,

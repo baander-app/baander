@@ -10,12 +10,15 @@ use Baander\Tooling\Deployment\HouseholdRenderer;
 use Baander\Tooling\Deployment\ImageProfile;
 use Baander\Tooling\Configuration\ApplicationLayout;
 use Baander\Tooling\Deployment\Household;
+use Baander\Tooling\Deployment\KillOrder;
 use Baander\Tooling\Deployment\Pooler;
 use Baander\Tooling\Deployment\PostgresSettings;
 use Baander\Tooling\Docker\{Client, Target};
 use Baander\Tooling\Filesystem\AtomicFile;
 use Baander\Tooling\Inventory\Collector;
 use Baander\Tooling\Process\{CommandExecutor, CompletionPolicy, EngineExecutor, ExecutionContext, ProcessResult, ProcessSpec};
+use App\Shared\Application\DTO\DeploymentProfile;
+use App\Shared\Infrastructure\Worker\OutOfMemoryKillOrder;
 use PHPUnit\Framework\TestCase;
 
 final class HouseholdDeploymentTest extends TestCase
@@ -32,32 +35,115 @@ final class HouseholdDeploymentTest extends TestCase
         ];
     }
 
-    public function testProfilesShareServiceLimitsAndLeavePostgresAndThePoolerUnlimited(): void
+    public function testRenderedServicesCarryNoContainerLimitsAndRenderTheKillOrder(): void
     {
         $household = HouseholdConfiguration::fromArray(self::configuration());
         $full = HouseholdConfiguration::fromArray(array_replace(self::configuration(), ['profile' => 'full']));
+        self::assertSame(['redisMaxmemoryMiB' => 192], $household->resources);
         self::assertSame($household->resources, $full->resources);
-        self::assertArrayNotHasKey('postgresMemoryMiB', $household->resources);
-        $explicit = self::configuration();
-        $explicit['resources'] = ['postgresMemoryMiB' => 1536];
-        try {
-            HouseholdConfiguration::fromArray($explicit);
-            self::fail('Accepted a PostgreSQL memory limit.');
-        } catch (\InvalidArgumentException $error) {
-            self::assertStringContainsString('Unknown key', $error->getMessage());
+        foreach ([['resources' => ['webMemoryMiB' => 1536]], ['resources' => ['operatorMemoryMiB' => 512]], ['resources' => ['postgresMemoryMiB' => 1536]], ['controlCpuSet' => [0]], ['executionCpuSet' => [1]]] as $override) {
+            try {
+                HouseholdConfiguration::fromArray(array_replace(self::configuration(), $override));
+                self::fail('Accepted a container limit or CPU set.');
+            } catch (\InvalidArgumentException $error) {
+                self::assertStringContainsString('Unknown key', $error->getMessage());
+            }
         }
         self::assertSame('household', $household->profile);
         self::assertSame('full', $full->profile);
         self::assertSame('baander-household-media', $household->volumes['media']);
         self::assertSame('private-database-secret', $household->environment['DB_PASSWORD']);
-        $compose = HouseholdRenderer::render($household, $this->images(), ApplicationLayout::fromArray(['version' => 1, 'root' => '/srv/baander']), $this->profile(), 'max_connections = 20', 'owner');
-        foreach (['postgres', 'pooler'] as $service) {
-            self::assertArrayNotHasKey('mem_limit', $compose['services'][$service], $service);
-            self::assertArrayNotHasKey('memswap_limit', $compose['services'][$service], $service);
-            self::assertArrayNotHasKey('cpus', $compose['services'][$service], $service);
+        $layout = ApplicationLayout::fromArray(['version' => 1, 'root' => '/srv/baander']);
+        $scores = ['web' => KillOrder::WEB, 'postgres' => KillOrder::POSTGRES, 'pooler' => KillOrder::POOLER, 'redis' => KillOrder::REDIS, 'gateway' => KillOrder::GATEWAY];
+        foreach ([[$household, $this->profile()], [$full, $this->profile('full')]] as [$configuration, $profile]) {
+            $compose = HouseholdRenderer::render($configuration, $this->images(), $layout, $profile, 'max_connections = 20', 'owner');
+            self::assertSame(array_keys($scores), array_keys($compose['services']));
+            foreach ($compose['services'] as $name => $service) {
+                foreach (['mem_limit', 'memswap_limit', 'mem_reservation', 'pids_limit', 'cpus', 'cpu_shares', 'cpuset', 'cpu_quota', 'cpu_period', 'deploy'] as $limit) {
+                    self::assertArrayNotHasKey($limit, $service, $configuration->profile . ' ' . $name . ' ' . $limit);
+                }
+                self::assertSame($scores[$name], $service['oom_score_adj'], $configuration->profile . ' ' . $name);
+            }
+            self::assertStringContainsString('--maxmemory 192mb', $compose['services']['redis']['command'][2]);
         }
-        self::assertArrayNotHasKey('pids_limit', $compose['services']['pooler']);
-        self::assertSame($compose['services']['web']['mem_limit'], $compose['services']['web']['memswap_limit']);
+    }
+
+    public function testKillOrderSacrificesWebAndMediaWorkBeforeStatefulServices(): void
+    {
+        $order = [
+            'web' => KillOrder::WEB,
+            'media work' => OutOfMemoryKillOrder::MEDIA_WORK,
+            'execution unit' => OutOfMemoryKillOrder::EXECUTION_UNIT,
+            'redis' => KillOrder::REDIS,
+            'gateway' => KillOrder::GATEWAY,
+            'postgres' => KillOrder::POSTGRES,
+        ];
+        self::assertSame([900, 600, 300, 100, 0, -500], array_values($order));
+        $scores = array_values($order);
+        $sorted = $scores;
+        rsort($sorted);
+        self::assertSame($sorted, $scores);
+        self::assertSame(count($scores), count(array_unique($scores)));
+        self::assertSame(KillOrder::POSTGRES, KillOrder::POOLER);
+        self::assertSame(KillOrder::POSTGRES, OutOfMemoryKillOrder::CONTROL_UNIT);
+        self::assertLessThan(0, KillOrder::POSTGRES);
+    }
+
+    public function testHouseholdRendersItsSharedCopyProfileAndNativeLimitsUnchanged(): void
+    {
+        $application = new DeploymentProfile('household');
+        $deployment = json_decode($application->toJson(), true, flags: JSON_THROW_ON_ERROR);
+        $runtime = ['phpHeapMiB' => $application->phpHeapMiB(), 'phpProcessMemoryMiB' => $application->phpProcessMemoryMiB(),
+            'nativeManagerHeapMiB' => $application->nativeManagerHeapMiB(), 'nativeCommandLimit' => $application->nativeCommandLimit(),
+            'nativeResultLimit' => $application->nativeResultLimit(), 'nativeClientLimit' => $application->nativeClientLimit(),
+            'mediaHelperLimit' => $application->mediaHelperLimit(), 'scheduledConsoleMiB' => $application->phpProcessMemoryMiB()];
+        $profile = ImageProfile::fromArray(['version' => 1, 'deployment' => $deployment, 'autoscaling' => ['minimumConcurrency' => 1, 'maximumConcurrency' => 1], 'runtime' => $runtime]);
+        $before = $profile->toArray();
+        $configuration = HouseholdConfiguration::fromArray(self::configuration());
+        $compose = HouseholdRenderer::render($configuration, $this->images(), ApplicationLayout::fromArray(['version' => 1, 'root' => '/srv/baander']), $profile, 'max_connections = 20', 'owner');
+        $rendered = json_decode(str_replace('$$', '$', $compose['services']['web']['environment']['BAANDER_DEPLOYMENT_PROFILE_JSON']), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame($profile->deployment, $rendered);
+        self::assertSame([2, 0, 0], [$rendered['sharedCopySlots'], $rendered['videoEncoderSlots'], $rendered['audioEncoderSlots']]);
+        self::assertSame($rendered, json_decode(HouseholdRenderer::workerEnvironment($configuration, $profile)['BAANDER_DEPLOYMENT_PROFILE_JSON'], true, flags: JSON_THROW_ON_ERROR));
+        self::assertSame($before, $profile->toArray());
+        self::assertSame($profile->fingerprint(), $compose['services']['web']['labels']['org.baander.deployment.fingerprint']);
+    }
+
+    public function testRootlessDaemonIsRefusedBeforeRendering(): void
+    {
+        KillOrder::assertApplicable(['SecurityOptions' => ['name=apparmor', 'name=seccomp,profile=builtin', 'name=cgroupns']]);
+        KillOrder::assertApplicable([]);
+        foreach (['name=rootless', 'name=rootless,detail=1'] as $option) {
+            try {
+                KillOrder::assertApplicable(['SecurityOptions' => ['name=seccomp,profile=builtin', $option]]);
+                self::fail('Accepted a rootless daemon.');
+            } catch (\RuntimeException $error) {
+                self::assertStringContainsString('rootless', $error->getMessage());
+            }
+        }
+        $directory = sys_get_temp_dir() . '/baander.app-household-' . bin2hex(random_bytes(8));
+        $store = new HouseholdStateStore($directory);
+        $target = new Target('/usr/bin/docker', 'unix:///run/baander.app-docker.sock', 'owned-daemon', null, null);
+        $commands = [];
+        $executor = $this->createStub(CommandExecutor::class);
+        $executor->method('run')->willReturnCallback(static function (ProcessSpec $command) use (&$commands): ProcessResult {
+            $arguments = array_slice($command->argv, 3);
+            $commands[] = $arguments;
+            $output = $arguments[0] === 'info' ? '{"ID":"owned-daemon","SecurityOptions":["name=seccomp,profile=builtin","name=rootless","name=cgroupns"]}' : '';
+            return new ProcessResult(0, null, false, false, $output, '', 0);
+        });
+        try {
+            try {
+                new Household($store, new Client($executor, $target, []), $executor, [], dirname(__DIR__, 3))->render(HouseholdConfiguration::fromArray(self::configuration()));
+                self::fail('Rendered for a rootless daemon.');
+            } catch (\RuntimeException $error) {
+                self::assertStringContainsString('negative out-of-memory scores', $error->getMessage());
+            }
+            self::assertSame(['info'], array_column($commands, 0));
+            self::assertNull($store->load());
+        } finally {
+            Collector::remove($directory);
+        }
     }
 
     public function testPostgresConnectionsAreSizedFromThePoolerServerPools(): void
@@ -119,9 +205,6 @@ final class HouseholdDeploymentTest extends TestCase
         $compose = HouseholdRenderer::render($configuration, $images, $layout, $profile, 'max_connections = 36', 'owner');
         self::assertSame(['postgres', '-c', 'config_file=/etc/baander/postgresql.conf'], $compose['services']['postgres']['command']);
         self::assertSame('secret$$literal', $compose['services']['postgres']['environment']['POSTGRES_PASSWORD']);
-        self::assertSame(96, $compose['services']['postgres']['pids_limit']);
-        $full = HouseholdConfiguration::fromArray(array_replace($configuration->toArray(), ['profile' => 'full']));
-        self::assertSame(128, HouseholdRenderer::render($full, $images, $layout, $this->profile('full'), 'max_connections = 100', 'owner')['services']['postgres']['pids_limit']);
         self::assertStringContainsString('$http_upgrade', HouseholdRenderer::configurationFiles($configuration, 'max_connections = 36')['gateway_configuration']['content']);
         self::assertStringContainsString('noeviction', $compose['services']['redis']['command'][2]);
         self::assertSame('memory_limit=256M', $compose['services']['web']['command'][1]);
@@ -130,7 +213,6 @@ final class HouseholdDeploymentTest extends TestCase
         foreach ($compose['services'] as $name => $service) {
             self::assertSame($images[$roles[$name]]['id'], $service['image']);
             self::assertArrayNotHasKey('privileged', $service);
-            self::assertSame($service['mem_limit'] ?? null, $service['memswap_limit'] ?? null);
             foreach ($service['volumes'] ?? [] as $mount) {
                 self::assertSame('volume', $mount['type']);
                 self::assertNotSame('/var/run/docker.sock', $mount['target']);
@@ -143,11 +225,6 @@ final class HouseholdDeploymentTest extends TestCase
         self::assertTrue($compose['services']['web']['volumes'][0]['read_only']);
         self::assertContains(['type' => 'volume', 'source' => 'secrets', 'target' => '/srv/baander/config/secrets', 'read_only' => true], $compose['services']['web']['volumes']);
         self::assertNotContains($configuration->volumes['secrets'], array_column(HouseholdRenderer::mediaMounts($configuration, $layout), 'volume'));
-        $reservations = HouseholdRenderer::reservations($configuration, $profile);
-        self::assertSame(2304, $reservations['controlMemoryMiB']);
-        self::assertSame(4480, $reservations['executionMemoryMiB']);
-        self::assertArrayNotHasKey('postgresMemoryMiB', $reservations);
-        self::assertSame(9792, $reservations['totalMiB']);
         self::assertArrayNotHasKey('DB_PASSWORD', $workerEnvironment);
         self::assertArrayNotHasKey('APP_DOMAIN', $workerEnvironment);
         self::assertSame('household', $compose['services']['web']['environment']['BAANDER_DEPLOYMENT_PROFILE']);
@@ -387,8 +464,7 @@ final class HouseholdDeploymentTest extends TestCase
             'version' => 1,
             'deployment' => ['identifier' => $identifier, 'webWorkers' => 2, 'doctrinePoolSlots' => 4],
             'autoscaling' => ['minimumConcurrency' => 1, 'maximumConcurrency' => 1],
-            'runtime' => ['phpHeapMiB' => 256],
-            'budgets' => ['controlMemoryMiB' => 2304, 'executionMemoryMiB' => 4480, 'controlPidsLimit' => 129, 'executionPidsLimit' => 256, 'scheduledConsoleMiB' => 320],
+            'runtime' => ['phpHeapMiB' => 256, 'scheduledConsoleMiB' => 320],
         ]);
     }
 

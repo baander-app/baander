@@ -75,7 +75,7 @@ final readonly class Household
         if ($previous !== null) {
             self::assertSameDeployment($previous, $configuration);
         }
-        $this->docker->validateIdentity();
+        KillOrder::assertApplicable($this->docker->validateIdentity());
         $this->docker->requireCompose();
         $owner = $previous['owner'] ?? bin2hex(random_bytes(16));
         $images = [];
@@ -96,7 +96,7 @@ final readonly class Household
             }
             $revision = $candidateRevision;
             $measurement = $this->measurement($configuration->name, $owner, 'profile-' . $role, $resolved->id);
-            $candidateProfile = ImageProfile::resolve($this->docker, $resolved->id, $candidateLayout, $configuration->profile, $this->store->directory . '/profile-' . $role . '.json', $this->environment, $this->cleanupSeconds, $configuration->resources['operatorMemoryMiB'], $measurement);
+            $candidateProfile = ImageProfile::resolve($this->docker, $resolved->id, $candidateLayout, $configuration->profile, $this->store->directory . '/profile-' . $role . '.json', $this->environment, $this->cleanupSeconds, $measurement);
             if (($layout !== null && $layout->toArray() !== $candidateLayout->toArray())
                 || ($profile !== null && $profile->fingerprint() !== $candidateProfile->fingerprint())) {
                 throw new \RuntimeException('Application, worker and operator images disagree on layout or deployment profile.');
@@ -138,12 +138,6 @@ final readonly class Household
         $state = $this->requiredState();
         $profile = ImageProfile::fromArray($state['profile']);
         $layout = ApplicationLayout::fromArray($state['layout']);
-        $information = $this->docker->validateIdentity();
-        $required = HouseholdRenderer::reservations($configuration, $profile)['totalMiB'];
-        $lastCpu = max([...$configuration->controlCpuSet, ...$configuration->executionCpuSet]);
-        if (($information['MemTotal'] ?? 0) < $required * 1024 ** 2 || ($information['NCPU'] ?? 0) <= $lastCpu) {
-            throw new \RuntimeException('The Docker host does not cover the configured complete deployment reservation (' . $required . ' MiB) and CPU sets. This is a configured envelope, not a measured minimum.');
-        }
         $state['phase'] = 'starting';
         $this->store->save($state);
         $this->assertOwnedServices($state);
@@ -171,9 +165,6 @@ final readonly class Household
             resourceLabels: ['org.baander.household' => $configuration->name, 'org.baander.household.owner' => $state['owner']],
             profile: $profile,
             cleanupSeconds: $this->cleanupSeconds,
-            controlCpuSet: $configuration->controlCpuSet,
-            executionCpuSet: $configuration->executionCpuSet,
-            operatorMemoryMiB: $configuration->resources['operatorMemoryMiB'],
         ));
         $lifecycle->start($record);
         $lifecycle->ready($record);
@@ -300,9 +291,7 @@ final readonly class Household
     {
         $measurement = $this->measurement($configuration->name, $state['owner'], 'seed-' . str_replace('_', '-', $role), $state['images']['application']['id']);
         DisposableContainer::run($this->docker, $this->store->directory . '/seed-' . $role . '.json', [
-            '--cgroupns', 'private',
-            ...DisposableContainer::memoryArguments($configuration->resources['operatorMemoryMiB']),
-            '--network', 'none', '--user', '0:0', '--entrypoint', 'php', '--mount', 'type=volume,src=' . $volume . ',dst=/seed',
+            '--cgroupns', 'private', '--network', 'none', '--user', '0:0', '--entrypoint', 'php', '--mount', 'type=volume,src=' . $volume . ',dst=/seed',
             $state['images']['application']['id'], '-r', $measurement['bootstrap'] . "\n" . $program, ...$arguments,
         ], $this->environment, $this->cleanupSeconds, input: $input, onCompletion: $measurement['onCompletion']);
     }
@@ -323,7 +312,7 @@ final readonly class Household
             'postgres',
         );
         DisposableContainer::run($this->docker, $this->store->directory . '/pooler-credentials.json', [
-            '--cgroupns', 'private', ...DisposableContainer::memoryArguments($configuration->resources['operatorMemoryMiB']), ...$helper['arguments'],
+            '--cgroupns', 'private', ...$helper['arguments'],
         ], array_replace($this->environment, $helper['environment']), $this->cleanupSeconds, timeout: 120, containerEnvironment: $helper['environment']);
     }
 
@@ -369,7 +358,6 @@ PHP;
     private static function privateHelperArguments(HouseholdConfiguration $configuration, ApplicationLayout $layout, array $environment): array
     {
         $arguments = ['--cgroupns', 'private', '--network', $configuration->name . '-private', '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges',
-            ...DisposableContainer::memoryArguments($configuration->resources['operatorMemoryMiB']),
             '--mount', 'type=volume,src=' . $configuration->volumes['secrets'] . ',dst=' . $layout->path('config/secrets'), '--entrypoint', 'php'];
         foreach ($environment as $key => $_) {
             array_push($arguments, '--env', $key);
@@ -441,7 +429,6 @@ PHP;
         $configuration = HouseholdConfiguration::fromArray($state['configuration']);
         return ['name' => $configuration->name, 'phase' => $state['phase'], 'profile' => $configuration->profile,
             'profileFingerprint' => $state['profileFingerprint'], 'origin' => $configuration->origin,
-            'composeFile' => $this->composeFile(), 'redisMaxmemoryMiB' => $configuration->resources['redisMaxmemoryMiB'], 'dataVolumes' => $configuration->volumes, 'configurationVolumes' => $state['configurationVolumes'], 'reservations' => HouseholdRenderer::reservations($configuration, ImageProfile::fromArray($state['profile'])),
-            'qualification' => 'Unqualified candidate limits; configured reservations are not measured consumption or a minimum host requirement.'];
+            'composeFile' => $this->composeFile(), 'redisMaxmemoryMiB' => $configuration->resources['redisMaxmemoryMiB'], 'dataVolumes' => $configuration->volumes, 'configurationVolumes' => $state['configurationVolumes']];
     }
 }

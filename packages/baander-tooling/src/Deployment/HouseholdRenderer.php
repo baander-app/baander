@@ -57,13 +57,12 @@ final class HouseholdRenderer
         $webMounts = self::mediaMounts($configuration, $layout);
         $webMounts = array_map(static fn(array $mount): array => ['type' => 'volume', 'source' => array_search($mount['volume'], $configuration->volumes, true), 'target' => $mount['target'], 'read_only' => $mount['readOnly']], $webMounts);
         $webMounts[] = ['type' => 'volume', 'source' => 'secrets', 'target' => $layout->path('config/secrets'), 'read_only' => true];
-        $resources = $configuration->resources;
         $services = [
             'web' => $common + [
                 'image' => $images['application']['id'], 'environment' => $environment,
                 'entrypoint' => ['php'], 'command' => ['-d', 'memory_limit=' . $profile->phpHeapMiB . 'M', $layout->path('bin/console'), 'app:serve', '--no-interaction'],
                 'volumes' => $webMounts, 'init' => true, 'stop_grace_period' => '35s', 'cap_drop' => ['ALL'],
-                'mem_limit' => $resources['webMemoryMiB'] . 'm', 'pids_limit' => 128,
+                'oom_score_adj' => KillOrder::WEB,
                 'depends_on' => [Pooler::SERVICE => ['condition' => 'service_healthy'], 'redis' => ['condition' => 'service_healthy']],
             ],
             'postgres' => $common + [
@@ -71,8 +70,7 @@ final class HouseholdRenderer
                 'command' => ['postgres', '-c', 'config_file=' . self::POSTGRES_CONFIG_PATH],
                 'volumes' => [['type' => 'volume', 'source' => 'postgres_configuration', 'target' => '/etc/baander', 'read_only' => true], ['type' => 'volume', 'source' => 'postgres', 'target' => '/var/lib/postgresql']],
                 'environment' => ['POSTGRES_USER' => $environment['DB_USERNAME'], 'POSTGRES_PASSWORD' => $environment['DB_PASSWORD'], 'POSTGRES_DB' => $environment['DB_DATABASE'], 'PGDATA' => '/var/lib/postgresql/data/baander'],
-                // Room for every configured connection plus PostgreSQL's background processes.
-                'pids_limit' => $configuration->profile === 'full' ? 128 : 96,
+                'oom_score_adj' => KillOrder::POSTGRES,
                 'healthcheck' => ['test' => ['CMD-SHELL', 'pg_isready -h 127.0.0.1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"'], 'interval' => '5s', 'timeout' => '5s', 'retries' => 24],
             ],
             Pooler::SERVICE => $common + Pooler::service(
@@ -80,19 +78,19 @@ final class HouseholdRenderer
                 Pooler::environment($configuration->profile, $environment['DB_USERNAME'], $environment['DB_DATABASE'], 'postgres'),
                 'pooler_credentials',
                 'postgres',
-            ) + ['cap_drop' => ['ALL']],
+            ) + ['cap_drop' => ['ALL'], 'oom_score_adj' => KillOrder::POOLER],
             'redis' => $common + [
                 'image' => $images['redis']['id'], 'environment' => ['REDIS_PASSWORD' => $environment['REDIS_PASSWORD']],
-                'command' => ['sh', '-ec', 'exec redis-server --dir /data --appendonly yes --maxmemory ' . $resources['redisMaxmemoryMiB'] . 'mb --maxmemory-policy noeviction --requirepass "$REDIS_PASSWORD"'],
+                'command' => ['sh', '-ec', 'exec redis-server --dir /data --appendonly yes --maxmemory ' . $configuration->resources['redisMaxmemoryMiB'] . 'mb --maxmemory-policy noeviction --requirepass "$REDIS_PASSWORD"'],
                 'volumes' => [['type' => 'volume', 'source' => 'redis', 'target' => '/data']],
-                'mem_limit' => $resources['redisMemoryMiB'] . 'm', 'pids_limit' => 32,
+                'oom_score_adj' => KillOrder::REDIS,
                 'healthcheck' => ['test' => ['CMD-SHELL', 'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli ping | grep -q PONG'], 'interval' => '5s', 'timeout' => '5s', 'retries' => 24],
             ],
             'gateway' => $common + [
                 'image' => $images['gateway']['id'], 'volumes' => [['type' => 'volume', 'source' => 'gateway_configuration', 'target' => '/etc/nginx/conf.d', 'read_only' => true]],
                 'ports' => [['target' => 80, 'published' => (string) $configuration->listenPort, 'host_ip' => $configuration->listenAddress, 'protocol' => 'tcp']],
                 'depends_on' => ['web' => ['condition' => 'service_healthy']],
-                'mem_limit' => $resources['gatewayMemoryMiB'] . 'm', 'pids_limit' => 32,
+                'oom_score_adj' => KillOrder::GATEWAY,
             ],
         ];
         $volumes = [];
@@ -102,12 +100,6 @@ final class HouseholdRenderer
         foreach (self::configurationFiles($configuration, $postgresConfiguration) as $role => $file) {
             $volumes[$role] = ['name' => $file['volume'], 'external' => true];
         }
-        foreach ($services as &$service) {
-            if (isset($service['mem_limit'])) {
-                $service['memswap_limit'] = $service['mem_limit'];
-            }
-        }
-        unset($service);
         return self::escapeInterpolation(['name' => $configuration->name, 'services' => $services, 'volumes' => $volumes,
             'networks' => ['private' => ['name' => $configuration->name . '-private', 'labels' => $labels]]]);
     }
@@ -130,17 +122,6 @@ final class HouseholdRenderer
             $mounts[] = ['volume' => $configuration->volumes[$role], 'target' => $target, 'role' => $role === 'media' ? 'source' : 'derived', 'readOnly' => $role === 'media'];
         }
         return $mounts;
-    }
-
-    /** @return array<string,int> */
-    public static function reservations(HouseholdConfiguration $configuration, ImageProfile $profile): array
-    {
-        $limits = $configuration->resources;
-        unset($limits['redisMaxmemoryMiB']);
-        $limits['controlMemoryMiB'] = $profile->controlMemoryMiB;
-        $limits['executionMemoryMiB'] = $profile->executionMemoryMiB;
-        $limits['totalMiB'] = array_sum($limits);
-        return $limits;
     }
 
     /** @param array<string,mixed> $document

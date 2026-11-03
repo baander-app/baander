@@ -22,13 +22,6 @@
         "MAILER_DSN": "null://null"
     },
     "resources": {
-        "webMemoryMiB": 1536,
-        "redisMemoryMiB": 384,
-        "redisMaxmemoryMiB": 192,
-        "gatewayMemoryMiB": 64,
-        "operatorMemoryMiB": 512,
-        "hostHeadroomMiB": 512
-    },
-    "controlCpuSet": [0],
-    "executionCpuSet": [1]
+        "redisMaxmemoryMiB": 192
+    }
 }

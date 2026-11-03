@@ -25,14 +25,7 @@ class WorkerLifecycle
             $this->cleanupControllerTag($record);
         }
         $docker = new Client($this->runner, Target::fromArray($configuration->target), $this->environment);
-        $information = $docker->validateIdentity();
-        $minimumMemory = $configuration->profile->controlMemoryMiB + $configuration->profile->executionMemoryMiB + ($configuration->operatorMemoryMiB ?? 0);
-        if (($information['NCPU'] ?? 0) < 2 || ($information['MemTotal'] ?? 0) < $minimumMemory * 1024 ** 2) {
-            throw new \RuntimeException('A worker pair requires at least two CPUs and ' . $minimumMemory . ' MiB of daemon RAM.');
-        }
-        if (max([...$configuration->controlCpuSet, ...$configuration->executionCpuSet]) >= $information['NCPU']) {
-            throw new \RuntimeException('Worker CPU sets exceed the Docker daemon CPU count.');
-        }
+        KillOrder::assertApplicable($docker->validateIdentity());
         $endpoint = $docker->target->endpoint;
         if (!str_starts_with($endpoint, 'unix://')) {
             throw new \RuntimeException('The local worker controller requires a daemon-visible Unix socket.');
@@ -46,7 +39,7 @@ class WorkerLifecycle
         $sharedVolumes = array_values(array_unique(array_column($configuration->mediaMounts, 'volume')));
         $ipc = $configuration->namespace . '-ipc-' . $boot;
         $manifest = [
-            'version' => 6,
+            'version' => 7,
             'sourceMountPolicy' => $configuration->sourceMountPolicy,
             'namespace' => $configuration->namespace,
             'bootId' => $boot,
@@ -55,14 +48,6 @@ class WorkerLifecycle
             'network' => $configuration->network,
             'dockerBinary' => '/usr/local/bin/docker',
             'dockerEndpoint' => 'unix:///var/run/docker.sock',
-            'controlMemoryMiB' => $configuration->profile->controlMemoryMiB,
-            'executionMemoryMiB' => $configuration->profile->executionMemoryMiB,
-            'controlNanoCpus' => 1000000000,
-            'executionNanoCpus' => 1000000000,
-            'controlCpuSet' => $configuration->controlCpuSet,
-            'executionCpuSet' => $configuration->executionCpuSet,
-            'controlPidsLimit' => $configuration->profile->controlPidsLimit,
-            'executionPidsLimit' => $configuration->profile->executionPidsLimit,
             'autoscaling' => $configuration->profile->autoscaling,
             'deploymentProfile' => $configuration->profile->deployment,
             'scheduledConsoleMiB' => $configuration->profile->scheduledConsoleMiB,
@@ -96,7 +81,6 @@ class WorkerLifecycle
             '--entrypoint',
             'php',
             ...self::sourceMountArguments($manifest),
-            ...DisposableContainer::memoryArguments($configuration->operatorMemoryMiB),
         ];
         $measurement = $this->operatorMeasurement(['directory' => $directory, 'namespace' => $configuration->namespace, 'boot_id' => $boot], 'prepare', $configuration->operatorImage);
         $validator = <<<'CODE'
@@ -143,7 +127,6 @@ CODE;
             'boot_id' => $boot,
             'ipc_volume' => $ipc,
             'cleanup_budget' => $cleanupSeconds,
-            'operator_memory_mib' => $configuration->operatorMemoryMiB,
             'preparation' => [
                 'version' => 1,
                 'manifest' => hash_file('sha256', $directory . '/manifest.json'),
@@ -169,7 +152,6 @@ if ($user === false || !chmod($directory, 0700)
 CODE;
         $initializeIpc = $measurement['bootstrap'] . "\n" . $initializeIpc;
         DisposableContainer::run($docker, $directory . '/ipc-initialize-resources.json', [
-            ...DisposableContainer::memoryArguments($configuration->operatorMemoryMiB),
             '--network',
             'none',
             '--cgroupns',
@@ -302,7 +284,6 @@ CODE;
             '--tmpfs',
             '/tmp:rw,noexec,nosuid,nodev,size=16m,mode=0700',
         ];
-        array_push($arguments, ...DisposableContainer::memoryArguments($record['operator_memory_mib'] ?? null));
         $documents = [];
         foreach (['manifest', 'credentials'] as $name) {
             $contents = @file_get_contents($record['directory'] . '/' . $name . '.json', length: 8193);

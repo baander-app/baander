@@ -481,7 +481,7 @@ final class DevelopmentWorkersTest extends DevDataTestCase
     {
         return $this->runner(static function (array $arguments) use ($reject, $failInitialization): string|\Baander\Tooling\Process\ProcessResult {
             if (in_array('info', $arguments, true)) {
-                return '{"ID":"daemon","NCPU":2,"MemTotal":17179869184}';
+                return '{"ID":"daemon","NCPU":2,"MemTotal":17179869184,"SecurityOptions":["name=seccomp,profile=builtin","name=cgroupns"]}';
             }
             if (in_array('context', $arguments, true)) {
                 return '[{"Endpoints":{"docker":{"Host":"unix:///var/run/docker.sock"}}}]';
@@ -497,8 +497,7 @@ final class DevelopmentWorkersTest extends DevDataTestCase
             }
             return json_encode([
                 'version' => 1,
-                'runtime' => ['phpHeapMiB' => 256],
-                'budgets' => ['controlMemoryMiB' => 2944, 'executionMemoryMiB' => 4480, 'controlPidsLimit' => 129, 'executionPidsLimit' => 256, 'scheduledConsoleMiB' => 320],
+                'runtime' => ['phpHeapMiB' => 256, 'scheduledConsoleMiB' => 320],
                 'autoscaling' => AtomicFile::readJson(dirname(__DIR__, 3) . '/tests/Fixtures/Worker/autoscaling-profile.json'),
                 'deployment' => AtomicFile::readJson(dirname(__DIR__, 3) . '/tests/Fixtures/Worker/deployment-profile.json'),
             ], JSON_THROW_ON_ERROR);

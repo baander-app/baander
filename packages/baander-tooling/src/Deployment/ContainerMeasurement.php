@@ -22,7 +22,7 @@ final class ContainerMeasurement
         $receipt = ['version' => 1, 'action' => $action, 'namespace' => $context['namespace'], 'bootId' => $context['boot_id'],
             'nonce' => $nonce, 'containerId' => null, 'imageId' => $image, 'status' => 'incomplete',
             'startedMonotonic' => null, 'finishedMonotonic' => null, 'startedEpochSeconds' => null, 'finishedEpochSeconds' => null,
-            'docker' => null, 'limits' => null, 'cgroup' => null, 'errors' => ['completion-not-observed']];
+            'docker' => null, 'cgroup' => null, 'errors' => ['completion-not-observed']];
         AtomicFile::writeJson($path, $receipt);
         $bootstrap = <<<'CODE'
 (static function (): void {
@@ -128,12 +128,11 @@ CODE;
                     || ($observed['cgroupNamespace'] ?? null) !== 'private' || ($result !== null && $observed['exitCode'] !== $result->exitCode)) {
                     throw new \RuntimeException('Invalid container observation.');
                 }
-                $receipt['docker'] = array_intersect_key($observed, array_flip(['status', 'running', 'exitCode', 'oomKilled', 'startedAt', 'finishedAt']));
-                $receipt['limits'] = ['memoryMaxBytes' => $observed['memory'], 'memorySwapMaxBytes' => $observed['memorySwap'],
-                    'nanoCpus' => $observed['nanoCpus'], 'pidsMax' => $observed['pidsLimit'], 'cpuSet' => $observed['cpuSet'], 'cgroupNamespace' => $observed['cgroupNamespace']];
-                if ($receipt['cgroup'] !== null && (($observed['memory'] > 0 && $receipt['cgroup']['memoryMaxBytes'] !== $observed['memory'])
-                    || ($observed['memorySwap'] > 0 && $receipt['cgroup']['swapMaxBytes'] !== max(0, $observed['memorySwap'] - $observed['memory'])))) {
-                    $errors[] = 'cgroup-limit-mismatch';
+                $receipt['docker'] = array_intersect_key($observed, array_flip(['status', 'running', 'exitCode', 'oomKilled', 'startedAt', 'finishedAt', 'cgroupNamespace']));
+                // Operator containers run without resource limits, both as Docker records them and as the kernel enforces them.
+                if ($observed['memory'] > 0 || $observed['memorySwap'] > 0 || $observed['nanoCpus'] > 0 || ($observed['pidsLimit'] ?? 0) > 0 || $observed['cpuSet'] !== ''
+                    || ($receipt['cgroup'] !== null && ($receipt['cgroup']['memoryMaxBytes'] !== 'max' || $receipt['cgroup']['swapMaxBytes'] !== 'max'))) {
+                    $errors[] = 'container-limit-present';
                 }
             } catch (\Throwable) {
                 $errors[] = 'container-state-unconfirmed';
@@ -169,6 +168,4 @@ CODE;
         }
         return true;
     }
-
-
 }

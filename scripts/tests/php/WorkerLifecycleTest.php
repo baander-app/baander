@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Baander\Tooling\Tests;
 
+use App\Shared\Infrastructure\Worker\DeploymentOperatorManifest;
 use Baander\Tooling\Configuration\ApplicationLayout;
 use Baander\Tooling\Deployment\{ImageProfile, WorkerConfiguration, WorkerLifecycle, WorkerStateStore};
 use Baander\Tooling\Filesystem\AtomicFile;
@@ -53,8 +54,7 @@ final class WorkerLifecycleTest extends TestCase
             'version' => 1,
             'deployment' => ['identifier' => 'household', 'webWorkers' => 2, 'doctrinePoolSlots' => 4],
             'autoscaling' => ['minimumConcurrency' => 1, 'maximumConcurrency' => 1],
-            'runtime' => ['phpHeapMiB' => 256],
-            'budgets' => ['controlMemoryMiB' => 2304, 'executionMemoryMiB' => 4480, 'controlPidsLimit' => 129, 'executionPidsLimit' => 256, 'scheduledConsoleMiB' => 320],
+            'runtime' => ['phpHeapMiB' => 256, 'scheduledConsoleMiB' => 320],
         ]);
         return new WorkerConfiguration(...array_replace([
             'namespace' => 'household-proof',
@@ -71,15 +71,15 @@ final class WorkerLifecycleTest extends TestCase
             ],
             'resourceLabels' => ['app.baander.household.owner' => 'household-proof'],
             'profile' => $profile,
-            'operatorMemoryMiB' => 512,
         ], $overrides));
     }
 
-    public function testProductionPreparationUsesImageBudgetAndPersistsIntentBeforeCreatingVolumes(): void
+    public function testProductionPreparationWritesAnUnlimitedManifestAndPersistsIntentBeforeCreatingVolumes(): void
     {
         $runner = new WorkerCommandExecutor(function (array $arguments): string {
             if (in_array('info', $arguments, true)) {
-                return '{"ID":"daemon","NCPU":4,"MemTotal":7650410496}';
+                // A single small CPU and little memory no longer refuse a worker pair.
+                return '{"ID":"daemon","NCPU":1,"MemTotal":1073741824,"SecurityOptions":["name=seccomp,profile=builtin","name=cgroupns"]}';
             }
             if (in_array('volume', $arguments, true) && in_array('create', $arguments, true)) {
                 self::assertSame('preparing', $this->store->load()['phase']);
@@ -91,40 +91,66 @@ final class WorkerLifecycleTest extends TestCase
             return '';
         });
         $record = null;
-        $configuration = $this->configuration(['controlCpuSet' => [2], 'executionCpuSet' => [3]]);
+        $configuration = $this->configuration();
         $lifecycle = new WorkerLifecycle($this->store, $runner, getenv());
         $lifecycle->prepare($record, $configuration);
         self::assertSame('prepared', $record['phase']);
         self::assertSame($record, $this->store->load());
         self::assertSame($configuration->target, $record['target']);
         self::assertSame('household-network', $record['network']);
-        self::assertSame(512, $record['operator_memory_mib']);
+        self::assertArrayNotHasKey('operator_memory_mib', $record);
         $manifest = AtomicFile::readJson($record['directory'] . '/manifest.json');
+        $fields = ['version', 'sourceMountPolicy', 'namespace', 'bootId', 'daemonId', 'imageId', 'network', 'dockerBinary', 'dockerEndpoint',
+            'autoscaling', 'deploymentProfile', 'scheduledConsoleMiB', 'ipcVolume', 'mediaMounts'];
+        $saved = array_keys($manifest);
+        sort($fields);
+        sort($saved);
+        self::assertSame($fields, $saved);
+        self::assertSame(7, $manifest['version']);
         self::assertSame('production', $manifest['sourceMountPolicy']);
-        self::assertSame(2304, $manifest['controlMemoryMiB']);
-        self::assertSame(4480, $manifest['executionMemoryMiB']);
-        self::assertSame([2], $manifest['controlCpuSet']);
-        self::assertSame([3], $manifest['executionCpuSet']);
+        self::assertSame(320, $manifest['scheduledConsoleMiB']);
         self::assertSame([], WorkerLifecycle::sourceMountArguments($manifest));
         self::assertEquals($configuration->mediaMounts, $manifest['mediaMounts']);
         self::assertSame(['state' => 'ready'], $lifecycle->invoke($record, 'status'));
-        $operator = array_find($runner->calls, static fn(array $call): bool => in_array('worker-controller', $call['arguments'], true));
-        self::assertSame('512m', $operator['arguments'][array_search('--memory', $operator['arguments'], true) + 1]);
-        self::assertSame('512m', $operator['arguments'][array_search('--memory-swap', $operator['arguments'], true) + 1]);
-        foreach ($runner->calls as $call) {
-            if (($call['arguments'][3] ?? null) === 'create') {
-                self::assertContains('--memory', $call['arguments']);
-                self::assertSame('512m', $call['arguments'][array_search('--memory', $call['arguments'], true) + 1]);
-                self::assertSame('512m', $call['arguments'][array_search('--memory-swap', $call['arguments'], true) + 1]);
+        $operators = array_filter($runner->calls, static fn(array $call): bool => in_array('worker-controller', $call['arguments'], true) || ($call['arguments'][3] ?? null) === 'create');
+        self::assertGreaterThanOrEqual(3, count($operators));
+        foreach ($operators as $call) {
+            foreach (['--memory', '--memory-swap', '--pids-limit', '--cpus', '--cpuset-cpus', '--cpu-shares'] as $limit) {
+                self::assertNotContains($limit, $call['arguments']);
             }
         }
     }
 
-    public function testKnownOperatorReservationCountsTowardDaemonMemoryAdmission(): void
+    public function testPreparedManifestIsTheShapeTheApplicationOperatorAccepts(): void
     {
-        $runner = new WorkerCommandExecutor(static fn(): string => '{"ID":"daemon","NCPU":2,"MemTotal":7340032000}');
+        $runner = new WorkerCommandExecutor(static function (array $arguments): string {
+            if (in_array('volume', $arguments, true) && in_array('create', $arguments, true)) {
+                return $arguments[array_key_last($arguments)];
+            }
+            return in_array('info', $arguments, true) ? '{"ID":"daemon"}' : '';
+        });
+        $deployment = AtomicFile::readJson(dirname(__DIR__, 3) . '/tests/Fixtures/Worker/deployment-profile.json');
+        $profile = ImageProfile::fromArray(['version' => 1, 'deployment' => $deployment,
+            'autoscaling' => AtomicFile::readJson(dirname(__DIR__, 3) . '/tests/Fixtures/Worker/autoscaling-profile.json'),
+            'runtime' => ['phpHeapMiB' => 256, 'scheduledConsoleMiB' => 320]]);
         $record = null;
-        $this->expectExceptionMessage('7296 MiB');
+        new WorkerLifecycle($this->store, $runner, getenv())->prepare($record, $this->configuration(['profile' => $profile, 'mediaMounts' => [
+            ['volume' => 'household-media', 'target' => '/storage/media', 'role' => 'source', 'readOnly' => true],
+            ['volume' => 'household-derived', 'target' => '/srv/baander/storage', 'role' => 'derived', 'readOnly' => false],
+            ['volume' => 'household-state', 'target' => '/srv/baander/var/transcode_state', 'role' => 'derived', 'readOnly' => false],
+        ]]));
+        $contents = file_get_contents($record['directory'] . '/manifest.json');
+        self::assertIsString($contents);
+        $manifest = DeploymentOperatorManifest::fromJson($contents, '/srv/baander');
+        self::assertSame(320 * 1024 ** 2, $manifest->scheduledConsoleBytes);
+        self::assertSame('full', $manifest->deploymentProfile->identifier);
+    }
+
+    public function testRootlessDaemonIsRefusedBeforeAnythingIsSaved(): void
+    {
+        $runner = new WorkerCommandExecutor(static fn(): string => '{"ID":"daemon","SecurityOptions":["name=seccomp,profile=builtin","name=rootless"]}');
+        $record = null;
+        $this->expectExceptionMessage('rootless');
         try {
             new WorkerLifecycle($this->store, $runner, getenv())->prepare($record, $this->configuration());
         } finally {
@@ -139,12 +165,6 @@ final class WorkerLifecycleTest extends TestCase
         $this->configuration(['mediaMounts' => [['source' => '/media/baander', 'target' => '/media', 'role' => 'source', 'readOnly' => true]]]);
     }
 
-    public function testOverlappingCpuSetsAreRefused(): void
-    {
-        $this->expectExceptionMessage('must not overlap');
-        $this->configuration(['controlCpuSet' => [0, 1], 'executionCpuSet' => [1]]);
-    }
-
     public function testOperatorReceiptCombinesShutdownPeakWithFinalDockerState(): void
     {
         [$lifecycle, $record] = $this->measuredOperator();
@@ -155,7 +175,8 @@ final class WorkerLifecycleTest extends TestCase
         self::assertSame('complete', $receipt['status']);
         self::assertSame(10485760, $receipt['cgroup']['memoryPeakBytes']);
         self::assertSame(false, $receipt['docker']['oomKilled']);
-        self::assertSame(536870912, $receipt['limits']['memoryMaxBytes']);
+        self::assertSame('private', $receipt['docker']['cgroupNamespace']);
+        self::assertArrayNotHasKey('limits', $receipt);
         self::assertSame(1700, $receipt['startedMonotonic']);
         self::assertSame($record['operator_image'], $receipt['imageId']);
         self::assertSame(0600, fileperms($paths[0]) & 0777);
@@ -184,6 +205,21 @@ final class WorkerLifecycleTest extends TestCase
         self::assertContains('container-state-unconfirmed', $receipt['errors']);
     }
 
+    public function testOperatorContainerLimitsCannotProduceACompleteReceipt(): void
+    {
+        foreach ([['memory' => 536870912, 'memorySwap' => 536870912], ['memorySwap' => 536870912], ['nanoCpus' => 1000000000], ['pidsLimit' => 64], ['cpuSet' => '0'],
+            ['cgroup' => ['memoryMaxBytes' => 536870912]], ['cgroup' => ['swapMaxBytes' => 0]]] as $limit) {
+            [$lifecycle, $record] = $this->measuredOperator(limits: $limit);
+            self::assertSame(['state' => 'ready'], $lifecycle->invoke($record, 'status'));
+            $paths = glob($record['directory'] . '/operator-measurements/status-*.json');
+            self::assertCount(1, $paths);
+            $receipt = AtomicFile::readJson($paths[0]);
+            self::assertSame('incomplete', $receipt['status'], json_encode($limit, JSON_THROW_ON_ERROR));
+            self::assertSame(['container-limit-present'], $receipt['errors']);
+            Collector::remove($record['directory']);
+        }
+    }
+
     public function testOomFailureRetainsFinalStateWithoutFabricatingPeak(): void
     {
         [$lifecycle, $record] = $this->measuredOperator(marker: false, oom: true);
@@ -201,23 +237,27 @@ final class WorkerLifecycleTest extends TestCase
         self::assertNull($receipt['cgroup']);
     }
 
-    /** @return array{WorkerLifecycle,array<string,mixed>} */
-    private function measuredOperator(bool $marker = true, bool $oom = false, string $cgroupNamespace = 'private'): array
+    /** @param array<string,mixed> $limits container settings, or cgroup values under 'cgroup', that replace the unlimited defaults
+     * @return array{WorkerLifecycle,array<string,mixed>}
+     */
+    private function measuredOperator(bool $marker = true, bool $oom = false, string $cgroupNamespace = 'private', array $limits = []): array
     {
         $record = ['directory' => $this->directory . '/boot', 'namespace' => 'household-proof', 'boot_id' => str_repeat('a', 32),
             'network' => 'household-network', 'socket' => '/var/run/docker.sock', 'operator_image' => 'sha256:' . str_repeat('b', 64),
-            'layout' => ['version' => 1, 'root' => '/srv/baander'], 'operator_memory_mib' => 512,
+            'layout' => ['version' => 1, 'root' => '/srv/baander'],
             'target' => DevelopmentCommandExecutor::target($this->directory . '/docker')];
         AtomicFile::writeJson($record['directory'] . '/manifest.json', ['mediaMounts' => []]);
         AtomicFile::writeJson($record['directory'] . '/credentials.json', ['controllerDatabaseUrl' => 'private-password']);
-        $runner = new WorkerCommandExecutor(static function (array $arguments) use ($record, $marker, $oom, $cgroupNamespace): string|\Baander\Tooling\Process\ProcessResult {
+        $cgroupLimits = $limits['cgroup'] ?? [];
+        unset($limits['cgroup']);
+        $runner = new WorkerCommandExecutor(static function (array $arguments) use ($record, $marker, $oom, $cgroupNamespace, $limits, $cgroupLimits): string|\Baander\Tooling\Process\ProcessResult {
             if (in_array('info', $arguments, true)) {
                 return '{"ID":"daemon"}';
             }
             if (in_array('inspect', $arguments, true) && str_contains(implode(' ', $arguments), 'cgroupNamespace')) {
                 return json_encode(['id' => $arguments[array_key_last($arguments)], 'image' => $record['operator_image'], 'status' => 'exited',
                     'running' => false, 'exitCode' => $oom ? 137 : 0, 'oomKilled' => $oom, 'startedAt' => '2026-11-02T10:00:00Z', 'finishedAt' => '2026-11-02T10:00:01Z',
-                    'memory' => 536870912, 'memorySwap' => 536870912, 'nanoCpus' => 0, 'pidsLimit' => null, 'cpuSet' => '', 'cgroupNamespace' => $cgroupNamespace], JSON_THROW_ON_ERROR);
+                    'memory' => 0, 'memorySwap' => 0, 'nanoCpus' => 0, 'pidsLimit' => null, 'cpuSet' => '', 'cgroupNamespace' => $cgroupNamespace, ...$limits], JSON_THROW_ON_ERROR);
             }
             if (in_array('worker-controller', $arguments, true)) {
                 self::assertSame('private', $arguments[array_search('--cgroupns', $arguments, true) + 1]);
@@ -225,9 +265,9 @@ final class WorkerLifecycleTest extends TestCase
                 $receipt = $paths === [] ? ['nonce' => 'absent'] : AtomicFile::readJson($paths[0]);
                 $metrics = ['version' => 1, 'nonce' => $receipt['nonce'], 'startedMonotonic' => 1700.0, 'finishedMonotonic' => 1701.0,
                     'startedEpochSeconds' => 1793613600.0, 'finishedEpochSeconds' => 1793613601.0, 'errors' => [],
-                    'cgroup' => ['identity' => '27:42', 'path' => '/', 'memoryCurrentBytes' => 7340032, 'memoryPeakBytes' => 10485760, 'memoryMaxBytes' => 536870912,
-                        'memoryEvents' => ['oom' => 0, 'oom_kill' => 0], 'swapCurrentBytes' => 0, 'swapPeakBytes' => 0, 'swapMaxBytes' => 0,
-                        'pidsCurrent' => 2, 'pidsPeak' => null, 'pidsMax' => 'max', 'unwanted' => 'private-password']];
+                    'cgroup' => [...['identity' => '27:42', 'path' => '/', 'memoryCurrentBytes' => 7340032, 'memoryPeakBytes' => 10485760, 'memoryMaxBytes' => 'max',
+                        'memoryEvents' => ['oom' => 0, 'oom_kill' => 0], 'swapCurrentBytes' => 0, 'swapPeakBytes' => 0, 'swapMaxBytes' => 'max',
+                        'pidsCurrent' => 2, 'pidsPeak' => null, 'pidsMax' => 'max', 'unwanted' => 'private-password'], ...$cgroupLimits]];
                 $stderr = $marker ? "\nBAANDER_OPERATOR_MEASURE_V1:" . $receipt['nonce'] . ':' . json_encode($metrics, JSON_THROW_ON_ERROR | JSON_PRESERVE_ZERO_FRACTION) . "\n" : '';
                 return new \Baander\Tooling\Process\ProcessResult($oom ? 137 : 0, null, false, false, '{"success":true,"action":"status","result":{"state":"ready"}}', $stderr, 1.0);
             }

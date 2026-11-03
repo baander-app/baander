@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Baander\Tooling\Tests\Historical;
 
-use App\Shared\Infrastructure\Worker\{DeploymentLease, DeploymentResourceBudget, DeploymentRuntimeEnvironment, RegisteredDeploymentStart};
+use App\Shared\Infrastructure\Worker\{DeploymentLease, DeploymentRuntimeEnvironment, RegisteredDeploymentStart};
 use App\Shared\Application\DTO\DeploymentUnit;
 use InvalidArgumentException;
 use Symfony\Component\DependencyInjection\Attribute\Exclude;
@@ -45,7 +45,7 @@ final readonly class DeploymentContainerRecipe
         public string $sourceMountPolicy = 'production',
     ) {
         DeploymentLease::validateIdentity($namespace, $bootId);
-        $this->cpuSet = (new DeploymentResourceBudget($memoryBytes, $nanoCpus, $pidsLimit, $cpuSet))->cpuSet;
+        $this->cpuSet = self::validateResources($memoryBytes, $nanoCpus, $pidsLimit, $cpuSet);
         if (preg_match('/\A[A-Za-z0-9][A-Za-z0-9_.-]{0,127}\z/D', $ipcVolume) !== 1) {
             throw new InvalidArgumentException('Worker IPC requires an explicitly named private volume.');
         }
@@ -191,6 +191,33 @@ final readonly class DeploymentContainerRecipe
             $validated[] = [($bind ? 'source' : 'volume') => $mount[$bind ? 'source' : 'volume'], 'target' => $target, 'readOnly' => $mount['readOnly'], 'role' => $mount['role']];
         }
         usort($validated, static fn(array $left, array $right): int => strcmp($left['target'], $right['target']));
+        return $validated;
+    }
+
+    /**
+     * Historical recipes carried container-wide memory, CPU and PID ceilings over a CPU set.
+     *
+     * @param array<array-key,mixed> $cpuSet
+     * @return list<int>
+     */
+    private static function validateResources(int $memoryBytes, int $nanoCpus, int $pidsLimit, array $cpuSet): array
+    {
+        if ($memoryBytes < 16 * 1024 * 1024 || $memoryBytes > 1024 * 1024 * 1024 * 1024
+            || $nanoCpus < 1_000_000 || $nanoCpus > 64_000_000_000 || $pidsLimit < 8 || $pidsLimit > 4096
+            || !array_is_list($cpuSet) || $cpuSet === [] || count($cpuSet) > 64) {
+            throw new InvalidArgumentException('Worker resources require bounded memory, CPU, PIDs and a nonempty CPU set.');
+        }
+        $validated = [];
+        foreach ($cpuSet as $cpu) {
+            if (!is_int($cpu) || $cpu < 0 || $cpu > 4095 || in_array($cpu, $validated, true)) {
+                throw new InvalidArgumentException('Worker CPU sets require distinct integer CPU identifiers.');
+            }
+            $validated[] = $cpu;
+        }
+        if ($nanoCpus > count($validated) * 1_000_000_000) {
+            throw new InvalidArgumentException('Worker CPU ceiling cannot exceed its CPU set.');
+        }
+        sort($validated, SORT_NUMERIC);
         return $validated;
     }
 

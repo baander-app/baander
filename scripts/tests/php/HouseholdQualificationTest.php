@@ -58,14 +58,13 @@ final class HouseholdQualificationTest extends TestCase
     public function testContractFailureProducesAFailureReceiptBeforeAnyObserverIsCreated(): void
     {
         $this->withPreparedQualification(function (Qualification $qualification, array $state, string $directory): void {
-            $deployment = AtomicFile::readJson($directory . '/deployment/state.json');
-            $deployment['profile']['version'] = 999;
-            AtomicFile::writeJson($directory . '/deployment/state.json', $deployment);
+            $state['images']['app'] = 'baander/fixture:latest';
+            AtomicFile::writeJson($directory . '/qualification.json', $state);
             try {
                 $qualification->start();
-                self::fail('Invalid image profile unexpectedly started.');
+                self::fail('A mutable run image unexpectedly started.');
             } catch (\InvalidArgumentException $error) {
-                self::assertStringContainsString('Unsupported image deployment profile', $error->getMessage());
+                self::assertStringContainsString('Run image must be immutable', $error->getMessage());
             }
             self::assertSame('start-failed', AtomicFile::readJson($directory . '/qualification.json')['phase']);
             self::assertFileExists($directory . '/runs/cold-startup/receipt.json');
@@ -98,10 +97,10 @@ final class HouseholdQualificationTest extends TestCase
         $seed = ['version' => 1, 'phase' => 'running', 'configuration' => $seedConfiguration, 'target' => $target, 'runs' => ['cold-startup' => 'receipt']];
         Qualification::validateSeed($seed, $configuration, $target);
         $tuned = $configuration;
-        $tuned['deployment']['resources']['webMemoryMiB'] = 2048;
+        $tuned['deployment']['resources']['redisMaxmemoryMiB'] = 256;
         $tuned['host']['constraintBytes'] = 8 * 1024 ** 3;
         Qualification::validateSeed($seed, $tuned, $target);
-        self::assertSame(2048, $tuned['deployment']['resources']['webMemoryMiB']);
+        self::assertSame(256, $tuned['deployment']['resources']['redisMaxmemoryMiB']);
         foreach ([['borrowedFrom' => []], ['changedSourcePath' => 'renamed.flac'], ['activeRun' => 'cold-startup'], ['phase' => 'cleaned'], ['target' => ['daemonId' => 'foreign', 'endpoint' => $target['endpoint']]]] as $change) {
             try {
                 Qualification::validateSeed(array_replace($seed, $change), $configuration, $target);
@@ -287,11 +286,10 @@ final class HouseholdQualificationTest extends TestCase
         }
     }
 
-    public function testRenameContainerUsesTheConfiguredOperatorBudget(): void
+    public function testRenameContainerRunsWithoutAContainerLimit(): void
     {
         $created = null;
         $this->withPreparedQualification(function (Qualification $qualification, array $state, string $directory) use (&$created): void {
-            $state['effectiveDeployment']['resources']['operatorMemoryMiB'] = 96;
             $store = new HouseholdStateStore($directory . '/deployment');
             $deployment = $store->load();
             $deployment['composeFile'] = $directory . '/compose.json';
@@ -306,8 +304,10 @@ final class HouseholdQualificationTest extends TestCase
             } catch (\RuntimeException) {
             }
             self::assertInstanceOf(ProcessSpec::class, $created);
-            self::assertSame('96m', $created->argv[array_search('--memory', $created->argv, true) + 1]);
-            self::assertSame('96m', $created->argv[array_search('--memory-swap', $created->argv, true) + 1]);
+            foreach (['--memory', '--memory-swap', '--pids-limit', '--cpus', '--cpuset-cpus'] as $limit) {
+                self::assertNotContains($limit, $created->argv);
+            }
+            self::assertContains('--cgroupns', $created->argv);
             self::assertContains('memory_limit=64M', $created->argv);
         }, function (CommandExecutor&\PHPUnit\Framework\MockObject\Stub $executor) use (&$created): void {
             $executor->method('run')->willReturnCallback(static function (ProcessSpec $command) use (&$created): \Baander\Tooling\Process\ProcessResult {
@@ -422,17 +422,17 @@ final class HouseholdQualificationTest extends TestCase
         self::assertFalse(Qualification::normalExits($containers, $first . str_replace('143', '137', $second)));
     }
 
-    public function testFailedStartRecordsEachServiceMemoryAndHealthState(): void
+    public function testFailedStartRecordsEachServiceExitAndHealthState(): void
     {
         $web = ['Name' => '/baander-household-web-1', 'Config' => ['Labels' => ['com.docker.compose.service' => 'web']],
             'State' => ['Running' => false, 'ExitCode' => 255, 'OOMKilled' => true, 'Health' => ['Status' => 'unhealthy', 'Log' => [
                 ['ExitCode' => 1, 'Output' => 'first'], ['ExitCode' => 1, 'Output' => 'second'], ['ExitCode' => 1, 'Output' => 'third'], ['ExitCode' => 1, 'Output' => str_repeat('x', 900)],
-            ]]], 'HostConfig' => ['Memory' => 268435456]];
+            ]]]];
         $redis = ['Name' => '/baander-household-redis-1', 'Config' => ['Labels' => ['com.docker.compose.service' => 'redis']],
-            'State' => ['Running' => true, 'ExitCode' => 0, 'OOMKilled' => false], 'HostConfig' => ['Memory' => 402653184]];
+            'State' => ['Running' => true, 'ExitCode' => 0, 'OOMKilled' => false]];
         $states = Qualification::serviceStates([$web, $redis]);
         self::assertSame(['name' => 'baander-household-web-1', 'service' => 'web', 'running' => false, 'exitCode' => 255, 'oomKilled' => true,
-            'health' => 'unhealthy', 'memoryLimitBytes' => 268435456], array_diff_key($states[0], ['healthLog' => true]));
+            'health' => 'unhealthy'], array_diff_key($states[0], ['healthLog' => true]));
         self::assertSame(['second', 'third'], array_slice(array_column($states[0]['healthLog'], 'output'), 0, 2));
         self::assertSame(512, strlen($states[0]['healthLog'][2]['output']));
         self::assertNull($states[1]['health']);
@@ -470,8 +470,7 @@ final class HouseholdQualificationTest extends TestCase
         $deployment = new HouseholdStateStore($directory . '/deployment');
         $deployment->save(['version' => 1, 'phase' => 'prepared', 'configuration' => $configuration['deployment'],
             'profile' => ['version' => 1, 'deployment' => ['identifier' => 'household', 'webWorkers' => 2, 'doctrinePoolSlots' => 4],
-                'autoscaling' => ['minimumConcurrency' => 1, 'maximumConcurrency' => 1], 'runtime' => ['phpHeapMiB' => 256],
-                'budgets' => ['controlMemoryMiB' => 2304, 'executionMemoryMiB' => 4480, 'controlPidsLimit' => 129, 'executionPidsLimit' => 256, 'scheduledConsoleMiB' => 320]],
+                'autoscaling' => ['minimumConcurrency' => 1, 'maximumConcurrency' => 1], 'runtime' => ['phpHeapMiB' => 256, 'scheduledConsoleMiB' => 320]],
             'layout' => ['version' => 1, 'root' => '/srv/baander'], 'owner' => 'fixture-owner']);
         $state = ['version' => 1, 'phase' => 'prepared', 'target' => $target->toArray(), 'configuration' => $configuration,
             'effectiveDeployment' => $configuration['deployment'], 'runs' => [], 'freshCopyConsumed' => false, 'datasetDigest' => str_repeat('d', 64),

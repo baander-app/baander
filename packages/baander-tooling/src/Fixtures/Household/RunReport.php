@@ -293,8 +293,7 @@ final class RunReport
                 $required = $phase === 'shutdown' ? ['status' => 1, 'recover' => 1]
                     : ($declaration['scenario'] === 'cold-startup' ? ['prepare' => 1, 'ipc-initialize' => 1, 'create' => 1, 'start' => 1, 'readiness' => 1] : ['readiness' => 2]);
                 $operatorAudits[$phase] = self::operatorAudit($input['receipts'], $input['context'], $required, (float) $input['from'], (float) $input['until']);
-                if (($input['context']['memoryMaxBytes'] ?? null) !== ($declaration['operatorMemoryMiB'] ?? 0) * 1024 ** 2
-                    || ($input['context']['namespace'] ?? null) !== ($declaration['workerNamespace'] ?? null)
+                if (($input['context']['namespace'] ?? null) !== ($declaration['workerNamespace'] ?? null)
                     || ($input['context']['operatorImage'] ?? null) !== ($declaration['operatorImageId'] ?? null)
                     || ($input['context']['workerImage'] ?? null) !== ($declaration['workerImageId'] ?? null)) {
                     $operatorAudits[$phase]['complete'] = false;
@@ -326,7 +325,6 @@ final class RunReport
             }
             if (($helpers['context']['bootId'] ?? null) !== ($declaration['deploymentOwner'] ?? null)
                 || ($helpers['context']['namespace'] ?? null) !== ($declaration['workerNamespace'] ?? null)
-                || ($helpers['context']['memoryMaxBytes'] ?? null) !== ($declaration['operatorMemoryMiB'] ?? 0) * 1024 ** 2
                 || (float) $helpers['from'] !== (float) $declaration['startedMonotonic'] || (float) $helpers['until'] !== (float) $completed) {
                 $helperAudit['complete'] = false;
                 $helperAudit['errors'][] = 'Helper identity or window differs from the run contract.';
@@ -356,7 +354,6 @@ final class RunReport
     {
         $errors = [];
         $counts = [];
-        $caps = [];
         $invocationPeaks = [];
         $nonces = [];
         $peak = $swapPeak = $oom = $failedExits = $included = $excluded = $pids = 0;
@@ -365,7 +362,6 @@ final class RunReport
         $readyProbes = [];
         $pidsPeakAvailable = true;
         if (!is_finite($from) || !is_finite($until) || $from < 0 || $until < $from || count($receipts) > 4096
-            || !is_int($context['memoryMaxBytes'] ?? null) || $context['memoryMaxBytes'] < 1
             || !is_string($context['namespace'] ?? null) || $context['namespace'] === ''
             || !is_string($context['bootId'] ?? null) || $context['bootId'] === '') {
             return ['complete' => false, 'errors' => ['Invalid operator measurement context or interval.']];
@@ -389,7 +385,7 @@ final class RunReport
                 $oom += (int) (($docker['oomKilled'] ?? null) === true);
                 $failedExits += (int) (is_int($docker['exitCode'] ?? null) && $docker['exitCode'] !== 0);
                 $invocationPeaks[] = ['action' => $action, 'nonce' => $nonce, 'containerId' => $receipt['containerId'] ?? null,
-                    'memoryMaxBytes' => $receipt['limits']['memoryMaxBytes'] ?? null, 'peakMemoryBytes' => $receipt['cgroup']['memoryPeakBytes'] ?? null,
+                    'peakMemoryBytes' => $receipt['cgroup']['memoryPeakBytes'] ?? null,
                     'peakSwapBytes' => $receipt['cgroup']['swapPeakBytes'] ?? null, 'exitCode' => $docker['exitCode'] ?? null, 'oomKilled' => $docker['oomKilled'] ?? null];
                 continue;
             }
@@ -402,25 +398,21 @@ final class RunReport
                 || !is_string($receipt['containerId'] ?? null) || preg_match('/^[a-f0-9]{64}$/D', $receipt['containerId']) !== 1) {
                 $errors[] = 'Operator identity differs from the measured worker deployment.';
             }
-            $limits = $receipt['limits'] ?? [];
             $group = $receipt['cgroup'] ?? [];
             $docker = $receipt['docker'] ?? [];
             $invocationPeaks[] = ['action' => $action, 'nonce' => $nonce, 'containerId' => $receipt['containerId'] ?? null,
-                'memoryMaxBytes' => $limits['memoryMaxBytes'] ?? null, 'peakMemoryBytes' => $group['memoryPeakBytes'] ?? null,
+                'peakMemoryBytes' => $group['memoryPeakBytes'] ?? null,
                 'peakSwapBytes' => $group['swapPeakBytes'] ?? null, 'exitCode' => $docker['exitCode'] ?? null, 'oomKilled' => $docker['oomKilled'] ?? null];
-            if (!is_int($limits['memoryMaxBytes'] ?? null) || $limits['memoryMaxBytes'] < 1 || $limits['memoryMaxBytes'] > $context['memoryMaxBytes']
-                || ($group['memoryMaxBytes'] ?? null) !== $limits['memoryMaxBytes']
-                || ($limits['cgroupNamespace'] ?? null) !== 'private' || ($group['path'] ?? null) !== '/'
-                || !is_int($limits['memorySwapMaxBytes'] ?? null) || $limits['memorySwapMaxBytes'] < $limits['memoryMaxBytes']
-                || ($group['swapMaxBytes'] ?? null) !== $limits['memorySwapMaxBytes'] - $limits['memoryMaxBytes']
-                || !is_int($group['memoryPeakBytes'] ?? null) || $group['memoryPeakBytes'] < 0 || $group['memoryPeakBytes'] > $limits['memoryMaxBytes']
+            // Operator invocations run without a memory limit in their own cgroup namespace.
+            if (($group['memoryMaxBytes'] ?? null) !== 'max' || ($group['swapMaxBytes'] ?? null) !== 'max'
+                || ($docker['cgroupNamespace'] ?? null) !== 'private' || ($group['path'] ?? null) !== '/'
+                || !is_int($group['memoryPeakBytes'] ?? null) || $group['memoryPeakBytes'] < 0
                 || !is_int($group['swapPeakBytes'] ?? null) || $group['swapPeakBytes'] < 0 || !is_string($group['identity'] ?? null) || $group['identity'] === ''
                 || !is_array($group['memoryEvents'] ?? null)
                 || !is_int($group['memoryEvents']['oom'] ?? null) || !is_int($group['memoryEvents']['oom_kill'] ?? null)
                 || $group['memoryEvents']['oom'] < 0 || $group['memoryEvents']['oom_kill'] < 0) {
-                $errors[] = 'Operator effective limits, peak or cgroup event evidence is missing or inconsistent.';
+                $errors[] = 'Operator unlimited cgroup, peak or cgroup event evidence is missing or inconsistent.';
             } else {
-                $caps[$limits['memoryMaxBytes']] = true;
                 if (is_int($group['pidsPeak'] ?? null)) {
                     $pids = max($pids, $group['pidsPeak']);
                 } else {
@@ -468,8 +460,8 @@ final class RunReport
             $errors[] = 'Operator used swap.';
         }
         return ['complete' => $errors === [], 'errors' => array_values(array_unique($errors)), 'invocations' => $included,
-            'excludedOutsideInterval' => $excluded, 'actions' => $counts, 'configuredMemoryMaxBytes' => $context['memoryMaxBytes'],
-            'invocationPeaks' => $invocationPeaks, 'effectiveMemoryCapsBytes' => array_keys($caps), 'peakMemoryBytes' => $peak, 'peakSwapBytes' => $swapPeak, 'oomEvents' => $oom, 'failedExits' => $failedExits, 'readinessPolls' => $readinessPolls, 'maximumObservedPids' => $pids, 'pidsPeakAvailableForAll' => $pidsPeakAvailable,
+            'excludedOutsideInterval' => $excluded, 'actions' => $counts,
+            'invocationPeaks' => $invocationPeaks, 'peakMemoryBytes' => $peak, 'peakSwapBytes' => $swapPeak, 'oomEvents' => $oom, 'failedExits' => $failedExits, 'readinessPolls' => $readinessPolls, 'maximumObservedPids' => $pids, 'pidsPeakAvailableForAll' => $pidsPeakAvailable,
             'peakScope' => 'Lifetime peak of each invocation intersecting this phase; reported separately, never added to sampled cgroup totals.'];
     }
 
