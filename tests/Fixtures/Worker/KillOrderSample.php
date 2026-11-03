@@ -39,7 +39,7 @@ final class KillOrderSample
                 'role' => $role,
                 'nice' => (int) ($fields[16] ?? 0),
                 'oomScoreAdj' => (int) trim($score),
-                'program' => basename($arguments[0] ?? ''),
+                'program' => basename($arguments[0]),
             ];
         }
         return $records;
