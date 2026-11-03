@@ -355,16 +355,10 @@ size, a 4 GB fit and Raspberry Pi support remain unqualified.
 One unit of concurrent media work a deployment admits: a video slot runs one
 video conversion or stream copy, an audio slot one audio rendition or stream copy.
 Original-file and completed-artifact playback use no slot. The startup profile
-fixes the slot counts; unset full-profile slots default to the largest pair the
-resource allowance supports, and native-execution limits are derived from them.
-
-### Resource allowance
-
-The CPUs and memory an operator lets Baander as a whole use, stated in the
-deployment configuration and carried in the startup profile. Each service's CPU
-weight and ceiling, memory floor and ceiling and kill priority are derived from
-it and from the media job slots. The memory floors and the steady CPU demand must
-fit the allowance; burst ceilings may add up to more than it.
+fixes the slot counts, and Baander's native encoder memory envelope and native
+execution limits are derived from them. Slots are Baander's only bound on media
+work: containers carry no CPU or memory limits, and operators lower the slots
+when their host cannot keep up.
 
 ### Connection pooler
 
