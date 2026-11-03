@@ -1,0 +1,30 @@
+#!/bin/sh
+# Renders Baander's PgBouncer configuration from the environment and runs
+# PgBouncer in the foreground. The values become configuration syntax, so each
+# must be a plain name or a positive count.
+set -eu
+
+fail() {
+    echo "baander-pooler: $1" >&2
+    exit 64
+}
+
+require() {
+    value=$(printenv "$1") || fail "$1 is required."
+    printf '%s' "$value" | grep -Eqx "$2" || fail "$1 must match $2."
+    printf '%s' "$value"
+}
+
+# The control alias and role append "_control", so the names leave it room
+# within PostgreSQL's 63-byte identifier limit.
+database=$(require BAANDER_POOLER_DATABASE '[A-Za-z_][A-Za-z0-9_]{0,54}')
+user=$(require BAANDER_POOLER_USER '[A-Za-z_][A-Za-z0-9_]{0,54}')
+host=$(require BAANDER_POOLER_SERVER_HOST '[A-Za-z0-9][A-Za-z0-9.-]{0,252}')
+application=$(require BAANDER_POOLER_APPLICATION_POOL_SIZE '[1-9][0-9]{0,3}')
+control=$(require BAANDER_POOLER_CONTROL_POOL_SIZE '[1-9][0-9]{0,3}')
+
+directory=$(mktemp -d)
+sed -e "s/@DATABASE@/$database/g" -e "s/@USER@/$user/g" -e "s/@SERVER_HOST@/$host/g" \
+    -e "s/@APPLICATION_POOL_SIZE@/$application/g" -e "s/@CONTROL_POOL_SIZE@/$control/g" \
+    /etc/baander-pooler/pgbouncer.ini > "$directory/pgbouncer.ini"
+exec pgbouncer "$directory/pgbouncer.ini"

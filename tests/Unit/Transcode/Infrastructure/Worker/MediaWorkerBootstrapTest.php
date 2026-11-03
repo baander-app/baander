@@ -69,6 +69,7 @@ PHP);
             'BAANDER_WORKER_GENERATION' => '1',
             'BAANDER_WORKER_LEASE_EPOCH' => '1',
             'DATABASE_URL' => 'postgresql://credential:private-secret@baander.app/database',
+            'DATABASE_CONTROL_URL' => 'postgresql://credential_control:private-secret@baander.app/database_control',
             // The repository Dotenv files must not fill this missing inherited setting.
             'APP_DEBUG' => '0',
         ];

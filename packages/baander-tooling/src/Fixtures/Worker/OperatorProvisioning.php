@@ -516,6 +516,7 @@ final readonly class OperatorProvisioning
             'APP_DEBUG' => '0',
             'APP_SECRET' => 'operator-test-only',
             'DATABASE_URL' => 'postgresql://baander:test-only@postgres:5432/worker_operator_test?serverVersion=18&charset=utf8',
+            'DATABASE_CONTROL_URL' => 'postgresql://baander:test-only@postgres:5432/worker_operator_test?serverVersion=18&charset=utf8',
             'REDIS_URL' => 'redis://default:test-only@redis:6379',
             'REDIS_PASSWORD' => 'test-only',
             'MESSENGER_TRANSPORT_DSN' => 'redis://default:test-only@redis:6379/messages',

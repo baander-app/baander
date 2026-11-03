@@ -36,7 +36,7 @@ final class WorkerSupervisorRunnerTest extends TestCase
     public function testLaunchReservationsExactlyMatchTheValidatedFloor(string $profileName, string $unit, int $concurrency, int $expectedMiB): void
     {
         $project = dirname(__DIR__, 5);
-        $runner = new \App\Shared\Infrastructure\Worker\WorkerSupervisorRunner($project, 'postgresql://worker:private@db.baander.app/worker', self::catalog());
+        $runner = new \App\Shared\Infrastructure\Worker\WorkerSupervisorRunner($project, 'postgresql://worker:private@db.baander.app/worker', 'postgresql://worker_control:private@db.baander.app/worker_control', self::catalog());
         $profile = new \App\Shared\Application\DTO\DeploymentProfile($profileName);
         $autoscaling = new \App\Shared\Application\DTO\WorkerAutoscalingProfile(maximumConcurrency: $concurrency);
         $configuration = new \App\Shared\Application\DTO\WorkerRuntimeConfiguration('worker.baander.app', str_repeat('a', 32), $unit,
@@ -63,7 +63,7 @@ final class WorkerSupervisorRunnerTest extends TestCase
     public function testHouseholdMediaReservationMatchesItsTwoChildSlots(): void
     {
         $project = dirname(__DIR__, 5);
-        $runner = new \App\Shared\Infrastructure\Worker\WorkerSupervisorRunner($project, 'postgresql://worker:private@db.baander.app/worker', self::catalog());
+        $runner = new \App\Shared\Infrastructure\Worker\WorkerSupervisorRunner($project, 'postgresql://worker:private@db.baander.app/worker', 'postgresql://worker_control:private@db.baander.app/worker_control', self::catalog());
         $configuration = new \App\Shared\Application\DTO\WorkerRuntimeConfiguration('worker.baander.app', str_repeat('a', 32), 'control',
             2304 * 1024 * 1024, 129, 0, '/tmp/baander-worker-locks', '/run/baander-worker', deploymentProfile: new \App\Shared\Application\DTO\DeploymentProfile('household'));
         $definitions = (new \ReflectionMethod($runner, 'definitions'))->invoke($runner, $configuration);
@@ -78,7 +78,7 @@ final class WorkerSupervisorRunnerTest extends TestCase
         try {
             $_SERVER['REDIS_URL'] = 'redis://redis.baander.app';
             $_SERVER['MESSENGER_TRANSPORT_DSN'] = 'redis://default:private-password@redis.baander.app/messages/baander/fixed';
-            $runner = new \App\Shared\Infrastructure\Worker\WorkerSupervisorRunner(dirname(__DIR__, 5), 'postgresql://worker:private@db.baander.app/worker', self::catalog());
+            $runner = new \App\Shared\Infrastructure\Worker\WorkerSupervisorRunner(dirname(__DIR__, 5), 'postgresql://worker:private@db.baander.app/worker', 'postgresql://worker_control:private@db.baander.app/worker_control', self::catalog());
             try {
                 (new \ReflectionMethod($runner, 'environment'))->invoke($runner);
                 self::fail('Resolved transport identity override was accepted.');
@@ -110,7 +110,7 @@ final class WorkerSupervisorRunnerTest extends TestCase
             $_SERVER['SYMFONY_DOTENV_VARS'] = 'MESSENGER_CONSUMER_NAME,BAANDER_SCHEDULED_CONSOLE_RESERVATION_BYTES';
             $_ENV['BAANDER_SCHEDULED_CONSOLE_RESERVATION_BYTES'] = '999999999';
             $_SERVER['BAANDER_SCHEDULED_CONSOLE_RESERVATION_BYTES'] = '999999999';
-            $runner = new \App\Shared\Infrastructure\Worker\WorkerSupervisorRunner($project, 'postgresql://worker:private@db.baander.app/worker', self::catalog());
+            $runner = new \App\Shared\Infrastructure\Worker\WorkerSupervisorRunner($project, 'postgresql://worker:private@db.baander.app/worker', 'postgresql://worker_control:private@db.baander.app/worker_control', self::catalog());
             $environment = (new \ReflectionMethod($runner, 'environment'))->invoke($runner);
             $expected = 'worker-namespace-boot-consumer-1';
             $environment['MESSENGER_CONSUMER_NAME'] = $expected;
@@ -145,7 +145,7 @@ PHP;
     public function testConsoleReservationIsGrantedOnlyToScheduledConsumerAndDisabledByDefault(): void
     {
         $project = dirname(__DIR__, 5);
-        $runner = new \App\Shared\Infrastructure\Worker\WorkerSupervisorRunner($project, 'postgresql://worker:private@db.baander.app/worker', self::catalog());
+        $runner = new \App\Shared\Infrastructure\Worker\WorkerSupervisorRunner($project, 'postgresql://worker:private@db.baander.app/worker', 'postgresql://worker_control:private@db.baander.app/worker_control', self::catalog());
         $environment = ['BAANDER_SCHEDULED_CONSOLE_RESERVATION_BYTES' => '999999999'];
         $method = new \ReflectionMethod($runner, 'roleEnvironment');
         foreach ([0, 320 * 1024 * 1024] as $reservation) {
@@ -161,7 +161,7 @@ PHP;
     public function testResolvedBooleanDebugOverridesInheritedTextWithCanonicalValue(): void
     {
         $project = dirname(__DIR__, 5);
-        $runner = new \App\Shared\Infrastructure\Worker\WorkerSupervisorRunner($project, 'postgresql://worker:private@db.baander.app/worker', self::catalog());
+        $runner = new \App\Shared\Infrastructure\Worker\WorkerSupervisorRunner($project, 'postgresql://worker:private@db.baander.app/worker', 'postgresql://worker_control:private@db.baander.app/worker_control', self::catalog());
         $previous = $_SERVER;
         try {
             foreach ([false => '0', true => '1'] as $debug => $expected) {
@@ -266,7 +266,7 @@ PHP;
     public function testSchedulerLaunchEnvironmentUsesCurrentCommittedEpochAndGeneration(): void
     {
         $project = dirname(__DIR__, 5);
-        $runner = new \App\Shared\Infrastructure\Worker\WorkerSupervisorRunner($project, 'postgresql://worker:private@db.baander.app/worker', self::catalog());
+        $runner = new \App\Shared\Infrastructure\Worker\WorkerSupervisorRunner($project, 'postgresql://worker:private@db.baander.app/worker', 'postgresql://worker_control:private@db.baander.app/worker_control', self::catalog());
         $configuration = new \App\Shared\Application\DTO\WorkerRuntimeConfiguration('worker.baander.app', str_repeat('a', 32), 'control', 2944 * 1024 * 1024, 129, 0, '/tmp/baander-worker-locks', '/run/baander-worker', new \App\Shared\Application\DTO\DeploymentProfile('full'));
         $definition = (new \ReflectionMethod($runner, 'definitions'))->invoke($runner, $configuration)[1];
         $identity = new \App\Shared\Infrastructure\Worker\WorkerLaunchIdentity($configuration->namespace, $configuration->bootId, 'scheduler', 7);
@@ -298,7 +298,7 @@ PHP;
 
     public function testConsumerIdentityIsDistinctAcrossDeploymentsBootsAndGenerations(): void
     {
-        $runner = new \App\Shared\Infrastructure\Worker\WorkerSupervisorRunner(dirname(__DIR__, 5), 'postgresql://worker:private@db.baander.app/worker', self::catalog());
+        $runner = new \App\Shared\Infrastructure\Worker\WorkerSupervisorRunner(dirname(__DIR__, 5), 'postgresql://worker:private@db.baander.app/worker', 'postgresql://worker_control:private@db.baander.app/worker_control', self::catalog());
         $names = [];
         foreach ([['one.baander.app', 'a', 1], ['two.baander.app', 'a', 1], ['one.baander.app', 'b', 1], ['one.baander.app', 'a', 2]] as [$namespace, $boot, $generation]) {
             $configuration = new \App\Shared\Application\DTO\WorkerRuntimeConfiguration($namespace, str_repeat($boot, 32), 'execution', 4160 * 1024 * 1024, 256, 0, '/tmp/baander-worker-locks', '/run/baander-worker', new \App\Shared\Application\DTO\DeploymentProfile('full'));
@@ -319,7 +319,7 @@ PHP;
 
     public function testRolesAndReceiversAreSeparatedAcrossUnits(): void
     {
-        $runner = new \App\Shared\Infrastructure\Worker\WorkerSupervisorRunner(dirname(__DIR__, 5), 'postgresql://worker:private@db.baander.app/worker', self::catalog());
+        $runner = new \App\Shared\Infrastructure\Worker\WorkerSupervisorRunner(dirname(__DIR__, 5), 'postgresql://worker:private@db.baander.app/worker', 'postgresql://worker_control:private@db.baander.app/worker_control', self::catalog());
         $definitions = new \ReflectionMethod($runner, 'definitions');
         $control = new \App\Shared\Application\DTO\WorkerRuntimeConfiguration('worker.baander.app', str_repeat('a', 32), 'control', 2944 * 1024 * 1024, 129, 0, '/tmp/locks', '/run/baander-worker', new \App\Shared\Application\DTO\DeploymentProfile('full'));
         self::assertSame(['relay', 'scheduler', 'media', 'autoscaler'], array_column($definitions->invoke($runner, $control), 'id'));
@@ -343,7 +343,7 @@ PHP;
 
     public function testEveryResidentSlotRetainsItsFullReservation(): void
     {
-        $runner = new \App\Shared\Infrastructure\Worker\WorkerSupervisorRunner(dirname(__DIR__, 5), 'postgresql://worker:private@db.baander.app/worker', self::catalog());
+        $runner = new \App\Shared\Infrastructure\Worker\WorkerSupervisorRunner(dirname(__DIR__, 5), 'postgresql://worker:private@db.baander.app/worker', 'postgresql://worker_control:private@db.baander.app/worker_control', self::catalog());
         $profile = new \App\Shared\Application\DTO\WorkerAutoscalingProfile(maximumConcurrency: 4);
         $configuration = new \App\Shared\Application\DTO\WorkerRuntimeConfiguration('worker.baander.app', str_repeat('a', 32), 'execution',
             5440 * 1024 * 1024, 259, 320 * 1024 * 1024, '/tmp/locks', '/run/baander-worker', new \App\Shared\Application\DTO\DeploymentProfile('full'), $profile);
@@ -365,7 +365,7 @@ require $argv[1] . '/vendor/autoload.php';
 $configuration = new \App\Shared\Application\DTO\WorkerRuntimeConfiguration('worker.baander.app', str_repeat('a', 32), 'control', 2944 * 1024 * 1024, 129, 0, $argv[2], '/run/baander-worker', new \App\Shared\Application\DTO\DeploymentProfile('full'));
 $metadata = \App\Tests\Fixtures\Messaging\MessengerConfiguration::container();
 $catalog = new \App\Shared\Infrastructure\Messaging\AsyncWorkloadCatalog($metadata->getParameter('app.messenger.workloads'), $metadata->getParameter('app.messenger.transport_policies'));
-$runner = new \App\Shared\Infrastructure\Worker\WorkerSupervisorRunner($argv[1], 'postgresql://worker:private@db.baander.app/worker', $catalog);
+$runner = new \App\Shared\Infrastructure\Worker\WorkerSupervisorRunner($argv[1], 'postgresql://worker:private@db.baander.app/worker', 'postgresql://worker_control:private@db.baander.app/worker_control', $catalog);
 try {
     $runner->run($configuration);
     fwrite(STDERR, 'Uncontained invocation was not rejected.');

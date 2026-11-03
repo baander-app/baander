@@ -36,7 +36,7 @@ final class WorkerLeaseAgentTest extends TestCase
         $this->connection->executeStatement('SET search_path TO ' . $this->schema . ', public');
         \App\Tests\Support\FinalSchemaBootstrap::bootstrap($this->connection);
         DeploymentJournalFixture::ready($this->connection, 'baander.app:workers', str_repeat('a', 32));
-        $this->environment = [...getenv(), 'DATABASE_URL' => $url, 'PGOPTIONS' => '-c search_path=' . $this->schema . ',public'];
+        $this->environment = [...getenv(), 'DATABASE_URL' => $url, 'DATABASE_CONTROL_URL' => $url, 'PGOPTIONS' => '-c search_path=' . $this->schema . ',public'];
     }
 
     public function testRealHelperAcquiresAndRenewsWithBoundSequenceAndIdentity(): void
@@ -140,7 +140,7 @@ final class WorkerLeaseAgentTest extends TestCase
     public function testUnavailableDatabaseReturnsSanitizedFailure(): void
     {
         $environment = $this->environment;
-        $environment['DATABASE_URL'] = 'postgresql://lease-user:do-not-leak-password@127.0.0.1:1/baander_test';
+        $environment['DATABASE_CONTROL_URL'] = 'postgresql://lease-user:do-not-leak-password@127.0.0.1:1/baander_test';
         $result = $this->finish($this->start($this->request(), environment: $environment));
         self::assertFalse($result['success']);
         self::assertSame('database_error', $result['category']);

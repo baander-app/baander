@@ -9,18 +9,19 @@ use Baander\Tooling\Configuration\{ImageSelection, JsonObject};
 final readonly class HouseholdConfiguration
 {
     public const array IMAGE_ROLES = ['application', 'worker', 'operator', 'postgres', 'gateway', 'redis'];
-    public const array VOLUME_ROLES = ['media', 'storage', 'conversions', 'transcode_state', 'postgres', 'redis', 'secrets'];
+    public const array VOLUME_ROLES = ['media', 'storage', 'conversions', 'transcode_state', 'postgres', 'redis', 'secrets', 'pooler_credentials'];
     public const array RESOURCE_DEFAULTS = [
-        'webMemoryMiB' => 1536, 'postgresMemoryMiB' => 512, 'redisMemoryMiB' => 384,
+        'webMemoryMiB' => 1536, 'postgresMemoryMiB' => 512, 'poolerMemoryMiB' => 64, 'redisMemoryMiB' => 384,
         'redisMaxmemoryMiB' => 192, 'gatewayMemoryMiB' => 64, 'operatorMemoryMiB' => 512,
         'hostHeadroomMiB' => 512,
     ];
     /**
      * PostgreSQL limits sized for each profile's configuration file: shared buffers, about 128 MiB for auxiliary
-     * processes and mapped libraries, and about 24 MiB of private memory for every client connection that may load
-     * PGroonga (household: 128 MiB buffers, 33 client connections; full: 256 MiB buffers, 97 client connections).
+     * processes and mapped libraries, and about 24 MiB of private memory for every server connection that may load
+     * PGroonga, rounded up to 128 MiB. The connections are the pooler's server pools, the direct reserve and the
+     * superuser slots (household: 128 MiB buffers, 20 connections; full: 256 MiB buffers, 35 connections).
      */
-    public const array POSTGRES_MEMORY_MIB = ['household' => 1152, 'full' => 2816];
+    public const array POSTGRES_MEMORY_MIB = ['household' => 768, 'full' => 1280];
 
     /** @param array<string,ImageSelection> $images
      * @param array<string,string> $environment
@@ -85,7 +86,7 @@ final readonly class HouseholdConfiguration
         foreach (['APP_SECRET', 'STREAM_URL_HMAC_SECRET', 'DB_USERNAME', 'DB_PASSWORD', 'DB_DATABASE', 'REDIS_PASSWORD'] as $key) {
             self::string($environment, $key);
         }
-        foreach (['BAANDER_DEPLOYMENT_PROFILE', 'BAANDER_DEPLOYMENT_PROFILE_JSON', 'APP_ENV', 'APP_DEBUG', 'DATABASE_URL', 'REDIS_URL', 'MESSENGER_TRANSPORT_DSN', 'APP_URL', 'DEFAULT_URI', 'APP_DOMAIN', 'MEDIA_STORAGE_PATH', 'CONVERT_STORAGE_PATH', 'APP_HOME', 'OAUTH_PRIVATE_KEY_PATH', 'OAUTH_PUBLIC_KEY_PATH'] as $key) {
+        foreach (['BAANDER_DEPLOYMENT_PROFILE', 'BAANDER_DEPLOYMENT_PROFILE_JSON', 'APP_ENV', 'APP_DEBUG', 'DATABASE_URL', 'DATABASE_CONTROL_URL', 'REDIS_URL', 'MESSENGER_TRANSPORT_DSN', 'APP_URL', 'DEFAULT_URI', 'APP_DOMAIN', 'MEDIA_STORAGE_PATH', 'CONVERT_STORAGE_PATH', 'APP_HOME', 'OAUTH_PRIVATE_KEY_PATH', 'OAUTH_PUBLIC_KEY_PATH'] as $key) {
             if (array_key_exists($key, $environment)) {
                 throw new \InvalidArgumentException('Deployment derives environment variable ' . $key . '.');
             }

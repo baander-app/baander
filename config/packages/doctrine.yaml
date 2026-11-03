@@ -1,6 +1,11 @@
 doctrine:
     dbal:
         url: '%env(DATABASE_URL)%'
+        # Connections run through a transaction-mode PgBouncer. libpq 15 frees a named
+        # statement with SQL DEALLOCATE, which PgBouncer cannot map to the server's
+        # renamed statement, so the transaction would abort; use unnamed statements.
+        options:
+            !php/const Pdo\Pgsql::ATTR_DISABLE_PREPARES: true
         # Migration/DBAL-owned runtime tables must not be dropped by ORM schema diffs.
         schema_filter: '/^(?!domain_event_outbox|query_change_inbox$|query_scope_revision$|worker_deployment_boots$|worker_deployment_leases$|worker_deployment_containers$|worker_deployment_creations$|worker_deployment_retirements$|scheduler_occurrences$|scheduler_occurrence_executions$|playback_destinations$|playback_destination_incarnations$|playback_transfers$|playback_commands$|failed_messages$).*$/'
         schema_manager_factory: App\Shared\Infrastructure\Doctrine\Platform\BaanderSchemaManagerFactory

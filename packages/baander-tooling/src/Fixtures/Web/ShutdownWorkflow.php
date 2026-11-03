@@ -77,6 +77,8 @@ final class ShutdownWorkflow
             '-e',
             'DATABASE_URL=postgresql://baander:test-only@postgres:5432/web_shutdown_test?serverVersion=18&charset=utf8',
             '-e',
+            'DATABASE_CONTROL_URL=postgresql://baander:test-only@postgres:5432/web_shutdown_test?serverVersion=18&charset=utf8',
+            '-e',
             'WEB_DRAIN_SECONDS=10',
         ];
     }

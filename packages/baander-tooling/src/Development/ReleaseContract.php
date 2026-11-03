@@ -12,7 +12,7 @@ use Baander\Tooling\Filesystem\PrivateDirectory;
 final readonly class ReleaseContract
 {
     public const int VERSION = 1;
-    public const array IMAGE_KEYS = ['app_image', 'tool_image', 'worker_image', 'operator_image', 'postgres_image', 'nginx_image', 'redis_image'];
+    public const array IMAGE_KEYS = ['app_image', 'tool_image', 'worker_image', 'operator_image', 'postgres_image', 'pooler_image', 'nginx_image', 'redis_image'];
 
     /** @param array<string,mixed> $data */
     private function __construct(private array $data) {}

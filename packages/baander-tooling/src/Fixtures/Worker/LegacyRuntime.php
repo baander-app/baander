@@ -111,6 +111,8 @@ final class LegacyRuntime
                 'MESSENGER_TRANSPORT_DSN=redis://default:test-only@redis:6379/messages',
                 '-e',
                 'DATABASE_URL=postgresql://baander:test-only@postgres:5432/worker_test?serverVersion=18&charset=utf8',
+                '-e',
+                'DATABASE_CONTROL_URL=postgresql://baander:test-only@postgres:5432/worker_test?serverVersion=18&charset=utf8',
                 $runtime->image('application')->id,
                 '-c',
                 'exec sleep infinity',

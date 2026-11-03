@@ -149,6 +149,8 @@ final readonly class Household
         $this->assertOwnedServices($state);
         $this->prepareVolumes($configuration, $state);
         $this->docker->compose($configuration->name, $this->composeFile(), ['up', '-d', '--wait', 'postgres', 'redis'], timeout: 180);
+        $this->poolerCredentials($configuration, $state);
+        $this->docker->compose($configuration->name, $this->composeFile(), ['up', '-d', '--wait', Pooler::SERVICE], timeout: 180);
         $this->migrate($configuration, $state, $layout, $profile);
         $this->initializeSecrets($configuration, $state, $layout, $profile);
         $this->verifyPostgres($configuration, $state);
@@ -283,7 +285,7 @@ final readonly class Household
                 $this->seedVolume($configuration, $state, $role, $name, '$path = "/seed/" . $argv[1]; if (file_put_contents($path, stream_get_contents(STDIN)) === false || !chmod($path, 0644)) { exit(1); }', [$files[$role]['name']], $files[$role]['content']);
                 continue;
             }
-            if (in_array($role, ['postgres', 'redis'], true)) {
+            if (in_array($role, ['postgres', 'redis', 'pooler_credentials'], true)) {
                 continue;
             }
             $this->seedVolume($configuration, $state, $role, $name, 'if (!chown("/seed", "www-data") || !chgrp("/seed", "www-data")) { exit(1); }');
@@ -303,6 +305,26 @@ final readonly class Household
             '--network', 'none', '--user', '0:0', '--entrypoint', 'php', '--mount', 'type=volume,src=' . $volume . ',dst=/seed',
             $state['images']['application']['id'], '-r', $measurement['bootstrap'] . "\n" . $program, ...$arguments,
         ], $this->environment, $this->cleanupSeconds, input: $input, onCompletion: $measurement['onCompletion']);
+    }
+
+    /** Gives the database roles and the pooler's auth file one SCRAM verifier each, over a direct connection.
+     * @param array<string,mixed> $state
+     */
+    private function poolerCredentials(HouseholdConfiguration $configuration, array $state): void
+    {
+        $environment = $configuration->environment;
+        $helper = Pooler::credentialsHelper(
+            $state['images']['postgres']['id'],
+            $configuration->name . '-private',
+            $configuration->volumes['pooler_credentials'],
+            $environment['DB_USERNAME'],
+            $environment['DB_PASSWORD'],
+            $environment['DB_DATABASE'],
+            'postgres',
+        );
+        DisposableContainer::run($this->docker, $this->store->directory . '/pooler-credentials.json', [
+            '--cgroupns', 'private', ...DisposableContainer::memoryArguments($configuration->resources['operatorMemoryMiB']), ...$helper['arguments'],
+        ], array_replace($this->environment, $helper['environment']), $this->cleanupSeconds, timeout: 120, containerEnvironment: $helper['environment']);
     }
 
     /** @param array<string,mixed> $state */

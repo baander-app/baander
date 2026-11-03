@@ -6,12 +6,16 @@ namespace Baander\Tooling\Development;
 
 use Baander\Tooling\Process\{CommandExecutor, ProcessSpec, CompletionPolicy};
 use Baander\Tooling\Configuration\ApplicationLayout;
+use Baander\Tooling\Deployment\Pooler;
 use Baander\Tooling\Filesystem\AtomicFile;
 use Baander\Tooling\Filesystem\PrivateDirectory;
 use Baander\Tooling\Resources\DisposableContainer;
 
 class Runtime
 {
+    /** One-shot service that gives the database roles and the pooler's auth file one SCRAM verifier each. */
+    private const string POOLER_CREDENTIALS = 'pooler-credentials';
+
     private readonly Connections $connections;
 
     public function __construct(private readonly StateStore $store, private readonly CommandExecutor $runner, ?Connections $connections = null)
@@ -85,7 +89,9 @@ class Runtime
         }
         $environment = $this->environment($instance);
         $origin = 'https://' . $instance['hostname'];
-        $environment = array_replace($environment, [
+        $database = self::database($environment);
+        $pooler = $release['images']['pooler_image']['resolvedId'] ?? null;
+        $environment = array_replace($environment, self::databaseUrls($environment, $release), [
             'APP_URL' => $origin,
             'DEFAULT_URI' => $origin,
             'APP_DOMAIN' => $instance['hostname'],
@@ -136,9 +142,9 @@ class Runtime
             'postgres' => [
                 'image' => $release['images']['postgres_image']['resolvedId'],
                 'environment' => [
-                    'POSTGRES_USER' => $environment['DB_USERNAME'] ?? 'baander',
-                    'POSTGRES_PASSWORD' => $environment['DB_PASSWORD'] ?? 'baander',
-                    'POSTGRES_DB' => $environment['DB_DATABASE'] ?? 'baander',
+                    'POSTGRES_USER' => $database[0],
+                    'POSTGRES_PASSWORD' => $database[1],
+                    'POSTGRES_DB' => $database[2],
                     'PGDATA' => $instance['pgdata'] ?? '/var/lib/postgresql/data/baanderdev',
                 ],
                 'volumes' => [self::volume(
@@ -184,6 +190,25 @@ class Runtime
                 ],
             ],
         ];
+        if ($pooler !== null) {
+            $services[Pooler::SERVICE] = [
+                ...Pooler::service($pooler, Pooler::environment('full', $database[0], $database[2], 'database'), 'pooler_credentials', 'postgres'),
+                'networks' => ['private' => new \stdClass()],
+            ];
+            $services[Pooler::SERVICE]['depends_on'][self::POOLER_CREDENTIALS] = ['condition' => 'service_completed_successfully'];
+            $services[self::POOLER_CREDENTIALS] = [
+                'image' => $pooler,
+                'restart' => 'no',
+                'user' => '0:0',
+                'entrypoint' => ['baander-pooler-credentials'],
+                'command' => ['/credentials'],
+                'environment' => Pooler::credentialsEnvironment($database[0], $database[1], $database[2], 'database'),
+                'volumes' => [self::volume('pooler_credentials', '/credentials')],
+                'tmpfs' => [Pooler::DATA_TMPFS],
+                'depends_on' => ['postgres' => ['condition' => 'service_healthy']],
+                'networks' => ['private' => new \stdClass()],
+            ];
+        }
         $postgresTarget = rtrim($instance['postgres_mount_target'] ?? '/var/lib/postgresql/data', '/');
         if (
             $postgresTarget !== ''
@@ -262,6 +287,7 @@ class Runtime
             'public',
             'vendor',
             'node_modules',
+            'pooler_credentials',
         ] as $key) {
             $volumes[$key] = ['name' => $instance['volumes'][$key] ?? $project . '-' . $key];
             if (isset($instance['volumes'][$key])) {
@@ -280,6 +306,38 @@ class Runtime
             ],
             'volumes' => $volumes,
         ];
+    }
+
+    /** @param array<string,string> $environment
+     * @return array{string,string,string} user, password and database
+     */
+    private static function database(array $environment): array
+    {
+        return [$environment['DB_USERNAME'] ?? 'baander', $environment['DB_PASSWORD'] ?? 'baander', $environment['DB_DATABASE'] ?? 'baander'];
+    }
+
+    /**
+     * The pooler's application and control DSNs. A release recorded before the pooler existed
+     * has no pooler image and keeps the saved direct DATABASE_URL.
+     *
+     * @param array<string,string> $environment
+     * @param array<string,mixed> $release
+     * @return array<string,string>
+     */
+    public static function databaseUrls(array $environment, array $release): array
+    {
+        return isset($release['images']['pooler_image']['resolvedId']) ? Pooler::urls(...self::database($environment)) : [];
+    }
+
+    /** Whether the instance's generated Compose model runs the pooler.
+     * @param array<string,mixed> $instance
+     */
+    public static function hasPooler(array $instance): bool
+    {
+        $content = is_string($instance['compose_file'] ?? null) ? @file_get_contents($instance['compose_file']) : false;
+        $compose = $content === false ? null : json_decode($content, true);
+
+        return isset($compose['services'][Pooler::SERVICE]);
     }
 
     /** @param array<string,mixed> $instance */
@@ -477,6 +535,10 @@ class Runtime
         $docker = $this->connections->client($instance['docker']);
         $docker->validateIdentity();
         $docker->compose($instance['project'], $instance['compose_file'], ['up', '-d', '--wait', 'postgres', 'redis']);
+        if (self::hasPooler($instance)) {
+            // Compose runs the credentials step to completion before the pooler starts.
+            $docker->compose($instance['project'], $instance['compose_file'], ['up', '-d', '--wait', Pooler::SERVICE]);
+        }
     }
 
     /** @param array<string,mixed> $instance

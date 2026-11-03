@@ -42,6 +42,7 @@ class Workers
             }
             $runtime = new Runtime($this->store, $this->runner, $this->connections);
             $environment = $runtime->environment($instance);
+            $environment = array_replace($environment, Runtime::databaseUrls($environment, $release));
             $configuration = $runtime->config($instance, $release);
             foreach ([
                 ['media', $environment['MEDIA_STORAGE_PATH'] ?? '/storage/media', 'source'],
@@ -83,6 +84,7 @@ class Workers
             $allowed = [
                 'APP_SECRET',
                 'DATABASE_URL',
+                'DATABASE_CONTROL_URL',
                 'REDIS_URL',
                 'REDIS_PASSWORD',
                 'MESSENGER_TRANSPORT_DSN',

@@ -10,6 +10,8 @@ use Baander\Tooling\Deployment\HouseholdRenderer;
 use Baander\Tooling\Deployment\ImageProfile;
 use Baander\Tooling\Configuration\ApplicationLayout;
 use Baander\Tooling\Deployment\Household;
+use Baander\Tooling\Deployment\Pooler;
+use Baander\Tooling\Deployment\PostgresSettings;
 use Baander\Tooling\Docker\{Client, Target};
 use Baander\Tooling\Filesystem\AtomicFile;
 use Baander\Tooling\Inventory\Collector;
@@ -34,8 +36,9 @@ final class HouseholdDeploymentTest extends TestCase
     {
         $household = HouseholdConfiguration::fromArray(self::configuration());
         $full = HouseholdConfiguration::fromArray(array_replace(self::configuration(), ['profile' => 'full']));
-        self::assertSame(1152, $household->resources['postgresMemoryMiB']);
-        self::assertSame(2816, $full->resources['postgresMemoryMiB']);
+        self::assertSame(768, $household->resources['postgresMemoryMiB']);
+        self::assertSame(1280, $full->resources['postgresMemoryMiB']);
+        self::assertSame(64, $household->resources['poolerMemoryMiB']);
         self::assertSame(array_diff_key($household->resources, ['postgresMemoryMiB' => true]), array_diff_key($full->resources, ['postgresMemoryMiB' => true]));
         $explicit = self::configuration();
         $explicit['resources'] = ['postgresMemoryMiB' => 1536];
@@ -44,6 +47,23 @@ final class HouseholdDeploymentTest extends TestCase
         self::assertSame('full', $full->profile);
         self::assertSame('baander-household-media', $household->volumes['media']);
         self::assertSame('private-database-secret', $household->environment['DB_PASSWORD']);
+    }
+
+    public function testPostgresIsSizedFromThePoolerServerPools(): void
+    {
+        foreach (['household' => '/deploy/household/postgresql.conf', 'full' => '/docker/postgres/conf/postgresql.conf'] as $profile => $path) {
+            $configuration = HouseholdConfiguration::fromArray(array_replace(self::configuration(), ['profile' => $profile]));
+            $content = file_get_contents(dirname(__DIR__, 3) . $path);
+            self::assertIsString($content);
+            $rendered = HouseholdRenderer::configurationFiles($configuration, $content)['postgres_configuration']['content'];
+            $settings = new PostgresSettings($rendered)->expectedSettings();
+            $pools = Pooler::POOLS[$profile];
+            $connections = (int) $settings['max_connections'];
+            self::assertSame($pools['application'] + $pools['control'] + $pools['direct'] + (int) $settings['superuser_reserved_connections'], $connections, $profile);
+            self::assertSame(Pooler::maxConnections($profile, (int) $settings['superuser_reserved_connections']), $connections);
+            $buffers = (int) rtrim($settings['shared_buffers'], 'MB');
+            self::assertSame((int) ceil(($buffers + 128 + 24 * $connections) / 128) * 128, HouseholdConfiguration::POSTGRES_MEMORY_MIB[$profile], $profile);
+        }
     }
 
     public function testConfigurationRejectsUnknownProfilesAndHostSourceMounts(): void
@@ -97,7 +117,7 @@ final class HouseholdDeploymentTest extends TestCase
         self::assertStringContainsString('noeviction', $compose['services']['redis']['command'][2]);
         self::assertSame('memory_limit=256M', $compose['services']['web']['command'][1]);
         self::assertSame($profile->fingerprint(), $compose['services']['web']['labels']['org.baander.deployment.fingerprint']);
-        $roles = ['web' => 'application', 'postgres' => 'postgres', 'redis' => 'redis', 'gateway' => 'gateway'];
+        $roles = ['web' => 'application', 'postgres' => 'postgres', 'pooler' => 'postgres', 'redis' => 'redis', 'gateway' => 'gateway'];
         foreach ($compose['services'] as $name => $service) {
             self::assertSame($images[$roles[$name]]['id'], $service['image']);
             self::assertArrayNotHasKey('privileged', $service);
@@ -117,10 +137,84 @@ final class HouseholdDeploymentTest extends TestCase
         $reservations = HouseholdRenderer::reservations($configuration, $profile);
         self::assertSame(2304, $reservations['controlMemoryMiB']);
         self::assertSame(4480, $reservations['executionMemoryMiB']);
-        self::assertSame(10944, $reservations['totalMiB']);
+        self::assertSame(64, $reservations['poolerMemoryMiB']);
+        self::assertSame(10624, $reservations['totalMiB']);
         self::assertArrayNotHasKey('DB_PASSWORD', $workerEnvironment);
         self::assertArrayNotHasKey('APP_DOMAIN', $workerEnvironment);
         self::assertSame('household', $compose['services']['web']['environment']['BAANDER_DEPLOYMENT_PROFILE']);
+    }
+
+    public function testRendererRoutesClientsThroughAPoolerThatAloneMountsItsCredentials(): void
+    {
+        $configuration = HouseholdConfiguration::fromArray(self::configuration());
+        $layout = ApplicationLayout::fromArray(['version' => 1, 'root' => '/srv/baander']);
+        $compose = HouseholdRenderer::render($configuration, $this->images(), $layout, $this->profile(), 'max_connections = 20', 'owner');
+        $pooler = $compose['services']['pooler'];
+        self::assertSame($this->images()['postgres']['id'], $pooler['image']);
+        self::assertSame(['baander-pooler'], $pooler['entrypoint']);
+        self::assertSame('postgres', $pooler['user']);
+        self::assertSame(['postgres' => ['condition' => 'service_healthy']], $pooler['depends_on']);
+        self::assertSame('service_healthy', $compose['services']['web']['depends_on']['pooler']['condition']);
+        self::assertArrayNotHasKey('postgres', $compose['services']['web']['depends_on']);
+        self::assertSame(['BAANDER_POOLER_USER' => 'baander', 'BAANDER_POOLER_DATABASE' => 'baander', 'BAANDER_POOLER_SERVER_HOST' => 'postgres',
+            'BAANDER_POOLER_APPLICATION_POOL_SIZE' => '10', 'BAANDER_POOLER_CONTROL_POOL_SIZE' => '4'], $pooler['environment']);
+        self::assertSame('64m', $pooler['mem_limit']);
+        self::assertSame([['type' => 'volume', 'source' => 'pooler_credentials', 'target' => '/etc/baander-pooler/credentials', 'read_only' => true]], $pooler['volumes']);
+        self::assertSame(['name' => 'baander-household-pooler-credentials', 'external' => true], $compose['volumes']['pooler_credentials']);
+        self::assertArrayNotHasKey('pooler_credentials', HouseholdRenderer::configurationFiles($configuration, 'max_connections = 20'));
+        foreach ($compose['services'] as $name => $service) {
+            $sources = array_column($service['volumes'] ?? [], 'source');
+            self::assertSame($name === 'pooler', in_array('pooler_credentials', $sources, true), $name);
+        }
+        self::assertArrayNotHasKey('DB_PASSWORD', $pooler['environment']);
+        $web = $compose['services']['web']['environment'];
+        self::assertSame('postgresql://baander:private-database-secret@pooler:6432/baander?serverVersion=18&charset=utf8', $web['DATABASE_URL']);
+        self::assertSame('postgresql://baander_control:private-database-secret@pooler:6432/baander_control?serverVersion=18&charset=utf8', $web['DATABASE_CONTROL_URL']);
+        $workers = HouseholdRenderer::workerEnvironment($configuration, $this->profile());
+        self::assertSame([$web['DATABASE_URL'], $web['DATABASE_CONTROL_URL']], [$workers['DATABASE_URL'], $workers['DATABASE_CONTROL_URL']]);
+        $full = HouseholdConfiguration::fromArray(array_replace(self::configuration(), ['profile' => 'full']));
+        $fullPooler = HouseholdRenderer::render($full, $this->images(), $layout, $this->profile('full'), 'max_connections = 35', 'owner')['services']['pooler'];
+        self::assertSame(['20', '8'], [$fullPooler['environment']['BAANDER_POOLER_APPLICATION_POOL_SIZE'], $fullPooler['environment']['BAANDER_POOLER_CONTROL_POOL_SIZE']]);
+    }
+
+    public function testPoolerCredentialsRunFromTheDatabaseImageWithTheCredentialsVolumeAndNoPasswordInArguments(): void
+    {
+        $directory = sys_get_temp_dir() . '/baander.app-household-' . bin2hex(random_bytes(8));
+        $store = new HouseholdStateStore($directory);
+        copy(__DIR__ . '/Fixtures/development-lifecycle-docker.php', $directory . '/docker');
+        chmod($directory . '/docker', 0700);
+        AtomicFile::writeJson($directory . '/daemon.json', ['daemonId' => 'owned-daemon']);
+        $actual = new EngineExecutor(ExecutionContext::bounded(10, getenv()));
+        $executor = $this->createStub(CommandExecutor::class);
+        $created = null;
+        $executor->method('run')->willReturnCallback(static function (ProcessSpec $command, CompletionPolicy $policy) use ($actual, &$created): ProcessResult {
+            if (in_array('create', $command->argv, true)) {
+                $created = $command;
+            }
+            return $actual->run($command, $policy);
+        });
+        $target = new Target($directory . '/docker', 'unix:///run/baander.app-docker.sock', 'owned-daemon', null, null);
+        $deployment = new Household($store, new Client($executor, $target, getenv()), $executor, getenv(), dirname(__DIR__, 3));
+        try {
+            new \ReflectionMethod(Household::class, 'poolerCredentials')->invoke(
+                $deployment,
+                HouseholdConfiguration::fromArray(self::configuration()),
+                ['owner' => 'fixture-owner', 'images' => ['postgres' => ['id' => 'sha256:' . str_repeat('d', 64)]]],
+            );
+            self::assertInstanceOf(ProcessSpec::class, $created);
+            $arguments = implode(' ', $created->argv);
+            self::assertStringContainsString('--network baander-household-private', $arguments);
+            self::assertStringContainsString('type=volume,src=baander-household-pooler-credentials,dst=/credentials', $arguments);
+            self::assertStringContainsString('--entrypoint baander-pooler-credentials', $arguments);
+            self::assertStringEndsWith('sha256:' . str_repeat('d', 64) . ' /credentials', $arguments);
+            self::assertStringNotContainsString('private-database-secret', $arguments);
+            self::assertSame('private-database-secret', $created->environment['PGPASSWORD']);
+            self::assertSame(['baander', 'baander', 'postgres'], [$created->environment['BAANDER_POOLER_USER'], $created->environment['BAANDER_POOLER_DATABASE'], $created->environment['BAANDER_POOLER_SERVER_HOST']]);
+            self::assertStringNotContainsString('secrets', $arguments);
+        } finally {
+            $actual->close();
+            Collector::remove($directory);
+        }
     }
 
     public function testRendererRejectsMixedProfiles(): void
@@ -158,7 +252,8 @@ final class HouseholdDeploymentTest extends TestCase
                 $this->profile(),
             );
             self::assertInstanceOf(ProcessSpec::class, $created);
-            self::assertSame('postgresql://baander:private-database-secret@postgres:5432/baander?serverVersion=18&charset=utf8', $created->environment['DATABASE_URL']);
+            self::assertSame('postgresql://baander:private-database-secret@pooler:6432/baander?serverVersion=18&charset=utf8', $created->environment['DATABASE_URL']);
+            self::assertSame('postgresql://baander_control:private-database-secret@pooler:6432/baander_control?serverVersion=18&charset=utf8', $created->environment['DATABASE_CONTROL_URL']);
             self::assertSame('redis://default:private-redis-secret@redis:6379/messages', $created->environment['MESSENGER_TRANSPORT_DSN']);
             self::assertSame('prod', $created->environment['APP_ENV']);
             self::assertContains('doctrine:migrations:migrate', $created->argv);

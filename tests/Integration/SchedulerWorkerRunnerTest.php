@@ -57,7 +57,7 @@ final class SchedulerWorkerRunnerTest extends TestCase
         $this->redis = RedisConnection::fromDsn($redis, ['stream' => $stream, 'group' => 'test', 'consumer' => 'test']);
         $this->transport = new RedisTransport($this->redis, new JsonTransportSerializer(MessageCodecFactory::create()));
         $this->transport->setup();
-        $this->environment = [...getenv(), 'DATABASE_URL' => $url, 'PGOPTIONS' => '-c search_path=' . $this->schema . ',public',
+        $this->environment = [...getenv(), 'DATABASE_URL' => $url, 'DATABASE_CONTROL_URL' => $url, 'PGOPTIONS' => '-c search_path=' . $this->schema . ',public',
             'PGAPPNAME' => $this->schema, 'BAANDER_TEST_SCHEDULER_STREAM' => $stream,
             'BAANDER_WORKER_NAMESPACE' => $lease->namespace, 'BAANDER_WORKER_BOOT_ID' => $lease->bootId,
             'BAANDER_WORKER_LEASE_EPOCH' => (string) $lease->epoch, 'BAANDER_WORKER_ID' => 'scheduler'];

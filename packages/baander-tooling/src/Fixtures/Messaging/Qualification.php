@@ -156,6 +156,7 @@ final class Qualification
                     'REDIS_URL=redis://default:test-only@redis:6379',
                     'MESSENGER_TRANSPORT_DSN=redis://default:test-only@redis:6379/messages',
                     'DATABASE_URL=postgresql://baander:test-only@postgres:5432/' . $database . '?serverVersion=18&charset=utf8',
+                    'DATABASE_CONTROL_URL=postgresql://baander:test-only@postgres:5432/' . $database . '?serverVersion=18&charset=utf8',
                 ];
             $flags = [];
             foreach ($environment as $value) {

@@ -27,7 +27,7 @@ try {
     exit(0);
 }
 try {
-    $url = getenv('DATABASE_URL');
+    $url = getenv('DATABASE_CONTROL_URL');
     if (!$url) {
         throw new RuntimeException('Database not configured.');
     }

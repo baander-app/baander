@@ -7,6 +7,7 @@ namespace Baander\Tooling\Development;
 use Baander\Tooling\Process\{CommandExecutor, EngineExecutor, ExecutionContext};
 use Baander\Tooling\Resources\{ResourceLedger, ResourceKind, DisposableContainer};
 use Baander\Tooling\Docker\Client;
+use Baander\Tooling\Deployment\Pooler;
 use Baander\Tooling\Filesystem\AtomicFile;
 use Baander\Tooling\Filesystem\PrivateDirectory;
 
@@ -161,16 +162,77 @@ SQL;
         }
     }
 
-    /** @param array<string,mixed> $instance */
+    /**
+     * Every client backend is a writer, except the pooler's idle server connections. A client
+     * connected to the pooler's application or control alias is a writer even while no
+     * server connection serves it.
+     *
+     * @param array<string,mixed> $instance
+     */
     private function assertNoWriters(array $instance, string $operation): void
     {
+        $idle = [];
+        foreach ($this->poolerActivity($instance) as $row) {
+            if ($row['type'] === 'C' && $row['database'] !== 'pgbouncer') {
+                throw new WorkflowError('Unaccounted pooler clients prevent ' . $operation . '.');
+            }
+            if ($row['type'] === 'S' && in_array($row['state'], ['idle', 'used'], true) && preg_match('/^[1-9][0-9]*$/D', $row['remote_pid']) === 1) {
+                $idle[] = $row['remote_pid'];
+            }
+        }
         $activity = $this->sql(
             $instance,
-            "BEGIN READ ONLY; SELECT json_build_object('writers',count(*)) FROM pg_stat_activity WHERE datname=current_database() AND pid<>pg_backend_pid() AND backend_type='client backend'; COMMIT;",
+            "BEGIN READ ONLY; SELECT json_build_object('writers',count(*)) FROM pg_stat_activity WHERE datname=current_database() AND pid<>pg_backend_pid() AND backend_type='client backend'"
+            . " AND NOT (state='idle' AND pid = ANY ('{" . implode(',', $idle) . "}'::int[])); COMMIT;",
         );
         if (!empty($activity['writers'])) {
             throw new WorkflowError('Unaccounted database writers prevent ' . $operation . '.');
         }
+    }
+
+    /**
+     * The pooler's clients and server connections from its admin console, read through the
+     * PostgreSQL container, which holds the password. An instance without a running pooler has neither.
+     *
+     * @param array<string,mixed> $instance
+     * @return list<array<string,string>>
+     */
+    private function poolerActivity(array $instance): array
+    {
+        if (!empty($instance['adoption']) && empty($instance['ownership_transferred'])) {
+            return [];
+        }
+        if (!Runtime::hasPooler($instance)) {
+            return [];
+        }
+        $docker = $this->docker($instance);
+        if (trim($docker->compose($instance['project'], $instance['compose_file'], ['ps', '-q', Pooler::SERVICE])->stdout) === '') {
+            return [];
+        }
+        $output = $docker->run([
+            'exec',
+            $this->container($instance, $docker),
+            '/bin/sh',
+            '-ec',
+            'export PGPASSWORD="$POSTGRES_PASSWORD" PGCONNECT_TIMEOUT=5; exec psql -X -qA -F "|" -P footer=off --set=ON_ERROR_STOP=1 -h '
+                . Pooler::SERVICE . ' -p ' . Pooler::PORT . ' -U "$POSTGRES_USER" -d pgbouncer -c "SHOW CLIENTS" -c "SHOW SERVERS"',
+        ], timeout: 30)->stdout;
+        $rows = [];
+        $columns = null;
+        foreach (explode("\n", trim($output)) as $line) {
+            $fields = explode('|', $line);
+            if (str_starts_with($line, 'type|')) {
+                $columns = $fields;
+            } elseif ($columns !== null && count($fields) === count($columns)) {
+                $rows[] = array_combine($columns, $fields);
+            } elseif ($line !== '') {
+                throw new WorkflowError('Malformed pooler activity evidence.');
+            }
+        }
+        if ($columns === null || array_diff(['type', 'database', 'state', 'remote_pid'], $columns) !== []) {
+            throw new WorkflowError('The pooler returned no activity evidence.');
+        }
+        return $rows;
     }
 
     /** @param array<string,mixed> $instance

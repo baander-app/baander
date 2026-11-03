@@ -30,7 +30,7 @@ final class LeaseAgentProcess
 
     /**
      * The directory and complete environment are trusted operator configuration.
-     * Credentials belong only in DATABASE_URL, never the request or argv.
+     * Credentials belong only in DATABASE_CONTROL_URL, never the request or argv.
      * @param array<string, mixed> $request
      * @param array<string, string>|null $environment Null inherits the process environment; no .env loading
      */

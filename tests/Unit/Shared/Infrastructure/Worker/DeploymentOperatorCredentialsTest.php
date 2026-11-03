@@ -149,7 +149,7 @@ final class DeploymentOperatorCredentialsTest extends TestCase
         $document = $base;
         $document['unknown'] = 'controller-private';
         yield 'unknown top-level key' => [json_encode($document, JSON_THROW_ON_ERROR)];
-        foreach (['APP_ENV', 'APP_DEBUG', 'DATABASE_URL', 'REDIS_URL', 'MESSENGER_TRANSPORT_DSN', 'APP_SECRET'] as $key) {
+        foreach (['APP_ENV', 'APP_DEBUG', 'DATABASE_URL', 'DATABASE_CONTROL_URL', 'REDIS_URL', 'MESSENGER_TRANSPORT_DSN', 'APP_SECRET'] as $key) {
             $document = $base;
             unset($document['runtimeEnvironment'][$key]);
             yield 'missing environment ' . $key => [json_encode($document, JSON_THROW_ON_ERROR)];
@@ -216,6 +216,7 @@ final class DeploymentOperatorCredentialsTest extends TestCase
             'runtimeEnvironment' => [
                 'APP_ENV' => 'prod', 'APP_DEBUG' => '0', 'APP_SECRET' => 'runtime-private',
                 'DATABASE_URL' => 'postgresql://runtime:runtime-private@db.baander.app/baander',
+                'DATABASE_CONTROL_URL' => 'postgresql://runtime_control:runtime-private@db.baander.app/baander_control',
                 'REDIS_URL' => 'redis://redis.baander.app', 'MESSENGER_TRANSPORT_DSN' => 'redis://redis.baander.app/messages',
             ],
         ], JSON_THROW_ON_ERROR);

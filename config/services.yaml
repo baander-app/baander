@@ -1284,7 +1284,7 @@ services:
     App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerManualOccurrenceRecorder:
         factory: ['App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerManualOccurrenceRecorder', 'fromDsn']
         arguments:
-            $databaseUrl: '%env(resolve:DATABASE_URL)%'
+            $databaseUrl: '%env(DATABASE_CONTROL_URL)%'
 
     App\Scheduler\Application\Port\SchedulerManualOccurrenceRecorderInterface:
         alias: App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerManualOccurrenceRecorder
@@ -1293,7 +1293,7 @@ services:
     App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerOccurrenceMaterializer:
         factory: ['App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerOccurrenceMaterializer', 'fromDsn']
         arguments:
-            $databaseUrl: '%env(resolve:DATABASE_URL)%'
+            $databaseUrl: '%env(DATABASE_CONTROL_URL)%'
 
     App\Scheduler\Application\Port\SchedulerOccurrenceMaterializerInterface:
         alias: App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerOccurrenceMaterializer
@@ -1301,7 +1301,7 @@ services:
     App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerRecoveryScheduleStore:
         factory: ['App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerRecoveryScheduleStore', 'fromDsn']
         arguments:
-            $databaseUrl: '%env(resolve:DATABASE_URL)%'
+            $databaseUrl: '%env(DATABASE_CONTROL_URL)%'
 
     App\Scheduler\Application\Port\SchedulerRecoveryScheduleStoreInterface:
         alias: App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerRecoveryScheduleStore
@@ -1309,7 +1309,7 @@ services:
     App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerWorkerAuthority:
         factory: ['App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerWorkerAuthority', 'fromDsn']
         arguments:
-            $databaseUrl: '%env(resolve:DATABASE_URL)%'
+            $databaseUrl: '%env(DATABASE_CONTROL_URL)%'
 
     App\Scheduler\Application\Port\SchedulerWorkerAuthorityInterface:
         alias: App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerWorkerAuthority
@@ -1326,7 +1326,7 @@ services:
     App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerOccurrenceExecutionStore:
         factory: ['App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerOccurrenceExecutionStore', 'fromDsn']
         arguments:
-            $databaseUrl: '%env(resolve:DATABASE_URL)%'
+            $databaseUrl: '%env(DATABASE_CONTROL_URL)%'
 
     App\Scheduler\Application\Port\SchedulerOccurrenceExecutionStoreInterface:
         alias: App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerOccurrenceExecutionStore
@@ -1335,7 +1335,7 @@ services:
     App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerOccurrenceDispatchStore:
         factory: ['App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerOccurrenceDispatchStore', 'fromDsn']
         arguments:
-            $databaseUrl: '%env(resolve:DATABASE_URL)%'
+            $databaseUrl: '%env(DATABASE_CONTROL_URL)%'
 
     App\Scheduler\Application\Port\SchedulerOccurrenceDispatchStoreInterface:
         alias: App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerOccurrenceDispatchStore
@@ -1390,7 +1390,7 @@ services:
 
     App\Transcode\Infrastructure\Worker\DoctrineMediaWorkerAuthority:
         factory: ['App\Transcode\Infrastructure\Worker\DoctrineMediaWorkerAuthority', 'fromDsn']
-        arguments: ['%env(DATABASE_URL)%']
+        arguments: ['%env(DATABASE_CONTROL_URL)%']
 
     App\Transcode\Infrastructure\Worker\MediaWorkerAuthorityInterface:
         alias: App\Transcode\Infrastructure\Worker\DoctrineMediaWorkerAuthority
@@ -1546,7 +1546,8 @@ services:
     App\Shared\Infrastructure\Worker\WorkerSupervisorRunner:
         arguments:
             $projectDirectory: '%kernel.project_dir%'
-            $databaseUrl: '%env(resolve:DATABASE_URL)%'
+            $databaseUrl: '%env(DATABASE_URL)%'
+            $controlDatabaseUrl: '%env(DATABASE_CONTROL_URL)%'
 
     App\Shared\Application\Port\WorkerSupervisorRunnerInterface:
         alias: App\Shared\Infrastructure\Worker\WorkerSupervisorRunner

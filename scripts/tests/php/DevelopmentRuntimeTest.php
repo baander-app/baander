@@ -76,6 +76,32 @@ final class DevelopmentRuntimeTest extends TestCase
         }
     }
 
+    public function testPoolerCarriesApplicationAndControlTrafficAfterItsCredentialsStep(): void
+    {
+        $config = $this->runtime->config($this->instance, $this->release);
+        $pooler = $config['services']['pooler'];
+        self::assertSame($this->release['images']['pooler_image']['resolvedId'], $pooler['image']);
+        self::assertSame(['postgres' => ['condition' => 'service_healthy'], 'pooler-credentials' => ['condition' => 'service_completed_successfully']], $pooler['depends_on']);
+        self::assertSame(['database', '20', '8'], [$pooler['environment']['BAANDER_POOLER_SERVER_HOST'], $pooler['environment']['BAANDER_POOLER_APPLICATION_POOL_SIZE'], $pooler['environment']['BAANDER_POOLER_CONTROL_POOL_SIZE']]);
+        self::assertSame([['type' => 'volume', 'source' => 'pooler_credentials', 'target' => '/etc/baander-pooler/credentials', 'read_only' => true]], $pooler['volumes']);
+        $credentials = $config['services']['pooler-credentials'];
+        self::assertSame(['baander-pooler-credentials'], $credentials['entrypoint']);
+        self::assertSame($pooler['image'], $credentials['image']);
+        self::assertSame('no', $credentials['restart']);
+        self::assertSame(['type' => 'volume', 'source' => 'pooler_credentials', 'target' => '/credentials'], $credentials['volumes'][0]);
+        foreach ($config['services'] as $name => $service) {
+            self::assertSame(in_array($name, ['pooler', 'pooler-credentials'], true), in_array('pooler_credentials', array_column($service['volumes'] ?? [], 'source'), true), $name);
+        }
+        self::assertSame('baander-persistent-pooler_credentials', $config['volumes']['pooler_credentials']['name']);
+        self::assertSame('postgresql://baander:baander@pooler:6432/baander?serverVersion=18&charset=utf8', $config['services']['app']['environment']['DATABASE_URL']);
+        self::assertSame('postgresql://baander_control:baander@pooler:6432/baander_control?serverVersion=18&charset=utf8', $config['services']['app']['environment']['DATABASE_CONTROL_URL']);
+        $previous = $this->release;
+        unset($previous['images']['pooler_image']);
+        $config = $this->runtime->config($this->instance, $previous);
+        self::assertArrayNotHasKey('pooler', $config['services']);
+        self::assertArrayNotHasKey('DATABASE_CONTROL_URL', $config['services']['app']['environment']);
+    }
+
     public function testSavedNondefaultLayoutDrivesRuntimeAndFrontend(): void
     {
         $this->release['layout'] = ['version' => 1, 'root' => '/opt/baander'];

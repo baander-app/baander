@@ -1,3 +1,11 @@
+# The database image also runs the connection pooler and prepares its credentials.
+x-database-build: &database-build
+    context: ./docker/
+    dockerfile: ./postgres/Dockerfile
+    args:
+        PGROONGA_VERSION: 4.0.5-1
+        POSTGRESQL_VERSION: 18
+
 services:
     nginx:
         image: martinjuul/baander-nginx:latest
@@ -72,12 +80,8 @@ services:
 
     database:
         container_name: baander-postgres
-        build:
-            context: ./docker/
-            dockerfile: ./postgres/Dockerfile
-            args:
-                PGROONGA_VERSION: 4.0.5-1
-                POSTGRESQL_VERSION: 18
+        image: baander-database:latest
+        build: *database-build
         restart: unless-stopped
         networks:
             - baander-backtier
@@ -102,6 +106,59 @@ services:
             timeout: 5s
             retries: 5
             start_period: 30s
+
+    # Gives the database roles and the pooler's auth file one SCRAM verifier each, over
+    # the direct connection, before the pooler starts.
+    pooler-credentials:
+        image: baander-database:latest
+        build: *database-build
+        restart: "no"
+        networks:
+            - baander-backtier
+        environment:
+            PGPASSWORD: ${DB_PASSWORD:-baander}
+            BAANDER_POOLER_USER: ${DB_USERNAME:-baander}
+            BAANDER_POOLER_DATABASE: ${DB_DATABASE:-baander}
+            BAANDER_POOLER_SERVER_HOST: database
+        entrypoint: [ "baander-pooler-credentials" ]
+        command: [ "/credentials" ]
+        volumes:
+            - pooler_credentials:/credentials
+        tmpfs:
+            - /var/lib/postgresql
+        depends_on:
+            database:
+                condition: service_healthy
+
+    # Transaction-mode PgBouncer: DATABASE_URL uses its application alias and
+    # DATABASE_CONTROL_URL its control alias and role.
+    pooler:
+        container_name: baander-pooler
+        image: baander-database:latest
+        build: *database-build
+        restart: unless-stopped
+        user: postgres
+        entrypoint: [ "baander-pooler" ]
+        networks:
+            - baander-backtier
+        environment:
+            BAANDER_POOLER_USER: ${DB_USERNAME:-baander}
+            BAANDER_POOLER_DATABASE: ${DB_DATABASE:-baander}
+            BAANDER_POOLER_SERVER_HOST: database
+            BAANDER_POOLER_APPLICATION_POOL_SIZE: 20
+            BAANDER_POOLER_CONTROL_POOL_SIZE: 8
+        volumes:
+            - pooler_credentials:/etc/baander-pooler/credentials:ro
+        tmpfs:
+            - /var/lib/postgresql
+        depends_on:
+            pooler-credentials:
+                condition: service_completed_successfully
+        healthcheck:
+            test: [ "CMD", "pg_isready", "-h", "127.0.0.1", "-p", "6432" ]
+            interval: 5s
+            timeout: 5s
+            retries: 24
 
     redis:
         image: redis/redis-stack-server:edge
@@ -138,6 +195,7 @@ services:
 
 volumes:
     postgres_data:
+    pooler_credentials:
 
     ###> doctrine/doctrine-bundle ###
     database_data:

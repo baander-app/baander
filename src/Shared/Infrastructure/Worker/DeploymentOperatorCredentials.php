@@ -42,7 +42,7 @@ final readonly class DeploymentOperatorCredentials implements JsonSerializable
                 throw new RuntimeException();
             }
             $variables = get_object_vars($document->runtimeEnvironment);
-            foreach (['APP_ENV', 'APP_DEBUG', 'DATABASE_URL', 'REDIS_URL', 'MESSENGER_TRANSPORT_DSN', 'APP_SECRET'] as $key) {
+            foreach (['APP_ENV', 'APP_DEBUG', 'DATABASE_URL', 'DATABASE_CONTROL_URL', 'REDIS_URL', 'MESSENGER_TRANSPORT_DSN', 'APP_SECRET'] as $key) {
                 if (!isset($variables[$key]) || !is_string($variables[$key]) || $variables[$key] === '') {
                     throw new RuntimeException();
                 }

@@ -14,6 +14,11 @@ use Symfony\Component\DependencyInjection\Attribute\Exclude;
 /**
  * A DBAL connection of its own, outside DoctrineBundle's connection and its transactions,
  * with the same driver middleware: the Baander platform and a UTC session time zone.
+ *
+ * Server-side named statements stay disabled, as on DoctrineBundle's connection: these
+ * connections run through a transaction-mode PgBouncer, and libpq 15 frees a named
+ * statement with SQL DEALLOCATE, which PgBouncer passes to a server that never saw the
+ * name, aborting the transaction.
  */
 #[Exclude]
 final class DedicatedConnectionFactory
@@ -29,6 +34,7 @@ final class DedicatedConnectionFactory
     public static function fromParams(#[\SensitiveParameter] array $params): Connection
     {
         $configuration = (new Configuration())->setMiddlewares([new BaanderDriverMiddleware()]);
+        $params['driverOptions'] = [\Pdo\Pgsql::ATTR_DISABLE_PREPARES => true] + ($params['driverOptions'] ?? []);
 
         return DriverManager::getConnection($params, $configuration);
     }

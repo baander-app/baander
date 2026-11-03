@@ -160,6 +160,56 @@ final class DevelopmentDatabaseTest extends DevDataTestCase
         self::assertSame(0600, fileperms($checkpoint['directory'] . '/database.dump') & 0777);
     }
 
+    private const string POOLER_COLUMNS = 'type|user|database|replication|state|addr|port|local_addr|local_port|connect_time|request_time|wait|wait_us|close_needed|ptr|link|remote_pid|tls|application_name|prepared_statements|id';
+
+    /** @param list<array{string,string,string}> $clients database, state and server process
+     * @param list<array{string,string,string}> $servers
+     */
+    private function poolerDatabase(array $clients, array $servers, int $writers = 0): Database
+    {
+        $compose = $this->root . '/pooler-compose.json';
+        AtomicFile::writeJson($compose, ['services' => ['postgres' => [], 'pooler' => []]]);
+        $this->instance['compose_file'] = $compose;
+        $this->instance['writers_stopped'] = true;
+        $row = static fn(string $type, string $database, string $state, string $pid): string => $type . '|baander|' . $database . '|none|' . $state . '|172.21.0.3|6432|172.21.0.2|5432|2026-11-03 18:44:11 UTC|2026-11-03 18:44:11 UTC|0|0|0|0x1||' . $pid . '||psql|0|1';
+        $output = implode("\n", [self::POOLER_COLUMNS, $row('C', 'pgbouncer', 'active', ''), ...array_map(static fn(array $client): string => $row('C', ...$client), $clients),
+            self::POOLER_COLUMNS, ...array_map(static fn(array $server): string => $row('S', ...$server), $servers)]) . "\n";
+        return $this->resourceDatabase(['versions' => [], 'objects' => []], ['pooler' => $output, 'writers' => $writers]);
+    }
+
+    public function testAClientOnThePoolerBlocksACheckpoint(): void
+    {
+        foreach (['baander', 'baander_control'] as $alias) {
+            $database = $this->poolerDatabase([[$alias, 'idle', '']], [['baander', 'idle', '136']]);
+            try {
+                $database->checkpoint($this->instance, $this->release);
+                self::fail('A connected pooler client did not block the checkpoint.');
+            } catch (WorkflowError $error) {
+                self::assertStringContainsString('Unaccounted pooler clients prevent a quiescent checkpoint.', $error->getMessage());
+            }
+            self::assertStringNotContainsString('pg_stat_activity', (string) @file_get_contents($this->root . '/database-sql.log'));
+        }
+    }
+
+    public function testIdlePoolerServerConnectionsAloneDoNotBlockACheckpoint(): void
+    {
+        $database = $this->poolerDatabase([], [['baander', 'idle', '136'], ['baander_control', 'used', '137'], ['baander', 'active', '138']]);
+        $checkpoint = $database->checkpoint($this->instance, $this->release);
+        self::assertFalse($checkpoint['verified']);
+        $sql = (string) file_get_contents($this->root . '/database-sql.log');
+        self::assertStringContainsString("backend_type='client backend' AND NOT (state='idle' AND pid = ANY ('{136,137}'::int[]))", $sql);
+        $pooler = array_values(array_filter($this->resourceCommands(), static fn(array $arguments): bool => str_contains(implode(' ', $arguments), 'SHOW CLIENTS')));
+        self::assertCount(1, $pooler);
+        self::assertStringContainsString('-h pooler -p 6432 -U "$POSTGRES_USER" -d pgbouncer', implode(' ', $pooler[0]));
+    }
+
+    public function testRemainingDatabaseWritersStillBlockACheckpointBehindThePooler(): void
+    {
+        $database = $this->poolerDatabase([], [['baander', 'idle', '136']], writers: 1);
+        $this->expectExceptionMessage('Unaccounted database writers prevent a quiescent checkpoint.');
+        $database->checkpoint($this->instance, $this->release);
+    }
+
     public function testRehearsalRefusesChangedArchiveBeforeCreatingResources(): void
     {
         file_put_contents($this->root . '/database.dump', 'changed');

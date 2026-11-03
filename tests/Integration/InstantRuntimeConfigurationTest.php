@@ -20,13 +20,15 @@ use Symfony\Component\Process\Process;
 /**
  * Booting the application kernel installs the project instant type under Doctrine's names, and
  * every connection the application opens runs its session in UTC, whatever the client's default.
+ * None of those connections leaves a named statement on the server: they run through a
+ * transaction-mode PgBouncer, which cannot map libpq 15's SQL DEALLOCATE of a named statement.
  *
  * The probe runs in a fresh process: the type registry is global, and this process has already
  * registered the project types.
  */
 final class InstantRuntimeConfigurationTest extends TestCase
 {
-    /** @var array{before: array<string, string>, after: array<string, string>, timestamptz: string, zones: array<string, string>} */
+    /** @var array{before: array<string, string>, after: array<string, string>, timestamptz: string, zones: array<string, string>, statements: array<string, int>} */
     private static array $probe;
 
     public static function setUpBeforeClass(): void
@@ -74,5 +76,20 @@ final class InstantRuntimeConfigurationTest extends TestCase
             DoctrineSchedulerWorkerAuthority::class => 'UTC',
             DedicatedConnectionFactory::class => 'UTC',
         ], self::$probe['zones']);
+    }
+
+    public function testNoConnectionLeavesANamedStatementOnTheServer(): void
+    {
+        self::assertSame([
+            'default' => 0,
+            DoctrineSchedulerManualOccurrenceRecorder::class => 0,
+            DoctrineSchedulerOccurrenceDispatchStore::class => 0,
+            DoctrineSchedulerOccurrenceExecutionStore::class => 0,
+            DoctrineSchedulerOccurrenceMaterializer::class => 0,
+            DoctrineSchedulerRecoveryScheduleStore::class => 0,
+            DoctrineSchedulerWorkerAuthority::class => 0,
+            DedicatedConnectionFactory::class => 0,
+            'requested named statements' => 0,
+        ], self::$probe['statements']);
     }
 }

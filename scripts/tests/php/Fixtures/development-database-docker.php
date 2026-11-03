@@ -133,8 +133,14 @@ if ($command === 'info') {
     }
 } elseif ($command === 'exec') {
     $text = implode(' ', $arguments);
-    if (str_contains($text, 'psql')) {
-        echo json_encode($configuration['catalog'] + ['writers' => 0], JSON_THROW_ON_ERROR);
+    if (str_contains($text, 'SHOW CLIENTS')) {
+        echo $configuration['pooler'] ?? '';
+    } elseif (str_contains($text, 'psql')) {
+        if (in_array('-i', $arguments, true)) {
+            file_put_contents($root . '/database-sql.log', stream_get_contents(STDIN) . "\n", FILE_APPEND | LOCK_EX);
+        }
+        $writers = $configuration['writers'] ?? 0;
+        echo json_encode($configuration['catalog'] + ['writers' => $writers], JSON_THROW_ON_ERROR);
     } elseif (str_contains($text, 'CONFIG GET dir')) {
         echo "dir\n/data\n";
     } elseif (str_contains($text, 'redis-cli --raw SAVE')) {

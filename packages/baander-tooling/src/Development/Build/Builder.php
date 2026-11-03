@@ -53,9 +53,11 @@ class Builder
         $release['app_image'] = $this->build($docker, $source, $instance['kind'] === 'persistent' ? 'production' : 'dev-runtime', $revision);
         $release['worker_image'] = $this->build($docker, $source, 'worker', $revision);
         $release['operator_image'] = $this->build($docker, $source, 'dev-operator', $revision);
-        foreach (['postgres_image' => 'postgres', 'nginx_image' => 'nginx', 'redis_image' => 'developmentRedis'] as $key => $role) {
+        // The database image also runs the pooler. Data keeps its retained PostgreSQL image;
+        // the pooler always runs from this release's build.
+        foreach (['postgres_image' => 'postgres', 'pooler_image' => 'postgres', 'nginx_image' => 'nginx', 'redis_image' => 'developmentRedis'] as $key => $role) {
             $selection = $this->configuration->images->role($role);
-            $retained = in_array($role, ['postgres', 'developmentRedis'], true) ? ($instance[$key] ?? $instance['release']['images'][$key]['resolvedId'] ?? null) : null;
+            $retained = in_array($key, ['postgres_image', 'redis_image'], true) ? ($instance[$key] ?? $instance['release']['images'][$key]['resolvedId'] ?? null) : null;
             if ($retained !== null) {
                 $release[$key] = $retained;
             } elseif ($role === 'postgres' && $this->configuration->provenance['images.postgres.reference'] === 'defaults') {

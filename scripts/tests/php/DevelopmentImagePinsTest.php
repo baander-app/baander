@@ -57,7 +57,7 @@ final class DevelopmentImagePinsTest extends TestCase
     {
         $first = $this->builder->prepare($this->instance);
         $second = $this->builder->prepare($this->instance);
-        self::assertCount(7, $first['image_pins']);
+        self::assertCount(8, $first['image_pins']);
         foreach ($first['image_pins'] as $key => $pin) {
             self::assertArrayNotHasKey($key, $first);
             self::assertArrayNotHasKey($key, $second);
@@ -98,9 +98,12 @@ final class DevelopmentImagePinsTest extends TestCase
 
     public function testExistingStorageImagesOverrideNewBuildBeforePinning(): void
     {
-        $this->instance['release'] = DevelopmentCommandExecutor::release(['postgres_image' => 'previous-postgres', 'redis_image' => 'previous-redis'], $this->instance);
+        $this->instance['release'] = DevelopmentCommandExecutor::release(['postgres_image' => 'previous-postgres', 'pooler_image' => 'previous-pooler', 'redis_image' => 'previous-redis'], $this->instance);
         $release = $this->builder->prepare($this->instance);
         self::assertSame('previous-postgres', $release['images']['postgres_image']['resolvedId']);
+        // The pooler runs from this release's database image while data keeps its retained one.
+        self::assertNotSame('previous-pooler', $release['images']['pooler_image']['resolvedId']);
+        self::assertFalse($release['image_selections']['pooler_image']['retained']);
         self::assertSame('previous-redis', $release['images']['redis_image']['resolvedId']);
         self::assertSame($release['image_pins']['redis_image'], $release['images']['redis_image']['reference']);
         self::assertTrue($release['image_selections']['redis_image']['retained']);

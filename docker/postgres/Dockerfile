@@ -11,6 +11,7 @@ FROM postgres:18-bookworm AS base
 # Set versions as build args for easy updates
 ARG PGROONGA_VERSION=4.0.5-1
 ARG POSTGRESQL_VERSION=18
+ARG PGBOUNCER_VERSION=1.26.1-1.pgdg12+1
 
 ENV PGROONGA_VERSION=${PGROONGA_VERSION}
 ENV POSTGRESQL_VERSION=${POSTGRESQL_VERSION}
@@ -41,6 +42,8 @@ RUN apt-get update && apt-get install -y -V \
     groonga-tokenizer-mecab \
     # PostgreSQL contrib extensions
     postgresql-contrib-${POSTGRESQL_VERSION} \
+    # Transaction-mode connection pooler, run as its own service from this image
+    pgbouncer=${PGBOUNCER_VERSION} \
     # Python support for complex processing
     postgresql-plpython3-${POSTGRESQL_VERSION} \
     python3-dev \
@@ -55,6 +58,11 @@ RUN apt-get update && apt-get install -y -V \
 
 # Copy configuration files - correct path relative to build context (./docker/)
 COPY ./postgres/conf/ /etc/postgresql/
+
+# The pooler service runs baander-pooler; baander-pooler-credentials prepares
+# its auth file before it starts.
+COPY ./postgres/pooler/pgbouncer.ini /etc/baander-pooler/pgbouncer.ini
+COPY --chmod=0755 ./postgres/pooler/baander-pooler ./postgres/pooler/baander-pooler-credentials /usr/local/bin/
 
 # PGroonga backends touch large anonymous mappings sparsely; with host THP mode
 # "always" each touched 2 MiB range can become a resident huge page, so every

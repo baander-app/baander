@@ -50,9 +50,9 @@ try {
     pcntl_signal(SIGINT, $stop);
     $environment = getenv('APP_ENV');
     $debug = getenv('APP_DEBUG');
-    $databaseUrl = getenv('DATABASE_URL');
+    $controlDatabaseUrl = getenv('DATABASE_CONTROL_URL');
     if (!is_string($environment) || preg_match('/\A[A-Za-z0-9_-]{1,64}\z/D', $environment) !== 1
-        || !in_array($debug, ['0', '1'], true) || !is_string($databaseUrl) || $databaseUrl === ''
+        || !in_array($debug, ['0', '1'], true) || !is_string($controlDatabaseUrl) || $controlDatabaseUrl === ''
     ) {
         throw new RuntimeException('Media job requires inherited kernel configuration.');
     }
@@ -71,7 +71,7 @@ try {
         throw new RuntimeException('Native execution peer is not ready.');
     }
     \App\Transcode\Infrastructure\FFmpeg\ProcessExecutor::configureNativeExecution($native);
-    $authority = \App\Transcode\Infrastructure\Worker\DoctrineMediaWorkerAuthority::fromDsn($databaseUrl);
+    $authority = \App\Transcode\Infrastructure\Worker\DoctrineMediaWorkerAuthority::fromDsn($controlDatabaseUrl);
     $authority->assertActive();
     $kernel = new \App\Kernel($environment, $debug === '1');
     $kernel->boot();

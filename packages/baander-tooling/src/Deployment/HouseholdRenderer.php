@@ -15,12 +15,11 @@ final class HouseholdRenderer
     {
         $env = $configuration->environment;
         $redis = 'redis://default:' . rawurlencode($env['REDIS_PASSWORD']) . '@redis:6379';
-        return array_replace($env, [
+        return array_replace($env, Pooler::urls($env['DB_USERNAME'], $env['DB_PASSWORD'], $env['DB_DATABASE']), [
             'APP_ENV' => 'prod', 'APP_DEBUG' => '0', 'APP_URL' => $configuration->origin,
             'DEFAULT_URI' => $configuration->origin, 'APP_DOMAIN' => (string) parse_url($configuration->origin, PHP_URL_HOST),
             'BAANDER_DEPLOYMENT_PROFILE' => $configuration->profile,
             'BAANDER_DEPLOYMENT_PROFILE_JSON' => json_encode($profile->deployment, JSON_THROW_ON_ERROR),
-            'DATABASE_URL' => 'postgresql://' . rawurlencode($env['DB_USERNAME']) . ':' . rawurlencode($env['DB_PASSWORD']) . '@postgres:5432/' . rawurlencode($env['DB_DATABASE']) . '?serverVersion=18&charset=utf8',
             'REDIS_URL' => $redis, 'MESSENGER_TRANSPORT_DSN' => $redis . '/messages',
             'MAILER_DSN' => $env['MAILER_DSN'] ?? 'null://null',
             'MEDIA_STORAGE_PATH' => '/storage/media', 'CONVERT_STORAGE_PATH' => '/storage/conversions',
@@ -31,7 +30,7 @@ final class HouseholdRenderer
     public static function workerEnvironment(HouseholdConfiguration $configuration, ImageProfile $profile): array
     {
         return array_intersect_key(self::environment($configuration, $profile), array_flip([
-            'APP_ENV', 'APP_DEBUG', 'APP_SECRET', 'DATABASE_URL', 'REDIS_URL',
+            'APP_ENV', 'APP_DEBUG', 'APP_SECRET', 'DATABASE_URL', 'DATABASE_CONTROL_URL', 'REDIS_URL',
             'REDIS_PASSWORD', 'MESSENGER_TRANSPORT_DSN', 'MAILER_DSN',
             'CONVERT_STORAGE_PATH', 'MEDIA_STORAGE_PATH', 'MAIL_FROM_ADDRESS', 'MAIL_FROM_NAME',
             'VAPID_PRIVATE_KEY', 'VAPID_PUBLIC_KEY', 'STREAM_URL_HMAC_SECRET', 'APP_URL', 'DEFAULT_URI',
@@ -65,7 +64,7 @@ final class HouseholdRenderer
                 'entrypoint' => ['php'], 'command' => ['-d', 'memory_limit=' . $profile->phpHeapMiB . 'M', $layout->path('bin/console'), 'app:serve', '--no-interaction'],
                 'volumes' => $webMounts, 'init' => true, 'stop_grace_period' => '35s', 'cap_drop' => ['ALL'],
                 'mem_limit' => $resources['webMemoryMiB'] . 'm', 'pids_limit' => 128,
-                'depends_on' => ['postgres' => ['condition' => 'service_healthy'], 'redis' => ['condition' => 'service_healthy']],
+                'depends_on' => [Pooler::SERVICE => ['condition' => 'service_healthy'], 'redis' => ['condition' => 'service_healthy']],
             ],
             'postgres' => $common + [
                 'image' => $images['postgres']['id'],
@@ -77,6 +76,12 @@ final class HouseholdRenderer
                 'pids_limit' => $configuration->profile === 'full' ? 128 : 96,
                 'healthcheck' => ['test' => ['CMD-SHELL', 'pg_isready -h 127.0.0.1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"'], 'interval' => '5s', 'timeout' => '5s', 'retries' => 24],
             ],
+            Pooler::SERVICE => $common + Pooler::service(
+                $images['postgres']['id'],
+                Pooler::environment($configuration->profile, $environment['DB_USERNAME'], $environment['DB_DATABASE'], 'postgres'),
+                'pooler_credentials',
+                'postgres',
+            ) + ['cap_drop' => ['ALL'], 'mem_limit' => $resources['poolerMemoryMiB'] . 'm', 'pids_limit' => 16],
             'redis' => $common + [
                 'image' => $images['redis']['id'], 'environment' => ['REDIS_PASSWORD' => $environment['REDIS_PASSWORD']],
                 'command' => ['sh', '-ec', 'exec redis-server --dir /data --appendonly yes --maxmemory ' . $resources['redisMaxmemoryMiB'] . 'mb --maxmemory-policy noeviction --requirepass "$REDIS_PASSWORD"'],

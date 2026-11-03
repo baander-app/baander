@@ -15,15 +15,16 @@ use App\Shared\Infrastructure\Worker\Autoscaling\ResourceChannel;
 /** Resident-role PID-1 runtime; child replacement requires external deployment recovery. */
 final readonly class WorkerSupervisorRunner implements WorkerSupervisorRunnerInterface
 {
-    public function __construct(private string $projectDirectory, private string $databaseUrl, private AsyncWorkloadCatalog $workloads)
+    public function __construct(private string $projectDirectory, private string $databaseUrl, private string $controlDatabaseUrl, private AsyncWorkloadCatalog $workloads)
     {
         if (!str_starts_with($projectDirectory, '/') || realpath($projectDirectory) !== $projectDirectory
             || !is_file($projectDirectory . '/bin/console') || !is_file($projectDirectory . '/bin/worker-lease-agent.php')
             || !is_file($projectDirectory . '/bin/worker-autoscaler.php')
             || !is_file($projectDirectory . '/bin/worker-native.php') || !is_file($projectDirectory . '/bin/worker-scheduler.php') || !is_file($projectDirectory . '/bin/worker-media.php') || !is_file($projectDirectory . '/bin/worker-media-job.php')
             || $databaseUrl === '' || str_contains($databaseUrl, "\0")
+            || $controlDatabaseUrl === '' || str_contains($controlDatabaseUrl, "\0")
         ) {
-            throw new \InvalidArgumentException('Worker runner requires a trusted canonical project with console/lease/scheduler/media entrypoints and a database URL.');
+            throw new \InvalidArgumentException('Worker runner requires a trusted canonical project with console/lease/scheduler/media entrypoints and database and control database URLs.');
         }
     }
 
@@ -48,6 +49,7 @@ final readonly class WorkerSupervisorRunner implements WorkerSupervisorRunnerInt
         pcntl_signal(SIGINT, $stop);
         try {
             $environment['DATABASE_URL'] = $this->databaseUrl;
+            $environment['DATABASE_CONTROL_URL'] = $this->controlDatabaseUrl;
             $environment['BAANDER_WORKER_NAMESPACE'] = $configuration->namespace;
             $environment['BAANDER_WORKER_BOOT_ID'] = $configuration->bootId;
             $startedAt = hrtime(true) / 1e9;
