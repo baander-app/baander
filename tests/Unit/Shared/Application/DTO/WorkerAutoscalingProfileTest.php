@@ -26,11 +26,11 @@ final class WorkerAutoscalingProfileTest extends TestCase
     {
         $deployment = new \App\Shared\Application\DTO\DeploymentProfile('household');
         $profile = new WorkerAutoscalingProfile();
-        self::assertSame(1856, $profile->minimumMemoryMiB('control', $deployment));
-        self::assertSame(1344, $profile->minimumMemoryMiB('execution', $deployment));
+        self::assertSame(2304, $profile->minimumMemoryMiB('control', $deployment));
+        self::assertSame(1536, $profile->minimumMemoryMiB('execution', $deployment));
         $configuration = new WorkerRuntimeConfiguration('worker.baander.app', str_repeat('a', 32), 'control',
-            1856 * 1024 * 1024, 129, 0, '/tmp/worker-locks', '/run/baander-worker', deploymentProfile: $deployment);
-        self::assertSame(320 * 1024 * 1024, $configuration->managementReservationBytes);
+            2304 * 1024 * 1024, 129, 0, '/tmp/worker-locks', '/run/baander-worker', deploymentProfile: $deployment);
+        self::assertSame(384 * 1024 * 1024, $configuration->managementReservationBytes);
     }
 
     public function testProfileRoundTripPreservesEveryPolicyInput(): void

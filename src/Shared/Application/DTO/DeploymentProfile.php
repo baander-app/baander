@@ -69,7 +69,7 @@ final readonly class DeploymentProfile
 
     public function phpHeapMiB(): int
     {
-        return $this->identifier === 'household' ? 192 : 256;
+        return 256;
     }
 
     public function phpProcessMemoryMiB(): int

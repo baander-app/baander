@@ -64,7 +64,7 @@ final class RelayOutboxWorkerCommandTest extends TestCase
     /** @return iterable<string, array{string, int}> */
     public static function profiles(): iterable
     {
-        yield 'household recycles at 192 MiB' => ['household', 1];
+        yield 'household continues below 256 MiB' => ['household', 2];
         yield 'full continues below 256 MiB' => ['full', 2];
     }
 }

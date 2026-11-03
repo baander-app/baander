@@ -36,18 +36,18 @@ final class WorkerRuntimeConfigurationTest extends TestCase
             $this->expectException(\InvalidArgumentException::class);
         }
         $configuration = new WorkerRuntimeConfiguration('worker.baander.app', str_repeat('a', 32), 'execution',
-            $memoryMiB * 1024 * 1024, 256, 256 * 1024 * 1024, '/tmp/worker-locks', '/run/baander-worker',
+            $memoryMiB * 1024 * 1024, 256, 320 * 1024 * 1024, '/tmp/worker-locks', '/run/baander-worker',
             deploymentProfile: new \App\Shared\Application\DTO\DeploymentProfile('household'));
-        self::assertSame(1600 * 1024 * 1024, $configuration->memoryLimitBytes);
-        self::assertSame(832 * 1024 * 1024, $configuration->managementReservationBytes);
-        self::assertSame(256 * 1024 * 1024, $configuration->scheduledConsoleReservationBytes);
+        self::assertSame(1856 * 1024 * 1024, $configuration->memoryLimitBytes);
+        self::assertSame(896 * 1024 * 1024, $configuration->managementReservationBytes);
+        self::assertSame(320 * 1024 * 1024, $configuration->scheduledConsoleReservationBytes);
     }
 
     /** @return iterable<string, array{int, bool}> */
     public static function householdExecutionBudgets(): iterable
     {
-        yield 'exact budget' => [1600, true];
-        yield 'insufficient budget' => [1599, false];
+        yield 'exact budget' => [1856, true];
+        yield 'insufficient budget' => [1855, false];
     }
 
     public function testWeakerUnitMemoryIsRejected(): void

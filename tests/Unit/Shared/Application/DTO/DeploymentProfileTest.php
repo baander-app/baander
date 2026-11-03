@@ -31,8 +31,8 @@ final class DeploymentProfileTest extends TestCase
         self::assertSame(128, $full->nativeManagerHeapMiB());
 
         $household = new DeploymentProfile('household');
-        self::assertSame(192, $household->phpHeapMiB());
-        self::assertSame(256, $household->phpProcessMemoryMiB());
+        self::assertSame(256, $household->phpHeapMiB());
+        self::assertSame(320, $household->phpProcessMemoryMiB());
         self::assertSame(512, $household->nativeEnvelopeMiB());
         self::assertSame(128, $household->nativeManagerHeapMiB());
     }
