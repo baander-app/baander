@@ -715,14 +715,14 @@ final class WorkerFixtureTest extends TestCase
     {
         if ($unit === 'control') {
             return [
-                ['pid' => 1, 'startTicks' => '10', 'role' => 'supervisor', 'nice' => 0, 'oomScoreAdj' => -500, 'argv' => ['php', 'bin/console', 'app:worker']],
-                ['pid' => 30, 'startTicks' => '200', 'role' => 'media-child', 'nice' => 0, 'oomScoreAdj' => 600, 'argv' => ['php', '/opt/baander/bin/worker-media-job.php']],
+                ['pid' => 1, 'startTicks' => '10', 'role' => 'supervisor', 'nice' => 0, 'oomScoreAdj' => -500, 'program' => 'php'],
+                ['pid' => 30, 'startTicks' => '200', 'role' => 'media-child', 'nice' => 0, 'oomScoreAdj' => 600, 'program' => 'php'],
             ];
         }
         return [
-            ['pid' => 1, 'startTicks' => '10', 'role' => 'supervisor', 'nice' => 0, 'oomScoreAdj' => 300, 'argv' => ['php', 'bin/console', 'app:worker']],
-            ['pid' => 20, 'startTicks' => '100', 'role' => 'native', 'nice' => 0, 'oomScoreAdj' => 300, 'argv' => ['php', '/opt/baander/bin/worker-native.php']],
-            ['pid' => 40, 'startTicks' => '300', 'role' => 'native-command', 'nice' => 10, 'oomScoreAdj' => 600, 'argv' => ['/usr/bin/ffmpeg', '-i', '/media/source/video.mkv']],
+            ['pid' => 1, 'startTicks' => '10', 'role' => 'supervisor', 'nice' => 0, 'oomScoreAdj' => 300, 'program' => 'php'],
+            ['pid' => 20, 'startTicks' => '100', 'role' => 'native', 'nice' => 0, 'oomScoreAdj' => 300, 'program' => 'php'],
+            ['pid' => 40, 'startTicks' => '300', 'role' => 'native-command', 'nice' => 10, 'oomScoreAdj' => 600, 'program' => 'ffmpeg'],
         ];
     }
 
@@ -1214,7 +1214,7 @@ final class WorkerFixtureTest extends TestCase
         $this->capacityFixture('cpu');
         $control = Reports::samples($this->root . '/control-samples.jsonl');
         $pressure = self::cpuPressure();
-        $child = static fn(int $score): array => ['pid' => 31, 'startTicks' => '210', 'role' => 'media-child', 'nice' => 0, 'oomScoreAdj' => $score, 'argv' => ['php', '/opt/baander/bin/worker-media-job.php']];
+        $child = static fn(int $score): array => ['pid' => 31, 'startTicks' => '210', 'role' => 'media-child', 'nice' => 0, 'oomScoreAdj' => $score, 'program' => 'php'];
         switch ($case) {
             case 'inherited-child':
                 $control[10]['killOrder'][] = $child(-500);

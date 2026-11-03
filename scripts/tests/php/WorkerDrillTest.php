@@ -140,9 +140,12 @@ final class WorkerDrillTest extends TestCase
 
     public function testStoppedSummaryAcceptsJsonKeyOrderButRejectsDuplicatesAndWrongCounts(): void
     {
-        $valid = '{"exitCode":1,"event":"worker_supervisor_stopped","launchAttempts":4}';
+        $valid = '{"exitCode":1,"event":"worker_supervisor_stopped","launchAttempts":4,"cause":{"reason":"stop_requested"}}';
         Command::validateStopped($valid, 1, 4);
+        Command::validateStopped('{"cause":null,"exitCode":1,"event":"worker_supervisor_stopped","launchAttempts":4}', 1, 4);
         foreach ([
+            '{"exitCode":1,"event":"worker_supervisor_stopped","launchAttempts":4}',
+            str_replace('{"reason":"stop_requested"}', '"stop_requested"', $valid),
             $valid . "\n" . $valid,
             str_replace('"launchAttempts":4', '"launchAttempts":5', $valid),
             str_replace('"exitCode":1', '"exitCode":"1"', $valid),

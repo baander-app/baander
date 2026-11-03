@@ -357,6 +357,8 @@ final class WorkerSamplerTest extends TestCase
                 array_map(static fn(array $record): array => [$record['pid'], $record['role'], $record['nice'], $record['oomScoreAdj']], $records),
             );
             self::assertSame('1040', $records[3]['startTicks']);
+            self::assertSame('ffmpeg', $records[3]['program']);
+            self::assertArrayNotHasKey('argv', $records[3]);
         } finally {
             (new EngineExecutor(ExecutionContext::bounded(30, getenv(), dirname(__DIR__, 3))))->run(new ProcessSpec(['rm', '-rf', '--', $proc]));
         }

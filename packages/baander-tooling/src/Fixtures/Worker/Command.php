@@ -400,8 +400,9 @@ final class Command
         Runtime::require(count($frames) === 1, 'Expected exactly one worker stop summary');
         $frame = $frames[0];
         Runtime::require(
-            count($frame) === 3 && ($frame['launchAttempts'] ?? null) === $launches
-            && ($frame['exitCode'] ?? null) === $exit,
+            count($frame) === 4 && ($frame['launchAttempts'] ?? null) === $launches
+            && ($frame['exitCode'] ?? null) === $exit
+            && array_key_exists('cause', $frame) && ($frame['cause'] === null || is_array($frame['cause'])),
             'Unexpected worker stop summary',
         );
     }

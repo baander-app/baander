@@ -10,7 +10,12 @@ declare(strict_types=1);
  */
 final class KillOrderSample
 {
-    /** @return list<array{pid:int,startTicks:string,role:string,nice:int,oomScoreAdj:int,argv:list<string>}> */
+    /**
+     * Records carry the program name rather than the argument vector: samplers take one every
+     * fifty milliseconds, and FFmpeg argument vectors would make the evidence files too large.
+     *
+     * @return list<array{pid:int,startTicks:string,role:string,nice:int,oomScoreAdj:int,program:string}>
+     */
     public static function processes(string $proc = '/proc'): array
     {
         $records = [];
@@ -34,7 +39,7 @@ final class KillOrderSample
                 'role' => $role,
                 'nice' => (int) ($fields[16] ?? 0),
                 'oomScoreAdj' => (int) trim($score),
-                'argv' => $arguments,
+                'program' => basename($arguments[0] ?? ''),
             ];
         }
         return $records;

@@ -126,10 +126,13 @@ final readonly class WorkerSupervisorRunner implements WorkerSupervisorRunnerInt
                 });
             $drainStarted = null;
             $exitCode = 0;
+            /** @var array<string, mixed>|null $cause */
+            $cause = null;
             while (true) {
                 if ($drainStarted === null && hrtime(true) / 1e9 >= $startedAt + 30.0 && $launchAttempts === 0) {
                     $stopRequested = true;
                     $exitCode = 1;
+                    $cause ??= ['reason' => 'no_launch'];
                 }
                 if ($stopRequested && $drainStarted === null) {
                     $drainStarted = hrtime(true) / 1e9;
@@ -144,8 +147,10 @@ final readonly class WorkerSupervisorRunner implements WorkerSupervisorRunnerInt
                     if ($drainStarted !== null || $configuration->unit !== 'execution' || $epoch !== null || $peer->ready(null, hrtime(true) / 1e9)) {
                         $runtime->tick();
                     }
-                } catch (\Throwable) {
+                } catch (\Throwable $error) {
                     $exitCode = 1;
+                    // Source location only: messages may carry connection details.
+                    $cause ??= ['reason' => 'management_failed', 'error' => $error::class, 'source' => basename($error->getFile()) . ':' . $error->getLine()];
                     $drainStarted ??= hrtime(true) / 1e9;
                     try {
                         $runtime->requestDrain();
@@ -155,15 +160,19 @@ final readonly class WorkerSupervisorRunner implements WorkerSupervisorRunnerInt
                 }
                 if ($drainStarted === null) {
                     $failed = $runtime->failureCode() !== null;
-                    foreach ($runtime->snapshot() as $worker) {
+                    $failedWorkers = [];
+                    foreach ($runtime->snapshot() as $id => $worker) {
                         if (in_array($worker['state'], ['awaiting_containment', 'backoff', 'exhausted'], true)
                             || $worker['exitCode'] !== null || $worker['terminationSignal'] !== null || $worker['errorCode'] !== null
                         ) {
                             $failed = true;
+                            $failedWorkers[] = ['id' => $id, 'state' => $worker['state'], 'exitCode' => $worker['exitCode'],
+                                'terminationSignal' => $worker['terminationSignal'], 'errorCode' => $worker['errorCode']];
                         }
                     }
                     if ($failed) {
                         $exitCode = 1;
+                        $cause ??= ['reason' => 'role_failed', 'failure' => $runtime->failureCode(), 'workers' => $failedWorkers];
                         $drainStarted = hrtime(true) / 1e9;
                         try {
                             $runtime->requestDrain();
@@ -181,7 +190,7 @@ final readonly class WorkerSupervisorRunner implements WorkerSupervisorRunnerInt
                     }
                     $nativeReaped = $native === null || !$native->poll(hrtime(true) / 1e9);
                     if ($runtime->areDirectChildrenReaped() && $nativeReaped) {
-                        $this->stoppedSummary($launchAttempts, $exitCode);
+                        $this->stoppedSummary($launchAttempts, $exitCode, $cause ?? ($stopRequested ? ['reason' => 'stop_requested'] : null));
                         return $exitCode;
                     }
                     if (hrtime(true) / 1e9 >= $drainStarted + 35.0) {
@@ -202,12 +211,13 @@ final readonly class WorkerSupervisorRunner implements WorkerSupervisorRunnerInt
     }
 
     /** Best-effort bounded diagnostics after direct reaping; never a readiness or containment receipt. */
-    private function stoppedSummary(int $launchAttempts, int $exitCode): void
+    /** @param array<string, mixed>|null $cause The first reason the unit drained, when it was not asked to stop. */
+    private function stoppedSummary(int $launchAttempts, int $exitCode, ?array $cause): void
     {
         $blocked = stream_get_meta_data(STDOUT)['blocked'];
         try {
             if (stream_set_blocking(STDOUT, false)) {
-                fwrite(STDOUT, json_encode(['event' => 'worker_supervisor_stopped', 'launchAttempts' => $launchAttempts, 'exitCode' => $exitCode], JSON_THROW_ON_ERROR) . "\n");
+                fwrite(STDOUT, json_encode(['event' => 'worker_supervisor_stopped', 'launchAttempts' => $launchAttempts, 'exitCode' => $exitCode, 'cause' => $cause], JSON_THROW_ON_ERROR) . "\n");
             }
         } catch (\Throwable) {
             // Diagnostic failure cannot reopen admission or delay the deployment exit.
