@@ -225,6 +225,9 @@ final class HostSampler
     private function process(int $pid, array $roles): ?array
     {
         $directory = rtrim($this->procRoot, '/') . '/' . $pid;
+        // Read the executable before the state: a process that exits after this point reports a zombie or
+        // vanished state below and is classified as exited instead of as missing telemetry.
+        $executable = @readlink($directory . '/exe');
         $raw = $this->read($directory . '/stat', 'process:' . $pid . '/stat');
         $boundary = $raw === null ? false : strrpos($raw, ') ');
         $fields = $boundary === false ? [] : preg_split('/\s+/', trim(substr($raw, $boundary + 2)));
@@ -239,7 +242,6 @@ final class HostSampler
         if ($name === null || $threads === null) {
             $this->missing[] = 'process:' . $pid . '/status:malformed';
         }
-        $executable = @readlink($directory . '/exe');
         if ($executable === false) {
             $this->missing[] = 'process:' . $pid . '/exe';
         }

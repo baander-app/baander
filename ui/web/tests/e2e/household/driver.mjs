@@ -245,6 +245,27 @@ async function login(page, slot) {
   const [response] = await Promise.all([responsePromise, page.getByRole('button', { name: /log in/i }).click()])
   requireValue(response.ok(), `Real UI login failed with HTTP ${response.status()}`)
   await page.waitForURL(url => url.pathname === '/music')
+  // The application stores the new session asynchronously; a full navigation before that write
+  // completes starts without a session and returns to the login page.
+  await page.waitForFunction(async () => {
+    if (!(await indexedDB.databases()).some(database => database.name === 'baander-auth')) return false
+    const database = await new Promise((resolve, reject) => {
+      const request = indexedDB.open('baander-auth')
+      request.onsuccess = () => resolve(request.result)
+      request.onerror = () => reject(request.error)
+    })
+    try {
+      if (!database.objectStoreNames.contains('auth')) return false
+      const record = await new Promise((resolve, reject) => {
+        const request = database.transaction('auth', 'readonly').objectStore('auth').get('current')
+        request.onsuccess = () => resolve(request.result)
+        request.onerror = () => reject(request.error)
+      })
+      return record != null && Number.isInteger(record.epoch) && record.cleared !== true
+    } finally {
+      database.close()
+    }
+  }, undefined, { polling: 100 })
 }
 
 function observeResponses(page, slot, state, record, pending) {
