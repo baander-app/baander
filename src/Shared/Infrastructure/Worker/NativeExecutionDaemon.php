@@ -11,9 +11,6 @@ use Symfony\Component\DependencyInjection\Attribute\Exclude;
 #[Exclude]
 final class NativeExecutionDaemon
 {
-    /** Open connections beyond one per admitted client, for overlapping requests and stray peers. */
-    private const int PEER_MARGIN = 4;
-
     /** Commands yield CPU to the unit's supervisor, lease helper, consumers and this daemon. */
     public const int COMMAND_NICENESS = 10;
 
@@ -65,7 +62,7 @@ final class NativeExecutionDaemon
         pcntl_signal(SIGINT, function (): void { $this->stopping = true; });
         /** @var array<int, array{socket:resource, input:string, output:?string, written:int, deadline:float}> $peers */
         $peers = [];
-        $peerLimit = count($this->clientCommandCaps) + self::PEER_MARGIN;
+        $peerLimit = $this->deploymentProfile->nativePeerLimit();
         try {
             while (!$this->stopping && !$this->poisoned) {
                 $this->tick();

@@ -49,16 +49,32 @@ final class DeploymentProfileTest extends TestCase
         self::assertSame(['media-copy-0', 'media-copy-1'], $household->mediaClientIds('audio'));
     }
 
-    public function testDefaultFullSlotsKeepTheEightCommandLimit(): void
+    public function testUnsetFullSlotsRunEightVideoAndTwelveAudioJobs(): void
     {
         $full = new DeploymentProfile('full');
 
-        self::assertSame([
-            'supervisor' => 0, 'media-control' => 1,
-            'media-video-0' => 2, 'media-video-1' => 2, 'media-video-2' => 2,
-            'media-audio-0' => 1,
-        ], $full->nativeClientCommandCaps());
-        self::assertSame([8, 18, 6, 1], [$full->nativeCommandLimit(), $full->nativeResultLimit(), $full->nativeClientLimit(), $full->mediaHelperLimit()]);
+        self::assertSame([8, 12], [$full->videoEncoderSlots, $full->audioEncoderSlots]);
+        self::assertEquals(new DeploymentProfile('full', 8, 12), $full);
+        self::assertEquals($full, DeploymentProfile::resolve('full'));
+        self::assertSame([29, 60, 22, 1], [$full->nativeCommandLimit(), $full->nativeResultLimit(), $full->nativeClientLimit(), $full->mediaHelperLimit()]);
+    }
+
+    public function testSlotsSetTheNativePeerLimitAboveTheirClients(): void
+    {
+        self::assertSame(22 + 4, (new DeploymentProfile('full', 8, 12))->nativePeerLimit());
+        self::assertSame(6 + 4, (new DeploymentProfile('full', 3, 1))->nativePeerLimit());
+        self::assertSame(4 + 4, (new DeploymentProfile('household'))->nativePeerLimit());
+    }
+
+    public function testFingerprintFollowsEverySetting(): void
+    {
+        $profile = new DeploymentProfile('full', 8, 12);
+
+        self::assertMatchesRegularExpression('/\A[0-9a-f]{64}\z/D', $profile->fingerprint());
+        self::assertSame($profile->fingerprint(), DeploymentProfile::fromJson($profile->toJson())->fingerprint());
+        self::assertNotSame($profile->fingerprint(), (new DeploymentProfile('full', 4, 12))->fingerprint());
+        self::assertNotSame($profile->fingerprint(), (new DeploymentProfile('full', 8, 11))->fingerprint());
+        self::assertNotSame($profile->fingerprint(), (new DeploymentProfile('household'))->fingerprint());
     }
 
     public function testEightVideoAndTwelveAudioSlotsDeriveTheirNativeLimits(): void
@@ -131,16 +147,57 @@ final class DeploymentProfileTest extends TestCase
         yield 'video disabled' => [[0, 4]];
     }
 
-    public function testFullProfileRejectsSlotsOutsideItsBounds(): void
+    public function testFullProfileMaximumsFollowThePoolerClientLimit(): void
     {
-        foreach ([[-1, 1], [1, -1], [DeploymentProfile::PROVISIONAL_MAXIMUM_SLOTS_PER_KIND + 1, 1], [1, DeploymentProfile::PROVISIONAL_MAXIMUM_SLOTS_PER_KIND + 1]] as [$video, $audio]) {
-            try {
-                new DeploymentProfile('full', $video, $audio);
-                self::fail('Out-of-range slots were accepted.');
-            } catch (\InvalidArgumentException $error) {
-                self::assertStringContainsString('0 through ' . DeploymentProfile::PROVISIONAL_MAXIMUM_SLOTS_PER_KIND, $error->getMessage());
-            }
+        $bounds = (new DeploymentProfile('full'))->mediaSlotBounds();
+
+        self::assertNotNull($bounds);
+        // Web: 4 workers × (10 Doctrine + 1 dedicated); 4 ordinary consumers; 3 scheduled consumer;
+        // 2 lease agents; 5 scheduler; 5 other control roles; 2 operator clients.
+        self::assertSame(44 + 4 + 3 + 2 + 5 + 5 + 2, $bounds->fixedClients);
+        self::assertSame(500 - 65, $bounds->mediaJobClients);
+        self::assertSame([145, 217], [$bounds->maximumVideoSlots, $bounds->maximumAudioSlots]);
+        self::assertNull((new DeploymentProfile('household'))->mediaSlotBounds());
+    }
+
+    public function testFullProfileAcceptsEachKindUpToItsMaximum(): void
+    {
+        self::assertSame(145, (new DeploymentProfile('full', 145, 0))->videoEncoderSlots);
+        self::assertSame(217, (new DeploymentProfile('full', 0, 217))->audioEncoderSlots);
+        // 3 × 101 + 2 × 66 = 435 pooled connections, exactly what media jobs may hold.
+        $shared = new DeploymentProfile('full', 101, 66);
+        self::assertSame([101, 66], [$shared->videoEncoderSlots, $shared->audioEncoderSlots]);
+    }
+
+    /** @param array{int, int} $slots */
+    #[DataProvider('slotsBeyondTheirBound')]
+    public function testFullProfileRejectsSlotsBeyondTheirBoundAndNamesIt(array $slots, string $bound): void
+    {
+        try {
+            new DeploymentProfile('full', ...$slots);
+            self::fail('Slots beyond their bound were accepted.');
+        } catch (\InvalidArgumentException $error) {
+            self::assertStringContainsString($bound, $error->getMessage());
         }
+    }
+
+    /** @return iterable<string, array{array{int, int}, string}> */
+    public static function slotsBeyondTheirBound(): iterable
+    {
+        yield 'negative video' => [[-1, 1], 'zero or more video slots'];
+        yield 'negative audio' => [[1, -1], 'zero or more audio slots'];
+        yield 'one video above its maximum' => [[146, 0], 'at most 145 video slots'];
+        yield 'one audio above its maximum' => [[0, 218], 'at most 217 audio slots'];
+        yield 'both kinds above the shared remainder' => [[101, 67], 'open 437 pooled client connections, more than the 435'];
+    }
+
+    public function testJsonBeyondTheBoundsIsRejectedWhenTheProfileIsBuilt(): void
+    {
+        $fields = json_decode((new DeploymentProfile('full'))->toJson(), true, flags: JSON_THROW_ON_ERROR);
+        $fields['videoEncoderSlots'] = 146;
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('at most 145 video slots');
+        DeploymentProfile::fromJson(json_encode($fields, JSON_THROW_ON_ERROR));
     }
 
     #[DataProvider('invalidSettings')]

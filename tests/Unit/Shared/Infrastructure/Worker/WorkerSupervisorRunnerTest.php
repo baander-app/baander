@@ -334,7 +334,7 @@ PHP;
         self::assertSame(['relay', 'scheduler', 'media', 'autoscaler'], array_column($definitions->invoke($runner, $control), 'id'));
         $controlRoles = $definitions->invoke($runner, $control);
         self::assertSame([PHP_BINARY, '-d', 'memory_limit=256M', dirname(__DIR__, 5) . '/bin/worker-scheduler.php'], $controlRoles[1]->argv);
-        self::assertSame([0, 0, 4, 0], array_column($controlRoles, 'descendantProcessReservation'));
+        self::assertSame([0, 0, 20, 0], array_column($controlRoles, 'descendantProcessReservation'));
         $execution = new \App\Shared\Application\DTO\WorkerRuntimeConfiguration('worker.baander.app', str_repeat('a', 32), 'execution', 320 * 1024 * 1024, '/tmp/locks', '/run/baander-worker', new \App\Shared\Application\DTO\DeploymentProfile('full'));
         $roles = $definitions->invoke($runner, $execution);
         self::assertSame([1, 2], array_column($roles, 'descendantProcessReservation'));

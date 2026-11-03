@@ -7,14 +7,15 @@ namespace App\Shared\Application\DTO;
 /** Immutable startup capabilities shared by web and worker processes. */
 final readonly class DeploymentProfile
 {
-    /** Placeholder per-kind ceiling until the maximums are derived from the measured cost of a job. */
-    public const int PROVISIONAL_MAXIMUM_SLOTS_PER_KIND = 32;
-
-    private const int DEFAULT_FULL_VIDEO_SLOTS = 3;
-    private const int DEFAULT_FULL_AUDIO_SLOTS = 1;
+    /** Video slots an unset full profile runs with software encoding. */
+    private const int DEFAULT_SOFTWARE_VIDEO_SLOTS = 8;
+    /** Audio slots an unset full profile runs. */
+    private const int DEFAULT_AUDIO_SLOTS = 12;
     private const int CONTROL_COMMANDS = 1;
     private const int MEDIA_JOB_COMMANDS = 1;
     private const int MEDIA_HELPER_COMMANDS = 1;
+    /** Open native peers beyond one per admitted client, for overlapping requests and stray peers. */
+    private const int NATIVE_PEER_MARGIN = 4;
 
     public int $webWorkers;
     public int $doctrinePoolSlots;
@@ -24,21 +25,23 @@ final readonly class DeploymentProfile
     public int $audioEncoderSlots;
 
     /**
-     * Full deployments accept operator video and audio slot counts; zero disables a kind and
-     * unset counts use the default. Household runs a fixed shared copy pool and accepts none.
+     * Full deployments accept operator video and audio slot counts up to the pooler-derived
+     * maximums; zero disables a kind and unset counts use the default. Household runs a fixed
+     * shared copy pool and accepts none.
      */
     public function __construct(public string $identifier, ?int $videoEncoderSlots = null, ?int $audioEncoderSlots = null)
     {
-        [$this->webWorkers, $this->doctrinePoolSlots, $this->ordinaryConsumerLimit,
-            $this->sharedCopySlots, $this->videoEncoderSlots, $this->audioEncoderSlots] = match ($identifier) {
-                'full' => [4, 10, 4, 0,
-                    self::boundedSlots('video', $videoEncoderSlots ?? self::DEFAULT_FULL_VIDEO_SLOTS),
-                    self::boundedSlots('audio', $audioEncoderSlots ?? self::DEFAULT_FULL_AUDIO_SLOTS)],
-                'household' => $videoEncoderSlots === null && $audioEncoderSlots === null
-                    ? [2, 4, 1, 2, 0, 0]
-                    : throw new \InvalidArgumentException('Household deployment profile runs a fixed shared copy pool and accepts no video or audio slot values.'),
-                default => throw new \InvalidArgumentException('Unknown deployment profile.'),
-            };
+        [$this->webWorkers, $this->doctrinePoolSlots, $this->ordinaryConsumerLimit, $this->sharedCopySlots] = match ($identifier) {
+            'full' => [4, 10, 4, 0],
+            'household' => $videoEncoderSlots === null && $audioEncoderSlots === null
+                ? [2, 4, 1, 2]
+                : throw new \InvalidArgumentException('Household deployment profile runs a fixed shared copy pool and accepts no video or audio slot values.'),
+            default => throw new \InvalidArgumentException('Unknown deployment profile.'),
+        };
+        [$this->videoEncoderSlots, $this->audioEncoderSlots] = $identifier === 'full'
+            ? [$videoEncoderSlots ?? self::defaultSlots('video'), $audioEncoderSlots ?? self::defaultSlots('audio')]
+            : [0, 0];
+        $this->mediaSlotBounds()?->assertAccepts($this->videoEncoderSlots, $this->audioEncoderSlots);
     }
 
     public static function resolve(string $identifier, ?string $serialized = null): self
@@ -98,12 +101,21 @@ final readonly class DeploymentProfile
         return $profile;
     }
 
-    private static function boundedSlots(string $kind, int $slots): int
+    private static function defaultSlots(string $kind): int
     {
-        if ($slots < 0 || $slots > self::PROVISIONAL_MAXIMUM_SLOTS_PER_KIND) {
-            throw new \InvalidArgumentException(sprintf('Full deployment profile accepts 0 through %d %s slots.', self::PROVISIONAL_MAXIMUM_SLOTS_PER_KIND, $kind));
-        }
-        return $slots;
+        return $kind === 'video' ? self::DEFAULT_SOFTWARE_VIDEO_SLOTS : self::DEFAULT_AUDIO_SLOTS;
+    }
+
+    /** The slot maximums of a profile that takes slot values; household's slots are fixed. */
+    public function mediaSlotBounds(): ?MediaSlotBounds
+    {
+        return $this->sharedCopySlots > 0 ? null : new MediaSlotBounds($this->webWorkers, $this->doctrinePoolSlots, $this->ordinaryConsumerLimit);
+    }
+
+    /** Identifies the profile's complete settings; the worker boot row records it for web health. */
+    public function fingerprint(): string
+    {
+        return hash('sha256', $this->toJson());
     }
 
     public function phpHeapMiB(): int
@@ -173,6 +185,12 @@ final readonly class DeploymentProfile
     public function nativeClientLimit(): int
     {
         return count($this->nativeClientCommandCaps());
+    }
+
+    /** Open peers the native daemon accepts before further peers wait in its listen backlog. */
+    public function nativePeerLimit(): int
+    {
+        return $this->nativeClientLimit() + self::NATIVE_PEER_MARGIN;
     }
 
     /** Helpers a video job runs at once inside its native client allowance; further helpers queue. */

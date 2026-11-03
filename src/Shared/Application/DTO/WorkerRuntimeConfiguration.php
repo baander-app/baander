@@ -40,11 +40,21 @@ final readonly class WorkerRuntimeConfiguration
         ) {
             throw new \InvalidArgumentException('Worker requires a bounded identity, absolute private directories and an ordinary concurrency within the profile. Scheduled console requires one PHP process reservation in execution.');
         }
-        $this->childProcessCeiling = 1 + ($unit === 'control'
+        $this->childProcessCeiling = self::childProcessCeilingFor($unit, $deploymentProfile, $autoscaling->maximumConcurrency, $scheduledConsoleReservationBytes > 0);
+    }
+
+    /**
+     * Processes a unit's supervisor may own at once, including the lease helper. The control
+     * unit's ceiling follows the media slots; the execution unit's follows its ordinary
+     * concurrency and whether scheduled console execution is enabled.
+     */
+    public static function childProcessCeilingFor(string $unit, DeploymentProfile $deploymentProfile, int $maximumConcurrency, bool $scheduledConsole): int
+    {
+        return 1 + ($unit === 'control'
             // Relay, scheduler and autoscaler, then the media manager and its media children.
             ? 3 + 1 + $deploymentProfile->mediaChildSlots()
             // Ordinary consumers and the scheduled consumer, then its console child.
-            : ($autoscaling->maximumConcurrency + 1) * (1 + self::CONSUMER_DESCENDANTS) + ($scheduledConsoleReservationBytes > 0 ? 1 : 0));
+            : ($maximumConcurrency + 1) * (1 + self::CONSUMER_DESCENDANTS) + ($scheduledConsole ? 1 : 0));
     }
 
     private function validPath(string $path): bool

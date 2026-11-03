@@ -19,7 +19,7 @@ final class MediaWorkerRunnerTest extends TestCase
 {
     /** @param list<string> $expectedIds */
     #[\PHPUnit\Framework\Attributes\DataProvider('deploymentCapacities')]
-    public function testFreshChildrenRespectCapacityAndAreReapedOnDrain(string $profile, int $count, array $expectedIds, int $videoCount): void
+    public function testFreshChildrenRespectCapacityAndAreReapedOnDrain(\App\Shared\Application\DTO\DeploymentProfile $profile, int $count, array $expectedIds, int $videoCount): void
     {
         $directory = sys_get_temp_dir() . '/baander-media-test-' . bin2hex(random_bytes(8));
         mkdir($directory);
@@ -47,7 +47,7 @@ final class MediaWorkerRunnerTest extends TestCase
         $deadline = microtime(true) + 3;
         $fullAt = null;
         try {
-            (new MediaWorkerRunner($video, $audio, $authority, new \App\Shared\Application\DTO\DeploymentProfile($profile), $script))->run(
+            (new MediaWorkerRunner($video, $audio, $authority, $profile, $script))->run(
                 static function () use ($log, $deadline, &$fullAt, $count): bool {
                     if (is_file($log) && count(file($log)) >= $count) {
                         $fullAt ??= microtime(true);
@@ -76,11 +76,11 @@ final class MediaWorkerRunnerTest extends TestCase
         }
     }
 
-    /** @return iterable<string, array{string,int,list<string>,int}> */
+    /** @return iterable<string, array{\App\Shared\Application\DTO\DeploymentProfile,int,list<string>,int}> */
     public static function deploymentCapacities(): iterable
     {
-        yield 'full' => ['full', 4, ['media-audio-0', 'media-video-0', 'media-video-1', 'media-video-2'], 3];
-        yield 'household' => ['household', 2, ['media-copy-0', 'media-copy-1'], 1];
+        yield 'full' => [new \App\Shared\Application\DTO\DeploymentProfile('full', 3, 1), 4, ['media-audio-0', 'media-video-0', 'media-video-1', 'media-video-2'], 3];
+        yield 'household' => [new \App\Shared\Application\DTO\DeploymentProfile('household'), 2, ['media-copy-0', 'media-copy-1'], 1];
     }
 
     public function testEveryConfiguredVideoSlotLaunchesAndNoneBeyondIt(): void
