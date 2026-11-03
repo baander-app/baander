@@ -45,7 +45,7 @@ final readonly class CopyPresentationService implements CopyPresentationPortInte
         $requestId = $input->requestId;
         $selection = new PresentationSelection('copy', $input->sourceHash, $input->videoStreamIndex, $input->audioStreamIndex, $input->container);
         Uuid::fromString($requestId);
-        $this->policy->assertAllowed(MediaOperation::StreamCopy);
+        $this->policy->assertAllowed(MediaOperation::VideoStreamCopy);
         $profile = AudioProfile::streamingStereo();
         $session = $this->transaction->run(function () use ($owner, $video, $selection, $width, $height, $requestId, $profile): TranscodeSession {
             $this->ownership->lockAdmission($video);

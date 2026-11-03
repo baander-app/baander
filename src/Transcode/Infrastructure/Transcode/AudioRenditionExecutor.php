@@ -38,7 +38,7 @@ final class AudioRenditionExecutor
         $final = $claim->runtime->generationDirectory() . '/' . $input->sourceSignature;
         $partial = $final . SegmentFileResolver::PARTIAL_SUFFIX;
         try {
-            $this->executionPolicy->assertAllowed($input->mode === 'copy' ? MediaOperation::StreamCopy : MediaOperation::AudioEncode);
+            $this->executionPolicy->assertAllowed($input->mode === 'copy' ? MediaOperation::AudioStreamCopy : MediaOperation::AudioEncode);
             clearstatcache(true, $input->sourcePath);
             $modified = @filemtime($input->sourcePath);
             $size = @filesize($input->sourcePath);

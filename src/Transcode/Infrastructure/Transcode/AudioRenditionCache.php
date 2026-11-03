@@ -93,7 +93,7 @@ final class AudioRenditionCache implements AudioRenditionPortInterface
 
     public function openCopy(string $trackKey, string $sourcePath, string $sourceHash, int $streamIndex): AudioRendition
     {
-        $this->executionPolicy->assertAllowed(MediaOperation::StreamCopy);
+        $this->executionPolicy->assertAllowed(MediaOperation::AudioStreamCopy);
         $input = $this->copyInput($trackKey, $sourcePath, $sourceHash, $streamIndex);
         if ($input === null) {
             $this->fail('the source file cannot be read');

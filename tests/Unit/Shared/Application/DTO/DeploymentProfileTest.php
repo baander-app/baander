@@ -47,6 +47,64 @@ final class DeploymentProfileTest extends TestCase
         self::assertSame(960, $household->mediaMemoryMiB());
     }
 
+    public function testHouseholdNativeLimitsKeepTheirSharedCopyValues(): void
+    {
+        $household = new DeploymentProfile('household');
+
+        self::assertSame(['supervisor' => 0, 'media-control' => 1, 'media-copy-0' => 2, 'media-copy-1' => 2], $household->nativeClientCommandCaps());
+        self::assertSame([5, 12, 4, 1], [$household->nativeCommandLimit(), $household->nativeResultLimit(), $household->nativeClientLimit(), $household->mediaHelperLimit()]);
+        self::assertSame(['media-copy-0', 'media-copy-1'], $household->mediaClientIds('video'));
+        self::assertSame(['media-copy-0', 'media-copy-1'], $household->mediaClientIds('audio'));
+    }
+
+    public function testDefaultFullSlotsKeepTheEightCommandLimit(): void
+    {
+        $full = new DeploymentProfile('full');
+
+        self::assertSame([
+            'supervisor' => 0, 'media-control' => 1,
+            'media-video-0' => 2, 'media-video-1' => 2, 'media-video-2' => 2,
+            'media-audio-0' => 1,
+        ], $full->nativeClientCommandCaps());
+        self::assertSame([8, 18, 6, 1], [$full->nativeCommandLimit(), $full->nativeResultLimit(), $full->nativeClientLimit(), $full->mediaHelperLimit()]);
+        self::assertSame([3136, 1600], [$full->nativeEnvelopeMiB(), $full->mediaMemoryMiB()]);
+    }
+
+    public function testEightVideoAndTwelveAudioSlotsDeriveTheirNativeLimits(): void
+    {
+        $profile = new DeploymentProfile('full', 8, 12);
+
+        self::assertSame([29, 60, 2 + 20], [$profile->nativeCommandLimit(), $profile->nativeResultLimit(), $profile->nativeClientLimit()]);
+        self::assertSame('media-video-7', array_last($profile->mediaClientIds('video')));
+        self::assertSame('media-audio-11', array_last($profile->mediaClientIds('audio')));
+        self::assertNotContains('media-video-8', $profile->mediaClientIds('video'));
+    }
+
+    public function testEachVideoSlotAddsAnEncoderAndAHelper(): void
+    {
+        $base = new DeploymentProfile('full', 8, 12);
+        $raised = new DeploymentProfile('full', 9, 12);
+
+        self::assertSame($base->nativeCommandLimit() + 2, $raised->nativeCommandLimit());
+        self::assertSame($base->nativeClientLimit() + 1, $raised->nativeClientLimit());
+        self::assertSame(2, $raised->nativeClientCommandCaps()['media-video-8']);
+    }
+
+    public function testZeroVideoSlotsDeriveNoVideoClients(): void
+    {
+        $profile = new DeploymentProfile('full', 0, 4);
+
+        self::assertSame([], $profile->mediaClientIds('video'));
+        self::assertSame([], array_filter(array_keys($profile->nativeClientCommandCaps()), static fn (string $client): bool => str_starts_with($client, 'media-video-')));
+        self::assertSame([5, 12, 6], [$profile->nativeCommandLimit(), $profile->nativeResultLimit(), $profile->nativeClientLimit()]);
+    }
+
+    public function testUnknownMediaKindHasNoClients(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        (new DeploymentProfile('full'))->mediaClientIds('subtitle');
+    }
+
     /** @param array{?int, ?int} $slots */
     #[DataProvider('householdSlotOverrides')]
     public function testHouseholdRejectsSlotOverrides(array $slots): void

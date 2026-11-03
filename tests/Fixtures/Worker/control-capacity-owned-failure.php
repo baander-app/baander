@@ -8,7 +8,9 @@ $mode = $argv[1] ?? '';
 $boot = (string) getenv('BAANDER_WORKER_BOOT_ID');
 $peer = json_decode((string) file_get_contents('/run/baander-worker/' . $boot . '/control.json'), true, flags: JSON_THROW_ON_ERROR);
 $evidence = ['phase' => $mode, 'identity' => ['namespace' => $peer['namespace'], 'bootId' => $boot, 'epoch' => $peer['epoch']]];
-$client = new App\Shared\Infrastructure\Worker\NativeExecutionClient('/run/baander-worker/' . $boot . '/native.sock', $peer['namespace'], $boot, $peer['epoch'], 'capacity-owned-' . $mode, 1, App\Shared\Application\DTO\DeploymentProfile::fromEnvironment());
+$profile = App\Shared\Application\DTO\DeploymentProfile::fromEnvironment();
+// No media job runs during the exhaustion phases, so the probe borrows the last admitted media slot.
+$client = new App\Shared\Infrastructure\Worker\NativeExecutionClient('/run/baander-worker/' . $boot . '/native.sock', $peer['namespace'], $boot, $peer['epoch'], array_key_last($profile->nativeClientCommandCaps()), 1, $profile);
 $deadline = hrtime(true) + 25_000_000_000;
 $attempts = 0;
 while (hrtime(true) < $deadline) {

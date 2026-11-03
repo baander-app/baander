@@ -105,6 +105,48 @@ PHP);
         self::assertStringNotContainsString('credential', $diagnostic);
     }
 
+    #[DataProvider('launchFenceClients')]
+    public function testLaunchFenceAdmitsOnlyTheProfilesSlotClients(string $kind, string $clientId, bool $admitted): void
+    {
+        $profile = new \App\Shared\Application\DTO\DeploymentProfile('full', 8, 1);
+        $environment = [
+            'BAANDER_DEPLOYMENT_PROFILE' => 'full',
+            'BAANDER_DEPLOYMENT_PROFILE_JSON' => $profile->toJson(),
+            'BAANDER_WORKER_NAMESPACE' => 'test.baander.app',
+            'BAANDER_WORKER_BOOT_ID' => str_repeat('a', 32),
+            'BAANDER_WORKER_ID' => 'media',
+            'BAANDER_WORKER_GENERATION' => '1',
+            'BAANDER_WORKER_LEASE_EPOCH' => '1',
+            'BAANDER_NATIVE_SOCKET' => sys_get_temp_dir() . '/baander-absent-' . bin2hex(random_bytes(8)) . '.sock',
+            'BAANDER_NATIVE_CLIENT_ID' => $clientId,
+            'BAANDER_NATIVE_CLIENT_GENERATION' => '1',
+            'APP_ENV' => 'test',
+            'APP_DEBUG' => '0',
+            'DATABASE_URL' => 'postgresql://baander@baander.app/database',
+        ];
+        $key = $kind === 'video' ? '019a9e53-8192-72dd-a50a-9f15553cecaf' : str_repeat('a', 64);
+        $process = proc_open([PHP_BINARY, dirname(__DIR__, 5) . '/bin/worker-media-job.php', $kind, $key],
+            [0 => ['file', '/dev/null', 'r'], 1 => ['file', '/dev/null', 'w'], 2 => ['file', '/dev/null', 'w'], 3 => ['pipe', 'w']], $pipes, env_vars: $environment);
+        self::assertIsResource($process);
+        $diagnostic = stream_get_contents($pipes[3]);
+        fclose($pipes[3]);
+        self::assertSame(1, proc_close($process));
+        $report = json_decode($diagnostic, true, flags: JSON_THROW_ON_ERROR);
+        // An admitted client passes the fence and fails only at the absent native socket.
+        self::assertSame($admitted ? \App\Shared\Infrastructure\Worker\NativeExecutionException::class : \RuntimeException::class, $report['exceptionClass']);
+    }
+
+    /** @return iterable<string, array{string, string, bool}> */
+    public static function launchFenceClients(): iterable
+    {
+        yield 'last video slot' => ['video', 'media-video-7', true];
+        yield 'video slot beyond the profile' => ['video', 'media-video-8', false];
+        yield 'audio slot' => ['audio', 'media-audio-0', true];
+        yield 'audio slot beyond the profile' => ['audio', 'media-audio-1', false];
+        yield 'audio client for a video job' => ['video', 'media-audio-0', false];
+        yield 'shared copy client in a full profile' => ['video', 'media-copy-0', false];
+    }
+
     /** @return iterable<string, array{string, list<string>, bool}> */
     public static function privateEntrypoints(): iterable
     {

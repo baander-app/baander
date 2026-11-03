@@ -20,7 +20,10 @@ final readonly class MediaExecutionPolicy implements MediaExecutionPolicyInterfa
         return match ($operation) {
             MediaOperation::AudioEncode => $this->profile->audioEncoderSlots > 0,
             MediaOperation::VideoEncode => $this->profile->videoEncoderSlots > 0,
-            MediaOperation::StreamCopy, MediaOperation::Probe, MediaOperation::AudioAnalysis,
+            // The household shared copy pool copies both kinds; full deployments copy in the kind's slots.
+            MediaOperation::VideoStreamCopy => $this->profile->sharedCopySlots > 0 || $this->profile->videoEncoderSlots > 0,
+            MediaOperation::AudioStreamCopy => $this->profile->sharedCopySlots > 0 || $this->profile->audioEncoderSlots > 0,
+            MediaOperation::Probe, MediaOperation::AudioAnalysis,
             MediaOperation::ImageDerivative, MediaOperation::SubtitleExtraction => true,
         };
     }
@@ -28,7 +31,10 @@ final readonly class MediaExecutionPolicy implements MediaExecutionPolicyInterfa
     public function assertAllowed(MediaOperation $operation): void
     {
         if (!$this->permits($operation)) {
-            throw new MediaEncodingProhibitedException();
+            throw new MediaEncodingProhibitedException($this->profile->sharedCopySlots > 0 ? null : match ($operation) {
+                MediaOperation::VideoEncode, MediaOperation::VideoStreamCopy => 'video',
+                default => 'audio',
+            });
         }
     }
 }

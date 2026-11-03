@@ -83,6 +83,45 @@ final class MediaWorkerRunnerTest extends TestCase
         yield 'household' => ['household', 2, ['media-copy-0', 'media-copy-1'], 1];
     }
 
+    public function testEveryConfiguredVideoSlotLaunchesAndNoneBeyondIt(): void
+    {
+        $directory = sys_get_temp_dir() . '/baander-media-slots-' . bin2hex(random_bytes(8));
+        mkdir($directory);
+        $script = $directory . '/child.php';
+        $log = $directory . '/launches';
+        file_put_contents($script, '<?php file_put_contents(__DIR__."/launches", json_encode([$argv[1], getenv("BAANDER_NATIVE_CLIENT_ID")])."\n", FILE_APPEND | LOCK_EX); sleep(10);');
+        $jobs = [];
+        for ($index = 0; $index < 9; ++$index) {
+            $jobs[] = new TranscodeRuntimeSnapshot(Uuid::generate(), Uuid::generate(), 'request', new DesiredTranscodeState(\App\Transcode\Domain\ValueObject\AudioProfile::streamingStereo()), 1, 0, 0, 'pending', null, null);
+        }
+        $video = $this->createStub(TranscodeExecutionOwnershipPort::class);
+        $video->method('pending')->willReturn($jobs);
+        $audio = $this->createMock(AudioRenditionRuntimePort::class);
+        $audio->expects(self::once())->method('pending')->willReturn([]);
+        $authority = $this->createStub(MediaWorkerAuthorityInterface::class);
+        $deadline = microtime(true) + 5;
+        $fullAt = null;
+        try {
+            (new MediaWorkerRunner($video, $audio, $authority, new \App\Shared\Application\DTO\DeploymentProfile('full', 8, 0), $script))->run(
+                static function () use ($log, $deadline, &$fullAt): bool {
+                    if (is_file($log) && count(file($log)) >= 8) {
+                        $fullAt ??= microtime(true);
+                    }
+                    return ($fullAt !== null && microtime(true) - $fullAt >= 0.2) || microtime(true) >= $deadline;
+                },
+            );
+            $launches = array_map(static fn (string $line): array => json_decode($line, true, flags: JSON_THROW_ON_ERROR), file($log));
+            $clientIds = array_column($launches, 1);
+            sort($clientIds, SORT_NATURAL);
+            self::assertSame(array_map(static fn (int $index): string => 'media-video-' . $index, range(0, 7)), $clientIds);
+            self::assertSame(['video'], array_values(array_unique(array_column($launches, 0))));
+        } finally {
+            @unlink($log);
+            unlink($script);
+            rmdir($directory);
+        }
+    }
+
     public function testSharedSlotGenerationFollowsTheSlotAcrossJobKinds(): void
     {
         $directory = sys_get_temp_dir() . '/baander-media-shared-' . bin2hex(random_bytes(8));

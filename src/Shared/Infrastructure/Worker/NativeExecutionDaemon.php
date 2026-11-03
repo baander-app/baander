@@ -11,18 +11,24 @@ use Symfony\Component\DependencyInjection\Attribute\Exclude;
 #[Exclude]
 final class NativeExecutionDaemon
 {
+    /** Open connections beyond one per admitted client, for overlapping requests and stray peers. */
+    private const int PEER_MARGIN = 4;
+
     /** @var array<string, NativeExecutionAttempt> */
     private array $attempts = [];
     /** @var array<string, array{generation:int, highest:int}> */
     private array $clients = [];
     private bool $stopping = false;
     private bool $poisoned = false;
+    /** @var array<string, int> */
+    private readonly array $clientCommandCaps;
 
     public function __construct(private readonly string $namespace, private readonly string $bootId, private readonly int $epoch, private readonly DeploymentProfile $deploymentProfile)
     {
         if ($namespace === '' || preg_match('/^[a-f0-9]{32}$/D', $bootId) !== 1 || $epoch < 1) {
             throw new \InvalidArgumentException('Invalid native launcher identity.');
         }
+        $this->clientCommandCaps = $deploymentProfile->nativeClientCommandCaps();
     }
 
     public function run(string $socketPath): int
@@ -56,20 +62,17 @@ final class NativeExecutionDaemon
         pcntl_signal(SIGINT, function (): void { $this->stopping = true; });
         /** @var array<int, array{socket:resource, input:string, output:?string, written:int, deadline:float}> $peers */
         $peers = [];
+        $peerLimit = count($this->clientCommandCaps) + self::PEER_MARGIN;
         try {
             while (!$this->stopping && !$this->poisoned) {
                 $this->tick();
                 if ($this->stopping || $this->poisoned) {
                     break;
                 }
-                $peer = @stream_socket_accept($server, 0);
-                if ($peer !== false) {
-                    if (count($peers) >= 16) {
-                        fclose($peer);
-                    } else {
-                        stream_set_blocking($peer, false);
-                        $peers[(int) $peer] = ['socket' => $peer, 'input' => '', 'output' => null, 'written' => 0, 'deadline' => self::now() + 1];
-                    }
+                // At the cap further peers wait in the listen backlog; closing them would read as an uncertain failure.
+                while (count($peers) < $peerLimit && ($peer = @stream_socket_accept($server, 0)) !== false) {
+                    stream_set_blocking($peer, false);
+                    $peers[(int) $peer] = ['socket' => $peer, 'input' => '', 'output' => null, 'written' => 0, 'deadline' => self::now() + 1];
                 }
                 foreach ($peers as $key => &$connection) {
                     $close = self::now() >= $connection['deadline'];
@@ -161,14 +164,10 @@ final class NativeExecutionDaemon
         if (!is_string($client) || preg_match('/^[A-Za-z0-9_.:-]{1,128}$/D', $client) !== 1 || !is_int($generation) || $generation < 1) {
             throw new NativeExecutionException('Invalid native client identity.', false);
         }
-        if ($this->deploymentProfile->sharedCopySlots > 0
-            && !in_array($client, ['supervisor', 'media-control', 'media-copy-0', 'media-copy-1'], true)) {
+        if (!isset($this->clientCommandCaps[$client])) {
             throw new NativeExecutionException('Native client is not admitted by the deployment profile.', false);
         }
         $previous = $this->clients[$client] ?? null;
-        if ($previous === null && count($this->clients) >= $this->deploymentProfile->nativeClientLimit()) {
-            throw new NativeExecutionException('Native client ledger is full.', false);
-        }
         if ($previous !== null && $generation < $previous['generation']) {
             throw new NativeExecutionException('Stale native client generation.');
         }
@@ -313,13 +312,9 @@ final class NativeExecutionDaemon
 
             return $existing->snapshot();
         }
-        if ($this->deploymentProfile->sharedCopySlots > 0) {
-            $client = substr($session, 0, strrpos($session, ':'));
-            $limit = str_starts_with($client, 'media-copy-') ? 2 : ($client === 'media-control' ? 1 : 0);
-            $owned = count(array_filter($this->attempts, static fn (NativeExecutionAttempt $attempt): bool => $attempt->session === $session && $attempt->state === 'running'));
-            if ($owned >= $limit) {
-                throw new NativeExecutionException('Native client command capacity is exhausted.', false);
-            }
+        $owned = count(array_filter($this->attempts, static fn (NativeExecutionAttempt $attempt): bool => $attempt->session === $session && $attempt->state === 'running'));
+        if ($owned >= $this->clientCommandCaps[$client]) {
+            throw new NativeExecutionException('Native client command capacity is exhausted.', false);
         }
         $active = count(array_filter($this->attempts, static fn (NativeExecutionAttempt $attempt): bool => $attempt->state === 'running'));
         if ($active >= $this->deploymentProfile->nativeCommandLimit() || count($this->attempts) >= $this->deploymentProfile->nativeResultLimit()) {

@@ -61,18 +61,18 @@ final class MediaWorkerRunner
             while (!$this->shouldStop($stopRequested)) {
                 $this->reap(true);
                 $this->authority->assertActive();
-                $videos = $this->hasCapacity('video', $this->capacity('video')) ? $this->video->pending(100) : [];
-                $audios = $this->hasCapacity('audio', $this->capacity('audio')) ? $this->audio->pending(100) : [];
+                $videos = $this->freeSlot('video') !== null ? $this->video->pending(100) : [];
+                $audios = $this->freeSlot('audio') !== null ? $this->audio->pending(100) : [];
                 // Interleave the queues so shared slots admit both kinds under backlog.
                 for ($index = 0; $index < max(count($videos), count($audios)); ++$index) {
                     if ($this->shouldStop($stopRequested)) {
                         return;
                     }
                     if (isset($videos[$index])) {
-                        $this->launch('video', $videos[$index]->jobId->toString(), $this->capacity('video'), $stopRequested);
+                        $this->launch('video', $videos[$index]->jobId->toString(), $stopRequested);
                     }
                     if (isset($audios[$index])) {
-                        $this->launch('audio', $audios[$index]->key, $this->capacity('audio'), $stopRequested);
+                        $this->launch('audio', $audios[$index]->key, $stopRequested);
                     }
                 }
                 usleep(50000);
@@ -92,30 +92,19 @@ final class MediaWorkerRunner
     }
 
     /** @param Closure():bool $stopRequested */
-    private function launch(string $kind, string $key, int $capacity, Closure $stopRequested): void
+    private function launch(string $kind, string $key, Closure $stopRequested): void
     {
         $childKey = $kind . ':' . $key;
         if (isset($this->children[$childKey])) {
             return;
         }
-        if (!$this->hasCapacity($kind, $capacity)) {
+        $slot = $this->freeSlot($kind);
+        if ($slot === null) {
             return;
         }
         $this->authority->assertActive();
         if ($this->shouldStop($stopRequested)) {
             return;
-        }
-        $used = array_column($this->children, 'slot');
-        $slot = null;
-        for ($index = 0; $index < $capacity; ++$index) {
-            $candidate = 'media-' . ($this->deploymentProfile->sharedCopySlots > 0 ? 'copy' : $kind) . '-' . $index;
-            if (!in_array($candidate, $used, true)) {
-                $slot = $candidate;
-                break;
-            }
-        }
-        if ($slot === null) {
-            throw new \LogicException('Media capacity has no free native client slot.');
         }
         $previous = $this->slotGenerations[$slot] ?? 0;
         if ($previous === PHP_INT_MAX) {
@@ -134,22 +123,12 @@ final class MediaWorkerRunner
         $this->children[$childKey] = ['process' => $process, 'kind' => $kind, 'slot' => $slot];
     }
 
-    private function capacity(string $kind): int
+    /** The first configured native client of the kind no running child holds; shared copy slots serve both kinds. */
+    private function freeSlot(string $kind): ?string
     {
-        return $this->deploymentProfile->sharedCopySlots > 0
-            ? $this->deploymentProfile->sharedCopySlots
-            : ($kind === 'video' ? $this->deploymentProfile->videoEncoderSlots : $this->deploymentProfile->audioEncoderSlots);
-    }
+        $free = array_diff($this->deploymentProfile->mediaClientIds($kind), array_column($this->children, 'slot'));
 
-    private function hasCapacity(string $kind, int $capacity): bool
-    {
-        $count = 0;
-        foreach ($this->children as $child) {
-            if ($this->deploymentProfile->sharedCopySlots > 0 || $child['kind'] === $kind) {
-                ++$count;
-            }
-        }
-        return $count < $capacity;
+        return $free === [] ? null : reset($free);
     }
 
     private function reap(bool $requireSuccess): void

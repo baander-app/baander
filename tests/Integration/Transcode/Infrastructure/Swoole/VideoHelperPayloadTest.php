@@ -25,6 +25,8 @@ final class VideoHelperPayloadTest extends TestCase
             $commands[] = $argv;
             return new NativeExecutionHandle(str_repeat('a', 64), count($commands));
         });
+        $client->method('inspect')->willReturn(['state' => 'exited', 'exitCode' => 0, 'stdout' => '{}']);
+        $client->method('release')->willReturn(true);
         $facade = new TranscodeProcessPool($client, new NullLogger(), new JsonEncoder(), new \App\Shared\Application\DTO\DeploymentProfile('full'));
         $job = TranscodeJob::create(Uuid::generate(), QualityTier::p720(), '/cache', Uuid::generate());
         $first = $facade->probeVideo($job, '/media/source with spaces.mkv', 1);
@@ -32,6 +34,11 @@ final class VideoHelperPayloadTest extends TestCase
         $directory = sys_get_temp_dir() . '/baander-remote-subtitle-' . bin2hex(random_bytes(6));
         try {
             $subtitle = $facade->extractSubtitles($job, '/media/source with spaces.mkv', 2, $directory . '/full.vtt', 2);
+            // One helper runs at a time; each released result submits the next queued helper.
+            self::assertCount(1, $commands);
+            $facade->readResult($first);
+            $facade->readResult($replacement);
+            self::assertCount(3, $commands);
             self::assertNotSame($first, $replacement);
             self::assertStringEndsWith(':2', $replacement);
             self::assertStringEndsWith(':2:s2', $subtitle);

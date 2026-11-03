@@ -61,10 +61,7 @@ try {
     $clientId = getenv('BAANDER_NATIVE_CLIENT_ID');
     $clientGeneration = getenv('BAANDER_NATIVE_CLIENT_GENERATION');
     $generation = is_string($clientGeneration) ? filter_var($clientGeneration, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]) : false;
-    $validClient = is_string($clientId) && ($profile->sharedCopySlots > 0
-        ? preg_match('/\Amedia-copy-[01]\z/D', $clientId) === 1
-        : preg_match('/\Amedia-(?:video-[0-2]|audio-0)\z/D', $clientId) === 1 && str_starts_with($clientId, 'media-' . $kind . '-'));
-    if (!$validClient || $generation === false
+    if (!is_string($clientId) || !in_array($clientId, $profile->mediaClientIds($kind), true) || $generation === false
         || !is_string($clientGeneration) || preg_match('/\A[1-9][0-9]*\z/D', $clientGeneration) !== 1
     ) {
         throw new RuntimeException('Media job requires a native client launch fence.');
@@ -110,10 +107,14 @@ try {
             }
             $claim = $runtime->claim($jobId, $identity);
             $copy = $claim?->runtime->desired->presentationSelection?->mode === 'copy';
-            if ($claim !== null && !$executionPolicy->permits($copy ? \App\Transcode\Application\DTO\MediaOperation::StreamCopy : \App\Transcode\Application\DTO\MediaOperation::VideoEncode)) {
-                $runtime->observe($claim, 'failed', error: (new \App\Transcode\Application\Exception\MediaEncodingProhibitedException())->getMessage());
-                $runtime->release($claim);
-                $claim = null;
+            if ($claim !== null) {
+                try {
+                    $executionPolicy->assertAllowed($copy ? \App\Transcode\Application\DTO\MediaOperation::VideoStreamCopy : \App\Transcode\Application\DTO\MediaOperation::VideoEncode);
+                } catch (\App\Transcode\Application\Exception\MediaEncodingProhibitedException $refusal) {
+                    $runtime->observe($claim, 'failed', error: $refusal->getMessage());
+                    $runtime->release($claim);
+                    $claim = null;
+                }
             }
             if ($claim !== null) {
                 if (!$copy) {

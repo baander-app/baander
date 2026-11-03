@@ -66,6 +66,36 @@ final class DeliveryCompatibilityTest extends TestCase
         self::assertSame(DeliveryKind::Original, $this->service()->decide($source, new DeliveryDestination(['mp4'], ['hevc'], ['aac'], maxBitDepth: 10, supportsHdr: true, pixelFormats: ['yuv420p10le']))->kind);
     }
 
+    public function testZeroAudioSlotsRefuseAudioCopyWithTheCompatibilityExplanation(): void
+    {
+        $service = new DeliveryCompatibility(new MediaExecutionPolicy(new DeploymentProfile('full', 2, 0)));
+        $audio = new DeliverySource('matroska', null, null, 'aac', 1, 2, video: false);
+
+        $refused = $service->decide($audio, new DeliveryDestination(['mp4'], [], ['aac'], transports: ['file']));
+        self::assertSame(DeliveryKind::Incompatible, $refused->kind);
+        self::assertSame('container_unsupported', $refused->reason);
+        self::assertSame(DeliveryKind::Copy, $service->decide($this->source('matroska'), new DeliveryDestination(['mp4'], ['h264'], ['aac'], transports: ['hls']))->kind);
+    }
+
+    public function testZeroVideoSlotsRefuseVideoCopyWhileAudioCopyContinues(): void
+    {
+        $service = new DeliveryCompatibility(new MediaExecutionPolicy(new DeploymentProfile('full', 0, 1)));
+
+        $refused = $service->decide($this->source('matroska'), new DeliveryDestination(['mp4'], ['h264'], ['aac'], transports: ['hls']));
+        self::assertSame(DeliveryKind::Incompatible, $refused->kind);
+        self::assertSame('container_unsupported', $refused->reason);
+        $audio = new DeliverySource('matroska', null, null, 'aac', 1, 2, video: false);
+        self::assertSame(DeliveryKind::Copy, $service->decide($audio, new DeliveryDestination(['mp4'], [], ['aac'], transports: ['file']))->kind);
+    }
+
+    public function testHouseholdSharedCopyPoolKeepsBothCopies(): void
+    {
+        $audio = new DeliverySource('matroska', null, null, 'aac', 1, 2, video: false);
+
+        self::assertSame(DeliveryKind::Copy, $this->service()->decide($audio, new DeliveryDestination(['mp4'], [], ['aac'], transports: ['file']))->kind);
+        self::assertSame(DeliveryKind::Copy, $this->service()->decide($this->source('matroska'), new DeliveryDestination(['mp4'], ['h264'], ['aac'], transports: ['hls']))->kind);
+    }
+
     private function service(string $profile = 'household'): DeliveryCompatibility
     {
         return new DeliveryCompatibility(new MediaExecutionPolicy(DeploymentProfile::resolve($profile)));

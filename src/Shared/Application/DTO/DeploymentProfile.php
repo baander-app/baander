@@ -12,6 +12,9 @@ final readonly class DeploymentProfile
 
     private const int DEFAULT_FULL_VIDEO_SLOTS = 3;
     private const int DEFAULT_FULL_AUDIO_SLOTS = 1;
+    private const int CONTROL_COMMANDS = 1;
+    private const int MEDIA_JOB_COMMANDS = 1;
+    private const int MEDIA_HELPER_COMMANDS = 1;
 
     public int $webWorkers;
     public int $doctrinePoolSlots;
@@ -144,24 +147,59 @@ final readonly class DeploymentProfile
         return $this->sharedCopySlots + $this->videoEncoderSlots + $this->audioEncoderSlots;
     }
 
-    public function nativeCommandLimit(): int
+    /**
+     * Native client identifiers a media job of the kind may run as, one per configured slot. The
+     * household shared copy pool serves both kinds from the same identifiers.
+     *
+     * @return list<string>
+     */
+    public function mediaClientIds(string $kind): array
     {
-        return $this->identifier === 'household' ? 5 : 8;
+        if (!in_array($kind, ['video', 'audio'], true)) {
+            throw new \InvalidArgumentException('Unknown media job kind.');
+        }
+        [$prefix, $slots] = $this->sharedCopySlots > 0
+            ? ['media-copy-', $this->sharedCopySlots]
+            : ['media-' . $kind . '-', $kind === 'video' ? $this->videoEncoderSlots : $this->audioEncoderSlots];
+
+        return array_map(static fn (int $index): string => $prefix . $index, $slots === 0 ? [] : range(0, $slots - 1));
     }
 
+    /**
+     * Every native client the profile admits, with the commands each may run at once. The
+     * supervisor only proves readiness, media control runs one probe, a video or shared copy
+     * client runs its encoder or copy plus one helper, and an audio client runs its encoder.
+     *
+     * @return array<string, int>
+     */
+    public function nativeClientCommandCaps(): array
+    {
+        $caps = ['supervisor' => 0, 'media-control' => self::CONTROL_COMMANDS]
+            + array_fill_keys($this->mediaClientIds('video'), self::MEDIA_JOB_COMMANDS + self::MEDIA_HELPER_COMMANDS);
+
+        return $this->sharedCopySlots > 0 ? $caps : $caps + array_fill_keys($this->mediaClientIds('audio'), self::MEDIA_JOB_COMMANDS);
+    }
+
+    public function nativeCommandLimit(): int
+    {
+        return array_sum($this->nativeClientCommandCaps());
+    }
+
+    /** Retained results, running or awaiting release: twice the command limit plus two. */
     public function nativeResultLimit(): int
     {
-        return $this->identifier === 'household' ? 12 : 32;
+        return 2 * $this->nativeCommandLimit() + 2;
     }
 
     public function nativeClientLimit(): int
     {
-        return $this->identifier === 'household' ? 4 : 64;
+        return count($this->nativeClientCommandCaps());
     }
 
+    /** Helpers a video job runs at once inside its native client allowance; further helpers queue. */
     public function mediaHelperLimit(): int
     {
-        return $this->identifier === 'household' ? 1 : 8;
+        return self::MEDIA_HELPER_COMMANDS;
     }
 
     public function toJson(): string

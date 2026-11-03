@@ -17,7 +17,9 @@ use Symfony\Component\Serializer\Encoder\JsonEncoder;
 
 final class TranscodeProcessPoolTest extends TestCase
 {
-    public function testHouseholdQueuesHelpersUntilThePreviousNativeAttemptIsReleased(): void
+    #[\PHPUnit\Framework\Attributes\TestWith(['household'])]
+    #[\PHPUnit\Framework\Attributes\TestWith(['full'])]
+    public function testHelpersQueueUntilThePreviousNativeAttemptIsReleased(string $profile): void
     {
         $submitted = [];
         $released = [];
@@ -31,7 +33,7 @@ final class TranscodeProcessPoolTest extends TestCase
             $released[] = $handle->attempt;
             return true;
         });
-        $pool = new TranscodeProcessPool($client, new NullLogger(), new JsonEncoder(), new DeploymentProfile('household'));
+        $pool = new TranscodeProcessPool($client, new NullLogger(), new JsonEncoder(), new DeploymentProfile($profile));
         $job = TranscodeJob::create(Uuid::generate(), QualityTier::p720(), '/cache', Uuid::generate());
         $first = $pool->probeVideo($job, '/media/first.mkv', 1);
         $second = $pool->probeVideo($job, '/media/second.mkv', 2);

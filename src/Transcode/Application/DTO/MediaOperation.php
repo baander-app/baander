@@ -8,7 +8,8 @@ enum MediaOperation: string
 {
     case AudioEncode = 'audio_encode';
     case VideoEncode = 'video_encode';
-    case StreamCopy = 'stream_copy';
+    case VideoStreamCopy = 'video_stream_copy';
+    case AudioStreamCopy = 'audio_stream_copy';
     case Probe = 'probe';
     case AudioAnalysis = 'audio_analysis';
     case ImageDerivative = 'image_derivative';

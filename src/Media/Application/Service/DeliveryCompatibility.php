@@ -39,7 +39,8 @@ final readonly class DeliveryCompatibility
             return new DeliveryDecision(DeliveryKind::Incompatible, 'source_stream_metadata_unavailable');
         }
         foreach ($destination->containers as $container) {
-            if ($this->canMux($container, $source) && (!$source->video || array_intersect(['hls', 'dash'], $destination->transports) !== [])) {
+            if ($this->canMux($container, $source) && (!$source->video || array_intersect(['hls', 'dash'], $destination->transports) !== [])
+                && $this->policy->permits($source->video ? MediaOperation::VideoStreamCopy : MediaOperation::AudioStreamCopy)) {
                 $transport = $source->video ? (in_array('hls', $destination->transports, true) ? 'hls' : 'dash') : 'file';
                 return new DeliveryDecision(DeliveryKind::Copy, selection: new DeliverySelection($container, $source->videoStreamIndex, $source->audioStreamIndex, $transport));
             }

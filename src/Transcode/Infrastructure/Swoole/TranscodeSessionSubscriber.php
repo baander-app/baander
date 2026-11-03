@@ -59,8 +59,10 @@ final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
     {
         $selection = $claim->runtime->desired->presentationSelection;
         $copy = $selection?->mode === 'copy';
-        if (!$this->executionPolicy->permits($copy ? MediaOperation::StreamCopy : MediaOperation::VideoEncode)) {
-            $this->ownership->observe($claim, 'failed', error: (new MediaEncodingProhibitedException())->getMessage());
+        try {
+            $this->executionPolicy->assertAllowed($copy ? MediaOperation::VideoStreamCopy : MediaOperation::VideoEncode);
+        } catch (MediaEncodingProhibitedException $refusal) {
+            $this->ownership->observe($claim, 'failed', error: $refusal->getMessage());
             $this->ownership->release($claim);
             return;
         }
@@ -612,7 +614,7 @@ final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
                 $this->logger->warning('Subtitle extraction failed; track omitted', ['jobId' => $job->getId()->toString(), 'track' => $track->trackKey(), 'error' => $result['data']]);
             }
         }
-        // Three video encoders, one helper each, and one audio encoder use seven of eight native slots.
+        // A video client's native allowance holds its encoder and one helper, so tracks extract one at a time.
         while ($active === [] && $queue !== []) {
             $track = array_shift($queue);
             $path = $storage->resolveSubtitleSegmentPath($job->getVideoId(), $track->trackKey(), 'full');
