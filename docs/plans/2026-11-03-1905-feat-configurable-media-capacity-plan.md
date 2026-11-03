@@ -12,19 +12,19 @@ execution: code
 
 ## Goal Capsule
 
-**Objective:** A household with a capable server can play 8 videos and 12 audio streams that need conversion or copy at the same time, in real time, and the deployment reserves exactly the memory, CPU and database capacity that its configured load requires.
+**Objective:** A household with a capable server can play 8 videos and 12 audio streams that need conversion or copy at the same time, in real time. The deployment derives its configuration from the CPU and memory the operator allows Baander as a whole: steady demand is guaranteed, and bursty services are overprovisioned instead of each holding a worst-case reservation.
 
-**Means:** Operator-set video and audio job slots in the startup profile, with every resource limit derived from them (KTD1–KTD5), and a transaction-mode PgBouncer 1.26.1 so PostgreSQL backends stop scaling with clients (KTD8–KTD11).
+**Means:** A resource allowance and optional video and audio job slots in the startup profile, with every resource limit derived from them (KTD1–KTD5, KTD16–KTD18), and a transaction-mode PgBouncer 1.26.1 so PostgreSQL backends stop scaling with clients (KTD8–KTD11).
 
 **Product authority:** The user directed the capacity model, the pooler, and the answers recorded under Key Decisions on 2026-11-03.
-Product behavior is governed by R1–R15; the Planning Contract decides how to deliver it.
+Product behavior is governed by R1–R18; the Planning Contract decides how to deliver it.
 
 **Execution profile:** One branch, `feat/configurable-media-capacity`, with dependency-ordered units landed as local commits.
 U2's measurements are inputs to U3, U5 and U7; no derived constant is written before they exist.
 Push only when the user asks.
 
 **Authority and stop conditions:** Follow `AGENTS.md`, then this Product Contract, then the Planning Contract.
-Stop affected work if it would weaken ownership, lease, signed-delivery or media access checks, change household slot values or worker reservations, or discard local data.
+Stop affected work if it would weaken ownership, lease, signed-delivery or media access checks, change household's shared copy mode or slot values, or discard local data.
 A measured per-job cost that makes the 8 + 12 target exceed any reasonable single-host envelope is reported with the numbers rather than hidden by lowering the target.
 
 **Product Contract preservation:** New plan; no upstream Product Contract.
@@ -35,8 +35,9 @@ A measured per-job cost that makes the 8 + 12 target exceed any reasonable singl
 
 ### Summary
 
-The full profile gains operator-set video and audio job slots with measured, generous defaults.
-Memory, PID, CPU and native-execution limits follow from the configured slots, so a deployment is admitted only when its host covers the configured load.
+The operator states the CPUs and memory Baander as a whole may use, and, in the full profile, may set video and audio job slots; unset slots default to the largest pair, up to 8 + 12, whose steady demand fits that allowance.
+Per-service CPU weights and ceilings, memory floors and ceilings, PID and native-execution limits follow from the allowance and the slots. Steady demand must fit the allowance, while burst ceilings may add up to more than it, because web, Redis and PostgreSQL rarely peak together.
+No service holds a dedicated CPU.
 A transaction-mode PgBouncer sits between the application and PostgreSQL in both profiles and the standard install, so database memory depends on a small server pool instead of on every web, worker and media client.
 Operators get documentation, a CLI that prints the effective profile and its reservations, and a health signal when web and workers disagree.
 
@@ -46,36 +47,46 @@ The full profile admits only 3 video jobs and 1 audio job at a time, and stream 
 Some households run 8 video and 12 audio streams that need conversion or copy at once; everything beyond the fixed slots queues, even on a host with spare CPU and memory.
 The limits are constants in `src/Shared/Application/DTO/DeploymentProfile.php`, and several dependent limits are hard-coded elsewhere: media client identifiers, a 16-peer native daemon cap, a single global native command limit, fixed PID floors, and a one-CPU execution quota in the managed preset.
 
+Sizing also adds up worst cases.
+The preset pins the control and execution workers to disjoint CPU sets, so the control worker holds a whole core it barely uses. Sizing host cores from the playback governor's budget cap, a share of host-wide CPU, silently sets aside the rest of the host for everything else. Every service's memory limit is a fixed worst-case reservation, and the total is the sum of all of them, although web, Redis and PostgreSQL burst at different times.
+
 Database memory compounds the problem.
 Each PostgreSQL connection that touches a PGroonga index keeps about 22 MiB, and every media child opens its own connections.
 More media slots would therefore grow PostgreSQL's memory with the same multiplier that caused the OOM kills fixed on the household branch.
 
 ### Key Decisions
 
-- **Operator-set slots with derived reservations.** (session-settled: user-directed — chosen over fixed 8 + 12 defaults and over sizing automatically from host CPU and memory: operators know their hardware; reservations must follow the choice.) Governs R1, R3.
+- **A resource allowance for Baander as a whole, with optional slots.** The operator states the CPUs and memory Baander may use. In the full profile, slots default to the largest pair on the 8:12 shrink sequence, up to 8 + 12, whose steady demand fits the allowance; an explicit pair is checked against the allowance and refused when it does not fit. (session-settled: user-directed, 2026-11-03 — supersedes "operator-set slots with summed reservations"; chosen over requiring both allowance and slots and over deriving slots with no override: bursty services need not each hold a worst-case reservation.) Nothing is sized from host hardware; the allowance is the operator's statement, and rendering only checks that the host has at least that much, as it checks the reservation today. Governs R1, R3.
+- **CPU is shared by weight; no service gets a dedicated core.** The control and execution CPU sets are removed; every service shares the allowance through CPU weights and ceilings, and the control worker gets the weight that keeps its lease deadlines. (session-settled: user-directed — chosen over keeping pinning as an option and over keeping pinning.) Governs R16.
+- **Memory floors fit the allowance; ceilings may exceed it.** Each service gets a floor for its steady memory and a hard ceiling for bursts. The floors must add up to no more than the allowance; the ceilings may add up to more. Under host pressure, web workers are reclaimed or killed before PostgreSQL, the pooler, Redis and the control worker. (session-settled: user-directed — chosen over no memory overcommit and over a fixed overcommit ratio.) Governs R3, R17.
+- **Memory floors are sizing figures, not kernel protection.** A container's `memory.low` protects nothing on a default Docker host because its parent slice has none, so the floors are arithmetic that must fit the allowance; host-pressure safety rests on the per-service ceilings and the kill order, and the documentation says so. (session-settled: user-directed — chosen over a protected parent slice and over using a slice only when the operator set one up.) Governs R3, R17.
 - **No compatibility constraint; aim for great defaults.** (session-settled: user-directed — chosen over keeping today's 3 + 1 for existing installs: nothing is deployed.) Governs R1.
-- **Real-time capability with CPU derived from slots.** (session-settled: user-directed — chosen over proving admission only and over CPU guidance without validation: a slot that cannot keep up is not capacity.) Governs R3, R4.
+- **Real-time capability with CPU derived from slots.** (session-settled: user-directed — chosen over proving admission only and over CPU guidance without validation: a slot that cannot keep up is not capacity.) Under the allowance model, the slots' steady encode demand must fit the CPU allowance. Governs R3, R4.
 - **Zero slots disable a kind.** (session-settled: user-directed — chosen over a minimum of one per kind: operators may run audio-only or video-only conversion.) Governs R5.
 - **Derived maximums, rejected early.** (session-settled: user-directed — chosen over fixed caps: limits move with the derived resources.) Governs R6.
 - **Queue when busy, with a documented busy response.** (session-settled: user-directed — chosen over an immediate busy error: today's queueing is kept.) Governs R7.
 - **PgBouncer in this plan, in both profiles and the standard install.** (session-settled: user-directed — chosen over a separate plan: more slots must not raise database memory.) Governs R9.
 - **Real time is guaranteed at 1080p.** (session-settled: user-directed — chosen over 1440p and over the ladder's 4K top tier: matches typical household content and fits a reasonable CPU envelope.) Governs R4.
-- **Default slots shrink in the 8:12 ratio.** (session-settled: user-directed — chosen over trimming video first and over trimming audio first: keeps the mix the target describes.) Governs R1.
+- **Default slots shrink in the 8:12 ratio.** (session-settled: user-directed — chosen over trimming video first and over trimming audio first: keeps the mix the target describes.) The default starts at 8 + 12 and shrinks until it fits the allowance. Governs R1.
 - **The pooler's credentials get their own volume.** (session-settled: user-directed — chosen over the application secrets volume: the network-facing pooler must not mount the OAuth signing key.) Governs R14.
 - **Household gets the pooler without requalification.** (session-settled: user-directed — chosen over freezing household entirely and over re-running its qualification: the configured values change; the measured figures are labelled as pre-pooler.) Governs R8, R15.
+- **The allowance model applies to both profiles.** Household keeps its shared copy mode and its rule against encoding, but its per-service sizes come from the allowance like full's. Household requalification under the new model is recorded in the roadmap and is not run in this plan. (session-settled: user-directed — chosen over applying the model to full only.) Governs R8.
 
 ### Requirements
 
 **Media capacity**
 
-- R1. Full-profile operators set the number of concurrent video jobs and audio jobs; stream copy shares the slots of its kind, and unset values use measured defaults sized for a typical full-profile host.
-- R2. Web, workers, the native daemon and the worker manifest use the same slot values; workers refuse a disagreeing profile, and web health reports when its profile differs from the active worker boot.
-- R3. Worker memory and PID reservations, the native encoder envelope, native execution limits and the execution CPU allowance are derived from the configured slots, and a deployment is refused when its host or configuration does not cover them.
+- R1. Operators state the CPUs and memory Baander as a whole may use. Full-profile operators may also set the number of concurrent video jobs and audio jobs; stream copy shares the slots of its kind. Unset slots default to the largest pair on the 8:12 shrink sequence (KTD5), up to 8 + 12, whose steady demand fits the allowance.
+- R2. Web, workers, the native daemon and the worker manifest use the same allowance and slot values; workers refuse a disagreeing profile, and web health reports when its profile differs from the active worker boot.
+- R3. Per-service CPU weights and ceilings, memory floors and ceilings, PID reservations, the native encoder envelope and native execution limits are derived from the allowance and the slots. A deployment is refused when its steady demand (the memory floors, and the encode CPU demand plus the measured baseline of the other services) exceeds the allowance, or the allowance exceeds the host. Ceilings may add up to more than the allowance.
 - R4. A full deployment configured for 8 video and 12 audio jobs runs all twenty concurrently, keeps every stream ahead of real-time playback at 1080p, and causes no media-role containment; 1440p and 4K renditions keep working but are outside this guarantee.
 - R5. In the full profile, a kind configured with zero slots is disabled: its encodes and its stream copies are refused with the existing compatibility explanation instead of waiting forever.
 - R6. Slot counts beyond the derived maximums are rejected when the managed preset renders and when the profile is built, naming the bound that was exceeded.
 - R7. When every slot of a kind is busy, new work of that kind queues; an audio start that exceeds its wait receives a documented busy response.
-- R8. The household profile keeps its slot values, worker reservations and native envelope, and rejects slot overrides.
+- R8. The household profile keeps its shared copy mode (two shared copy slots, no encoders), its native execution limits and its native envelope, and rejects slot overrides; its per-service sizes come from the allowance.
+- R16. No service holds a dedicated CPU; CPU is shared by weight within the allowance, and worker leases and media authority checks meet their deadlines while every slot encodes.
+- R17. When memory runs short on the host, web workers are reclaimed or killed before PostgreSQL, the pooler, Redis and the control worker.
+- R18. The playback governor measures its CPU budget against Baander's CPU allowance, not against all host CPUs.
 
 **Database pooling**
 
@@ -88,11 +99,13 @@ More media slots would therefore grow PostgreSQL's memory with the same multipli
 
 **Guidance**
 
-- R15. Operator documentation explains slot sizing, the derived reservations and CPU, the pooler and connection sizing; System Requirements shows the new configured values and labels the household measurements as taken before the pooler.
+- R15. Operator documentation explains the allowance, slot sizing, the derived floors, ceilings and weights, the kill order, the pooler and connection sizing. System Requirements shows the new configured values and labels the household measurements as taken before the pooler and the allowance model.
 
 ### Acceptance Examples
 
-- AE1. **Covers R1, R3.** Given a full preset configuration with `videoSlots: 8` and `audioSlots: 12` and an execution CPU set too small for them, when the operator renders the deployment, then rendering fails and names the required CPU count.
+- AE1. **Covers R1, R3.** Given a full preset configuration with `videoSlots: 8` and `audioSlots: 12` and a CPU allowance smaller than their steady demand, when the operator renders the deployment, then rendering fails and names the required CPU allowance.
+- AE7. **Covers R1.** Given a full preset configuration with an allowance and no slots, when the operator renders the deployment, then rendering picks the largest pair on the 8:12 shrink sequence that fits and reports it with the derived floors and ceilings.
+- AE8. **Covers R16.** Given every slot encoding and web load on the same allowance, when a worker renews its lease, then the renewal completes within its deadline although no service has a dedicated CPU.
 - AE2. **Covers R5.** Given a full profile with zero audio slots, when a client requests an audio rendition or an audio stream copy, then it receives the existing compatibility explanation and no job is queued.
 - AE3. **Covers R2.** Given a source install whose web profile says 8 video slots while the active worker boot was started with 4, when an operator checks web health, then health reports the profile mismatch.
 - AE4. **Covers R7.** Given all audio slots busy, when a listener starts a track that needs a new rendition and no slot frees within the start wait, then the player receives the documented busy response.
@@ -102,13 +115,15 @@ More media slots would therefore grow PostgreSQL's memory with the same multipli
 ### Success Criteria
 
 - The 8 + 12 load proof finishes with every stream ahead of real time, no containment, no OOM event, and PostgreSQL backends never exceeding the configured server pools plus direct reserve.
-- Household's derived worker reservations and native envelope are byte-identical to today's in tests.
+- Household's shared copy mode, native execution limits and native envelope are byte-identical to today's in tests.
+- The 8 + 12 load proof runs on an allowance equal to the derived steady demand rounded up, with no CPU sets.
 - An operator can size a full host from System Requirements and the profile CLI without reading code.
 
 ### Scope Boundaries
 
-- Requalifying the household profile with the pooler is not part of this plan (Key Decisions).
-- Automatic sizing from host CPU and memory stays out (Key Decisions).
+- Requalifying the household profile with the pooler or the allowance model is not part of this plan (Key Decisions); the roadmap records it.
+- Detecting host CPU and memory stays out: sizing derives from the allowance the operator states (Key Decisions).
+- A hard aggregate cap on Baander's total CPU and memory use, through a parent cgroup, is out; the allowance sizes floors and per-service ceilings (KTD17).
 - Redesigning the one-process-per-job media model is out; this plan measures and right-sizes each job's reservation instead.
 - Web-side slot admission is out: web receives the configured slot-bearing profile for policy refusal and the health fingerprint, but does not count or admit jobs against slots.
 - GPU encoding and hardware-acceleration selection are unchanged.
@@ -119,36 +134,41 @@ More media slots would therefore grow PostgreSQL's memory with the same multipli
 
 ### Key Technical Decisions
 
-- KTD1. **The profile carries a validated slot choice.** `DeploymentProfile` takes the identifier plus optional video and audio slot counts, validates them against per-profile rules, and `fromJson` validates the serialized fields instead of comparing them with a built-in table. This follows `WorkerAutoscalingProfile`'s strict-JSON, bounded-choice pattern. Household keeps its fixed shared copy pool (two shared copy slots, `media-copy-0` and `media-copy-1`, encoders prohibited) as a profile mode the video and audio slot parameters do not express. The eleven parameters that default-construct a profile are removed so every consumer receives the configured instance. Instantiates the Key Decision governing R1 and R3.
-- KTD2. **Every dependent limit is derived from slots by one set of formulas.** The full profile's media child reservation becomes a measured per-child value of its own; household keeps today's 320 MiB per child (R8). The native envelope is the sum of measured per-kind native allowances plus fixed headroom; household keeps 512 MiB. Per-client native caps exist for every profile: a video client may run one encoder and one helper, an audio client one encoder, a household shared copy client one copy command and one helper, media control one command. Commands are the sum of client caps; results are twice the commands plus two; clients are the fixed system clients plus one per slot. Process floors add the measured per-slot thread counts. The formulas reproduce household's current values exactly, and tests pin both. The video cap counts one helper rather than the helper queue's eight because helpers beyond the first already queue inside the job; today's full command limit of 8 is this formula at 3 + 1. Every video encode runs with a fixed two-thread cap today (`SegmentEncoder`); if U2 measures that cap below real time at the R4 tier, the per-encoder thread count becomes a measured constant used by `SegmentEncoder` and counted in the per-slot thread floors and per-kind CPU cost.
-- KTD3. **CPU follows the slots.** The required execution CPUs are the measured per-kind CPU cost, taken with the slots running concurrently, times the configured slots, rounded up. Because the playback governor admits new encodes only up to its configured share of host CPU, the required host cores are that cost divided by the governor's budget cap, rounded up, and rendering reports both figures. The managed preset sets the execution unit's CPU quota to the size of its CPU set instead of one CPU, and rendering rejects a CPU set smaller than the requirement; the source-install manifest applies the same check at worker creation. (session-settled: user-directed — chosen over proving admission only: real-time is the requirement.) Governs R3, R4.
+- KTD1. **The profile carries a validated slot choice.** `DeploymentProfile` takes the identifier plus optional video and audio slot counts, validates them against per-profile rules, and `fromJson` validates the serialized fields instead of comparing them with a built-in table. This follows `WorkerAutoscalingProfile`'s strict-JSON, bounded-choice pattern. Household keeps its fixed shared copy pool (two shared copy slots, `media-copy-0` and `media-copy-1`, encoders prohibited) as a profile mode the video and audio slot parameters do not express. The eleven parameters that default-construct a profile are removed so every consumer receives the configured instance. The profile also carries the resource allowance (CPUs as a decimal with millicore precision, memory in MiB), so web, workers and the manifest derive from one value and the fingerprint covers it. Instantiates the Key Decisions governing R1 and R3.
+- KTD2. **Every dependent limit is derived from slots by one set of formulas.** The full profile's media child reservation becomes a measured per-child value of its own and counts toward the execution worker's memory floor (KTD17); household keeps today's 320 MiB per child. The native envelope is the sum of measured per-kind native memory shares plus fixed headroom; household keeps 512 MiB. Per-client native caps exist for every profile: a video client may run one encoder and one helper, an audio client one encoder, a household shared copy client one copy command and one helper, media control one command. Commands are the sum of client caps; results are twice the commands plus two; clients are the fixed system clients plus one per slot. Process floors add the measured per-slot thread counts. The formulas reproduce household's current values exactly, and tests pin both. The video cap counts one helper rather than the helper queue's eight because helpers beyond the first already queue inside the job; today's full command limit of 8 is this formula at 3 + 1. Every video encode runs with a fixed two-thread cap today (`SegmentEncoder`); if U2 measures that cap below real time at the R4 tier, the per-encoder thread count becomes a measured constant used by `SegmentEncoder` and counted in the per-slot thread floors and per-kind CPU cost.
+- KTD3. **Steady CPU demand follows the slots and must fit the allowance.** The steady encode demand is the measured per-kind CPU cost per second of output at real time, taken with the slots running concurrently, times the configured slots. The steady baseline is the measured steady CPU of web, PostgreSQL, Redis and the control worker under the target load (U2), plus the pooler's (U8). A configuration fits when the encode demand plus the baseline is at most the CPU allowance; the slots and this check bound the aggregate encode demand, because each video media child runs its own playback governor that sees only its own stream (KTD18). Rendering and the source-install manifest refuse a configuration that does not fit, naming the required allowance, and refuse an allowance larger than the host's CPUs. (session-settled: user-directed — chosen over proving admission only: real-time is the requirement.) Governs R3, R4.
 - KTD4. **The native daemon admits by derived peer cap with backpressure.** Its open-peer cap is the derived client count plus a small margin. At the cap it stops accepting, so new peers wait in the listen backlog instead of being closed and escalating to containment, and it drains all pending accepts each loop iteration. (session-settled: user-directed — chosen over raising the cap but still closing excess peers: a closed peer is treated as uncertain and contains the media role.)
-- KTD5. **Defaults are measured, not guessed.** The full profile's default slot pair starts at 8 video and 12 audio and, while its derived CPU requirement exceeds an 8-core execution set or its derived worker reservation exceeds 16 GiB, shrinks both kinds in the 8:12 ratio, rounding down. U2's measurements decide the numbers, and System Requirements records them beside the measurements.
+- KTD5. **Default slots are derived from the allowance.** When the full profile's slots are unset, rendering takes the first pair on the sequence video v from 8 down to 1 with audio floor(3v/2) (8 + 12, 7 + 10, 6 + 9, 5 + 7, 4 + 6, 3 + 4, 2 + 3, 1 + 1) that passes KTD3's CPU check and KTD17's memory-floor check for the stated allowance. When no pair fits, rendering refuses, naming the allowance that 1 + 1 needs and the explicit `media.videoSlots`/`media.audioSlots` setting, so a disabled kind only ever comes from an explicit zero. The allowance itself is a required configuration field with no host detection; `deploy/household/example.json` shows one for each profile. U2's measurements set the per-kind costs, and System Requirements records the resulting slot pair for common allowances beside the measurements.
 - KTD6. **Web reports profile disagreement through health.** The worker boot row records the profile fingerprint the boot started with; the web health check compares it with its own profile and reports a mismatch. (session-settled: user-directed — chosen over refusing web startup and over documenting only: misconfiguration becomes visible without a restart loop.) Governs R2.
 - KTD7. **Zero slots refuse the kind at the policy.** `MediaOperation::StreamCopy` splits into video and audio stream copy, and in the full profile `MediaExecutionPolicy` refuses encodes and stream copies of a kind whose slot count is zero, so delivery negotiation returns its existing compatibility explanation and nothing reaches the worker queue. Household's shared copy pool is not gated by this rule. Governs R5.
 - KTD8. **PgBouncer runs from the database image as its own service.** PgBouncer 1.26.1 is installed from the PostgreSQL project's packages in `docker/postgres/Dockerfile` and started as a separate service with its own memory limit; the preset image list and configuration version stay unchanged. It runs transaction pooling. Every pooled PDO connection, through Doctrine and through the dedicated connection factories, sets `Pdo\Pgsql::ATTR_DISABLE_PREPARES`: the image's pdo_pgsql links libpq 15, which frees named statements with SQL `DEALLOCATE`, and PgBouncer does not map that to its renamed server statements, so it would abort transactions. (session-settled: user-directed — chosen over a separate pooler image role: one database image to build and pin.) Governs R9.
 - KTD9. **Two pooler databases separate application and control traffic.** An application alias carries web and ordinary worker traffic; a control alias with its own reserved server connections carries leases, media authority and the scheduler, with a query-wait timeout shorter than the lease safety margin. (session-settled: user-directed — chosen over control traffic connecting directly and over a single shared pool: control deadlines must hold under web load.) Governs R10.
 - KTD10. **Connection routing is explicit.** `DATABASE_URL` points at the application alias, a control DSN at the control alias, and a direct URL at PostgreSQL for backups, preset verification, development checkpoints and session-state fixtures; migrations use the pooler. (session-settled: user-directed — chosen over migrations connecting directly: migration SQL is already transaction-scoped.) Governs R9, R11.
-- KTD11. **PostgreSQL is sized from the server pools.** `max_connections` becomes the application pool plus the control pool plus a direct reserve plus superuser slots, and the preset's PostgreSQL memory default follows the existing sizing rule (shared buffers, 128 MiB auxiliary, 24 MiB per server connection) applied to that smaller count. The household branch's per-client rule is replaced.
+- KTD11. **PostgreSQL is sized from the server pools.** `max_connections` becomes the application pool plus the control pool plus a direct reserve plus superuser slots, and PostgreSQL's memory follows the existing sizing rule (shared buffers, 128 MiB auxiliary, 24 MiB per server connection) applied to that smaller count; that figure is PostgreSQL's memory floor under KTD17. The household branch's per-client rule is replaced. U8 implements these as pure functions of the pool sizes.
 - KTD12. **The pooler authenticates from a generated auth file.** Before the pooler starts, the preset generates one SCRAM-SHA-256 verifier from `DB_PASSWORD`, applies it to the database role with `ALTER ROLE … PASSWORD` over the direct connection, and writes the same verifier to the auth file with `auth_type = scram-sha-256`. The auth file lives in a dedicated pooler credentials volume, mounted read-only only into the pooler; the pooler never mounts the application secrets volume. PgBouncer can reuse a client's SCRAM proof for its server login only when its verifier is byte-identical to the role's, so the role and the file must carry the same one. The file never holds a plain-text or MD5 password, and `auth_query` is not used, which avoids CVE-2025-12819's precondition. (session-settled: user-directed — chosen over a separate operator-supplied pooler password: one secret to manage.) Governs R14.
 - KTD13. **UTC is guaranteed three ways.** Both PostgreSQL configuration files set `timezone = 'UTC'`, a migration runs `ALTER DATABASE … SET timezone`, and web and worker startup refuse when the default zone, read as `reset_val` for `TimeZone` from `pg_settings`, is not UTC; `SHOW TimeZone` would only echo the connect-time setting. The per-connection `SET TIME ZONE` stays; PgBouncer tracks `TimeZone` per client. (session-settled: user-directed — chosen over configuration files only: drift is caught at startup.) Governs R12.
 - KTD14. **A convention test keeps SQL pool-safe.** A unit test scans `src/` and `migrations/` for session advisory locks, `LISTEN`, SQL `PREPARE`/`DEALLOCATE`, `WITH HOLD` cursors, temporary tables without `ON COMMIT DROP`, session `set_config(…, false)`, and `SET` other than the transaction-scoped forms (`SET LOCAL`, `SET TRANSACTION`, `set_config(…, true)`) and the connect-time time zone, following `InstantBindConventionTest`. The lease agent's session `SET statement_timeout` moves into a transaction as `SET LOCAL`. Governs R13.
 - KTD15. **Busy is a documented response, not a new admission path.** The audio rendition start wait keeps queueing; when it expires, the delivery response states that every audio slot is busy, and the obsolete "server-wide encode limit" docblock on `AudioRenditionPortInterface` is corrected. Governs R7.
+- KTD16. **CPU weights and ceilings replace CPU sets.** `controlCpuSet` and `executionCpuSet` are removed from the preset configuration, the worker configuration, the lifecycle and the operator manifest, along with the one-CPU execution quota. Every service, including the worker units the deployment operator creates, gets a CPU ceiling (Docker `cpus` / `NanoCpus`, cgroup `cpu.max`) no larger than the allowance and a CPU weight (Docker `cpu_shares` / `CpuShares`, cgroup v2 `cpu.weight`). The execution worker's ceiling is the whole allowance, so encodes can run ahead of real time when the host is idle. Weights are proportional to each service's steady demand, and the control worker, PostgreSQL and the pooler, which carries lease and authority traffic on its control alias, carry a priority multiplier so lease, authority and query latency win under contention. CPU ceilings may add up to more than the allowance, because CPU overuse throttles rather than kills. (session-settled: user-directed.) Governs R16.
+- KTD17. **Memory has floors that fit and ceilings that may overcommit.** Each service gets a floor for its steady memory, used as sizing arithmetic and not rendered as `mem_reservation`, and a ceiling (`mem_limit` / `Memory`, cgroup `memory.max`) for bursts. The floors are: the execution worker's native envelope plus its per-child media reservation per slot; the control worker's fixed reservation; PostgreSQL's KTD11 figure; the pooler's steady memory as U8 measures it; Redis's measured steady size; and the web server's measured anonymous memory per worker times its worker count. Page cache is not part of a floor. The floors must add up to no more than the memory allowance. Each ceiling is its floor plus a measured burst headroom, capped at the allowance, and the ceilings may add up to more than the allowance. Host-pressure kill order is set with `oom_score_adj`: web workers first, then the execution worker's media children, then Redis, with PostgreSQL, the pooler and the control worker last. Because the score is per process and inherited, each media child raises its own score above its container's (raising needs no privilege), so the execution worker's supervisor and native daemon are not the first victims in that container. Baander's aggregate use is not capped by a parent cgroup. (session-settled: user-directed.) Governs R3, R17.
+- KTD18. **The governor's budget is relative to the allowance and measures its own stream.** The playback governor runs in each video media child (`WorkerQoLLifecycle`, started from `bin/worker-media-job.php`) and holds only that child's stream, so it bounds one stream's cost; the aggregate is bounded by the slots and KTD3. Its learning samples and the mid-stream monitor's readings become the stream's own CPU (its encoder processes' CPU seconds per wall second, from the native execution result or the child's process accounting), expressed as a percentage of the CPU allowance, instead of host-wide `/proc/stat` utilization. An 80 % cap then means one stream may use up to 80 % of the allowance. The QoL profiles and their caps stay. Governs R18.
 
 ### High-Level Technical Design
 
-Slot values flow from the operator's configuration into one profile that every process derives its limits from:
+The allowance and slot values flow from the operator's configuration into one profile that every process derives its limits from:
 
 ```mermaid
 flowchart LR
-    cfg[Preset media config or profile JSON] --> profile[DeploymentProfile: identifier + slots]
-    profile --> mem[Memory and PID reservations]
-    profile --> cpu[Execution CPU requirement]
+    cfg[Preset allowance and media config, or profile JSON] --> profile[DeploymentProfile: identifier + allowance + slots]
+    profile --> fit[Steady-demand fit: encode CPU + baseline, memory floors]
+    fit --> slots[Default slot pair when unset]
+    profile --> ranges[Per-service CPU weights and ceilings, memory floors and ceilings, kill order]
     profile --> native[Native envelope, client caps, commands, results, peers]
     profile --> ids[Media client identifiers]
+    profile --> gov[Governor budget relative to the allowance]
     profile --> fp[Profile fingerprint]
-    mem --> admit[Worker creation and preset render checks]
-    cpu --> admit
+    fit --> admit[Worker creation and preset render checks]
+    ranges --> admit
     fp --> boot[Worker boot row]
     boot --> health[Web health mismatch check]
 ```
@@ -170,15 +190,18 @@ flowchart LR
 
 - **Every database client changes address.** Web, worker consumers, media children, the scheduler, the lease agent, migrations, console commands, the host controller, backups and the development tooling all resolve one of three DSNs (KTD10); a missed client keeps working against PostgreSQL directly and silently escapes the pool bound.
 - **Worker boots and manifests change shape.** The manifest and boot row carry the slot-bearing profile and its fingerprint, so every worker deployment is replaced once; nothing is deployed, so no migration path is needed.
-- **The household preset's rendered stack gains a service.** Its compose fingerprint, PostgreSQL sizing and total reservation change while its worker reservations do not (R8).
+- **The household preset's rendered stack gains a service and new sizing.** Its compose fingerprint, PostgreSQL sizing and every per-service limit change; its shared copy mode and native limits do not (R8).
+- **CPU sets disappear from configuration.** The preset configuration, the worker configuration, the lifecycle, the operator manifest and their tests lose `controlCpuSet` and `executionCpuSet`; the qualification harness stops pinning units.
 - **Tests that pin today's numbers move.** Profile, reservation, manifest, image-profile, preset and media-control tests and fixtures that hard-code 3 + 1, 3136 MiB or 2944/4480 MiB are updated to the derived values.
 
 ### Deferred to Implementation
 
-- The per-kind native allowance, per-child media reservation, per-slot thread count and per-kind CPU cost: set from U2's receipt.
-- The full default slot pair: set by KTD5's rule from those values.
+- The per-kind native memory share, per-child media reservation, per-slot thread count and per-kind CPU cost: set from U2's receipt.
+- The steady CPU baseline, the web per-worker anonymous memory, Redis's steady size and each service's burst headroom: set from U2's receipt.
+- The CPU weight values and the priority multiplier: set in U5 from the steady demands, then confirmed by U10's lease timing.
+- The example allowances in `deploy/household/example.json`: set by U7 from KTD5's rule so each profile's example admits a useful slot pair.
 - The application and control pool sizes, the direct reserve and the control query-wait timeout: set in U8 from the lease safety margin and measured concurrency, then confirmed by U10.
-- Whether HEVC at 1080p needs its own allowance: decided by U2's measurement.
+- Whether HEVC at 1080p needs its own native memory share: decided by U2's measurement.
 
 ### Assumptions
 
@@ -188,7 +211,10 @@ flowchart LR
 
 | Risk | Mitigation |
 | --- | --- |
-| The QoL governor samples host-wide CPU and may veto or downgrade new encodes while eight run. | U10 records governor decisions; a veto on a host that meets the derived CPU requirement is treated as a defect in the requirement or the governor, not tuned away. |
+| Each video media child's governor learns host-wide CPU as its own stream's cost, so under eight concurrent encodes it would veto or downgrade every new encode. | KTD18 records the stream's own encoder CPU against the allowance; U10 records governor decisions, and a veto on an allowance that meets the derived requirement is treated as a defect in the requirement or the governor, not tuned away. |
+| Without a dedicated core, the control worker's lease renewals lose to encodes under contention. | KTD16's priority weight; U10 measures lease timing with every slot encoding and web load (AE8). A missed deadline is a defect in the weights, not a reason to restore pinning silently. |
+| Coinciding bursts exceed host memory when ceilings overcommit. | The floors are not kernel-protected (Key Decisions); page cache is reclaimed first, and the kill order sacrifices web workers and media children before stateful services; U10 records cgroup memory events. |
+| A rootless Docker daemon cannot set a negative `oom_score_adj`. | U5 verifies the kill order on the CI host's Docker and refuses to render with a named reason where it cannot be applied. |
 | Per-job memory at 1080p exceeds the 360p figures measured so far. | U2 measures 1080p before any constant is set (KTD2, KTD5). |
 | Pooler queueing adds latency under bursts. | KTD9's control pool and query-wait timeout bound control traffic; U10 measures web latency through the pooler. |
 | Twenty clients polling the native daemon expose untested transport behavior. | KTD4 and U10's load proof. |
@@ -210,12 +236,13 @@ flowchart LR
 | U2 | Measure per-job cost | `tests/Fixtures/Worker/`, `packages/baander-tooling/src/Fixtures/Worker/MediaControl.php` | — |
 | U3 | Derived reservations and native limits | `DeploymentProfile.php`, `WorkerAutoscalingProfile.php`, `WorkerSupervisorRunner.php` | U1, U2 |
 | U4 | Media client identity, admission and daemon backpressure | `bin/worker-media-job.php`, `NativeExecutionDaemon.php`, `MediaWorkerRunner.php`, `MediaExecutionPolicy.php` | U1, U3 |
-| U5 | CPU derived from slots | `WorkerLifecycle.php`, `HouseholdRenderer.php`, `DeploymentOperatorManifest.php` | U2, U3 |
+| U5 | Allowance fit, CPU weights and memory ranges | `DeploymentProfile.php`, `WorkerLifecycle.php`, `HouseholdRenderer.php`, `DeploymentOperatorManifest.php` | U2, U3, U8 |
 | U6 | Operator configuration, CLI and mismatch health | `HouseholdConfiguration.php`, `ImageProfile.php`, console command, health check | U1, U3, U5 |
-| U7 | Measured defaults and bounds | `DeploymentProfile.php` | U2, U3, U5, U8 |
+| U7 | Allowance-derived defaults and bounds | `DeploymentProfile.php`, `deploy/household/example.json` | U2, U3, U5, U8 |
+| U13 | Governor budget relative to the allowance | `StreamGovernor.php`, `StreamAdmissionService.php`, `MidStreamMonitor.php` | U1, U5 |
 | U8 | PgBouncer in the database image and deployments | `docker/postgres/`, `HouseholdRenderer.php`, `docker-compose.yml`, config | — |
 | U9 | Pool-safe SQL and UTC guarantee | `bin/worker-lease-agent.php`, migration, convention test | U8 |
-| U10 | 8 + 12 real-time load proof | media-control drill and fixtures | U4, U5, U6, U7, U8 |
+| U10 | 8 + 12 real-time load proof | media-control drill and fixtures | U4, U5, U6, U7, U8, U13 |
 | U11 | Busy response | `AudioRenditionCache.php`, `AudioRenditionPortInterface.php` | U4 |
 | U12 | Documentation and roadmap | `docs-book/`, `deploy/household/README.md`, `CONCEPTS.md`, `ROADMAP.md` | U10 |
 
@@ -258,7 +285,8 @@ flowchart LR
 **Approach:**
 1. Extend the media-control drill to run one job per kind at the R4 tier, H.264 and HEVC where the ladder uses them, stream copy, and each audio codec, then again with the candidate default video and audio slot counts running concurrently.
 2. Record per-process peak RSS, thread counts, per-job CPU seconds per second of output in isolation and under concurrency, encode speed (output seconds per wall second) under the current two-thread cap, and the control unit's per-child PHP peak.
-3. Write the results into a retained receipt and summarise them in the unit's commit message for U3, U5 and U7.
+3. During the concurrent run and one idle period, record per-container CPU (mean and p95 from `cpu.stat`) and memory (anonymous memory and page cache separately, from `memory.stat`) for web, PostgreSQL, Redis, the control worker and the execution worker. These give KTD3's baseline and KTD17's floors and burst headroom.
+4. Write the results into a retained receipt and summarise them in the unit's commit message for U3, U5 and U7.
 
 **Execution note:** This is measurement: run it on the real FFmpeg build in the worker image before writing U3's constants.
 
@@ -277,14 +305,14 @@ flowchart LR
 **Files:** `src/Shared/Application/DTO/DeploymentProfile.php`, `src/Shared/Application/DTO/WorkerAutoscalingProfile.php`, `src/Shared/Application/DTO/WorkerRuntimeConfiguration.php`, `src/Shared/Infrastructure/Worker/WorkerSupervisorRunner.php`, `src/Transcode/Infrastructure/Swoole/TranscodeProcessPool.php`, `packages/baander-tooling/src/Deployment/ImageProfile.php`, tests under `tests/Unit/Shared/Application/DTO/` and `tests/Unit/Shared/Infrastructure/Worker/`, `scripts/tests/php/ImageProfileTest.php`.
 
 **Approach:**
-1. Introduce the full profile's measured per-child media reservation and per-kind native allowances from U2.
+1. Introduce the full profile's measured per-child media reservation and per-kind native memory shares from U2.
 2. Derive the envelope, per-client caps, command, result and client limits, and PID floors from the slots.
 3. Keep household's existing outputs byte-identical.
 
 **Test scenarios:**
 - Household's derived control floor, execution floor, native envelope and native limits equal today's values.
 - A full profile with 8 video and 12 audio derives 29 native commands, 60 results, and a client count of the fixed clients plus 20.
-- Raising video slots by one raises the envelope by the measured video allowance and the commands by two.
+- Raising video slots by one raises the envelope by the measured video native memory share and the commands by two.
 - A full profile with zero video slots derives no video client caps.
 
 **Verification:** Reservation and limit tests pass; household pins are unchanged.
@@ -312,33 +340,35 @@ flowchart LR
 
 **Verification:** Media runner, daemon and policy tests pass in the CI image.
 
-### U5. CPU derived from slots
+### U5. Allowance fit, CPU weights and memory ranges
 
-**Goal:** A deployment is admitted only with enough execution CPU for its configured slots, and the preset gives the execution unit that CPU.
+**Goal:** Baander's configuration is derived from the allowance: steady demand is checked against it, and every service gets CPU weights and ceilings, memory floors and ceilings and a kill priority instead of CPU sets and summed worst-case reservations.
 
-**Requirements:** R3, R4; KTD3.
+**Requirements:** R3, R4, R8, R16, R17; KTD3, KTD11, KTD16, KTD17.
 
-**Dependencies:** U2, U3.
+**Dependencies:** U2, U3, U8.
 
-**Files:** `packages/baander-tooling/src/Deployment/WorkerLifecycle.php`, `packages/baander-tooling/src/Deployment/HouseholdRenderer.php`, `src/Shared/Infrastructure/Worker/DeploymentOperatorManifest.php`, `bin/worker-deployment.php`, `scripts/tests/php/WorkerLifecycleTest.php`, `scripts/tests/php/HouseholdDeploymentTest.php`, `tests/Unit/Shared/Infrastructure/Worker/DeploymentOperatorManifestTest.php`.
+**Files:** `src/Shared/Application/DTO/DeploymentProfile.php` (allowance and the derived resource plan, or a value object it owns), `packages/baander-tooling/src/Deployment/HouseholdConfiguration.php`, `packages/baander-tooling/src/Deployment/HouseholdRenderer.php`, `packages/baander-tooling/src/Deployment/Household.php`, `packages/baander-tooling/src/Deployment/WorkerConfiguration.php`, `packages/baander-tooling/src/Deployment/WorkerLifecycle.php`, `src/Shared/Infrastructure/Worker/DeploymentOperatorManifest.php`, `bin/worker-deployment.php`, `deploy/household/example.json`, the qualification harness under `packages/baander-tooling/src/Fixtures/Household/`, tests for each (`scripts/tests/php/WorkerLifecycleTest.php`, `scripts/tests/php/HouseholdDeploymentTest.php`, `tests/Unit/Shared/Infrastructure/Worker/DeploymentOperatorManifestTest.php`).
 
 **Approach:**
-1. Derive the required execution CPUs from U2's per-kind CPU cost.
-2. Set the preset's execution CPU quota to its CPU set size and reject a set smaller than the requirement at render.
-3. Apply the same check in the manifest at worker creation.
+1. Add the allowance to the profile and derive one resource plan from the allowance and slots: steady encode demand and baseline (KTD3), per-service CPU weights and ceilings (KTD16), memory floors, ceilings and kill priorities (KTD17), using U2's measurements and U8's PostgreSQL and pooler functions.
+2. Remove `controlCpuSet`, `executionCpuSet` and the one-CPU execution quota from configuration, lifecycle, manifest and harness.
+3. Render the plan into the preset (`cpus`, `cpu_shares`, `mem_limit`, `oom_score_adj`) and apply the same values when the deployment operator creates worker units; refuse at render and at worker creation when the steady demand does not fit, naming the required allowance, or when the allowance exceeds the host.
+4. Have each media child raise its own `oom_score_adj` above its container's, verify on the CI host that the kill priorities apply, and refuse with a named reason where they cannot.
 
 **Test scenarios:**
-- A full configuration with 8 + 12 and a CPU set smaller than the requirement fails to render and names the required count (Covers AE1).
-- Rendering reports the required host cores derived from the governor's budget cap alongside the execution CPU requirement.
-- The rendered execution quota equals the CPU set size.
-- A manifest whose execution CPU set is too small is refused at worker creation.
-- Household's CPU requirement is satisfied by its existing one-CPU execution set.
+- A full configuration with 8 + 12 and a CPU allowance below their steady demand fails to render and names the required allowance (Covers AE1).
+- The memory floors of a rendered deployment add up to no more than the memory allowance while its ceilings may add up to more; a configuration whose floors exceed the allowance is refused.
+- No rendered service or created worker unit carries a CPU set; the execution worker's CPU ceiling equals the allowance, the control worker's weight is above every other service's, and PostgreSQL's and the pooler's weights carry the priority multiplier.
+- Web workers carry the highest `oom_score_adj`, a media child's score is above its execution container's, and PostgreSQL, the pooler and the control worker carry the lowest.
+- An allowance larger than the host's CPUs or memory is refused.
+- Household renders from its allowance with its shared copy mode and native limits unchanged.
 
-**Verification:** Tooling and manifest tests pass.
+**Verification:** Tooling, manifest and preset tests pass; a rendered deployment's cgroup files show the derived `cpu.weight`, `cpu.max` and `memory.max`, and its processes show the derived `oom_score_adj`.
 
 ### U6. Operator configuration, CLI and mismatch health
 
-**Goal:** Operators set slots in the managed preset or the source install, can see the effective profile and its reservations, and see when web and workers disagree.
+**Goal:** Operators set the allowance and slots in the managed preset or the source install, can see the effective profile and its derived resource plan, and see when web and workers disagree.
 
 **Requirements:** R1, R2, R6; KTD1, KTD6; `.agents/rules/admin-cli-parity.md`.
 
@@ -347,36 +377,39 @@ flowchart LR
 **Files:** `packages/baander-tooling/src/Deployment/HouseholdConfiguration.php`, `packages/baander-tooling/src/Deployment/ImageProfile.php`, `packages/baander-tooling/src/Deployment/Household.php`, `deploy/household/example.json`, a console command under `src/Shared/Interface/Console/` that prints the effective profile JSON and its derived reservations, the worker boot persistence and web health check under `src/Shared/`, `packages/baander-tooling/src/Development/Workers.php`, tests for each.
 
 **Approach:**
-1. Add a `media` object with `videoSlots` and `audioSlots` to the preset configuration (full only) and pass the values into the image profile probe.
-2. Add the console command so source installs can produce the manifest and web values without hand-writing JSON.
+1. Add a required `allowance` object (`cpus`, `memoryMiB`) for both profiles and an optional `media` object with `videoSlots` and `audioSlots` (full only) to the preset configuration, and pass the values into the image profile probe.
+2. Add the console command so source installs can produce the manifest and web values without hand-writing JSON; it prints the effective slots and the derived floors, ceilings, weights and kill priorities.
 3. Record the profile fingerprint on the worker boot row and compare it in web health (KTD6).
 4. Keep the development preview on the measured defaults.
 
 **Test scenarios:**
 - A full preset with `media` renders a profile with those slots and pins its fingerprint.
 - A household preset with `media` is rejected (Covers AE6).
-- The console command prints JSON that `DeploymentProfile::fromJson` accepts and reservations equal to U3's derivation.
+- The console command prints JSON that `DeploymentProfile::fromJson` accepts and a resource plan equal to U5's derivation.
+- A preset configuration without `allowance` is rejected naming the field.
 - Web health reports a mismatch when its fingerprint differs from the active boot's (Covers AE3) and is healthy when they match.
 
 **Verification:** Tooling, unit and functional tests pass; `lint:container` passes for both profiles.
 
-### U7. Measured defaults and bounds
+### U7. Allowance-derived defaults and bounds
 
-**Goal:** Unset slots use measured, generous defaults, and oversized configurations are rejected early.
+**Goal:** Unset slots take the largest pair the allowance supports, and oversized configurations are rejected early.
 
 **Requirements:** R1, R6; KTD5.
 
 **Dependencies:** U2, U3, U5, U8.
 
-**Files:** `src/Shared/Application/DTO/DeploymentProfile.php`, `packages/baander-tooling/src/Deployment/HouseholdConfiguration.php`, profile and preset tests.
+**Files:** `src/Shared/Application/DTO/DeploymentProfile.php`, `packages/baander-tooling/src/Deployment/HouseholdConfiguration.php`, `deploy/household/example.json`, profile and preset tests.
 
 **Approach:**
-1. Apply KTD5's rule to U2's measurements and set the full defaults.
+1. Implement KTD5's shrinking rule over U5's fit check and set the example allowances.
 2. Derive the per-kind and total maximums from the daemon peer, worker child and pooler client limits, and reject beyond them with the bound named.
 
 **Test scenarios:**
-- An unset full profile uses the measured defaults, and its derived reservation fits KTD5's envelope.
+- An unset full profile with an allowance that fits 8 + 12 gets 8 + 12; with a smaller allowance it gets the first fitting pair on the 8:12 shrink sequence, and rendering reports it (Covers AE7).
+- An unset full profile whose allowance fits no pair down to 1 + 1 is refused, naming the allowance 1 + 1 needs.
 - A slot count one above the derived maximum is rejected with the bound in the message.
+- Each example allowance in `deploy/household/example.json` renders.
 
 **Verification:** Profile and preset tests pass.
 
@@ -396,6 +429,7 @@ flowchart LR
 3. Route `DATABASE_URL`, the control DSN and the direct URL per KTD10, and set `Pdo\Pgsql::ATTR_DISABLE_PREPARES` on every pooled connection (KTD8).
 4. Make the development writer check count clients on the pooler's application and control aliases (PgBouncer's `SHOW CLIENTS`) as writers and ignore only idle pooler server connections.
 5. Resize `max_connections` and the preset's PostgreSQL memory default per KTD11.
+6. In the preset start run, record the pooler's steady CPU (mean and p95 from `cpu.stat`) and memory (anonymous memory and page cache from `memory.stat`), idle and under light query load; these are the pooler's CPU baseline and memory floor in KTD3 and KTD17.
 
 **Execution note:** Verify `TimeZone` tracking and the disabled-prepares behavior against a running PgBouncer 1.26.1, including through the web runtime's Swoole coroutine pgsql driver, before building on them.
 
@@ -437,22 +471,24 @@ flowchart LR
 
 **Goal:** A full deployment configured for 8 video and 12 audio jobs proves R4 on real FFmpeg.
 
-**Requirements:** R4, R9, R10; Success Criteria.
+**Requirements:** R4, R9, R10, R16, R17, R18; Success Criteria.
 
-**Dependencies:** U4, U5, U6, U7, U8.
+**Dependencies:** U4, U5, U6, U7, U8, U13.
 
 **Files:** `scripts/test-worker-media-control-container.sh` and its PHP driver, `packages/baander-tooling/src/Fixtures/Worker/MediaControl.php`, `packages/baander-tooling/src/Fixtures/Worker/ControlCapacityVerifier.php`, `packages/baander-tooling/src/Fixtures/Worker/AutoscalingVerifier.php`, `tests/Fixtures/TwoCommand/media-control.php`, `tests/Fixtures/TwoCommand/deployment.php`.
 
 **Approach:**
 1. Parameterize the drill's job counts and verifiers from the profile instead of three video jobs.
 2. Bring the playback governor to its Active state before the run, by a warm-up of at least its learning sample count, and record the governor state with every admission decision.
-3. Run 8 video jobs at the R4 tier and 12 audio jobs concurrently through the pooler, recording segment progress against wall time, governor decisions, native launches, the longest native connect-to-accept wait, cgroup peaks, PostgreSQL backends and lease renewals.
+3. Run 8 video jobs at the R4 tier and 12 audio jobs concurrently through the pooler, on an allowance equal to the derived steady demand rounded up and with no CPU sets. Record segment progress against wall time, governor decisions, native launches, the longest native connect-to-accept wait, per-service CPU throttling and cgroup memory events, cgroup peaks, PostgreSQL backends and lease renewals.
 
 **Test scenarios:**
 - All twenty jobs are admitted with the governor Active and produce output ahead of real time for the run; a decision made while the governor was still learning fails the receipt.
 - No media-role containment, OOM event or uncertain native failure occurs.
+- No admission is vetoed or downgraded after the governor learned under the 8 + 12 load.
 - PostgreSQL backends stay at or below the configured server pools plus direct reserve.
-- Lease renewals complete within their deadlines while web load saturates the application pool (Covers AE5).
+- Lease renewals complete within their deadlines while every slot encodes and web load saturates the application pool, with no service on a dedicated CPU (Covers AE5, AE8).
+- No service's memory floor is breached and no OOM kill occurs.
 
 **Verification:** A retained receipt shows every criterion above.
 
@@ -484,11 +520,31 @@ flowchart LR
 
 **Files:** `docs-book/part-1-operator-guide/system-requirements.md`, `configuration.md`, `transcoding.md`, `background-work.md`, `commands/README.md`, `commands/app-worker.md`, `getting-started.md`, `docs-book/part-2-developer-guide/testing.md`, `deploy/household/README.md`, `CONCEPTS.md` (media job slot, connection pooler), `ROADMAP.md`.
 
-**Approach:** Replace the fixed 3 + 1 statements with slot configuration and derived sizing, document the pooler and its aliases, record U2 and U10 figures, and label the household measurements as taken before the pooler.
+**Approach:** Replace the fixed 3 + 1 statements and the CPU-set guidance with the allowance, slot configuration and derived sizing. Explain why ceilings may overcommit while floors may not, that the floors are sizing figures rather than kernel protection, and the kill order. Document the pooler and its aliases, record U2 and U10 figures with the slot pair common allowances produce, and label the household measurements as taken before the pooler and the allowance model. Record household requalification under the new model as an open roadmap item, and add a `CONCEPTS.md` entry for the resource allowance.
 
 **Test expectation:** none -- documentation; verified by `prose-fix`, link checks and `git diff --check`.
 
 **Verification:** Every published number traces to a U2 or U10 receipt.
+
+### U13. Governor budget relative to the allowance
+
+**Goal:** The playback governor's budget cap means a share of Baander's CPU allowance, not of all host CPUs.
+
+**Requirements:** R18; KTD18.
+
+**Dependencies:** U1, U5 (U5 adds the allowance to the profile, which reaches the video media child through `BAANDER_DEPLOYMENT_PROFILE_JSON`).
+
+**Files:** `src/QoL/Domain/Service/StreamGovernor.php`, `src/QoL/Infrastructure/Swoole/CpuGpuSampler.php`, `src/QoL/Infrastructure/StreamAdmissionService.php`, `src/QoL/Infrastructure/Swoole/MidStreamMonitor.php`, `src/QoL/Infrastructure/Swoole/LearningDataPersister.php`, `src/QoL/Infrastructure/Worker/WorkerQoLLifecycle.php`, the native execution result that reports the encoder's CPU, tests under `tests/Unit/QoL/`.
+
+**Approach:** Record each learning sample and mid-stream reading as the stream's own encoder CPU expressed against the allowance (KTD18), and keep the QoL profiles and their caps.
+
+**Test scenarios:**
+- On a 16-CPU host with an 8-CPU allowance and an 80 % cap, a stream whose predicted cost exceeds 6.4 CPUs is downgraded or refused, and one below it is admitted.
+- Samples recorded while eight encodes run concurrently predict a single stream's cost within a stated tolerance of samples recorded in isolation.
+- The mid-stream monitor does not release a stream whose own CPU stays under the cap while the host is saturated by other encodes.
+- A learned cost model from before the rescale is not misread after it (reset or rescaled at load).
+
+**Verification:** QoL unit tests pass in the CI image.
 
 ---
 
@@ -496,7 +552,7 @@ flowchart LR
 
 | Area | Gate | Proves |
 | --- | --- | --- |
-| Backend | `bash scripts/test-backend-container.sh` on affected paths, then the unit, functional and integration lanes, in the CI image | U1, U3, U4, U6, U9, U11 |
+| Backend | `bash scripts/test-backend-container.sh` on affected paths, then the unit, functional and integration lanes, in the CI image | U1, U3, U4, U6, U9, U11, U13 |
 | Static analysis | PHPStan, Deptrac and `lint:container` for both profiles through `scripts/check-backend-container.php` | No new violations or weakened baselines |
 | Tooling | `composer run-script --timeout=7200 test:tooling`, `composer analyse:tooling`, `composer check:tooling-format`, `composer check:tooling-architecture` | U5, U6, U7, U8 |
 | Web | in `ui/web`: `corepack yarn vitest run` on affected tests, `corepack yarn typecheck`, `corepack yarn lint` | U11 |
@@ -508,8 +564,9 @@ flowchart LR
 
 ## Definition of Done
 
-- R1–R15 are satisfied, with AE1–AE6 covered by tests named in their units.
-- Household's derived reservations, native envelope and slot values are unchanged in tests.
+- R1–R18 are satisfied, with AE1–AE8 covered by tests named in their units.
+- Household's shared copy mode, native envelope, native limits and slot values are unchanged in tests.
+- No configuration, manifest or rendered service carries a CPU set.
 - The U10 receipt shows 8 video and 12 audio jobs ahead of real time with no containment, and PostgreSQL backends within the configured pools.
 - The gates above pass without weakened baselines; `ce-simplify-code` and `ce-code-review` ran and justified findings were applied.
 - Code from abandoned approaches and temporary measurement scaffolding is removed from the diff.
