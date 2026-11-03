@@ -1,3 +1,11 @@
+# Builds the launcher that starts PostgreSQL with transparent huge pages
+# disabled; see postgres/thp-disabled-exec.c.
+FROM postgres:18-bookworm AS thp-helper
+RUN apt-get update && apt-get install -y --no-install-recommends gcc libc6-dev \
+    && rm -rf /var/lib/apt/lists/*
+COPY ./postgres/thp-disabled-exec.c /src/thp-disabled-exec.c
+RUN gcc -O2 -Wall -Wextra -Werror -o /thp-disabled-exec /src/thp-disabled-exec.c
+
 FROM postgres:18-bookworm AS base
 
 # Set versions as build args for easy updates
@@ -47,3 +55,11 @@ RUN apt-get update && apt-get install -y -V \
 
 # Copy configuration files - correct path relative to build context (./docker/)
 COPY ./postgres/conf/ /etc/postgresql/
+
+# PGroonga backends touch large anonymous mappings sparsely; with host THP mode
+# "always" each touched 2 MiB range can become a resident huge page, so every
+# process in this container runs with THP disabled. hugetlbfs pages selected by
+# the huge_pages setting are unaffected.
+COPY --from=thp-helper /thp-disabled-exec /usr/local/bin/thp-disabled-exec
+ENTRYPOINT ["thp-disabled-exec", "docker-entrypoint.sh"]
+CMD ["postgres"]

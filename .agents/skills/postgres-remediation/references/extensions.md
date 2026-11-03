@@ -55,6 +55,44 @@ running extension versions with their matching upstream documentation before
 using new options. `pg_stat_statements` also needs effective preload/configuration;
 CREATE EXTENSION alone does not prove usable query statistics.
 
+## Size memory per PGroonga backend
+
+PGroonga is not preloaded. Each backend loads it, with libgroonga, Apache Arrow,
+ggml/llama and MeCab, on first use of a PGroonga index, operator or function,
+including writes to an indexed table. Measured 2026-11-03 on disposable
+`baander-database:latest` (PostgreSQL 18.4, PGroonga 4.0.5, Groonga 16.0.4,
+Arrow 24.0.0) and a rebuild (PostgreSQL 18.6, Groonga 16.0.5): a fresh backend
+holds about 3 MiB RssAnon. Loading PGroonga raises it to 21 MiB, and a search
+plus an UPDATE of the indexed column to 22 MiB. The memory stays until the
+backend exits. Most of it is libgroonga's `.data.rel.ro` (9.3 MiB, dirtied by
+relocation) and a heap of about 7 MiB from library initialisation, so
+`pg_log_backend_memory_contexts` does not show it. `pgroonga.enable_wal`,
+`GRN_GGML_BACKENDS_DIR`, `GRN_MRUBY_ENABLED` and glibc malloc trim tunables
+changed it by at most 0.5 MiB. Budget about 24 MiB of private memory for every
+connection that may use PGroonga, on top of shared_buffers.
+
+When the host's THP mode is `always`, the sparsely touched large anonymous
+mappings of these libraries can be backed by 2 MiB huge pages at fault time or
+collapsed by khugepaged later. One backend reached 95 MiB RssAnon, 72 MiB of it
+`AnonHugePages`. Whether this happens depends on how many free huge pages the
+host has, so the same workload succeeds on one run and is OOM-killed on the next.
+The image therefore starts its entrypoint through
+[thp-disabled-exec](../../../../docker/postgres/thp-disabled-exec.c)
+(`PR_SET_THP_DISABLE`, inherited by every backend). Check `THP_enabled: 0` in
+`/proc/1/status` of the container and zero `AnonHugePages` in a backend's
+`/proc/<pid>/smaps_rollup`. An image built before this change lacks the helper.
+
+Do not put `pgroonga` in `shared_preload_libraries` to share this memory. In
+4.0.5, `_PG_init` is the only backend path that opens the Groonga database, and
+it skips the open when no database is selected, as in the postmaster. The
+upstream [GH-336 release note](https://pgroonga.github.io/news/) says preloading
+does not work, for example `CREATE INDEX USING pgroonga` fails.
+[`pgroonga.enable_wal`](https://pgroonga.github.io/reference/parameters/enable-wal.html)
+defaults to `off` and is documented for streaming replication, with
+`pgroonga_wal_resource_manager` recommended on PostgreSQL 15 and later. Both project
+configurations enable it. The page does not say what turning it off means for
+crash recovery of a primary without replicas, so keep it until that is verified.
+
 ## Preserve the actual search contract
 
 Album, Artist, Song, Genre and Movie entity attributes and initial migration
