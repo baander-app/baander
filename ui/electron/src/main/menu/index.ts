@@ -129,7 +129,7 @@ function wireMenuActions(menu: Menu) {
       if (ses) {
         await ses.clearCache();
         await ses.clearStorageData({
-          storages: ['cookies', 'localstorage', 'serviceworkers', 'websql', 'indexdb'],
+          storages: ['cookies', 'localstorage', 'serviceworkers', 'indexdb'],
         });
       }
       BrowserWindow.getFocusedWindow()?.reload();
@@ -226,7 +226,7 @@ function handleMenuAction(actionId: string) {
         if (ses) {
           await ses.clearCache();
           await ses.clearStorageData({
-            storages: ['cookies', 'localstorage', 'serviceworkers', 'websql', 'indexdb'],
+            storages: ['cookies', 'localstorage', 'serviceworkers', 'indexdb'],
           });
         }
         BrowserWindow.getFocusedWindow()?.reload();
