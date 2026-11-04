@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace App\Transcode\Infrastructure\FFmpeg;
 
+use App\Shared\Application\DTO\DeploymentProfile;
+use App\Shared\Application\DTO\HardwareEncoder;
 use App\Transcode\Application\DTO\MediaOperation;
 use App\Transcode\Application\Service\MediaExecutionPolicy;
 use App\Transcode\Domain\ValueObject\EncoderProfile;
 use App\Transcode\Domain\ValueObject\HardwareAccelerator;
+use App\Transcode\Domain\ValueObject\QualityTier;
 use Psr\Log\LoggerInterface;
 use RuntimeException;
 
@@ -17,6 +20,10 @@ use RuntimeException;
  * Runs `ffmpeg -hwaccels` and `ffmpeg -encoders` to detect GPU capabilities,
  * then validates each detected accelerator with a test encode.
  * Produces an EncoderProfile for the best available hardware, or falls back to software.
+ *
+ * Under native execution the deployment profile decides: a configured hardware encoder must pass
+ * its test encode on the configured device or startup fails, and without one the software encoder
+ * is qualified.
  */
 class HardwareCapabilitiesProber
 {
@@ -29,6 +36,7 @@ class HardwareCapabilitiesProber
         private readonly string $preferredEncoder = '',
         private readonly string $hwAccelDevice = '',
         private readonly float $bitrateMultiplier = 1.0,
+        private readonly ?DeploymentProfile $deploymentProfile = null,
     ) {
     }
 
@@ -39,6 +47,9 @@ class HardwareCapabilitiesProber
             return $this->profile;
         }
         if (ProcessExecutor::usesNativeExecution()) {
+            if ($this->deploymentProfile?->hardware !== null) {
+                return $this->profile = $this->qualifyConfiguredHardware($this->deploymentProfile->hardware);
+            }
             $encoder = in_array($this->preferredEncoder, ['libx264', 'libx265', 'libsvtav1'], true) ? $this->preferredEncoder : 'libx265';
             if (!$this->validateEncoder(HardwareAccelerator::None, $encoder)) {
                 throw new RuntimeException('The execution runtime failed software encoder qualification.');
@@ -46,6 +57,27 @@ class HardwareCapabilitiesProber
             return $this->profile = EncoderProfile::software($encoder);
         }
         return $this->profile = $this->probe();
+    }
+
+    /**
+     * The configured accelerator's HEVC encoder, or the H.264 one when the encoder setting names
+     * it, must complete a test encode on the configured device.
+     *
+     * @throws HardwareEncoderUnavailable when the test encode fails
+     */
+    private function qualifyConfiguredHardware(HardwareEncoder $hardware): EncoderProfile
+    {
+        $accelerator = HardwareAccelerator::from($hardware->accelerator);
+        $encoder = in_array($this->preferredEncoder, [$accelerator->hevcEncoder(), $accelerator->h264Encoder()], true)
+            ? $this->preferredEncoder
+            : $accelerator->hevcEncoder();
+        $device = $hardware->device ?? '';
+        if (!$this->validateEncoder($accelerator, $encoder, $device)) {
+            throw new HardwareEncoderUnavailable($encoder, $device, $this->lastDiagnostic);
+        }
+        $this->logger->info('Using configured hardware encoder', ['encoder' => $encoder, 'accelerator' => $accelerator->value, 'device' => $device]);
+
+        return EncoderProfile::fromEncoderName($encoder, $device);
     }
 
     public function getProfile(): EncoderProfile
@@ -180,20 +212,25 @@ class HardwareCapabilitiesProber
      * Validate that an encoder is functional by attempting a minimal test encode.
      * For VAAPI/QSV/AMF encoders, frames must be uploaded to GPU memory first.
      */
-    private function validateEncoder(HardwareAccelerator $accel, string $encoder): bool
+    private function validateEncoder(HardwareAccelerator $accel, string $encoder, ?string $configuredDevice = null): bool
     {
         $command = [$this->ffmpegPath, '-nostdin', '-y', '-threads', '1', '-filter_threads', '1', '-filter_complex_threads', '1'];
         if ($accel->requiresDevicePath()) {
-            $device = $this->hwAccelDevice ?: $accel->defaultDevicePath();
+            $device = $configuredDevice ?: ($this->hwAccelDevice ?: $accel->defaultDevicePath());
             $method = $accel->ffmpegHwaccelMethod();
             array_push($command, '-init_hw_device', sprintf('%s=%s_0:%s', $method, $method, $device));
         }
-        array_push($command, '-f', 'lavfi', '-i', 'nullsrc=s=256x256:d=0.1');
+        // The test frame takes the smallest tier the ladder encodes: hardware encoders have
+        // minimum sizes, and AMD's RDNA4 HEVC encoder refuses widths below 384.
+        $tier = QualityTier::p360();
+        array_push($command, '-f', 'lavfi', '-i', sprintf('nullsrc=s=%dx%d:d=0.1', $tier->width, $tier->height));
         if ($accel->requiresDevicePath()) {
             array_push($command, '-vf', 'format=nv12,hwupload');
         }
         array_push($command, '-c:v', $encoder, '-threads', '1', '-f', 'null', '-');
-        $this->exec($command);
+        $output = $this->exec($command);
+        $lines = array_values(array_filter(array_map(trim(...), explode("\n", $output)), static fn (string $line): bool => $line !== ''));
+        $this->lastDiagnostic = substr(implode(' | ', array_slice($lines, -3)), 0, 512);
 
         if ($this->lastExitCode !== 0) {
             $this->logger->debug('Encoder validation failed', [
@@ -208,6 +245,9 @@ class HardwareCapabilitiesProber
     }
 
     protected int $lastExitCode = 0;
+
+    /** The last lines of the most recent test encode's output, for a startup failure reason. */
+    private string $lastDiagnostic = '';
 
     /** @param list<string> $command */
     protected function exec(array $command): string

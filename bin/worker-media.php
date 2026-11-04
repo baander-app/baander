@@ -72,6 +72,8 @@ try {
         'exceptionClass' => $error::class,
         'sourceFile' => basename($error->getFile()),
         'sourceLine' => $error->getLine(),
+        // Absent when the failure precedes the autoloader.
+        ...(class_exists(\App\Transcode\Infrastructure\Worker\MediaWorkerFailure::class) ? \App\Transcode\Infrastructure\Worker\MediaWorkerFailure::reason($error) : []),
     ], JSON_INVALID_UTF8_SUBSTITUTE) . "\n");
     $exitCode = 1;
 } finally {

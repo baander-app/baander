@@ -72,6 +72,82 @@ final class HardwareCapabilitiesProberTest extends TestCase
         (new HardwareCapabilitiesProber(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile('full')), $this->logger))->probeForWorker();
     }
 
+    public function testRemoteStartupQualifiesTheConfiguredHardwareEncoderOnItsDevice(): void
+    {
+        $client = $this->createMock(NativeExecutionClientInterface::class);
+        $client->expects(self::once())->method('submit')->with(self::callback(static function (array $argv): bool {
+            return in_array('hevc_vaapi', $argv, true) && in_array('vaapi=vaapi_0:/dev/dri/renderD129', $argv, true)
+                && in_array('format=nv12,hwupload', $argv, true) && !in_array('libx265', $argv, true)
+                // Hardware encoders refuse frames below their minimum size; RDNA4 HEVC needs 384 pixels across.
+                && in_array('nullsrc=s=640x360:d=0.1', $argv, true);
+        }), 30)->willReturn(new NativeExecutionHandle(str_repeat('a', 64), 1));
+        $client->method('inspect')->willReturn(['state' => 'exited', 'exitCode' => 0, 'stdout' => '', 'stderr' => '']);
+        $client->method('release')->willReturn(true);
+        ProcessExecutor::configureNativeExecution($client);
+        $profile = $this->configuredProber('vaapi', '/dev/dri/renderD129')->probeForWorker();
+
+        self::assertSame(HardwareAccelerator::Vaapi, $profile->accelerator);
+        self::assertSame('hevc_vaapi', $profile->encoder);
+        self::assertSame('/dev/dri/renderD129', $profile->hwaccelDevice);
+        self::assertSame(['-hwaccel', 'vaapi', '-hwaccel_device', '/dev/dri/renderD129', '-hwaccel_output_format', 'vaapi'], \App\Transcode\Infrastructure\FFmpeg\FFmpegArguments::input($profile));
+    }
+
+    public function testConfiguredH264EncoderSettingSelectsTheAcceleratorsH264Encoder(): void
+    {
+        $client = $this->createMock(NativeExecutionClientInterface::class);
+        $client->expects(self::once())->method('submit')->with(self::callback(static fn (array $argv): bool => in_array('h264_vaapi', $argv, true)), 30)
+            ->willReturn(new NativeExecutionHandle(str_repeat('a', 64), 1));
+        $client->method('inspect')->willReturn(['state' => 'exited', 'exitCode' => 0, 'stdout' => '', 'stderr' => '']);
+        $client->method('release')->willReturn(true);
+        ProcessExecutor::configureNativeExecution($client);
+
+        self::assertSame('h264_vaapi', $this->configuredProber('vaapi', '/dev/dri/renderD128', 'h264_vaapi')->probeForWorker()->encoder);
+    }
+
+    public function testConfiguredNvencOpensNoDevice(): void
+    {
+        $client = $this->createMock(NativeExecutionClientInterface::class);
+        $client->expects(self::once())->method('submit')->with(self::callback(static fn (array $argv): bool => in_array('hevc_nvenc', $argv, true)
+            && !in_array('-init_hw_device', $argv, true)), 30)->willReturn(new NativeExecutionHandle(str_repeat('a', 64), 1));
+        $client->method('inspect')->willReturn(['state' => 'exited', 'exitCode' => 0, 'stdout' => '', 'stderr' => '']);
+        $client->method('release')->willReturn(true);
+        ProcessExecutor::configureNativeExecution($client);
+
+        $profile = $this->configuredProber('nvenc', null)->probeForWorker();
+        self::assertSame(HardwareAccelerator::Nvenc, $profile->accelerator);
+        self::assertSame('', $profile->hwaccelDevice);
+    }
+
+    public function testConfiguredHardwareThatFailsToInitializeStopsStartupWithANamedReason(): void
+    {
+        $client = $this->createStub(NativeExecutionClientInterface::class);
+        $client->method('submit')->willReturn(new NativeExecutionHandle(str_repeat('a', 64), 1));
+        $client->method('inspect')->willReturn(['state' => 'exited', 'exitCode' => 187, 'stdout' => '',
+            'stderr' => "ffmpeg version 7.1\n[AVHWDeviceContext @ 0x1] No VA display found for device /dev/dri/renderD128.\nDevice creation failed: -22.\nFailed to set value 'vaapi=vaapi_0:/dev/dri/renderD128' for option 'init_hw_device': Invalid argument\n"]);
+        $client->method('release')->willReturn(true);
+        ProcessExecutor::configureNativeExecution($client);
+        $prober = $this->configuredProber('vaapi', '/dev/dri/renderD128');
+        try {
+            $prober->probeForWorker();
+            self::fail('Startup encoded in software after the configured hardware failed.');
+        } catch (\App\Transcode\Infrastructure\FFmpeg\HardwareEncoderUnavailable $error) {
+            self::assertSame(['hevc_vaapi', '/dev/dri/renderD128'], [$error->encoder, $error->device]);
+            self::assertStringContainsString('The configured hardware encoder hevc_vaapi on /dev/dri/renderD128 did not initialize', $error->getMessage());
+            self::assertStringContainsString('No VA display found for device /dev/dri/renderD128', $error->getMessage());
+            self::assertSame([
+                'reason' => 'hardware_encoder_unavailable', 'encoder' => 'hevc_vaapi', 'device' => '/dev/dri/renderD128', 'detail' => $error->getMessage(),
+            ], \App\Transcode\Infrastructure\Worker\MediaWorkerFailure::reason($error));
+        }
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('have not been probed');
+        $prober->getProfile();
+    }
+
+    public function testOtherStartupFailuresNameNoReason(): void
+    {
+        self::assertSame([], \App\Transcode\Infrastructure\Worker\MediaWorkerFailure::reason(new \RuntimeException('postgresql://credential:private-secret@baander.app')));
+    }
+
     //
     // Explicit encoder configuration
     //
@@ -366,6 +442,14 @@ final class HardwareCapabilitiesProberTest extends TestCase
 
         $this->assertStringNotContainsString('-init_hw_device', $capturedCmd);
         $this->assertStringContainsString('hevc_nvenc', $capturedCmd);
+    }
+
+    private function configuredProber(string $accelerator, ?string $device, string $preferredEncoder = ''): HardwareCapabilitiesProber
+    {
+        $profile = new \App\Shared\Application\DTO\DeploymentProfile('full', 8, 12, new \App\Shared\Application\DTO\HardwareEncoder($accelerator, $device));
+
+        return new HardwareCapabilitiesProber(new \App\Transcode\Application\Service\MediaExecutionPolicy($profile), $this->logger,
+            preferredEncoder: $preferredEncoder, deploymentProfile: $profile);
     }
 
     /**
