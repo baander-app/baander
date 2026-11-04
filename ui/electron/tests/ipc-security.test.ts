@@ -69,7 +69,9 @@ test('native controls require the live main owner and reject invalid colors', as
   effects.length = 0; await assert.rejects(async () => invoke('window:minimize', fixture().event), /unauthorized/i); assert.deepEqual(effects, []);
 });
 test('failed configuration save reports feedback without finishing setup', async () => {
-  const script = readFileSync(new URL('../src/renderer/config/index.html', import.meta.url), 'utf8').match(/<script[^>]*>([\s\S]*?)<\/script>/)![1];
+  // The window's style imports are bundled by Vite; only its behaviour runs here.
+  const script = readFileSync(new URL('../src/renderer/config/index.html', import.meta.url), 'utf8').match(/<script[^>]*>([\s\S]*?)<\/script>/)![1]
+    .replace(/^\s*import\s+['"][^'"]+['"];?\s*$/gm, '');
   for (const result of [false, new Error('failed')]) {
     const elements = new Map<string, any>(); const alerts: string[] = []; let finished = 0;
     const element = (id: string) => { if (!elements.has(id)) elements.set(id, { value: 'https://baander.app', addEventListener(name: string, callback: Function) { this[name] = callback; }, focus() {}, classList: { add() {}, remove() {} } }); return elements.get(id); };

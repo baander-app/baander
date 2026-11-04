@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:http';
 import { createRequire } from 'node:module';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, resolve, extname, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -22,6 +22,10 @@ try {
     display.once('exit', code => reject(new Error(`Xvfb exited: ${code}`)));
   });
   const rendererRoot = resolve(desktop, 'dist/renderer');
+  const assets = await readdir(resolve(rendererRoot, 'assets'));
+  assert.ok(assets.some(name => /^geist-latin-wght-normal-.+\.woff2$/.test(name)), 'the renderer bundles Geist');
+  assert.ok(assets.some(name => /^geist-mono-latin-wght-normal-.+\.woff2$/.test(name)), 'the renderer bundles Geist Mono');
+  assert.deepEqual(assets.filter(name => /^(inter|jetbrains-mono|kanit|pretendard)-/i.test(name)), [], 'the renderer bundles no replaced font');
   let apiCalls = 0;
   api = createServer((request, response) => {
     apiCalls++;
@@ -70,6 +74,13 @@ await import(${JSON.stringify(pathToFileURL(resolve(desktop, 'dist/main/index.js
       return Boolean(result);
     }, { timeout: 15000 }).toBe(true).catch(error => { console.error('windows:', application.windows().map(page => page.url())); throw error; });
     return result;
+  }
+
+  async function expectLoadedFonts(page, families) {
+    await expect.poll(() => page.evaluate(async () => {
+      await document.fonts.ready;
+      return [...document.fonts].filter(face => face.status === 'loaded').map(face => face.family.replace(/^["']|["']$/g, ''));
+    }), { timeout: 10000 }).toEqual(expect.arrayContaining(families));
   }
 
   async function exerciseDiscovery(page) {
@@ -131,6 +142,9 @@ await import(${JSON.stringify(pathToFileURL(resolve(desktop, 'dist/main/index.js
     if (!configured) {
       assert.match(page.url(), /config\/index.html$/);
       await exerciseDiscovery(page);
+      assert.match(await page.evaluate(() => getComputedStyle(document.body).fontFamily), /^"Geist Variable",/);
+      assert.match(await page.locator('.server-url').evaluate(element => getComputedStyle(element).fontFamily), /^"Geist Mono Variable",/);
+      await expectLoadedFonts(page, ['Geist Variable', 'Geist Mono Variable']);
       await page.evaluate(async server => {
         if (!await window.BaanderElectron.config.setServerUrl(server)) throw new Error('Save failed');
       }, apiUrl);
@@ -146,6 +160,7 @@ await import(${JSON.stringify(pathToFileURL(resolve(desktop, 'dist/main/index.js
 
   async function exercise(page) {
     await page.locator('input[type=email]').waitFor();
+    await expectLoadedFonts(page, ['Geist Variable']);
     if (page.url().startsWith('file:')) assert.match(page.url(), /index\.html#\/login/);
     assert.equal(await page.evaluate(() => window.BaanderElectron.config.getServerUrl()), apiUrl);
     assert.equal(await page.evaluate(server => fetch(`${server}/smoke`).then(r => r.json()).then(r => r.smoke), apiUrl), true);
@@ -175,7 +190,7 @@ await import(${JSON.stringify(pathToFileURL(resolve(desktop, 'dist/main/index.js
     await exercise(page);
     await application.close();
     application = undefined;
-    console.log(`${mode}: literal discovery metadata/selection, setup handoff, configured startup, API access, reload, blocked navigation/popup and titlebar controls passed`);
+    console.log(`${mode}: literal discovery metadata/selection, Geist in both windows, setup handoff, configured startup, API access, reload, blocked navigation/popup and titlebar controls passed`);
   }
   assert.ok(apiCalls >= 4);
 } finally {

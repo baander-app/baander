@@ -17,14 +17,40 @@
     <title>Configure Server</title>
     <style>
         body {
-            font-family: system-ui, sans-serif;
+            font-family: var(--font-ui);
+            font-size: var(--text-body-size);
+            font-weight: var(--text-body-weight);
+            line-height: var(--text-body-line-height);
             margin: 24px;
             max-width: 500px;
         }
+        h2 {
+            font-size: var(--text-title-size);
+            font-weight: var(--text-title-weight);
+            letter-spacing: var(--text-title-tracking);
+            line-height: var(--text-title-line-height);
+        }
+        .mono {
+            font-family: var(--font-mono);
+            font-size: var(--text-mono-sm-size);
+            font-weight: var(--text-mono-sm-weight);
+            line-height: var(--text-mono-sm-line-height);
+            font-variant-numeric: tabular-nums;
+        }
         .row { margin-bottom: 12px; }
         .row-discover { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
-        input[type='url'] { width: 100%; padding: 8px; box-sizing: border-box; }
+        input[type='url'] {
+            width: 100%;
+            padding: 8px;
+            box-sizing: border-box;
+            font-family: var(--font-mono);
+            font-size: var(--text-body-sm-size);
+        }
         button {
+            font-family: var(--font-ui);
+            font-size: var(--text-body-sm-size);
+            font-weight: 500;
+            line-height: var(--text-body-sm-line-height);
             padding: 8px 12px;
             border: 1px solid #ccc;
             background: #f0f0f0;
@@ -33,9 +59,9 @@
         }
         button:hover { background: #e0e0e0; }
         button:disabled { opacity: 0.5; cursor: not-allowed; }
-        button.primary { background: #007bff; color: white; border-color: #007bff; }
+        button.primary { background: #007bff; color: white; border-color: #007bff; font-weight: 600; }
         button.primary:hover { background: #0056b3; }
-        .hint { color: #666; font-size: 12px; margin-top: 4px; }
+        .hint { color: #666; font-size: var(--text-caption-size); line-height: var(--text-caption-line-height); margin-top: 4px; }
         .discovered-servers {
             margin-top: 12px;
             border: 1px solid #ddd;
@@ -54,9 +80,9 @@
         .server-item:hover { background: #f5f5f5; }
         .server-item:last-child { border-bottom: none; }
         .server-name { font-weight: 500; }
-        .server-url { font-size: 12px; color: #666; }
-        .server-meta { font-size: 11px; color: #999; }
-        .scanning-status { font-size: 12px; color: #666; margin-left: auto; }
+        .server-url { color: #666; }
+        .server-meta { color: #999; font-size: var(--text-caption-size); line-height: var(--text-caption-line-height); }
+        .scanning-status { font-size: var(--text-caption-size); line-height: var(--text-caption-line-height); color: #666; margin-left: auto; }
         .spinner {
             display: inline-block;
             width: 12px;
@@ -74,7 +100,7 @@
             padding: 12px;
             text-align: center;
             color: #999;
-            font-size: 13px;
+            font-size: var(--text-body-sm-size);
         }
     </style>
 </head>
@@ -97,6 +123,10 @@
 </div>
 
 <script type="module">
+  import '@fontsource-variable/geist'
+  import '@fontsource-variable/geist-mono'
+  import '../../../../design-tokens/build/web/theme.css'
+
   const input = document.getElementById('serverUrl');
   const discoverBtn = document.getElementById('discoverBtn');
   const saveBtn = document.getElementById('saveBtn');
@@ -178,11 +208,11 @@
       name.textContent = server.name;
 
       const url = document.createElement('div');
-      url.className = 'server-url';
+      url.className = 'server-url mono';
       url.textContent = server.url;
 
       const version = document.createElement('div');
-      version.className = 'server-meta';
+      version.className = 'server-meta mono';
       version.textContent = `v${server.version}`;
 
       row.append(name, url, version);
