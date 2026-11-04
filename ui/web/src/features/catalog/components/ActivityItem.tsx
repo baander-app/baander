@@ -1,5 +1,7 @@
 import styled, { css } from 'styled-components'
 import { formatRelativeTime } from '@/shared/utils/format-relative-time'
+import { textRole } from '@/shared/theme'
+import { ContentText } from '@/shared/typography'
 import { useSelectionStore } from '../stores/selection-store'
 import { usePlayerStore, type Track } from '@/features/player/stores/player-store'
 import { SongContextMenu } from './menus/SongContextMenu'
@@ -44,11 +46,15 @@ const SongInfo = styled.div`
   flex: 1;
 `
 
-const SongTitle = styled.p`
+const TitleLine = styled.p`
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 0.875rem;
+  ${textRole('body-sm')}
+  font-weight: 500;
+`
+
+const SongTitle = styled(ContentText)`
   font-weight: 500;
 `
 
@@ -58,11 +64,10 @@ const MetaRow = styled.div`
   gap: 0.5rem;
 `
 
-const MetaText = styled.span`
+const MetaText = styled(ContentText)`
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 0.875rem;
   color: var(--color-muted-foreground);
 `
 
@@ -72,7 +77,7 @@ const Separator = styled.span`
 
 const Timestamp = styled.span`
   flex-shrink: 0;
-  font-size: 0.75rem;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
 `
 
@@ -137,15 +142,18 @@ export function ActivityItem({ entry }: ActivityItemProps) {
 
         {/* Song info */}
         <SongInfo>
-          <SongTitle>{title}{entry.songAvailable === false && <span> · Unavailable</span>}</SongTitle>
+          <TitleLine>
+            <SongTitle textRole="body-sm" text={title} />
+            {entry.songAvailable === false && <span> · Unavailable</span>}
+          </TitleLine>
           <MetaRow>
             {entry.artistName && (
-              <MetaText>{entry.artistName}</MetaText>
+              <MetaText textRole="body-sm" text={entry.artistName} />
             )}
             {entry.albumName && (
               <>
-                {entry.artistName && <Separator>\u00b7</Separator>}
-                <MetaText>{entry.albumName}</MetaText>
+                {entry.artistName && <Separator>·</Separator>}
+                <MetaText textRole="body-sm" text={entry.albumName} />
               </>
             )}
           </MetaRow>

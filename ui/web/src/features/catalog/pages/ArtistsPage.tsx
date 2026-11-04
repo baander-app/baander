@@ -10,6 +10,7 @@ import { ArtistGridItem } from '../components/ArtistGridItem'
 import { SortSelect, type SortOption } from '@/shared/components/ui/sort-select'
 import { FilterBar, type FilterOption } from '@/shared/components/ui/filter-bar'
 import { asGenres } from '../utils/api-adapters'
+import { textRole } from '@/shared/theme'
 
 const PageContainer = styled.div`
   display: flex;
@@ -25,9 +26,7 @@ const PageHeader = styled.div`
 `
 
 const PageTitle = styled.h1`
-  font-size: 1.125rem;
-  font-weight: 600;
-  letter-spacing: -0.025em;
+  ${textRole('title-lg')}
 `
 
 const HeaderActions = styled.div`
@@ -68,7 +67,7 @@ const ErrorContainer = styled.div`
 `
 
 const ErrorText = styled.p`
-  font-size: 0.875rem;
+  ${textRole('body')}
   color: var(--color-destructive);
 `
 
@@ -81,7 +80,7 @@ const PaginationRow = styled.div`
 `
 
 const PageInfo = styled.span`
-  font-size: 0.75rem;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
 `
 
@@ -99,7 +98,7 @@ const EmptyIcon = styled.svg`
 `
 
 const EmptyTitle = styled.p`
-  font-size: 0.875rem;
+  ${textRole('body')}
   color: var(--color-muted-foreground);
 `
 

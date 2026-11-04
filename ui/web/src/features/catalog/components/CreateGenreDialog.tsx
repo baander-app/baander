@@ -9,6 +9,7 @@ import {
 } from '@/shared/components/ui/dialog'
 import { Button } from '@/shared/components/ui/button'
 import { Input } from '@/shared/components/ui/input'
+import { textRole } from '@/shared/theme'
 import { createGenre } from '../api/catalog-admin-api'
 
 const Form = styled.form`
@@ -24,13 +25,13 @@ const FieldGroup = styled.div`
 `
 
 const Label = styled.label`
-  font-size: 0.875rem;
+  ${textRole('body')}
   font-weight: 500;
   color: var(--color-foreground);
 `
 
 const ErrorText = styled.p`
-  font-size: 0.875rem;
+  ${textRole('body')}
   color: var(--color-destructive);
 `
 

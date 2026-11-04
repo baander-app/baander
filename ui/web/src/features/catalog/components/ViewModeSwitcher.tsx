@@ -20,6 +20,7 @@ import {
   type ViewMode,
   VIEW_MODES,
 } from '../stores/view-mode-store'
+import { textRole } from '@/shared/theme'
 
 const Toolbar = styled.div`
   display: flex;
@@ -39,7 +40,7 @@ const ViewButton = styled(Button)<{ $isActive: boolean }>`
 
 const ShortcutKey = styled.kbd`
   margin-left: 0.25rem;
-  font-size: 11px;
+  ${textRole('caption')}
   opacity: 0.6;
 `
 

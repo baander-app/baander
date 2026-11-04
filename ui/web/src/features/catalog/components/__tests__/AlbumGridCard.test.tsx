@@ -54,7 +54,7 @@ describe('AlbumGridCard', () => {
   const defaultProps = {
     publicId: 'album-123',
     title: 'Test Album',
-    artistName: 'Test Artist',
+    artistNames: ['Test Artist'],
     imageUrl: '/api/images/cover.jpg',
     blurhash: 'LEHV6nWB2yk8pyo0adR*.7kCMdnj',
   }
@@ -63,6 +63,19 @@ describe('AlbumGridCard', () => {
     render(<AlbumGridCard {...defaultProps} />)
     expect(screen.getByText('Test Album')).toBeInTheDocument()
     expect(screen.getByText('Test Artist')).toBeInTheDocument()
+  })
+
+  it('renders the title in the album language and each artist name on its own', () => {
+    render(<AlbumGridCard {...defaultProps} title="Cowboy Bebop" artistNames={['Seatbelts', '菅野よう子']} language="jpn" />)
+
+    const title = screen.getByText('Cowboy Bebop')
+    const artist = screen.getByText('Seatbelts')
+
+    expect(title).not.toBe(artist)
+    expect(title).not.toContainElement(artist)
+    expect(title).toHaveAttribute('lang', 'ja')
+    expect(artist).toHaveAttribute('lang', 'en')
+    expect(screen.getByText('菅野よう子')).toHaveAttribute('lang', 'ja')
   })
 
   it('renders cover image with correct alt text', () => {
@@ -93,7 +106,7 @@ describe('AlbumGridCard', () => {
   })
 
   it('renders without artist name when not provided', () => {
-    render(<AlbumGridCard {...defaultProps} artistName={undefined} />)
+    render(<AlbumGridCard {...defaultProps} artistNames={undefined} />)
     expect(screen.getByText('Test Album')).toBeInTheDocument()
     expect(screen.queryByText('Test Artist')).not.toBeInTheDocument()
   })

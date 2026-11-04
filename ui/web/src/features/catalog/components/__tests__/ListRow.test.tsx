@@ -119,4 +119,16 @@ describe('ListRow', () => {
 
     expect(screen.getByText('—')).toBeInTheDocument()
   })
+
+  it('renders title and artist as separate elements, each with its own language', () => {
+    const song = { ...baseSong, title: '直', albumLanguage: 'jpn', artistName: '周杰倫', albumName: 'Ongaku' }
+    render(<ListRow song={song} allSongs={[song]} style={defaultStyle} />)
+
+    const title = screen.getByText('直')
+    const artist = screen.getByText('周杰倫')
+    expect(title).toHaveAttribute('lang', 'ja')
+    expect(artist).toHaveAttribute('lang', 'en')
+    expect(title).not.toContainElement(artist)
+    expect(screen.getByText('Ongaku')).toHaveAttribute('lang', 'ja')
+  })
 })

@@ -17,6 +17,7 @@ function makeAlbumData(count: number, currentPage = 1, lastPage = 2) {
       publicId: `album-${i}`,
       title: `Album ${i}`,
       artists: [{ name: `Artist ${i}`, role: null }],
+      language: null as string | null,
       coverImage: { url: `/cover/${i}.jpg`, blurhash: 'LEHV6nWB2yk8pyo0adR*.7kCMdnj' },
     })),
     meta: {
@@ -100,6 +101,15 @@ describe('GridView', () => {
     expect(screen.getByText('Album 0')).toBeInTheDocument()
     expect(screen.getByText('Artist 0')).toBeInTheDocument()
     expect(screen.getByText('Album 5')).toBeInTheDocument()
+  })
+
+  it('sets each album title in its own stored language', () => {
+    const data = makeAlbumData(2, 1, 1)
+    data.data[0].language = 'de'
+    mockConfig.data = data
+    render(<SCTypedThemeProvider theme={testTheme}><GridView /></SCTypedThemeProvider>)
+    expect(screen.getByText('Album 0')).toHaveAttribute('lang', 'de')
+    expect(screen.getByText('Album 1')).toHaveAttribute('lang', 'en')
   })
 
   it('shows skeleton cards in loading state', () => {

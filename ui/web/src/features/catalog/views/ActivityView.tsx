@@ -1,6 +1,7 @@
 import styled from 'styled-components'
 import { Button } from '@/shared/components/ui/button'
 import { Skeleton } from '@/shared/components/ui/skeleton'
+import { textRole } from '@/shared/theme'
 import { useActivityViewModel } from '../hooks/use-activity-view-model'
 import { ActivityGroup } from '../components/ActivityGroup'
 
@@ -60,12 +61,12 @@ const CenterMessage = styled.div`
 `
 
 const ErrorText = styled.p`
-  font-size: 0.875rem;
+  ${textRole('body')}
   color: var(--color-destructive);
 `
 
 const EmptyText = styled.p`
-  font-size: 0.875rem;
+  ${textRole('body')}
   color: var(--color-muted-foreground);
 `
 

@@ -1,6 +1,6 @@
 import { useLiveCoordinator } from '@/shared/live/context'
 import styled from 'styled-components'
-import { useState, useCallback } from 'react'
+import { Fragment, useState, useCallback } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -34,14 +34,14 @@ import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Search, Download, Check, Music } from 'lucide-react'
 import { formatDuration } from '@/shared/utils/format-duration'
-import { interactiveTransition } from '@/shared/theme'
+import { interactiveTransition, textRole } from '@/shared/theme'
+import { ContentText } from '@/shared/typography'
 import { lyricsErrorMessage } from './lyrics-error-message'
 
-const LyricsPre = styled.pre`
+const LyricsPre = styled(ContentText)`
+  display: block;
+  margin: 0;
   white-space: pre-wrap;
-  font-family: var(--font-ui);
-  font-size: 0.875rem;
-  line-height: 1.625;
   color: var(--color-foreground);
 `
 
@@ -49,13 +49,13 @@ const InstrumentalRow = styled.div`
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  font-size: 0.875rem;
+  ${textRole('body-sm')}
   color: var(--color-muted-foreground);
 `
 
 const SourceText = styled.p`
   margin-top: 0.5rem;
-  font-size: 0.75rem;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
 `
 
@@ -68,7 +68,7 @@ const NoLyricsContainer = styled.div`
 `
 
 const NoLyricsText = styled.p`
-  font-size: 0.875rem;
+  ${textRole('body')}
   color: var(--color-muted-foreground);
 `
 
@@ -111,11 +111,11 @@ const SearchResultContent = styled.div`
   flex: 1;
 `
 
-const SearchResultTitle = styled.p`
+const SearchResultTitle = styled(ContentText)`
+  display: block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 0.875rem;
   font-weight: 500;
 `
 
@@ -123,22 +123,21 @@ const SearchResultMeta = styled.p`
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 0.75rem;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
 `
 
-const SearchResultPreview = styled.p`
+const SearchResultPreview = styled(ContentText)`
   margin-top: 0.25rem;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  font-size: 0.75rem;
   color: color-mix(in srgb, var(--color-muted-foreground) 70%, transparent);
 `
 
 const SearchHint = styled.p`
-  font-size: 0.75rem;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
   text-align: center;
 `
@@ -146,7 +145,7 @@ const SearchHint = styled.p`
 const NoResultsText = styled.p`
   padding: 1rem 0;
   text-align: center;
-  font-size: 0.875rem;
+  ${textRole('body')}
   color: var(--color-muted-foreground);
 `
 
@@ -161,6 +160,8 @@ interface LyricsDialogProps {
   onOpenChange: (open: boolean) => void
   songPublicId: string
   songTitle: string
+  /** The song's album language, which its title and lyrics take. */
+  language?: string | null
   artistName?: string
 }
 
@@ -173,6 +174,7 @@ export function LyricsDialog({
   onOpenChange,
   songPublicId,
   songTitle,
+  language,
   artistName,
 }: LyricsDialogProps) {
   const isAdmin = useIsAdmin()
@@ -284,9 +286,11 @@ export function LyricsDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Lyrics \u2014 {songTitle}</DialogTitle>
+          <DialogTitle>
+            Lyrics — <ContentText textRole="title" text={songTitle} language={language} />
+          </DialogTitle>
           <DialogDescription>
-            {artistName ?? 'View lyrics for this track'}
+            {artistName ? <ContentText textRole="body-sm" text={artistName} /> : 'View lyrics for this track'}
           </DialogDescription>
         </DialogHeader>
 
@@ -318,9 +322,9 @@ export function LyricsDialog({
             ) : hasLyrics ? (
               <ScrollArea style={{ height: '18rem' }}>
                 {lyrics.syncedLyrics ? (
-                  <SyncedLyricsView synced={lyrics.syncedLyrics} plain={lyrics.plainLyrics ?? undefined} />
+                  <SyncedLyricsView synced={lyrics.syncedLyrics} plain={lyrics.plainLyrics ?? undefined} language={language} />
                 ) : (
-                  <LyricsPre>{lyrics.plainLyrics}</LyricsPre>
+                  <LyricsPre textRole="body" text={lyrics.plainLyrics ?? ''} language={language} forwardedAs="pre" />
                 )}
                 {lyrics.isInstrumental && (
                   <InstrumentalRow>
@@ -383,7 +387,9 @@ export function LyricsDialog({
                 ) : searchError && searchQuery.length >= 2 ? (
                   <NoResultsText role="alert">{lyricsErrorMessage(searchError, 'Search failed. Try again.')}</NoResultsText>
                 ) : searchResults.length === 0 && searchQuery.length >= 2 ? (
-                  <NoResultsText>No results found for &ldquo;{searchQuery}&rdquo;</NoResultsText>
+                  <NoResultsText>
+                    No results found for &ldquo;<ContentText textRole="body" text={searchQuery} />&rdquo;
+                  </NoResultsText>
                 ) : (
                   <ScrollArea style={{ height: '16rem' }}>
                     <SearchResultsList>
@@ -413,7 +419,7 @@ export function LyricsDialog({
   )
 }
 
-function SyncedLyricsView({ synced, plain }: { synced: string; plain?: string }) {
+function SyncedLyricsView({ synced, plain, language }: { synced: string; plain?: string; language?: string | null }) {
   const [showSynced, setShowSynced] = useState(true)
 
   const lines = synced.split('\n').filter((l) => l.trim())
@@ -429,17 +435,19 @@ function SyncedLyricsView({ synced, plain }: { synced: string; plain?: string })
       <Button
         variant="ghost"
         size="sm"
-        style={{ alignSelf: 'flex-start', fontSize: '0.75rem' }}
+        style={{ alignSelf: 'flex-start' }}
         onClick={() => setShowSynced(!showSynced)}
       >
         {showSynced ? 'Hide timestamps' : 'Show timestamps'}
       </Button>
-      <LyricsPre>
-        {showSynced
+      <LyricsPre
+        textRole="body"
+        language={language}
+        forwardedAs="pre"
+        text={showSynced
           ? parsed.map((l) => (l.time ? `${l.time} ${l.text}` : l.text)).join('\n')
-          : (plain ?? parsed.map((l) => l.text).join('\n'))
-        }
-      </LyricsPre>
+          : (plain ?? parsed.map((l) => l.text).join('\n'))}
+      />
     </SyncedControls>
   )
 }
@@ -460,16 +468,19 @@ function SearchResultItem({
       disabled={isApplying}
     >
       <SearchResultContent>
-        <SearchResultTitle>{result.trackName ?? 'Unknown'}</SearchResultTitle>
+        <SearchResultTitle textRole="body-sm" text={result.trackName ?? 'Unknown'} />
         <SearchResultMeta>
-          {[result.artistName, result.albumName].filter(Boolean).join(' \u00b7 ')}
-          {result.duration ? ` \u00b7 ${formatDuration(result.duration)}` : ''}
-          {result.instrumental ? ' \u00b7 Instrumental' : ''}
+          {[result.artistName, result.albumName].filter((name): name is string => !!name).map((name, index) => (
+            <Fragment key={`${index}-${name}`}>
+              {index > 0 && ' · '}
+              <ContentText textRole="caption" text={name} />
+            </Fragment>
+          ))}
+          {result.duration ? ` · ${formatDuration(result.duration)}` : ''}
+          {result.instrumental ? ' · Instrumental' : ''}
         </SearchResultMeta>
         {result.plainLyrics && (
-          <SearchResultPreview>
-            {result.plainLyrics.slice(0, 120)}\u2026
-          </SearchResultPreview>
+          <SearchResultPreview textRole="caption" text={`${result.plainLyrics.slice(0, 120)}…`} forwardedAs="p" />
         )}
       </SearchResultContent>
       <Check size={14} style={{ marginTop: '0.25rem', flexShrink: 0, color: 'var(--color-muted-foreground)' }} />

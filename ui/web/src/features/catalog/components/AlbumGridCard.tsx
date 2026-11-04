@@ -1,11 +1,12 @@
 import styled, { css } from 'styled-components'
-import { useCallback, useMemo } from 'react'
+import { Fragment, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useImageBlob } from '@/shared/hooks/use-image-blob'
 import { extractDominantColor } from '@/shared/utils/blurhash'
 import { useSelectionStore } from '../stores/selection-store'
 import { AlbumContextMenu } from './menus/AlbumContextMenu'
-import { focusVisibleRing } from '@/shared/theme'
+import { focusVisibleRing, textRole } from '@/shared/theme'
+import { ContentText } from '@/shared/typography'
 
 const GridCard = styled.div<{ $isSelected: boolean }>`
   position: relative;
@@ -49,31 +50,34 @@ const InfoArea = styled.div`
   padding: 0.5rem;
 `
 
-const Title = styled.p`
+const Title = styled(ContentText)`
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 0.875rem;
   font-weight: 500;
 `
 
-const ArtistName = styled.p`
+const ArtistNames = styled.p`
+  ${textRole('caption')}
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 0.75rem;
   color: var(--color-muted-foreground);
 `
 
 interface AlbumGridCardProps {
   publicId: string
   title: string
-  artistName?: string
+  /** The album's artists, each rendered as its own name. */
+  artistNames?: readonly string[]
   imageUrl?: string | null
   blurhash?: string | null
+  /** The album's stored release language, which applies to its title only. */
+  language?: string | null
 }
 
-export function AlbumGridCard({ publicId, title, artistName, imageUrl, blurhash }: AlbumGridCardProps) {
+export function AlbumGridCard({ publicId, title, artistNames = [], imageUrl, blurhash, language }: AlbumGridCardProps) {
+  const artistName = artistNames.join(', ') || undefined
   const navigate = useNavigate()
   const select = useSelectionStore((s) => s.select)
   const selectedId = useSelectionStore((s) => s.selectedId)
@@ -144,9 +148,16 @@ export function AlbumGridCard({ publicId, title, artistName, imageUrl, blurhash 
 
         {/* Title & artist */}
         <InfoArea>
-          <Title>{title}</Title>
-          {artistName && (
-            <ArtistName>{artistName}</ArtistName>
+          <Title textRole="body-sm" text={title} language={language} forwardedAs="p" />
+          {artistNames.length > 0 && (
+            <ArtistNames>
+              {artistNames.map((name, index) => (
+                <Fragment key={`${index}-${name}`}>
+                  {index > 0 && ', '}
+                  <ContentText textRole="caption" text={name} />
+                </Fragment>
+              ))}
+            </ArtistNames>
           )}
         </InfoArea>
       </GridCard>

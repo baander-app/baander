@@ -1,14 +1,18 @@
 import styled, { css } from 'styled-components'
-import { useRef, useEffect, useCallback } from 'react'
+import { Fragment, useRef, useEffect, useCallback } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { useImageBlob } from '@/shared/hooks/use-image-blob'
 import { Music } from 'lucide-react'
+import { textRole } from '@/shared/theme'
+import { ContentText } from '@/shared/typography'
 
 export interface BrowserItem {
   id: string
   label: string
-  sublabel?: string
-  secondary?: string
+  /** The label's stored language, such as an album's release language. */
+  language?: string | null
+  /** Secondary names shown after the label, such as an album's artists, one per item. */
+  sublabels?: readonly string[]
   coverUrl?: string
   blurhash?: string
 }
@@ -31,16 +35,14 @@ const ColumnHeader = styled.div`
 `
 
 const HeaderLabel = styled.span`
-  font-size: 11px;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  ${textRole('label')}
   color: var(--color-muted-foreground);
 `
 
 const HeaderCount = styled.span`
   margin-left: auto;
-  font-size: 11px;
+  ${textRole('caption')}
+  font-variant-numeric: tabular-nums;
   color: var(--color-muted-foreground);
 `
 
@@ -82,7 +84,7 @@ const OptionButton = styled.button<{ $isSelected: boolean; $hasCover: boolean }>
   border: none;
   background: none;
   cursor: pointer;
-  font-size: 0.875rem;
+  ${textRole('body-sm')}
 
   ${({ $isSelected }) =>
     $isSelected
@@ -98,18 +100,17 @@ const OptionButton = styled.button<{ $isSelected: boolean; $hasCover: boolean }>
       `}
 `
 
-const ItemLabel = styled.span`
+const ItemLabel = styled(ContentText)`
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 0.875rem;
 `
 
 const ItemSecondary = styled.span`
   margin-left: auto;
   flex-shrink: 0;
   padding-left: 0.5rem;
-  font-size: 11px;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
 `
 
@@ -148,7 +149,7 @@ interface BrowserColumnProps {
   className?: string
 }
 
-const ROW_HEIGHT = 28
+const ROW_HEIGHT = 32
 
 function BrowserItemRow({
   item,
@@ -191,10 +192,15 @@ function BrowserItemRow({
           )}
         </CoverThumbnail>
       )}
-      <ItemLabel>{item.label}</ItemLabel>
-      {(item.sublabel ?? item.secondary) && (
+      <ItemLabel textRole="body-sm" text={item.label} language={item.language} />
+      {item.sublabels && item.sublabels.length > 0 && (
         <ItemSecondary>
-          {item.sublabel ?? item.secondary}
+          {item.sublabels.map((name, index) => (
+            <Fragment key={`${index}-${name}`}>
+              {index > 0 && ', '}
+              <ContentText textRole="caption" text={name} />
+            </Fragment>
+          ))}
         </ItemSecondary>
       )}
     </OptionButton>

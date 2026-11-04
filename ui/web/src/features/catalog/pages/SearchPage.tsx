@@ -3,6 +3,7 @@ import { Search } from 'lucide-react'
 import styled from 'styled-components'
 import { SearchResults } from '../components/SearchResults'
 import { useMediaModeStore } from '@/features/layout/stores/media-mode-store'
+import { textRole } from '@/shared/theme'
 
 const PageContainer = styled.div`
   display: flex;
@@ -18,13 +19,11 @@ const TopBar = styled.div`
 `
 
 const Title = styled.h1`
-  font-size: 1.125rem;
-  font-weight: 600;
-  letter-spacing: -0.025em;
+  ${textRole('title-lg')}
 `
 
 const ScopeToggle = styled.button`
-  font-size: 0.75rem;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
   transition: color var(--duration-hover) ease-out;
   background: none;
@@ -52,7 +51,7 @@ const EmptyState = styled.div`
 `
 
 const EmptyText = styled.p`
-  font-size: 0.875rem;
+  ${textRole('body')}
   color: var(--color-muted-foreground);
 `
 

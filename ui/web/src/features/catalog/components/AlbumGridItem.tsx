@@ -5,6 +5,7 @@ import { useImageBlob } from '@/shared/hooks/use-image-blob'
 import { useContextPanelStore } from '@/features/layout/stores/context-panel-store'
 import { AlbumContextMenu } from './menus/AlbumContextMenu'
 import { usePlayAlbum } from '../hooks/use-play-album'
+import { ContentText } from '@/shared/typography'
 
 const CardButton = styled(Button).attrs({ variant: 'ghost' })`
   height: auto;
@@ -47,31 +48,31 @@ const InfoArea = styled.div`
   padding: 0.5rem;
 `
 
-const Title = styled.p`
+const Title = styled(ContentText)`
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 0.875rem;
   font-weight: 500;
   color: var(--color-foreground);
 `
 
-const ArtistName = styled.p`
+const ArtistName = styled(ContentText)`
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 0.75rem;
   color: var(--color-muted-foreground);
 `
 
 interface AlbumGridItemProps {
   publicId: string
   title: string
+  /** The album's stored release language, which its title takes. */
+  language?: string | null
   artistName?: string
   imageUrl?: string | null
 }
 
-export function AlbumGridItem({ publicId, title, artistName, imageUrl }: AlbumGridItemProps) {
+export function AlbumGridItem({ publicId, title, language, artistName, imageUrl }: AlbumGridItemProps) {
   const { src } = useImageBlob(imageUrl)
   const setSelectedItem = useContextPanelStore((s) => s.setSelectedItem)
   const { playAlbum } = usePlayAlbum()
@@ -107,9 +108,9 @@ export function AlbumGridItem({ publicId, title, artistName, imageUrl }: AlbumGr
 
       {/* Info */}
       <InfoArea>
-        <Title>{title}</Title>
+        <Title textRole="body-sm" text={title} language={language} forwardedAs="p" />
         {artistName && (
-          <ArtistName>{artistName}</ArtistName>
+          <ArtistName textRole="caption" text={artistName} forwardedAs="p" />
         )}
       </InfoArea>
     </CardButton>

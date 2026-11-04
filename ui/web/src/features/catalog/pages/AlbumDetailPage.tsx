@@ -12,6 +12,7 @@ import { AlbumMetadata } from '../components/AlbumMetadata'
 import { DuplicateWarningBanner } from '../components/DuplicateWarningBanner'
 import { MergeAlbumsDialog } from '../components/MergeAlbumsDialog'
 import { useAlbumDuplicates } from '../api/album-duplicates-api'
+import { textRole } from '@/shared/theme'
 
 const PageContainer = styled.div`
   display: flex;
@@ -41,7 +42,7 @@ const CenterMessage = styled.div`
 `
 
 const ErrorText = styled.p`
-  font-size: 0.875rem;
+  ${textRole('body')}
   color: var(--color-destructive);
 `
 
@@ -104,6 +105,7 @@ export function AlbumDetailPage() {
         coverUrl={coverUrl}
         songs={songs as unknown as Record<string, unknown>[]}
         albumTitle={album.title ?? ''}
+        albumLanguage={album.language}
         albumPublicId={publicId}
         onBack={() => navigate(-1)}
         onToggleMetadata={() => setMetadataOpen((v) => !v)}
@@ -120,7 +122,12 @@ export function AlbumDetailPage() {
       {metadataOpen && (
         <AlbumMetadata album={album as unknown as Record<string, unknown>} />
       )}
-      <AlbumTrackList songs={songs as unknown as Record<string, unknown>[]} albumTitle={album.title ?? ''} albumPublicId={publicId} />
+      <AlbumTrackList
+        songs={songs as unknown as Record<string, unknown>[]}
+        albumTitle={album.title ?? ''}
+        albumLanguage={album.language}
+        albumPublicId={publicId}
+      />
       <MergeAlbumsDialog />
     </PageContainer>
   )

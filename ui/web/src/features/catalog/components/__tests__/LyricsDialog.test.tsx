@@ -119,6 +119,30 @@ describe('LyricsDialog', () => {
     client?.clear()
   })
 
+  it('renders Thai lyrics as one block with the Thai script rules, in the album language of the song like its title', async () => {
+    mockRequest.mockImplementation((url: string) => {
+      if (url === `/api/songs/${SONG}/lyrics`) {
+        return Promise.resolve({ data: { plainLyrics: 'ฉันรักเธอ\nทุกวัน', syncedLyrics: null, source: 'lrclib', isInstrumental: false } })
+      }
+
+      return Promise.reject(new Error(`Unexpected request ${url}`))
+    })
+    client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } })
+    render(
+      <QueryClientProvider client={client}>
+        <ThemeProvider theme={resolveTheme('dark', 'violet')}>
+          <LyricsDialog open onOpenChange={() => {}} songPublicId={SONG} songTitle="直" language="jpn" artistName="周杰倫" />
+        </ThemeProvider>
+      </QueryClientProvider>,
+    )
+
+    const block = await screen.findByText((_, element) => element?.tagName === 'PRE' && (element.textContent ?? '').startsWith('ฉันรักเธอ'))
+    expect(block).toHaveAttribute('lang', 'ja')
+    expect(block.getAttribute('data-script')?.split(' ')).toContain('thai')
+    expect(screen.getByText('直')).toHaveAttribute('lang', 'ja')
+    expect(screen.getByText('周杰倫')).toHaveAttribute('lang', 'en')
+  })
+
   it('shows the conflict instead of "Lyrics applied" when the song already has lyrics', async () => {
     answers.apply = () => Promise.reject(httpError(409, 'The song already has lyrics.'))
 

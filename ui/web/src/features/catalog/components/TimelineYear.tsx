@@ -12,7 +12,8 @@ import {
   TooltipTrigger,
 } from '@/shared/components/ui/tooltip'
 import type { AlbumSummary } from '../types'
-import { focusVisibleRing } from '@/shared/theme'
+import { focusVisibleRing, textRole } from '@/shared/theme'
+import { ContentText } from '@/shared/typography'
 
 const ThumbnailButton = styled.div<{ $isSelected: boolean }>`
   height: 4rem;
@@ -58,7 +59,7 @@ const YearLabel = styled.span`
   width: 3rem;
   flex-shrink: 0;
   padding-top: 1rem;
-  font-size: 0.875rem;
+  ${textRole('body-sm')}
   font-weight: 600;
   color: var(--color-foreground);
 `
@@ -152,7 +153,7 @@ function AlbumThumbnail({ album }: { album: AlbumSummary }) {
           <TooltipTrigger asChild>{thumbnail}</TooltipTrigger>
         </AlbumContextMenu>
         <TooltipContent side="top">
-          {album.title}
+          <ContentText textRole="caption" text={album.title} language={album.language} />
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>

@@ -11,6 +11,7 @@ import { Skeleton } from '@/shared/components/ui/skeleton'
 import { SortSelect, type SortOption } from '@/shared/components/ui/sort-select'
 import { FilterBar, type FilterOption } from '@/shared/components/ui/filter-bar'
 import { asGenres } from '../utils/api-adapters'
+import { textRole } from '@/shared/theme'
 
 const PageContainer = styled.div`
   display: flex;
@@ -26,9 +27,7 @@ const PageHeader = styled.div`
 `
 
 const PageTitle = styled.h1`
-  font-size: 1.125rem;
-  font-weight: 600;
-  letter-spacing: -0.025em;
+  ${textRole('title-lg')}
 `
 
 const HeaderActions = styled.div`
@@ -69,7 +68,7 @@ const ErrorContainer = styled.div`
 `
 
 const ErrorText = styled.p`
-  font-size: 0.875rem;
+  ${textRole('body')}
   color: var(--color-destructive);
 `
 
@@ -82,7 +81,7 @@ const TableHeader = styled.thead``
 const HeaderRow = styled.tr`
   border-bottom: 1px solid var(--color-border);
   text-align: left;
-  font-size: 0.75rem;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
 `
 
@@ -99,7 +98,7 @@ const PaginationRow = styled.div`
 `
 
 const PageInfo = styled.span`
-  font-size: 0.75rem;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
 `
 
@@ -117,12 +116,12 @@ const EmptyIcon = styled.svg`
 `
 
 const EmptyTitle = styled.p`
-  font-size: 0.875rem;
+  ${textRole('body')}
   color: var(--color-muted-foreground);
 `
 
 const EmptySubtitle = styled.p`
-  font-size: 0.75rem;
+  ${textRole('caption')}
   color: color-mix(in srgb, var(--color-muted-foreground) 70%, transparent);
 `
 
@@ -271,6 +270,7 @@ export function AlbumsPage() {
                     key={album.publicId}
                     publicId={album.publicId}
                     title={album.title ?? 'Unknown'}
+                    language={album.language}
                     artistName={album.artistName}
                     imageUrl={album?.coverImage?.url}
                   />
@@ -293,6 +293,7 @@ export function AlbumsPage() {
                       key={album.publicId}
                       publicId={album.publicId}
                       title={album.title ?? 'Unknown'}
+                      language={album.language}
                       artistName={album.artistName}
                       imageUrl={album?.coverImage?.url}
                     />

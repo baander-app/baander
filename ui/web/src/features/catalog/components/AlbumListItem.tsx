@@ -5,6 +5,7 @@ import { useContextPanelStore } from '@/features/layout/stores/context-panel-sto
 import { AlbumContextMenu } from './menus/AlbumContextMenu'
 import { usePlayAlbum } from '../hooks/use-play-album'
 import { interactiveTransition } from '@/shared/theme'
+import { ContentText } from '@/shared/typography'
 
 const Row = styled.tr`
   cursor: pointer;
@@ -45,31 +46,31 @@ const Cell = styled.td`
   padding: 0.375rem 0.5rem;
 `
 
-const Title = styled.p`
+const Title = styled(ContentText)`
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 0.875rem;
   font-weight: 500;
   color: var(--color-foreground);
 `
 
-const ArtistName = styled.p`
+const ArtistName = styled(ContentText)`
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 0.875rem;
   color: var(--color-muted-foreground);
 `
 
 interface AlbumListItemProps {
   publicId: string
   title: string
+  /** The album's stored release language, which its title takes. */
+  language?: string | null
   artistName?: string
   imageUrl?: string | null
 }
 
-export function AlbumListItem({ publicId, title, artistName, imageUrl }: AlbumListItemProps) {
+export function AlbumListItem({ publicId, title, language, artistName, imageUrl }: AlbumListItemProps) {
   const { src } = useImageBlob(imageUrl)
   const setSelectedItem = useContextPanelStore((s) => s.setSelectedItem)
   const { playAlbum } = usePlayAlbum()
@@ -100,10 +101,10 @@ export function AlbumListItem({ publicId, title, artistName, imageUrl }: AlbumLi
         </Thumbnail>
       </ThumbCell>
       <Cell>
-        <Title>{title}</Title>
+        <Title textRole="body-sm" text={title} language={language} forwardedAs="p" />
       </Cell>
       <Cell>
-        <ArtistName>{artistName}</ArtistName>
+        {artistName && <ArtistName textRole="body-sm" text={artistName} forwardedAs="p" />}
       </Cell>
     </Row>
     </AlbumContextMenu>

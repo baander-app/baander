@@ -119,7 +119,7 @@ describe('DiscoverView', () => {
       },
     ]
     render(<SCTypedThemeProvider theme={testTheme}><DiscoverView /></SCTypedThemeProvider>)
-    expect(screen.getByText('Because you listened to Album A')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 3, name: 'Because you listened to Album A' })).toBeInTheDocument()
   })
 
   it('renders Refresh button', () => {

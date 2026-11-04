@@ -4,6 +4,8 @@ import { useImageBlob } from '@/shared/hooks/use-image-blob'
 import { usePlayerStore, type Track } from '@/features/player/stores/player-store'
 import { Button } from '@/shared/components/ui/button'
 import { AlbumContextMenu } from './menus/AlbumContextMenu'
+import { textRole } from '@/shared/theme'
+import { ContentText } from '@/shared/typography'
 
 const HeaderBar = styled.div`
   display: flex;
@@ -37,29 +39,32 @@ const PlaceholderIcon = styled.svg`
   color: color-mix(in srgb, var(--color-muted-foreground) 20%, transparent);
 `
 
-const Title = styled.span`
+const Title = styled(ContentText)`
   min-width: 0;
   flex: 1 1 8rem;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   font-weight: 600;
-  font-size: 0.875rem;
 `
 
-const ArtistName = styled.span`
+const ArtistName = styled(ContentText)`
   min-width: 0;
   max-width: 12rem;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 0.875rem;
   color: var(--color-muted-foreground);
 `
 
 const Year = styled.span`
   flex-shrink: 0;
-  font-size: 0.75rem;
+  ${textRole('caption')}
+  font-variant-numeric: tabular-nums;
+  color: var(--color-muted-foreground);
+`
+
+const InfoButton = styled(Button)`
   color: var(--color-muted-foreground);
 `
 
@@ -80,19 +85,27 @@ interface AlbumHeaderProps {
   coverUrl: string | null
   songs: Record<string, unknown>[]
   albumTitle: string
+  /** The album's stored release language, which its title and songs take. */
+  albumLanguage?: string | null
   albumPublicId?: string
   onBack: () => void
   onToggleMetadata: () => void
   metadataOpen: boolean
 }
 
-function buildTracks(songs: Record<string, unknown>[], albumTitle: string, albumPublicId?: string): Track[] {
+function buildTracks(
+  songs: Record<string, unknown>[],
+  albumTitle: string,
+  albumLanguage: string | null | undefined,
+  albumPublicId?: string,
+): Track[] {
   return songs.filter((s) => s.available === true).map((s) => ({
     publicId: String(s.publicId ?? ''),
     available: s.available === true,
     title: String(s.title ?? ''),
     artistName: s.artistName ? String(s.artistName) : undefined,
     albumName: albumTitle,
+    albumLanguage: albumLanguage ?? undefined,
     albumPublicId,
     duration: typeof s.length === 'number' ? s.length : (typeof s.duration === 'number' ? s.duration : undefined),
   }))
@@ -105,6 +118,7 @@ export function AlbumHeader({
   coverUrl,
   songs,
   albumTitle,
+  albumLanguage,
   albumPublicId,
   onBack,
   onToggleMetadata,
@@ -115,13 +129,13 @@ export function AlbumHeader({
 
   const handlePlayAll = () => {
     if (songs.length === 0) return
-    const tracks = buildTracks(songs, albumTitle, albumPublicId)
+    const tracks = buildTracks(songs, albumTitle, albumLanguage, albumPublicId)
     if (tracks.length > 0) playTrack(tracks[0], tracks)
   }
 
   const handleShuffle = () => {
     if (songs.length === 0) return
-    const tracks = [...buildTracks(songs, albumTitle, albumPublicId)].sort(() => Math.random() - 0.5)
+    const tracks = [...buildTracks(songs, albumTitle, albumLanguage, albumPublicId)].sort(() => Math.random() - 0.5)
     if (tracks.length > 0) playTrack(tracks[0], tracks)
   }
 
@@ -144,9 +158,9 @@ export function AlbumHeader({
           )}
         </CoverThumb>
 
-        <Title>{title}</Title>
+        <Title textRole="body-sm" text={title} language={albumLanguage} />
         {artistName && (
-          <ArtistName>{artistName}</ArtistName>
+          <ArtistName textRole="body-sm" text={artistName} />
         )}
         {year != null && (
           <Year>{year}</Year>
@@ -154,9 +168,9 @@ export function AlbumHeader({
 
         <Spacer />
 
-        <Button variant="ghost" size="xs" onClick={onToggleMetadata} style={{ fontSize: '0.75rem', color: 'var(--color-muted-foreground)' }}>
+        <InfoButton variant="ghost" size="xs" onClick={onToggleMetadata}>
           {metadataOpen ? 'Hide Info' : 'Info'}
-        </Button>
+        </InfoButton>
 
         <Button size="xs" onClick={handlePlayAll} disabled={!songs.some((song) => song.available === true)}>
           <Play size={12} fill="currentColor" />

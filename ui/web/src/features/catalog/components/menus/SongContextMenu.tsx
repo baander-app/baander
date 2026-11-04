@@ -19,6 +19,7 @@ import { useContextActions, type SongContextMenuData } from '../../hooks/use-con
 import { useGetPlaylistIndex } from '@/shared/api-client/gen/endpoints'
 import { toast } from 'sonner'
 import { LyricsDialog } from '../LyricsDialog'
+import { ContentText } from '@/shared/typography'
 import { useContextPanelStore } from '@/features/layout/stores/context-panel-store'
 import { useShortcutDisplay } from '@/shared/hooks/use-shortcut-display'
 
@@ -103,7 +104,7 @@ export function SongContextMenu({ song, children }: SongContextMenuProps) {
                     }))
                   }}
                 >
-                  {playlist.name}
+                  <ContentText textRole="body" text={playlist.name} />
                 </ContextMenuItem>
               ))}
               {playlists.length > 0 && <ContextMenuSeparator />}
@@ -160,6 +161,7 @@ export function SongContextMenu({ song, children }: SongContextMenuProps) {
         onOpenChange={setLyricsOpen}
         songPublicId={song.publicId}
         songTitle={song.title}
+        language={song.albumLanguage}
         artistName={song.artistName}
       />
     </>

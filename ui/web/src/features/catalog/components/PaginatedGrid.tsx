@@ -1,6 +1,6 @@
 import styled from 'styled-components'
 import type { ReactNode } from 'react'
-import { interactiveTransition } from '@/shared/theme'
+import { interactiveTransition, textRole } from '@/shared/theme'
 
 const Container = styled.div``
 
@@ -35,7 +35,8 @@ const PageButton = styled.button`
   border-radius: var(--radius-md);
   border: 1px solid var(--color-border);
   padding: 0.375rem 0.75rem;
-  font-size: 0.875rem;
+  ${textRole('body')}
+  font-weight: 500;
   ${interactiveTransition(['color', 'background-color'])}
   background: none;
   cursor: pointer;
@@ -51,7 +52,7 @@ const PageButton = styled.button`
 `
 
 const PageInfo = styled.span`
-  font-size: 0.875rem;
+  ${textRole('body-sm')}
   color: var(--color-muted-foreground);
 `
 

@@ -2,6 +2,7 @@ import styled from 'styled-components'
 import { useMemo } from 'react';
 import { AlbumGridCard } from './AlbumGridCard';
 import { Skeleton } from '@/shared/components/ui/skeleton';
+import { textRole } from '@/shared/theme';
 import type { AlbumSummary } from '../types';
 
 const Grid = styled.div`
@@ -10,7 +11,7 @@ const Grid = styled.div`
 `;
 
 const NoAlbumsText = styled.p`
-  font-size: 0.875rem;
+  ${textRole('body')}
   color: var(--color-muted-foreground);
 `;
 
@@ -25,16 +26,16 @@ export function ArtistDiscography({albums, isLoading}: ArtistDiscographyProps) {
     if (!albums || albums.length === 0) return null;
 
     return albums.map((album) => {
-      const artistName = album.artists.map((a) => a.name).join(', ') || undefined;
 
       return (
         <AlbumGridCard
           key={album.publicId}
           publicId={album.publicId}
           title={album.title}
-          artistName={artistName}
+          artistNames={album.artists.map((a) => a.name).filter(Boolean)}
           imageUrl={album.coverImage?.url}
           blurhash={album.coverImage?.blurhash}
+          language={album.language}
         />
       );
     });

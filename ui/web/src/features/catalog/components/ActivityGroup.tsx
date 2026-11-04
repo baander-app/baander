@@ -1,4 +1,5 @@
 import styled from 'styled-components'
+import { textRole } from '@/shared/theme'
 import type { ActivityEntry } from '../types/activity'
 import { ActivityItem } from './ActivityItem'
 
@@ -15,10 +16,7 @@ const PeriodHeader = styled.div`
 `
 
 const PeriodLabel = styled.span`
-  font-size: 11px;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  ${textRole('label')}
   color: var(--color-muted-foreground);
 `
 

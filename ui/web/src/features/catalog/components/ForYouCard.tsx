@@ -2,6 +2,8 @@ import { Button } from '@/shared/components/ui/button'
 import styled from 'styled-components'
 import { usePlayerStore } from '@/features/player/stores/player-store'
 import type { ForYouSong } from '../hooks/use-for-you-view-model'
+import { textRole } from '@/shared/theme'
+import { ContentText } from '@/shared/typography'
 
 // ── Shared card styles (mirror HomePage cover-card primitives) ──
 
@@ -46,11 +48,10 @@ const CardInfo = styled.div`
   padding: 0.375rem;
 `
 
-const CardTitle = styled.p`
+const CardTitle = styled(ContentText)`
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 0.75rem;
   font-weight: 500;
   color: var(--color-foreground);
 `
@@ -59,7 +60,7 @@ const CardSubtitle = styled.p`
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 11px;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
 `
 
@@ -91,7 +92,7 @@ export function ForYouCard({ song }: ForYouCardProps) {
         </PlaceholderIcon>
       </CoverImageArea>
       <CardInfo>
-        <CardTitle>{song.title}</CardTitle>
+        <CardTitle textRole="body-sm" text={song.title} forwardedAs="p" />
         <CardSubtitle>{song.available ? song.explanation : 'Unavailable'}</CardSubtitle>
       </CardInfo>
     </CoverCard>

@@ -1,7 +1,7 @@
 import styled, { css } from 'styled-components'
 import { Lock } from 'lucide-react'
 import type { FieldDef } from './field-config'
-import { interactiveTransition } from '@/shared/theme'
+import { interactiveTransition, textRole } from '@/shared/theme'
 
 const Container = styled.div`
   display: flex;
@@ -21,15 +21,12 @@ const HeaderIcon = styled(Lock)`
 `
 
 const HeaderLabel = styled.span`
-  font-size: 11px;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  ${textRole('label')}
   color: var(--color-muted-foreground);
 `
 
 const Description = styled.p`
-  font-size: 0.75rem;
+  ${textRole('caption')}
   color: color-mix(in srgb, var(--color-muted-foreground) 70%, transparent);
   margin-bottom: 0.25rem;
 `
@@ -40,7 +37,7 @@ const LockButton = styled.button<{ $isLocked: boolean }>`
   justify-content: between;
   border-radius: var(--radius-md);
   padding: 0.375rem 0.5rem;
-  font-size: 0.875rem;
+  ${textRole('body-sm')}
   ${interactiveTransition(['color', 'background-color'])}
   background: none;
   border: none;
@@ -65,7 +62,7 @@ const FieldLabel = styled.span`
 `
 
 const LockStatus = styled.span<{ $isLocked: boolean }>`
-  font-size: 0.75rem;
+  ${textRole('caption')}
 
   ${({ $isLocked }) =>
     $isLocked

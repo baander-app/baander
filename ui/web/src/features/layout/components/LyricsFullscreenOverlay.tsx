@@ -7,6 +7,8 @@ import { usePlayerStore } from '@/features/player/stores/player-store'
 import { useCurrentTime } from '@/features/player/stores/player-time-tracker'
 import { Button } from '@/shared/components/ui/button'
 import { useLyricsFullscreenStore } from '../stores/lyrics-fullscreen-store'
+import { textRole } from '@/shared/theme'
+import { ContentText } from '@/shared/typography'
 import {
   useGetLyricsSongLyrics,
   useGetAlbumShow,
@@ -82,12 +84,11 @@ const TrackInfo = styled.div`
   flex: 1;
 `
 
-const TrackTitle = styled.p`
+const TrackTitle = styled(ContentText)`
+  display: block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 1.125rem;
-  font-weight: 500;
   color: var(--color-foreground);
   margin: 0;
 `
@@ -96,7 +97,7 @@ const TrackSubtitle = styled.p`
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 0.875rem;
+  ${textRole('body-sm')}
   color: var(--color-muted-foreground);
   margin: 0;
 `
@@ -120,13 +121,11 @@ const PlainLyricsCenter = styled.div`
   padding: 0 3rem;
 `
 
-const PlainLyricsText = styled.pre`
+const PlainLyricsText = styled(ContentText)`
+  display: block;
   max-width: 42rem;
   white-space: pre-wrap;
   text-align: center;
-  font-family: inherit;
-  font-size: 1.25rem;
-  line-height: 1.625;
   color: color-mix(in srgb, var(--color-foreground) 70%, transparent);
   margin: 0;
 `
@@ -139,7 +138,7 @@ const CenteredMessage = styled.div`
 `
 
 const MessageText = styled.p`
-  font-size: 1.125rem;
+  ${textRole('subtitle')}
   color: var(--color-muted-foreground);
   margin: 0;
 `
@@ -171,16 +170,14 @@ const ProgressRow = styled.div`
 `
 
 const TimeLabel = styled.span`
-  width: 2.5rem;
-  font-size: 0.75rem;
-  font-variant-numeric: tabular-nums;
+  min-width: 3.5rem;
+  ${textRole('timecode')}
   color: var(--color-muted-foreground);
 `
 
 const TimeLabelRight = styled.span`
-  width: 2.5rem;
-  font-size: 0.75rem;
-  font-variant-numeric: tabular-nums;
+  min-width: 3.5rem;
+  ${textRole('timecode')}
   color: var(--color-muted-foreground);
 `
 
@@ -220,26 +217,24 @@ const FullscreenLine = styled.div`
   text-align: center;
 `
 
-const FullscreenLineText = styled.span<{ $active: boolean; $past: boolean }>`
+const FullscreenLineText = styled(ContentText)<{ $active: boolean; $past: boolean }>`
   display: inline-block;
-  font-size: 1.5rem;
-  line-height: 1.625;
   transition: color 60ms ease-out, opacity 60ms ease-out, transform 120ms ease-out;
 
   @media (min-width: 640px) {
-    font-size: 1.875rem;
+    ${textRole('title-lg')}
   }
 
   @media (min-width: 1024px) {
-    font-size: 2.25rem;
+    ${textRole('hero')}
   }
 
   ${({ $active, $past }) =>
     $active
       ? css`color: var(--color-foreground); font-weight: 600; opacity: 1; transform: scale(1);`
       : $past
-        ? css`color: color-mix(in srgb, var(--color-muted-foreground) 50%, transparent); opacity: 0.5; transform: scale(1);`
-        : css`color: color-mix(in srgb, var(--color-muted-foreground) 30%, transparent); opacity: 0.3; transform: scale(1);`}
+        ? css`color: color-mix(in srgb, var(--color-muted-foreground) 50%, transparent); font-weight: 500; opacity: 0.5; transform: scale(1);`
+        : css`color: color-mix(in srgb, var(--color-muted-foreground) 30%, transparent); font-weight: 500; opacity: 0.3; transform: scale(1);`}
 `
 
 const BlurhashCanvas = styled.canvas`
@@ -358,11 +353,18 @@ function FullscreenContent({ onClose }: { onClose: () => void }) {
       {/* Top bar */}
       <TopBar>
         <TrackInfo>
-          <TrackTitle>{currentTrack?.title ?? 'Unknown'}</TrackTitle>
+          <TrackTitle
+            textRole="subtitle"
+            text={currentTrack?.title ?? 'Unknown'}
+            language={currentTrack?.albumLanguage}
+            forwardedAs="p"
+          />
           <TrackSubtitle>
-            {currentTrack?.artistName}
+            {currentTrack?.artistName && <ContentText textRole="body-sm" text={currentTrack.artistName} />}
             {currentTrack?.artistName && currentTrack?.albumName ? ' · ' : ''}
-            {currentTrack?.albumName}
+            {currentTrack?.albumName && (
+              <ContentText textRole="body-sm" text={currentTrack.albumName} language={currentTrack.albumLanguage} />
+            )}
           </TrackSubtitle>
         </TrackInfo>
         <ModeButtons>
@@ -388,10 +390,15 @@ function FullscreenContent({ onClose }: { onClose: () => void }) {
       {/* Lyrics area */}
       <LyricsArea>
         {hasSynced ? (
-          <FullscreenSyncedLyrics syncedLyrics={lyrics!.syncedLyrics!} />
+          <FullscreenSyncedLyrics syncedLyrics={lyrics!.syncedLyrics!} language={currentTrack?.albumLanguage} />
         ) : lyrics?.plainLyrics ? (
           <PlainLyricsCenter>
-            <PlainLyricsText>{lyrics.plainLyrics}</PlainLyricsText>
+            <PlainLyricsText
+              textRole="subtitle"
+              text={lyrics.plainLyrics}
+              language={currentTrack?.albumLanguage}
+              forwardedAs="pre"
+            />
           </PlainLyricsCenter>
         ) : lyrics?.isInstrumental ? (
           <InstrumentalMessage>
@@ -444,7 +451,7 @@ function FullscreenContent({ onClose }: { onClose: () => void }) {
 
 // -- Synced lyrics in fullscreen --
 
-function FullscreenSyncedLyrics({ syncedLyrics }: { syncedLyrics: string }) {
+function FullscreenSyncedLyrics({ syncedLyrics, language }: { syncedLyrics: string; language?: string }) {
   const currentTime = useCurrentTime()
   const seekTo = usePlayerStore((s) => s.seekTo)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -517,11 +524,12 @@ function FullscreenSyncedLyrics({ syncedLyrics }: { syncedLyrics: string }) {
           }}
         >
           <FullscreenLineText
+            textRole="title"
+            text={line.content || '\u00A0'}
+            language={language}
             $active={i === activeIndex}
             $past={i < activeIndex}
-          >
-            {line.content || '\u00A0'}
-          </FullscreenLineText>
+          />
         </FullscreenLine>
       ))}
 

@@ -7,6 +7,8 @@ import { requestPlayback, type PlaybackIntent } from '@/features/session/service
 import { usePlaybackSession } from '@/features/session/hooks/use-playback-session'
 import { PlaybackDestinationSelector } from '@/features/session/components/PlaybackDestinationSelector'
 import { useVideoPresentation } from '../stores/video-presentation-store'
+import { textRole } from '@/shared/theme'
+import { ContentText } from '@/shared/typography'
 
 const Overlay = styled.div`
   position: fixed;
@@ -27,6 +29,16 @@ const HeaderBar = styled.div`
   justify-content: space-between;
   background-color: var(--color-background);
   padding: 0.75rem 1rem;
+`
+
+const MovieTitle = styled(ContentText)`
+  font-weight: 500;
+  color: var(--color-foreground);
+`
+
+const TimeReadout = styled.span`
+  ${textRole('timecode')}
+  color: var(--color-muted-foreground);
 `
 
 const TitleBar = styled.div`
@@ -120,10 +132,10 @@ export function MoviePlayerOverlay({ title, videoId, sourceDuration = 0, onClose
           <X size={16} />
           Back
         </Button>
-        <span style={{ fontSize: '0.875rem', fontWeight: 500, color: 'var(--color-foreground)' }}>{title}</span>
-        <span style={{ fontSize: '0.75rem', color: 'var(--color-muted-foreground)' }}>
+        <MovieTitle textRole="body" text={title} />
+        <TimeReadout>
           {formatTime(displayedTime)} / {formatTime(duration)}
-        </span>
+        </TimeReadout>
       </HeaderBar>
 
       {/* Video container */}

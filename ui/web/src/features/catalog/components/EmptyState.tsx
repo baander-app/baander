@@ -1,5 +1,6 @@
 import styled from 'styled-components'
 import { useTranslation } from '@/shared/i18n'
+import { textRole } from '@/shared/theme'
 
 const EmptyContainer = styled.div`
   display: flex;
@@ -11,7 +12,7 @@ const EmptyContainer = styled.div`
 `
 
 const EmptyMessage = styled.p`
-  font-size: 1.125rem;
+  ${textRole('subtitle')}
 `
 
 export function EmptyState({ message }: { message: string }) {

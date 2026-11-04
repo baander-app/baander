@@ -98,12 +98,12 @@ describe('RecommendationCluster', () => {
 
   it('renders "Because you listened to" header for album source', () => {
     render(<RecommendationClusterRow cluster={albumCluster} />)
-    expect(screen.getByText('Because you listened to Album A')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Because you listened to Album A' })).toBeInTheDocument()
   })
 
   it('renders "Similar to" header for artist source', () => {
     render(<RecommendationClusterRow cluster={artistCluster} />)
-    expect(screen.getByText('Similar to Artist X')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Similar to Artist X' })).toBeInTheDocument()
   })
 
   it('renders each recommended item', () => {

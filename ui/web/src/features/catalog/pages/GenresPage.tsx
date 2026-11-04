@@ -7,7 +7,8 @@ import { Button } from '@/shared/components/ui/button'
 import { Plus } from 'lucide-react'
 import { useAuthStore } from '@/features/auth/stores/auth-store'
 import { CreateGenreDialog } from '../components/CreateGenreDialog'
-import { focusVisibleRing } from '@/shared/theme'
+import { focusVisibleRing, textRole } from '@/shared/theme'
+import { ContentText } from '@/shared/typography'
 
 const PageContainer = styled.div`
   display: flex;
@@ -23,9 +24,7 @@ const PageHeader = styled.div`
 `
 
 const PageTitle = styled.h1`
-  font-size: 1.125rem;
-  font-weight: 600;
-  letter-spacing: -0.025em;
+  ${textRole('title-lg')}
 `
 
 const ContentArea = styled.div`
@@ -60,8 +59,7 @@ const GenreButton = styled(Button).attrs({ variant: 'ghost' })`
 
 `
 
-const GenreName = styled.p`
-  font-size: 0.875rem;
+const GenreName = styled(ContentText)`
   font-weight: 500;
   color: var(--color-foreground);
   text-align: center;
@@ -87,7 +85,7 @@ const EmptyIcon = styled.svg`
 `
 
 const EmptyTitle = styled.p`
-  font-size: 0.875rem;
+  ${textRole('body')}
   color: var(--color-muted-foreground);
 `
 
@@ -130,7 +128,7 @@ export function GenresPage() {
                 type="button"
                 onClick={() => navigate(`/music/albums?genre=${encodeURIComponent(genre.slug as string)}`)}
               >
-                <GenreName>{(genre.name as string) ?? 'Unknown'}</GenreName>
+                <GenreName textRole="body" text={(genre.name as string) ?? 'Unknown'} />
               </GenreButton>
             ))}
           </ResponsiveGrid>

@@ -2,7 +2,7 @@ import styled, { css } from 'styled-components'
 import { useState, useCallback } from 'react'
 import { TimelineYear } from './TimelineYear'
 import type { TimelineDecade as TimelineDecadeType } from '../hooks/use-timeline-view-model'
-import { focusVisibleRing } from '@/shared/theme'
+import { focusVisibleRing, textRole } from '@/shared/theme'
 
 const Container = styled.div``
 
@@ -31,10 +31,7 @@ const ChevronIcon = styled.svg<{ $collapsed: boolean }>`
 `
 
 const DecadeLabel = styled.span`
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  font-weight: 500;
+  ${textRole('label')}
   color: var(--color-muted-foreground);
 `
 

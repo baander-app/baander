@@ -7,6 +7,8 @@ import { ALL_COLUMNS, DEFAULT_WIDTHS, useListColumnStore } from '../stores/list-
 import { SongContextMenu } from './menus/SongContextMenu';
 import { type Track, usePlayerStore } from '@/features/player/stores/player-store';
 import { useShallow } from 'zustand/react/shallow';
+import { textRole } from '@/shared/theme';
+import { ContentText } from '@/shared/typography';
 
 const RowContainer = styled.div<{ $isSelected: boolean; $isPlaying: boolean }>`
   position: absolute;
@@ -42,7 +44,7 @@ const IndexCell = styled.span`
   flex-shrink: 0;
   padding-left: 0.25rem;
   text-align: right;
-  font-size: 0.75rem;
+  ${textRole('caption')}
   font-variant-numeric: tabular-nums;
   color: var(--color-muted-foreground);
 `
@@ -71,41 +73,45 @@ const TitleCell = styled.span<{ $isPlaying: boolean }>`
   text-overflow: ellipsis;
   white-space: nowrap;
   padding: 0 0.5rem;
-  font-size: 0.875rem;
-  font-weight: 500;
+  ${textRole('body-sm')}
 
   ${({ $isPlaying }) =>
     $isPlaying &&
     css`color: var(--color-accent-text);`}
 `
 
-const MutedCell = styled.span`
+const TitleText = styled(ContentText)`
+  font-weight: 500;
+`
+
+const mutedCell = css`
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   padding: 0 0.5rem;
-  font-size: 0.75rem;
   color: var(--color-muted-foreground);
+`
+
+const MutedCell = styled.span`
+  ${mutedCell}
+  ${textRole('body-sm')}
+`
+
+const ContentCell = styled(ContentText)`
+  ${mutedCell}
 `
 
 const DurationCell = styled.span`
   flex-shrink: 0;
   text-align: right;
-  font-size: 0.75rem;
-  font-variant-numeric: tabular-nums;
+  ${textRole('mono-sm')}
   color: var(--color-muted-foreground);
 `
 
 const MonoCell = styled.span`
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  padding: 0 0.5rem;
-  font-size: 0.75rem;
-  font-family: var(--font-mono);
-  color: var(--color-muted-foreground);
+  ${mutedCell}
+  ${textRole('mono-sm')}
 `
 
 const Spacer = styled.span`
@@ -243,20 +249,17 @@ export function ListRow({song, allSongs, style}: ListRowProps) {
       case 'title':
         return (
           <TitleCell key={colId} $isPlaying={isPlaying} style={{width}}>
-            {song.title}{song.available === false && <span> · Unavailable</span>}
+            <TitleText textRole="body-sm" text={song.title} language={song.albumLanguage} />
+            {song.available === false && <span> · Unavailable</span>}
           </TitleCell>
         );
       case 'artist':
         return (
-          <MutedCell key={colId} style={{width}}>
-            {song.artistName}
-          </MutedCell>
+          <ContentCell key={colId} style={{width}} textRole="body-sm" text={song.artistName ?? ''} />
         );
       case 'album':
         return (
-          <MutedCell key={colId} style={{width}}>
-            {song.albumName}
-          </MutedCell>
+          <ContentCell key={colId} style={{width}} textRole="body-sm" text={song.albumName ?? ''} language={song.albumLanguage} />
         );
       case 'year':
         return (
@@ -266,9 +269,7 @@ export function ListRow({song, allSongs, style}: ListRowProps) {
         );
       case 'genre':
         return (
-          <MutedCell key={colId} style={{width}}>
-            {song.genre ?? ''}
-          </MutedCell>
+          <ContentCell key={colId} style={{width}} textRole="body-sm" text={song.genre ?? ''} />
         );
       case 'duration':
         return (
@@ -284,9 +285,9 @@ export function ListRow({song, allSongs, style}: ListRowProps) {
         );
       case 'format':
         return (
-          <MutedCell key={colId} style={{width}}>
+          <MonoCell key={colId} style={{width}}>
             {song.format ?? ''}
-          </MutedCell>
+          </MonoCell>
         );
       case 'createdAt':
         return (

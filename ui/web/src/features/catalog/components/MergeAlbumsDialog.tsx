@@ -18,6 +18,8 @@ import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
 import { toast } from 'sonner'
 import { Loader2 } from 'lucide-react'
 import { useShallow } from 'zustand/react/shallow'
+import { textRole } from '@/shared/theme'
+import { ContentText } from '@/shared/typography'
 
 const MergeInfo = styled.div`
   padding: 1rem 0;
@@ -47,13 +49,12 @@ const MergeCardDashed = styled.div`
   padding: 0.75rem;
 `
 
-const CardTitle = styled.p`
-  font-size: 0.875rem;
+const CardTitle = styled(ContentText)`
   font-weight: 500;
 `
 
 const CardSubtitle = styled.p`
-  font-size: 0.75rem;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
 `
 
@@ -63,12 +64,12 @@ const ArrowText = styled.div`
 `
 
 const ArrowSpan = styled.span`
-  font-size: 0.75rem;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
 `
 
 const LoadingText = styled.p`
-  font-size: 0.875rem;
+  ${textRole('body')}
   color: var(--color-muted-foreground);
 `
 
@@ -144,7 +145,7 @@ export function MergeAlbumsDialog() {
             <MergeSteps>
               <MergeCard>
                 <div>
-                  <CardTitle>{targetTitle}</CardTitle>
+                  <CardTitle textRole="body" text={targetTitle} forwardedAs="p" />
                   <CardSubtitle>Target (kept)</CardSubtitle>
                 </div>
               </MergeCard>
@@ -153,7 +154,7 @@ export function MergeAlbumsDialog() {
               </ArrowText>
               <MergeCardDashed>
                 <div>
-                  <CardTitle>{sourceTitle}</CardTitle>
+                  <CardTitle textRole="body" text={sourceTitle} forwardedAs="p" />
                   <CardSubtitle>Source (deleted)</CardSubtitle>
                 </div>
               </MergeCardDashed>

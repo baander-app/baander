@@ -17,6 +17,8 @@ import { toast } from 'sonner'
 import { Download, Maximize2, Music } from 'lucide-react'
 import { AudioLyricSynchronizer, Lrc } from '@/shared/lib/lyrics'
 import { useLyricsFullscreenStore } from '../stores/lyrics-fullscreen-store'
+import { textRole } from '@/shared/theme'
+import { ContentText } from '@/shared/typography'
 
 interface CachedLyrics {
   plainLyrics?: string | null
@@ -50,7 +52,7 @@ const EmptyState = styled.div`
 `
 
 const EmptyText = styled.p`
-  font-size: 0.875rem;
+  ${textRole('body')}
   color: var(--color-muted-foreground);
 `
 
@@ -101,7 +103,7 @@ const Toolbar = styled.div`
 `
 
 const ToolbarLabel = styled.p`
-  font-size: 0.75rem;
+  ${textRole('caption')}
   color: color-mix(in srgb, var(--color-muted-foreground) 60%, transparent);
 `
 
@@ -116,12 +118,10 @@ const LyricLineContainer = styled.div`
   cursor: pointer;
   padding: 0.375rem 0.5rem;
   text-align: center;
-  font-size: 1.125rem;
-  line-height: 1.625;
   transition: color 60ms ease-out;
 `
 
-const LineText = styled.span<{ $active: boolean; $past: boolean }>`
+const LineText = styled(ContentText)<{ $active: boolean; $past: boolean }>`
   ${({ $active, $past }) =>
     $active
       ? css`color: var(--color-foreground); font-weight: 600;`
@@ -134,7 +134,7 @@ const SourceLabel = styled.p`
   flex-shrink: 0;
   padding-top: 0.25rem;
   text-align: center;
-  font-size: 0.75rem;
+  ${textRole('caption')}
   color: color-mix(in srgb, var(--color-muted-foreground) 40%, transparent);
 `
 
@@ -149,11 +149,9 @@ const PlainScroll = styled.div`
   overflow-y: auto;
 `
 
-const PlainText = styled.pre`
+const PlainText = styled(ContentText)`
+  display: block;
   white-space: pre-wrap;
-  font-family: inherit;
-  font-size: 0.875rem;
-  line-height: 1.625;
   color: color-mix(in srgb, var(--color-foreground) 80%, transparent);
   margin: 0;
 `
@@ -164,6 +162,7 @@ export function LyricsTab() {
   const publicId = currentTrack?.publicId ?? ''
   const queryClient = useQueryClient()
   const toggleFullscreen = useLyricsFullscreenStore((s) => s.toggle)
+  const language = currentTrack?.albumLanguage
 
   const { data: lyricsData, isPending: isLoading, isError } = useGetLyricsSongLyrics(publicId, {
     query: { enabled: !!publicId },
@@ -246,6 +245,7 @@ export function LyricsTab() {
     return (
       <SyncedLyricsView
         syncedLyrics={lyrics.syncedLyrics}
+        language={language}
         source={lyrics.source}
         onFullscreen={toggleFullscreen}
       />
@@ -255,6 +255,7 @@ export function LyricsTab() {
   return (
     <PlainLyricsView
       plainLyrics={lyrics.plainLyrics!}
+      language={language}
       source={lyrics.source}
       onFullscreen={toggleFullscreen}
     />
@@ -265,10 +266,12 @@ export function LyricsTab() {
 
 function SyncedLyricsView({
   syncedLyrics,
+  language,
   source,
   onFullscreen,
 }: {
   syncedLyrics: string
+  language?: string
   source?: string | null
   onFullscreen: () => void
 }) {
@@ -351,6 +354,7 @@ function SyncedLyricsView({
             key={i}
             ref={(el) => { lineRefs.current[i] = el }}
             content={line.content}
+            language={language}
             active={i === activeIndex}
             past={i < activeIndex}
             onClick={line.timestamp >= 0 ? () => seekTo(line.timestamp) : undefined}
@@ -371,19 +375,18 @@ function SyncedLyricsView({
 const LyricLine = motion.create(
   React.forwardRef<HTMLDivElement, {
     content: string
+    language?: string
     active: boolean
     past: boolean
     onClick?: () => void
   }>(
-    function LyricLineInner({ content, active, past, onClick }, ref) {
+    function LyricLineInner({ content, language, active, past, onClick }, ref) {
       return (
         <LyricLineContainer
           ref={ref}
           onClick={onClick}
         >
-          <LineText $active={active} $past={past}>
-            {content || '\u00A0'}
-          </LineText>
+          <LineText textRole="subtitle" text={content || '\u00A0'} language={language} $active={active} $past={past} />
         </LyricLineContainer>
       )
     },
@@ -394,10 +397,12 @@ const LyricLine = motion.create(
 
 function PlainLyricsView({
   plainLyrics,
+  language,
   source,
   onFullscreen,
 }: {
   plainLyrics: string
+  language?: string
   source?: string | null
   onFullscreen: () => void
 }) {
@@ -410,7 +415,7 @@ function PlainLyricsView({
         </Button>
       </Toolbar>
       <PlainScroll>
-        <PlainText>{plainLyrics}</PlainText>
+        <PlainText textRole="body" text={plainLyrics} language={language} forwardedAs="pre" />
       </PlainScroll>
       {source && (
         <SourceLabel>Source: {source}</SourceLabel>

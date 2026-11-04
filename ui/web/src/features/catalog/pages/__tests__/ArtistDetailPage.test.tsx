@@ -159,6 +159,19 @@ describe('ArtistDetailPage', () => {
     expect(screen.getByText('3 albums')).toBeInTheDocument()
   })
 
+  it('gives the artist name its own lang from its script rather than inheriting one', () => {
+    mockConfig.artistData = { ...mockArtistData, name: '宇多田ヒカル' }
+    render(<SCTypedThemeProvider theme={testTheme}><ArtistDetailPage /></SCTypedThemeProvider>)
+    const heading = screen.getByRole('heading', { level: 1, name: '宇多田ヒカル' })
+    expect(heading).toHaveAttribute('lang', 'ja')
+    expect(heading).toHaveAttribute('data-script')
+  })
+
+  it('marks a Latin artist name with the interface language', () => {
+    render(<SCTypedThemeProvider theme={testTheme}><ArtistDetailPage /></SCTypedThemeProvider>)
+    expect(screen.getByRole('heading', { level: 1, name: 'Radiohead' })).toHaveAttribute('lang', 'en')
+  })
+
   it('renders album grid cards', () => {
     render(<SCTypedThemeProvider theme={testTheme}><ArtistDetailPage /></SCTypedThemeProvider>)
     expect(screen.getByText('Album 0')).toBeInTheDocument()

@@ -1,5 +1,6 @@
 import { useCallback, useRef, useEffect, useState } from 'react'
 import styled from 'styled-components'
+import { textRole } from '@/shared/theme'
 import { BrowserColumn } from '../components/BrowserColumn'
 import { VirtualSongList } from '../components/VirtualSongList'
 import type { SongEntry } from '../types'
@@ -71,16 +72,14 @@ const SongHeader = styled.div`
 `
 
 const SongHeaderLabel = styled.span`
-  font-size: 11px;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  ${textRole('label')}
   color: var(--color-muted-foreground);
 `
 
 const SongHeaderCount = styled.span`
   margin-left: auto;
-  font-size: 0.75rem;
+  ${textRole('caption')}
+  font-variant-numeric: tabular-nums;
   color: var(--color-muted-foreground);
 `
 

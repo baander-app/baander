@@ -11,6 +11,8 @@ import { ArtistDiscography } from '../components/ArtistDiscography'
 import { useContextPanelStore } from '@/features/layout/stores/context-panel-store'
 import { usePlayerStore, type Track } from '@/features/player/stores/player-store'
 import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
+import { textRole } from '@/shared/theme'
+import { ContentText } from '@/shared/typography'
 
 const PageContainer = styled.div`
   display: flex;
@@ -28,7 +30,7 @@ const CompactHeader = styled.div`
   padding: 0 1.5rem;
 `
 
-const Avatar = styled.div`
+const Avatar = styled(ContentText)`
   display: flex;
   height: 2rem;
   width: 2rem;
@@ -37,27 +39,20 @@ const Avatar = styled.div`
   justify-content: center;
   border-radius: 50%;
   background-color: var(--color-secondary);
-  font-size: 0.875rem;
   font-weight: 600;
   color: var(--color-muted-foreground);
 `
 
-const ArtistName = styled.h1`
+const ArtistName = styled(ContentText)`
   min-width: 0;
   flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 0.875rem;
-  font-weight: 600;
-  letter-spacing: -0.01em;
 `
 
 const AlbumCount = styled.span`
-  font-size: 11px;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  ${textRole('label')}
   color: var(--color-muted-foreground);
 `
 
@@ -73,10 +68,10 @@ const ActionButtons = styled.div`
 `
 
 const ActionButton = styled(Button)`
-  height: 1.75rem;
+  height: auto;
+  min-height: 1.75rem;
   gap: 0.25rem;
   padding: 0 0.5rem;
-  font-size: 0.75rem;
 `
 
 const DiscographyArea = styled.div`
@@ -101,7 +96,7 @@ const CenterMessage = styled.div`
 `
 
 const ErrorText = styled.p`
-  font-size: 0.875rem;
+  ${textRole('body')}
   color: var(--color-destructive);
 `
 
@@ -244,9 +239,9 @@ export function ArtistDetailPage() {
           <ArrowLeft size={16} />
         </Button>
 
-        <Avatar>{initial}</Avatar>
+        <Avatar textRole="body-sm" text={initial} />
 
-        <ArtistName>{artistName}</ArtistName>
+        <ArtistName textRole="title" text={artistName} forwardedAs="h1" />
 
         {albumCount > 0 && (
           <AlbumCount>

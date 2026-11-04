@@ -1,6 +1,7 @@
 import styled from 'styled-components'
 import { useNavigate } from 'react-router-dom'
-import { interactiveTransition } from '@/shared/theme'
+import { interactiveTransition, textRole } from '@/shared/theme'
+import { ContentText } from '@/shared/typography'
 
 const Row = styled.tr`
   cursor: pointer;
@@ -41,25 +42,25 @@ const TitleCell = styled.td`
   padding: 0.5rem;
 `
 
-const MovieTitle = styled.div`
-  font-size: 0.875rem;
+const MovieTitle = styled(ContentText)`
+  display: block;
   font-weight: 500;
 `
 
 const RuntimeText = styled.div`
-  font-size: 0.75rem;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
 `
 
 const YearCell = styled.td`
   padding: 0.5rem;
-  font-size: 0.875rem;
+  ${textRole('body-sm')}
   color: var(--color-muted-foreground);
 `
 
 const RatingCell = styled.td`
   padding: 0.5rem;
-  font-size: 0.875rem;
+  ${textRole('body-sm')}
 `
 
 const StarIcon = styled.svg`
@@ -104,7 +105,7 @@ export function MovieListItem({ movie }: MovieListItemProps) {
         )}
       </PosterCell>
       <TitleCell>
-        <MovieTitle>{movie.title}</MovieTitle>
+        <MovieTitle textRole="body-sm" text={movie.title} />
         {movie.runtime && <RuntimeText>{Math.floor(movie.runtime / 60)}h {movie.runtime % 60}m</RuntimeText>}
       </TitleCell>
       <YearCell>{movie.year ?? '\u2014'}</YearCell>
@@ -116,7 +117,7 @@ export function MovieListItem({ movie }: MovieListItemProps) {
             </StarIcon>
             {movie.rating.toFixed(1)}
           </StarSpan>
-        ) : <DashText>\u2014</DashText>}
+        ) : <DashText>—</DashText>}
       </RatingCell>
     </Row>
   )

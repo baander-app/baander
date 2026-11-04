@@ -3,7 +3,7 @@ import { Input } from '@/shared/components/ui/input'
 import { Textarea } from '@/shared/components/ui/textarea'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/shared/components/ui/select'
 import type { FieldDef } from './field-config'
-import { focusVisibleRing } from '@/shared/theme'
+import { focusVisibleRing, textRole } from '@/shared/theme'
 
 const FieldContainer = styled.div`
   display: flex;
@@ -20,10 +20,7 @@ const ToggleRow = styled.div`
 `
 
 const FieldLabel = styled.span`
-  font-size: 11px;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  ${textRole('label')}
   color: var(--color-muted-foreground);
 `
 
@@ -66,11 +63,12 @@ const DirtyInput = styled(Input)<{ $isDirty?: boolean; $isReadOnly?: boolean }>`
   ${({ $isDirty }) =>
     $isDirty &&
     css`border-color: color-mix(in srgb, var(--color-primary) 50%, transparent);`}
+  ${({ $isReadOnly }) => $isReadOnly && textRole('mono-sm')}
 `
 
 const DirtyTextarea = styled(Textarea)`
   min-height: 5rem;
-  font-size: 0.875rem;
+  ${textRole('body')}
 `
 
 interface MetadataFieldProps {
@@ -125,7 +123,7 @@ export function MetadataField({
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="_empty">\u2014</SelectItem>
+            <SelectItem value="_empty">—</SelectItem>
             {field.options?.map((opt) => (
               <SelectItem key={opt.value} value={opt.value}>
                 {opt.label}
@@ -179,7 +177,6 @@ export function MetadataField({
         onChange={(e) => onChange(e.target.value)}
         $isDirty={isDirty}
         $isReadOnly={field.readOnly}
-        style={field.readOnly ? { fontFamily: 'var(--font-mono)', fontSize: '0.75rem' } : undefined}
       />
     </FieldContainer>
   )

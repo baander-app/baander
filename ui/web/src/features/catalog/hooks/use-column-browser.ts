@@ -103,13 +103,17 @@ export function useColumnBrowser(): UseColumnBrowserReturn {
 
   const albumItems: BrowserItem[] = useMemo(() => {
     return allAlbums
-      .map((a) => ({
-        id: a.publicId,
-        label: a.title,
-        sublabel: a.artists.map((ar) => ar.name).join(', ') || (a.year != null ? String(a.year) : undefined),
-        coverUrl: a.coverImage?.url ?? undefined,
-        blurhash: a.coverImage?.blurhash ?? undefined,
-      }))
+      .map((a): BrowserItem => {
+        const artistNames = a.artists.map((ar) => ar.name).filter(Boolean)
+        return {
+          id: a.publicId,
+          label: a.title,
+          language: a.language,
+          sublabels: artistNames.length > 0 ? artistNames : a.year != null ? [String(a.year)] : undefined,
+          coverUrl: a.coverImage?.url ?? undefined,
+          blurhash: a.coverImage?.blurhash ?? undefined,
+        }
+      })
       .sort((a, b) => a.label.localeCompare(b.label))
   }, [allAlbums])
 

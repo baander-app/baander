@@ -3,6 +3,7 @@ import { useRef, useCallback } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { usePlayerStore } from '@/features/player/stores/player-store'
 import { VirtualSongRow } from './VirtualSongRow'
+import { textRole } from '@/shared/theme'
 import type { SongEntry } from '@/features/catalog/types'
 
 export type { SongEntry }
@@ -24,10 +25,7 @@ const HeaderRow = styled.div`
 `
 
 const HeaderCell = styled.span`
-  font-size: 11px;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  ${textRole('label')}
   color: var(--color-muted-foreground);
 `
 
@@ -61,7 +59,7 @@ const EmptyContainer = styled.div`
 `
 
 const EmptyText = styled.p`
-  font-size: 0.875rem;
+  ${textRole('body')}
   color: var(--color-muted-foreground);
 `
 

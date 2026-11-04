@@ -1,6 +1,7 @@
 import { useRef, useCallback, useState, useEffect } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import styled, { keyframes } from 'styled-components'
+import { textRole } from '@/shared/theme'
 import { Loader2 } from 'lucide-react'
 import { Button } from '@/shared/components/ui/button'
 import { ListHeader, type SortState } from '../components/ListHeader'
@@ -76,7 +77,7 @@ const EmptyContainer = styled.div`
 `
 
 const EmptyText = styled.p`
-  font-size: 0.875rem;
+  ${textRole('body')}
   color: var(--color-muted-foreground);
 `
 

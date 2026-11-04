@@ -9,6 +9,7 @@ import { useLiveCoordinator } from '@/shared/live/context'
 import { captureOwnership, isCurrentOwnership } from '@/shared/live/ownership'
 import { useImageBlob } from '@/shared/hooks/use-image-blob'
 import { Button } from '@/shared/components/ui/button'
+import { textRole } from '@/shared/theme'
 
 const Container = styled.div`
   display: flex;
@@ -17,10 +18,7 @@ const Container = styled.div`
 `
 
 const Label = styled.span`
-  font-size: 10px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
+  ${textRole('label')}
   color: color-mix(in srgb, var(--color-muted-foreground) 60%, transparent);
 `
 

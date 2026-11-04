@@ -18,6 +18,34 @@ export const catalogSong: SongResource = {
   lockedFields: [], createdAt: '2026-01-01T00:00:00Z',
 }
 
+/** An album stored as Japanese whose songs carry Thai and wholly Burmese titles. */
+export const scriptAlbum = {
+  publicId: 'stylingAlbum0000000002',
+  title: 'つづきの うた',
+  language: 'jpn',
+  type: 'album', year: 2026, createdAt: '2026-01-01T00:00:00Z',
+  coverImage: { blurhash: '00Qb-z', url: null }, artists: [{ name: '坂本龍一', role: null }],
+  artistName: '坂本龍一', lockedFields: [],
+}
+
+export const thaiSong: SongResource = {
+  publicId: 'stylingSong00000000002', albumId: scriptAlbum.publicId,
+  title: 'ฤดูกาลใหม่ของเรา',
+  artistName: '坂本龍一', albumName: scriptAlbum.title, albumLanguage: scriptAlbum.language,
+  available: true, length: 30, track: 1, disc: 1, explicit: false,
+  lockedFields: [], createdAt: '2026-01-01T00:00:00Z',
+}
+
+export const burmeseSong: SongResource = {
+  publicId: 'stylingSong00000000003', albumId: scriptAlbum.publicId,
+  title: 'ဆက်ကြည့်ရန်',
+  artistName: '坂本龍一', albumName: scriptAlbum.title, albumLanguage: scriptAlbum.language,
+  available: true, length: 30, track: 2, disc: 1, explicit: false,
+  lockedFields: [], createdAt: '2026-01-01T00:00:00Z',
+}
+
+const scriptSongs = [thaiSong, burmeseSong]
+
 export const catalogPlaylist = {
   publicId: 'stylingPlaylist000001',
   name: 'A very long playlist name for checking narrow browsing layouts',
@@ -48,8 +76,8 @@ function localAudio(): Buffer {
 
 /** Replace catalog reads only. Login, preferences and account APIs stay real. */
 export async function installCatalogFixtures(page: Page, state: 'empty' | 'populated') {
-  const albums = state === 'populated' ? [catalogAlbum] : []
-  const songs = state === 'populated' ? [catalogSong] : []
+  const albums = state === 'populated' ? [catalogAlbum, scriptAlbum] : []
+  const songs = state === 'populated' ? [catalogSong, ...scriptSongs] : []
   const pageMeta = { current_page: 1, last_page: 1, per_page: 20, total: albums.length }
   const cursorMeta = {
     next_cursor: null, prev_cursor: null, has_next_page: false,
@@ -57,13 +85,21 @@ export async function installCatalogFixtures(page: Page, state: 'empty' | 'popul
   }
   const responses: Record<string, unknown> = {
     '/api/albums': { data: albums, meta: pageMeta },
-    [`/api/albums/${catalogAlbum.publicId}`]: { data: { ...catalogAlbum, songs } },
+    [`/api/albums/${catalogAlbum.publicId}`]: {
+      data: { ...catalogAlbum, songs: songs.filter((song) => song.albumId === catalogAlbum.publicId) },
+    },
+    [`/api/albums/${scriptAlbum.publicId}`]: {
+      data: { ...scriptAlbum, songs: songs.filter((song) => song.albumId === scriptAlbum.publicId) },
+    },
     '/api/songs': { data: songs, meta: cursorMeta },
     [`/api/songs/${catalogSong.publicId}`]: { data: catalogSong },
+    ...Object.fromEntries(scriptSongs.map((song) => [`/api/songs/${song.publicId}`, { data: song }])),
     '/api/artists': { data: [], meta: { ...pageMeta, total: 0 } },
     '/api/genres': { data: [] },
     '/api/playlists': { data: state === 'populated' ? [catalogPlaylist] : [] },
-    [`/api/playlists/${catalogPlaylist.publicId}`]: { data: { ...catalogPlaylist, songs } },
+    [`/api/playlists/${catalogPlaylist.publicId}`]: {
+      data: { ...catalogPlaylist, songs: songs.filter((song) => song.publicId === catalogSong.publicId) },
+    },
     '/api/activity/history': { data: [] },
     '/api/recommendations/for-you': { data: [] },
     '/api/radio/starred': { data: [] },
@@ -73,7 +109,8 @@ export async function installCatalogFixtures(page: Page, state: 'empty' | 'popul
     const url = new URL(request.url())
     const path = url.pathname.replace(/\/$/, '')
     if (request.method() !== 'GET') return route.fallback()
-    if (path === '/api/stream/track' && url.searchParams.get('id') === catalogSong.publicId) {
+    const streamed = [catalogSong, ...songs].some((song) => song.publicId === url.searchParams.get('id'))
+    if (path === '/api/stream/track' && streamed) {
       const audio = localAudio()
       const range = /^bytes=(\d+)-(\d*)$/.exec(request.headers().range ?? '')
       if (range) {

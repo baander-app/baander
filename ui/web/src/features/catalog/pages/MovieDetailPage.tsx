@@ -11,6 +11,7 @@ import { requestPlayback } from '@/features/session/services/playback-execution'
 import { usePlaybackSession } from '@/features/session/hooks/use-playback-session'
 import { useVideoPresentation } from '../stores/video-presentation-store'
 import { MoviePlayerOverlay } from '../components/MoviePlayerOverlay'
+import { textRole } from '@/shared/theme'
 
 const CenterMessage = styled.div`
   display: flex;
@@ -22,7 +23,7 @@ const CenterMessage = styled.div`
 `
 
 const ErrorText = styled.p`
-  font-size: 0.875rem;
+  ${textRole('body')}
   color: var(--color-destructive);
 `
 

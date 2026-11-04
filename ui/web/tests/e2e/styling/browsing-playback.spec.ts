@@ -1,7 +1,36 @@
+import type { Locator } from '@playwright/test'
 import { spaNavigate } from '../fixtures'
-import { test, expect, catalogAlbum, catalogSong, catalogPlaylist } from './fixtures'
+import {
+  test, expect, catalogAlbum, catalogSong, catalogPlaylist, scriptAlbum, thaiSong, burmeseSong,
+} from './fixtures'
 import { setTheme } from '../helpers/theme-utils'
 import { expectContained, expectNoPageOverflow, expectReadable } from './helpers'
+
+/** Thai, Burmese, Hangul and CJK characters, whose text must never carry tracking. */
+const NO_TRACKING_SCRIPTS = /[\p{Script=Thai}\p{Script=Myanmar}\p{Script=Hangul}\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/u
+
+/**
+ * Checks the script rules on every element in a surface whose own text holds Thai,
+ * Burmese, Hangul or CJK characters: each must render with zero letter-spacing.
+ */
+async function expectScriptTextRules(surface: Locator, name: string) {
+  await expect(surface).toBeVisible()
+  const elements = await surface.evaluate((root, source) => {
+    const pattern = new RegExp(source, 'u')
+    return [root, ...root.querySelectorAll('*')].flatMap((element) => {
+      const ownText = [...element.childNodes]
+        .filter((node) => node.nodeType === Node.TEXT_NODE)
+        .map((node) => node.textContent ?? '')
+        .join('')
+      return pattern.test(ownText)
+        ? [{ text: ownText.trim(), letterSpacing: getComputedStyle(element).letterSpacing }]
+        : []
+    })
+  }, NO_TRACKING_SCRIPTS.source)
+  expect(elements.length, `${name} renders Thai, Burmese, Hangul or CJK text`).toBeGreaterThan(0)
+  const tracked = elements.filter(({ letterSpacing }) => letterSpacing !== 'normal' && Number.parseFloat(letterSpacing) !== 0)
+  expect(tracked, `${name} sets no letter-spacing on Thai, Burmese, Hangul or CJK text`).toEqual([])
+}
 
 test.describe('footer radio player', () => {
   test.use({ serviceWorkers: 'block' })
@@ -282,4 +311,40 @@ test('populated playlist preserves readable selection and long names', async ({ 
     await expectReadable(song)
     await expectNoPageOverflow(page)
   }
+})
+
+test.describe('non-Latin catalog text', () => {
+  test.use({ serviceWorkers: 'block' })
+
+  test('renders without letter-spacing on every catalog and playback surface', async ({ populatedCatalog: page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 })
+    const main = page.getByRole('main')
+
+    await spaNavigate(page)(`/music/albums/${scriptAlbum.publicId}`)
+    await expect(main.getByText(thaiSong.title, { exact: true })).toBeVisible()
+    await expect(main.getByText(burmeseSong.title, { exact: true })).toBeVisible()
+    await expectScriptTextRules(main, 'album page')
+
+    await spaNavigate(page)('/music/browse')
+    await page.getByRole('button', { name: 'List view', exact: true }).click()
+    await expect(main.getByText(burmeseSong.title, { exact: true })).toBeVisible()
+    await expectScriptTextRules(main, 'song list')
+
+    await spaNavigate(page)('/music/songs')
+    await expect(main.getByRole('option', { name: scriptAlbum.title })).toBeVisible()
+    await expect(main.getByText(thaiSong.title, { exact: true })).toBeVisible()
+    await expectScriptTextRules(main, 'column browser')
+
+    await main.getByText(thaiSong.title, { exact: true }).click()
+    const panel = page.getByRole('complementary')
+    await expect(panel.getByText(thaiSong.title, { exact: true })).toBeVisible()
+    await expectScriptTextRules(panel, 'context panel')
+
+    await spaNavigate(page)(`/music/albums/${scriptAlbum.publicId}`)
+    await main.getByRole('button', { name: 'Play', exact: true }).first().click()
+    const nowPlaying = page.getByRole('region', { name: 'Playback', exact: true })
+      .getByRole('group', { name: 'Now playing', exact: true })
+    await expect(nowPlaying.getByText(thaiSong.title, { exact: true })).toBeVisible()
+    await expectScriptTextRules(nowPlaying, 'now-playing bar')
+  })
 })

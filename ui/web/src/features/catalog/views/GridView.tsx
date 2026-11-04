@@ -7,6 +7,7 @@ import type { AlbumSummary } from '../types'
 import { AlbumGridCard } from '../components/AlbumGridCard'
 import { Button } from '@/shared/components/ui/button'
 import { Skeleton } from '@/shared/components/ui/skeleton'
+import { textRole } from '@/shared/theme'
 
 const GridContainer = styled.div`
   display: grid;
@@ -23,13 +24,13 @@ const CenterMessage = styled.div`
 `
 
 const ErrorText = styled.p`
-  font-size: 0.875rem;
+  ${textRole('body')}
   color: var(--color-destructive);
 `
 
 const EmptyText = styled.p`
   padding: 1rem 0;
-  font-size: 0.875rem;
+  ${textRole('body')}
   color: var(--color-muted-foreground);
 `
 
@@ -97,9 +98,10 @@ export function GridView({ params }: GridViewProps) {
             key={album.publicId}
             publicId={album.publicId}
             title={album.title ?? 'Unknown'}
-            artistName={album.artists.map((a) => a.name).join(', ') || undefined}
+            artistNames={album.artists.map((a) => a.name).filter(Boolean)}
             imageUrl={album.coverImage?.url}
             blurhash={album.coverImage?.blurhash}
+            language={album.language}
           />
         ))}
       </GridContainer>

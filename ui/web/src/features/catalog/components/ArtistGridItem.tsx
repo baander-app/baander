@@ -4,6 +4,8 @@ import { useCallback } from 'react'
 import { useContextPanelStore } from '@/features/layout/stores/context-panel-store'
 import { ArtistContextMenu } from './menus/ArtistContextMenu'
 import { usePlayArtist } from '../hooks/use-play-artist'
+import { textRole } from '@/shared/theme'
+import { ContentText } from '@/shared/typography'
 
 const CardButton = styled(Button).attrs({ variant: 'ghost' })`
   height: auto;
@@ -40,11 +42,10 @@ const InfoArea = styled.div`
   padding: 0.5rem;
 `
 
-const Name = styled.p`
+const Name = styled(ContentText)`
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 0.875rem;
   font-weight: 500;
   color: var(--color-foreground);
 `
@@ -53,7 +54,7 @@ const AlbumCount = styled.p`
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 0.75rem;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
 `
 
@@ -91,7 +92,7 @@ export function ArtistGridItem({ publicId, name, albumCount }: ArtistGridItemPro
         </Placeholder>
       </CoverArea>
       <InfoArea>
-        <Name>{name}</Name>
+        <Name textRole="body-sm" text={name} forwardedAs="p" />
         {albumCount !== undefined && (
           <AlbumCount>
             {albumCount} {albumCount === 1 ? 'album' : 'albums'}

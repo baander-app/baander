@@ -1,6 +1,8 @@
 import { Button } from '@/shared/components/ui/button'
 import styled from 'styled-components'
 import { useNavigate } from 'react-router-dom'
+import { textRole } from '@/shared/theme'
+import { ContentText } from '@/shared/typography'
 
 const CardButton = styled(Button).attrs({ variant: 'ghost' })`
   height: auto;
@@ -52,8 +54,8 @@ const CaptionPanel = styled.div`
   padding: 0.75rem;
 `
 
-const MovieTitle = styled.h3`
-  font-size: 0.875rem;
+const MovieTitle = styled(ContentText)`
+  display: block;
   font-weight: 500;
   color: var(--color-foreground);
   overflow: hidden;
@@ -65,7 +67,7 @@ const MetaRow = styled.div`
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  font-size: 0.75rem;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
 `
 
@@ -108,7 +110,7 @@ export function MovieGridItem({ movie }: MovieGridItemProps) {
         </PosterPlaceholder>
       )}
       <CaptionPanel>
-        <MovieTitle>{movie.title}</MovieTitle>
+        <MovieTitle textRole="body-sm" text={movie.title} forwardedAs="h3" />
         <MetaRow>
           {movie.year && <span>{movie.year}</span>}
           {movie.rating && (

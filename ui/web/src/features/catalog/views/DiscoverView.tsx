@@ -1,6 +1,7 @@
 import styled from 'styled-components'
 import { Button } from '@/shared/components/ui/button'
 import { Skeleton } from '@/shared/components/ui/skeleton'
+import { textRole } from '@/shared/theme'
 import { useDiscoverViewModel } from '../hooks/use-discover-view-model'
 import { RecommendationClusterRow } from '../components/RecommendationCluster'
 
@@ -17,9 +18,7 @@ const TopRow = styled.div`
 `
 
 const Title = styled.h2`
-  font-size: 1.125rem;
-  font-weight: 600;
-  letter-spacing: -0.025em;
+  ${textRole('title-lg')}
 `
 
 const CenterMessage = styled.div`
@@ -32,13 +31,13 @@ const CenterMessage = styled.div`
 `
 
 const ErrorText = styled.p`
-  font-size: 0.875rem;
+  ${textRole('body')}
   color: var(--color-destructive);
 `
 
 const EmptyText = styled.p`
   padding: 1rem 0;
-  font-size: 0.875rem;
+  ${textRole('body')}
   color: var(--color-muted-foreground);
 `
 

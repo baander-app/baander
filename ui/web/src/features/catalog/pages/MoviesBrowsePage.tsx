@@ -11,6 +11,7 @@ import type { MovieSummary } from '../types'
 import { Button } from '@/shared/components/ui/button'
 import { Skeleton } from '@/shared/components/ui/skeleton'
 import { SortSelect, type SortOption } from '@/shared/components/ui/sort-select'
+import { textRole } from '@/shared/theme'
 
 const PageContainer = styled.div`
   display: flex;
@@ -26,9 +27,7 @@ const TopBar = styled.div`
 `
 
 const Title = styled.h1`
-  font-size: 1.125rem;
-  font-weight: 600;
-  letter-spacing: -0.025em;
+  ${textRole('title-lg')}
 `
 
 const TopActions = styled.div`
@@ -74,7 +73,7 @@ const TableHead = styled.thead``
 const HeadRow = styled.tr`
   border-bottom: 1px solid var(--color-border);
   text-align: left;
-  font-size: 0.75rem;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
 `
 
@@ -95,7 +94,7 @@ const PaginationRow = styled.div`
 `
 
 const PageInfo = styled.span`
-  font-size: 0.75rem;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
 `
 
@@ -109,17 +108,17 @@ const CenterMessage = styled.div`
 `
 
 const ErrorText = styled.p`
-  font-size: 0.875rem;
+  ${textRole('body')}
   color: var(--color-destructive);
 `
 
 const EmptyText = styled.p`
-  font-size: 0.875rem;
+  ${textRole('body')}
   color: var(--color-muted-foreground);
 `
 
 const EmptySubText = styled.p`
-  font-size: 0.75rem;
+  ${textRole('caption')}
   color: color-mix(in srgb, var(--color-muted-foreground) 70%, transparent);
 `
 

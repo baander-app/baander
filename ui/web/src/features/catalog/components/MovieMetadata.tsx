@@ -1,7 +1,8 @@
 import styled from 'styled-components'
 import { useState } from 'react'
 import { ChevronDown, ChevronUp, ExternalLink } from 'lucide-react'
-import { interactiveTransition } from '@/shared/theme'
+import { interactiveTransition, textRole } from '@/shared/theme'
+import { ContentText } from '@/shared/typography'
 import type { MovieDetail } from '../types'
 
 const Container = styled.div`
@@ -12,7 +13,7 @@ const ToggleButton = styled.button`
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  font-size: 0.875rem;
+  ${textRole('body')}
   font-weight: 500;
   color: var(--color-muted-foreground);
   ${interactiveTransition(['color'])}
@@ -34,9 +35,8 @@ const ExpandedContent = styled.div`
   }
 `
 
-const Synopsis = styled.p`
-  font-size: 0.875rem;
-  line-height: 1.625;
+const Synopsis = styled(ContentText)`
+  display: block;
   color: var(--color-muted-foreground);
 `
 
@@ -45,7 +45,7 @@ const MetaGrid = styled.div`
   grid-template-columns: repeat(2, 1fr);
   column-gap: 2rem;
   row-gap: 0.5rem;
-  font-size: 0.875rem;
+  ${textRole('body-sm')}
 `
 
 const MetaLabel = styled.span`
@@ -71,7 +71,7 @@ const ExternalLinkStyled = styled.a`
 const VersionSection = styled.div``
 
 const VersionTitle = styled.h3`
-  font-size: 0.875rem;
+  ${textRole('body')}
   font-weight: 500;
   color: var(--color-muted-foreground);
   margin-bottom: 0.5rem;
@@ -81,7 +81,7 @@ const VersionRow = styled.div`
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  font-size: 0.875rem;
+  ${textRole('body-sm')}
 
   & + & {
     margin-top: 0.25rem;
@@ -93,7 +93,13 @@ const VersionLabel = styled.span`
 `
 
 const VersionValue = styled.span`
+  ${textRole('mono-sm')}
   font-weight: 500;
+`
+
+const VersionDuration = styled.span`
+  ${textRole('mono-sm')}
+  color: var(--color-muted-foreground);
 `
 
 interface MovieMetadataProps {
@@ -114,7 +120,7 @@ export function MovieMetadata({ movie }: MovieMetadataProps) {
         <ExpandedContent>
           {/* Synopsis */}
           {movie.overview && (
-            <Synopsis>{movie.overview}</Synopsis>
+            <Synopsis textRole="body" text={movie.overview} forwardedAs="p" />
           )}
 
           {/* Metadata grid */}
@@ -167,9 +173,9 @@ export function MovieMetadata({ movie }: MovieMetadataProps) {
                     <VersionLabel>Version {idx + 1}</VersionLabel>
                     <VersionValue>{video.width}\u00d7{video.height}</VersionValue>
                     {video.duration && (
-                      <VersionLabel>
+                      <VersionDuration>
                         {Math.floor(video.duration / 60)}:{String(Math.floor(video.duration % 60)).padStart(2, '0')}
-                      </VersionLabel>
+                      </VersionDuration>
                     )}
                   </VersionRow>
                 ))}

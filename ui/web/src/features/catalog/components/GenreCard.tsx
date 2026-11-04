@@ -1,5 +1,6 @@
 import styled from 'styled-components'
-import { interactiveTransition } from '@/shared/theme'
+import { interactiveTransition, textRole } from '@/shared/theme'
+import { ContentText } from '@/shared/typography'
 
 const Card = styled.div`
   display: flex;
@@ -17,13 +18,12 @@ const CenterContent = styled.div`
   text-align: center;
 `
 
-const Name = styled.p`
-  font-size: 0.875rem;
+const Name = styled(ContentText)`
   font-weight: 500;
 `
 
 const AlbumCount = styled.p`
-  font-size: 0.75rem;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
 `
 
@@ -37,7 +37,7 @@ export function GenreCard({ name, albumCount }: GenreCardProps) {
   return (
     <Card>
       <CenterContent>
-        <Name>{name}</Name>
+        <Name textRole="body-sm" text={name} forwardedAs="p" />
         {albumCount !== undefined && (
           <AlbumCount>
             {albumCount} {albumCount === 1 ? 'album' : 'albums'}

@@ -1,7 +1,8 @@
 import styled from 'styled-components'
 import { Link } from 'react-router-dom'
 import { ArtistContextMenu } from './menus/ArtistContextMenu'
-import { interactiveTransition } from '@/shared/theme'
+import { interactiveTransition, textRole } from '@/shared/theme'
+import { ContentText } from '@/shared/typography'
 
 const CardLink = styled(Link)`
   display: block;
@@ -28,11 +29,10 @@ const InfoArea = styled.div`
   padding: 0.5rem;
 `
 
-const Name = styled.p`
+const Name = styled(ContentText)`
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 0.875rem;
   font-weight: 500;
 `
 
@@ -40,7 +40,7 @@ const AlbumCount = styled.p`
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 0.75rem;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
 `
 
@@ -61,7 +61,7 @@ export function ArtistCard({ publicId, name, albumCount, imageUrl }: ArtistCardP
         )}
       </ImageArea>
       <InfoArea>
-        <Name>{name}</Name>
+        <Name textRole="body-sm" text={name} forwardedAs="p" />
         {albumCount !== undefined && (
           <AlbumCount>
             {albumCount} {albumCount === 1 ? 'album' : 'albums'}

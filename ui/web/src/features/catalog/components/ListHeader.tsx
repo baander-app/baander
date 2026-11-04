@@ -13,7 +13,7 @@ import { CSS } from '@dnd-kit/utilities'
 import type { GetSongIndexSort } from '@/shared/api-client/gen/endpoints'
 import { ALL_COLUMNS, DEFAULT_WIDTHS, useListColumnStore, type ColumnConfig } from '../stores/list-column-store'
 import { ColumnResizeHandle } from './ColumnResizeHandle'
-import { interactiveTransition } from '@/shared/theme'
+import { interactiveTransition, textRole } from '@/shared/theme'
 
 export interface SortState {
   field: GetSongIndexSort | null
@@ -56,10 +56,7 @@ const headerCell = css`
   align-items: center;
   gap: 0.25rem;
   padding: 0 0.5rem;
-  font-size: 11px;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  ${textRole('label')}
   color: var(--color-muted-foreground);
   min-width: 0;
 `
@@ -109,7 +106,7 @@ const MenuLabel = styled.label`
   gap: 0.5rem;
   border-radius: var(--radius-sm);
   padding: 0.375rem 0.5rem;
-  font-size: 0.875rem;
+  ${textRole('body')}
   ${interactiveTransition(['color', 'background-color'])}
 
   &:hover {

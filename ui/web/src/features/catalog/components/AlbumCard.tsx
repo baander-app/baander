@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { useImageBlob } from '@/shared/hooks/use-image-blob'
 import { AlbumContextMenu } from './menus/AlbumContextMenu'
 import { interactiveTransition } from '@/shared/theme'
+import { ContentText } from '@/shared/typography'
 
 const CardLink = styled(Link)`
   display: block;
@@ -29,19 +30,17 @@ const InfoArea = styled.div`
   padding: 0.5rem;
 `
 
-const Title = styled.p`
+const Title = styled(ContentText)`
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 0.875rem;
   font-weight: 500;
 `
 
-const ArtistName = styled.p`
+const ArtistName = styled(ContentText)`
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 0.75rem;
   color: var(--color-muted-foreground);
 `
 
@@ -64,9 +63,9 @@ export function AlbumCard({ publicId, title, artistName, imageUrl }: AlbumCardPr
           )}
         </ImageArea>
         <InfoArea>
-          <Title>{title}</Title>
+          <Title textRole="body-sm" text={title} forwardedAs="p" />
           {artistName && (
-            <ArtistName>{artistName}</ArtistName>
+            <ArtistName textRole="caption" text={artistName} forwardedAs="p" />
           )}
         </InfoArea>
       </CardLink>

@@ -82,6 +82,14 @@ describe('ArtistDiscography', () => {
     expect(screen.getByText('Album 2')).toBeInTheDocument()
   })
 
+  it('passes each album language to its card title', () => {
+    const [album] = makeAlbums(1)
+    renderWithTheme(<ArtistDiscography albums={[{ ...album, language: 'jpn' }]} isLoading={false} />)
+
+    expect(screen.getByText('Album 0')).toHaveAttribute('lang', 'ja')
+    expect(screen.getByText('Test Artist')).toHaveAttribute('lang', 'en')
+  })
+
   it('shows "No albums yet" when empty', () => {
     renderWithTheme(<ArtistDiscography albums={[]} isLoading={false} />)
     expect(screen.getByText('No albums yet')).toBeInTheDocument()

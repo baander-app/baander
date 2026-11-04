@@ -2,6 +2,8 @@ import styled from 'styled-components'
 import { Play } from 'lucide-react'
 import { Button } from '@/shared/components/ui/button'
 import type { MovieDetail } from '../types'
+import { textRole } from '@/shared/theme'
+import { ContentText } from '@/shared/typography'
 
 const Container = styled.div`
   position: relative;
@@ -75,7 +77,7 @@ const MetaRow = styled.div`
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  font-size: 0.875rem;
+  ${textRole('body-sm')}
   color: var(--color-muted-foreground);
 `
 
@@ -89,14 +91,12 @@ const StarIcon = styled.svg`
   color: var(--color-warning);
 `
 
-const MovieTitle = styled.h1`
-  font-size: 1.875rem;
-  font-weight: 600;
-  letter-spacing: -0.025em;
+const MovieTitle = styled(ContentText)`
+  display: block;
 `
 
 const Tagline = styled.p`
-  font-size: 0.875rem;
+  ${textRole('body')}
   font-style: italic;
   color: var(--color-muted-foreground);
 `
@@ -141,10 +141,10 @@ export function MovieHeader({ movie, onPlay }: MovieHeaderProps) {
         <MetaArea>
           <MetaRow>
             {movie.year && <span>{movie.year}</span>}
-            {runtime && <><Dot>\u00b7</Dot><span>{runtime}</span></>}
+            {runtime && <><Dot>·</Dot><span>{runtime}</span></>}
             {movie.rating && (
               <>
-                <Dot>\u00b7</Dot>
+                <Dot>·</Dot>
                 <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
                   <StarIcon viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" /></StarIcon>
                   {movie.rating.toFixed(1)}
@@ -153,10 +153,10 @@ export function MovieHeader({ movie, onPlay }: MovieHeaderProps) {
             )}
           </MetaRow>
 
-          <MovieTitle>{movie.title}</MovieTitle>
+          <MovieTitle textRole="title-lg" text={movie.title} forwardedAs="h1" />
 
           {movie.tagline && (
-            <Tagline>&ldquo;{movie.tagline}&rdquo;</Tagline>
+            <Tagline>&ldquo;<ContentText textRole="body" text={movie.tagline} />&rdquo;</Tagline>
           )}
 
           {hasVideo && (

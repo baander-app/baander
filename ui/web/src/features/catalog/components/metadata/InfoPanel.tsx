@@ -4,6 +4,7 @@ import { isAxiosError } from 'axios'
 import { RefreshCw } from 'lucide-react'
 import { Separator } from '@/shared/components/ui/separator'
 import { Button } from '@/shared/components/ui/button'
+import { textRole } from '@/shared/theme'
 import { useGetSongShow, useGetAlbumShow, useGetArtistShow } from '@/shared/api-client/gen/endpoints'
 import { asSongFromData, asAlbumFromData, asArtistFromData } from '../../utils/api-adapters'
 import { getFieldConfig } from './field-config'
@@ -55,22 +56,18 @@ const ErrorContainer = styled.div`
 `
 
 const ErrorText = styled.p`
-  font-size: 0.875rem;
+  ${textRole('body')}
   color: var(--color-muted-foreground);
 `
 
 const SectionLabel = styled.span`
-  font-size: 10px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
+  ${textRole('label')}
   color: color-mix(in srgb, var(--color-muted-foreground) 60%, transparent);
 `
 
 const SyncButton = styled(Button)`
   width: 100%;
   gap: 0.375rem;
-  font-size: 0.75rem;
   color: var(--color-muted-foreground);
 `
 

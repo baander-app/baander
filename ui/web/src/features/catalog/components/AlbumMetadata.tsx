@@ -1,4 +1,6 @@
 import styled from 'styled-components'
+import { textRole } from '@/shared/theme'
+import { ContentText } from '@/shared/typography'
 
 const Container = styled.div`
   flex-shrink: 0;
@@ -19,16 +21,11 @@ const Field = styled.div`
 `
 
 const Label = styled.span`
-  font-size: 11px;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  ${textRole('label')}
   color: var(--color-muted-foreground);
 `
 
-const Value = styled.span`
-  font-family: var(--font-mono);
-  font-size: 0.875rem;
+const Value = styled(ContentText)`
   color: var(--color-foreground);
 `
 
@@ -66,7 +63,7 @@ export function AlbumMetadata({ album }: AlbumMetadataProps) {
         {fields.map((field) => (
           <Field key={field.label}>
             <Label>{field.label}</Label>
-            <Value>{String(field.value)}</Value>
+            <Value textRole="mono-sm" text={String(field.value)} />
           </Field>
         ))}
       </Grid>

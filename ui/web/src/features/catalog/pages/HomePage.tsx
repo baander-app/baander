@@ -18,6 +18,8 @@ import { useRadioPlayback } from '@/features/radio/hooks/use-radio-playback'
 import { useRadioStore } from '@/features/radio/stores/radio-store'
 import { Radio } from 'lucide-react'
 import { useImageBlob } from '@/shared/hooks/use-image-blob'
+import { textRole } from '@/shared/theme'
+import { ContentText } from '@/shared/typography'
 
 // ── Shared card styles ──────────────────────────────────
 
@@ -62,20 +64,43 @@ const CardInfo = styled.div`
   padding: 0.375rem;
 `
 
-const CardTitle = styled.p`
+const CardTitle = styled(ContentText)`
+  display: block;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 0.75rem;
   font-weight: 500;
   color: var(--color-foreground);
 `
 
-const CardSubtitle = styled.p`
+const CardTitleRow = styled.span`
+  display: flex;
+  min-width: 0;
+`
+
+const UnavailableNote = styled.span`
+  flex-shrink: 0;
+  white-space: pre;
+  ${textRole('body-sm')}
+  font-weight: 500;
+  color: var(--color-foreground);
+`
+
+const CardSubtitle = styled(ContentText)`
+  display: block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 11px;
+  color: var(--color-muted-foreground);
+`
+
+const CardSubtitleLine = styled.span`
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
 `
 
@@ -123,20 +148,21 @@ const PlaylistInfo = styled.div`
   min-width: 0;
 `
 
-const PlaylistTitle = styled.p`
+const PlaylistTitle = styled(ContentText)`
+  display: block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 0.75rem;
   font-weight: 500;
   color: var(--color-foreground);
 `
 
-const PlaylistSub = styled.p`
+const PlaylistSub = styled.span`
+  display: block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 11px;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
 `
 
@@ -153,9 +179,7 @@ const PageHeader = styled.div`
 `
 
 const PageTitle = styled.h1`
-  font-size: 1.125rem;
-  font-weight: 600;
-  letter-spacing: -0.025em;
+  ${textRole('title-lg')}
 `
 
 const ContentArea = styled.div`
@@ -194,12 +218,12 @@ const EmptyContainer = styled.div`
 `
 
 const EmptyText = styled.p`
-  font-size: 0.875rem;
+  ${textRole('body')}
   color: var(--color-muted-foreground);
 `
 
 const EmptySubText = styled.p`
-  font-size: 0.75rem;
+  ${textRole('caption')}
   color: color-mix(in srgb, var(--color-muted-foreground) 70%, transparent);
 `
 
@@ -228,8 +252,8 @@ function AlbumCard({ album }: { album: AlbumSummary }) {
         )}
       </CoverImageArea>
       <CardInfo>
-        <CardTitle>{album.title}</CardTitle>
-        {artistName && <CardSubtitle>{artistName}</CardSubtitle>}
+        <CardTitle textRole="body-sm" text={album.title} language={album.language} />
+        {artistName && <CardSubtitle textRole="caption" text={artistName} />}
       </CardInfo>
     </CoverCard>
   )
@@ -278,8 +302,11 @@ function RecentlyPlayedCard({ item }: { item: RecentItem }) {
         )}
       </CoverImageArea>
       <CardInfo>
-        <CardTitle>{item.songTitle ?? 'Unknown'}{item.songAvailable === false && <span> · Unavailable</span>}</CardTitle>
-        {item.artistName && <CardSubtitle>{item.artistName}</CardSubtitle>}
+        <CardTitleRow>
+          <CardTitle textRole="body-sm" text={item.songTitle ?? 'Unknown'} />
+          {item.songAvailable === false && <UnavailableNote> · Unavailable</UnavailableNote>}
+        </CardTitleRow>
+        {item.artistName && <CardSubtitle textRole="caption" text={item.artistName} />}
       </CardInfo>
     </CoverCard>
   )
@@ -310,7 +337,7 @@ function PlaylistCard({ playlist }: { playlist: PlaylistItem }) {
         </svg>
       </PlaylistIconBox>
       <PlaylistInfo>
-        <PlaylistTitle>{playlist.name}</PlaylistTitle>
+        <PlaylistTitle textRole="body-sm" text={playlist.name} />
         <PlaylistSub>
           {playlist.isSmart ? 'Smart' : `${playlist.songCount ?? 0} tracks`}
         </PlaylistSub>
@@ -343,10 +370,16 @@ function RadioStationCard({ station }: { station: RadioStation }) {
         )}
       </CoverImageArea>
       <CardInfo>
-        <CardTitle>{station.name}</CardTitle>
-        <CardSubtitle>
-          {station.country}{station.genres.length > 0 ? ` · ${station.genres[0]}` : ''}
-        </CardSubtitle>
+        <CardTitle textRole="body-sm" text={station.name} />
+        <CardSubtitleLine>
+          {station.country}
+          {station.genres.length > 0 && (
+            <>
+              <span>{' · '}</span>
+              <ContentText textRole="caption" text={station.genres[0]} />
+            </>
+          )}
+        </CardSubtitleLine>
       </CardInfo>
     </CoverCardWithRing>
   )

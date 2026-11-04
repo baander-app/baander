@@ -4,7 +4,8 @@ import { Music } from 'lucide-react'
 import { useSelectionStore } from '../stores/selection-store'
 import { useImageBlob } from '@/shared/hooks/use-image-blob'
 import type { Recommendation, RecommendationCluster } from '../types/recommendation'
-import { focusVisibleRing } from '@/shared/theme'
+import { focusVisibleRing, textRole } from '@/shared/theme'
+import { ContentText } from '@/shared/typography'
 
 const RecCard = styled.div<{ $isSelected: boolean }>`
   flex-shrink: 0;
@@ -61,28 +62,24 @@ const CoverPlaceholder = styled.div`
   color: color-mix(in srgb, var(--color-muted-foreground) 30%, transparent);
 `
 
-const RecTitle = styled.p`
+const RecTitle = styled(ContentText)`
   margin-top: 0.5rem;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 0.75rem;
   font-weight: 500;
 `
 
-const RecSubtitle = styled.p`
+const RecSubtitle = styled(ContentText)`
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 11px;
   color: var(--color-muted-foreground);
 `
 
 const SectionTitle = styled.h3`
   margin-bottom: 0.75rem;
-  font-size: 0.875rem;
-  font-weight: 600;
-  letter-spacing: -0.025em;
+  ${textRole('title')}
   color: var(--color-foreground);
 `
 
@@ -148,25 +145,28 @@ function RecommendationCard({ rec }: { rec: Recommendation }) {
           </CoverPlaceholder>
         )}
       </RecCover>
-      <RecTitle title={displayName}>{displayName}</RecTitle>
+      <RecTitle textRole="body-sm" text={displayName} title={displayName} forwardedAs="p" />
       {subtitleName && (
-        <RecSubtitle title={subtitleName}>{subtitleName}</RecSubtitle>
+        <RecSubtitle textRole="caption" text={subtitleName} title={subtitleName} forwardedAs="p" />
       )}
     </RecCard>
   )
 }
 
 export function RecommendationClusterRow({ cluster }: RecommendationClusterProps) {
-  const headerLabel =
+  const headerPrefix =
     cluster.sourceType === 'album'
-      ? `Because you listened to ${cluster.sourceName}`
+      ? 'Because you listened to '
       : cluster.sourceType === 'artist'
-        ? `Similar to ${cluster.sourceName}`
-        : cluster.sourceName
+        ? 'Similar to '
+        : ''
 
   return (
-    <section aria-label={headerLabel}>
-      <SectionTitle>{headerLabel}</SectionTitle>
+    <section aria-label={`${headerPrefix}${cluster.sourceName}`}>
+      <SectionTitle>
+        {headerPrefix}
+        <ContentText textRole="title" text={cluster.sourceName} />
+      </SectionTitle>
       <RecStrip>
         {cluster.items.map((rec) => (
           <RecommendationCard key={rec.public_id} rec={rec} />

@@ -6,6 +6,8 @@ import { usePlayerStore, type Track } from '@/features/player/stores/player-stor
 import { useSelectionStore } from '../stores/selection-store'
 import { SongContextMenu } from './menus/SongContextMenu'
 import { formatDuration } from '@/shared/utils/format-duration'
+import { textRole } from '@/shared/theme'
+import { ContentText } from '@/shared/typography'
 
 const EmptyContainer = styled.div`
   display: flex;
@@ -15,7 +17,7 @@ const EmptyContainer = styled.div`
 `
 
 const EmptyText = styled.p`
-  font-size: 0.875rem;
+  ${textRole('body')}
   color: var(--color-muted-foreground);
 `
 
@@ -49,7 +51,7 @@ const TrackNumber = styled.span`
   width: 2.5rem;
   flex-shrink: 0;
   text-align: right;
-  font-size: 0.75rem;
+  ${textRole('caption')}
   font-variant-numeric: tabular-nums;
   color: var(--color-muted-foreground);
 `
@@ -71,18 +73,20 @@ const TrackTitle = styled.span`
   text-overflow: ellipsis;
   white-space: nowrap;
   padding: 0 0.5rem;
-  font-size: 0.875rem;
+  ${textRole('body-sm')}
+`
+
+const TrackTitleText = styled(ContentText)`
   font-weight: 500;
 `
 
-const TrackArtist = styled.span`
+const TrackArtist = styled(ContentText)`
   width: 25%;
   flex-shrink: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   padding: 0 0.5rem;
-  font-size: 0.75rem;
   color: var(--color-muted-foreground);
 `
 
@@ -90,8 +94,7 @@ const TrackDuration = styled.span`
   width: 4rem;
   flex-shrink: 0;
   text-align: right;
-  font-size: 0.75rem;
-  font-variant-numeric: tabular-nums;
+  ${textRole('mono-sm')}
   color: var(--color-muted-foreground);
 `
 
@@ -108,6 +111,8 @@ const EqualizerBar = styled.rect`
 interface AlbumTrackListProps {
   songs: Record<string, unknown>[]
   albumTitle: string
+  /** The album's stored release language, which its songs inherit. */
+  albumLanguage?: string | null
   albumPublicId?: string
 }
 
@@ -123,7 +128,7 @@ function EqualizerIcon() {
   )
 }
 
-export function AlbumTrackList({ songs, albumTitle, albumPublicId }: AlbumTrackListProps) {
+export function AlbumTrackList({ songs, albumTitle, albumLanguage, albumPublicId }: AlbumTrackListProps) {
   const parentRef = useRef<HTMLDivElement>(null)
   const currentTrack = usePlayerStore((s) => s.currentTrack)
   const playTrack = usePlayerStore((s) => s.playTrack)
@@ -145,10 +150,11 @@ export function AlbumTrackList({ songs, albumTitle, albumPublicId }: AlbumTrackL
       title: String(s.title ?? ''),
       artistName: s.artistName ? String(s.artistName) : undefined,
       albumName: albumTitle,
+      albumLanguage: albumLanguage ?? undefined,
       albumPublicId,
       duration: typeof s.length === 'number' ? s.length : (typeof s.duration === 'number' ? s.duration : undefined),
     }))
-  }, [songs, albumTitle, albumPublicId])
+  }, [songs, albumTitle, albumLanguage, albumPublicId])
 
   const handlePlayTrack = useCallback(
     (index: number) => {
@@ -197,6 +203,7 @@ export function AlbumTrackList({ songs, albumTitle, albumPublicId }: AlbumTrackL
                 title,
                 artistName,
                 albumName: albumTitle,
+                albumLanguage: albumLanguage ?? undefined,
                 duration,
                 albumId: song.albumId ? String(song.albumId) : undefined,
                 artistId: song.artistId ? String(song.artistId) : undefined,
@@ -234,10 +241,13 @@ export function AlbumTrackList({ songs, albumTitle, albumPublicId }: AlbumTrackL
                 </TrackNumber>
 
                 {/* Title */}
-                <TrackTitle>{title}{song.available === false && <span> · Unavailable</span>}</TrackTitle>
+                <TrackTitle>
+                  <TrackTitleText textRole="body-sm" text={title} language={albumLanguage} />
+                  {song.available === false && <span> · Unavailable</span>}
+                </TrackTitle>
 
                 {/* Artist (for compilations) */}
-                <TrackArtist>{artistName}</TrackArtist>
+                <TrackArtist textRole="body-sm" text={artistName ?? ''} />
 
                 {/* Duration */}
                 <TrackDuration>

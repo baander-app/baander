@@ -2,6 +2,8 @@ import styled, { css } from 'styled-components'
 import { memo } from 'react'
 import { Play } from 'lucide-react'
 import { formatDuration } from '@/shared/utils/format-duration'
+import { textRole } from '@/shared/theme'
+import { ContentText } from '@/shared/typography'
 import type { SongEntry } from '@/features/catalog/types'
 
 const Row = styled.div<{ $isPlaying: boolean; $isFocused: boolean }>`
@@ -38,7 +40,7 @@ const IndexCell = styled.span`
   flex-shrink: 0;
   padding-left: 0.25rem;
   text-align: right;
-  font-size: 0.75rem;
+  ${textRole('caption')}
   font-variant-numeric: tabular-nums;
   color: var(--color-muted-foreground);
 
@@ -83,17 +85,19 @@ const TitleCell = styled.span`
   text-overflow: ellipsis;
   white-space: nowrap;
   padding: 0 0.5rem;
-  font-size: 0.875rem;
+  ${textRole('body-sm')}
+`
+
+const TitleText = styled(ContentText)`
   font-weight: 500;
 `
 
-const MutedCell = styled.span`
+const MutedCell = styled(ContentText)`
   width: 25%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   padding: 0 0.5rem;
-  font-size: 0.75rem;
   color: var(--color-muted-foreground);
 `
 
@@ -101,8 +105,7 @@ const DurationCell = styled.span`
   width: 4rem;
   flex-shrink: 0;
   text-align: right;
-  font-size: 0.75rem;
-  font-variant-numeric: tabular-nums;
+  ${textRole('mono-sm')}
   color: var(--color-muted-foreground);
 `
 
@@ -163,13 +166,16 @@ export const VirtualSongRow = memo(function VirtualSongRow({
       </HoverPlayCell>
 
       {/* Title */}
-      <TitleCell>{song.title}{song.available === false && <span> · Unavailable</span>}</TitleCell>
+      <TitleCell>
+        <TitleText textRole="body-sm" text={song.title} language={song.albumLanguage} />
+        {song.available === false && <span> · Unavailable</span>}
+      </TitleCell>
 
       {/* Artist */}
-      <MutedCell>{song.artistName}</MutedCell>
+      <MutedCell textRole="body-sm" text={song.artistName ?? ''} />
 
       {/* Album */}
-      <MutedCell>{song.albumName}</MutedCell>
+      <MutedCell textRole="body-sm" text={song.albumName ?? ''} language={song.albumLanguage} />
 
       {/* Duration */}
       <DurationCell>
@@ -181,6 +187,7 @@ export const VirtualSongRow = memo(function VirtualSongRow({
   // Custom equality: compare by publicId (stable UUID) + display-affecting props
   if (prev.song.publicId !== next.song.publicId) return false
   if (prev.song.available !== next.song.available) return false
+  if (prev.song.albumLanguage !== next.song.albumLanguage) return false
   if (prev.isPlaying !== next.isPlaying) return false
   if (prev.isFocused !== next.isFocused) return false
   if (prev.index !== next.index) return false

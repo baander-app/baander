@@ -3,6 +3,7 @@ import { useTimelineViewModel } from '../hooks/use-timeline-view-model'
 import { TimelineDecade } from '../components/TimelineDecade'
 import { Button } from '@/shared/components/ui/button'
 import { Skeleton } from '@/shared/components/ui/skeleton'
+import { textRole } from '@/shared/theme'
 
 const Container = styled.div`
   display: flex;
@@ -20,13 +21,13 @@ const CenterMessage = styled.div`
 `
 
 const ErrorText = styled.p`
-  font-size: 0.875rem;
+  ${textRole('body')}
   color: var(--color-destructive);
 `
 
 const EmptyText = styled.p`
   padding: 1rem 0;
-  font-size: 0.875rem;
+  ${textRole('body')}
   color: var(--color-muted-foreground);
 `
 

@@ -2,6 +2,7 @@ import styled from 'styled-components'
 import { AlertTriangle, X } from 'lucide-react'
 import { Button } from '@/shared/components/ui/button'
 import { useMergeStore } from '../stores/merge-store'
+import { textRole } from '@/shared/theme'
 import type { DuplicateGroup } from '@/features/admin/api/album-duplicates-api'
 
 const Banner = styled.div`
@@ -28,7 +29,7 @@ const AlertIcon = styled(AlertTriangle)`
 `
 
 const BannerText = styled.div`
-  font-size: 0.875rem;
+  ${textRole('body')}
 `
 
 const Highlight = styled.span`
@@ -98,7 +99,7 @@ export function DuplicateWarningBanner({
           variant="ghost"
           size="sm"
           onClick={handleMerge}
-          style={{ height: '1.75rem', padding: '0 0.5rem', fontSize: '0.75rem' }}
+          style={{ minHeight: '1.75rem', padding: '0 0.5rem' }}
         >
           Review Duplicates
         </Button>

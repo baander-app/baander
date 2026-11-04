@@ -10,7 +10,8 @@ import { formatDuration } from '@/shared/utils/format-duration';
 import { AlbumContextMenu } from './menus/AlbumContextMenu';
 import { ArtistContextMenu } from './menus/ArtistContextMenu';
 import { SongContextMenu } from './menus/SongContextMenu';
-import { interactiveTransition } from '@/shared/theme';
+import { interactiveTransition, textRole } from '@/shared/theme';
+import { ContentText } from '@/shared/typography';
 
 const Container = styled.div`
   & > * + * {
@@ -20,9 +21,7 @@ const Container = styled.div`
 
 const SectionTitle = styled.h2`
   margin-bottom: 0.75rem;
-  font-size: 0.875rem;
-  font-weight: 600;
-  letter-spacing: -0.025em;
+  ${textRole('title')}
 `
 
 const Grid = styled.div`
@@ -58,16 +57,15 @@ const ArtistAvatar = styled.div`
   justify-content: center;
   border-radius: 50%;
   background-color: var(--color-secondary);
-  font-size: 1.5rem;
-  font-weight: 600;
   color: var(--color-muted-foreground);
 `
 
-const ArtistName = styled.div`
+const ArtistName = styled(ContentText)`
+  display: block;
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 0.75rem;
   font-weight: 500;
 `
 
@@ -99,19 +97,17 @@ const AlbumPlaceholder = styled.div`
   color: color-mix(in srgb, var(--color-muted-foreground) 20%, transparent);
 `
 
-const AlbumTitle = styled.div`
+const AlbumTitle = styled(ContentText)`
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 0.75rem;
   font-weight: 500;
 `
 
-const AlbumArtist = styled.div`
+const AlbumArtist = styled(ContentText)`
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 11px;
   color: var(--color-muted-foreground);
 `
 
@@ -142,22 +138,24 @@ const SongTitle = styled.p`
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 0.875rem;
-  font-weight: 500;
+  ${textRole('body-sm')}
   color: color-mix(in srgb, var(--color-foreground) 80%, transparent);
 `
 
-const SongArtist = styled.p`
+const SongTitleText = styled(ContentText)`
+  font-weight: 500;
+`
+
+const SongArtist = styled(ContentText)`
+  display: block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 11px;
   color: var(--color-muted-foreground);
 `
 
 const SongDuration = styled.span`
-  font-size: 0.75rem;
-  font-variant-numeric: tabular-nums;
+  ${textRole('mono-sm')}
   color: var(--color-muted-foreground);
 `
 
@@ -177,7 +175,7 @@ const EmptyContainer = styled.div`
 `
 
 const EmptyText = styled.p`
-  font-size: 0.875rem;
+  ${textRole('body')}
   color: var(--color-muted-foreground);
 `
 
@@ -219,7 +217,7 @@ export function SearchResults({query}: { query: string }) {
   if (!hasResults) {
     return (
       <EmptyContainer>
-        <EmptyText>No results for &ldquo;{query}&rdquo;</EmptyText>
+        <EmptyText>No results for &ldquo;<ContentText textRole="body" text={query} />&rdquo;</EmptyText>
       </EmptyContainer>
     );
   }
@@ -235,9 +233,9 @@ export function SearchResults({query}: { query: string }) {
               <ArtistContextMenu key={artist.publicId} artist={{ publicId: artist.publicId, name: artist.name }}>
                 <ArtistLink to={`/artists/${artist.publicId}`}>
                   <ArtistAvatar>
-                    {artist.name.charAt(0).toUpperCase()}
+                    <ContentText textRole="title" text={Array.from(artist.name)[0]?.toUpperCase() ?? ''} aria-hidden="true" />
                   </ArtistAvatar>
-                  <ArtistName>{artist.name}</ArtistName>
+                  <ArtistName textRole="caption" text={artist.name} />
                 </ArtistLink>
               </ArtistContextMenu>
             ))}
@@ -262,8 +260,8 @@ export function SearchResults({query}: { query: string }) {
                       </AlbumPlaceholder>
                     )}
                   </AlbumCover>
-                  <AlbumTitle>{album.title}</AlbumTitle>
-                  <AlbumArtist>{album.artists[0]?.name}</AlbumArtist>
+                  <AlbumTitle textRole="caption" text={album.title} language={album.language} forwardedAs="div" />
+                  <AlbumArtist textRole="caption" text={album.artists[0]?.name ?? ''} forwardedAs="div" />
                 </AlbumLink>
               </AlbumContextMenu>
             ))}
@@ -294,8 +292,11 @@ export function SearchResults({query}: { query: string }) {
                   onClick={() => handlePlaySong(song, songs, index)}
                 >
                   <SongInfo>
-                    <SongTitle>{song.title}{song.available === false && <span> · Unavailable</span>}</SongTitle>
-                    <SongArtist>{song.artistName}</SongArtist>
+                    <SongTitle>
+                      <SongTitleText textRole="body-sm" text={song.title} language={song.albumLanguage} />
+                      {song.available === false && <span> · Unavailable</span>}
+                    </SongTitle>
+                    <SongArtist textRole="caption" text={song.artistName ?? ''} forwardedAs="p" />
                   </SongInfo>
                   <SongDuration>
                     {song.length != null ? formatDuration(song.length) : ''}
