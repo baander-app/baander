@@ -41,7 +41,9 @@ try {
     if (!is_string($appHome) || $appHome === '') {
         throw new InvalidArgumentException('Operator image must declare APP_HOME.');
     }
-    $manifest = \App\Shared\Infrastructure\Worker\DeploymentOperatorManifest::fromJson($json, $appHome);
+    // A manifest that leaves the hardware encoder device's group unset takes it from this host.
+    $manifest = \App\Shared\Infrastructure\Worker\DeploymentOperatorManifest::fromJson($json, $appHome,
+        \App\Shared\Infrastructure\Worker\DeploymentOperatorManifest::hostDeviceGroup(...));
     $credentials = \App\Shared\Infrastructure\Worker\DeploymentOperatorCredentials::fromFile($arguments[3]);
     $recipes = [
         'control' => $manifest->recipe(\App\Shared\Application\DTO\DeploymentUnit::Control, $credentials->runtimeEnvironment),

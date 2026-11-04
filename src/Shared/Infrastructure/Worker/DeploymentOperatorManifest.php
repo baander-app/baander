@@ -36,7 +36,11 @@ final readonly class DeploymentOperatorManifest
         public WorkerAutoscalingProfile $autoscaling,
         public string $sourceMountPolicy,
         public DeploymentProfile $deploymentProfile,
+        public ?int $deviceGroup,
     ) {
+        if (($deploymentProfile->hardware?->device === null) !== ($deviceGroup === null)) {
+            throw new InvalidArgumentException('Operator manifest requires a device group exactly when the deployment profile names a hardware encoder device.');
+        }
         if (!str_starts_with($dockerBinary, '/') || strlen($dockerBinary) > 4096
             || preg_match('/[\x00-\x1f\x7f]/', $dockerBinary) !== 0
             || strlen($dockerEndpoint) > 4096
@@ -53,7 +57,13 @@ final readonly class DeploymentOperatorManifest
         }
     }
 
-    public static function fromJson(string $json, string $appHome): self
+    /**
+     * A null `deviceGroup` with a hardware encoder device takes the group that owns the device,
+     * as the given resolver reports it on the Docker host; without a resolver it is rejected.
+     *
+     * @param ?\Closure(string): int $deviceGroupOf
+     */
+    public static function fromJson(string $json, string $appHome, ?\Closure $deviceGroupOf = null): self
     {
         if (strlen($json) > 8192) {
             throw new InvalidArgumentException('Operator manifest exceeds 8192 bytes.');
@@ -67,12 +77,12 @@ final readonly class DeploymentOperatorManifest
             throw new InvalidArgumentException('Operator manifest must be a JSON object.');
         }
         $fields = get_object_vars($decoded);
-        $expected = [...self::STRING_FIELDS, ...self::INTEGER_FIELDS, 'mediaMounts', 'autoscaling', 'deploymentProfile'];
+        $expected = [...self::STRING_FIELDS, ...self::INTEGER_FIELDS, 'mediaMounts', 'autoscaling', 'deploymentProfile', 'deviceGroup'];
         if (array_diff(array_keys($fields), $expected) !== [] || array_diff($expected, array_keys($fields)) !== []) {
             throw new InvalidArgumentException('Operator manifest has unknown or missing fields.');
         }
-        if (self::integer($fields, 'version') !== 7) {
-            throw new InvalidArgumentException('Operator manifest version must be 7.');
+        if (self::integer($fields, 'version') !== 8) {
+            throw new InvalidArgumentException('Operator manifest version must be 8.');
         }
         if (!is_array($fields['mediaMounts']) || !array_is_list($fields['mediaMounts'])) {
             throw new InvalidArgumentException('Operator media mounts require an ordered list.');
@@ -84,11 +94,31 @@ final readonly class DeploymentOperatorManifest
             }
             $mounts[] = get_object_vars($mount);
         }
+        $profile = json_encode($fields['deploymentProfile'], JSON_THROW_ON_ERROR) |> DeploymentProfile::fromJson(...);
+        $deviceGroup = $fields['deviceGroup'];
+        if ($deviceGroup !== null && !is_int($deviceGroup)) {
+            throw new InvalidArgumentException('Operator manifest device group requires a JSON integer or null.');
+        }
+        $device = $profile->hardware?->device;
+        if ($deviceGroup === null && $device !== null && $deviceGroupOf !== null) {
+            $deviceGroup = $deviceGroupOf($device);
+        }
         return new self(self::string($fields, 'namespace'), self::string($fields, 'bootId'), self::string($fields, 'daemonId'),
             self::string($fields, 'imageId'), $appHome, self::string($fields, 'network'), self::string($fields, 'dockerBinary'), self::string($fields, 'dockerEndpoint'),
             self::bytes($fields, 'scheduledConsoleMiB'), self::string($fields, 'ipcVolume'), $mounts,
             WorkerAutoscalingProfile::fromJson(json_encode($fields['autoscaling'], JSON_THROW_ON_ERROR)), self::string($fields, 'sourceMountPolicy'),
-            json_encode($fields['deploymentProfile'], JSON_THROW_ON_ERROR) |> DeploymentProfile::fromJson(...));
+            $profile, $deviceGroup);
+    }
+
+    /** The group that owns a device node on this host, for a manifest that leaves it to the host. */
+    public static function hostDeviceGroup(string $device): int
+    {
+        clearstatcache(true, $device);
+        $status = @stat($device);
+        if ($status === false || !in_array(@filetype($device), ['char', 'block'], true)) {
+            throw new InvalidArgumentException('The hardware encoder device is not a device node on this host; set the manifest deviceGroup explicitly.');
+        }
+        return $status['gid'];
     }
 
     public function recipe(DeploymentUnit $unit, DeploymentRuntimeEnvironment $environment): DeploymentContainerRecipe
@@ -104,7 +134,7 @@ final readonly class DeploymentOperatorManifest
                 '--autoscaling-profile=' . $this->autoscaling->toJson(),
                 '--deployment-profile=' . $this->deploymentProfile->toJson(),
                 '--lock-dir=/tmp/baander-worker-locks', '--ipc-dir=/run/baander-worker'],
-            $this->network, $unit, $this->ipcVolume, $this->appHome, $this->deploymentProfile, $environment, $this->mediaMounts, $this->sourceMountPolicy);
+            $this->network, $unit, $this->ipcVolume, $this->appHome, $this->deploymentProfile, $environment, $this->mediaMounts, $this->sourceMountPolicy, $this->deviceGroup);
         if (!in_array('source', array_column($recipe->mediaMounts, 'role'), true)) {
             throw new InvalidArgumentException('Operator media topology requires an explicitly authorized source storage.');
         }

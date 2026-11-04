@@ -405,7 +405,7 @@ final class RegisteredDeploymentRecoveryTest extends TestCase
             $recipe = $this->recipe($unit);
             return json_encode(['id' => $target, 'namespace' => self::NAMESPACE, 'bootId' => self::BOOT, 'role' => $unit->value,
                 'privileged' => false, 'pidMode' => '', 'cgroupnsMode' => 'private', 'binds' => null, 'tmpfs' => null,
-                'devices' => [], 'deviceRequests' => [], 'capAdd' => null, 'capDrop' => ['ALL'], 'securityOpt' => ['no-new-privileges'],
+                'devices' => [], 'deviceRequests' => [], 'groupAdd' => null, 'capAdd' => null, 'capDrop' => ['ALL'], 'securityOpt' => ['no-new-privileges'],
                 'memory' => 0, 'memorySwap' => 0, 'nanoCpus' => 0, 'cpuQuota' => 0, 'cpuShares' => 0, 'pidsLimit' => null, 'cpuSet' => '', 'oomScoreAdj' => $recipe->oomScoreAdj, 'restart' => 'no', 'retryCount' => 0,
                 'mounts' => [['Type' => 'volume', 'Name' => 'worker-ipc', 'Driver' => 'local', 'Source' => '/var/lib/docker/volumes/worker-ipc/_data', 'Destination' => '/run/baander-worker', 'RW' => true]],
             ], JSON_THROW_ON_ERROR);

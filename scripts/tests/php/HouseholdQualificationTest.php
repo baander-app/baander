@@ -469,7 +469,7 @@ final class HouseholdQualificationTest extends TestCase
         $target = new Target('/usr/bin/docker', 'unix:///run/baander.app-docker.sock', 'fixture-daemon', null, null);
         $deployment = new HouseholdStateStore($directory . '/deployment');
         $deployment->save(['version' => 1, 'phase' => 'prepared', 'configuration' => $configuration['deployment'],
-            'profile' => ['version' => 1, 'deployment' => ['identifier' => 'household', 'webWorkers' => 2, 'doctrinePoolSlots' => 4],
+            'profile' => ['version' => 1, 'deployment' => ['identifier' => 'household', 'hardware' => null, 'webWorkers' => 2, 'doctrinePoolSlots' => 4],
                 'autoscaling' => ['minimumConcurrency' => 1, 'maximumConcurrency' => 1], 'runtime' => ['phpHeapMiB' => 256, 'scheduledConsoleMiB' => 320]],
             'layout' => ['version' => 1, 'root' => '/srv/baander'], 'owner' => 'fixture-owner']);
         $state = ['version' => 1, 'phase' => 'prepared', 'target' => $target->toArray(), 'configuration' => $configuration,

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Functional\Console;
 
 use App\Shared\Application\DTO\DeploymentProfile;
+use App\Shared\Application\DTO\HardwareEncoder;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 use Symfony\Component\Console\Command\Command;
@@ -78,6 +79,39 @@ final class DeploymentProfileShowCommandTest extends KernelTestCase
     {
         self::assertSame(Command::INVALID, $this->command->execute(['--identifier' => 'household', '--audio-slots' => '1'], ['capture_stderr_separately' => true]));
         self::assertStringContainsString('Household deployment profile', $this->command->getErrorOutput());
+    }
+
+    public function testHardwareOptionsBuildAProfileWithTheHardwareVideoDefault(): void
+    {
+        self::assertSame(Command::SUCCESS, $this->command->execute(['--identifier' => 'full', '--hardware-accelerator' => 'vaapi', '--hardware-device' => '/dev/dri/renderD128', '--json' => true]));
+        $document = json_decode($this->command->getDisplay(), true, flags: JSON_THROW_ON_ERROR);
+        self::assertIsArray($document);
+
+        $profile = DeploymentProfile::fromJson(json_encode($document['profile'], JSON_THROW_ON_ERROR));
+        self::assertEquals(new DeploymentProfile('full', hardware: new HardwareEncoder('vaapi', '/dev/dri/renderD128')), $profile);
+        self::assertSame(['accelerator' => 'vaapi', 'device' => '/dev/dri/renderD128'], $document['profile']['hardware']);
+        self::assertSame($profile->videoEncoderSlots, $document['limits']['videoSlots']);
+        self::assertNotSame((new DeploymentProfile('full'))->fingerprint(), $document['fingerprint']);
+    }
+
+    public function testTextOutputNamesTheHardwareEncoder(): void
+    {
+        self::assertSame(Command::SUCCESS, $this->command->execute(['--identifier' => 'full', '--video-slots' => '6', '--hardware-accelerator' => 'vaapi', '--hardware-device' => '/dev/dri/renderD128']));
+        self::assertStringContainsString('vaapi on /dev/dri/renderD128', $this->command->getDisplay());
+        self::assertStringContainsString('"hardware":{"accelerator":"vaapi","device":"\\/dev\\/dri\\/renderD128"}', $this->command->getDisplay());
+    }
+
+    public function testInvalidHardwareOptionsAreRejected(): void
+    {
+        foreach ([
+            [['--hardware-device' => '/dev/dri/renderD128'], 'requires --hardware-accelerator'],
+            [['--hardware-accelerator' => 'vaapi'], 'requires a device path'],
+            [['--hardware-accelerator' => 'cuda'], 'must be one of'],
+            [['--identifier' => 'household', '--hardware-accelerator' => 'nvenc'], 'Household deployment profile'],
+        ] as [$options, $message]) {
+            self::assertSame(Command::INVALID, $this->command->execute($options, ['capture_stderr_separately' => true]));
+            self::assertStringContainsString($message, $this->command->getErrorOutput());
+        }
     }
 
     public function testNonIntegerSlotsAreRejected(): void

@@ -46,7 +46,7 @@ final class WorkerLifecycleManifestTest extends TestCase
     /** @return array<string,mixed> */
     private function manifest(): array
     {
-        return ['version' => 7, 'autoscaling' => ['maximumConcurrency' => 2],
+        return ['version' => 8, 'autoscaling' => ['maximumConcurrency' => 2],
             'deploymentProfile' => OperatorConfiguration::json(dirname(__DIR__, 3) . '/tests/Fixtures/Worker/deployment-profile.json')];
     }
 

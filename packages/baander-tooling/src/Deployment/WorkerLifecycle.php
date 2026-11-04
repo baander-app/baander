@@ -39,7 +39,7 @@ class WorkerLifecycle
         $sharedVolumes = array_values(array_unique(array_column($configuration->mediaMounts, 'volume')));
         $ipc = $configuration->namespace . '-ipc-' . $boot;
         $manifest = [
-            'version' => 7,
+            'version' => 8,
             'sourceMountPolicy' => $configuration->sourceMountPolicy,
             'namespace' => $configuration->namespace,
             'bootId' => $boot,
@@ -50,6 +50,7 @@ class WorkerLifecycle
             'dockerEndpoint' => 'unix:///var/run/docker.sock',
             'autoscaling' => $configuration->profile->autoscaling,
             'deploymentProfile' => $configuration->profile->deployment,
+            'deviceGroup' => $configuration->deviceGroup(),
             'scheduledConsoleMiB' => $configuration->profile->scheduledConsoleMiB,
             'ipcVolume' => $ipc,
             'mediaMounts' => $configuration->mediaMounts,

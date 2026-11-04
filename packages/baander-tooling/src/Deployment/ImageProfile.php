@@ -14,7 +14,8 @@ final readonly class ImageProfile
 require $argv[2] . '/vendor/autoload.php';
 $slots = static fn (string $value): ?int => $value === '' ? null : (int) $value;
 try {
-    $profile = new \App\Shared\Application\DTO\DeploymentProfile($argv[1], $slots($argv[3]), $slots($argv[4]));
+    $hardware = $argv[5] === '' ? null : new \App\Shared\Application\DTO\HardwareEncoder($argv[5], $argv[6] === '' ? null : $argv[6]);
+    $profile = new \App\Shared\Application\DTO\DeploymentProfile($argv[1], $slots($argv[3]), $slots($argv[4]), $hardware);
 } catch (\InvalidArgumentException $error) {
     fwrite(STDERR, $error->getMessage() . "\n");
     exit(2);
@@ -42,7 +43,7 @@ PHP;
     public int $webWorkers;
     public int $doctrinePoolSlots;
 
-    /** @param array<string,int|string> $deployment
+    /** @param array<string,mixed> $deployment Integer settings, the identifier and the hardware encoder or null.
      * @param array<string,int> $autoscaling
      * @param array<string,int> $runtime
      */
@@ -55,13 +56,14 @@ PHP;
     }
 
     /**
-     * Asks the image for the deployment profile with the given media slots; null slots take the
-     * image's defaults, and slots the image's profile rejects fail with its reason.
+     * Asks the image for the deployment profile with the given media slots and hardware encoder;
+     * null slots take the image's defaults, and settings the image's profile rejects fail with its reason.
      *
      * @param array<string,string> $environment
      * @param array{bootstrap:string,onCompletion:\Closure,path:string}|null $measurement
+     * @param array{accelerator:string,device:?string}|null $hardware
      */
-    public static function resolve(Client $docker, string $imageId, ApplicationLayout $layout, string $profileId, string $receiptPath, array $environment, float $cleanupSeconds, ?array $measurement = null, ?int $videoSlots = null, ?int $audioSlots = null): self
+    public static function resolve(Client $docker, string $imageId, ApplicationLayout $layout, string $profileId, string $receiptPath, array $environment, float $cleanupSeconds, ?array $measurement = null, ?int $videoSlots = null, ?int $audioSlots = null, ?array $hardware = null): self
     {
         if (preg_match('/^sha256:[a-f0-9]{64}$/D', $imageId) !== 1 || !in_array($profileId, ['full', 'household'], true)) {
             throw new \InvalidArgumentException('Profile resolution requires an immutable image and a supported deployment profile.');
@@ -74,7 +76,7 @@ PHP;
             '--network', 'none', '--read-only', '--cap-drop', 'ALL', '--cgroupns', 'private',
             '--security-opt', 'no-new-privileges', '--workdir', $layout->root,
             '--entrypoint', 'php', $imageId, '-r', ($measurement['bootstrap'] ?? '') . "\n" . self::PROGRAM, $profileId, $layout->root,
-            (string) $videoSlots, (string) $audioSlots,
+            (string) $videoSlots, (string) $audioSlots, $hardware['accelerator'] ?? '', $hardware['device'] ?? '',
         ], $environment, $cleanupSeconds, timeout: 30, onCompletion: $measurement['onCompletion'] ?? null);
         if (strlen($result->stdout) > 8192) {
             throw new \RuntimeException('The image deployment profile exceeds its bounded response size.');
@@ -86,7 +88,8 @@ PHP;
         $profile = self::fromArray($document);
         if ($profile->deployment['identifier'] !== $profileId
             || ($videoSlots !== null && ($profile->deployment['videoEncoderSlots'] ?? null) !== $videoSlots)
-            || ($audioSlots !== null && ($profile->deployment['audioEncoderSlots'] ?? null) !== $audioSlots)) {
+            || ($audioSlots !== null && ($profile->deployment['audioEncoderSlots'] ?? null) !== $audioSlots)
+            || $profile->deployment['hardware'] !== $hardware) {
             throw new \RuntimeException('The image returned a different deployment profile.');
         }
         return $profile;
@@ -104,7 +107,11 @@ PHP;
             throw new \InvalidArgumentException('Unknown image deployment profile.');
         }
         $fields = $document['deployment'];
-        unset($fields['identifier']);
+        if (!array_key_exists('hardware', $fields)) {
+            throw new \InvalidArgumentException('Image deployment profile omits its hardware encoder.');
+        }
+        $hardware = self::hardware($fields['hardware']);
+        unset($fields['identifier'], $fields['hardware']);
         $deployment = self::integerMap($fields);
         $autoscaling = self::integerMap($document['autoscaling'] ?? null);
         $runtime = self::integerMap($document['runtime'] ?? null);
@@ -114,7 +121,20 @@ PHP;
         self::requirePositive($autoscaling, 'maximumConcurrency');
         self::requirePositive($runtime, 'phpHeapMiB');
         self::requirePositive($runtime, 'scheduledConsoleMiB');
-        return new self(['identifier' => $identifier, ...$deployment], $autoscaling, $runtime);
+        return new self(['identifier' => $identifier, 'hardware' => $hardware, ...$deployment], $autoscaling, $runtime);
+    }
+
+    /** @return array{accelerator:string,device:?string}|null */
+    private static function hardware(mixed $value): ?array
+    {
+        if ($value === null) {
+            return null;
+        }
+        if (!is_array($value) || array_keys($value) !== ['accelerator', 'device'] || !is_string($value['accelerator'])
+            || !(is_string($value['device']) || $value['device'] === null)) {
+            throw new \InvalidArgumentException('Image profile hardware encoder requires an accelerator and a device or null.');
+        }
+        return $value;
     }
 
     /** @return array<string,int> */

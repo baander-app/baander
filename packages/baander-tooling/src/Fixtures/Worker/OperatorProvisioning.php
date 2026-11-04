@@ -448,7 +448,7 @@ final readonly class OperatorProvisioning
         $maximum = (int) $value;
         $profile['maximumConcurrency'] = $maximum;
         $manifest = [
-            'version' => 7,
+            'version' => 8,
             'sourceMountPolicy' => $this->qualification->configuration->developmentSource ? 'local-development' : 'production',
             'namespace' => $s->namespace,
             'bootId' => $s->boot,
@@ -459,6 +459,7 @@ final readonly class OperatorProvisioning
             'dockerEndpoint' => $this->qualification->topology->operatorTarget()->endpoint,
             'autoscaling' => $profile,
             'deploymentProfile' => OperatorConfiguration::json($this->qualification->root . '/tests/Fixtures/Worker/deployment-profile.json'),
+            'deviceGroup' => null,
             'scheduledConsoleMiB' => 320,
             'ipcVolume' => $s->ipcVolume,
             'mediaMounts' => [

@@ -126,7 +126,7 @@ final readonly class LifecycleCheckpoint
             static fn(int|string $field): bool => preg_match('/\A(control|execution)(MemoryMiB|NanoCpus|PidsLimit|CpuSet)\z/D', (string) $field) === 1,
         );
         $this->qualification->expect(
-            ($manifest['version'] ?? null) === 7 && ($manifest['autoscaling']['maximumConcurrency'] ?? null) === 2
+            ($manifest['version'] ?? null) === 8 && ($manifest['autoscaling']['maximumConcurrency'] ?? null) === 2
             && ($expected['identifier'] ?? null) === 'full' && $profile === $expected && $limits === [],
             'Lifecycle requires the two-slot full-profile worker pair without container limits',
         );

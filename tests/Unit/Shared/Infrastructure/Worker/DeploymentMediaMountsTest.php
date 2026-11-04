@@ -211,7 +211,7 @@ final class DeploymentMediaMountsTest extends TestCase
             'role' => 'control', 'memory' => 0, 'memorySwap' => 0, 'nanoCpus' => 0, 'cpuQuota' => 0, 'cpuShares' => 0, 'pidsLimit' => null, 'cpuSet' => '', 'oomScoreAdj' => -500,
             'restart' => 'no', 'retryCount' => 0, 'privileged' => false, 'pidMode' => '', 'cgroupnsMode' => 'private',
             'capDrop' => ['ALL'], 'securityOpt' => ['no-new-privileges'],
-            'binds' => null, 'tmpfs' => null, 'devices' => null, 'deviceRequests' => null, 'capAdd' => null,
+            'binds' => null, 'tmpfs' => null, 'devices' => null, 'deviceRequests' => null, 'groupAdd' => null, 'capAdd' => null,
             'mounts' => array_map(static fn (array $mount): array => [
                 'Type' => 'volume', 'Name' => $mount['volume'], 'Driver' => 'local',
                 'Source' => '/var/lib/docker/volumes/' . $mount['volume'] . '/_data',

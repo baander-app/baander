@@ -162,10 +162,10 @@ final class DeploymentOperatorManifestTest extends TestCase
     {
         $mounts = self::mounts();
         $mounts[0] = ['source' => '/tmp', 'target' => '/media/library', 'readOnly' => true, 'role' => 'source'];
-        $manifest = DeploymentOperatorManifest::fromJson($this->json(['version' => 7, 'sourceMountPolicy' => 'local-development', 'mediaMounts' => $mounts]), '/var/www/html');
+        $manifest = DeploymentOperatorManifest::fromJson($this->json(['version' => 8, 'sourceMountPolicy' => 'local-development', 'mediaMounts' => $mounts]), '/var/www/html');
         self::assertContains('type=bind,src=/tmp,dst=/media/library,readonly,bind-propagation=rprivate,bind-recursive=readonly', $manifest->recipe(DeploymentUnit::Control, new DeploymentRuntimeEnvironment())->createArguments());
         $this->expectException(InvalidArgumentException::class);
-        DeploymentOperatorManifest::fromJson($this->json(['version' => 7, 'sourceMountPolicy' => 'production', 'mediaMounts' => $mounts]), '/var/www/html');
+        DeploymentOperatorManifest::fromJson($this->json(['version' => 8, 'sourceMountPolicy' => 'production', 'mediaMounts' => $mounts]), '/var/www/html');
     }
 
     /** @return list<array{volume:string,target:string,readOnly:bool,role:string}> */
@@ -216,7 +216,9 @@ final class DeploymentOperatorManifestTest extends TestCase
     {
         foreach (self::fields() as $field => $value) {
             yield $field . ' wrong scalar type' => [$field, is_int($value) ? (string) $value : 1];
-            yield $field . ' null' => [$field, null];
+            if ($value !== null) {
+                yield $field . ' null' => [$field, null];
+            }
             yield $field . ' structured value' => [$field, ['value' => $value]];
             if (is_int($value)) {
                 yield $field . ' floating point' => [$field, $value + 0.5];
@@ -224,7 +226,7 @@ final class DeploymentOperatorManifestTest extends TestCase
             }
         }
         yield 'unsupported version' => ['version', 1];
-        yield 'obsolete manifest version' => ['version', 6];
+        yield 'obsolete manifest version' => ['version', 7];
         yield 'unknown source policy' => ['sourceMountPolicy', 'permissive'];
         yield 'unknown argv' => ['command', ['/bin/sh', '-c', 'arbitrary command']];
         yield 'unknown environment' => ['environment', ['APP_SECRET' => 'test-only-secret']];
@@ -271,7 +273,7 @@ final class DeploymentOperatorManifestTest extends TestCase
         yield 'null' => ['null'];
         yield 'oversized' => [str_repeat(' ', 8193)];
         yield 'excess depth' => [str_repeat('[', 9) . '0' . str_repeat(']', 9)];
-        yield 'numeric overflow' => [str_replace('"version":7', '"version":9223372036854775808', json_encode(self::fields(), JSON_THROW_ON_ERROR))];
+        yield 'numeric overflow' => [str_replace('"version":8', '"version":9223372036854775808', json_encode(self::fields(), JSON_THROW_ON_ERROR))];
     }
 
     /** @param array<string,mixed> $overrides */

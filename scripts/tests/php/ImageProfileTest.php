@@ -19,7 +19,7 @@ final class ImageProfileTest extends TestCase
     {
         return [
             'version' => 1,
-            'deployment' => ['identifier' => 'household', 'webWorkers' => 2, 'doctrinePoolSlots' => 4, 'ordinaryConsumerLimit' => 1, 'sharedCopySlots' => 2, 'videoEncoderSlots' => 0, 'audioEncoderSlots' => 0],
+            'deployment' => ['identifier' => 'household', 'webWorkers' => 2, 'doctrinePoolSlots' => 4, 'ordinaryConsumerLimit' => 1, 'sharedCopySlots' => 2, 'videoEncoderSlots' => 0, 'audioEncoderSlots' => 0, 'hardware' => null],
             'autoscaling' => ['minimumConcurrency' => 1, 'maximumConcurrency' => 1],
             'runtime' => ['phpHeapMiB' => 256, 'phpProcessMemoryMiB' => 320, 'nativeManagerHeapMiB' => 128, 'nativeCommandLimit' => 5,
                 'nativeResultLimit' => 12, 'nativeClientLimit' => 4, 'mediaHelperLimit' => 1, 'scheduledConsoleMiB' => 320],
@@ -76,7 +76,7 @@ final class ImageProfileTest extends TestCase
         self::assertIsString($program);
         $root = dirname(__DIR__, 3);
         foreach (['household', 'full'] as $identifier) {
-            $document = $this->runProgram($program, [$identifier, $root, '', '']);
+            $document = $this->runProgram($program, [$identifier, $root, '', '', '', '']);
             self::assertSame(['version', 'deployment', 'autoscaling', 'runtime'], array_keys($document));
             self::assertSame(['phpHeapMiB', 'phpProcessMemoryMiB', 'nativeManagerHeapMiB', 'nativeCommandLimit', 'nativeResultLimit', 'nativeClientLimit', 'mediaHelperLimit', 'scheduledConsoleMiB'], array_keys($document['runtime']));
             self::assertSame($document['runtime']['phpProcessMemoryMiB'], $document['runtime']['scheduledConsoleMiB']);
@@ -92,7 +92,7 @@ final class ImageProfileTest extends TestCase
         self::assertIsString($program);
         $root = dirname(__DIR__, 3);
 
-        $configured = ImageProfile::fromArray($this->runProgram($program, ['full', $root, '4', '0']));
+        $configured = ImageProfile::fromArray($this->runProgram($program, ['full', $root, '4', '0', '', '']));
         self::assertSame([4, 0], [$configured->deployment['videoEncoderSlots'], $configured->deployment['audioEncoderSlots']]);
         $expected = new \App\Shared\Application\DTO\DeploymentProfile('full', 4, 0);
         self::assertSame(
@@ -100,7 +100,7 @@ final class ImageProfileTest extends TestCase
             [$configured->runtime['nativeCommandLimit'], $configured->runtime['nativeResultLimit'], $configured->runtime['nativeClientLimit']],
         );
 
-        $defaults = ImageProfile::fromArray($this->runProgram($program, ['full', $root, '', '']));
+        $defaults = ImageProfile::fromArray($this->runProgram($program, ['full', $root, '', '', '', '']));
         self::assertSame([8, 12], [$defaults->deployment['videoEncoderSlots'], $defaults->deployment['audioEncoderSlots']]);
         self::assertNotSame($defaults->fingerprint(), $configured->fingerprint());
     }
@@ -111,12 +111,55 @@ final class ImageProfileTest extends TestCase
         self::assertIsString($program);
         $executor = new EngineExecutor(ExecutionContext::bounded(30, getenv()));
         try {
-            $result = $executor->run(new ProcessSpec([PHP_BINARY, '-r', $program, 'full', dirname(__DIR__, 3), '146', '']), new CompletionPolicy([2]));
+            $result = $executor->run(new ProcessSpec([PHP_BINARY, '-r', $program, 'full', dirname(__DIR__, 3), '146', '', '', '']), new CompletionPolicy([2]));
         } finally {
             $executor->close();
         }
         self::assertSame('', $result->stdout);
         self::assertStringContainsString('at most 145 video slots', $result->stderr);
+    }
+
+    public function testInImageProgramCarriesTheHardwareEncoderAndItsVideoDefault(): void
+    {
+        $program = new \ReflectionClassConstant(ImageProfile::class, 'PROGRAM')->getValue();
+        self::assertIsString($program);
+        $root = dirname(__DIR__, 3);
+
+        $hardware = ImageProfile::fromArray($this->runProgram($program, ['full', $root, '', '', 'vaapi', '/dev/dri/renderD128']));
+        $expected = new \App\Shared\Application\DTO\DeploymentProfile('full', hardware: new \App\Shared\Application\DTO\HardwareEncoder('vaapi', '/dev/dri/renderD128'));
+        self::assertSame(['accelerator' => 'vaapi', 'device' => '/dev/dri/renderD128'], $hardware->deployment['hardware']);
+        self::assertSame($expected->videoEncoderSlots, $hardware->deployment['videoEncoderSlots']);
+        self::assertEquals($expected, \App\Shared\Application\DTO\DeploymentProfile::fromJson(json_encode($hardware->deployment, JSON_THROW_ON_ERROR)));
+        self::assertNotSame(ImageProfile::fromArray($this->runProgram($program, ['full', $root, '', '', '', '']))->fingerprint(), $hardware->fingerprint());
+
+        $nvenc = ImageProfile::fromArray($this->runProgram($program, ['full', $root, '4', '12', 'nvenc', '']));
+        self::assertSame(['accelerator' => 'nvenc', 'device' => null], $nvenc->deployment['hardware']);
+
+        $executor = new EngineExecutor(ExecutionContext::bounded(30, getenv()));
+        try {
+            $result = $executor->run(new ProcessSpec([PHP_BINARY, '-r', $program, 'full', $root, '', '', 'vaapi', '']), new CompletionPolicy([2]));
+        } finally {
+            $executor->close();
+        }
+        self::assertStringContainsString('requires a device path', $result->stderr);
+    }
+
+    public function testHydrationRequiresAWellFormedHardwareEncoder(): void
+    {
+        foreach ([null, ['accelerator' => 'vaapi'], ['accelerator' => 'vaapi', 'device' => 128], 'vaapi'] as $hardware) {
+            $document = $this->document();
+            if ($hardware === null) {
+                unset($document['deployment']['hardware']);
+            } else {
+                $document['deployment']['hardware'] = $hardware;
+            }
+            try {
+                ImageProfile::fromArray($document);
+                self::fail('Accepted a malformed hardware encoder.');
+            } catch (\InvalidArgumentException) {
+                self::addToAssertionCount(1);
+            }
+        }
     }
 
     /** @param list<string> $arguments
@@ -171,7 +214,7 @@ final class ImageProfileTest extends TestCase
                 self::assertNotContains($limit, $created);
             }
             self::assertSame('/srv/baander', $created[array_search('--workdir', $created, true) + 1]);
-            self::assertSame(['household', '/srv/baander', '', ''], array_slice($created, -4));
+            self::assertSame(['household', '/srv/baander', '', '', '', ''], array_slice($created, -6));
             self::assertFileDoesNotExist($directory . '/resources.json');
             self::assertSame([], glob($directory . '/resource-*.json'));
         });
@@ -194,7 +237,7 @@ final class ImageProfileTest extends TestCase
                 }
             }
             self::assertIsArray($created);
-            self::assertSame(['household', '/srv/baander', '3', '0'], array_slice($created, -4));
+            self::assertSame(['household', '/srv/baander', '3', '0', '', ''], array_slice($created, -6));
         });
     }
 

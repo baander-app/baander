@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Shared\Interface\Console;
 
 use App\Shared\Application\DTO\DeploymentProfile;
+use App\Shared\Application\DTO\HardwareEncoder;
 use App\Shared\Application\DTO\WorkerRuntimeConfiguration;
 use App\Shared\Application\Exception\InvalidInputException;
 use Symfony\Component\Console\Attribute\AsCommand;
@@ -17,7 +18,7 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 /**
  * Prints a deployment profile and the limits Baander derives from it, so a source install can
  * set the web environment and the worker manifest's profile without writing the JSON by hand.
- * Without a profile or slot option it prints the profile this process runs; those options build another one.
+ * Without a profile, slot or hardware option it prints the profile this process runs; those options build another one.
  */
 #[AsCommand(
     name: 'app:deployment:profile:show',
@@ -37,6 +38,8 @@ final class DeploymentProfileShowCommand extends Command
             ->addOption('identifier', null, InputOption::VALUE_REQUIRED, 'Profile to build instead of the effective one: full or household')
             ->addOption('video-slots', null, InputOption::VALUE_REQUIRED, 'Concurrent video jobs of the full profile; 0 disables video conversion and copy')
             ->addOption('audio-slots', null, InputOption::VALUE_REQUIRED, 'Concurrent audio jobs of the full profile; 0 disables audio conversion and copy')
+            ->addOption('hardware-accelerator', null, InputOption::VALUE_REQUIRED, 'Hardware encoder of the full profile: ' . implode(', ', HardwareEncoder::ACCELERATORS))
+            ->addOption('hardware-device', null, InputOption::VALUE_REQUIRED, 'Device path the hardware encoder opens, such as /dev/dri/renderD128; nvenc takes none')
             ->addOption(AdminCommandSupport::JSON_OPTION, null, InputOption::VALUE_NONE, 'Print the profile, its fingerprint and its limits as JSON');
     }
 
@@ -62,6 +65,7 @@ final class DeploymentProfileShowCommand extends Command
         $io->newLine();
         $io->definitionList(
             ['Fingerprint' => $profile->fingerprint()],
+            ['Hardware encoder' => $profile->hardware === null ? 'none (software)' : $profile->hardware->accelerator . ($profile->hardware->device === null ? '' : ' on ' . $profile->hardware->device)],
             ['Video slots' => self::slots($limits['videoSlots'], $limits['maximumVideoSlots'])],
             ['Audio slots' => self::slots($limits['audioSlots'], $limits['maximumAudioSlots'])],
             ['Shared copy slots' => (string) $limits['sharedCopySlots']],
@@ -82,11 +86,17 @@ final class DeploymentProfileShowCommand extends Command
         $identifier = AdminCommandSupport::stringOption($input, 'identifier');
         $video = AdminCommandSupport::integerOption($input, 'video-slots');
         $audio = AdminCommandSupport::integerOption($input, 'audio-slots');
-        if ($identifier === null && $video === null && $audio === null) {
+        $accelerator = AdminCommandSupport::stringOption($input, 'hardware-accelerator');
+        $device = AdminCommandSupport::stringOption($input, 'hardware-device');
+        if ($identifier === null && $video === null && $audio === null && $accelerator === null && $device === null) {
             return $this->effective;
         }
         try {
-            return new DeploymentProfile($identifier ?? $this->effective->identifier, $video, $audio);
+            if ($accelerator === null && $device !== null) {
+                throw new \InvalidArgumentException('A hardware device requires --hardware-accelerator.');
+            }
+            $hardware = $accelerator === null ? null : new HardwareEncoder($accelerator, $device);
+            return new DeploymentProfile($identifier ?? $this->effective->identifier, $video, $audio, $hardware);
         } catch (\InvalidArgumentException $error) {
             throw new InvalidInputException($error->getMessage(), previous: $error);
         }

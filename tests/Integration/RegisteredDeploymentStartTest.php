@@ -227,7 +227,7 @@ final class RegisteredDeploymentStartTest extends TestCase
             return json_encode(['id' => $binding->containerId, 'namespace' => $binding->namespace, 'bootId' => $binding->bootId, 'role' => $binding->unit->value,
                 'memory' => 0, 'memorySwap' => 0, 'nanoCpus' => 0, 'cpuQuota' => 0, 'cpuShares' => 0, 'pidsLimit' => null, 'cpuSet' => '', 'oomScoreAdj' => \App\Shared\Infrastructure\Worker\OutOfMemoryKillOrder::unit($binding->unit), 'restart' => 'no', 'retryCount' => 0,
                 'privileged' => false, 'pidMode' => '', 'cgroupnsMode' => 'private', 'mounts' => [['Type' => 'volume', 'Name' => 'worker-ipc', 'Driver' => 'local', 'Source' => '/var/lib/docker/volumes/worker-ipc/_data', 'Destination' => '/run/baander-worker', 'RW' => true]], 'binds' => null, 'tmpfs' => null,
-                'devices' => [], 'deviceRequests' => [], 'capAdd' => null, 'capDrop' => ['ALL'], 'securityOpt' => ['no-new-privileges']], JSON_THROW_ON_ERROR);
+                'devices' => [], 'deviceRequests' => [], 'groupAdd' => null, 'capAdd' => null, 'capDrop' => ['ALL'], 'securityOpt' => ['no-new-privileges']], JSON_THROW_ON_ERROR);
         };
     }
 

@@ -18,6 +18,7 @@ use Baander\Tooling\Filesystem\AtomicFile;
 use Baander\Tooling\Inventory\Collector;
 use Baander\Tooling\Process\{CommandExecutor, CompletionPolicy, EngineExecutor, ExecutionContext, ProcessResult, ProcessSpec};
 use App\Shared\Application\DTO\DeploymentProfile;
+use App\Shared\Application\DTO\HardwareEncoder;
 use App\Shared\Application\DTO\MediaSlotBounds;
 use App\Shared\Infrastructure\Worker\OutOfMemoryKillOrder;
 use PHPUnit\Framework\TestCase;
@@ -205,6 +206,62 @@ final class HouseholdDeploymentTest extends TestCase
         self::assertEquals($deployment, DeploymentProfile::fromJson($rendered));
         self::assertEquals($deployment, DeploymentProfile::fromJson(HouseholdRenderer::workerEnvironment($configuration, $profile)['BAANDER_DEPLOYMENT_PROFILE_JSON']));
         self::assertSame($profile->fingerprint(), $compose['services']['web']['labels']['org.baander.deployment.fingerprint']);
+    }
+
+    public function testFullPresetCarriesItsHardwareEncoderToTheProfileAndNoComposeService(): void
+    {
+        $media = ['hardware' => ['accelerator' => 'vaapi', 'device' => '/dev/dri/renderD128', 'group' => 485]];
+        $configuration = HouseholdConfiguration::fromArray(array_replace(self::configuration(), ['profile' => 'full', 'media' => $media]));
+        self::assertSame(['accelerator' => 'vaapi', 'device' => '/dev/dri/renderD128'], $configuration->hardware());
+        self::assertSame(485, $configuration->hardwareGroup());
+        self::assertSame([null, null], [$configuration->slots('video'), $configuration->slots('audio')]);
+        self::assertSame($media, $configuration->toArray()['media']);
+        self::assertEquals($configuration, HouseholdConfiguration::fromArray($configuration->toArray()));
+        $derived = HouseholdConfiguration::fromArray(array_replace(self::configuration(), ['profile' => 'full', 'media' => ['hardware' => ['accelerator' => 'nvenc']]]));
+        self::assertSame(['accelerator' => 'nvenc', 'device' => null], $derived->hardware());
+        self::assertNull($derived->hardwareGroup());
+
+        $deployment = new DeploymentProfile('full', hardware: new HardwareEncoder('vaapi', '/dev/dri/renderD128'));
+        $profile = ImageProfile::fromArray([
+            'version' => 1,
+            'deployment' => json_decode($deployment->toJson(), true, flags: JSON_THROW_ON_ERROR),
+            'autoscaling' => ['minimumConcurrency' => 1, 'maximumConcurrency' => 1],
+            'runtime' => ['phpHeapMiB' => 256, 'scheduledConsoleMiB' => 320],
+        ]);
+        $compose = HouseholdRenderer::render($configuration, $this->images(), ApplicationLayout::fromArray(['version' => 1, 'root' => '/srv/baander']), $profile, 'max_connections = 35', 'owner');
+        self::assertEquals($deployment, DeploymentProfile::fromJson(str_replace('$$', '$', $compose['services']['web']['environment']['BAANDER_DEPLOYMENT_PROFILE_JSON'])));
+        self::assertEquals($deployment, DeploymentProfile::fromJson(HouseholdRenderer::workerEnvironment($configuration, $profile)['BAANDER_DEPLOYMENT_PROFILE_JSON']));
+        // Only the execution worker, which the worker lifecycle creates, receives the device.
+        foreach ($compose['services'] as $name => $service) {
+            foreach (['devices', 'group_add', 'gpus', 'device_cgroup_rules', 'privileged', 'cap_add'] as $field) {
+                self::assertArrayNotHasKey($field, $service, $name . ' must not receive ' . $field);
+            }
+            foreach (['cpus', 'cpu_shares', 'cpuset', 'mem_limit', 'memswap_limit', 'pids_limit', 'deploy'] as $limit) {
+                self::assertArrayNotHasKey($limit, $service, $name . ' must not carry ' . $limit);
+            }
+        }
+        self::assertNotSame($this->profile('full')->fingerprint(), $compose['services']['web']['labels']['org.baander.deployment.fingerprint']);
+    }
+
+    public function testHardwareEncoderConfigurationRequiresItsShape(): void
+    {
+        foreach ([
+            [['hardware' => 'vaapi'], 'hardware must be an object.'],
+            [['hardware' => ['device' => '/dev/dri/renderD128']], 'Missing or invalid accelerator.'],
+            [['hardware' => ['accelerator' => 'vaapi', 'device' => 128]], 'Missing or invalid device.'],
+            [['hardware' => ['accelerator' => 'vaapi', 'device' => '/dev/dri/renderD128', 'group' => -1]], 'The hardware encoder group must be a numeric group ID.'],
+            [['hardware' => ['accelerator' => 'vaapi', 'device' => '/dev/dri/renderD128', 'group' => '485']], 'The hardware encoder group must be a numeric group ID.'],
+            [['hardware' => ['accelerator' => 'vaapi', 'devices' => ['/dev/dri/renderD128']]], 'Unknown key in hardware encoder configuration.'],
+        ] as [$media, $message]) {
+            try {
+                HouseholdConfiguration::fromArray(array_replace(self::configuration(), ['profile' => 'full', 'media' => $media]));
+                self::fail('Accepted an invalid hardware encoder: ' . $message);
+            } catch (\InvalidArgumentException $error) {
+                self::assertSame($message, $error->getMessage());
+            }
+        }
+        $this->expectExceptionMessage('The household profile runs fixed shared copy slots and accepts no media configuration.');
+        HouseholdConfiguration::fromArray(array_replace(self::configuration(), ['media' => ['hardware' => ['accelerator' => 'vaapi', 'device' => '/dev/dri/renderD128']]]));
     }
 
     public function testThePoolerClientLimitIsTheOneTheSlotMaximumsAreDerivedFrom(): void
@@ -543,7 +600,7 @@ final class HouseholdDeploymentTest extends TestCase
     {
         return ImageProfile::fromArray([
             'version' => 1,
-            'deployment' => ['identifier' => $identifier, 'webWorkers' => 2, 'doctrinePoolSlots' => 4],
+            'deployment' => ['identifier' => $identifier, 'hardware' => null, 'webWorkers' => 2, 'doctrinePoolSlots' => 4],
             'autoscaling' => ['minimumConcurrency' => 1, 'maximumConcurrency' => 1],
             'runtime' => ['phpHeapMiB' => 256, 'scheduledConsoleMiB' => 320],
         ]);

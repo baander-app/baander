@@ -13,11 +13,13 @@ final readonly class HouseholdConfiguration
     /** Redis's own dataset bound, enforced by Redis itself rather than by a container limit. */
     public const array RESOURCE_DEFAULTS = ['redisMaxmemoryMiB' => 192];
     public const array MEDIA_SLOT_KEYS = ['videoSlots', 'audioSlots'];
+    public const array HARDWARE_KEYS = ['accelerator', 'device', 'group'];
     /** @param array<string,ImageSelection> $images
      * @param array<string,string> $environment
      * @param array<string,int> $resources
      * @param array<string,string> $volumes
-     * @param array{videoSlots?:int,audioSlots?:int}|null $media Full profile slot counts; unset kinds use the profile default.
+     * @param array{videoSlots?:int,audioSlots?:int,hardware?:array{accelerator:string,device?:string,group?:int}}|null $media Full
+     *     profile slot counts, where unset kinds use the profile default, and the hardware encoder.
      */
     private function __construct(
         public string $name,
@@ -113,8 +115,25 @@ final readonly class HouseholdConfiguration
         return $this->media[$kind . 'Slots'] ?? null;
     }
 
+    /**
+     * The hardware encoder the deployment profile carries, without the host-specific group.
+     *
+     * @return array{accelerator:string,device:?string}|null
+     */
+    public function hardware(): ?array
+    {
+        $hardware = $this->media['hardware'] ?? null;
+        return $hardware === null ? null : ['accelerator' => $hardware['accelerator'], 'device' => $hardware['device'] ?? null];
+    }
+
+    /** The group that opens the hardware encoder device, when the operator overrides the device's own group. */
+    public function hardwareGroup(): ?int
+    {
+        return $this->media['hardware']['group'] ?? null;
+    }
+
     /** @param array<string,mixed> $data
-     * @return array{videoSlots?:int,audioSlots?:int}|null
+     * @return array{videoSlots?:int,audioSlots?:int,hardware?:array{accelerator:string,device?:string,group?:int}}|null
      */
     private static function media(array $data, string $profile): ?array
     {
@@ -125,7 +144,7 @@ final readonly class HouseholdConfiguration
             throw new \InvalidArgumentException('The household profile runs fixed shared copy slots and accepts no media configuration.');
         }
         $media = self::map($data, 'media');
-        JsonObject::keys($media, self::MEDIA_SLOT_KEYS, 'media configuration');
+        JsonObject::keys($media, [...self::MEDIA_SLOT_KEYS, 'hardware'], 'media configuration');
         $slots = [];
         foreach (self::MEDIA_SLOT_KEYS as $key) {
             if (!array_key_exists($key, $media)) {
@@ -136,7 +155,30 @@ final readonly class HouseholdConfiguration
             }
             $slots[$key] = $media[$key];
         }
+        if (array_key_exists('hardware', $media)) {
+            $slots['hardware'] = self::hardwareEncoder(self::map($media, 'hardware'));
+        }
         return $slots === [] ? null : $slots;
+    }
+
+    /** The image's deployment profile validates the accelerator and device; this checks their shape.
+     * @param array<string,mixed> $hardware
+     * @return array{accelerator:string,device?:string,group?:int}
+     */
+    private static function hardwareEncoder(array $hardware): array
+    {
+        JsonObject::keys($hardware, self::HARDWARE_KEYS, 'hardware encoder configuration');
+        $encoder = ['accelerator' => self::string($hardware, 'accelerator')];
+        if (array_key_exists('device', $hardware)) {
+            $encoder['device'] = self::string($hardware, 'device');
+        }
+        if (array_key_exists('group', $hardware)) {
+            if (!is_int($hardware['group']) || $hardware['group'] < 0) {
+                throw new \InvalidArgumentException('The hardware encoder group must be a numeric group ID.');
+            }
+            $encoder['group'] = $hardware['group'];
+        }
+        return $encoder;
     }
 
     /** @return array<string,mixed> */

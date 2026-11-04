@@ -13,6 +13,9 @@ use Symfony\Component\DependencyInjection\Attribute\Exclude;
 #[Exclude]
 final readonly class DeploymentContainerRecipe
 {
+    /** NVENC needs the video capability; compute and utility load the CUDA and management libraries. */
+    private const array NVIDIA_CAPABILITIES = ['compute', 'utility', 'video'];
+
     /** @var list<string> */
     public array $command;
 
@@ -22,9 +25,19 @@ final readonly class DeploymentContainerRecipe
     /** Out-of-memory score the container starts with; it carries no CPU, memory or PID limit. */
     public int $oomScoreAdj;
 
+    /** @var list<string> Hardware encoder device nodes the execution unit receives at the same path. */
+    public array $devices;
+
+    /** @var list<int> Supplementary groups that open those devices. */
+    public array $groups;
+
+    /** Whether the execution unit receives the host's NVIDIA GPUs through the container runtime. */
+    public bool $nvidiaGpus;
+
     /**
      * @param array<array-key, mixed> $command Validated argv, never a shell command.
      * @param array<array-key, mixed> $mediaMounts
+     * @param ?int $deviceGroup Group owning the profile's hardware encoder device on the Docker host.
      */
     public function __construct(
         public string $namespace,
@@ -40,6 +53,7 @@ final readonly class DeploymentContainerRecipe
         public DeploymentRuntimeEnvironment $runtimeEnvironment = new DeploymentRuntimeEnvironment(),
         array $mediaMounts = [],
         public string $sourceMountPolicy = 'production',
+        ?int $deviceGroup = null,
     ) {
         DeploymentLease::validateIdentity($namespace, $bootId);
         if (strlen($appHome) > 4096 || preg_match('~\A/(?:[A-Za-z0-9_.-]+/)*[A-Za-z0-9_.-]+\z~D', $appHome) !== 1
@@ -47,6 +61,14 @@ final readonly class DeploymentContainerRecipe
             throw new InvalidArgumentException('Observed application home requires a canonical absolute path.');
         }
         $this->oomScoreAdj = OutOfMemoryKillOrder::unit($unit);
+        // Only execution runs FFmpeg, so only execution receives the hardware encoder.
+        $hardware = $unit === DeploymentUnit::Execution ? $deploymentProfile->hardware : null;
+        if ($hardware?->device !== null && ($deviceGroup === null || $deviceGroup < 0 || $deviceGroup > 4_294_967_294)) {
+            throw new InvalidArgumentException('The hardware encoder device requires the numeric group that owns it on the Docker host.');
+        }
+        $this->devices = $hardware?->device === null ? [] : [$hardware->device];
+        $this->groups = $hardware?->device === null || $deviceGroup === null ? [] : [$deviceGroup];
+        $this->nvidiaGpus = $hardware !== null && !$hardware->usesDevice();
         if (preg_match('/\A[A-Za-z0-9][A-Za-z0-9_.-]{0,127}\z/D', $ipcVolume) !== 1) {
             throw new InvalidArgumentException('Worker IPC requires an explicitly named private volume.');
         }
@@ -91,6 +113,7 @@ final readonly class DeploymentContainerRecipe
             'oomScoreAdj' => $this->oomScoreAdj, 'unit' => $this->unit->value, 'ipcVolume' => $this->ipcVolume,
             'sourceMountPolicy' => $this->sourceMountPolicy, 'deploymentProfile' => $this->deploymentProfile->toJson(),
             'runtimeEnvironment' => $this->runtimeEnvironment->variables, 'mediaMounts' => $this->mediaMounts,
+            'devices' => $this->devices, 'groups' => $this->groups, 'nvidiaGpus' => $this->nvidiaGpus,
         ], JSON_THROW_ON_ERROR));
     }
 
@@ -110,6 +133,41 @@ final readonly class DeploymentContainerRecipe
         return array_key_exists('pidsLimit', $inspection) && in_array($inspection['pidsLimit'], [null, 0], true)
             && ($inspection['cpuSet'] ?? null) === ''
             && ($inspection['oomScoreAdj'] ?? null) === $this->oomScoreAdj;
+    }
+
+    /**
+     * Docker reports device mappings, supplementary groups and GPU requests as absent or empty
+     * when none were given, groups as strings, and an all-GPU request with its capabilities plus `gpu`.
+     *
+     * @param array<array-key, mixed> $inspection
+     */
+    public function matchesDevices(array $inspection): bool
+    {
+        $devices = array_map(static fn (string $device): array => ['PathOnHost' => $device, 'PathInContainer' => $device, 'CgroupPermissions' => 'rwm'], $this->devices);
+        $groups = array_map(strval(...), $this->groups);
+        $requests = $this->nvidiaGpus
+            ? [['Driver' => '', 'Count' => -1, 'DeviceIDs' => null, 'Capabilities' => [[...self::NVIDIA_CAPABILITIES, 'gpu']], 'Options' => []]]
+            : [];
+        foreach (['devices' => $devices, 'groupAdd' => $groups, 'deviceRequests' => $requests] as $field => $expected) {
+            if (!array_key_exists($field, $inspection)
+                || ($expected === [] ? !in_array($inspection[$field], [null, []], true) : self::canonical($inspection[$field]) !== self::canonical($expected))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /** Orders object keys so inspection output compares independently of Docker's field order. */
+    private static function canonical(mixed $value): mixed
+    {
+        if (!is_array($value)) {
+            return $value;
+        }
+        $value = array_map(self::canonical(...), $value);
+        if (!array_is_list($value)) {
+            ksort($value);
+        }
+        return $value;
     }
 
     /** @return list<string> */
@@ -132,6 +190,7 @@ final readonly class DeploymentContainerRecipe
             'container', 'create', '--pull=never', '--name', RegisteredDeploymentStart::containerName($this->namespace, $this->bootId, $this->unit),
             '--network', $this->network, '--oom-score-adj', (string) $this->oomScoreAdj,
             '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges', '--cgroupns', 'private', '--restart', 'no',
+            ...$this->deviceArguments(),
             '--label', 'app.baander.worker.namespace=' . $this->namespace,
             '--label', 'app.baander.worker.boot-id=' . $this->bootId, '--label', 'app.baander.worker.role=' . $this->unit->value,
             '--env', 'BAANDER_WORKER_NAMESPACE=' . $this->namespace, '--env', 'BAANDER_WORKER_BOOT_ID=' . $this->bootId,
@@ -143,6 +202,22 @@ final readonly class DeploymentContainerRecipe
             '--entrypoint', $this->command[0], $this->imageId, ...array_slice($this->command, 1),
         ];
     }
+    /** @return list<string> */
+    private function deviceArguments(): array
+    {
+        $arguments = [];
+        foreach ($this->devices as $device) {
+            array_push($arguments, '--device', $device . ':' . $device . ':rwm');
+        }
+        foreach ($this->groups as $group) {
+            array_push($arguments, '--group-add', (string) $group);
+        }
+        if ($this->nvidiaGpus) {
+            array_push($arguments, '--gpus', 'all,"capabilities=' . implode(',', self::NVIDIA_CAPABILITIES) . '"');
+        }
+        return $arguments;
+    }
+
     /** @return list<string> */
     private function mountArguments(): array
     {

@@ -79,12 +79,12 @@ final class DeploymentPairManifestTest extends TestCase
     public static function fields(): array
     {
         return [
-            'version' => 7, 'sourceMountPolicy' => 'production', 'namespace' => 'operator.baander.app', 'bootId' => str_repeat('a', 32),
+            'version' => 8, 'sourceMountPolicy' => 'production', 'namespace' => 'operator.baander.app', 'bootId' => str_repeat('a', 32),
             'daemonId' => 'docker-daemon', 'imageId' => 'sha256:' . str_repeat('b', 64), 'network' => 'none',
             'dockerBinary' => '/usr/bin/docker', 'dockerEndpoint' => 'unix:///var/run/docker.sock',
             'deploymentProfile' => json_decode((new \App\Shared\Application\DTO\DeploymentProfile('full'))->toJson(), true, flags: JSON_THROW_ON_ERROR),
             'autoscaling' => json_decode((new \App\Shared\Application\DTO\WorkerAutoscalingProfile())->toJson(), true, flags: JSON_THROW_ON_ERROR),
-            'scheduledConsoleMiB' => 320, 'ipcVolume' => 'worker-ipc',
+            'deviceGroup' => null, 'scheduledConsoleMiB' => 320, 'ipcVolume' => 'worker-ipc',
             'mediaMounts' => [
                 ['volume' => 'library', 'target' => '/media/library', 'readOnly' => true, 'role' => 'source'],
                 ['volume' => 'storage', 'target' => '/var/www/html/storage', 'readOnly' => false, 'role' => 'derived'],

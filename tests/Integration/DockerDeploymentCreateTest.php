@@ -212,6 +212,34 @@ final class DockerDeploymentCreateTest extends TestCase
         yield 'mounted socket' => [[], ['mounts' => [['Destination' => '/var/run/docker.sock']]]];
     }
 
+    public function testHardwareExecutionRegistersOnlyWithItsAdmittedDeviceAndGroup(): void
+    {
+        $profile = new \App\Shared\Application\DTO\DeploymentProfile('full', 8, 12, new \App\Shared\Application\DTO\HardwareEncoder('vaapi', '/dev/dri/renderD128'));
+        $recipe = static fn (DeploymentUnit $unit): DeploymentContainerRecipe => new DeploymentContainerRecipe('baander.app:create', str_repeat('a', 32), 'baander.app-daemon', 'sha256:' . str_repeat('f', 64),
+            ['/usr/local/bin/php', '/app/bin/worker.php'], 'none', $unit, 'worker-ipc', '/app', $profile, deviceGroup: 485);
+        $execution = $recipe(DeploymentUnit::Execution);
+        $inventory = new DoctrineDeploymentInventory($this->first);
+        self::assertTrue($inventory->reserveBoot($execution->namespace, $execution->bootId, str_repeat('f', 64), $profile->fingerprint(), $execution->daemonId,
+            $recipe(DeploymentUnit::Control)->fingerprint(), $execution->fingerprint()));
+        $device = [['PathOnHost' => '/dev/dri/renderD128', 'PathInContainer' => '/dev/dri/renderD128', 'CgroupPermissions' => 'rwm']];
+        try {
+            (new DockerDeploymentCreate($inventory, $this->executor($execution)))->create($execution);
+            self::fail('An execution unit without its hardware encoder device was admitted.');
+        } catch (\RuntimeException $error) {
+            self::assertStringContainsString('devices, groups or GPU requests', $error->getMessage());
+            self::assertNull((new DoctrineDeploymentInventory($this->second))->findUnit($execution->namespace, $execution->bootId, $execution->unit));
+        }
+        $created = array_values(array_filter($this->commands, static fn (array $command): bool => $command[0] === 'container' && $command[1] === 'create'));
+        self::assertCount(1, $created);
+        self::assertContains('/dev/dri/renderD128:/dev/dri/renderD128:rwm', $created[0]);
+        self::assertSame('485', $created[0][array_search('--group-add', $created[0], true) + 1]);
+
+        $binding = (new DockerDeploymentCreate($inventory, $this->executor($execution, isolation: ['devices' => $device, 'groupAdd' => ['485']])))->reconcile($execution);
+        self::assertSame($this->containerId(DeploymentUnit::Execution), $binding->containerId);
+        self::assertSame(1, $this->createCount());
+        self::assertSame(0, $this->startCount());
+    }
+
     public function testWrongDaemonNeverCreates(): void
     {
         $recipe = $this->recipe();
@@ -428,7 +456,7 @@ final class DockerDeploymentCreateTest extends TestCase
                 'id' => $state['id'] ?? $this->containerId($recipe->unit), 'namespace' => $recipe->namespace, 'bootId' => $recipe->bootId, 'role' => $recipe->unit->value,
                 'memory' => 0, 'memorySwap' => 0, 'nanoCpus' => 0, 'cpuQuota' => 0, 'cpuShares' => 0, 'pidsLimit' => null, 'cpuSet' => '', 'oomScoreAdj' => $recipe->oomScoreAdj, 'restart' => 'no', 'retryCount' => 0,
                 'privileged' => false, 'pidMode' => '', 'cgroupnsMode' => 'private', 'mounts' => [['Type' => 'volume', 'Name' => 'worker-ipc', 'Driver' => 'local', 'Source' => '/var/lib/docker/volumes/worker-ipc/_data', 'Destination' => '/run/baander-worker', 'RW' => true]], 'binds' => null, 'tmpfs' => null,
-                'devices' => null, 'deviceRequests' => null, 'capAdd' => null, 'capDrop' => ['ALL'], 'securityOpt' => ['no-new-privileges:true'],
+                'devices' => null, 'deviceRequests' => null, 'groupAdd' => null, 'capAdd' => null, 'capDrop' => ['ALL'], 'securityOpt' => ['no-new-privileges:true'],
             ], $isolation), JSON_THROW_ON_ERROR);
         };
     }

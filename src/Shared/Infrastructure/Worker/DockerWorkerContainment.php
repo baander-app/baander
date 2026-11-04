@@ -15,7 +15,7 @@ use Symfony\Component\DependencyInjection\Attribute\Exclude;
 final readonly class DockerWorkerContainment
 {
     private const string INSPECT_FORMAT = <<<'FORMAT'
-{"id":{{json .Id}},"namespace":{{json (index .Config.Labels "app.baander.worker.namespace")}},"bootId":{{json (index .Config.Labels "app.baander.worker.boot-id")}},"role":{{json (index .Config.Labels "app.baander.worker.role")}},"privileged":{{json .HostConfig.Privileged}},"pidMode":{{json .HostConfig.PidMode}},"cgroupnsMode":{{json .HostConfig.CgroupnsMode}},"mounts":{{json .Mounts}},"binds":{{json (index .HostConfig "Binds")}},"tmpfs":{{json (index .HostConfig "Tmpfs")}},"devices":{{json (index .HostConfig "Devices")}},"deviceRequests":{{json (index .HostConfig "DeviceRequests")}},"capAdd":{{json (index .HostConfig "CapAdd")}},"capDrop":{{json .HostConfig.CapDrop}},"securityOpt":{{json .HostConfig.SecurityOpt}},"memory":{{json .HostConfig.Memory}},"memorySwap":{{json .HostConfig.MemorySwap}},"nanoCpus":{{json .HostConfig.NanoCpus}},"cpuQuota":{{json .HostConfig.CpuQuota}},"cpuShares":{{json .HostConfig.CpuShares}},"pidsLimit":{{json .HostConfig.PidsLimit}},"cpuSet":{{json .HostConfig.CpusetCpus}},"oomScoreAdj":{{json .HostConfig.OomScoreAdj}},"restart":{{json .HostConfig.RestartPolicy.Name}},"retryCount":{{json .HostConfig.RestartPolicy.MaximumRetryCount}}}
+{"id":{{json .Id}},"namespace":{{json (index .Config.Labels "app.baander.worker.namespace")}},"bootId":{{json (index .Config.Labels "app.baander.worker.boot-id")}},"role":{{json (index .Config.Labels "app.baander.worker.role")}},"privileged":{{json .HostConfig.Privileged}},"pidMode":{{json .HostConfig.PidMode}},"cgroupnsMode":{{json .HostConfig.CgroupnsMode}},"mounts":{{json .Mounts}},"binds":{{json (index .HostConfig "Binds")}},"tmpfs":{{json (index .HostConfig "Tmpfs")}},"devices":{{json (index .HostConfig "Devices")}},"deviceRequests":{{json (index .HostConfig "DeviceRequests")}},"groupAdd":{{json (index .HostConfig "GroupAdd")}},"capAdd":{{json (index .HostConfig "CapAdd")}},"capDrop":{{json .HostConfig.CapDrop}},"securityOpt":{{json .HostConfig.SecurityOpt}},"memory":{{json .HostConfig.Memory}},"memorySwap":{{json .HostConfig.MemorySwap}},"nanoCpus":{{json .HostConfig.NanoCpus}},"cpuQuota":{{json .HostConfig.CpuQuota}},"cpuShares":{{json .HostConfig.CpuShares}},"pidsLimit":{{json .HostConfig.PidsLimit}},"cpuSet":{{json .HostConfig.CpusetCpus}},"oomScoreAdj":{{json .HostConfig.OomScoreAdj}},"restart":{{json .HostConfig.RestartPolicy.Name}},"retryCount":{{json .HostConfig.RestartPolicy.MaximumRetryCount}}}
 FORMAT;
 
     /** @param Closure(list<string>): string $execute Successful commands return stdout; every command failure throws. */
@@ -24,7 +24,8 @@ FORMAT;
     }
 
     /**
-     * Only private PID/cgroup namespaces, admitted media and IPC mounts, no devices,
+     * Only private PID/cgroup namespaces, admitted media and IPC mounts, the admitted
+     * execution unit's hardware encoder device and group and no other device,
      * all capabilities dropped, and no-new-privileges are accepted.
      * The trusted controller creates one container per unit and fresh boot and
      * records its immutable ID and labels before starting it. These labels do not
@@ -92,7 +93,7 @@ FORMAT;
         } catch (\JsonException $error) {
             throw new RuntimeException('Container inspection is not valid containment evidence.', 0, $error);
         }
-        if (!is_array($inspection) || count($inspection) !== 25
+        if (!is_array($inspection) || count($inspection) !== 26
             || ($inspection['id'] ?? null) !== $containerId
             || ($inspection['namespace'] ?? null) !== $namespace
             || ($inspection['bootId'] ?? null) !== $bootId
@@ -114,10 +115,15 @@ FORMAT;
             throw new RuntimeException('Container inspection does not identify its mounts.');
         }
         $this->verifyMounts($inspection['mounts']);
-        foreach (['binds', 'tmpfs', 'devices', 'deviceRequests', 'capAdd'] as $field) {
+        foreach (['binds', 'tmpfs', 'capAdd'] as $field) {
             if (!array_key_exists($field, $inspection) || !in_array($inspection[$field], [null, []], true)) {
                 throw new RuntimeException('Container resources do not match containment requirements.');
             }
+        }
+        $deviceless = array_all(['devices', 'groupAdd', 'deviceRequests'],
+            static fn (string $field): bool => array_key_exists($field, $inspection) && in_array($inspection[$field], [null, []], true));
+        if (!($this->recipe?->matchesDevices($inspection) ?? $deviceless)) {
+            throw new RuntimeException('Container devices, groups or GPU requests differ from the admitted unit.');
         }
     }
 

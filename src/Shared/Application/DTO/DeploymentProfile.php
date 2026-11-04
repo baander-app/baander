@@ -9,6 +9,13 @@ final readonly class DeploymentProfile
 {
     /** Video slots an unset full profile runs with software encoding. */
     private const int DEFAULT_SOFTWARE_VIDEO_SLOTS = 8;
+    /**
+     * Video slots an unset full profile runs with a hardware encoder: the most concurrent 1080p
+     * hardware encodes that each stayed ahead of real time on the reference GPU, an AMD Radeon
+     * RX 9070 XT with VAAPI, for both encoders the accelerator offers. H.264 bounds it; HEVC
+     * stayed ahead at 14.
+     */
+    private const int DEFAULT_HARDWARE_VIDEO_SLOTS = 8;
     /** Audio slots an unset full profile runs. */
     private const int DEFAULT_AUDIO_SLOTS = 12;
     private const int CONTROL_COMMANDS = 1;
@@ -26,21 +33,25 @@ final readonly class DeploymentProfile
 
     /**
      * Full deployments accept operator video and audio slot counts up to the pooler-derived
-     * maximums; zero disables a kind and unset counts use the default. Household runs a fixed
-     * shared copy pool and accepts none.
+     * maximums; zero disables a kind and unset counts use the default, which for video depends on
+     * whether a hardware encoder is configured. Household runs a fixed shared copy pool and
+     * accepts neither slots nor a hardware encoder.
      */
-    public function __construct(public string $identifier, ?int $videoEncoderSlots = null, ?int $audioEncoderSlots = null)
+    public function __construct(public string $identifier, ?int $videoEncoderSlots = null, ?int $audioEncoderSlots = null, public ?HardwareEncoder $hardware = null)
     {
         [$this->webWorkers, $this->doctrinePoolSlots, $this->ordinaryConsumerLimit, $this->sharedCopySlots] = match ($identifier) {
             'full' => [4, 10, 4, 0],
-            'household' => $videoEncoderSlots === null && $audioEncoderSlots === null
+            'household' => $videoEncoderSlots === null && $audioEncoderSlots === null && $hardware === null
                 ? [2, 4, 1, 2]
-                : throw new \InvalidArgumentException('Household deployment profile runs a fixed shared copy pool and accepts no video or audio slot values.'),
+                : throw new \InvalidArgumentException('Household deployment profile runs a fixed shared copy pool and accepts no video or audio slot values or hardware encoder.'),
             default => throw new \InvalidArgumentException('Unknown deployment profile.'),
         };
         [$this->videoEncoderSlots, $this->audioEncoderSlots] = $identifier === 'full'
-            ? [$videoEncoderSlots ?? self::defaultSlots('video'), $audioEncoderSlots ?? self::defaultSlots('audio')]
+            ? [$videoEncoderSlots ?? self::defaultSlots('video', $hardware), $audioEncoderSlots ?? self::defaultSlots('audio', $hardware)]
             : [0, 0];
+        if ($hardware !== null && $this->videoEncoderSlots === 0) {
+            throw new \InvalidArgumentException('A hardware encoder serves video jobs; configure video slots above zero or remove the hardware encoder.');
+        }
         $this->mediaSlotBounds()?->assertAccepts($this->videoEncoderSlots, $this->audioEncoderSlots);
     }
 
@@ -85,25 +96,28 @@ final readonly class DeploymentProfile
             throw new \InvalidArgumentException('Deployment profile has unknown or missing settings.');
         }
         foreach ($fields as $name => $field) {
-            if ($name === 'identifier' ? !is_string($field) : !is_int($field)) {
-                throw new \InvalidArgumentException('Deployment profile requires a string identifier and JSON integer settings.');
+            if (match ($name) { 'identifier' => !is_string($field), 'hardware' => $field !== null && !$field instanceof \stdClass, default => !is_int($field) }) {
+                throw new \InvalidArgumentException('Deployment profile requires a string identifier, a hardware object or null, and JSON integer settings.');
             }
         }
-        $profile = $fields['identifier'] === 'household'
+        $hardware = $fields['hardware'] === null ? null : HardwareEncoder::fromJsonObject($fields['hardware']);
+        $profile = $fields['identifier'] === 'household' && $hardware === null
             ? new self('household')
-            : new self($fields['identifier'], $fields['videoEncoderSlots'], $fields['audioEncoderSlots']);
-        $derived = get_object_vars($profile);
-        ksort($fields);
-        ksort($derived);
-        if ($fields !== $derived) {
+            : new self($fields['identifier'], $fields['videoEncoderSlots'], $fields['audioEncoderSlots'], $hardware);
+        $fields['hardware'] = $hardware;
+        if ($fields != get_object_vars($profile)) {
             throw new \InvalidArgumentException('Deployment profile derived settings disagree with its identifier and slots.');
         }
         return $profile;
     }
 
-    private static function defaultSlots(string $kind): int
+    private static function defaultSlots(string $kind, ?HardwareEncoder $hardware): int
     {
-        return $kind === 'video' ? self::DEFAULT_SOFTWARE_VIDEO_SLOTS : self::DEFAULT_AUDIO_SLOTS;
+        return match (true) {
+            $kind === 'audio' => self::DEFAULT_AUDIO_SLOTS,
+            $hardware !== null => self::DEFAULT_HARDWARE_VIDEO_SLOTS,
+            default => self::DEFAULT_SOFTWARE_VIDEO_SLOTS,
+        };
     }
 
     /** The slot maximums of a profile that takes slot values; household's slots are fixed. */

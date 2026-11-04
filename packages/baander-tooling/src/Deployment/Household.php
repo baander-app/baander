@@ -107,6 +107,7 @@ final readonly class Household
                 $measurement,
                 videoSlots: $configuration->slots('video'),
                 audioSlots: $configuration->slots('audio'),
+                hardware: $configuration->hardware(),
             );
             if (($layout !== null && $layout->toArray() !== $candidateLayout->toArray())
                 || ($profile !== null && $profile->fingerprint() !== $candidateProfile->fingerprint())) {
@@ -176,6 +177,7 @@ final readonly class Household
             resourceLabels: ['org.baander.household' => $configuration->name, 'org.baander.household.owner' => $state['owner']],
             profile: $profile,
             cleanupSeconds: $this->cleanupSeconds,
+            deviceGroup: $configuration->hardwareGroup(),
         ));
         $lifecycle->start($record);
         $lifecycle->ready($record);

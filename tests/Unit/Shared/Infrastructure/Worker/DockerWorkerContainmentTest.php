@@ -248,6 +248,7 @@ final class DockerWorkerContainmentTest extends TestCase
         yield 'tmpfs mount' => ['tmpfs', ['/run' => 'rw']];
         yield 'device' => ['devices', [['PathOnHost' => '/dev/sda']]];
         yield 'GPU device request' => ['deviceRequests', [['Driver' => 'nvidia']]];
+        yield 'supplementary group' => ['groupAdd', ['485']];
         yield 'added capability' => ['capAdd', ['SYS_ADMIN']];
         yield 'no drops' => ['capDrop', []];
         yield 'partial drops' => ['capDrop', ['NET_ADMIN']];
@@ -363,7 +364,7 @@ final class DockerWorkerContainmentTest extends TestCase
         return ['id' => self::ID, 'namespace' => 'worker.baander.app', 'bootId' => self::BOOT, 'role' => 'control',
             'memory' => 0, 'memorySwap' => 0, 'nanoCpus' => 0, 'cpuQuota' => 0, 'cpuShares' => 0, 'pidsLimit' => null, 'cpuSet' => '', 'oomScoreAdj' => -500, 'restart' => 'no', 'retryCount' => 0,
             'privileged' => false, 'pidMode' => '', 'cgroupnsMode' => 'private', 'mounts' => [], 'binds' => [], 'tmpfs' => [],
-            'devices' => [], 'deviceRequests' => [], 'capAdd' => [], 'capDrop' => ['ALL'], 'securityOpt' => ['no-new-privileges']];
+            'devices' => [], 'deviceRequests' => [], 'groupAdd' => null, 'capAdd' => [], 'capDrop' => ['ALL'], 'securityOpt' => ['no-new-privileges']];
     }
 
     private function lease(): DeploymentLease
