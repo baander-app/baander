@@ -27,10 +27,17 @@ light and dark themes and existing SVG branding. The website adds no surface
 gradients or shadows; the player material remains inside real application
 screenshots.
 
-The website self-hosts only the Latin subsets of Geist and Geist Mono, as
-variable faces under content-hashed names, and bundles no Noto fonts. Text outside
-those subsets falls back to the visitor's system fonts. Rendered diagrams embed the
-same Latin Geist face.
+The website self-hosts the Latin subsets of Geist and Geist Mono, as variable
+faces under content-hashed names. Text outside those subsets falls back to the
+visitor's system fonts. Rendered diagrams embed the same Latin Geist face.
+
+The typography page at `/typography/` is the one exception: it shows every
+supported script in live text. The build walks that page's text in font-stack
+order and ships only the Geist and Noto slices its characters reach first, through
+the page's own stylesheet. No other page declares or requests a Noto face. The page
+restates the application's language reorders and script rules in its stylesheet,
+because the site has no `ContentText` component, and reads the type roles from the
+design tokens.
 
 Codec comparison charts use a distinct color for each vendor, consistent across
 profiles and encoding or decoding views. These data colors have light and dark
