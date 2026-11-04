@@ -78,7 +78,7 @@ final class WorkerLifecycleTest extends TestCase
     {
         $runner = new WorkerCommandExecutor(function (array $arguments): string {
             if (in_array('info', $arguments, true)) {
-                // A single small CPU and little memory no longer refuse a worker pair.
+                // A single small CPU and little memory still admit a worker pair.
                 return '{"ID":"daemon","NCPU":1,"MemTotal":1073741824,"SecurityOptions":["name=seccomp,profile=builtin","name=cgroupns"]}';
             }
             if (in_array('volume', $arguments, true) && in_array('create', $arguments, true)) {

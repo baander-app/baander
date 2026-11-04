@@ -202,6 +202,7 @@ final readonly class DeploymentContainerRecipe
             '--entrypoint', $this->command[0], $this->imageId, ...array_slice($this->command, 1),
         ];
     }
+
     /** @return list<string> */
     private function deviceArguments(): array
     {

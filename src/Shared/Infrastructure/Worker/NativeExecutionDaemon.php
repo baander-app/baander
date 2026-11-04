@@ -455,12 +455,14 @@ final class NativeExecutionDaemon
         if ($stat === false || $close === false) {
             return;
         }
-        // Fields after the command name start at the state (field 3); utime is field 14.
+        // Fields after the command name start at the state (field 3), so utime, stime, cutime
+        // and cstime (fields 14 to 17) sit at offsets 11 to 14.
         $fields = explode(' ', trim(substr($stat, $close + 2)));
         if (count($fields) < 15) {
             return;
         }
-        $ticks = (int) $fields[11] + (int) $fields[12] + (int) $fields[13] + (int) $fields[14];
+        [$userTicks, $systemTicks, $childUserTicks, $childSystemTicks] = array_map(intval(...), array_slice($fields, 11, 4));
+        $ticks = $userTicks + $systemTicks + $childUserTicks + $childSystemTicks;
         $attempt->cpuSeconds = max($attempt->cpuSeconds, $ticks / self::clockTicks());
     }
 

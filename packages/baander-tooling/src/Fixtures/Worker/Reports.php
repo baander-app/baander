@@ -102,13 +102,33 @@ final class Reports
         self::require($values !== [], 'Missing timing samples');
         sort($values, SORT_NUMERIC);
         $count = count($values);
-        $middle = intdiv($count, 2);
         return [
             'count' => $count,
-            'medianSeconds' => $count % 2 === 0 ? ($values[$middle - 1] + $values[$middle]) / 2 : $values[$middle],
-            'p99Seconds' => $values[max(0, (int) ceil($count * .99) - 1)],
+            'medianSeconds' => self::median($values),
+            'p99Seconds' => self::percentile($values, .99),
             'maxSeconds' => $values[$count - 1],
         ];
+    }
+
+    /**
+     * The nearest-rank percentile of values sorted in ascending order.
+     *
+     * @param non-empty-list<int|float> $sorted
+     */
+    public static function percentile(array $sorted, float $rank): int|float
+    {
+        return $sorted[max(0, (int) ceil($rank * count($sorted)) - 1)];
+    }
+
+    /**
+     * The median of values sorted in ascending order; an even count averages the middle pair.
+     *
+     * @param non-empty-list<int|float> $sorted
+     */
+    public static function median(array $sorted): int|float
+    {
+        $middle = intdiv(count($sorted), 2);
+        return count($sorted) % 2 === 0 ? ($sorted[$middle - 1] + $sorted[$middle]) / 2 : $sorted[$middle];
     }
 
     /** @param list<int|float> $values

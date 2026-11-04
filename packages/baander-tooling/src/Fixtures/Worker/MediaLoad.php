@@ -595,7 +595,7 @@ final class MediaLoad
         $ok = array_values(array_filter($requests, static fn(array $request): bool => $request['status'] === 200 && $request['curl'] === 0));
         $seconds = array_column($ok, 'seconds');
         sort($seconds);
-        $rank = static fn(float $rank): ?float => $seconds === [] ? null : round($seconds[max(0, (int) ceil($rank * count($seconds)) - 1)], 4);
+        $rank = static fn(float $rank): ?float => $seconds === [] ? null : round(Reports::percentile($seconds, $rank), 4);
         return [
             'requests' => count($requests),
             'failed' => count($requests) - count($ok),
@@ -678,9 +678,7 @@ final class MediaLoad
             return null;
         }
         sort($values);
-        $middle = intdiv(count($values), 2);
-        $median = count($values) % 2 === 0 ? ($values[$middle - 1] + $values[$middle]) / 2 : $values[$middle];
-        return ['minimum' => round((float) $values[0], 3), 'median' => round((float) $median, 3), 'maximum' => round((float) $values[count($values) - 1], 3)];
+        return ['minimum' => round((float) $values[0], 3), 'median' => round((float) Reports::median($values), 3), 'maximum' => round((float) $values[count($values) - 1], 3)];
     }
 
     /**

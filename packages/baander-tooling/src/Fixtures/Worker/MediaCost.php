@@ -218,7 +218,7 @@ final class MediaCost
     private static function percentile(array $values, float $rank): float
     {
         sort($values);
-        return (float) $values[max(0, (int) ceil($rank * count($values)) - 1)];
+        return (float) Reports::percentile($values, $rank);
     }
 
     /** The largest peak resident memory of one native process of a kind seen so far, in MiB. */
@@ -451,7 +451,7 @@ final class MediaCost
             $file = array_map(static fn(array $sample): int => (int) ($sample['containers'][$role]['fileBytes'] ?? 0), $window);
             $services[$role] = [
                 'meanCpus' => round(($last['containers'][$role]['usageUsec'] - $window[0]['containers'][$role]['usageUsec']) / 1e6 / ($last['t'] - $window[0]['t']), 3),
-                'p95Cpus' => round($rates[(int) ceil(.95 * count($rates)) - 1], 3),
+                'p95Cpus' => round(Reports::percentile($rates, .95), 3),
                 'meanAnonMiB' => round(array_sum($anon) / count($anon) / 1048576, 1),
                 'peakAnonMiB' => round(max($anon) / 1048576, 1),
                 'peakFileMiB' => round(max($file) / 1048576, 1),
