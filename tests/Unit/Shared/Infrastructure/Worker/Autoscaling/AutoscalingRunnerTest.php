@@ -98,6 +98,23 @@ final class AutoscalingRunnerTest extends TestCase
         }
     }
 
+    public function testContendedLockSkipsTheTickAndTheNextTickPublishes(): void
+    {
+        $this->ledger->publishDecision(1, 'startup', [], 10);
+        $before = $this->ledger->snapshot(10);
+        $lock = fopen($this->directory . '/' . $this->boot . '/admission.lock', 'r+');
+        self::assertIsResource($lock);
+        self::assertTrue(flock($lock, LOCK_EX));
+        try {
+            self::assertNull($this->tryTick(10.5));
+        } finally {
+            flock($lock, LOCK_UN);
+            fclose($lock);
+        }
+        self::assertSame($before, $this->ledger->snapshot(10.5));
+        self::assertNotNull($this->tryTick(10.6));
+    }
+
     public function testMissingLedgerIsNeverReinitialized(): void
     {
         $path = $this->directory . '/' . $this->boot . '/admission.json';
@@ -111,6 +128,14 @@ final class AutoscalingRunnerTest extends TestCase
     }
 
     private function tick(float $now): \App\Shared\Infrastructure\Worker\Autoscaling\ScalingDecision
+    {
+        $decision = $this->tryTick($now);
+        self::assertNotNull($decision);
+
+        return $decision;
+    }
+
+    private function tryTick(float $now): ?\App\Shared\Infrastructure\Worker\Autoscaling\ScalingDecision
     {
         return $this->runner->tick($this->ledger, $this->policy, $this->channel, $this->profile,
             new QueueObservation('known', $now, 0, 0, 0, 0), $now);

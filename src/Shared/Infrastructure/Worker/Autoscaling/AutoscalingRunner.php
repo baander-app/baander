@@ -71,7 +71,22 @@ final readonly class AutoscalingRunner
         }
     }
 
+    /**
+     * Decides and publishes one admission target. A tick that cannot take the admission
+     * lock within its deadline publishes nothing and returns null; the previous target
+     * stands until the next tick, as it would after a slow sample.
+     */
     public function tick(AdmissionLedger $ledger, AutoscalingPolicy $policy, ResourceChannel $channel,
+        WorkerAutoscalingProfile $profile, QueueObservation $queue, float $now): ?ScalingDecision
+    {
+        try {
+            return $this->decide($ledger, $policy, $channel, $profile, $queue, $now);
+        } catch (AdmissionLockContended) {
+            return null;
+        }
+    }
+
+    private function decide(AdmissionLedger $ledger, AutoscalingPolicy $policy, ResourceChannel $channel,
         WorkerAutoscalingProfile $profile, QueueObservation $queue, float $now): ScalingDecision
     {
         $state = $ledger->snapshot($now);
