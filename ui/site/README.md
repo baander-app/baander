@@ -32,6 +32,24 @@ data it renders for the homepage and the bAAC page. Uncommitted edits do not mov
 these dates, and a page whose sources have no commit yet is listed without one, so
 publish a build made from a commit.
 
+Every page also carries its search and link-preview metadata, built by
+`SearchMetadata` in the website tooling:
+
+- **Title:** the page name, then its chapter or manual, then Bånder, for example
+  `app:user:enable — CLI Commands — Bånder`. The middle part is dropped when the
+  title would exceed 60 characters.
+- **Description:** the page's opening paragraphs before its first subsection, as
+  plain text cut at a word boundary within 155 characters. To change a page's
+  search snippet, edit its opening paragraph.
+- **Breadcrumbs:** the visible breadcrumb names the manual and, for a page in a
+  fold-out chapter, that chapter.
+- **Structured data:** the same trail appears as schema.org `BreadcrumbList` data,
+  next to a `TechArticle` carrying the page's last commit date. The homepage
+  describes the site and the software, including the ASCII spelling Baander.
+- **Link previews:** Open Graph and Twitter tags point to `assets/social-card.png`.
+  After changing the branding or the playback destinations screenshot, rebuild and
+  regenerate the card with `(cd ui/site && node scripts/social-card.mjs)`.
+
 Manual text belongs in `docs-book/`. Homepage text and layout belong in
 `ui/site/templates/`; site styles and reviewed screenshots belong in
 `ui/site/assets/`. The build copies shared token CSS, SVG branding and licensed

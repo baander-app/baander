@@ -21,9 +21,9 @@ final class SitemapTest extends TestCase
         self::assertSame('http://www.sitemaps.org/schemas/sitemap/0.9', $document->documentElement?->namespaceURI);
         $xpath = new \DOMXPath($document);
         $xpath->registerNamespace('s', 'http://www.sitemaps.org/schemas/sitemap/0.9');
-        $locations = array_map(static fn (\DOMNode $node): string => $node->textContent, iterator_to_array($xpath->query('//s:loc')));
+        $locations = array_map(static fn(\DOMNode $node): string => $node->textContent, iterator_to_array($xpath->query('//s:loc')));
         self::assertSame(['https://baander.app/', 'https://baander.app/docs/', 'https://baander.app/docs/a&b/'], $locations);
-        self::assertSame(['2026-11-04T17:00:00+01:00'], array_map(static fn (\DOMNode $node): string => $node->textContent, iterator_to_array($xpath->query('//s:lastmod'))));
+        self::assertSame(['2026-11-04T17:00:00+01:00'], array_map(static fn(\DOMNode $node): string => $node->textContent, iterator_to_array($xpath->query('//s:lastmod'))));
     }
 
     public function testRejectsDuplicateAndRelativeUrls(): void
@@ -40,6 +40,6 @@ final class SitemapTest extends TestCase
 
     public function testRobotsPointsCrawlersToTheSitemap(): void
     {
-        self::assertSame("User-agent: *\nAllow: /\n\nSitemap: https://baander.app/sitemap.xml\n", Sitemap::robots('https://baander.app/'));
+        self::assertSame("User-agent: *\nAllow: /\nDisallow: /pagefind/\n\nSitemap: https://baander.app/sitemap.xml\n", Sitemap::robots('https://baander.app/'));
     }
 }

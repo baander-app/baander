@@ -110,7 +110,11 @@ test('the sitemap lists every published page at its canonical URL and robots.txt
     const pages = await Promise.all(locations.map(async (location) => {
       const response = await fetch(new URL(location).pathname, { redirect: 'manual' });
       const html = await response.text();
-      return { location, status: response.status, canonical: html.includes(`<link rel="canonical" href="${location}">`) };
+      const head = new DOMParser().parseFromString(html, 'text/html');
+      return {
+        location, status: response.status, canonical: html.includes(`<link rel="canonical" href="${location}">`),
+        title: head.title, description: head.querySelector('meta[name="description"]')?.getAttribute('content') ?? '',
+      };
     }));
     const robots = await fetch('/robots.txt');
     return {
@@ -125,6 +129,10 @@ test('the sitemap lists every published page at its canonical URL and robots.txt
   expect(result.locations.some((location) => location.endsWith('404.html'))).toBe(false);
   for (const value of result.lastModified) expect(Number.isNaN(Date.parse(value)), value).toBe(false);
   for (const listed of result.pages) expect(listed, listed.location).toMatchObject({ status: 200, canonical: true });
+  const repeated = (values: string[]) => values.filter((value, index) => values.indexOf(value) !== index);
+  expect(repeated(result.pages.map((listed) => listed.title)), 'Every listed page has its own title').toEqual([]);
+  expect(repeated(result.pages.map((listed) => listed.description)), 'Every listed page has its own description').toEqual([]);
+  for (const listed of result.pages) expect(listed.description.length, listed.location).toBeLessThanOrEqual(160);
   expect(result.robots.status).toBe(200);
   expect(result.robots.body).toContain('Sitemap: https://baander.app/sitemap.xml');
 });
@@ -151,6 +159,38 @@ for (const width of [1440, 390]) {
     }
   });
 }
+
+test('manual pages describe themselves to search engines and link previews', async ({ page }) => {
+  await page.goto('/docs/operator-guide/commands/app-user-enable/');
+  await expect(page).toHaveTitle('app:user:enable — CLI Commands — Bånder');
+  const head = await page.evaluate(() => {
+    const content = (selector: string) => document.querySelector(selector)?.getAttribute('content') ?? null;
+    return {
+      canonical: document.querySelector('link[rel="canonical"]')?.getAttribute('href'),
+      ogUrl: content('meta[property="og:url"]'), ogTitle: content('meta[property="og:title"]'),
+      ogImage: content('meta[property="og:image"]'), twitter: content('meta[name="twitter:card"]'),
+      description: content('meta[name="description"]'),
+      graph: JSON.parse(document.querySelector('script[type="application/ld+json"]')!.textContent!)['@graph'],
+      crumbs: [...document.querySelectorAll('nav[aria-label="Breadcrumb"] a')].map((link) => link.textContent),
+    };
+  });
+  expect(head.canonical).toBe('https://baander.app/docs/operator-guide/commands/app-user-enable/');
+  expect(head.ogUrl).toBe(head.canonical);
+  expect(head.ogTitle).toBe(await page.title());
+  expect(head.twitter).toBe('summary_large_image');
+  expect(head.description).toMatch(/^Enable a previously disabled user account/);
+  expect(head.graph.map((node: { '@type': string }) => node['@type'])).toEqual(['TechArticle', 'BreadcrumbList']);
+  const listed = head.graph[1].itemListElement.map((item: { name: string }) => item.name);
+  expect(listed).toEqual([...head.crumbs, 'app:user:enable']);
+  expect(head.crumbs).toEqual(['Bånder', 'Operator manual', 'CLI Commands']);
+  const card = await page.evaluate(async (url) => {
+    const image = new Image();
+    image.src = new URL(url!).pathname;
+    await image.decode();
+    return [image.naturalWidth, image.naturalHeight];
+  }, head.ogImage);
+  expect(card).toEqual([1200, 630]);
+});
 
 test('keyboard focus and enlarged text preserve access to chapters and search', async ({ page }) => {
   await page.goto('/docs/operator-guide/getting-started/');

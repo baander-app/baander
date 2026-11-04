@@ -6,7 +6,10 @@ namespace Baander\Tooling\Website;
 
 use RuntimeException;
 
-/** Writes the sitemap protocol document and the robots.txt that points crawlers to it. */
+/**
+ * Writes the sitemap protocol document and the robots.txt that points crawlers to it. The search
+ * index chunks under /pagefind/ serve the in-page search and are not useful search results.
+ */
 final class Sitemap
 {
     private const string NAMESPACE = 'http://www.sitemaps.org/schemas/sitemap/0.9';
@@ -38,6 +41,7 @@ final class Sitemap
         return <<<ROBOTS
             User-agent: *
             Allow: /
+            Disallow: /pagefind/
 
             Sitemap: {$sitemap}
 

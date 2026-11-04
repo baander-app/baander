@@ -40,6 +40,11 @@ final class WebsiteBuilder
     public const string ORIGIN = 'https://baander.app';
     /** Repository paths whose changes update the homepage's last-modified date. */
     private const array HOME_SOURCES = ['ui/site/templates/home.php', 'ui/site/assets/screenshots'];
+    /** Each guide's breadcrumb, shared by the page header and the structured data. */
+    private const array GUIDES = [
+        'operator' => ['name' => 'Operator manual', 'url' => '/docs/operator-guide/'],
+        'developer' => ['name' => 'Developer guide', 'url' => '/docs/developer-guide/'],
+    ];
     /** Chapter indexes whose linked pages fold out under the chapter in the manual navigation. */
     private const array FOLD_OUT_CHAPTERS = ['part-1-operator-guide/commands/README.md', 'part-2-developer-guide/contexts/README.md'];
     /** @var array<string,list<array{url:string,title:string,children?:list<array{url:string,title:string,group?:string}>}>> */
@@ -85,13 +90,21 @@ final class WebsiteBuilder
         try {
             $this->renderBlocks($staging, $renderBlocks);
             $renderer = new HtmlRenderer($this->environment);
+            $chapters = $this->foldOutParents();
             foreach ($this->pages as $source => &$page) {
                 $page['html'] = (string) $renderer->renderDocument($this->documents[$source]);
-                $this->write($staging . $page['url'] . 'index.html', $this->template('page', $page));
+                $meta = $this->manualMetadata($source, $page, $chapters, $history);
+                $this->write($staging . $page['url'] . 'index.html', $this->template('page', $page + ['meta' => $meta]));
             }
             unset($page);
-            $this->write($staging . '/index.html', $this->template('home', ['source' => '', 'url' => '/', 'title' => 'Bånder', 'guide' => null, 'html' => '', 'headings' => []]));
-            $this->write($staging . '/404.html', $this->template('404', ['source' => '', 'url' => '/404.html', 'title' => 'Page not found', 'guide' => null, 'html' => '', 'headings' => []]));
+            $this->write($staging . '/index.html', $this->template('home', [
+                'source' => '', 'url' => '/', 'title' => 'Bånder', 'guide' => null, 'html' => '', 'headings' => [],
+                'meta' => SearchMetadata::home(self::ORIGIN),
+            ]));
+            $this->write($staging . '/404.html', $this->template('404', [
+                'source' => '', 'url' => '/404.html', 'title' => 'Page not found', 'guide' => null, 'html' => '', 'headings' => [],
+                'meta' => SearchMetadata::notFound(self::ORIGIN),
+            ]));
             $routes = array_fill_keys(array_column($this->pages, 'url'), true);
             $routes['/'] = $routes['/404.html'] = true;
             foreach ($publicPages as $descriptor) {
@@ -103,7 +116,16 @@ final class WebsiteBuilder
                     throw new RuntimeException('Invalid public page template.');
                 }
                 $routes[$url] = true;
-                $page = $descriptor + ['source' => '', 'guide' => null, 'html' => '', 'headings' => []];
+                $meta = SearchMetadata::page(
+                    origin: self::ORIGIN,
+                    url: $url,
+                    heading: $descriptor['title'],
+                    description: $descriptor['description'],
+                    trail: [],
+                    lastModified: $history?->lastModified($descriptor['sources'] ?? ['ui/site/templates/' . $descriptor['template'] . '.php']),
+                    schemaType: 'WebPage',
+                );
+                $page = $descriptor + ['source' => '', 'guide' => null, 'html' => '', 'headings' => [], 'meta' => $meta];
                 $this->write($staging . $url . 'index.html', $this->template($descriptor['template'], $page, $descriptor['data']));
             }
             $this->write($staging . '/sitemap.xml', $this->sitemap($publicPages, $history));
@@ -342,6 +364,46 @@ final class WebsiteBuilder
                 $this->navigation[$guide][] = $entry;
             }
         }
+    }
+
+    /**
+     * Search metadata for a manual page: its guide and, inside a fold-out chapter, that chapter form
+     * the trail; the opening paragraphs form the description.
+     *
+     * @param array{source:string,url:string,title:string,guide:?string} $page
+     * @param array<string, array{name: string, url: string}> $chapters fold-out page URL => its chapter
+     */
+    private function manualMetadata(string $source, array $page, array $chapters, ?SourceHistory $history): SearchMetadata
+    {
+        $guide = $page['guide'] === null ? null : self::GUIDES[$page['guide']];
+        $trail = $guide === null || $guide['url'] === $page['url'] ? [] : [$guide];
+        if (isset($chapters[$page['url']])) {
+            $trail[] = $chapters[$page['url']];
+        }
+        $description = SearchMetadata::description($this->documents[$source])
+            ?? $page['title'] . ' in the ' . SearchMetadata::SITE_NAME . ' ' . ($guide['name'] ?? 'manual') . '.';
+
+        return SearchMetadata::page(
+            origin: self::ORIGIN,
+            url: $page['url'],
+            heading: $page['title'],
+            description: $description,
+            trail: $trail,
+            lastModified: $history?->lastModified(['docs-book/' . $source]),
+        );
+    }
+
+    /** @return array<string, array{name: string, url: string}> fold-out page URL => the chapter that lists it */
+    private function foldOutParents(): array
+    {
+        $parents = [];
+        foreach (array_merge(...array_values($this->navigation)) as $chapter) {
+            foreach ($chapter['children'] ?? [] as $child) {
+                $parents[$child['url']] = ['name' => $chapter['title'], 'url' => $chapter['url']];
+            }
+        }
+
+        return $parents;
     }
 
     /**

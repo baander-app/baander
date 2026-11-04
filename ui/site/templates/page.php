@@ -60,7 +60,12 @@ include __DIR__ . '/header.php';
     </details>
   </aside>
   <main id="main" class="manual-main">
-    <div class="manual-breadcrumb"><a href="/">Bånder</a><span aria-hidden="true">/</span><a href="<?= $page['guide'] === 'developer' ? '/docs/developer-guide/' : '/docs/operator-guide/' ?>"><?= $page['guide'] === 'developer' ? 'Developer guide' : 'Operator manual' ?></a></div>
+    <nav class="manual-breadcrumb" aria-label="Breadcrumb">
+      <?php foreach ($page['meta']->breadcrumbs as $index => $crumb): ?>
+        <?php if ($index > 0): ?><span aria-hidden="true">/</span><?php endif; ?>
+        <a href="<?= $escape($crumb['url']) ?>"><?= $escape($crumb['name']) ?></a>
+      <?php endforeach; ?>
+    </nav>
     <?php if (count($page['headings']) > 1): ?>
       <details class="section-navigation">
         <summary>On this page</summary>
