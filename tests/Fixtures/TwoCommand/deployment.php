@@ -40,7 +40,7 @@ const COST_VIDEO_SECONDS = 120;
 const COST_TRACK_SECONDS = 600;
 const LOAD_VIDEO = '/media/source/load-1080p.mkv';
 const LOAD_VIDEO_SECONDS = 120;
-const LOAD_TRACK_SECONDS = 300;
+const LOAD_TRACK_SECONDS = 600;
 
 function ensure(bool $condition, string $message): void
 {

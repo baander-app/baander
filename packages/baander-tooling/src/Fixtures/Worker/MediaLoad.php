@@ -111,7 +111,7 @@ final class MediaLoad
                 }
                 throw $error;
             }
-            $docker->run(['exec', $checkpoint->postgres, 'sh', '-c', 'kill -INT "$(cat /tmp/load-saturator.pid)"'], check: false);
+            $docker->run(['exec', $checkpoint->postgres, 'sh', '-c', 'kill -TERM "$(cat /tmp/load-saturator.pid)"'], check: false);
             $runtime->wait($saturator, check: false);
             $runtime->wait($web);
             // The run is over: one encode of each codec alone on the otherwise idle host.
@@ -179,10 +179,21 @@ final class MediaLoad
             'database' => self::database($artifacts, $start, $end, $wallOffset),
             'leases' => self::leases($units, $start, $end),
             'web' => self::web($artifacts, $start, $end),
-            'killOrder' => ['control' => KillOrderEvidence::processes(self::sampleRecords($units['control']), 'control'),
-                'execution' => KillOrderEvidence::processes(self::sampleRecords($units['execution']), 'execution')],
+            // From the first warm-up encode to the run's end: the idle single encodes afterwards
+            // are the drill's own commands, not launches of the native daemon.
+            'killOrder' => array_map(
+                static fn(string $unit): array => KillOrderEvidence::processes(
+                    Reports::window(self::sampleRecords($units[$unit]), Reports::number($client['warmUp'][0]['startedAt'] ?? $start), $end),
+                    $unit,
+                ),
+                ['control' => 'control', 'execution' => 'execution'],
+            ),
             'singleEncode' => self::singleEncode($artifacts),
         ];
+        $saved = is_file($artifacts . '/governor-state.json') ? Reports::json($artifacts . '/governor-state.json') : [];
+        $learned = $saved['governor']['model']['samples'] ?? [];
+        $receipt['governor']['savedAfterRun'] = ['state' => $saved['governor']['state'] ?? null, 'samples' => count($learned),
+            'hardwareSamples' => count(array_filter($learned, static fn(array $sample): bool => ($sample['hardware_accelerated'] ?? false) === true))];
         $receipt['summary'] = self::summary($receipt);
         return $receipt;
     }

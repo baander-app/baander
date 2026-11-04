@@ -57,7 +57,7 @@ $governor = static function () use ($governorPath): ?array {
     }
     $samples = $saved['governor']['model']['samples'];
     return ['state' => (string) ($saved['governor']['state'] ?? ''), 'samples' => count($samples),
-        'hardwareSamples' => count(array_filter($samples, static fn (array $sample): bool => ($sample['hardwareAccelerated'] ?? false) === true))];
+        'hardwareSamples' => count(array_filter($samples, static fn (array $sample): bool => ($sample['hardware_accelerated'] ?? false) === true))];
 };
 /** @return array<string,mixed> */
 $job = static fn (string $publicId): array => $direct->fetchAssociative(
@@ -178,7 +178,8 @@ while (true) {
             // its body is dropped now so hundreds of renditions do not accumulate.
             $exchange->body = '';
             $renditions[] = $record;
-            $laneState['current'] = $videoDone ? null : $audioStart($lane, $laneState['next']++);
+            // A lane never repeats a rendition, which the cache would answer without encoding.
+            $laneState['current'] = $videoDone || $laneState['next'] >= count(LOAD_RENDITIONS) ? null : $audioStart($lane, $laneState['next']++);
         }
     }
     unset($laneState);
