@@ -48,6 +48,25 @@ final class AdvancedStaticFilesServerTest extends TestCase
         );
     }
 
+    public function testARepeatedAssetRequestIsAlsoCachedForAYear(): void
+    {
+        $server = $this->server($this->neverReached());
+        $first = $this->createStub(Response::class);
+        $first->method('sendfile')->willReturn(true);
+        $server->handle(self::get(self::FONT), $first);
+
+        $response = $this->createMock(Response::class);
+        $headers = $this->recordHeaders($response);
+        $response->expects(self::once())->method('sendfile')->with($this->public . self::FONT)->willReturn(true);
+
+        $server->handle(self::get(self::FONT), $response);
+
+        self::assertSame(
+            ['Content-Type' => 'font/woff2', 'Cache-Control' => 'public, max-age=31536000, immutable'],
+            $headers->getArrayCopy(),
+        );
+    }
+
     public function testOtherStaticFilesKeepTheirHeaders(): void
     {
         $response = $this->createMock(Response::class);
