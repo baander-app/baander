@@ -361,6 +361,47 @@ their retention does not resume deferred work or validate historical assumptions
 The entries below preserve the installation guides' linked checkpoint and the
 open items left by the AAC codec work.
 
+### Geist and Noto typography
+
+Delivered on branch `feat/geist-noto-typography` from the
+[typography plan](docs/plans/2026-11-04-1910-feat-geist-noto-typography-plan.md):
+Geist and Geist Mono with self-hosted Noto fallbacks in the web app, Electron and
+the public site; ten type roles with phone sizes below 768px; the 12px floor with
+11px only in admin tables, badges and chips; per-element script rules; per-item
+content language from the stored album or movie language, then script detection;
+album and song API language fields; and a one-year immutable cache header for
+`/assets`.
+
+Verification checkpoint at the review-fix commits on that branch:
+
+- Web: typecheck and lint clean (0 errors), 269 Vitest files with 3,283 tests
+  passing, the typography census passing, the generated API client current, and
+  the production build verified.
+- Typography harness: 24 of 24 checks in Chromium, Firefox and WebKit (WebKit in
+  the `mcr.microsoft.com/playwright:v1.64.1-noble` image).
+- Design tokens: build check current and 76 tests passing. Website: typecheck, 4
+  node tests, 75 tooling PHPUnit tests and 47 Chromium browser checks. Electron:
+  typecheck, 75 tests, build, and the runtime smoke test in built and development
+  modes.
+- Backend in the CI image: PHPStan, Deptrac, container lint and the OpenAPI check
+  clean; the Catalog and Playlist functional suites passing; the unit suite at
+  7,434 tests with 2 failures in `CaptureCoverageTest`, which fail identically on
+  `master` and predate this work.
+- Code review: full multi-agent review, verdict ready with fixes; both confirmed
+  findings fixed.
+
+Open items:
+
+- The real-screen styling specs (`tests/e2e/styling`) and a first-paint
+  measurement have not run, because the preview instance cannot start: its saved
+  release references a data-store image that is no longer on the host. The main
+  stylesheet measures 456 kB raw and 157 kB compressed, of which the 489
+  `@font-face` rules take about 412 kB raw.
+- Considered and not done: song resources still split the album title and
+  language into two maps; radio genre chips render genre names without a content
+  language; `input` and `textarea` use a 2.0 line-height inside the fixed 2rem
+  field height, which WebKit may render with the caret off-centre.
+
 ### Source-installation documentation
 
 Disposable installation verified frontend loading, administrator login, worker
