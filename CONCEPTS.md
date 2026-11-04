@@ -237,6 +237,14 @@ The monotonically increasing order of committed desired-state changes for a vide
 job. The worker applies the latest revision, preserving paused state across a seek
 and treating cancellation as terminal.
 
+A playback progress report that moves the desired position commits a new revision
+without starting a new execution generation; a control that leaves the desired state
+unchanged commits none. The worker's writes for the job are fenced on both the
+generation and the revision, so a revision committed while a write is in flight
+refuses that write. The worker then takes the latest revision and writes again. A
+step with effects outside the job record, such as sealing a finished encode, records
+that it ran so the retry does not repeat it.
+
 ### Owned video job
 
 A transcode job belonging to one playback user, client session, video, selected presentation and quality tier.
@@ -340,6 +348,12 @@ set; each starts at its own out-of-memory score in the kill order. Control owns
 the lease and coordination; execution observes the lease and owns native
 processes. A private IPC volume connects the pair.
 
+Each unit publishes a heartbeat on that volume and admits work only while its
+peer's heartbeat is current, ready and at the same lease epoch. A peer heartbeat
+that is foreign, stale, draining or dated ahead of the reader's clock, or one
+still missing or not ready after startup, is a peer failure: the unit drains, and its draining
+heartbeat then drains the other unit.
+
 ### Small-host household profile
 
 A startup profile for household playback and ordinary library maintenance with
@@ -356,8 +370,8 @@ size, a 4 GB fit and Raspberry Pi support remain unqualified.
 One unit of concurrent media work a deployment admits: a video slot runs one
 video conversion or stream copy, an audio slot one audio rendition or stream copy.
 Original-file and completed-artifact playback use no slot. The startup profile
-carries the slot counts: the full profile takes operator-set counts, 8 video and
-12 audio by default, and zero disables a kind; the household profile has two fixed
+carries the slot counts: the full profile takes operator-set counts with a default
+for each kind, and zero disables a kind; the household profile has two fixed
 shared copy slots. Baander's native command, result and client limits are derived
 from the slots, and the pooler's client limit bounds how many slots a profile
 accepts. Slots are Baander's only bound on media work: containers carry no CPU or
