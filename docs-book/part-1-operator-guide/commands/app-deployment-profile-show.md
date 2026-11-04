@@ -36,8 +36,8 @@ profile this process runs, read from `BAANDER_DEPLOYMENT_PROFILE` and
 options alone and leave the environment unchanged; the effective profile's hardware
 encoder is not carried over. An option without `--identifier` builds the effective
 profile's kind. An unset slot option takes the default: 8 video and 12 audio jobs.
-The video default is a separate measured figure with a hardware encoder; it is also 8
-on the reference GPU. See
+With a hardware encoder, unset video slots take a separate measured default instead:
+12 on the reference GPU. See
 [Hardware acceleration](../transcoding.md#hardware-acceleration) for what the
 hardware encoder changes.
 

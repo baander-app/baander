@@ -1609,8 +1609,8 @@ phase; the table gives the range across both runs:
 | AAC 192k rendition | 56 MiB | 1 | 0.019 / 0.020 | 52x / 47–50x |
 | MP3 192k rendition | 52 MiB | 1 | 0.014–0.015 / 0.015–0.016 | 69–70x / 56–66x |
 
-SegmentEncoder's two-thread cap limits the encoder's own threads to two; the
-FFmpeg process as a whole uses more CPU. An H.264 job used 2.56 CPUs alone. Its two x264
+In this run SegmentEncoder capped the encoder's own threads at two; the
+FFmpeg process as a whole used more CPU. An H.264 job used 2.56 CPUs alone. Its two x264
 threads used 0.9 CPU each, one thread 0.43, and decoding, audio and muxing threads
 0.08–0.13 each. An HEVC job used 2.13 CPUs: its two x265 pool threads used 0.99
 CPU each and every other thread 0.05 or less. Under that cap, HEVC at 1080p
@@ -1626,14 +1626,14 @@ smallest setting above 1.2x. The one-minute load average was 2.8–4.8 during
 the sweep.
 
 That source was synthetic. On 4 November 2026 the same sweep ran on real film
-content in the Debian 13 worker image with FFmpeg 7.1: 60-second excerpts at 60,
-300 and 480 seconds into the 1080p30 Big Buck Bunny file, scaled to 1080p at
-6 Mb/s with two frame threads and the production GOP of 180 frames, on an
-otherwise idle host. Four pool threads ran at 0.76–0.87x and missed real time
-on every excerpt; six ran at 1.07–1.21x for 4.7–5.5 CPU-s per output second;
-eight ran at 1.18–1.34x for 5.1–6.0 CPU-s per output second. SegmentEncoder now
-gives `libx265` six pool threads, the smallest setting ahead of real time on every
-excerpt, with two frame threads; libx264 keeps its two encoder threads.
+content, on an otherwise idle host, in the Debian 13 worker image with FFmpeg 7.1.
+It encoded 60-second excerpts at 60, 300 and 480 seconds into the 1080p30 Big Buck
+Bunny file, scaled to 1080p at 6 Mb/s with two frame threads and the production
+GOP of 180 frames. With four pool threads, every excerpt missed real time, at
+0.76–0.87x. Six pool threads ran at 1.07–1.21x for 4.7–5.5 CPU-s per output
+second, and eight at 1.18–1.34x for 5.1–6.0 CPU-s per output second. SegmentEncoder
+now gives `libx265` six pool threads, the smallest setting ahead of real time on
+every excerpt, with two frame threads; libx264 keeps its two encoder threads.
 
 Each media job child in the control unit peaked at 92 MiB with two threads for
 video and 66 MiB with one thread for audio. No separate helper process appeared.
@@ -1673,10 +1673,10 @@ BAANDER_TEST_MEDIA_COST=hardware BAANDER_TEST_IMAGE=baander-worker:hw-cost \
 `/dev/dri/renderD128`), `BAANDER_TEST_MEDIA_COST_ENCODERS` the encoders (default
 `h264_vaapi,hevc_vaapi`), `BAANDER_TEST_MEDIA_COST_STEPS` the concurrency steps
 (default `1,2,4,8,12,16,24`) and `BAANDER_TEST_MEDIA_COST_STEP_SECONDS` how long a
-step may run (default 150). The runner gives one disposable worker-image container
-the device and the group that owns it, as worker creation gives the execution unit,
-with no network, no capabilities and Docker's default seccomp profile. Inside, the
-fixture generates the same 120-second 1080p30 H.264/AAC source as cost mode, builds
+step may run (default 150). The runner starts one disposable worker-image
+container with no network, no capabilities and Docker's default seccomp profile,
+and gives it the device and the group that owns it, as worker creation does for
+the execution unit. Inside, the fixture generates the same 120-second 1080p30 H.264/AAC source as cost mode, builds
 the encode command with `SegmentEncoder` for each hardware encoder, and starts each
 step's encodes together through the native daemon's launcher. Every encode decodes,
 scales and encodes on the device and encodes AAC audio on the CPU.
@@ -1686,13 +1686,13 @@ Every half second the fixture records each encode's CPU ticks, `VmHWM`, threads,
 `/proc/<pid>/fdinfo`, and the device's `gpu_busy_percent`, `vcn_busy_percent` and
 `mem_info_vram_used`. `media-cost-hardware.json` reports each step over the window
 in which every encode had passed three seconds of output and none had stopped
-advancing. A step is real time when its slowest stream runs faster than 1.0x, and the receipt
-records each encoder's largest real-time step.
+advancing. A step is real time when its slowest stream runs faster than 1.0x, and
+the receipt records each encoder's largest real-time step.
 
 The recorded run on 2026-11-04 used an AMD Radeon RX 9070 XT (16 GiB) through VAAPI
 with Mesa radeonsi and FFmpeg 7.1.5 on Debian 13, on the Ryzen 7 5800X3D host above
-with other work running (one-minute load average 1.5–6.2). Steps 10 and 14 were
-added to the defaults:
+with other work running (one-minute load average 1.5–6.2). The run added steps 10
+and 14 to the default steps:
 
 | Encoder | Streams | Slowest / aggregate speed | CPU-s per output s | Peak RSS | Device VRAM used |
 |---|---|---|---|---|---|
@@ -1713,8 +1713,8 @@ aggregate rate, about 9x real time for H.264 and 13–15x for HEVC. Device VRAM 
 by about 1.1 GiB per stream and levelled off near 12.7 GiB above twelve streams
 without errors. Every encode exited cleanly or ran until the step's deadline. H.264
 is real time up to 8 streams and HEVC up to 14. The hardware video default of 12
-follows HEVC, the encoder media control selects by default, at the step that kept a
-12% margin; 14 streams left only 8%. These figures are for one GPU, one synthetic
+follows HEVC, the encoder media control selects by default. It sits at the step
+that kept a 12% margin; 14 streams left only 8%. These figures are for one GPU, one synthetic
 source and one run.
 
 #### Load proof at the default slots

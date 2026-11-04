@@ -117,11 +117,11 @@ An encoded session is assigned an audio profile that controls codec, bitrate, ch
 ## Worker execution capacity
 
 Under `full`, the media role admits as many video jobs and audio renditions at
-once as the profile's [media slots](configuration.md#media-slots), 8 video and 12
-audio by default; stream copy uses the slots of its kind, and a kind with zero
+once as the profile has [media slots](configuration.md#media-slots): 8 video and 12
+audio by default. Stream copy uses the slots of its kind, and a kind with zero
 slots is refused. Under `household`, audio and video copy jobs share two slots,
-and encoding is refused. Each video job has a fresh PHP kernel and one private CPU helper,
-started before any database or Redis connection opens. FFmpeg processes and their
+and encoding is refused. Each video job has a fresh PHP kernel and one private CPU
+helper, started before any database or Redis connection opens. FFmpeg processes and their
 process groups belong to the worker deployment. Web has no CPU pool or encoder
 fallback.
 
@@ -257,23 +257,26 @@ container's devices, groups and GPU requests with the admitted recipe. The
 containers still carry no CPU or memory limits.
 
 At worker start, media control runs a test encode with the accelerator's HEVC
-encoder on the configured device, at 640x360, the smallest tier the ladder encodes. When `VIDEO_ENCODER` names the same accelerator's
-H.264 encoder, such as `h264_vaapi`, it tests and uses that one instead. If the test
-encode fails, media control stops instead of encoding in software, and the worker
+encoder on the configured device, at 640x360, the smallest tier the ladder
+encodes. When `VIDEO_ENCODER` names the same accelerator's H.264 encoder, such as
+`h264_vaapi`, media control tests and uses that one instead. If the test encode
+fails, media control stops instead of encoding in software, and the worker
 deployment does not become ready. Its `worker_media_failure` log line then carries
 `"reason": "hardware_encoder_unavailable"` with the encoder, the device and the last
 lines of FFmpeg's output. Without a hardware encoder, the worker qualifies its
-software encoder as before.
+software encoder.
 
-With a hardware encoder, unset video slots take the measured hardware default of 12.
-Audio stays at 12, and the video maximum still follows the pooler bound: 145 slots
-in `full`. The default follows `hevc_vaapi`, the encoder media control picks by
-default: on an AMD Radeon RX 9070 XT with VAAPI, every 1080p stream ran at 1.12x
-real time with 12 streams and at 1.08x with 14. `h264_vaapi` keeps up with fewer
-streams, 1.12x with 8 and 0.91x with 10, so a deployment that sets `VIDEO_ENCODER`
-to `h264_vaapi` should set `videoSlots` to 8 on that GPU. The video engine
-was fully busy at every step while each stream used about 0.03 CPU seconds per
-second of output. The
+With a hardware encoder, unset video slots take the measured hardware default of
+12. Audio stays at 12, and the video maximum still follows the pooler bound: 145
+slots in `full`.
+
+The default of 12 follows `hevc_vaapi`, the encoder media control picks by default.
+On an AMD Radeon RX 9070 XT with VAAPI, every 1080p stream ran at 1.12x real time
+or faster with 12 streams, and at 1.08x or faster with 14. `h264_vaapi` keeps up
+with fewer streams: 1.12x with 8 and 0.91x with 10. A deployment that sets
+`VIDEO_ENCODER` to `h264_vaapi` should therefore set `videoSlots` to 8 on that GPU.
+The video engine was fully busy at every step. Each stream used about 0.03 CPU
+seconds per second of output up to 12 streams, and up to 0.063 at 14 and 16. The
 [hardware cost measurement](../part-2-developer-guide/testing.md#hardware-encoder-cost)
 records the figures. Other GPUs, codecs and sources sustain different counts, so
 set `videoSlots` after trying the host's own load.

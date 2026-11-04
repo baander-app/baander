@@ -89,10 +89,10 @@ Preserve the private state directory to recover an interrupted operation. See
 [Getting started](getting-started.md) for image preparation and account setup.
 
 No rendered service or worker unit carries a CPU, memory or PID limit or a CPU
-set; the preset keeps only Redis's own `maxmemory`, set by
-`resources.redisMaxmemoryMiB` (default 192). The media slots bound media work, and
-[System Requirements](system-requirements.md) explains how to choose them and the
-kill order that applies under host memory pressure. A 4 GB host and Raspberry Pi
+set. The only limit the preset keeps is Redis's own `maxmemory`, set by
+`resources.redisMaxmemoryMiB` (default 192). Media work is bounded by the media
+slots instead; [System Requirements](system-requirements.md) explains how to choose
+them and the kill order that applies under host memory pressure. A 4 GB host and Raspberry Pi
 support remain unqualified.
 
 ### Media slots
@@ -108,27 +108,27 @@ In the `full` preset, set the slots with an optional `media` object:
 
 `videoSlots` and `audioSlots` are each optional. An unset count takes its default,
 8 video or 12 audio, and an absent `media` object takes both defaults. Zero
-disables that kind: its conversions and stream copies are refused with the
-existing compatibility explanation instead of waiting for a slot. The `household`
-preset rejects a `media` object because its two shared copy slots are fixed. A
-source installation sets the same counts through `BAANDER_DEPLOYMENT_PROFILE_JSON`
-and the worker manifest's `deploymentProfile`; `app:deployment:profile:show`
-prints both.
+disables that kind: instead of waiting for a slot, its conversions and stream
+copies are refused with the compatibility explanation described above. The
+`household` preset rejects a `media` object because its two shared copy slots are
+fixed. A source installation sets the same counts through
+`BAANDER_DEPLOYMENT_PROFILE_JSON` and the worker manifest's `deploymentProfile`;
+`app:deployment:profile:show` prints both.
 
 A `hardware` entry in the same object names a hardware encoder, for example
-`"hardware": {"accelerator": "vaapi", "device": "/dev/dri/renderD128"}`. With one,
-unset video slots default to 12 instead of 8. [Hardware
+`"hardware": {"accelerator": "vaapi", "device": "/dev/dri/renderD128"}`. When a
+hardware encoder is named, unset video slots default to 12 instead of 8. [Hardware
 Acceleration](transcoding.md#hardware-acceleration) describes the fields, the
 device pass-through and the startup check.
 
 The maximums come from the pooler, the only fixed resource bound left. PgBouncer
-admits 500 client connections. In `full`, the web workers, worker roles, scheduler,
-lease agents and an operator's console command and deployment controller hold 65
-of them, which leaves 435 for media jobs. A video job opens 3 pooled connections
-and an audio job 2, so a profile accepts at most 145 video slots or 217 audio
-slots, and both kinds together must satisfy `3 × videoSlots + 2 × audioSlots ≤
-435`. Rendering the preset and building the profile reject a larger value and name
-the bound it exceeds.
+admits 500 client connections. In `full`, 65 of them are held by the web workers,
+worker roles, scheduler, lease agents, and an operator's console command and
+deployment controller, which leaves 435 for media jobs. A video job opens 3 pooled
+connections and an audio job 2, so a profile accepts at most 145 video slots or 217
+audio slots, and both kinds together must satisfy `3 × videoSlots + 2 × audioSlots
+≤ 435`. Rendering the preset and building the profile both reject a larger value
+and name the bound it exceeds.
 
 ### Connection pooler
 
@@ -147,10 +147,9 @@ The pooler exposes two aliases, each with its own server pool:
 | Control, the database name with `_control` appended | Worker lease agents, media authority checks and the scheduler | The database user's name with `_control` appended | 4 / 8 |
 
 The source installation's Compose file uses the `full` pool sizes. The control
-alias keeps its own server connections, so lease renewals and
-authority checks do not wait behind web traffic. PgBouncer sets its query wait
-per user, so control traffic logs in as its own role, a member of the application
-role. A control query that finds no free server connection fails after one second,
+alias keeps its own server connections, so lease renewals and authority checks do
+not wait behind web traffic. PgBouncer sets its query wait per user, so control
+traffic logs in as its own role, a member of the application role. A control query that finds no free server connection fails after one second,
 before the lease agent's 1.5-second deadline; application clients keep
 PgBouncer's two-minute wait.
 
@@ -158,10 +157,11 @@ PgBouncer's two-minute wait.
 control alias and role. Web and workers require both; the preset derives them
 from `DB_USERNAME`, `DB_PASSWORD` and `DB_DATABASE`. Work that needs session
 state or the server itself bypasses the pooler and connects to PostgreSQL
-directly; no URL setting names that path. It covers the pooler credentials step,
-the preset's PostgreSQL settings verification, development checkpoints, `pg_dump`
-backups run inside the PostgreSQL container and an operator's `psql` session. The
-test configuration also points both URLs directly at PostgreSQL.
+directly; no URL setting names that path. The direct path serves the pooler
+credentials step, the preset's PostgreSQL settings verification, development
+checkpoints, `pg_dump` backups run inside the PostgreSQL container and an
+operator's `psql` session. The test configuration also points both URLs directly
+at PostgreSQL.
 
 The pooler authenticates with SCRAM-SHA-256 from an auth file. Before the pooler
 starts, a one-off credentials step derives one verifier per role from
@@ -174,10 +174,11 @@ pooler working.
 
 PostgreSQL's `max_connections` is both pools plus a direct reserve plus three
 superuser slots: 10 + 4 + 3 + 3 = 20 for `household` and 20 + 8 + 4 + 3 = 35 for
-`full`. The direct reserve serves the direct connections above. Pooled
-connections disable named server-side prepared statements: the image's PostgreSQL
-driver frees them with SQL `DEALLOCATE`, which PgBouncer does not map to its own
-renamed statements, so the transaction would abort.
+`full`. The direct reserve serves the direct connections above.
+
+Pooled connections disable named server-side prepared statements. The image's
+PostgreSQL driver frees them with SQL `DEALLOCATE`, and PgBouncer does not map that
+statement to its own renamed statements, so the transaction would abort.
 
 PostgreSQL runs in UTC. Both preset PostgreSQL files set `timezone = 'UTC'`, a
 migration sets the database's default zone, and web and each worker supervisor

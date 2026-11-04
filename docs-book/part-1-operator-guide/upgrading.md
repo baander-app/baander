@@ -16,14 +16,14 @@ schema is still installed. Preserve the database, pending work and media; no res
 is required or authorized by this upgrade.
 
 Version 8 manifests require `sourceMountPolicy`, the complete startup
-`deploymentProfile`, the ordinary autoscaling profile and `deviceGroup`, and carry
-no per-unit memory, CPU, PID or CPU-set fields. The selected startup profile must agree with
-web and the worker runtime environment. The new controller refuses earlier
-manifest versions, including recovery actions. Keep the old checkout, controller,
-manifest and credentials to retire an existing pair before switching code. Confirm
-both units' retirement and the joint reservation release, then create a version 8
-manifest with a fresh boot ID, the new image and `sourceMountPolicy: production`
-for the named-volume recipe. Lease expiry or a
+`deploymentProfile`, the ordinary autoscaling profile and `deviceGroup`. They carry
+no per-unit memory, CPU, PID or CPU-set fields. The selected startup profile must
+agree with web and the worker runtime environment. The new controller refuses
+earlier manifest versions, including recovery actions. Keep the old checkout,
+controller, manifest and credentials to retire an existing pair before switching
+code. Confirm both units' retirement and the joint reservation release, then create
+a version 8 manifest with a fresh boot ID, the new image and
+`sourceMountPolicy: production` for the named-volume recipe. Lease expiry or a
 stopped container is insufficient. Preserve the database, pending work and media.
 This manifest change requires no data reset and provides no compatibility path.
 
@@ -146,7 +146,7 @@ the control/execution journals and joint retirement barrier. It is irreversible.
 `Version20261021120000` retains the last observed availability of indexed source
 files and is also irreversible.
 New deployments require a version 8 manifest with a private IPC volume and
-complete deployment and autoscaling profiles, and without unit limits or CPU sets;
+complete deployment and autoscaling profiles, and with no unit limits or CPU sets;
 earlier manifest versions are refused. Every profile field is fingerprinted in
 both recipes. Changing thresholds, concurrency or the startup profile requires
 retirement and a fresh boot, with matching web and worker runtime settings.
@@ -230,8 +230,8 @@ image starts on it. Rebuild its indexes before writers return:
 
 1. **Stop the writers.** Stop web and retire the worker pair as in the
    [standard update](#standard-update). Keep PostgreSQL running on the new image.
-2. **Rebuild the indexes and record the new version.** Connect directly to
-   PostgreSQL, not through the pooler, as the database owner. For the source
+2. **Rebuild the indexes and record the new version.** Connect to PostgreSQL
+   directly as the database owner, not through the pooler. For the source
    installation:
 
    ```bash
@@ -241,7 +241,7 @@ image starts on it. Rebuild its indexes before writers return:
    For the managed preset, run the same `psql` command in its `postgres` service
    container. `REINDEX DATABASE` rebuilds every index of the current database and
    takes longer on a larger library; `REFRESH COLLATION VERSION` then records the
-   new glibc version so the warning stops.
+   new glibc version so the mismatch warning stops.
 3. **Repeat for other databases.** Run both statements in any other database of
    the same volume that reports the mismatch.
 4. **Return the writers.** Start web and a fresh worker pair, then observe them as
