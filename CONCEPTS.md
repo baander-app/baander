@@ -709,3 +709,15 @@ Its stable runtime interface allows a compatible binary to serve both Node and E
 
 AAC-ELD with MPS 212, carrying a mono core and low-delay spatial parameters that reconstruct stereo through a low-delay filterbank and decorrelator.
 *Avoid: ELD with LD-SBR, which is a different extension of the same core.*
+
+## Typography
+
+### Content language
+
+The language catalog text renders in. It is the item's stored language when that value is a recognised language code, such as an album's release language (which its songs inherit) or a movie's original language; otherwise it is detected from the text's script.
+
+It selects Han glyph forms and script spacing. It is separate from the interface locale, which governs interface text.
+
+### Type role
+
+One of the ten named text styles, from `text-hero` to `text-mono-sm`, that fixes size, weight, tracking and line-height for each platform. Every text element uses one role.
