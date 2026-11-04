@@ -57,9 +57,9 @@ final class BlockRenderingTest extends TestCase
 
     public function testCreatesSanitizedThemeAssetsAndAccessibleSourceDisclosure(): void
     {
-        $directory = $this->root . '/ui/site/node_modules/@fontsource/inter/files';
+        $directory = $this->root . '/ui/site/node_modules/@fontsource-variable/geist/files';
         mkdir($directory, 0700, true);
-        file_put_contents($directory . '/inter-latin-400-normal.woff2', 'trusted-font');
+        file_put_contents($directory . '/geist-latin-wght-normal.woff2', 'trusted-font');
         $svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 60"><text>A &amp; B</text><script>unsafe</script></svg>';
         $this->helper(['sample' => ['kind' => 'diagram', 'light' => $svg, 'dark' => $svg, 'width' => 100, 'height' => 60]]);
         $source = "flowchart LR\naccTitle: Music & playback\naccDescr: A to B\nA --> B\n";
@@ -74,6 +74,7 @@ final class BlockRenderingTest extends TestCase
         foreach (['light', 'dark'] as $appearance) {
             $asset = file_get_contents($this->root . '/stage/assets/diagrams/sample-' . $appearance . '.svg');
             self::assertStringNotContainsString('<script', $asset);
+            self::assertStringContainsString('font-family:"Geist Variable"', $asset);
             self::assertStringContainsString('base64,' . base64_encode('trusted-font'), $asset);
             self::assertStringContainsString('class="diagram-' . $appearance . '"', $html);
         }

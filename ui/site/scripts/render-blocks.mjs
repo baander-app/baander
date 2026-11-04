@@ -50,7 +50,7 @@ async function createDiagramRenderer(request) {
   try {
     font = await readFile(request.fontPath);
   } catch (error) {
-    throw new Error(`Cannot load the local Inter font: ${error.message}`);
+    throw new Error(`Cannot load the local Geist font: ${error.message}`);
   }
   try {
     themeCss = await readFile(request.themeCssPath, 'utf8');
@@ -74,10 +74,10 @@ async function createDiagramRenderer(request) {
     await page.setContent('<!doctype html><html><head></head><body></body></html>');
     await page.addStyleTag({ content: themeCss });
     await page.evaluate(async base64 => {
-      const font = new FontFace('Inter', `url(data:font/woff2;base64,${base64})`, { weight: '400', style: 'normal' });
+      const font = new FontFace('Geist Variable', `url(data:font/woff2;base64,${base64})`, { weight: '100 900', style: 'normal' });
       document.fonts.add(await font.load());
       await document.fonts.ready;
-      document.body.style.fontFamily = 'Inter';
+      document.body.style.fontFamily = '"Geist Variable"';
     }, font.toString('base64'));
     const bundle = await readFile(fileURLToPath(new URL('../node_modules/mermaid/dist/mermaid.min.js', import.meta.url)), 'utf8');
     await page.addScriptTag({ content: bundle });
@@ -116,14 +116,14 @@ async function createDiagramRenderer(request) {
             htmlLabels: false,
             theme: 'base',
             look: 'classic',
-            fontFamily: 'Inter',
+            fontFamily: '"Geist Variable"',
             deterministicIds: true,
             deterministicIDSeed: seed,
             suppressErrorRendering: true,
             secure: ['secure', 'securityLevel', 'startOnLoad', 'htmlLabels', 'look', 'theme', 'themeVariables', 'themeCSS', 'fontFamily', 'flowchart'],
             flowchart: { htmlLabels: false, useMaxWidth: false, curve: 'rounded', nodeSpacing: 40, rankSpacing: 48, padding: 20, diagramPadding: 12 },
             themeVariables: {
-              darkMode: dark, background: canvas, fontFamily: 'Inter', fontSize: '16px',
+              darkMode: dark, background: canvas, fontFamily: '"Geist Variable"', fontSize: '16px',
               primaryColor: nodeFill, primaryTextColor: foreground, primaryBorderColor: nodeBorder,
               secondaryColor: nodeFill, secondaryTextColor: foreground, secondaryBorderColor: nodeBorder,
               tertiaryColor: clusterFill, tertiaryTextColor: foreground, tertiaryBorderColor: clusterBorder,

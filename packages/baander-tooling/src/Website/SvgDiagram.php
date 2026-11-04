@@ -29,7 +29,7 @@ final class SvgDiagram
             throw new \RuntimeException('Diagram font payload is empty.');
         }
         $style = $document->createElementNS('http://www.w3.org/2000/svg', 'style');
-        $style->textContent = '@font-face{font-family:Inter;font-style:normal;font-weight:400;src:url(data:font/woff2;base64,' . base64_encode($fontBytes) . ') format("woff2")}';
+        $style->textContent = '@font-face{font-family:"Geist Variable";font-style:normal;font-weight:100 900;src:url(data:font/woff2;base64,' . base64_encode($fontBytes) . ') format("woff2")}';
         $document->documentElement->appendChild($style);
         return $document->saveXML($document->documentElement) ?: throw new \RuntimeException('Diagram SVG serialization failed.');
     }

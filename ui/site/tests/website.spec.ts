@@ -32,6 +32,32 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844
   }
 }
 
+test('pages set their text in the self-hosted Geist faces', async ({ page }) => {
+  const fonts: string[] = [];
+  page.on('response', (response) => {
+    if (response.request().resourceType() === 'font') fonts.push(new URL(response.url()).pathname);
+  });
+  const typography = async (selector: string) => {
+    await page.evaluate(() => document.fonts.ready);
+    return page.evaluate((selector) => ({
+      family: getComputedStyle(document.querySelector(selector)!).fontFamily,
+      loaded: [...document.fonts].filter((face) => face.status === 'loaded').map((face) => face.family.replaceAll('"', '')),
+    }), selector);
+  };
+  await page.goto('/');
+  const home = await typography('body');
+  expect(home.family).toMatch(/^"Geist Variable",/);
+  expect(home.loaded).toContain('Geist Variable');
+  await page.goto('/docs/developer-guide/testing/');
+  const code = await typography('.manual-article code');
+  expect(code.family).toMatch(/^"Geist Mono Variable",/);
+  expect(code.loaded).toContain('Geist Mono Variable');
+  expect(fonts.length).toBeGreaterThan(0);
+  for (const font of fonts) {
+    expect(font, 'Only the hashed Latin Geist faces are requested').toMatch(/^\/assets\/site\/fonts\/geist(?:-mono)?-latin-wght-normal-[0-9a-f]{16}\.woff2$/);
+  }
+});
+
 test('visitor reaches operating model and source-based installation', async ({ page }) => {
   await page.goto('/');
   const screenshot = page.getByRole('img', { name: /music library/ });

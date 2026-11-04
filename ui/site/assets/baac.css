@@ -54,7 +54,7 @@
 .baac-chart-panel h3 { font-size: 18px; margin-bottom: 16px; }
 .baac-plot-scroll, .baac-table-scroll { max-width: 100%; overflow-x: auto; overscroll-behavior-x: contain; }
 .baac-plot-scroll { margin-bottom: 16px; }
-.baac-chart { display: block; width: 100%; min-width: 720px; max-width: 900px; margin-inline: auto; height: auto; color: var(--color-foreground); font-family: var(--font-sans); }
+.baac-chart { display: block; width: 100%; min-width: 720px; max-width: 900px; margin-inline: auto; height: auto; color: var(--color-foreground); font-family: var(--font-ui); }
 .baac-chart text { font-size: 13px; }
 .baac-grid { stroke: var(--color-border); }
 .baac-axis { stroke: var(--color-muted-foreground); }

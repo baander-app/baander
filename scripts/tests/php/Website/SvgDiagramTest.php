@@ -9,11 +9,11 @@ use PHPUnit\Framework\TestCase;
 
 final class SvgDiagramTest extends TestCase
 {
-    public function testPreservesDiagramGeometryLabelsMarkersAndEmbedsOnlyTrustedFont(): void
+    public function testPreservesDiagramGeometryLabelsMarkersAndEmbedsOnlyTrustedGeistFont(): void
     {
         $source = <<<'SVG'
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 200" width="400" height="200">
-<style>.edge{stroke:#555;marker-end:url(#arrow)}text{font-family:Inter;font-size:16px}</style>
+<style>.edge{stroke:#555;marker-end:url(#arrow)}text{font-family:"Geist Variable";font-size:16px}</style>
 <defs><marker id="arrow" viewBox="0 0 10 10"><path d="M0 0L10 5L0 10z"/></marker></defs>
 <path class="edge" d="M0 0L100 100" marker-end="url(#arrow)"/>
 <text x="10" y="20">Bånder &amp; “music” → ready</text>
@@ -30,6 +30,8 @@ SVG;
         self::assertStringContainsString('id="arrow"', $svg);
         self::assertStringContainsString('data:font/woff2;base64,' . base64_encode('trusted-font-bytes'), $svg);
         self::assertSame(1, substr_count($svg, '@font-face'));
+        self::assertStringContainsString('@font-face{font-family:"Geist Variable";font-style:normal;font-weight:100 900;src:url(data:font/woff2;base64,', $svg);
+        self::assertStringContainsString('text{font-family:"Geist Variable"', $svg, 'Labels name the embedded face');
     }
 
     public function testDoesNotIndentWrappedLabelLinesSoCenteredTextStaysCentered(): void

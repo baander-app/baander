@@ -11,7 +11,7 @@ import { renderBlocks } from './render-blocks.mjs';
 
 const root = new URL('../../../', import.meta.url);
 const resources = {
-  fontPath: fileURLToPath(new URL('ui/site/node_modules/@fontsource/inter/files/inter-latin-400-normal.woff2', root)),
+  fontPath: fileURLToPath(new URL('ui/site/node_modules/@fontsource-variable/geist/files/geist-latin-wght-normal.woff2', root)),
   themeCssPath: fileURLToPath(new URL('ui/design-tokens/build/web/theme.css', root)),
 };
 const block = (language, source, id = language) => ({ id, language, source, page: 'part-2-developer-guide/testing.md', ordinal: 3 });
@@ -39,7 +39,7 @@ test('all maintained languages preserve source and use only safe semantic spans'
   }
 });
 
-test('real diagrams have deterministic paired SVGs, Inter labels, complete markers and dimensions', async () => {
+test('real diagrams have deterministic paired SVGs, Geist labels, complete markers and dimensions', async () => {
   const blocks = [];
   for (const [index, name] of ['live-updates', 'application-threat-model', 'registry-threat-model'].entries()) {
     const markdown = await readFile(new URL(`docs-book/part-2-developer-guide/${name}.md`, root), 'utf8');
@@ -52,7 +52,8 @@ test('real diagrams have deterministic paired SVGs, Inter labels, complete marke
     assert.notEqual(item.light, item.dark);
     for (const svg of [item.light, item.dark]) {
       assert.match(svg, /^<svg/);
-      assert.match(svg, /Inter/);
+      assert.match(svg, /font-family:"Geist Variable";font-size:16px/);
+      assert.doesNotMatch(svg, /Inter/);
       assert.match(svg, /marker-end="url\(#/);
       assert.doesNotMatch(svg, /<foreignObject|<script|onclick=|<a\b/);
       assert.doesNotMatch(svg.replace(/<style>[\s\S]*?<\/style>/g, ''), /data-look="neo"/);
@@ -65,7 +66,7 @@ test('real diagrams have deterministic paired SVGs, Inter labels, complete marke
     await page.route('**/*', route => route.abort());
     const font = await readFile(resources.fontPath);
     await page.evaluate(async base64 => {
-      document.fonts.add(await new FontFace('Inter', `url(data:font/woff2;base64,${base64})`).load());
+      document.fonts.add(await new FontFace('Geist Variable', `url(data:font/woff2;base64,${base64})`, { weight: '100 900' }).load());
       await document.fonts.ready;
     }, font.toString('base64'));
     for (const item of Object.values(result)) {
@@ -89,7 +90,7 @@ test('real diagrams have deterministic paired SVGs, Inter labels, complete marke
         assert.deepEqual(inspection.shadowed, [], 'Static diagrams must not render drop shadows');
         assert.ok(inspection.labels.length > 0);
         for (const label of inspection.labels) {
-          assert.match(label.font, /Inter/);
+          assert.match(label.font, /^"Geist Variable"/);
           assert.ok(label.width > 0, label.label);
           assert.ok(label.contained, `Clipped SVG label: ${label.label}`);
         }
@@ -106,7 +107,7 @@ test('diagram failures identify the source page and block', async () => {
   for (const source of ['flowchart LR\n A[broken', 'not-a-diagram\n x', '%%{init: {"look":"neo"}}%%\nflowchart LR\n A-->B', '%%{init: {"securityLevel":"loose"}}%%\nflowchart LR\n A-->B', 'flowchart LR\n A-->B\n click A "https://baander.app"', '---\nconfig:\n theme: dark\n---\nflowchart LR\n A-->B']) {
     await assert.rejects(renderBlocks({ blocks: [block('mermaid', source)], ...resources }), /testing\.md.*block 3/);
   }
-  await assert.rejects(renderBlocks({ blocks: [block('mermaid', 'flowchart LR\n A-->B')], ...resources, fontPath: '/missing/inter.woff2' }), /testing\.md.*block 3.*font/i);
+  await assert.rejects(renderBlocks({ blocks: [block('mermaid', 'flowchart LR\n A-->B')], ...resources, fontPath: '/missing/geist.woff2' }), /testing\.md.*block 3.*font/i);
 });
 
 

@@ -22,11 +22,11 @@ const card = `<!doctype html>
       position: relative; box-sizing: border-box; width: 1200px; height: 630px; padding: 64px 72px;
       background: radial-gradient(900px 500px at 85% 110%, color-mix(in oklab, var(--color-accent-text) 22%, transparent), transparent 70%), var(--color-background);
     }
-    .brand { display: flex; align-items: center; gap: 18px; font: 600 34px/1 var(--font-sans); color: var(--color-foreground); }
+    .brand { display: flex; align-items: center; gap: 18px; font: 600 34px/1 var(--font-ui); color: var(--color-foreground); }
     .brand img { width: 56px; height: 56px; }
-    h1 { max-width: 560px; margin: 56px 0 20px; font: 600 64px/1.08 var(--font-sans); letter-spacing: -.02em; color: var(--color-foreground); }
-    p { max-width: 480px; margin: 0; font: 400 24px/1.45 var(--font-sans); color: var(--color-muted-foreground); }
-    .url { position: absolute; left: 72px; bottom: 56px; font: 500 20px/1 var(--font-sans); letter-spacing: .02em; color: var(--color-accent-text); }
+    h1 { max-width: 560px; margin: 56px 0 20px; font: 700 64px/1.08 var(--font-ui); letter-spacing: -.02em; color: var(--color-foreground); }
+    p { max-width: 480px; margin: 0; font: 400 24px/1.45 var(--font-ui); color: var(--color-muted-foreground); }
+    .url { position: absolute; left: 72px; bottom: 56px; font: 500 20px/1 var(--font-ui); letter-spacing: .02em; color: var(--color-accent-text); }
     .shot { position: absolute; left: 630px; top: 110px; width: 800px; border: 1px solid var(--color-border); border-radius: 14px; box-shadow: 0 30px 80px rgb(0 0 0 / .55); }
   </style>
 </head>

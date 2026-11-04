@@ -11,19 +11,17 @@ use RuntimeException;
 
 final class Publication
 {
+    /** The Latin variable faces the site self-hosts, by the family names the shared font stacks use. */
+    private const array FONTS = ['Geist Variable' => 'geist', 'Geist Mono Variable' => 'geist-mono'];
+
+    /** Font file names carry their content hash, so the fonts directory is cached as immutable. */
+    private const string FONT_DIRECTORY = '/assets/site/fonts/';
+
     public static function assets(string $root, string $staging): void
     {
         $destination = $staging . '/assets/site';
         self::copy($root . '/ui/web/public/logo.svg', $destination . '/logo.svg');
-        file_put_contents($destination . '/theme.css', self::theme($root));
-        foreach (['inter' => [400, 500, 600], 'jetbrains-mono' => [400]] as $font => $weights) {
-            $package = $root . '/ui/site/node_modules/@fontsource/' . $font;
-            foreach ($weights as $weight) {
-                $filename = $font . '-latin-' . $weight . '-normal.woff2';
-                self::copy($package . '/files/' . $filename, $destination . '/fonts/' . $filename);
-            }
-            self::copy($package . '/LICENSE', $destination . '/fonts/' . $font . '-LICENSE.txt');
-        }
+        file_put_contents($destination . '/theme.css', self::fonts($root, $staging) . self::theme($root));
     }
 
     /**
@@ -57,6 +55,7 @@ final class Publication
         }
         ksort($files);
         $routes = [
+            ['src' => preg_quote(self::FONT_DIRECTORY, '~') . '.+', 'headers' => ['Cache-Control' => 'public, max-age=31536000, immutable'], 'continue' => true],
             ['src' => '/index\\.html', 'headers' => ['Location' => '/'], 'status' => 308],
             ['src' => '/(.+)/index\\.html', 'headers' => ['Location' => '/$1/'], 'status' => 308],
             ['src' => '/', 'dest' => '/index.html'],
@@ -74,10 +73,41 @@ final class Publication
         file_put_contents($output . '/config.json', json_encode(['version' => 3, 'routes' => $routes], JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n");
     }
 
+    /** Copies each Latin face and its license under content-hashed names and returns the faces' rules. */
+    private static function fonts(string $root, string $staging): string
+    {
+        $rules = '';
+        foreach (self::FONTS as $family => $font) {
+            $package = $root . '/ui/site/node_modules/@fontsource-variable/' . $font;
+            $face = self::copyHashed($package . '/files/' . $font . '-latin-wght-normal.woff2', $staging, $font . '-latin-wght-normal', 'woff2');
+            self::copyHashed($package . '/LICENSE', $staging, $font . '-LICENSE', 'txt');
+            $rules .= "@font-face {\n  font-family: \"{$family}\";\n  font-style: normal;\n  font-weight: 100 900;\n"
+                . "  font-display: swap;\n  src: url('{$face}') format('woff2');\n}\n";
+        }
+        return $rules;
+    }
+
+    /** @return string the published path of the copy */
+    private static function copyHashed(string $source, string $staging, string $name, string $extension): string
+    {
+        $digest = is_file($source) ? hash_file('sha256', $source) : false;
+        if ($digest === false) {
+            throw self::missing($source);
+        }
+        $path = self::FONT_DIRECTORY . $name . '-' . substr($digest, 0, 16) . '.' . $extension;
+        self::copy($source, $staging . $path);
+        return $path;
+    }
+
+    private static function missing(string $source): RuntimeException
+    {
+        return new RuntimeException('Missing website asset: ' . $source . '. Install the site dependencies first.');
+    }
+
     private static function copy(string $source, string $destination): void
     {
         if (!is_file($source)) {
-            throw new RuntimeException('Missing website asset: ' . $source . '. Install the site dependencies first.');
+            throw self::missing($source);
         }
         $directory = dirname($destination);
         if (!is_dir($directory) && !mkdir($directory, 0755, true)) {

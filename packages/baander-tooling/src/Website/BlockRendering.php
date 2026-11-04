@@ -25,7 +25,7 @@ final readonly class BlockRendering
         if (!mkdir($scratch, 0700, true)) {
             throw new \RuntimeException('Cannot create website rendering scratch directory.');
         }
-        $fontPath = $this->root . '/ui/site/node_modules/@fontsource/inter/files/inter-latin-400-normal.woff2';
+        $fontPath = $this->root . '/ui/site/node_modules/@fontsource-variable/geist/files/geist-latin-wght-normal.woff2';
         try {
             file_put_contents($scratch . '/theme.css', $this->themeCss);
             file_put_contents($scratch . '/request.json', json_encode([
@@ -110,7 +110,7 @@ final readonly class BlockRendering
         }
         $font = is_file($fontPath) ? file_get_contents($fontPath) : false;
         if ($font === false) {
-            throw new \RuntimeException('Cannot read local Inter font.');
+            throw new \RuntimeException('Cannot read local Geist font.');
         }
         $directory = $staging . '/assets/diagrams';
         if (!is_dir($directory) && !mkdir($directory, 0755, true)) {

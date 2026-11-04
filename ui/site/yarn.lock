@@ -19,8 +19,8 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@baander/site@workspace:."
   dependencies:
-    "@fontsource/inter": "npm:5.3.0"
-    "@fontsource/jetbrains-mono": "npm:5.3.0"
+    "@fontsource-variable/geist": "npm:5.3.0"
+    "@fontsource-variable/geist-mono": "npm:5.3.0"
     "@playwright/test": "npm:1.64.1"
     esbuild: "npm:0.28.2"
     mermaid: "npm:12.2.0"
@@ -675,17 +675,17 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@fontsource/inter@npm:5.3.0":
+"@fontsource-variable/geist-mono@npm:5.3.0":
   version: 5.3.0
-  resolution: "@fontsource/inter@npm:5.3.0"
-  checksum: 10c0/568601c10c83601c23005f8cd7434499df6e007eaa22c4dabbb1dcae327cc8e4a148ece8d4a4edaa8bafc5d2371ea97a37d1cc91ffbed77a43e2d8c15a6e831b
+  resolution: "@fontsource-variable/geist-mono@npm:5.3.0"
+  checksum: 10c0/21a4097b3ccce08cbc181199f68a9193adc17d997ef8d883eab7565c6d79a82b2f8d7656f32f97b66f1f0b4ebba78a1a822c6318d55e0c5f572d74683ab036ee
   languageName: node
   linkType: hard
 
-"@fontsource/jetbrains-mono@npm:5.3.0":
+"@fontsource-variable/geist@npm:5.3.0":
   version: 5.3.0
-  resolution: "@fontsource/jetbrains-mono@npm:5.3.0"
-  checksum: 10c0/1351b2350e893f5da39559ed90ff0e5e60bcc876b1f40531ad081ad4bf2f3cda3fa9e8940364aef5a7430ae3140685c9cd4819c36d8ad62bcd3fa37e3cc66b1d
+  resolution: "@fontsource-variable/geist@npm:5.3.0"
+  checksum: 10c0/6b1d1d249643377c885d040769bf0964f242e8d03c4470535329ad4eed3d30a8134fea0d45c0b99b8069924a1f506a3bcb5b8d9cea77b7b5234dc7dd57371842
   languageName: node
   linkType: hard
 
