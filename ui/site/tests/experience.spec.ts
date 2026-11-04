@@ -22,7 +22,7 @@ async function loadedImage(image: Locator): Promise<void> {
   const light = await image.evaluate(() => document.documentElement.dataset.theme
     ? document.documentElement.dataset.theme === 'balanced'
     : matchMedia('(prefers-color-scheme: light)').matches);
-  await expect(image).toHaveAttribute('src', light ? /-light\.png$/ : /(?<!-light)\.png$/);
+  await expect(image).toHaveAttribute('src', light ? /-light\.webp$/ : /(?<!-light)\.webp$/);
 }
 
 test('equalizer slides respond to controls and keyboard, and stay still without input', async ({ page }) => {
@@ -145,7 +145,7 @@ test('theme screenshots use real image pairs in a stable unfiltered frame and cr
   const figure = page.locator('.hero-screenshot');
   const exposed = figure.getByRole('img');
   await expect(exposed).toHaveCount(1);
-  await expect(exposed).toHaveAttribute('src', '/assets/site/screenshots/music.png');
+  await expect(exposed).toHaveAttribute('src', '/assets/site/screenshots/music.webp');
   await loadedImage(exposed);
   const frameBefore = await figure.boundingBox();
   const transition = await page.evaluate(() => {
@@ -165,7 +165,7 @@ test('theme screenshots use real image pairs in a stable unfiltered frame and cr
     expect(image.transition).toContain('0.2s');
   }
   await expect(exposed).toHaveCount(1);
-  await expect(exposed).toHaveAttribute('src', '/assets/site/screenshots/music-light.png');
+  await expect(exposed).toHaveAttribute('src', '/assets/site/screenshots/music-light.webp');
   await loadedImage(exposed);
   await expect.poll(() => figure.locator('img').first().evaluate((image) => getComputedStyle(image).willChange)).toBe('auto');
   const frameAfter = await figure.boundingBox();
@@ -173,7 +173,7 @@ test('theme screenshots use real image pairs in a stable unfiltered frame and cr
   expect(frameAfter?.height).toBe(frameBefore?.height);
   await page.getByRole('button', { name: 'Switch to dark mode' }).click();
   await expect(exposed).toHaveCount(1);
-  await expect(exposed).toHaveAttribute('src', '/assets/site/screenshots/music.png');
+  await expect(exposed).toHaveAttribute('src', '/assets/site/screenshots/music.webp');
   await expect.poll(() => figure.locator('img').first().evaluate((image) => getComputedStyle(image).willChange)).toBe('auto');
 });
 
@@ -220,6 +220,6 @@ test('reduced motion suppresses effects and cancels transitions already in progr
   await page.getByRole('button', { name: 'Previous equalizer feature' }).click();
   expect(await heroImage.evaluate((image) => getComputedStyle(image).transitionDuration)).toBe('0s');
   expect(await slide.evaluate((element) => getComputedStyle(element).animationName)).toBe('none');
-  await expect(page.locator('.hero-screenshot').getByRole('img')).toHaveAttribute('src', '/assets/site/screenshots/music.png');
+  await expect(page.locator('.hero-screenshot').getByRole('img')).toHaveAttribute('src', '/assets/site/screenshots/music.webp');
   await expect(page.locator('[data-carousel-status]')).toContainText('1 of 4');
 });

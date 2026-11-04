@@ -67,6 +67,10 @@ playback position, controls and scroll position. The processing slide captures
 the complete processing panel. Normal website builds reuse these checked-in
 images and do not need a running application.
 
+Screenshots are stored as lossless WebP, which is about half the size of the
+equivalent PNG with identical pixels. Encode new captures losslessly, for example
+with Pillow's `lossless=True`: lossy WebP blurs small interface text.
+
 The playback destinations screenshot was captured from an isolated application
 preview on 2026-11-04. A disposable live-updates fixture run supplied one user and
 twelve silent tracks; the run was cleaned up after capture. Four real browser
