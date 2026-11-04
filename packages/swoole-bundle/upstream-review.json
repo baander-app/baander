@@ -7113,10 +7113,10 @@
             "recommended_disposition": "adopt",
             "rationale": "Port containment check; characterize traversal/symlink swap and cached-path escape behavior against static server contract.",
             "qualification": "Source-only recommendation; not a runtime proof or permission to change behavior.",
-            "current_local_sha256": "cb6cf7a2bb7290836c415f7f089d3d5133097fd58311bfd4a7540739b34c437a",
+            "current_local_sha256": "037035f7b1509a549b70f20505345f6651d6e5a824ec248edbf5d8834abcbb5a",
             "current_source_presence": "present",
             "final_disposition": "adopted-adapted",
-            "final_reason": "Enforces resolved-path containment beneath publicDir, including cached MIME paths.",
+            "final_reason": "Enforces resolved-path containment beneath publicDir, including cached MIME paths. Locally adds Cache-Control: public, max-age=31536000, immutable to files resolved beneath publicDir/assets, which holds only content-hashed build output.",
             "source_review_status": "recorded",
             "runtime_qualification": {
                 "status": "pending-authoritative-gates",

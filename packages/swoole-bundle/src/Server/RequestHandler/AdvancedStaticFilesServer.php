@@ -22,6 +22,11 @@ final class AdvancedStaticFilesServer implements RequestHandler, Bootable
 {
     private const string MIME_TYPE_APPLICATION_OCTET_STREAM = 'application/octet-stream';
 
+    /** Every file under this public subdirectory carries a content hash in its name. */
+    private const string FINGERPRINTED_DIRECTORY = 'assets';
+
+    private const string IMMUTABLE_CACHE_CONTROL = 'public, max-age=31536000, immutable';
+
     /**
      * Default static file extensions supported.
      *
@@ -141,10 +146,14 @@ final class AdvancedStaticFilesServer implements RequestHandler, Bootable
         if ($request->server['request_method'] === 'GET') {
             $path = $this->publicDir . $request->server['request_uri'];
             $resolved = realpath($path);
+            $root = rtrim($this->publicDir, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR;
             if ($resolved !== false
-                && str_starts_with($resolved, rtrim($this->publicDir, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR)
+                && str_starts_with($resolved, $root)
                 && (isset($this->cachedMimeTypes[$path]) || $this->checkPath($path))) {
                 $response->header('Content-Type', $this->cachedMimeTypes[$path]);
+                if (str_starts_with($resolved, $root . self::FINGERPRINTED_DIRECTORY . DIRECTORY_SEPARATOR)) {
+                    $response->header('Cache-Control', self::IMMUTABLE_CACHE_CONTROL);
+                }
                 $response->sendfile($path);
 
                 return;
