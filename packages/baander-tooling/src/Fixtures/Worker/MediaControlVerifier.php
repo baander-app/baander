@@ -94,7 +94,7 @@ final class MediaControlVerifier
             'Missing retained output or reconnect replay',
         );
         Reports::require(
-            $media['independentOwners'] === 4 && count($media['unaffectedOwnerJobs']) === 2,
+            $media['independentOwners'] === $media['slots']['video'] + 1 && count($media['unaffectedOwnerJobs']) === $media['slots']['video'] - 1,
             'Independent owner work changed',
         );
         $phases = array_column($media['attachments'], 'phase')
@@ -149,12 +149,12 @@ final class MediaControlVerifier
                             true,
                         ),
                     ));
-                    Reports::require($audio >= 1, 'Admitted audio slot disappeared during controls');
+                    Reports::require($audio >= $media['slots']['audio'], 'Admitted audio slots disappeared during controls');
                     if ($stamp < $media['seekStartedAt'] || ($media['seekReadyAt'] <= $stamp && $stamp < $media['cancelStartedAt'])) {
-                        Reports::require($videos >= 3, 'Full video occupancy disappeared before cancellation');
+                        Reports::require($videos >= $media['slots']['video'], 'Full video occupancy disappeared before cancellation');
                         ++$saturated;
                     } elseif ($media['cancelRetiredAt'] <= $stamp) {
-                        Reports::require($videos >= 2, 'Unaffected video work disappeared after cancellation');
+                        Reports::require($videos >= $media['slots']['video'] - 1, 'Unaffected video work disappeared after cancellation');
                         ++$cancellation;
                     }
                 }
@@ -228,7 +228,7 @@ final class MediaControlVerifier
             $seen[$key] = true;
         }
         Reports::require(
-            $launches !== [] && count($media['videoJobs']) === 3 && $media['audioBytes'] > 0,
+            $launches !== [] && count($media['videoJobs']) === $media['slots']['video'] && $media['audioBytes'] > 0,
             'Missing media launch evidence',
         );
         $report['nativeLaunches'] = count($launches);

@@ -114,7 +114,7 @@ final readonly class LifecycleCheckpoint
     /** @param array<string,mixed> $manifest */
     private function assertManifest(array $manifest): void
     {
-        $expected = OperatorConfiguration::json($this->qualification->root . '/tests/Fixtures/Worker/deployment-profile.json');
+        $expected = DrillProfile::resolve($this->qualification->root, $this->qualification->configuration->environment)->value;
         $profile = $manifest['deploymentProfile'] ?? [];
         if (!is_array($profile)) {
             throw new RuntimeException('Lifecycle requires a structured deployment profile');

@@ -16,6 +16,10 @@ final readonly class OperatorConfiguration
     public bool $mediaObservation;
     public bool $mediaCost;
     public string $mediaCostEncoder;
+    /** The load proof's encode path, software or hardware, or empty outside the load proof. */
+    public string $mediaLoad;
+    /** The host's 1080p video the load proof cuts its sources from. */
+    public string $mediaLoadSource;
     public bool $browserControls;
     public bool $movieEndpoint;
     public bool $useImage;
@@ -36,6 +40,17 @@ final readonly class OperatorConfiguration
         }
         if ($this->mediaCost && !$this->mediaObservation) {
             throw new InvalidArgumentException('Media cost measurement requires native launch observation', 2);
+        }
+        $this->mediaLoad = $environment['BAANDER_TEST_MEDIA_LOAD'] ?? '';
+        $this->mediaLoadSource = $environment['BAANDER_TEST_MEDIA_LOAD_SOURCE'] ?? '';
+        if (!in_array($this->mediaLoad, ['', 'software', 'hardware'], true)) {
+            throw new InvalidArgumentException('BAANDER_TEST_MEDIA_LOAD must be software or hardware', 2);
+        }
+        if ($this->mediaLoad !== '' && (!$this->mediaObservation || !$this->twoCommand || $this->mediaCost)) {
+            throw new InvalidArgumentException('The load proof requires two-command mode and native launch observation without cost mode', 2);
+        }
+        if ($this->mediaLoad !== '' && !is_file($this->mediaLoadSource)) {
+            throw new InvalidArgumentException('BAANDER_TEST_MEDIA_LOAD_SOURCE must name a 1080p video file on this host', 2);
         }
         $this->browserControls = $this->flag('BAANDER_TEST_BROWSER_CLIENT_CONTROLS');
         $this->movieEndpoint = $this->flag('BAANDER_TEST_MOVIE_ENDPOINT');
@@ -76,21 +91,22 @@ final readonly class OperatorConfiguration
 
     /**
      * Logical CPUs a container must be allowed to use. Worker units run on every CPU; cost
-     * measurement needs room for eight concurrent encoders beside the control traffic.
+     * measurement needs room for eight concurrent encoders beside the control traffic, and the
+     * load proof for every default slot.
      */
     public function minimumCpus(): int
     {
-        return $this->mediaCost ? 10 : 4;
+        return $this->mediaLoad !== '' ? 12 : ($this->mediaCost ? 10 : 4);
     }
 
     /**
      * Host memory the qualification needs in GiB. Worker units carry no memory limit, so the host
      * must hold the pair, its dependencies and, for cost measurement, eight 1080p encoders at
-     * about 510 MiB each.
+     * about 510 MiB each; the load proof adds room for the larger slot counts and their media children.
      */
     public function minimumHostMemoryGiB(): int
     {
-        return ($this->twoCommand ? 15 : 13) + ($this->mediaCost ? 5 : 0)
+        return ($this->twoCommand ? 15 : 13) + ($this->mediaCost ? 5 : 0) + ($this->mediaLoad !== '' ? 10 : 0)
             + (($this->environment['BAANDER_TEST_AUTOSCALING_MAXIMUM'] ?? '1') === '4' ? 1 : 0);
     }
 
@@ -107,6 +123,7 @@ final readonly class OperatorConfiguration
     {
         return match (true) {
             $this->lifecyclePhase !== '' => 'workerLifecycle',
+            $this->mediaLoad !== '' => 'workerMediaLoad',
             $this->twoCommand || $this->mediaObservation || $this->checkpoint !== null => 'workerCapacity',
             default => 'workerOperator',
         };

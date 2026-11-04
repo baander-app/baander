@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Baander\Tooling\Fixtures\Worker;
 
+use Baander\Tooling\Deployment\Pooler;
 use Baander\Tooling\Fixtures\{Failure, Runtime as FixtureRuntime};
 use Throwable;
 
@@ -24,12 +25,7 @@ final readonly class OperatorProvisioning
             'ALL',
             '--security-opt',
             'no-new-privileges',
-            '--pids-limit',
-            '128',
-            '--memory',
-            '2g',
-            '--memory-swap',
-            '2g',
+            ...$this->serviceLimits(['--pids-limit', '128', '--memory', '2g', '--memory-swap', '2g']),
             '--env-file',
             $this->qualification->work('runtime.env'),
             '-e',
@@ -160,10 +156,7 @@ final readonly class OperatorProvisioning
             $s->runId,
             '--network-alias',
             'redis',
-            '--memory',
-            '256m',
-            '--memory-swap',
-            '256m',
+            ...$this->serviceLimits(['--memory', '256m', '--memory-swap', '256m']),
             '-e',
             'REDIS_ARGS=--requirepass test-only',
             $this->qualification->commands->runtime->image('fixtureRedis')->id,
@@ -174,10 +167,7 @@ final readonly class OperatorProvisioning
             $s->runId . '-control',
             '--network-alias',
             'postgres',
-            '--memory',
-            '4g',
-            '--memory-swap',
-            '4g',
+            ...$this->serviceLimits(['--memory', '4g', '--memory-swap', '4g']),
             ...$publish,
             '-e',
             'POSTGRES_USER=baander',
@@ -186,6 +176,9 @@ final readonly class OperatorProvisioning
             '-e',
             'POSTGRES_DB=worker_operator_test',
             $this->qualification->commands->runtime->image('postgres')->id,
+            // The load proof runs the database image's own configuration, whose connection
+            // limit is the full profile's pools plus the direct reserve and superuser slots.
+            ...($this->load() ? ['postgres', '-c', 'config_file=/etc/postgresql/postgresql.conf'] : []),
         ]);
         $this->qualification->docker(['network', 'connect', '--alias', 'postgres', $s->runId, $s->runId . '-postgres']);
         $ready = false;
@@ -214,6 +207,9 @@ final readonly class OperatorProvisioning
             $this->qualification->commands->pause(1);
         }
         $this->qualification->expect($ready, 'Disposable operator services did not become ready');
+        if ($this->load()) {
+            $this->startPooler();
+        }
         $port = $this->qualification->configuration->container ? '5432' : $this->qualification->output(['port', $s->runId . '-postgres', '5432/tcp']);
         if (!$this->qualification->configuration->container) {
             $port = substr($port, strrpos($port, ':') + 1);
@@ -439,6 +435,7 @@ final readonly class OperatorProvisioning
         $s->namespace = 'baander.app:' . $s->runId;
         $s->workerName = OperatorConfiguration::workerName($s->namespace, $s->boot);
         $s->controlName = substr($s->workerName, 0, -strlen('execution')) . 'control';
+        $deployment = DrillProfile::resolve($this->qualification->root, $this->qualification->configuration->environment);
         $profile = OperatorConfiguration::json($this->qualification->root . '/tests/Fixtures/Worker/autoscaling-profile.json');
         $value = $this->qualification->configuration->environment['BAANDER_TEST_AUTOSCALING_MAXIMUM'] ?? (string) $profile['maximumConcurrency'];
         $this->qualification->expect(
@@ -458,8 +455,8 @@ final readonly class OperatorProvisioning
             'dockerBinary' => $this->qualification->configuration->container ? '/usr/local/bin/docker' : $this->qualification->topology->operatorTarget()->executable,
             'dockerEndpoint' => $this->qualification->topology->operatorTarget()->endpoint,
             'autoscaling' => $profile,
-            'deploymentProfile' => OperatorConfiguration::json($this->qualification->root . '/tests/Fixtures/Worker/deployment-profile.json'),
-            'deviceGroup' => null,
+            'deploymentProfile' => $deployment->value,
+            'deviceGroup' => $deployment->deviceGroup(),
             'scheduledConsoleMiB' => 320,
             'ipcVolume' => $s->ipcVolume,
             'mediaMounts' => [
@@ -491,12 +488,15 @@ final readonly class OperatorProvisioning
                 'role' => 'source',
             ];
         }
+        $direct = 'postgresql://baander:test-only@postgres:5432/worker_operator_test?serverVersion=18&charset=utf8';
         $runtime = [
+            // Web and both units run the same profile, so web health and policy see the drill's slots.
+            'BAANDER_DEPLOYMENT_PROFILE' => 'full',
+            'BAANDER_DEPLOYMENT_PROFILE_JSON' => $deployment->json(),
             'APP_ENV' => 'prod',
             'APP_DEBUG' => '0',
             'APP_SECRET' => 'operator-test-only',
-            'DATABASE_URL' => 'postgresql://baander:test-only@postgres:5432/worker_operator_test?serverVersion=18&charset=utf8',
-            'DATABASE_CONTROL_URL' => 'postgresql://baander:test-only@postgres:5432/worker_operator_test?serverVersion=18&charset=utf8',
+            ...($this->load() ? Pooler::urls('baander', 'test-only', 'worker_operator_test') : ['DATABASE_URL' => $direct, 'DATABASE_CONTROL_URL' => $direct]),
             'REDIS_URL' => 'redis://default:test-only@redis:6379',
             'REDIS_PASSWORD' => 'test-only',
             'MESSENGER_TRANSPORT_DSN' => 'redis://default:test-only@redis:6379/messages',
@@ -570,6 +570,12 @@ final readonly class OperatorProvisioning
                 'BAANDER_TEST_MOVIE_ENDPOINT=' . ($this->qualification->configuration->movieEndpoint ? '1' : '0'),
                 '-e',
                 'BAANDER_TEST_MEDIA_COST=' . ($this->qualification->configuration->mediaCost ? '1' : '0'),
+                '-e',
+                'BAANDER_TEST_MEDIA_LOAD=' . $this->qualification->configuration->mediaLoad,
+                ...($this->load() ? [
+                    '--security-opt', 'label=disable',
+                    '--mount', 'type=bind,source=' . $this->qualification->configuration->mediaLoadSource . ',target=' . self::LOAD_INPUT . ',readonly',
+                ] : []),
                 '--entrypoint',
                 '/bin/sh',
                 $s->imageId,
@@ -581,6 +587,78 @@ final readonly class OperatorProvisioning
             ],
             log: $this->qualification->artifact('prepare.log'),
         );
+    }
+
+    /** Where the load proof's preparation reads the host's 1080p source video. */
+    public const string LOAD_INPUT = '/media/load-input';
+
+    private function load(): bool
+    {
+        return $this->qualification->configuration->mediaLoad !== '';
+    }
+
+    /**
+     * Resource limits for the drill's disposable web, Redis and PostgreSQL. The load proof runs
+     * them as deployments do, without limits.
+     *
+     * @param list<string> $limits
+     * @return list<string>
+     */
+    private function serviceLimits(array $limits): array
+    {
+        return $this->load() ? [] : $limits;
+    }
+
+    /**
+     * Starts the transaction-mode pooler from the database image, as deployments run it, after
+     * giving it and the database roles the same SCRAM verifiers.
+     */
+    private function startPooler(): void
+    {
+        $s = $this->qualification->state;
+        $image = $this->qualification->commands->runtime->image('postgres')->id;
+        $volume = $s->runId . '-pooler-credentials';
+        $this->qualification->resources->createVolume($volume, ['--label', 'app.baander.test.project=' . $s->runId]);
+        $helper = Pooler::credentialsHelper($image, $s->runId, $volume, 'baander', 'test-only', 'worker_operator_test', 'postgres');
+        $arguments = [];
+        foreach ($helper['arguments'] as $index => $argument) {
+            // The helper names its environment; the disposable container receives the values.
+            $previous = $helper['arguments'][$index - 1] ?? null;
+            $arguments[] = $previous === '--env' ? $argument . '=' . $helper['environment'][$argument] : $argument;
+        }
+        $this->qualification->resources->runContainer($arguments, log: $this->qualification->artifact('pooler-credentials.log'));
+        $environment = [];
+        foreach (Pooler::environment('full', 'baander', 'worker_operator_test', 'postgres') as $key => $value) {
+            array_push($environment, '-e', $key . '=' . $value);
+        }
+        $this->qualification->resources->startContainer($s->runId . '-pooler', [
+            '--network',
+            $s->runId,
+            '--network-alias',
+            Pooler::SERVICE,
+            '--user',
+            'postgres',
+            '--cap-drop',
+            'ALL',
+            '--security-opt',
+            'no-new-privileges',
+            '--tmpfs',
+            Pooler::DATA_TMPFS,
+            '--mount',
+            'type=volume,source=' . $volume . ',target=' . Pooler::CREDENTIALS_PATH . ',readonly,volume-nocopy',
+            ...$environment,
+            '--entrypoint',
+            'baander-pooler',
+            $image,
+        ]);
+        $ready = false;
+        for ($attempt = 0; $attempt < 30 && !$ready; ++$attempt) {
+            $ready = $this->qualification->docker(['exec', $s->runId . '-pooler', 'pg_isready', '-h', '127.0.0.1', '-p', (string) Pooler::PORT], false)->exitCode === 0;
+            if (!$ready) {
+                $this->qualification->commands->pause(0.5);
+            }
+        }
+        $this->qualification->expect($ready, 'Disposable pooler did not become ready');
     }
 
     private const string AUTOSCALING_SERVICES = <<<'YAML'

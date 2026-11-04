@@ -205,7 +205,7 @@ final class WorkerOperatorBuildTest extends TestCase
             $manifest = DeploymentOperatorManifest::fromJson(file_get_contents($directory . '/work/manifest.json'), $appHome);
             self::assertSame($appHome, $manifest->appHome);
             $written = AtomicFile::readJson($directory . '/work/manifest.json');
-            self::assertSame(7, $written['version']);
+            self::assertSame(8, $written['version']);
             self::assertSame([], preg_grep('/(MemoryMiB|NanoCpus|PidsLimit|CpuSet)\z/', array_keys($written)));
             new \ReflectionMethod($provisioning, 'prepareMediaAndApplication')->invoke($provisioning);
             $fake = AtomicFile::readJson($directory . '/state.json');

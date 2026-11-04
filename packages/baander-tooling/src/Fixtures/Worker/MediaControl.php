@@ -14,14 +14,23 @@ final class MediaControl
         if (getenv('BAANDER_TEST_MEDIA_COST') === 'hardware') {
             return MediaCostHardware::main($root);
         }
+        if (($arguments[0] ?? null) === 'verify-load') {
+            return MediaLoadVerifier::main(array_slice($arguments, 1));
+        }
+        $load = getenv('BAANDER_TEST_MEDIA_LOAD') ?: '';
         if ($arguments === []) {
-            $runtime = new Runtime($root, budget: 'workerCapacity');
-            $artifacts = Runtime::artifacts($root, getenv('BAANDER_TEST_MEDIA_COST') === '1' ? 'media-cost' : 'media-control');
+            $runtime = new Runtime($root, budget: $load !== '' ? 'workerMediaLoad' : 'workerCapacity');
+            $artifacts = Runtime::artifacts($root, match (true) {
+                $load !== '' => 'media-load-' . $load,
+                getenv('BAANDER_TEST_MEDIA_COST') === '1' => 'media-cost',
+                default => 'media-control',
+            });
             try {
                 $runtime->run(
                     [PHP_BINARY, 'scripts/test-worker-operator-container.php'],
                     env: array_replace(
                         Checkpoint::operatorEnvironment($runtime, $artifacts),
+                        $load === '' ? [] : [DrillProfile::ENVIRONMENT => getenv(DrillProfile::ENVIRONMENT) ?: MediaLoad::profilePath($load)],
                         [
                             'BAANDER_TEST_ARTIFACTS' => $artifacts,
                             'BAANDER_TEST_TWO_COMMAND' => '1',
@@ -42,6 +51,9 @@ final class MediaControl
         }
         if (getenv('BAANDER_TEST_MEDIA_COST') === '1') {
             return self::cost(new Checkpoint($arguments, $root, 600), $root);
+        }
+        if ($load !== '') {
+            return MediaLoad::run(new Checkpoint($arguments, $root, 2000), $load);
         }
         $checkpoint = new Checkpoint($arguments, $root, 300);
         $runtime = $checkpoint->runtime;

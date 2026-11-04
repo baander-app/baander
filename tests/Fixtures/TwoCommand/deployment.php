@@ -38,6 +38,9 @@ const AUDIO = '/media/source/track.flac';
 const COST_VIDEO = '/media/source/cost-1080p.mkv';
 const COST_VIDEO_SECONDS = 120;
 const COST_TRACK_SECONDS = 600;
+const LOAD_VIDEO = '/media/source/load-1080p.mkv';
+const LOAD_VIDEO_SECONDS = 120;
+const LOAD_TRACK_SECONDS = 300;
 
 function ensure(bool $condition, string $message): void
 {
@@ -507,6 +510,46 @@ function rejectRetiredVideoOutput(array $retained): array
     }
     return $statuses;
 }
+/**
+ * The video and audio slots of the profile web runs; the drill's clients fill them.
+ *
+ * @return array{video:int,audio:int}
+ */
+function profileSlots(): array
+{
+    $profile = App\Shared\Application\DTO\DeploymentProfile::fromEnvironment();
+    return ['video' => $profile->videoEncoderSlots, 'audio' => $profile->audioEncoderSlots];
+}
+/** One more signed-in administrator, whose video sessions get jobs of their own. */
+function drillOwner(Doctrine\ORM\EntityManagerInterface $manager, string $project, string $name): StreamClient
+{
+    $email = $name . '@baander.app';
+    $owner = new App\Auth\Infrastructure\Doctrine\Entity\UserEntity(new PublicId(), ucfirst(str_replace('-', ' ', $name)), $email, 'unused-password', '', roles: ['ROLE_ADMIN']);
+    $owner->markEmailAsVerified();
+    $manager->persist($owner);
+    $manager->flush();
+    return new StreamClient($manager, $email, (string) file_get_contents($project . '/config/secrets/oauth/private.key'), BASE . '/api/stream/track', audience: BASE);
+}
+/**
+ * Occupies every audio slot with renditions of one track, each in a distinct format and bitrate,
+ * and waits until each has produced output.
+ *
+ * @return list<HttpExchange>
+ */
+function occupyAudio(StreamClient $client, string $track, int $slots): array
+{
+    $renditions = [['mp3', 192000], ['aac', 192000], ['opus', 128000], ['mp3', 128000], ['aac', 128000], ['opus', 96000], ['mp3', 160000], ['aac', 160000],
+        ['opus', 160000], ['mp3', 96000], ['aac', 96000], ['opus', 64000], ['mp3', 64000], ['aac', 64000], ['opus', 192000]];
+    ensure($slots >= 1 && $slots <= count($renditions), 'The drill holds between one and ' . count($renditions) . ' audio slots.');
+    $streams = [];
+    foreach (array_slice($renditions, 0, $slots) as [$format, $bitrate]) {
+        $streams[] = $client->open('id=' . $track . '&format=' . $format . '&bitrate=' . $bitrate, timeoutSeconds: 120);
+    }
+    foreach ($streams as $stream) {
+        ensure($stream->until(static fn (HttpExchange $value): bool => strlen($value->body) >= 8192, 30), 'Native audio did not start.');
+    }
+    return $streams;
+}
 $mode = $argv[1] ?? '';
 $started = microtime(true);
 set_exception_handler(static function (Throwable $error) use ($mode): never {
@@ -622,10 +665,41 @@ if ($mode === 'prepare') {
         foreach ([$costVideo, $costMovie, new MovieVideoEntity($costMovie, $costVideo)] as $entity) { $manager->persist($entity); }
         $cost = ['video' => (string) $costVideo->getPublicId(), 'videoSeconds' => COST_VIDEO_SECONDS, 'videoFrameRate' => 30, 'tracks' => $costTracks, 'trackSeconds' => COST_TRACK_SECONDS];
     }
+    $load = null;
+    if (in_array(getenv('BAANDER_TEST_MEDIA_LOAD'), ['software', 'hardware'], true)) {
+        // The load proof plays real content: a 1080p excerpt of the host's source video with its
+        // picture copied unchanged, and one track per audio lane cut from its soundtrack.
+        $input = '/media/load-input';
+        command(['ffmpeg', '-nostdin', '-v', 'error', '-y', '-ss', '60', '-t', (string) LOAD_VIDEO_SECONDS, '-i', $input,
+            '-map', '0:v:0', '-map', '0:a:0', '-c:v', 'copy', '-c:a', 'aac', '-b:a', '160k', '-ac', '2', LOAD_VIDEO], 120);
+        $probe = json_decode((new Process(\App\Transcode\Infrastructure\FFmpeg\FFprobeArguments::video(LOAD_VIDEO, 'ffprobe'), timeout: 30))->mustRun()->getOutput(), true, flags: JSON_THROW_ON_ERROR);
+        $loadProbe = \App\Transcode\Domain\ValueObject\VideoProbeResult::fromProbeOutput($probe);
+        ensure($loadProbe->width === 1920 && $loadProbe->height === 1080, 'The load proof source must be 1080p.');
+        $loadVideo = new VideoEntity(new PublicId(), LOAD_VIDEO, hash_file('xxh3', LOAD_VIDEO));
+        $loadVideo->setProbe($loadProbe->jsonSerialize());
+        $loadVideo->setDuration((int) round((float) $probe['format']['duration'])); $loadVideo->setWidth(1920); $loadVideo->setHeight(1080);
+        $loadVideo->setFramerate((int) round($loadProbe->framerate));
+        $loadMovie = new MovieEntity(new PublicId(), $movies, 'Two command load playback');
+        foreach ([$loadVideo, $loadMovie, new MovieVideoEntity($loadMovie, $loadVideo)] as $entity) { $manager->persist($entity); }
+        $loadTracks = [];
+        foreach (range(0, 15) as $index) {
+            $path = '/media/source/load-track-' . $index . '.flac';
+            command(['ffmpeg', '-nostdin', '-v', 'error', '-y', '-stream_loop', '-1', '-ss', (string) (20 * $index), '-i', $input,
+                '-map', '0:a:0', '-t', (string) LOAD_TRACK_SECONDS, '-ac', '2', '-ar', '44100', '-threads', '1', '-c:a', 'flac', $path], 120);
+            $loadSong = new SongEntity(new PublicId(), $album, 'Worker load ' . $index, $path, (int) filesize($path), 'audio/flac');
+            $manager->persist($loadSong);
+            $loadTracks[] = (string) $loadSong->getPublicId();
+        }
+        $load = ['video' => (string) $loadVideo->getPublicId(), 'videoSeconds' => (float) $probe['format']['duration'], 'frameRate' => $loadProbe->framerate,
+            'sourceVideoCodec' => $loadProbe->videoCodec, 'tracks' => $loadTracks, 'trackSeconds' => LOAD_TRACK_SECONDS];
+    }
     $manager->flush();
     $prepared = ['requestId' => \App\Shared\Domain\Model\Uuid::generate()->toString(), 'video' => (string) $video->getPublicId(), 'movie' => (string) $movie->getPublicId(), 'track' => (string) $song->getPublicId(), 'image' => (string) $image->getPublicId()];
     if ($cost !== null) {
         $prepared['cost'] = $cost;
+    }
+    if ($load !== null) {
+        $prepared['load'] = $load;
     }
     if ($movieEndpoint) {
         $prepared['scenario'] = 'movie-endpoint';
@@ -653,19 +727,25 @@ if ($mode === 'prepare') {
     require __DIR__ . '/media-control.php';
 } elseif ($mode === 'media-cost') {
     require __DIR__ . '/media-cost.php';
+} elseif ($mode === 'media-load') {
+    require __DIR__ . '/media-load.php';
+} elseif ($mode === 'media-load-web') {
+    require __DIR__ . '/media-load-web.php';
 } elseif ($mode === 'capacity') {
-    $state = state(); $auth = $client(); $sessions = [];
-    foreach (['360p', '480p', '720p'] as $quality) {
-        $response = twoCommandExchange($auth, '/api/transcode/sessions/', 'POST', ['requestId' => $state['requestId'], 'videoId' => $state['video'], 'qualityTier' => $quality])->complete(20);
+    $state = state(); $auth = $client(); $sessions = []; $slots = profileSlots();
+    // Three qualities give one owner three jobs; every further slot gets an owner of its own.
+    foreach (range(0, $slots['video'] - 1) as $index) {
+        [$owner, $quality] = $index < 3 ? [$auth, ['360p', '480p', '720p'][$index]] : [drillOwner($manager, $project, 'capacity-' . $index), '360p'];
+        $response = twoCommandExchange($owner, '/api/transcode/sessions/', 'POST', ['requestId' => $state['requestId'], 'videoId' => $state['video'], 'qualityTier' => $quality])->complete(20);
         ensure($response->status() === 201, 'Capacity video admission failed: ' . $response->body);
         $sessions[] = jsonBody($response);
     }
-    ensure(count(array_unique(array_column($sessions, 'jobId'))) === 3, 'Capacity needs three distinct video jobs.');
-    $audio = $auth->open('id=' . $state['track'] . '&format=mp3&bitrate=192000', timeoutSeconds: 120);
-    ensure($audio->until(static fn (HttpExchange $value): bool => strlen($value->body) >= 8192, 30), 'Capacity audio did not start.');
-    await(static fn (): bool => (int) $db->fetchOne("SELECT count(*) FROM transcode_runtime_state WHERE claim_token IS NOT NULL") >= 3,
-        'three durable video slots');
-    ensure((int) $db->fetchOne("SELECT count(*) FROM audio_rendition_runtime WHERE state='running'") >= 1, 'Capacity audio slot is not occupied.');
+    ensure(count(array_unique(array_column($sessions, 'jobId'))) === $slots['video'], 'Capacity needs a distinct video job per slot.');
+    $audioStreams = occupyAudio($auth, $state['track'], $slots['audio']);
+    $audio = $audioStreams[0];
+    await(static fn (): bool => (int) $db->fetchOne("SELECT count(*) FROM transcode_runtime_state WHERE claim_token IS NOT NULL") >= $slots['video'],
+        'every durable video slot');
+    ensure((int) $db->fetchOne("SELECT count(*) FROM audio_rendition_runtime WHERE state='running'") >= $slots['audio'], 'Capacity audio slots are not occupied.');
     $session = $sessions[0];
     foreach (['pause' => 'paused', 'resume' => 'running'] as $action => $status) {
         $response = twoCommandExchange($auth, '/api/transcode/sessions/' . $session['publicId'] . '/' . $action, 'PATCH')->complete(3);
@@ -723,7 +803,7 @@ if ($mode === 'prepare') {
         $occurrence['execution'] = $db->fetchAssociative('SELECT e.deployment_namespace, e.deployment_boot_id, e.deployment_epoch, EXTRACT(EPOCH FROM (e.returned_at - o.created_at)) AS completion_seconds, e.returned_at IS NOT NULL AS returned FROM scheduler_occurrence_executions e JOIN scheduler_occurrences o ON o.id=e.occurrence_id WHERE o.id=?', [$occurrence['id']]);
     }
     unset($occurrence);
-    $result = ['ordinaryBacklog' => $backlog, 'dueOccurrences' => $occurrences, 'videoJobs' => array_column($sessions, 'jobId'), 'desiredStateSamples' => $samples, 'audioBytes' => strlen($audio->body), 'pressureStartedAt' => ($deadline - 60_000_000_000) / 1e9, 'pressureEndedAt' => hrtime(true) / 1e9];
+    $result = ['slots' => $slots, 'ordinaryBacklog' => $backlog, 'dueOccurrences' => $occurrences, 'videoJobs' => array_column($sessions, 'jobId'), 'desiredStateSamples' => $samples, 'audioBytes' => strlen($audio->body), 'pressureStartedAt' => ($deadline - 60_000_000_000) / 1e9, 'pressureEndedAt' => hrtime(true) / 1e9];
 } elseif ($mode === 'attach') {
     $state = state(); $auth = $client();
     $requests = [];

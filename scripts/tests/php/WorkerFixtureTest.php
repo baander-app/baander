@@ -225,6 +225,7 @@ final class WorkerFixtureTest extends TestCase
         $this->json(
             'media.json',
             ['evidence' => [
+                'slots' => ['video' => 3, 'audio' => 1],
                 'videoJobs' => ['one', 'two', 'three'],
                 'audioBytes' => 8192,
                 'desiredStateSamples' => [['seconds' => .5]],
@@ -690,6 +691,7 @@ final class WorkerFixtureTest extends TestCase
         $this->lines('control-samples.jsonl', $control);
         $this->lines('execution-samples.jsonl', $this->values);
         $media = [
+            'slots' => ['video' => 3, 'audio' => 1],
             'videoJobs' => ['one', 'two', 'three'],
             'audioBytes' => 8192,
             'desiredStateSamples' => array_fill(0, 40, ['seconds' => .5, 'observedRevision' => 2, 'desiredRevision' => 2]),

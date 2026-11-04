@@ -291,7 +291,7 @@ final class ControlCapacityVerifier
             'acknowledgedProgress' => $backlog[array_key_last($backlog)]['acknowledged'] - $backlog[0]['acknowledged'],
             'dueOccurrencesReturned' => count($media['dueOccurrences']),
         ];
-        Reports::require(count($media['videoJobs']) === 3 && $media['audioBytes'] > 0, 'Missing admitted media');
+        Reports::require(count($media['videoJobs']) === $media['slots']['video'] && $media['audioBytes'] > 0, 'Missing admitted media');
         $occupied = Reports::window($execution, $start, $end);
         Reports::require(
             $occupied !== [] && $occupied[array_key_last($occupied)]['monotonic'] - $occupied[0]['monotonic'] >= 59,
@@ -307,8 +307,8 @@ final class ControlCapacityVerifier
                         $process['argv'],
                         true,
                     ),
-                )) >= 3,
-                'Three video native slots did not stay occupied',
+                )) >= $media['slots']['video'],
+                'Every video native slot did not stay occupied',
             );
             Reports::require(
                 count(array_filter(
@@ -318,8 +318,8 @@ final class ControlCapacityVerifier
                         $process['argv'],
                         true,
                     ),
-                )) >= 1,
-                'Audio native slot did not stay occupied',
+                )) >= $media['slots']['audio'],
+                'Every audio native slot did not stay occupied',
             );
         }
         $report['occupiedSlotSamples'] = count($occupied);

@@ -383,7 +383,7 @@ final class AutoscalingVerifier
         }
         $media = Reports::json($root . '/media.json')['evidence'];
         Reports::require(
-            count(array_unique($media['videoJobs'])) === 3 && $media['audioBytes'] >= 8192,
+            count(array_unique($media['videoJobs'])) === $media['slots']['video'] && $media['audioBytes'] >= 8192,
             'Missing admitted media work',
         );
         Reports::require(
@@ -582,8 +582,8 @@ final class AutoscalingVerifier
                 ),
             );
             Reports::require(
-                count($videos) >= 3 && count($audio) >= 1,
-                'Three video and one audio native slots did not stay occupied',
+                count($videos) >= $media['slots']['video'] && count($audio) >= $media['slots']['audio'],
+                'Every video and audio native slot did not stay occupied',
             );
             $identities = [];
             foreach ($audio as [$process]) {

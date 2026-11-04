@@ -28,7 +28,7 @@ final class Command
         $this->resources = new Resources($this->runtime, 'worker-command');
         $this->image = $this->runtime->image('application')->id;
         $this->profile = file_get_contents($root . '/tests/Fixtures/Worker/autoscaling-profile.json');
-        $this->deploymentProfile = trim(file_get_contents($root . '/tests/Fixtures/Worker/deployment-profile.json'));
+        $this->deploymentProfile = DrillProfile::resolve($root, $this->runtime->environment)->json();
     }
 
     /** @param list<string> $arguments */

@@ -73,6 +73,7 @@
         "workerLifecycle": 1300,
         "workerOperator": 240,
         "workerCapacity": 900,
+        "workerMediaLoad": 2400,
         "workerAutoscaling": 2000,
         "webShutdown": 900,
         "webRuntime": 180,

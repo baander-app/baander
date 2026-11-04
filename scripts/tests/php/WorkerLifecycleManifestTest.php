@@ -55,6 +55,7 @@ final class WorkerLifecycleManifestTest extends TestCase
     {
         $qualification = new \ReflectionClass(OperatorQualification::class)->newInstanceWithoutConstructor();
         new \ReflectionProperty(OperatorQualification::class, 'root')->setValue($qualification, dirname(__DIR__, 3));
+        new \ReflectionProperty(OperatorQualification::class, 'configuration')->setValue($qualification, new OperatorConfiguration(['BAANDER_TEST_OPERATOR_IN_CONTAINER' => '1']));
         $checkpoint = new LifecycleCheckpoint($qualification);
         new \ReflectionMethod($checkpoint, 'assertManifest')->invoke($checkpoint, $manifest);
     }

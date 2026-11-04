@@ -76,21 +76,16 @@ function mediaSocket(StreamClient $auth, array $payload): void
     if ($failure !== null) { throw $failure; }
 }
 
-$state = state(); $auth = $client(); $sessions = [];
-$owners = ['360p' => $auth];
-foreach (['480p', '720p', '1080p'] as $quality) {
-    $email = 'media-control-' . $quality . '@baander.app';
-    $owner = new App\Auth\Infrastructure\Doctrine\Entity\UserEntity(
-        new App\Shared\Domain\Model\PublicId(), 'Media control ' . $quality, $email, 'unused-password', '', roles: ['ROLE_ADMIN'],
-    );
-    $owner->markEmailAsVerified();
-    $manager->persist($owner);
-    $manager->flush();
-    $owners[$quality] = new StreamClient($manager, $email,
-        (string) file_get_contents($project . '/config/secrets/oauth/private.key'), BASE . '/api/stream/track', audience: BASE);
+$state = state(); $auth = $client(); $sessions = []; $slots = profileSlots();
+// One owner per video slot fills every slot; one more owner's 1080p admission waits behind them.
+$owners = [$auth];
+foreach (range(1, $slots['video']) as $index) {
+    $owners[] = drillOwner($manager, $project, 'media-control-' . $index);
 }
-foreach (['360p', '480p', '720p'] as $quality) {
-    $response = twoCommandExchange($owners[$quality], '/api/transcode/sessions/', 'POST', ['requestId' => $state['requestId'], 'videoId' => $state['video'], 'qualityTier' => $quality])->complete(20);
+$qualities = ['360p', '480p', '720p'];
+foreach (range(0, $slots['video'] - 1) as $index) {
+    $quality = $qualities[$index % count($qualities)];
+    $response = twoCommandExchange($owners[$index], '/api/transcode/sessions/', 'POST', ['requestId' => $state['requestId'], 'videoId' => $state['video'], 'qualityTier' => $quality])->complete(20);
     $admissionBody = json_decode($response->body, true);
     ensure($response->status() === 201, 'Video capacity admission failed: ' . json_encode([
         'httpStatus' => $response->status(), 'curlResult' => $response->result, 'contentType' => $response->header('Content-Type'),
@@ -101,7 +96,7 @@ foreach (['360p', '480p', '720p'] as $quality) {
     ], JSON_THROW_ON_ERROR));
     $sessions[] = jsonBody($response);
 }
-ensure(count(array_unique(array_column($sessions, 'jobId'))) === 3, 'Expected three independent capacity jobs.');
+ensure(count(array_unique(array_column($sessions, 'jobId'))) === $slots['video'], 'Expected an independent capacity job per video slot.');
 $state['job'] = $sessions[0]['jobId']; $state['session'] = $sessions[0]['publicId']; save($state);
 $oldOutput = decodeVideo($auth, $state);
 $initialRuntime = row($db, $state);
@@ -119,8 +114,8 @@ foreach ($sessions as $index => $session) {
         $unaffected[$session['jobId']] = ['generation' => $runtime['generation'], 'desiredRevision' => $runtime['desired_revision'], 'desired' => $runtime['desired'], 'identity' => $attempt['identity']];
     }
 }
-$audio = $auth->open('id=' . $state['track'] . '&format=mp3&bitrate=192000', timeoutSeconds: 120);
-ensure($audio->until(static fn (HttpExchange $value): bool => strlen($value->body) >= 8192, 30), 'Native audio did not start.');
+$audioStreams = occupyAudio($auth, $state['track'], $slots['audio']);
+$audio = $audioStreams[0];
 file_put_contents(ROOT . '/capacity-ready', 'ready');
 await(static fn (): bool => is_file(ROOT . '/capacity-pressure-start'), 'CPU pressure barrier', 60);
 $pressureStart = hrtime(true) / 1e9;
@@ -157,8 +152,9 @@ $attach = static function (string $phase) use ($auth, $db, &$state, &$attachment
     $attachments[] = ['phase' => $phase, 'requests' => count($requests), 'references' => $references, 'generation' => (int) $after['generation'], 'attempts' => count($attempts)];
 };
 // Begin admission without waiting for its startup response; the durable pending
-// session is cancellable while all three video slots remain occupied.
-$pendingRequest = twoCommandExchange($owners['1080p'], '/api/transcode/sessions/', 'POST', ['requestId' => $state['requestId'], 'videoId' => $state['video'], 'qualityTier' => '1080p']);
+// session is cancellable while every video slot remains occupied.
+$pendingOwner = $owners[$slots['video']];
+$pendingRequest = twoCommandExchange($pendingOwner, '/api/transcode/sessions/', 'POST', ['requestId' => $state['requestId'], 'videoId' => $state['video'], 'qualityTier' => '1080p']);
 $pending = await(static function () use ($pendingRequest, $db): array|false {
     $pendingRequest->until(static fn (HttpExchange $value): bool => $value->done, .01);
     $value = $db->fetchAssociative("SELECT s.public_id AS session, j.public_id AS job, j.id AS native_job, r.outcome, r.claim_token FROM transcode_runtime_state r JOIN transcode_jobs j ON j.id=r.job_id JOIN transcode_sessions s ON s.id=r.session_id WHERE j.quality_tier_name='1080p'");
@@ -166,7 +162,7 @@ $pending = await(static function () use ($pendingRequest, $db): array|false {
 }, 'pending fourth-quality admission', 3);
 ensure($pending['outcome'] === 'pending' && $pending['claim_token'] === null, 'Fourth video admission was not pending under full capacity.');
 ensure(MediaControlObservation::launchesForJob($pending['native_job']) === [], 'Pending admission launched an encoder.');
-$pendingCancel = twoCommandExchange($owners['1080p'], '/api/transcode/sessions/' . $pending['session'], 'DELETE')->complete(3);
+$pendingCancel = twoCommandExchange($pendingOwner, '/api/transcode/sessions/' . $pending['session'], 'DELETE')->complete(3);
 ensure($pendingCancel->status() === 200, 'Pending cancellation failed.');
 $pendingRequest->complete(10);
 ensure($pendingRequest->status() === 503, 'Cancelled pending admission unexpectedly succeeded.');
@@ -250,7 +246,7 @@ foreach ($unaffected as $job => $before) {
 }
 MediaControlObservation::assertNoOverlap();
 ensure(MediaControlObservation::launchesForJob($pending['native_job']) === [], 'Cancelled pending work launched after capacity became available.');
-$result = ['videoJobs' => array_column($sessions, 'jobId'), 'independentOwners' => count($owners), 'unaffectedOwnerJobs' => array_keys($unaffected), 'attachments' => $attachments, 'desiredStateSamples' => $timings,
+$result = ['slots' => $slots, 'videoJobs' => array_column($sessions, 'jobId'), 'independentOwners' => count($owners), 'unaffectedOwnerJobs' => array_keys($unaffected), 'attachments' => $attachments, 'desiredStateSamples' => $timings,
     'pressureStartedAt' => $pressureStart, 'pressureEndedAt' => hrtime(true) / 1e9,
     'cancelStartedAt' => $cancelStart / 1e9, 'cancelRetiredAt' => $cancelEnd,
     'seekHandlingSeconds' => $seekHandlingSeconds, 'cancelHandlingSeconds' => $cancelHandlingSeconds, 'seekStartedAt' => $seekStart / 1e9, 'seekReadyAt' => $seekStart / 1e9 + $seekSeconds, 'seekReadinessSeconds' => $seekSeconds, 'cancelRetirementSeconds' => $cancelSeconds,

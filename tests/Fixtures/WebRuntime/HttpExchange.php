@@ -135,6 +135,14 @@ final class HttpExchange
         }
     }
 
+    /** Advance the exchange once without waiting, so one loop can drive many; true once it has finished. */
+    public function poll(): bool
+    {
+        $this->advance();
+
+        return $this->done;
+    }
+
     private function advance(): void
     {
         if ($this->failure !== null) {
