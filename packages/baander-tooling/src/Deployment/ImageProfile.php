@@ -12,7 +12,13 @@ final readonly class ImageProfile
 {
     private const string PROGRAM = <<<'PHP'
 require $argv[2] . '/vendor/autoload.php';
-$profile = new \App\Shared\Application\DTO\DeploymentProfile($argv[1]);
+$slots = static fn (string $value): ?int => $value === '' ? null : (int) $value;
+try {
+    $profile = new \App\Shared\Application\DTO\DeploymentProfile($argv[1], $slots($argv[3]), $slots($argv[4]));
+} catch (\InvalidArgumentException $error) {
+    fwrite(STDERR, $error->getMessage() . "\n");
+    exit(2);
+}
 $autoscaling = new \App\Shared\Application\DTO\WorkerAutoscalingProfile();
 echo json_encode([
     'version' => 1,
@@ -48,19 +54,27 @@ PHP;
         $this->doctrinePoolSlots = (int) $deployment['doctrinePoolSlots'];
     }
 
-    /** @param array<string,string> $environment
+    /**
+     * Asks the image for the deployment profile with the given media slots; null slots take the
+     * image's defaults, and slots the image's profile rejects fail with its reason.
+     *
+     * @param array<string,string> $environment
      * @param array{bootstrap:string,onCompletion:\Closure,path:string}|null $measurement
      */
-    public static function resolve(Client $docker, string $imageId, ApplicationLayout $layout, string $profileId, string $receiptPath, array $environment, float $cleanupSeconds, ?array $measurement = null): self
+    public static function resolve(Client $docker, string $imageId, ApplicationLayout $layout, string $profileId, string $receiptPath, array $environment, float $cleanupSeconds, ?array $measurement = null, ?int $videoSlots = null, ?int $audioSlots = null): self
     {
         if (preg_match('/^sha256:[a-f0-9]{64}$/D', $imageId) !== 1 || !in_array($profileId, ['full', 'household'], true)) {
             throw new \InvalidArgumentException('Profile resolution requires an immutable image and a supported deployment profile.');
+        }
+        if (($videoSlots !== null && $videoSlots < 0) || ($audioSlots !== null && $audioSlots < 0)) {
+            throw new \InvalidArgumentException('Media slots must be zero or more jobs.');
         }
         $docker->validateIdentity();
         $result = DisposableContainer::run($docker, $receiptPath, [
             '--network', 'none', '--read-only', '--cap-drop', 'ALL', '--cgroupns', 'private',
             '--security-opt', 'no-new-privileges', '--workdir', $layout->root,
             '--entrypoint', 'php', $imageId, '-r', ($measurement['bootstrap'] ?? '') . "\n" . self::PROGRAM, $profileId, $layout->root,
+            (string) $videoSlots, (string) $audioSlots,
         ], $environment, $cleanupSeconds, timeout: 30, onCompletion: $measurement['onCompletion'] ?? null);
         if (strlen($result->stdout) > 8192) {
             throw new \RuntimeException('The image deployment profile exceeds its bounded response size.');
@@ -70,7 +84,9 @@ PHP;
             throw new \RuntimeException('The image did not return a deployment profile object.');
         }
         $profile = self::fromArray($document);
-        if ($profile->deployment['identifier'] !== $profileId) {
+        if ($profile->deployment['identifier'] !== $profileId
+            || ($videoSlots !== null && ($profile->deployment['videoEncoderSlots'] ?? null) !== $videoSlots)
+            || ($audioSlots !== null && ($profile->deployment['audioEncoderSlots'] ?? null) !== $audioSlots)) {
             throw new \RuntimeException('The image returned a different deployment profile.');
         }
         return $profile;

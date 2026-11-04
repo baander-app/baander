@@ -8,7 +8,7 @@ use Baander\Tooling\Deployment\HouseholdConfiguration;
 use Baander\Tooling\Deployment\HouseholdStateStore;
 use Baander\Tooling\Deployment\HouseholdRenderer;
 use Baander\Tooling\Deployment\ImageProfile;
-use Baander\Tooling\Configuration\ApplicationLayout;
+use Baander\Tooling\Configuration\{ApplicationLayout, JsonObject};
 use Baander\Tooling\Deployment\Household;
 use Baander\Tooling\Deployment\KillOrder;
 use Baander\Tooling\Deployment\Pooler;
@@ -18,6 +18,7 @@ use Baander\Tooling\Filesystem\AtomicFile;
 use Baander\Tooling\Inventory\Collector;
 use Baander\Tooling\Process\{CommandExecutor, CompletionPolicy, EngineExecutor, ExecutionContext, ProcessResult, ProcessSpec};
 use App\Shared\Application\DTO\DeploymentProfile;
+use App\Shared\Application\DTO\MediaSlotBounds;
 use App\Shared\Infrastructure\Worker\OutOfMemoryKillOrder;
 use PHPUnit\Framework\TestCase;
 
@@ -166,7 +167,8 @@ final class HouseholdDeploymentTest extends TestCase
         $data = self::configuration();
         foreach ([
             [['profile' => 'tiny'], 'Select the household or full deployment profile.'],
-            [['media' => ['/home/operator/music']], 'Unknown key in household configuration.'],
+            [['media' => ['/home/operator/music']], 'The household profile runs fixed shared copy slots and accepts no media configuration.'],
+            [['profile' => 'full', 'media' => ['/home/operator/music']], 'media must be an object.'],
             [['volumes' => ['media' => '/home/operator/music']], 'Persistent storage requires named Docker volumes.'],
             [['environment' => $data['environment'] + ['BAANDER_DEPLOYMENT_PROFILE' => 'full']], 'Deployment derives environment variable BAANDER_DEPLOYMENT_PROFILE.'],
         ] as [$override, $message]) {
@@ -176,6 +178,85 @@ final class HouseholdDeploymentTest extends TestCase
             } catch (\InvalidArgumentException $error) {
                 self::assertSame($message, $error->getMessage());
             }
+        }
+    }
+
+    public function testFullPresetCarriesItsMediaSlotsIntoTheRenderedProfile(): void
+    {
+        $configuration = HouseholdConfiguration::fromArray(array_replace(self::configuration(), ['profile' => 'full', 'media' => ['videoSlots' => 4, 'audioSlots' => 0]]));
+        self::assertSame([4, 0], [$configuration->slots('video'), $configuration->slots('audio')]);
+        self::assertSame(['videoSlots' => 4, 'audioSlots' => 0], $configuration->toArray()['media']);
+        self::assertEquals($configuration, HouseholdConfiguration::fromArray($configuration->toArray()));
+        $partial = HouseholdConfiguration::fromArray(array_replace(self::configuration(), ['profile' => 'full', 'media' => ['audioSlots' => 6]]));
+        self::assertSame([null, 6], [$partial->slots('video'), $partial->slots('audio')]);
+        $unset = HouseholdConfiguration::fromArray(array_replace(self::configuration(), ['profile' => 'full']));
+        self::assertSame([null, null], [$unset->slots('video'), $unset->slots('audio')]);
+        self::assertArrayNotHasKey('media', $unset->toArray());
+
+        $deployment = new DeploymentProfile('full', 4, 0);
+        $profile = ImageProfile::fromArray([
+            'version' => 1,
+            'deployment' => json_decode($deployment->toJson(), true, flags: JSON_THROW_ON_ERROR),
+            'autoscaling' => ['minimumConcurrency' => 1, 'maximumConcurrency' => 1],
+            'runtime' => ['phpHeapMiB' => 256, 'scheduledConsoleMiB' => 320, 'nativeCommandLimit' => $deployment->nativeCommandLimit()],
+        ]);
+        $compose = HouseholdRenderer::render($configuration, $this->images(), ApplicationLayout::fromArray(['version' => 1, 'root' => '/srv/baander']), $profile, 'max_connections = 35', 'owner');
+        $rendered = $compose['services']['web']['environment']['BAANDER_DEPLOYMENT_PROFILE_JSON'];
+        self::assertEquals($deployment, DeploymentProfile::fromJson($rendered));
+        self::assertEquals($deployment, DeploymentProfile::fromJson(HouseholdRenderer::workerEnvironment($configuration, $profile)['BAANDER_DEPLOYMENT_PROFILE_JSON']));
+        self::assertSame($profile->fingerprint(), $compose['services']['web']['labels']['org.baander.deployment.fingerprint']);
+    }
+
+    public function testThePoolerClientLimitIsTheOneTheSlotMaximumsAreDerivedFrom(): void
+    {
+        $configuration = file_get_contents(dirname(__DIR__, 3) . '/docker/postgres/pooler/pgbouncer.ini');
+        self::assertIsString($configuration);
+        self::assertSame(1, preg_match_all('/^max_client_conn\s*=\s*(\d+)\s*$/m', $configuration, $matches));
+        self::assertSame(MediaSlotBounds::POOLER_CLIENT_LIMIT, (int) $matches[1][0]);
+    }
+
+    public function testHouseholdPresetRejectsMediaSlots(): void
+    {
+        foreach ([['videoSlots' => 8], ['audioSlots' => 0], []] as $media) {
+            try {
+                HouseholdConfiguration::fromArray(array_replace(self::configuration(), ['media' => $media]));
+                self::fail('Accepted media slots for the household profile.');
+            } catch (\InvalidArgumentException $error) {
+                self::assertSame('The household profile runs fixed shared copy slots and accepts no media configuration.', $error->getMessage());
+            }
+        }
+    }
+
+    public function testMediaSlotsRequireKnownKindsAndWholeNonNegativeCounts(): void
+    {
+        foreach ([
+            [['subtitleSlots' => 1], 'Unknown key in media configuration.'],
+            [['videoSlots' => -1], 'Media videoSlots must be zero or more jobs.'],
+            [['audioSlots' => '12'], 'Media audioSlots must be zero or more jobs.'],
+            [['videoSlots' => 2.0], 'Media videoSlots must be zero or more jobs.'],
+        ] as [$media, $message]) {
+            try {
+                HouseholdConfiguration::fromArray(array_replace(self::configuration(), ['profile' => 'full', 'media' => $media]));
+                self::fail('Accepted invalid media slots.');
+            } catch (\InvalidArgumentException $error) {
+                self::assertSame($message, $error->getMessage());
+            }
+        }
+    }
+
+    public function testExampleConfigurationRendersForEachProfile(): void
+    {
+        $example = JsonObject::read(dirname(__DIR__, 3) . '/deploy/household/example.json');
+        $layout = ApplicationLayout::fromArray(['version' => 1, 'root' => '/srv/baander']);
+        foreach ([
+            'household' => [$example, null],
+            'full' => [array_replace($example, ['profile' => 'full']), null],
+            'full with media' => [array_replace($example, ['profile' => 'full', 'media' => ['videoSlots' => 8, 'audioSlots' => 12]]), 8],
+        ] as $case => [$data, $videoSlots]) {
+            $configuration = HouseholdConfiguration::fromArray($data);
+            self::assertSame($videoSlots, $configuration->slots('video'), $case);
+            $compose = HouseholdRenderer::render($configuration, $this->images(), $layout, $this->profile($configuration->profile), 'max_connections = 35', 'owner');
+            self::assertSame($configuration->profile, $compose['services']['web']['environment']['BAANDER_DEPLOYMENT_PROFILE'], $case);
         }
     }
 

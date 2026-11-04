@@ -12,10 +12,12 @@ final readonly class HouseholdConfiguration
     public const array VOLUME_ROLES = ['media', 'storage', 'conversions', 'transcode_state', 'postgres', 'redis', 'secrets', 'pooler_credentials'];
     /** Redis's own dataset bound, enforced by Redis itself rather than by a container limit. */
     public const array RESOURCE_DEFAULTS = ['redisMaxmemoryMiB' => 192];
+    public const array MEDIA_SLOT_KEYS = ['videoSlots', 'audioSlots'];
     /** @param array<string,ImageSelection> $images
      * @param array<string,string> $environment
      * @param array<string,int> $resources
      * @param array<string,string> $volumes
+     * @param array{videoSlots?:int,audioSlots?:int}|null $media Full profile slot counts; unset kinds use the profile default.
      */
     private function __construct(
         public string $name,
@@ -27,12 +29,13 @@ final readonly class HouseholdConfiguration
         public array $environment,
         public array $resources,
         public array $volumes,
+        public ?array $media,
     ) {}
 
     /** @param array<string,mixed> $data */
     public static function fromArray(array $data): self
     {
-        JsonObject::keys($data, ['version', 'name', 'profile', 'origin', 'listen', 'images', 'environment', 'resources', 'volumes'], 'household configuration');
+        JsonObject::keys($data, ['version', 'name', 'profile', 'origin', 'listen', 'images', 'environment', 'resources', 'volumes', 'media'], 'household configuration');
         if (($data['version'] ?? null) !== 1) {
             throw new \InvalidArgumentException('Unsupported household configuration version.');
         }
@@ -101,7 +104,39 @@ final readonly class HouseholdConfiguration
         if (count(array_unique($volumes)) !== count($volumes)) {
             throw new \InvalidArgumentException('Persistent volume roles must have distinct names.');
         }
-        return new self($name, $profile, rtrim($origin, '/'), $address, $listen['port'], $selections, $environment, $resources, $volumes);
+        return new self($name, $profile, rtrim($origin, '/'), $address, $listen['port'], $selections, $environment, $resources, $volumes, self::media($data, $profile));
+    }
+
+    /** The configured slot count of a media kind, or null when the profile default applies. */
+    public function slots(string $kind): ?int
+    {
+        return $this->media[$kind . 'Slots'] ?? null;
+    }
+
+    /** @param array<string,mixed> $data
+     * @return array{videoSlots?:int,audioSlots?:int}|null
+     */
+    private static function media(array $data, string $profile): ?array
+    {
+        if (!array_key_exists('media', $data)) {
+            return null;
+        }
+        if ($profile === 'household') {
+            throw new \InvalidArgumentException('The household profile runs fixed shared copy slots and accepts no media configuration.');
+        }
+        $media = self::map($data, 'media');
+        JsonObject::keys($media, self::MEDIA_SLOT_KEYS, 'media configuration');
+        $slots = [];
+        foreach (self::MEDIA_SLOT_KEYS as $key) {
+            if (!array_key_exists($key, $media)) {
+                continue;
+            }
+            if (!is_int($media[$key]) || $media[$key] < 0) {
+                throw new \InvalidArgumentException('Media ' . $key . ' must be zero or more jobs.');
+            }
+            $slots[$key] = $media[$key];
+        }
+        return $slots === [] ? null : $slots;
     }
 
     /** @return array<string,mixed> */
@@ -110,7 +145,8 @@ final readonly class HouseholdConfiguration
         return ['version' => 1, 'name' => $this->name, 'profile' => $this->profile, 'origin' => $this->origin,
             'listen' => ['address' => $this->listenAddress, 'port' => $this->listenPort],
             'images' => array_map(static fn(ImageSelection $image): string => $image->reference, $this->images),
-            'environment' => $this->environment, 'resources' => $this->resources, 'volumes' => $this->volumes];
+            'environment' => $this->environment, 'resources' => $this->resources, 'volumes' => $this->volumes]
+            + ($this->media === null ? [] : ['media' => $this->media]);
     }
 
     /** @param array<string,mixed> $data */

@@ -76,14 +76,7 @@ final class ImageProfileTest extends TestCase
         self::assertIsString($program);
         $root = dirname(__DIR__, 3);
         foreach (['household', 'full'] as $identifier) {
-            $executor = new EngineExecutor(ExecutionContext::bounded(30, getenv()));
-            try {
-                $result = $executor->run(new ProcessSpec([PHP_BINARY, '-r', $program, $identifier, $root]), new CompletionPolicy([0]));
-            } finally {
-                $executor->close();
-            }
-            $document = json_decode($result->stdout, true, flags: JSON_THROW_ON_ERROR);
-            self::assertIsArray($document);
+            $document = $this->runProgram($program, [$identifier, $root, '', '']);
             self::assertSame(['version', 'deployment', 'autoscaling', 'runtime'], array_keys($document));
             self::assertSame(['phpHeapMiB', 'phpProcessMemoryMiB', 'nativeManagerHeapMiB', 'nativeCommandLimit', 'nativeResultLimit', 'nativeClientLimit', 'mediaHelperLimit', 'scheduledConsoleMiB'], array_keys($document['runtime']));
             self::assertSame($document['runtime']['phpProcessMemoryMiB'], $document['runtime']['scheduledConsoleMiB']);
@@ -91,6 +84,55 @@ final class ImageProfileTest extends TestCase
             self::assertSame($identifier, $profile->deployment['identifier']);
             self::assertSame(new \App\Shared\Application\DTO\DeploymentProfile($identifier)->webWorkers, $profile->webWorkers);
         }
+    }
+
+    public function testInImageProgramCarriesConfiguredSlotsAndTheirNativeLimits(): void
+    {
+        $program = new \ReflectionClassConstant(ImageProfile::class, 'PROGRAM')->getValue();
+        self::assertIsString($program);
+        $root = dirname(__DIR__, 3);
+
+        $configured = ImageProfile::fromArray($this->runProgram($program, ['full', $root, '4', '0']));
+        self::assertSame([4, 0], [$configured->deployment['videoEncoderSlots'], $configured->deployment['audioEncoderSlots']]);
+        $expected = new \App\Shared\Application\DTO\DeploymentProfile('full', 4, 0);
+        self::assertSame(
+            [$expected->nativeCommandLimit(), $expected->nativeResultLimit(), $expected->nativeClientLimit()],
+            [$configured->runtime['nativeCommandLimit'], $configured->runtime['nativeResultLimit'], $configured->runtime['nativeClientLimit']],
+        );
+
+        $defaults = ImageProfile::fromArray($this->runProgram($program, ['full', $root, '', '']));
+        self::assertSame([8, 12], [$defaults->deployment['videoEncoderSlots'], $defaults->deployment['audioEncoderSlots']]);
+        self::assertNotSame($defaults->fingerprint(), $configured->fingerprint());
+    }
+
+    public function testInImageProgramRejectsSlotsBeyondTheirBoundWithTheReason(): void
+    {
+        $program = new \ReflectionClassConstant(ImageProfile::class, 'PROGRAM')->getValue();
+        self::assertIsString($program);
+        $executor = new EngineExecutor(ExecutionContext::bounded(30, getenv()));
+        try {
+            $result = $executor->run(new ProcessSpec([PHP_BINARY, '-r', $program, 'full', dirname(__DIR__, 3), '146', '']), new CompletionPolicy([2]));
+        } finally {
+            $executor->close();
+        }
+        self::assertSame('', $result->stdout);
+        self::assertStringContainsString('at most 145 video slots', $result->stderr);
+    }
+
+    /** @param list<string> $arguments
+     * @return array<string,mixed>
+     */
+    private function runProgram(string $program, array $arguments): array
+    {
+        $executor = new EngineExecutor(ExecutionContext::bounded(30, getenv()));
+        try {
+            $result = $executor->run(new ProcessSpec([PHP_BINARY, '-r', $program, ...$arguments]), new CompletionPolicy([0]));
+        } finally {
+            $executor->close();
+        }
+        $document = json_decode($result->stdout, true, flags: JSON_THROW_ON_ERROR);
+        self::assertIsArray($document);
+        return $document;
     }
 
     public function testUnknownProfileCannotBeHydrated(): void
@@ -129,9 +171,38 @@ final class ImageProfileTest extends TestCase
                 self::assertNotContains($limit, $created);
             }
             self::assertSame('/srv/baander', $created[array_search('--workdir', $created, true) + 1]);
-            self::assertSame(['household', '/srv/baander'], array_slice($created, -2));
+            self::assertSame(['household', '/srv/baander', '', ''], array_slice($created, -4));
             self::assertFileDoesNotExist($directory . '/resources.json');
             self::assertSame([], glob($directory . '/resource-*.json'));
+        });
+    }
+
+    public function testResolvePassesConfiguredSlotsAndRejectsAnImageThatIgnoresThem(): void
+    {
+        $this->withDocker(function (Client $docker, string $directory): void {
+            try {
+                ImageProfile::resolve($docker, 'sha256:' . str_repeat('a', 64), ApplicationLayout::fromArray(['version' => 1, 'root' => '/srv/baander']), 'household', $directory . '/resources.json', getenv(), 5, videoSlots: 3, audioSlots: 0);
+                self::fail('Accepted a profile without the requested slots.');
+            } catch (\RuntimeException $error) {
+                self::assertSame('The image returned a different deployment profile.', $error->getMessage());
+            }
+            $created = null;
+            foreach (file($directory . '/calls.jsonl', FILE_IGNORE_NEW_LINES) ?: [] as $line) {
+                $arguments = json_decode($line, true, flags: JSON_THROW_ON_ERROR);
+                if ($arguments[0] === 'create') {
+                    $created = $arguments;
+                }
+            }
+            self::assertIsArray($created);
+            self::assertSame(['household', '/srv/baander', '3', '0'], array_slice($created, -4));
+        });
+    }
+
+    public function testResolveRejectsNegativeSlotsBeforeRunningTheImage(): void
+    {
+        $this->withDocker(function (Client $docker, string $directory): void {
+            $this->expectException(\InvalidArgumentException::class);
+            ImageProfile::resolve($docker, 'sha256:' . str_repeat('a', 64), ApplicationLayout::load(), 'full', $directory . '/resources.json', getenv(), 5, audioSlots: -1);
         });
     }
 

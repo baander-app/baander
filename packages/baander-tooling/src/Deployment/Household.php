@@ -96,7 +96,18 @@ final readonly class Household
             }
             $revision = $candidateRevision;
             $measurement = $this->measurement($configuration->name, $owner, 'profile-' . $role, $resolved->id);
-            $candidateProfile = ImageProfile::resolve($this->docker, $resolved->id, $candidateLayout, $configuration->profile, $this->store->directory . '/profile-' . $role . '.json', $this->environment, $this->cleanupSeconds, $measurement);
+            $candidateProfile = ImageProfile::resolve(
+                $this->docker,
+                $resolved->id,
+                $candidateLayout,
+                $configuration->profile,
+                $this->store->directory . '/profile-' . $role . '.json',
+                $this->environment,
+                $this->cleanupSeconds,
+                $measurement,
+                videoSlots: $configuration->slots('video'),
+                audioSlots: $configuration->slots('audio'),
+            );
             if (($layout !== null && $layout->toArray() !== $candidateLayout->toArray())
                 || ($profile !== null && $profile->fingerprint() !== $candidateProfile->fingerprint())) {
                 throw new \RuntimeException('Application, worker and operator images disagree on layout or deployment profile.');
