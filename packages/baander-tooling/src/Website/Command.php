@@ -14,8 +14,11 @@ final class Command
     /** Repository paths whose commit dates become the sitemap's last-modified values. */
     private const array SITE_SOURCES = ['docs-book', 'ui/site/templates', 'ui/site/assets/screenshots', 'ui/site/assets/typography.css', 'ui/design-tokens/tokens/base/type.json', 'packages/baander-aac/bench/results'];
 
-    /** The typography page's elements that set the mono stack; a sample without the numeral rule uses the interface stack. */
-    private const string TYPOGRAPHY_MONO = '.type-timecode:not(.typography-without-numerals), .type-mono-sm';
+    /**
+     * The site's elements, besides code, kbd, samp and pre, whose styles set the mono stack; a typography
+     * sample without the numeral rule uses the interface stack.
+     */
+    private const string MONO_SELECTOR = '.step-number, .type-timecode:not(.typography-without-numerals), .type-mono-sm';
 
     /** The type roles in scale order, with their use and a sample; sizes, weights and spacing come from the tokens. */
     private const array TYPE_ROLES = [
@@ -62,9 +65,9 @@ final class Command
                 'data' => ['typography' => self::typography($root)],
             ];
             $pages = new WebsiteBuilder($root, $revisionUrl)->build(
-                static function (string $staging) use ($executor, $root, $typography): void {
+                static function (string $staging) use ($executor, $root): void {
                     Publication::assets($root, $staging);
-                    Publication::pageFonts($root, $staging, $typography['url'], $typography['stylesheet'], self::TYPOGRAPHY_MONO);
+                    Publication::pageFonts($root, $staging, self::MONO_SELECTOR);
                     $executor->run(new ProcessSpec(
                         ['corepack', 'yarn', 'build', $staging . '/assets/site/search.js'],
                         cwd: $root . '/ui/site',

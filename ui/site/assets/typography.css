@@ -71,7 +71,7 @@
 .type-timecode { --role-size: var(--text-timecode-size); --role-weight: var(--text-timecode-weight); --role-tracking: var(--text-timecode-tracking); --role-line-height: var(--text-timecode-line-height); }
 .type-mono-sm { --role-size: var(--text-mono-sm-size); --role-weight: var(--text-mono-sm-weight); --role-tracking: var(--text-mono-sm-tracking); --role-line-height: var(--text-mono-sm-line-height); }
 .type-timecode, .type-mono-sm { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
-.typography-page code { font-family: var(--font-mono); font-size: .875em; }
+.typography-page code { font-size: .875em; }
 
 .typography-intro { max-width: 760px; padding: 64px 0 48px; }
 .typography-intro h1 { margin: 16px 0 24px; font-size: clamp(48px, 8vw, 80px); letter-spacing: -.04em; }

@@ -11,7 +11,7 @@ use Dom\Text;
 use RuntimeException;
 
 /**
- * Chooses the Fontsource faces one rendered page needs. Each character follows its element's font stack
+ * Chooses the Fontsource faces a rendered page, or search results drawn from many pages, need. Each character follows its element's font stack
  * the way a browser does: the first family with a face whose unicode-range covers the character supplies
  * it, and among that family's overlapping faces the last declared wins. Later families are never reached,
  * so the Latin faces every Noto package also declares, and the Han faces of the other CJK families, stay
@@ -58,7 +58,7 @@ final readonly class PageFonts
     /**
      * The faces the page's rendered text reaches, in package declaration order.
      *
-     * @param string $monoSelector the page's elements, besides code, that set the mono stack
+     * @param string $monoSelector the page's elements, besides code, kbd, samp and pre, that set the mono stack
      * @return list<Face>
      */
     public function select(string $html, string $monoSelector): array
@@ -76,6 +76,41 @@ final readonly class PageFonts
                 $characters[$stack][mb_ord($character)] = true;
             }
         }
+        return $this->resolve($characters);
+    }
+
+    /**
+     * The faces search results reach when they show the pages' indexed text: each `data-pagefind-body`
+     * element without its `data-pagefind-ignore` parts. Results set every excerpt, code included, in the
+     * interface stack, without the languages of the elements it came from.
+     *
+     * @param iterable<string> $pages rendered pages
+     * @return list<Face>
+     */
+    public function selectIndexed(iterable $pages): array
+    {
+        $codes = [];
+        foreach ($pages as $html) {
+            $document = HTMLDocument::createFromString($html, LIBXML_NOERROR);
+            foreach ($document->querySelectorAll('[data-pagefind-body]') as $body) {
+                foreach (self::texts($body) as $text) {
+                    if ($text->parentElement?->closest('[data-pagefind-ignore]') === null) {
+                        foreach (mb_str_split($text->data) as $character) {
+                            $codes[mb_ord($character)] = true;
+                        }
+                    }
+                }
+            }
+        }
+        return $this->resolve([self::STACKS['ui'] => $codes]);
+    }
+
+    /**
+     * @param array<string,array<int,true>> $characters code points by the stack variable that sets them
+     * @return list<Face>
+     */
+    private function resolve(array $characters): array
+    {
         $selected = [];
         foreach ($characters as $stack => $codes) {
             $families = $this->stacks[$stack] ?? throw new RuntimeException('The shared font stack ' . $stack . ' is missing.');

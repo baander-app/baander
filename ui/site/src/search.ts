@@ -52,6 +52,8 @@ function mountSearch(container: HTMLElement): void {
   let generation = 0;
   let timer: ReturnType<typeof setTimeout> | undefined;
   let library: Promise<Pagefind> | undefined;
+  // Results show other pages' text, so the fonts for every indexed character load only once results appear.
+  let resultFonts = container.dataset.resultFonts;
 
   input.addEventListener('input', () => {
     generation += 1;
@@ -121,6 +123,13 @@ function mountSearch(container: HTMLElement): void {
         item.append(excerpt);
       }
       results.append(item);
+    }
+    if (resultFonts) {
+      const stylesheet = document.createElement('link');
+      stylesheet.rel = 'stylesheet';
+      stylesheet.href = resultFonts;
+      document.head.append(stylesheet);
+      resultFonts = undefined;
     }
     results.hidden = false;
     status.textContent = response.results.length > pages.length

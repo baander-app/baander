@@ -17,6 +17,12 @@ final class Publication
     /** Font file names carry their content hash, so the fonts directory is cached as immutable. */
     private const string FONT_DIRECTORY = '/assets/site/fonts/';
 
+    /** The head link that declares the shared Latin faces; page font links go before it. */
+    private const string THEME_LINK = '<link rel="stylesheet" href="/assets/site/theme.css">';
+
+    /** The start of the manual search box, which names the search results' font stylesheet. */
+    private const string SEARCH_MOUNT = '<section id="manual-search"';
+
     public static function assets(string $root, string $staging): void
     {
         $destination = $staging . '/assets/site';
@@ -74,25 +80,58 @@ final class Publication
     }
 
     /**
-     * Publishes the font slices a rendered page's own text reaches first in its font stacks, each with its
-     * family's license, and puts their rules at the top of that page's stylesheet, so no other page loads them.
-     * The site-wide Latin faces are already declared and are not repeated.
+     * Publishes, for every rendered page, the font slices its own text reaches first in the shared font
+     * stacks, each with its family's license, and links them from the page's head ahead of the shared
+     * Latin faces. Pages that reach the same slices share one stylesheet; a page the shared Latin faces
+     * fully cover links none. Search results show other pages' text, so each search box names one
+     * stylesheet for all indexed text, which the search script links when it first shows results.
      *
-     * @param string $monoSelector the page's elements, besides code, that set the mono stack
+     * @param string $monoSelector the site's elements, besides code, kbd, samp and pre, that set the mono stack
      */
-    public static function pageFonts(string $root, string $staging, string $url, string $stylesheet, string $monoSelector): void
+    public static function pageFonts(string $root, string $staging, string $monoSelector): void
     {
-        $page = $staging . $url . 'index.html';
-        $html = is_file($page) ? file_get_contents($page) : false;
-        $target = $staging . '/assets/site/' . $stylesheet;
-        $css = is_file($target) ? file_get_contents($target) : false;
-        if ($html === false || $css === false) {
-            throw self::missing($html === false ? $page : $target);
+        $fonts = PageFonts::load($root);
+        $pages = [];
+        foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($staging, FilesystemIterator::SKIP_DOTS)) as $file) {
+            if ($file->getExtension() === 'html') {
+                $pages[$file->getPathname()] = file_get_contents($file->getPathname()) ?: throw self::missing($file->getPathname());
+            }
         }
+        ksort($pages);
+        $stylesheets = [];
+        $stylesheet = static function (string $name, array $faces) use ($staging, &$stylesheets): ?string {
+            $key = $name . ':' . implode(',', array_column($faces, 'file'));
+            return $stylesheets[$key] ??= self::fontStylesheet($staging, $name, $faces);
+        };
+        $search = $stylesheet('search', $fonts->selectIndexed($pages));
+        foreach ($pages as $path => $html) {
+            $published = $html;
+            $own = $stylesheet('page', $fonts->select($html, $monoSelector));
+            if ($own !== null) {
+                $published = self::replaceOnce($published, self::THEME_LINK, '<link rel="stylesheet" href="' . $own . '">' . "\n  " . self::THEME_LINK, $path);
+            }
+            if ($search !== null && str_contains($published, self::SEARCH_MOUNT)) {
+                $published = self::replaceOnce($published, self::SEARCH_MOUNT, self::SEARCH_MOUNT . ' data-result-fonts="' . $search . '"', $path);
+            }
+            if ($published !== $html && file_put_contents($path, $published) === false) {
+                throw new RuntimeException('Cannot write website page: ' . $path);
+            }
+        }
+    }
+
+    /**
+     * Publishes the faces the shared Latin faces do not already declare, with their licenses, as one
+     * content-hashed stylesheet.
+     *
+     * @param list<array{family:string,package:string,file:string,range:string}> $faces
+     * @return ?string the stylesheet's published path, or null when the shared Latin faces declare every face
+     */
+    private static function fontStylesheet(string $staging, string $name, array $faces): ?string
+    {
         $siteWide = array_map(static fn(string $font): string => $font . '-latin-wght-normal.woff2', self::FONTS);
         $rules = '';
         $packages = [];
-        foreach (PageFonts::load($root)->select($html, $monoSelector) as $face) {
+        foreach ($faces as $face) {
             if (in_array(basename($face['file']), $siteWide, true)) {
                 continue;
             }
@@ -100,12 +139,27 @@ final class Publication
             $packages[$face['package']] = dirname($face['file'], 2);
             $rules .= self::faceRule($face['family'], $path, $face['range']);
         }
+        if ($rules === '') {
+            return null;
+        }
         foreach ($packages as $package => $directory) {
             self::copyHashed($directory . '/LICENSE', $staging, $package . '-LICENSE', 'txt');
         }
-        if (file_put_contents($target, $rules . $css) === false) {
-            throw new RuntimeException('Cannot write website asset: ' . $target);
+        $path = self::FONT_DIRECTORY . $name . '-' . substr(hash('sha256', $rules), 0, 16) . '.css';
+        $directory = dirname($staging . $path);
+        if ((!is_dir($directory) && !mkdir($directory, 0755, true)) || file_put_contents($staging . $path, $rules) === false) {
+            throw new RuntimeException('Cannot write website asset: ' . $staging . $path);
         }
+        return $path;
+    }
+
+    /** Replaces the one occurrence of markup the page templates write. */
+    private static function replaceOnce(string $html, string $anchor, string $replacement, string $page): string
+    {
+        if (substr_count($html, $anchor) !== 1) {
+            throw new RuntimeException('Cannot link page fonts: ' . $page . ' must contain ' . $anchor . ' once.');
+        }
+        return str_replace($anchor, $replacement, $html);
     }
 
     private static function faceRule(string $family, string $path, ?string $range = null): string

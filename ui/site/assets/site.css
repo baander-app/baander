@@ -15,6 +15,7 @@ h1, h2, h3, h4, h5, h6 { font-weight: 600; line-height: 1.2; letter-spacing: -.0
 h1 { font-weight: 700; }
 p, figure { margin: 0; }
 h1, h2, h3 { margin: 0; }
+code, kbd, samp, pre { font-family: var(--font-mono); }
 ::selection { color: var(--color-highlight-foreground); background: var(--color-highlight); }
 .visually-hidden, .skip-link:not(:focus) { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .skip-link:focus { position: absolute; z-index: 10; top: 16px; left: 16px; padding: 16px; background: var(--color-background); }
@@ -159,7 +160,7 @@ h1, h2, h3 { margin: 0; }
 .manual-article li { margin: 8px 0; }
 .manual-article li > ul, .manual-article li > ol { margin-bottom: 0; }
 .manual-article strong { font-weight: 600; }
-.manual-article code, .manual-article pre { font-family: var(--font-mono); font-size: 13px; }
+.manual-article code, .manual-article pre { font-size: 13px; }
 .manual-article :not(pre) > code { padding: 2px 4px; border-radius: var(--radius-sm); background: var(--color-secondary); }
 .manual-article pre { --code-padding: 24px; padding: var(--code-padding); background: var(--color-card); border: 1px solid var(--color-border); border-radius: var(--radius-md); overflow-x: auto; max-width: 100%; line-height: 1.7; overflow-wrap: normal; }
 .manual-article pre:focus-visible, .manual-article table:focus-visible { outline-offset: 2px; }

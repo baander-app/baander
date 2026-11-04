@@ -9,7 +9,7 @@ use PHPUnit\Framework\TestCase;
 
 final class PublicationTest extends TestCase
 {
-    private const string PAGE_CSS = ".page-rule { color: red; }\n";
+    private const string THEME_LINK = '<link rel="stylesheet" href="/assets/site/theme.css">';
 
     /** Unicode ranges in Fontsource's slicing, trimmed to what the fixtures need. */
     private const array RANGES = [
@@ -116,11 +116,36 @@ final class PublicationTest extends TestCase
         );
     }
 
-    public function testALatinPageGetsNoPageFonts(): void
+    public function testAnArrowOutsideGeistGetsTheOneNotoSliceThatCoversIt(): void
     {
-        $published = $this->publishPageFonts('<h1>The quick brown fox — “Dune: Part Two” (2024)</h1><p>Bånder · ‘quotes’</p>');
-        self::assertSame([], $published['faces'], 'The site-wide Latin Geist face already covers the text');
-        self::assertSame(self::PAGE_CSS, $published['css']);
+        $published = $this->publishPageFonts('<nav><a href="https://github.com/baander-app/baander">Source <span aria-hidden="true">↗</span></a></nav>');
+        self::assertSame(['noto-sans-sc-90-wght-normal.woff2'], $published['faces']);
+        self::assertSame(1, substr_count($published['stylesheet'] ?? '', '@font-face'), 'The page declares no face beyond the shared Latin Geist faces');
+        self::assertStringContainsString('font-family: "Noto Sans SC Variable";', $published['stylesheet'] ?? '');
+        self::assertStringContainsString('unicode-range: U+2197,U+2199;', $published['stylesheet'] ?? '');
+    }
+
+    public function testALatinPageLinksNoFontStylesheet(): void
+    {
+        $body = '<h1>The quick brown fox — “Dune: Part Two” (2024)</h1><p>Bånder · ‘quotes’</p>';
+        $published = $this->publishPageFonts($body);
+        self::assertSame([], $published['files'], 'The site-wide Latin Geist face already covers the text');
+        self::assertNull($published['stylesheet']);
+        self::assertSame(self::page($body), $published['html'], 'The page is left as rendered');
+    }
+
+    public function testPagesThatReachTheSameFacesShareOneStylesheet(): void
+    {
+        $staging = $this->stagePages([
+            '/docs/one/' => '<p>Source ↗</p>',
+            '/docs/two/' => '<p>Read this page’s source ↗</p>',
+            '/three/' => '<p>ไทย</p>',
+        ]);
+        $links = array_map(fn(string $url): ?string => $this->fontLink($staging . $url . 'index.html'), ['/docs/one/', '/docs/two/', '/three/']);
+        self::assertNotNull($links[0]);
+        self::assertSame($links[0], $links[1]);
+        self::assertNotSame($links[0], $links[2]);
+        self::assertCount(2, glob($staging . '/assets/site/fonts/page-*.css') ?: []);
     }
 
     public function testTheNearestLanguageOrdersTheHanFamilies(): void
@@ -147,29 +172,60 @@ final class PublicationTest extends TestCase
     {
         self::assertSame(
             ['geist-mono-cyrillic-wght-normal.woff2', 'noto-sans-jp-30-wght-normal.woff2'],
-            $this->publishPageFonts('<p><code>Сезон</code> <span class="type-mono" lang="ja">続</span></p>')['faces'],
+            $this->publishPageFonts('<p><kbd>Сезон</kbd> <span class="type-mono" lang="ja">続</span></p>')['faces'],
         );
     }
 
-    public function testPageFontsShipUnderContentHashedNamesWithLicensesAndPrependTheirRules(): void
+    public function testPageFontsShipUnderContentHashedNamesWithLicensesAndTheirLinkPrecedesTheTheme(): void
     {
         $published = $this->publishPageFonts('<p>直 ไทย</p>');
         $hash = static fn(string $content): string => substr(hash('sha256', $content), 0, 16);
+        $stylesheet = (string) $published['stylesheet'];
         self::assertSame([
             'noto-sans-sc-50-wght-normal-' . $hash('noto-sans-sc-50-wght-normal fixture') . '.woff2',
             'noto-sans-sc-LICENSE-' . $hash('SIL OPEN FONT LICENSE for noto-sans-sc') . '.txt',
             'noto-sans-thai-LICENSE-' . $hash('SIL OPEN FONT LICENSE for noto-sans-thai') . '.txt',
             'noto-sans-thai-thai-wght-normal-' . $hash('noto-sans-thai-thai-wght-normal fixture') . '.woff2',
+            'page-' . $hash($stylesheet) . '.css',
         ], $published['files']);
-        self::assertStringEndsWith(self::PAGE_CSS, $published['css'], 'The face rules come before the page rules');
         $face = '/assets/site/fonts/noto-sans-sc-50-wght-normal-' . $hash('noto-sans-sc-50-wght-normal fixture') . '.woff2';
         self::assertMatchesRegularExpression(
             '~@font-face \{[^}]*font-family: "Noto Sans SC Variable";[^}]*font-weight: 100 900;[^}]*font-display: swap;[^}]*src: url\(\''
                 . preg_quote($face, '~') . '\'\) format\(\'woff2\'\);[^}]*unicode-range: U\+76f4-76f5,U\+9aa8;[^}]*\}~',
-            $published['css'],
+            $stylesheet,
         );
-        self::assertStringContainsString('font-family: "Noto Sans Thai Variable";', $published['css']);
-        self::assertSame(2, substr_count($published['css'], '@font-face'));
+        self::assertStringContainsString('font-family: "Noto Sans Thai Variable";', $stylesheet);
+        self::assertSame(2, substr_count($stylesheet, '@font-face'));
+        self::assertStringContainsString(
+            '<link rel="stylesheet" href="/assets/site/fonts/page-' . $hash($stylesheet) . '.css">' . "\n" . '  ' . self::THEME_LINK,
+            $published['html'],
+            'The page faces are declared before the shared Latin faces, as Fontsource orders a family’s slices',
+        );
+    }
+
+    public function testSearchResultsGetOneStylesheetForTheIndexedTextInTheInterfaceStack(): void
+    {
+        $search = '<section id="manual-search" aria-label="Search manuals"></section>';
+        $staging = $this->stagePages([
+            '/docs/one/' => $search . '<p>直</p><article data-pagefind-body><h1>Flow</h1><p>Interface → Domain</p>'
+                . '<a data-pagefind-ignore="all">ไทย</a></article>',
+            '/docs/two/' => $search . '<article data-pagefind-body><pre><code>Сезон</code></pre></article>',
+            '/' => '<p>続</p>',
+        ]);
+        $stylesheets = glob($staging . '/assets/site/fonts/search-*.css') ?: [];
+        self::assertCount(1, $stylesheets);
+        $css = (string) file_get_contents($stylesheets[0]);
+        preg_match_all('~url\(\'/assets/site/fonts/([a-z0-9-]+)-[0-9a-f]{16}\.woff2\'\)~', $css, $faces);
+        self::assertSame(
+            ['geist-cyrillic-wght-normal', 'noto-sans-sc-109-wght-normal'],
+            $faces[1],
+            'Results set code in the interface stack and show no text outside the indexed body or from an ignored part',
+        );
+        $path = '/assets/site/fonts/' . basename($stylesheets[0]);
+        foreach (['/docs/one/', '/docs/two/'] as $url) {
+            self::assertStringContainsString('<section id="manual-search" data-result-fonts="' . $path . '"', (string) file_get_contents($staging . $url . 'index.html'));
+        }
+        self::assertStringNotContainsString($path, (string) file_get_contents($staging . '/index.html'), 'Pages without search do not name it');
     }
 
     public function testSiteStylesAndScriptsReadTheSharedFontStacks(): void
@@ -182,29 +238,60 @@ final class PublicationTest extends TestCase
         }
     }
 
+    /** A rendered page as the site templates shape it: the shared stylesheets in the head, a style rule the subsetter must not read. */
+    private static function page(string $body): string
+    {
+        return '<!doctype html><html lang="en"><head><title>Page</title>' . "\n  " . self::THEME_LINK
+            . '<style>p::before { content: "直"; }</style></head><body>' . $body . '</body></html>';
+    }
+
     /**
-     * Renders a typography page with the given body into a fresh staging tree, publishes its fonts and
-     * returns the published font files, the faces without their hashes, and the page stylesheet.
+     * Writes the pages into a fresh staging tree and publishes their fonts.
      *
-     * @return array{files:list<string>,faces:list<string>,css:string}
+     * @param array<string,string> $bodies page body by URL
+     * @return string the staging directory
      */
-    private function publishPageFonts(string $body): array
+    private function stagePages(array $bodies): string
     {
         $root = $this->directory . '/source';
         if (!is_dir($root)) {
             $this->writeFontPackages($root);
         }
         $staging = $this->directory . '/staging-' . bin2hex(random_bytes(4));
-        mkdir($staging . '/typography', 0700, true);
-        mkdir($staging . '/assets/site', 0700, true);
-        file_put_contents($staging . '/typography/index.html', '<!doctype html><html lang="en"><head><title>Typography</title><style>p::before { content: "直"; }</style></head><body>' . $body . '</body></html>');
-        file_put_contents($staging . '/assets/site/typography.css', self::PAGE_CSS);
-        Publication::pageFonts($root, $staging, '/typography/', 'typography.css', 'code, .type-mono');
+        foreach ($bodies as $url => $body) {
+            is_dir($staging . $url) || mkdir($staging . $url, 0700, true);
+            file_put_contents($staging . $url . 'index.html', self::page($body));
+        }
+        Publication::pageFonts($root, $staging, '.type-mono');
+        return $staging;
+    }
+
+    /** The font stylesheet a published page links, if any. */
+    private function fontLink(string $page): ?string
+    {
+        return preg_match('~<link rel="stylesheet" href="(/assets/site/fonts/page-[0-9a-f]{16}\.css)">~', (string) file_get_contents($page), $link) ? $link[1] : null;
+    }
+
+    /**
+     * Publishes the fonts of one page with the given body and returns the published font files, the faces
+     * without their hashes, the page's font stylesheet and the page as published.
+     *
+     * @return array{files:list<string>,faces:list<string>,stylesheet:?string,html:string}
+     */
+    private function publishPageFonts(string $body): array
+    {
+        $staging = $this->stagePages(['/page/' => $body]);
         $files = array_map(basename(...), glob($staging . '/assets/site/fonts/*') ?: []);
         sort($files);
         $faces = array_values(array_filter($files, static fn(string $file): bool => str_ends_with($file, '.woff2')))
             |> (static fn(array $faces): array => preg_replace('/-[0-9a-f]{16}(?=\.woff2$)/', '', $faces));
-        return ['files' => $files, 'faces' => $faces, 'css' => (string) file_get_contents($staging . '/assets/site/typography.css')];
+        $link = $this->fontLink($staging . '/page/index.html');
+        return [
+            'files' => $files,
+            'faces' => $faces,
+            'stylesheet' => $link === null ? null : (string) file_get_contents($staging . $link),
+            'html' => (string) file_get_contents($staging . '/page/index.html'),
+        ];
     }
 
     /** Writes the shared font stacks and Fontsource-shaped packages for every family they name. */
@@ -230,9 +317,9 @@ final class PublicationTest extends TestCase
             'noto-sans-mono' => ['Noto Sans Mono Variable', $standard('cyrillic', 'latin')],
             'noto-sans-thai' => ['Noto Sans Thai Variable', ['thai' => 'U+0E01-0E5B,U+200C-200D,U+25CC', ...$standard('latin')]],
             'noto-sans-myanmar' => ['Noto Sans Myanmar Variable', ['myanmar' => 'U+1000-109F,U+200C-200D,U+25CC', ...$standard('latin')]],
-            'noto-sans-sc' => ['Noto Sans SC Variable', ['60' => 'U+4e00-4e0f', '50' => 'U+76f4-76f5,U+9aa8', ...$standard('latin')]],
+            'noto-sans-sc' => ['Noto Sans SC Variable', ['60' => 'U+4e00-4e0f', '50' => 'U+76f4-76f5,U+9aa8', '90' => 'U+2197,U+2199', '109' => 'U+2192', ...$standard('latin')]],
             'noto-sans-tc' => ['Noto Sans TC Variable', ['40' => 'U+76f4,U+9aa8', ...$standard('latin')]],
-            'noto-sans-jp' => ['Noto Sans JP Variable', ['30' => 'U+30a0-30ff,U+7d9a,U+76f4,U+9aa8', ...$standard('latin')]],
+            'noto-sans-jp' => ['Noto Sans JP Variable', ['30' => 'U+30a0-30ff,U+7d9a,U+76f4,U+9aa8,U+2192,U+2197', ...$standard('latin')]],
             'noto-sans-kr' => ['Noto Sans KR Variable', ['20' => 'U+76f4,U+ac00-d7a3', ...$standard('latin')]],
         ];
         foreach ($packages as $package => [$family, $subsets]) {

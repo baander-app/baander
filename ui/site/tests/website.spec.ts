@@ -33,10 +33,6 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844
 }
 
 test('pages set their text in the self-hosted Geist faces', async ({ page }) => {
-  const fonts: string[] = [];
-  page.on('response', (response) => {
-    if (response.request().resourceType() === 'font') fonts.push(new URL(response.url()).pathname);
-  });
   const typography = async (selector: string) => {
     await page.evaluate(() => document.fonts.ready);
     return page.evaluate((selector) => ({
@@ -52,10 +48,10 @@ test('pages set their text in the self-hosted Geist faces', async ({ page }) => 
   const code = await typography('.manual-article code');
   expect(code.family).toMatch(/^"Geist Mono Variable",/);
   expect(code.loaded).toContain('Geist Mono Variable');
-  expect(fonts.length).toBeGreaterThan(0);
-  for (const font of fonts) {
-    expect(font, 'Only the hashed Latin Geist faces are requested').toMatch(/^\/assets\/site\/fonts\/geist(?:-mono)?-latin-wght-normal-[0-9a-f]{16}\.woff2$/);
-  }
+  await page.goto('/baac/');
+  const codec = await typography('.baac-method code');
+  expect(codec.family, 'Code outside the manual uses the mono stack too').toMatch(/^"Geist Mono Variable",/);
+  expect(codec.loaded).toContain('Geist Mono Variable');
 });
 
 test('visitor reaches operating model and source-based installation', async ({ page }) => {
@@ -332,6 +328,74 @@ const HAN_FAMILY = /^Noto Sans (?:SC|TC|JP|KR) Variable$/;
 /** The site-wide Geist faces declare no unicode-range; their files hold Fontsource's Latin slice. */
 const SITE_WIDE_LATIN = 'U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD';
 
+/**
+ * Checks the text below the root against the page's declared faces. Each character must fall, along its
+ * element's computed family order, to a family with a declared face whose unicode-range covers it, and
+ * for rendered text that face must be loaded. A plain `document.fonts.check()` passes when no face
+ * covers the character, so the covering family is found first. The faces reached this way are the ones
+ * the page's own font stylesheet may declare and the page may request.
+ */
+async function fontCoverage(page: import('@playwright/test').Page, root: string) {
+  return page.evaluate(async ({ root, siteWideLatin }) => {
+    for (const details of document.querySelectorAll('details')) details.open = true;
+    await new Promise(requestAnimationFrame);
+    await document.fonts.ready;
+    const ranges = (value: string) => value.split(',').map((part) => {
+      const [start, end = start] = part.trim().replace(/^u\+/i, '').split('-');
+      return [Number.parseInt(start, 16), Number.parseInt(end, 16)] as const;
+    });
+    const faces = [...document.styleSheets].flatMap((sheet) => [...sheet.cssRules])
+      .filter((rule): rule is CSSFontFaceRule => rule instanceof CSSFontFaceRule)
+      .map((rule) => {
+        const range = rule.style.getPropertyValue('unicode-range');
+        return {
+          family: rule.style.getPropertyValue('font-family').replace(/^"|"$/g, ''),
+          file: new URL(/url\("?([^")]+)"?\)/.exec(rule.style.getPropertyValue('src'))![1], location.href).pathname,
+          pageFont: /\/assets\/site\/fonts\/page-[0-9a-f]{16}\.css$/.test(rule.parentStyleSheet?.href ?? ''),
+          ranges: ranges(range === '' || /^U\+0-10FFFF$/i.test(range) ? siteWideLatin : range),
+        };
+      });
+    const reached = new Set<string>();
+    const missing = new Set<string>();
+    const reach = (stack: string[], character: string) => {
+      const code = character.codePointAt(0)!;
+      const covering = (name: string) => faces.filter((face) => face.family === name
+        && face.ranges.some(([start, end]) => code >= start && code <= end));
+      const family = stack.find((name) => covering(name).length > 0);
+      for (const face of family === undefined ? [] : covering(family)) reached.add(face.file);
+      return family;
+    };
+    const walker = document.createTreeWalker(document.querySelector(root)!, NodeFilter.SHOW_TEXT);
+    for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
+      const element = node.parentElement!;
+      if (element.closest('script, style')) continue;
+      const style = getComputedStyle(element);
+      const stack = style.fontFamily.split(',').map((family) => family.trim().replace(/^"|"$/g, ''));
+      const text = node.textContent!.replace(/\s/g, '');
+      for (const character of new Set(text)) reach(stack, character);
+      const shown = style.textTransform === 'uppercase' ? text.toUpperCase() : text;
+      const rendered = element.checkVisibility({ visibilityProperty: true });
+      for (const character of new Set(shown)) {
+        const family = reach(stack, character);
+        if (family === undefined) {
+          missing.add(`${character} in "${node.textContent!.trim().slice(0, 60)}" has no bundled face`);
+        } else if (rendered && !document.fonts.check(`${style.fontStyle} ${style.fontWeight} ${style.fontSize} "${family}"`, character)) {
+          missing.add(`${character} in ${family} is not loaded`);
+        }
+      }
+    }
+    const requested = performance.getEntriesByType('resource').map((entry) => new URL(entry.name).pathname)
+      .filter((file) => file.endsWith('.woff2'));
+    const declared = faces.filter((face) => face.pageFont).map((face) => face.file);
+    return {
+      missing: [...missing],
+      declared,
+      declaredUnreached: [...new Set(declared)].filter((file) => !reached.has(file)),
+      requestedUnreached: [...new Set(requested)].filter((file) => !reached.has(file)),
+    };
+  }, { root, siteWideLatin: SITE_WIDE_LATIN });
+}
+
 async function openTypography(page: import('@playwright/test').Page) {
   await page.goto('/typography/');
   await expect(page.getByRole('heading', { level: 1, name: 'Typography' })).toBeVisible();
@@ -416,21 +480,32 @@ test('each script rule sample differs from its sample without the rule', async (
   expect(proportional.family).toMatch(/^"Geist Variable",/);
 });
 
-test('only the typography page declares or requests Noto fonts', async ({ page }) => {
-  const notoRequests: string[] = [];
-  page.on('request', (request) => {
-    if (/\/noto-sans/.test(new URL(request.url()).pathname)) notoRequests.push(request.url());
-  });
-  for (const path of ['/', '/baac/', '/docs/operator-guide/getting-started/']) {
+for (const path of ['/', '/docs/developer-guide/testing/', '/baac/']) {
+  test(`${path}: every character renders from a bundled face and only the slices the text reaches load`, async ({ page }) => {
     await page.goto(path);
-    await page.evaluate(() => document.fonts.ready.then(() => undefined));
-    const declared = await page.evaluate(() => [...document.fonts].map((face) => face.family.replaceAll('"', '')));
-    expect(declared.filter((family) => family.startsWith('Noto')), path).toEqual([]);
-  }
-  expect(notoRequests).toEqual([]);
+    await expect(page.locator('main h1')).toBeVisible();
+    const report = await fontCoverage(page, 'body');
+    expect(report.missing, 'Each character falls to a declared bundled face that is loaded').toEqual([]);
+    expect(report.declaredUnreached, 'The page declares no slice its text does not reach first').toEqual([]);
+    expect(report.requestedUnreached, 'The page requests no slice its text does not reach first').toEqual([]);
+    expect(report.declared.length, 'The page has text beyond the shared Latin faces').toBeGreaterThan(0);
+  });
+}
 
-  await openTypography(page);
-  expect(notoRequests.some((url) => /\/assets\/site\/fonts\/noto-sans-thai-thai-wght-normal-[0-9a-f]{16}\.woff2$/.test(url))).toBe(true);
+test('search results render characters from other pages in bundled faces once results appear', async ({ page }) => {
+  const stylesheets: string[] = [];
+  page.on('request', (request) => {
+    if (/^\/assets\/site\/fonts\/search-[0-9a-f]{16}\.css$/.test(new URL(request.url()).pathname)) stylesheets.push(request.url());
+  });
+  await page.goto('/docs/');
+  expect(await page.locator('body').textContent(), 'The arrow comes only from another page').not.toContain('→');
+  await page.evaluate(() => document.fonts.ready.then(() => undefined));
+  expect(stylesheets, 'The search stylesheet loads only after a search').toEqual([]);
+  await page.getByRole('searchbox', { name: 'Search manuals' }).fill('dependency flow');
+  const excerpt = page.locator('#manual-search-results .search-excerpt', { hasText: '→' }).first();
+  await expect(excerpt).toBeVisible();
+  expect(stylesheets).toHaveLength(1);
+  await expect.poll(async () => (await fontCoverage(page, '#manual-search-results')).missing).toEqual([]);
 });
 
 test('every character on the typography page renders from a bundled Geist or Noto face', async ({ page }) => {
