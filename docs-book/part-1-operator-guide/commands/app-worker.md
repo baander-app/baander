@@ -6,7 +6,7 @@ coordination. Execution runs resident ordinary `async` consumers, one separate
 `scheduler` consumer and the native execution daemon.
 Native probes, encoders, CPU helpers and scheduled console children run in
 execution. The host `bin/worker-deployment.php` supplies the options from a version
-6 manifest; see [Worker deployment](README.md#worker-deployment).
+7 manifest; see [Worker deployment](README.md#worker-deployment).
 
 ## Quick start
 
@@ -24,31 +24,30 @@ start, stop, replacement and uncertain outcomes.
 | `--deployment` | `BAANDER_WORKER_NAMESPACE` | Deployment namespace |
 | `--boot-id` | `BAANDER_WORKER_BOOT_ID` | Fresh 32-character hexadecimal boot identity |
 | `--unit` | `BAANDER_WORKER_UNIT` | Required unit identity: `control` or `execution` |
-| `--memory-mib` | — | Required unit ceiling, validated against the selected deployment profile, resident consumers and scheduled console reservation; see the [manifest reference](README.md#worker-deployment) |
-| `--pids-limit` | — | Required unit PID capacity: at least 129 for control or `256 + maximumConcurrency - 1` for execution; at most 4096 |
 | `--scheduled-console-mib` | `0` | Execution reservation for one synchronous scheduled console child; `0` disables it, otherwise at least 320 MiB; control requires `0` |
-| `--deployment-profile` | — | Required complete startup profile JSON; it must agree with the runtime environment and version 6 manifest |
-| `--autoscaling-profile` | — | Required complete ordinary-admission profile JSON from the version 6 manifest; all fields bind both unit recipes |
+| `--deployment-profile` | — | Required complete startup profile JSON; it must agree with the runtime environment and version 7 manifest |
+| `--autoscaling-profile` | — | Required complete ordinary-admission profile JSON from the version 7 manifest; all fields bind both unit recipes |
 | `--lock-dir` | `/tmp/baander-worker-locks` | Private unit lock directory |
 | `--ipc-dir` | `/run/baander-worker` | Private IPC directory shared by the pair |
 
 ## Details
 
-When the environment sets `BAANDER_WORKER_NAMESPACE`, `BAANDER_WORKER_BOOT_ID` or `BAANDER_WORKER_UNIT`, the matching option must be absent or equal to it. Memory values are whole MiB up to 1048576. The host manifest binds these admission values to separate Docker memory, CPU and PID ceilings and disjoint CPU sets. They do not certify measured usage or capacity.
+When the environment sets `BAANDER_WORKER_NAMESPACE`, `BAANDER_WORKER_BOOT_ID` or `BAANDER_WORKER_UNIT`, the matching option must be absent or equal to it. The scheduled console value is whole MiB up to 1048576. The command has no memory or PID options: the worker units run without Docker memory, CPU or PID limits and without CPU sets, and the supervisor admits no work against a memory or PID budget. Its child ceiling follows from the profile: the fixed roles, the media manager with one child per slot, one local helper per consumer, the scheduled console child and the lease helper. The command refuses to start when PostgreSQL's default time zone is not UTC.
 
 The deployment profile is fixed at startup. `full` allows up to four ordinary
-consumers and encoding; `household` allows one ordinary consumer and two shared
+consumers and encoding in its configured video and audio slots; `household` allows one ordinary consumer and two shared
 copy jobs, with no audio or video encoding. Web and workers must select the same
 profile. Profile replacement requires retirement and a new admitted boot.
 
 Execution starts `consumer-0` through `consumer-(maximumConcurrency - 1)` for
 `async`, plus one separate `scheduler` consumer. Every ordinary slot remains
-resident and fully reserved, including when parked. Parking gates the next receive
+resident, including when parked. Parking gates the next receive
 without reclaiming RSS or interrupting handling, acknowledgment, retry publication
 or keepalive. A shrink waits for occupied permits to drain below the target before
 admitting more work. Control's independent private autoscaler collects queue and
-execution cgroup evidence and updates admission through boot/epoch-fenced IPC;
-it does not consume ordinary work. It reserves 320 MiB within control's ceiling.
+execution cgroup evidence, measured against the host because the cgroup has no
+limits, and updates admission through boot/epoch-fenced IPC; it does not consume
+ordinary work.
 
 The [manifest reference](README.md#worker-deployment) defines profile bounds and
 the measured `full` maximum-two example and its workload limits. Missing
@@ -60,8 +59,8 @@ Container compilation checks default routes,
 handlers registered for the transport, payload codecs, JSON serialization and
 bounded retry policies. Producer dispatch checks the actual selected senders,
 including explicit transport stamps. Catalog resource classes describe work; the
-unit budgets above remain the admission policy. PHP kernel processes use a
-256 MiB heap ceiling; unit memory also reserves native and management headroom.
+profile's consumer and slot counts remain the admission policy. PHP kernel
+processes use a 256 MiB heap ceiling.
 
 The supervisor checks `REDIS_URL` and `MESSENGER_TRANSPORT_DSN` before launching
 children. Accepted forms preserve the configured streams and `baander` group;
@@ -80,16 +79,20 @@ peer failure and the 35-second drain deadline; the
 startup admission deadline. A `worker_supervisor_stopped` log entry is neither
 a readiness result nor a containment receipt.
 
-The `full` media coordinator admits at most three video jobs and one audio rendition.
-In `household`, audio and video copy jobs share two slots. Completed artifacts can
+The `full` media coordinator admits at most the profile's video and audio slots,
+8 and 12 by default; see [Media slots](../configuration.md#media-slots). In
+`household`, audio and video copy jobs share two slots. Completed artifacts can
 be delivered without a producer, but their reuse never authorizes re-encoding.
 Each job uses a fresh kernel in control and sends bounded native requests over
 the private Unix socket to execution. Hardware probing, FFmpeg, video CPU helpers
 and scheduled console children belong to execution; no devices are admitted.
 Native requests carry deployment, boot, epoch, client generation and attempt
 identity. Uncertain completion retains ownership until containment or a confirmed
-release; caller cancellation alone does not free a native slot. Encoder and file
-I/O threads count against execution's PID ceiling.
+release; caller cancellation alone does not free a native slot. The native daemon
+starts each FFmpeg command at nice 10 with the media work out-of-memory score
+600; each PHP media child in control raises its own score to 600. Control runs at
+−500 and execution at 300, so under host memory pressure media work is killed
+before either unit's own processes.
 
 The supervisor does not restart itself. Reconcile a failed deployment through the
 host controller before replacing it; see the lifecycle procedure linked above.

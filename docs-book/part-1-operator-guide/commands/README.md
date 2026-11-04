@@ -32,11 +32,12 @@ Run `bin/worker-deployment.php` from a trusted host checkout with Composer depen
 PHP 8.5 with extensions `posix` and `pdo_pgsql`, and an absolute Docker executable connected
 to a local Unix socket. The application container receives no Docker authority.
 Provision the migrated database, Redis and a private Docker network first; use a
-locally available immutable image ID. The version 6 recipe admits a fixed pair
-of control and execution containers,
-with separate resource ceilings and disjoint CPU sets. It requires explicitly
-authorized shared media volumes and a private named IPC volume. Devices are
-refused; the production source policy also refuses bind mounts.
+locally available immutable image ID. The version 7 recipe admits a fixed pair
+of control and execution containers without CPU, memory or PID limits and without
+CPU sets. It requires explicitly authorized shared media volumes and a private
+named IPC volume. Devices are refused; the production source policy also refuses
+bind mounts. The Docker daemon must run rootful: creation refuses a rootless
+daemon, which cannot start the control unit at its negative out-of-memory score.
 
 Build the worker image with the same layout-aware builder used in
 [Getting started](../getting-started.md#3-build-images-and-start-dependencies).
@@ -54,12 +55,12 @@ keep the corresponding `APP_HOME` exported for each controller invocation. The
 controller rejects an unset `APP_HOME`. The storage targets below illustrate the
 current `/var/www/html` image layout; align them with the selected image's layout.
 
-The manifest is a JSON object of at most 8192 bytes. Version 6 requires exactly
-these fields, with JSON integers for version and resource values:
+The manifest is a JSON object of at most 8192 bytes. Version 7 requires exactly
+these fields, with JSON integers for `version` and `scheduledConsoleMiB`:
 
 ```json
 {
-  "version": 6,
+  "version": 7,
   "sourceMountPolicy": "production",
   "namespace": "worker.baander.app",
   "bootId": "0123456789abcdef0123456789abcdef",
@@ -68,14 +69,6 @@ these fields, with JSON integers for version and resource values:
   "network": "baander-workers",
   "dockerBinary": "/usr/bin/docker",
   "dockerEndpoint": "unix:///var/run/docker.sock",
-  "controlMemoryMiB": 2944,
-  "executionMemoryMiB": 4800,
-  "controlNanoCpus": 1000000000,
-  "executionNanoCpus": 2000000000,
-  "controlPidsLimit": 129,
-  "executionPidsLimit": 257,
-  "controlCpuSet": [0],
-  "executionCpuSet": [1, 2],
   "scheduledConsoleMiB": 320,
   "deploymentProfile": {
     "identifier": "full",
@@ -83,8 +76,8 @@ these fields, with JSON integers for version and resource values:
     "doctrinePoolSlots": 10,
     "ordinaryConsumerLimit": 4,
     "sharedCopySlots": 0,
-    "videoEncoderSlots": 3,
-    "audioEncoderSlots": 1
+    "videoEncoderSlots": 8,
+    "audioEncoderSlots": 12
   },
   "autoscaling": {
     "minimumConcurrency": 1,
@@ -115,26 +108,23 @@ these fields, with JSON integers for version and resource values:
 Replace the daemon/image examples with `docker info --format '{{.ID}}'` and the
 local image's `docker image inspect --format '{{.Id}}'` values on the same endpoint.
 Generate a fresh 32-character lowercase hexadecimal boot ID for each deployment
-attempt. In the `full` profile, control requires at least 2944 MiB and 129 PID slots,
-including a 320 MiB reservation for its independent autoscaler. With maximum ordinary concurrency
-`max`, execution requires at least `4160 + 320 * (max - 1)` MiB plus its scheduled
-console reservation, and `256 + max - 1` PID slots.
-Scheduled console execution is disabled at `0` or reserves at least 320 MiB in
-execution. The example enables it with a 4800 MiB execution ceiling. CPU sets must
-be nonempty and disjoint; select available host CPUs explicitly. The example's
-CPU placement and quotas must fit the host; the measured envelope below applies
-to the recorded hardware and fixture. Docker counts threads toward each unit's
-PID ceiling.
-Creation also requires host memory for both ceilings plus 1 GiB and verifies that
-the declared CPU identifiers are available on that daemon.
+attempt. Scheduled console execution is disabled at `0` and enabled by a value of
+at least 320; the example enables it. The manifest declares no memory, CPU, PID or
+CPU-set values. Creation starts both units without limits and verifies that Docker
+reports no limit on either unit and each unit's out-of-memory score: −500 for
+control and 300 for execution. The native daemon raises each FFmpeg command it
+launches to 600, and each PHP media child raises its own score to 600; see
+[Kill order](../system-requirements.md#kill-order).
 
-The `deploymentProfile` object is required. Its complete settings must match one
-of the supported profiles and the worker's runtime environment. `full` permits up
-to four resident ordinary consumers, three video jobs and one audio rendition.
-`household` permits one ordinary consumer and two shared audio/video copy jobs;
-it does not permit encoding. Its media and ordinary reservations are calculated
-from those limits. Both profiles currently retain conservative native headroom.
-These limits do not establish measured memory use or a minimum host size.
+The `deploymentProfile` object is required. Its complete settings must form a
+valid profile and match the worker's runtime environment. `full` permits up to
+four resident ordinary consumers and the configured video and audio slots; the
+example carries the defaults of 8 and 12. `household` permits one ordinary
+consumer and two shared audio/video copy jobs; it does not permit encoding. Print
+the object for chosen slots with
+[`app:deployment:profile:show`](app-deployment-profile-show.md) instead of writing
+it by hand; [Media slots](../configuration.md#media-slots) gives the maximums.
+These settings do not establish measured memory use or a minimum host size.
 
 The `autoscaling` object is required. Every field must be a JSON integer; missing
 or unknown fields are rejected. All fields contribute to both unit recipe
@@ -144,17 +134,17 @@ fresh boot; see [Upgrading](../upgrading.md#standard-update).
 
 The `full` example recommends minimum one and maximum two for ordinary work on the
 measured envelope: an AMD Ryzen 7 5800X3D host with eight cores, sixteen threads
-and 64 GiB of physical RAM, with one CPU reserved for control, two disjoint CPUs
-for execution, and dependencies/web on another CPU.
+and 64 GiB of physical RAM. The measurement predates the removal of container
+limits: it reserved one CPU for control, two disjoint CPUs for execution, and
+another CPU for dependencies and web.
 Two 48-message bursts of two-second simulated I/O completed in 56.99 and
 56.97 seconds, compared with 97.42 and 97.43 seconds at maximum one, about 1.71×
 faster. The maximum-two run returned to target one between bursts and reduced the
 target under CPU pressure. Maximum four completed the bursts in 39.21 and
 38.48 seconds, 2.48× and 2.53× faster than maximum one. It is an option for this
-I/O-heavy envelope with an execution ceiling of 5440 MiB and 259 PID slots,
-including the same 320 MiB scheduled console reservation. Maximum two is the
-general starting recommendation: it uses fewer resident processes and connections,
-and maximum four did not improve the measured CPU-work completion time.
+I/O-heavy envelope. Maximum two is the general starting recommendation: it uses
+fewer resident processes and connections, and maximum four did not improve the
+measured CPU-work completion time.
 
 This recommendation covers the recorded synthetic workload and placement; it does
 not establish external-provider latency, unrestricted concurrency or smaller-host
@@ -170,14 +160,16 @@ Concurrency bounds must satisfy `1 <= minimumConcurrency <= maximumConcurrency`,
 with a maximum of 4 for `full` and 1 for `household`. Durations are 100 through 3600000 milliseconds. Sample age must cover at least two intervals;
 scale-up sustain and cooldown must cover an interval; scale-down sustain must
 exceed scale-up sustain. Percentages are 1 through 100, with memory/PID stop
-thresholds strictly above their growth ceilings.
+thresholds strictly above their growth ceilings. The units have no limits, so the
+autoscaler measures the execution unit's CPU, memory and processes against the
+host's CPUs, memory and kernel task limit.
 
 Execution starts all `consumer-0` through `consumer-(max - 1)` ordinary consumers
 at boot. A lower admission target parks free consumers before transport receive;
-it does not stop them or reclaim their RSS, connections or reservations. Occupied
-permits remain held through handling and completion. After a shrink, new receives
-wait until occupied permits fall below the new target. The scheduler consumer and
-media slots retain separate reservations.
+it does not stop them or reclaim their RSS or connections. Occupied permits remain
+held through handling and completion. After a shrink, new receives wait until
+occupied permits fall below the new target. The scheduler consumer and media slots
+are admitted separately.
 
 The media workload follows `deploymentProfile`; neither profile admits devices.
 The worker argv,
@@ -228,7 +220,8 @@ invoking user, with mode `0600`, no symlink components and at most 8192 bytes:
     "APP_DEBUG": "0",
     "BAANDER_DEPLOYMENT_PROFILE": "full",
     "APP_SECRET": "replace-with-runtime-secret",
-    "DATABASE_URL": "postgresql://worker:replace-password@db-worker.baander.app/baander?serverVersion=18&charset=utf8",
+    "DATABASE_URL": "postgresql://worker:replace-password@db-worker.baander.app:6432/baander?serverVersion=18&charset=utf8",
+    "DATABASE_CONTROL_URL": "postgresql://worker_control:replace-password@db-worker.baander.app:6432/baander_control?serverVersion=18&charset=utf8",
     "REDIS_URL": "redis://:replace-password@redis.baander.app:6379",
     "MESSENGER_TRANSPORT_DSN": "redis://:replace-password@redis.baander.app:6379/messages",
     "CONVERT_STORAGE_PATH": "/storage/conversions",
@@ -243,8 +236,10 @@ that same complete profile. The controller supplies each profile variable once,
 using the admitted environment or a generated default. Switching profiles requires
 a fresh boot after retirement, not an edit to a running container.
 
-The two database addresses must reach the same database from the host and worker
-network respectively. The controller URL and credentials file stay on the host.
+`DATABASE_URL` and `DATABASE_CONTROL_URL` are required and name the pooler's
+application and control aliases; see [Connection pooler](../configuration.md#connection-pooler).
+The controller URL and the worker URLs must reach the same database from the host
+and worker network respectively. The controller URL and credentials file stay on the host.
 Docker receives the admitted runtime values through a temporary private env-file;
 trusted daemon operators can inspect the resulting container environment.
 Additional runtime keys are `CONVERT_STORAGE_PATH`, `MEDIA_STORAGE_PATH`,
