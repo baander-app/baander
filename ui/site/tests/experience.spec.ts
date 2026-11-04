@@ -116,6 +116,8 @@ for (const colorScheme of ['light', 'dark'] as const) {
     }
     await loadedImage(page.getByRole('img', { name: /playlists view in the browser/ }));
     await contained();
+    await loadedImage(page.getByRole('img', { name: /playback destination menu/ }));
+    await contained();
   });
 }
 

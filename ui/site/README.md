@@ -58,6 +58,21 @@ playback position, controls and scroll position. The processing slide captures
 the complete processing panel. Normal website builds reuse these checked-in
 images and do not need a running application.
 
+The playback destinations screenshot was captured from an isolated application
+preview on 2026-11-04. A disposable live-updates fixture run supplied one user and
+twelve silent tracks; the run was cleaned up after capture. Four real browser
+sessions signed in as that user under the device names Studio MacBook, Living
+room, Kitchen iPad and iPhone. The captured session played a track, transferred it
+to Living room through the destination menu, then sought and paused it remotely,
+so the menu shows the real state after a transfer. Only the display metadata is
+staged: the capturing browser replaced the fixture's track, artist, album and
+genre names with fictional ones and served generated cover art. The light
+variant uses the same paused view with the application theme switched. Both use
+a 1136 × 710 viewport at device scale 2, which matches the full-width homepage
+column, so the image appears at its captured size with no downscaled text. AirPlay,
+Chromecast and DLNA are not shown because they are not available yet; the
+homepage marks them as planned. The user reviewed and approved both images.
+
 Run the rendering fixtures and dedicated site browser suite after building:
 
 ```bash

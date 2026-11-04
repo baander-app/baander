@@ -155,6 +155,35 @@ include __DIR__ . '/header.php';
     </figure>
   </section>
 
+  <section class="home-section wide-feature" aria-labelledby="destinations-title">
+    <div class="section-intro wide-feature-intro">
+      <div>
+        <p class="eyebrow">Playback destinations</p>
+        <h2 id="destinations-title">Start in one room.<br>Keep listening in another.</h2>
+      </div>
+      <div>
+        <p>Move what's playing to another device where you're signed in to Bånder, such as the living-room computer, a tablet or your phone. The track, the queue, the position and whether it was playing or paused all move with it.</p>
+        <p>Pause, play and seek from the device you started on, or bring playback back. Movies move between devices the same way.</p>
+        <aside class="feature-note" aria-label="Planned casting support">
+          <p><strong>Planned: AirPlay, Chromecast and DLNA.</strong> Casting to these receivers is in development and isn't available yet.</p>
+        </aside>
+      </div>
+    </div>
+    <figure class="app-screenshot feature-screenshot">
+      <?php
+      $screenshot = [
+          'name' => 'destinations',
+          'alt' => "Bånder's playback destination menu, showing music playing on the living-room device with other signed-in devices listed.",
+          'width' => 2272,
+          'height' => 1420,
+          'loading' => 'lazy',
+      ];
+      include __DIR__ . '/screenshot.php';
+      ?>
+      <figcaption>Playback destinations · Captured in Bånder with sample music</figcaption>
+    </figure>
+  </section>
+
   <section id="how-it-works" class="home-section operating-model" aria-labelledby="how-title">
     <div class="section-intro">
       <p class="eyebrow">From files to playback</p>
