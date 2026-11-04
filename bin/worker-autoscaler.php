@@ -51,8 +51,15 @@ try {
         throw new RuntimeException('Autoscaler runner is not configured.');
     }
     $runner->runUntilSignalled();
-} catch (Throwable) {
+} catch (Throwable $error) {
     fwrite(STDERR, "Autoscaler worker failed; supervisor reconciliation is required.\n");
+    // Only the class and location: messages can carry credentials.
+    fwrite(STDERR, json_encode([
+        'event' => 'worker_autoscaler_failure',
+        'exceptionClass' => $error::class,
+        'sourceFile' => basename($error->getFile()),
+        'sourceLine' => $error->getLine(),
+    ], JSON_INVALID_UTF8_SUBSTITUTE) . "\n");
     $exitCode = 1;
 } finally {
     try {
