@@ -28,15 +28,17 @@ work; execution also needs its native daemon ready. A running container alone
 does not establish that these conditions hold. Startup fails if the pair cannot
 reach admission within 30 seconds.
 
-The host controller creates and starts the pair from an admitted version 6
+The host controller creates and starts the pair from an admitted version 7
 manifest. The complete-stack preset starts this pair through its host controller;
 starting only the web Compose service does not start workers. Worker runtime uses the credentials
 and image selected for that pair, separately from web configuration. See
 [Configuration](configuration.md#where-a-change-takes-effect) before changing either.
 
 The [startup profile](configuration.md#deployment-profiles) binds both units and
-web to the same capabilities. `full` permits encoding; `household` has one resident
-ordinary consumer and two shared copy slots, with no audio or video encoding.
+web to the same capabilities. `full` permits encoding, with the video and audio
+[media slots](configuration.md#media-slots) it was started with; `household` has
+one resident ordinary consumer and two shared copy slots, with no audio or video
+encoding.
 Both profiles retain the scheduler, outbox relay and media coordination. Change
 profiles by replacing the admitted deployment, not by changing a running worker's
 environment.
@@ -96,19 +98,21 @@ For example, the seeded recommendations schedule runs daily but generates nothin
 while `recommendations.auto_generate` is off. See
 [Scheduled recommendations](configuration.md#scheduled-recommendations).
 
-A scheduled console command runs as a native child in execution. The manifest
-must reserve memory for one such child; a reservation of `0` disables scheduled
-console execution. If completion becomes uncertain, the scheduler records the
+A scheduled console command runs as a native child in execution. The manifest's
+`scheduledConsoleMiB` enables it with a value of at least 320; `0` disables
+scheduled console execution. If completion becomes uncertain, the scheduler records the
 failure and pauses the active schedule to avoid dispatching duplicate work.
 Establish deployment containment and inspect the job before resuming it. See
 [Scheduler commands](commands/README.md#scheduler) for schedule administration.
 
 ## Admission and native work
 
-Worker admission binds the pair to declared CPU, memory, PID and storage limits.
-The manifest is an operating recipe, not a measurement of what any library will
-need. Its measured concurrency example has workload and host limits documented
-in the [worker deployment reference](commands/README.md#worker-deployment).
+Worker admission binds the pair to its declared profile and storage. The worker
+containers carry no CPU, memory or PID limit and no CPU set; the media slots and
+the ordinary concurrency bound their work. The manifest is an operating recipe,
+not a measurement of what any library will need. Its measured concurrency example
+has workload and host limits documented in the
+[worker deployment reference](commands/README.md#worker-deployment).
 
 Execution starts all configured ordinary consumer slots at boot. The autoscaler
 changes the **ordinary admission target**: how many slots may acquire permission
@@ -119,21 +123,27 @@ publication and keepalive. A reduction waits for occupied permits to drain befor
 admitting more work.
 
 Missing or stale queue/resource measurements prohibit growth and reduce ordinary
-admission to at most one. Severe memory or PID pressure closes ordinary admission;
+admission to at most one. Without container limits, the autoscaler measures the
+execution unit against the host: its CPU use over all host CPUs, its memory over
+the host's memory and its processes over the kernel's task limit. Severe memory or
+PID pressure closes ordinary admission;
 fresh samples are needed for recovery. Missing consumer evidence stays unknown;
 it does not count as an idle consumer or an empty queue. Check the decision reason
 and evidence age before treating low concurrency as a fault.
 
 Media execution has its own ownership. Under `full`, control's media coordinator
-admits at most three video jobs and one audio rendition. Under `household`, audio
+admits at most as many video jobs and audio renditions as the profile's slots, 8
+and 12 by default. Under `household`, audio
 and video copy jobs share two slots; jobs requiring re-encoding are refused. Original
 files and compatible completed artifacts do not need a live producer. The coordinator
 sends bounded native requests over
 the private socket to execution, where FFmpeg, probes and helpers run. Each native
 execution attempt carries its deployment and attempt identity. If completion is
 uncertain, ownership remains until containment or a confirmed release; cancelling
-the caller does not by itself free the native slot. Encoder and file I/O threads
-also count toward the execution PID limit.
+the caller does not by itself free the native slot. The native daemon starts each
+FFmpeg command at nice 10, so encodes yield CPU to the execution unit's own
+processes; [System Requirements](system-requirements.md#kill-order) describes the
+out-of-memory kill order.
 
 Worker admission currently accepts no devices. Configure the supported CPU
 encoding path described in [Transcoding](transcoding.md), and do not infer worker

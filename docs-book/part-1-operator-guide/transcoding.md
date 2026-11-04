@@ -116,9 +116,11 @@ An encoded session is assigned an audio profile that controls codec, bitrate, ch
 
 ## Worker execution capacity
 
-Under `full`, the media role admits at most three video jobs and one audio rendition
-at once. Under `household`, audio and video copy jobs share two slots, and encoding
-is refused. Each video job has a fresh PHP kernel and one private CPU helper,
+Under `full`, the media role admits as many video jobs and audio renditions at
+once as the profile's [media slots](configuration.md#media-slots), 8 video and 12
+audio by default; stream copy uses the slots of its kind, and a kind with zero
+slots is refused. Under `household`, audio and video copy jobs share two slots,
+and encoding is refused. Each video job has a fresh PHP kernel and one private CPU helper,
 started before any database or Redis connection opens. FFmpeg processes and their
 process groups belong to the worker deployment. Web has no CPU pool or encoder
 fallback.
@@ -126,18 +128,14 @@ fallback.
 Private media jobs use one asynchronous file-I/O thread, configured before helper
 forks or reactor startup. The shipped Swoole build uses its thread backend for
 coroutine file reads under the worker's default Docker security restrictions.
-AIO threads and encoder threads both count toward the container PID ceiling.
-
-For `full`, the version 6 host manifest reserves at least 2944 MiB and 129 PID slots for control.
-Execution requires at least `4160 + 320 * (maximumConcurrency - 1)` MiB plus any
-scheduled console reservation, and `256 + maximumConcurrency - 1` PID slots,
-including encoder threads. Ordinary admission can change within the profile's
-bounds; all ordinary consumers remain resident and fully reserved when parked.
-Media slots remain independent of the ordinary target. The selected profile sets
-its resident-consumer and media-slot bounds; the controller derives the required
-reservations from them. Current household reservations retain conservative native
-headroom while whole-stack qualification is open. These are admission reservations,
-not measured capacity guarantees. See [Worker deployment](commands/README.md#worker-deployment) for the complete memory and storage recipe.
+The worker containers carry no CPU, memory or PID limit, so the slots are the only
+bound on media work. The native daemon starts each FFmpeg command at nice 10 and
+with a higher out-of-memory score than the worker's own processes. Ordinary
+admission can change within the profile's bounds; all ordinary consumers remain
+resident when parked. Media slots remain independent of the ordinary target.
+[System Requirements](system-requirements.md#choose-media-slots) gives the measured
+cost of each job and how to choose the slots; see
+[Worker deployment](commands/README.md#worker-deployment) for the storage recipe.
 
 ## Job Monitoring and State
 
@@ -253,7 +251,7 @@ Baander then rounds the bitrate down to the highest step of a fixed ladder that 
 
 An unsupported format, a bitrate that is not a positive whole number, or a bitrate without a format gets `400`. A failed encode gets `500` and is logged with the track, format and bitrate.
 
-Renditions are admitted through durable PostgreSQL runtime state. Under `full`, the media role runs one audio encode at a time, independently of its three video slots. Requests for the same source fingerprint, format and bitrate join the same accepted work. Web waits up to 60 seconds for output to start; an unavailable worker or failed generation produces an encode failure rather than an inline web encode.
+Renditions are admitted through durable PostgreSQL runtime state. Under `full`, the media role runs as many audio encodes at once as its audio slots, 12 by default, independently of its video slots. Requests for the same source fingerprint, format and bitrate join the same accepted work. Web waits up to 60 seconds for output to start; an unavailable worker or failed generation produces an encode failure rather than an inline web encode. When every audio slot stays busy for that whole wait, `/api/stream/track` and `/api/stream/original/track` answer `503` with `Retry-After: 5` and the reason `audio_slots_busy`. The work keeps its place in the queue, and the web player's retry follows it once a slot frees.
 
 ### Cached renditions
 
@@ -289,7 +287,7 @@ Audio transcoding is switched on and capped with the [server settings](#settings
 - **Derived output** uses `CONVERT_STORAGE_PATH`, default `/storage/conversions`, mounted at the same path in web and worker.
 - **Application storage and state** require shared writable worker volumes covering `APP_HOME/storage` and `APP_HOME/var/transcode_state`, where `APP_HOME` is the image application path generated during [installation](getting-started.md).
 - **Source media** uses an explicit `MEDIA_STORAGE_PATH`, for example `/media/library`, covered by a read-only worker source volume. Use the identical source root in both roles. Preserve web access needed for authorized library deletion.
-- **Capacity** comes from the startup profile: `full` permits three video jobs and one audio rendition; `household` permits two shared copy jobs and no encoding. Configure the matching memory and descendant reservations in the [host manifest](commands/README.md#worker-deployment).
+- **Capacity** comes from the startup profile: `full` permits as many video jobs and audio renditions as its [media slots](configuration.md#media-slots), 8 and 12 by default; `household` permits two shared copy jobs and no encoding. The [host manifest](commands/README.md#worker-deployment) carries the same profile; it declares no memory or process reservations.
 
 ## Checking playback
 
