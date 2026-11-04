@@ -297,6 +297,12 @@ endpoint when it can be resolved; otherwise it retains a container-based estimat
 That estimate is not a verified selected video endpoint and does not establish
 exact-end coverage.
 
+Movie encoding pads audio with silence and cuts it at a resolved endpoint, so
+both tracks finish together. With only the estimate, the encoder instead stops
+the whole output when the video stream ends. That fallback does not guarantee
+that audio reaches the exact video end, and it can publish the first segment
+later.
+
 ### Source position
 
 A playback position measured from the beginning of the source video. Subtracting
