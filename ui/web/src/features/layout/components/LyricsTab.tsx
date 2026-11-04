@@ -415,7 +415,7 @@ function PlainLyricsView({
         </Button>
       </Toolbar>
       <PlainScroll>
-        <PlainText textRole="body" text={plainLyrics} language={language} forwardedAs="pre" />
+        <PlainText textRole="body" text={plainLyrics} language={language} element="pre" />
       </PlainScroll>
       {source && (
         <SourceLabel>Source: {source}</SourceLabel>

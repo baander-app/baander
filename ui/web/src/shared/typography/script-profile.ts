@@ -20,8 +20,24 @@ const HANGUL = /\p{Script=Hangul}/u;
 const KANA = /[\p{Script=Hiragana}\p{Script=Katakana}]/u;
 const HAN = /\p{Script=Han}/u;
 const CYRILLIC = /\p{Script=Cyrillic}/u;
+/** Any character past Greek; every script the rules detect lies above it. */
+const BEYOND_GREEK = /[\u0400-\u{10FFFF}]/u;
+
+const NO_SCRIPTS: ScriptProfile = Object.freeze({
+  thai: false,
+  burmese: false,
+  burmeseOnly: false,
+  hangul: false,
+  kana: false,
+  han: false,
+  cyrillic: false,
+});
 
 export function scriptProfile(text: string): ScriptProfile {
+  if (!BEYOND_GREEK.test(text)) {
+    return NO_SCRIPTS;
+  }
+
   const burmese = BURMESE.test(text);
 
   return {

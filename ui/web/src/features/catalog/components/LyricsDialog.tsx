@@ -324,7 +324,7 @@ export function LyricsDialog({
                 {lyrics.syncedLyrics ? (
                   <SyncedLyricsView synced={lyrics.syncedLyrics} plain={lyrics.plainLyrics ?? undefined} language={language} />
                 ) : (
-                  <LyricsPre textRole="body" text={lyrics.plainLyrics ?? ''} language={language} forwardedAs="pre" />
+                  <LyricsPre textRole="body" text={lyrics.plainLyrics ?? ''} language={language} element="pre" />
                 )}
                 {lyrics.isInstrumental && (
                   <InstrumentalRow>
@@ -443,7 +443,7 @@ function SyncedLyricsView({ synced, plain, language }: { synced: string; plain?:
       <LyricsPre
         textRole="body"
         language={language}
-        forwardedAs="pre"
+        element="pre"
         text={showSynced
           ? parsed.map((l) => (l.time ? `${l.time} ${l.text}` : l.text)).join('\n')
           : (plain ?? parsed.map((l) => l.text).join('\n'))}
@@ -480,7 +480,7 @@ function SearchResultItem({
           {result.instrumental ? ' · Instrumental' : ''}
         </SearchResultMeta>
         {result.plainLyrics && (
-          <SearchResultPreview textRole="caption" text={`${result.plainLyrics.slice(0, 120)}…`} forwardedAs="p" />
+          <SearchResultPreview textRole="caption" text={`${result.plainLyrics.slice(0, 120)}…`} element="p" />
         )}
       </SearchResultContent>
       <Check size={14} style={{ marginTop: '0.25rem', flexShrink: 0, color: 'var(--color-muted-foreground)' }} />

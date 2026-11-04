@@ -231,8 +231,8 @@ element would share one language and one set of script rules.
 - Render content names with `ContentText` from `@/shared/typography`. Pass the
   item's stored language as `language` where one exists. `ContentText` writes the
   item's `lang` and the script markers the rules need.
-- When a styled component wraps `ContentText`, choose the rendered element with
-  `forwardedAs`; `as` would replace `ContentText` itself.
+- Choose the element `ContentText` renders with its `element` prop, also on a
+  styled component that wraps it; `as` would replace `ContentText` itself.
 - Do not write literal font sizes, weights, letter-spacing, line-heights or font
   families. A census test fails on them outside the allowed dense surfaces, canvas
   text and SVG viewBox text.

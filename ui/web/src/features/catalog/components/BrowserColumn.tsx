@@ -1,10 +1,10 @@
 import styled, { css } from 'styled-components'
-import { Fragment, useRef, useEffect, useCallback } from 'react'
+import { useRef, useEffect, useCallback } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { useImageBlob } from '@/shared/hooks/use-image-blob'
 import { Music } from 'lucide-react'
 import { textRole } from '@/shared/theme'
-import { ContentText } from '@/shared/typography'
+import { ContentText, ContentTextList } from '@/shared/typography'
 
 export interface BrowserItem {
   id: string
@@ -195,12 +195,7 @@ function BrowserItemRow({
       <ItemLabel textRole="body-sm" text={item.label} language={item.language} />
       {item.sublabels && item.sublabels.length > 0 && (
         <ItemSecondary>
-          {item.sublabels.map((name, index) => (
-            <Fragment key={`${index}-${name}`}>
-              {index > 0 && ', '}
-              <ContentText textRole="caption" text={name} />
-            </Fragment>
-          ))}
+          <ContentTextList textRole="caption" names={item.sublabels} />
         </ItemSecondary>
       )}
     </OptionButton>

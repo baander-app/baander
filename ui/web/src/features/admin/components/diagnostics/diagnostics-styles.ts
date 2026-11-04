@@ -5,8 +5,7 @@ import { Skeleton } from '@/shared/components/ui/skeleton'
 
 export const HeadCell = styled(TableHead)`
   padding: 0 var(--space-md);
-  ${textRole('label')}
-  font-size: var(--text-dense-size);
+  ${textRole('label', { dense: true })}
   color: var(--color-muted-foreground);
 `
 

@@ -63,9 +63,9 @@ export function AlbumCard({ publicId, title, artistName, imageUrl }: AlbumCardPr
           )}
         </ImageArea>
         <InfoArea>
-          <Title textRole="body-sm" text={title} forwardedAs="p" />
+          <Title textRole="body-sm" text={title} element="p" />
           {artistName && (
-            <ArtistName textRole="caption" text={artistName} forwardedAs="p" />
+            <ArtistName textRole="caption" text={artistName} element="p" />
           )}
         </InfoArea>
       </CardLink>

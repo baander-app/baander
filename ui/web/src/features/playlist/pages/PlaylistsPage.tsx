@@ -140,8 +140,7 @@ const SharedBadge = styled(Badge)`
   height: auto;
   min-height: 1rem;
   padding: 0 0.375rem;
-  ${textRole('caption')}
-  font-size: var(--text-dense-size);
+  ${textRole('caption', { dense: true })}
 `
 
 const PlaylistName = styled(ContentText)`
@@ -351,7 +350,7 @@ export function PlaylistsPage() {
                 <PlaylistItem key={item.publicId}>
                   <PlaylistLink to={`/music/playlists/${item.publicId}`}>
                     <NameRow>
-                      <PlaylistName textRole="body-sm" text={item.name} forwardedAs="p" />
+                      <PlaylistName textRole="body-sm" text={item.name} element="p" />
                       {isShared && (
                         <SharedBadge variant="secondary">Shared with you</SharedBadge>
                       )}

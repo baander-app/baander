@@ -112,7 +112,6 @@ const PasskeyText = styled.div`
 `
 
 const PasskeyName = styled(ContentText)`
-  display: block;
   font-weight: 500;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -197,7 +196,7 @@ export function PasskeyManagement() {
             <PasskeyItem key={passkey.publicId}>
               <PasskeyInfo>
                 <PasskeyText>
-                  <PasskeyName textRole="body" text={passkey.name} forwardedAs="p" />
+                  <PasskeyName textRole="body" text={passkey.name} element="p" />
                   <PasskeyMeta>
                     Created {formatDate(passkey.createdAt)}
                     {passkey.lastUsedAt && ` · Last used ${formatRelative(passkey.lastUsedAt)}`}

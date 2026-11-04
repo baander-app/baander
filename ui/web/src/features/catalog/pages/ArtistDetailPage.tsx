@@ -241,7 +241,7 @@ export function ArtistDetailPage() {
 
         <Avatar textRole="body-sm" text={initial} />
 
-        <ArtistName textRole="title" text={artistName} forwardedAs="h1" />
+        <ArtistName textRole="title" text={artistName} element="h1" />
 
         {albumCount > 0 && (
           <AlbumCount>

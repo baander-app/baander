@@ -1,7 +1,7 @@
 import styled from 'styled-components'
 import { textRole } from '@/shared/theme'
-import { ContentText } from '@/shared/typography'
-import { Fragment, useState, useMemo } from 'react'
+import { ContentText, ContentTextList } from '@/shared/typography'
+import { useState, useMemo } from 'react'
 import { Radio } from 'lucide-react'
 import { useRadioStations, useRadioCountries } from '../hooks/use-radio-admin'
 import { Skeleton } from '@/shared/components/ui/skeleton'
@@ -38,8 +38,7 @@ const StyledTable = styled.table`
 `
 
 const HeadRow = styled.tr`
-  ${textRole('label')}
-  font-size: var(--text-dense-size);
+  ${textRole('label', { dense: true })}
   border-bottom: 1px solid var(--color-border);
   text-align: left;
   color: var(--color-muted-foreground);
@@ -201,12 +200,7 @@ export function RadioAdminPage() {
                   <TdNum>{station.country}</TdNum>
                   <TdMuted>
                     {station.genres.length > 0
-                      ? station.genres.slice(0, 2).map((genre, index) => (
-                        <Fragment key={genre}>
-                          {index > 0 && ', '}
-                          <ContentText textRole="body-sm" text={genre} />
-                        </Fragment>
-                      ))
+                      ? <ContentTextList textRole="body-sm" names={station.genres.slice(0, 2)} />
                       : '—'}
                   </TdMuted>
                   <TdMono>

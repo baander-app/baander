@@ -1,4 +1,4 @@
-import { Fragment, useState } from 'react'
+import { useState } from 'react'
 import styled, { css } from 'styled-components'
 import type { DuplicateGroup as DuplicateGroupType } from '../../api/album-duplicates-api'
 import { getCoverImageUrl } from '../../api/album-duplicates-api'
@@ -16,25 +16,11 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
 import { toast } from 'sonner'
 import { interactiveTransition, focusVisibleRing, textRole } from '@/shared/theme'
-import { ContentText } from '@/shared/typography'
+import { ContentText, ContentTextList } from '@/shared/typography'
 
 interface DuplicateGroupCardProps {
   group: DuplicateGroupType
   onMergeComplete?: () => void
-}
-
-/** Lists an album's artists, each name with its own language and script rules. */
-function ArtistNames({ artists }: { artists: Array<{ name: string }> }) {
-  return (
-    <>
-      {artists.map((artist, index) => (
-        <Fragment key={`${index}-${artist.name}`}>
-          {index > 0 && ', '}
-          <ContentText textRole="caption" text={artist.name} />
-        </Fragment>
-      ))}
-    </>
-  )
 }
 
 function formatConfidence(confidence: number): string {
@@ -130,7 +116,6 @@ const AlbumInfo = styled.div`
 `
 
 const AlbumTitle = styled(ContentText)`
-  display: block;
   font-weight: 500;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -204,7 +189,6 @@ const TargetAlbumInfo = styled.div`
 `
 
 const TargetAlbumTitle = styled(ContentText)`
-  display: block;
   font-weight: 500;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -294,11 +278,11 @@ export function DuplicateGroupCard({ group, onMergeComplete }: DuplicateGroupCar
               )}
             </Thumbnail>
             <AlbumInfo>
-              <AlbumTitle textRole="body-sm" forwardedAs="p" text={album.title} />
+              <AlbumTitle textRole="body-sm" element="p" text={album.title} />
               <AlbumMeta>
                 {album.year && <span>{album.year}</span>}
                 {album.artists && album.artists.length > 0 && (
-                  <span>· <ArtistNames artists={album.artists} /></span>
+                  <span>· <ContentTextList textRole="caption" names={album.artists.map((artist) => artist.name)} /></span>
                 )}
               </AlbumMeta>
               <AlbumDetails>
@@ -336,10 +320,10 @@ export function DuplicateGroupCard({ group, onMergeComplete }: DuplicateGroupCar
                   )}
                 </Thumbnail>
                 <TargetAlbumInfo>
-                  <TargetAlbumTitle textRole="body-sm" forwardedAs="p" text={album.title} />
+                  <TargetAlbumTitle textRole="body-sm" element="p" text={album.title} />
                   <TargetAlbumMeta>
                     {album.year && `${album.year} · `}
-                    {album.artists && <ArtistNames artists={album.artists} />}
+                    {album.artists && <ContentTextList textRole="caption" names={album.artists.map((artist) => artist.name)} />}
                   </TargetAlbumMeta>
                 </TargetAlbumInfo>
                 <RadioButton $selected={targetPublicId === album.publicId}>

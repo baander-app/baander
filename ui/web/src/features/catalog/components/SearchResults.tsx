@@ -147,7 +147,6 @@ const SongTitleText = styled(ContentText)`
 `
 
 const SongArtist = styled(ContentText)`
-  display: block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -260,8 +259,8 @@ export function SearchResults({query}: { query: string }) {
                       </AlbumPlaceholder>
                     )}
                   </AlbumCover>
-                  <AlbumTitle textRole="caption" text={album.title} language={album.language} forwardedAs="div" />
-                  <AlbumArtist textRole="caption" text={album.artists[0]?.name ?? ''} forwardedAs="div" />
+                  <AlbumTitle textRole="caption" text={album.title} language={album.language} element="div" />
+                  <AlbumArtist textRole="caption" text={album.artists[0]?.name ?? ''} element="div" />
                 </AlbumLink>
               </AlbumContextMenu>
             ))}
@@ -296,7 +295,7 @@ export function SearchResults({query}: { query: string }) {
                       <SongTitleText textRole="body-sm" text={song.title} language={song.albumLanguage} />
                       {song.available === false && <span> · Unavailable</span>}
                     </SongTitle>
-                    <SongArtist textRole="caption" text={song.artistName ?? ''} forwardedAs="p" />
+                    <SongArtist textRole="caption" text={song.artistName ?? ''} element="p" />
                   </SongInfo>
                   <SongDuration>
                     {song.length != null ? formatDuration(song.length) : ''}

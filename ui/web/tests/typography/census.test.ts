@@ -56,6 +56,7 @@ const DECLARATIONS: readonly DeclarationCheck[] = [
   { pattern: new RegExp(String.raw`(?<![\w.-])font${CSS_VALUE}`, 'g'), rule: 'font-family', violates: () => true },
   { pattern: /\.font\s*=\s*([^;\n]*)/g, rule: 'canvas-font', violates: () => true },
   { pattern: /--text-dense-size/g, rule: 'dense-size', violates: () => true },
+  { pattern: /\btextRole\([^)]*\bdense\s*:\s*true\b/g, rule: 'dense-size', violates: () => true },
 ]
 
 function declaredValue(value: string): string {
@@ -142,7 +143,7 @@ function scanTypography(file: string, rawSource: string): CensusFinding[] {
   }
 
   // styled-components' `as` replaces the wrapped ContentText, dropping its `lang` and
-  // `data-script`; a wrapper must pass the element through `forwardedAs`.
+  // `data-script`; ContentText's `element` prop chooses the tag instead.
   for (const wrapper of contentTextWrappers(source)) {
     for (const match of source.matchAll(new RegExp(String.raw`<${wrapper}(?=[\s/>])`, 'g'))) {
       if (/(?<![\w$])as\s*=/.test(openingTagAttributes(source, match.index + match[0].length))) report(match.index, 'content-text-as')
@@ -192,11 +193,27 @@ describe('typography census scanner', () => {
   })
 
   it('allows the dense size in an allowlisted admin table file and rejects it in a catalog file', () => {
-    const source = 'const HeadRow = styled.tr`\n  ${textRole(\'label\')}\n  font-size: var(--text-dense-size);\n`'
+    const source = [
+      'const HeadRow = styled.tr`',
+      "  ${textRole('label', { dense: true })}",
+      '`',
+      'const Cell = styled.td`',
+      '  font-size: var(--text-dense-size);',
+      '`',
+    ].join('\n')
     expect(census('src/features/admin/pages/ActivityPage.tsx', source)).toEqual([])
     expect(census('src/features/catalog/components/AlbumCard.tsx', source)).toEqual([
-      'src/features/catalog/components/AlbumCard.tsx:3 dense-size: font-size: var(--text-dense-size);',
+      "src/features/catalog/components/AlbumCard.tsx:2 dense-size: ${textRole('label', { dense: true })}",
+      'src/features/catalog/components/AlbumCard.tsx:5 dense-size: font-size: var(--text-dense-size);',
     ])
+  })
+
+  it('reads the dense option only when it is on', () => {
+    expect(scanTypography('src/features/catalog/View.tsx', [
+      "const A = styled.p`${textRole('caption', { dense: true })}`",
+      "const B = styled.p`${textRole('caption', { dense: false })}`",
+      "const C = styled.p`${textRole('caption')}`",
+    ].join('\n')).map(({ line, rule }) => [line, rule])).toEqual([[1, 'dense-size']])
   })
 
   it('rejects weights from 100 to 300 anywhere, including allowlisted files', () => {
@@ -253,7 +270,7 @@ describe('typography census scanner', () => {
     ])
   })
 
-  it('rejects a styled ContentText wrapper given `as` and accepts `forwardedAs`', () => {
+  it('rejects a styled ContentText wrapper given `as` and accepts `element`', () => {
     const source = [
       "import { ContentText } from '@/shared/typography'",
       'const Title = styled(ContentText)`overflow: hidden;`',
@@ -267,8 +284,8 @@ describe('typography census scanner', () => {
       '      as="p"',
       '      text={song.title}',
       '    />',
-      '    <Title textRole="body" text={song.title} forwardedAs="h3" />',
-      '    <ContentText textRole="body" text={song.title} as="h4" />',
+      '    <Title textRole="body" text={song.title} element="h3" />',
+      '    <ContentText textRole="body" text={song.title} element="h4" />',
       '  </div>',
       ')',
     ].join('\n')

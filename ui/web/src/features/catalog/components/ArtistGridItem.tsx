@@ -92,7 +92,7 @@ export function ArtistGridItem({ publicId, name, albumCount }: ArtistGridItemPro
         </Placeholder>
       </CoverArea>
       <InfoArea>
-        <Name textRole="body-sm" text={name} forwardedAs="p" />
+        <Name textRole="body-sm" text={name} element="p" />
         {albumCount !== undefined && (
           <AlbumCount>
             {albumCount} {albumCount === 1 ? 'album' : 'albums'}

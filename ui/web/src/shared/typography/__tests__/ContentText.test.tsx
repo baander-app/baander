@@ -83,7 +83,7 @@ describe('ContentText', () => {
 
   it('renders the requested element with the role applied to it', () => {
     const { container, cssText } = renderWithCss(
-      <ContentText textRole="title" text="Dune: Part Two" as="h2" className="details-title" />,
+      <ContentText textRole="title" text="Dune: Part Two" element="h2" className="details-title" />,
     );
     const heading = container.querySelector('h2');
 

@@ -45,8 +45,7 @@ const ColumnHeader = styled.div`
 `
 
 const ColLabel = styled.span`
-  ${textRole('label')}
-  font-size: var(--text-dense-size);
+  ${textRole('label', { dense: true })}
   color: var(--color-muted-foreground);
 `
 
@@ -101,8 +100,7 @@ const JobMonoDark = styled.span`
 `
 
 const JobDate = styled.span`
-  ${textRole('mono-sm')}
-  font-size: var(--text-dense-size);
+  ${textRole('mono-sm', { dense: true })}
   color: var(--color-muted-foreground);
 `
 

@@ -69,8 +69,7 @@ const StyledTable = styled.table`
 `
 
 const HeadRow = styled.tr`
-  ${textRole('label')}
-  font-size: var(--text-dense-size);
+  ${textRole('label', { dense: true })}
   border-bottom: 1px solid var(--color-border);
   text-align: left;
   color: var(--color-muted-foreground);

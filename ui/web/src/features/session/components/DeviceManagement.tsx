@@ -114,7 +114,6 @@ const DeviceIcon = styled(Monitor)`
 `;
 
 const DeviceName = styled(ContentText)`
-  display: block;
   font-weight: 500;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -257,7 +256,7 @@ export function DeviceManagement() {
               <DeviceInfo>
                 <DeviceIcon size={14} />
                 <div style={{ minWidth: 0 }}>
-                  <DeviceName textRole="body" text={device.name || 'Unknown Device'} forwardedAs="p" />
+                  <DeviceName textRole="body" text={device.name || 'Unknown Device'} element="p" />
                   {device.lastUsedAt && (
                     <DeviceLastUsed>
                       Last used {formatRelative(device.lastUsedAt)}

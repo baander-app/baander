@@ -1,12 +1,12 @@
 import styled, { css } from 'styled-components'
-import { Fragment, useCallback, useMemo } from 'react'
+import { useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useImageBlob } from '@/shared/hooks/use-image-blob'
 import { extractDominantColor } from '@/shared/utils/blurhash'
 import { useSelectionStore } from '../stores/selection-store'
 import { AlbumContextMenu } from './menus/AlbumContextMenu'
 import { focusVisibleRing, textRole } from '@/shared/theme'
-import { ContentText } from '@/shared/typography'
+import { ContentText, ContentTextList } from '@/shared/typography'
 
 const GridCard = styled.div<{ $isSelected: boolean }>`
   position: relative;
@@ -148,15 +148,10 @@ export function AlbumGridCard({ publicId, title, artistNames = [], imageUrl, blu
 
         {/* Title & artist */}
         <InfoArea>
-          <Title textRole="body-sm" text={title} language={language} forwardedAs="p" />
+          <Title textRole="body-sm" text={title} language={language} element="p" />
           {artistNames.length > 0 && (
             <ArtistNames>
-              {artistNames.map((name, index) => (
-                <Fragment key={`${index}-${name}`}>
-                  {index > 0 && ', '}
-                  <ContentText textRole="caption" text={name} />
-                </Fragment>
-              ))}
+              <ContentTextList textRole="caption" names={artistNames} />
             </ArtistNames>
           )}
         </InfoArea>

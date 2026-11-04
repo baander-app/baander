@@ -67,7 +67,6 @@ const AvatarInitial = styled(ContentText)`
 `
 
 const ArtistName = styled(ContentText)`
-  display: block;
   color: var(--color-foreground);
   margin: 0;
 `
@@ -177,7 +176,7 @@ export function ArtistDetailsPanel({ publicId }: ArtistDetailsPanelProps) {
           <AvatarInitial textRole="title" text={initial || '?'} />
         </AvatarCircle>
         <div>
-          <ArtistName forwardedAs="h3" textRole="subtitle" text={name} />
+          <ArtistName element="h3" textRole="subtitle" text={name} />
           {albumCount !== null && (
             <ArtistMeta>
               {albumCount} {albumCount === 1 ? 'album' : 'albums'}

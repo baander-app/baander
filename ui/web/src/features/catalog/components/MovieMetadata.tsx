@@ -36,7 +36,6 @@ const ExpandedContent = styled.div`
 `
 
 const Synopsis = styled(ContentText)`
-  display: block;
   color: var(--color-muted-foreground);
 `
 
@@ -120,7 +119,7 @@ export function MovieMetadata({ movie }: MovieMetadataProps) {
         <ExpandedContent>
           {/* Synopsis */}
           {movie.overview && (
-            <Synopsis textRole="body" text={movie.overview} forwardedAs="p" />
+            <Synopsis textRole="body" text={movie.overview} element="p" />
           )}
 
           {/* Metadata grid */}

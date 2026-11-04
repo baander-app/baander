@@ -91,10 +91,6 @@ const StarIcon = styled.svg`
   color: var(--color-warning);
 `
 
-const MovieTitle = styled(ContentText)`
-  display: block;
-`
-
 const Tagline = styled.p`
   ${textRole('body')}
   font-style: italic;
@@ -153,7 +149,7 @@ export function MovieHeader({ movie, onPlay }: MovieHeaderProps) {
             )}
           </MetaRow>
 
-          <MovieTitle textRole="title-lg" text={movie.title} forwardedAs="h1" />
+          <ContentText textRole="title-lg" text={movie.title} element="h1" />
 
           {movie.tagline && (
             <Tagline>&ldquo;<ContentText textRole="body" text={movie.tagline} />&rdquo;</Tagline>

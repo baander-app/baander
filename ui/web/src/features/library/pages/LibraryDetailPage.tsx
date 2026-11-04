@@ -51,7 +51,6 @@ const TitleArea = styled.div`
 `
 
 const LibraryPath = styled(ContentText)`
-  display: block;
   color: var(--color-muted-foreground);
 `
 
@@ -64,8 +63,7 @@ const RightSection = styled.div`
 const StatusBadge = styled.span<{ $status?: string }>`
   border-radius: 9999px;
   padding: 0.125rem 0.5rem;
-  ${textRole('caption')}
-  font-size: var(--text-dense-size);
+  ${textRole('caption', { dense: true })}
   font-weight: 500;
 
   ${(p) => {
@@ -257,8 +255,8 @@ export function LibraryDetailPage() {
             </svg>
           </BackButton>
           <TitleArea>
-            <ContentText textRole="title" text={library.name} as="h1" />
-            <LibraryPath textRole="mono-sm" text={library.path} forwardedAs="p" />
+            <ContentText textRole="title" text={library.name} element="h1" />
+            <LibraryPath textRole="mono-sm" text={library.path} element="p" />
           </TitleArea>
           {library.scanStatus && (
             <StatusBadge $status={library.scanStatus}>

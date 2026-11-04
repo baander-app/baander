@@ -77,7 +77,6 @@ const ContentArea = styled.div`
 `
 
 const Title = styled(ContentText)`
-  display: block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -117,7 +116,7 @@ export function NotificationItem({ notification }: { notification: NotificationI
     <ItemButton onClick={handleClick} disabled={markRead.isPending} $unread={!notification.isRead}>
       <ColorBar $color={barColor} />
       <ContentArea>
-        <Title textRole="body-sm" text={notification.title ?? notification.eventType} forwardedAs="p" />
+        <Title textRole="body-sm" text={notification.title ?? notification.eventType} element="p" />
         <Time>
           {relativeTime(notification.createdAt)}
         </Time>

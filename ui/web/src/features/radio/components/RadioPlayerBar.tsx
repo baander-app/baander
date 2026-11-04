@@ -55,7 +55,6 @@ const StationNameRow = styled.div`
 `
 
 const StationName = styled(ContentText)`
-  display: block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -67,8 +66,7 @@ const LiveBadge = styled.span`
   border-radius: 9999px;
   background-color: var(--color-secondary);
   padding: 0.125rem 0.375rem;
-  ${textRole('label')}
-  font-size: var(--text-dense-size);
+  ${textRole('label', { dense: true })}
   color: var(--color-destructive);
 `
 
@@ -172,7 +170,7 @@ export function RadioPlayerBar() {
 
           <StationText>
             <StationNameRow>
-              <StationName textRole="body-sm" text={activeStation.name} forwardedAs="p" />
+              <StationName textRole="body-sm" text={activeStation.name} element="p" />
               {isPlaying && !allStreamsFailed && (
                 <LiveBadge>LIVE</LiveBadge>
               )}

@@ -6,8 +6,7 @@ const Badge = styled.span<{ $bg: string; $text: string }>`
   align-items: center;
   border-radius: 0.25rem;
   padding: 0.125rem 0.375rem;
-  ${textRole('caption')}
-  font-size: var(--text-dense-size);
+  ${textRole('caption', { dense: true })}
   font-weight: 500;
   background-color: ${({ $bg }) => $bg};
   color: ${({ $text }) => $text};

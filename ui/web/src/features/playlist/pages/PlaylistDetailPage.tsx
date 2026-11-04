@@ -58,7 +58,6 @@ const HeaderInfo = styled.div`
 `
 
 const PlaylistDescription = styled(ContentText)`
-  display: block;
   color: var(--color-muted-foreground);
 `
 
@@ -80,8 +79,7 @@ const TotalDuration = styled.span`
 `
 
 const SmartBadge = styled(Badge)`
-  ${textRole('caption')}
-  font-size: var(--text-dense-size);
+  ${textRole('caption', { dense: true })}
 `
 
 const ActionRow = styled.div`
@@ -138,7 +136,6 @@ const SongTitle = styled(ContentText)`
 `
 
 const SongArtist = styled(ContentText)`
-  display: block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -230,9 +227,9 @@ export function PlaylistDetailPage() {
           <ArrowLeft size={20} />
         </BackLink>
         <HeaderInfo>
-          <ContentText textRole="title" text={playlist.name ?? ''} as="h1" />
+          <ContentText textRole="title" text={playlist.name ?? ''} element="h1" />
           {playlist.description && (
-            <PlaylistDescription textRole="body" text={playlist.description} forwardedAs="p" />
+            <PlaylistDescription textRole="body" text={playlist.description} element="p" />
           )}
           <MetaRow>
             <MetaText>
@@ -274,7 +271,7 @@ export function PlaylistDetailPage() {
                 {song.available === false && <span> · Unavailable</span>}
               </SongTitleLine>
               {song.artistName
-                ? <SongArtist textRole="caption" text={song.artistName} forwardedAs="p" />
+                ? <SongArtist textRole="caption" text={song.artistName} element="p" />
                 : <UnknownArtist>Unknown artist</UnknownArtist>}
             </SongInfo>
             {song.length != null && (

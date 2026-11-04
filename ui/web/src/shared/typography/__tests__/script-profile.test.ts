@@ -44,4 +44,12 @@ describe('scriptProfile', () => {
       cyrillic: false,
     });
   });
+
+  it('returns one shared, frozen empty profile for text with no character past Greek', () => {
+    const latin = scriptProfile('Beyoncé - Déjà Vu');
+
+    expect(latin).toBe(scriptProfile('Αλκηστις'));
+    expect(Object.isFrozen(latin)).toBe(true);
+    expect(scriptTokens(latin)).toEqual([]);
+  });
 });

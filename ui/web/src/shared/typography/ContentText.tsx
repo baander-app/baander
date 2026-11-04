@@ -13,7 +13,7 @@ export interface ContentTextProps extends Omit<HTMLAttributes<HTMLElement>, 'chi
   /** The item's stored language, such as its album's release language, if any. */
   readonly language?: string | null;
   /** The element to render; a span by default. */
-  readonly as?: ElementType;
+  readonly element?: ElementType;
 }
 
 const Text = styled.span<{ $role: TextRole }>`
@@ -25,17 +25,19 @@ const Text = styled.span<{ $role: TextRole }>`
  * characters call for. Always writing `lang` keeps an item from inheriting another
  * item's language; `data-script` appears only when a script rule applies.
  */
-export function ContentText({ textRole: role, text, language, as, ...attributes }: ContentTextProps) {
+export function ContentText({ textRole: role, text, language, element, ...attributes }: ContentTextProps) {
   const interfaceLanguage = useInterfaceLanguage();
-  const profile = useMemo(() => scriptProfile(text), [text]);
-  const lang = useMemo(
-    () => resolveContentLanguage(text, language, interfaceLanguage, profile),
-    [text, language, interfaceLanguage, profile],
-  );
-  const tokens = useMemo(() => scriptTokens(profile).join(' '), [profile]);
+  const { lang, tokens } = useMemo(() => {
+    const profile = scriptProfile(text);
+
+    return {
+      lang: resolveContentLanguage(text, language, interfaceLanguage, profile),
+      tokens: scriptTokens(profile).join(' '),
+    };
+  }, [text, language, interfaceLanguage]);
 
   return (
-    <Text {...attributes} as={as} $role={role} lang={lang} data-script={tokens || undefined}>
+    <Text {...attributes} as={element} $role={role} lang={lang} data-script={tokens || undefined}>
       {text}
     </Text>
   );

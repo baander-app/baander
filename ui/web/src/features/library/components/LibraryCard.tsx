@@ -35,8 +35,7 @@ const Badge = styled.span<{ $variant?: string }>`
   gap: 0.25rem;
   border-radius: 9999px;
   padding: 0.125rem 0.5rem;
-  ${textRole('caption')}
-  font-size: var(--text-dense-size);
+  ${textRole('caption', { dense: true })}
   font-weight: 500;
 
   ${(p) => {
@@ -65,8 +64,7 @@ const TypeBadgeWrapper = styled.span`
   border-radius: 9999px;
   background-color: var(--color-secondary);
   padding: 0.125rem 0.5rem;
-  ${textRole('label')}
-  font-size: var(--text-dense-size);
+  ${textRole('label', { dense: true })}
   color: var(--color-muted-foreground);
 `
 
@@ -101,7 +99,6 @@ const LibraryName = styled(ContentText)`
 `
 
 const PathText = styled(ContentText)`
-  display: block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -197,10 +194,10 @@ export function LibraryCard({ library, isScanning, onEdit, onDelete, onScan, onV
         <HeaderRow>
           <InfoArea onClick={() => onViewDetail(library)}>
             <NameRow>
-              <LibraryName textRole="body" text={library.name} forwardedAs="p" />
+              <LibraryName textRole="body" text={library.name} element="p" />
               <ScanStatusBadge status={library.scanStatus} />
             </NameRow>
-            <PathText textRole="mono-sm" text={library.path} forwardedAs="p" />
+            <PathText textRole="mono-sm" text={library.path} element="p" />
           </InfoArea>
           <TypeBadge type={library.type} />
         </HeaderRow>

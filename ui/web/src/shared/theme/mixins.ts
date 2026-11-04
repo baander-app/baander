@@ -45,9 +45,11 @@ const MONO_TEXT_ROLES: ReadonlySet<TextRole> = new Set(['timecode', 'mono-sm']);
  * order reaches it. Script rules arrive as inherited custom properties: tracking is
  * multiplied by `--tracking-scale`, the line-height never drops below
  * `--script-line-height`, and `--script-size-boost` is added to the size. The mono
- * roles also set tabular numerals so changing digits keep their width.
+ * roles also set tabular numerals so changing digits keep their width. The dense
+ * option sets the smaller dense size after the role's own size, for admin tables,
+ * badges and chips.
  */
-export const textRole = (role: TextRole) => {
+export const textRole = (role: TextRole, { dense = false }: { readonly dense?: boolean } = {}) => {
   const mono = MONO_TEXT_ROLES.has(role);
 
   return css`
@@ -58,5 +60,6 @@ export const textRole = (role: TextRole) => {
     line-height: max(var(--text-${role}-line-height), var(--script-line-height, 0));
     ${role === 'label' ? 'text-transform: var(--text-label-transform);' : ''}
     ${mono ? 'font-variant-numeric: tabular-nums;' : ''}
+    ${dense ? 'font-size: var(--text-dense-size);' : ''}
   `;
 };

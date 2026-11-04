@@ -61,7 +61,7 @@ export function ArtistCard({ publicId, name, albumCount, imageUrl }: ArtistCardP
         )}
       </ImageArea>
       <InfoArea>
-        <Name textRole="body-sm" text={name} forwardedAs="p" />
+        <Name textRole="body-sm" text={name} element="p" />
         {albumCount !== undefined && (
           <AlbumCount>
             {albumCount} {albumCount === 1 ? 'album' : 'albums'}

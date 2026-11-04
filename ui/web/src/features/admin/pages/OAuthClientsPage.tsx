@@ -57,8 +57,7 @@ const Row = styled.div<{ $columns: string }>`
 `
 
 const ColLabel = styled.span`
-  ${textRole('label')}
-  font-size: var(--text-dense-size);
+  ${textRole('label', { dense: true })}
   color: var(--color-muted-foreground);
 `
 
@@ -79,14 +78,12 @@ const ClientId = styled.span`
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  ${textRole('mono-sm')}
-  font-size: var(--text-dense-size);
+  ${textRole('mono-sm', { dense: true })}
   color: var(--color-muted-foreground);
 `
 
 const DateCell = styled.span`
-  ${textRole('mono-sm')}
-  font-size: var(--text-dense-size);
+  ${textRole('mono-sm', { dense: true })}
   color: var(--color-muted-foreground);
 `
 

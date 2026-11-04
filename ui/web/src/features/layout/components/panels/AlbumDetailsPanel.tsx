@@ -81,13 +81,11 @@ const CoverImg = styled.img`
 `
 
 const AlbumTitle = styled(ContentText)`
-  display: block;
   color: var(--color-foreground);
   margin: 0;
 `
 
 const AlbumArtist = styled(ContentText)`
-  display: block;
   color: var(--color-muted-foreground);
   margin: 0;
 `
@@ -330,8 +328,8 @@ export function AlbumDetailsPanel({ publicId }: AlbumDetailsPanelProps) {
           )}
         </CoverContainer>
         <div>
-          <AlbumTitle forwardedAs="h3" textRole="subtitle" text={album.title ?? ''} language={album.language} />
-          {album.artistName && <AlbumArtist forwardedAs="p" textRole="body" text={album.artistName} />}
+          <AlbumTitle element="h3" textRole="subtitle" text={album.title ?? ''} language={album.language} />
+          {album.artistName && <AlbumArtist element="p" textRole="body" text={album.artistName} />}
           {(album.year || album.label) && (
             <AlbumMeta>
               {album.year}

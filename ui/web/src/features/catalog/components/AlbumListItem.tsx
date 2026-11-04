@@ -101,10 +101,10 @@ export function AlbumListItem({ publicId, title, language, artistName, imageUrl 
         </Thumbnail>
       </ThumbCell>
       <Cell>
-        <Title textRole="body-sm" text={title} language={language} forwardedAs="p" />
+        <Title textRole="body-sm" text={title} language={language} element="p" />
       </Cell>
       <Cell>
-        {artistName && <ArtistName textRole="body-sm" text={artistName} forwardedAs="p" />}
+        {artistName && <ArtistName textRole="body-sm" text={artistName} element="p" />}
       </Cell>
     </Row>
     </AlbumContextMenu>

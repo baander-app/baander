@@ -1,5 +1,5 @@
 import styled from 'styled-components'
-import { Fragment, useCallback } from 'react'
+import { useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Play, ExternalLink, Music } from 'lucide-react'
 import { useGetSongShow, useGetAlbumShow } from '@/shared/api-client/gen/endpoints'
@@ -11,7 +11,7 @@ import { Button } from '@/shared/components/ui/button'
 import { Skeleton } from '@/shared/components/ui/skeleton'
 import { SongContextMenu } from '../menus/SongContextMenu'
 import { textRole } from '@/shared/theme'
-import { ContentText } from '@/shared/typography'
+import { ContentText, ContentTextList } from '@/shared/typography'
 
 const Container = styled.div`
   display: flex;
@@ -45,7 +45,6 @@ const CoverImage = styled.img`
 `
 
 const SongTitle = styled(ContentText)`
-  display: block;
   color: var(--color-foreground);
 `
 
@@ -55,7 +54,6 @@ const ArtistText = styled.p`
 `
 
 const AlbumText = styled(ContentText)`
-  display: block;
   color: color-mix(in srgb, var(--color-muted-foreground) 70%, transparent);
 `
 
@@ -230,13 +228,13 @@ export function SongPreviewPanel({ publicId }: SongPreviewPanelProps) {
           )}
         </CoverArea>
         <div>
-          <SongTitle textRole="subtitle" text={song.title ?? 'Unknown'} language={songLanguage} forwardedAs="h3" />
+          <SongTitle textRole="subtitle" text={song.title ?? 'Unknown'} language={songLanguage} element="h3" />
           {song.available === false && <UnavailableText>Unavailable</UnavailableText>}
           {artistNames && artistNames.length > 0 && (
-            <ArtistText><ArtistNames names={artistNames} /></ArtistText>
+            <ArtistText><ContentTextList textRole="body-sm" names={artistNames} /></ArtistText>
           )}
           {album?.title && (
-            <AlbumText textRole="caption" text={album.title} language={songLanguage} forwardedAs="p" />
+            <AlbumText textRole="caption" text={album.title} language={songLanguage} element="p" />
           )}
         </div>
         <Button size="sm" onClick={handlePlay} disabled={song.available !== true}>
@@ -250,7 +248,7 @@ export function SongPreviewPanel({ publicId }: SongPreviewPanelProps) {
         {artistNames && artistNames.length > 0 && (
           <MetadataRow>
             <MetadataLabel>Artist</MetadataLabel>
-            <MetadataValue><ArtistNames names={artistNames} /></MetadataValue>
+            <MetadataValue><ContentTextList textRole="body-sm" names={artistNames} /></MetadataValue>
           </MetadataRow>
         )}
         {album?.title && (
@@ -303,12 +301,3 @@ export function SongPreviewPanel({ publicId }: SongPreviewPanelProps) {
   )
 }
 
-/** Renders each artist name as its own content item, separated by commas. */
-function ArtistNames({ names }: { names: readonly string[] }) {
-  return names.map((name, index) => (
-    <Fragment key={`${index}-${name}`}>
-      {index > 0 && ', '}
-      <ContentText textRole="body-sm" text={name} />
-    </Fragment>
-  ))
-}

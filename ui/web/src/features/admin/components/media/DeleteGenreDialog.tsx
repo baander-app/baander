@@ -38,7 +38,7 @@ export function DeleteGenreDialog({
           <DialogTitle>Delete Genre</DialogTitle>
         </DialogHeader>
         <Message>
-          Delete <ContentText textRole="body" as="strong" text={genre.name} />? This cannot be undone.
+          Delete <ContentText textRole="body" element="strong" text={genre.name} />? This cannot be undone.
         </Message>
         <DialogFooter>
           <Button

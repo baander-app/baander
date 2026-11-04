@@ -145,7 +145,7 @@ export function MergeAlbumsDialog() {
             <MergeSteps>
               <MergeCard>
                 <div>
-                  <CardTitle textRole="body" text={targetTitle} forwardedAs="p" />
+                  <CardTitle textRole="body" text={targetTitle} element="p" />
                   <CardSubtitle>Target (kept)</CardSubtitle>
                 </div>
               </MergeCard>
@@ -154,7 +154,7 @@ export function MergeAlbumsDialog() {
               </ArrowText>
               <MergeCardDashed>
                 <div>
-                  <CardTitle textRole="body" text={sourceTitle} forwardedAs="p" />
+                  <CardTitle textRole="body" text={sourceTitle} element="p" />
                   <CardSubtitle>Source (deleted)</CardSubtitle>
                 </div>
               </MergeCardDashed>

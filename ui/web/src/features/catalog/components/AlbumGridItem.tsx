@@ -108,9 +108,9 @@ export function AlbumGridItem({ publicId, title, language, artistName, imageUrl 
 
       {/* Info */}
       <InfoArea>
-        <Title textRole="body-sm" text={title} language={language} forwardedAs="p" />
+        <Title textRole="body-sm" text={title} language={language} element="p" />
         {artistName && (
-          <ArtistName textRole="caption" text={artistName} forwardedAs="p" />
+          <ArtistName textRole="caption" text={artistName} element="p" />
         )}
       </InfoArea>
     </CardButton>

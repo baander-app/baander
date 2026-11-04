@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { resolveContentLanguage } from '../content-language';
 
 const INTERFACE_LOCALE = 'en';
@@ -67,5 +67,21 @@ describe('resolveContentLanguage', () => {
   it('uses the interface locale for Latin text with no stored language', () => {
     expect(resolve('Season 2')).toBe('en');
     expect(resolve('')).toBe('en');
+  });
+
+  describe('stored language cache', () => {
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it('parses a stored value once and returns the same result on a repeated call', () => {
+      const lookup = vi.spyOn(Intl.DisplayNames.prototype, 'of');
+
+      expect(resolve('Saudade', 'por')).toBe('pt');
+      expect(lookup).toHaveBeenCalledTimes(1);
+
+      expect(resolve('Saudade', 'por')).toBe('pt');
+      expect(lookup).toHaveBeenCalledTimes(1);
+    });
   });
 });

@@ -51,7 +51,7 @@ export function RoleMatrix() {
     {TEXT_ROLES.map((role) => <div key={role} data-testid={`role-${role}`}>
       <h2>{role}</h2>
       {TEST_STRINGS.map(({ key, text, language }) => (
-        <ContentText key={key} as="p" textRole={role} text={text} language={language} data-testid={`${role}-${key}`} />
+        <ContentText key={key} element="p" textRole={role} text={text} language={language} data-testid={`${role}-${key}`} />
       ))}
     </div>)}
   </section>
@@ -88,11 +88,11 @@ export function BadgesAndLabels() {
 
 export function StoredLanguages() {
   return <section aria-label="Stored languages">
-    <ContentText as="p" data-testid="burmese-body" textRole="body" text={BURMESE_TITLE} />
-    <ContentText as="p" data-testid="mixed-burmese-body" textRole="body" text={MIXED_BURMESE_TITLE} />
-    <ContentText as="p" data-testid="latin-label-stored-ja" textRole="label" text={LATIN_LABEL} language="ja" />
-    <ContentText as="p" data-testid="mixed-burmese-stored-my" textRole="body" text={MIXED_BURMESE_TITLE} language="my" />
-    <ContentText as="p" data-testid="thai-body-stored-ja" textRole="body" text="ภาษาไทยทดสอบการแสดงผล" language="ja" />
+    <ContentText element="p" data-testid="burmese-body" textRole="body" text={BURMESE_TITLE} />
+    <ContentText element="p" data-testid="mixed-burmese-body" textRole="body" text={MIXED_BURMESE_TITLE} />
+    <ContentText element="p" data-testid="latin-label-stored-ja" textRole="label" text={LATIN_LABEL} language="ja" />
+    <ContentText element="p" data-testid="mixed-burmese-stored-my" textRole="body" text={MIXED_BURMESE_TITLE} language="my" />
+    <ContentText element="p" data-testid="thai-body-stored-ja" textRole="body" text="ภาษาไทยทดสอบการแสดงผล" language="ja" />
   </section>
 }
 

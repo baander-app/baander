@@ -56,8 +56,7 @@ const Badge = styled.span`
   border-radius: 50%;
   background-color: var(--color-destructive);
   padding: 0 0.25rem;
-  ${textRole('caption')}
-  font-size: var(--text-dense-size);
+  ${textRole('caption', { dense: true })}
   font-weight: 500;
   color: var(--color-destructive-foreground);
 `

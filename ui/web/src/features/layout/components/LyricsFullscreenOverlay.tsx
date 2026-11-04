@@ -85,7 +85,6 @@ const TrackInfo = styled.div`
 `
 
 const TrackTitle = styled(ContentText)`
-  display: block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -357,7 +356,7 @@ function FullscreenContent({ onClose }: { onClose: () => void }) {
             textRole="subtitle"
             text={currentTrack?.title ?? 'Unknown'}
             language={currentTrack?.albumLanguage}
-            forwardedAs="p"
+            element="p"
           />
           <TrackSubtitle>
             {currentTrack?.artistName && <ContentText textRole="body-sm" text={currentTrack.artistName} />}
@@ -397,7 +396,7 @@ function FullscreenContent({ onClose }: { onClose: () => void }) {
               textRole="subtitle"
               text={lyrics.plainLyrics}
               language={currentTrack?.albumLanguage}
-              forwardedAs="pre"
+              element="pre"
             />
           </PlainLyricsCenter>
         ) : lyrics?.isInstrumental ? (

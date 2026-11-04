@@ -92,7 +92,7 @@ export function ForYouCard({ song }: ForYouCardProps) {
         </PlaceholderIcon>
       </CoverImageArea>
       <CardInfo>
-        <CardTitle textRole="body-sm" text={song.title} forwardedAs="p" />
+        <CardTitle textRole="body-sm" text={song.title} element="p" />
         <CardSubtitle>{song.available ? song.explanation : 'Unavailable'}</CardSubtitle>
       </CardInfo>
     </CoverCard>

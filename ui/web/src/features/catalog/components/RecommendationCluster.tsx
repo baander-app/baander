@@ -145,9 +145,9 @@ function RecommendationCard({ rec }: { rec: Recommendation }) {
           </CoverPlaceholder>
         )}
       </RecCover>
-      <RecTitle textRole="body-sm" text={displayName} title={displayName} forwardedAs="p" />
+      <RecTitle textRole="body-sm" text={displayName} title={displayName} element="p" />
       {subtitleName && (
-        <RecSubtitle textRole="caption" text={subtitleName} title={subtitleName} forwardedAs="p" />
+        <RecSubtitle textRole="caption" text={subtitleName} title={subtitleName} element="p" />
       )}
     </RecCard>
   )

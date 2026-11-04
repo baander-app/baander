@@ -75,8 +75,7 @@ const AndLabel = styled.span`
 `
 
 const OperatorBadge = styled(Badge)`
-  ${textRole('caption')}
-  font-size: var(--text-dense-size);
+  ${textRole('caption', { dense: true })}
 `
 
 const FIELDS = [

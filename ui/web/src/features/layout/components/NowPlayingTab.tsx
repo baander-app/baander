@@ -36,7 +36,6 @@ const CoverWrapper = styled.div`
 `
 
 const TrackTitle = styled(ContentText)`
-  display: block;
   color: var(--color-foreground);
   margin: 0;
 `
@@ -141,7 +140,7 @@ export function NowPlayingTab() {
         </CoverWrapper>
         <div>
           <TrackTitle
-            forwardedAs="h3"
+            element="h3"
             textRole="subtitle"
             text={currentTrack.title}
             language={currentTrack.albumLanguage}

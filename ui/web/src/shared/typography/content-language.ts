@@ -16,6 +16,8 @@ const TRADITIONAL_CHINESE: StoredLanguage = { tag: 'zh-Hant', language: 'zh' };
 const TMDB_CANTONESE = 'cn';
 
 let languageNames: Intl.DisplayNames | undefined;
+/** Parsed stored languages by their raw value; a library repeats the same few codes. */
+const storedLanguages = new Map<string, StoredLanguage | undefined>();
 
 function isKnownLanguage(language: string): boolean {
   languageNames ??= new Intl.DisplayNames(['en'], { type: 'language', fallback: 'none' });
@@ -30,7 +32,19 @@ function isKnownLanguage(language: string): boolean {
  * name no single language are not usable.
  */
 function storedLanguage(stored: string | null | undefined): StoredLanguage | undefined {
-  const value = stored?.trim();
+  if (stored == null) {
+    return undefined;
+  }
+
+  if (!storedLanguages.has(stored)) {
+    storedLanguages.set(stored, parseStoredLanguage(stored));
+  }
+
+  return storedLanguages.get(stored);
+}
+
+function parseStoredLanguage(stored: string): StoredLanguage | undefined {
+  const value = stored.trim();
 
   if (!value) {
     return undefined;

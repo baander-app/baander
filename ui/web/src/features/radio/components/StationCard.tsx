@@ -47,7 +47,6 @@ const StationInfo = styled.div`
 `
 
 const StationName = styled(ContentText)`
-  display: block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -81,8 +80,7 @@ const GenreTag = styled.span`
   border-radius: 9999px;
   background-color: var(--color-muted);
   padding: 0.125rem 0.375rem;
-  ${textRole('caption')}
-  font-size: var(--text-dense-size);
+  ${textRole('caption', { dense: true })}
   color: var(--color-muted-foreground);
 `
 
@@ -136,7 +134,7 @@ export function StationCard({ station, isStarred, onStar, onUnstar }: StationCar
 
       {/* Station info */}
       <StationInfo>
-        <StationName textRole="body-sm" text={station.name} forwardedAs="p" />
+        <StationName textRole="body-sm" text={station.name} element="p" />
         <StationMeta>
           {station.language && (
             <MetaText>{station.language}</MetaText>

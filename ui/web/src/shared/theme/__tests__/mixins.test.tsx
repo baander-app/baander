@@ -4,9 +4,9 @@ import styled from 'styled-components';
 import { textRole, type TextRole } from '../mixins';
 import { declaration, renderWithCss, rulesForElement, type CssRule } from './css-text';
 
-function roleRule(role: TextRole): CssRule {
+function roleRule(role: TextRole, options?: { dense?: boolean }): CssRule {
   const Probe = styled.div`
-    ${textRole(role)}
+    ${textRole(role, options)}
   `;
   const { container, cssText } = renderWithCss(<Probe />);
   const rules = rulesForElement(container.firstElementChild!, cssText);
@@ -38,6 +38,20 @@ describe('textRole', () => {
     expect(declaration(rule, 'font-family')).toBe('var(--font-mono)');
     expect(declaration(rule, 'font-variant-numeric')).toBe('tabular-nums');
     expect(declaration(rule, 'font-size')).toBe('calc(var(--text-timecode-size) + var(--script-size-boost, 0px))');
+  });
+
+  it('follows the role size with the dense size when dense', () => {
+    const rule = roleRule('label', { dense: true });
+    const sizes = [...rule.declarations.matchAll(/font-size:\s*([^;]+)/g)].map((match) => match[1].trim());
+
+    expect(sizes).toEqual(['calc(var(--text-label-size) + var(--script-size-boost, 0px))', 'var(--text-dense-size)']);
+    expect(declaration(rule, 'text-transform')).toBe('var(--text-label-transform)');
+  });
+
+  it('sets only the role size when not dense', () => {
+    const sizes = [...roleRule('label').declarations.matchAll(/font-size:\s*([^;]+)/g)].map((match) => match[1].trim());
+
+    expect(sizes).toEqual(['calc(var(--text-label-size) + var(--script-size-boost, 0px))']);
   });
 
   it('keeps proportional numerals and no case transform on the body role', () => {

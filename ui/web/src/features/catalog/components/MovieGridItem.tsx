@@ -55,7 +55,6 @@ const CaptionPanel = styled.div`
 `
 
 const MovieTitle = styled(ContentText)`
-  display: block;
   font-weight: 500;
   color: var(--color-foreground);
   overflow: hidden;
@@ -110,7 +109,7 @@ export function MovieGridItem({ movie }: MovieGridItemProps) {
         </PosterPlaceholder>
       )}
       <CaptionPanel>
-        <MovieTitle textRole="body-sm" text={movie.title} forwardedAs="h3" />
+        <MovieTitle textRole="body-sm" text={movie.title} element="h3" />
         <MetaRow>
           {movie.year && <span>{movie.year}</span>}
           {movie.rating && (

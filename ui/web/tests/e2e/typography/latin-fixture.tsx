@@ -45,7 +45,7 @@ export function LatinPage() {
     <Badge variant="outline">FLAC</Badge>
     <ContentText textRole="label" text={LATIN_LABEL} />
     {TEXT_ROLES.flatMap((role) => LATIN_STRINGS.map(({ key, text }) => (
-      <ContentText key={`${role}-${key}`} as="p" textRole={role} text={text} />
+      <ContentText key={`${role}-${key}`} element="p" textRole={role} text={text} />
     )))}
     <KeyboardShortcutsHelp open onOpenChange={ignore} />
   </main>
