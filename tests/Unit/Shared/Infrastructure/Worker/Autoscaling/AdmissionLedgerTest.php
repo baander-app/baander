@@ -6,6 +6,7 @@ namespace App\Tests\Unit\Shared\Infrastructure\Worker\Autoscaling;
 
 use App\Shared\Application\DTO\WorkerAutoscalingProfile;
 use App\Shared\Infrastructure\Worker\Autoscaling\AdmissionLedger;
+use App\Shared\Infrastructure\Worker\Autoscaling\AdmissionLockContended;
 use App\Shared\Infrastructure\Worker\DeploymentLease;
 use App\Shared\Infrastructure\Worker\WorkerLaunchIdentity;
 use App\Shared\Infrastructure\Worker\WorkerPeerHandshake;
@@ -216,6 +217,38 @@ final class AdmissionLedgerTest extends TestCase
             self::fail('A held lock must time out.');
         } catch (\RuntimeException) {
             self::assertLessThan(200_000_000, hrtime(true) - $started);
+        } finally {
+            flock($lock, LOCK_UN);
+            fclose($lock);
+        }
+    }
+
+    public function testContendedLockDuringAcquireAdmitsNothingAndTheNextPollSucceeds(): void
+    {
+        $lock = fopen($this->directory . '/' . $this->boot . '/admission.lock', 'r+');
+        self::assertIsResource($lock);
+        self::assertTrue(flock($lock, LOCK_EX));
+        try {
+            self::assertFalse($this->ledger->acquire($this->identity(), 1, $this->request(), 10));
+        } finally {
+            flock($lock, LOCK_UN);
+            fclose($lock);
+        }
+        $slot = $this->ledger->snapshot(10)['slots']['consumer-0'];
+        self::assertNull($slot['requestId']);
+        self::assertSame(0, $slot['sequence']);
+        self::assertTrue($this->ledger->acquire($this->identity(), 2, $this->request(), 10.1));
+    }
+
+    public function testContendedLockAfterAPermitIsHeldStillFails(): void
+    {
+        self::assertTrue($this->ledger->acquire($this->identity(), 1, $this->request(), 10));
+        $lock = fopen($this->directory . '/' . $this->boot . '/admission.lock', 'r+');
+        self::assertIsResource($lock);
+        self::assertTrue(flock($lock, LOCK_EX));
+        try {
+            $this->expectException(AdmissionLockContended::class);
+            $this->ledger->received($this->identity(), $this->request(), 10.1);
         } finally {
             flock($lock, LOCK_UN);
             fclose($lock);

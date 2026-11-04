@@ -64,9 +64,22 @@ final class AdmissionLedger
         });
     }
 
+    /**
+     * A permit is taken only under the admission lock. When the lock stays contended past its
+     * deadline nothing was read or written, so the consumer owns nothing and simply polls again.
+     */
     public function acquire(WorkerLaunchIdentity $identity, int $sequence, string $requestId, float $now): bool
     {
         $this->identity($identity, $requestId, $now);
+        try {
+            return $this->tryAcquire($identity, $sequence, $requestId, $now);
+        } catch (AdmissionLockContended) {
+            return false;
+        }
+    }
+
+    private function tryAcquire(WorkerLaunchIdentity $identity, int $sequence, string $requestId, float $now): bool
+    {
         return $this->update(function (array &$state) use ($identity, $sequence, $requestId, $now): bool {
             $slot = &$state['slots'][$identity->workerId];
             if ($sequence <= $slot['sequence'] || $slot['requestId'] !== null || ($slot['seenAt'] !== null && $now < $slot['seenAt'])) {
@@ -238,7 +251,7 @@ final class AdmissionLedger
             $deadline = hrtime(true) + 50_000_000;
             while (!flock($lock, LOCK_EX | LOCK_NB)) {
                 if (hrtime(true) >= $deadline) {
-                    throw new \RuntimeException('Admission lock deadline exceeded.');
+                    throw new AdmissionLockContended('Admission lock deadline exceeded.');
                 }
                 usleep(1000);
             }
