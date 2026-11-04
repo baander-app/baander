@@ -1623,8 +1623,17 @@ with `pools=2:frame-threads=2`, 1.02x with `pools=3`, 1.06x with
 (3.93–3.95 CPUs), and 1.72x with `pools=6:frame-threads=3` (5.38 CPUs). Every
 setting cost 2.96–3.13 CPU-s per output second; four pool threads is the
 smallest setting above 1.2x. The one-minute load average was 2.8–4.8 during
-the sweep. SegmentEncoder now gives `libx265` four pool threads with two frame
-threads; libx264 keeps its two encoder threads.
+the sweep.
+
+That source was synthetic. On 4 November 2026 the same sweep ran on real film
+content in the Debian 13 worker image with FFmpeg 7.1: 60-second excerpts at 60,
+300 and 480 seconds into the 1080p30 Big Buck Bunny file, scaled to 1080p at
+6 Mb/s with two frame threads and the production GOP of 180 frames, on an
+otherwise idle host. Four pool threads ran at 0.76–0.87x and missed real time
+on every excerpt; six ran at 1.07–1.21x for 4.7–5.5 CPU-s per output second;
+eight ran at 1.18–1.34x for 5.1–6.0 CPU-s per output second. SegmentEncoder now
+gives `libx265` six pool threads, the smallest setting ahead of real time on every
+excerpt, with two frame threads; libx264 keeps its two encoder threads.
 
 Each media job child in the control unit peaked at 92 MiB with two threads for
 video and 66 MiB with one thread for audio. No separate helper process appeared.
