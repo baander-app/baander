@@ -102,8 +102,8 @@ file does not accept these settings. See
 
 Create `.env.dev.local` with mode `0600`. Put the following settings in it, replacing
 the secret placeholders with independently generated values from `openssl rand -hex 32`.
-Use the same database password in `DB_PASSWORD` and `DATABASE_URL`, and the same
-Redis password in all three Redis settings:
+Use the same database password in `DB_PASSWORD`, `DATABASE_URL` and
+`DATABASE_CONTROL_URL`, and the same Redis password in all three Redis settings:
 
 ```env
 APP_SECRET=<chosen-random-secret>
@@ -111,7 +111,8 @@ STREAM_URL_HMAC_SECRET=<another-random-secret>
 DB_USERNAME=baander
 DB_PASSWORD=<chosen-database-password>
 DB_DATABASE=baander
-DATABASE_URL="postgresql://baander:<chosen-database-password>@database:5432/baander?serverVersion=18&charset=utf8"
+DATABASE_URL="postgresql://baander:<chosen-database-password>@pooler:6432/baander?serverVersion=18&charset=utf8"
+DATABASE_CONTROL_URL="postgresql://baander_control:<chosen-database-password>@pooler:6432/baander_control?serverVersion=18&charset=utf8"
 REDIS_PASSWORD=<chosen-redis-password>
 REDIS_URL=redis://default:<chosen-redis-password>@redis:6379
 MESSENGER_TRANSPORT_DSN=redis://default:<chosen-redis-password>@redis:6379/messages
@@ -129,7 +130,13 @@ configuration; existing process environment variables take precedence. The track
 `.env.dev` contains a development `APP_SECRET`, so putting your secret only in `.env`
 or `.env.local` does not override it. `.env.dev.local` is excluded from Git and Docker
 build contexts. Set the complete connection URLs there so they use the same chosen
-credentials as the services.
+credentials as the services. Both database URLs reach PostgreSQL through the
+[connection pooler](configuration.md#connection-pooler) on port 6432.
+`DATABASE_URL` uses its application alias. `DATABASE_CONTROL_URL` uses its control
+alias and role, whose names are `DB_DATABASE` and `DB_USERNAME` with `_control`
+appended. The tracked `.env` defaults both URLs to the password `baander`, so a
+custom password must appear in both URLs; otherwise the control connections fail
+to authenticate.
 
 Compose has its own environment loading. Use this shell function for every Compose
 command below so it reads the private settings and the image selection explicitly.
@@ -226,10 +233,15 @@ php scripts/build-application.php --target dev --tag baander:local --compose-env
 dc config --quiet
 dc build nginx database
 dc up -d --wait database redis
+dc up -d --wait pooler
 dc exec redis sh -c 'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli ping'
 ```
 
 The Redis check must print `PONG`. Redis receives its password on its first startup.
+Starting `pooler` first runs its one-off `pooler-credentials` dependency to
+completion: once PostgreSQL is healthy, that step derives SCRAM verifiers from
+`DB_PASSWORD` for the database role and its `_control` role and writes the
+pooler's auth file. The pooler service shares the database image built above.
 The app and nginx are still
 stopped. If a build or dependency fails, inspect its error before continuing.
 
