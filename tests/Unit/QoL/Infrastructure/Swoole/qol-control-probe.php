@@ -15,6 +15,7 @@ require dirname(__DIR__, 5) . '/vendor/autoload.php';
 use App\QoL\Application\Port\EncoderProfileFingerprintPortInterface;
 use App\QoL\Domain\Service\LearningModel;
 use App\QoL\Domain\Service\StreamGovernor;
+use App\QoL\Domain\ValueObject\EncoderWork;
 use App\QoL\Domain\ValueObject\UtilizationSample;
 use App\QoL\Infrastructure\QoLAdminService;
 use App\QoL\Infrastructure\HostCpus;
@@ -151,7 +152,7 @@ $registry = new ServerControlOperationRegistry([
         }
         $jobId = new Uuid();
         $admission->admit($jobId, '1080p', 5_000_000, 1080, false);
-        $admission->complete($jobId, '1080p', 5_000_000, 1080, 'h264', false, 0.0, 0.0);
+        $admission->complete($jobId, '1080p', 5_000_000, 1080, 'h264', false, new EncoderWork(0.0, 0.0));
         $governor->recordSample(new UtilizationSample(25.0, 30.0, 1080, 'h264', false, 5_000_000, '1080p', $governor->getActiveStreamCount()));
         $persister->save();
 

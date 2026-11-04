@@ -912,7 +912,7 @@ deptrac:
               value: '^App\\QoL\\Domain\\'
           must_not:
             - type: classLike
-              value: '^App\\QoL\\Domain\\Port\\QualityLadderPortInterface$'
+              value: '^App\\QoL\\Domain\\(Port\\QualityLadderPortInterface|ValueObject\\EncoderWork)$'
 
     - name: 'QoL Quality Ladder Contract'
       collectors:
@@ -927,7 +927,7 @@ deptrac:
     - name: 'QoL Stream Admission Contract'
       collectors:
         - type: classLike
-          value: '^App\\QoL\\Application\\Port\\StreamAdmissionPortInterface$'
+          value: '^App\\QoL\\(Application\\Port\\StreamAdmissionPortInterface|Domain\\ValueObject\\EncoderWork)$'
 
     - name: 'QoL Allowed Tiers Contract'
       collectors:

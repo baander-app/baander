@@ -267,7 +267,7 @@ final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
                     $publication = $this->streamManager->publication($jobId);
                     if ($admitted) {
                         $work = $this->streamManager->encoderWork($jobId);
-                        $this->admission?->observe($jobId, $work['cpuSeconds'], $work['outputSeconds']);
+                        $this->admission?->observe($jobId, $work);
                     }
                     if (!$nativeClockCaptured && $publication !== null && !$publication->complete
                         && isset($publication->mpdAttributes['availabilityStartTime'])) {
@@ -385,7 +385,7 @@ final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
                 $cleanup[] = function () use ($jobId, $tier, $sourceHeight, $sourceCodec): void {
                     $work = $this->streamManager->takeEncoderWork($jobId);
                     $this->admission?->complete($jobId, $tier->name, $tier->videoBitrate, $sourceHeight, $sourceCodec,
-                        $this->encoder()->getEncoderProfile()->isHardware(), $work['cpuSeconds'], $work['outputSeconds']);
+                        $this->encoder()->getEncoderProfile()->isHardware(), $work);
                 };
             }
             foreach ($cleanup as $operation) {

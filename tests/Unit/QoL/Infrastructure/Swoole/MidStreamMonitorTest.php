@@ -8,6 +8,7 @@ use App\QoL\Application\Port\EncoderProfileFingerprintPortInterface;
 use App\QoL\Domain\Model\GovernorState;
 use App\QoL\Domain\Service\LearningModel;
 use App\QoL\Domain\Service\StreamGovernor;
+use App\QoL\Domain\ValueObject\EncoderWork;
 use App\QoL\Domain\ValueObject\UtilizationSample;
 use App\QoL\Infrastructure\HostCpus;
 use App\QoL\Infrastructure\StreamAdmissionService;
@@ -62,7 +63,7 @@ final class MidStreamMonitorTest extends TestCase
         $this->admission->admit($jobId, '1080p', 5_000_000, 1080, false);
 
         for ($check = 1; $check <= 4; $check++) {
-            $this->admission->observe($jobId, 9.6 * $check, 6.0 * $check);
+            $this->admission->observe($jobId, new EncoderWork(9.6 * $check, 6.0 * $check));
             $this->monitor->check();
         }
 
@@ -76,11 +77,11 @@ final class MidStreamMonitorTest extends TestCase
         $this->admission->admit($jobId, '1080p', 5_000_000, 1080, false);
 
         // 14.4 CPUs of 16 per output second exceeds the balanced 80 percent cap.
-        $this->admission->observe($jobId, 86.4, 6.0);
+        $this->admission->observe($jobId, new EncoderWork(86.4, 6.0));
         $this->monitor->check();
         self::assertSame(1, $this->governor->getActiveStreamCount());
 
-        $this->admission->observe($jobId, 172.8, 12.0);
+        $this->admission->observe($jobId, new EncoderWork(172.8, 12.0));
         $this->monitor->check();
         self::assertSame(0, $this->governor->getActiveStreamCount());
     }

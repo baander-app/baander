@@ -10,6 +10,7 @@ use App\QoL\Domain\Model\GovernorState;
 use App\QoL\Domain\Port\QualityLadderPortInterface;
 use App\QoL\Domain\Service\LearningModel;
 use App\QoL\Domain\Service\StreamGovernor;
+use App\QoL\Domain\ValueObject\EncoderWork;
 use App\QoL\Infrastructure\HostCpus;
 use App\QoL\Infrastructure\StreamAdmissionService;
 use App\QoL\Infrastructure\Swoole\LearningDataPersister;
@@ -52,7 +53,7 @@ final class StreamAdmissionServiceTest extends TestCase
         $governor->allocateStream($jobId, '1080p', 25.0);
         self::assertSame(1, $governor->getActiveStreamCount());
 
-        $service->complete($jobId, '1080p', 5000000, 1080, 'h264', false, 3.0, 2.0);
+        $service->complete($jobId, '1080p', 5000000, 1080, 'h264', false, new EncoderWork(3.0, 2.0));
 
         self::assertSame(0, $governor->getActiveStreamCount());
         self::assertSame(0, $governor->getModel()->sampleCount());
@@ -66,7 +67,7 @@ final class StreamAdmissionServiceTest extends TestCase
         $governor->allocateStream($jobId, '1080p', 25.0);
 
         // 96 CPU seconds for 60 seconds of video: 1.6 CPUs of 16 keep up with playback.
-        $service->complete($jobId, '1080p', 5000000, 1080, 'h264', false, 96.0, 60.0);
+        $service->complete($jobId, '1080p', 5000000, 1080, 'h264', false, new EncoderWork(96.0, 60.0));
 
         self::assertSame(0, $governor->getActiveStreamCount());
         self::assertEqualsWithDelta(10.0, $governor->getModel()->averageCostForTier('1080p', false), 0.000001);
@@ -88,7 +89,7 @@ final class StreamAdmissionServiceTest extends TestCase
 
             $alone = new Uuid();
             $isolatedGovernor->allocateStream($alone, $tier, 10.0);
-            $isolated->complete($alone, $tier, $bitrate, $height, 'h264', false, $cpu, 60.0);
+            $isolated->complete($alone, $tier, $bitrate, $height, 'h264', false, new EncoderWork($cpu, 60.0));
 
             $batch = [];
             for ($stream = 0; $stream < 8; $stream++) {
@@ -98,7 +99,7 @@ final class StreamAdmissionServiceTest extends TestCase
             self::assertSame(8, $concurrentGovernor->getActiveStreamCount());
             foreach ($batch as $stream => $jobId) {
                 // Cache and memory contention adds up to two percent CPU per output second.
-                $concurrent->complete($jobId, $tier, $bitrate, $height, 'h264', false, $cpu * (1.0 + 0.0025 * $stream), 60.0);
+                $concurrent->complete($jobId, $tier, $bitrate, $height, 'h264', false, new EncoderWork($cpu * (1.0 + 0.0025 * $stream), 60.0));
             }
         }
 
@@ -134,10 +135,10 @@ final class StreamAdmissionServiceTest extends TestCase
         $jobId = new Uuid();
         $governor->allocateStream($jobId, '1080p', 25.0);
 
-        $service->observe($jobId, 1.0, 2.0);
+        $service->observe($jobId, new EncoderWork(1.0, 2.0));
         self::assertNull($governor->getActiveStreams()[0]->measuredCost);
 
-        $service->observe($jobId, 48.0, 30.0);
+        $service->observe($jobId, new EncoderWork(48.0, 30.0));
         self::assertEqualsWithDelta(10.0, $governor->getActiveStreams()[0]->measuredCost, 0.000001);
         self::assertEqualsWithDelta(10.0, $governor->observedLoad(), 0.000001);
     }
@@ -189,7 +190,7 @@ final class StreamAdmissionServiceTest extends TestCase
             $jobId = new Uuid();
             $governor->allocateStream($jobId, $tier, 10.0);
             $service->complete($jobId, $tier, $bitrate, $height, 'h264', $hardwareAccelerated,
-                self::cpuSecondsFor($height, $bitrate) * $cpuScale, 60.0);
+                new EncoderWork(self::cpuSecondsFor($height, $bitrate) * $cpuScale, 60.0));
         }
     }
 

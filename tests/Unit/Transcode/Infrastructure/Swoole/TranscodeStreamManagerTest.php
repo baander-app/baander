@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Transcode\Infrastructure\Swoole;
 
+use App\QoL\Domain\ValueObject\EncoderWork;
 use App\Shared\Domain\Model\Uuid;
 use App\Tests\Support\PublishedPresentationFixture;
 use App\Transcode\Application\Port\FFmpegPortInterface;
@@ -217,24 +218,24 @@ final class TranscodeStreamManagerTest extends TestCase
             PublishedPresentationFixture::write($first, count: 2, complete: false);
             $this->spawner->cpuSeconds = 9.0;
             self::assertTrue($this->manager->pollOnce($job->getId()));
-            self::assertSame(['cpuSeconds' => 9.0, 'outputSeconds' => 12.0], $this->manager->encoderWork($job->getId()));
+            self::assertEquals(new EncoderWork(9.0, 12.0), $this->manager->encoderWork($job->getId()));
 
             // The terminal receipt covers CPU spent after the last poll.
             $this->spawner->closeCpuSeconds = 15.0;
             $this->manager->stopStream($job->getId());
-            self::assertSame(['cpuSeconds' => 15.0, 'outputSeconds' => 12.0], $this->manager->encoderWork($job->getId()));
+            self::assertEquals(new EncoderWork(15.0, 12.0), $this->manager->encoderWork($job->getId()));
 
             // A seek restarts the encoder; its work adds to the stopped attempt's.
             $this->manager->startStream($job, '/src.mkv', QualityTier::p720(), '', outputDirectory: $second);
             PublishedPresentationFixture::write($second, count: 1, complete: false);
             $this->spawner->cpuSeconds = 4.0;
             self::assertTrue($this->manager->pollOnce($job->getId()));
-            self::assertSame(['cpuSeconds' => 19.0, 'outputSeconds' => 18.0], $this->manager->encoderWork($job->getId()));
+            self::assertEquals(new EncoderWork(19.0, 18.0), $this->manager->encoderWork($job->getId()));
 
             $this->spawner->closeCpuSeconds = 5.0;
             $this->manager->stopStream($job->getId());
-            self::assertSame(['cpuSeconds' => 20.0, 'outputSeconds' => 18.0], $this->manager->takeEncoderWork($job->getId()));
-            self::assertSame(['cpuSeconds' => 0.0, 'outputSeconds' => 0.0], $this->manager->encoderWork($job->getId()));
+            self::assertEquals(new EncoderWork(20.0, 18.0), $this->manager->takeEncoderWork($job->getId()));
+            self::assertEquals(new EncoderWork(0.0, 0.0), $this->manager->encoderWork($job->getId()));
         } finally {
             $this->removeScannerDirectory($first);
             $this->removeScannerDirectory($second);

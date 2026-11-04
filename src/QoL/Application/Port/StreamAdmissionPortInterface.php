@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\QoL\Application\Port;
 
+use App\QoL\Domain\ValueObject\EncoderWork;
 use App\Shared\Domain\Model\Uuid;
 
 /**
@@ -14,9 +15,9 @@ use App\Shared\Domain\Model\Uuid;
  * runs, callers report the encoder's own work so far; completion feeds that work to
  * the learning model and releases the job's stream allocation.
  *
- * Encoder work is the encoder process's cumulative CPU seconds and the seconds of
- * output it has produced. Their ratio does not shrink when other encodes contend for
- * the host, so it measures this stream alone.
+ * Encoder work (EncoderWork) is the encoder process's cumulative CPU seconds and the
+ * seconds of output it has produced. Their ratio does not shrink when other encodes
+ * contend for the host, so it measures this stream alone.
  */
 interface StreamAdmissionPortInterface
 {
@@ -36,7 +37,7 @@ interface StreamAdmissionPortInterface
     /**
      * Record the running stream's encoder work so far for the mid-stream budget check.
      */
-    public function observe(Uuid $jobId, float $encoderCpuSeconds, float $outputSeconds): void;
+    public function observe(Uuid $jobId, EncoderWork $work): void;
 
     /**
      * Record the finished stream's encoder work as a learning sample and release its allocation.
@@ -48,7 +49,6 @@ interface StreamAdmissionPortInterface
         int    $sourceHeight,
         string $sourceCodec,
         bool   $hardwareAccelerated,
-        float  $encoderCpuSeconds,
-        float  $outputSeconds,
+        EncoderWork $work,
     ): void;
 }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Transcode\Infrastructure\Swoole;
 
+use App\QoL\Domain\ValueObject\EncoderWork;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Infrastructure\Swoole\Async;
 use App\Transcode\Application\Port\SegmentAvailabilityInterface;
@@ -46,7 +47,7 @@ final class TranscodeStreamManager
     /** @var array<string, array{identity: \stdClass, handle: mixed, output_dir: string, tier_name: string, availability_tier: string, marked: array<string, bool>, publication: ?PublishedPresentation, cpu_seconds: float}> */
     private array $streams = [];
 
-    /** @var array<string, array{cpuSeconds: float, outputSeconds: float}> encoder work of each job's stopped attempts */
+    /** @var array<string, EncoderWork> encoder work of each job's stopped attempts */
     private array $retiredWork = [];
 
     public function __construct(
@@ -252,9 +253,9 @@ final class TranscodeStreamManager
             try {
                 $cpuSeconds = max($cpuSeconds, $this->spawner->close($entry['handle']));
             } finally {
-                $retired = $this->retiredWork[$jobKey] ?? ['cpuSeconds' => 0.0, 'outputSeconds' => 0.0];
-                $this->retiredWork[$jobKey] = ['cpuSeconds' => $retired['cpuSeconds'] + $cpuSeconds,
-                    'outputSeconds' => $retired['outputSeconds'] + self::outputSeconds($entry['publication'])];
+                $retired = $this->retiredWork[$jobKey] ?? new EncoderWork(0.0, 0.0);
+                $this->retiredWork[$jobKey] = new EncoderWork($retired->cpuSeconds + $cpuSeconds,
+                    $retired->outputSeconds + self::outputSeconds($entry['publication']));
             }
         }
     }
@@ -263,28 +264,24 @@ final class TranscodeStreamManager
      * The encoder work a job has done so far, over its stopped attempts and the running one:
      * the encoder's CPU seconds as the execution daemon reports them, and the seconds of video
      * the attempts have published as segments.
-     *
-     * @return array{cpuSeconds: float, outputSeconds: float}
      */
-    public function encoderWork(Uuid $jobId): array
+    public function encoderWork(Uuid $jobId): EncoderWork
     {
         $jobKey = $jobId->toString();
-        $work = $this->retiredWork[$jobKey] ?? ['cpuSeconds' => 0.0, 'outputSeconds' => 0.0];
+        $work = $this->retiredWork[$jobKey] ?? new EncoderWork(0.0, 0.0);
         $entry = $this->streams[$jobKey] ?? null;
-        if ($entry !== null) {
-            $work['cpuSeconds'] += $entry['cpu_seconds'];
-            $work['outputSeconds'] += self::outputSeconds($entry['publication']);
+        if ($entry === null) {
+            return $work;
         }
 
-        return $work;
+        return new EncoderWork($work->cpuSeconds + $entry['cpu_seconds'],
+            $work->outputSeconds + self::outputSeconds($entry['publication']));
     }
 
     /**
      * Returns the job's encoder work and forgets it; call after the job's stream has stopped.
-     *
-     * @return array{cpuSeconds: float, outputSeconds: float}
      */
-    public function takeEncoderWork(Uuid $jobId): array
+    public function takeEncoderWork(Uuid $jobId): EncoderWork
     {
         $work = $this->encoderWork($jobId);
         unset($this->retiredWork[$jobId->toString()]);

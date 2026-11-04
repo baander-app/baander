@@ -18,6 +18,7 @@ The QoL ("quality of life") context is a stream-governance layer over the Transc
 | `GovernorState` | Enum | `learning` / `active` lifecycle of the governor |
 | `AlgorithmProfile` | Enum (VO) | Budget profile: `conservative` (70%), `balanced` (80%), `aggressive` (90%) |
 | `StreamAllocation` | Value object | An allocated active stream (job ID, quality tier, predicted cost) |
+| `EncoderWork` | Value object | A stream's encoder CPU seconds and output seconds, and the cost they give as a share of the host's CPUs; published with `StreamAdmissionPortInterface` |
 | `UtilizationSample` | Value object | A completed stream's measured utilization (CPU/GPU/encode FPS + stream params) used for training |
 | `StreamBudgetExhausted` | Exception | Thrown when no quality tier fits the remaining budget; carries structured 503 response data |
 
@@ -27,7 +28,7 @@ The QoL ("quality of life") context is a stream-governance layer over the Transc
 |------|---------|
 | `QoLAdminPortInterface` | Admin read/write surface over `StreamGovernor`: status, active streams, profile switching, learning reset |
 | `QualityLadderPortInterface` | Domain contract for the default quality ladder as primitives; consumed by `StreamGovernor`, implemented by Transcode |
-| `StreamAdmissionPortInterface` | Synchronous stream admission (budget veto) and completion (learning sample and stream release) |
+| `StreamAdmissionPortInterface` | Synchronous stream admission (budget veto), observation of the running stream's `EncoderWork`, and completion (learning sample and stream release) |
 | `AllowedQualityTiersPortInterface` | Tier names the budget currently allows, used for manifest filtering |
 | `BudgetGuardInterface` | Mid-stream capacity check against sampled CPU; registered, with no caller since long FFmpeg streams replaced per-segment dispatch |
 | `EncoderProfileFingerprintPortInterface` | Encoder configuration name stored with persisted learning state; implemented by Transcode |

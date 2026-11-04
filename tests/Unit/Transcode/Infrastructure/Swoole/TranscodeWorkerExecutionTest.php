@@ -7,6 +7,7 @@ namespace App\Tests\Unit\Transcode\Infrastructure\Swoole;
 use App\Catalog\Domain\Model\Video;
 use App\Catalog\Domain\Repository\VideoRepositoryInterface;
 use App\QoL\Application\Port\StreamAdmissionPortInterface;
+use App\QoL\Domain\ValueObject\EncoderWork;
 use App\Shared\Domain\Model\Uuid;
 use App\Tests\Support\PublishedPresentationFixture;
 use App\Shared\Infrastructure\Worker\NativeExecutionClientInterface;
@@ -180,10 +181,10 @@ final class TranscodeWorkerExecutionTest extends TestCase
         $this->timer = new VideoExecutionRenewalTimer();
         $admission = $this->createStub(StreamAdmissionPortInterface::class);
         $admission->method('admit')->willReturnCallback(function (): void { ++$this->allocations; });
-        $admission->method('observe')->willReturnCallback(function (Uuid $jobId, float $cpu, float $output): void { $this->observedWork[] = [$cpu, $output]; });
-        $admission->method('complete')->willReturnCallback(function (Uuid $jobId, string $tier, int $bitrate, int $height, string $codec, bool $hardware, float $cpu, float $output): void {
+        $admission->method('observe')->willReturnCallback(function (Uuid $jobId, EncoderWork $work): void { $this->observedWork[] = [$work->cpuSeconds, $work->outputSeconds]; });
+        $admission->method('complete')->willReturnCallback(function (Uuid $jobId, string $tier, int $bitrate, int $height, string $codec, bool $hardware, EncoderWork $work): void {
             --$this->allocations;
-            $this->completedWork = [$cpu, $output];
+            $this->completedWork = [$work->cpuSeconds, $work->outputSeconds];
         });
         $storage = new TranscodeFileStorage(new SegmentFileResolver($this->root));
         $encoder = new SegmentEncoder(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile('full')), $ffmpeg, $storage, EncoderProfile::software('libx264'));

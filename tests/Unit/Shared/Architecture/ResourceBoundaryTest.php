@@ -111,6 +111,8 @@ SOURCE);
 <?php
 namespace App\QoL\Domain\Port;
 interface QualityLadderPortInterface {}
+namespace App\QoL\Domain\ValueObject;
+final class EncoderWork {}
 namespace App\QoL\Domain\Service;
 final class InternalDomainService {}
 final class BoundaryGovernor {
@@ -140,6 +142,7 @@ final class BoundaryListener {
     public function admit(
         \App\QoL\Application\Port\StreamAdmissionPortInterface $admission,
         \App\QoL\Application\Port\AllowedQualityTiersPortInterface $tiers,
+        \App\QoL\Domain\ValueObject\EncoderWork $work,
     ): void {}
 }
 final class BoundaryViolation {

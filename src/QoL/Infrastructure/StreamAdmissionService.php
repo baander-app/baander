@@ -81,9 +81,9 @@ final class StreamAdmissionService implements StreamAdmissionPortInterface
         ]);
     }
 
-    public function observe(Uuid $jobId, float $encoderCpuSeconds, float $outputSeconds): void
+    public function observe(Uuid $jobId, EncoderWork $work): void
     {
-        $cost = new EncoderWork($encoderCpuSeconds, $outputSeconds)->costPercent($this->hostCpus->count());
+        $cost = $work->costPercent($this->hostCpus->count());
         if ($cost !== null) {
             $this->governor->recordStreamCost($jobId, $cost);
         }
@@ -96,16 +96,15 @@ final class StreamAdmissionService implements StreamAdmissionPortInterface
         int    $sourceHeight,
         string $sourceCodec,
         bool   $hardwareAccelerated,
-        float  $encoderCpuSeconds,
-        float  $outputSeconds,
+        EncoderWork $work,
     ): void
     {
-        $cost = new EncoderWork($encoderCpuSeconds, $outputSeconds)->costPercent($this->hostCpus->count());
+        $cost = $work->costPercent($this->hostCpus->count());
         if ($cost === null) {
             $this->governor->releaseStream($jobId);
             $this->logger->info('StreamAdmission: too little encoder output; allocation released without learning', [
                 'jobId' => $jobId->toString(),
-                'outputSeconds' => $outputSeconds,
+                'outputSeconds' => $work->outputSeconds,
             ]);
 
             return;
@@ -128,8 +127,8 @@ final class StreamAdmissionService implements StreamAdmissionPortInterface
             'jobId' => $jobId->toString(),
             'tier' => $qualityTier,
             'cost' => $cost,
-            'encoderCpuSeconds' => $encoderCpuSeconds,
-            'outputSeconds' => $outputSeconds,
+            'encoderCpuSeconds' => $work->cpuSeconds,
+            'outputSeconds' => $work->outputSeconds,
             'hardwareAccelerated' => $hardwareAccelerated,
             'totalSamples' => $this->governor->getModel()->sampleCount(),
             'governorState' => $this->governor->getState()->value,
