@@ -1241,20 +1241,22 @@ by its user, and it reaches PostgreSQL on a separate controller network with
 no published database port. The controller verifies that its socket reaches the
 same daemon before issuing an operator action. The worker keeps its private
 network and receives only its admitted named media volumes, with no Docker
-authority. Version 4 manifests require a complete autoscaling profile, separate
-control/execution budgets and disjoint CPU sets, read-only source and writable derived volumes, and a private IPC volume.
-Each unit has separate memory/CPU/PID ceilings, including encoder threads;
-see the [operator recipe](../part-1-operator-guide/commands/README.md#worker-deployment).
+authority. Version 7 manifests require complete deployment and autoscaling
+profiles, read-only source and writable derived volumes, and a private IPC volume.
+Both units run without CPU, memory or PID limits and without CPU sets; the fixture
+checks that Docker reports no limit on either unit and that each unit starts at
+its out-of-memory score, −500 for control and 300 for execution. See the
+[operator recipe](../part-1-operator-guide/commands/README.md#worker-deployment).
 With no explicit override in the shared Docker configuration, setup captures the
 runner's ambient Docker connection. The explicit socket mapping supplies the
 controller's daemon-host bind source when the runner is itself a container.
 
 The paired operator fixture requires at least four host CPUs and 13 GiB of host
-memory. Combined web/media and control-capacity runs require 15 GiB: 7424 MiB
-for the one-slot worker pair, 4352 MiB for PostgreSQL/Redis (4096/256 MiB), 2048 MiB for
-web and 1024 MiB of headroom. The standalone sum is 12800 MiB; adding web raises it to 14848 MiB,
-rounded up to the stated host requirements. These are fixture admission
-ceilings, not measured universal capacity defaults.
+memory. Combined web/media and control-capacity runs require 15 GiB, and an
+ordinary maximum of four adds 1 GiB. The worker units have no limits, so these
+are host preflight minimums rather than unit ceilings. The disposable PostgreSQL,
+Redis and web containers keep their own fixture limits of 4 GiB, 256 MiB and
+2 GiB. None of these figures is a measured capacity default.
 
 Both modes exercise `bin/worker-deployment.php` create, reconciliation, start,
 status and recovery against disposable PostgreSQL/Redis with canonical private
@@ -1467,18 +1469,29 @@ BAANDER_TEST_IMAGE=baander-worker:test BAANDER_TEST_OPERATOR_IN_CONTAINER=1 \
   bash scripts/test-worker-control-capacity-container.sh
 ```
 
-It uses disposable services and a version 4 paired deployment, with control
-2944 MiB/129 PIDs on one available CPU and execution 4480 MiB/256 PIDs on two
-other available CPUs, including 320 MiB for scheduled console execution. The
-runner selects the first three available CPUs and records their explicit sets in
-the manifest; its host preflight requires four CPUs and 15 GiB, including the
-web/dependency ceilings and headroom described above. Inspect its resource and progress
-receipts before claiming pressure qualification. Separate OOM, PID exhaustion,
-peer-loss and containment results from ordinary backend correctness results.
-The recorded version 4 maximum-one run passed all three phases in
-281.436 seconds, with verified cleanup and joint retirement. Execution OOM/PID
-exhaustion left control alive with no control OOM event. These exhaustion results
-do not qualify maxima two or four.
+It uses disposable services and a version 7 paired deployment whose units carry
+no limits or CPU sets, with 320 MiB for scheduled console execution. Its host
+preflight requires four CPUs and 15 GiB. The drill runs two phases:
+
+1. **`cpu`** runs media CPU load beside control traffic. Its CPU burners start at
+   nice 10 and out-of-memory score 600, as real encodes do. The verifier requires
+   FFmpeg commands at nice 10 and score 600, above the native daemon and execution
+   supervisor at 300, and PHP media children at 600, above the control supervisor
+   at −500.
+2. **`native-loss`** ends the exact native role with `SIGKILL`, as the kernel's
+   out-of-memory killer would end a victim. It requires the execution supervisor
+   and native role at the execution unit's score just before the kill, an
+   automatic joint drain and no control OOM event.
+
+The former memory and PID exhaustion phases needed unit limits; without them they
+would exhaust the host, so the native-loss phase replaces them. Inspect the
+resource, kill-order and progress receipts before claiming pressure
+qualification. Separate peer-loss and containment results from ordinary backend
+correctness results. Before the limits were removed, a version 4 maximum-one run
+passed the former CPU, memory and PID phases in 281.436 seconds, with verified
+cleanup and joint retirement; execution OOM/PID exhaustion left control alive
+with no control OOM event. Those results do not qualify the unlimited units or
+maxima two and four.
 
 ### Shared media control qualification
 
@@ -1515,8 +1528,9 @@ This is an instrumented runtime test; the immutable production-image contract
 remains a separate gate. Observation defaults to zero and is incompatible with
 `BAANDER_TEST_USE_IMAGE=1`, which forbids rebuilding the worker fixture.
 
-The drill fills three video slots and one audio slot, queues ordinary work and
-applies execution CPU pressure for at least 60 seconds. The audio encoder is held
+The drill's fixture profile has three video slots and one audio slot. The drill
+fills them, queues ordinary work and applies execution CPU pressure for at least
+60 seconds; the pressure processes run at nice 10 and score 600, as encodes do. The audio encoder is held
 after initial output to keep its slot occupied; this does not measure sustained
 audio throughput. Controls exercise running and paused attachment, ticketed socket
 reconnect and replay, stale generation refusal, paused seek, active and pending
@@ -1526,7 +1540,7 @@ and readiness-wait races need their separate deterministic coverage.
 
 `qualification.json` records control acknowledgement and heartbeat p99 and maximum,
 seek readiness, cancellation retirement, occupancy, sampling gaps and ordinary
-progress. Both p99 limits are one second and both maximum limits are two seconds;
+progress, together with each unit's absent limits and the sampled kill order. Both p99 limits are one second and both maximum limits are two seconds;
 seek and cancel request handling also have two-second limits. Seek readiness and
 exact encoder retirement after cancellation each have a 30-second watchdog.
 Seek readiness ends when both audio and video init/fragment bytes are available,
@@ -1551,8 +1565,9 @@ Cost mode measures each media job kind without the control drill's CPU
 pressure. Add `BAANDER_TEST_MEDIA_COST=1` to the command above, and set
 `BAANDER_TEST_MEDIA_COST_ENCODER` to `libx264` (the shipped default) or
 `libx265`. The runner writes that encoder into the fixture image's
-`.env.prod.local`. The execution unit gets eight logical CPUs and 9216 MiB, so the
-preflight needs ten permitted CPUs.
+`.env.prod.local`. The execution unit has no limits; the preflight needs ten
+permitted CPUs and 5 GiB of host memory beyond the drill's 15 GiB for eight
+1080p encoders.
 
 Preparation generates a 120-second 1920x1080 30 fps H.264/AAC source with mild
 temporal noise and three 600-second 44.1 kHz stereo FLAC tracks before the
@@ -1564,8 +1579,8 @@ measured window. The client then runs these phases in order:
 3. Three 1080p encodes with queued renditions and a fourth video waiting.
 4. Four copy requests at once.
 
-The media role admits only three video jobs, so the checkpoint then replays the
-recorded 1080p encoder command eight times at once inside the execution unit.
+The drill's profile admits only three video jobs, so the checkpoint then replays
+the recorded 1080p encoder command eight times at once inside the execution unit.
 
 Samplers in both worker units record each process's peak RSS (`VmHWM`), thread
 count and per-thread CPU ticks. A host sampler records `cpu.stat` and
@@ -1577,10 +1592,12 @@ encode. `media-cost.json` holds per-phase figures, a summary and the host's load
 average at each phase boundary.
 
 The recorded run on 2026-11-03 used an AMD Ryzen 7 5800X3D (8 cores, 16 threads,
-`performance` governor, boost on, 3.44 GHz scaling maximum, 62.7 GiB). Other
-heavy host work was paused, and the one-minute load average was 1.4 before each
-run. The execution unit used CPUs 1–8, which are seven cores plus the SMT sibling
-of the control unit's CPU 0. One H.264 run and one HEVC run each measured every
+`performance` governor, boost on, 3.44 GHz scaling maximum, 62.7 GiB) and
+FFmpeg 5.1 in the Debian 12 worker image, before the move to Debian 13 and
+FFmpeg 7.1. Other heavy host work was paused, and the one-minute load average was
+1.4 before each run. The run predates the removal of unit limits: the execution
+unit was confined to eight logical CPUs and 9216 MiB, on CPUs 1–8, which are seven
+cores plus the SMT sibling of the control unit's CPU 0. One H.264 run and one HEVC run each measured every
 phase; the table gives the range across both runs:
 
 | Job (1080p30 source) | Peak RSS | Threads | CPU-s per output s: alone / 3 slots / 8 replayed | Speed: alone / 3 slots / 8 replayed |
@@ -1606,7 +1623,8 @@ with `pools=2:frame-threads=2`, 1.02x with `pools=3`, 1.06x with
 (3.93–3.95 CPUs), and 1.72x with `pools=6:frame-threads=3` (5.38 CPUs). Every
 setting cost 2.96–3.13 CPU-s per output second; four pool threads is the
 smallest setting above 1.2x. The one-minute load average was 2.8–4.8 during
-the sweep.
+the sweep. SegmentEncoder now gives `libx265` four pool threads with two frame
+threads; libx264 keeps its two encoder threads.
 
 Each media job child in the control unit peaked at 92 MiB with two threads for
 video and 66 MiB with one thread for audio. No separate helper process appeared.
@@ -2102,20 +2120,25 @@ jobs and one audio rendition with execution CPU pressure. The audio encoder is
 deliberately stopped after initial output to retain its occupied slot, while the
 three video encoders remain active; this does not measure uninterrupted audio
 throughput during pressure. Desired-state controls
-must finish within three seconds and pressure must block ordinary growth. Sampling
+must finish within three seconds, and admission must not grow on high CPU
+evidence. The execution unit has no CPU quota, so media load measured against
+every host CPU rarely crosses the CPU ceiling; the policy tests cover blocked
+growth. The drill instead requires each known resource observation to be measured
+against the host's CPUs, memory and task limit, with a utilization that matches
+the execution cgroup's own CPU time over all host CPUs. Native commands sampled
+under load must run at nice 10 and score 600. Sampling
 gaps must stay within five seconds, deployment authority must remain continuous,
 and both units must remain running at the final inspection.
 
 Artifacts include declared thresholds, daemon/container details, manifest
 fingerprints, startup timing, timestamped slot/queue/resource/status observations,
-completion receipts and media results. Every resident consumer remains fully
-reserved even when parked: execution is `4480 + 320 * (max - 1)` MiB and
-`256 + max - 1` PID slots for this fixture, including its 320 MiB scheduled console
-reservation. Control remains 2944 MiB/129 PIDs. The four-slot pair therefore needs
-8384 MiB; with dependencies, web and headroom the declared total is 15808 MiB,
-requiring at least 16 GiB of host memory. Use four available CPUs with the recorded
-explicit placement. These are admission envelopes, not measured RSS or throughput.
+completion receipts and media results, including each unit's absent limits and
+the host-relative measurement. Every resident consumer remains resident even when
+parked. The preflight requires four available CPUs and 15 GiB of host memory, or
+16 GiB for maximum four; these are host minimums, not measured RSS or throughput.
 
+The recorded qualification below ran before the worker units lost their limits;
+its CPU placement, quotas and ceilings describe that run, not the current fixture.
 Local qualification used an AMD Ryzen 7 5800X3D host with eight cores, sixteen threads
 and 64 GiB of physical RAM (Docker reported 67337879552 bytes), Docker
 29.7.2-ce and kernel 7.2.10-1-default. Control used CPU 0 with a one-CPU quota;
