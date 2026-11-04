@@ -60,6 +60,6 @@ export const textRole = (role: TextRole, { dense = false }: { readonly dense?: b
     line-height: max(var(--text-${role}-line-height), var(--script-line-height, 0));
     ${role === 'label' ? 'text-transform: var(--text-label-transform);' : ''}
     ${mono ? 'font-variant-numeric: tabular-nums;' : ''}
-    ${dense ? 'font-size: var(--text-dense-size);' : ''}
+    ${dense ? 'font-size: calc(var(--text-dense-size) + var(--script-size-boost, 0px));' : ''}
   `;
 };

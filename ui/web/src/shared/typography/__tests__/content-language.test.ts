@@ -84,4 +84,19 @@ describe('resolveContentLanguage', () => {
       expect(lookup).toHaveBeenCalledTimes(1);
     });
   });
+  it('falls back to the text when the stored value is not a well-formed language tag', () => {
+    expect(resolve('続きを見る', 'English (US)')).toBe('ja');
+    expect(resolve('Love Song', 'English (US)')).toBe('en');
+  });
+
+  it('still recognises a stored code where the browser has no language display names', async () => {
+    vi.stubGlobal('Intl', Object.assign(Object.create(Intl), { DisplayNames: undefined }));
+    vi.resetModules();
+    try {
+      const { resolveContentLanguage: freshResolve } = await import('../content-language');
+      expect(freshResolve('Kalevala', 'fin', INTERFACE_LOCALE)).toBe('fi');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
 });

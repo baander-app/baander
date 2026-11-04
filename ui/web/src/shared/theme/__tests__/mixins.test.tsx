@@ -40,11 +40,11 @@ describe('textRole', () => {
     expect(declaration(rule, 'font-size')).toBe('calc(var(--text-timecode-size) + var(--script-size-boost, 0px))');
   });
 
-  it('follows the role size with the dense size when dense', () => {
+  it('follows the role size with the dense size, keeping the Burmese boost, when dense', () => {
     const rule = roleRule('label', { dense: true });
     const sizes = [...rule.declarations.matchAll(/font-size:\s*([^;]+)/g)].map((match) => match[1].trim());
 
-    expect(sizes).toEqual(['calc(var(--text-label-size) + var(--script-size-boost, 0px))', 'var(--text-dense-size)']);
+    expect(sizes).toEqual(['calc(var(--text-label-size) + var(--script-size-boost, 0px))', 'calc(var(--text-dense-size) + var(--script-size-boost, 0px))']);
     expect(declaration(rule, 'text-transform')).toBe('var(--text-label-transform)');
   });
 

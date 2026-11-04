@@ -86,7 +86,7 @@ describe('admin user pagination', () => {
     expect(createdRules.map(rule => declaration(rule, 'font-family'))).toContain('var(--font-mono)')
     // The dense size follows the role's own size in the same rule, so the last font-size wins.
     const sizes = createdRules.flatMap(rule => [...rule.declarations.matchAll(/font-size:\s*([^;]+)/g)].map(match => match[1].trim()))
-    expect(sizes.at(-1)).toBe('var(--text-dense-size)')
+    expect(sizes.at(-1)).toBe('calc(var(--text-dense-size) + var(--script-size-boost, 0px))')
     expect(name).toHaveAttribute('lang')
   })
 

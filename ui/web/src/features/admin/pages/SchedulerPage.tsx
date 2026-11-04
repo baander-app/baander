@@ -76,7 +76,7 @@ const JobName = styled(ContentText)`
 `
 
 const JobDesc = styled(ContentText)`
-  font-size: var(--text-dense-size);
+  font-size: calc(var(--text-dense-size) + var(--script-size-boost, 0px));
   color: var(--color-muted-foreground);
   overflow: hidden;
   text-overflow: ellipsis;

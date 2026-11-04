@@ -20,6 +20,9 @@ let languageNames: Intl.DisplayNames | undefined;
 const storedLanguages = new Map<string, StoredLanguage | undefined>();
 
 function isKnownLanguage(language: string): boolean {
+  // Browsers without language display names cannot confirm a code; the canonical
+  // two- or three-letter shape has already been checked, so accept it.
+  if (typeof Intl.DisplayNames !== 'function') return true;
   languageNames ??= new Intl.DisplayNames(['en'], { type: 'language', fallback: 'none' });
 
   return languageNames.of(language) !== undefined;
