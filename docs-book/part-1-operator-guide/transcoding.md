@@ -265,13 +265,13 @@ deployment does not become ready. Its `worker_media_failure` log line then carri
 lines of FFmpeg's output. Without a hardware encoder, the worker qualifies its
 software encoder as before.
 
-With a hardware encoder, unset video slots take the measured hardware default of 8.
+With a hardware encoder, unset video slots take the measured hardware default of 12.
 Audio stays at 12, and the video maximum still follows the pooler bound: 145 slots
-in `full`. The default is the largest measured concurrency at which every 1080p
-stream of both encoders stayed ahead of real time on an AMD Radeon RX 9070 XT with
-VAAPI. `h264_vaapi` sets it: 8 streams ran at 1.12x and 10 at 0.91x. `hevc_vaapi`,
-the encoder media control picks by default, still ran at 1.08x with 14 streams, so a
-deployment that keeps HEVC can set `videoSlots` to 14 on that GPU. The video engine
+in `full`. The default follows `hevc_vaapi`, the encoder media control picks by
+default: on an AMD Radeon RX 9070 XT with VAAPI, every 1080p stream ran at 1.12x
+real time with 12 streams and at 1.08x with 14. `h264_vaapi` keeps up with fewer
+streams, 1.12x with 8 and 0.91x with 10, so a deployment that sets `VIDEO_ENCODER`
+to `h264_vaapi` should set `videoSlots` to 8 on that GPU. The video engine
 was fully busy at every step while each stream used about 0.03 CPU seconds per
 second of output. The
 [hardware cost measurement](../part-2-developer-guide/testing.md#hardware-encoder-cost)

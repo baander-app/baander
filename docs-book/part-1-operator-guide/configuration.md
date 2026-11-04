@@ -115,7 +115,11 @@ source installation sets the same counts through `BAANDER_DEPLOYMENT_PROFILE_JSO
 and the worker manifest's `deploymentProfile`; `app:deployment:profile:show`
 prints both.
 
-<!-- media.hardware: U15 hardware encoder configuration -->
+A `hardware` entry in the same object names a hardware encoder, for example
+`"hardware": {"accelerator": "vaapi", "device": "/dev/dri/renderD128"}`. With one,
+unset video slots default to 12 instead of 8. [Hardware
+Acceleration](transcoding.md#hardware-acceleration) describes the fields, the
+device pass-through and the startup check.
 
 The maximums come from the pooler, the only fixed resource bound left. PgBouncer
 admits 500 client connections. In `full`, the web workers, worker roles, scheduler,

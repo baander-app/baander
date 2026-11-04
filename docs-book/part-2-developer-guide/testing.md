@@ -1677,8 +1677,8 @@ Every half second the fixture records each encode's CPU ticks, `VmHWM`, threads,
 `/proc/<pid>/fdinfo`, and the device's `gpu_busy_percent`, `vcn_busy_percent` and
 `mem_info_vram_used`. `media-cost-hardware.json` reports each step over the window
 in which every encode had passed three seconds of output and none had stopped
-advancing. A step is real time when its slowest stream runs faster than 1.0x. The
-hardware video default is the largest step that is real time for every encoder.
+advancing. A step is real time when its slowest stream runs faster than 1.0x, and the receipt
+records each encoder's largest real-time step.
 
 The recorded run on 2026-11-04 used an AMD Radeon RX 9070 XT (16 GiB) through VAAPI
 with Mesa radeonsi and FFmpeg 7.1.5 on Debian 13, on the Ryzen 7 5800X3D host above
@@ -1703,8 +1703,10 @@ encodes' summed engine time equalled the wall time: the video engine bounds the
 aggregate rate, about 9x real time for H.264 and 13–15x for HEVC. Device VRAM grew
 by about 1.1 GiB per stream and levelled off near 12.7 GiB above twelve streams
 without errors. Every encode exited cleanly or ran until the step's deadline. H.264
-is real time up to 8 streams and HEVC up to 14, so the hardware video default is 8.
-These figures are for one GPU, one synthetic source and one run.
+is real time up to 8 streams and HEVC up to 14. The hardware video default of 12
+follows HEVC, the encoder media control selects by default, at the step that kept a
+12% margin; 14 streams left only 8%. These figures are for one GPU, one synthetic
+source and one run.
 
 Run browser controls against the immutable production worker image through the
 combined deployment runner:

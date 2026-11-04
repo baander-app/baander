@@ -95,10 +95,31 @@ video job and 66 MiB for an audio job.
 
 The CPU figures apply to software encoding only. A codec handled by a hardware
 encoder, such as a GPU, QuickSync or another video engine, costs almost no CPU.
-The admitted worker recipe does not yet pass an encoding device to the worker, so
-current deployments encode in software.
+A deployment encodes in software unless its profile names a hardware encoder; see
+[Hardware Acceleration](transcoding.md#hardware-acceleration).
 
-<!-- U15 hardware figures -->
+### Measured hardware cost per job
+
+These costs were measured on 4 November 2026 with FFmpeg 7.1.5 in the Debian 13
+worker image, on the same host with an AMD Radeon RX 9070 XT (16 GiB) through VAAPI
+and Mesa radeonsi. Each stream decoded a 1080p30 H.264/AAC source on the GPU,
+scaled it and encoded it there. Speed is the slowest stream at that concurrency.
+
+| Encoder | Streams | Slowest stream speed | CPU-seconds per output second | Peak memory per stream |
+| --- | ---: | ---: | ---: | ---: |
+| `h264_vaapi` | 1 | 8.98× | 0.031 | 164 MiB |
+| `h264_vaapi` | 8 | 1.12× | 0.033 | 170 MiB |
+| `h264_vaapi` | 10 | 0.91× | 0.033 | 169 MiB |
+| `hevc_vaapi` | 1 | 13.3× | 0.029 | 185 MiB |
+| `hevc_vaapi` | 12 | 1.12× | 0.031 | 195 MiB |
+| `hevc_vaapi` | 14 | 1.08× | 0.055 | 196 MiB |
+| `hevc_vaapi` | 16 | 0.96× | 0.053 | 200 MiB |
+
+The GPU's video engine, not the CPU, sets the limit: it was fully busy at every
+step, and each stream needed about 1.1 GiB of video memory up to the card's 16 GiB.
+With a hardware encoder, unset video slots default to 12, which follows the HEVC
+row; a deployment that forces H.264 should set 8. Other GPUs sustain different
+counts.
 
 ## Memory
 

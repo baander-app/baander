@@ -125,7 +125,6 @@ final class MediaCost
             'tier' => $header['tier'],
             'steps' => $steps,
             'largestRealTimeConcurrency' => $realTime,
-            'hardwareVideoDefault' => min($realTime),
         ];
     }
 

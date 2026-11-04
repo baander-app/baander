@@ -49,8 +49,7 @@ final class MediaCostHardware
             ], $runtime->environment, 60, timeout: $budget, logPath: $artifacts . '/hardware-samples.jsonl', stderrLogPath: $artifacts . '/hardware-drill.log');
             $receipt = MediaCost::hardwareReceipt($artifacts . '/hardware-samples.jsonl');
             Reports::publish($artifacts . '/media-cost-hardware.json', $receipt);
-            echo json_encode(['artifacts' => $artifacts, 'largestRealTimeConcurrency' => $receipt['largestRealTimeConcurrency'],
-                'hardwareVideoDefault' => $receipt['hardwareVideoDefault']], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR), "\n";
+            echo json_encode(['artifacts' => $artifacts, 'largestRealTimeConcurrency' => $receipt['largestRealTimeConcurrency']], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR), "\n";
             return 0;
         } finally {
             $runtime->close();

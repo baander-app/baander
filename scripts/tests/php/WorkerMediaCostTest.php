@@ -213,7 +213,6 @@ final class WorkerMediaCostTest extends TestCase
         self::assertEqualsWithDelta(.9, $hevc['speed']['minimum'], .01);
         self::assertFalse($hevc['everyStreamAheadOfRealTime']);
         self::assertSame(['h264_vaapi' => 2, 'hevc_vaapi' => 0], $receipt['largestRealTimeConcurrency']);
-        self::assertSame(0, $receipt['hardwareVideoDefault']);
         self::assertSame(['seconds' => 120, 'frameRate' => 30], $receipt['source']);
     }
 
@@ -229,7 +228,7 @@ final class WorkerMediaCostTest extends TestCase
 
         self::assertNull($receipt['steps'][0]['window']);
         self::assertSame('No VA display found', $receipt['steps'][0]['failedProcesses'][0]['stderr']);
-        self::assertSame(0, $receipt['hardwareVideoDefault']);
+        self::assertSame(['hevc_vaapi' => 0], $receipt['largestRealTimeConcurrency']);
     }
 
     private function units(int $executionMemory = 0): void

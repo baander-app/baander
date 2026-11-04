@@ -10,12 +10,13 @@ final readonly class DeploymentProfile
     /** Video slots an unset full profile runs with software encoding. */
     private const int DEFAULT_SOFTWARE_VIDEO_SLOTS = 8;
     /**
-     * Video slots an unset full profile runs with a hardware encoder: the most concurrent 1080p
-     * hardware encodes that each stayed ahead of real time on the reference GPU, an AMD Radeon
-     * RX 9070 XT with VAAPI, for both encoders the accelerator offers. H.264 bounds it; HEVC
-     * stayed ahead at 14.
+     * Video slots an unset full profile runs with a hardware encoder. On the reference GPU, an
+     * AMD Radeon RX 9070 XT with VAAPI, twelve concurrent 1080p HEVC encodes (the encoder media
+     * control selects by default) each stayed 12% ahead of real time; fourteen held only 8%.
+     * H.264 hardware encodes stay ahead only up to eight, so a deployment that forces H.264
+     * sets its video slots explicitly.
      */
-    private const int DEFAULT_HARDWARE_VIDEO_SLOTS = 8;
+    private const int DEFAULT_HARDWARE_VIDEO_SLOTS = 12;
     /** Audio slots an unset full profile runs. */
     private const int DEFAULT_AUDIO_SLOTS = 12;
     private const int CONTROL_COMMANDS = 1;

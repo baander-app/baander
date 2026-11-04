@@ -11,8 +11,8 @@ use PHPUnit\Framework\TestCase;
 
 final class DeploymentProfileHardwareTest extends TestCase
 {
-    /** Concurrent 1080p hardware encodes that each stayed ahead of real time on the reference GPU. */
-    private const int MEASURED_HARDWARE_VIDEO_SLOTS = 8;
+    /** Concurrent 1080p HEVC hardware encodes that each stayed clearly ahead of real time on the reference GPU. */
+    private const int MEASURED_HARDWARE_VIDEO_SLOTS = 12;
 
     public function testUnsetVideoSlotsTakeTheMeasuredHardwareDefault(): void
     {
