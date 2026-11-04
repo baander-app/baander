@@ -1708,6 +1708,89 @@ follows HEVC, the encoder media control selects by default, at the step that kep
 12% margin; 14 streams left only 8%. These figures are for one GPU, one synthetic
 source and one run.
 
+#### Load proof at the default slots
+
+Load mode runs every video and audio job of a full deployment's default slots at
+once, through the pooler and with no limits on any container. Set
+`BAANDER_TEST_MEDIA_LOAD` to `software` for 8 video and 12 audio slots, or to
+`hardware` for the hardware encoder at `/dev/dri/renderD128` with its default of 12
+video and 12 audio slots. `BAANDER_TEST_MEDIA_LOAD_SOURCE` names a 1080p video on
+the host, such as a 1080p30 Big Buck Bunny file:
+
+```bash
+BAANDER_TEST_IMAGE=baander-worker:test BAANDER_TEST_POSTGRES_IMAGE=baander-database:test \
+  BAANDER_TEST_OPERATOR_IN_CONTAINER=1 BAANDER_TEST_DOCKER_SOCKET_PATH=/var/run/docker.sock \
+  BAANDER_TEST_CHECKOUT_IN_IMAGE=0 BAANDER_TEST_USE_IMAGE=0 \
+  BAANDER_TEST_MEDIA_LOAD=software BAANDER_TEST_MEDIA_LOAD_SOURCE=/path/to/1080p.mp4 \
+  bash scripts/test-worker-media-control-container.sh
+```
+
+`BAANDER_TEST_DEPLOYMENT_PROFILE` selects another profile file; every worker drill
+reads its slot counts from it, and without it they keep the fixture's three video
+and one audio slot. The load proof needs twelve permitted CPUs and 25 GiB of host
+memory. It starts PostgreSQL with the database image's own configuration and the
+pooler from the same image, with the full profile's pools.
+
+Preparation copies a 120-second excerpt of the source's picture unchanged, with
+AAC audio, and cuts 600-second FLAC tracks from its soundtrack. The client then
+warms the playback governor: rounds of every video slot at 1080p, each cancelled
+after ten seconds of output, until the saved learning state holds at least the
+governor's 50 learning samples and is active. Next, 22 clients hold
+50-millisecond transactions on the 20-connection application pool, so no server
+connection is idle, and 8 signed-in clients request the album listing without
+pause. The run admits every video slot at 1080p and keeps every audio slot busy
+with one rendition after another of each lane's track until every video has
+completed. Each video session reports real-time playback progress, capped at its
+encoded output, every two seconds. Finally, with the load stopped, one encode of
+each codec runs alone: `libx264` and `libx265` in the software pass, `h264_vaapi` and
+`hevc_vaapi` in the hardware pass.
+
+`media-load.json` records each stream's output against wall time and its encode
+path, the governor's decisions and their state, native launches, the native
+daemon's answer time to a new peer, OOM events, unit containment, PostgreSQL
+backends by pool, pooler queues, lease helper lifetimes, web latency, the kill
+order and the single encodes. A stream's real-time margin is its steady speed
+minus one, measured from three seconds of output to its completion. The verifier
+fails the receipt when any of these holds:
+
+- a configured job is missing, failed or did not complete, or no sample saw every
+  slot busy at once;
+- the governor had not learned before the run, or a run admission was decided
+  while it was learning, downgraded or vetoed;
+- a unit was contained, drained, restarted or OOM-killed, or native execution
+  failed;
+- PostgreSQL backends exceeded 20 application, 8 control or 32 in total, or the
+  application pool was saturated in fewer than half of the run's samples;
+- a lease helper outlived its 1.5-second deadline, or the native daemon took a
+  second or more to answer a new peer;
+- a stream lacks its margin or encoded on the other path.
+
+Real time under load is recorded, not judged. Check a retained receipt again with
+`php scripts/test-worker-media-control-container.php verify-load media-load.json`.
+
+The recorded passes on 2026-11-04 used the Ryzen 7 5800X3D and RX 9070 XT above,
+the Debian 13 worker image with FFmpeg 7.1 and a 128-second 1080p30 excerpt of Big
+Buck Bunny. Other work shared the host; the one-minute load average was 3.5–6.4
+during the software pass's single encodes and 30–35 during the hardware pass's.
+Both receipts passed every criterion:
+
+| Pass | Video streams, steady speed | Audio first wave | Peak backends (application / control / direct) | Lease helper maximum, control / execution | Native answer maximum | Web p50 / p95 |
+|---|---|---|---|---|---|---|
+| Software, 8 + 12 | 8 `libx264`, 0.349–0.354x | 15.3–24.6x | 30 (20 / 8 / 2) | 0.45 / 0.22 s | 17 ms | 0.90 / 1.55 s |
+| Hardware, 12 + 12 | 12 `hevc_vaapi`, 1.14–1.17x | 13.1–21.6x | 30 (20 / 8 / 2) | 0.45 / 0.25 s | 9.5 ms | 0.37 / 2.88 s |
+
+An active governor decided every run admission, after learning 56 samples in
+the software pass and 60 in the hardware pass; none was downgraded or vetoed, and
+no unit drained, restarted or recorded an OOM kill. No run sample found an idle
+server in the application pool, and pooler waits stayed at or below 28 ms in the
+software pass and 36 ms in the hardware pass. In the single encodes after the
+load, `libx264` ran at 1.07x and `libx265` at 0.94x, so HEVC software encoding of
+this content missed real time with the other host work beside it; `h264_vaapi`
+ran at 9.2x and `hevc_vaapi` at 13.5x. In the software pass each
+lane's 15 distinct renditions of a 300-second track ran out 145–160 seconds
+before the video finished, and the cache answered the repeats; the drill now cuts
+600-second tracks and never repeats a rendition.
+
 Run browser controls against the immutable production worker image through the
 combined deployment runner:
 
