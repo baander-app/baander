@@ -1,0 +1,25 @@
+/*
+ * The public site softens the shared dark theme's text slightly. Near-white on pure black (about
+ * 19.6:1) glares on long reading pages; this text keeps about 16.8:1 on the same black background,
+ * well above the 7:1 AAA level.
+ * Applies to an explicit dark choice and to the dark default when no choice is stored. The selectors
+ * match the shared dark theme's own specificity, so loading after it is enough to take precedence.
+ */
+:root[data-theme="dark"]:not([data-accent]) {
+  --color-foreground: #e6e6e9;
+  --color-card-foreground: #e6e6e9;
+  --color-popover-foreground: #e6e6e9;
+  --color-secondary-foreground: #e6e6e9;
+  --color-highlight-foreground: #e6e6e9;
+  --color-sidebar-foreground: #e6e6e9;
+}
+@media not (prefers-color-scheme: light) {
+  :root:not([data-theme]):not([data-accent]) {
+    --color-foreground: #e6e6e9;
+    --color-card-foreground: #e6e6e9;
+    --color-popover-foreground: #e6e6e9;
+    --color-secondary-foreground: #e6e6e9;
+    --color-highlight-foreground: #e6e6e9;
+    --color-sidebar-foreground: #e6e6e9;
+  }
+}

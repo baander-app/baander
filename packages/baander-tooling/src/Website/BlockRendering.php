@@ -9,7 +9,8 @@ use Baander\Tooling\Process\ProcessSpec;
 
 final readonly class BlockRendering
 {
-    public function __construct(private string $root, private EngineExecutor $executor) {}
+    /** @param string $themeCss the site theme the diagrams take their colours from */
+    public function __construct(private string $root, private EngineExecutor $executor, private string $themeCss) {}
 
     /**
      * @param list<array{id:string,source:string,language:string,page:string,ordinal:int}> $blocks
@@ -26,10 +27,11 @@ final readonly class BlockRendering
         }
         $fontPath = $this->root . '/ui/site/node_modules/@fontsource/inter/files/inter-latin-400-normal.woff2';
         try {
+            file_put_contents($scratch . '/theme.css', $this->themeCss);
             file_put_contents($scratch . '/request.json', json_encode([
                 'blocks' => $blocks,
                 'fontPath' => $fontPath,
-                'themeCssPath' => $this->root . '/ui/design-tokens/build/web/theme.css',
+                'themeCssPath' => $scratch . '/theme.css',
             ], JSON_THROW_ON_ERROR));
             $this->executor->run(new ProcessSpec(
                 ['node', $this->root . '/ui/site/scripts/render-blocks.mjs', $scratch . '/request.json', $scratch . '/result.json'],

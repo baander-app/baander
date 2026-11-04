@@ -35,7 +35,7 @@ final class BlockRenderingTest extends TestCase
     public function testReturnsSafeCodeAndCleansPrivateHelperManifest(): void
     {
         $this->helper(['sample' => ['kind' => 'code', 'html' => '<span class="tok-keyword">true</span> &amp; &lt;safe&gt;' . "\n"]]);
-        $html = new BlockRendering($this->root, $this->executor)->render([$this->block("true & <safe>\n")], $this->root . '/stage');
+        $html = new BlockRendering($this->root, $this->executor, ':root {}')->render([$this->block("true & <safe>\n")], $this->root . '/stage');
         self::assertSame('<pre data-language="JSON"><code class="language-json"><span class="tok-keyword">true</span> &amp; &lt;safe&gt;' . "\n</code></pre>", $html['sample']);
         self::assertSame([], glob($this->root . '/var/website-render-*'));
         self::assertSame([], glob($this->root . '/stage/*'));
@@ -46,7 +46,7 @@ final class BlockRenderingTest extends TestCase
         foreach (['changed', '<img src=x onerror=alert(1)>', '<span class="tok-keyword" onclick="alert(1)">true</span>', '</span>true<span class="tok-keyword">'] as $html) {
             $this->helper(['sample' => ['kind' => 'code', 'html' => $html]]);
             try {
-                new BlockRendering($this->root, $this->executor)->render([$this->block('true')], $this->root . '/stage');
+                new BlockRendering($this->root, $this->executor, ':root {}')->render([$this->block('true')], $this->root . '/stage');
                 self::fail('Invalid helper HTML must fail.');
             } catch (\RuntimeException $error) {
                 self::assertStringContainsString('manual.md, block 3', $error->getMessage());
@@ -65,7 +65,7 @@ final class BlockRenderingTest extends TestCase
         $source = "flowchart LR\naccTitle: Music & playback\naccDescr: A to B\nA --> B\n";
         $block = $this->block($source);
         $block['language'] = 'mermaid';
-        $html = new BlockRendering($this->root, $this->executor)->render([$block], $this->root . '/stage')['sample'];
+        $html = new BlockRendering($this->root, $this->executor, ':root {}')->render([$block], $this->root . '/stage')['sample'];
         self::assertStringContainsString('Music &amp; playback</figcaption>', $html);
         self::assertSame(2, substr_count($html, 'alt="A to B"'));
         self::assertStringContainsString('data-pagefind-ignore="all"', $html);
@@ -82,7 +82,7 @@ final class BlockRenderingTest extends TestCase
     public function testMissingHelperFailsWithContextAndCleansScratch(): void
     {
         try {
-            new BlockRendering($this->root, $this->executor)->render([$this->block('true')], $this->root . '/stage');
+            new BlockRendering($this->root, $this->executor, ':root {}')->render([$this->block('true')], $this->root . '/stage');
             self::fail('Missing helper must fail.');
         } catch (\RuntimeException $error) {
             self::assertStringContainsString('manual.md, block 3', $error->getMessage());

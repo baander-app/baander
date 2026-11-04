@@ -30,7 +30,7 @@ final class Command
             if (!preg_match('/^[a-f0-9]{40}$/', $codecRevision)) {
                 throw new \RuntimeException('Cannot resolve the bAAC source revision.');
             }
-            $blocks = new BlockRendering($root, $executor);
+            $blocks = new BlockRendering($root, $executor, Publication::theme($root));
             $revisionUrl = 'https://github.com/baander-app/baander/tree/' . $revision;
             $evidence = new AacEvidence()->load($root);
             $history = $executor->run(new ProcessSpec([...SourceHistory::GIT_LOG, '--', ...self::SITE_SOURCES]))->stdout

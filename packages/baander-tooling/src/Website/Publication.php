@@ -15,12 +15,7 @@ final class Publication
     {
         $destination = $staging . '/assets/site';
         self::copy($root . '/ui/web/public/logo.svg', $destination . '/logo.svg');
-        $theme = file_get_contents($root . '/ui/design-tokens/build/web/theme.css');
-        if ($theme === false || !preg_match('/:root\[data-theme="balanced"\]:not\(\[data-accent\]\)\s*\{([^}]+)\}/', $theme, $light)) {
-            throw new RuntimeException('The shared balanced theme is missing; rebuild design tokens.');
-        }
-        $theme .= "\n@media (prefers-color-scheme: light) {\n:root:not([data-theme]) {" . $light[1] . "}\n}\n";
-        file_put_contents($destination . '/theme.css', $theme);
+        file_put_contents($destination . '/theme.css', self::theme($root));
         foreach (['inter' => [400, 500, 600], 'jetbrains-mono' => [400]] as $font => $weights) {
             $package = $root . '/ui/site/node_modules/@fontsource/' . $font;
             foreach ($weights as $weight) {
@@ -29,6 +24,24 @@ final class Publication
             }
             self::copy($package . '/LICENSE', $destination . '/fonts/' . $font . '-LICENSE.txt');
         }
+    }
+
+    /**
+     * The site theme: the shared design tokens, their light values as the system-preference fallback,
+     * and the site's softer dark tone. Pages and rendered diagrams both use it.
+     */
+    public static function theme(string $root): string
+    {
+        $tokens = file_get_contents($root . '/ui/design-tokens/build/web/theme.css');
+        if ($tokens === false || !preg_match('/:root\[data-theme="balanced"\]:not\(\[data-accent\]\)\s*\{([^}]+)\}/', $tokens, $light)) {
+            throw new RuntimeException('The shared balanced theme is missing; rebuild design tokens.');
+        }
+        $tone = file_get_contents($root . '/ui/site/theme-tone.css')
+            ?: throw new RuntimeException('The site theme tone is missing: ui/site/theme-tone.css.');
+
+        return $tokens
+            . "\n@media (prefers-color-scheme: light) {\n:root:not([data-theme]) {" . $light[1] . "}\n}\n"
+            . $tone;
     }
 
     public static function package(string $staging): void

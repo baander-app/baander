@@ -51,6 +51,8 @@ final class PublicationTest extends TestCase
         mkdir($root . '/ui/design-tokens/build/web', 0700, true);
         file_put_contents($root . '/ui/web/public/logo.svg', '<svg></svg>');
         file_put_contents($root . '/ui/design-tokens/build/web/theme.css', ':root[data-theme="balanced"]:not([data-accent]) { color-scheme: light; --color-background: #f5f5f5; }');
+        mkdir($root . '/ui/site', 0700, true);
+        file_put_contents($root . '/ui/site/theme-tone.css', ':root[data-theme="dark"] { --color-foreground: #e6e6e9; }');
         foreach (['inter' => [400, 500, 600], 'jetbrains-mono' => [400]] as $font => $weights) {
             $package = $root . '/ui/site/node_modules/@fontsource/' . $font;
             mkdir($package . '/files', 0700, true);
@@ -67,5 +69,6 @@ final class PublicationTest extends TestCase
         $css = file_get_contents($this->directory . '/assets/site/theme.css');
         self::assertStringContainsString('@media (prefers-color-scheme: light)', $css);
         self::assertStringContainsString(':root:not([data-theme])', $css);
+        self::assertStringEndsWith(':root[data-theme="dark"] { --color-foreground: #e6e6e9; }', $css, 'The site tone follows the shared tokens');
     }
 }
