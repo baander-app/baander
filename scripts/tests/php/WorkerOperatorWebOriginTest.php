@@ -8,7 +8,7 @@ use Baander\Tooling\Configuration\ApplicationLayout;
 use Baander\Tooling\Docker\Target;
 use Baander\Tooling\Filesystem\AtomicFile;
 use Baander\Tooling\Inventory\Collector;
-use Baander\Tooling\Fixtures\Worker\{OperatorCommands, OperatorProvisioning, OperatorQualification, OperatorResources, OperatorRun};
+use Baander\Tooling\Fixtures\Worker\{OperatorCommands, OperatorConfiguration, OperatorProvisioning, OperatorQualification, OperatorResources, OperatorRun};
 use PHPUnit\Framework\TestCase;
 
 final class WorkerOperatorWebOriginTest extends TestCase
@@ -30,7 +30,8 @@ final class WorkerOperatorWebOriginTest extends TestCase
         $state->imageId = 'sha256:' . str_repeat('a', 64);
         $state->secretsVolume = 'baander-web-origin-secrets';
         $qualification = new \ReflectionClass(OperatorQualification::class)->newInstanceWithoutConstructor();
-        foreach (['root' => dirname(__DIR__, 3), 'state' => $state, 'commands' => $commands, 'resources' => $resources] as $name => $value) {
+        foreach (['root' => dirname(__DIR__, 3), 'state' => $state, 'commands' => $commands, 'resources' => $resources,
+            'configuration' => new OperatorConfiguration($environment, $commands->runtime->configuration)] as $name => $value) {
             new \ReflectionProperty(OperatorQualification::class, $name)->setValue($qualification, $value);
         }
         try {

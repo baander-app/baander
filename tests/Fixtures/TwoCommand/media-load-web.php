@@ -2,7 +2,8 @@
 
 declare(strict_types=1);
 
-use App\Tests\Fixtures\WebRuntime\StreamClient;
+const LOAD_WEB_CLIENTS = 8;
+const LOAD_WEB_PATH = '/api/albums/?limit=20';
 
 /**
  * Web load for the load proof: from the load barrier until the run ends, a fixed number of
@@ -12,10 +13,6 @@ use App\Tests\Fixtures\WebRuntime\StreamClient;
  * @var string $project
  * @var Doctrine\ORM\EntityManagerInterface $manager
  */
-
-const LOAD_WEB_CLIENTS = 8;
-const LOAD_WEB_PATH = '/api/albums/?limit=20';
-
 $owner = drillOwner($manager, $project, 'media-load-web');
 await(static fn (): bool => is_file(ROOT . '/load-go'), 'load barrier', 1200);
 $log = fopen(ROOT . '/web-latency.jsonl', 'wb') ?: throw new RuntimeException('Cannot record web latency.');
