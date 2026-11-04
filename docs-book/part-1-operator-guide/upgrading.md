@@ -15,14 +15,15 @@ lease expiry is insufficient. Resolve these through the old controller while its
 schema is still installed. Preserve the database, pending work and media; no reset
 is required or authorized by this upgrade.
 
-Version 6 manifests require `sourceMountPolicy`, the complete startup
-`deploymentProfile` and the ordinary autoscaling profile. The selected startup
-profile must agree with web and the worker runtime environment. The new controller
-refuses earlier manifest versions, including recovery actions. Keep the old
-checkout, controller, manifest and credentials to retire an existing pair before
-switching code. Confirm both units' retirement and the joint reservation release,
-then create a version 6 manifest with a fresh boot ID, the new image and
-`sourceMountPolicy: production` for the named-volume recipe. Lease expiry or a
+Version 7 manifests require `sourceMountPolicy`, the complete startup
+`deploymentProfile` and the ordinary autoscaling profile, and carry no per-unit
+memory, CPU, PID or CPU-set fields. The selected startup profile must agree with
+web and the worker runtime environment. The new controller refuses earlier
+manifest versions, including recovery actions. Keep the old checkout, controller,
+manifest and credentials to retire an existing pair before switching code. Confirm
+both units' retirement and the joint reservation release, then create a version 7
+manifest with a fresh boot ID, the new image and `sourceMountPolicy: production`
+for the named-volume recipe. Lease expiry or a
 stopped container is insufficient. Preserve the database, pending work and media.
 This manifest change requires no data reset and provides no compatibility path.
 
@@ -144,8 +145,8 @@ playback owners without rewriting the initial migration or existing histories.
 the control/execution journals and joint retirement barrier. It is irreversible.
 `Version20261021120000` retains the last observed availability of indexed source
 files and is also irreversible.
-New deployments require a version 6 manifest with separate budgets, disjoint CPU
-sets, a private IPC volume and complete deployment and autoscaling profiles;
+New deployments require a version 7 manifest with a private IPC volume and
+complete deployment and autoscaling profiles, and without unit limits or CPU sets;
 earlier manifest versions are refused. Every profile field is fingerprinted in
 both recipes. Changing thresholds, concurrency or the startup profile requires
 retirement and a fresh boot, with matching web and worker runtime settings.
@@ -216,6 +217,35 @@ the retirement and fresh-boot sequence above when replacing it. Maintainers can
 check version drift and patch status through
 [PHP dependency maintenance](../part-2-developer-guide/php-dependencies.md);
 those checks do not replace application startup, delivery or drain qualification.
+
+## Moving to the Debian 13 images
+
+The application, worker and database images build on Debian 13 (trixie), which
+moves glibc from 2.36 to 2.41. PostgreSQL in the Bånder database image takes its
+default collation from glibc, so an index on text built under the old version may
+not match the new ordering. A fresh install initializes its data volume under the
+new version and needs no action. An existing PostgreSQL data volume, created by a
+Debian 12 database image, reports a collation version mismatch once the Debian 13
+image starts on it. Rebuild its indexes before writers return:
+
+1. **Stop the writers.** Stop web and retire the worker pair as in the
+   [standard update](#standard-update). Keep PostgreSQL running on the new image.
+2. **Rebuild the indexes and record the new version.** Connect directly to
+   PostgreSQL, not through the pooler, as the database owner. For the source
+   installation:
+
+   ```bash
+   dc exec database sh -ec 'psql -v ON_ERROR_STOP=1 --username="$POSTGRES_USER" --dbname="$POSTGRES_DB" -c "REINDEX DATABASE" -c "ALTER DATABASE \"$POSTGRES_DB\" REFRESH COLLATION VERSION"'
+   ```
+
+   For the managed preset, run the same `psql` command in its `postgres` service
+   container. `REINDEX DATABASE` rebuilds every index of the current database and
+   takes longer on a larger library; `REFRESH COLLATION VERSION` then records the
+   new glibc version so the warning stops.
+3. **Repeat for other databases.** Run both statements in any other database of
+   the same volume that reports the mismatch.
+4. **Return the writers.** Start web and a fresh worker pair, then observe them as
+   described above.
 
 ## Docker Compose Changes
 
