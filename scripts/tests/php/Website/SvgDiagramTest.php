@@ -32,6 +32,24 @@ SVG;
         self::assertSame(1, substr_count($svg, '@font-face'));
     }
 
+    public function testDoesNotIndentWrappedLabelLinesSoCenteredTextStaysCentered(): void
+    {
+        $source = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 80"><g class="label"><text text-anchor="middle">'
+            . '<tspan class="row" x="0" dy="1.1em"><tspan>Revision</tspan></tspan>'
+            . '<tspan class="row" x="0" dy="1.1em"><tspan>projector</tspan></tspan>'
+            . '</text></g></svg>';
+        $svg = new SvgDiagram()->sanitize($source, 'font');
+        $document = new \DOMDocument();
+        self::assertTrue($document->loadXML($svg));
+        $rows = [];
+        foreach ($document->getElementsByTagName('tspan') as $tspan) {
+            if ($tspan->getAttribute('class') === 'row') {
+                $rows[] = $tspan->textContent;
+            }
+        }
+        self::assertSame(['Revision', 'projector'], $rows);
+    }
+
     public function testRemovesActiveContentAndExternalAndSourceDataResources(): void
     {
         $source = <<<'SVG'

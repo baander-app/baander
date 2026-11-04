@@ -235,8 +235,18 @@ h1, h2, h3 { margin: 0; }
 .manual-article .tok-variable, .manual-article .tok-operator { color: var(--color-foreground); }
 .manual-article .diagram { margin-bottom: 24px; min-width: 0; }
 .diagram figcaption { margin-bottom: 16px; font-weight: 500; }
-.diagram-viewport { max-width: 100%; overflow-x: auto; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-card); }
-.diagram-viewport img { max-width: none; }
+.diagram-viewport {
+  max-width: 100%;
+  overflow-x: auto;
+  padding: 32px 24px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background-color: var(--color-background);
+  background-image: radial-gradient(circle at 1px 1px, var(--color-border) 1px, transparent 0);
+  background-size: 16px 16px;
+  background-position: 8px 8px;
+}
+.diagram-viewport img { max-width: none; margin-inline: auto; }
 .diagram > a { margin-top: 16px; font-size: 14px; }
 .diagram details { margin-top: 16px; }
 .diagram summary { cursor: pointer; width: fit-content; color: var(--color-muted-foreground); }

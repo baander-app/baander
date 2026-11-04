@@ -93,10 +93,23 @@ async function createDiagramRenderer(request) {
             if (!/^#[0-9a-f]{6}$/i.test(value)) throw new Error(`Missing shared theme color ${role}`);
             return value;
           };
+          // Blends two #rrggbb colors; weight is the share of the first color.
+          const mix = (first, second, weight) => '#' + [1, 3, 5].map(offset => {
+            const channel = Math.round(parseInt(first.slice(offset, offset + 2), 16) * weight + parseInt(second.slice(offset, offset + 2), 16) * (1 - weight));
+            return channel.toString(16).padStart(2, '0');
+          }).join('');
           const foreground = color('foreground');
-          const background = color('background');
-          const surface = color('card');
-          const line = color('muted-foreground');
+          const muted = color('muted-foreground');
+          const canvas = color('background');
+          const card = color('card');
+          const border = color('border');
+          const accent = color('accent-text');
+          const dark = appearance === 'dark';
+          const nodeFill = mix(accent, card, dark ? 0.1 : 0.07);
+          const nodeBorder = mix(accent, border, dark ? 0.55 : 0.5);
+          const clusterFill = mix(accent, canvas, dark ? 0.035 : 0.025);
+          const clusterBorder = mix(muted, border, 0.45);
+          const edge = mix(muted, canvas, 0.85);
           window.mermaid.initialize({
             startOnLoad: false,
             securityLevel: 'strict',
@@ -107,17 +120,26 @@ async function createDiagramRenderer(request) {
             deterministicIds: true,
             deterministicIDSeed: seed,
             suppressErrorRendering: true,
-            secure: ['secure', 'securityLevel', 'startOnLoad', 'htmlLabels', 'look', 'theme', 'themeVariables', 'fontFamily', 'flowchart'],
-            flowchart: { htmlLabels: false, useMaxWidth: false, curve: 'linear' },
+            secure: ['secure', 'securityLevel', 'startOnLoad', 'htmlLabels', 'look', 'theme', 'themeVariables', 'themeCSS', 'fontFamily', 'flowchart'],
+            flowchart: { htmlLabels: false, useMaxWidth: false, curve: 'rounded', nodeSpacing: 40, rankSpacing: 48, padding: 20, diagramPadding: 12 },
             themeVariables: {
-              darkMode: appearance === 'dark', background, fontFamily: 'Inter', fontSize: '16px',
-              primaryColor: surface, primaryTextColor: foreground, primaryBorderColor: line,
-              secondaryColor: surface, secondaryTextColor: foreground, secondaryBorderColor: line,
-              tertiaryColor: surface, tertiaryTextColor: foreground, tertiaryBorderColor: line,
-              lineColor: line, textColor: foreground, mainBkg: surface,
-              nodeBorder: line, clusterBkg: surface, clusterBorder: line,
-              edgeLabelBackground: background, titleColor: foreground,
+              darkMode: dark, background: canvas, fontFamily: 'Inter', fontSize: '16px',
+              primaryColor: nodeFill, primaryTextColor: foreground, primaryBorderColor: nodeBorder,
+              secondaryColor: nodeFill, secondaryTextColor: foreground, secondaryBorderColor: nodeBorder,
+              tertiaryColor: clusterFill, tertiaryTextColor: foreground, tertiaryBorderColor: clusterBorder,
+              lineColor: edge, textColor: foreground, mainBkg: nodeFill,
+              nodeBorder, clusterBkg: clusterFill, clusterBorder,
+              edgeLabelBackground: canvas, titleColor: muted,
             },
+            themeCSS: [
+              `.node rect, .node polygon, .node circle, .node path { stroke-width: 1.25px; }`,
+              `.cluster rect { stroke-width: 1px; stroke-dasharray: 5 4; }`,
+              `.cluster-label text { fill: ${muted}; }`,
+              `.flowchart-link { stroke-width: 1.5px; }`,
+              `.marker, .arrowMarkerPath { fill: ${edge}; stroke: ${edge}; }`,
+              `.edgeLabel text { fill: ${muted}; }`,
+              `.edgeLabel rect.background, .labelBkg { fill: ${canvas}; opacity: 1; }`,
+            ].join(''),
           });
           const rendered = await window.mermaid.render(`diagram-${seed}`, source);
           // Mermaid includes these unused animation defaults even in static flowcharts.
@@ -130,7 +152,15 @@ async function createDiagramRenderer(request) {
           if (root.localName !== 'svg' || viewBox?.length !== 4 || !viewBox.every(Number.isFinite) || viewBox[2] <= 0 || viewBox[3] <= 0) {
             throw new Error('Mermaid generated an invalid SVG viewport');
           }
-          return { svg, width: viewBox[2], height: viewBox[3] };
+          // Corner radii are geometry attributes, so they hold in every SVG renderer rather than depending on CSS geometry support.
+          const round = (selector, radius) => xml.querySelectorAll(selector).forEach(rect => {
+            rect.setAttribute('rx', radius);
+            rect.setAttribute('ry', radius);
+          });
+          round('.node rect.label-container, .node rect.basic', '8');
+          round('.cluster > rect', '12');
+          round('.edgeLabel rect.background', '6');
+          return { svg: new XMLSerializer().serializeToString(root), width: viewBox[2], height: viewBox[3] };
         }, { source: block.source, appearance, seed });
         if (blockedRequests.length) throw new Error('Diagram attempted to request an external resource');
         return result;

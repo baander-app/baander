@@ -17,6 +17,8 @@ final class SvgDiagram
         $this->removeUnsafeContent($document);
         $sanitizer = new Sanitizer();
         $sanitizer->removeRemoteReferences(true);
+        // Indentation inside <text> would render as spaces and shift centered labels.
+        $sanitizer->minify(true);
         $clean = $sanitizer->sanitize($document->saveXML() ?: '');
         if (!is_string($clean)) {
             throw new \RuntimeException('Diagram SVG sanitization failed.');
