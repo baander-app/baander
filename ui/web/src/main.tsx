@@ -17,11 +17,13 @@ import { registerAllHandlers } from '@/shared/lib/mediator/handlers'
 import { useAuthStore } from '@/features/auth/stores/auth-store'
 import { drainPendingLogouts, installPendingLogoutTriggers } from '@/features/auth/services/pending-logout'
 import { createLogger } from '@/shared/lib/logger'
+import { loadPrimaryFonts } from '@/shared/typography'
 import App from './App'
 
 const logger = createLogger('Bootstrap')
 
 async function bootstrap() {
+  const primaryFonts = loadPrimaryFonts(document.fonts)
   await useAuthStore.getState().initAuth()
   // Logouts recorded earlier are delivered now and on every later trigger; the page lives as long as the app.
   installPendingLogoutTriggers()
@@ -40,6 +42,7 @@ async function bootstrap() {
 
   const rootEl = document.getElementById('root') || document.getElementById('baanderapproot')
   if (!rootEl) throw new Error('Root element not found')
+  await primaryFonts
   createRoot(rootEl).render(
     <StrictMode>
       <App />
