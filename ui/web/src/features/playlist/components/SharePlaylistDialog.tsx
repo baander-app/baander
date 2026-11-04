@@ -10,6 +10,7 @@ import { createLogger } from '@/shared/lib/logger'
 import { Button } from '@/shared/components/ui/button'
 import { Input } from '@/shared/components/ui/input'
 import { Switch } from '@/shared/components/ui/switch'
+import { textRole } from '@/shared/theme'
 import {
   Dialog,
   DialogContent,
@@ -28,10 +29,7 @@ const Section = styled.section`
 `
 
 const SectionLabel = styled.span`
-  font-size: 0.6875rem;
-  font-weight: 500;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  ${textRole('label')}
   color: var(--color-muted-foreground);
 `
 
@@ -43,7 +41,7 @@ const SwitchRow = styled.div`
 `
 
 const SwitchLabel = styled.label`
-  font-size: 0.875rem;
+  ${textRole('body')}
   cursor: pointer;
 `
 
@@ -60,13 +58,12 @@ const PublicId = styled.code`
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-family: var(--font-mono);
-  font-size: 0.8125rem;
+  ${textRole('mono-sm')}
   user-select: all;
 `
 
 const CopyStatus = styled.span`
-  font-size: 0.75rem;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
 `
 
@@ -89,7 +86,7 @@ const CollaboratorItem = styled.li`
 `
 
 const EmptyText = styled.p`
-  font-size: 0.875rem;
+  ${textRole('body-sm')}
   color: var(--color-muted-foreground);
 `
 
@@ -104,7 +101,7 @@ const AddInput = styled(Input)`
 `
 
 const ErrorText = styled.p`
-  font-size: 0.75rem;
+  ${textRole('caption')}
   color: var(--color-destructive);
 `
 

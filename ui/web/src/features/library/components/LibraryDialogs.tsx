@@ -14,6 +14,8 @@ import { LIBRARY_TYPES, type Library } from '../api/library-api'
 import { useDraft } from '@/shared/drafts/use-draft'
 import { captureOwnership, isCurrentOwnership, subscribeOwnership } from '@/shared/live/ownership'
 import { usePathValidation } from '../hooks/use-path-validation'
+import { textRole } from '@/shared/theme'
+import { ContentText } from '@/shared/typography'
 
 const DialogBody = styled.div`
   display: flex;
@@ -36,7 +38,7 @@ const FieldGroup = styled.div`
 const Label = styled.label`
   margin-bottom: 0.25rem;
   display: block;
-  font-size: 0.875rem;
+  ${textRole('body')}
   font-weight: 500;
 `
 
@@ -49,13 +51,13 @@ const ValidatingHint = styled.span`
   right: 0.5rem;
   top: 50%;
   transform: translateY(-50%);
-  font-size: 0.75rem;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
 `
 
 const PathHint = styled.p<{ $valid: boolean }>`
   margin-top: 0.25rem;
-  font-size: 0.75rem;
+  ${textRole('caption')}
   ${(p) => p.$valid
     ? css`color: var(--color-success);`
     : css`color: var(--color-destructive);`
@@ -73,20 +75,24 @@ const InfoBox = styled.div`
   border-radius: var(--radius-md);
   background-color: var(--color-secondary);
   padding: 0.75rem;
-  font-size: 0.75rem;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
 
   p {
     margin: 0.125rem 0;
   }
 
-  .mono {
-    font-family: monospace;
-  }
-
   .capitalize {
     text-transform: capitalize;
   }
+`
+
+const MonoValue = styled.span`
+  ${textRole('mono-sm')}
+`
+
+const NameInDescription = styled(ContentText)`
+  font-weight: 500;
 `
 
 const CheckboxLabel = styled.label`
@@ -115,13 +121,13 @@ const CheckboxLabel = styled.label`
   }
 
   p:first-of-type {
-    font-size: 0.875rem;
+    ${textRole('body')}
     font-weight: 500;
   }
 
   p:last-of-type {
     margin-top: 0.125rem;
-    font-size: 0.75rem;
+    ${textRole('caption')}
     color: var(--color-muted-foreground);
   }
 `
@@ -192,7 +198,7 @@ function CreateLibraryForm({ open, onClose, onSubmit, isPending }: CreateLibrary
             {pathResult && !isValidating && (
               <PathHint $valid={pathResult.valid}>
                 {pathResult.valid
-                  ? `Resolved: ${pathResult.resolvedPath}`
+                  ? <>Resolved: <ContentText textRole="mono-sm" text={pathResult.resolvedPath ?? ''} /></>
                   : pathResult.error}
               </PathHint>
             )}
@@ -332,8 +338,8 @@ function EditLibraryForm({ library, onClose, onSubmit, isPending, unavailable, u
           </FieldGroup>
 
           {draft.status !== 'unavailable' && <InfoBox>
-            <p>Slug: <span className="mono">/{library.slug}</span></p>
-            <p>Path: <span className="mono">{library.path}</span></p>
+            <p>Slug: <MonoValue>/{library.slug}</MonoValue></p>
+            <p>Path: <ContentText textRole="mono-sm" text={library.path} /></p>
             <p>Type: <span className="capitalize">{library.type.replace('_', ' ')}</span></p>
           </InfoBox>}
 
@@ -367,7 +373,7 @@ export function DeleteLibraryDialog({ library, onClose, onConfirm, isPending }: 
         <DialogHeader>
           <DialogTitle>Delete Library</DialogTitle>
           <DialogDescription>
-            Are you sure you want to delete <span style={{ fontWeight: 500 }}>{library.name}</span>?
+            Are you sure you want to delete <NameInDescription textRole="body" text={library.name} />?
             This will also remove all associated albums and songs. This action cannot be undone.
           </DialogDescription>
         </DialogHeader>
@@ -417,7 +423,7 @@ function ScanLibraryForm({ library, onClose, onConfirm, isPending }: ScanLibrary
         <DialogHeader>
           <DialogTitle>Scan Library</DialogTitle>
           <DialogDescription>
-            Start a scan for <span style={{ fontWeight: 500 }}>{library.name}</span>.
+            Start a scan for <NameInDescription textRole="body" text={library.name} />.
           </DialogDescription>
         </DialogHeader>
 

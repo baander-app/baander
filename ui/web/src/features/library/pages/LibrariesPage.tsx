@@ -12,6 +12,8 @@ import { useScanPolling } from '../hooks/use-scan-polling'
 import { LibraryCard } from '../components/LibraryCard'
 import { CreateLibraryDialog, EditLibraryDialog, DeleteLibraryDialog, ScanLibraryDialog } from '../components/LibraryDialogs'
 import type { Library } from '../api/library-api'
+import { textRole } from '@/shared/theme'
+import { ContentText } from '@/shared/typography'
 
 const PageWrapper = styled.div`
   display: flex;
@@ -54,13 +56,13 @@ const EmptyState = styled.div`
   text-align: center;
 
   p:first-child {
-    font-size: 0.875rem;
+    ${textRole('body')}
     color: var(--color-muted-foreground);
   }
 
   p:last-child {
     margin-top: 0.25rem;
-    font-size: 0.75rem;
+    ${textRole('caption')}
     color: var(--color-muted-foreground);
   }
 `
@@ -108,7 +110,7 @@ const SkeletonLine = styled.div<{ $width: string }>`
 
 const ErrorText = styled.p`
   margin-top: 0.5rem;
-  font-size: 0.875rem;
+  ${textRole('body-sm')}
   color: var(--color-destructive);
 `
 
@@ -279,9 +281,9 @@ export function LibrariesPage() {
             {
               onSuccess: () => {
                 setScanTarget(null)
-                toast.success(`Scan started for ${scanTarget.name}${rescan ? ' (rescan)' : ''}`)
+                toast.success(<>Scan started for <ContentText textRole="body-sm" text={scanTarget.name} />{rescan ? ' (rescan)' : ''}</>)
               },
-              onError: () => toast.error(`Failed to scan ${scanTarget.name}`),
+              onError: () => toast.error(<>Failed to scan <ContentText textRole="body-sm" text={scanTarget.name} /></>),
             },
           )
         }}

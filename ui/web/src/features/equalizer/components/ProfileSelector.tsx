@@ -8,6 +8,8 @@ import { Input } from '@/shared/components/ui/input'
 import { Button } from '@/shared/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card'
 import styled, { css } from 'styled-components'
+import { textRole } from '@/shared/theme'
+import { ContentText } from '@/shared/typography'
 import { createLogger } from '@/shared/lib/logger'
 import { toast } from 'sonner'
 
@@ -74,7 +76,7 @@ const NameInput = styled(Input)`
   border-radius: var(--radius-md);
   background-color: var(--color-secondary);
   padding: 0.375rem 0.75rem;
-  font-size: 0.875rem;
+  ${textRole('body')}
   border: 1px solid var(--color-input-boundary);
   width: 100%;
 
@@ -93,7 +95,7 @@ const IconRow = styled.div`
 const IconButton = styled(Button).attrs({ variant: 'ghost', size: 'xs' })<{ $active: boolean }>`
   padding: 0.125rem 0.375rem;
   border-radius: var(--radius-md);
-  font-size: 0.875rem;
+  ${textRole('body-sm')}
   border: none;
   cursor: pointer;
   transition: none;
@@ -114,7 +116,7 @@ const FormActions = styled.div`
 `
 
 const EmptyText = styled.p`
-  font-size: 11px;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
 `
 
@@ -147,12 +149,11 @@ const ProfileItem = styled.div<{ $active: boolean }>`
 `
 
 const ProfileIcon = styled.span`
-  font-size: 0.875rem;
+  ${textRole('body-sm')}
 `
 
-const ProfileName = styled.span`
+const ProfileName = styled(ContentText)`
   min-width: 0;
-  font-size: 11px;
   font-weight: 500;
   flex: 1;
   overflow: hidden;
@@ -161,9 +162,9 @@ const ProfileName = styled.span`
 `
 
 const DefaultLabel = styled.span`
-  font-size: 9px;
+  ${textRole('label')}
+  font-size: var(--text-dense-size);
   color: var(--color-muted-foreground);
-  text-transform: uppercase;
 `
 
 export function ProfileSelector() {
@@ -348,7 +349,7 @@ export function ProfileSelector() {
               onClick={() => handleActivate(profile.publicId)}
             >
               <ProfileIcon>{ICON_LABEL[profile.icon]}</ProfileIcon>
-              <ProfileName>{profile.name}</ProfileName>
+              <ProfileName textRole="body-sm" text={profile.name} />
               {profile.isDefault && (
                 <DefaultLabel>Default</DefaultLabel>
               )}

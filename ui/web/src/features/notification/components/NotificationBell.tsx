@@ -2,6 +2,7 @@ import { Button } from '@/shared/components/ui/button'
 import styled from 'styled-components'
 import { Bell } from 'lucide-react'
 import { useNotificationStore } from '../stores/notification-store'
+import { textRole } from '@/shared/theme'
 
 const BellButton = styled(Button).attrs({ variant: 'ghost', size: 'icon-xs' })`
   border: 0;
@@ -37,9 +38,9 @@ const UnreadBadge = styled.span`
   border-radius: 9999px;
   background-color: var(--color-destructive);
   padding: 0 0.25rem;
-  font-size: 9px;
+  ${textRole('caption')}
+  font-size: var(--text-dense-size);
   font-weight: 500;
-  line-height: 1;
   color: var(--color-destructive-foreground);
 `
 

@@ -15,6 +15,8 @@ import { useMemo } from 'react'
 import { toast } from 'sonner'
 import { formatDuration } from '@/shared/utils/format-duration'
 import { SharePlaylistDialog } from '../components/SharePlaylistDialog'
+import { textRole } from '@/shared/theme'
+import { ContentText } from '@/shared/typography'
 
 const PageContainer = styled.div`
   display: flex;
@@ -32,7 +34,7 @@ const LoadingContainer = styled.div`
 
 const NotFoundMessage = styled.div`
   padding: 1.5rem;
-  font-size: 0.875rem;
+  ${textRole('body')}
   color: var(--color-muted-foreground);
 `
 
@@ -55,13 +57,8 @@ const HeaderInfo = styled.div`
   flex: 1;
 `
 
-const PlaylistTitle = styled.h1`
-  font-size: 1.125rem;
-  font-weight: 600;
-`
-
-const PlaylistDescription = styled.p`
-  font-size: 0.875rem;
+const PlaylistDescription = styled(ContentText)`
+  display: block;
   color: var(--color-muted-foreground);
 `
 
@@ -73,8 +70,18 @@ const MetaRow = styled.div`
 `
 
 const MetaText = styled.span`
-  font-size: 0.75rem;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
+`
+
+const TotalDuration = styled.span`
+  ${textRole('mono-sm')}
+  color: var(--color-muted-foreground);
+`
+
+const SmartBadge = styled(Badge)`
+  ${textRole('caption')}
+  font-size: var(--text-dense-size);
 `
 
 const ActionRow = styled.div`
@@ -99,7 +106,6 @@ const SongItem = styled.li`
   gap: 0.75rem;
   border-radius: var(--radius-md);
   padding: 0.5rem 0.75rem;
-  font-size: 0.875rem;
   cursor: pointer;
 
   &:hover {
@@ -109,6 +115,7 @@ const SongItem = styled.li`
 
 const SongPosition = styled.span`
   width: 1.5rem;
+  ${textRole('body-sm')}
   text-align: right;
   color: var(--color-muted-foreground);
 `
@@ -118,23 +125,33 @@ const SongInfo = styled.div`
   flex: 1;
 `
 
-const SongTitle = styled.p`
+const SongTitleLine = styled.p`
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  ${textRole('body-sm')}
   font-weight: 500;
 `
 
-const SongArtist = styled.p`
+const SongTitle = styled(ContentText)`
+  font-weight: 500;
+`
+
+const SongArtist = styled(ContentText)`
+  display: block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 0.75rem;
+  color: var(--color-muted-foreground);
+`
+
+const UnknownArtist = styled.p`
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
 `
 
 const SongDuration = styled.span`
-  font-size: 0.75rem;
+  ${textRole('timecode')}
   color: var(--color-muted-foreground);
 `
 
@@ -213,16 +230,17 @@ export function PlaylistDetailPage() {
           <ArrowLeft size={20} />
         </BackLink>
         <HeaderInfo>
-          <PlaylistTitle>{playlist.name}</PlaylistTitle>
+          <ContentText textRole="title" text={playlist.name ?? ''} as="h1" />
           {playlist.description && (
-            <PlaylistDescription>{playlist.description}</PlaylistDescription>
+            <PlaylistDescription textRole="body" text={playlist.description} forwardedAs="p" />
           )}
           <MetaRow>
             <MetaText>
               {songs.length} {songs.length === 1 ? 'song' : 'songs'}
-              {totalDuration > 0 && ` · ${formatDuration(totalDuration)}`}
+              {totalDuration > 0 && ' · '}
+              {totalDuration > 0 && <TotalDuration>{formatDuration(totalDuration)}</TotalDuration>}
             </MetaText>
-            {playlist.isSmart && <Badge variant="secondary" style={{ fontSize: '10px' }}>Smart</Badge>}
+            {playlist.isSmart && <SmartBadge variant="secondary">Smart</SmartBadge>}
           </MetaRow>
         </HeaderInfo>
       </HeaderRow>
@@ -251,8 +269,13 @@ export function PlaylistDetailPage() {
           >
             <SongPosition>{song.position ?? i + 1}</SongPosition>
             <SongInfo>
-              <SongTitle>{song.title || song.publicId}{song.available === false && <span> · Unavailable</span>}</SongTitle>
-              <SongArtist>{song.artistName ?? 'Unknown artist'}</SongArtist>
+              <SongTitleLine>
+                <SongTitle textRole="body-sm" text={song.title || song.publicId || ''} language={song.albumLanguage} />
+                {song.available === false && <span> · Unavailable</span>}
+              </SongTitleLine>
+              {song.artistName
+                ? <SongArtist textRole="caption" text={song.artistName} forwardedAs="p" />
+                : <UnknownArtist>Unknown artist</UnknownArtist>}
             </SongInfo>
             {song.length != null && (
               <SongDuration>

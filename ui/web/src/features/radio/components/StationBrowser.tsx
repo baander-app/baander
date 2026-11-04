@@ -12,6 +12,7 @@ import {
 import { StationCard } from './StationCard'
 import { Input } from '@/shared/components/ui/input'
 import { Skeleton } from '@/shared/components/ui/skeleton'
+import { textRole } from '@/shared/theme'
 
 const Container = styled.div`
   display: flex;
@@ -43,7 +44,7 @@ const SearchIcon = styled(Search)`
 const SearchInput = styled(Input)`
   height: 2rem;
   padding-left: 2rem;
-  font-size: 0.875rem;
+  ${textRole('body-sm')}
 `
 
 const CountryFilters = styled.div`
@@ -55,7 +56,7 @@ const CountryFilters = styled.div`
 const CountryButton = styled.button<{ $active: boolean }>`
   border-radius: 9999px;
   padding: 0.25rem 0.625rem;
-  font-size: 0.75rem;
+  ${textRole('caption')}
   border: none;
   cursor: pointer;
   transition: background-color 0.15s, color 0.15s;
@@ -91,7 +92,7 @@ const ResultsList = styled.div`
 const EmptyMessage = styled.p`
   padding: 2rem 0;
   text-align: center;
-  font-size: 0.875rem;
+  ${textRole('body-sm')}
   color: var(--color-muted-foreground);
 `
 

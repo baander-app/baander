@@ -3,6 +3,7 @@ import { LoudnessTargetControl } from './LoudnessTargetControl'
 import { Button } from '@/shared/components/ui/button'
 import { useEqProcessingStore, type ProcessingModule, DEFAULT_CHAIN_ORDER } from '../stores/eq-processing-store'
 import styled, { css } from 'styled-components'
+import { textRole } from '@/shared/theme'
 import {
   DndContext,
   closestCenter,
@@ -69,9 +70,8 @@ const SlotName = styled(Button).attrs({ variant: 'ghost', size: 'xs' })`
   min-width: 0;
   justify-content: flex-start;
   text-align: left;
-  font-size: 11px;
+  ${textRole('body-sm')}
   font-weight: 500;
-  letter-spacing: 0.025em;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -96,7 +96,8 @@ const BypassButton = styled(Button).attrs({ variant: 'ghost', size: 'xs' })<{ $e
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  font-size: 8px;
+  ${textRole('caption')}
+  font-size: var(--text-dense-size);
   font-weight: 700;
   border: none;
   cursor: pointer;
@@ -126,20 +127,16 @@ const SliderRowWrapper = styled.div`
 `
 
 const SliderLabel = styled.span`
-  font-size: 10px;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  ${textRole('label')}
   color: var(--color-muted-foreground);
-  width: 3rem;
+  width: 4.5rem;
   flex-shrink: 0;
 `
 
 const SliderValue = styled.span`
-  width: 3.5rem;
+  width: 4rem;
   text-align: right;
-  font-variant-numeric: tabular-nums;
-  font-size: 10px;
+  ${textRole('mono-sm')}
   flex-shrink: 0;
 `
 
@@ -152,7 +149,7 @@ const ModeRow = styled.div`
 const ModeButton = styled(Button).attrs({ variant: 'ghost', size: 'xs' })<{ $active: boolean }>`
   padding: 0.125rem 0.5rem;
   border-radius: var(--radius-md);
-  font-size: 10px;
+  ${textRole('caption')}
   font-weight: 500;
   border: none;
   cursor: pointer;
@@ -169,7 +166,7 @@ const ModeButton = styled(Button).attrs({ variant: 'ghost', size: 'xs' })<{ $act
 `
 
 const HintText = styled.span`
-  font-size: 10px;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
 `
 
@@ -203,12 +200,12 @@ const Footer = styled.div`
 `
 
 const FooterHint = styled.span`
-  font-size: 9px;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
 `
 
 const ResetButton = styled(Button).attrs({ variant: 'ghost', size: 'xs' })`
-  font-size: 10px;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
   border: none;
   background: none;

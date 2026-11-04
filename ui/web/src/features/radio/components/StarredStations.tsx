@@ -2,6 +2,7 @@ import { useStarredStations, useStations, useUnstarStation } from '../hooks/use-
 import styled from 'styled-components'
 import { StationCard } from './StationCard'
 import { Skeleton } from '@/shared/components/ui/skeleton'
+import { textRole } from '@/shared/theme'
 
 const Container = styled.div`
   display: flex;
@@ -18,7 +19,7 @@ const SkeletonContainer = styled.div`
 const EmptyMessage = styled.p`
   padding: 2rem 0;
   text-align: center;
-  font-size: 0.875rem;
+  ${textRole('body-sm')}
   color: var(--color-muted-foreground);
 `
 

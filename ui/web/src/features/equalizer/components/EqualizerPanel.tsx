@@ -12,6 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui
 import { Button } from '@/shared/components/ui/button'
 import { Slider } from '@/shared/components/ui/slider'
 import styled from 'styled-components'
+import { textRole } from '@/shared/theme'
 
 // --- Main Panel Styled Components ---
 
@@ -77,10 +78,7 @@ const EqBandCol = styled.div`
 `
 
 const BandLabel = styled.span`
-  font-size: 11px;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  ${textRole('label')}
   color: var(--color-muted-foreground);
 `
 
@@ -91,8 +89,7 @@ const BandSliderWrap = styled.div`
 `
 
 const BandGain = styled.span<{ $gain: number }>`
-  font-variant-numeric: tabular-nums;
-  font-size: 11px;
+  ${textRole('mono-sm')}
   color: ${(p) => {
     if (p.$gain > 0) return 'var(--color-accent-text)'
     if (p.$gain < 0) return 'var(--color-muted-foreground)'
@@ -109,8 +106,7 @@ const BottomGrid = styled.div`
 `
 
 const VolumeLabel = styled.span`
-  font-variant-numeric: tabular-nums;
-  font-size: 0.875rem;
+  ${textRole('mono-sm')}
 `
 
 const VolumeRow = styled.div`

@@ -1,4 +1,5 @@
 import styled from 'styled-components'
+import { textRole } from '@/shared/theme'
 import type { LibraryStats } from '../api/library-api'
 import { formatFileSize, formatDuration } from '../utils/format'
 
@@ -32,11 +33,11 @@ const StatCard = styled.div`
 
   & > div {
     p:first-child {
-      font-size: 0.75rem;
+      ${textRole('caption')}
       color: var(--color-muted-foreground);
     }
     p:last-child {
-      font-size: 0.875rem;
+      ${textRole('mono-sm')}
       font-weight: 500;
     }
   }
@@ -56,7 +57,7 @@ const SkeletonCard = styled.div`
 `
 
 const EmptyText = styled.p`
-  font-size: 0.875rem;
+  ${textRole('body-sm')}
   color: var(--color-muted-foreground);
 `
 

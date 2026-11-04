@@ -10,6 +10,7 @@ import {
   DropdownMenuItem,
 } from '@/shared/components/ui/dropdown-menu'
 import { Badge } from '@/shared/components/ui/badge'
+import { textRole } from '@/shared/theme'
 
 const EditorContainer = styled.div`
   display: flex;
@@ -24,14 +25,14 @@ const Header = styled.div`
 `
 
 const HintText = styled.p`
-  font-size: 0.75rem;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
 `
 
 const EmptyMessage = styled.p`
   padding: 1.5rem 0;
   text-align: center;
-  font-size: 0.875rem;
+  ${textRole('body-sm')}
   color: var(--color-muted-foreground);
 `
 
@@ -60,17 +61,22 @@ const OperatorTrigger = styled(Button).attrs({ variant: 'outline', size: 'xs' })
 `
 
 const ValueInput = styled(Input)`
-  height: 1.5rem;
+  height: auto;
+  min-height: 1.5rem;
   flex: 1;
-  font-size: 0.75rem;
+  ${textRole('body-sm')}
 `
 
 const AndLabel = styled.span`
   position: absolute;
   margin-top: -0.25rem;
-  font-size: 10px;
-  font-weight: 500;
+  ${textRole('label')}
   color: var(--color-muted-foreground);
+`
+
+const OperatorBadge = styled(Badge)`
+  ${textRole('caption')}
+  font-size: var(--text-dense-size);
 `
 
 const FIELDS = [
@@ -210,9 +216,9 @@ export function SmartPlaylistEditor({ rules, onChange, disabled }: SmartPlaylist
               )}
 
               {!needsValue && (
-                <Badge variant="secondary" style={{ fontSize: '10px' }}>
+                <OperatorBadge variant="secondary">
                   {operator?.label}
-                </Badge>
+                </OperatorBadge>
               )}
 
               <Button

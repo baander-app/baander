@@ -1,4 +1,5 @@
-import { focusVisibleRing } from '@/shared/theme'
+import { focusVisibleRing, textRole } from '@/shared/theme'
+import { ContentText } from '@/shared/typography'
 import { notificationCategoryColors } from '@/features/notification/category-colors'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -75,17 +76,16 @@ const ContentArea = styled.div`
   flex: 1;
 `
 
-const Title = styled.p`
+const Title = styled(ContentText)`
+  display: block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 13px;
-  line-height: 1.375;
   color: var(--color-foreground);
 `
 
 const Time = styled.p`
-  font-size: 11px;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
 `
 
@@ -117,9 +117,7 @@ export function NotificationItem({ notification }: { notification: NotificationI
     <ItemButton onClick={handleClick} disabled={markRead.isPending} $unread={!notification.isRead}>
       <ColorBar $color={barColor} />
       <ContentArea>
-        <Title>
-          {notification.title ?? notification.eventType}
-        </Title>
+        <Title textRole="body-sm" text={notification.title ?? notification.eventType} forwardedAs="p" />
         <Time>
           {relativeTime(notification.createdAt)}
         </Time>

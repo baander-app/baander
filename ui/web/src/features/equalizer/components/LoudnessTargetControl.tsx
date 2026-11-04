@@ -1,5 +1,6 @@
 import { useId, useState } from 'react'
 import styled from 'styled-components'
+import { textRole } from '@/shared/theme'
 import { Input } from '@/shared/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/components/ui/select'
 import { isLoudnessTarget, LOUDNESS_PRESETS } from '../loudness-targets'
@@ -20,13 +21,13 @@ const Fields = styled.div`
 `
 
 const FieldLabel = styled.label`
-  font-size: 0.875rem;
+  ${textRole('body')}
   font-weight: 500;
 `
 
 const Description = styled.p`
   margin: 0;
-  font-size: 0.75rem;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
 `
 

@@ -5,6 +5,7 @@ import { Globe, Radio, Star } from 'lucide-react'
 import { CountryPicker } from '../components/CountryPicker'
 import { StationBrowser } from '../components/StationBrowser'
 import { StarredStations } from '../components/StarredStations'
+import { textRole } from '@/shared/theme'
 
 const PageContainer = styled.div`
   display: flex;
@@ -18,12 +19,11 @@ const PageHeader = styled.div`
 `
 
 const PageTitle = styled.h1`
-  font-size: 1.125rem;
-  font-weight: 600;
+  ${textRole('title-lg')}
 `
 
 const PageDescription = styled.p`
-  font-size: 0.875rem;
+  ${textRole('subtitle')}
   color: var(--color-muted-foreground);
 `
 

@@ -3,7 +3,8 @@ import { usePostPlaylistStore, useDeletePlaylistDestroy } from '@/features/playl
 import { useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import styled from 'styled-components'
-import { interactiveTransition } from '@/shared/theme'
+import { interactiveTransition, textRole } from '@/shared/theme'
+import { ContentText } from '@/shared/typography'
 import { useGetPlaylistIndex } from '@/shared/api-client/gen/endpoints'
 import { SmartPlaylistEditor, type SmartRule } from '../components/SmartPlaylistEditor'
 import { useAuthStore } from '@/features/auth/stores/auth-store'
@@ -34,9 +35,7 @@ const PageHeader = styled.div`
 `
 
 const PageTitle = styled.h1`
-  font-size: 0.875rem;
-  font-weight: 600;
-  letter-spacing: -0.025em;
+  ${textRole('title-lg')}
 `
 
 const CreateForm = styled.div`
@@ -53,7 +52,7 @@ const CreateFormInner = styled.div`
 const SmartToggle = styled.button<{ $active: boolean }>`
   border-radius: var(--radius-md);
   padding: 0.25rem 0.5rem;
-  font-size: 0.75rem;
+  ${textRole('body-sm')}
   border: none;
   cursor: pointer;
   transition: background-color 0.15s, color 0.15s;
@@ -97,7 +96,7 @@ const EmptyState = styled.div`
 `
 
 const EmptyText = styled.p`
-  font-size: 0.75rem;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
   text-align: center;
 `
@@ -138,17 +137,18 @@ const NameRow = styled.div`
 `
 
 const SharedBadge = styled(Badge)`
-  height: 1rem;
+  height: auto;
+  min-height: 1rem;
   padding: 0 0.375rem;
-  font-size: 10px;
+  ${textRole('caption')}
+  font-size: var(--text-dense-size);
 `
 
-const PlaylistName = styled.p`
+const PlaylistName = styled(ContentText)`
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 0.875rem;
   font-weight: 500;
 `
 
@@ -156,7 +156,7 @@ const PlaylistMeta = styled.p`
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 10px;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
 `
 
@@ -180,7 +180,7 @@ const DeleteButton = styled.button`
 
 const SmallInput = styled(Input)`
   height: 1.75rem;
-  font-size: 0.75rem;
+  ${textRole('body-sm')}
 `
 
 const SmartToggleRow = styled.div`
@@ -351,7 +351,7 @@ export function PlaylistsPage() {
                 <PlaylistItem key={item.publicId}>
                   <PlaylistLink to={`/music/playlists/${item.publicId}`}>
                     <NameRow>
-                      <PlaylistName>{item.name}</PlaylistName>
+                      <PlaylistName textRole="body-sm" text={item.name} forwardedAs="p" />
                       {isShared && (
                         <SharedBadge variant="secondary">Shared with you</SharedBadge>
                       )}

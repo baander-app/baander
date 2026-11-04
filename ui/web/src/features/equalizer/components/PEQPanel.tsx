@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useEqBandsStore, EQ_BANDS } from '../stores/eq-bands-store'
 import styled, { css } from 'styled-components'
+import { textRole } from '@/shared/theme'
 
 const MAX_PEQ_POINTS = 15
 const FREQ_MIN = 20
@@ -105,7 +106,7 @@ const PointInfo = styled.div`
   display: flex;
   align-items: center;
   gap: 1rem;
-  font-size: 11px;
+  ${textRole('mono-sm')}
 `
 
 const InfoLabel = styled.span`
@@ -121,7 +122,7 @@ const GainLabel = styled.span<{ $positive: boolean | null }>`
 `
 
 const HelpText = styled.p`
-  font-size: 10px;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
   text-align: center;
 `

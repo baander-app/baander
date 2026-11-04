@@ -2,6 +2,7 @@ import { captureEqSettings, applyEqSettings } from '../stores/eq-settings'
 import { useEqCompareStore, type EqSnapshot } from '../stores/eq-compare-store'
 import { Button } from '@/shared/components/ui/button'
 import styled from 'styled-components'
+import { textRole } from '@/shared/theme'
 
 function captureCurrentState(label: string): EqSnapshot {
   const { bands, ...processing } = captureEqSettings()
@@ -25,7 +26,7 @@ const SlotHeader = styled.div`
 `
 
 const Timestamp = styled.span`
-  font-size: 10px;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
   text-align: center;
 `

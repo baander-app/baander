@@ -14,6 +14,8 @@ import { Input } from '@/shared/components/ui/input'
 import { Button } from '@/shared/components/ui/button'
 import { Skeleton } from '@/shared/components/ui/skeleton'
 import { useGetPlaylistIndex } from '@/shared/api-client/gen/endpoints'
+import { textRole } from '@/shared/theme'
+import { ContentText } from '@/shared/typography'
 
 import { toast } from 'sonner'
 import { Plus } from 'lucide-react'
@@ -46,7 +48,7 @@ const PlaylistButton = styled.button`
   border-radius: var(--radius-md);
   padding: 0.5rem 0.75rem;
   text-align: left;
-  font-size: 0.875rem;
+  ${textRole('body')}
   background: none;
   border: none;
   cursor: pointer;
@@ -61,7 +63,7 @@ const PlaylistButton = styled.button`
 const EmptyMessage = styled.p`
   padding: 1rem 0;
   text-align: center;
-  font-size: 0.875rem;
+  ${textRole('body-sm')}
   color: var(--color-muted-foreground);
 `
 
@@ -127,7 +129,7 @@ export function AddToPlaylistDialog({ open, onOpenChange, songId }: AddToPlaylis
       if (newPlaylistId) {
         await addSong.mutateAsync({ publicId: newPlaylistId, data: { songId } })
         if (!isCurrentOwnership(owner)) return
-        toast.success(`Created "${newName.trim()}" and added song`)
+        toast.success(<>Created &quot;<ContentText textRole="body-sm" text={newName.trim()} />&quot; and added song</>)
       }
       setNewName('')
       onOpenChange(false)
@@ -171,7 +173,7 @@ export function AddToPlaylistDialog({ open, onOpenChange, songId }: AddToPlaylis
                     type="button"
                     onClick={() => handleAdd(playlist.publicId)}
                   >
-                    {playlist.name}
+                    <ContentText textRole="body" text={playlist.name} />
                   </PlaylistButton>
                 ))}
               </PlaylistList>

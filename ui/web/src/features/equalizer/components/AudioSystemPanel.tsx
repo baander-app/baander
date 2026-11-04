@@ -3,6 +3,7 @@ import { audioService } from '@/features/player/services/audio-service'
 import type { AudioSystemInfo, AnalysisData } from '@/features/player/services/audio-processor'
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card'
 import styled, { css } from 'styled-components'
+import { textRole } from '@/shared/theme'
 
 interface LiveState {
   system: AudioSystemInfo | null
@@ -17,10 +18,7 @@ const TwoColGrid = styled.div`
 `
 
 const ColHeader = styled.p`
-  font-size: 11px;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  ${textRole('label')}
   color: var(--color-muted-foreground);
   margin-bottom: 0.5rem;
 `
@@ -51,7 +49,7 @@ const Dot = styled.div<{ $on: boolean }>`
 `
 
 const StatusLabel = styled.span`
-  font-size: 11px;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
 `
 
@@ -63,17 +61,14 @@ const KvRow = styled.div`
 `
 
 const KvLabel = styled.span`
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  ${textRole('label')}
   color: var(--color-muted-foreground);
   flex-shrink: 0;
 `
 
 const KvValue = styled.span<{ $mono?: boolean }>`
-  font-size: 11px;
+  ${(p) => textRole(p.$mono ? 'mono-sm' : 'caption')}
   color: var(--color-foreground);
-  ${(p) => p.$mono && css`font-variant-numeric: tabular-nums;`}
 `
 
 const MiniBarTrack = styled.div`
@@ -104,10 +99,7 @@ const HeaderStatus = styled.div`
 `
 
 const StateText = styled.span<{ $color: string }>`
-  font-size: 11px;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  ${textRole('label')}
   color: ${(p) => p.$color};
 `
 
@@ -125,7 +117,7 @@ const MetricWithBar = styled.div`
 `
 
 const NoProcessorText = styled.p`
-  font-size: 11px;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
 `
 

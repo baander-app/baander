@@ -1,5 +1,7 @@
 import styled, { css } from 'styled-components'
 import { Card, CardContent } from '@/shared/components/ui/card'
+import { textRole } from '@/shared/theme'
+import { ContentText } from '@/shared/typography'
 import type { Library } from '../api/library-api'
 import { formatRelativeTime } from '../utils/format'
 
@@ -33,7 +35,8 @@ const Badge = styled.span<{ $variant?: string }>`
   gap: 0.25rem;
   border-radius: 9999px;
   padding: 0.125rem 0.5rem;
-  font-size: 10px;
+  ${textRole('caption')}
+  font-size: var(--text-dense-size);
   font-weight: 500;
 
   ${(p) => {
@@ -62,9 +65,8 @@ const TypeBadgeWrapper = styled.span`
   border-radius: 9999px;
   background-color: var(--color-secondary);
   padding: 0.125rem 0.5rem;
-  font-size: 10px;
-  font-weight: 500;
-  text-transform: uppercase;
+  ${textRole('label')}
+  font-size: var(--text-dense-size);
   color: var(--color-muted-foreground);
 `
 
@@ -85,39 +87,37 @@ const NameRow = styled.div`
   display: flex;
   align-items: center;
   gap: 0.5rem;
-
-  p:first-child {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-size: 0.875rem;
-    font-weight: 500;
-
-    &:hover {
-      text-decoration: underline;
-    }
-  }
 `
 
-const PathText = styled.p`
+const LibraryName = styled(ContentText)`
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 0.75rem;
+  font-weight: 500;
+
+  &:hover {
+    text-decoration: underline;
+  }
+`
+
+const PathText = styled(ContentText)`
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: var(--color-muted-foreground);
-  font-family: monospace;
 `
 
 const MetaRow = styled.div`
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 0.75rem;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
+`
 
-  span:last-child {
-    font-family: monospace;
-  }
+const SlugText = styled.span`
+  ${textRole('mono-sm')}
 `
 
 const ActionsRow = styled.div`
@@ -128,7 +128,7 @@ const ActionsRow = styled.div`
 const ActionButton = styled.button<{ $variant?: 'primary' | 'secondary' | 'destructive' }>`
   border-radius: var(--radius-md);
   padding: 0.375rem 0.75rem;
-  font-size: 0.75rem;
+  ${textRole('body-sm')}
   font-weight: 500;
   transition: background-color 0.15s, opacity 0.15s;
   border: none;
@@ -197,17 +197,17 @@ export function LibraryCard({ library, isScanning, onEdit, onDelete, onScan, onV
         <HeaderRow>
           <InfoArea onClick={() => onViewDetail(library)}>
             <NameRow>
-              <p>{library.name}</p>
+              <LibraryName textRole="body" text={library.name} forwardedAs="p" />
               <ScanStatusBadge status={library.scanStatus} />
             </NameRow>
-            <PathText>{library.path}</PathText>
+            <PathText textRole="mono-sm" text={library.path} forwardedAs="p" />
           </InfoArea>
           <TypeBadge type={library.type} />
         </HeaderRow>
 
         <MetaRow>
           <span>Last scan: {formatRelativeTime(library.lastScan)}</span>
-          <span>/{library.slug}</span>
+          <SlugText>/{library.slug}</SlugText>
         </MetaRow>
 
         <ActionsRow>

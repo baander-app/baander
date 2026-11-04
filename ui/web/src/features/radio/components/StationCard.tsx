@@ -4,6 +4,8 @@ import type { RadioStation } from '@/features/radio/api/radio-api'
 import { useRadioPlayback } from '@/features/radio/hooks/use-radio-playback'
 import { useRadioStore } from '@/features/radio/stores/radio-store'
 import { Button } from '@/shared/components/ui/button'
+import { textRole } from '@/shared/theme'
+import { ContentText } from '@/shared/typography'
 
 const CardContainer = styled.div<{ $active: boolean }>`
   display: flex;
@@ -44,11 +46,11 @@ const StationInfo = styled.div`
   flex: 1;
 `
 
-const StationName = styled.p`
+const StationName = styled(ContentText)`
+  display: block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 0.875rem;
   font-weight: 500;
 `
 
@@ -59,7 +61,12 @@ const StationMeta = styled.div`
 `
 
 const MetaText = styled.span`
-  font-size: 0.75rem;
+  ${textRole('caption')}
+  color: var(--color-muted-foreground);
+`
+
+const StreamText = styled.span`
+  ${textRole('mono-sm')}
   color: var(--color-muted-foreground);
 `
 
@@ -74,7 +81,8 @@ const GenreTag = styled.span`
   border-radius: 9999px;
   background-color: var(--color-muted);
   padding: 0.125rem 0.375rem;
-  font-size: 10px;
+  ${textRole('caption')}
+  font-size: var(--text-dense-size);
   color: var(--color-muted-foreground);
 `
 
@@ -128,15 +136,15 @@ export function StationCard({ station, isStarred, onStar, onUnstar }: StationCar
 
       {/* Station info */}
       <StationInfo>
-        <StationName>{station.name}</StationName>
+        <StationName textRole="body-sm" text={station.name} forwardedAs="p" />
         <StationMeta>
           {station.language && (
             <MetaText>{station.language}</MetaText>
           )}
           {station.streams.length > 0 && (
-            <MetaText>
+            <StreamText>
               {station.streams[0].format.toUpperCase()} · {formatBitrate(station.streams[0].bitrate)}
-            </MetaText>
+            </StreamText>
           )}
         </StationMeta>
         {station.genres.length > 0 && (

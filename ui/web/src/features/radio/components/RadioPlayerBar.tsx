@@ -3,6 +3,8 @@ import { Square, Radio, AlertTriangle, Volume2, VolumeX } from 'lucide-react'
 import { useRadioStore } from '@/features/radio/stores/radio-store'
 import { useRadioPlayback } from '@/features/radio/hooks/use-radio-playback'
 import { usePlayerStore } from '@/features/player/stores/player-store'
+import { textRole } from '@/shared/theme'
+import { ContentText } from '@/shared/typography'
 
 const BarContainer = styled.div`
   border-top: 1px solid var(--color-border);
@@ -52,11 +54,11 @@ const StationNameRow = styled.div`
   gap: 0.375rem;
 `
 
-const StationName = styled.p`
+const StationName = styled(ContentText)`
+  display: block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 0.875rem;
   font-weight: 500;
 `
 
@@ -65,8 +67,8 @@ const LiveBadge = styled.span`
   border-radius: 9999px;
   background-color: var(--color-secondary);
   padding: 0.125rem 0.375rem;
-  font-size: 10px;
-  font-weight: 500;
+  ${textRole('label')}
+  font-size: var(--text-dense-size);
   color: var(--color-destructive);
 `
 
@@ -74,7 +76,7 @@ const StationMeta = styled.p`
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 0.75rem;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
 `
 
@@ -82,12 +84,12 @@ const FailureIndicator = styled.div`
   display: flex;
   align-items: center;
   gap: 0.25rem;
-  font-size: 0.75rem;
+  ${textRole('caption')}
   color: var(--color-destructive);
 `
 
 const FallbackText = styled.span`
-  font-size: 0.75rem;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
 `
 
@@ -170,7 +172,7 @@ export function RadioPlayerBar() {
 
           <StationText>
             <StationNameRow>
-              <StationName>{activeStation.name}</StationName>
+              <StationName textRole="body-sm" text={activeStation.name} forwardedAs="p" />
               {isPlaying && !allStreamsFailed && (
                 <LiveBadge>LIVE</LiveBadge>
               )}

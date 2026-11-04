@@ -116,6 +116,20 @@ describe('PlaylistDetailPage sharing controls', () => {
       queue: ['present'], currentTrackIndex: 0, position: 0, desiredState: 'playing' })
   })
 
+  it('sets each song title in its album language and leaves the artist to its own', async () => {
+    served = playlist({ songs: [
+      { publicId: 'japanese', title: '直', artistName: '周杰倫', albumLanguage: 'jpn', available: true },
+    ] })
+    signInAs(STRANGER)
+    renderPage()
+
+    const title = await screen.findByText('直')
+    const artist = screen.getByText('周杰倫')
+    expect(title).toHaveAttribute('lang', 'ja')
+    expect(artist).toHaveAttribute('lang', 'en')
+    expect(title).not.toContainElement(artist)
+  })
+
   it('offers the owner the share dialog and no leave action', async () => {
     signInAs(OWNER)
     renderPage()

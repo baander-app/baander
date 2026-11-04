@@ -7,6 +7,7 @@ import { getAvailableCountries, subscribeCountry, unsubscribeCountry } from '@/f
 import { Input } from '@/shared/components/ui/input'
 import { Skeleton } from '@/shared/components/ui/skeleton'
 import { toast } from 'sonner'
+import { textRole } from '@/shared/theme'
 
 const CountryGrid = styled.div`
   display: grid;
@@ -75,19 +76,19 @@ const CountryName = styled.p`
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 0.875rem;
+  ${textRole('body-sm')}
   font-weight: 500;
 `
 
 const StationCount = styled.p`
-  font-size: 0.75rem;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
 `
 
 const EmptyMessage = styled.p`
   padding: 2rem 0;
   text-align: center;
-  font-size: 0.875rem;
+  ${textRole('body-sm')}
   color: var(--color-muted-foreground);
 `
 

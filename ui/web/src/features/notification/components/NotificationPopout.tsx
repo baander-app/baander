@@ -4,6 +4,7 @@ import { useNotificationReader } from '../hooks/use-notification-reader'
 import { useNotificationActions } from '../hooks/use-notification-actions'
 import { Button } from '@/shared/components/ui/button'
 import { NotificationItem } from './NotificationItem'
+import { textRole } from '@/shared/theme'
 
 const PopoutContent = styled(Popover.Content)`
   z-index: 50;
@@ -24,15 +25,13 @@ const Header = styled.div`
 `
 
 const HeaderLabel = styled.span`
-  font-size: 11px;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  ${textRole('label')}
   color: var(--color-muted-foreground);
 `
 
 const MarkAllButton = styled(Button).attrs({ variant: 'ghost', size: 'sm' })`
-  font-size: 11px;
+  ${textRole('caption')}
+  font-weight: 500;
   color: var(--color-muted-foreground);
   transition: color var(--duration-hover) ease-out;
 
@@ -49,7 +48,7 @@ const ScrollArea = styled.div`
 const EmptyState = styled.div`
   padding: 1.5rem 0.75rem;
   text-align: center;
-  font-size: 13px;
+  ${textRole('body-sm')}
   color: var(--color-muted-foreground);
 `
 

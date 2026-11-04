@@ -9,6 +9,8 @@ import { LibraryStatsPanel } from '../components/LibraryStatsPanel'
 import { DeleteLibraryDialog, ScanLibraryDialog } from '../components/LibraryDialogs'
 import { useState } from 'react'
 import { formatRelativeTime } from '../utils/format'
+import { textRole } from '@/shared/theme'
+import { ContentText } from '@/shared/typography'
 
 const PageWrapper = styled.div`
   display: flex;
@@ -45,17 +47,12 @@ const BackButton = styled.button`
 `
 
 const TitleArea = styled.div`
-  h1 {
-    font-size: 1.125rem;
-    font-weight: 600;
-    letter-spacing: -0.025em;
-  }
+  min-width: 0;
+`
 
-  p {
-    font-size: 0.75rem;
-    color: var(--color-muted-foreground);
-    font-family: monospace;
-  }
+const LibraryPath = styled(ContentText)`
+  display: block;
+  color: var(--color-muted-foreground);
 `
 
 const RightSection = styled.div`
@@ -67,7 +64,8 @@ const RightSection = styled.div`
 const StatusBadge = styled.span<{ $status?: string }>`
   border-radius: 9999px;
   padding: 0.125rem 0.5rem;
-  font-size: 10px;
+  ${textRole('caption')}
+  font-size: var(--text-dense-size);
   font-weight: 500;
 
   ${(p) => {
@@ -113,11 +111,8 @@ const ContentInner = styled.div`
 
 const SectionTitle = styled.h2`
   margin-bottom: 0.75rem;
-  font-size: 0.875rem;
-  font-weight: 600;
-  letter-spacing: -0.025em;
+  ${textRole('label')}
   color: var(--color-muted-foreground);
-  text-transform: uppercase;
 `
 
 const DetailGrid = styled.div`
@@ -135,22 +130,22 @@ const DetailCard = styled.div`
   border: 1px solid var(--color-border);
   background-color: var(--color-card);
   padding: 0.625rem 0.75rem;
+`
 
-  p:first-child {
-    font-size: 0.75rem;
-    color: var(--color-muted-foreground);
-  }
+const DetailLabel = styled.p`
+  ${textRole('caption')}
+  color: var(--color-muted-foreground);
+`
 
-  p:last-child {
-    font-size: 0.875rem;
-  }
+const DetailValue = styled.p`
+  ${textRole('body-sm')}
 `
 
 const MonoText = styled.p`
-  font-family: monospace;
+  ${textRole('mono-sm')}
 `
 
-const CapitalizeText = styled.p`
+const CapitalizeText = styled(DetailValue)`
   text-transform: capitalize;
 `
 
@@ -158,14 +153,12 @@ const ErrorWrapper = styled.div`
   padding: 1.5rem;
 
   h1 {
-    font-size: 1.125rem;
-    font-weight: 600;
-    letter-spacing: -0.025em;
+    ${textRole('title')}
   }
 
   p {
     margin-top: 0.5rem;
-    font-size: 0.875rem;
+    ${textRole('body')}
     color: var(--color-muted-foreground);
   }
 `
@@ -264,8 +257,8 @@ export function LibraryDetailPage() {
             </svg>
           </BackButton>
           <TitleArea>
-            <h1>{library.name}</h1>
-            <p>{library.path}</p>
+            <ContentText textRole="title" text={library.name} as="h1" />
+            <LibraryPath textRole="mono-sm" text={library.path} forwardedAs="p" />
           </TitleArea>
           {library.scanStatus && (
             <StatusBadge $status={library.scanStatus}>
@@ -306,28 +299,28 @@ export function LibraryDetailPage() {
             <SectionTitle>Details</SectionTitle>
             <DetailGrid>
               <DetailCard>
-                <p>Slug</p>
+                <DetailLabel>Slug</DetailLabel>
                 <MonoText>/{library.slug}</MonoText>
               </DetailCard>
               <DetailCard>
-                <p>Type</p>
+                <DetailLabel>Type</DetailLabel>
                 <CapitalizeText>{library.type.replace('_', ' ')}</CapitalizeText>
               </DetailCard>
               <DetailCard>
-                <p>Sort Order</p>
-                <p>{library.sortOrder}</p>
+                <DetailLabel>Sort Order</DetailLabel>
+                <DetailValue>{library.sortOrder}</DetailValue>
               </DetailCard>
               <DetailCard>
-                <p>Last Scan</p>
-                <p>{formatRelativeTime(library.lastScan)}</p>
+                <DetailLabel>Last Scan</DetailLabel>
+                <DetailValue>{formatRelativeTime(library.lastScan)}</DetailValue>
               </DetailCard>
               <DetailCard>
-                <p>Created</p>
-                <p>{new Date(library.createdAt).toLocaleDateString()}</p>
+                <DetailLabel>Created</DetailLabel>
+                <DetailValue>{new Date(library.createdAt).toLocaleDateString()}</DetailValue>
               </DetailCard>
               <DetailCard>
-                <p>Updated</p>
-                <p>{new Date(library.updatedAt).toLocaleDateString()}</p>
+                <DetailLabel>Updated</DetailLabel>
+                <DetailValue>{new Date(library.updatedAt).toLocaleDateString()}</DetailValue>
               </DetailCard>
             </DetailGrid>
           </section>

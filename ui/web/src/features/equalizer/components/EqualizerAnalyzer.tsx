@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui
 import { Button } from '@/shared/components/ui/button'
 import { aggregateSpectrum, frequencyToPosition, getFrequencyRange, frameSmoothing } from '@/features/visualizer/utils/spectrum'
 import styled from 'styled-components'
+import { textRole } from '@/shared/theme'
 
 interface DisplayData {
   leftChannel: number
@@ -118,11 +119,9 @@ const MeterWrapper = styled.div`
 `
 
 const MeterLabel = styled.span`
-  width: 0.75rem;
+  width: 1rem;
   text-align: right;
-  font-size: 11px;
-  font-weight: 500;
-  letter-spacing: 0.05em;
+  ${textRole('label')}
   color: var(--color-muted-foreground);
 `
 
@@ -143,10 +142,8 @@ const MeterFill = styled.div`
 
 const MeterValue = styled.span`
   width: 6rem;
-  font-family: var(--font-mono);
   text-align: right;
-  font-variant-numeric: tabular-nums;
-  font-size: 11px;
+  ${textRole('mono-sm')}
   color: var(--color-muted-foreground);
 `
 
@@ -196,7 +193,7 @@ const PhaseCanvas = styled.div`
 
 const PhaseReadout = styled.div`
   text-align: center;
-  font-size: 11px;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
   font-variant-numeric: tabular-nums;
 `
@@ -270,16 +267,12 @@ const PeakRow = styled.div`
 `
 
 const PeakLabel = styled.span`
-  font-size: 11px;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  ${textRole('label')}
   color: var(--color-muted-foreground);
 `
 
 const PeakValue = styled.span`
-  font-variant-numeric: tabular-nums;
-  font-size: 0.875rem;
+  ${textRole('mono-sm')}
 `
 
 const Readouts = styled.div`
@@ -288,9 +281,7 @@ const Readouts = styled.div`
   flex-wrap: wrap;
   align-items: center;
   gap: 1.5rem;
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  ${textRole('label')}
   color: var(--color-muted-foreground);
 `
 
@@ -301,14 +292,14 @@ const ReadoutItem = styled.div`
 `
 
 const ReadoutValue = styled.span`
-  font-variant-numeric: tabular-nums;
+  ${textRole('mono-sm')}
   font-weight: 500;
   color: var(--color-foreground);
 `
 
 const VisualizationNote = styled.p`
   margin: 0.5rem 0 0;
-  font-size: 0.6875rem;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
 `
 
