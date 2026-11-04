@@ -11,6 +11,9 @@ use Baander\Tooling\Process\ProcessSpec;
 
 final class Command
 {
+    /** Repository paths whose commit dates become the sitemap's last-modified values. */
+    private const array SITE_SOURCES = ['docs-book', 'ui/site/templates', 'ui/site/assets/screenshots', 'packages/baander-aac/bench/results'];
+
     /** @param list<string> $arguments
      * @param array<string,string> $environment
      */
@@ -30,6 +33,8 @@ final class Command
             $blocks = new BlockRendering($root, $executor);
             $revisionUrl = 'https://github.com/baander-app/baander/tree/' . $revision;
             $evidence = new AacEvidence()->load($root);
+            $history = $executor->run(new ProcessSpec([...SourceHistory::GIT_LOG, '--', ...self::SITE_SOURCES]))->stdout
+                |> SourceHistory::fromGitLog(...);
             $pages = new WebsiteBuilder($root, $revisionUrl)->build(
                 static function (string $staging) use ($executor, $root): void {
                     Publication::assets($root, $staging);
@@ -51,12 +56,14 @@ final class Command
                     'description' => 'Bånder’s AAC codec library: Electron integration, planned transcoder and FFmpeg support, and recorded quality and speed comparisons.',
                     'stylesheet' => 'baac.css',
                     'script' => 'baac-charts.js',
+                    'sources' => ['ui/site/templates/baac.php', 'packages/baander-aac/bench/results'],
                     'data' => ['aac' => [
                         'evidence' => $evidence,
                         'charts' => new AacCharts()->render($evidence),
                         'sourceBase' => 'https://github.com/baander-app/baander/blob/' . $codecRevision . '/packages/baander-aac/',
                     ]],
                 ]],
+                $history,
             );
             fwrite(STDOUT, 'Built ' . count($pages) . ' manual pages in var/website.' . "\n");
             return 0;

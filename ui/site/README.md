@@ -23,6 +23,15 @@ built files; rebuild after editing a manual, template or asset. A failed build
 keeps the previous complete artifact. Build output is disposable; do not keep
 credentials or other personal files under `var/website/`.
 
+Each build also writes `sitemap.xml` and `robots.txt` at the site root, so the
+sitemap follows every change without a separate step. It lists the homepage, the
+bAAC page and every manual page at its `https://baander.app` URL, and never the
+404 page. Each `<lastmod>` is the date of the newest commit that touched the
+page's sources: the Markdown file for a manual page, and the template plus the
+data it renders for the homepage and the bAAC page. Uncommitted edits do not move
+these dates, and a page whose sources have no commit yet is listed without one, so
+publish a build made from a commit.
+
 Manual text belongs in `docs-book/`. Homepage text and layout belong in
 `ui/site/templates/`; site styles and reviewed screenshots belong in
 `ui/site/assets/`. The build copies shared token CSS, SVG branding and licensed

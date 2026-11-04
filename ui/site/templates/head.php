@@ -10,7 +10,7 @@ $escape = static fn (string $value): string => htmlspecialchars($value, ENT_QUOT
   <title><?= $escape($page['title'] === 'Bånder' ? 'Bånder — A home for your media' : $page['title'] . ' — Bånder') ?></title>
   <meta name="description" content="<?= $escape($page['description'] ?? 'Browse and play your music and movies with Bånder, a media server you host. Read the installation and operator manuals.') ?>">
   <?php if ($page['url'] !== '/404.html'): ?>
-    <link rel="canonical" href="https://baander.app<?= $escape($page['url']) ?>">
+    <link rel="canonical" href="<?= $escape($site['origin'] . $page['url']) ?>">
   <?php else: ?>
     <meta name="robots" content="noindex">
   <?php endif; ?>

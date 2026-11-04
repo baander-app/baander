@@ -99,6 +99,36 @@ test('CLI commands fold out by section and the sidebar reveals the current comma
   await expect(current).toBeInViewport();
 });
 
+test('the sitemap lists every published page at its canonical URL and robots.txt points to it', async ({ page }) => {
+  // Requests run inside the page because the routed test origin resolves only in the browser.
+  await page.goto('/');
+  const result = await page.evaluate(async () => {
+    const sitemap = await fetch('/sitemap.xml');
+    const body = await sitemap.text();
+    const locations = [...body.matchAll(/<loc>([^<]+)<\/loc>/g)].map((match) => match[1]);
+    const lastModified = [...body.matchAll(/<lastmod>([^<]+)<\/lastmod>/g)].map((match) => match[1]);
+    const pages = await Promise.all(locations.map(async (location) => {
+      const response = await fetch(new URL(location).pathname, { redirect: 'manual' });
+      const html = await response.text();
+      return { location, status: response.status, canonical: html.includes(`<link rel="canonical" href="${location}">`) };
+    }));
+    const robots = await fetch('/robots.txt');
+    return {
+      status: sitemap.status, type: sitemap.headers.get('content-type'), locations, lastModified, pages,
+      robots: { status: robots.status, body: await robots.text() },
+    };
+  });
+  expect(result.status).toBe(200);
+  expect(result.type).toMatch(/xml/);
+  expect(result.locations.length).toBeGreaterThan(200);
+  expect(result.locations).toEqual(expect.arrayContaining(['https://baander.app/', 'https://baander.app/baac/', 'https://baander.app/docs/developer-guide/contexts/']));
+  expect(result.locations.some((location) => location.endsWith('404.html'))).toBe(false);
+  for (const value of result.lastModified) expect(Number.isNaN(Date.parse(value)), value).toBe(false);
+  for (const listed of result.pages) expect(listed, listed.location).toMatchObject({ status: 200, canonical: true });
+  expect(result.robots.status).toBe(200);
+  expect(result.robots.body).toContain('Sitemap: https://baander.app/sitemap.xml');
+});
+
 test('keyboard focus and enlarged text preserve access to chapters and search', async ({ page }) => {
   await page.goto('/docs/operator-guide/getting-started/');
   await page.keyboard.press('Tab');

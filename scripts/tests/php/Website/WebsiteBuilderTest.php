@@ -92,6 +92,29 @@ final class WebsiteBuilderTest extends TestCase
         ]], $navigation['operator'][2]);
     }
 
+    public function testWritesSitemapAndRobotsForEveryPublishedPage(): void
+    {
+        file_put_contents($this->root . '/ui/site/templates/extra.php', '<?php echo "extra";');
+        $history = \Baander\Tooling\Website\SourceHistory::fromGitLog("\x1e2026-11-04T10:00:00+00:00\n\ndocs-book/part-1-operator-guide/chapter.md\nui/site/templates/extra.php\n");
+        $this->builder()->build(publicPages: [['template' => 'extra', 'url' => '/extra/', 'title' => 'Extra', 'description' => 'Extra page', 'data' => []]], history: $history);
+        $document = new \DOMDocument();
+        self::assertTrue($document->load($this->root . '/var/website/sitemap.xml'));
+        $entries = [];
+        foreach ($document->getElementsByTagName('url') as $url) {
+            $entries[$url->getElementsByTagName('loc')->item(0)?->textContent] = $url->getElementsByTagName('lastmod')->item(0)?->textContent;
+        }
+        self::assertSame([
+            'https://baander.app/' => null,
+            'https://baander.app/docs/' => null,
+            'https://baander.app/docs/developer-guide/' => null,
+            'https://baander.app/docs/operator-guide/' => null,
+            'https://baander.app/docs/operator-guide/chapter/' => '2026-11-04T10:00:00+00:00',
+            'https://baander.app/docs/operator-guide/nested/' => null,
+            'https://baander.app/extra/' => '2026-11-04T10:00:00+00:00',
+        ], $entries);
+        self::assertStringContainsString('Sitemap: https://baander.app/sitemap.xml', (string) file_get_contents($this->root . '/var/website/robots.txt'));
+    }
+
     public function testFailedRebuildRetainsExistingArtifactAndSource(): void
     {
         $this->builder()->build();

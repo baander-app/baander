@@ -36,6 +36,10 @@ final class WebsiteBuilder
     private array $documents = [];
     /** @var array<string,string> */
     private array $assets = [];
+    /** The public origin named by canonical links and the sitemap. */
+    public const string ORIGIN = 'https://baander.app';
+    /** Repository paths whose changes update the homepage's last-modified date. */
+    private const array HOME_SOURCES = ['ui/site/templates/home.php', 'ui/site/assets/screenshots'];
     /** Chapter indexes whose linked pages fold out under the chapter in the manual navigation. */
     private const array FOLD_OUT_CHAPTERS = ['part-1-operator-guide/commands/README.md', 'part-2-developer-guide/contexts/README.md'];
     /** @var array<string,list<array{url:string,title:string,children?:list<array{url:string,title:string,group?:string}>}>> */
@@ -64,10 +68,11 @@ final class WebsiteBuilder
      * Any exception retains the previous complete artifact.
      * @param ?Closure(string,array<string,array{source:string,url:string,title:string,guide:?string,html:string,headings:list<array{id:string,title:string,level:int}>}>):void $afterRender
      * @param ?Closure(list<array{id:string,source:string,language:string,page:string,ordinal:int}>,string):array<string,string> $renderBlocks
-     * @param list<array{template:string,url:string,title:string,description:string,stylesheet?:string,script?:string,data:array<string,mixed>}> $publicPages
+     * @param list<array{template:string,url:string,title:string,description:string,stylesheet?:string,script?:string,sources?:list<string>,data:array<string,mixed>}> $publicPages
+     * @param ?SourceHistory $history commit dates for the sitemap's last-modified values; without it they are omitted
      * @return array<string,array{source:string,url:string,title:string,guide:?string,html:string,headings:list<array{id:string,title:string,level:int}>}>
      */
-    public function build(?Closure $afterRender = null, ?Closure $renderBlocks = null, array $publicPages = []): array
+    public function build(?Closure $afterRender = null, ?Closure $renderBlocks = null, array $publicPages = [], ?SourceHistory $history = null): array
     {
         $this->pages = $this->documents = $this->assets = [];
         $this->navigation = ['operator' => [], 'developer' => []];
@@ -101,6 +106,8 @@ final class WebsiteBuilder
                 $page = $descriptor + ['source' => '', 'guide' => null, 'html' => '', 'headings' => []];
                 $this->write($staging . $url . 'index.html', $this->template($descriptor['template'], $page, $descriptor['data']));
             }
+            $this->write($staging . '/sitemap.xml', $this->sitemap($publicPages, $history));
+            $this->write($staging . '/robots.txt', Sitemap::robots(self::ORIGIN));
             foreach ($this->assets as $url => $source) {
                 $this->write($staging . $url, (string) file_get_contents($source));
             }
@@ -113,6 +120,36 @@ final class WebsiteBuilder
             throw $error;
         }
         return $this->pages;
+    }
+
+    /**
+     * Lists the homepage, every manual page and every public page; the 404 page is never listed.
+     * Each entry's last modification is the newest commit touching the sources it renders.
+     *
+     * @param list<array{template:string,url:string,sources?:list<string>}> $publicPages
+     */
+    private function sitemap(array $publicPages, ?SourceHistory $history): string
+    {
+        $entry = static fn(string $url, array $sources): array => [
+            'url' => $url,
+            'lastModified' => $history?->lastModified($sources),
+        ];
+
+        return [
+            $entry('/', self::HOME_SOURCES),
+            ...array_map(
+                static fn(string $source, array $page): array => $entry($page['url'], ['docs-book/' . $source]),
+                array_keys($this->pages),
+                $this->pages,
+            ),
+            ...array_map(
+                static fn(array $page): array => $entry(
+                    $page['url'],
+                    $page['sources'] ?? ['ui/site/templates/' . $page['template'] . '.php'],
+                ),
+                $publicPages,
+            ),
+        ] |> (static fn(array $entries): string => Sitemap::xml(self::ORIGIN, $entries));
     }
 
     /** @param ?Closure(list<array{id:string,source:string,language:string,page:string,ordinal:int}>,string):array<string,string> $renderBlocks */
@@ -299,16 +336,25 @@ final class WebsiteBuilder
             foreach ($this->linkedPages($index, $guide, $seen) as ['page' => $page]) {
                 $entry = ['url' => $page['url'], 'title' => $page['title']];
                 if (in_array($page['source'], self::FOLD_OUT_CHAPTERS, true)) {
-                    // The chapter index's section headings label groups of its pages.
-                    $entry['children'] = array_map(
-                        static fn (array $child): array => ['url' => $child['page']['url'], 'title' => $child['page']['title']]
-                            + ($child['group'] === null ? [] : ['group' => $child['group']]),
-                        $this->linkedPages($page['source'], $guide, $seen),
-                    );
+                    $entry['children'] = $this->linkedPages($page['source'], $guide, $seen)
+                        |> (static fn(array $linked): array => array_map(self::foldOutEntry(...), $linked));
                 }
                 $this->navigation[$guide][] = $entry;
             }
         }
+    }
+
+    /**
+     * A fold-out child keeps the chapter index's section heading as its group label.
+     *
+     * @param array{page: array{url: string, title: string}, group: ?string} $linked
+     * @return array{url: string, title: string, group?: string}
+     */
+    private static function foldOutEntry(array $linked): array
+    {
+        $entry = ['url' => $linked['page']['url'], 'title' => $linked['page']['title']];
+
+        return $linked['group'] === null ? $entry : $entry + ['group' => $linked['group']];
     }
 
     /**
@@ -347,7 +393,7 @@ final class WebsiteBuilder
     private function template(string $name, array $page, array $data = []): string
     {
         $navigation = $this->navigation;
-        $site = ['repositoryUrl' => 'https://github.com/baander-app/baander', 'revisionUrl' => $this->revisionUrl];
+        $site = ['origin' => self::ORIGIN, 'repositoryUrl' => 'https://github.com/baander-app/baander', 'revisionUrl' => $this->revisionUrl];
         $template = $this->checkedSource($this->root . '/ui/site/templates/' . $name . '.php');
         if (function_exists('opcache_invalidate')) {
             opcache_invalidate($template, true);

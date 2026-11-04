@@ -9,18 +9,17 @@ final class CodeHighlighter
     private const array INSIGNIFICANT = [T_WHITESPACE, T_COMMENT, T_DOC_COMMENT, T_OPEN_TAG];
 
     /** Names after these tokens are class-like: declarations, instantiation, inheritance, imports and attributes. */
-    private const array TYPE_CONTEXT = [T_NEW, T_INSTANCEOF, T_EXTENDS, T_IMPLEMENTS, T_INSTEADOF, T_CLASS, T_INTERFACE, T_TRAIT, T_ENUM, T_NAMESPACE, T_USE, T_ATTRIBUTE];
+    private const array TYPE_CONTEXT = [
+        T_NEW, T_INSTANCEOF, T_EXTENDS, T_IMPLEMENTS, T_INSTEADOF, T_CLASS,
+        T_INTERFACE, T_TRAIT, T_ENUM, T_NAMESPACE, T_USE, T_ATTRIBUTE,
+    ];
 
     public function highlight(string $source): string
     {
         $prefix = preg_match('/<\?(?:php(?:\s|$)|=)/i', $source) === 1 ? '' : "<?php ";
         $tokens = token_get_all($prefix . $source);
-        $significant = [];
-        foreach ($tokens as $index => $token) {
-            if (!is_array($token) || !in_array($token[0], self::INSIGNIFICANT, true)) {
-                $significant[] = $index;
-            }
-        }
+        // Neighbours are read across whitespace and comments, so index only the tokens that carry meaning.
+        $significant = array_filter($tokens, self::isSignificant(...)) |> array_keys(...);
         $position = array_flip($significant);
         $remaining = strlen($prefix);
         $html = '';
@@ -130,11 +129,18 @@ final class CodeHighlighter
 
     private function docComment(string $literal): string
     {
-        $html = '';
-        foreach (preg_split('/(@[a-zA-Z][\w-]*)/', $literal, -1, PREG_SPLIT_DELIM_CAPTURE | PREG_SPLIT_NO_EMPTY) ?: [] as $part) {
-            $html .= $this->span(str_starts_with($part, '@') ? 'keyword' : 'comment', $part);
-        }
-        return $html;
+        return (preg_split('/(@[a-zA-Z][\w-]*)/', $literal, -1, PREG_SPLIT_DELIM_CAPTURE | PREG_SPLIT_NO_EMPTY) ?: [])
+            |> (fn(array $parts): array => array_map(
+                fn(string $part): string => $this->span(str_starts_with($part, '@') ? 'keyword' : 'comment', $part),
+                $parts,
+            ))
+            |> implode(...);
+    }
+
+    /** @param array{int,string,int}|string $token */
+    private static function isSignificant(array|string $token): bool
+    {
+        return !is_array($token) || !in_array($token[0], self::INSIGNIFICANT, true);
     }
 
     private function span(?string $role, string $literal): string
