@@ -168,6 +168,8 @@ final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
             $throttled = false;
             $ready = false;
             $finished = false;
+            // Segments of the sealed completed generation, or null until the generation is sealed.
+            $sealedSegments = null;
             $appliedRevision = 0;
             $seen = [];
             $publication = null;
@@ -233,6 +235,7 @@ final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
                         $this->assertCurrent($active, $local, $stopRequested);
                         $generation = $active->runtime->generation;
                         $paused = $throttled = $ready = $finished = false;
+                        $sealedSegments = null;
                         $seen = [];
                         $publication = null;
                         $nativeClockCaptured = false;
@@ -312,20 +315,26 @@ final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
                             Async::sleep(0.1);
                             continue;
                         }
-                        if (!$ready || $publication === null || !$publication->complete || $videoTrack === null
-                            || ($hasAudio && $publication->track(MediaTrack::Audio) === null)) {
-                            throw new RuntimeException('Encoder exited before publishing complete playable tracks.');
+                        // A control revision, such as a playback progress report, can land while the
+                        // completion persists; the retry then records the sealed generation again
+                        // instead of judging a publication whose stream has already stopped.
+                        if ($sealedSegments === null) {
+                            if (!$ready || $publication === null || !$publication->complete || $videoTrack === null
+                                || ($hasAudio && $publication->track(MediaTrack::Audio) === null)) {
+                                throw new RuntimeException('Encoder exited before publishing complete playable tracks.');
+                            }
+                            $this->assertCurrent($active, $local, $stopRequested);
+                            $this->streamManager->stopStream($jobId);
+                            if ($selection !== null) {
+                                $outputProbeKey = $this->processPool->probeVideo($job, $output . '/manifest.mpd', $active->runtime->generation);
+                                $outputProbe = VideoProbeResult::fromProbeOutput(json_decode($this->awaitHelper($outputProbeKey, $active, $local, $stopRequested), true, 512, JSON_THROW_ON_ERROR));
+                                $this->publishOutputMetadata($output, $outputProbe);
+                            }
+                            $this->sealCompletedGeneration($output);
+                            $sealedSegments = count($videoTrack->segments);
                         }
-                        $this->assertCurrent($active, $local, $stopRequested);
-                        $this->streamManager->stopStream($jobId);
-                        if ($selection !== null) {
-                            $outputProbeKey = $this->processPool->probeVideo($job, $output . '/manifest.mpd', $active->runtime->generation);
-                            $outputProbe = VideoProbeResult::fromProbeOutput(json_decode($this->awaitHelper($outputProbeKey, $active, $local, $stopRequested), true, 512, JSON_THROW_ON_ERROR));
-                            $this->publishOutputMetadata($output, $outputProbe);
-                        }
-                        $this->sealCompletedGeneration($output);
-                        $this->persist($active, static function (TranscodeJob $fresh) use ($videoTrack): void {
-                            $fresh->setTotalSegments(count($videoTrack->segments));
+                        $this->persist($active, static function (TranscodeJob $fresh) use ($sealedSegments): void {
+                            $fresh->setTotalSegments($sealedSegments);
                             if ($fresh->getStatus() === TranscodeStatus::InProgress) {
                                 $fresh->markCompleted();
                             }

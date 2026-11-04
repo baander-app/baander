@@ -628,6 +628,30 @@ final class TranscodeWorkerExecutionTest extends TestCase
         self::assertSame(0, $this->allocations);
     }
 
+    public function testControlRevisionDuringCompletionStillCompletesTheSealedGeneration(): void
+    {
+        $raced = false;
+        $this->onFence = function () use (&$raced): void {
+            if ($raced) {
+                return;
+            }
+            foreach (new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($this->root, \FilesystemIterator::SKIP_DOTS)) as $file) {
+                if ($file->getFilename() === 'generation.json'
+                    && (json_decode((string) file_get_contents($file->getPathname()), true)['complete'] ?? false) === true) {
+                    // A playback progress report commits a new desired revision while completion persists.
+                    $this->current = $this->claim(1, 2);
+                    $raced = true;
+                }
+            }
+        };
+        $this->worker->run($this->current, static fn(): bool => false);
+        self::assertTrue($raced);
+        self::assertNotContains('failed', $this->observed);
+        self::assertSame('complete', $this->observed[array_key_last($this->observed)]);
+        self::assertSame(TranscodeStatus::Completed, $this->job->getStatus());
+        self::assertSame(1, $this->releases);
+    }
+
     public function testPositionProgressReleasesBufferThrottleAfterFarSeekWithoutNewGeneration(): void
     {
         $this->sourceDuration = 300.0;
