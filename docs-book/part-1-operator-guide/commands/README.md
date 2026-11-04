@@ -32,12 +32,13 @@ Run `bin/worker-deployment.php` from a trusted host checkout with Composer depen
 PHP 8.5 with extensions `posix` and `pdo_pgsql`, and an absolute Docker executable connected
 to a local Unix socket. The application container receives no Docker authority.
 Provision the migrated database, Redis and a private Docker network first; use a
-locally available immutable image ID. The version 7 recipe admits a fixed pair
+locally available immutable image ID. The version 8 recipe admits a fixed pair
 of control and execution containers without CPU, memory or PID limits and without
 CPU sets. It requires explicitly authorized shared media volumes and a private
-named IPC volume. Devices are refused; the production source policy also refuses
-bind mounts. The Docker daemon must run rootful: creation refuses a rootless
-daemon, which cannot start the control unit at its negative out-of-memory score.
+named IPC volume. The only device it admits is the profile's hardware encoder, in
+execution; the production source policy also refuses bind mounts. The Docker daemon
+must run rootful: creation refuses a rootless daemon, which cannot start the control
+unit at its negative out-of-memory score.
 
 Build the worker image with the same layout-aware builder used in
 [Getting started](../getting-started.md#3-build-images-and-start-dependencies).
@@ -55,12 +56,12 @@ keep the corresponding `APP_HOME` exported for each controller invocation. The
 controller rejects an unset `APP_HOME`. The storage targets below illustrate the
 current `/var/www/html` image layout; align them with the selected image's layout.
 
-The manifest is a JSON object of at most 8192 bytes. Version 7 requires exactly
+The manifest is a JSON object of at most 8192 bytes. Version 8 requires exactly
 these fields, with JSON integers for `version` and `scheduledConsoleMiB`:
 
 ```json
 {
-  "version": 7,
+  "version": 8,
   "sourceMountPolicy": "production",
   "namespace": "worker.baander.app",
   "bootId": "0123456789abcdef0123456789abcdef",
@@ -72,6 +73,7 @@ these fields, with JSON integers for `version` and `scheduledConsoleMiB`:
   "scheduledConsoleMiB": 320,
   "deploymentProfile": {
     "identifier": "full",
+    "hardware": null,
     "webWorkers": 4,
     "doctrinePoolSlots": 10,
     "ordinaryConsumerLimit": 4,
@@ -79,6 +81,7 @@ these fields, with JSON integers for `version` and `scheduledConsoleMiB`:
     "videoEncoderSlots": 8,
     "audioEncoderSlots": 12
   },
+  "deviceGroup": null,
   "autoscaling": {
     "minimumConcurrency": 1,
     "maximumConcurrency": 2,
@@ -171,8 +174,18 @@ held through handling and completion. After a shrink, new receives wait until
 occupied permits fall below the new target. The scheduler consumer and media slots
 are admitted separately.
 
-The media workload follows `deploymentProfile`; neither profile admits devices.
-The worker argv,
+The media workload follows `deploymentProfile`. Print it with
+[app:deployment:profile:show](app-deployment-profile-show.md) rather than writing it
+by hand. Its `hardware` entry is `null` for software encoding or names the hardware
+encoder; see [Hardware acceleration](../transcoding.md#hardware-acceleration).
+`deviceGroup` is the numeric group the execution container joins to open that
+encoder's device. Leave it `null` and `bin/worker-deployment.php` reads the group that
+owns the device node on the host where it runs; set it when a different group opens
+the device. The controller refuses a `deviceGroup` without a device, and a device
+whose group it cannot read. Execution then receives the device at
+the same path with that group; control receives neither. An `nvenc` encoder takes no
+device or group and receives the host's NVIDIA GPUs through the NVIDIA container
+runtime. The worker argv,
 PHP management limit, identity and lock directory are fixed by the manifest parser;
 arbitrary commands, environment fields and secret paths are rejected.
 
@@ -204,8 +217,9 @@ Copy existing media into these volumes explicitly; the development Compose bind
 mounts do not provide this shared topology. Do not reset or replace existing media.
 
 Mount targets cannot overlap or replace code, secrets, operating-system paths or
-worker-private paths. Production bind mounts, devices, extra mounts and source volumes
-aliased as writable derived storage are refused. Creation/start/recovery checks
+worker-private paths. Production bind mounts, devices other than the hardware
+encoder's, extra mounts and source volumes aliased as writable derived storage are
+refused. Creation/start/recovery checks
 verify declared names, concrete local-volume mountpoints and access modes. A
 changed recipe requires a fresh admitted deployment.
 

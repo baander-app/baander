@@ -14,6 +14,7 @@ installed instance, use the `dc` function from
 ```bash
 make exec cmd="php bin/console app:deployment:profile:show"
 make exec cmd="php bin/console app:deployment:profile:show --identifier=full --video-slots=4 --audio-slots=12"
+make exec cmd="php bin/console app:deployment:profile:show --identifier=full --hardware-accelerator=vaapi --hardware-device=/dev/dri/renderD128"
 ```
 
 ## Options
@@ -23,21 +24,28 @@ make exec cmd="php bin/console app:deployment:profile:show --identifier=full --v
 | `--identifier=PROFILE` | Build the `full` or `household` profile instead of showing the effective one |
 | `--video-slots=N` | Concurrent video jobs of the `full` profile; `0` disables video conversion and stream copy |
 | `--audio-slots=N` | Concurrent audio jobs of the `full` profile; `0` disables audio conversion and stream copy |
+| `--hardware-accelerator=NAME` | Hardware encoder of the `full` profile: `vaapi`, `qsv`, `nvenc` or `amf` |
+| `--hardware-device=PATH` | Device the hardware encoder opens, such as `/dev/dri/renderD128`; `vaapi`, `qsv` and `amf` require one and `nvenc` takes none |
 | `--json` | Print the profile, its fingerprint and its limits as JSON |
 
 ## Details
 
-Without `--identifier` or a slot option, the command prints the profile this process
-runs, read from `BAANDER_DEPLOYMENT_PROFILE` and `BAANDER_DEPLOYMENT_PROFILE_JSON`.
-Those options build another profile instead and leave the environment unchanged. A
-slot option without
-`--identifier` builds the effective profile's kind with those slots. An unset slot
-option takes the default: 8 video and 12 audio jobs.
+Without `--identifier`, a slot option or a hardware option, the command prints the
+profile this process runs, read from `BAANDER_DEPLOYMENT_PROFILE` and
+`BAANDER_DEPLOYMENT_PROFILE_JSON`. Those options build another profile from the
+options alone and leave the environment unchanged; the effective profile's hardware
+encoder is not carried over. An option without `--identifier` builds the effective
+profile's kind. An unset slot option takes the default: 8 video and 12 audio jobs.
+The video default is a separate measured figure with a hardware encoder; it is also 8
+on the reference GPU. See
+[Hardware acceleration](../transcoding.md#hardware-acceleration) for what the
+hardware encoder changes.
 
 The text output starts with the two environment lines for web and the source
 install's `.env.local`. The JSON in `BAANDER_DEPLOYMENT_PROFILE_JSON` is also the
-worker manifest's `deploymentProfile` object. A table lists the profile fingerprint,
-the slots with their maximums, and these derived limits:
+worker manifest's `deploymentProfile` object, including its `hardware` entry. A table
+lists the profile fingerprint, the hardware encoder, the slots with their maximums,
+and these derived limits:
 
 | Limit | Meaning |
 |-------|---------|
@@ -68,4 +76,4 @@ boot; see [app:health:check](app-health-check.md).
 | Code | Meaning |
 |------|---------|
 | 0 | The profile and its limits were printed |
-| 2 | The options do not form a valid profile: an unknown profile, a slot value that is not an integer, slots beyond their maximum, or slots for the `household` profile |
+| 2 | The options do not form a valid profile: an unknown profile, a slot value that is not an integer, slots beyond their maximum, slots or a hardware encoder for the `household` profile, an unknown accelerator, a missing or unexpected device, or a hardware encoder with zero video slots |

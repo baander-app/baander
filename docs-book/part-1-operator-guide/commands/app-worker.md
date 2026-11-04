@@ -25,8 +25,8 @@ start, stop, replacement and uncertain outcomes.
 | `--boot-id` | `BAANDER_WORKER_BOOT_ID` | Fresh 32-character hexadecimal boot identity |
 | `--unit` | `BAANDER_WORKER_UNIT` | Required unit identity: `control` or `execution` |
 | `--scheduled-console-mib` | `0` | Execution reservation for one synchronous scheduled console child; `0` disables it, otherwise at least 320 MiB; control requires `0` |
-| `--deployment-profile` | — | Required complete startup profile JSON; it must agree with the runtime environment and version 7 manifest |
-| `--autoscaling-profile` | — | Required complete ordinary-admission profile JSON from the version 7 manifest; all fields bind both unit recipes |
+| `--deployment-profile` | — | Required complete startup profile JSON; it must agree with the runtime environment and version 8 manifest |
+| `--autoscaling-profile` | — | Required complete ordinary-admission profile JSON from the version 8 manifest; all fields bind both unit recipes |
 | `--lock-dir` | `/tmp/baander-worker-locks` | Private unit lock directory |
 | `--ipc-dir` | `/run/baander-worker` | Private IPC directory shared by the pair |
 

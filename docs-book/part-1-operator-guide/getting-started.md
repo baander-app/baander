@@ -36,7 +36,7 @@ FFmpeg, Node and Corepack are supplied by the app image. The web frontend select
 its Yarn version from the repository's `packageManager` field.
 
 Read [Worker deployment](commands/README.md#worker-deployment) before provisioning
-storage or choosing host resources. Its version 7 procedure is authoritative for
+storage or choosing host resources. Its version 8 procedure is authoritative for
 the worker manifest, credentials, volume ownership and admission checks.
 
 The separate [household deployment preset](../../deploy/household/README.md)
@@ -97,8 +97,9 @@ HW_BITRATE_MULTIPLIER=1.0
 
 The encoder settings above select CPU encoding. Set them before building the
 worker image: its media process requires all three, and the worker credentials
-file does not accept these settings. See
-[Transcoding](transcoding.md#hardware-acceleration) for current hardware support.
+file does not accept these settings. A hardware encoder is configured in the
+deployment profile instead; see
+[Transcoding](transcoding.md#hardware-acceleration).
 
 Create `.env.dev.local` with mode `0600`. Put the following settings in it, replacing
 the secret placeholders with independently generated values from `openssl rand -hex 32`.
@@ -333,7 +334,7 @@ proxy trust setting.
 
 Follow [Worker deployment](commands/README.md#worker-deployment) to build the worker
 image, prepare its private IPC volume and credentials, and create and start the
-version 7 deployment from the host. First export the application layout selected by
+version 8 deployment from the host. First export the application layout selected by
 the builder in that host shell; the controller requires it when interpreting the
 manifest:
 

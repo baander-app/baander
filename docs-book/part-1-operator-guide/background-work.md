@@ -28,7 +28,7 @@ work; execution also needs its native daemon ready. A running container alone
 does not establish that these conditions hold. Startup fails if the pair cannot
 reach admission within 30 seconds.
 
-The host controller creates and starts the pair from an admitted version 7
+The host controller creates and starts the pair from an admitted version 8
 manifest. The complete-stack preset starts this pair through its host controller;
 starting only the web Compose service does not start workers. Worker runtime uses the credentials
 and image selected for that pair, separately from web configuration. See
@@ -145,8 +145,10 @@ FFmpeg command at nice 10, so encodes yield CPU to the execution unit's own
 processes; [System Requirements](system-requirements.md#kill-order) describes the
 out-of-memory kill order.
 
-Worker admission currently accepts no devices. Configure the supported CPU
-encoding path described in [Transcoding](transcoding.md), and do not infer worker
+Worker admission accepts one device: the hardware encoder the deployment profile
+names, mapped into execution only with its group. Without one, execution receives no
+device and encodes in software. See
+[Hardware acceleration](transcoding.md#hardware-acceleration), and do not infer worker
 hardware support from optional device examples in the web Compose file.
 
 ## Observe background work

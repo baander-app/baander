@@ -363,6 +363,13 @@ from the slots, and the pooler's client limit bounds how many slots a profile
 accepts. Slots are Baander's only bound on media work: containers carry no CPU or
 memory limits, and operators lower the slots when their host cannot keep up.
 
+### Configured hardware encoder
+
+The accelerator and device a `full` deployment's startup profile names for video
+encoding. Only the execution worker receives the device and its group. Media
+control must pass a test encode on it at worker start or fails instead of encoding
+in software, and unset video slots take the hardware default.
+
 ### Connection pooler
 
 The transaction-mode PgBouncer between the application and PostgreSQL. Clients

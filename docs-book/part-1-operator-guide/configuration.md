@@ -65,7 +65,7 @@ See [Transcoding](transcoding.md#how-it-works) for delivery selection.
 `BAANDER_DEPLOYMENT_PROFILE` selects the profile. The generated
 `BAANDER_DEPLOYMENT_PROFILE_JSON` records its complete effective settings,
 including the slot counts. If that JSON is supplied, it must agree with the
-selected identifier. Web, workers and the version 7 worker manifest must agree;
+selected identifier. Web, workers and the version 8 worker manifest must agree;
 conflicting settings fail startup, and web health reports a profile that differs
 from the active worker boot's. Print the effective profile, or one built from
 other slot counts, with

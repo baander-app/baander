@@ -15,13 +15,13 @@ lease expiry is insufficient. Resolve these through the old controller while its
 schema is still installed. Preserve the database, pending work and media; no reset
 is required or authorized by this upgrade.
 
-Version 7 manifests require `sourceMountPolicy`, the complete startup
-`deploymentProfile` and the ordinary autoscaling profile, and carry no per-unit
-memory, CPU, PID or CPU-set fields. The selected startup profile must agree with
+Version 8 manifests require `sourceMountPolicy`, the complete startup
+`deploymentProfile`, the ordinary autoscaling profile and `deviceGroup`, and carry
+no per-unit memory, CPU, PID or CPU-set fields. The selected startup profile must agree with
 web and the worker runtime environment. The new controller refuses earlier
 manifest versions, including recovery actions. Keep the old checkout, controller,
 manifest and credentials to retire an existing pair before switching code. Confirm
-both units' retirement and the joint reservation release, then create a version 7
+both units' retirement and the joint reservation release, then create a version 8
 manifest with a fresh boot ID, the new image and `sourceMountPolicy: production`
 for the named-volume recipe. Lease expiry or a
 stopped container is insufficient. Preserve the database, pending work and media.
@@ -145,7 +145,7 @@ playback owners without rewriting the initial migration or existing histories.
 the control/execution journals and joint retirement barrier. It is irreversible.
 `Version20261021120000` retains the last observed availability of indexed source
 files and is also irreversible.
-New deployments require a version 7 manifest with a private IPC volume and
+New deployments require a version 8 manifest with a private IPC volume and
 complete deployment and autoscaling profiles, and without unit limits or CPU sets;
 earlier manifest versions are refused. Every profile field is fingerprinted in
 both recipes. Changing thresholds, concurrency or the startup profile requires

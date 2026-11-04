@@ -180,8 +180,9 @@ unsupported codec, FFmpeg, worker execution or resource exhaustion.
    The same source mount must be available to the admitted worker when it handles
    queued work. See [Storage and Data](storage-and-data.md).
 4. Read app and worker logs around the failure. Check memory, disk space and codec
-   errors before changing resource settings. The admitted worker recipe does not
-   support GPU passthrough; see [Hardware acceleration](transcoding.md#hardware-acceleration).
+   errors before changing resource settings. A configured hardware encoder that
+   fails its test encode stops media control with the reason
+   `hardware_encoder_unavailable`; see [Hardware acceleration](transcoding.md#hardware-acceleration).
    Use [server statistics](monitoring.md#server-stats) for the web process; they do
    not describe worker container limits.
 5. Once the cause is corrected, choose a single retry path from
