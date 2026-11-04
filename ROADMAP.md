@@ -1,6 +1,6 @@
 # Baander roadmap
 
-Updated: 2026-11-03. This roadmap selects future work and records unresolved
+Updated: 2026-11-04. This roadmap selects future work and records unresolved
 acceptance. Current operating contracts belong in the linked guides; completed
 milestones and their verification evidence remain in Git history.
 
@@ -19,8 +19,38 @@ Open items for this plan:
 - After a PostgreSQL crash the worker pair stops ("deployment reconciliation is required") and stays stopped until an operator intervenes.
 - `CaptureCoverageTest` still fails on master's playback-destination tables and six `listening_sessions` columns; whether to capture or exclude each needs a decision.
 - `ce-simplify-code` ran (4c24a9bb5); its affected tooling, backend and web tests passed. Shipping gates not yet run: `ce-code-review`, the full backend suites, worker runtime container suites, affected browser playback specs and a documentation build. `baander-database:latest` has not been rebuilt, so existing instances still run PostgreSQL without the THP launcher.
+- The household profile has not been requalified since the configurable media capacity work added the connection pooler and removed its container limits; its published measurements predate both changes.
 
-Configurable media capacity, 2026-11-03: the full profile admits only 3 video and 1 audio conversion jobs, and some households run 8 video and 12 audio streams at once. The user chose operator-set job slots, with the worker reservation and manifest derived from them, as a separate follow-up plan rather than part of this branch.
+## Configurable media capacity
+
+The user confirmed the
+[configurable media capacity plan](docs/plans/2026-11-03-1905-feat-configurable-media-capacity-plan.md),
+delivered on branch `feat/configurable-media-capacity` (local, not pushed).
+Full-profile operators set the video and audio job slots: 8 and 12 by default, or 12 video slots with a configured hardware encoder. The slots are Bånder's only bound on media work.
+No container carries a CPU, memory or PID limit, and an `oom_score_adj` kill order protects the stateful services.
+All database traffic goes through PgBouncer 1.26.1 with separate application and control pools, and the images moved to Debian 13 with FFmpeg 7.1.
+[System Requirements](docs-book/part-1-operator-guide/system-requirements.md) publishes the per-job costs and the reference margins.
+
+Checkpoint, 2026-11-04:
+
+- The 8 + 12 software load proof (`var/u10/software/media-load.json`) and the 12 + 12 VAAPI load proof (`var/u10/hardware/media-load.json`) passed every criterion on the Ryzen 7 5800X3D and RX 9070 XT. Every job completed with no containment, restart or OOM kill, lease helpers stayed at or below 0.40 s against a 1.5 s deadline, and PostgreSQL backends peaked at 30 of 32. Software video ran at 0.251–0.256x real time and hardware video at 1.26–1.28x. Alone, `libx264` ran at 1.08x, `libx265` at 1.30x, `h264_vaapi` at 9.4x and `hevc_vaapi` at 13.7x.
+- Full backend suite on `baander-ci:capacity` and `baander-database:capacity` (`var/test-runs/20261104-122123-1848a3a1`, 11,568 tests): the native lane passed 913 tests, and the only failures are the 14 that also fail on master (listed below).
+- Tooling suite: 1,455 tests, 9 skipped, no failures. Static gates pass: PHPStan, Deptrac (0 violations) and `lint:container` in the CI image, plus the tooling analysis, format and architecture checks.
+- `ce-simplify-code` (a007a8f63) and `ce-code-review` ran. The review's one code finding was applied (5bb051540), and this entry closes its roadmap finding. Four learnings were recorded under `docs/solutions/`.
+
+Open items for this plan:
+
+- At the default 8 software video slots, the reference host keeps about two 1080p `libx264` encodes in real time, not eight, so operators who convert video in software must lower the slots. The default was the user's choice and is unchanged.
+- Backend failures that also occur on master: `SignedDeliveryFirewallTest` (8), `OpenApiSpecTest` (2), `CoveredIndexPersistenceTest` (1), `DatabaseNamingConventionTest` (1) and `CaptureCoverageTest` (2).
+- Not run: the static FFmpeg image's full build, the controls drill at 8 + 12 (the default drills keep the 3 + 1 fixture), and NVENC, QSV and AMF on real hardware. The NVENC device-request shape that containment verification compares was not checked against a Docker NVIDIA runtime.
+- Existing PostgreSQL volumes need `REINDEX` and `ALTER DATABASE … REFRESH COLLATION VERSION` on the Debian 13 database image; `baander-database:latest` and the persistent instance were not touched.
+- Transcode execution ownership renewal runs on the application pool, where a client can wait up to PgBouncer's default 120 s; the ownership lease is 15 s. The load proofs saturated that pool without a missed renewal, but a burst of long application transactions could delay renewals past the lease.
+- The control pool fails a media authority query that waits more than one second. In the 8 + 12 software pass it peaked at 8 of 8 server connections with no wait; larger slot counts are unproven.
+- The pooler's `admin_users` is the application role, so web and worker processes could pause or stop the pooler; the development checks need only `stats_users`.
+- When a progress report races the write that records a failed encode, that write is refused and the failure stays unrecorded on that path (behaviour that predates this plan).
+- The governor's warm-up encodes predict about 40% of the host per 1080p stream, against about 21% measured for full encodes. Nothing is vetoed, because each media child budgets only its own stream.
+- Test gaps: the functional suite connects to PostgreSQL directly, so transaction-pooling incompatibilities surface only in the worker drills, and `HostCpus` and the boot-row fingerprint check constraint have no direct tests.
+- The development `docker-compose.yml` sets no `oom_score_adj`.
 
 ## Playback destinations and notifications
 

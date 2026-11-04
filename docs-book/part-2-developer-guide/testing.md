@@ -1749,7 +1749,8 @@ governor's 50 learning samples and is active. Next, 22 clients hold
 connection is idle, and 8 signed-in clients request the album listing without
 pause. The run admits every video slot at 1080p and keeps every audio slot busy
 with one rendition after another of each lane's track until every video has
-completed. Each video session reports real-time playback progress, capped at its
+completed or the lane has used each of its 15 distinct renditions; a lane never
+repeats one, because the cache would answer it without encoding. Each video session reports real-time playback progress, capped at its
 encoded output, every two seconds. Finally, with the load stopped, one encode of
 each codec runs alone: `libx264` and `libx265` in the software pass, `h264_vaapi` and
 `hevc_vaapi` in the hardware pass.
@@ -1777,12 +1778,13 @@ fails the receipt when any of these holds:
 Real time under load is recorded, not judged. Check a retained receipt again with
 `php scripts/test-worker-media-control-container.php verify-load media-load.json`.
 
-The recorded passes on 2026-11-04 used the Ryzen 7 5800X3D and RX 9070 XT above,
-the Debian 13 worker image with FFmpeg 7.1 and a 128-second 1080p30 excerpt of Big
-Buck Bunny, with `libx265` at six pool threads. Both passes ran with no other heavy
-work on the host. The one-minute load average during the single encodes came from
-the run before them: 33 falling to 7 after the software pass and 18 falling to 13
-after the hardware pass. Both receipts passed every criterion:
+The recorded passes on 2026-11-04 ran on the Ryzen 7 5800X3D and RX 9070 XT
+above, with the Debian 13 worker image, FFmpeg 7.1, `libx265` at six pool threads
+and a 128-second 1080p30 excerpt of Big Buck Bunny. No other heavy work ran on the
+host during either pass. The single encodes ran while the one-minute load average
+was still falling from the load run before them: from 33 to 7 after the software
+pass and from 18 to 13 after the hardware pass. Both receipts passed every
+criterion:
 
 | Pass | Video streams, steady speed | Audio first wave | Peak backends (application / control / direct) | Lease helper maximum, control / execution | Native answer maximum | Web p50 / p95 |
 |---|---|---|---|---|---|---|
@@ -1790,24 +1792,25 @@ after the hardware pass. Both receipts passed every criterion:
 | Hardware, 12 + 12 | 12 `hevc_vaapi`, 1.26–1.28x | 31.4–41.8x | 30 (20 / 8 / 2) | 0.19 / 0.18 s | 8.0 ms | 0.41 / 4.45 s |
 
 An active governor decided every run admission, after learning 56 samples in
-the software pass and 60 in the hardware pass; none was downgraded or vetoed, and
+the software pass and 60 in the hardware pass. It downgraded or vetoed none, and
 no unit drained, restarted or recorded an OOM kill. No run sample found an idle
 server in the application pool, and pooler waits stayed at or below 31 ms in the
-software pass and 36 ms in the hardware pass. In the software run each audio lane
-encoded 14 or 15 distinct renditions and stayed busy until 420–521 seconds in;
-its videos completed after 503–515 seconds. In the hardware run each lane encoded
-6 to 8 renditions and the videos completed after 100–103 seconds. The web clients
-completed 5,859 requests in the software run and 738 in the hardware run, none
-failed. In the single encodes after the load, `libx264` ran at 1.08x and `libx265`
-at 1.30x, `h264_vaapi` at 9.4x and `hevc_vaapi` at 13.7x, so every codec ran ahead
-of real time alone.
+software pass and 36 ms in the hardware pass. In the software pass, each audio
+lane encoded 14 or 15 distinct renditions and stayed busy until 420–521 seconds
+in, and the videos completed after 503–515 seconds. In the hardware pass, each
+lane encoded 6 to 8 renditions and the videos completed after 100–103 seconds.
+The web clients completed 5,859 requests in the software pass and 738 in the
+hardware pass, and none failed. In the single encodes after the load, `libx264`
+ran at 1.08x, `libx265` at 1.30x, `h264_vaapi` at 9.4x and `hevc_vaapi` at
+13.7x: every codec ran ahead of real time alone.
 
-An earlier software run on the same day lost its deployment about nine minutes in:
-the control unit's autoscaler exited while a backend test suite loaded the host,
-and the execution unit followed when it read the control unit's draining heartbeat.
-The autoscaler's report named no cause. It now reports its exception class and
-location, and a tick whose admission lock is contended publishes nothing instead of
-ending the autoscaler; the passes above ran after both changes.
+An earlier software run on the same day lost its deployment about nine minutes
+in. The control unit's autoscaler exited while a backend test suite loaded the
+host, and the execution unit followed when it read the control unit's draining
+heartbeat. The autoscaler's report named no cause. It now reports its exception
+class and location, and a tick that finds its admission lock contended publishes
+nothing instead of ending the autoscaler. The passes above ran after both
+changes.
 
 Run browser controls against the immutable production worker image through the
 combined deployment runner:

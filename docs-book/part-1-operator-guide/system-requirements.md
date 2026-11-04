@@ -45,8 +45,8 @@ disable that kind of conversion and stream copy.
 
 A video slot runs one video conversion or video stream copy; an audio slot runs
 one audio rendition or audio stream copy. The slots are the only bound on media
-work: Bånder admits at most that many jobs of each kind and queues the rest. The
-derived native limits follow from the slots, and
+work: Bånder admits at most that many jobs of each kind and queues the rest. It
+derives the native limits from the slots, and
 [`app:deployment:profile:show`](commands/app-deployment-profile-show.md) prints
 them for any slot pair before you deploy it.
 
@@ -57,7 +57,7 @@ Choose the slots by trial and error:
    whether converted streams keep playing in real time. A stream whose encode
    falls behind stalls while the player waits for the next segment.
 3. If encodes fall behind, lower the slots of that kind and try again. Further
-   requests then queue for a free slot instead of slowing every running encode.
+   requests then wait for a free slot instead of slowing every running encode.
 4. If every slot stays busy while the host still has CPU and memory to spare, you
    can raise the slots, up to the [maximums](configuration.md#media-slots).
 
@@ -67,9 +67,9 @@ Changing the slots replaces the deployment; it is not a live setting.
 ### Reference margins at the default slots
 
 On 4 November 2026, a full deployment ran every default slot at once on the
-reference host described below, an AMD Ryzen 7 5800X3D with an AMD Radeon RX 9070
-XT. Every video slot converted a 128-second 1080p30 excerpt of Big Buck Bunny to
-1080p, and every audio slot converted 600-second tracks one after another, while
+reference host described below: an AMD Ryzen 7 5800X3D with an AMD Radeon RX 9070
+XT. Each video slot converted a 128-second 1080p30 excerpt of Big Buck Bunny to
+1080p, and each audio slot converted 600-second tracks one after another, while
 signed-in web clients browsed the library. A stream's real-time margin is its
 steady speed minus one; a negative margin means the encode fell behind playback.
 
@@ -78,13 +78,13 @@ steady speed minus one; a negative margin means the encode fell behind playback.
 | Software, `libx264` | 8 video + 12 audio | 0.251–0.256× | −0.749 to −0.744 | 12.0–20.7× |
 | Hardware, `hevc_vaapi` | 12 video + 12 audio | 1.26–1.28× | +0.26 to +0.28 | 31.4–41.8× |
 
-Both runs completed every job with no service killed for lack of memory, no
-worker unit restarted, and web requests answered throughout. They show different
-limits. With a hardware encoder, the default 12 video slots stay ahead of real
-time on this GPU. In software, eight 1080p encodes share the host's CPUs: together
-they produced about 2 seconds of video per second, so this host keeps about two
-software 1080p encodes in real time, not eight. The default software slots
-therefore suit a host that mostly copies streams or converts audio; a host that
+Both runs completed every job. No service was killed for lack of memory, no
+worker unit restarted, and web requests were answered throughout. The two encode
+paths differ in what they sustain. With a hardware encoder, the default 12 video
+slots stay ahead of real time on this GPU. In software, the eight 1080p encodes
+share the host's CPUs and together produced about 2 seconds of video per second,
+so this host keeps about two software 1080p encodes in real time, not eight. The
+default software slots therefore suit a host that mostly copies streams or converts audio; a host that
 converts video in software should lower its video slots as described above.
 
 Alone on the same host after each run, every codec ran ahead of real time on this
@@ -109,17 +109,18 @@ encoded a synthetic 1080p30 H.264/AAC source.
 | AAC rendition | 0.019 | — | — | — | about 55 MiB |
 | MP3 rendition | 0.015 | — | — | — | about 55 MiB |
 
-Speed is output seconds per wall-clock second, so below 1× an encode cannot keep
+Speed is output seconds per wall-clock second; below 1×, an encode cannot keep
 up with playback. The HEVC row used two pool threads, which stays below real time.
-Four pool threads reached 1.29–1.31× real time on this synthetic source but
-only 0.76–0.87× on film content, so production now gives `libx265` six pool
-threads. Alone, on 60-second excerpts of 1080p30 Big Buck Bunny, that reached
-1.07–1.21× real time at 4.7–5.5 CPU-seconds per output second. The four-thread
-setting peaked at 557 MiB. An encode that keeps pace with playback
-therefore occupies about 1.5 to 1.7 CPUs for H.264 on the synthetic source and
-about 5 for HEVC on film content. Each
-media job also runs a PHP child in the control unit, which peaked at 92 MiB for a
-video job and 66 MiB for an audio job.
+Four pool threads reached 1.29–1.31× real time on this synthetic source but only
+0.76–0.87× on film content, and peaked at 557 MiB. Production therefore gives
+`libx265` six pool threads, which reached 1.07–1.21× real time at 4.7–5.5
+CPU-seconds per output second when run alone on 60-second excerpts of 1080p30 Big
+Buck Bunny.
+
+An encode that keeps pace with playback occupies about 1.5 to 1.7 CPUs for H.264
+on the synthetic source and about 5 for HEVC on film content. Each media job also
+runs a PHP child in the control unit, which peaked at 92 MiB for a video job and
+66 MiB for an audio job.
 
 The CPU figures apply to software encoding only. A codec handled by a hardware
 encoder, such as a GPU, QuickSync or another video engine, costs almost no CPU.
@@ -128,10 +129,10 @@ A deployment encodes in software unless its profile names a hardware encoder; se
 
 ### Measured hardware cost per job
 
-These costs were measured on 4 November 2026 with FFmpeg 7.1.5 in the Debian 13
-worker image, on the same host with an AMD Radeon RX 9070 XT (16 GiB) through VAAPI
-and Mesa radeonsi. Each stream decoded a 1080p30 H.264/AAC source on the GPU,
-scaled it and encoded it there. Speed is the slowest stream at that concurrency.
+These costs were measured on 4 November 2026 on the same host, with FFmpeg 7.1.5
+in the Debian 13 worker image and an AMD Radeon RX 9070 XT (16 GiB) through VAAPI
+and Mesa radeonsi. Each stream decoded, scaled and encoded a 1080p30 H.264/AAC
+source on the GPU. The speed column gives the slowest stream at each concurrency.
 
 | Encoder | Streams | Slowest stream speed | CPU-seconds per output second | Peak memory per stream |
 | --- | ---: | ---: | ---: | ---: |
@@ -144,10 +145,11 @@ scaled it and encoded it there. Speed is the slowest stream at that concurrency.
 | `hevc_vaapi` | 16 | 0.96× | 0.053 | 200 MiB |
 
 The GPU's video engine, not the CPU, sets the limit: it was fully busy at every
-step, and each stream needed about 1.1 GiB of video memory up to the card's 16 GiB.
+step. Video memory grew by about 1.1 GiB per stream and levelled off near 12.7 GiB of
+the card's 16 GiB above twelve streams.
 With a hardware encoder, unset video slots default to 12, which follows the HEVC
-row; a deployment that forces H.264 should set 8. Other GPUs sustain different
-counts.
+rows; a deployment that forces H.264 should set 8. Other GPUs sustain different
+stream counts.
 
 ## Memory
 
@@ -155,7 +157,8 @@ Containers have no memory limits, so the host's memory is shared by every servic
 and every running job. Estimate the media share from the per-job peaks above: at
 the default 8 + 12 with every slot encoding, the media processes alone peak near
 6.5 GiB (8 × (557 + 92) MiB for HEVC video jobs, plus 12 × (56 + 66) MiB for audio
-renditions). Web, PostgreSQL, Redis and the worker units come on top of that; the
+renditions). The 557 MiB HEVC peak was measured with four pool threads; the
+six-thread peak was not measured. Web, PostgreSQL, Redis and the worker units come on top of that; the
 [household measurements](#household-measurements) show their consumption under a
 two-player workload. Lower the slots if the host cannot hold that sum with room
 for the page cache.
