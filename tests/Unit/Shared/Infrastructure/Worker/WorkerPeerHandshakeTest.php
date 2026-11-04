@@ -104,6 +104,32 @@ PHP;
         $control->ready(4, 12);
     }
 
+    public function testHeartbeatPublishedWhileTheObserverStalledIsFresh(): void
+    {
+        $clock = 10.0;
+        $control = new WorkerPeerHandshake($this->directory, 'worker.baander.app', str_repeat('a', 32), 'control', 10,
+            new \App\Shared\Application\DTO\DeploymentProfile('full'), static function () use (&$clock): float {
+                return $clock;
+            });
+        $execution = $this->peer('execution');
+        // Control read its clock at 10.0 and stalled; execution published at 10.6 meanwhile.
+        $execution->publish(4, true, false, 10.6);
+        $clock = 10.7;
+        self::assertTrue($control->ready(4, 10.0));
+        // A heartbeat ahead of the later reading is still rejected.
+        $execution->publish(4, true, false, 11.0);
+        $this->expectException(\RuntimeException::class);
+        $control->ready(4, 10.0);
+    }
+
+    public function testStaleObservationWithoutAClockRejectsAFresherHeartbeat(): void
+    {
+        $control = $this->peer('control');
+        $this->peer('execution')->publish(4, true, false, 10.6);
+        $this->expectException(\RuntimeException::class);
+        $control->ready(4, 10.0);
+    }
+
     public function testMismatchingDeploymentProfileCannotAdmitBusiness(): void
     {
         $control = $this->peer('control');

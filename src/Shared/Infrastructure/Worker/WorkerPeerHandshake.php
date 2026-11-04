@@ -14,7 +14,10 @@ final class WorkerPeerHandshake
     private readonly string $directory;
     private bool $established = false;
 
-    public function __construct(string $directory, private readonly string $namespace, private readonly string $bootId, private readonly string $unit, private readonly float $startedAt, private readonly DeploymentProfile $deploymentProfile)
+    /**
+     * @param (\Closure(): float)|null $clock the host's monotonic clock, read again after a heartbeat is read
+     */
+    public function __construct(string $directory, private readonly string $namespace, private readonly string $bootId, private readonly string $unit, private readonly float $startedAt, private readonly DeploymentProfile $deploymentProfile, private readonly ?\Closure $clock = null)
     {
         DeploymentLease::validateIdentity($namespace, $bootId);
         if (!in_array($unit, ['control', 'execution'], true) || !str_starts_with($directory, '/')) {
@@ -71,6 +74,10 @@ final class WorkerPeerHandshake
         if (is_link($path) || !is_file($path) || fileowner($path) !== fileowner('/proc/self') || (fileperms($path) & 0077) !== 0 || ($raw = file_get_contents($path, false, null, 0, 2049)) === false || strlen($raw) > 2048) {
             throw new \RuntimeException('Invalid worker peer heartbeat.');
         }
+        // The caller read its clock before this read; a stall in between, such as CPU contention or
+        // a slow filesystem under load, makes a heartbeat the peer published meanwhile look as if it
+        // came from the future. Both clocks are the host's monotonic clock, so the later reading bounds it.
+        $now = $this->clock === null ? $now : max($now, ($this->clock)());
         $value = json_decode($raw, true, 8, JSON_THROW_ON_ERROR);
         if (!is_array($value) || count($value) !== 8 || ($value['namespace'] ?? null) !== $this->namespace
             || ($value['deploymentProfile'] ?? null) !== $this->deploymentProfile->toJson()
