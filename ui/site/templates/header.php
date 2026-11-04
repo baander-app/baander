@@ -7,6 +7,7 @@
         <a href="/#how-it-works">How it works</a>
         <a href="/docs/operator-guide/"<?= $page['guide'] === 'operator' ? ' aria-current="true"' : '' ?>>Manual</a>
         <a href="/baac/"<?= $page['url'] === '/baac/' ? ' aria-current="page"' : '' ?>>bAAC</a>
+        <a href="/typography/"<?= $page['url'] === '/typography/' ? ' aria-current="page"' : '' ?>>Typography</a>
         <a href="<?= $escape($site['repositoryUrl']) ?>">Source <span aria-hidden="true">↗</span></a>
       </nav>
       <button class="theme-toggle" type="button" data-appearance-toggle hidden>

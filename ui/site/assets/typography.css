@@ -1,0 +1,133 @@
+/* The app's script rules, restated for the page's own samples. The page captures the default font
+   order before any language changes it, so an element with its own language can start from it again. */
+.typography-page {
+  --typography-font-ui: var(--font-ui);
+  --typography-font-mono: var(--font-mono);
+  max-width: 1200px;
+  margin: auto;
+  padding: 0 32px;
+}
+
+/* Each element with its own language starts from the default font order and no script adjustment.
+   Zero specificity lets the rules below override it on the same element. */
+:where(.typography-page [lang]) {
+  --font-ui: var(--typography-font-ui);
+  --font-mono: var(--typography-font-mono);
+  --tracking-scale: 1;
+  --script-line-height: 0;
+  --script-size-boost: 0px;
+  font-family: var(--font-ui);
+}
+
+/* The element's language decides which Han glyph forms win. */
+.typography-page [lang]:lang(ja) {
+  --font-ui: var(--font-ui-ja);
+  --font-mono: var(--font-mono-ja);
+  line-break: strict;
+}
+.typography-page [lang]:lang(ko) {
+  --font-ui: var(--font-ui-ko);
+  --font-mono: var(--font-mono-ko);
+}
+.typography-page [lang]:lang(zh-Hant), .typography-page [lang]:lang(zh-TW),
+.typography-page [lang]:lang(zh-HK), .typography-page [lang]:lang(zh-MO) {
+  --font-ui: var(--font-ui-hant);
+  --font-mono: var(--font-mono-hant);
+}
+
+/* Script rules come only from the characters an element renders. The line-height minimums ascend so
+   the most demanding script present wins. */
+.typography-page [data-script~="no-tracking"] { --tracking-scale: 0; }
+.typography-page [data-script~="cjk"] { --script-line-height: 1.6; overflow-wrap: anywhere; }
+.typography-page [data-script~="thai"] { --script-line-height: 1.8; }
+.typography-page [data-script~="burmese"] { --script-line-height: 2; }
+.typography-page [data-script~="burmese-only"] { --script-size-boost: 2px; }
+
+/* "Without the rule" samples restore the rule's absence on the same element. Without the numeral
+   rule a timecode is set in the proportional interface face. */
+.typography-page .typography-without-tracking { --tracking-scale: 1; }
+.typography-page .typography-without-line-height { --script-line-height: 0; }
+.typography-page .typography-without-size { --script-size-boost: 0px; }
+.typography-page .typography-without-numerals { font-family: var(--font-ui); font-variant-numeric: proportional-nums; }
+
+/* A type role from the design tokens: tracking scales with the script, the line-height never drops
+   below the script minimum, and the size boost is added to the role size. */
+.type {
+  font-family: var(--font-ui);
+  font-size: calc(var(--role-size) + var(--script-size-boost, 0px));
+  font-weight: var(--role-weight);
+  letter-spacing: calc(var(--role-tracking) * var(--tracking-scale, 1));
+  line-height: max(var(--role-line-height), var(--script-line-height, 0));
+  overflow-wrap: anywhere;
+}
+.type-hero { --role-size: var(--text-hero-size); --role-weight: var(--text-hero-weight); --role-tracking: var(--text-hero-tracking); --role-line-height: var(--text-hero-line-height); }
+.type-title-lg { --role-size: var(--text-title-lg-size); --role-weight: var(--text-title-lg-weight); --role-tracking: var(--text-title-lg-tracking); --role-line-height: var(--text-title-lg-line-height); }
+.type-title { --role-size: var(--text-title-size); --role-weight: var(--text-title-weight); --role-tracking: var(--text-title-tracking); --role-line-height: var(--text-title-line-height); }
+.type-subtitle { --role-size: var(--text-subtitle-size); --role-weight: var(--text-subtitle-weight); --role-tracking: var(--text-subtitle-tracking); --role-line-height: var(--text-subtitle-line-height); }
+.type-body { --role-size: var(--text-body-size); --role-weight: var(--text-body-weight); --role-tracking: var(--text-body-tracking); --role-line-height: var(--text-body-line-height); }
+.type-body-sm { --role-size: var(--text-body-sm-size); --role-weight: var(--text-body-sm-weight); --role-tracking: var(--text-body-sm-tracking); --role-line-height: var(--text-body-sm-line-height); }
+.type-caption { --role-size: var(--text-caption-size); --role-weight: var(--text-caption-weight); --role-tracking: var(--text-caption-tracking); --role-line-height: var(--text-caption-line-height); }
+.type-label { --role-size: var(--text-label-size); --role-weight: var(--text-label-weight); --role-tracking: var(--text-label-tracking); --role-line-height: var(--text-label-line-height); text-transform: var(--text-label-transform); }
+.type-timecode { --role-size: var(--text-timecode-size); --role-weight: var(--text-timecode-weight); --role-tracking: var(--text-timecode-tracking); --role-line-height: var(--text-timecode-line-height); }
+.type-mono-sm { --role-size: var(--text-mono-sm-size); --role-weight: var(--text-mono-sm-weight); --role-tracking: var(--text-mono-sm-tracking); --role-line-height: var(--text-mono-sm-line-height); }
+.type-timecode, .type-mono-sm { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.typography-page code { font-family: var(--font-mono); font-size: .875em; }
+
+.typography-intro { max-width: 760px; padding: 64px 0 48px; }
+.typography-intro h1 { margin: 16px 0 24px; font-size: clamp(48px, 8vw, 80px); letter-spacing: -.04em; }
+.typography-lead { font-size: clamp(22px, 3vw, 28px); line-height: 1.4; }
+.typography-intro > p + p { margin-top: 24px; }
+.typography-intro > p:not(.eyebrow):not(.typography-lead) { color: var(--color-muted-foreground); }
+.typography-navigation { display: flex; flex-wrap: wrap; gap: 16px 24px; border-block: 1px solid var(--color-border); padding: 24px 0; }
+.typography-navigation a { font-size: 14px; }
+.typography-section { padding: 64px 0; border-bottom: 1px solid var(--color-border); }
+.typography-section:last-child { border: 0; }
+.typography-section-heading { max-width: 760px; margin-bottom: 32px; }
+.typography-section h2 { margin: 16px 0 24px; font-size: clamp(28px, 4vw, 40px); }
+.typography-section h3 { font-size: 20px; }
+.typography-section-heading > p:not(.eyebrow), .typography-rule > p { color: var(--color-muted-foreground); }
+
+.typography-specimens { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr)); gap: 24px; }
+.typography-specimen { display: flex; flex-direction: column; gap: 8px; min-width: 0; padding: 24px; border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-card); }
+.typography-specimen h3 { font-size: 16px; }
+.typography-family, .typography-roles { font-size: 14px; color: var(--color-muted-foreground); }
+.typography-samples { display: flex; flex-direction: column; gap: 8px; margin: 16px 0; }
+.typography-roles { margin-top: auto; }
+
+.typography-forms { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; }
+.typography-form { min-width: 0; padding: 24px; border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-card); }
+.typography-form figcaption { font-weight: 600; }
+.typography-form figcaption span { display: block; font-size: 14px; font-weight: 400; color: var(--color-muted-foreground); }
+.typography-glyphs { margin-top: 16px; font-family: var(--font-ui); font-size: clamp(48px, 6vw, 72px); font-weight: 400; line-height: 1.3; }
+
+.typography-rule { margin-top: 48px; }
+.typography-rule > p { max-width: 760px; margin-top: 16px; }
+.typography-compare { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; margin-top: 24px; }
+.typography-panel { min-width: 0; padding: 24px; border: 1px solid var(--color-border); border-radius: var(--radius-lg); }
+.typography-panel[data-variant="with"] { border-color: var(--color-accent-text); }
+.typography-panel-label { margin-bottom: 16px; font-size: 14px; font-weight: 600; color: var(--color-muted-foreground); }
+.typography-panel[data-variant="with"] .typography-panel-label { color: var(--color-accent-text); }
+.typography-panel-samples { display: flex; flex-direction: column; align-items: flex-start; gap: 16px; }
+#rule-line-height .type { max-width: 14em; }
+#rule-numerals .typography-panel-samples { align-items: flex-end; width: max-content; gap: 0; }
+
+.typography-scale { margin: 0; padding: 0; list-style: none; }
+.typography-role { display: grid; grid-template-columns: minmax(0, 320px) minmax(0, 1fr); gap: 16px 48px; align-items: center; padding: 24px 0; border-top: 1px solid var(--color-border); }
+.typography-role-meta h3 { font-size: 16px; }
+.typography-role-meta h3 code { font-size: 1em; }
+.typography-role-meta dl { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 8px 0; font-size: 14px; }
+.typography-role-meta dl div { display: flex; gap: 4px; }
+.typography-role-meta dt { color: var(--color-muted-foreground); }
+.typography-role-meta dd { margin: 0; font-variant-numeric: tabular-nums; }
+.typography-role-meta p { font-size: 14px; color: var(--color-muted-foreground); }
+
+@media (max-width: 767px) {
+  .typography-forms, .typography-compare { grid-template-columns: minmax(0, 1fr); }
+  .typography-role { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 640px) {
+  .typography-page { padding-inline: 24px; }
+  .typography-intro { padding-top: 48px; }
+  .typography-section { padding-block: 48px; }
+  .typography-specimen, .typography-form, .typography-panel { padding: 16px; }
+}

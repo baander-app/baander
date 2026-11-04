@@ -6,6 +6,7 @@
     <a href="/docs/operator-guide/">Operator manual</a>
     <a href="/docs/developer-guide/">Developer guide</a>
     <a href="/baac/">bAAC</a>
+    <a href="/typography/">Typography</a>
     <a href="<?= $escape($site['repositoryUrl']) ?>">Source</a>
   </nav>
 </footer>

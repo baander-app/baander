@@ -151,7 +151,7 @@ test('the sitemap lists every published page at its canonical URL and robots.txt
   expect(result.status).toBe(200);
   expect(result.type).toMatch(/xml/);
   expect(result.locations.length).toBeGreaterThan(200);
-  expect(result.locations).toEqual(expect.arrayContaining(['https://baander.app/', 'https://baander.app/baac/', 'https://baander.app/docs/developer-guide/contexts/']));
+  expect(result.locations).toEqual(expect.arrayContaining(['https://baander.app/', 'https://baander.app/baac/', 'https://baander.app/typography/', 'https://baander.app/docs/developer-guide/contexts/']));
   expect(result.locations.some((location) => location.endsWith('404.html'))).toBe(false);
   for (const value of result.lastModified) expect(Number.isNaN(Date.parse(value)), value).toBe(false);
   for (const listed of result.pages) expect(listed, listed.location).toMatchObject({ status: 200, canonical: true });
@@ -325,3 +325,183 @@ test('unknown and private paths return 404; chapter URLs canonicalize', async ({
     await expect(page).toHaveURL(/\/docs\/operator-guide\/getting-started\/$/);
   }
 });
+
+/** The families the site bundles, as the font files name themselves; a variable font may add its default instance. */
+const BUNDLED_FAMILY = /^(?:Geist|Geist Mono|Noto Sans(?: Mono| Thai| Myanmar| SC| TC| JP| KR)?)(?: Thin)?$/;
+const HAN_FAMILY = /^Noto Sans (?:SC|TC|JP|KR) Variable$/;
+/** The site-wide Geist faces declare no unicode-range; their files hold Fontsource's Latin slice. */
+const SITE_WIDE_LATIN = 'U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD';
+
+async function openTypography(page: import('@playwright/test').Page) {
+  await page.goto('/typography/');
+  await expect(page.getByRole('heading', { level: 1, name: 'Typography' })).toBeVisible();
+  await page.evaluate(() => document.fonts.ready.then(() => undefined));
+}
+
+/** The computed family order of an element, without quotes. */
+function families(page: import('@playwright/test').Page, selector: string): Promise<string[]> {
+  return page.locator(selector).evaluate((element) => getComputedStyle(element).fontFamily
+    .split(',').map((family) => family.trim().replace(/^"|"$/g, '')));
+}
+
+function spacing(page: import('@playwright/test').Page, selector: string) {
+  return page.locator(selector).first().evaluate((element) => {
+    const style = getComputedStyle(element);
+    return {
+      letterSpacing: style.letterSpacing === 'normal' ? 0 : Number.parseFloat(style.letterSpacing),
+      fontSize: Number.parseFloat(style.fontSize),
+      lineHeight: Number.parseFloat(style.lineHeight),
+      numerals: style.fontVariantNumeric,
+      family: style.fontFamily,
+    };
+  });
+}
+
+test('visitors reach the typography page from the header and it describes itself', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('navigation', { name: 'Main navigation' }).getByRole('link', { name: 'Typography', exact: true }).click();
+  await expect(page).toHaveURL(/\/typography\/$/);
+  await expect(page).toHaveTitle(/^Typography/);
+  await expect(page.getByRole('navigation', { name: 'Main navigation' }).getByRole('link', { name: 'Typography', exact: true }))
+    .toHaveAttribute('aria-current', 'page');
+  await expect(page.getByRole('navigation', { name: 'Main navigation' }).getByRole('link', { name: 'bAAC', exact: true }))
+    .not.toHaveAttribute('aria-current');
+  await expect(page.getByRole('navigation', { name: 'Footer navigation' }).getByRole('link', { name: 'Typography', exact: true }))
+    .toHaveAttribute('href', '/typography/');
+  await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', 'https://baander.app/typography/');
+  await expect(page.locator('meta[property="og:url"]')).toHaveAttribute('content', 'https://baander.app/typography/');
+  await expect(page.locator('meta[name="description"]')).toHaveAttribute('content', /Thai, Burmese, Korean, Chinese and Japanese/);
+  for (const section of ['Scripts', 'Glyph forms', 'Script rules', 'Type scale']) {
+    await expect(page.getByRole('navigation', { name: 'On this page' }).getByRole('link', { name: section, exact: true })).toBeVisible();
+  }
+  await expect(page.locator('.typography-specimen h3')).toHaveText([
+    'Latin and Vietnamese', 'Cyrillic', 'Thai', 'Burmese', 'Korean', 'Simplified Chinese', 'Traditional Chinese', 'Japanese',
+  ]);
+  await expect(page.locator('.typography-role')).toHaveCount(10);
+});
+
+test('the glyph-form columns put their own Han family first', async ({ page }) => {
+  await openTypography(page);
+  const firstHan = async (lang: string) => (await families(page, `#glyph-forms [lang="${lang}"]`)).find((family) => HAN_FAMILY.test(family));
+  await expect(page.locator('#glyph-forms [lang="ja"]')).toHaveText('直 骨 与');
+  expect(await firstHan('ja')).toBe('Noto Sans JP Variable');
+  expect(await firstHan('zh-Hans')).toBe('Noto Sans SC Variable');
+  expect(await firstHan('zh-Hant')).toBe('Noto Sans TC Variable');
+});
+
+test('each script rule sample differs from its sample without the rule', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await openTypography(page);
+  const rule = (id: string, variant: 'with' | 'without', lang: string) => spacing(page, `#rule-${id} [data-variant="${variant}"] [lang="${lang}"]`);
+
+  const trackedThai = await rule('tracking', 'without', 'th');
+  expect(trackedThai.letterSpacing).toBeCloseTo(0.12 * trackedThai.fontSize, 2);
+  for (const lang of ['th', 'my', 'ko', 'ja']) expect((await rule('tracking', 'with', lang)).letterSpacing, lang).toBe(0);
+
+  for (const [lang, minimum] of [['th', 1.8], ['my', 2], ['ja', 1.6]] as const) {
+    const without = await rule('line-height', 'without', lang);
+    const withRule = await rule('line-height', 'with', lang);
+    expect(without.lineHeight / without.fontSize, `${lang} without the rule`).toBeCloseTo(1.5, 2);
+    expect(withRule.lineHeight / withRule.fontSize, `${lang} with the rule`).toBeCloseTo(minimum, 2);
+  }
+
+  const sizes = await page.locator('#rule-size .type').evaluateAll((samples) => samples.map((sample) => Number.parseFloat(getComputedStyle(sample).fontSize)));
+  expect(sizes, 'Wholly Burmese text gains 2px; the mixed string keeps the body size').toEqual([15, 15, 17, 15]);
+
+  const tabular = await rule('numerals', 'with', 'en');
+  expect(tabular.numerals).toBe('tabular-nums');
+  expect(tabular.family).toMatch(/^"Geist Mono Variable",/);
+  const proportional = await rule('numerals', 'without', 'en');
+  expect(proportional.numerals).toBe('proportional-nums');
+  expect(proportional.family).toMatch(/^"Geist Variable",/);
+});
+
+test('only the typography page declares or requests Noto fonts', async ({ page }) => {
+  const notoRequests: string[] = [];
+  page.on('request', (request) => {
+    if (/\/noto-sans/.test(new URL(request.url()).pathname)) notoRequests.push(request.url());
+  });
+  for (const path of ['/', '/baac/', '/docs/operator-guide/getting-started/']) {
+    await page.goto(path);
+    await page.evaluate(() => document.fonts.ready.then(() => undefined));
+    const declared = await page.evaluate(() => [...document.fonts].map((face) => face.family.replaceAll('"', '')));
+    expect(declared.filter((family) => family.startsWith('Noto')), path).toEqual([]);
+  }
+  expect(notoRequests).toEqual([]);
+
+  await openTypography(page);
+  expect(notoRequests.some((url) => /\/assets\/site\/fonts\/noto-sans-thai-thai-wght-normal-[0-9a-f]{16}\.woff2$/.test(url))).toBe(true);
+});
+
+test('every character on the typography page renders from a bundled Geist or Noto face', async ({ page }) => {
+  await openTypography(page);
+  await page.evaluate(async () => {
+    for (const section of document.querySelectorAll('.typography-section')) {
+      section.scrollIntoView();
+      await new Promise(requestAnimationFrame);
+    }
+    await document.fonts.ready;
+  });
+
+  const session = await page.context().newCDPSession(page);
+  await session.send('DOM.enable');
+  await session.send('CSS.enable');
+  const { root } = await session.send('DOM.getDocument', { depth: -1 });
+  const { nodeIds } = await session.send('DOM.querySelectorAll', { nodeId: root.nodeId, selector: 'body, body *' });
+  const used: { familyName: string; isCustomFont: boolean }[] = [];
+  for (const nodeId of nodeIds) {
+    const { fonts } = await session.send('CSS.getPlatformFontsForNode', { nodeId });
+    used.push(...fonts.map(({ familyName, isCustomFont }) => ({ familyName, isCustomFont })));
+  }
+  expect(new Set(used.map(({ familyName }) => familyName.replace(/ Thin$/, '')))).toEqual(new Set([
+    'Geist', 'Geist Mono', 'Noto Sans Thai', 'Noto Sans Myanmar', 'Noto Sans SC', 'Noto Sans TC', 'Noto Sans JP', 'Noto Sans KR',
+  ]));
+  expect(used.filter(({ familyName, isCustomFont }) => !isCustomFont || !BUNDLED_FAMILY.test(familyName))).toEqual([]);
+
+  // Each specimen character falls to a declared face in its element's own family order, and that face
+  // is loaded at the element's weight and size.
+  const missing = await page.evaluate((siteWideLatin) => {
+    const ranges = (value: string) => value.split(',').map((part) => {
+      const [start, end = start] = part.trim().replace(/^u\+/i, '').split('-');
+      return [Number.parseInt(start, 16), Number.parseInt(end, 16)] as const;
+    });
+    const faces = [...document.fonts].map((face) => ({
+      family: face.family.replace(/^"|"$/g, ''),
+      ranges: ranges(/^U\+0-10FFFF$/i.test(face.unicodeRange) ? siteWideLatin : face.unicodeRange),
+    }));
+    const samples = [...document.querySelectorAll('.typography-page .type, .typography-glyphs')];
+    return samples.flatMap((element) => {
+      const style = getComputedStyle(element);
+      const stack = style.fontFamily.split(',').map((family) => family.trim().replace(/^"|"$/g, ''));
+      const text = style.textTransform === 'uppercase' ? element.textContent!.toUpperCase() : element.textContent!;
+      return [...new Set(text.replace(/\s/g, ''))].flatMap((character) => {
+        const code = character.codePointAt(0)!;
+        const family = stack.find((name) => faces.some((face) => face.family === name
+          && face.ranges.some(([start, end]) => code >= start && code <= end)));
+        if (family === undefined) return [`${character} in "${element.textContent}" has no bundled face`];
+        return document.fonts.check(`${style.fontStyle} ${style.fontWeight} ${style.fontSize} "${family}"`, character)
+          ? []
+          : [`${character} in ${family} is not loaded`];
+      });
+    });
+  }, SITE_WIDE_LATIN);
+  expect(missing).toEqual([]);
+});
+
+for (const width of [1280, 390]) {
+  for (const colorScheme of ['light', 'dark'] as const) {
+    test(`${width}px ${colorScheme}: the typography page stays within the viewport`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 900 });
+      await page.emulateMedia({ colorScheme });
+      await openTypography(page);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+      const overflowing = await page.locator('.typography-page section, .typography-page section *').evaluateAll((elements) => elements
+        .filter((element) => element.scrollWidth > element.clientWidth + 1 && getComputedStyle(element).display !== 'inline')
+        .map((element) => element.className || element.tagName));
+      expect(overflowing, 'No section or sample scrolls horizontally').toEqual([]);
+      const screenshot = test.info().outputPath(`typography-${width}-${colorScheme}.png`);
+      await page.screenshot({ path: screenshot, fullPage: true });
+      await test.info().attach(`typography-${width}-${colorScheme}`, { path: screenshot, contentType: 'image/png' });
+    });
+  }
+}
