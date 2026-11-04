@@ -944,10 +944,11 @@ tone instead of relying on an MP4 edit list. The audio-only transcoder is outsid
 this movie-path normalization.
 
 For the qualified cases where selected audio ends at or before video,
-`apad=packet_size=1024` follows normalization. When the caller passes the probed
-video end, `whole_dur` pads the audio to that end and `atrim` cuts it there, so
-both tracks finish together. Only a caller without that end falls back to output
-`-shortest`. On FFmpeg 7, `-shortest` buffers up to ten seconds of frames before
+`apad=packet_size=1024` follows normalization. When the selected video stream
+states its own end (MOV or MP4 stream timing, or the Matroska track duration
+tag), `whole_dur` pads the audio to that end and `atrim` cuts it there, so both
+tracks finish together. A source whose end is only a container estimate keeps
+output `-shortest`, so its audio still stops at the video end. On FFmpeg 7, `-shortest` buffers up to ten seconds of frames before
 the first segment is published and drops the final AAC frame that crosses the
 video end. Commands with audio also set `-max_interleave_delta 0`: padded audio
 runs ahead of the movie, and without strict interleaving the DASH muxer can flush

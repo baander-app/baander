@@ -670,7 +670,10 @@ final class SegmentEncoderStreamArgsTest extends TestCase
         yield 'sparse seek keeps its preroll trim' => [1, '24.000000', 'atrim=start=0,'];
     }
 
-    /** @param array<string, mixed> $format */
+    /**
+     * @param array<string, mixed> $format
+     * @param array<string, mixed> $video
+     */
     #[DataProvider('probedEnds')]
     public function testOnlyAVideoStreamEndReplacesShortest(array $format, array $video, bool $streamEnd): void
     {
