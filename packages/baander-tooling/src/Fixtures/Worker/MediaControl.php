@@ -11,6 +11,9 @@ final class MediaControl
     /** @param list<string> $arguments */
     public static function main(array $arguments, string $root): int
     {
+        if (getenv('BAANDER_TEST_MEDIA_COST') === 'hardware') {
+            return MediaCostHardware::main($root);
+        }
         if ($arguments === []) {
             $runtime = new Runtime($root, budget: 'workerCapacity');
             $artifacts = Runtime::artifacts($root, getenv('BAANDER_TEST_MEDIA_COST') === '1' ? 'media-cost' : 'media-control');

@@ -173,6 +173,65 @@ final class WorkerMediaCostTest extends TestCase
         MediaCost::receipt($this->directory);
     }
 
+    public function testHardwareReceiptMeasuresEveryStreamOverTheirCommonWindow(): void
+    {
+        // Two H.264 streams at 3x and 2x real time, then four HEVC streams of which one falls behind real time.
+        $lines = [['header' => ['cpuModel' => 'Test CPU', 'device' => '/dev/dri/renderD128', 'tier' => '1080p', 'encoders' => ['h264_vaapi', 'hevc_vaapi'], 'steps' => [2, 4],
+            'stepSeconds' => 60, 'source' => ['seconds' => 120, 'frameRate' => 30]]]];
+        foreach ([['h264_vaapi', [3.0, 2.0]], ['hevc_vaapi', [1.5, 1.2, 1.1, .9]]] as [$encoder, $speeds]) {
+            $lines[] = ['step' => ['encoder' => $encoder, 'concurrency' => count($speeds), 'startedAt' => 100.0, 'arguments' => ['/usr/bin/ffmpeg']]];
+            foreach (range(0, 20) as $index) {
+                $wall = $index * .5;
+                $processes = [];
+                foreach ($speeds as $stream => $speed) {
+                    $processes[] = ['id' => $stream . ':1', 'ppid' => 1, 'startTicks' => 1, 'cpuTicks' => (int) round($wall * 10), 'threads' => 20 + $stream,
+                        'rssKib' => 180_000, 'hwmKib' => 180_000 + $index * 1024, 'progress' => ['frame' => (string) (int) round($wall * $speed * 30)],
+                        'gpu' => ['enc' => (int) ($wall * .2e9), 'vramKib' => 1024 * (100 + $stream)]];
+                }
+                $lines[] = ['sample' => ['t' => 100.0 + $wall, 'uptime' => 1000.0 + $wall, 'loadavg' => 1.5, 'processes' => $processes,
+                    'gpu' => ['busyPercent' => 5, 'vcnBusyPercent' => 90 + $index % 2 * 10, 'memoryBusyPercent' => 3, 'vramUsedBytes' => 2 * 1024 ** 3]]];
+            }
+            $lines[] = ['end' => ['encoder' => $encoder, 'concurrency' => count($speeds), 'endedAt' => 110.0,
+                'processes' => array_fill(0, count($speeds), ['exitCode' => null, 'stoppedAtDeadline' => true, 'stderr' => ''])]];
+        }
+        file_put_contents($this->directory . '/hardware-samples.jsonl', implode("\n", array_map(static fn(array $line): string => json_encode($line, JSON_THROW_ON_ERROR), $lines)) . "\n");
+
+        $receipt = MediaCost::hardwareReceipt($this->directory . '/hardware-samples.jsonl');
+
+        [$h264, $hevc] = $receipt['steps'];
+        // Output passes three seconds once the slowest stream has run three seconds at 2x: 1.5 s.
+        self::assertSame(['seconds' => 8.5, 'loadavg' => ['start' => 1.5, 'end' => 1.5]], $h264['window']);
+        self::assertSame(['minimum' => 2.0, 'median' => 2.0, 'maximum' => 3.0, 'aggregate' => 5.0], $h264['speed']);
+        self::assertTrue($h264['everyStreamAheadOfRealTime']);
+        self::assertSame(0.4, $h264['videoEngineShare']);
+        self::assertSame(['busyPercent' => ['mean' => 5.0, 'p95' => 5.0], 'vcnBusyPercent' => ['mean' => 95.0, 'p95' => 100.0],
+            'memoryBusyPercent' => ['mean' => 3.0, 'p95' => 3.0], 'peakVramUsedMiB' => 2048.0], $h264['device']);
+        self::assertSame(round((180_000 + 20 * 1024) / 1024, 1), $h264['peakRssMiB']);
+        self::assertSame(21, $h264['peakThreads']);
+        self::assertSame(101.0, $h264['peakProcessVramMiB']);
+        self::assertSame(2, $h264['stoppedAtDeadline']);
+        self::assertEqualsWithDelta(.9, $hevc['speed']['minimum'], .01);
+        self::assertFalse($hevc['everyStreamAheadOfRealTime']);
+        self::assertSame(['h264_vaapi' => 2, 'hevc_vaapi' => 0], $receipt['largestRealTimeConcurrency']);
+        self::assertSame(0, $receipt['hardwareVideoDefault']);
+        self::assertSame(['seconds' => 120, 'frameRate' => 30], $receipt['source']);
+    }
+
+    public function testHardwareStepWithAFailedEncodeIsNotRealTime(): void
+    {
+        $lines = [['header' => ['tier' => '1080p', 'source' => ['frameRate' => 30]]],
+            ['step' => ['encoder' => 'hevc_vaapi', 'concurrency' => 1, 'startedAt' => 1.0, 'arguments' => []]],
+            ['sample' => ['t' => 1.0, 'uptime' => 1.0, 'loadavg' => 1.0, 'processes' => [], 'gpu' => []]],
+            ['end' => ['encoder' => 'hevc_vaapi', 'concurrency' => 1, 'endedAt' => 2.0, 'processes' => [['exitCode' => 187, 'stoppedAtDeadline' => false, 'stderr' => 'No VA display found']]]]];
+        file_put_contents($this->directory . '/hardware-samples.jsonl', implode("\n", array_map(static fn(array $line): string => json_encode($line, JSON_THROW_ON_ERROR), $lines)) . "\n");
+
+        $receipt = MediaCost::hardwareReceipt($this->directory . '/hardware-samples.jsonl');
+
+        self::assertNull($receipt['steps'][0]['window']);
+        self::assertSame('No VA display found', $receipt['steps'][0]['failedProcesses'][0]['stderr']);
+        self::assertSame(0, $receipt['hardwareVideoDefault']);
+    }
+
     private function units(int $executionMemory = 0): void
     {
         $unit = static fn(int $score, int $memory): array => ['HostConfig' => ['Memory' => $memory, 'MemorySwap' => $memory, 'NanoCpus' => 0,

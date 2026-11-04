@@ -1648,6 +1648,64 @@ Service cgroups, as mean / p95 CPUs and anonymous memory (page cache in brackets
 These are measurements of one host and one synthetic source, not derived limits.
 Real film content, other frame rates and other CPUs change the figures.
 
+#### Hardware encoder cost
+
+Hardware mode measures the application's 1080p hardware encode command on a GPU,
+without the worker pair. It needs a worker image built from the checkout and a
+render node on the host:
+
+```bash
+php scripts/build-application.php --target worker --tag baander-worker:hw-cost
+BAANDER_TEST_MEDIA_COST=hardware BAANDER_TEST_IMAGE=baander-worker:hw-cost \
+  bash scripts/test-worker-media-control-container.sh
+```
+
+`BAANDER_TEST_MEDIA_COST_DEVICE` selects the device (default
+`/dev/dri/renderD128`), `BAANDER_TEST_MEDIA_COST_ENCODERS` the encoders (default
+`h264_vaapi,hevc_vaapi`), `BAANDER_TEST_MEDIA_COST_STEPS` the concurrency steps
+(default `1,2,4,8,12,16,24`) and `BAANDER_TEST_MEDIA_COST_STEP_SECONDS` how long a
+step may run (default 150). The runner gives one disposable worker-image container
+the device and the group that owns it, as worker creation gives the execution unit,
+with no network, no capabilities and Docker's default seccomp profile. Inside, the
+fixture generates the same 120-second 1080p30 H.264/AAC source as cost mode, builds
+the encode command with `SegmentEncoder` for each hardware encoder, and starts each
+step's encodes together through the native daemon's launcher. Every encode decodes,
+scales and encodes on the device and encodes AAC audio on the CPU.
+
+Every half second the fixture records each encode's CPU ticks, `VmHWM`, threads,
+`-progress` frame count and the per-client DRM engine time and VRAM from
+`/proc/<pid>/fdinfo`, and the device's `gpu_busy_percent`, `vcn_busy_percent` and
+`mem_info_vram_used`. `media-cost-hardware.json` reports each step over the window
+in which every encode had passed three seconds of output and none had stopped
+advancing. A step is real time when its slowest stream runs faster than 1.0x. The
+hardware video default is the largest step that is real time for every encoder.
+
+The recorded run on 2026-11-04 used an AMD Radeon RX 9070 XT (16 GiB) through VAAPI
+with Mesa radeonsi and FFmpeg 7.1.5 on Debian 13, on the Ryzen 7 5800X3D host above
+with other work running (one-minute load average 1.5–6.2). Steps 10 and 14 were
+added to the defaults:
+
+| Encoder | Streams | Slowest / aggregate speed | CPU-s per output s | Peak RSS | Device VRAM used |
+|---|---|---|---|---|---|
+| `h264_vaapi` | 1 | 8.98x / 8.98x | 0.031 | 164 MiB | 2.2 GiB |
+| `h264_vaapi` | 4 | 2.25x / 9.05x | 0.033 | 164 MiB | 5.4 GiB |
+| `h264_vaapi` | 8 | 1.12x / 8.98x | 0.033 | 170 MiB | 9.6 GiB |
+| `h264_vaapi` | 10 | 0.91x / 9.14x | 0.033 | 169 MiB | 11.7 GiB |
+| `h264_vaapi` | 16 | 0.57x / 9.27x | 0.063 | 163 MiB | 12.7 GiB |
+| `hevc_vaapi` | 1 | 13.3x / 13.3x | 0.029 | 185 MiB | 1.1 GiB |
+| `hevc_vaapi` | 8 | 1.67x / 13.4x | 0.030 | 192 MiB | 8.5 GiB |
+| `hevc_vaapi` | 12 | 1.12x / 13.5x | 0.031 | 195 MiB | 12.7 GiB |
+| `hevc_vaapi` | 14 | 1.08x / 15.2x | 0.055 | 196 MiB | 12.7 GiB |
+| `hevc_vaapi` | 16 | 0.96x / 15.4x | 0.053 | 200 MiB | 12.7 GiB |
+
+`vcn_busy_percent` read 100 at every step, `gpu_busy_percent` stayed low, and the
+encodes' summed engine time equalled the wall time: the video engine bounds the
+aggregate rate, about 9x real time for H.264 and 13–15x for HEVC. Device VRAM grew
+by about 1.1 GiB per stream and levelled off near 12.7 GiB above twelve streams
+without errors. Every encode exited cleanly or ran until the step's deadline. H.264
+is real time up to 8 streams and HEVC up to 14, so the hardware video default is 8.
+These figures are for one GPU, one synthetic source and one run.
+
 Run browser controls against the immutable production worker image through the
 combined deployment runner:
 

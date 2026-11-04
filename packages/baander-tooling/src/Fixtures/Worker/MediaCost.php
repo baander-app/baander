@@ -79,6 +79,149 @@ final class MediaCost
         ];
     }
 
+    /**
+     * Turns the hardware drill's samples into per-step figures: for every encoder and concurrency,
+     * each stream's speed, CPU seconds per output second, video engine share, peak memory and the
+     * device's busy figures over the window in which every stream of the step was encoding. The
+     * hardware video default is the largest measured concurrency at which every stream of every
+     * encoder stayed ahead of real time.
+     *
+     * @return array<string,mixed>
+     */
+    public static function hardwareReceipt(string $path): array
+    {
+        $records = Reports::samples($path);
+        Reports::require(isset($records[0]['header']), 'Hardware cost drill omitted its header');
+        $header = $records[0]['header'];
+        $frameRate = Reports::number($header['source']['frameRate']);
+        $steps = [];
+        $current = null;
+        foreach (array_slice($records, 1) as $record) {
+            if (isset($record['step'])) {
+                $current = ['step' => $record['step'], 'samples' => []];
+            } elseif (isset($record['sample'])) {
+                Reports::require($current !== null, 'Hardware sample precedes its step');
+                $current['samples'][] = $record['sample'];
+            } elseif (isset($record['end'])) {
+                Reports::require($current !== null, 'Hardware step end precedes its start');
+                $steps[] = self::hardwareStep($current['step'], $current['samples'], $record['end'], $frameRate);
+                $current = null;
+            }
+        }
+        Reports::require($current === null && $steps !== [], 'Hardware cost drill ended inside a step or measured none');
+        $encoders = [];
+        foreach ($steps as $step) {
+            $encoders[$step['encoder']][] = $step;
+        }
+        $realTime = [];
+        foreach ($encoders as $encoder => $measured) {
+            $passing = array_column(array_filter($measured, static fn(array $step): bool => $step['everyStreamAheadOfRealTime']), 'concurrency');
+            $realTime[$encoder] = $passing === [] ? 0 : max($passing);
+        }
+        return [
+            'version' => 1,
+            'host' => array_diff_key($header, array_flip(['source', 'encoders', 'steps', 'stepSeconds'])),
+            'source' => $header['source'],
+            'tier' => $header['tier'],
+            'steps' => $steps,
+            'largestRealTimeConcurrency' => $realTime,
+            'hardwareVideoDefault' => min($realTime),
+        ];
+    }
+
+    /**
+     * @param array<string,mixed> $step
+     * @param list<array<string,mixed>> $samples
+     * @param array<string,mixed> $end
+     * @return array<string,mixed>
+     */
+    private static function hardwareStep(array $step, array $samples, array $end, float $frameRate): array
+    {
+        $failed = array_values(array_filter($end['processes'], static fn(array $process): bool => !$process['stoppedAtDeadline'] && $process['exitCode'] !== 0));
+        $streams = [];
+        foreach ($samples as $sample) {
+            foreach ($sample['processes'] as $process) {
+                // A reaped-but-unwaited process keeps a stat entry without memory; its last progress stays.
+                if ($process['rssKib'] !== null && isset($process['progress']['frame'])) {
+                    $streams[$process['id']][] = $process + ['t' => $sample['t'], 'output' => (int) $process['progress']['frame'] / $frameRate];
+                }
+            }
+        }
+        $result = ['encoder' => $step['encoder'], 'concurrency' => $step['concurrency'], 'streams' => count($streams),
+            'failedProcesses' => $failed, 'stoppedAtDeadline' => count(array_filter(array_column($end['processes'], 'stoppedAtDeadline')))];
+        $start = $finish = null;
+        foreach ($streams as $points) {
+            $warm = array_values(array_filter($points, static fn(array $point): bool => $point['output'] >= self::WARM_UP_OUTPUT_SECONDS));
+            if ($warm === []) {
+                $start = INF;
+                break;
+            }
+            $last = $warm[0];
+            foreach ($warm as $point) {
+                $last = $point['output'] > $last['output'] ? $point : $last;
+            }
+            $start = max($start ?? $warm[0]['t'], $warm[0]['t']);
+            $finish = min($finish ?? $last['t'], $last['t']);
+        }
+        if (count($streams) !== $step['concurrency'] || $failed !== [] || $start === null || $finish === null || $finish - $start < 2.0) {
+            return $result + ['window' => null, 'everyStreamAheadOfRealTime' => false];
+        }
+        $figures = [];
+        foreach ($streams as $points) {
+            $inside = array_values(array_filter($points, static fn(array $point): bool => $start <= $point['t'] && $point['t'] <= $finish));
+            [$first, $last] = [$inside[0], $inside[array_key_last($inside)]];
+            $wall = $last['t'] - $first['t'];
+            $output = $last['output'] - $first['output'];
+            $figures[] = [
+                'speed' => $output / $wall,
+                'cpuSecondsPerOutputSecond' => ($last['cpuTicks'] - $first['cpuTicks']) / self::CLOCK_TICKS / $output,
+                'videoEngineShare' => isset($first['gpu']['enc'], $last['gpu']['enc']) ? ($last['gpu']['enc'] - $first['gpu']['enc']) / 1e9 / $wall : null,
+                'peakRssMiB' => max(array_column($points, 'hwmKib')) / 1024,
+                'peakThreads' => max(array_column($points, 'threads')),
+                'peakVramMiB' => max(array_map(static fn(array $point): int => (int) ($point['gpu']['vramKib'] ?? 0), $points)) / 1024,
+            ];
+        }
+        $device = array_values(array_filter($samples, static fn(array $sample): bool => $start <= $sample['t'] && $sample['t'] <= $finish));
+        $speeds = array_column($figures, 'speed');
+        $engine = array_filter(array_column($figures, 'videoEngineShare'), static fn(?float $share): bool => $share !== null);
+        return $result + [
+            'window' => ['seconds' => round($finish - $start, 3), 'loadavg' => ['start' => $device[0]['loadavg'], 'end' => $device[array_key_last($device)]['loadavg']]],
+            'speed' => ['minimum' => round(min($speeds), 3), 'median' => round(self::percentile($speeds, .5), 3), 'maximum' => round(max($speeds), 3), 'aggregate' => round(array_sum($speeds), 3)],
+            'cpuSecondsPerOutputSecond' => round(array_sum(array_column($figures, 'cpuSecondsPerOutputSecond')) / count($figures), 4),
+            'videoEngineShare' => $engine === [] ? null : round(array_sum($engine), 3),
+            'peakRssMiB' => round(max(array_column($figures, 'peakRssMiB')), 1),
+            'peakThreads' => max(array_column($figures, 'peakThreads')),
+            'peakProcessVramMiB' => round(max(array_column($figures, 'peakVramMiB')), 1),
+            'device' => self::deviceBusy($device),
+            'everyStreamAheadOfRealTime' => min($speeds) > 1.0,
+        ];
+    }
+
+    /**
+     * Mean and 95th percentile of the device's busy counters, and its peak VRAM use.
+     *
+     * @param list<array<string,mixed>> $samples
+     * @return array<string,mixed>
+     */
+    private static function deviceBusy(array $samples): array
+    {
+        $device = [];
+        foreach (['busyPercent', 'vcnBusyPercent', 'memoryBusyPercent'] as $counter) {
+            $values = array_values(array_filter(array_map(static fn(array $sample): mixed => $sample['gpu'][$counter] ?? null, $samples), is_int(...)));
+            $device[$counter] = $values === [] ? null : ['mean' => round(array_sum($values) / count($values), 1), 'p95' => self::percentile($values, .95)];
+        }
+        $vram = array_values(array_filter(array_map(static fn(array $sample): mixed => $sample['gpu']['vramUsedBytes'] ?? null, $samples), is_int(...)));
+        $device['peakVramUsedMiB'] = $vram === [] ? null : round(max($vram) / 1048576, 1);
+        return $device;
+    }
+
+    /** @param list<int|float> $values */
+    private static function percentile(array $values, float $rank): float
+    {
+        sort($values);
+        return (float) $values[max(0, (int) ceil($rank * count($values)) - 1)];
+    }
+
     /** The largest peak resident memory of one native process of a kind seen so far, in MiB. */
     public static function peakNativeRssMiB(string $path, string $kind): float
     {
