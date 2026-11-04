@@ -147,6 +147,9 @@ h1, h2, h3 { margin: 0; }
 .site-footer nav a { color: var(--color-muted-foreground); }
 .manual-layout { display: grid; grid-template-columns: 248px minmax(0, 760px); gap: 64px; max-width: 1200px; padding: 32px; margin: auto; align-items: start; }
 .chapter-sidebar { position: sticky; top: 24px; max-height: calc(100dvh - 48px); overflow: auto; scrollbar-gutter: stable; padding: 0 16px 16px 0; font-size: 13px; }
+/* The sidebar scrolls, so it clips anything painted past its edge. Inline padding, cancelled by an
+   equal negative margin, leaves room for focus rings (outline plus offset) without moving content. */
+.chapter-sidebar { --focus-room: 8px; padding-inline-start: var(--focus-room); margin-inline-start: calc(-1 * var(--focus-room)); }
 .chapter-navigation > summary { font-size: 14px; font-weight: 500; cursor: pointer; padding: 16px 0; }
 .chapter-group { margin-top: 24px; }
 .chapter-group .eyebrow { margin-bottom: 16px; }
@@ -241,7 +244,7 @@ h1, h2, h3 { margin: 0; }
   .manual-chapters { grid-template-columns: 1fr; }
   .site-footer { padding: 24px; }
   .manual-layout { display: block; padding: 24px; }
-  .chapter-sidebar { position: static; max-height: none; padding: 0; margin-bottom: 32px; }
+  .chapter-sidebar { position: static; max-height: none; padding: 0 0 0 var(--focus-room); margin-bottom: 32px; }
   .chapter-navigation { border-bottom: 1px solid var(--color-border); }
   .chapter-navigation nav { max-height: 240px; overflow: auto; padding-bottom: 16px; }
   .manual-article pre { --code-padding: 16px; }

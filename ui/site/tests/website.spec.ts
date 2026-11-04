@@ -129,6 +129,29 @@ test('the sitemap lists every published page at its canonical URL and robots.txt
   expect(result.robots.body).toContain('Sitemap: https://baander.app/sitemap.xml');
 });
 
+for (const width of [1440, 390]) {
+  test(`${width}px: focus rings in the scrolling manual sidebar are not clipped`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto('/docs/operator-guide/getting-started/');
+    const targets = [
+      page.getByRole('searchbox', { name: 'Search manuals' }),
+      page.getByRole('navigation', { name: 'Manual chapters' }).getByRole('link', { name: 'Getting Started', exact: true }),
+    ];
+    for (const target of targets) {
+      await target.focus();
+      const ring = await target.evaluate((element) => {
+        const style = getComputedStyle(element);
+        const reach = parseFloat(style.outlineWidth) + parseFloat(style.outlineOffset);
+        const box = element.getBoundingClientRect();
+        const clip = element.closest('.chapter-sidebar')!.getBoundingClientRect();
+        return { outline: style.outlineStyle, ringLeft: box.left - reach, clipLeft: clip.left };
+      });
+      expect(ring.outline).not.toBe('none');
+      expect(ring.ringLeft, 'The focus ring starts inside the sidebar clip').toBeGreaterThanOrEqual(ring.clipLeft);
+    }
+  });
+}
+
 test('keyboard focus and enlarged text preserve access to chapters and search', async ({ page }) => {
   await page.goto('/docs/operator-guide/getting-started/');
   await page.keyboard.press('Tab');
