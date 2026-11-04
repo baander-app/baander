@@ -143,6 +143,7 @@ await import(${JSON.stringify(pathToFileURL(resolve(desktop, 'dist/main/index.js
       assert.match(page.url(), /config\/index.html$/);
       await exerciseDiscovery(page);
       assert.match(await page.evaluate(() => getComputedStyle(document.body).fontFamily), /^"Geist Variable",/);
+      assert.equal(await page.evaluate(() => getComputedStyle(document.documentElement).colorScheme), 'light');
       assert.match(await page.locator('.server-url').evaluate(element => getComputedStyle(element).fontFamily), /^"Geist Mono Variable",/);
       await expectLoadedFonts(page, ['Geist Variable', 'Geist Mono Variable']);
       await page.evaluate(async server => {
