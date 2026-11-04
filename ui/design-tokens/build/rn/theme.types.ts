@@ -52,9 +52,59 @@ export interface ThemeSpacing {
 }
 
 export interface ThemeTypography {
-  readonly sans: string
+  readonly ui: string
+  readonly uiJa: string
+  readonly uiKo: string
+  readonly uiHant: string
   readonly mono: string
-  readonly heading: string
+  readonly monoJa: string
+  readonly monoKo: string
+  readonly monoHant: string
+}
+
+export interface ThemeText {
+  readonly heroSize: string
+  readonly heroWeight: string
+  readonly heroTracking: string
+  readonly heroLineHeight: string
+  readonly titleLgSize: string
+  readonly titleLgWeight: string
+  readonly titleLgTracking: string
+  readonly titleLgLineHeight: string
+  readonly titleSize: string
+  readonly titleWeight: string
+  readonly titleTracking: string
+  readonly titleLineHeight: string
+  readonly subtitleSize: string
+  readonly subtitleWeight: string
+  readonly subtitleTracking: string
+  readonly subtitleLineHeight: string
+  readonly bodySize: string
+  readonly bodyWeight: string
+  readonly bodyTracking: string
+  readonly bodyLineHeight: string
+  readonly bodySmSize: string
+  readonly bodySmWeight: string
+  readonly bodySmTracking: string
+  readonly bodySmLineHeight: string
+  readonly captionSize: string
+  readonly captionWeight: string
+  readonly captionTracking: string
+  readonly captionLineHeight: string
+  readonly labelSize: string
+  readonly labelWeight: string
+  readonly labelTracking: string
+  readonly labelLineHeight: string
+  readonly labelTransform: string
+  readonly timecodeSize: string
+  readonly timecodeWeight: string
+  readonly timecodeTracking: string
+  readonly timecodeLineHeight: string
+  readonly monoSmSize: string
+  readonly monoSmWeight: string
+  readonly monoSmTracking: string
+  readonly monoSmLineHeight: string
+  readonly denseSize: string
 }
 
 export interface ThemeDurations {
@@ -75,6 +125,7 @@ export interface Theme {
   radii: ThemeRadii
   spacing: ThemeSpacing
   typography: ThemeTypography
+  text: ThemeText
   durations: ThemeDurations
   _meta: ThemeMeta
 }

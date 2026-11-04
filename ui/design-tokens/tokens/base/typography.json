@@ -1,7 +1,12 @@
 {
   "font": {
-    "sans":    { "value": "\"Inter\", system-ui, -apple-system, BlinkMacSystemFont, sans-serif", "type": "fontFamily" },
-    "mono":    { "value": "\"JetBrains Mono\", ui-monospace, monospace", "type": "fontFamily" },
-    "heading": { "value": "{font.sans}", "type": "fontFamily" }
+    "ui":       { "value": "\"Geist Variable\", \"Noto Sans Variable\", \"Noto Sans Thai Variable\", \"Noto Sans Myanmar Variable\", \"Noto Sans SC Variable\", \"Noto Sans TC Variable\", \"Noto Sans JP Variable\", \"Noto Sans KR Variable\", sans-serif", "type": "fontFamily" },
+    "uiJa":     { "value": "\"Geist Variable\", \"Noto Sans Variable\", \"Noto Sans Thai Variable\", \"Noto Sans Myanmar Variable\", \"Noto Sans JP Variable\", \"Noto Sans SC Variable\", \"Noto Sans TC Variable\", \"Noto Sans KR Variable\", sans-serif", "type": "fontFamily" },
+    "uiKo":     { "value": "\"Geist Variable\", \"Noto Sans Variable\", \"Noto Sans Thai Variable\", \"Noto Sans Myanmar Variable\", \"Noto Sans KR Variable\", \"Noto Sans SC Variable\", \"Noto Sans TC Variable\", \"Noto Sans JP Variable\", sans-serif", "type": "fontFamily" },
+    "uiHant":   { "value": "\"Geist Variable\", \"Noto Sans Variable\", \"Noto Sans Thai Variable\", \"Noto Sans Myanmar Variable\", \"Noto Sans TC Variable\", \"Noto Sans SC Variable\", \"Noto Sans JP Variable\", \"Noto Sans KR Variable\", sans-serif", "type": "fontFamily" },
+    "mono":     { "value": "\"Geist Mono Variable\", \"Noto Sans Mono Variable\", \"Noto Sans Variable\", \"Noto Sans Thai Variable\", \"Noto Sans Myanmar Variable\", \"Noto Sans SC Variable\", \"Noto Sans TC Variable\", \"Noto Sans JP Variable\", \"Noto Sans KR Variable\", monospace", "type": "fontFamily" },
+    "monoJa":   { "value": "\"Geist Mono Variable\", \"Noto Sans Mono Variable\", \"Noto Sans Variable\", \"Noto Sans Thai Variable\", \"Noto Sans Myanmar Variable\", \"Noto Sans JP Variable\", \"Noto Sans SC Variable\", \"Noto Sans TC Variable\", \"Noto Sans KR Variable\", monospace", "type": "fontFamily" },
+    "monoKo":   { "value": "\"Geist Mono Variable\", \"Noto Sans Mono Variable\", \"Noto Sans Variable\", \"Noto Sans Thai Variable\", \"Noto Sans Myanmar Variable\", \"Noto Sans KR Variable\", \"Noto Sans SC Variable\", \"Noto Sans TC Variable\", \"Noto Sans JP Variable\", monospace", "type": "fontFamily" },
+    "monoHant": { "value": "\"Geist Mono Variable\", \"Noto Sans Mono Variable\", \"Noto Sans Variable\", \"Noto Sans Thai Variable\", \"Noto Sans Myanmar Variable\", \"Noto Sans TC Variable\", \"Noto Sans SC Variable\", \"Noto Sans JP Variable\", \"Noto Sans KR Variable\", monospace", "type": "fontFamily" }
   }
 }

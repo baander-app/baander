@@ -67,13 +67,13 @@ function capitalize(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
 
 // ── Load base tokens ─────────────────────────────────────────────────
 
-const baseFiles = ['colors', 'radii', 'spacing', 'typography', 'durations'];
+const baseFiles = ['colors', 'radii', 'spacing', 'typography', 'type', 'durations'];
 let base = {};
 for (const name of baseFiles) {
   base = merge(base, readJson(`tokens/base/${name}.json`));
 }
 
-// ── Resolve reference tokens (e.g. {font.sans} → value) ──────────────
+// ── Resolve reference tokens (e.g. {font.ui} → value) ────────────────
 
 function resolveRefs(tokens) {
   const flat = flatten(tokens);
@@ -147,7 +147,7 @@ const typeLines = [
   '',
 ];
 
-const nsMap = { color: 'ThemeColors', radius: 'ThemeRadii', space: 'ThemeSpacing', font: 'ThemeTypography', duration: 'ThemeDurations' };
+const nsMap = { color: 'ThemeColors', radius: 'ThemeRadii', space: 'ThemeSpacing', font: 'ThemeTypography', text: 'ThemeText', duration: 'ThemeDurations' };
 for (const [ns, tokens] of Object.entries(namespaces)) {
   const ifaceName = nsMap[ns] || `Theme${capitalize(ns)}`;
   typeLines.push(`export interface ${ifaceName} {`);
@@ -169,6 +169,7 @@ typeLines.push('  colors: ThemeColors');
 typeLines.push('  radii: ThemeRadii');
 typeLines.push('  spacing: ThemeSpacing');
 typeLines.push('  typography: ThemeTypography');
+typeLines.push('  text: ThemeText');
 typeLines.push('  durations: ThemeDurations');
 typeLines.push('  _meta: ThemeMeta');
 typeLines.push('}');
@@ -176,8 +177,8 @@ typeLines.push('');
 writeOut('rn/theme.types.ts', typeLines.join('\n'));
 
 // theme.ts
-const themeObj = { colors: {}, radii: {}, spacing: {}, typography: {}, durations: {} };
-const nsTarget = { color: 'colors', radius: 'radii', space: 'spacing', font: 'typography', duration: 'durations' };
+const themeObj = { colors: {}, radii: {}, spacing: {}, typography: {}, text: {}, durations: {} };
+const nsTarget = { color: 'colors', radius: 'radii', space: 'spacing', font: 'typography', text: 'text', duration: 'durations' };
 for (const t of darkFlat) {
   const target = nsTarget[t.path[0]];
   if (target && themeObj[target]) {
