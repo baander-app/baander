@@ -17,7 +17,7 @@ final class DeploymentJournalFixture
     public static function ready(Connection $connection, string $namespace, string $bootId): array
     {
         $inventory = new DoctrineDeploymentInventory($connection);
-        if (!$inventory->reserveBoot($namespace, $bootId, str_repeat('f', 64), 'baander.app:daemon', str_repeat('1', 64), str_repeat('2', 64))) {
+        if (!$inventory->reserveBoot($namespace, $bootId, str_repeat('f', 64), str_repeat('d', 64), 'baander.app:daemon', str_repeat('1', 64), str_repeat('2', 64))) {
             throw new \RuntimeException('Cannot reserve fixture deployment.');
         }
         $bindings = [];

@@ -361,7 +361,7 @@ final class DockerDeploymentCreateTest extends TestCase
     {
         $inventory = new DoctrineDeploymentInventory($this->first);
         if ($inventory->findBoot($recipe->namespace, $recipe->bootId) === null) {
-            self::assertTrue($inventory->reserveBoot($recipe->namespace, $recipe->bootId, str_repeat('f', 64), $recipe->daemonId, $this->recipe($recipe->runtimeEnvironment->variables)->fingerprint(), $this->recipe($recipe->runtimeEnvironment->variables, DeploymentUnit::Execution)->fingerprint()));
+            self::assertTrue($inventory->reserveBoot($recipe->namespace, $recipe->bootId, str_repeat('f', 64), str_repeat('d', 64), $recipe->daemonId, $this->recipe($recipe->runtimeEnvironment->variables)->fingerprint(), $this->recipe($recipe->runtimeEnvironment->variables, DeploymentUnit::Execution)->fingerprint()));
         }
     }
 

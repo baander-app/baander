@@ -21,7 +21,7 @@ use SwooleBundle\SwooleBundle\Server\Runtime\Bootable;
  */
 final class HealthAlertTable implements Bootable, WorkerHeartbeatSightingInterface
 {
-    /** HealthCheckService::check() reports five components; this leaves room for more. */
+    /** HealthCheckService::check() reports six components; this leaves room for more. */
     private const int SIZE = 32;
     private const string SEEN_KEY = 'seen';
 

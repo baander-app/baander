@@ -112,7 +112,7 @@ final class WorkerDeploymentRetirementTest extends TestCase
     {
         $namespace = 'baander.app:partial';
         $inventory = new DoctrineDeploymentInventory($this->connection);
-        self::assertTrue($inventory->reserveBoot($namespace, self::BOOT, str_repeat('f', 64), 'baander.app:daemon', str_repeat('1', 64), str_repeat('2', 64)));
+        self::assertTrue($inventory->reserveBoot($namespace, self::BOOT, str_repeat('f', 64), str_repeat('d', 64), 'baander.app:daemon', str_repeat('1', 64), str_repeat('2', 64)));
         self::assertTrue($inventory->claimCreate($namespace, self::BOOT, DeploymentUnit::Control));
         $binding = new DeploymentContainer($namespace, self::BOOT, 'baander.app:daemon', str_repeat('e', 64), DeploymentUnit::Control);
         self::assertTrue($inventory->register($binding));
@@ -216,7 +216,7 @@ final class WorkerDeploymentRetirementTest extends TestCase
     {
         if ($operation === 'create') {
             $this->contenderNamespace = 'baander.app:create-race';
-            self::assertTrue((new DoctrineDeploymentInventory($this->connection))->reserveBoot($this->contenderNamespace, self::BOOT, str_repeat('f', 64), 'baander.app:daemon', str_repeat('1', 64), str_repeat('2', 64)));
+            self::assertTrue((new DoctrineDeploymentInventory($this->connection))->reserveBoot($this->contenderNamespace, self::BOOT, str_repeat('f', 64), str_repeat('d', 64), 'baander.app:daemon', str_repeat('1', 64), str_repeat('2', 64)));
         }
         $this->writer->beforeCommit = function () use ($operation): void {
             $this->startContender($operation);
@@ -247,7 +247,7 @@ final class WorkerDeploymentRetirementTest extends TestCase
     public function testCreateWinnerIsNotCancelledByWaitingRetirement(): void
     {
         $this->contenderNamespace = 'baander.app:create-race';
-        self::assertTrue((new DoctrineDeploymentInventory($this->connection))->reserveBoot($this->contenderNamespace, self::BOOT, str_repeat('f', 64), 'baander.app:daemon', str_repeat('1', 64), str_repeat('2', 64)));
+        self::assertTrue((new DoctrineDeploymentInventory($this->connection))->reserveBoot($this->contenderNamespace, self::BOOT, str_repeat('f', 64), str_repeat('d', 64), 'baander.app:daemon', str_repeat('1', 64), str_repeat('2', 64)));
         $this->writer->beforeCommit = function (): void {
             $this->startContender('retire');
         };

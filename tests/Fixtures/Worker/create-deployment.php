@@ -77,6 +77,7 @@ try {
             $namespace,
             $boot,
             hash('sha256', $boot),
+            (new DeploymentProfile('full'))->fingerprint(),
             $daemon,
             $recipes['control']->fingerprint(),
             $recipes['execution']->fingerprint(),

@@ -24,7 +24,7 @@ final class HealthCheckController
 
     #[OA\Get(
         path: '/health',
-        description: 'Returns the health status of all system components (PostgreSQL, Redis, the background worker, Swoole, memory). A missing worker heartbeat reports the worker as not available until a worker has reported in. The background worker and memory are listed but do not decide the status code: either can read unhealthy while the endpoint answers 200.',
+        description: 'Returns the health status of all system components (PostgreSQL, Redis, the background worker, the worker deployment profile, Swoole, memory). A missing worker heartbeat reports the worker as not available until a worker has reported in. The worker profile reads unhealthy when the active worker boot was started with another deployment profile than web runs. The background worker, the worker profile and memory are listed but do not decide the status code: each can read unhealthy while the endpoint answers 200.',
         summary: 'Health check endpoint',
         responses: [
             new OA\Response(
@@ -145,7 +145,7 @@ final class HealthCheckController
      */
     private function buildResponse(array $results, string $okStatus = 'healthy', string $failStatus = 'unhealthy'): JsonResponse
     {
-        // The worker and memory are listed, but neither makes this container unhealthy.
+        // The worker, its profile and memory are listed, but none makes this container unhealthy.
         $healthy = true;
         foreach ($results as $result) {
             if ($result->status === HealthStatus::Unhealthy && HealthCheckService::affectsContainerHealth($result)) {

@@ -8,6 +8,8 @@ use App\Shared\Application\Port\ServerDrainStateInterface;
 use App\Shared\Infrastructure\Health\HealthCheckService;
 use App\Shared\Infrastructure\Health\HealthAlertTable;
 use App\Shared\Infrastructure\Health\MessengerWorkerHealth;
+use App\Shared\Infrastructure\Health\WorkerProfileHealth;
+use App\Shared\Application\DTO\DeploymentProfile;
 use App\Shared\Infrastructure\Redis\RedisClientFactory;
 use App\Shared\Interface\Console\HealthCheckCommand;
 use App\Shared\Interface\Controller\HealthCheckController;
@@ -153,6 +155,7 @@ final class HealthCheckWorkerOutageTest extends TestCase
             oauthPublicKeyPath: '/missing-baander-oauth/public.key',
             vapidPublicKey: '',
             vapidPrivateKey: '',
+            workerProfileHealth: new WorkerProfileHealth($connection, new DeploymentProfile('full')),
             messengerWorkerHealth: $messenger,
         );
     }

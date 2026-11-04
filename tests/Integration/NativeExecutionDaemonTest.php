@@ -366,7 +366,7 @@ final class NativeExecutionDaemonTest extends TestCase
         foreach (array_keys((new DeploymentProfile('full'))->nativeClientCommandCaps()) as $id) {
             self::assertTrue($this->clientNamed($id)->handshake()['ready'], $id);
         }
-        foreach (['media-video-3', 'media-audio-1', 'media-copy-0', 'media'] as $id) {
+        foreach (['media-video-8', 'media-audio-12', 'media-copy-0', 'media'] as $id) {
             try {
                 $this->clientNamed($id)->handshake();
                 self::fail('A client outside the configured slots was admitted: ' . $id);

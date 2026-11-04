@@ -22,23 +22,27 @@ final class DoctrineDeploymentInventory
         }
     }
 
-    /** Exact retries observe the reservation; they never reset a unit's permission. */
-    public function reserveBoot(string $namespace, string $bootId, string $manifestHash, string $daemonId, string $controlRecipeHash, string $executionRecipeHash): bool
+    /**
+     * Exact retries observe the reservation; they never reset a unit's permission. The boot
+     * records the fingerprint of the deployment profile its manifest starts it with.
+     */
+    public function reserveBoot(string $namespace, string $bootId, string $manifestHash, string $deploymentProfileFingerprint, string $daemonId, string $controlRecipeHash, string $executionRecipeHash): bool
     {
         DeploymentLease::validateIdentity($namespace, $bootId);
         if (!preg_match('/\A[A-Za-z0-9_.:-]{1,128}\z/D', $daemonId)) {
             throw new \InvalidArgumentException('A deployment requires a bounded safe daemon identity.');
         }
-        foreach ([$manifestHash, $controlRecipeHash, $executionRecipeHash] as $hash) {
+        foreach ([$manifestHash, $deploymentProfileFingerprint, $controlRecipeHash, $executionRecipeHash] as $hash) {
             if (!preg_match('/\A[0-9a-f]{64}\z/D', $hash)) {
-                throw new \InvalidArgumentException('Deployment manifests and recipes require SHA-256 fingerprints.');
+                throw new \InvalidArgumentException('Deployment manifests, profiles and recipes require SHA-256 fingerprints.');
             }
         }
-        return $this->operation(function () use ($namespace, $bootId, $manifestHash, $daemonId, $controlRecipeHash, $executionRecipeHash): bool {
+        return $this->operation(function () use ($namespace, $bootId, $manifestHash, $deploymentProfileFingerprint, $daemonId, $controlRecipeHash, $executionRecipeHash): bool {
             DeploymentNamespaceLock::acquire($this->connection, $namespace);
             $existing = $this->selectBoot($namespace, $bootId);
             if ($existing !== null) {
-                return !$existing->retirementRequested && $existing->manifestHash === $manifestHash && $existing->daemonId === $daemonId
+                return !$existing->retirementRequested && $existing->manifestHash === $manifestHash
+                    && $existing->deploymentProfileFingerprint === $deploymentProfileFingerprint && $existing->daemonId === $daemonId
                     && $existing->control->recipeHash === $controlRecipeHash && $existing->execution->recipeHash === $executionRecipeHash;
             }
             if ($this->connection->fetchOne(<<<'SQL'
@@ -48,8 +52,9 @@ final class DoctrineDeploymentInventory
                 return false;
             }
             $this->connection->executeStatement(<<<'SQL'
-                INSERT INTO worker_deployment_boots (namespace, boot_id, daemon_id, manifest_hash) VALUES (:namespace, :boot, :daemon, :manifest)
-                SQL, ['namespace' => $namespace, 'boot' => $bootId, 'daemon' => $daemonId, 'manifest' => $manifestHash]);
+                INSERT INTO worker_deployment_boots (namespace, boot_id, daemon_id, manifest_hash, deployment_profile_fingerprint)
+                VALUES (:namespace, :boot, :daemon, :manifest, :profile)
+                SQL, ['namespace' => $namespace, 'boot' => $bootId, 'daemon' => $daemonId, 'manifest' => $manifestHash, 'profile' => $deploymentProfileFingerprint]);
             $this->connection->executeStatement(<<<'SQL'
                 INSERT INTO worker_deployment_creations (namespace, boot_id, daemon_id, unit, recipe_hash)
                 VALUES (:namespace, :boot, :daemon, 'control', :control), (:namespace, :boot, :daemon, 'execution', :execution)
@@ -184,7 +189,7 @@ final class DoctrineDeploymentInventory
             throw new \UnexpectedValueException('A deployment boot must contain both fixed unit reservations.');
         }
         $root = $rows[0];
-        return new DeploymentBoot($namespace, $bootId, $root['manifest_hash'], $root['daemon_id'], $units['control'], $units['execution'], $root['retirement_requested_at'] !== null, $root['retired_at'] !== null, (bool) $root['imported_singleton']);
+        return new DeploymentBoot($namespace, $bootId, $root['manifest_hash'], $root['deployment_profile_fingerprint'], $root['daemon_id'], $units['control'], $units['execution'], $root['retirement_requested_at'] !== null, $root['retired_at'] !== null, (bool) $root['imported_singleton']);
     }
 
     /** @return array{namespace:string, boot:string, unit:string, daemon:string, container:string} */

@@ -55,10 +55,12 @@ final class WorkerDeploymentInventoryTest extends TestCase
         self::assertNotNull($boot);
         self::assertFalse($boot->control->createClaimed);
         self::assertFalse($boot->execution->cancelled);
-        self::assertFalse($inventory->reserveBoot(self::NAMESPACE, str_repeat('b', 32), str_repeat('f', 64), 'baander.app:daemon', str_repeat('1', 64), str_repeat('2', 64)));
-        self::assertFalse($inventory->reserveBoot(self::NAMESPACE, self::BOOT, str_repeat('e', 64), 'baander.app:daemon', str_repeat('1', 64), str_repeat('2', 64)));
-        self::assertFalse($inventory->reserveBoot(self::NAMESPACE, self::BOOT, str_repeat('f', 64), 'baander.app:foreign', str_repeat('1', 64), str_repeat('2', 64)));
-        self::assertFalse($inventory->reserveBoot(self::NAMESPACE, self::BOOT, str_repeat('f', 64), 'baander.app:daemon', str_repeat('3', 64), str_repeat('2', 64)));
+        self::assertSame(str_repeat('d', 64), $boot->deploymentProfileFingerprint);
+        self::assertFalse($inventory->reserveBoot(self::NAMESPACE, str_repeat('b', 32), str_repeat('f', 64), str_repeat('d', 64), 'baander.app:daemon', str_repeat('1', 64), str_repeat('2', 64)));
+        self::assertFalse($inventory->reserveBoot(self::NAMESPACE, self::BOOT, str_repeat('e', 64), str_repeat('d', 64), 'baander.app:daemon', str_repeat('1', 64), str_repeat('2', 64)));
+        self::assertFalse($inventory->reserveBoot(self::NAMESPACE, self::BOOT, str_repeat('f', 64), str_repeat('c', 64), 'baander.app:daemon', str_repeat('1', 64), str_repeat('2', 64)));
+        self::assertFalse($inventory->reserveBoot(self::NAMESPACE, self::BOOT, str_repeat('f', 64), str_repeat('d', 64), 'baander.app:foreign', str_repeat('1', 64), str_repeat('2', 64)));
+        self::assertFalse($inventory->reserveBoot(self::NAMESPACE, self::BOOT, str_repeat('f', 64), str_repeat('d', 64), 'baander.app:daemon', str_repeat('3', 64), str_repeat('2', 64)));
     }
 
     public function testCreateRequiresReservationAndExactCommittedRecipeObservationDoesNotGrantAnotherAttempt(): void
@@ -267,7 +269,7 @@ $inventory = new \App\Shared\Infrastructure\Worker\DoctrineDeploymentInventory($
 $permission = match ($argv[5]) {
     'start' => $inventory->claimStart($binding),
     'create' => $inventory->claimCreate('baander.app:workers', str_repeat('a',32), \App\Shared\Application\DTO\DeploymentUnit::Control),
-    'reserve' => $inventory->reserveBoot('baander.app:workers', str_repeat($argv[6] === '0' ? 'a' : 'b',32), str_repeat('f',64), 'baander.app:daemon', str_repeat('1',64), str_repeat('2',64)),
+    'reserve' => $inventory->reserveBoot('baander.app:workers', str_repeat($argv[6] === '0' ? 'a' : 'b',32), str_repeat('f',64), str_repeat('d', 64), 'baander.app:daemon', str_repeat('1',64), str_repeat('2',64)),
 };
 echo json_encode($permission);
 PHP;
@@ -324,7 +326,7 @@ PHP;
 
     private function reserve(DoctrineDeploymentInventory $inventory): bool
     {
-        return $inventory->reserveBoot(self::NAMESPACE, self::BOOT, str_repeat('f', 64), 'baander.app:daemon', str_repeat('1', 64), str_repeat('2', 64));
+        return $inventory->reserveBoot(self::NAMESPACE, self::BOOT, str_repeat('f', 64), str_repeat('d', 64), 'baander.app:daemon', str_repeat('1', 64), str_repeat('2', 64));
     }
 
     private function binding(DeploymentUnit $unit = DeploymentUnit::Control): DeploymentContainer
@@ -357,7 +359,7 @@ PHP;
         $retirement = new \App\Shared\Infrastructure\Worker\DoctrineDeploymentRetirement($this->second);
         $namespace = 'baander.app:paired';
         $boot = str_repeat('a', 32);
-        self::assertTrue($inventory->reserveBoot($namespace, $boot, str_repeat('f', 64), 'baander.app-daemon', str_repeat('1', 64), str_repeat('2', 64)));
+        self::assertTrue($inventory->reserveBoot($namespace, $boot, str_repeat('f', 64), str_repeat('d', 64), 'baander.app-daemon', str_repeat('1', 64), str_repeat('2', 64)));
         foreach (\App\Shared\Application\DTO\DeploymentUnit::cases() as $unit) {
             self::assertTrue($inventory->claimCreate($namespace, $boot, $unit));
         }
@@ -367,14 +369,14 @@ PHP;
         self::assertTrue($retirement->beginUnitRetirement($control));
         self::assertTrue($retirement->completeUnitRetirement($control));
         self::assertFalse($retirement->completeBootRetirement($namespace, $boot), 'An uncertain execution create cannot be cancelled or inferred absent.');
-        self::assertFalse($inventory->reserveBoot($namespace, str_repeat('b', 32), str_repeat('f', 64), 'baander.app-daemon', str_repeat('1', 64), str_repeat('2', 64)));
+        self::assertFalse($inventory->reserveBoot($namespace, str_repeat('b', 32), str_repeat('f', 64), str_repeat('d', 64), 'baander.app-daemon', str_repeat('1', 64), str_repeat('2', 64)));
         $execution = new DeploymentContainer($namespace, $boot, 'baander.app-daemon', str_repeat('d', 64), \App\Shared\Application\DTO\DeploymentUnit::Execution);
         self::assertFalse($inventory->register($execution));
         self::assertTrue($inventory->registerForRetirement($execution));
         self::assertTrue($retirement->beginUnitRetirement($execution));
         self::assertTrue($retirement->completeUnitRetirement($execution));
         self::assertTrue($retirement->completeBootRetirement($namespace, $boot));
-        self::assertTrue($inventory->reserveBoot($namespace, str_repeat('b', 32), str_repeat('f', 64), 'baander.app-daemon', str_repeat('1', 64), str_repeat('2', 64)));
+        self::assertTrue($inventory->reserveBoot($namespace, str_repeat('b', 32), str_repeat('f', 64), str_repeat('d', 64), 'baander.app-daemon', str_repeat('1', 64), str_repeat('2', 64)));
     }
 
 }

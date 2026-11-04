@@ -320,7 +320,7 @@ final class RegisteredDeploymentRecoveryTest extends TestCase
             self::assertNotNull($boot);
             self::assertFalse($boot->retired);
             self::assertFalse($boot->execution->cancelled);
-            self::assertFalse($inventory->reserveBoot(self::NAMESPACE, str_repeat('b', 32), str_repeat('f', 64), self::DAEMON, str_repeat('1', 64), str_repeat('2', 64)));
+            self::assertFalse($inventory->reserveBoot(self::NAMESPACE, str_repeat('b', 32), str_repeat('f', 64), str_repeat('d', 64), self::DAEMON, str_repeat('1', 64), str_repeat('2', 64)));
         }
     }
 
@@ -342,7 +342,7 @@ final class RegisteredDeploymentRecoveryTest extends TestCase
     private function reserve(): void
     {
         $recipes = $this->recipes();
-        self::assertTrue((new DoctrineDeploymentInventory($this->first))->reserveBoot(self::NAMESPACE, self::BOOT, str_repeat('f', 64), self::DAEMON, $recipes['control']->fingerprint(), $recipes['execution']->fingerprint()));
+        self::assertTrue((new DoctrineDeploymentInventory($this->first))->reserveBoot(self::NAMESPACE, self::BOOT, str_repeat('f', 64), str_repeat('d', 64), self::DAEMON, $recipes['control']->fingerprint(), $recipes['execution']->fingerprint()));
     }
 
     private function reserveAndBind(): void

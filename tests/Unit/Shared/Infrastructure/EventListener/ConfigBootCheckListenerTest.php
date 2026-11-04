@@ -7,6 +7,8 @@ namespace App\Tests\Unit\Shared\Infrastructure\EventListener;
 use App\Shared\Infrastructure\EventListener\ConfigBootCheckListener;
 use App\Shared\Infrastructure\Health\HealthCheckService;
 use App\Shared\Infrastructure\Health\MessengerWorkerHealth;
+use App\Shared\Infrastructure\Health\WorkerProfileHealth;
+use App\Shared\Application\DTO\DeploymentProfile;
 use App\Shared\Infrastructure\Health\WorkerHeartbeatSightingInterface;
 use App\Shared\Infrastructure\Redis\RedisClientFactory;
 use Doctrine\DBAL\Connection;
@@ -60,6 +62,7 @@ final class ConfigBootCheckListenerTest extends TestCase
                 oauthPublicKeyPath: $keyPath,
                 vapidPublicKey: '',
                 vapidPrivateKey: '',
+                workerProfileHealth: new WorkerProfileHealth($connection, new DeploymentProfile('full')),
                 messengerWorkerHealth: new MessengerWorkerHealth(
                     $redis,
                     new MockClock(),

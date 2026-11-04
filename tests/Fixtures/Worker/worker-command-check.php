@@ -101,7 +101,7 @@ if (in_array($mode, ['reserve-pair', 'claim-unit', 'register-unit', 'start-unit'
     if ($mode === 'reserve-pair') {
         $controlRecipe = hash('sha256', 'control:2944:129:cpu0');
         $executionRecipe = hash('sha256', 'execution:4480:256:cpu1,2:console320');
-        $accepted = $inventory->reserveBoot($namespace, $bootId, hash('sha256', $controlRecipe . $executionRecipe), $daemon, $controlRecipe, $executionRecipe);
+        $accepted = $inventory->reserveBoot($namespace, $bootId, hash('sha256', $controlRecipe . $executionRecipe), (new App\Shared\Application\DTO\DeploymentProfile('full'))->fingerprint(), $daemon, $controlRecipe, $executionRecipe);
     } else {
         $unit = App\Shared\Application\DTO\DeploymentUnit::from($arguments[4] ?? '');
         if ($mode === 'claim-unit') {

@@ -35,6 +35,7 @@ final class HealthCheckService
         private readonly string $vapidPublicKey,
         private readonly string $vapidPrivateKey,
         private readonly MessengerWorkerHealth $messengerWorkerHealth,
+        private readonly WorkerProfileHealth $workerProfileHealth,
         private readonly WorkerMemoryTable $workerMemory = new WorkerMemoryTable(),
         private readonly array $apiKeys = [],
     )
@@ -50,6 +51,7 @@ final class HealthCheckService
             $this->checkPostgreSQL(),
             $this->checkRedis(),
             $this->messengerWorkerHealth->check(),
+            $this->workerProfileHealth->check(),
             $this->checkSwoole(),
             $this->checkMemory(),
         ];
@@ -57,8 +59,9 @@ final class HealthCheckService
 
     /**
      * Dependency readiness — checks if PostgreSQL and Redis are available. The
-     * background worker and memory are left out: check() still reports them and the
-     * health monitor alerts on them, but neither makes the web container unready.
+     * background worker, its deployment profile and memory are left out: check() still
+     * reports them and the health monitor alerts on them, but none makes the web
+     * container unready.
      *
      * @return HealthCheckResult[]
      */
@@ -72,11 +75,12 @@ final class HealthCheckService
 
     /**
      * Whether a result decides the web container's own health. The background
-     * worker's and memory's do not: they alert administrators instead.
+     * worker's, its deployment profile's and memory's do not: they alert
+     * administrators instead.
      */
     public static function affectsContainerHealth(HealthCheckResult $result): bool
     {
-        return $result->component !== MessengerWorkerHealth::COMPONENT && $result->component !== self::MEMORY;
+        return !in_array($result->component, [MessengerWorkerHealth::COMPONENT, WorkerProfileHealth::COMPONENT, self::MEMORY], true);
     }
 
     /**

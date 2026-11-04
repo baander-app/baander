@@ -12,6 +12,8 @@ use App\Shared\Infrastructure\Health\HealthAlertTable;
 use App\Shared\Infrastructure\Health\HealthCheckService;
 use App\Shared\Infrastructure\Health\HealthMonitorSubscriber;
 use App\Shared\Infrastructure\Health\MessengerWorkerHealth;
+use App\Shared\Infrastructure\Health\WorkerProfileHealth;
+use App\Shared\Application\DTO\DeploymentProfile;
 use App\Shared\Infrastructure\Redis\RedisClientFactory;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Result;
@@ -191,6 +193,7 @@ final class HealthMonitorSubscriberTest extends TestCase
             oauthPublicKeyPath: '',
             vapidPublicKey: '',
             vapidPrivateKey: '',
+            workerProfileHealth: new WorkerProfileHealth($connection, new DeploymentProfile('full')),
             messengerWorkerHealth: new MessengerWorkerHealth($redis, new MockClock(), new HealthAlertTable()),
         );
         $alertService = new HealthAlertService(

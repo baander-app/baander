@@ -14,6 +14,8 @@ final readonly class DeploymentBoot
         public string $namespace,
         public string $bootId,
         public ?string $manifestHash,
+        /** Unknown for boots reserved before boots recorded their profile. */
+        public ?string $deploymentProfileFingerprint,
         public string $daemonId,
         public DeploymentUnitState $control,
         public DeploymentUnitState $execution,

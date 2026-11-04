@@ -11,6 +11,8 @@ use App\Shared\Infrastructure\Health\HealthAlertService;
 use App\Shared\Infrastructure\Health\HealthAlertTable;
 use App\Shared\Infrastructure\Health\HealthCheckService;
 use App\Shared\Infrastructure\Health\MessengerWorkerHealth;
+use App\Shared\Infrastructure\Health\WorkerProfileHealth;
+use App\Shared\Application\DTO\DeploymentProfile;
 use App\Shared\Infrastructure\Redis\RedisClientFactory;
 use App\Shared\Infrastructure\Swoole\WorkerMemoryTable;
 use App\Shared\Interface\Console\HealthCheckCommand;
@@ -137,6 +139,7 @@ final class HealthCheckMemoryPressureTest extends TestCase
             oauthPublicKeyPath: '/missing-baander-oauth/public.key',
             vapidPublicKey: '',
             vapidPrivateKey: '',
+            workerProfileHealth: new WorkerProfileHealth($connection, new DeploymentProfile('full')),
             messengerWorkerHealth: new MessengerWorkerHealth($factory, new MockClock(), new HealthAlertTable()),
             workerMemory: $workerMemory,
         );

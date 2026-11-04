@@ -69,7 +69,7 @@ try {
                 throw new RuntimeException('Docker host does not match the worker manifest or lacks cgroup v2.');
             }
             \App\Shared\Infrastructure\Worker\OutOfMemoryKillOrder::assertApplicable($host['securityOptions'] ?? null);
-            if (!$inventory->reserveBoot($manifest->namespace, $manifest->bootId, $manifestHash, $manifest->daemonId,
+            if (!$inventory->reserveBoot($manifest->namespace, $manifest->bootId, $manifestHash, $manifest->deploymentProfile->fingerprint(), $manifest->daemonId,
                 $recipes['control']->fingerprint(), $recipes['execution']->fingerprint())) {
                 $success = false;
                 $result = ['state' => 'reservation_denied'];

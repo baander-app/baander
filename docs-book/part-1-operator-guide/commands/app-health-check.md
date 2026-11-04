@@ -25,7 +25,15 @@ not prove that every consumer, the scheduler, the outbox relay or media executio
 is making progress. See [Monitoring](../monitoring.md#health-checks) and
 [Background work](../background-work.md#observe-background-work) for those checks.
 
-The exit status describes this container, so it leaves out the background worker and memory; the web server alerts administrators about those instead. If no other component is unhealthy, the command prints `This container is healthy.` and exits with code 0. If the worker or memory is unhealthy, it also prints a warning that names them as unhealthy but not counted toward this container. If any other component is unhealthy, it exits with code 1.
+The `worker_profile` row compares this process's deployment profile with the one
+the active worker boot was started with. It reads `FAIL` when they differ, for
+example when web was configured for 8 video slots and the workers for 4, and lists
+each disagreeing boot with its profile fingerprint. It reads `OK` when they match,
+and `N/A` when no worker boot holds the deployment lease or the boot did not record
+its profile. [app:deployment:profile:show](app-deployment-profile-show.md) prints a
+profile's fingerprint.
+
+The exit status describes this container, so it leaves out the background worker, its deployment profile and memory; the web server alerts administrators about those instead. If no other component is unhealthy, the command prints `This container is healthy.` and exits with code 0. If the worker, its profile or memory is unhealthy, it also prints a warning that names them as unhealthy but not counted toward this container. If any other component is unhealthy, it exits with code 1.
 
 The command runs in its own PHP process, so the `memory` row measures that process against its `memory_limit`, not the web server's workers. The [`/health` endpoint](../monitoring.md#health-checks) reports the workers.
 
@@ -35,8 +43,8 @@ This is the same check used by the Docker healthcheck, which the web image defin
 
 | Code | Meaning |
 |------|---------|
-| 0 | No component other than the background worker and memory is unhealthy |
-| 1 | One or more components other than the background worker and memory are unhealthy |
+| 0 | No component other than the background worker, its deployment profile and memory is unhealthy |
+| 1 | One or more components other than the background worker, its deployment profile and memory are unhealthy |
 
 ## Tips
 

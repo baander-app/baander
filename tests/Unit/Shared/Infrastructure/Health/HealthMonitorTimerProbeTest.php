@@ -65,6 +65,10 @@ $checks = new App\Shared\Infrastructure\Health\HealthCheckService(
     vapidPublicKey: '',
     vapidPrivateKey: '',
     messengerWorkerHealth: new App\Shared\Infrastructure\Health\MessengerWorkerHealth($redis, new Symfony\Component\Clock\MockClock(), new App\Shared\Infrastructure\Health\HealthAlertTable()),
+    workerProfileHealth: new App\Shared\Infrastructure\Health\WorkerProfileHealth(
+        Doctrine\DBAL\DriverManager::getConnection(['driver' => 'pdo_sqlite', 'memory' => true]),
+        new App\Shared\Application\DTO\DeploymentProfile('full'),
+    ),
 );
 $service = new App\Shared\Infrastructure\Health\HealthAlertService(
     $checks, $alerts, new AlertsOn(), new App\Shared\Infrastructure\Health\HealthAlertTable(), $clock, new Psr\Log\NullLogger(),

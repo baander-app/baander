@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Shared\Infrastructure\Health;
 
+use App\Shared\Application\DTO\DeploymentProfile;
 use App\Shared\Infrastructure\Health\HealthCheckResult;
 use App\Shared\Infrastructure\Health\HealthCheckService;
 use App\Shared\Infrastructure\Health\HealthStatus;
 use App\Shared\Infrastructure\Health\HealthAlertTable;
 use App\Shared\Infrastructure\Health\MessengerWorkerHealth;
+use App\Shared\Infrastructure\Health\WorkerProfileHealth;
 use App\Shared\Infrastructure\Redis\RedisClientFactory;
 use App\Shared\Infrastructure\Swoole\WorkerMemoryTable;
 use App\Tests\Fixtures\Redis\ArrayRedis;
@@ -169,7 +171,7 @@ final class HealthCheckServiceTest extends TestCase
         yield 'empty injected keys remain optional' => ['', 0];
     }
 
-    public function testReadinessLeavesOutTheWorkerAndMemoryWhileTheFullCheckStillListsThem(): void
+    public function testReadinessLeavesOutTheWorkerItsProfileAndMemoryWhileTheFullCheckStillListsThem(): void
     {
         $redis = new ArrayRedis();
         $clock = new MockClock('2026-10-02T10:00:00Z');
@@ -181,6 +183,10 @@ final class HealthCheckServiceTest extends TestCase
         $result->method('fetchOne')->willReturn(1);
         $connection = $this->createStub(Connection::class);
         $connection->method('executeQuery')->willReturn($result);
+        $connection->method('fetchAllAssociative')->willReturn([[
+            'namespace' => 'workers.baander.app', 'boot_id' => str_repeat('a', 32),
+            'deployment_profile_fingerprint' => (new DeploymentProfile('full', 4, 12))->fingerprint(),
+        ]]);
         ini_set('memory_limit', '1G');
         $table = $this->memoryTable();
         $table->record(1, (int) (0.95 * self::GIGABYTE), time());
@@ -197,9 +203,10 @@ final class HealthCheckServiceTest extends TestCase
         );
         self::assertSame(HealthStatus::Unhealthy, $statuses($service->check())['messenger']);
         self::assertSame(HealthStatus::Unhealthy, $statuses($service->check())['memory']);
+        self::assertSame(HealthStatus::Unhealthy, $statuses($service->check())['worker_profile']);
         foreach ($service->check() as $check) {
             self::assertSame(
-                !in_array($check->component, ['messenger', 'memory'], true),
+                !in_array($check->component, ['messenger', 'worker_profile', 'memory'], true),
                 HealthCheckService::affectsContainerHealth($check),
                 $check->component,
             );
@@ -231,9 +238,10 @@ final class HealthCheckServiceTest extends TestCase
         ?WorkerMemoryTable $workerMemory = null,
     ): HealthCheckService {
         $redis ??= $this->createStub(RedisClientFactory::class);
+        $connection ??= $this->createStub(Connection::class);
 
         return new HealthCheckService(
-            connection: $connection ?? $this->createStub(Connection::class),
+            connection: $connection,
             redisClientFactory: $redis,
             appEnv: 'prod',
             appSecret: str_repeat('secure-', 6),
@@ -243,6 +251,7 @@ final class HealthCheckServiceTest extends TestCase
             vapidPublicKey: '',
             vapidPrivateKey: '',
             messengerWorkerHealth: $messenger ?? new MessengerWorkerHealth($redis, new MockClock(), new HealthAlertTable()),
+            workerProfileHealth: new WorkerProfileHealth($connection, new DeploymentProfile('full')),
             workerMemory: $workerMemory ?? new WorkerMemoryTable(),
             apiKeys: $apiKeys,
         );
