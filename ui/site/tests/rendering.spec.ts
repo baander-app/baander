@@ -125,6 +125,8 @@ test.describe('code without JavaScript', () => {
       }
       await page.goto('/docs/developer-guide/adding-a-feature/');
       const code = page.locator('code.language-php').first();
+      const label = await code.evaluate((element) => getComputedStyle(element.closest('pre')!, '::before').content);
+      expect(label, 'Named languages show a label outside the code text').toBe('"PHP"');
       const colors = await code.locator('[class^="tok-"]').evaluateAll((tokens) => {
         // Token colors may compute to oklab() through color-mix(); a canvas resolves any CSS color to sRGB bytes.
         const context = document.createElement('canvas').getContext('2d', { willReadFrequently: true })!;

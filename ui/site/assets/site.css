@@ -174,8 +174,26 @@ h1, h2, h3 { margin: 0; }
 .manual-article strong { font-weight: 600; }
 .manual-article code, .manual-article pre { font-family: var(--font-mono); font-size: 13px; }
 .manual-article :not(pre) > code { padding: 2px 4px; border-radius: var(--radius-sm); background: var(--color-secondary); }
-.manual-article pre { padding: 24px; background: var(--color-card); border: 1px solid var(--color-border); border-radius: var(--radius-md); overflow-x: auto; max-width: 100%; line-height: 1.7; overflow-wrap: normal; }
+.manual-article pre { --code-padding: 24px; padding: var(--code-padding); background: var(--color-card); border: 1px solid var(--color-border); border-radius: var(--radius-md); overflow-x: auto; max-width: 100%; line-height: 1.7; overflow-wrap: normal; }
 .manual-article pre:focus-visible, .manual-article table:focus-visible { outline-offset: 2px; }
+.manual-article pre[data-language]::before {
+  content: attr(data-language);
+  position: sticky;
+  /* Sticky offsets are measured inside the scroll container's padding. */
+  left: calc(-1 * var(--code-padding));
+  display: block;
+  width: fit-content;
+  /* Pulled out of the padding so the badge sits flush in the box's top-left corner. */
+  margin: calc(-1 * var(--code-padding)) 0 16px calc(-1 * var(--code-padding));
+  padding: 3px 10px;
+  border-right: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border);
+  border-radius: calc(var(--radius-md) - 1px) 0 var(--radius-sm) 0;
+  background: var(--color-background);
+  color: var(--color-muted-foreground);
+  font: 500 11px/1.5 var(--font-sans);
+  letter-spacing: .04em;
+}
 .manual-article table { display: block; overflow: auto; max-width: 100%; border-collapse: collapse; font-size: 14px; }
 .manual-article th, .manual-article td { padding: 16px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--color-border); min-width: 144px; }
 .manual-article th { color: var(--color-foreground); font-weight: 600; background: var(--color-card); }
@@ -215,7 +233,7 @@ h1, h2, h3 { margin: 0; }
   .chapter-sidebar { position: static; max-height: none; padding: 0; margin-bottom: 32px; }
   .chapter-navigation { border-bottom: 1px solid var(--color-border); }
   .chapter-navigation nav { max-height: 240px; overflow: auto; padding-bottom: 16px; }
-  .manual-article pre { padding: 16px; }
+  .manual-article pre { --code-padding: 16px; }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; }

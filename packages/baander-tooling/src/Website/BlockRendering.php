@@ -54,7 +54,7 @@ final readonly class BlockRendering
                         $html[$block['id']] = $this->diagram($block, $result, $staging, $fontPath);
                     } elseif (($result['kind'] ?? null) === 'code' && is_string($result['html'] ?? null)) {
                         $this->validateCode($result['html'], $block['source']);
-                        $html[$block['id']] = '<pre><code class="language-' . self::escape($block['language']) . '">' . $result['html'] . '</code></pre>';
+                        $html[$block['id']] = CodeBlock::html($block['language'], $result['html']);
                     } else {
                         throw new \RuntimeException('Rendering helper returned an invalid code result.');
                     }

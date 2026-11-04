@@ -137,7 +137,7 @@ final class WebsiteBuilder
                         fwrite(STDERR, $source . ', block ' . $ordinal . ': PHP highlighting failed; using escaped source: ' . $error->getMessage() . "\n");
                         $html = htmlspecialchars($node->getLiteral(), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
                     }
-                    $node->data->set('website/html', '<pre><code class="language-php">' . $html . '</code></pre>');
+                    $node->data->set('website/html', CodeBlock::html('php', $html));
                     continue;
                 }
                 if ($renderBlocks === null) {

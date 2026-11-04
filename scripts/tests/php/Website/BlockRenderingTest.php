@@ -36,7 +36,7 @@ final class BlockRenderingTest extends TestCase
     {
         $this->helper(['sample' => ['kind' => 'code', 'html' => '<span class="tok-keyword">true</span> &amp; &lt;safe&gt;' . "\n"]]);
         $html = new BlockRendering($this->root, $this->executor)->render([$this->block("true & <safe>\n")], $this->root . '/stage');
-        self::assertSame('<pre><code class="language-json"><span class="tok-keyword">true</span> &amp; &lt;safe&gt;' . "\n</code></pre>", $html['sample']);
+        self::assertSame('<pre data-language="JSON"><code class="language-json"><span class="tok-keyword">true</span> &amp; &lt;safe&gt;' . "\n</code></pre>", $html['sample']);
         self::assertSame([], glob($this->root . '/var/website-render-*'));
         self::assertSame([], glob($this->root . '/stage/*'));
     }
