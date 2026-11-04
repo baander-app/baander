@@ -68,7 +68,7 @@ final class DatabaseTimeZoneGuardTest extends TestCase
 
     public function testStartupProceedsAgainstUtcAndItsAliases(): void
     {
-        foreach (['UTC', 'Etc/UTC', 'zulu'] as $zone) {
+        foreach (['UTC', 'Etc/UTC', 'etc/zulu'] as $zone) {
             $this->setDatabaseZone($zone);
             (new DatabaseTimeZoneStartupCheck($this->url))->boot();
             DatabaseTimeZoneGuard::assertUtcDefaultAt($this->url);
