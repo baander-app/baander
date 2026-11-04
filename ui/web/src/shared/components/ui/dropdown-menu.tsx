@@ -1,6 +1,7 @@
 import * as React from "react"
 import { DropdownMenu as DropdownMenuPrimitive } from "radix-ui"
 import styled, { css, type DataAttributes } from "styled-components"
+import { textRole } from "@/shared/theme"
 import { CheckIcon, ChevronRightIcon } from "lucide-react"
 
 /* ── Shared menu animation mixin ─────────────────────────────────────── */
@@ -110,8 +111,7 @@ const ItemStyled = styled(DropdownMenuPrimitive.Item).attrs<DataAttributes & {
   gap: 0.375rem;
   border-radius: var(--radius-md);
   padding: 0.25rem 0.375rem;
-  font-size: 0.875rem;
-  line-height: 1.25rem;
+  ${textRole('body')}
   outline: none;
   user-select: none;
 
@@ -159,8 +159,7 @@ const SubTriggerStyled = styled(DropdownMenuPrimitive.SubTrigger).attrs<DataAttr
   gap: 0.375rem;
   border-radius: var(--radius-md);
   padding: 0.25rem 0.375rem;
-  font-size: 0.875rem;
-  line-height: 1.25rem;
+  ${textRole('body')}
   outline: none;
   user-select: none;
 
@@ -216,8 +215,7 @@ const CheckboxItemStyled = styled(DropdownMenuPrimitive.CheckboxItem).attrs<Data
   gap: 0.375rem;
   border-radius: var(--radius-md);
   padding: 0.25rem 2rem 0.25rem 0.375rem;
-  font-size: 0.875rem;
-  line-height: 1.25rem;
+  ${textRole('body')}
   outline: none;
   user-select: none;
 
@@ -251,8 +249,7 @@ const RadioItemStyled = styled(DropdownMenuPrimitive.RadioItem).attrs<DataAttrib
   gap: 0.375rem;
   border-radius: var(--radius-md);
   padding: 0.25rem 2rem 0.25rem 0.375rem;
-  font-size: 0.875rem;
-  line-height: 1.25rem;
+  ${textRole('body')}
   outline: none;
   user-select: none;
 
@@ -293,8 +290,7 @@ const LabelStyled = styled(DropdownMenuPrimitive.Label).attrs<DataAttributes & {
   "data-inset": p.inset || undefined,
 }))`
   padding: 0.25rem 0.375rem;
-  font-size: 0.75rem;
-  font-weight: 500;
+  ${textRole('label')}
   color: var(--color-muted-foreground);
 
   &[data-inset] {
@@ -314,8 +310,7 @@ const ShortcutStyled = styled.span.attrs<DataAttributes>({
   "data-slot": "dropdown-menu-shortcut",
 })`
   margin-left: auto;
-  font-size: 0.75rem;
-  letter-spacing: 0.1em;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
 `
 

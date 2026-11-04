@@ -1,5 +1,7 @@
 import styled from 'styled-components'
 import { useImageBlob } from '@/shared/hooks/use-image-blob'
+import { textRole } from '@/shared/theme'
+import { ContentText } from '@/shared/typography'
 
 export interface RecentItem {
   id: string
@@ -20,16 +22,13 @@ const SectionWrapper = styled.div`
 
 const SectionHeader = styled.div`
   padding: 0.75rem 1rem 0.25rem;
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  font-weight: 500;
+  ${textRole('label')}
   color: var(--color-muted-foreground);
 `
 
 const EmptyText = styled.p`
   padding: 0.375rem 0.625rem;
-  font-size: 0.875rem;
+  ${textRole('body-sm')}
   color: var(--color-muted-foreground);
   font-style: italic;
 `
@@ -85,25 +84,25 @@ const ItemText = styled.div`
   flex: 1;
 `
 
-const ItemTitle = styled.div`
+const ItemTitle = styled(ContentText)`
+  display: block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 0.875rem;
   color: var(--color-foreground);
 `
 
-const ItemSubtitle = styled.div`
+const ItemSubtitle = styled(ContentText)`
+  display: block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 0.75rem;
   color: var(--color-muted-foreground);
 `
 
 const ItemTime = styled.span`
   flex-shrink: 0;
-  font-size: 11px;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
 `
 
@@ -156,8 +155,8 @@ export function SidebarRecentItems({ items, isLoading = false }: SidebarRecentIt
             >
               <RecentItemThumbnail url={item.thumbnailUrl} />
               <ItemText>
-                <ItemTitle>{item.title}</ItemTitle>
-                <ItemSubtitle>{item.subtitle}</ItemSubtitle>
+                <ItemTitle textRole="body-sm" text={item.title} />
+                <ItemSubtitle textRole="caption" text={item.subtitle} />
               </ItemText>
               <ItemTime>{item.timestamp}</ItemTime>
             </RecentRow>

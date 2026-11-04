@@ -1,12 +1,12 @@
 import * as React from 'react';
 import { styled, css } from 'styled-components';
 import { Slot } from 'radix-ui';
-import { focusVisibleRing, ariaInvalidRing } from '@/shared/theme';
+import { focusVisibleRing, ariaInvalidRing, textRole } from '@/shared/theme';
 
 const baseStyles = css`
   display: inline-flex;
   color: var(--color-foreground);
-  height: 1.25rem;
+  min-height: 1.25rem;
   width: fit-content;
   flex-shrink: 0;
   align-items: center;
@@ -16,7 +16,7 @@ const baseStyles = css`
   border-radius: var(--radius-4xl);
   border: 1px solid transparent;
   padding: 0.125rem 0.5rem;
-  font-size: 0.75rem;
+  ${textRole('caption')}
   font-weight: 500;
   white-space: nowrap;
   transition: all var(--duration-hover) ease-out;

@@ -1,4 +1,5 @@
 import styled from 'styled-components'
+import { textRole } from '@/shared/theme'
 
 interface EmptyStateProps {
   message: string
@@ -20,7 +21,7 @@ const IconWrapper = styled.div`
 `
 
 const Message = styled.p`
-  font-size: 0.875rem;
+  ${textRole('body')}
   color: var(--color-muted-foreground);
 `
 

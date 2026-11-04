@@ -2,6 +2,7 @@ import { Component, type ReactNode, type ErrorInfo } from 'react'
 import styled from 'styled-components'
 import { AlertTriangle } from 'lucide-react'
 import { Button } from '@/shared/components/ui/button'
+import { textRole } from '@/shared/theme'
 
 interface ErrorBoundaryState {
   hasError: boolean
@@ -31,14 +32,13 @@ const IconCircle = styled.div`
 `
 
 const ErrorTitle = styled.p`
-  font-size: 0.875rem;
-  font-weight: 500;
+  ${textRole('subtitle')}
   color: var(--color-foreground);
 `
 
 const ErrorMessage = styled.p`
   margin-top: 0.25rem;
-  font-size: 0.75rem;
+  ${textRole('body-sm')}
   color: var(--color-muted-foreground);
 `
 

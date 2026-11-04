@@ -12,6 +12,7 @@ import { DetailsTab } from './DetailsTab'
 import { PlayerBar } from './PlayerBar'
 import { usePlayerStore } from '@/features/player/stores/player-store'
 import { useRadioStore } from '@/features/radio/stores/radio-store'
+import { textRole } from '@/shared/theme'
 
 const ExpandedTabs = styled(Tabs)`
   display: flex;
@@ -27,7 +28,8 @@ const FullWidthTabsList = styled(TabsList)`
 const PanelTabTrigger = styled(TabsTrigger)`
   flex: 1;
   gap: 0.375rem;
-  font-size: 0.75rem;
+  ${textRole('caption')}
+  font-weight: 500;
   background: transparent !important;
 
   &[data-state="active"] {
@@ -119,10 +121,7 @@ const PanelHeader = styled.div`
 `
 
 const CompactLabel = styled.span`
-  font-size: 0.75rem;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  ${textRole('label')}
   color: var(--color-muted-foreground);
 `
 

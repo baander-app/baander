@@ -1,4 +1,5 @@
 import styled from 'styled-components'
+import { textRole } from '@/shared/theme'
 
 interface SectionCardProps {
   title: string
@@ -21,8 +22,7 @@ const CardHeader = styled.div`
 `
 
 const CardTitle = styled.h3`
-  font-size: 0.875rem;
-  font-weight: 500;
+  ${textRole('subtitle')}
 `
 
 const CardBody = styled.div`

@@ -1,9 +1,10 @@
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { NowPlayingBar } from '../NowPlayingBar'
 import { usePlayerStore } from '../../stores/player-store'
 import { useRadioStore } from '@/features/radio/stores/radio-store'
+import '@/shared/i18n'
 
 vi.mock('@/shared/components/cover-art', () => ({ CoverArt: () => null }))
 vi.mock('@/features/session/components/PlaybackDestinationSelector', () => ({
@@ -63,5 +64,27 @@ describe('player volume control', () => {
     await user.keyboard('{ArrowRight}')
     expect(setVolume).toHaveBeenCalledExactlyOnceWith(1)
     expect(toggleMute).not.toHaveBeenCalled()
+  })
+})
+
+describe('now playing text', () => {
+  it('renders the title, artist and album as separate items, each with its own language', () => {
+    usePlayerStore.setState({
+      currentTrack: {
+        publicId: 'song',
+        title: '直',
+        artistName: '坂本龍一',
+        albumName: '音楽図鑑',
+        albumLanguage: 'jpn',
+        available: true,
+      },
+    })
+
+    render(<NowPlayingBar />)
+    const nowPlaying = screen.getByRole('group', { name: 'Now playing' })
+
+    expect(within(nowPlaying).getByText('直')).toHaveAttribute('lang', 'ja')
+    expect(within(nowPlaying).getByText('坂本龍一')).toHaveAttribute('lang', 'en')
+    expect(within(nowPlaying).getByText('音楽図鑑')).toHaveAttribute('lang', 'ja')
   })
 })

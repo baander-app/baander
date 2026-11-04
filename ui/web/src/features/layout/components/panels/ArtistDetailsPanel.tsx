@@ -6,6 +6,8 @@ import { useGetArtistShow } from '@/shared/api-client/gen/endpoints'
 import { Button } from '@/shared/components/ui/button'
 import { Skeleton } from '@/shared/components/ui/skeleton'
 import { ArtistContextMenu } from '@/features/catalog/components/menus/ArtistContextMenu'
+import { textRole } from '@/shared/theme'
+import { ContentText } from '@/shared/typography'
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -60,21 +62,18 @@ const AvatarCircle = styled.div`
   background-color: var(--color-secondary);
 `
 
-const AvatarInitial = styled.span`
-  font-size: 1.5rem;
-  font-weight: 600;
+const AvatarInitial = styled(ContentText)`
   color: color-mix(in srgb, var(--color-muted-foreground) 40%, transparent);
 `
 
-const ArtistName = styled.h3`
-  font-size: 1rem;
-  font-weight: 500;
+const ArtistName = styled(ContentText)`
+  display: block;
   color: var(--color-foreground);
   margin: 0;
 `
 
 const ArtistMeta = styled.p`
-  font-size: 0.75rem;
+  ${textRole('caption')}
   color: color-mix(in srgb, var(--color-muted-foreground) 70%, transparent);
   margin: 0;
 `
@@ -94,7 +93,7 @@ const ErrorState = styled.div`
 `
 
 const ErrorText = styled.p`
-  font-size: 0.875rem;
+  ${textRole('body')}
   color: var(--color-muted-foreground);
 `
 
@@ -175,10 +174,10 @@ export function ArtistDetailsPanel({ publicId }: ArtistDetailsPanelProps) {
       {/* Artist header */}
       <Header>
         <AvatarCircle>
-          <AvatarInitial>{initial || '?'}</AvatarInitial>
+          <AvatarInitial textRole="title" text={initial || '?'} />
         </AvatarCircle>
         <div>
-          <ArtistName>{name}</ArtistName>
+          <ArtistName forwardedAs="h3" textRole="subtitle" text={name} />
           {albumCount !== null && (
             <ArtistMeta>
               {albumCount} {albumCount === 1 ? 'album' : 'albums'}

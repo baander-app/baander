@@ -1,5 +1,6 @@
 import styled, { css } from 'styled-components'
 import { Link } from 'react-router-dom'
+import { textRole } from '@/shared/theme'
 
 interface StatCardProps {
   label: string
@@ -41,10 +42,7 @@ const LabelGroup = styled.div`
 `
 
 const Label = styled.span`
-  font-size: 11px;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  ${textRole('label')}
 `
 
 const ValueGroup = styled.div`
@@ -54,8 +52,7 @@ const ValueGroup = styled.div`
 `
 
 const Value = styled.span`
-  font-size: 1.25rem;
-  font-weight: 600;
+  ${textRole('title')}
   font-variant-numeric: tabular-nums;
 `
 
@@ -72,7 +69,7 @@ const StatusDot = styled.span<{ $ok: boolean }>`
 `
 
 const Sub = styled.span`
-  font-size: 11px;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
 `
 

@@ -1,5 +1,17 @@
 import styled from 'styled-components'
 import {
+  ArrowBigUp,
+  ArrowDown,
+  ArrowLeft,
+  ArrowRight,
+  ArrowUp,
+  Command,
+  CornerDownLeft,
+  Delete,
+  type LucideIcon,
+} from 'lucide-react'
+import { textRole } from '@/shared/theme'
+import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -16,6 +28,28 @@ import {
 interface KeyboardShortcutsHelpProps {
   open: boolean
   onOpenChange: (open: boolean) => void
+}
+
+interface KeyIcon {
+  icon: LucideIcon
+  label: string
+}
+
+/** Arrow keys are drawn as icons on every platform. */
+const ARROW_KEY_ICONS: Record<string, KeyIcon> = {
+  ArrowLeft: { icon: ArrowLeft, label: 'Left arrow' },
+  ArrowRight: { icon: ArrowRight, label: 'Right arrow' },
+  ArrowUp: { icon: ArrowUp, label: 'Up arrow' },
+  ArrowDown: { icon: ArrowDown, label: 'Down arrow' },
+}
+
+/** macOS draws its modifier and editing keys as symbols; other platforms name them in words. */
+const MAC_KEY_ICONS: Record<string, KeyIcon> = {
+  ...ARROW_KEY_ICONS,
+  Cmd: { icon: Command, label: 'Command' },
+  Shift: { icon: ArrowBigUp, label: 'Shift' },
+  Enter: { icon: CornerDownLeft, label: 'Return' },
+  Backspace: { icon: Delete, label: 'Delete' },
 }
 
 const StyledDialogContent = styled(DialogContent)`
@@ -39,8 +73,7 @@ const CategoryGroup = styled.div`
 
 const CategoryTitle = styled.h3`
   margin-bottom: 0.5rem;
-  font-size: 0.875rem;
-  font-weight: 600;
+  ${textRole('label')}
   color: var(--color-foreground);
 `
 
@@ -58,7 +91,7 @@ const ShortcutRow = styled.div`
 `
 
 const ShortcutDescription = styled.span`
-  font-size: 0.875rem;
+  ${textRole('body')}
   color: var(--color-muted-foreground);
 `
 
@@ -77,15 +110,14 @@ const Kbd = styled.kbd`
   border-radius: var(--radius-md);
   background-color: var(--color-secondary);
   padding: 0 0.375rem;
-  font-size: 0.75rem;
+  ${textRole('caption')}
   font-weight: 500;
-  font-family: inherit;
   color: var(--color-foreground);
 `
 
 const Footer = styled.p`
   margin-top: 0.5rem;
-  font-size: 0.75rem;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
   text-align: center;
 `
@@ -93,6 +125,7 @@ const Footer = styled.p`
 export function KeyboardShortcutsHelp({ open, onOpenChange }: KeyboardShortcutsHelpProps) {
   const categories = getShortcutsByCategory()
   const mac = isPlatformMac()
+  const keyIcons = mac ? MAC_KEY_ICONS : ARROW_KEY_ICONS
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -120,7 +153,9 @@ export function KeyboardShortcutsHelp({ open, onOpenChange }: KeyboardShortcutsH
                         <ShortcutDescription>{shortcut.description}</ShortcutDescription>
                         <KeyGroup>
                           {tokens.map((token, i) => (
-                            <Kbd key={`${shortcut.id}-${i}`}>{token}</Kbd>
+                            <Kbd key={`${shortcut.id}-${i}`}>
+                              <KeyLabel name={token} icon={keyIcons[token]} />
+                            </Kbd>
                           ))}
                         </KeyGroup>
                       </ShortcutRow>
@@ -136,4 +171,12 @@ export function KeyboardShortcutsHelp({ open, onOpenChange }: KeyboardShortcutsH
       </StyledDialogContent>
     </Dialog>
   )
+}
+
+function KeyLabel({ name, icon }: { name: string; icon: KeyIcon | undefined }) {
+  if (!icon) return <>{name}</>
+
+  const Icon = icon.icon
+
+  return <Icon size={14} role="img" aria-label={icon.label} />
 }

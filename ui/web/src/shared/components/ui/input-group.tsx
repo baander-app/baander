@@ -1,5 +1,6 @@
 import * as React from 'react';
 import styled, { css } from 'styled-components';
+import { textRole } from '@/shared/theme';
 import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/input';
 import { Textarea } from '@/shared/components/ui/textarea';
@@ -69,7 +70,7 @@ const StyledAddon = styled.div<{ $align: string }>`
   justify-content: center;
   gap: 0.5rem;
   padding: 0.375rem 0;
-  font-size: 0.875rem;
+  ${textRole('body')}
   font-weight: 500;
   color: var(--color-muted-foreground);
   user-select: none;
@@ -113,7 +114,7 @@ const StyledText = styled.span`
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  font-size: 0.875rem;
+  ${textRole('body')}
   color: var(--color-muted-foreground);
   & svg { pointer-events: none; }
   & svg:not([class*='size-']) { width: 1rem; height: 1rem; }

@@ -2,12 +2,11 @@ import styled, { css } from 'styled-components'
 import { NavLink } from 'react-router-dom'
 import type { SidebarItemData } from '../stores/sidebar-store'
 import { getSidebarIcon } from '../schemas/icons'
+import { textRole } from '@/shared/theme'
+import { ContentText } from '@/shared/typography'
 
 const SectionHeader = styled.div<{ $isFirst: boolean }>`
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  font-weight: 500;
+  ${textRole('label')}
   color: var(--color-muted-foreground);
   padding: ${({ $isFirst }) =>
     $isFirst ? '1rem 1rem 0.25rem' : '0.75rem 1rem 0.25rem'};
@@ -27,7 +26,7 @@ const navLinkStyles = css`
   gap: 0.5rem;
   border-radius: var(--radius-md);
   padding: 0.375rem 0.625rem;
-  font-size: 0.875rem;
+  ${textRole('body')}
   color: var(--color-muted-foreground);
   text-decoration: none;
   transition: background-color 60ms ease-out, color 60ms ease-out;
@@ -59,7 +58,7 @@ const NavIcon = styled.span`
   }
 `
 
-const NavLinkLabel = styled.span`
+const NavLinkLabel = styled(ContentText)`
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -72,7 +71,6 @@ const ActionButton = styled.button`
   background: none;
   border: none;
   cursor: pointer;
-  font: inherit;
 `
 
 interface SidebarSectionProps {
@@ -105,7 +103,7 @@ export function SidebarSection({ id, label, items, isFirst = false, onItemClick 
                 end={route === '/' || route === '/music'}
               >
                 <NavIcon><Icon /></NavIcon>
-                <NavLinkLabel>{item.label}</NavLinkLabel>
+                <NavLinkLabel textRole="body" text={item.label} />
               </StyledNavLink>
             )
           }
@@ -118,7 +116,7 @@ export function SidebarSection({ id, label, items, isFirst = false, onItemClick 
                 onClick={() => onItemClick?.(item)}
               >
                 <NavIcon><Icon /></NavIcon>
-                <NavLinkLabel>{item.label}</NavLinkLabel>
+                <NavLinkLabel textRole="body" text={item.label} />
               </ActionButton>
             )
           }
@@ -132,7 +130,7 @@ export function SidebarSection({ id, label, items, isFirst = false, onItemClick 
                 to={route}
               >
                 <NavIcon><Icon /></NavIcon>
-                <NavLinkLabel>{item.label}</NavLinkLabel>
+                <NavLinkLabel textRole="body" text={item.label} />
               </StyledNavLink>
             )
           }

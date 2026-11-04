@@ -4,6 +4,7 @@ import { AlbumDetailsPanel } from './panels/AlbumDetailsPanel'
 import { ArtistDetailsPanel } from './panels/ArtistDetailsPanel'
 import { SongPreviewPanel } from '@/features/catalog/components/panels/SongPreviewPanel'
 import { InfoPanel } from '@/features/catalog/components/metadata/InfoPanel'
+import { textRole } from '@/shared/theme'
 
 const EmptyState = styled.div`
   display: flex;
@@ -19,12 +20,12 @@ const EmptyIcon = styled.svg`
 `
 
 const EmptyTitle = styled.p`
-  font-size: 0.875rem;
+  ${textRole('body')}
   color: var(--color-muted-foreground);
 `
 
 const EmptySubtitle = styled.p`
-  font-size: 0.75rem;
+  ${textRole('caption')}
   color: color-mix(in srgb, var(--color-muted-foreground) 70%, transparent);
 `
 

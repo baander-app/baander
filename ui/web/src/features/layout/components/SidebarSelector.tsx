@@ -26,10 +26,6 @@ const MEDIA_TYPE_ICONS: Record<MediaType, React.ComponentType<{ className?: stri
   ebooks: BookOpen,
 }
 
-const SmallTooltip = styled(TooltipContent)`
-  font-size: 0.75rem;
-`
-
 const SelectorWrapper = styled.div`
   padding: 0.5rem 0.75rem;
 `
@@ -102,9 +98,9 @@ export function SidebarSelector() {
                     <IconWrapper><Icon /></IconWrapper>
                   </MediaButton>
                 </TooltipTrigger>
-                <SmallTooltip side="bottom">
+                <TooltipContent side="bottom">
                   {MEDIA_TYPE_LABELS[mt]}
-                </SmallTooltip>
+                </TooltipContent>
               </Tooltip>
             )
           })}

@@ -8,6 +8,9 @@ import { useRadioStore } from '@/features/radio/stores/radio-store'
 import { RadioPlayerBar } from '@/features/radio/components/RadioPlayerBar'
 import { ProgressBar } from './ProgressBar'
 import { PlaybackRecoveryAnnouncer } from './PlaybackRecoveryStatus'
+import { TrackCredits } from './TrackCredits'
+import { textRole } from '@/shared/theme'
+import { ContentText } from '@/shared/typography'
 import { CoverArt } from '@/shared/components/cover-art'
 import { PlaybackDestinationSelector } from '@/features/session/components/PlaybackDestinationSelector'
 
@@ -91,12 +94,12 @@ const TrackInfo = styled.div`
   text-align: center;
 `
 
-const TrackTitle = styled.p`
+const TrackTitle = styled(ContentText)`
+  display: block;
   margin: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  font-size: 0.875rem;
   font-weight: 500;
 `
 
@@ -105,7 +108,7 @@ const TrackSubtitle = styled.p`
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  font-size: 0.75rem;
+  ${textRole('caption')}
   color: var(--player-secondary-text);
 `
 
@@ -177,11 +180,14 @@ function MusicPlayerBar() {
             <CoverArt albumPublicId={currentTrack.albumPublicId} iconSize={18} />
           </CoverThumbnail>
           <TrackInfo>
-            <TrackTitle title={currentTrack.title}>{currentTrack.title}</TrackTitle>
+            <TrackTitle
+              textRole="body-sm"
+              text={currentTrack.title}
+              language={currentTrack.albumLanguage}
+              title={currentTrack.title}
+            />
             <TrackSubtitle>
-              {currentTrack.artistName}
-              {currentTrack.artistName && currentTrack.albumName ? ' · ' : ''}
-              {currentTrack.albumName}
+              <TrackCredits track={currentTrack} textRole="caption" />
             </TrackSubtitle>
             <ProgressBar />
           </TrackInfo>

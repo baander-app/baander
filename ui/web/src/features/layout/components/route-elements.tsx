@@ -1,5 +1,6 @@
 import styled from 'styled-components'
 import { Navigate, useParams } from 'react-router-dom'
+import { textRole } from '@/shared/theme'
 
 const PlaceholderContainer = styled.div`
   display: flex;
@@ -12,14 +13,13 @@ const PlaceholderContainer = styled.div`
 `
 
 const PlaceholderTitle = styled.p`
-  font-size: 1.125rem;
-  font-weight: 500;
+  ${textRole('subtitle')}
   color: var(--color-muted-foreground);
   margin: 0;
 `
 
 const PlaceholderSubtitle = styled.p`
-  font-size: 0.875rem;
+  ${textRole('body')}
   color: color-mix(in srgb, var(--color-muted-foreground) 70%, transparent);
   margin: 0;
 `

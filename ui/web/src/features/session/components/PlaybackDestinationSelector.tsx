@@ -5,6 +5,7 @@ import { Button } from '@/shared/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/shared/components/ui/dropdown-menu'
 import { usePlaybackSession } from '../hooks/use-playback-session'
 import { hasUnconfirmedPlayback } from '../services/playback-status'
+import { textRole } from '@/shared/theme'
 
 const DestinationMenu = styled(DropdownMenuContent)`
   min-width: 16rem;
@@ -21,7 +22,7 @@ const Status = styled.p`
   max-width: 20rem;
   margin: 0.5rem;
   color: var(--color-muted-foreground);
-  font-size: var(--font-size-xs);
+  ${textRole('caption')}
 `
 
 const rotate = keyframes`

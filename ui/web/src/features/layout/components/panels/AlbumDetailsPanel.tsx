@@ -9,6 +9,8 @@ import { usePlayerStore, type Track } from '@/features/player/stores/player-stor
 import { Button } from '@/shared/components/ui/button'
 import { Skeleton } from '@/shared/components/ui/skeleton'
 import { AlbumContextMenu } from '@/features/catalog/components/menus/AlbumContextMenu'
+import { textRole } from '@/shared/theme'
+import { ContentText } from '@/shared/typography'
 
 /** Album song as returned by GET /api/albums/{id}. Extends the generated SongResource
  *  with an optional `duration` alias some payloads use alongside the canonical `length`. */
@@ -78,21 +80,20 @@ const CoverImg = styled.img`
   object-fit: cover;
 `
 
-const AlbumTitle = styled.h3`
-  font-size: 1rem;
-  font-weight: 500;
+const AlbumTitle = styled(ContentText)`
+  display: block;
   color: var(--color-foreground);
   margin: 0;
 `
 
-const AlbumArtist = styled.p`
-  font-size: 0.875rem;
+const AlbumArtist = styled(ContentText)`
+  display: block;
   color: var(--color-muted-foreground);
   margin: 0;
 `
 
 const AlbumMeta = styled.p`
-  font-size: 0.75rem;
+  ${textRole('caption')}
   color: color-mix(in srgb, var(--color-muted-foreground) 70%, transparent);
   margin: 0;
 `
@@ -107,7 +108,7 @@ const SummarySection = styled.div`
   display: flex;
   flex-direction: column;
   gap: 0.375rem;
-  font-size: 0.875rem;
+  ${textRole('body-sm')}
 `
 
 const SummaryRow = styled.div`
@@ -120,9 +121,7 @@ const SummaryLabel = styled.span`
 `
 
 const SummaryValue = styled.span`
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
-  font-variant-numeric: tabular-nums;
+  ${textRole('mono-sm')}
   color: var(--color-foreground);
 `
 
@@ -142,7 +141,7 @@ const TrackItem = styled.li`
   gap: 0.5rem;
   border-radius: var(--radius-md);
   padding: 0.375rem 0.5rem;
-  font-size: 0.875rem;
+  ${textRole('body-sm')}
   transition: background-color 60ms ease-out;
 
   &:hover {
@@ -154,7 +153,7 @@ const TrackIndex = styled.span`
   width: 1.25rem;
   flex-shrink: 0;
   text-align: right;
-  font-size: 0.75rem;
+  ${textRole('caption')}
   font-variant-numeric: tabular-nums;
   color: var(--color-muted-foreground);
 `
@@ -173,10 +172,8 @@ const TrackNameText = styled.p`
 `
 
 const TrackDuration = styled.span`
-  font-size: 0.75rem;
-  font-variant-numeric: tabular-nums;
+  ${textRole('timecode')}
   color: var(--color-muted-foreground);
-  font-family: var(--font-mono);
 `
 
 const ErrorState = styled.div`
@@ -188,7 +185,7 @@ const ErrorState = styled.div`
 `
 
 const ErrorText = styled.p`
-  font-size: 0.875rem;
+  ${textRole('body')}
   color: var(--color-muted-foreground);
 `
 
@@ -222,13 +219,14 @@ interface AlbumDetailsPanelProps {
   publicId: string
 }
 
-function buildTracks(songs: AlbumSong[], albumTitle: string): Track[] {
+function buildTracks(songs: AlbumSong[], albumTitle: string, albumLanguage: string | undefined): Track[] {
   return songs.filter((s) => s.available === true).map((s) => ({
     publicId: String(s.publicId ?? ''),
     available: s.available === true,
     title: String(s.title ?? ''),
     artistName: s.artistName ? String(s.artistName) : undefined,
     albumName: albumTitle,
+    albumLanguage,
     duration: typeof s.length === 'number' ? s.length : (typeof s.duration === 'number' ? s.duration : undefined),
   }))
 }
@@ -254,26 +252,27 @@ export function AlbumDetailsPanel({ publicId }: AlbumDetailsPanelProps) {
 
   const handlePlay = useCallback(() => {
     if (songs.length === 0) return
-    const tracks = buildTracks(songs, album?.title ?? '')
+    const tracks = buildTracks(songs, album?.title ?? '', album?.language ?? undefined)
     if (tracks.length > 0) playTrack(tracks[0], tracks)
   }, [songs, album, playTrack])
 
   const handleShuffle = useCallback(() => {
     if (songs.length === 0) return
-    const tracks = [...buildTracks(songs, album?.title ?? '')].sort(() => Math.random() - 0.5)
+    const tracks = [...buildTracks(songs, album?.title ?? '', album?.language ?? undefined)].sort(() => Math.random() - 0.5)
     if (tracks.length > 0) playTrack(tracks[0], tracks)
   }, [songs, album, playTrack])
 
   const handlePlayTrack = useCallback(
     (song: AlbumSong) => {
       if (song.available !== true) return
-      const tracks = buildTracks(songs, album?.title ?? '')
+      const tracks = buildTracks(songs, album?.title ?? '', album?.language ?? undefined)
       const track: Track = {
         publicId: String(song.publicId ?? ''),
         available: song.available,
         title: String(song.title ?? ''),
         artistName: song.artistName ? String(song.artistName) : undefined,
         albumName: album?.title,
+        albumLanguage: album?.language ?? undefined,
         duration: typeof song.length === 'number' ? song.length : (typeof song.duration === 'number' ? song.duration : undefined),
       }
       playTrack(track, tracks)
@@ -331,10 +330,14 @@ export function AlbumDetailsPanel({ publicId }: AlbumDetailsPanelProps) {
           )}
         </CoverContainer>
         <div>
-          <AlbumTitle>{album.title}</AlbumTitle>
-          <AlbumArtist>{album.artistName}</AlbumArtist>
+          <AlbumTitle forwardedAs="h3" textRole="subtitle" text={album.title ?? ''} language={album.language} />
+          {album.artistName && <AlbumArtist forwardedAs="p" textRole="body" text={album.artistName} />}
           {(album.year || album.label) && (
-            <AlbumMeta>{[album.year, album.label].filter(Boolean).join(' · ')}</AlbumMeta>
+            <AlbumMeta>
+              {album.year}
+              {album.year && album.label ? ' · ' : null}
+              {album.label && <ContentText textRole="caption" text={album.label} />}
+            </AlbumMeta>
           )}
         </div>
         {songs.length > 0 && (
@@ -376,7 +379,12 @@ export function AlbumDetailsPanel({ publicId }: AlbumDetailsPanelProps) {
             >
               <TrackIndex>{index + 1}</TrackIndex>
               <TrackName>
-                <TrackNameText>{song.title ?? 'Unknown'}{song.available === false && <span> · Unavailable</span>}</TrackNameText>
+                <TrackNameText>
+                  {song.title
+                    ? <ContentText textRole="body-sm" text={song.title} language={song.albumLanguage ?? album.language} />
+                    : 'Unknown'}
+                  {song.available === false && <span> · Unavailable</span>}
+                </TrackNameText>
               </TrackName>
               <TrackDuration>
                 {typeof (song.length ?? song.duration) === 'number' ? formatDuration((song.length ?? song.duration) as number) : '\u2014'}

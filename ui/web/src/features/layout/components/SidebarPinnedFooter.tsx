@@ -5,6 +5,7 @@ import { useNotificationStore } from '@/features/notification/stores/notificatio
 import styled from 'styled-components'
 import { NavLink } from 'react-router-dom'
 import { useMediaModeStore, type MediaType } from '../stores/media-mode-store'
+import { textRole } from '@/shared/theme'
 
 const FooterWrapper = styled.div`
   margin-top: auto;
@@ -22,7 +23,7 @@ const FooterLinks = styled.div`
   display: flex;
   align-items: center;
   gap: 0.375rem;
-  font-size: 0.75rem;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
 `
 

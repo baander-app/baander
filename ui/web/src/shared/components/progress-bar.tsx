@@ -1,5 +1,6 @@
 import styled from 'styled-components'
 import type { CSSProperties } from 'react'
+import { textRole } from '@/shared/theme'
 
 interface ProgressBarProps {
   value: number
@@ -17,7 +18,7 @@ const LabelRow = styled.div`
   align-items: center;
   justify-content: space-between;
   margin-bottom: 0.25rem;
-  font-size: 11px;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
 `
 

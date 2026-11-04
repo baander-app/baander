@@ -4,6 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ProgressBar } from '../ProgressBar'
 import { usePlayerStore } from '@/features/player/stores/player-store'
 import { updateTime } from '@/features/player/stores/player-time-tracker'
+import { resolveTheme } from '@/shared/theme/resolve-theme'
+import { declaration, renderWithCss, rulesForElement } from '@/shared/theme/__tests__/css-text'
 
 const originalSeek = usePlayerStore.getState().seekTo
 const seekTo = vi.fn()
@@ -79,5 +81,23 @@ describe('progress control', () => {
     await user.tab()
     await user.keyboard('{ArrowRight}')
     expect(seekTo).not.toHaveBeenCalled()
+  })
+
+  it('sets both time labels in the timecode role with tabular numerals', () => {
+    const { container, cssText } = renderWithCss(<ProgressBar />)
+    const labels = [...container.querySelectorAll('span')].filter((span) => /^\d+:\d{2}$/.test(span.textContent ?? ''))
+
+    expect(labels).toHaveLength(2)
+    for (const label of labels) {
+      const [rule] = rulesForElement(label, cssText)
+
+      expect(declaration(rule, 'font-family')).toBe('var(--font-mono)')
+      expect(declaration(rule, 'font-size')).toBe('calc(var(--text-timecode-size) + var(--script-size-boost, 0px))')
+      expect(declaration(rule, 'font-variant-numeric')).toBe('tabular-nums')
+    }
+  })
+
+  it('keeps the timecode role at 12px or larger', () => {
+    expect(Number.parseFloat(resolveTheme('dark', 'violet').text.timecodeSize)).toBeGreaterThanOrEqual(12)
   })
 })

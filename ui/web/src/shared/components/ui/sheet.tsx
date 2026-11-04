@@ -3,6 +3,7 @@
 import * as React from "react"
 import { Dialog as SheetPrimitive } from "radix-ui"
 import styled, { keyframes, type DataAttributes } from "styled-components"
+import { textRole } from "@/shared/theme"
 
 import { Button } from "@/shared/components/ui/button"
 import { XIcon } from "lucide-react"
@@ -122,8 +123,7 @@ const StyledContent = styled(SheetPrimitive.Content).attrs<DataAttributes>({
   gap: 1rem;
   background: var(--color-popover);
   background-clip: padding-box;
-  font-size: 0.875rem;
-  line-height: 1.6;
+  ${textRole('body')}
   color: var(--color-popover-foreground);
   box-shadow: 0 4px 24px rgb(0 0 0 / 0.4);
   transition: opacity 120ms ease-out, transform 120ms ease-out;
@@ -226,18 +226,14 @@ const StyledFooter = styled.div.attrs<DataAttributes>({ 'data-slot': 'sheet-foot
 const StyledTitle = styled(SheetPrimitive.Title).attrs<DataAttributes>({
   'data-slot': 'sheet-title',
 })`
-  font-family: var(--font-ui);
-  font-size: 1rem;
-  line-height: 1.6;
-  font-weight: 500;
+  ${textRole('title')}
   color: var(--color-foreground);
 `
 
 const StyledDescription = styled(SheetPrimitive.Description).attrs<DataAttributes>({
   'data-slot': 'sheet-description',
 })`
-  font-size: 0.875rem;
-  line-height: 1.6;
+  ${textRole('body')}
   color: var(--color-muted-foreground);
 `
 

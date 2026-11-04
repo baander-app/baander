@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { styled, css } from 'styled-components';
 import { Slot } from 'radix-ui';
-import { focusVisibleRing, interactiveTransition, disabledStyle, ariaInvalidRing } from '@/shared/theme';
+import { focusVisibleRing, interactiveTransition, disabledStyle, ariaInvalidRing, textRole } from '@/shared/theme';
 
 const baseStyles = css`
   display: inline-flex;
@@ -12,8 +12,6 @@ const baseStyles = css`
   border-radius: var(--radius-md);
   color: var(--color-foreground);
   background-clip: padding-box;
-  font-size: 0.875rem;
-  font-weight: 500;
   white-space: nowrap;
   outline: none;
   user-select: none;
@@ -72,11 +70,11 @@ const sizeStyles: Record<string, ReturnType<typeof css>> = {
     &:has([data-icon="inline-start"]) { padding-left: 0.5rem; }
   `,
   xs: css`
-    height: 1.5rem; gap: 0.25rem; padding: 0 0.5rem; font-size: 0.75rem;
+    height: 1.5rem; gap: 0.25rem; padding: 0 0.5rem;
     & svg:not([class*='size-']) { width: 0.75rem; height: 0.75rem; }
   `,
   sm: css`
-    height: 1.75rem; gap: 0.25rem; padding: 0 0.625rem; font-size: 0.8rem;
+    height: 1.75rem; gap: 0.25rem; padding: 0 0.625rem;
     & svg:not([class*='size-']) { width: 0.875rem; height: 0.875rem; }
   `,
   lg: css`
@@ -95,8 +93,16 @@ const sizeStyles: Record<string, ReturnType<typeof css>> = {
   'icon-lg': css` width: 2.25rem; height: 2.25rem; `,
 };
 
+/** Compact sizes set their label in the dense-list role; the others use the body role. */
+const DENSE_SIZES = new Set(['xs', 'sm']);
+
+/** Primary actions carry the button weight; the quieter variants use the secondary-button weight. */
+const PRIMARY_VARIANTS = new Set(['default', 'destructive']);
+
 const StyledButton = styled.button<{ $variant: string; $size: string }>`
   ${baseStyles}
+  ${({ $size }) => textRole(DENSE_SIZES.has($size) ? 'body-sm' : 'body')}
+  font-weight: ${({ $variant }) => (PRIMARY_VARIANTS.has($variant) ? 600 : 500)};
   ${({ $variant }) => variantStyles[$variant] || variantStyles.default}
   ${({ $size }) => sizeStyles[$size] || sizeStyles.default}
 `;

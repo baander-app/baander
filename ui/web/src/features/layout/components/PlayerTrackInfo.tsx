@@ -1,6 +1,9 @@
 import styled from 'styled-components'
 import type { Track } from '@/features/player/stores/player-store'
+import { TrackCredits } from '@/features/player/components/TrackCredits'
 import { CoverArt } from '@/shared/components/cover-art'
+import { textRole } from '@/shared/theme'
+import { ContentText } from '@/shared/typography'
 
 const TrackInfoRow = styled.div`
   display: flex;
@@ -22,13 +25,12 @@ const TrackText = styled.div`
   flex: 1;
 `
 
-const TrackTitle = styled.p`
+const TrackTitle = styled(ContentText)`
+  display: block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 0.875rem;
   font-weight: 500;
-  line-height: 1.25;
   color: var(--color-foreground);
 `
 
@@ -36,8 +38,7 @@ const TrackSubtitle = styled.p`
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 0.75rem;
-  line-height: 1.25;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
 `
 
@@ -52,11 +53,9 @@ export function PlayerTrackInfo({ track }: PlayerTrackInfoProps) {
         <CoverArt albumPublicId={track.albumPublicId} iconSize={14} />
       </CoverArtWrapper>
       <TrackText>
-        <TrackTitle>{track.title}</TrackTitle>
+        <TrackTitle textRole="body-sm" text={track.title} language={track.albumLanguage} />
         <TrackSubtitle>
-          {track.artistName}
-          {track.artistName && track.albumName ? ' · ' : ''}
-          {track.albumName}
+          <TrackCredits track={track} textRole="caption" />
         </TrackSubtitle>
       </TrackText>
     </TrackInfoRow>

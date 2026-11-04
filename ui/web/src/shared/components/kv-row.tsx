@@ -1,4 +1,5 @@
 import styled from 'styled-components'
+import { textRole } from '@/shared/theme'
 
 interface KVRowProps {
   label: string
@@ -11,7 +12,7 @@ const Row = styled.div`
   align-items: center;
   justify-content: space-between;
   padding: 0.625rem 1rem;
-  font-size: 0.875rem;
+  ${textRole('body-sm')}
 `
 
 const Label = styled.span`
@@ -19,7 +20,7 @@ const Label = styled.span`
 `
 
 const ValueMono = styled.span`
-  font-family: var(--font-mono);
+  ${textRole('mono-sm')}
 `
 
 const ValueMuted = styled.span`

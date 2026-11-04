@@ -3,7 +3,10 @@ import { Play, Pause, SkipBack, SkipForward } from 'lucide-react'
 import { usePlayerStore } from '@/features/player/stores/player-store'
 import { ProgressBar } from '@/features/player/components/ProgressBar'
 import { Button } from '@/shared/components/ui/button'
+import { TrackCredits } from '@/features/player/components/TrackCredits'
 import { CoverArt } from '@/shared/components/cover-art'
+import { textRole } from '@/shared/theme'
+import { ContentText } from '@/shared/typography'
 
 const EmptyState = styled.div`
   display: flex;
@@ -14,7 +17,7 @@ const EmptyState = styled.div`
 `
 
 const EmptyText = styled.p`
-  font-size: 0.875rem;
+  ${textRole('body')}
   color: var(--color-muted-foreground);
 `
 
@@ -50,16 +53,14 @@ const ExpandButton = styled.button`
   padding: 0;
   cursor: pointer;
   color: inherit;
-  font: inherit;
 `
 
-const TrackTitle = styled.p`
+const TrackTitle = styled(ContentText)`
+  display: block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 0.875rem;
   font-weight: 500;
-  line-height: 1.25;
   color: var(--color-foreground);
 `
 
@@ -67,8 +68,7 @@ const TrackSubtitle = styled.p`
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 0.75rem;
-  line-height: 1.25;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
 `
 
@@ -108,11 +108,9 @@ export function NowPlayingCompact({ onExpand }: { onExpand: () => void }) {
           onClick={onExpand}
           aria-label="Expand now playing"
         >
-          <TrackTitle>{currentTrack.title}</TrackTitle>
+          <TrackTitle textRole="body-sm" text={currentTrack.title} language={currentTrack.albumLanguage} />
           <TrackSubtitle>
-            {currentTrack.artistName}
-            {currentTrack.artistName && currentTrack.albumName ? ' · ' : ''}
-            {currentTrack.albumName}
+            <TrackCredits track={currentTrack} textRole="caption" />
           </TrackSubtitle>
         </ExpandButton>
 

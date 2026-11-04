@@ -1,6 +1,7 @@
 import * as React from 'react';
 import styled from 'styled-components';
 import { Tooltip as TooltipPrimitive } from 'radix-ui';
+import { textRole } from '@/shared/theme';
 
 function TooltipProvider({ delayDuration = 0, ...props }: React.ComponentProps<typeof TooltipPrimitive.Provider>) {
   return <TooltipPrimitive.Provider data-slot="tooltip-provider" delayDuration={delayDuration} {...props} />;
@@ -24,7 +25,7 @@ const StyledTooltipContent = styled(TooltipPrimitive.Content)`
   border-radius: var(--radius-xl);
   background-color: var(--color-foreground);
   padding: 0.375rem 0.75rem;
-  font-size: 0.75rem;
+  ${textRole('caption')}
   color: var(--color-background);
   transform-origin: var(--radix-tooltip-content-transform-origin);
   &:has([data-slot="kbd"]) { padding-right: 0.375rem; }

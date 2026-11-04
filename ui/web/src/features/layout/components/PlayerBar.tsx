@@ -9,6 +9,7 @@ import { PlayerProgress } from './PlayerProgress'
 import { PlayerTransport } from './PlayerTransport'
 import { PlayerVolume } from './PlayerVolume'
 import { PlayerTimeLabel } from './PlayerTimeLabel'
+import { textRole } from '@/shared/theme'
 
 const EmptyState = styled.div`
   display: flex;
@@ -18,7 +19,7 @@ const EmptyState = styled.div`
 `
 
 const EmptyText = styled.p`
-  font-size: 0.75rem;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
 `
 

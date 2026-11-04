@@ -1,7 +1,7 @@
 import * as React from "react"
 import { Tabs as TabsPrimitive } from "radix-ui"
 import styled, { css, type DataAttributes } from "styled-components"
-import { focusVisibleRing, interactiveTransition } from "@/shared/theme"
+import { focusVisibleRing, interactiveTransition, textRole } from "@/shared/theme"
 
 const StyledTabs = styled(TabsPrimitive.Root).attrs<DataAttributes>((p) => ({
   'data-slot': 'tabs',
@@ -97,7 +97,7 @@ const StyledTabsTrigger = styled(TabsPrimitive.Trigger).attrs<DataAttributes>({ 
   border: 1px solid transparent;
   background: transparent;
   padding: 0.125rem 0.375rem;
-  font-size: 0.875rem;
+  ${textRole('body-sm')}
   font-weight: 500;
   white-space: nowrap;
   color: var(--color-muted-foreground);
@@ -127,6 +127,7 @@ const StyledTabsTrigger = styled(TabsPrimitive.Trigger).attrs<DataAttributes>({ 
     transition: none;
     background: var(--color-background);
     color: var(--color-foreground);
+    font-weight: 600;
   }
 
   /* Active state within line variant list: no shadow */
@@ -184,7 +185,7 @@ const TabsTrigger = React.forwardRef<
 
 const StyledTabsContent = styled(TabsPrimitive.Content).attrs<DataAttributes>({ 'data-slot': 'tabs-content' })`
   flex: 1;
-  font-size: 0.875rem;
+  ${textRole('body')}
   outline: none;
 `
 

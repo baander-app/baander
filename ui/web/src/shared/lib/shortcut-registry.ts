@@ -12,6 +12,7 @@ export const ShortcutCategory = {
 
 export type ShortcutCategory = (typeof ShortcutCategory)[keyof typeof ShortcutCategory]
 
+/** Key display strings per platform: key names joined with "+", such as "Cmd+K". */
 export interface PlatformKeys {
   mac: string
   default: string
@@ -100,38 +101,13 @@ export function getShortcut(id: string): ShortcutEntry | undefined {
 
 // ── Key display parsing ──
 
-const MAC_SYMBOLS = new Set(['⌘', '⇧', '⌥', '⌃'])
-const ARROW_SYMBOLS = new Set(['→', '←', '↑', '↓'])
-
 /**
- * Parse a key display string into individual tokens for separate <kbd> elements.
- * - macOS: "⇧→" → ["⇧", "→"], "⌘K" → ["⌘", "K"]
- * - Default: "Shift+→" → ["Shift", "→"], "Ctrl+K" → ["Ctrl", "K"]
+ * Split a key display string into its keys, one per <kbd> element. Keys are named in
+ * words and joined with "+", such as "Cmd+ArrowRight" or "Shift+Enter"; the
+ * cheat-sheet decides which names it draws as icons.
  */
 export function parseKeyDisplay(display: string): string[] {
   if (!display) return []
 
-  // If it contains '+', split on '+' (Linux/Windows format)
-  if (display.includes('+')) {
-    return display.split('+').map((s) => s.trim())
-  }
-
-  // macOS: split on symbol boundaries
-  const tokens: string[] = []
-  let buf = ''
-
-  for (const ch of display) {
-    if (MAC_SYMBOLS.has(ch) || ARROW_SYMBOLS.has(ch)) {
-      if (buf) {
-        tokens.push(buf)
-        buf = ''
-      }
-      tokens.push(ch)
-    } else {
-      buf += ch
-    }
-  }
-  if (buf) tokens.push(buf)
-
-  return tokens.length > 0 ? tokens : [display]
+  return display.split('+').map((key) => key.trim())
 }

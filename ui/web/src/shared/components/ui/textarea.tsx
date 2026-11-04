@@ -10,8 +10,6 @@ export const Textarea = styled.textarea.attrs<DataAttributes>({ 'data-slot': 'te
   border: 1px solid var(--color-input);
   background: transparent;
   padding: 0.375rem 0.625rem;
-  font-size: 0.875rem;
-  line-height: 1.6;
   color: var(--color-foreground);
   outline: none;
   resize: vertical;

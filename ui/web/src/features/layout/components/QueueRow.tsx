@@ -4,6 +4,8 @@ import { Play, X } from 'lucide-react'
 import type { Track } from '@/features/player/stores/player-store'
 import { Button } from '@/shared/components/ui/button'
 import { formatDuration } from '@/shared/utils/format-duration'
+import { textRole } from '@/shared/theme'
+import { ContentText } from '@/shared/typography'
 
 const Row = styled.div`
   display: flex;
@@ -13,7 +15,7 @@ const Row = styled.div`
   gap: 0.5rem;
   border-radius: var(--radius-md);
   padding: 0.375rem 0.25rem;
-  font-size: 0.875rem;
+  ${textRole('body-sm')}
   transition: background-color 60ms ease-out;
 
   &:hover {
@@ -25,7 +27,7 @@ const IndexCell = styled.span`
   width: 1.25rem;
   flex-shrink: 0;
   text-align: right;
-  font-size: 0.75rem;
+  ${textRole('caption')}
   font-variant-numeric: tabular-nums;
   color: var(--color-muted-foreground);
 `
@@ -39,7 +41,6 @@ const TitleButton = styled.button`
   padding: 0;
   cursor: pointer;
   color: inherit;
-  font: inherit;
 `
 
 const trackTitleStyles = css`
@@ -50,22 +51,24 @@ const trackTitleStyles = css`
 
 const TrackTitle = styled.p<{ $isCurrent: boolean }>`
   ${trackTitleStyles}
-  font-weight: ${({ $isCurrent }) => $isCurrent ? 500 : 400};
   color: ${({ $isCurrent }) =>
     $isCurrent
       ? 'var(--color-foreground)'
       : 'color-mix(in srgb, var(--color-foreground) 80%, transparent)'};
 `
 
-const TrackArtist = styled.p`
+const TitleText = styled(ContentText)<{ $isCurrent: boolean }>`
+  font-weight: ${({ $isCurrent }) => $isCurrent ? 500 : 400};
+`
+
+const TrackArtist = styled(ContentText)`
+  display: block;
   ${trackTitleStyles}
-  font-size: 0.75rem;
   color: var(--color-muted-foreground);
 `
 
 const Duration = styled.span`
-  font-size: 0.75rem;
-  font-variant-numeric: tabular-nums;
+  ${textRole('timecode')}
   color: var(--color-muted-foreground);
 `
 
@@ -104,8 +107,11 @@ export const QueueRow = memo(function QueueRow({
       </IndexCell>
 
       <TitleButton disabled={track.available === false} onClick={() => onPlay(track)}>
-        <TrackTitle $isCurrent={isCurrent}>{track.title}{track.available === false && <span> · Unavailable</span>}</TrackTitle>
-        <TrackArtist>{track.artistName}</TrackArtist>
+        <TrackTitle $isCurrent={isCurrent}>
+          <TitleText textRole="body-sm" text={track.title} language={track.albumLanguage} $isCurrent={isCurrent} />
+          {track.available === false && <span> · Unavailable</span>}
+        </TrackTitle>
+        <TrackArtist textRole="caption" text={track.artistName ?? ''} />
       </TitleButton>
 
       <Duration>

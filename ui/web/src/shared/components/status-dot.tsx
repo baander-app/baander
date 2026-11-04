@@ -1,4 +1,5 @@
 import styled, { css, keyframes } from 'styled-components'
+import { textRole } from '@/shared/theme'
 
 interface StatusDotProps {
   color: 'green' | 'red' | 'amber' | 'blue' | 'gray'
@@ -36,7 +37,7 @@ const Dot = styled.span<{ $color: string; $pulse: boolean }>`
 `
 
 const Label = styled.span`
-  font-size: 13px;
+  ${textRole('body-sm')}
   color: var(--color-muted-foreground);
 `
 

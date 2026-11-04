@@ -11,8 +11,6 @@ export const Input = styled.input.attrs<DataAttributes>({ 'data-slot': 'input' }
   border: 1px solid var(--color-input);
   background: transparent;
   padding: 0.25rem 0.625rem;
-  font-size: 0.875rem;
-  line-height: 1.4;
   color: var(--color-foreground);
   outline: none;
   ${interactiveTransition(['color', 'background-color', 'border-color', 'box-shadow'])}

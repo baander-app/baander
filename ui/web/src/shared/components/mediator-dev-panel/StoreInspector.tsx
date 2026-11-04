@@ -2,6 +2,7 @@ import { useState, useSyncExternalStore } from 'react'
 import styled from 'styled-components'
 import { storeDebugger, captureState } from '@/shared/stores/debug'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/shared/components/ui/select'
+import { textRole } from '@/shared/theme'
 
 interface StoreInspectorProps {
   /** Override store snapshot sources. Keyed by display name. */
@@ -27,15 +28,14 @@ const Content = styled.div`
 `
 
 const JsonPre = styled.pre`
-  font-size: 0.75rem;
-  font-family: var(--font-mono);
+  ${textRole('mono-sm')}
   white-space: pre-wrap;
   word-break: break-word;
 `
 
 const EmptyState = styled.div`
   padding: 1rem;
-  font-size: 0.875rem;
+  ${textRole('body')}
   color: var(--color-muted-foreground);
   text-align: center;
 `

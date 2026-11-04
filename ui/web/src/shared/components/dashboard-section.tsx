@@ -1,4 +1,5 @@
 import styled from 'styled-components'
+import { textRole } from '@/shared/theme'
 
 interface DashboardSectionProps {
   title: string
@@ -14,9 +15,8 @@ const Header = styled.div`
 `
 
 const Title = styled.h2`
-  font-size: 0.875rem;
+  ${textRole('subtitle')}
   font-weight: 600;
-  letter-spacing: -0.025em;
   color: var(--color-foreground);
 `
 

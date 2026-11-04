@@ -1,7 +1,7 @@
 import * as React from "react"
 import { Select as SelectPrimitive } from "radix-ui"
 import styled, { css, keyframes, type DataAttributes } from "styled-components"
-import { focusVisibleRing, interactiveTransition, ariaInvalidRing } from "@/shared/theme"
+import { focusVisibleRing, interactiveTransition, ariaInvalidRing, textRole } from "@/shared/theme"
 
 const Select = SelectPrimitive.Root
 const SelectValue = SelectPrimitive.Value
@@ -69,8 +69,7 @@ const StyledTrigger = styled(SelectPrimitive.Trigger).attrs<DataAttributes>({ 'd
   background: transparent;
   color: var(--color-foreground);
   padding: 0.25rem 0.625rem;
-  font-size: 0.875rem;
-  line-height: 1.4;
+  ${textRole('body')}
   outline: none;
   ${interactiveTransition(['color', 'border-color', 'background-color', 'box-shadow'])}
 
@@ -182,7 +181,7 @@ const StyledItem = styled(SelectPrimitive.Item).attrs<DataAttributes>({ 'data-sl
   align-items: center;
   border-radius: ${({ theme }) => theme.radii.md};
   padding: 0.375rem 0.5rem 0.375rem 2rem;
-  font-size: 0.875rem;
+  ${textRole('body')}
   outline: none;
 
   &:focus {

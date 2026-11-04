@@ -1,10 +1,12 @@
 import { memo, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import styled from 'styled-components'
+import { ArrowLeft } from 'lucide-react'
 import { storeDebugger, type createStoreDebugger, type StateCapture, type StoreCaptures, type StoreTraceEvent } from '@/shared/stores/debug'
 import { Button } from '@/shared/components/ui/button'
 import type { StoreTransitionVerification } from '@/shared/stores/verify-transition'
 import { reconstructCaptures } from '@/shared/stores/reconstruct-captures'
+import { textRole } from '@/shared/theme'
 
 const Container = styled.div`
   flex: 1;
@@ -12,12 +14,16 @@ const Container = styled.div`
   overflow: auto;
   padding: 16px;
   color: var(--color-foreground);
-  font-size: 12px;
+  ${textRole('caption')}
   input { width: 100%; background: var(--color-background); color: inherit; border: 1px solid var(--color-border); padding: 8px; }
   textarea { width: 100%; background: var(--color-background); color: inherit; border: 1px solid var(--color-border); }
   details { border-bottom: 1px solid var(--color-border); padding: 8px 0; }
   summary { cursor: pointer; }
-  pre { white-space: pre-wrap; overflow-wrap: anywhere; font-family: var(--font-mono); }
+  pre { white-space: pre-wrap; overflow-wrap: anywhere; ${textRole('mono-sm')} }
+`
+
+const ParentIcon = styled(ArrowLeft)`
+  vertical-align: middle;
 `
 
 const EventRow = styled.div<{ $selected: boolean }>`
@@ -30,7 +36,7 @@ const Inspection = styled.section`
   padding: 16px;
   background: var(--color-card);
   border-radius: 12px;
-  h2, h3 { font-size: inherit; font-weight: 600; }
+  h2, h3 { ${textRole('caption')} font-weight: 600; }
 `
 
 const CaptureScroll = styled.div`
@@ -124,7 +130,10 @@ function ActionVerification({ recorder, event }: {
 
 const EventDetails = memo(function EventDetails({ event }: { event: StoreTraceEvent }) {
   return <details>
-    <summary>#{event.id} {event.store} · {event.action} · {event.kind}{event.parentId !== null ? ` ← #${event.parentId}` : ''}</summary>
+    <summary>
+      #{event.id} {event.store} · {event.action} · {event.kind}
+      {event.parentId !== null && <> <ParentIcon size={12} role="img" aria-label="caused by" /> #{event.parentId}</>}
+    </summary>
     {event.changedKeys && <p>Changed: {event.changedKeys.join(', ')}</p>}
     {event.args && <><strong>Arguments</strong><pre>{JSON.stringify(event.args, null, 2)}</pre></>}
     {event.before && <><strong>Before</strong><pre>{JSON.stringify(event.before, null, 2)}</pre></>}

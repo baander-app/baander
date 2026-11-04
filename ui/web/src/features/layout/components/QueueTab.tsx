@@ -4,6 +4,7 @@ import { usePlayerStore } from '@/features/player/stores/player-store'
 import { Button } from '@/shared/components/ui/button'
 import { SortableContainer, SortableItem } from '@/shared/components/ui/dnd-sortable'
 import { QueueRow } from './QueueRow'
+import { textRole } from '@/shared/theme'
 
 const ClearButton = styled(Button)`
   color: var(--color-muted-foreground);
@@ -28,7 +29,7 @@ const HeaderRow = styled.div`
 `
 
 const TrackCount = styled.span`
-  font-size: 0.75rem;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
 `
 
@@ -42,12 +43,12 @@ const EmptyState = styled.div`
 `
 
 const EmptyTitle = styled.p`
-  font-size: 0.875rem;
+  ${textRole('body')}
   color: var(--color-muted-foreground);
 `
 
 const EmptySubtitle = styled.p`
-  font-size: 0.75rem;
+  ${textRole('caption')}
   color: color-mix(in srgb, var(--color-muted-foreground) 70%, transparent);
 `
 

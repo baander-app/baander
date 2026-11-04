@@ -13,6 +13,8 @@ import {
   CommandList,
   CommandSeparator,
 } from '@/shared/components/ui/command'
+import { textRole } from '@/shared/theme'
+import { ContentText } from '@/shared/typography'
 
 /** Minimal shapes of the search-index list results. The orval-generated index
  *  responses type `data` as `unknown[]` (paginated), so these capture only the
@@ -21,6 +23,7 @@ interface AlbumSearchItem {
   publicId?: string
   title?: string
   artistName?: string
+  language?: string | null
 }
 interface ArtistSearchItem {
   publicId?: string
@@ -55,7 +58,7 @@ const ItemMeta = styled.span`
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 0.75rem;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
 `
 
@@ -133,7 +136,7 @@ export function SpotlightOverlay() {
           <CommandEmpty>Start typing to search...</CommandEmpty>
         )}
         {debouncedQuery && !hasResults && (
-          <CommandEmpty>No results for "{debouncedQuery}"</CommandEmpty>
+          <CommandEmpty>No results for "<ContentText textRole="body" text={debouncedQuery} />"</CommandEmpty>
         )}
 
         {artists.length > 0 && (
@@ -149,7 +152,7 @@ export function SpotlightOverlay() {
                   }}
                 >
                   <ArtistIcon />
-                  <ItemLabel>{asString(artist.name)}</ItemLabel>
+                  <ItemLabel><ContentText textRole="body" text={asString(artist.name)} /></ItemLabel>
                 </CommandItem>
               ))}
             </CommandGroup>
@@ -167,8 +170,10 @@ export function SpotlightOverlay() {
                   onSelect={() => handleSelectAlbum(album)}
                 >
                   <DiscIcon />
-                  <ItemLabel>{asString(album.title)}</ItemLabel>
-                  <ItemMeta>{asString(album.artistName)}</ItemMeta>
+                  <ItemLabel>
+                    <ContentText textRole="body" text={asString(album.title)} language={album.language} />
+                  </ItemLabel>
+                  <ItemMeta><ContentText textRole="caption" text={asString(album.artistName)} /></ItemMeta>
                 </CommandItem>
               ))}
             </CommandGroup>
@@ -185,8 +190,11 @@ export function SpotlightOverlay() {
                 onSelect={() => handlePlaySong(song, songs, i)}
               >
                 <MusicIcon />
-                <ItemLabel>{asString(song.title)}{song.available === false && <span> · Unavailable</span>}</ItemLabel>
-                <ItemMeta>{asString(song.artistName)}</ItemMeta>
+                <ItemLabel>
+                  <ContentText textRole="body" text={asString(song.title)} language={song.albumLanguage} />
+                  {song.available === false && <span> · Unavailable</span>}
+                </ItemLabel>
+                <ItemMeta><ContentText textRole="caption" text={asString(song.artistName)} /></ItemMeta>
               </CommandItem>
             ))}
           </CommandGroup>

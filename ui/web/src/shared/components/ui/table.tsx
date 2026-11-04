@@ -1,5 +1,6 @@
 import * as React from 'react';
 import styled from 'styled-components';
+import { textRole } from '@/shared/theme';
 
 const TableContainer = styled.div`
   position: relative;
@@ -10,7 +11,7 @@ const TableContainer = styled.div`
 const StyledTable = styled.table`
   width: 100%;
   caption-side: bottom;
-  font-size: 0.875rem;
+  ${textRole('body-sm')}
 `;
 
 function Table({ ...props }: React.ComponentProps<'table'>) {
@@ -88,7 +89,7 @@ function TableCell({ ...props }: React.ComponentProps<'td'>) {
 
 const StyledTableCaption = styled.caption`
   margin-top: 1rem;
-  font-size: 0.875rem;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
 `;
 

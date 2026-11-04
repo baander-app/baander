@@ -52,7 +52,7 @@ export function createShortcutDefinitions(deps: ShortcutDependencies): ShortcutE
     {
       id: 'transport.next',
       category: ShortcutCategory.Transport,
-      keys: { mac: '⌘→', default: 'Ctrl+→' },
+      keys: { mac: 'Cmd+ArrowRight', default: 'Ctrl+ArrowRight' },
       description: 'Next track',
       matches: (e) => e.key === 'ArrowRight' && (e.metaKey || e.ctrlKey) && !e.shiftKey,
       action: () => deps.playNext(),
@@ -60,7 +60,7 @@ export function createShortcutDefinitions(deps: ShortcutDependencies): ShortcutE
     {
       id: 'transport.previous',
       category: ShortcutCategory.Transport,
-      keys: { mac: '⌘←', default: 'Ctrl+←' },
+      keys: { mac: 'Cmd+ArrowLeft', default: 'Ctrl+ArrowLeft' },
       description: 'Previous track',
       matches: (e) => e.key === 'ArrowLeft' && (e.metaKey || e.ctrlKey) && !e.shiftKey,
       action: () => deps.playPrevious(),
@@ -68,7 +68,7 @@ export function createShortcutDefinitions(deps: ShortcutDependencies): ShortcutE
     {
       id: 'transport.seek-forward',
       category: ShortcutCategory.Transport,
-      keys: { mac: '⇧→', default: 'Shift+→' },
+      keys: { mac: 'Shift+ArrowRight', default: 'Shift+ArrowRight' },
       description: 'Seek forward 10 seconds',
       matches: (e) => e.key === 'ArrowRight' && e.shiftKey && !e.metaKey && !e.ctrlKey,
       action: () => deps.seekTo(deps.getCurrentTime() + 10),
@@ -76,7 +76,7 @@ export function createShortcutDefinitions(deps: ShortcutDependencies): ShortcutE
     {
       id: 'transport.seek-backward',
       category: ShortcutCategory.Transport,
-      keys: { mac: '⇧←', default: 'Shift+←' },
+      keys: { mac: 'Shift+ArrowLeft', default: 'Shift+ArrowLeft' },
       description: 'Seek backward 10 seconds',
       matches: (e) => e.key === 'ArrowLeft' && e.shiftKey && !e.metaKey && !e.ctrlKey,
       action: () => deps.seekTo(Math.max(0, deps.getCurrentTime() - 10)),
@@ -110,7 +110,7 @@ export function createShortcutDefinitions(deps: ShortcutDependencies): ShortcutE
     {
       id: 'volume.up',
       category: ShortcutCategory.Volume,
-      keys: { mac: '↑', default: '↑' },
+      keys: { mac: 'ArrowUp', default: 'ArrowUp' },
       description: 'Volume up',
       matches: (e) => e.key === 'ArrowUp' && !e.shiftKey && !e.metaKey && !e.ctrlKey,
       action: () => deps.setVolume(Math.min(100, deps.getVolume() + 5)),
@@ -118,7 +118,7 @@ export function createShortcutDefinitions(deps: ShortcutDependencies): ShortcutE
     {
       id: 'volume.down',
       category: ShortcutCategory.Volume,
-      keys: { mac: '↓', default: '↓' },
+      keys: { mac: 'ArrowDown', default: 'ArrowDown' },
       description: 'Volume down',
       matches: (e) => e.key === 'ArrowDown' && !e.shiftKey && !e.metaKey && !e.ctrlKey,
       action: () => deps.setVolume(Math.max(0, deps.getVolume() - 5)),
@@ -126,7 +126,7 @@ export function createShortcutDefinitions(deps: ShortcutDependencies): ShortcutE
     {
       id: 'volume.up-large',
       category: ShortcutCategory.Volume,
-      keys: { mac: '⇧↑', default: 'Shift+↑' },
+      keys: { mac: 'Shift+ArrowUp', default: 'Shift+ArrowUp' },
       description: 'Volume up (large)',
       matches: (e) => e.key === 'ArrowUp' && e.shiftKey && !e.metaKey && !e.ctrlKey,
       action: () => deps.setVolume(Math.min(100, deps.getVolume() + 10)),
@@ -134,7 +134,7 @@ export function createShortcutDefinitions(deps: ShortcutDependencies): ShortcutE
     {
       id: 'volume.down-large',
       category: ShortcutCategory.Volume,
-      keys: { mac: '⇧↓', default: 'Shift+↓' },
+      keys: { mac: 'Shift+ArrowDown', default: 'Shift+ArrowDown' },
       description: 'Volume down (large)',
       matches: (e) => e.key === 'ArrowDown' && e.shiftKey && !e.metaKey && !e.ctrlKey,
       action: () => deps.setVolume(Math.max(0, deps.getVolume() - 10)),
@@ -144,7 +144,7 @@ export function createShortcutDefinitions(deps: ShortcutDependencies): ShortcutE
     {
       id: 'navigation.go-back',
       category: ShortcutCategory.Navigation,
-      keys: { mac: '⌫', default: 'Backspace' },
+      keys: { mac: 'Backspace', default: 'Backspace' },
       description: 'Go back',
       matches: (e) => e.key === 'Backspace' && !e.metaKey && !e.ctrlKey && !e.altKey,
       action: () => deps.goBack(),
@@ -171,7 +171,7 @@ export function createShortcutDefinitions(deps: ShortcutDependencies): ShortcutE
     {
       id: 'search.spotlight',
       category: ShortcutCategory.Search,
-      keys: { mac: '⌘K', default: 'Ctrl+K' },
+      keys: { mac: 'Cmd+K', default: 'Ctrl+K' },
       description: 'Open spotlight',
       // Display-only: SpotlightOverlay owns the keydown listener
       matches: () => false,
@@ -269,7 +269,7 @@ export function createShortcutDefinitions(deps: ShortcutDependencies): ShortcutE
     {
       id: 'listnav.open',
       category: ShortcutCategory.ListNav,
-      keys: { mac: '↵', default: 'Enter' },
+      keys: { mac: 'Enter', default: 'Enter' },
       description: 'Open / Play selected item',
       // TODO: Implement when list keyboard navigation is added
       matches: () => false,
@@ -277,7 +277,7 @@ export function createShortcutDefinitions(deps: ShortcutDependencies): ShortcutE
     {
       id: 'listnav.append-queue',
       category: ShortcutCategory.ListNav,
-      keys: { mac: '⇧↵', default: 'Shift+Enter' },
+      keys: { mac: 'Shift+Enter', default: 'Shift+Enter' },
       description: 'Append to queue',
       // TODO: Implement when list keyboard navigation is added
       matches: () => false,
@@ -300,7 +300,7 @@ function createMediaTypeEntries(): ShortcutEntry[] {
   return MEDIA_TYPE_LABELS.map(({ id, label, num }) => ({
     id,
     category: ShortcutCategory.MediaType,
-    keys: { mac: `⌘${num}`, default: `Ctrl+${num}` },
+    keys: { mac: `Cmd+${num}`, default: `Ctrl+${num}` },
     description: label,
     // Display-only: useMediaShortcuts owns the keydown listener
     matches: () => false,

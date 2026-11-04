@@ -1,6 +1,7 @@
 import * as React from "react"
 import { Dialog as DialogPrimitive } from "radix-ui"
 import styled, { keyframes, type DataAttributes } from "styled-components"
+import { textRole } from "@/shared/theme"
 
 import { Button } from "@/shared/components/ui/button"
 import { XIcon } from "lucide-react"
@@ -103,7 +104,7 @@ const StyledContent = styled(DialogPrimitive.Content).attrs<DataAttributes>({
   border-radius: var(--radius-xl);
   background-color: var(--color-popover);
   padding: 1rem;
-  font-size: 0.875rem;
+  ${textRole('body')}
   color: var(--color-popover-foreground);
   box-shadow: 0 4px 24px rgb(0 0 0 / 0.4);
   transition-duration: 100ms;
@@ -164,16 +165,13 @@ const StyledFooter = styled.div.attrs<DataAttributes>({ 'data-slot': 'dialog-foo
 const StyledTitle = styled(DialogPrimitive.Title).attrs<DataAttributes>({
   'data-slot': 'dialog-title',
 })`
-  font-family: var(--font-ui);
-  font-size: 1rem;
-  line-height: 1;
-  font-weight: 500;
+  ${textRole('title')}
 `
 
 const StyledDescription = styled(DialogPrimitive.Description).attrs<DataAttributes>({
   'data-slot': 'dialog-description',
 })`
-  font-size: 0.875rem;
+  ${textRole('body')}
   color: var(--color-muted-foreground);
 
   a {

@@ -1,5 +1,6 @@
 import * as React from 'react';
 import styled, { css } from 'styled-components';
+import { textRole } from '@/shared/theme';
 
 const StyledCard = styled.div<{ $size?: string }>`
   display: flex;
@@ -11,7 +12,7 @@ const StyledCard = styled.div<{ $size?: string }>`
   background-color: var(--color-card);
   padding-top: 1rem;
   padding-bottom: 1rem;
-  font-size: 0.875rem;
+  ${textRole('body')}
   color: var(--color-card-foreground);
   &:has([data-slot="card-footer"]) { padding-bottom: 0; }
   &:has(> img:first-child) { padding-top: 0; }
@@ -48,11 +49,8 @@ function CardHeader({ ...props }: React.ComponentProps<'div'>) {
 }
 
 const StyledCardTitle = styled.div`
-  font-family: var(--font-ui);
-  font-size: 1rem;
-  font-weight: 500;
-  line-height: 1.375;
-  [data-size="sm"] & { font-size: 0.875rem; }
+  ${textRole('title')}
+  [data-size="sm"] & { ${textRole('subtitle')} }
 `;
 
 function CardTitle({ ...props }: React.ComponentProps<'div'>) {
@@ -60,7 +58,7 @@ function CardTitle({ ...props }: React.ComponentProps<'div'>) {
 }
 
 const StyledCardDescription = styled.div`
-  font-size: 0.875rem;
+  ${textRole('body')}
   color: var(--color-muted-foreground);
 `;
 

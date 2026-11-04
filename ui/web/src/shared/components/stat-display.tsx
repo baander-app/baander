@@ -1,4 +1,5 @@
 import styled, { keyframes } from 'styled-components'
+import { textRole } from '@/shared/theme'
 
 interface StatDisplayProps {
   label: string
@@ -8,17 +9,13 @@ interface StatDisplayProps {
 const Container = styled.div``
 
 const Label = styled.div`
-  font-size: 11px;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  ${textRole('label')}
   color: var(--color-muted-foreground);
 `
 
 const Value = styled.div`
   margin-top: 0.25rem;
-  font-size: 1.5rem;
-  font-weight: 600;
+  ${textRole('title')}
   font-variant-numeric: tabular-nums;
 `
 

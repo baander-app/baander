@@ -7,6 +7,8 @@ import { Button } from '@/shared/components/ui/button'
 import { Slider } from '@/shared/components/ui/slider'
 import { formatDuration } from '@/shared/utils/format-duration'
 import { CoverArt } from '@/shared/components/cover-art'
+import { textRole } from '@/shared/theme'
+import { ContentText } from '@/shared/typography'
 
 const SliderWrapper = styled.div`
   flex: 1;
@@ -33,21 +35,20 @@ const CoverWrapper = styled.div`
   border-radius: var(--radius-lg);
 `
 
-const TrackTitle = styled.h3`
-  font-size: 1rem;
-  font-weight: 500;
+const TrackTitle = styled(ContentText)`
+  display: block;
   color: var(--color-foreground);
   margin: 0;
 `
 
-const TrackArtist = styled.p`
-  font-size: 0.875rem;
+const TrackArtist = styled(ContentText)`
+  display: block;
   color: var(--color-muted-foreground);
   margin: 0;
 `
 
-const TrackAlbum = styled.p`
-  font-size: 0.75rem;
+const TrackAlbum = styled(ContentText)`
+  display: block;
   color: var(--color-muted-foreground);
   margin: 0;
 `
@@ -61,8 +62,7 @@ const ProgressSection = styled.div`
 const TimeRow = styled.div`
   display: flex;
   justify-content: space-between;
-  font-size: 0.75rem;
-  font-variant-numeric: tabular-nums;
+  ${textRole('timecode')}
   color: var(--color-muted-foreground);
 `
 
@@ -91,7 +91,7 @@ const EmptyCover = styled.div`
 `
 
 const EmptyText = styled.p`
-  font-size: 0.875rem;
+  ${textRole('body')}
   color: var(--color-muted-foreground);
 `
 
@@ -140,10 +140,15 @@ export function NowPlayingTab() {
           <CoverArt albumPublicId={currentTrack.albumPublicId} iconSize={48} />
         </CoverWrapper>
         <div>
-          <TrackTitle>{currentTrack.title}</TrackTitle>
-          <TrackArtist>{currentTrack.artistName}</TrackArtist>
+          <TrackTitle
+            forwardedAs="h3"
+            textRole="subtitle"
+            text={currentTrack.title}
+            language={currentTrack.albumLanguage}
+          />
+          {currentTrack.artistName && <TrackArtist textRole="body" text={currentTrack.artistName} />}
           {currentTrack.albumName && (
-            <TrackAlbum>{currentTrack.albumName}</TrackAlbum>
+            <TrackAlbum textRole="body-sm" text={currentTrack.albumName} language={currentTrack.albumLanguage} />
           )}
         </div>
       </TrackInfoSection>

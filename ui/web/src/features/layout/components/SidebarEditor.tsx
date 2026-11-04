@@ -14,6 +14,8 @@ import { Input } from '@/shared/components/ui/input'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/shared/components/ui/select'
 import { Skeleton } from '@/shared/components/ui/skeleton'
 import { ChevronDown, ChevronRight, Plus, Trash2, X } from 'lucide-react'
+import { textRole } from '@/shared/theme'
+import { ContentText } from '@/shared/typography'
 
 const ICON_OPTIONS = Object.keys(SIDEBAR_ICONS).map((key) => ({
   value: key,
@@ -32,15 +34,10 @@ const EditorSkeleton = styled(Skeleton)`
   border-radius: var(--radius-md);
 `
 
-const SmallInput = styled(Input)`
-  height: 1.75rem;
-  font-size: 0.75rem;
-`
-
 const SmallSelectTrigger = styled(SelectTrigger)`
   height: 1.75rem;
   flex: 1;
-  font-size: 0.75rem;
+  ${textRole('body-sm')}
 `
 
 const MutedButton = styled(Button)`
@@ -85,14 +82,12 @@ const SheetHeader = styled.div`
 `
 
 const SheetTitle = styled.h2`
-  font-size: 0.875rem;
-  font-weight: 600;
-  letter-spacing: -0.025em;
+  ${textRole('title')}
   margin: 0;
 `
 
 const SheetSubtitle = styled.p`
-  font-size: 11px;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
   text-transform: capitalize;
   margin: 0;
@@ -136,8 +131,7 @@ const SectionHeader = styled.button`
   gap: 0.5rem;
   padding: 0.5rem 0.75rem;
   text-align: left;
-  font-size: 0.75rem;
-  font-weight: 500;
+  ${textRole('label')}
   color: var(--color-muted-foreground);
   background: none;
   border: none;
@@ -150,7 +144,8 @@ const SectionHeader = styled.button`
 
 const SectionItemCount = styled.span`
   margin-left: auto;
-  font-size: 10px;
+  ${textRole('caption')}
+  font-variant-numeric: tabular-nums;
   color: color-mix(in srgb, var(--color-muted-foreground) 60%, transparent);
 `
 
@@ -182,18 +177,17 @@ const ItemIconWrapper = styled.span`
   }
 `
 
-const ItemLabel = styled.span`
+const ItemLabel = styled(ContentText)`
   flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 0.75rem;
   font-weight: 500;
   color: var(--color-foreground);
 `
 
 const ItemType = styled.span`
-  font-size: 10px;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
 `
 
@@ -256,7 +250,7 @@ const AddItemButton = styled.button`
   gap: 0.25rem;
   border-radius: var(--radius-md);
   padding: 0.25rem 0.5rem;
-  font-size: 11px;
+  ${textRole('caption')}
   color: color-mix(in srgb, var(--color-muted-foreground) 60%, transparent);
   background: none;
   border: none;
@@ -496,7 +490,7 @@ function SidebarEditorForm({ activeMedia, initialSchema }: { activeMedia: MediaT
                           return (
                             <ItemRow key={item.id}>
                               <ItemIconWrapper><ItemIcon size={12} /></ItemIconWrapper>
-                              <ItemLabel>{item.label}</ItemLabel>
+                              <ItemLabel textRole="body-sm" text={item.label} />
                               <ItemType>
                                 {item.type === 'page_link' ? 'Link' : item.type === 'smart_filter' ? 'Smart' : 'Action'}
                               </ItemType>
@@ -530,7 +524,7 @@ function SidebarEditorForm({ activeMedia, initialSchema }: { activeMedia: MediaT
                         {/* Add to this section */}
                         {showAddForm === section.id ? (
                           <AddFormWrapper>
-                            <SmallInput
+                            <Input
                               placeholder="Label"
                               value={newLabel}
                               onChange={(e) => setNewLabel(e.target.value)}
@@ -559,7 +553,7 @@ function SidebarEditorForm({ activeMedia, initialSchema }: { activeMedia: MediaT
                               </Select>
                             </AddFormRow>
                             {newType === 'page_link' && (
-                              <SmallInput
+                              <Input
                                 placeholder="Route (e.g. /albums)"
                                 value={newRoute}
                                 onChange={(e) => setNewRoute(e.target.value)}

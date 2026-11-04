@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import styled from 'styled-components'
 import { mediator } from '@/shared/lib/mediator/bus'
+import { textRole } from '@/shared/theme'
 
 interface HandlerMapProps {
   handlerMap?: Record<string, string[]>
@@ -16,10 +17,7 @@ const Group = styled.div`
 `
 
 const GroupTitle = styled.h4`
-  font-size: 0.75rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  ${textRole('label')}
   color: var(--color-muted-foreground);
   margin-bottom: 0.25rem;
   padding: 0 0.25rem;
@@ -30,8 +28,7 @@ const ActionRow = styled.div`
   align-items: flex-start;
   gap: 0.5rem;
   padding: 0.25rem 0.5rem;
-  font-size: 0.75rem;
-  font-family: var(--font-mono);
+  ${textRole('mono-sm')}
   border-bottom: 1px solid color-mix(in srgb, var(--color-border) 30%, transparent);
 `
 
@@ -51,12 +48,11 @@ const HandlerBadge = styled.span`
   padding: 0.125rem 0.375rem;
   background-color: var(--color-muted);
   border-radius: var(--radius-md);
-  font-size: 10px;
 `
 
 const EmptyState = styled.div`
   padding: 1rem;
-  font-size: 0.875rem;
+  ${textRole('body')}
   color: var(--color-muted-foreground);
   text-align: center;
 `

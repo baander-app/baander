@@ -1,6 +1,7 @@
 import * as React from 'react';
 import styled from 'styled-components';
 import { Command as CommandPrimitive } from 'cmdk';
+import { textRole } from '@/shared/theme';
 import {
   Dialog,
   DialogContent,
@@ -70,7 +71,6 @@ const StyledInput = styled(CommandPrimitive.Input)`
   padding: 0.25rem 0.625rem;
   background: transparent;
   color: var(--color-foreground);
-  font-size: 0.875rem;
   outline: none;
   &::placeholder { color: var(--color-muted-foreground); opacity: 1; }
   &:disabled { cursor: not-allowed; opacity: 0.5; }
@@ -104,7 +104,7 @@ function CommandList({ ...props }: React.ComponentProps<typeof CommandPrimitive.
 const StyledEmpty = styled(CommandPrimitive.Empty)`
   padding: 1.5rem 0;
   text-align: center;
-  font-size: 0.875rem;
+  ${textRole('body')}
 `;
 
 function CommandEmpty({ ...props }: React.ComponentProps<typeof CommandPrimitive.Empty>) {
@@ -117,8 +117,7 @@ const StyledGroup = styled(CommandPrimitive.Group)`
   color: var(--color-foreground);
   & [cmdk-group-heading] {
     padding: 0.375rem 0.5rem;
-    font-size: 0.75rem;
-    font-weight: 500;
+    ${textRole('label')}
     color: var(--color-muted-foreground);
   }
 `;
@@ -145,7 +144,7 @@ const StyledItem = styled(CommandPrimitive.Item)`
   gap: 0.5rem;
   border-radius: var(--radius-sm);
   padding: 0.375rem 0.5rem;
-  font-size: 0.875rem;
+  ${textRole('body')}
   outline: none;
   user-select: none;
   color: var(--color-foreground);
@@ -175,8 +174,7 @@ function CommandItem({ children, ...props }: React.ComponentProps<typeof Command
 
 const StyledShortcut = styled.span`
   margin-left: auto;
-  font-size: 0.75rem;
-  letter-spacing: 0.1em;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
 `;
 

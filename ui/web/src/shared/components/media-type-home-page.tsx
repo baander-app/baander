@@ -1,4 +1,6 @@
 import styled, { keyframes } from 'styled-components'
+import { textRole } from '@/shared/theme'
+import { ContentText } from '@/shared/typography'
 import { useImageBlob } from '@/shared/hooks/use-image-blob'
 import { DashboardSection } from '@/shared/components/dashboard-section'
 import { HorizontalScrollRow } from '@/shared/components/horizontal-scroll-row'
@@ -37,20 +39,20 @@ const CardInfo = styled.div`
   padding: 0.375rem;
 `
 
-const CardTitle = styled.p`
+const CardTitle = styled(ContentText)`
+  display: block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 0.75rem;
   font-weight: 500;
   color: var(--color-foreground);
 `
 
-const CardSubtitle = styled.p`
+const CardSubtitle = styled(ContentText)`
+  display: block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 11px;
   color: var(--color-muted-foreground);
 `
 
@@ -124,14 +126,12 @@ const PageHeader = styled.div`
 `
 
 const PageTitle = styled.h1`
-  font-size: 1.125rem;
-  font-weight: 600;
-  letter-spacing: -0.025em;
+  ${textRole('title-lg')}
 `
 
 const PageSubtitle = styled.p`
   margin-top: 0.125rem;
-  font-size: 0.875rem;
+  ${textRole('body')}
   color: var(--color-muted-foreground);
 `
 
@@ -157,7 +157,7 @@ const EmptyContainer = styled.div`
 `
 
 const EmptyMessage = styled.p`
-  font-size: 0.875rem;
+  ${textRole('body')}
   color: var(--color-muted-foreground);
 `
 
@@ -180,8 +180,8 @@ function MediaTypeHomePageCard({ item }: { item: RecentItem }) {
         )}
       </CardImageArea>
       <CardInfo>
-        <CardTitle>{item.title}</CardTitle>
-        {item.subtitle && <CardSubtitle>{item.subtitle}</CardSubtitle>}
+        <CardTitle textRole="body-sm" text={item.title} />
+        {item.subtitle && <CardSubtitle textRole="caption" text={item.subtitle} />}
       </CardInfo>
     </CardOuter>
   )

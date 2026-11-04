@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import styled from 'styled-components'
-import { focusVisibleRing } from '@/shared/theme'
+import { focusVisibleRing, textRole } from '@/shared/theme'
 import { filterActionLog } from '@/shared/lib/mediator/devtools'
 import type { ActionLogEntry } from '@/shared/lib/mediator/types'
 
@@ -24,8 +24,7 @@ const FilterBar = styled.div`
 const FilterInput = styled.input`
   width: 100%;
   padding: 0.25rem 0.5rem;
-  font-size: 0.75rem;
-  font-family: var(--font-mono);
+  ${textRole('mono-sm')}
   background-color: var(--color-muted);
   border-radius: var(--radius-md);
   border: 1px solid var(--color-border);
@@ -46,8 +45,7 @@ const EntryRow = styled.div`
   align-items: flex-start;
   gap: 0.5rem;
   padding: 0.375rem 0.75rem;
-  font-size: 0.75rem;
-  font-family: var(--font-mono);
+  ${textRole('mono-sm')}
   border-bottom: 1px solid color-mix(in srgb, var(--color-border) 50%, transparent);
 
   &:hover {
@@ -86,7 +84,7 @@ const ErrorCount = styled.span`
 
 const EmptyState = styled.div`
   padding: 1rem;
-  font-size: 0.875rem;
+  ${textRole('body')}
   color: var(--color-muted-foreground);
   text-align: center;
 `

@@ -1,6 +1,7 @@
 import styled from 'styled-components'
 import { AlertTriangle, RotateCcw } from 'lucide-react'
 import { Button } from '@/shared/components/ui/button'
+import { textRole } from '@/shared/theme'
 
 interface ErrorBannerProps {
   message?: string
@@ -15,7 +16,7 @@ const Banner = styled.div`
   border-radius: var(--radius-lg);
   background-color: color-mix(in srgb, var(--color-destructive) 10%, transparent);
   padding: 0.75rem 1rem;
-  font-size: 0.875rem;
+  ${textRole('body')}
   color: var(--color-destructive);
 `
 

@@ -13,11 +13,10 @@ import { Input } from '@/shared/components/ui/input'
 import { Skeleton } from '@/shared/components/ui/skeleton'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/shared/components/ui/tooltip'
 import { Search, Settings2, Menu, X } from 'lucide-react'
+import { textRole } from '@/shared/theme'
 
 const SearchInput = styled(Input)`
-  height: 1.75rem;
   padding-left: 2rem;
-  font-size: 0.75rem;
 `
 
 const NavSkeleton = styled(Skeleton)`
@@ -62,9 +61,8 @@ const LogoImg = styled.img`
 `
 
 const LogoText = styled.span`
-  font-size: 1rem;
+  ${textRole('subtitle')}
   font-weight: 600;
-  letter-spacing: -0.025em;
   color: var(--color-sidebar-foreground);
 `
 
@@ -113,7 +111,8 @@ const ConfigureButton = styled(Button).attrs({ variant: 'ghost' })`
   gap: 0.5rem;
   border-radius: var(--radius-md);
   padding: 0.375rem 0.625rem;
-  font-size: 0.75rem;
+  ${textRole('body-sm')}
+  font-weight: 500;
   color: var(--color-muted-foreground);
   background: none;
   border: none;

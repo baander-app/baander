@@ -4,6 +4,7 @@ import { Slider } from '@/shared/components/ui/slider'
 import { usePlayerStore } from '@/features/player/stores/player-store'
 import { useCurrentTime } from '@/features/player/stores/player-time-tracker'
 import { PlaybackClock } from './PlaybackRecoveryStatus'
+import { textRole } from '@/shared/theme'
 
 function formatTime(seconds: number): string {
   if (!Number.isFinite(seconds) || seconds < 0) return '0:00'
@@ -22,9 +23,7 @@ const ProgressRow = styled.div`
 
 const TimeLabel = styled.span`
   white-space: nowrap;
-  font-family: var(--font-mono);
-  font-size: 0.6875rem;
-  font-variant-numeric: tabular-nums;
+  ${textRole('timecode')}
   color: var(--player-secondary-text, var(--color-muted-foreground));
 `
 

@@ -6,6 +6,8 @@ import {
   DialogContent,
   DialogTitle,
 } from '@/shared/components/ui/dialog'
+import { textRole } from '@/shared/theme'
+import { ContentText } from '@/shared/typography'
 
 const QueueContent = styled(DialogContent)`
   max-width: 32rem;
@@ -28,12 +30,12 @@ const HeaderActions = styled.div`
 `
 
 const TrackCount = styled.span`
-  font-size: 0.75rem;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
 `
 
 const ClearButton = styled.button`
-  font-size: 0.75rem;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
   background: none;
   border: none;
@@ -60,7 +62,7 @@ const EmptyState = styled.div`
 `
 
 const EmptyText = styled.p`
-  font-size: 0.875rem;
+  ${textRole('body')}
 `
 
 const QueueItemLi = styled.li<{ $isCurrent?: boolean }>`
@@ -68,7 +70,7 @@ const QueueItemLi = styled.li<{ $isCurrent?: boolean }>`
   align-items: center;
   gap: 0.75rem;
   padding: 0.5rem 1rem;
-  font-size: 0.875rem;
+  ${textRole('body-sm')}
   transition: background-color 0.15s;
 
   background-color: ${({ $isCurrent }) =>
@@ -82,7 +84,7 @@ const QueueItemLi = styled.li<{ $isCurrent?: boolean }>`
 const IndexCell = styled.span`
   width: 1.5rem;
   text-align: right;
-  font-size: 0.75rem;
+  ${textRole('caption')}
   font-variant-numeric: tabular-nums;
   color: var(--color-muted-foreground);
 `
@@ -106,16 +108,19 @@ const TrackName = styled.p<{ $isCurrent?: boolean }>`
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  font-weight: ${({ $isCurrent }) => ($isCurrent ? 500 : 400)};
   color: var(--color-foreground);
   opacity: ${({ $isCurrent }) => ($isCurrent ? 1 : 0.8)};
 `
 
-const ArtistName = styled.p`
+const TrackTitleText = styled(ContentText)<{ $isCurrent?: boolean }>`
+  font-weight: ${({ $isCurrent }) => ($isCurrent ? 500 : 400)};
+`
+
+const ArtistName = styled(ContentText)`
+  display: block;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  font-size: 0.75rem;
   color: var(--color-muted-foreground);
 `
 
@@ -214,8 +219,11 @@ function QueueItem({
         )}
       </IndexCell>
       <TrackButton disabled={track.available === false} onClick={onSelect}>
-        <TrackName $isCurrent={isCurrent}>{track.title}{track.available === false && <span> · Unavailable</span>}</TrackName>
-        <ArtistName>{track.artistName}</ArtistName>
+        <TrackName $isCurrent={isCurrent}>
+          <TrackTitleText textRole="body-sm" text={track.title} language={track.albumLanguage} $isCurrent={isCurrent} />
+          {track.available === false && <span> · Unavailable</span>}
+        </TrackName>
+        <ArtistName textRole="caption" text={track.artistName ?? ''} />
       </TrackButton>
       <RemoveButton
         onClick={(e) => { e.stopPropagation(); onRemove() }}

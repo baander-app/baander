@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { styled, css } from 'styled-components';
 import { Toggle as TogglePrimitive } from 'radix-ui';
-import { focusVisibleRing, interactiveTransition, disabledStyle, ariaInvalidRing } from '@/shared/theme';
+import { focusVisibleRing, interactiveTransition, disabledStyle, ariaInvalidRing, textRole } from '@/shared/theme';
 
 const baseStyles = css`
   display: inline-flex;
@@ -9,8 +9,6 @@ const baseStyles = css`
   justify-content: center;
   gap: 0.25rem;
   border-radius: var(--radius-lg);
-  font-size: 0.875rem;
-  font-weight: 500;
   white-space: nowrap;
   outline: none;
   ${interactiveTransition(['color', 'background-color', 'border-color', 'opacity'])}
@@ -19,7 +17,7 @@ const baseStyles = css`
   ${focusVisibleRing}
   ${disabledStyle}
   ${ariaInvalidRing}
-  &[aria-pressed="true"], &[data-state="on"] { background-color: var(--color-muted); }
+  &[aria-pressed="true"], &[data-state="on"] { background-color: var(--color-muted); font-weight: 600; }
   & svg { pointer-events: none; flex-shrink: 0; }
   & svg:not([class*='size-']) { width: 1rem; height: 1rem; }
 `;
@@ -40,7 +38,7 @@ const sizeStyles: Record<string, ReturnType<typeof css>> = {
     &:has([data-icon="inline-start"]) { padding-left: 0.5rem; }
   `,
   sm: css`
-    height: 1.75rem; min-width: 1.75rem; padding: 0 0.625rem; font-size: 0.8rem;
+    height: 1.75rem; min-width: 1.75rem; padding: 0 0.625rem;
     border-radius: min(var(--radius-md), 12px);
     & svg:not([class*='size-']) { width: 0.875rem; height: 0.875rem; }
   `,
@@ -52,6 +50,8 @@ const sizeStyles: Record<string, ReturnType<typeof css>> = {
 };
 
 const StyledToggle = styled(TogglePrimitive.Root)<{ $variant: string; $size: string }>`
+  ${({ $size }) => textRole($size === 'sm' ? 'body-sm' : 'body')}
+  font-weight: 500;
   ${baseStyles}
   ${({ $variant }) => variantStyles[$variant] || variantStyles.default}
   ${({ $size }) => sizeStyles[$size] || sizeStyles.default}

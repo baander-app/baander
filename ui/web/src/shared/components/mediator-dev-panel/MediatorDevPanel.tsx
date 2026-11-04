@@ -8,7 +8,8 @@ import { StoreInspector } from './StoreInspector'
 import { StoreTimeline } from './StoreTimeline'
 import { storeDebugger, setStoreDebugEnabled } from '@/shared/stores/debug'
 import { Button } from '@/shared/components/ui/button'
-import { focusVisibleRing } from '@/shared/theme'
+import { X } from 'lucide-react'
+import { focusVisibleRing, textRole } from '@/shared/theme'
 
 type Tab = 'timeline' | 'handlers' | 'inspector' | 'stores'
 
@@ -18,8 +19,7 @@ const ToggleButton = styled.button`
   right: 1rem;
   z-index: 50;
   padding: 0.375rem 0.75rem;
-  font-size: 0.75rem;
-  font-family: var(--font-mono);
+  ${textRole('mono-sm')}
   background-color: color-mix(in srgb, var(--color-muted) 80%, transparent);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
@@ -62,7 +62,7 @@ const TabGroup = styled.div`
 
 const TabButton = styled.button<{ $active: boolean }>`
   padding: 0.25rem 0.5rem;
-  font-size: 0.75rem;
+  ${textRole('body-sm')}
   border-radius: var(--radius-md);
   cursor: pointer;
   border: 0;
@@ -88,14 +88,14 @@ const HeaderActions = styled.div`
 `
 
 const ActionCount = styled.span`
-  font-size: 10px;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
-  font-family: var(--font-mono);
 `
 
 const CloseButton = styled.button`
+  display: inline-flex;
+  align-items: center;
   color: var(--color-muted-foreground);
-  font-size: 0.75rem;
   cursor: pointer;
   border: 0;
   background: transparent;
@@ -185,7 +185,7 @@ export function MediatorDevPanel() {
             onClick={() => setIsOpen(false)}
             aria-label="Close debug panel"
           >
-            ✕
+            <X size={14} aria-hidden="true" />
           </CloseButton>
         </HeaderActions>
       </PanelHeader>
