@@ -197,6 +197,8 @@ export async function renderBlocks(request) {
               { scope: 'keyword.operator', settings: { foreground: 'var(--shiki-token-operator)' } },
               { scope: ['entity.name.type', 'support.type'], settings: { foreground: 'var(--shiki-token-type)' } },
               { scope: 'variable', settings: { foreground: 'var(--shiki-token-variable)' } },
+              // const bindings are ordinary variables to the reader, not literal constants.
+              { scope: 'variable.other.constant', settings: { foreground: 'var(--shiki-token-variable)' } },
             );
             highlighter = await createHighlighter({ langs: [...new Set(languages.values())], themes: [theme] });
           }

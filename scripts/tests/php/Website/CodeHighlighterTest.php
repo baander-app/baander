@@ -61,6 +61,37 @@ SOURCE,
         self::assertStringContainsString('<span class="tok-operator">|&gt;</span>', $html);
     }
 
+    public function testClassifiesModernPhpNamesByTheirRoleInTheCode(): void
+    {
+        $source = <<<'SOURCE'
+<?php
+#[Route('/music', methods: ['GET'])]
+enum State: string { case Ready = 'ready'; }
+final readonly class Track extends Base implements Countable {
+    public const string KIND = 'track';
+    public string $name { get => $this->name; set => trim($value); }
+    public function __construct(private ?Uuid $id = null, public array $tags = []) {}
+    public static function create(): static { return new Track(Uuid::generate(), tags: [State::Ready]); }
+}
+echo $track?->title, PHP_EOL, Track::KIND, true;
+/** @return list<string> */
+SOURCE;
+        $html = new CodeHighlighter()->highlight($source);
+        $expected = [
+            ['type', 'Route'], ['property', 'methods'], ['type', 'State'], ['constant', 'Ready'],
+            ['type', 'Track'], ['type', 'Base'], ['type', 'Countable'], ['type', 'string'], ['constant', 'KIND'],
+            ['keyword', 'get'], ['keyword', 'set'], ['property', 'name'], ['function', 'trim'],
+            ['function', '__construct'], ['type', 'Uuid'], ['constant', 'null'], ['type', 'array'],
+            ['type', 'static'], ['function', 'generate'], ['property', 'tags'], ['property', 'title'],
+            ['constant', 'PHP_EOL'], ['constant', 'true'], ['keyword', '@return'],
+        ];
+        foreach ($expected as [$role, $text]) {
+            self::assertStringContainsString('<span class="tok-' . $role . '">' . $text . '</span>', $html, $text . ' should be ' . $role);
+        }
+        self::assertStringNotContainsString('<span class="tok-function">Track</span>', $html, 'Instantiation names a type, not a function call');
+        self::assertSame($source, html_entity_decode(strip_tags($html), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+    }
+
     public function testEscapesInlineHtmlWithoutIntroducingMarkup(): void
     {
         $source = "<?php echo '<img src=x onerror=alert(1)>'; ?>\n<script>alert('x')</script>\n";

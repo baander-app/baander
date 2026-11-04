@@ -126,8 +126,17 @@ test.describe('code without JavaScript', () => {
       await page.goto('/docs/developer-guide/adding-a-feature/');
       const code = page.locator('code.language-php').first();
       const colors = await code.locator('[class^="tok-"]').evaluateAll((tokens) => {
-        const background = getComputedStyle(tokens[0].closest('pre')!).backgroundColor;
-        return { background, foregrounds: [...new Set(tokens.map((token) => getComputedStyle(token).color))] };
+        // Token colors may compute to oklab() through color-mix(); a canvas resolves any CSS color to sRGB bytes.
+        const context = document.createElement('canvas').getContext('2d', { willReadFrequently: true })!;
+        const srgb = (color: string) => {
+          context.clearRect(0, 0, 1, 1);
+          context.fillStyle = color;
+          context.fillRect(0, 0, 1, 1);
+          const [red, green, blue] = context.getImageData(0, 0, 1, 1).data;
+          return `rgb(${red}, ${green}, ${blue})`;
+        };
+        const background = srgb(getComputedStyle(tokens[0].closest('pre')!).backgroundColor);
+        return { background, foregrounds: [...new Set(tokens.map((token) => srgb(getComputedStyle(token).color)))] };
       });
       expect(colors.foregrounds.length).toBeGreaterThanOrEqual(3);
       const luminance = (color: string) => {

@@ -228,11 +228,16 @@ h1, h2, h3 { margin: 0; }
   .header-actions nav { grid-column: 1 / -1; grid-row: 2; justify-content: space-between; }
   .theme-toggle { grid-column: 2; grid-row: 1; }
 }
-.manual-article .tok-keyword, .manual-article .tok-function, .manual-article .tok-type { color: var(--color-accent-text); }
+/* Each syntax role draws from a different theme hue so keywords, types and calls stay distinguishable. */
+.manual-article .tok-keyword { color: var(--color-accent-text); }
+.manual-article .tok-type { color: var(--color-warning); }
+.manual-article .tok-function { color: var(--color-info); }
 .manual-article .tok-string { color: var(--color-success); }
-.manual-article .tok-number { color: var(--color-info); }
-.manual-article .tok-comment { color: var(--color-muted-foreground); }
-.manual-article .tok-variable, .manual-article .tok-operator { color: var(--color-foreground); }
+.manual-article .tok-number, .manual-article .tok-constant { color: color-mix(in oklab, var(--color-warning) 45%, var(--color-destructive)); }
+.manual-article .tok-variable { color: color-mix(in oklab, var(--color-destructive) 55%, var(--color-accent-text)); }
+.manual-article .tok-property { color: var(--color-foreground); }
+.manual-article .tok-operator { color: var(--color-muted-foreground); }
+.manual-article .tok-comment { color: var(--color-muted-foreground); font-style: italic; }
 .manual-article .diagram { margin-bottom: 24px; min-width: 0; }
 .diagram figcaption { margin-bottom: 16px; font-weight: 500; }
 .diagram-viewport {

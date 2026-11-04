@@ -75,7 +75,7 @@ final readonly class BlockRendering
 
     private function validateCode(string $html, string $source): void
     {
-        $withoutSpans = preg_replace('/<span class="tok-(?:keyword|string|number|comment|variable|operator|function|type)">|<\/span>/', '', $html) ?? $html;
+        $withoutSpans = preg_replace('/<span class="tok-(?:keyword|string|number|constant|comment|variable|property|operator|function|type)">|<\/span>/', '', $html) ?? $html;
         if (str_contains($withoutSpans, '<') || preg_match('/&(?!amp;|lt;|gt;|quot;|apos;|#[0-9]+;|#x[0-9a-f]+;)/i', $withoutSpans) === 1 || html_entity_decode($withoutSpans, ENT_QUOTES | ENT_HTML5, 'UTF-8') !== $source) {
             throw new \RuntimeException('Highlighted code changed the source or contains unsafe markup.');
         }
