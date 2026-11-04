@@ -73,6 +73,49 @@ final class Publication
         file_put_contents($output . '/config.json', json_encode(['version' => 3, 'routes' => $routes], JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n");
     }
 
+    /**
+     * Publishes the font slices a rendered page's own text reaches first in its font stacks, each with its
+     * family's license, and puts their rules at the top of that page's stylesheet, so no other page loads them.
+     * The site-wide Latin faces are already declared and are not repeated.
+     *
+     * @param string $monoSelector the page's elements, besides code, that set the mono stack
+     */
+    public static function pageFonts(string $root, string $staging, string $url, string $stylesheet, string $monoSelector): void
+    {
+        $page = $staging . $url . 'index.html';
+        $html = is_file($page) ? file_get_contents($page) : false;
+        $target = $staging . '/assets/site/' . $stylesheet;
+        $css = is_file($target) ? file_get_contents($target) : false;
+        if ($html === false || $css === false) {
+            throw self::missing($html === false ? $page : $target);
+        }
+        $siteWide = array_map(static fn(string $font): string => $font . '-latin-wght-normal.woff2', self::FONTS);
+        $rules = '';
+        $packages = [];
+        foreach (PageFonts::load($root)->select($html, $monoSelector) as $face) {
+            if (in_array(basename($face['file']), $siteWide, true)) {
+                continue;
+            }
+            $path = self::copyHashed($face['file'], $staging, basename($face['file'], '.woff2'), 'woff2');
+            $packages[$face['package']] = dirname($face['file'], 2);
+            $rules .= self::faceRule($face['family'], $path, $face['range']);
+        }
+        foreach ($packages as $package => $directory) {
+            self::copyHashed($directory . '/LICENSE', $staging, $package . '-LICENSE', 'txt');
+        }
+        if (file_put_contents($target, $rules . $css) === false) {
+            throw new RuntimeException('Cannot write website asset: ' . $target);
+        }
+    }
+
+    private static function faceRule(string $family, string $path, ?string $range = null): string
+    {
+        return "@font-face {\n  font-family: \"{$family}\";\n  font-style: normal;\n  font-weight: 100 900;\n"
+            . "  font-display: swap;\n  src: url('{$path}') format('woff2');\n"
+            . ($range === null ? '' : "  unicode-range: {$range};\n")
+            . "}\n";
+    }
+
     /** Copies each Latin face and its license under content-hashed names and returns the faces' rules. */
     private static function fonts(string $root, string $staging): string
     {
@@ -81,8 +124,7 @@ final class Publication
             $package = $root . '/ui/site/node_modules/@fontsource-variable/' . $font;
             $face = self::copyHashed($package . '/files/' . $font . '-latin-wght-normal.woff2', $staging, $font . '-latin-wght-normal', 'woff2');
             self::copyHashed($package . '/LICENSE', $staging, $font . '-LICENSE', 'txt');
-            $rules .= "@font-face {\n  font-family: \"{$family}\";\n  font-style: normal;\n  font-weight: 100 900;\n"
-                . "  font-display: swap;\n  src: url('{$face}') format('woff2');\n}\n";
+            $rules .= self::faceRule($family, $face);
         }
         return $rules;
     }

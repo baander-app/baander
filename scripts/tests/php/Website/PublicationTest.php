@@ -9,6 +9,16 @@ use PHPUnit\Framework\TestCase;
 
 final class PublicationTest extends TestCase
 {
+    private const string PAGE_CSS = ".page-rule { color: red; }\n";
+
+    /** Unicode ranges in Fontsource's slicing, trimmed to what the fixtures need. */
+    private const array RANGES = [
+        'cyrillic' => 'U+0301,U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116',
+        'vietnamese' => 'U+0102-0103,U+0110-0111,U+0128-0129,U+0168-0169,U+01A0-01A1,U+01AF-01B0,U+0300-0301,U+0303-0304,U+0308-0309,U+0323,U+0329,U+1EA0-1EF9,U+20AB',
+        'latin-ext' => 'U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF',
+        'latin' => 'U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD',
+    ];
+
     private string $directory;
 
     protected function setUp(): void
@@ -97,6 +107,71 @@ final class PublicationTest extends TestCase
         self::assertStringEndsWith(':root[data-theme="dark"] { --color-foreground: #e6e6e9; }', $css, 'The site tone follows the shared tokens');
     }
 
+    public function testAPageGetsTheFirstCoveringFaceOfEachCharacterAlongItsFontStack(): void
+    {
+        self::assertSame(
+            ['noto-sans-sc-50-wght-normal.woff2', 'noto-sans-thai-thai-wght-normal.woff2'],
+            $this->publishPageFonts('<p>直 ไทย</p>')['faces'],
+            'Han text without a language reaches Noto Sans SC first; no Myanmar, other Han or Noto Latin face ships',
+        );
+    }
+
+    public function testALatinPageGetsNoPageFonts(): void
+    {
+        $published = $this->publishPageFonts('<h1>The quick brown fox — “Dune: Part Two” (2024)</h1><p>Bånder · ‘quotes’</p>');
+        self::assertSame([], $published['faces'], 'The site-wide Latin Geist face already covers the text');
+        self::assertSame(self::PAGE_CSS, $published['css']);
+    }
+
+    public function testTheNearestLanguageOrdersTheHanFamilies(): void
+    {
+        self::assertSame(['noto-sans-jp-30-wght-normal.woff2'], $this->publishPageFonts('<p lang="ja">直</p>')['faces']);
+        self::assertSame(['noto-sans-tc-40-wght-normal.woff2'], $this->publishPageFonts('<p lang="zh-Hant">直</p>')['faces']);
+        self::assertSame(['noto-sans-kr-20-wght-normal.woff2'], $this->publishPageFonts('<p lang="ko">직 直</p>')['faces']);
+        self::assertSame(
+            ['noto-sans-sc-50-wght-normal.woff2'],
+            $this->publishPageFonts('<div lang="ja"><p lang="en">直</p></div>')['faces'],
+            'An element with its own language starts again from the default order',
+        );
+    }
+
+    public function testGeistSuppliesCyrillicAndVietnameseBeforeNotoSans(): void
+    {
+        self::assertSame(
+            ['geist-cyrillic-wght-normal.woff2', 'geist-vietnamese-wght-normal.woff2'],
+            $this->publishPageFonts('<p lang="ru">Сезон 2</p><p lang="vi">Tiếng Việt</p>')['faces'],
+        );
+    }
+
+    public function testMonoTextFollowsTheMonoStack(): void
+    {
+        self::assertSame(
+            ['geist-mono-cyrillic-wght-normal.woff2', 'noto-sans-jp-30-wght-normal.woff2'],
+            $this->publishPageFonts('<p><code>Сезон</code> <span class="type-mono" lang="ja">続</span></p>')['faces'],
+        );
+    }
+
+    public function testPageFontsShipUnderContentHashedNamesWithLicensesAndPrependTheirRules(): void
+    {
+        $published = $this->publishPageFonts('<p>直 ไทย</p>');
+        $hash = static fn(string $content): string => substr(hash('sha256', $content), 0, 16);
+        self::assertSame([
+            'noto-sans-sc-50-wght-normal-' . $hash('noto-sans-sc-50-wght-normal fixture') . '.woff2',
+            'noto-sans-sc-LICENSE-' . $hash('SIL OPEN FONT LICENSE for noto-sans-sc') . '.txt',
+            'noto-sans-thai-LICENSE-' . $hash('SIL OPEN FONT LICENSE for noto-sans-thai') . '.txt',
+            'noto-sans-thai-thai-wght-normal-' . $hash('noto-sans-thai-thai-wght-normal fixture') . '.woff2',
+        ], $published['files']);
+        self::assertStringEndsWith(self::PAGE_CSS, $published['css'], 'The face rules come before the page rules');
+        $face = '/assets/site/fonts/noto-sans-sc-50-wght-normal-' . $hash('noto-sans-sc-50-wght-normal fixture') . '.woff2';
+        self::assertMatchesRegularExpression(
+            '~@font-face \{[^}]*font-family: "Noto Sans SC Variable";[^}]*font-weight: 100 900;[^}]*font-display: swap;[^}]*src: url\(\''
+                . preg_quote($face, '~') . '\'\) format\(\'woff2\'\);[^}]*unicode-range: U\+76f4-76f5,U\+9aa8;[^}]*\}~',
+            $published['css'],
+        );
+        self::assertStringContainsString('font-family: "Noto Sans Thai Variable";', $published['css']);
+        self::assertSame(2, substr_count($published['css'], '@font-face'));
+    }
+
     public function testSiteStylesAndScriptsReadTheSharedFontStacks(): void
     {
         $site = dirname(__DIR__, 4) . '/ui/site';
@@ -104,6 +179,74 @@ final class PublicationTest extends TestCase
         self::assertNotEmpty($sources);
         foreach ($sources as $source) {
             self::assertSame(0, preg_match('/--font-(?:sans|heading)\b/', file_get_contents($source)), $source . ' reads a removed font stack');
+        }
+    }
+
+    /**
+     * Renders a typography page with the given body into a fresh staging tree, publishes its fonts and
+     * returns the published font files, the faces without their hashes, and the page stylesheet.
+     *
+     * @return array{files:list<string>,faces:list<string>,css:string}
+     */
+    private function publishPageFonts(string $body): array
+    {
+        $root = $this->directory . '/source';
+        if (!is_dir($root)) {
+            $this->writeFontPackages($root);
+        }
+        $staging = $this->directory . '/staging-' . bin2hex(random_bytes(4));
+        mkdir($staging . '/typography', 0700, true);
+        mkdir($staging . '/assets/site', 0700, true);
+        file_put_contents($staging . '/typography/index.html', '<!doctype html><html lang="en"><head><title>Typography</title><style>p::before { content: "直"; }</style></head><body>' . $body . '</body></html>');
+        file_put_contents($staging . '/assets/site/typography.css', self::PAGE_CSS);
+        Publication::pageFonts($root, $staging, '/typography/', 'typography.css', 'code, .type-mono');
+        $files = array_map(basename(...), glob($staging . '/assets/site/fonts/*') ?: []);
+        sort($files);
+        $faces = array_values(array_filter($files, static fn(string $file): bool => str_ends_with($file, '.woff2')))
+            |> (static fn(array $faces): array => preg_replace('/-[0-9a-f]{16}(?=\.woff2$)/', '', $faces));
+        return ['files' => $files, 'faces' => $faces, 'css' => (string) file_get_contents($staging . '/assets/site/typography.css')];
+    }
+
+    /** Writes the shared font stacks and Fontsource-shaped packages for every family they name. */
+    private function writeFontPackages(string $root): void
+    {
+        $default = ['"Noto Sans SC Variable"', '"Noto Sans TC Variable"', '"Noto Sans JP Variable"', '"Noto Sans KR Variable"'];
+        $orders = ['' => $default, '-ja' => ['"Noto Sans JP Variable"', '"Noto Sans SC Variable"', '"Noto Sans TC Variable"', '"Noto Sans KR Variable"'],
+            '-ko' => ['"Noto Sans KR Variable"', '"Noto Sans SC Variable"', '"Noto Sans TC Variable"', '"Noto Sans JP Variable"'],
+            '-hant' => ['"Noto Sans TC Variable"', '"Noto Sans SC Variable"', '"Noto Sans JP Variable"', '"Noto Sans KR Variable"']];
+        $stacks = '';
+        foreach ($orders as $variant => $han) {
+            $scripts = ['"Noto Sans Variable"', '"Noto Sans Thai Variable"', '"Noto Sans Myanmar Variable"', ...$han];
+            $stacks .= "  --font-ui{$variant}: " . implode(', ', ['"Geist Variable"', ...$scripts, 'sans-serif']) . ";\n"
+                . "  --font-mono{$variant}: " . implode(', ', ['"Geist Mono Variable"', '"Noto Sans Mono Variable"', ...$scripts, 'monospace']) . ";\n";
+        }
+        mkdir($root . '/ui/design-tokens/build/web', 0700, true);
+        file_put_contents($root . '/ui/design-tokens/build/web/theme.css', ":root {\n{$stacks}}\n");
+        $standard = static fn(string ...$subsets): array => array_intersect_key(self::RANGES, array_flip($subsets));
+        $packages = [
+            'geist' => ['Geist Variable', $standard('cyrillic', 'vietnamese', 'latin-ext', 'latin')],
+            'geist-mono' => ['Geist Mono Variable', $standard('cyrillic', 'latin')],
+            'noto-sans' => ['Noto Sans Variable', $standard('cyrillic', 'vietnamese', 'latin-ext', 'latin')],
+            'noto-sans-mono' => ['Noto Sans Mono Variable', $standard('cyrillic', 'latin')],
+            'noto-sans-thai' => ['Noto Sans Thai Variable', ['thai' => 'U+0E01-0E5B,U+200C-200D,U+25CC', ...$standard('latin')]],
+            'noto-sans-myanmar' => ['Noto Sans Myanmar Variable', ['myanmar' => 'U+1000-109F,U+200C-200D,U+25CC', ...$standard('latin')]],
+            'noto-sans-sc' => ['Noto Sans SC Variable', ['60' => 'U+4e00-4e0f', '50' => 'U+76f4-76f5,U+9aa8', ...$standard('latin')]],
+            'noto-sans-tc' => ['Noto Sans TC Variable', ['40' => 'U+76f4,U+9aa8', ...$standard('latin')]],
+            'noto-sans-jp' => ['Noto Sans JP Variable', ['30' => 'U+30a0-30ff,U+7d9a,U+76f4,U+9aa8', ...$standard('latin')]],
+            'noto-sans-kr' => ['Noto Sans KR Variable', ['20' => 'U+76f4,U+ac00-d7a3', ...$standard('latin')]],
+        ];
+        foreach ($packages as $package => [$family, $subsets]) {
+            $directory = $root . '/ui/site/node_modules/@fontsource-variable/' . $package;
+            mkdir($directory . '/files', 0700, true);
+            file_put_contents($directory . '/LICENSE', 'SIL OPEN FONT LICENSE for ' . $package);
+            $css = '';
+            foreach ($subsets as $subset => $range) {
+                $name = $package . '-' . $subset . '-wght-normal';
+                file_put_contents($directory . '/files/' . $name . '.woff2', $name . ' fixture');
+                $css .= "/* {$name} */\n@font-face {\n  font-family: '{$family}';\n  font-style: normal;\n  font-display: swap;\n  font-weight: 100 900;\n"
+                    . "  src: url(./files/{$name}.woff2) format('woff2-variations');\n  unicode-range: {$range};\n}\n\n";
+            }
+            file_put_contents($directory . '/index.css', $css);
         }
     }
 }
