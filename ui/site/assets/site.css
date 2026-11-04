@@ -154,6 +154,15 @@ h1, h2, h3 { margin: 0; }
 .chapter-group a { display: block; padding: 8px 16px; border-left: 2px solid transparent; color: var(--color-muted-foreground); text-decoration: none; overflow-wrap: anywhere; }
 .chapter-group a:hover { color: var(--color-foreground); background: var(--color-highlight); }
 .chapter-group a[aria-current="page"] { color: var(--color-accent-text); border-left-color: var(--color-accent-text); background: var(--color-card); }
+.chapter-fold summary { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 16px; border-left: 2px solid transparent; color: var(--color-muted-foreground); cursor: pointer; list-style: none; }
+.chapter-fold summary::-webkit-details-marker { display: none; }
+.chapter-fold summary::after { content: ""; width: 7px; height: 7px; flex: none; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: translateY(-2px) rotate(45deg); transition: transform var(--duration-fast) ease-out; }
+.chapter-fold details[open] > summary { color: var(--color-foreground); }
+.chapter-fold details[open] > summary::after { transform: translateY(2px) rotate(-135deg); }
+.chapter-fold summary:hover { color: var(--color-foreground); background: var(--color-highlight); }
+.chapter-fold ul { margin: 4px 0 8px 16px; border-left: 1px solid var(--color-border); }
+.chapter-fold li a { padding-block: 6px; font-size: 14px; }
+@media (prefers-reduced-motion: reduce) { .chapter-fold summary::after { transition: none; } }
 .manual-main { min-width: 0; }
 .manual-breadcrumb { display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap; font-size: 12px; color: var(--color-muted-foreground); margin-bottom: 32px; }
 .manual-breadcrumb a { color: var(--color-muted-foreground); }

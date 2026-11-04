@@ -29,28 +29,7 @@ Understand the architecture, write code following project conventions, and contr
 
 | Page | Description |
 |------|-------------|
-| [Activity](contexts/activity.md) | Listen history and favorites tracking |
-| [Auth](contexts/auth.md) | OAuth 2.0 server, passkeys, TOTP, and DPoP |
-| [Catalog](contexts/catalog.md) | Artists, albums, songs, movies, videos, and genres |
-| [Command](contexts/command.md) | CLI utilities (OpenAPI export) |
-| [Discovery](contexts/discovery.md) | LAN server discovery and device pairing |
-| [Favorites](contexts/favorites.md) | User favorites (songs, artists, albums) |
-| [Filesystem](contexts/filesystem.md) | MIME detection and inotify file watching |
-| [Library](contexts/library.md) | Media library management and file scanning |
-| [Lyrics](contexts/lyrics.md) | Lyrics storage and retrieval |
-| [Media](contexts/media.md) | Image storage, streaming, and BlurHash |
-| [Metadata](contexts/metadata.md) | External API enrichment (Discogs, Last.fm, Spotify, MusicBrainz) |
-| [Notification](contexts/notification.md) | Push, email, webhook, and in-app notifications |
-| [Party](contexts/party.md) | Synchronized watch-party playback |
-| [Playlist](contexts/playlist.md) | Manual and smart playlist management |
-| [QoL](contexts/qol.md) | Stream governance and quality-of-life allocation |
-| [Radio](contexts/radio.md) | Internet radio, country subscriptions, and station starring |
-| [Recommendation](contexts/recommendation.md) | Music recommendation algorithms |
-| [Scheduler](contexts/scheduler.md) | Cron-like scheduled job execution |
-| [Session](contexts/session.md) | Listening sessions and registered devices |
-| [Transcode](contexts/transcode.md) | CMAF video transcoding via FFmpeg and Swoole |
-| [User Preference](contexts/user-preference.md) | Accent color, sidebar, audio/layout/player preferences, EQ profiles, theme mood, and user settings |
-| [Shared](contexts/shared.md) | Cross-cutting kernel: UUID, Swoole, caching, WebSocket, and settings |
+| [Bounded Contexts](contexts/README.md) | Domain models, ports, API endpoints and cross-context relationships for each context and the Shared kernel |
 
 ## Contributing
 

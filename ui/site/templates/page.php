@@ -13,7 +13,22 @@ include __DIR__ . '/header.php';
             <p class="eyebrow"><?= $label ?></p>
             <ul>
               <?php foreach ($navigation[$guide] as $chapter): ?>
-                <li><a href="<?= $escape($chapter['url']) ?>"<?= $chapter['url'] === $page['url'] ? ' aria-current="page"' : '' ?>><?= $escape($chapter['title']) ?></a></li>
+                <?php if (isset($chapter['children'])): ?>
+                  <?php $inChapter = in_array($page['url'], [$chapter['url'], ...array_column($chapter['children'], 'url')], true); ?>
+                  <li class="chapter-fold">
+                    <details<?= $inChapter ? ' open' : '' ?>>
+                      <summary><?= $escape($chapter['title']) ?></summary>
+                      <ul>
+                        <li><a href="<?= $escape($chapter['url']) ?>"<?= $chapter['url'] === $page['url'] ? ' aria-current="page"' : '' ?>>Overview</a></li>
+                        <?php foreach ($chapter['children'] as $child): ?>
+                          <li><a href="<?= $escape($child['url']) ?>"<?= $child['url'] === $page['url'] ? ' aria-current="page"' : '' ?>><?= $escape($child['title']) ?></a></li>
+                        <?php endforeach; ?>
+                      </ul>
+                    </details>
+                  </li>
+                <?php else: ?>
+                  <li><a href="<?= $escape($chapter['url']) ?>"<?= $chapter['url'] === $page['url'] ? ' aria-current="page"' : '' ?>><?= $escape($chapter['title']) ?></a></li>
+                <?php endif; ?>
               <?php endforeach; ?>
             </ul>
           </div>

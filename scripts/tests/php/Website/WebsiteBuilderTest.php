@@ -50,6 +50,30 @@ final class WebsiteBuilderTest extends TestCase
         self::assertCount(5, $manifest);
     }
 
+    public function testBoundedContextsChapterFoldsItsPagesUnderOneNavigationEntry(): void
+    {
+        mkdir($this->root . '/docs-book/part-2-developer-guide/contexts', 0700, true);
+        file_put_contents($this->root . '/ui/site/templates/page.php', '<?php echo json_encode($navigation, JSON_THROW_ON_ERROR);');
+        $this->source('part-2-developer-guide/README.md', "# Developer\n[Guide](guide.md)\n[Contexts](contexts/README.md)");
+        $this->source('part-2-developer-guide/guide.md', '# Guide');
+        $this->source('part-2-developer-guide/contexts/README.md', "# Bounded Contexts\n[Guide](../guide.md)\n[Auth](auth.md)\n[Catalog](catalog.md#models)\n[Auth again](auth.md)");
+        $this->source('part-2-developer-guide/contexts/auth.md', '# Auth');
+        $this->source('part-2-developer-guide/contexts/catalog.md', "# Catalog\n## Models");
+        $this->builder()->build();
+        $navigation = json_decode((string) file_get_contents($this->root . '/var/website/docs/developer-guide/guide/index.html'), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame([
+            ['url' => '/docs/developer-guide/', 'title' => 'Developer'],
+            ['url' => '/docs/developer-guide/guide/', 'title' => 'Guide'],
+            ['url' => '/docs/developer-guide/contexts/', 'title' => 'Bounded Contexts', 'children' => [
+                ['url' => '/docs/developer-guide/contexts/auth/', 'title' => 'Auth'],
+                ['url' => '/docs/developer-guide/contexts/catalog/', 'title' => 'Catalog'],
+            ]],
+        ], $navigation['developer']);
+        foreach ($navigation['operator'] as $entry) {
+            self::assertArrayNotHasKey('children', $entry, 'Only opted-in chapter indexes fold out');
+        }
+    }
+
     public function testFailedRebuildRetainsExistingArtifactAndSource(): void
     {
         $this->builder()->build();

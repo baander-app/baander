@@ -36,7 +36,9 @@ final class WebsiteBuilder
     private array $documents = [];
     /** @var array<string,string> */
     private array $assets = [];
-    /** @var array<string,list<array{url:string,title:string}>> */
+    /** Chapter indexes whose linked pages fold out under the chapter in the manual navigation. */
+    private const array FOLD_OUT_CHAPTERS = ['part-2-developer-guide/contexts/README.md'];
+    /** @var array<string,list<array{url:string,title:string,children?:list<array{url:string,title:string}>}>> */
     private array $navigation = ['operator' => [], 'developer' => []];
 
     public function __construct(string $root, private readonly string $revisionUrl)
@@ -291,23 +293,44 @@ final class WebsiteBuilder
             if (!isset($this->documents[$index])) {
                 throw new RuntimeException('Missing guide index: ' . $index);
             }
-            $seen = [];
             $rootPage = $this->pages[$index];
+            $seen = [$rootPage['url'] => true];
             $this->navigation[$guide][] = ['url' => $rootPage['url'], 'title' => $rootPage['title']];
-            $seen[$rootPage['url']] = true;
-            foreach ($this->documents[$index]->iterator() as $node) {
-                if (!$node instanceof Link) {
-                    continue;
+            foreach ($this->linkedPages($index, $guide, $seen) as $page) {
+                $entry = ['url' => $page['url'], 'title' => $page['title']];
+                if (in_array($page['source'], self::FOLD_OUT_CHAPTERS, true)) {
+                    $entry['children'] = array_map(
+                        static fn (array $child): array => ['url' => $child['url'], 'title' => $child['title']],
+                        $this->linkedPages($page['source'], $guide, $seen),
+                    );
                 }
-                $url = explode('#', $node->getUrl(), 2)[0];
-                foreach ($this->pages as $page) {
-                    if ($page['url'] === $url && $page['guide'] === $guide && !isset($seen[$url])) {
-                        $this->navigation[$guide][] = ['url' => $url, 'title' => $page['title']];
-                        $seen[$url] = true;
-                    }
+                $this->navigation[$guide][] = $entry;
+            }
+        }
+    }
+
+    /**
+     * Pages of one guide linked from a document, in link order, each listed once across the guide.
+     *
+     * @param array<string,true> $seen
+     * @return list<array{source:string,url:string,title:string,guide:?string,html:string,headings:list<array{id:string,title:string,level:int}>}>
+     */
+    private function linkedPages(string $source, string $guide, array &$seen): array
+    {
+        $linked = [];
+        foreach ($this->documents[$source]->iterator() as $node) {
+            if (!$node instanceof Link) {
+                continue;
+            }
+            $url = explode('#', $node->getUrl(), 2)[0];
+            foreach ($this->pages as $page) {
+                if ($page['url'] === $url && $page['guide'] === $guide && !isset($seen[$url])) {
+                    $linked[] = $page;
+                    $seen[$url] = true;
                 }
             }
         }
+        return $linked;
     }
 
     /** @param array<string,mixed> $page
