@@ -58,7 +58,7 @@ final class ProgressiveMediaPublicationTest extends TestCase
         $probe->mustRun();
         $arguments = $encoder->buildStreamArgs($source, $tier, '', $this->directory,
             audioFilters: 'aformat=channel_layouts=stereo', hasAudio: true,
-            sourceDuration: VideoProbeResult::fromProbeOutput(json_decode($probe->getOutput(), true, 512, JSON_THROW_ON_ERROR))->duration);
+            sourceDuration: VideoProbeResult::fromProbeOutput(json_decode($probe->getOutput(), true, 512, JSON_THROW_ON_ERROR))->videoEnd ?? 0.0);
         $input = array_search('-i', $arguments, true);
         self::assertIsInt($input);
         array_splice($arguments, $input, 0, ['-re']);

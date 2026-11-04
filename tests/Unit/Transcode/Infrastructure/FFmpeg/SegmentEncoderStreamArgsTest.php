@@ -670,6 +670,34 @@ final class SegmentEncoderStreamArgsTest extends TestCase
         yield 'sparse seek keeps its preroll trim' => [1, '24.000000', 'atrim=start=0,'];
     }
 
+    /** @param array<string, mixed> $format */
+    #[DataProvider('probedEnds')]
+    public function testOnlyAVideoStreamEndReplacesShortest(array $format, array $video, bool $streamEnd): void
+    {
+        $probe = \App\Transcode\Domain\ValueObject\VideoProbeResult::fromProbeOutput(['format' => $format, 'streams' => [
+            ['index' => 0, 'codec_type' => 'video', 'codec_name' => 'h264', 'time_base' => '1/12800', ...$video],
+            ['index' => 1, 'codec_type' => 'audio', 'codec_name' => 'aac', 'duration' => '18.000000'],
+        ]]);
+        $args = $this->encoder()->buildStreamArgs('/source', QualityTier::p720(), '', '/output', sourceDuration: $probe->videoEnd ?? 0.0);
+        $audioFilters = $args[array_search('-af', $args, true) + 1];
+
+        self::assertSame($streamEnd ? 14.0 : 18.0, $probe->duration);
+        self::assertSame(!$streamEnd, in_array('-shortest', $args, true));
+        self::assertSame($streamEnd, str_contains($audioFilters, 'whole_dur=14.000000,atrim=end=14.000000'));
+    }
+
+    /** @return iterable<string, array{array<string, mixed>, array<string, mixed>, bool}> */
+    public static function probedEnds(): iterable
+    {
+        $mov = ['format_name' => 'mov,mp4,m4a,3gp,3g2,mj2', 'start_time' => '0.000000', 'duration' => '18.000000'];
+        $timing = ['start_pts' => 0, 'start_time' => '0.000000', 'duration_ts' => 179200, 'duration' => '14.000000'];
+        yield 'MOV video stream timing' => [$mov, $timing, true];
+        yield 'MOV without video stream timing uses the container' => [$mov, [], false];
+        yield 'MPEG-TS container duration' => [['format_name' => 'mpegts', 'start_time' => '0.000000', 'duration' => '18.000000'], $timing, false];
+        yield 'Matroska track duration tag' => [['format_name' => 'matroska,webm', 'start_time' => '0.000000', 'duration' => '18.000000'],
+            ['tags' => ['DURATION' => '00:00:14.000000000']], true];
+    }
+
     public function testVideoEndAtOrBeforeTheSeekFallsBackToShortest(): void
     {
         $args = $this->encoder()->buildStreamArgs('/source.mkv', QualityTier::p720(), '', '/output', 5, sourceDuration: 30.0);

@@ -155,7 +155,7 @@ final class SegmentEncoderVideoEndpointMediaTest extends TestCase
             outputDirectory: $output, audioProfile: $profile, audioFilters: $encoder->buildAudioFiltersForProfile($probe, $profile),
             hasAudio: $probe->hasAudio(), sourceFrameRate: $probe->framerate,
             sourceTimestampOrigin: $probe->sourceTimestampOrigin, audioStreamOrdinal: $probe->selectedAudioStreamOrdinal(),
-            sourceDuration: $probe->duration);
+            sourceDuration: $probe->videoEnd ?? 0.0);
         $elapsed = (hrtime(true) - $started) / 1_000_000_000;
         self::assertLessThan(30.0, $elapsed);
         self::assertFalse($manager->pollOnce($job->getId()));

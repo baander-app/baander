@@ -68,6 +68,7 @@ class VideoProbeResultTest extends TestCase
         $probe = VideoProbeResult::fromProbeOutput($raw);
         foreach ([$probe, VideoProbeResult::fromSerialized($probe->jsonSerialize())] as $result) {
             self::assertSame($expected, $result->duration);
+            self::assertSame($expected, $result->videoEnd, 'The end comes from the selected video stream.');
             self::assertSame($probe->sourceTimestampOrigin, $result->sourceTimestampOrigin);
         }
     }
@@ -126,6 +127,16 @@ class VideoProbeResultTest extends TestCase
         $probe = VideoProbeResult::fromProbeOutput($raw);
         self::assertSame($expected, $probe->duration);
         self::assertSame($expected, VideoProbeResult::fromSerialized($probe->jsonSerialize())->duration);
+        self::assertNull($probe->videoEnd, 'A container estimate is not a video stream end.');
+        self::assertNull(VideoProbeResult::fromSerialized($probe->jsonSerialize())->videoEnd);
+    }
+
+    public function testMalformedSerializedVideoEndIsUnknown(): void
+    {
+        foreach ([0, -1, 'bad', INF, [], null] as $value) {
+            self::assertNull(VideoProbeResult::fromSerialized(['duration' => 14, 'videoEnd' => $value])->videoEnd);
+        }
+        self::assertSame(14.0, VideoProbeResult::fromSerialized(['duration' => 14, 'videoEnd' => 14])->videoEnd);
     }
 
     /** @return iterable<string, array{array<string, mixed>, float}|array{array<string, mixed>}> */

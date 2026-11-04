@@ -110,7 +110,7 @@ final class SegmentEncoderTimestampOriginMediaTest extends TestCase
             $output, $startSegment, audioProfile: $profile,
             audioFilters: $encoder->buildAudioFiltersForProfile($probe, $profile),
             hasAudio: $probe->hasAudio(), sourceFrameRate: $probe->framerate, sourceTimestampOrigin: $probe->sourceTimestampOrigin,
-            sourceDuration: $probe->duration));
+            sourceDuration: $probe->videoEnd ?? 0.0));
 
         $presentation = (new PublishedPresentationReader())->read($output);
         self::assertNotNull($presentation);

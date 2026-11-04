@@ -40,6 +40,8 @@ final readonly class VideoProbeResult implements JsonSerializable
         public ?float $containerStartTime = null,
         public ?float $videoStartTime = null,
         public ?string $videoTimeBase = null,
+        /** Selected video end relative to the source clock origin when the video stream itself states it; null when only the container duration is known. */
+        public ?float $videoEnd = null,
     ) {
         $selected = $this->selectedAudioStream();
         $this->audioChannels = $selected->channels ?? $audioChannels;
@@ -126,10 +128,10 @@ final readonly class VideoProbeResult implements JsonSerializable
         $isInterlaced = in_array($fieldOrder, ['tt', 'bb', 'tb', 'bt'], true);
 
         $sourceTimestampOrigin = self::verifiedSourceTimestampOrigin($format, $videoStream, $raw['packets'] ?? []);
+        $videoEnd = self::selectedVideoEndpoint($format, $videoStream, $sourceTimestampOrigin);
 
         return new self(
-            duration: self::selectedVideoEndpoint($format, $videoStream, $sourceTimestampOrigin)
-                ?? (float) ($format['duration'] ?? 0.0) - ($sourceTimestampOrigin ?? 0.0),
+            duration: $videoEnd ?? (float) ($format['duration'] ?? 0.0) - ($sourceTimestampOrigin ?? 0.0),
             width: (int) ($videoStream['width'] ?? 0),
             height: (int) ($videoStream['height'] ?? 0),
             framerate: self::streamFramerate($videoStream),
@@ -151,6 +153,7 @@ final readonly class VideoProbeResult implements JsonSerializable
             containerStartTime: is_numeric($format['start_time'] ?? null) ? (float) $format['start_time'] : null,
             videoStartTime: is_numeric($videoStream['start_time'] ?? null) ? (float) $videoStream['start_time'] : null,
             videoTimeBase: $videoStream['time_base'] ?? null,
+            videoEnd: $videoEnd,
         );
     }
 
@@ -207,6 +210,7 @@ final readonly class VideoProbeResult implements JsonSerializable
             containerStartTime: isset($data['containerStartTime']) ? (float) $data['containerStartTime'] : null,
             videoStartTime: isset($data['videoStartTime']) ? (float) $data['videoStartTime'] : null,
             videoTimeBase: $data['videoTimeBase'] ?? null,
+            videoEnd: self::positiveEnd($data['videoEnd'] ?? null),
         );
     }
 
@@ -329,6 +333,13 @@ final readonly class VideoProbeResult implements JsonSerializable
         return $timestamp !== null && $timestamp >= 0.0 ? $timestamp : null;
     }
 
+    private static function positiveEnd(mixed $value): ?float
+    {
+        $timestamp = self::finiteTimestamp($value);
+
+        return $timestamp !== null && $timestamp > 0.0 ? $timestamp : null;
+    }
+
     /**
      * Prefer the average rate ffprobe derives from the stream's frames and
      * duration. Its r_frame_rate is a guessed base rate that overstates
@@ -428,6 +439,7 @@ final readonly class VideoProbeResult implements JsonSerializable
             'containerStartTime' => $this->containerStartTime,
             'videoStartTime' => $this->videoStartTime,
             'videoTimeBase' => $this->videoTimeBase,
+            'videoEnd' => $this->videoEnd,
             'sourceTimestampOrigin' => $this->sourceTimestampOrigin,
             'width' => $this->width,
             'height' => $this->height,

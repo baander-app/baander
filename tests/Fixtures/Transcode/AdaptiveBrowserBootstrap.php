@@ -205,7 +205,8 @@ foreach (['low' => QualityTier::p360(), 'high' => QualityTier::p720()] as $label
         'startTime' => $sourceStartTime, 'nativeAvailabilityStartTime' => gmdate('Y-m-d\TH:i:s\Z')]);
     $arguments = $encoder->buildStreamArgs($source, $tier, $encoder->buildVideoFilters($probe, $tier), $output,
         startSegment: $sourceStartTime > 0 ? 1 : null, audioStreamIndex: $selectedAudioOrdinal, audioProfile: $audioProfile, audioFilters: $encoder->buildAudioFiltersForProfile($probe, $audioProfile), hasAudio: true,
-        sourceFrameRate: $probe->framerate, sourceTimestampOrigin: $probe->sourceTimestampOrigin);
+        sourceFrameRate: $probe->framerate, sourceTimestampOrigin: $probe->sourceTimestampOrigin,
+        sourceDuration: $probe->videoEnd ?? 0.0);
     if ($hasSubtitles) {
         $track = $probe->subtitleStreams[0] ?? throw new RuntimeException('The delayed movie must contain its embedded subtitle.');
         $subtitleDirectory = $output . '/subtitles/' . $track->trackKey();

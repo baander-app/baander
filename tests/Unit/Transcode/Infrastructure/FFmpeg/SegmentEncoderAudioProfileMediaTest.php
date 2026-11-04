@@ -53,7 +53,7 @@ final class SegmentEncoderAudioProfileMediaTest extends TestCase
         $this->runMedia($encoder->buildStreamArgs($source, $tier, $encoder->buildVideoFilters($probe, $tier),
             $output, $start, audioProfile: $profile,
             audioFilters: $encoder->buildAudioFiltersForProfile($probe, $profile), hasAudio: $probe->hasAudio(),
-            sourceDuration: $probe->duration));
+            sourceDuration: $probe->videoEnd ?? 0.0));
 
         $presentation = (new PublishedPresentationReader())->read($output);
         self::assertNotNull($presentation, 'The completed native MPD must publish both MP4 tracks.');

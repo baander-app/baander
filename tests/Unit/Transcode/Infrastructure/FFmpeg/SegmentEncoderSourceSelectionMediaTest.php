@@ -51,7 +51,7 @@ final class SegmentEncoderSourceSelectionMediaTest extends TestCase
         mkdir($output);
         $this->runMedia($encoder->buildStreamArgs($source, $this->tier(),
             $encoder->buildVideoFilters($probe, $this->tier()), $output, $start, hasAudio: $probe->hasAudio(),
-            sourceDuration: $probe->duration));
+            sourceDuration: $probe->videoEnd ?? 0.0));
 
         self::assertSame(64, $probe->width);
         self::assertSame(64, $probe->height);

@@ -305,7 +305,7 @@ final class SegmentEncoderMediaTest extends TestCase
 
     private function sourceDuration(string $path): float
     {
-        return VideoProbeResult::fromProbeOutput(json_decode($this->runMedia(FFprobeArguments::video($path)), true, 512, JSON_THROW_ON_ERROR))->duration;
+        return VideoProbeResult::fromProbeOutput(json_decode($this->runMedia(FFprobeArguments::video($path)), true, 512, JSON_THROW_ON_ERROR))->videoEnd ?? 0.0;
     }
 
     /** @return array<string, mixed> */

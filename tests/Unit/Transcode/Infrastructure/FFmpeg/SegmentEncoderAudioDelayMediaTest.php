@@ -102,7 +102,7 @@ final class SegmentEncoderAudioDelayMediaTest extends TestCase
             hasAudio: $probe->hasAudio(),
             sourceFrameRate: $probe->framerate,
             sourceTimestampOrigin: $probe->sourceTimestampOrigin,
-            sourceDuration: $probe->duration,
+            sourceDuration: $probe->videoEnd ?? 0.0,
         ));
 
         $presentation = (new PublishedPresentationReader())->read($output);

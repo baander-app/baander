@@ -54,7 +54,7 @@ final class SegmentEncoderSparseMediaTest extends TestCase
         mkdir($output);
         $arguments = $encoder->buildStreamArgs($source, $tier, $encoder->buildVideoFilters($probe, $tier),
             $output, audioProfile: $profile, audioFilters: $encoder->buildAudioFiltersForProfile($probe, $profile),
-            hasAudio: $probe->hasAudio(), sourceFrameRate: $probe->framerate, sourceDuration: $probe->duration);
+            hasAudio: $probe->hasAudio(), sourceFrameRate: $probe->framerate, sourceDuration: $probe->videoEnd ?? 0.0);
         $inputIndex = array_search('-i', $arguments, true);
         self::assertIsInt($inputIndex);
         array_splice($arguments, $inputIndex, 0, ['-re']);
@@ -188,7 +188,7 @@ final class SegmentEncoderSparseMediaTest extends TestCase
         $this->runMedia($encoder->buildStreamArgs($source, $tier, $encoder->buildVideoFilters($probe, $tier),
             $output, $startSegment, audioProfile: $profile,
             audioFilters: $encoder->buildAudioFiltersForProfile($probe, $profile),
-            hasAudio: $probe->hasAudio(), sourceFrameRate: $probe->framerate, sourceDuration: $probe->duration));
+            hasAudio: $probe->hasAudio(), sourceFrameRate: $probe->framerate, sourceDuration: $probe->videoEnd ?? 0.0));
 
         $presentation = (new PublishedPresentationReader())->read($output);
         self::assertNotNull($presentation);
