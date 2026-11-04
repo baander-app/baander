@@ -1770,26 +1770,26 @@ Real time under load is recorded, not judged. Check a retained receipt again wit
 
 The recorded passes on 2026-11-04 used the Ryzen 7 5800X3D and RX 9070 XT above,
 the Debian 13 worker image with FFmpeg 7.1 and a 128-second 1080p30 excerpt of Big
-Buck Bunny. Other work shared the host; the one-minute load average was 3.5–6.4
-during the software pass's single encodes and 30–35 during the hardware pass's.
-Both receipts passed every criterion:
+Buck Bunny. The hardware pass shared the host with other work; the one-minute load
+average was 30–35 during its single encodes. The software pass ran alone, and the
+load average during its single encodes, 32 falling to 6, came from the run before
+them. Both receipts passed every criterion:
 
 | Pass | Video streams, steady speed | Audio first wave | Peak backends (application / control / direct) | Lease helper maximum, control / execution | Native answer maximum | Web p50 / p95 |
 |---|---|---|---|---|---|---|
-| Software, 8 + 12 | 8 `libx264`, 0.349–0.354x | 15.3–24.6x | 30 (20 / 8 / 2) | 0.45 / 0.22 s | 17 ms | 0.90 / 1.55 s |
+| Software, 8 + 12 | 8 `libx264`, 0.266–0.270x | 13.0–24.1x | 30 (20 / 8 / 2) | 0.43 / 0.22 s | 13 ms | 0.70 / 1.30 s |
 | Hardware, 12 + 12 | 12 `hevc_vaapi`, 1.14–1.17x | 13.1–21.6x | 30 (20 / 8 / 2) | 0.45 / 0.25 s | 9.5 ms | 0.37 / 2.88 s |
 
 An active governor decided every run admission, after learning 56 samples in
 the software pass and 60 in the hardware pass; none was downgraded or vetoed, and
 no unit drained, restarted or recorded an OOM kill. No run sample found an idle
-server in the application pool, and pooler waits stayed at or below 28 ms in the
-software pass and 36 ms in the hardware pass. In the single encodes after the
-load, `libx264` ran at 1.07x and `libx265` at 0.94x, so HEVC software encoding of
-this content missed real time with the other host work beside it; `h264_vaapi`
-ran at 9.2x and `hevc_vaapi` at 13.5x. In the software pass each
-lane's 15 distinct renditions of a 300-second track ran out 145–160 seconds
-before the video finished, and the cache answered the repeats; the drill now cuts
-600-second tracks and never repeats a rendition.
+server in the application pool, and pooler waits stayed at or below 31 ms in the
+software pass and 36 ms in the hardware pass. In the software run each audio lane
+encoded 14 or 15 distinct renditions and stayed busy until 403–490 seconds in;
+its videos completed after 474–487 seconds. In the single
+encodes after the load, `libx264` ran at 1.09x and `libx265` at 0.97x, so HEVC
+software encoding of this content missed real time; `h264_vaapi` ran at 9.2x and
+`hevc_vaapi` at 13.5x.
 
 Run browser controls against the immutable production worker image through the
 combined deployment runner:
