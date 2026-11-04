@@ -64,7 +64,32 @@ Choose the slots by trial and error:
 Changing the slots replaces the deployment; it is not a live setting.
 [Configuration](configuration.md#media-slots) shows where to set them.
 
-<!-- U10 reference margins -->
+### Reference margins at the default slots
+
+On 4 November 2026, a full deployment ran every default slot at once on the
+reference host described below, an AMD Ryzen 7 5800X3D with an AMD Radeon RX 9070
+XT. Every video slot converted a 128-second 1080p30 excerpt of Big Buck Bunny to
+1080p, and every audio slot converted 600-second tracks one after another, while
+signed-in web clients browsed the library. A stream's real-time margin is its
+steady speed minus one; a negative margin means the encode fell behind playback.
+
+| Encode path | Slots | Video speed | Video margin | Audio speed |
+| --- | --- | ---: | ---: | ---: |
+| Software, `libx264` | 8 video + 12 audio | 0.251–0.256× | −0.749 to −0.744 | 12.0–20.7× |
+| Hardware, `hevc_vaapi` | 12 video + 12 audio | 1.26–1.28× | +0.26 to +0.28 | 31.4–41.8× |
+
+Both runs completed every job with no service killed for lack of memory, no
+worker unit restarted, and web requests answered throughout. They show different
+limits. With a hardware encoder, the default 12 video slots stay ahead of real
+time on this GPU. In software, eight 1080p encodes share the host's CPUs: together
+they produced about 2 seconds of video per second, so this host keeps about two
+software 1080p encodes in real time, not eight. The default software slots
+therefore suit a host that mostly copies streams or converts audio; a host that
+converts video in software should lower its video slots as described above.
+
+Alone on the same host after each run, every codec ran ahead of real time on this
+content: `libx264` at 1.08×, `libx265` at 1.30×, `h264_vaapi` at 9.4× and
+`hevc_vaapi` at 13.7×.
 
 ### Measured software cost per job
 
@@ -86,10 +111,13 @@ encoded a synthetic 1080p30 H.264/AAC source.
 
 Speed is output seconds per wall-clock second, so below 1× an encode cannot keep
 up with playback. The HEVC row used two pool threads, which stays below real time.
-Production now gives `libx265` four pool threads: alone, that reached 1.29–1.31×
-real time at the same cost of about 3 CPU-seconds per output second, and the
-production setting peaked at 557 MiB. An encode that keeps pace with playback
-therefore occupies about 1.5 to 1.7 CPUs for H.264 and about 3 for HEVC. Each
+Four pool threads reached 1.29–1.31× real time on this synthetic source but
+only 0.76–0.87× on film content, so production now gives `libx265` six pool
+threads. Alone, on 60-second excerpts of 1080p30 Big Buck Bunny, that reached
+1.07–1.21× real time at 4.7–5.5 CPU-seconds per output second. The four-thread
+setting peaked at 557 MiB. An encode that keeps pace with playback
+therefore occupies about 1.5 to 1.7 CPUs for H.264 on the synthetic source and
+about 5 for HEVC on film content. Each
 media job also runs a PHP child in the control unit, which peaked at 92 MiB for a
 video job and 66 MiB for an audio job.
 

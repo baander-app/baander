@@ -1779,26 +1779,35 @@ Real time under load is recorded, not judged. Check a retained receipt again wit
 
 The recorded passes on 2026-11-04 used the Ryzen 7 5800X3D and RX 9070 XT above,
 the Debian 13 worker image with FFmpeg 7.1 and a 128-second 1080p30 excerpt of Big
-Buck Bunny. The hardware pass shared the host with other work; the one-minute load
-average was 30–35 during its single encodes. The software pass ran alone, and the
-load average during its single encodes, 32 falling to 6, came from the run before
-them. Both receipts passed every criterion:
+Buck Bunny, with `libx265` at six pool threads. Both passes ran with no other heavy
+work on the host. The one-minute load average during the single encodes came from
+the run before them: 33 falling to 7 after the software pass and 18 falling to 13
+after the hardware pass. Both receipts passed every criterion:
 
 | Pass | Video streams, steady speed | Audio first wave | Peak backends (application / control / direct) | Lease helper maximum, control / execution | Native answer maximum | Web p50 / p95 |
 |---|---|---|---|---|---|---|
-| Software, 8 + 12 | 8 `libx264`, 0.266–0.270x | 13.0–24.1x | 30 (20 / 8 / 2) | 0.43 / 0.22 s | 13 ms | 0.70 / 1.30 s |
-| Hardware, 12 + 12 | 12 `hevc_vaapi`, 1.14–1.17x | 13.1–21.6x | 30 (20 / 8 / 2) | 0.45 / 0.25 s | 9.5 ms | 0.37 / 2.88 s |
+| Software, 8 + 12 | 8 `libx264`, 0.251–0.256x | 12.0–20.7x | 30 (20 / 8 / 2) | 0.40 / 0.24 s | 9.3 ms | 0.68 / 1.24 s |
+| Hardware, 12 + 12 | 12 `hevc_vaapi`, 1.26–1.28x | 31.4–41.8x | 30 (20 / 8 / 2) | 0.19 / 0.18 s | 8.0 ms | 0.41 / 4.45 s |
 
 An active governor decided every run admission, after learning 56 samples in
 the software pass and 60 in the hardware pass; none was downgraded or vetoed, and
 no unit drained, restarted or recorded an OOM kill. No run sample found an idle
 server in the application pool, and pooler waits stayed at or below 31 ms in the
 software pass and 36 ms in the hardware pass. In the software run each audio lane
-encoded 14 or 15 distinct renditions and stayed busy until 403–490 seconds in;
-its videos completed after 474–487 seconds. In the single
-encodes after the load, `libx264` ran at 1.09x and `libx265` at 0.97x, so HEVC
-software encoding of this content missed real time; `h264_vaapi` ran at 9.2x and
-`hevc_vaapi` at 13.5x.
+encoded 14 or 15 distinct renditions and stayed busy until 420–521 seconds in;
+its videos completed after 503–515 seconds. In the hardware run each lane encoded
+6 to 8 renditions and the videos completed after 100–103 seconds. The web clients
+completed 5,859 requests in the software run and 738 in the hardware run, none
+failed. In the single encodes after the load, `libx264` ran at 1.08x and `libx265`
+at 1.30x, `h264_vaapi` at 9.4x and `hevc_vaapi` at 13.7x, so every codec ran ahead
+of real time alone.
+
+An earlier software run on the same day lost its deployment about nine minutes in:
+the control unit's autoscaler exited while a backend test suite loaded the host,
+and the execution unit followed when it read the control unit's draining heartbeat.
+The autoscaler's report named no cause. It now reports its exception class and
+location, and a tick whose admission lock is contended publishes nothing instead of
+ending the autoscaler; the passes above ran after both changes.
 
 Run browser controls against the immutable production worker image through the
 combined deployment runner:
