@@ -96,7 +96,6 @@ const NodeName = styled(ContentText)`
 
 const MbidLabel = styled.span`
   ${textRole('mono-sm')}
-  font-size: var(--text-dense-size);
   color: var(--color-muted-foreground);
 `
 

@@ -89,15 +89,15 @@ const ExpandedContent = styled.div`
 `
 
 const BypassButton = styled(Button).attrs({ variant: 'ghost', size: 'xs' })<{ $enabled: boolean }>`
-  width: 1rem;
-  height: 1rem;
+  width: 1.125rem;
+  height: 1.125rem;
+  padding: 0;
   border-radius: 9999px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
   ${textRole('caption')}
-  font-size: var(--text-dense-size);
   font-weight: 700;
   border: none;
   cursor: pointer;

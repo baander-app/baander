@@ -163,7 +163,6 @@ const ProfileName = styled(ContentText)`
 
 const DefaultLabel = styled.span`
   ${textRole('label')}
-  font-size: var(--text-dense-size);
   color: var(--color-muted-foreground);
 `
 
