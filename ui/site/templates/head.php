@@ -23,6 +23,7 @@ $escape = static fn (string $value): string => htmlspecialchars($value, ENT_QUOT
   <?php if (str_starts_with($page['url'], '/docs/')): ?>
     <link rel="stylesheet" href="/assets/site/search.css">
     <script type="module" src="/assets/site/search.js"></script>
+    <script src="/assets/site/manual-navigation.js" defer></script>
   <?php endif; ?>
   <script src="/assets/site/appearance.js"></script>
   <?php if (isset($page['script'])): ?>

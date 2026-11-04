@@ -74,6 +74,24 @@ final class WebsiteBuilderTest extends TestCase
         }
     }
 
+    public function testCliReferenceFoldsItsCommandsUnderTheirSectionHeadings(): void
+    {
+        mkdir($this->root . '/docs-book/part-1-operator-guide/commands', 0700, true);
+        file_put_contents($this->root . '/ui/site/templates/page.php', '<?php echo json_encode($navigation, JSON_THROW_ON_ERROR);');
+        $this->source('part-1-operator-guide/README.md', "# Operator\n[Chapter](chapter.md)\n[CLI](commands/README.md)");
+        $this->source('part-1-operator-guide/commands/README.md', "# CLI Commands\nRun them from [Chapter](../chapter.md).\n[Ungrouped](app-about.md)\n## Auth & Users\n[app:user:create](app-user-create.md)\n## Server\n[app:settings](app-settings.md)");
+        foreach (['app-about' => 'app:about', 'app-user-create' => 'app:user:create', 'app-settings' => 'app:settings'] as $file => $title) {
+            $this->source('part-1-operator-guide/commands/' . $file . '.md', '# ' . $title);
+        }
+        $this->builder()->build();
+        $navigation = json_decode((string) file_get_contents($this->root . '/var/website/docs/operator-guide/chapter/index.html'), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame(['url' => '/docs/operator-guide/commands/', 'title' => 'CLI Commands', 'children' => [
+            ['url' => '/docs/operator-guide/commands/app-about/', 'title' => 'app:about'],
+            ['url' => '/docs/operator-guide/commands/app-user-create/', 'title' => 'app:user:create', 'group' => 'Auth & Users'],
+            ['url' => '/docs/operator-guide/commands/app-settings/', 'title' => 'app:settings', 'group' => 'Server'],
+        ]], $navigation['operator'][2]);
+    }
+
     public function testFailedRebuildRetainsExistingArtifactAndSource(): void
     {
         $this->builder()->build();

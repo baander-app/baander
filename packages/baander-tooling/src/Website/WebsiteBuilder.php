@@ -37,8 +37,8 @@ final class WebsiteBuilder
     /** @var array<string,string> */
     private array $assets = [];
     /** Chapter indexes whose linked pages fold out under the chapter in the manual navigation. */
-    private const array FOLD_OUT_CHAPTERS = ['part-2-developer-guide/contexts/README.md'];
-    /** @var array<string,list<array{url:string,title:string,children?:list<array{url:string,title:string}>}>> */
+    private const array FOLD_OUT_CHAPTERS = ['part-1-operator-guide/commands/README.md', 'part-2-developer-guide/contexts/README.md'];
+    /** @var array<string,list<array{url:string,title:string,children?:list<array{url:string,title:string,group?:string}>}>> */
     private array $navigation = ['operator' => [], 'developer' => []];
 
     public function __construct(string $root, private readonly string $revisionUrl)
@@ -296,11 +296,13 @@ final class WebsiteBuilder
             $rootPage = $this->pages[$index];
             $seen = [$rootPage['url'] => true];
             $this->navigation[$guide][] = ['url' => $rootPage['url'], 'title' => $rootPage['title']];
-            foreach ($this->linkedPages($index, $guide, $seen) as $page) {
+            foreach ($this->linkedPages($index, $guide, $seen) as ['page' => $page]) {
                 $entry = ['url' => $page['url'], 'title' => $page['title']];
                 if (in_array($page['source'], self::FOLD_OUT_CHAPTERS, true)) {
+                    // The chapter index's section headings label groups of its pages.
                     $entry['children'] = array_map(
-                        static fn (array $child): array => ['url' => $child['url'], 'title' => $child['title']],
+                        static fn (array $child): array => ['url' => $child['page']['url'], 'title' => $child['page']['title']]
+                            + ($child['group'] === null ? [] : ['group' => $child['group']]),
                         $this->linkedPages($page['source'], $guide, $seen),
                     );
                 }
@@ -310,22 +312,28 @@ final class WebsiteBuilder
     }
 
     /**
-     * Pages of one guide linked from a document, in link order, each listed once across the guide.
+     * Pages of one guide linked from a document, in link order, each listed once across the guide,
+     * with the document's most recent second-level heading before each link.
      *
      * @param array<string,true> $seen
-     * @return list<array{source:string,url:string,title:string,guide:?string,html:string,headings:list<array{id:string,title:string,level:int}>}>
+     * @return list<array{page:array{source:string,url:string,title:string,guide:?string,html:string,headings:list<array{id:string,title:string,level:int}>},group:?string}>
      */
     private function linkedPages(string $source, string $guide, array &$seen): array
     {
         $linked = [];
+        $group = null;
         foreach ($this->documents[$source]->iterator() as $node) {
+            if ($node instanceof Heading && $node->getLevel() === 2) {
+                $group = trim(StringContainerHelper::getChildText($node, [RawMarkupContainerInterface::class]));
+                continue;
+            }
             if (!$node instanceof Link) {
                 continue;
             }
             $url = explode('#', $node->getUrl(), 2)[0];
             foreach ($this->pages as $page) {
                 if ($page['url'] === $url && $page['guide'] === $guide && !isset($seen[$url])) {
-                    $linked[] = $page;
+                    $linked[] = ['page' => $page, 'group' => $group];
                     $seen[$url] = true;
                 }
             }

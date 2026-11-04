@@ -60,7 +60,7 @@ test('visitor reaches operating model and source-based installation', async ({ p
 
 test('bounded contexts fold out as their own chapter in the developer navigation', async ({ page }) => {
   const chapters = page.getByRole('navigation', { name: 'Manual chapters' });
-  const fold = chapters.locator('.chapter-fold details');
+  const fold = chapters.locator('.chapter-fold details').filter({ has: page.locator('summary', { hasText: 'Bounded Contexts' }) });
   await page.goto('/docs/developer-guide/contexts/auth/');
   await expect(fold).toHaveAttribute('open', '');
   await expect(fold.getByRole('link', { name: 'Auth', exact: true })).toHaveAttribute('aria-current', 'page');
@@ -77,6 +77,26 @@ test('bounded contexts fold out as their own chapter in the developer navigation
   await fold.getByRole('link', { name: 'Catalog', exact: true }).click();
   await expect(page).toHaveURL(/\/docs\/developer-guide\/contexts\/catalog\/$/);
   await expect(fold).toHaveAttribute('open', '');
+  const sizes = await chapters.evaluate((nav) => {
+    const size = (selector: string) => parseFloat(getComputedStyle(nav.querySelector(selector)!).fontSize);
+    return { chapter: size('.chapter-group > ul > li > a'), fold: size('.chapter-fold summary'), page: size('.chapter-fold li a') };
+  });
+  expect(sizes.fold, 'A fold-out chapter matches its sibling chapters').toBe(sizes.chapter);
+  expect(sizes.page, 'Pages inside a fold-out are not larger than the chapter line').toBeLessThanOrEqual(sizes.fold);
+});
+
+test('CLI commands fold out by section and the sidebar reveals the current command', async ({ page }) => {
+  const chapters = page.getByRole('navigation', { name: 'Manual chapters' });
+  const fold = chapters.locator('.chapter-fold details').filter({ has: page.locator('summary', { hasText: 'CLI Commands' }) });
+  await page.goto('/docs/operator-guide/getting-started/');
+  await expect(fold).not.toHaveAttribute('open', '');
+  await page.goto('/docs/operator-guide/commands/app-user-enable/');
+  await expect(fold).toHaveAttribute('open', '');
+  await expect(fold.locator('.chapter-fold-label', { hasText: 'Auth & Users' })).toBeVisible();
+  const current = fold.getByRole('link', { name: 'app:user:enable', exact: true });
+  await expect(current).toHaveAttribute('aria-current', 'page');
+  expect(await page.evaluate(() => scrollY), 'Revealing the link scrolls only the sidebar').toBe(0);
+  await expect(current).toBeInViewport();
 });
 
 test('keyboard focus and enlarged text preserve access to chapters and search', async ({ page }) => {

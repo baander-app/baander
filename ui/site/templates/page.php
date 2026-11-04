@@ -20,8 +20,31 @@ include __DIR__ . '/header.php';
                       <summary><?= $escape($chapter['title']) ?></summary>
                       <ul>
                         <li><a href="<?= $escape($chapter['url']) ?>"<?= $chapter['url'] === $page['url'] ? ' aria-current="page"' : '' ?>>Overview</a></li>
-                        <?php foreach ($chapter['children'] as $child): ?>
-                          <li><a href="<?= $escape($child['url']) ?>"<?= $child['url'] === $page['url'] ? ' aria-current="page"' : '' ?>><?= $escape($child['title']) ?></a></li>
+                        <?php
+                        $groups = [];
+                        foreach ($chapter['children'] as $child) {
+                            $label = $child['group'] ?? null;
+                            if ($groups === [] || end($groups)['label'] !== $label) {
+                                $groups[] = ['label' => $label, 'children' => []];
+                            }
+                            $groups[array_key_last($groups)]['children'][] = $child;
+                        }
+                        ?>
+                        <?php foreach ($groups as $group): ?>
+                          <?php if ($group['label'] === null): ?>
+                            <?php foreach ($group['children'] as $child): ?>
+                              <li><a href="<?= $escape($child['url']) ?>"<?= $child['url'] === $page['url'] ? ' aria-current="page"' : '' ?>><?= str_replace(':', ':<wbr>', $escape($child['title'])) ?></a></li>
+                            <?php endforeach; ?>
+                          <?php else: ?>
+                            <li class="chapter-fold-group">
+                              <span class="chapter-fold-label"><?= $escape($group['label']) ?></span>
+                              <ul>
+                                <?php foreach ($group['children'] as $child): ?>
+                                  <li><a href="<?= $escape($child['url']) ?>"<?= $child['url'] === $page['url'] ? ' aria-current="page"' : '' ?>><?= str_replace(':', ':<wbr>', $escape($child['title'])) ?></a></li>
+                                <?php endforeach; ?>
+                              </ul>
+                            </li>
+                          <?php endif; ?>
                         <?php endforeach; ?>
                       </ul>
                     </details>
