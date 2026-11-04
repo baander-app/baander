@@ -53,9 +53,11 @@ Every page also carries its search and link-preview metadata, built by
 Manual text belongs in `docs-book/`. Homepage text and layout belong in
 `ui/site/templates/`; site styles and reviewed screenshots belong in
 `ui/site/assets/`. The build copies shared token CSS, SVG branding and licensed
-fonts, then builds search from the rendered manual pages. For the typography page
-it also copies the Geist and Noto slices that page's text needs, selected along
-the font stack, and writes their rules into `typography.css`. Change token inputs in
+fonts, then builds search from the rendered manual pages. For each rendered page it
+also copies the Geist and Noto slices that the page's text reaches first along the
+font stack, beyond the shared Latin faces, and links their rules from the page's
+head. Search results get one such stylesheet for all indexed text, which the
+search script links when it first shows results. Change token inputs in
 `ui/design-tokens/` and regenerate them with its existing build command rather than
 editing generated CSS.
 

@@ -420,6 +420,27 @@ before publication. Open: the Korean samples need a native-speaker check, and th
 header's `↗` renders from Noto Sans SC on this page because Geist's Latin slice
 lacks it.
 
+### Website font stack
+
+Delivered on branch `feat/site-font-stack` from the
+[website font stack plan](docs/plans/2026-11-04-2207-feat-site-font-stack-plan.md):
+every page now uses the application's font stack, which replaces the earlier
+decision to load Noto only on the typography page. After rendering, the build
+selects the slices each page's text reaches first and links them as one
+content-hashed stylesheet per distinct set: eight sets across 211 pages. 200
+pages need only the Noto Sans SC slice that covers the header's `↗` (9,224 bytes);
+the largest set outside the typography page holds four slices (160,732 bytes).
+Search results link one stylesheet (four slices, 162,300 bytes) when they first
+appear. `code`, `kbd`, `samp` and `pre` use the mono stack on every page.
+
+Verification checkpoint: 84 Website tooling PHPUnit tests, PHPStan and
+php-cs-fixer clean on the changed PHP, site typecheck, 4 node tests, a fresh
+`make website-build`, and 59 Chromium browser checks. On the homepage, a manual
+page and bAAC, those checks confirm that every character renders from a bundled
+face and that the page declares and requests only slices its text reaches first.
+Each new check failed once against a deliberately broken build. Open: the user
+previews the rebuilt site before publication.
+
 ### Source-installation documentation
 
 Disposable installation verified frontend loading, administrator login, worker

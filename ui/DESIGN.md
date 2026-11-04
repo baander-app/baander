@@ -27,17 +27,21 @@ light and dark themes and existing SVG branding. The website adds no surface
 gradients or shadows; the player material remains inside real application
 screenshots.
 
-The website self-hosts the Latin subsets of Geist and Geist Mono, as variable
-faces under content-hashed names. Text outside those subsets falls back to the
-visitor's system fonts. Rendered diagrams embed the same Latin Geist face.
+The website uses the application's font stacks on every page: Geist and Geist
+Mono for Latin, Latin Extended, Vietnamese and Cyrillic, and Noto for other
+scripts and for symbols Geist lacks. It self-hosts them as variable faces under
+content-hashed names. Every page declares the Latin subsets of Geist and Geist
+Mono. After rendering, the build walks each page's text in font-stack order and
+links a stylesheet that declares only the other slices its characters reach first;
+pages that reach the same slices share one stylesheet. Search results show text
+from other pages, so the search script links one stylesheet for all indexed text
+when it first shows results. `code`, `kbd`, `samp` and `pre` use the mono stack
+on every page. Rendered diagrams embed the Latin Geist face.
 
-The typography page at `/typography/` is the one exception: it shows every
-supported script in live text. The build walks that page's text in font-stack
-order and ships only the Geist and Noto slices its characters reach first, through
-the page's own stylesheet. No other page declares or requests a Noto face. The page
-restates the application's language reorders and script rules in its stylesheet,
-because the site has no `ContentText` component, and reads the type roles from the
-design tokens.
+The typography page at `/typography/` shows every supported script in live text
+and gets its fonts the same way. It restates the application's language reorders
+and script rules in its stylesheet, because the site has no `ContentText`
+component, and reads the type roles from the design tokens.
 
 Codec comparison charts use a distinct color for each vendor, consistent across
 profiles and encoding or decoding views. These data colors have light and dark

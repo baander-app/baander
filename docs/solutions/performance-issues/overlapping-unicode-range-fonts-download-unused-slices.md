@@ -1,6 +1,7 @@
 ---
 title: Overlapping unicode-range fonts download slices a page never renders
 date: "2026-11-04"
+last_updated: "2026-11-04"
 category: performance-issues
 module: Web typography font loading and website page fonts
 problem_type: performance_issue
@@ -47,5 +48,5 @@ Once Geist is loaded, the browser resolves Latin text from it and never reaches 
 
 ## Prevention
 
-- Keep a test that a Latin-only page requests no non-Latin font file, and run it in Firefox, not only Chromium (`ui/web/tests/e2e/typography/typography.spec.ts`, Latin-only page). The site suite has the same check for every page except the typography page.
+- Keep a test that a Latin-only page requests no non-Latin font file, and run it in Firefox, not only Chromium (`ui/web/tests/e2e/typography/typography.spec.ts`, Latin-only page). The site suite checks that each page declares and requests only the slices its own text reaches first (`ui/site/tests/website.spec.ts`).
 - When adding a family to a stack, check whether its `unicode-range` overlaps the families before it; overlapping faces are where the extra downloads come from.
