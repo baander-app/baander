@@ -406,6 +406,25 @@ pending logout reads back after a reload and still signs a proof. Mock proofs
 qualify the browser transport; they do not validate the server's DPoP
 cryptography.
 
+## Web typography
+
+Run `yarn --cwd ui/web test:typography` for the typography harness at
+`https://typography.baander.app:5188`, served with a temporary certificate and
+mapped to loopback in Chromium, Firefox and WebKit. It renders the design-language
+test strings in every type role, real song and column-browser rows, badges and
+labels. It checks that Thai, Burmese, Hangul and CJK text has no letter-spacing,
+that script line-heights and the Burmese size apply, that glyph ink stays inside
+fixed rows, that the element's language picks the Han glyph family, and that every
+character renders from a bundled Geist or Noto face. A Latin-only page checks that
+no Thai, Burmese, Korean or CJK font file is requested. The frontend workflow runs
+this gate. WebKit needs its Playwright system libraries; on hosts without them, run
+the harness in the `mcr.microsoft.com/playwright` image. Port 5188 must be free.
+
+`ui/web/tests/typography/census.test.ts` runs with the unit suite. It fails on
+literal font sizes, light weights, literal tracking, families other than the two
+stacks, and the 11px dense size outside the allowlisted admin tables, badges and
+chips.
+
 ## Web store isolation and debugging
 
 Run `yarn --cwd ui/web test:store-debug` for the disposable Chromium workflow at

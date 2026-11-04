@@ -5,13 +5,12 @@ import {
 } from './fixtures'
 import { setTheme } from '../helpers/theme-utils'
 import { expectContained, expectNoPageOverflow, expectReadable } from './helpers'
-
-/** Thai, Burmese, Hangul and CJK characters, whose text must never carry tracking. */
-const NO_TRACKING_SCRIPTS = /[\p{Script=Thai}\p{Script=Myanmar}\p{Script=Hangul}\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/u
+import { expectInkInsideClip, NO_TRACKING_SCRIPTS } from '../typography/ink-bounds'
 
 /**
  * Checks the script rules on every element in a surface whose own text holds Thai,
- * Burmese, Hangul or CJK characters: each must render with zero letter-spacing.
+ * Burmese, Hangul or CJK characters: each must render with zero letter-spacing, and
+ * the glyphs of that text must stay inside their nearest clipping box.
  */
 async function expectScriptTextRules(surface: Locator, name: string) {
   await expect(surface).toBeVisible()
@@ -30,6 +29,7 @@ async function expectScriptTextRules(surface: Locator, name: string) {
   expect(elements.length, `${name} renders Thai, Burmese, Hangul or CJK text`).toBeGreaterThan(0)
   const tracked = elements.filter(({ letterSpacing }) => letterSpacing !== 'normal' && Number.parseFloat(letterSpacing) !== 0)
   expect(tracked, `${name} sets no letter-spacing on Thai, Burmese, Hangul or CJK text`).toEqual([])
+  await expectInkInsideClip(surface, name, NO_TRACKING_SCRIPTS)
 }
 
 test.describe('footer radio player', () => {

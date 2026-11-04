@@ -163,6 +163,10 @@ jobs:
                 working-directory: ui/web
                 run: yarn test:store-debug
 
+            -   name: Typography in Chromium, Firefox and WebKit
+                working-directory: ui/web
+                run: yarn test:typography
+
             -   name: Extract coverage metrics
                 working-directory: ui/web
                 run: |
