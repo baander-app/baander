@@ -24,6 +24,13 @@ utilities or import the removed `@/shared/lib/utils` helper. Preserve the
 interaction, accessibility, motion, and token requirements in `ui/DESIGN.md`.
 Use `lucide-react` and `@lucide/lab` for icons.
 
+Set text through the type roles in the Typography section of `ui/DESIGN.md`. Use
+`textRole(role)` from `@/shared/theme` for interface text and `ContentText` from
+`@/shared/typography` for content names, passing the item's stored language. Do not
+write literal font sizes, weights, letter-spacing, line-heights or families; the
+typography census test fails on them. When a styled component wraps `ContentText`,
+set the element with `forwardedAs`, not `as`.
+
 Keep formatting consistent with `.editorconfig` and adjacent TypeScript: two-space
 indentation, readable multiline callbacks and object literals, and separate logical
 steps. Avoid compressed test setup and several statements on one line. Prefer named

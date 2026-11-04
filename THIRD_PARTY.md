@@ -21,6 +21,13 @@ notices belonging to bundled or installed dependencies.
 - The web movie player bundles HLS.js 1.7.3. Its upstream attribution is retained
   in [hls.js-LICENSE.txt](public/licenses/hls.js-LICENSE.txt), alongside the complete
   [Apache-2.0 license](public/licenses/Apache-2.0.txt), in the public assets.
+- The web app, the Electron app and the public website bundle the Geist and Geist
+  Mono fonts under the SIL Open Font License 1.1. Their copyright notices and the
+  license text are in [Geist-OFL.txt](public/licenses/Geist-OFL.txt).
+- The web app and the Electron app bundle Noto Sans, Noto Sans Thai, Noto Sans
+  Myanmar, Noto Sans SC, Noto Sans TC, Noto Sans JP, Noto Sans KR and Noto Sans
+  Mono under the SIL Open Font License 1.1. Their copyright notices and the license
+  text are in [Noto-OFL.txt](public/licenses/Noto-OFL.txt).
 
 The [application inventory procedure](dev-docs/application-packaged-inventory.md)
 collects installed Debian and Composer packages, native build evidence, copied

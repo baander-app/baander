@@ -23,9 +23,14 @@ Its page composition adapts to a public introduction and long-form manuals. Body
 copy may use 16px text, the homepage may use larger responsive headings, and section
 spacing may use the shared 48px and 64px spacing tokens. Keep the shared typography,
 semantic color roles, radii, visible focus and restrained surfaces. Use the generated
-light and dark themes, local fonts and existing SVG branding. The website adds no
-surface gradients or shadows; the player material remains inside real application
+light and dark themes and existing SVG branding. The website adds no surface
+gradients or shadows; the player material remains inside real application
 screenshots.
+
+The website self-hosts only the Latin subsets of Geist and Geist Mono, as
+variable faces under content-hashed names, and bundles no Noto fonts. Text outside
+those subsets falls back to the visitor's system fonts. Rendered diagrams embed the
+same Latin Geist face.
 
 Codec comparison charts use a distinct color for each vendor, consistent across
 profiles and encoding or decoding views. These data colors have light and dark
@@ -119,13 +124,118 @@ transient menus and overlays retain their existing rules.
 
 ## Typography
 
-- **Font:** Inter (`var(--font-sans)`)
-- **Tracking:** `-0.01em` on headings
-- **Body:** `14px` / `0.875rem`
-- **Labels:** `11px` / `0.6875rem`, uppercase, wider tracking, medium weight
-- **Muted text:** `var(--color-muted-foreground)`
-- **Headings:** semibold, never bold
-- **Monospace:** JetBrains Mono for metadata values (bitrate, format, durations, IDs)
+The web app and the Electron desktop app, including its configuration window,
+share these rules. The public website uses the same families and tokens with the
+font subset described in its own section.
+
+### Families
+
+All interface and content text uses Geist through `var(--font-ui)`. Timecodes,
+durations, technical metadata and file names use Geist Mono through
+`var(--font-mono)`. Both are variable fonts.
+
+Fallback works per glyph. Geist and Geist Mono cover Latin, Latin Extended,
+Vietnamese and Cyrillic. Every other script falls through, in this default order,
+to Noto Sans, Noto Sans Thai, Noto Sans Myanmar, Noto Sans SC, Noto Sans TC, Noto
+Sans JP and Noto Sans KR. In a mono context, such as a file name with Japanese or
+Thai characters, Noto Sans Mono comes first and the same chain follows, so the text
+never falls to a system font.
+
+Every font is bundled and served from Baander's own origin. A browser downloads a
+script's font only when text in that script appears on screen.
+
+### Roles
+
+Every text element uses one of the ten type roles. Phone sizes apply at
+`max-width: 767px`; the other values stay the same at every width.
+
+| Role | Desktop | Phone (≤767px) | Weight | Tracking | Line-height | Use |
+|---|---|---|---|---|---|---|
+| `hero` | 40px | 34px | 700 | −0.02em | 1.1 | Hero titles, large browse headers |
+| `title-lg` | 30px | 26px | 700 | −0.015em | 1.2 | Screen titles, shelf headers |
+| `title` | 24px | 20px | 600 | −0.01em | 1.25 | Card group headers, detail-page titles |
+| `subtitle` | 18px | 17px | 500 | 0 | 1.35 | Lines under titles, credit rows |
+| `body` | 15px | 16px | 400 | 0 | 1.5 | Descriptions, settings, menus |
+| `body-sm` | 13px | 14px | 400 | 0 | 1.5 | Dense lists, metadata rows |
+| `caption` | 12px | 12px | 400 | 0 | 1.4 | Timestamps, badges, helper text |
+| `label` | 12px | 12px | 600 | +0.12em, uppercase | 1.3 | Overline labels, category chips |
+| `timecode` | 15px | 15px | 500, mono | 0 | 1.2 | Player timecodes, durations |
+| `mono-sm` | 13px | 13px | 400, mono | 0 | 1.3 | Codec and bitrate lines, file names |
+
+- **Weights:** 400 to 700 only; never 100 to 300. Use 400 for body text, 500 for
+  emphasis and secondary buttons, 600 for section headers, buttons and active
+  states, and 700 for titles and hero text. Every bundled family is variable, so
+  each weight has a real face and no browser synthesises bold.
+- **Floor:** no text renders below 12px. Two surfaces are exempt and may use
+  11px: admin tables and feature-level badges and chips. They apply their role and
+  then set `font-size: var(--text-dense-size)`.
+- **Crowding:** when a role crowds a row, badge or column, adapt the layout through
+  padding, truncation or width. The text keeps its role size.
+- **Numerals:** durations, timecodes, bitrates, file sizes and episode counters
+  use the `timecode` or `mono-sm` role. Both set tabular numerals, so digits keep
+  their width as they change. Mono never sets paragraphs.
+- **Muted text:** `var(--color-muted-foreground)`.
+
+### Script rules
+
+Script rules depend on the characters an element contains, and they override the
+role where the two conflict. One decision covers the whole element, and the most
+demanding script present wins.
+
+- **Tracking:** an element containing any Thai, Burmese, Hangul or CJK character
+  has zero letter-spacing throughout, including in tracked roles such as `label`,
+  `hero` and the titles. The Latin part of a mixed string loses its tracking too.
+- **Line-height:** an element takes the larger of its role's line-height and the
+  minimum of the scripts it contains: CJK and Korean 1.6, Thai 1.8, Burmese 2.0.
+  Fixed-height rows, such as virtualised song lists, must keep stacked Thai and
+  Burmese marks fully visible.
+- **Burmese size:** a string written wholly in Burmese, apart from digits, spaces
+  and punctuation, renders 2px larger than its role. A mixed string keeps the role
+  size.
+- **Line breaking:** Japanese text uses strict line breaking. CJK text may break
+  between any two characters when it would overflow. Never justify CJK text.
+- **Text inputs:** typed values carry no language, so no script rule can reach
+  them. Inputs and text areas use zero tracking and a line-height of 2 for every
+  script instead.
+
+### Content language
+
+Interface text carries the active interface language, and the page language
+follows it. Each content item, such as a song title, an artist name or an album
+title, carries its own language:
+
+1. A stored language that is a recognised language code wins. Songs inherit their
+   album's release language. A movie's original language applies only to its
+   original title; its localised title takes its language from the text.
+2. Kana or Hangul in the text overrides a stored language other than Chinese,
+   Japanese or Korean, because taggers often mark every album as English.
+3. Without a usable stored language, the text decides: kana means Japanese, Hangul
+   means Korean, and Thai, Burmese and Cyrillic characters mean their scripts.
+4. Text with nothing to detect takes the interface language.
+
+The language selects which Han glyph forms win. Japanese puts Noto Sans JP first,
+Korean puts Noto Sans KR first, and Traditional Chinese, including Cantonese and
+the Taiwan, Hong Kong and Macao regions, puts Noto Sans TC first. Every other
+language keeps the default order, with Noto Sans SC first. Han-only text without a
+stored language therefore shows Simplified Chinese forms, unless the interface
+language is itself Japanese, Korean or Traditional Chinese.
+
+Put one content item in each element. A song title and its artist name in one
+element would share one language and one set of script rules.
+
+### Applying the rules
+
+- Set interface text with `textRole(role)` from `@/shared/theme`. It applies the
+  role's family, size, weight, tracking and line-height, plus the script
+  adjustments.
+- Render content names with `ContentText` from `@/shared/typography`. Pass the
+  item's stored language as `language` where one exists. `ContentText` writes the
+  item's `lang` and the script markers the rules need.
+- When a styled component wraps `ContentText`, choose the rendered element with
+  `forwardedAs`; `as` would replace `ContentText` itself.
+- Do not write literal font sizes, weights, letter-spacing, line-heights or font
+  families. A census test fails on them outside the allowed dense surfaces, canvas
+  text and SVG viewBox text.
 
 ---
 

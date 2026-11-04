@@ -70,8 +70,8 @@ Measurement commits and dates identify the recorded experiments separately.
 
 PHP examples use PHP's native tokenizer; other declared languages use Shiki.
 Mermaid diagrams are rendered during the build, sanitized and packaged as light
-and dark SVG images with embedded Inter fonts. Code and diagrams remain readable
-without JavaScript. The build uses the configured `tooling.budgets.website`
+and dark SVG images that embed the Latin Geist face. Code and diagrams remain
+readable without JavaScript. The build uses the configured `tooling.budgets.website`
 deadline, which defaults to 600 seconds; set it in `dev.local.json` when needed.
 
 The music browsing and playback screenshot was captured from an isolated
