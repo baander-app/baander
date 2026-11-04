@@ -1614,7 +1614,7 @@ FFmpeg process as a whole used more CPU. An H.264 job used 2.56 CPUs alone. Its 
 threads used 0.9 CPU each, one thread 0.43, and decoding, audio and muxing threads
 0.08–0.13 each. An HEVC job used 2.13 CPUs: its two x265 pool threads used 0.99
 CPU each and every other thread 0.05 or less. Under that cap, HEVC at 1080p
-stays below real time.
+stayed below real time.
 
 A libx265 thread sweep ran alone on the same CPUs, outside the drill, with the
 recorded command and `-threads:v` set to the pool size. It gave 0.72x real time
