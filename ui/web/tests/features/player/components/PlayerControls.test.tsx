@@ -99,7 +99,8 @@ describe('NowPlayingBar', () => {
     renderWithRouter(<NowPlayingBar />)
 
     expect(screen.getByText('Test Song')).toBeInTheDocument()
-    expect(screen.getByText('Test Artist · Test Album')).toBeInTheDocument()
+    expect(screen.getByText('Test Artist')).toBeInTheDocument()
+    expect(screen.getByText('Test Album')).toBeInTheDocument()
     expect(screen.getByLabelText('Pause')).toBeInTheDocument()
     expect(screen.getByLabelText('Next')).toBeInTheDocument()
     expect(screen.getByLabelText('Previous')).toBeInTheDocument()
