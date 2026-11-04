@@ -31,6 +31,7 @@ final class EncodePresentationIdentity
             hasAudio: $probe->hasAudio(),
             sourceFrameRate: $probe->framerate,
             sourceTimestampOrigin: $probe->sourceTimestampOrigin,
+            sourceDuration: $probe->duration,
         );
         $fingerprint = json_encode([
             'arguments' => $arguments,

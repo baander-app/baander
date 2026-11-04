@@ -944,13 +944,21 @@ tone instead of relying on an MP4 edit list. The audio-only transcoder is outsid
 this movie-path normalization.
 
 For the qualified cases where selected audio ends at or before video,
-`apad=packet_size=1024` follows normalization and output `-shortest` bounds padding
-to the finite video. When selected source audio ends early, real silence must
-cover the remaining video, including sought output with no source audio packets
-left. The producer must terminate without losing the video tail. Video-only
-commands omit both padding and `-shortest`; separate subtitle helpers do not set
-duration. Longer-soundtrack endpoint resolution uses qualified selected-video
-metadata; missing or invalid evidence retains the container estimate.
+`apad=packet_size=1024` follows normalization. When the caller passes the probed
+video end, `whole_dur` pads the audio to that end and `atrim` cuts it there, so
+both tracks finish together. Only a caller without that end falls back to output
+`-shortest`. On FFmpeg 7, `-shortest` buffers up to ten seconds of frames before
+the first segment is published and drops the final AAC frame that crosses the
+video end. Commands with audio also set `-max_interleave_delta 0`: padded audio
+runs ahead of the movie, and without strict interleaving the DASH muxer can flush
+it before the first video packet and cut empty leading audio segments. When
+selected source audio ends early, real silence must cover the remaining video,
+including sought output with no source audio packets left. The producer must
+terminate without losing the video tail. Video-only commands omit padding,
+trimming, strict interleaving and `-shortest`; separate subtitle helpers do not
+set duration. Longer-soundtrack endpoint resolution uses qualified
+selected-video metadata; missing or invalid evidence retains the container
+estimate.
 
 One FFmpeg process reads the same source through two inputs when audio exists.
 Video input zero retains hardware options, fixture pacing and source selection;

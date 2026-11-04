@@ -84,7 +84,7 @@ final class SegmentEncoderShortAudioMediaTest extends TestCase
         $arguments = $encoder->buildStreamArgs($source, $tier, $encoder->buildVideoFilters($probe, $tier), $output, 1,
             audioProfile: $profile, audioFilters: $encoder->buildAudioFiltersForProfile($probe, $profile),
             hasAudio: true, sourceFrameRate: $probe->framerate, sourceTimestampOrigin: $probe->sourceTimestampOrigin,
-            audioStreamIndex: $probe->selectedAudioStreamOrdinal());
+            audioStreamIndex: $probe->selectedAudioStreamOrdinal(), sourceDuration: $probe->duration);
         $input = array_search('-i', $arguments, true);
         self::assertIsInt($input);
         array_splice($arguments, $input, 0, ['-re']);
@@ -292,7 +292,8 @@ final class SegmentEncoderShortAudioMediaTest extends TestCase
         $manager->startStream($job, $source, $tier, $encoder->buildVideoFilters($probe, $tier), $startSegment,
             outputDirectory: $output, audioProfile: $profile, audioFilters: $encoder->buildAudioFiltersForProfile($probe, $profile),
             hasAudio: $probe->hasAudio(), sourceFrameRate: $probe->framerate,
-            sourceTimestampOrigin: $probe->sourceTimestampOrigin, audioStreamOrdinal: $probe->selectedAudioStreamOrdinal());
+            sourceTimestampOrigin: $probe->sourceTimestampOrigin, audioStreamOrdinal: $probe->selectedAudioStreamOrdinal(),
+            sourceDuration: $probe->duration);
         $elapsed = (hrtime(true) - $started) / 1_000_000_000;
         self::assertLessThan(30.0, $elapsed, 'The padded producer must terminate within its process deadline.');
         self::assertFalse($manager->pollOnce($job->getId()));

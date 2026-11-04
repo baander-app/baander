@@ -8,7 +8,9 @@ use App\Transcode\Application\Port\FFmpegPortInterface;
 use App\Transcode\Application\Port\TranscodeStoragePortInterface;
 use App\Transcode\Domain\ValueObject\EncoderProfile;
 use App\Transcode\Domain\ValueObject\QualityTier;
+use App\Transcode\Domain\ValueObject\VideoProbeResult;
 use App\Transcode\Infrastructure\Auth\HmacStreamAuthAdapter;
+use App\Transcode\Infrastructure\FFmpeg\FFprobeArguments;
 use App\Transcode\Infrastructure\FFmpeg\SegmentEncoder;
 use App\Transcode\Infrastructure\Packaging\PublishedPresentationReader;
 use PHPUnit\Framework\TestCase;
@@ -52,8 +54,11 @@ final class ProgressiveMediaPublicationTest extends TestCase
             '-g', '24', '-c:a', 'aac', $source]);
         $encoder = new SegmentEncoder(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile('full')), $this->createStub(FFmpegPortInterface::class), $this->createStub(TranscodeStoragePortInterface::class), EncoderProfile::software('libx264'));
         $tier = new QualityTier('fixture', 64, 64, 100_000, 200_000, 200_000, 'avc1', 'avc1.64000a');
+        $probe = new Process(FFprobeArguments::video($source));
+        $probe->mustRun();
         $arguments = $encoder->buildStreamArgs($source, $tier, '', $this->directory,
-            audioFilters: 'aformat=channel_layouts=stereo', hasAudio: true);
+            audioFilters: 'aformat=channel_layouts=stereo', hasAudio: true,
+            sourceDuration: VideoProbeResult::fromProbeOutput(json_decode($probe->getOutput(), true, 512, JSON_THROW_ON_ERROR))->duration);
         $input = array_search('-i', $arguments, true);
         self::assertIsInt($input);
         array_splice($arguments, $input, 0, ['-re']);

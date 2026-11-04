@@ -54,7 +54,7 @@ final class SegmentEncoderSparseMediaTest extends TestCase
         mkdir($output);
         $arguments = $encoder->buildStreamArgs($source, $tier, $encoder->buildVideoFilters($probe, $tier),
             $output, audioProfile: $profile, audioFilters: $encoder->buildAudioFiltersForProfile($probe, $profile),
-            hasAudio: $probe->hasAudio(), sourceFrameRate: $probe->framerate);
+            hasAudio: $probe->hasAudio(), sourceFrameRate: $probe->framerate, sourceDuration: $probe->duration);
         $inputIndex = array_search('-i', $arguments, true);
         self::assertIsInt($inputIndex);
         array_splice($arguments, $inputIndex, 0, ['-re']);
@@ -188,7 +188,7 @@ final class SegmentEncoderSparseMediaTest extends TestCase
         $this->runMedia($encoder->buildStreamArgs($source, $tier, $encoder->buildVideoFilters($probe, $tier),
             $output, $startSegment, audioProfile: $profile,
             audioFilters: $encoder->buildAudioFiltersForProfile($probe, $profile),
-            hasAudio: $probe->hasAudio(), sourceFrameRate: $probe->framerate));
+            hasAudio: $probe->hasAudio(), sourceFrameRate: $probe->framerate, sourceDuration: $probe->duration));
 
         $presentation = (new PublishedPresentationReader())->read($output);
         self::assertNotNull($presentation);
@@ -234,7 +234,7 @@ final class SegmentEncoderSparseMediaTest extends TestCase
                     // A terminal codec packet can contain only encoder padding after the audible tail.
                     $paddingOnlyTail = $segment === $track->segments[array_key_last($track->segments)]
                         && count($packets) === 1 && $segment->duration / $track->timescale <= $codecFrameDuration + 0.0001;
-                    $pcm = $this->decodeAudio($combined, requireSignal: false);
+                    $pcm = $this->decodeAudio($combined, requireSignal: false, terminalFrame: $paddingOnlyTail);
                     $decodedDuration = strlen($pcm) / 4 / 48_000;
                     self::assertEqualsWithDelta($segment->duration / $track->timescale, $decodedDuration, 0.05);
                     $pcmSeconds += $decodedDuration;
@@ -352,7 +352,7 @@ final class SegmentEncoderSparseMediaTest extends TestCase
         return $markers;
     }
 
-    private function decodeAudio(string $path, bool $requireSignal = true): string
+    private function decodeAudio(string $path, bool $requireSignal = true, bool $terminalFrame = false): string
     {
         $decoded = $path.'.f32le';
         $this->runMedia(['/usr/bin/ffmpeg', '-hide_banner', '-loglevel', 'error', '-xerror', '-y',
@@ -361,6 +361,12 @@ final class SegmentEncoderSparseMediaTest extends TestCase
         self::assertNotFalse($pcm);
         $samples = unpack('g*', $pcm);
         self::assertIsArray($samples);
+        // Decoded on its own, a one-packet terminal AAC fragment loses its samples to
+        // the encoder-delay skip FFmpeg 7 applies to a file's first packet; the
+        // playlist decode checks that tail in sequence.
+        if ($terminalFrame && $samples === []) {
+            return $pcm;
+        }
         self::assertNotEmpty($samples);
         $energy = 0.0;
         foreach ($samples as $sample) {

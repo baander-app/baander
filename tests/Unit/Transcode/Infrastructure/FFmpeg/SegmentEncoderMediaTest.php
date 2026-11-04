@@ -12,6 +12,7 @@ use App\Transcode\Domain\Service\AudioProcessingRules;
 use App\Transcode\Domain\ValueObject\EncoderProfile;
 use App\Transcode\Domain\ValueObject\QualityTier;
 use App\Transcode\Domain\ValueObject\VideoProbeResult;
+use App\Transcode\Infrastructure\FFmpeg\FFprobeArguments;
 use App\Transcode\Infrastructure\FFmpeg\SegmentEncoder;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -48,7 +49,8 @@ final class SegmentEncoderMediaTest extends TestCase
         $encoder = new SegmentEncoder(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile('full')), $this->createStub(FFmpegPortInterface::class), $this->createStub(TranscodeStoragePortInterface::class), EncoderProfile::software($codec));
         $tier = new QualityTier('fixture', 64, 64, 100_000, 200_000, 200_000, 'hvc1', 'hvc1.1.6.L93.B0');
         $this->runMedia($encoder->buildStreamArgs($source, $tier, '', $this->directory, $start,
-            audioFilters: $hasAudio ? 'aformat=channel_layouts=stereo' : '', hasAudio: $hasAudio));
+            audioFilters: $hasAudio ? 'aformat=channel_layouts=stereo' : '', hasAudio: $hasAudio,
+            sourceDuration: $this->sourceDuration($source)));
 
         $presentation = (new PublishedPresentationReader())->read($this->directory);
         self::assertNotNull($presentation);
@@ -174,7 +176,7 @@ final class SegmentEncoderMediaTest extends TestCase
         $encoder = new SegmentEncoder(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile('full')), $this->createStub(FFmpegPortInterface::class), $this->createStub(TranscodeStoragePortInterface::class), EncoderProfile::software('libx264'));
         $tier = new QualityTier('fixture', 64, 64, 100_000, 200_000, 200_000, 'avc1', 'avc1.64001f');
         $this->runMedia($encoder->buildStreamArgs($source, $tier, '', $this->directory, 2,
-            audioFilters: 'aformat=channel_layouts=stereo'));
+            audioFilters: 'aformat=channel_layouts=stereo', sourceDuration: $this->sourceDuration($source)));
         $presentation = (new PublishedPresentationReader())->read($this->directory);
         self::assertNotNull($presentation);
         self::assertTrue($presentation->complete);
@@ -299,6 +301,11 @@ final class SegmentEncoderMediaTest extends TestCase
         yield 'hevc wide gamut SDR seek' => ['libx265', 'bt2020-10', 1, false];
         yield 'h264 PQ' => ['libx264', 'smpte2084', 0, true];
         yield 'h264 HLG' => ['libx264', 'arib-std-b67', 0, true];
+    }
+
+    private function sourceDuration(string $path): float
+    {
+        return VideoProbeResult::fromProbeOutput(json_decode($this->runMedia(FFprobeArguments::video($path)), true, 512, JSON_THROW_ON_ERROR))->duration;
     }
 
     /** @return array<string, mixed> */

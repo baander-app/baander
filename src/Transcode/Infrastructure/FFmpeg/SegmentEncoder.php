@@ -128,6 +128,7 @@ final class SegmentEncoder
      * @param int $videoStreamIndex Ordinal among source video streams excluding attached pictures (default 0)
      * @param int $audioStreamIndex Source audio stream index (default 0)
      * @param bool $hasAudio Whether the source contains an audio stream
+     * @param float $sourceDuration Selected video end relative to the source clock origin; 0 when unknown
      * @return list<string> FFmpeg argument array (bypasses shell entirely via proc_open array form)
      */
     public function buildStreamArgs(
@@ -143,10 +144,14 @@ final class SegmentEncoder
         bool $hasAudio = true,
         float $sourceFrameRate = 0.0,
         ?float $sourceTimestampOrigin = null,
+        float $sourceDuration = 0.0,
     ): array {
         $this->executionPolicy->assertAllowed(MediaOperation::VideoEncode);
         if ($sourceTimestampOrigin !== null && (!is_finite($sourceTimestampOrigin) || $sourceTimestampOrigin < 0.0)) {
             throw new \InvalidArgumentException('Invalid source timestamp origin.');
+        }
+        if (!is_finite($sourceDuration) || $sourceDuration < 0.0) {
+            throw new \InvalidArgumentException('Invalid source duration.');
         }
         $sparse = is_finite($sourceFrameRate) && $sourceFrameRate > 0.0 && $sourceFrameRate < 1.0;
         $seeking = $startSegment !== null && $startSegment > 0;
@@ -156,8 +161,15 @@ final class SegmentEncoder
                 $audioFilters = 'atrim=start=0' . ($audioFilters === '' ? '' : ',' . $audioFilters);
             }
         }
+        // Pad and trim audio to the selected video's end. FFmpeg 7's -shortest
+        // holds up to ten seconds of frames before publication and drops the
+        // final audio frame that crosses the video end; it remains only for
+        // callers that cannot name that end.
+        $sourceStart = $seeking ? $startSegment * self::SEGMENT_DURATION : 0.0;
+        $audioEnd = $sourceDuration > $sourceStart ? $sourceDuration - $sourceStart : null;
         if ($hasAudio) {
-            $audioFilters = ($audioFilters === '' ? '' : $audioFilters . ',') . 'aresample=first_pts=0,apad=packet_size=1024';
+            $audioFilters = ($audioFilters === '' ? '' : $audioFilters . ',') . 'aresample=first_pts=0,apad=packet_size=1024'
+                . ($audioEnd === null ? '' : sprintf(':whole_dur=%1$.6f,atrim=end=%1$.6f', $audioEnd));
         }
         $encoderFlags = VideoProcessingRules::codecFlags($this->encoderProfile->encoder);
         // libx265 and SVT maintain pools independently of FFmpeg's thread limit.
@@ -185,7 +197,6 @@ final class SegmentEncoder
 
         array_push($args, ...FFmpegArguments::input($this->encoderProfile));
 
-        $sourceStart = $seeking ? $startSegment * self::SEGMENT_DURATION : 0.0;
         $seekInput = $seeking && !($sourceTimestampOrigin !== null && $sparse && $sourceStart < 1 / $sourceFrameRate);
         if ($sourceTimestampOrigin !== null) {
             array_push($args, '-copyts', '-seek_timestamp', '1', '-itsoffset', sprintf('%.6f', -($sourceTimestampOrigin + $sourceStart)));
@@ -274,7 +285,13 @@ final class SegmentEncoder
         }
 
         if ($hasAudio) {
-            $args[] = '-shortest';
+            // Padded audio is cheap and runs ahead of the movie. Strict interleaving
+            // keeps the DASH muxer from flushing audio before the first video packet,
+            // which otherwise cuts empty and fragmentary leading audio segments.
+            array_push($args, '-max_interleave_delta', '0');
+            if ($audioEnd === null) {
+                $args[] = '-shortest';
+            }
         }
 
         // Signed composition offsets avoid video edit-list shifts in HLS tracking while retaining AAC priming.

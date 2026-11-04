@@ -102,6 +102,7 @@ final class SegmentEncoderAudioDelayMediaTest extends TestCase
             hasAudio: $probe->hasAudio(),
             sourceFrameRate: $probe->framerate,
             sourceTimestampOrigin: $probe->sourceTimestampOrigin,
+            sourceDuration: $probe->duration,
         ));
 
         $presentation = (new PublishedPresentationReader())->read($output);
@@ -466,8 +467,9 @@ final class SegmentEncoderAudioDelayMediaTest extends TestCase
         self::assertNotFalse($pcm);
         $samples = unpack('g*', $pcm);
         self::assertIsArray($samples);
-        // FFmpeg 7 drops the encoder padding a padding-only terminal packet carries,
-        // so that packet may decode to no samples at all.
+        // Decoded on its own, a one-packet terminal AAC fragment loses its samples to
+        // the encoder-delay skip FFmpeg 7 applies to a file's first packet; the
+        // playlist decode checks that tail in sequence.
         if (!$paddingOnly) {
             self::assertNotEmpty($samples);
         }

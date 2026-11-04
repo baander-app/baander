@@ -154,7 +154,8 @@ final class SegmentEncoderVideoEndpointMediaTest extends TestCase
         $manager->startStream($job, $source, $tier, $encoder->buildVideoFilters($probe, $tier), $startSegment,
             outputDirectory: $output, audioProfile: $profile, audioFilters: $encoder->buildAudioFiltersForProfile($probe, $profile),
             hasAudio: $probe->hasAudio(), sourceFrameRate: $probe->framerate,
-            sourceTimestampOrigin: $probe->sourceTimestampOrigin, audioStreamOrdinal: $probe->selectedAudioStreamOrdinal());
+            sourceTimestampOrigin: $probe->sourceTimestampOrigin, audioStreamOrdinal: $probe->selectedAudioStreamOrdinal(),
+            sourceDuration: $probe->duration);
         $elapsed = (hrtime(true) - $started) / 1_000_000_000;
         self::assertLessThan(30.0, $elapsed);
         self::assertFalse($manager->pollOnce($job->getId()));
@@ -197,7 +198,9 @@ final class SegmentEncoderVideoEndpointMediaTest extends TestCase
                     self::assertSame($profile->codec, $metadata['streams'][0]['codec_name']);
                     self::assertSame((string) $profile->sampleRate, $metadata['streams'][0]['sample_rate']);
                     self::assertSame($profile->channelCount, $metadata['streams'][0]['channels']);
-                    $pcm = $this->decodeAudio($combined);
+                    $terminalFrame = $segment === $track->segments[array_key_last($track->segments)]
+                        && $segment->duration / $track->timescale <= 1024 / 48_000 + 0.0001;
+                    $pcm = $this->decodeAudio($combined, $terminalFrame);
                     $seconds = strlen($pcm) / 4 / 48_000;
                     $decodedAudioSeconds += $seconds;
                     self::assertEqualsWithDelta($segment->duration / $track->timescale, $seconds, 0.05);
@@ -371,7 +374,7 @@ final class SegmentEncoderVideoEndpointMediaTest extends TestCase
         return $markers;
     }
 
-    private function decodeAudio(string $path): string
+    private function decodeAudio(string $path, bool $terminalFrame = false): string
     {
         $decoded = $path.'.f32le';
         $this->runMedia(['/usr/bin/ffmpeg', '-hide_banner', '-loglevel', 'error', '-xerror', '-y',
@@ -380,7 +383,12 @@ final class SegmentEncoderVideoEndpointMediaTest extends TestCase
         self::assertNotFalse($pcm);
         $samples = unpack('g*', $pcm);
         self::assertIsArray($samples);
-        self::assertNotEmpty($samples);
+        // Decoded on its own, a one-packet terminal AAC fragment loses its samples to
+        // the encoder-delay skip FFmpeg 7 applies to a file's first packet; the
+        // playlist decode checks that tail in sequence.
+        if (!$terminalFrame) {
+            self::assertNotEmpty($samples);
+        }
         return $pcm;
     }
 

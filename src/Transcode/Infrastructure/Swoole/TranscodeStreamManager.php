@@ -70,6 +70,7 @@ final class TranscodeStreamManager
      *
      * @param string $videoFilters FFmpeg video filter chain, may be empty
      * @param ?int $startSegment Starting segment number (for seek restart)
+     * @param float $sourceDuration Selected video end relative to the source clock origin; 0 when unknown
      * @return string Output directory path
      */
     public function startStream(
@@ -88,6 +89,7 @@ final class TranscodeStreamManager
         int $audioStreamOrdinal = 0,
         ?PresentationSelection $presentationSelection = null,
         float $sourceBoundary = 0.0,
+        float $sourceDuration = 0.0,
     ): string {
         $tierName = is_string($tier) ? $tier : $tier->name;
         $jobId = $job->getId();
@@ -120,6 +122,7 @@ final class TranscodeStreamManager
             hasAudio: $hasAudio,
             sourceFrameRate: $sourceFrameRate,
             sourceTimestampOrigin: $sourceTimestampOrigin,
+            sourceDuration: $sourceDuration,
         );
 
         $this->logger->info('Starting long-lived video stream', [

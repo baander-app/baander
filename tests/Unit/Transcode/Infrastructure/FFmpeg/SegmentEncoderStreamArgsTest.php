@@ -368,6 +368,7 @@ final class SegmentEncoderStreamArgsTest extends TestCase
         self::assertSame('mp4', $args[array_search('-dash_segment_type', $args, true) + 1]);
         self::assertSame('id=0,streams=v', $args[array_search('-adaptation_sets', $args, true) + 1]);
         self::assertNotContains('-shortest', $args);
+        self::assertNotContains('-max_interleave_delta', $args);
         self::assertCount(1, array_keys($args, '-i', true));
     }
 
@@ -644,6 +645,59 @@ final class SegmentEncoderStreamArgsTest extends TestCase
             startSegment: 1, sourceFrameRate: 0.1, sourceTimestampOrigin: 0.0);
         self::assertContains('-copyts', $zero);
         self::assertSame('-6.000000', $zero[array_search('-itsoffset', $zero, true) + 1]);
+    }
+
+    #[DataProvider('knownVideoEnds')]
+    public function testKnownVideoEndPadsAndTrimsAudioInsteadOfShortest(?int $startSegment, string $audioEnd, string $prefix): void
+    {
+        foreach ([AudioProfile::streamingStereo(), AudioProfile::fromString('opus_stereo')] as $profile) {
+            $args = $this->encoder()->buildStreamArgs('/source.mkv', QualityTier::p720(), '', '/output', $startSegment,
+                audioProfile: $profile, sourceFrameRate: $prefix === '' ? 25.0 : 0.1, sourceDuration: 30.0);
+
+            self::assertNotContains('-shortest', $args);
+            self::assertSame('0', $args[array_search('-max_interleave_delta', $args, true) + 1]);
+            self::assertLessThan(array_search('-f', $args, true), array_search('-max_interleave_delta', $args, true));
+            self::assertSame($prefix . 'aresample=first_pts=0,apad=packet_size=1024:whole_dur=' . $audioEnd . ',atrim=end=' . $audioEnd,
+                $args[array_search('-af', $args, true) + 1]);
+        }
+    }
+
+    /** @return iterable<string, array{?int, string, string}> */
+    public static function knownVideoEnds(): iterable
+    {
+        yield 'fresh' => [null, '30.000000', ''];
+        yield 'seek' => [2, '18.000000', ''];
+        yield 'sparse seek keeps its preroll trim' => [1, '24.000000', 'atrim=start=0,'];
+    }
+
+    public function testVideoEndAtOrBeforeTheSeekFallsBackToShortest(): void
+    {
+        $args = $this->encoder()->buildStreamArgs('/source.mkv', QualityTier::p720(), '', '/output', 5, sourceDuration: 30.0);
+
+        self::assertContains('-shortest', $args);
+        self::assertSame('aresample=first_pts=0,apad=packet_size=1024', $args[array_search('-af', $args, true) + 1]);
+    }
+
+    public function testKnownVideoEndLeavesVideoOnlyEncodesAlone(): void
+    {
+        $args = $this->encoder()->buildStreamArgs('/source.mkv', QualityTier::p720(), '', '/output', hasAudio: false, sourceDuration: 30.0);
+
+        self::assertSame($this->encoder()->buildStreamArgs('/source.mkv', QualityTier::p720(), '', '/output', hasAudio: false), $args);
+    }
+
+    #[DataProvider('invalidSourceDurations')]
+    public function testInvalidSourceDurationIsRejected(float $duration): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->encoder()->buildStreamArgs('/source.mkv', QualityTier::p720(), '', '/output', sourceDuration: $duration);
+    }
+
+    /** @return iterable<string, array{float}> */
+    public static function invalidSourceDurations(): iterable
+    {
+        yield 'negative' => [-1.0];
+        yield 'infinity' => [INF];
+        yield 'not a number' => [NAN];
     }
 
     #[DataProvider('invalidSourceOrigins')]

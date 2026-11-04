@@ -130,7 +130,7 @@ final class SegmentEncoderDefaultAudioMediaTest extends TestCase
         $manager->startStream($job, $source, $tier, $encoder->buildVideoFilters($probe, $tier), $startSegment,
             outputDirectory: $output, audioProfile: $profile, audioFilters: $filters, hasAudio: $probe->hasAudio(),
             sourceFrameRate: $probe->framerate, sourceTimestampOrigin: $probe->sourceTimestampOrigin,
-            audioStreamOrdinal: $probe->selectedAudioStreamOrdinal());
+            audioStreamOrdinal: $probe->selectedAudioStreamOrdinal(), sourceDuration: $probe->duration);
         self::assertFalse($manager->pollOnce($job->getId()));
         $maps = [];
         foreach ($spawner->command as $index => $argument) {
