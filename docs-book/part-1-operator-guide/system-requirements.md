@@ -1,15 +1,19 @@
 # System Requirements
 
-This page lists what a Bånder host needs for each deployment profile. It separates
-two kinds of figures. Configured reservations are the limits Bånder admits and
-enforces. Observed consumption is what a measured workload used. A host must cover
-the configured reservations; the observed figures show how much of that headroom
-a household workload used.
+This page describes what a Bånder host needs and how to size media work for it.
+Bånder bounds media work with its own job slots. No container carries a CPU,
+memory or PID limit or a CPU set, so the host's real capacity, not a configured
+reservation, decides how much it can run. You find that capacity by trial: start
+from the default slots, watch playback, and lower the slots when encodes fall
+behind. The measured figures below show what each job costs on one reference
+host; they are a starting point, not a guarantee for yours.
 
 ## Host software
 
 - A Linux Docker host with cgroup v2 and a local Docker Unix socket for the trusted
-  worker controller.
+  worker controller. The Docker daemon must run rootful: rendering the managed
+  preset and creating worker units both refuse a rootless daemon, which cannot
+  apply the negative out-of-memory scores described under [Kill order](#kill-order).
 - Docker with Compose and Buildx.
 - Host PHP 8.5 with Swoole, Composer, and the `posix` and `pdo_pgsql` extensions for
   image-build tooling and the worker controller.
@@ -25,70 +29,139 @@ The profile is selected before startup and applies to web and workers together.
 | Capability | `household` | `full` |
 | --- | --- | --- |
 | Original-file and cached playback | Unlimited by job slots | Unlimited by job slots |
-| Stream copy (remux) | 2 shared audio/video jobs | Uses the encoding slots |
-| Video encoding | None | 3 concurrent jobs |
-| Audio encoding | None | 1 concurrent job |
+| Stream copy (remux) | 2 shared audio/video jobs | Uses the slots of its kind |
+| Video conversion | None | 8 concurrent jobs by default |
+| Audio conversion | None | 12 concurrent jobs by default |
 | Web workers | 2 | 4 |
 | Resident background consumers | 1 | Up to 4 |
 
 Only playback that needs a live copy or conversion occupies a job slot. In
 `household`, a destination that would need re-encoding receives a compatibility
-explanation instead; see [Transcoding](transcoding.md). Neither profile yet lets
-the operator raise the number of concurrent conversion jobs. A household that
-needs many simultaneous conversions, such as 8 video and 12 audio streams, is not
-covered by either profile today.
+explanation instead; see [Transcoding](transcoding.md). The household slots are
+fixed. In `full`, the operator sets the video and audio slot counts; zero slots
+disable that kind of conversion and stream copy.
+
+## Choose media slots
+
+A video slot runs one video conversion or video stream copy; an audio slot runs
+one audio rendition or audio stream copy. The slots are the only bound on media
+work: Bånder admits at most that many jobs of each kind and queues the rest. The
+derived native limits follow from the slots, and
+[`app:deployment:profile:show`](commands/app-deployment-profile-show.md) prints
+them for any slot pair before you deploy it.
+
+Choose the slots by trial and error:
+
+1. Start from the default of 8 video and 12 audio slots.
+2. Load the host with the playback your household actually runs at once, and watch
+   whether converted streams keep playing in real time. A stream whose encode
+   falls behind stalls while the player waits for the next segment.
+3. If encodes fall behind, lower the slots of that kind and try again. Further
+   requests then queue for a free slot instead of slowing every running encode.
+4. If every slot stays busy while the host still has CPU and memory to spare, you
+   can raise the slots, up to the [maximums](configuration.md#media-slots).
+
+Changing the slots replaces the deployment; it is not a live setting.
+[Configuration](configuration.md#media-slots) shows where to set them.
+
+<!-- U10 reference margins -->
+
+### Measured software cost per job
+
+These costs were measured on 3 November 2026 with FFmpeg 5.1 in the Debian 12
+worker image, before the images moved to Debian 13 and FFmpeg 7.1. The host was
+an AMD Ryzen 7 5800X3D (8 cores, 16 threads) with other heavy work paused. The
+execution unit was confined to eight logical CPUs for the measurement, so the
+eight-at-once figures describe eight encodes sharing eight CPUs. Each video job
+encoded a synthetic 1080p30 H.264/AAC source.
+
+| Job | CPU-seconds per output second, alone | With 8 at once | Speed alone | Speed with 8 at once | Peak memory |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| H.264 encode (`libx264`) | 1.49 | 1.72 | 1.71× | 0.55–0.58× | 531 MiB |
+| HEVC encode (`libx265`, two pool threads) | 3.04 | 3.3–3.56 | 0.70× | 0.28–0.30× | 535 MiB |
+| Video stream copy | under 0.001 | — | — | — | 72 MiB |
+| Opus rendition | 0.008 | — | — | — | about 55 MiB |
+| AAC rendition | 0.019 | — | — | — | about 55 MiB |
+| MP3 rendition | 0.015 | — | — | — | about 55 MiB |
+
+Speed is output seconds per wall-clock second, so below 1× an encode cannot keep
+up with playback. The HEVC row used two pool threads, which stays below real time.
+Production now gives `libx265` four pool threads: alone, that reached 1.29–1.31×
+real time at the same cost of about 3 CPU-seconds per output second, and the
+production setting peaked at 557 MiB. An encode that keeps pace with playback
+therefore occupies about 1.5 to 1.7 CPUs for H.264 and about 3 for HEVC. Each
+media job also runs a PHP child in the control unit, which peaked at 92 MiB for a
+video job and 66 MiB for an audio job.
+
+The CPU figures apply to software encoding only. A codec handled by a hardware
+encoder, such as a GPU, QuickSync or another video engine, costs almost no CPU.
+The admitted worker recipe does not yet pass an encoding device to the worker, so
+current deployments encode in software.
+
+<!-- U15 hardware figures -->
 
 ## Memory
 
-### Configured reservations
+Containers have no memory limits, so the host's memory is shared by every service
+and every running job. Estimate the media share from the per-job peaks above: at
+the default 8 + 12 with every slot encoding, the media processes alone peak near
+6.5 GiB (8 × (557 + 92) MiB for HEVC video jobs, plus 12 × (56 + 66) MiB for audio
+renditions). Web, PostgreSQL, Redis and the worker units come on top of that; the
+[household measurements](#household-measurements) show their consumption under a
+two-player workload. Lower the slots if the host cannot hold that sum with room
+for the page cache.
 
-The [household deployment preset](../../deploy/household/README.md) renders these
-limits. The deployment refuses to start on a Docker host whose total memory is
-below the reported reservation.
+### Kill order
 
-| Component | `household` (MiB) | `full` (MiB) |
-| --- | ---: | ---: |
-| Web server | 1,536 | 1,536 |
-| PostgreSQL | 1,152 | 2,816 |
-| Redis container (dataset limit 192 MiB) | 384 | 384 |
-| Gateway | 64 | 64 |
-| Worker control unit | 2,304 | 2,944 |
-| Worker execution unit | 1,856 | 4,480 |
-| Operator helper during lifecycle actions | 512 | 512 |
-| Host headroom | 512 | 512 |
-| **Total reservation** | **8,320** | **13,248** |
+Without container limits, the kernel's out-of-memory killer picks victims across
+the whole host. Bånder gives each process an `oom_score_adj` so that, under host
+memory pressure, web workers and media work go before the services that hold
+state. The kernel adds the adjustment to each process's share of memory when it
+picks a victim, so a higher score goes first unless a lower-scored process holds
+far more memory.
 
-The worker values include each unit's management, media and scheduled-console
-reservations. The `full` execution value is the preset's rendering; a manifest
-that allows more resident consumers reserves more. Configured reservations are
-ceilings, not a minimum host size.
+| Process | `oom_score_adj` | Set by |
+| --- | ---: | --- |
+| Web server container | 900 | Managed preset |
+| FFmpeg commands in the execution unit | 600 | Native daemon, at launch |
+| PHP media job children in the control unit | 600 | Each child, as it starts |
+| Execution unit (supervisor, native daemon, consumers) | 300 | Worker creation |
+| Redis | 100 | Managed preset |
+| Gateway | 0 | Managed preset |
+| PostgreSQL | −500 | Managed preset |
+| Connection pooler | −500 | Managed preset |
+| Control unit (supervisor, lease agent, scheduler, relay, autoscaler, media manager) | −500 | Worker creation |
+
+A process may raise its own score without privilege, which is how FFmpeg commands
+and media children reach 600. Lowering a score needs a rootful daemon, so the
+preset and worker creation refuse a rootless one. The worker scores apply to every
+deployment the worker controller creates. The Compose file of the source
+installation sets no scores for web, PostgreSQL, the pooler or Redis.
 
 ### PostgreSQL sizing
 
 Each database connection that searches or writes a full-text indexed title loads
-PGroonga and keeps about 22 MiB of private memory until the connection closes. The
-preset therefore sizes PostgreSQL from its configuration file:
-
-```text
-shared_buffers + 128 MiB + 24 MiB × client connections
-```
-
-The household file allows 33 client connections with 128 MiB of shared buffers.
-The full file allows 97 with 256 MiB. If you lower `postgresMemoryMiB`, also lower
-`max_connections` in the selected PostgreSQL file, or PostgreSQL can be stopped by
-the kernel when the connection pool fills.
+PGroonga and keeps about 22 MiB of private memory until the connection closes.
+Clients therefore reach PostgreSQL through a transaction-mode
+[connection pooler](configuration.md#connection-pooler), which holds a server
+connection only for the length of a transaction. PostgreSQL's connection count
+follows the pooler's server pools rather than the number of web, worker and media
+clients: the preset's PostgreSQL files set `max_connections` to 20 for
+`household` and 35 for `full`.
+More slots add pooler clients, not PostgreSQL backends.
 
 The Bånder database image starts PostgreSQL with transparent huge pages disabled.
 With the host mode `always`, huge pages could otherwise inflate each such
-connection to about 95 MiB and exhaust the container unpredictably. Keep the
+connection to about 95 MiB and exhaust host memory unpredictably. Keep the
 image's entrypoint when you override the PostgreSQL command.
 
-### Observed consumption
+### Household measurements
 
-These peaks come from the qualification on 3 November 2026. Each deployment
-served two simultaneous players for at least 30 minutes while a library scan and
-metadata synchronisation ran. In every completed scenario both players advanced
-without a stall, and no service was killed for lack of memory.
+These peaks come from the qualification on 3 November 2026, taken before the
+connection pooler was added and before container limits were removed. Each
+deployment served two simultaneous players for at least 30 minutes while a library
+scan and metadata synchronisation ran. In every completed scenario both players
+advanced without a stall, and no service was killed for lack of memory.
 
 | Component | `household` peak (MiB) | `full` peak (MiB) |
 | --- | ---: | ---: |
@@ -103,12 +176,11 @@ without a stall, and no service was killed for lack of memory.
 The ranges cover the cold import and the original-file and stream-copy scenarios
 of three household deployments and one full deployment. A container's peak
 includes reclaimable page cache from media files and database pages. The web
-server's peak therefore rises toward its limit during streaming without
-indicating memory exhaustion.
-
-Under this two-player workload, both profiles consumed similar memory. The
-household profile's lower reservation comes from its smaller worker and
-database envelopes, not from lower use at this load.
+server's peak therefore rose toward its former 1,536 MiB limit during streaming
+without indicating memory exhaustion. Under this two-player workload, both
+profiles consumed similar memory. The household profile has not been requalified
+with the pooler and without container limits; [the roadmap](../../ROADMAP.md)
+records that open work.
 
 ### Not yet established
 
@@ -122,14 +194,23 @@ database envelopes, not from lower use at this load.
 - **The complete workload.** The mixed music-and-video scenario and three
   complete household repetitions did not finish before the measurements ended.
   [The roadmap](../../ROADMAP.md) lists the open qualification work.
+- **Slot counts above the defaults.** Media authority checks use the pooler's
+  control pool, whose size was chosen before the slots grew. Counts above 8 video
+  and 12 audio rely on that pool's one-second wait and are unproven.
 
 ## CPU
 
-Each worker unit runs on its own configured CPU set; control and execution must
-not share a CPU. The qualification pinned each unit to one physical core and ran
-web, PostgreSQL and Redis on the remaining cores. Original playback and stream
-copy need little CPU. Video and audio encoding in the `full` profile need
-substantially more, and no CPU minimum has been measured for them.
+Original playback and stream copy need little CPU; conversion needs the CPU in
+the [cost table](#measured-software-cost-per-job). No container is pinned to a CPU
+set or capped by a CPU quota. Under contention, each container receives CPU
+through its own cgroup at Docker's default weight, so web, PostgreSQL, the pooler
+and the control unit keep their share while the execution unit encodes.
+
+Inside the execution unit, the native daemon starts every FFmpeg encode, copy and
+helper command at nice 10. Encodes therefore yield to the unit's own lease
+renewal, supervisor, native daemon and consumers. Nice ranks processes only within
+one cgroup; it has no effect between containers. On an otherwise idle host,
+encodes still receive all the CPU they can use.
 
 ## Storage
 

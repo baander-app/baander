@@ -1,11 +1,15 @@
 # Household deployment preset
 
-This preset runs a gateway, web server, PostgreSQL, Redis and the managed worker
-pair. Its limits are enforced reservations, not measured consumption or a minimum
-host size. The `full` profile shares the web, Redis and gateway limits, sizes
-PostgreSQL for its larger connection pool and preserves its existing worker
-budget. [System Requirements](../../docs-book/part-1-operator-guide/system-requirements.md)
-lists each reservation beside the consumption measured on 3 November 2026. A 4 GB
+This preset runs a gateway, web server, PostgreSQL, a connection pooler, Redis and
+the managed worker pair. No service or worker unit carries a CPU, memory or PID
+limit or a CPU set; Redis keeps only its own dataset limit,
+`resources.redisMaxmemoryMiB` (default 192). In the `full` profile the media slots
+bound media work: 8 video and 12 audio jobs unless the configuration's `media`
+object sets other counts. Each service gets an out-of-memory score so that web and
+media work are killed before Redis, PostgreSQL, the pooler and the control worker.
+[System Requirements](../../docs-book/part-1-operator-guide/system-requirements.md)
+explains how to choose the slots and lists the consumption measured on
+3 November 2026, before the pooler was added and the limits were removed. A 4 GB
 host, ARM builds and Raspberry Pi hardware remain unqualified.
 
 ## Prepare
@@ -41,7 +45,9 @@ Keep the configuration file and state directory accessible only to the operator.
 
 Install the standalone tooling loader with `composer tooling:autoload`. The host
 requires the normal tooling runtime, Docker Compose, and a daemon-visible Unix
-socket for the trusted worker operator. The web container has no Docker socket.
+socket for the trusted worker operator. The Docker daemon must run rootful;
+rendering refuses a rootless daemon, which cannot apply the negative
+out-of-memory scores. The web container has no Docker socket.
 The account bootstrap commands documented in the operator guide remain applicable;
 this preset creates no default account. After first startup, run `app:auth:setup-clients`
 and [create an administrator](../../docs-book/part-1-operator-guide/user-management.md)
@@ -59,17 +65,20 @@ php scripts/deploy-household.php status --state /srv/baander/household-state
 php scripts/deploy-household.php stop --state /srv/baander/household-state
 ```
 
-Rendering validates image profiles and saves the private Compose document and
-release identity. Start creates owned named volumes, loads the selected PostgreSQL
-configuration, runs pending schema migrations, initializes a missing OAuth key
-pair, verifies effective database settings, starts web services and launches the
-worker pair. The reported reservation includes workers, services, the operator
-and host headroom. Redis's dataset limit is reported separately from its container
-limit to leave room for persistence.
+Rendering validates image profiles and the media slots against their maximums,
+then saves the private Compose document and release identity. Start creates owned
+named volumes, loads the selected PostgreSQL configuration, gives the database
+role and the pooler's auth file one SCRAM verifier, runs pending schema
+migrations through the pooler, initializes a missing OAuth key pair, verifies
+effective database settings, starts web services and launches the worker pair.
+See [Connection pooler](../../docs-book/part-1-operator-guide/configuration.md#connection-pooler)
+for the pooler's aliases and pools.
 
 The household profile permits original media delivery and stream copy, with one
-ordinary consumer and two shared copy slots. It forbids audio and video encoding.
-Set `profile` to `full` to select full operation. Starting again retires the old
+ordinary consumer and two shared copy slots. It forbids audio and video encoding
+and rejects a `media` object. Set `profile` to `full` to select full operation,
+and add `media` with `videoSlots` and `audioSlots` to change its slots; see
+[Media slots](../../docs-book/part-1-operator-guide/configuration.md#media-slots). Starting again retires the old
 worker pair before installing the selected release; no live profile toggle exists.
 
 Stop retires workers and removes service containers and the private network. It

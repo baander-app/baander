@@ -19,11 +19,12 @@ evidence, environment adaptations and verification limits.
 ## Prerequisites
 
 - Git, Docker with Compose and Buildx, and OpenSSL for generating secrets.
-- A Linux Docker host with cgroup v2, a local Docker Unix socket and enough CPU and
-  memory for web, PostgreSQL, Redis and the worker pair. The worker guide's full-profile
-  example reserves 2944 MiB for control and 4800 MiB for execution; admission also
-  requires 1 GiB of host memory beyond those ceilings and disjoint CPU sets. These
-  are configured reservations, not measured consumption or a universal minimum.
+- A Linux Docker host with cgroup v2, a rootful Docker daemon with a local Unix
+  socket, and enough CPU and memory for web, PostgreSQL, Redis, the worker pair and
+  the media jobs you run at once. Containers carry no resource limits; the full
+  profile's media slots, 8 video and 12 audio by default, bound media work.
+  [System Requirements](system-requirements.md) gives the measured cost of each job
+  and how to choose the slots for your host.
 - Host PHP 8.5 with Swoole for image-build tooling, Composer, and `posix` and
   `pdo_pgsql` for the worker controller. Tooling and application dependencies are
   installed separately below. The controller runs on the
@@ -35,7 +36,7 @@ FFmpeg, Node and Corepack are supplied by the app image. The web frontend select
 its Yarn version from the repository's `packageManager` field.
 
 Read [Worker deployment](commands/README.md#worker-deployment) before provisioning
-storage or choosing host resources. Its version-6 procedure is authoritative for
+storage or choosing host resources. Its version 7 procedure is authoritative for
 the worker manifest, credentials, volume ownership and admission checks.
 
 The separate [household deployment preset](../../deploy/household/README.md)
@@ -43,9 +44,9 @@ starts the complete stack with two web workers, one ordinary background consumer
 and two shared remux slots. It permits original playback and remuxing but prohibits
 audio and video re-encoding. A receiver that needs an incompatible codec converted
 cannot play that item through this profile; see [Transcoding](transcoding.md).
-[System Requirements](system-requirements.md) lists the preset's reservations and
-measured consumption. A 4 GB host and Raspberry Pi remain unqualified. The source
-installation below uses the full profile.
+[System Requirements](system-requirements.md) lists the measured consumption and
+the per-job costs for choosing media slots. A 4 GB host and Raspberry Pi remain
+unqualified. The source installation below uses the full profile.
 
 ## Command context
 
@@ -320,7 +321,7 @@ proxy trust setting.
 
 Follow [Worker deployment](commands/README.md#worker-deployment) to build the worker
 image, prepare its private IPC volume and credentials, and create and start the
-version-6 deployment from the host. First export the application layout selected by
+version 7 deployment from the host. First export the application layout selected by
 the builder in that host shell; the controller requires it when interpreting the
 manifest:
 

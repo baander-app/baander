@@ -335,14 +335,15 @@ The identity of one worker launch within a deployment and boot, scoped to its me
 ### Worker deployment pair
 
 The fixed control and execution containers admitted together under one deployment
-namespace and boot identity. Each has its own memory, CPU and PID ceilings and a
-disjoint CPU set. Control owns the lease and coordination; execution observes the
-lease and owns native processes. A private IPC volume connects the pair.
+namespace and boot identity. Neither carries a CPU, memory or PID limit or a CPU
+set; each starts at its own out-of-memory score in the kill order. Control owns
+the lease and coordination; execution observes the lease and owns native
+processes. A private IPC volume connects the pair.
 
 ### Small-host household profile
 
 A startup profile for household playback and ordinary library maintenance with
-bounded resource admission. It permits original-file playback, compatible
+fixed media slots. It permits original-file playback, compatible
 completed artifacts and two shared audio/video copy jobs, but no server-side audio
 or video re-encoding. Web and worker processes use the same profile; changing it
 requires deployment replacement.
@@ -355,17 +356,31 @@ size, a 4 GB fit and Raspberry Pi support remain unqualified.
 One unit of concurrent media work a deployment admits: a video slot runs one
 video conversion or stream copy, an audio slot one audio rendition or stream copy.
 Original-file and completed-artifact playback use no slot. The startup profile
-fixes the slot counts, and Baander's native encoder memory envelope and native
-execution limits are derived from them. Slots are Baander's only bound on media
-work: containers carry no CPU or memory limits, and operators lower the slots
-when their host cannot keep up.
+carries the slot counts: the full profile takes operator-set counts, 8 video and
+12 audio by default, and zero disables a kind; the household profile has two fixed
+shared copy slots. Baander's native command, result and client limits are derived
+from the slots, and the pooler's client limit bounds how many slots a profile
+accepts. Slots are Baander's only bound on media work: containers carry no CPU or
+memory limits, and operators lower the slots when their host cannot keep up.
 
 ### Connection pooler
 
 The transaction-mode PgBouncer between the application and PostgreSQL. Clients
 hold a server connection only for the length of a transaction, so PostgreSQL's
 backend count, and its memory, follow the pooler's server pools rather than the
-number of web, worker and media clients.
+number of web, worker and media clients. An application alias serves web, ordinary
+workers, media jobs and migrations; a control alias with its own server pool
+serves worker leases, media authority checks and the scheduler. Work that needs
+session state connects to PostgreSQL directly.
+
+### Kill order
+
+The `oom_score_adj` ranking that decides which processes the kernel kills first
+when host memory runs short, since no container has a memory limit. Web workers
+rank highest, then media work (FFmpeg commands and PHP media children), then the
+execution unit, Redis and the gateway; PostgreSQL, the pooler and the control
+unit rank lowest. It needs a rootful Docker daemon, which can set the negative
+scores.
 
 ### Ordinary admission target
 
