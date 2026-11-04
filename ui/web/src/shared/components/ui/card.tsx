@@ -48,7 +48,7 @@ function CardHeader({ ...props }: React.ComponentProps<'div'>) {
 }
 
 const StyledCardTitle = styled.div`
-  font-family: var(--font-heading);
+  font-family: var(--font-ui);
   font-size: 1rem;
   font-weight: 500;
   line-height: 1.375;

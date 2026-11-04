@@ -164,7 +164,7 @@ const StyledFooter = styled.div.attrs<DataAttributes>({ 'data-slot': 'dialog-foo
 const StyledTitle = styled(DialogPrimitive.Title).attrs<DataAttributes>({
   'data-slot': 'dialog-title',
 })`
-  font-family: var(--font-heading);
+  font-family: var(--font-ui);
   font-size: 1rem;
   line-height: 1;
   font-weight: 500;

@@ -39,7 +39,7 @@ import { lyricsErrorMessage } from './lyrics-error-message'
 
 const LyricsPre = styled.pre`
   white-space: pre-wrap;
-  font-family: var(--font-sans);
+  font-family: var(--font-ui);
   font-size: 0.875rem;
   line-height: 1.625;
   color: var(--color-foreground);

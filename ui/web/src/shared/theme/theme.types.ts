@@ -1,6 +1,6 @@
 export type {
   Theme, ThemeMood, AccentColor, ThemeColors, ThemeRadii, ThemeSpacing,
-  ThemeTypography, ThemeDurations, ThemeMeta,
+  ThemeTypography, ThemeText, ThemeDurations, ThemeMeta,
 } from '../../../../design-tokens/build/web/theme';
 export {
   VALID_MOODS, VALID_ACCENTS, ACCENT_PALETTE, MOOD_OPTIONS, ACCENT_OPTIONS,

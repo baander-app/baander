@@ -1,6 +1,6 @@
 export type {
   Theme, ThemeMood, AccentColor, ThemeColors, ThemeRadii,
-  ThemeSpacing, ThemeTypography, ThemeDurations, ThemeMeta,
+  ThemeSpacing, ThemeTypography, ThemeText, ThemeDurations, ThemeMeta,
 } from './theme.types';
 export { resolveTheme } from './resolve-theme';
 export { ACCENT_PALETTE, VALID_MOODS, VALID_ACCENTS, isDarkMood } from './theme.types';
@@ -10,5 +10,6 @@ export { GlobalStyles } from './GlobalStyles';
 
 export {
   focusVisibleRing, interactiveTransition,
-  disabledStyle, ariaInvalidRing,
+  disabledStyle, ariaInvalidRing, textRole,
 } from './mixins';
+export type { TextRole } from './mixins';

@@ -1,5 +1,6 @@
 import { createGlobalStyle } from 'styled-components';
 import { keyframes } from './keyframes';
+import { textRole } from './mixins';
 
 export const GlobalStyles = createGlobalStyle`
   *, *::before, *::after {
@@ -11,20 +12,78 @@ export const GlobalStyles = createGlobalStyle`
     color: inherit;
   }
 
+  /* Typed values carry no language, so they cannot get script rules: zero tracking
+     and a line-height that keeps stacked Thai and Burmese marks visible. */
+  input, textarea {
+    font-family: var(--font-ui);
+    font-size: var(--text-body-size);
+    font-weight: var(--text-body-weight);
+    letter-spacing: 0;
+    line-height: 2;
+  }
+
   input[type="checkbox"], input[type="radio"], input[type="range"] {
     accent-color: var(--color-primary);
   }
 
   body {
     margin: 0;
-    font-family: ${({ theme }) => theme.typography.sans};
+    ${textRole('body')}
     background-color: ${({ theme }) => theme.colors.background};
     color: ${({ theme }) => theme.colors.foreground};
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    font-size: 0.875rem;
-    line-height: 1.6;
-    letter-spacing: -0.01em;
+  }
+
+  /* Each element with its own language starts from the default font order and no
+     script adjustment. Zero specificity lets the rules below override it on the
+     same element; the root keeps the order the interface locale gives it. */
+  :where([lang]:not(html)) {
+    --font-ui: ${({ theme }) => theme.typography.ui};
+    --font-mono: ${({ theme }) => theme.typography.mono};
+    --tracking-scale: 1;
+    --script-line-height: 0;
+    --script-size-boost: 0px;
+  }
+
+  /* The element's language decides which Han glyph forms win. */
+  [lang]:lang(ja) {
+    --font-ui: var(--font-ui-ja);
+    --font-mono: var(--font-mono-ja);
+    line-break: strict;
+  }
+
+  [lang]:lang(ko) {
+    --font-ui: var(--font-ui-ko);
+    --font-mono: var(--font-mono-ko);
+  }
+
+  [lang]:lang(zh-Hant), [lang]:lang(zh-TW), [lang]:lang(zh-HK), [lang]:lang(zh-MO) {
+    --font-ui: var(--font-ui-hant);
+    --font-mono: var(--font-mono-hant);
+  }
+
+  /* Script rules come only from the characters an element renders. The
+     line-height minimums ascend so the most demanding script present wins. */
+  [data-script~="no-tracking"] {
+    --tracking-scale: 0;
+  }
+
+  [data-script~="cjk"] {
+    --script-line-height: 1.6;
+    overflow-wrap: anywhere;
+  }
+
+  [data-script~="thai"] {
+    --script-line-height: 1.8;
+  }
+
+  [data-script~="burmese"] {
+    --script-line-height: 2;
+  }
+
+  [data-script~="burmese-only"] {
+    --script-size-boost: 2px;
   }
 
   html.theme-transitioning,

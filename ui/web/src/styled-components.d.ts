@@ -8,6 +8,7 @@ declare module 'styled-components' {
     readonly radii: Theme['radii'];
     readonly spacing: Theme['spacing'];
     readonly typography: Theme['typography'];
+    readonly text: Theme['text'];
     readonly durations: Theme['durations'];
     readonly _meta: Theme['_meta'];
   }

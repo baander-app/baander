@@ -45,11 +45,16 @@ __metadata:
     "@dnd-kit/sortable": "npm:^10.0.0"
     "@dnd-kit/utilities": "npm:^3.2.2"
     "@eslint/js": "npm:^10.0.1"
-    "@fontsource/inter": "npm:^5.3.0"
-    "@fontsource/jetbrains-mono": "npm:^5.3.0"
-    "@fontsource/kanit": "npm:^5.3.0"
-    "@fontsource/noto-sans-jp": "npm:^5.3.1"
-    "@fontsource/pretendard": "npm:^5.3.0"
+    "@fontsource-variable/geist": "npm:^5.3.0"
+    "@fontsource-variable/geist-mono": "npm:^5.3.0"
+    "@fontsource-variable/noto-sans": "npm:^5.3.0"
+    "@fontsource-variable/noto-sans-jp": "npm:^5.3.0"
+    "@fontsource-variable/noto-sans-kr": "npm:^5.3.0"
+    "@fontsource-variable/noto-sans-mono": "npm:^5.3.0"
+    "@fontsource-variable/noto-sans-myanmar": "npm:^5.3.0"
+    "@fontsource-variable/noto-sans-sc": "npm:^5.3.0"
+    "@fontsource-variable/noto-sans-tc": "npm:^5.3.0"
+    "@fontsource-variable/noto-sans-thai": "npm:^5.3.0"
     "@lucide/lab": "npm:^0.7.0"
     "@playwright/test": "npm:^1.64.1"
     "@tanstack/react-query": "npm:^5.105.0"
@@ -823,38 +828,73 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@fontsource/inter@npm:^5.3.0":
+"@fontsource-variable/geist-mono@npm:^5.3.0":
   version: 5.3.0
-  resolution: "@fontsource/inter@npm:5.3.0"
-  checksum: 10c0/568601c10c83601c23005f8cd7434499df6e007eaa22c4dabbb1dcae327cc8e4a148ece8d4a4edaa8bafc5d2371ea97a37d1cc91ffbed77a43e2d8c15a6e831b
+  resolution: "@fontsource-variable/geist-mono@npm:5.3.0"
+  checksum: 10c0/21a4097b3ccce08cbc181199f68a9193adc17d997ef8d883eab7565c6d79a82b2f8d7656f32f97b66f1f0b4ebba78a1a822c6318d55e0c5f572d74683ab036ee
   languageName: node
   linkType: hard
 
-"@fontsource/jetbrains-mono@npm:^5.3.0":
+"@fontsource-variable/geist@npm:^5.3.0":
   version: 5.3.0
-  resolution: "@fontsource/jetbrains-mono@npm:5.3.0"
-  checksum: 10c0/1351b2350e893f5da39559ed90ff0e5e60bcc876b1f40531ad081ad4bf2f3cda3fa9e8940364aef5a7430ae3140685c9cd4819c36d8ad62bcd3fa37e3cc66b1d
+  resolution: "@fontsource-variable/geist@npm:5.3.0"
+  checksum: 10c0/6b1d1d249643377c885d040769bf0964f242e8d03c4470535329ad4eed3d30a8134fea0d45c0b99b8069924a1f506a3bcb5b8d9cea77b7b5234dc7dd57371842
   languageName: node
   linkType: hard
 
-"@fontsource/kanit@npm:^5.3.0":
-  version: 5.3.0
-  resolution: "@fontsource/kanit@npm:5.3.0"
-  checksum: 10c0/834e554cce043992cf2fd348bcd88d4f71be3a80a2b0371d3fe0424733b13a74b62bf4609447aaa530866a585a589c1257100ffc33f0dcd39e9cf23b5067dce7
-  languageName: node
-  linkType: hard
-
-"@fontsource/noto-sans-jp@npm:^5.3.1":
+"@fontsource-variable/noto-sans-jp@npm:^5.3.0":
   version: 5.3.1
-  resolution: "@fontsource/noto-sans-jp@npm:5.3.1"
-  checksum: 10c0/00624c77fa3ea58ae09c54ba1301b62b5250184df19f3196a8f40d8ebca26512052acbfe609f9451cfcd9308ea38d2d51e8a9a4d6f09d65e30df969161982c05
+  resolution: "@fontsource-variable/noto-sans-jp@npm:5.3.1"
+  checksum: 10c0/695254075273786900a3d170c2ff7a6d7a564d9ed00153def67814afafcfcea538986a47a34396fdec946715798d2d2592fa22b624f8c1648cb2baae369f5c78
   languageName: node
   linkType: hard
 
-"@fontsource/pretendard@npm:^5.3.0":
+"@fontsource-variable/noto-sans-kr@npm:^5.3.0":
+  version: 5.3.1
+  resolution: "@fontsource-variable/noto-sans-kr@npm:5.3.1"
+  checksum: 10c0/9cc61ea4fe83a26c287d250c270c0cca6092c8d120eda979605ef2c4a6226391fad225b3e4ae8b83b14b0fa50886702eac397d5ac4a967fb7d86d02e1f8f4d4f
+  languageName: node
+  linkType: hard
+
+"@fontsource-variable/noto-sans-mono@npm:^5.3.0":
   version: 5.3.0
-  resolution: "@fontsource/pretendard@npm:5.3.0"
-  checksum: 10c0/436d948eb5803af42c9c62436bdb4835254c9c8b918503168f5ce21cc1ddf7430bd437c5de9e956936588af2a531333237f12bea9c9bb7b6a7d02605c452f060
+  resolution: "@fontsource-variable/noto-sans-mono@npm:5.3.0"
+  checksum: 10c0/669712a78fef5d2adccbc5467338fa9c1775468eb3e166e33a44b9e22a1b3e8aaca1f61a475a13435bb0e988c024cba50cd93ba5ac3f61ce7d7f270694fd5004
+  languageName: node
+  linkType: hard
+
+"@fontsource-variable/noto-sans-myanmar@npm:^5.3.0":
+  version: 5.3.0
+  resolution: "@fontsource-variable/noto-sans-myanmar@npm:5.3.0"
+  checksum: 10c0/69164eeb2cc3c2d886e3afca9c7cb0d4e2bf25d3533f9e71f8f60cf58b17a15f1d3e783545e9c73dc9f47f13e5ca02455fb025a5b7fb331cb0f21a1a88ec6248
+  languageName: node
+  linkType: hard
+
+"@fontsource-variable/noto-sans-sc@npm:^5.3.0":
+  version: 5.3.1
+  resolution: "@fontsource-variable/noto-sans-sc@npm:5.3.1"
+  checksum: 10c0/5911690b2b43187a986783c0666bab074fd92815dc3fe845c99c1bf145d45a240fb8648ac50938750ba84f11795841a7bed15c8f9e66b76a32837c9cb28065ec
+  languageName: node
+  linkType: hard
+
+"@fontsource-variable/noto-sans-tc@npm:^5.3.0":
+  version: 5.3.1
+  resolution: "@fontsource-variable/noto-sans-tc@npm:5.3.1"
+  checksum: 10c0/c13363e32c007f89de62f64584b35337359c754ee3cc8f944866558561ff78b0ac3d9e342e206cc4ae4460593b5473fa5106f20baa3fc08468bf23e4708a998c
+  languageName: node
+  linkType: hard
+
+"@fontsource-variable/noto-sans-thai@npm:^5.3.0":
+  version: 5.3.0
+  resolution: "@fontsource-variable/noto-sans-thai@npm:5.3.0"
+  checksum: 10c0/4cdad6dd49f08406f3b8b92bc5f89e9dff74cf026827e3cada812d3b21f08fd61b402af2470c5fc25636cbb772f9091baf72d6c17946f8008f7c09a750a0be19
+  languageName: node
+  linkType: hard
+
+"@fontsource-variable/noto-sans@npm:^5.3.0":
+  version: 5.3.0
+  resolution: "@fontsource-variable/noto-sans@npm:5.3.0"
+  checksum: 10c0/5518c158bc8bdd067ac6e59972bdfb019888c5bf03da4c1d6f208995ed642ea7ae67c04e4f8efd8f21c1bc40998c3654b0bf21d2563947b98ff9c35a52fd1edc
   languageName: node
   linkType: hard
 

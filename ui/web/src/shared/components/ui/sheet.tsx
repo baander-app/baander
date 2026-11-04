@@ -226,7 +226,7 @@ const StyledFooter = styled.div.attrs<DataAttributes>({ 'data-slot': 'sheet-foot
 const StyledTitle = styled(SheetPrimitive.Title).attrs<DataAttributes>({
   'data-slot': 'sheet-title',
 })`
-  font-family: var(--font-heading);
+  font-family: var(--font-ui);
   font-size: 1rem;
   line-height: 1.6;
   font-weight: 500;
