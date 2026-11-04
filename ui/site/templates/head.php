@@ -25,6 +25,9 @@ $escape = static fn (string $value): string => htmlspecialchars($value, ENT_QUOT
     <script type="module" src="/assets/site/search.js"></script>
   <?php endif; ?>
   <script src="/assets/site/appearance.js"></script>
+  <?php if (isset($page['script'])): ?>
+    <script src="/assets/site/<?= $escape($page['script']) ?>" defer></script>
+  <?php endif; ?>
   <?php if ($page['url'] === '/'): ?>
     <script src="/assets/site/carousel.js" defer></script>
   <?php endif; ?>

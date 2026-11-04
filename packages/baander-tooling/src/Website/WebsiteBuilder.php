@@ -62,7 +62,7 @@ final class WebsiteBuilder
      * Any exception retains the previous complete artifact.
      * @param ?Closure(string,array<string,array{source:string,url:string,title:string,guide:?string,html:string,headings:list<array{id:string,title:string,level:int}>}>):void $afterRender
      * @param ?Closure(list<array{id:string,source:string,language:string,page:string,ordinal:int}>,string):array<string,string> $renderBlocks
-     * @param list<array{template:string,url:string,title:string,description:string,stylesheet?:string,data:array<string,mixed>}> $publicPages
+     * @param list<array{template:string,url:string,title:string,description:string,stylesheet?:string,script?:string,data:array<string,mixed>}> $publicPages
      * @return array<string,array{source:string,url:string,title:string,guide:?string,html:string,headings:list<array{id:string,title:string,level:int}>}>
      */
     public function build(?Closure $afterRender = null, ?Closure $renderBlocks = null, array $publicPages = []): array

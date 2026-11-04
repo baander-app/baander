@@ -50,6 +50,7 @@ final class Command
                     'title' => 'bAAC',
                     'description' => 'Bånder’s AAC codec library: Electron integration, planned transcoder and FFmpeg support, and recorded quality and speed comparisons.',
                     'stylesheet' => 'baac.css',
+                    'script' => 'baac-charts.js',
                     'data' => ['aac' => [
                         'evidence' => $evidence,
                         'charts' => new AacCharts()->render($evidence),

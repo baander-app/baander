@@ -76,6 +76,66 @@ test('all sixteen charts reproduce their adjacent tables and complete recorded p
   await expect(page.locator('#lossless tbody tr td:last-child')).toHaveText(['Passed', 'Passed', 'Passed', 'Passed']);
 });
 
+test('charts show readouts on hover and keyboard focus, and legend buttons toggle encoders', async ({ page }) => {
+  const format = (value: string | null, digits = 3) => Number(value).toLocaleString('en-US', { minimumFractionDigits: digits, maximumFractionDigits: digits });
+  await page.goto('/baac/');
+  const panel = page.locator('#baac-lc-peaq_basic');
+  const chart = panel.locator('svg.baac-chart');
+  const tooltip = panel.locator('.baac-tooltip');
+  await expect(tooltip).toBeHidden();
+
+  const point = panel.locator('.baac-series[data-codec="ours"] .baac-point').nth(2);
+  await point.scrollIntoViewIfNeeded();
+  const box = (await point.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2 + 6, box.y + box.height / 2 + 6);
+  await expect(tooltip).toBeVisible();
+  const nominal = await point.getAttribute('data-nominal');
+  await expect(tooltip).toContainText(`Nominal ${nominal} kbit/s`);
+  const peers = await panel.locator(`.baac-point[data-nominal="${nominal}"]`).evaluateAll((points) => points.map((element) => ({
+    label: element.getAttribute('data-label'),
+    value: element.getAttribute('data-value'),
+  })));
+  expect(peers.length).toBeGreaterThan(1);
+  for (const peer of peers) {
+    await expect(tooltip).toContainText(peer.label!);
+    await expect(tooltip).toContainText(format(peer.value));
+  }
+  await page.mouse.move(0, 0);
+  await expect(tooltip).toBeHidden();
+
+  await chart.focus();
+  await chart.press('ArrowRight');
+  await expect(tooltip).toBeVisible();
+  await expect(panel.locator('[aria-live]')).toContainText('kbit/s measured');
+  await chart.press('Escape');
+  await expect(tooltip).toBeHidden();
+
+  const ffmpeg = panel.locator('.baac-legend-item[data-series="ffmpeg"]');
+  await expect(ffmpeg).toHaveAttribute('role', 'button');
+  await expect(ffmpeg).toHaveAttribute('aria-pressed', 'true');
+  await ffmpeg.press('Enter');
+  await expect(ffmpeg).toHaveAttribute('aria-pressed', 'false');
+  await expect(panel.locator('.baac-series[data-codec="ffmpeg"]')).toBeHidden();
+  await expect(panel.locator('.baac-series.is-receded')).toHaveCount(0);
+  await page.mouse.move(box.x + box.width / 2 + 6, box.y + box.height / 2 + 6);
+  await expect(tooltip).toBeVisible();
+  await expect(tooltip).not.toContainText('FFmpeg');
+  await ffmpeg.click();
+  await expect(ffmpeg).toHaveAttribute('aria-pressed', 'true');
+  await expect(panel.locator('.baac-series[data-codec="ffmpeg"]')).toBeVisible();
+
+  const speed = page.locator('#baac-lc-encode');
+  const bar = speed.locator('.baac-bar').first();
+  await bar.scrollIntoViewIfNeeded();
+  const barBox = (await bar.boundingBox())!;
+  await page.mouse.move(barBox.x + 8, barBox.y + barBox.height / 2);
+  const barTooltip = speed.locator('.baac-tooltip');
+  await expect(barTooltip).toBeVisible();
+  await expect(barTooltip).toContainText((await bar.getAttribute('data-label'))!);
+  await expect(barTooltip).toContainText(format(await bar.getAttribute('data-value')));
+  await expect(bar).toHaveClass(/is-active/);
+});
+
 for (const width of [1440, 390]) {
   for (const colorScheme of ['light', 'dark'] as const) {
     test.describe(`${width}px ${colorScheme} bAAC without JavaScript`, () => {
