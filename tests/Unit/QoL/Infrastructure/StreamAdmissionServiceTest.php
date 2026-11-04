@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Tests\Unit\QoL\Infrastructure;
 
 use App\QoL\Application\Port\EncoderProfileFingerprintPortInterface;
+use App\QoL\Domain\Exception\StreamBudgetExhausted;
+use App\QoL\Domain\Model\GovernorState;
 use App\QoL\Domain\Port\QualityLadderPortInterface;
 use App\QoL\Domain\Service\LearningModel;
 use App\QoL\Domain\Service\StreamGovernor;
@@ -14,6 +16,8 @@ use App\QoL\Infrastructure\Swoole\LearningDataPersister;
 use App\Shared\Domain\Model\Uuid;
 use App\Tests\Fixtures\QoL\InMemoryAlgorithmProfileStore;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\AbstractLogger;
+use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
 
@@ -138,6 +142,46 @@ final class StreamAdmissionServiceTest extends TestCase
         self::assertEqualsWithDelta(10.0, $governor->observedLoad(), 0.000001);
     }
 
+    public function testAdmissionRecordsTheGovernorStateItWasDecidedIn(): void
+    {
+        $logger = new AdmissionRecordingLogger();
+        [$service, $governor] = $this->service($logger);
+
+        $service->admit(new Uuid(), '1080p', 5_000_000, 1080, false);
+        $this->learn($service, $governor, false, 1.0);
+        $governor->activate();
+        $service->admit(new Uuid(), '1080p', 5_000_000, 1080, false);
+
+        $decisions = array_values(array_filter($logger->records, static fn (array $record): bool => $record['message'] === 'StreamAdmission: allocated stream'));
+        self::assertSame(['learning', 'active'], array_column(array_column($decisions, 'context'), 'governorState'));
+        self::assertSame([0, LearningModel::MIN_SAMPLES], array_column(array_column($decisions, 'context'), 'learningSamples'));
+        self::assertSame('1080p', $decisions[1]['context']['allowedTier']);
+    }
+
+    public function testVetoIsRecordedWithTheGovernorStateAndRethrown(): void
+    {
+        $logger = new AdmissionRecordingLogger();
+        [$service, $governor] = $this->service($logger);
+        // Each learned stream needs twice the host: no tier fits the budget.
+        $this->learn($service, $governor, false, 2.0 * self::HOST_CPUS);
+        $governor->activate();
+        self::assertSame(GovernorState::Active, $governor->getState());
+        $jobId = new Uuid();
+
+        try {
+            $service->admit($jobId, '1080p', 5_000_000, 1080, false);
+            self::fail('An over-budget stream was admitted.');
+        } catch (StreamBudgetExhausted) {
+        }
+
+        $vetoes = array_values(array_filter($logger->records, static fn (array $record): bool => $record['message'] === 'StreamAdmission: vetoed stream'));
+        self::assertCount(1, $vetoes);
+        self::assertSame('warning', $vetoes[0]['level']);
+        self::assertSame(['jobId' => $jobId->toString(), 'requestedTier' => '1080p', 'hardwareAccelerated' => false,
+            'governorState' => 'active', 'learningSamples' => LearningModel::MIN_SAMPLES], $vetoes[0]['context']);
+        self::assertSame(0, $governor->getActiveStreamCount());
+    }
+
     private function learn(StreamAdmissionService $service, StreamGovernor $governor, bool $hardwareAccelerated, float $cpuScale): void
     {
         for ($i = 0; $i < LearningModel::MIN_SAMPLES; $i++) {
@@ -156,13 +200,25 @@ final class StreamAdmissionServiceTest extends TestCase
     }
 
     /** @return array{StreamAdmissionService, StreamGovernor} */
-    private function service(): array
+    private function service(LoggerInterface $logger = new NullLogger()): array
     {
         $governor = new StreamGovernor(new LearningModel(), $this->createStub(QualityLadderPortInterface::class), new InMemoryAlgorithmProfileStore());
         $fingerprint = $this->createStub(EncoderProfileFingerprintPortInterface::class);
         $fingerprint->method('getName')->willReturn('none/libx265');
         $persister = new LearningDataPersister($governor, $fingerprint, new NullLogger(), $this->directory, new JsonEncoder());
 
-        return [new StreamAdmissionService($governor, $persister, new NullLogger(), new HostCpus(self::HOST_CPUS)), $governor];
+        return [new StreamAdmissionService($governor, $persister, $logger, new HostCpus(self::HOST_CPUS)), $governor];
+    }
+}
+
+/** Keeps every log record so a test can read the admission decisions. */
+final class AdmissionRecordingLogger extends AbstractLogger
+{
+    /** @var list<array{level: string, message: string, context: array<array-key, mixed>}> */
+    public array $records = [];
+
+    public function log($level, \Stringable|string $message, array $context = []): void
+    {
+        $this->records[] = ['level' => is_string($level) ? $level : 'unknown', 'message' => (string) $message, 'context' => $context];
     }
 }

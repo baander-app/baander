@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\QoL\Infrastructure;
 
 use App\QoL\Application\Port\StreamAdmissionPortInterface;
+use App\QoL\Domain\Exception\StreamBudgetExhausted;
 use App\QoL\Domain\Service\StreamGovernor;
 use App\QoL\Domain\ValueObject\EncoderWork;
 use App\QoL\Domain\ValueObject\UtilizationSample;
@@ -16,7 +17,8 @@ use Psr\Log\LoggerInterface;
  * Backs stream admission and completion with the in-memory StreamGovernor.
  *
  * Admission performs no I/O, so the synchronous veto never blocks the
- * video child. Observation turns the stream's encoder work into its measured cost.
+ * video child. Every admission decision, allocation or veto, is logged with the
+ * governor state it was made in. Observation turns the stream's encoder work into its measured cost.
  * Completion records that cost as a learning sample, releases the allocation and
  * persists learning state when the persister's threshold is reached.
  */
@@ -41,13 +43,25 @@ final class StreamAdmissionService implements StreamAdmissionPortInterface
         bool   $hardwareAccelerated,
     ): void
     {
-        // May throw StreamBudgetExhausted (veto)
-        $allowedTier = $this->governor->evaluateBudget(
-            sourceHeight: $sourceHeight,
-            targetBitrate: $targetBitrate,
-            hardwareAccelerated: $hardwareAccelerated,
-            requestedTier: $qualityTier,
-        );
+        // The governor's state decides whether the budget applies, so every decision records it.
+        $governorState = $this->governor->getState()->value;
+        try {
+            $allowedTier = $this->governor->evaluateBudget(
+                sourceHeight: $sourceHeight,
+                targetBitrate: $targetBitrate,
+                hardwareAccelerated: $hardwareAccelerated,
+                requestedTier: $qualityTier,
+            );
+        } catch (StreamBudgetExhausted $veto) {
+            $this->logger->warning('StreamAdmission: vetoed stream', [
+                'jobId' => $jobId->toString(),
+                'requestedTier' => $qualityTier,
+                'hardwareAccelerated' => $hardwareAccelerated,
+                'governorState' => $governorState,
+                'learningSamples' => $this->governor->getModel()->sampleCount(),
+            ]);
+            throw $veto;
+        }
 
         $model = $this->governor->getModel();
         $predictedCost = $model->predict($sourceHeight, $targetBitrate, $hardwareAccelerated)
@@ -62,6 +76,8 @@ final class StreamAdmissionService implements StreamAdmissionPortInterface
             'allowedTier' => $allowedTier,
             'predictedCost' => $predictedCost,
             'hardwareAccelerated' => $hardwareAccelerated,
+            'governorState' => $governorState,
+            'learningSamples' => $model->sampleCount(),
         ]);
     }
 
