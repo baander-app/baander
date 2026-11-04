@@ -402,6 +402,24 @@ Open items:
   language; `input` and `textarea` use a 2.0 line-height inside the fixed 2rem
   field height, which WebKit may render with the caret off-centre.
 
+### Website typography page
+
+Delivered on branch `feat/typography-page` from the
+[typography page plan](docs/plans/2026-11-04-2140-feat-typography-page-plan.md):
+a `/typography/` page linked from the header and footer, with live specimens of
+every supported script, Japanese, Simplified and Traditional Han forms, the script
+rules with and without each rule, and the ten type roles read from the design
+tokens. The build ships only the 36 Geist and Noto slices (1,493,344 bytes) that the
+page's text reaches first along its font stack; no other page declares a Noto face.
+
+Verification checkpoint: 81 tooling PHPUnit tests, PHPStan and php-cs-fixer clean
+on the changed PHP, site typecheck, 4 node tests, a fresh `make website-build`, and
+56 Chromium browser checks, including glyph order, the script rules, bundled faces
+and the absence of Noto requests on other pages. The user previewed the page
+before publication. Open: the Korean samples need a native-speaker check, and the
+header's `↗` renders from Noto Sans SC on this page because Geist's Latin slice
+lacks it.
+
 ### Source-installation documentation
 
 Disposable installation verified frontend loading, administrator login, worker
