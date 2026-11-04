@@ -1942,6 +1942,11 @@ export interface SongResource {
      */
   albumName?: string | null;
   /**
+     * Release language stored on the album, unchanged; usually a language code, but tag readers may store free text
+     * @nullable
+     */
+  albumLanguage?: string | null;
+  /**
      * Release year
      * @nullable
      */
@@ -2011,6 +2016,11 @@ export interface AlbumResource {
      * @nullable
      */
   country?: string | null;
+  /**
+     * Release language as stored; usually a language code, but tag readers may store free text
+     * @nullable
+     */
+  language?: string | null;
   /** Creation timestamp */
   createdAt: string;
 }
@@ -4492,6 +4502,11 @@ export type GetAlbumShow200Data = {
   label?: string;
   barcode?: string;
   country?: string;
+  /**
+     * Release language as stored; usually a language code, but tag readers may store free text
+     * @nullable
+     */
+  language?: string | null;
   createdAt?: string;
   songs?: SongResource[];
   /** @nullable */
@@ -5981,6 +5996,11 @@ export type GetPlaylistShow200DataSongsItem = {
   artistName?: string | null;
   /** @nullable */
   albumName?: string | null;
+  /**
+     * Release language stored on the album, unchanged; usually a language code, but tag readers may store free text
+     * @nullable
+     */
+  albumLanguage?: string | null;
   /** @nullable */
   year?: number | null;
   /**

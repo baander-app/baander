@@ -147,6 +147,7 @@ function asSong(raw: unknown): SongSummary {
     lyrics: asStringOrNull(item.lyrics),
     artistName: asStringOrNull(item.artistName),
     albumName: asStringOrNull(item.albumName),
+    albumLanguage: asStringOrNull(item.albumLanguage),
     createdAt: asString(item.createdAt),
     comment: asStringOrNull(item.comment),
     mimeType: asStringOrNull(item.mimeType),

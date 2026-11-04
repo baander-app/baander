@@ -42,10 +42,12 @@ interface SongPortInterface
     public function getVisibleArtistNamesForSongs(array $songIds, LibraryReadScope $scope): array;
 
     /**
+     * Titles and stored languages of the albums the scope can read; albums outside it are absent.
+     *
      * @param Uuid[] $albumIds
-     * @return array<string, string>
+     * @return array<string, array{title: string, language: string|null}> albumUuid => title and stored language
      */
-    public function getVisibleAlbumTitlesByIds(array $albumIds, LibraryReadScope $scope): array;
+    public function getVisibleAlbumTitlesAndLanguagesByIds(array $albumIds, LibraryReadScope $scope): array;
 
     public function findByPublicId(PublicId $publicId): ?Song;
 
@@ -100,9 +102,9 @@ interface SongPortInterface
 
     /**
      * @param Uuid[] $albumIds
-     * @return array<string, string> albumUuid => albumTitle
+     * @return array<string, array{title: string, language: string|null}> albumUuid => title and stored language
      */
-    public function getAlbumTitlesByIds(array $albumIds): array;
+    public function getAlbumTitlesAndLanguagesByIds(array $albumIds): array;
 
     /**
      * @param Uuid[] $uuids

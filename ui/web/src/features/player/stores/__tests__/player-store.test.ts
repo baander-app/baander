@@ -161,6 +161,12 @@ describe('player-store', () => {
       expect(usePlayerStore.getState().currentTrack?.publicId).toBe('selected')
       expect(usePlayerStore.getState().currentIndex).toBe(1)
     })
+
+    it('keeps the album language when a listed song enters the queue', () => {
+      usePlayerStore.getState().runtimeActions.playTrackFromList([{ ...track('selected'), albumLanguage: 'jpn' }], 0)
+      expect(usePlayerStore.getState().queue[0].albumLanguage).toBe('jpn')
+      expect(usePlayerStore.getState().currentTrack?.albumLanguage).toBe('jpn')
+    })
   })
 
   describe('adoptPreloadedNext', () => {

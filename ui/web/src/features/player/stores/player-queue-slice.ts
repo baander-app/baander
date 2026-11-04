@@ -52,7 +52,7 @@ export function createPlayerQueueSlice({ get, commit }: PlayerSliceContext): Pla
       if (songs[position].available !== true) return
       const tracks: Track[] = songs.map(song => ({
         publicId: song.publicId, available: song.available, title: song.title, artistName: song.artistName,
-        albumName: song.albumName, albumPublicId: song.albumPublicId, duration: song.duration,
+        albumName: song.albumName, albumLanguage: song.albumLanguage, albumPublicId: song.albumPublicId, duration: song.duration,
       }))
       get().playTrack(tracks[position], tracks)
     },

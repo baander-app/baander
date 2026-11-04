@@ -119,7 +119,7 @@ final class CatalogReadScopeRepositoryTest extends TestCase
         $this->assertNotNull($visible);
         $this->assertCount(1, $visible[1]);
         $this->assertSame([$this->allowedSong->getId()->toString() => $this->sharedArtist->getName()], $songs->getVisibleArtistNamesForSongs([$this->allowedSong->getId(), $this->deniedSong->getId()], $this->scope));
-        $this->assertSame([$this->allowedAlbum->getId()->toString() => $this->allowedAlbum->getTitle()], $songs->getVisibleAlbumTitlesByIds([$this->allowedAlbum->getId(), $this->deniedAlbum->getId()], $this->scope));
+        $this->assertSame([$this->allowedAlbum->getId()->toString() => ['title' => $this->allowedAlbum->getTitle(), 'language' => null]], $songs->getVisibleAlbumTitlesAndLanguagesByIds([$this->allowedAlbum->getId(), $this->deniedAlbum->getId()], $this->scope));
         $page = $songs->searchVisibleWithCursor(SearchOptions::create('Acceptance'), $this->scope);
         $this->assertSame(1, $page->getTotal());
         $this->assertCount(1, $page->getItems());

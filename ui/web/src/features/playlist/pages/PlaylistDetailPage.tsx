@@ -172,6 +172,7 @@ export function PlaylistDetailPage() {
         title: s.title ?? 'Unknown',
         artistName: s.artistName ?? undefined,
         albumName: s.albumName ?? undefined,
+        albumLanguage: s.albumLanguage ?? undefined,
         albumPublicId: s.albumId ?? undefined,
         duration: s.length ?? undefined,
       })),

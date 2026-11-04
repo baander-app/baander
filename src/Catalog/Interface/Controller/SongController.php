@@ -99,9 +99,9 @@ final class SongController
         $albumIds = array_map(fn (Song $s) => $s->getAlbumId(), $songs);
 
         $artistNames = $this->songService->getVisibleArtistNamesForSongs($songIds, $scope);
-        $albumTitles = $this->songService->getVisibleAlbumTitlesByIds($albumIds, $scope);
+        [$albumTitles, $albumLanguages] = SongResource::albumMaps($this->songService->getVisibleAlbumTitlesAndLanguagesByIds($albumIds, $scope));
 
-        return $this->cursorPaginatedResponse(CursorPaginatedResponse::fromPage($page, SongResource::collectionWithMeta($songs, $artistNames, $albumTitles, $this->availability->forSongs($songs))));
+        return $this->cursorPaginatedResponse(CursorPaginatedResponse::fromPage($page, SongResource::collectionWithMeta($songs, $artistNames, $albumTitles, $this->availability->forSongs($songs), $albumLanguages)));
     }
 
     /**
@@ -138,9 +138,9 @@ final class SongController
         }
 
         $artistNames = $this->songService->getVisibleArtistNamesForSongs([$song->getId()], $scope);
-        $albumTitles = $this->songService->getVisibleAlbumTitlesByIds([$song->getAlbumId()], $scope);
+        [$albumTitles, $albumLanguages] = SongResource::albumMaps($this->songService->getVisibleAlbumTitlesAndLanguagesByIds([$song->getAlbumId()], $scope));
 
-        return $this->successResponse(SongResource::fromWithMeta($song, $artistNames, $albumTitles, $this->availability->forSongs([$song])));
+        return $this->successResponse(SongResource::fromWithMeta($song, $artistNames, $albumTitles, $this->availability->forSongs([$song]), $albumLanguages));
     }
 
     /**
@@ -188,9 +188,9 @@ final class SongController
         assert($song instanceof Song);
 
         $artistNames = $this->songService->getArtistNamesForSongs([$song->getId()]);
-        $albumTitles = $this->songService->getAlbumTitlesByIds([$song->getAlbumId()]);
+        [$albumTitles, $albumLanguages] = SongResource::albumMaps($this->songService->getAlbumTitlesAndLanguagesByIds([$song->getAlbumId()]));
 
-        return $this->successResponse(SongResource::fromWithMeta($song, $artistNames, $albumTitles, $this->availability->forSongs([$song])));
+        return $this->successResponse(SongResource::fromWithMeta($song, $artistNames, $albumTitles, $this->availability->forSongs([$song]), $albumLanguages));
     }
 
     /**

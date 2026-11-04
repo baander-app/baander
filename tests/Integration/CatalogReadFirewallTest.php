@@ -548,11 +548,11 @@ final class CatalogReadFirewallTest extends TestCase
         $names = $songs->getVisibleArtistNamesForSongs([$allowed['song']->getId(), $denied['song']->getId()], $scope);
         self::assertArrayHasKey($allowed['song']->getId()->toString(), $names);
         self::assertArrayNotHasKey($denied['song']->getId()->toString(), $names);
-        $titles = $songs->getVisibleAlbumTitlesByIds([$allowed['album']->getId(), $denied['album']->getId()], $scope);
-        self::assertArrayHasKey($allowed['album']->getId()->toString(), $titles);
-        self::assertArrayNotHasKey($denied['album']->getId()->toString(), $titles);
+        $albumsSeen = $songs->getVisibleAlbumTitlesAndLanguagesByIds([$allowed['album']->getId(), $denied['album']->getId()], $scope);
+        self::assertArrayHasKey($allowed['album']->getId()->toString(), $albumsSeen);
+        self::assertArrayNotHasKey($denied['album']->getId()->toString(), $albumsSeen);
         self::assertSame([], $songs->getVisibleArtistNamesForSongs([$allowed['song']->getId()], $none));
-        self::assertSame([], $songs->getVisibleAlbumTitlesByIds([$allowed['album']->getId()], $none));
+        self::assertSame([], $songs->getVisibleAlbumTitlesAndLanguagesByIds([$allowed['album']->getId()], $none));
     }
 
     #[DataProvider('libraryActors')]

@@ -119,6 +119,7 @@ export interface ListSongData {
   available?: boolean;
   artistName?: string;
   albumName?: string;
+  albumLanguage?: string;
   year?: number;
   genre?: string;
   duration?: number;
@@ -199,6 +200,7 @@ export function ListRow({song, allSongs, style}: ListRowProps) {
           title: s.title,
           artistName: s.artistName,
           albumName: s.albumName,
+          albumLanguage: s.albumLanguage,
           albumPublicId: s.albumPublicId,
           duration: s.duration,
         }));
@@ -210,6 +212,7 @@ export function ListRow({song, allSongs, style}: ListRowProps) {
             title: song.title,
             artistName: song.artistName,
             albumName: song.albumName,
+            albumLanguage: song.albumLanguage,
             albumPublicId: song.albumPublicId,
             duration: song.duration,
           },
@@ -304,6 +307,7 @@ export function ListRow({song, allSongs, style}: ListRowProps) {
         title: song.title,
         artistName: song.artistName,
         albumName: song.albumName,
+        albumLanguage: song.albumLanguage,
         duration: song.duration,
         albumId: song.albumId,
         artistId: song.artistId,

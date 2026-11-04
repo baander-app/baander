@@ -32,6 +32,7 @@ interface SongSearchItem {
   title?: string
   artistName?: string
   albumName?: string
+  albumLanguage?: string | null
   /** Duration in seconds (song resource field name). */
   length?: number
   /** Alternate duration field some payloads use. */
@@ -112,6 +113,7 @@ export function SpotlightOverlay() {
       title: asString(s.title),
       artistName: asString(s.artistName),
       albumName: asString(s.albumName),
+      albumLanguage: s.albumLanguage ?? undefined,
       duration: typeof s.length === 'number' ? s.length : s.duration,
     }))
     playTrack(tracks[index], tracks.filter((track) => track.available === true))

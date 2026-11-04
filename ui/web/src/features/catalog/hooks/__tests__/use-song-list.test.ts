@@ -186,4 +186,14 @@ describe('useSongList pagination', () => {
     await waitFor(() => expect(mockGetSongIndex).toHaveBeenCalledOnce())
     expect(mockGetSongIndex.mock.calls[0][0]).toEqual({ limit: 100 })
   })
+
+  it('carries the album language of each song row', async () => {
+    mockGetSongIndex.mockResolvedValue({
+      ...page([], null, 2),
+      data: [{ publicId: 'song-1', title: '直', albumLanguage: 'jpn' }, { publicId: 'song-2', title: 'Plain', albumLanguage: null }],
+    })
+    const { result } = renderHook(() => useSongList({ sort }), { wrapper: wrapper() })
+    await waitFor(() => expect(result.current.songs).toHaveLength(2))
+    expect(result.current.songs.map((song) => song.albumLanguage)).toEqual(['jpn', undefined])
+  })
 })

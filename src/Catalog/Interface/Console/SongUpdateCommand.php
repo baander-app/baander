@@ -72,12 +72,14 @@ final class SongUpdateCommand extends Command
             return AdminCommandSupport::fail($io, $exception);
         }
 
-        // The same song resource SongController returns, with the artist and album names.
+        // The same song resource SongController returns, with the artist and album names and the album language.
+        [$albumTitles, $albumLanguages] = SongResource::albumMaps($this->songs->getAlbumTitlesAndLanguagesByIds([$song->getAlbumId()]));
         $resource = SongResource::fromWithMeta(
             $song,
             $this->songs->getArtistNamesForSongs([$song->getId()]),
-            $this->songs->getAlbumTitlesByIds([$song->getAlbumId()]),
+            $albumTitles,
             $this->availability->forSongs([$song]),
+            $albumLanguages,
         );
 
         if (AdminCommandSupport::wantsJson($input)) {

@@ -169,6 +169,7 @@ final class AlbumController
                         new OA\Property(property: 'label', type: 'string'),
                         new OA\Property(property: 'barcode', type: 'string'),
                         new OA\Property(property: 'country', type: 'string'),
+                        new OA\Property(property: 'language', type: 'string', nullable: true, description: 'Release language as stored; usually a language code, but tag readers may store free text'),
                         new OA\Property(property: 'createdAt', type: 'string', format: 'date-time'),
                         new OA\Property(property: 'songs', type: 'array', items: new OA\Items(ref: new Model(type: SongResource::class))),
                         new OA\Property(property: 'coverImage', properties: [

@@ -29,11 +29,12 @@ describe('usePlayAlbum with the generated API client', () => {
 
   afterEach(() => api.restore())
 
-  it('plays the first song with the album queue from the backend JSON body', async () => {
+  it('plays the first song with the album queue and the album language from the backend JSON body', async () => {
     api.onGet('/api/albums/album-1').reply(200, {
       data: {
         publicId: 'album-1',
         title: 'Album',
+        language: 'jpn',
         songs: [
           { available: true, publicId: 'song-1', title: 'First', artistName: 'Artist', length: 180 },
           { available: true, publicId: 'song-2', title: 'Second', artistName: null, length: null },
@@ -45,8 +46,8 @@ describe('usePlayAlbum with the generated API client', () => {
     await act(() => result.current.playAlbum('album-1', 'Album'))
 
     const tracks = [
-      { available: true, publicId: 'song-1', title: 'First', artistName: 'Artist', duration: 180, albumName: 'Album', albumPublicId: 'album-1' },
-      { available: true, publicId: 'song-2', title: 'Second', artistName: undefined, duration: undefined, albumName: 'Album', albumPublicId: 'album-1' },
+      { available: true, publicId: 'song-1', title: 'First', artistName: 'Artist', duration: 180, albumName: 'Album', albumLanguage: 'jpn', albumPublicId: 'album-1' },
+      { available: true, publicId: 'song-2', title: 'Second', artistName: undefined, duration: undefined, albumName: 'Album', albumLanguage: 'jpn', albumPublicId: 'album-1' },
     ]
     expect(playTrack).toHaveBeenCalledWith(tracks[0], tracks)
     expect(api.history.get).toHaveLength(1)

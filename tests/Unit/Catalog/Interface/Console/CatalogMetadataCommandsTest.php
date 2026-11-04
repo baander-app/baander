@@ -119,7 +119,7 @@ final class CatalogMetadataCommandsTest extends TestCase
         self::assertStringContainsString('--year must be an integer.', $tester->getDisplay());
     }
 
-    public function testSongUpdatePrintsTheResourceWithArtistAndAlbumNames(): void
+    public function testSongUpdatePrintsTheResourceWithArtistAndAlbumNamesAndAlbumLanguage(): void
     {
         $song = Song::create(new Uuid(), 'Come Together', '/music/come-together.flac', 1024, 'audio/flac');
         $song = Song::reconstitute(new \App\Catalog\Domain\Model\SongState(...array_replace(get_object_vars($song->getState()), ['albumPublicId' => new PublicId()])));
@@ -127,7 +127,7 @@ final class CatalogMetadataCommandsTest extends TestCase
         $songs->method('findByPublicId')->willReturn($song);
         $songs->expects(self::exactly(2))->method('save')->with($song);
         $songs->method('getArtistNamesForSongs')->willReturn([$song->getId()->toString() => 'The Beatles']);
-        $songs->method('getAlbumTitlesByIds')->willReturn([$song->getAlbumId()->toString() => 'Abbey Road']);
+        $songs->method('getAlbumTitlesAndLanguagesByIds')->willReturn([$song->getAlbumId()->toString() => ['title' => 'Abbey Road', 'language' => 'eng']]);
 
         $availability = $this->createMock(\App\Catalog\Application\Port\SongAvailabilityPortInterface::class);
         $availability->expects(self::exactly(2))->method('forSongs')->with([$song])->willReturn([$song->getId()->toString() => true]);
@@ -141,8 +141,8 @@ final class CatalogMetadataCommandsTest extends TestCase
             '--json' => true,
         ]), $tester->getDisplay());
         $printed = json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR);
-        self::assertSame(SongResource::fromWithMeta($song, ['' . $song->getId() => 'The Beatles'], ['' . $song->getAlbumId() => 'Abbey Road'], [$song->getId()->toString() => true]), $printed);
-        self::assertSame(['The Beatles', 'Abbey Road', 1, true, ['title']], [$printed['artistName'], $printed['albumName'], $printed['track'], $printed['explicit'], $printed['lockedFields']]);
+        self::assertSame(SongResource::fromWithMeta($song, ['' . $song->getId() => 'The Beatles'], ['' . $song->getAlbumId() => 'Abbey Road'], [$song->getId()->toString() => true], ['' . $song->getAlbumId() => 'eng']), $printed);
+        self::assertSame(['The Beatles', 'Abbey Road', 'eng', 1, true, ['title']], [$printed['artistName'], $printed['albumName'], $printed['albumLanguage'], $printed['track'], $printed['explicit'], $printed['lockedFields']]);
 
         $notExplicit = new CommandTester(new SongUpdateCommand($this->support(songs: $songs), $songs, $availability));
         self::assertSame(Command::SUCCESS, $notExplicit->execute(['public-id' => $song->getPublicId()->toString(), '--no-explicit' => true]));

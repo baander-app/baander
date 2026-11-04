@@ -97,7 +97,7 @@ final class SongRepository implements SongRepositoryInterface
         return $this->getArtistNamesForSongs(array_map(static fn (SongEntity $entity): Uuid => $entity->getId(), $entities));
     }
 
-    public function getVisibleAlbumTitlesByIds(array $albumIds, LibraryReadScope $scope): array
+    public function getVisibleAlbumTitlesAndLanguagesByIds(array $albumIds, LibraryReadScope $scope): array
     {
         if ($albumIds === []) {
             return [];
@@ -111,7 +111,7 @@ final class SongRepository implements SongRepositoryInterface
             ->setParameter('albumIds', $albumIds)
             ->getQuery()
             ->getResult();
-        return $this->getAlbumTitlesByIds(array_map(static fn (AlbumEntity $entity): Uuid => $entity->getId(), $entities));
+        return $this->getAlbumTitlesAndLanguagesByIds(array_map(static fn (AlbumEntity $entity): Uuid => $entity->getId(), $entities));
     }
 
     public function save(Song $song): void
@@ -582,7 +582,7 @@ final class SongRepository implements SongRepositoryInterface
         return $map;
     }
 
-    public function getAlbumTitlesByIds(array $albumIds): array
+    public function getAlbumTitlesAndLanguagesByIds(array $albumIds): array
     {
         if ($albumIds === []) {
             return [];
@@ -590,7 +590,7 @@ final class SongRepository implements SongRepositoryInterface
 
         $results = $this->entityManager->createQuery(
             <<<'DQL'
-                SELECT a.id AS albumId, a.title
+                SELECT a.id AS albumId, a.title, a.language
                 FROM App\Catalog\Infrastructure\Doctrine\Entity\AlbumEntity a
                 WHERE a.id IN (:albumIds)
                 DQL,
@@ -600,12 +600,11 @@ final class SongRepository implements SongRepositoryInterface
 
         $map = [];
         foreach ($results as $row) {
-            $map[$row['albumId']->toString()] = $row['title'];
+            $map[$row['albumId']->toString()] = ['title' => $row['title'], 'language' => $row['language']];
         }
 
         return $map;
     }
-
     public function findAllForRecommendations(): array
     {
         $entities = $this->entityManager

@@ -97,7 +97,6 @@ final class AlbumResourceTest extends TestCase
         $this->assertArrayNotHasKey('annotation', $result);
         $this->assertArrayNotHasKey('disambiguation', $result);
         $this->assertArrayNotHasKey('catalogNumber', $result);
-        $this->assertArrayNotHasKey('language', $result);
         $this->assertArrayNotHasKey('mbid', $result);
         $this->assertArrayNotHasKey('discogsId', $result);
         $this->assertArrayNotHasKey('spotifyId', $result);
@@ -115,6 +114,16 @@ final class AlbumResourceTest extends TestCase
         $this->assertNull($result['label']);
         $this->assertNull($result['barcode']);
         $this->assertNull($result['country']);
+        $this->assertArrayHasKey('language', $result);
+        $this->assertNull($result['language']);
+    }
+
+    public function testFromCarriesTheStoredLanguageUnchanged(): void
+    {
+        $album = Album::create(Uuid::v4(), 'Album', 'Album', language: 'jpn');
+
+        $this->assertSame('jpn', AlbumResource::from($album)['language']);
+        $this->assertSame('English', AlbumResource::from($this->album)['language']);
     }
 
     public function testFromWithCoverIncludesAllBaseFields(): void

@@ -60,6 +60,14 @@ describe('useContextActions', () => {
     )
   })
 
+  it('playSong keeps the album language on the track', () => {
+    const { result } = renderHook(() => useContextActions())
+    act(() => {
+      result.current.playSong({ ...sampleSong, albumLanguage: 'jpn' })
+    })
+    expect(mockPlayTrack).toHaveBeenCalledWith(expect.objectContaining({ albumLanguage: 'jpn' }), undefined)
+  })
+
   it('playSong passes queue when provided', () => {
     const { result } = renderHook(() => useContextActions())
     const queue = [

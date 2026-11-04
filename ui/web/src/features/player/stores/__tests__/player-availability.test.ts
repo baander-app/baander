@@ -1,4 +1,5 @@
 import { registerPlayerHandlers } from '../player-handlers'
+import { readTrackResource } from '../player-availability'
 import { mediator } from '@/shared/lib/mediator/bus'
 import { RADIO_ACTIONS } from '@/features/radio/radio-actions'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -169,5 +170,12 @@ describe('restored music availability', () => {
     await settle()
     expect(usePlayerStore.getState().currentTrack).toBe(selected)
     expect(usePlayerStore.getState().queue).toEqual([selected])
+  })
+})
+
+describe('readTrackResource', () => {
+  it('reads the album language from a song resource', () => {
+    expect(readTrackResource({ publicId: 'song-1', title: '直', albumLanguage: 'jpn' })?.albumLanguage).toBe('jpn')
+    expect(readTrackResource({ publicId: 'song-2', title: 'Plain', albumLanguage: null })?.albumLanguage).toBeUndefined()
   })
 })

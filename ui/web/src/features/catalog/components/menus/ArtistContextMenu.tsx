@@ -45,6 +45,7 @@ export function ArtistContextMenu({ artist, children }: ArtistContextMenuProps) 
         title: String(s.title ?? ''),
         artistName: artist.name,
         albumName: s.albumName ? String(s.albumName) : undefined,
+        albumLanguage: typeof s.albumLanguage === 'string' ? s.albumLanguage : undefined,
         albumPublicId: typeof s.albumId === 'string' ? s.albumId : undefined,
         duration: typeof s.length === 'number' ? s.length : undefined,
       }))
@@ -73,6 +74,7 @@ export function ArtistContextMenu({ artist, children }: ArtistContextMenuProps) 
         title: String(s.title ?? ''),
         artistName: artist.name,
         albumName: s.albumName ? String(s.albumName) : undefined,
+        albumLanguage: typeof s.albumLanguage === 'string' ? s.albumLanguage : undefined,
         albumPublicId: typeof s.albumId === 'string' ? s.albumId : undefined,
         duration: typeof s.length === 'number' ? s.length : undefined,
       }))

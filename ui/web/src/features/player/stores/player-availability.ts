@@ -13,6 +13,7 @@ export function readTrackResource(value: unknown): Track | null {
     duration: typeof resource.length === 'number' && Number.isFinite(resource.length) && resource.length > 0 ? resource.length : 0,
     artistName: typeof resource.artistName === 'string' ? resource.artistName : undefined,
     albumName: typeof resource.albumName === 'string' ? resource.albumName : undefined,
+    albumLanguage: typeof resource.albumLanguage === 'string' ? resource.albumLanguage : undefined,
     albumPublicId: typeof resource.albumId === 'string' ? resource.albumId : undefined,
   }
 }

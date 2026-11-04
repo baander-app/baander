@@ -42,7 +42,7 @@ export function AlbumContextMenu({ album, tracks, children }: AlbumContextMenuPr
       const response = await getAlbumShow(album.publicId)
       const songs = response.data?.songs
       if (!songs || songs.length === 0) return []
-      return songResourcesToTracks(songs, album.title, album.publicId)
+      return songResourcesToTracks(songs, album.title, album.publicId, response.data?.language ?? undefined)
     } catch {
       return []
     }

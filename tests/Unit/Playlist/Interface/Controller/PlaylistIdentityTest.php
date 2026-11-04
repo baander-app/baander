@@ -55,7 +55,7 @@ final class PlaylistIdentityTest extends TestCase
         $songs = $this->createMock(SongPortInterface::class);
         $songs->expects(self::never())->method('findVisibleByUuids');
         $songs->expects(self::never())->method('getVisibleArtistNamesForSongs');
-        $songs->expects(self::never())->method('getVisibleAlbumTitlesByIds');
+        $songs->expects(self::never())->method('getVisibleAlbumTitlesAndLanguagesByIds');
         $scopes = $this->createMock(LibraryReadScopeProviderInterface::class);
         $scopes->expects(self::never())->method('current');
         $controller = new PlaylistController(

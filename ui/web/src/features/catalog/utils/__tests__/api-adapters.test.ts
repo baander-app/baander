@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { extractCursorMeta, extractPaginatedMeta } from '../api-adapters'
+import { asAlbumFromData, asSongs, extractCursorMeta, extractPaginatedMeta } from '../api-adapters'
 
 describe('extractPaginatedMeta', () => {
   it('reads backend snake case metadata and preserves the full collection total', () => {
@@ -44,5 +44,19 @@ describe('extractCursorMeta', () => {
       meta: { next_cursor: 12, has_next_page: 'true', total: '125' },
     })).toEqual({ next_cursor: null, has_next_page: false, total: 0 })
     expect(extractCursorMeta(undefined)).toEqual({ next_cursor: null, has_next_page: false, total: 0 })
+  })
+})
+
+describe('album language', () => {
+  it('maps the stored album language onto each song', () => {
+    const songs = asSongs({ data: [
+      { publicId: 'song-1', title: '直', albumLanguage: 'jpn' },
+      { publicId: 'song-2', title: 'Plain' },
+    ] })
+    expect(songs.map((song) => song.albumLanguage)).toEqual(['jpn', null])
+  })
+
+  it('keeps the stored album language unchanged on the album', () => {
+    expect(asAlbumFromData({ data: { publicId: 'album-1', title: '直', language: 'Japanese' } })?.language).toBe('Japanese')
   })
 })

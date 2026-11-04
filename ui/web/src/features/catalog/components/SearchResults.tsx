@@ -205,6 +205,7 @@ export function SearchResults({query}: { query: string }) {
       title: s.title,
       artistName: s.artistName ?? undefined,
       albumName: s.albumName ?? undefined,
+      albumLanguage: s.albumLanguage ?? undefined,
       albumPublicId: s.albumId,
       duration: s.length ?? undefined,
     }));
@@ -284,6 +285,7 @@ export function SearchResults({query}: { query: string }) {
                   title: song.title,
                   artistName: song.artistName ?? undefined,
                   albumName: song.albumName ?? undefined,
+                  albumLanguage: song.albumLanguage ?? undefined,
                   duration: song.length ?? undefined,
                 }}
               >

@@ -144,6 +144,7 @@ export function useColumnBrowser(): UseColumnBrowserReturn {
         available: s.available === true,
         artistName: String(s.artistName ?? albumInfo?.artistName ?? ''),
         albumName: String(s.albumName ?? albumInfo?.title ?? ''),
+        albumLanguage: typeof s.albumLanguage === 'string' ? s.albumLanguage : undefined,
         albumPublicId: String(s.albumId ?? albumInfo?.publicId ?? ''),
         duration: typeof (s.length ?? s.duration) === 'number' ? (s.length ?? s.duration) as number : undefined,
         year: typeof s.year === 'number' ? s.year : undefined,

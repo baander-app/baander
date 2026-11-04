@@ -223,7 +223,7 @@ final class PlaylistSongIdentityTest extends TestCase
         $songs = $this->createStub(SongPortInterface::class);
         $songs->method('findVisibleByUuids')->willReturn([]);
         $songs->method('getVisibleArtistNamesForSongs')->willReturn([]);
-        $songs->method('getVisibleAlbumTitlesByIds')->willReturn([]);
+        $songs->method('getVisibleAlbumTitlesAndLanguagesByIds')->willReturn([]);
         $scopes = $this->createStub(LibraryReadScopeProviderInterface::class);
         $scopes->method('current')->willReturn(LibraryReadScope::none());
         $controller = new PlaylistController($security, $playlists, $songs, $this->createStub(MessageBusInterface::class), $scopes, $this->createStub(PlaylistCollaboratorResolverInterface::class), $this->createStub(PlaylistSongVisibilityInterface::class), $this->createStub(\App\Catalog\Application\Port\SongAvailabilityPortInterface::class));

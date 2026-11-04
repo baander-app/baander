@@ -6,6 +6,8 @@ export interface Track {
   available?: boolean
   artistName?: string
   albumName?: string
+  /** Release language stored on the album, unchanged. Tracks queued before it was carried lack it. */
+  albumLanguage?: string
   albumPublicId?: string
   duration?: number
 }

@@ -4801,6 +4801,11 @@
                                                 "country": {
                                                     "type": "string"
                                                 },
+                                                "language": {
+                                                    "description": "Release language as stored; usually a language code, but tag readers may store free text",
+                                                    "type": "string",
+                                                    "nullable": true
+                                                },
                                                 "createdAt": {
                                                     "type": "string",
                                                     "format": "date-time"
@@ -12464,6 +12469,11 @@
                                                                 "nullable": true
                                                             },
                                                             "albumName": {
+                                                                "type": "string",
+                                                                "nullable": true
+                                                            },
+                                                            "albumLanguage": {
+                                                                "description": "Release language stored on the album, unchanged; usually a language code, but tag readers may store free text",
                                                                 "type": "string",
                                                                 "nullable": true
                                                             },
@@ -25807,6 +25817,11 @@
                         "type": "string",
                         "nullable": true
                     },
+                    "albumLanguage": {
+                        "description": "Release language stored on the album, unchanged; usually a language code, but tag readers may store free text",
+                        "type": "string",
+                        "nullable": true
+                    },
                     "year": {
                         "description": "Release year",
                         "type": "integer",
@@ -25896,6 +25911,11 @@
                     },
                     "country": {
                         "description": "Country of release",
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "language": {
+                        "description": "Release language as stored; usually a language code, but tag readers may store free text",
                         "type": "string",
                         "nullable": true
                     },

@@ -47,6 +47,7 @@ export function SongContextMenu({ song, children }: SongContextMenuProps) {
     title: song.title,
     artistName: song.artistName,
     albumName: song.albumName,
+    albumLanguage: song.albumLanguage,
     duration: song.duration,
   }
 
@@ -119,6 +120,7 @@ export function SongContextMenu({ song, children }: SongContextMenuProps) {
               title: song.title,
               artistName: song.artistName,
               albumName: song.albumName,
+              albumLanguage: song.albumLanguage,
               duration: song.duration,
             }
             mediator.dispatch(PLAYER_ACTIONS.QUEUE_ADD, { track }, 'catalog')

@@ -186,6 +186,7 @@ export function ColumnBrowserView() {
               title: s.title,
               artistName: s.artistName,
               albumName: s.albumName,
+              albumLanguage: s.albumLanguage,
               albumPublicId: s.albumPublicId,
               duration: s.duration,
             }))

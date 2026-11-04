@@ -19,6 +19,7 @@ use OpenApi\Attributes as OA;
         new OA\Property(property: 'label', type: 'string', nullable: true, description: 'Record label'),
         new OA\Property(property: 'barcode', type: 'string', nullable: true, description: 'Barcode'),
         new OA\Property(property: 'country', type: 'string', nullable: true, description: 'Country of release'),
+        new OA\Property(property: 'language', type: 'string', nullable: true, description: 'Release language as stored; usually a language code, but tag readers may store free text'),
         new OA\Property(property: 'createdAt', type: 'string', format: 'date-time', description: 'Creation timestamp'),
     ],
 )]
@@ -36,6 +37,7 @@ final class AlbumResource extends AbstractResource
             'label' => $source->getLabel(),
             'barcode' => $source->getBarcode(),
             'country' => $source->getCountry(),
+            'language' => $source->getLanguage(),
             'createdAt' => $source->getCreatedAt()->format(\DateTimeInterface::ATOM),
         ];
     }

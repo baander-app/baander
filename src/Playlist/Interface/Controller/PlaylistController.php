@@ -190,6 +190,7 @@ final class PlaylistController
                             new OA\Property(property: 'title', type: 'string'),
                             new OA\Property(property: 'artistName', type: 'string', nullable: true),
                             new OA\Property(property: 'albumName', type: 'string', nullable: true),
+                            new OA\Property(property: 'albumLanguage', type: 'string', nullable: true, description: 'Release language stored on the album, unchanged; usually a language code, but tag readers may store free text'),
                             new OA\Property(property: 'year', type: 'integer', nullable: true),
                             new OA\Property(property: 'length', type: 'number', nullable: true, description: 'Duration in seconds'),
                             new OA\Property(property: 'track', type: 'integer', nullable: true),
@@ -239,7 +240,7 @@ final class PlaylistController
             static fn(\App\Catalog\Domain\Model\Song $song) => $song->getAlbumId(),
             array_values($songMap),
         );
-        $albumTitles = $this->songService->getVisibleAlbumTitlesByIds($albumIds, $scope);
+        [$albumTitles, $albumLanguages] = SongResource::albumMaps($this->songService->getVisibleAlbumTitlesAndLanguagesByIds($albumIds, $scope));
 
         $availability = $this->availability->forSongs(array_values($songMap));
         $songs = [];
@@ -248,7 +249,7 @@ final class PlaylistController
             if ($song === null) {
                 continue;
             }
-            $data = SongResource::fromWithMeta($song, $artistNames, $albumTitles, $availability);
+            $data = SongResource::fromWithMeta($song, $artistNames, $albumTitles, $availability, $albumLanguages);
             unset($data['path']);
             $songs[] = array_merge(['position' => $playlistSong->getPosition()], $data);
         }

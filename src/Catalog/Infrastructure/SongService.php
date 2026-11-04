@@ -60,13 +60,9 @@ final class SongService implements SongPortInterface
         return $this->songRepository->getVisibleArtistNamesForSongs($songIds, $scope);
     }
 
-    /**
-     * @param Uuid[] $albumIds
-     * @return array<string, string>
-     */
-    public function getVisibleAlbumTitlesByIds(array $albumIds, LibraryReadScope $scope): array
+    public function getVisibleAlbumTitlesAndLanguagesByIds(array $albumIds, LibraryReadScope $scope): array
     {
-        return $this->songRepository->getVisibleAlbumTitlesByIds($albumIds, $scope);
+        return $this->songRepository->getVisibleAlbumTitlesAndLanguagesByIds($albumIds, $scope);
     }
 
     public function findByPublicId(PublicId $publicId): ?Song
@@ -165,9 +161,9 @@ final class SongService implements SongPortInterface
         return $this->songRepository->getArtistNamesForSongs($songIds);
     }
 
-    public function getAlbumTitlesByIds(array $albumIds): array
+    public function getAlbumTitlesAndLanguagesByIds(array $albumIds): array
     {
-        return $this->songRepository->getAlbumTitlesByIds($albumIds);
+        return $this->songRepository->getAlbumTitlesAndLanguagesByIds($albumIds);
     }
 
     public function findByUuids(array $uuids): array

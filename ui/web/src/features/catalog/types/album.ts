@@ -5,6 +5,8 @@ export interface SongEntry {
   available?: boolean
   artistName?: string
   albumName?: string
+  /** Release language stored on the album, unchanged. */
+  albumLanguage?: string
   albumPublicId?: string
   duration?: number
   year?: number
@@ -57,6 +59,8 @@ export interface SongSummary {
   lyrics: string | null
   artistName: string | null
   albumName: string | null
+  /** Release language stored on the song's album, unchanged. */
+  albumLanguage: string | null
   createdAt: string
   /** Free-text comment (present on detail responses). */
   comment?: string | null

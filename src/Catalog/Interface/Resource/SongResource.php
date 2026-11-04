@@ -18,6 +18,7 @@ use OpenApi\Attributes as OA;
         new OA\Property(property: 'title', type: 'string', description: 'Song title'),
         new OA\Property(property: 'artistName', type: 'string', nullable: true, description: 'Primary artist name'),
         new OA\Property(property: 'albumName', type: 'string', nullable: true, description: 'Album title'),
+        new OA\Property(property: 'albumLanguage', type: 'string', nullable: true, description: 'Release language stored on the album, unchanged; usually a language code, but tag readers may store free text'),
         new OA\Property(property: 'year', type: 'integer', nullable: true, description: 'Release year'),
         new OA\Property(property: 'path', type: 'string', nullable: true, description: 'File path'),
         new OA\Property(property: 'length', type: 'number', nullable: true, description: 'Duration in seconds'),
@@ -40,9 +41,10 @@ final class SongResource extends AbstractResource
      * @param array<string, string> $artistNames  songUuid => artistName
      * @param array<string, string> $albumTitles  albumUuid => albumTitle
      * @param array<string, bool> $availability songUuid => observed source availability
+     * @param array<string, string|null> $albumLanguages albumUuid => stored album language
      * @return array<string, mixed>
      */
-    public static function fromWithMeta(Song $song, array $artistNames = [], array $albumTitles = [], array $availability = []): array
+    public static function fromWithMeta(Song $song, array $artistNames = [], array $albumTitles = [], array $availability = [], array $albumLanguages = []): array
     {
         $songUuid = $song->getId()->toString();
         $albumUuid = $song->getAlbumId()->toString();
@@ -54,6 +56,7 @@ final class SongResource extends AbstractResource
             'title' => $song->getTitle(),
             'artistName' => $artistNames[$songUuid] ?? null,
             'albumName' => $albumTitles[$albumUuid] ?? null,
+            'albumLanguage' => $albumLanguages[$albumUuid] ?? null,
             'year' => $song->getYear(),
             'path' => $song->getPath(),
             'length' => $song->getLength(),
@@ -67,17 +70,33 @@ final class SongResource extends AbstractResource
     }
 
     /**
+     * Splits album titles and stored languages keyed by album UUID into the title map and the
+     * language map the song projection reads.
+     *
+     * @param array<string, array{title: string, language: string|null}> $albums
+     * @return array{array<string, string>, array<string, string|null>}
+     */
+    public static function albumMaps(array $albums): array
+    {
+        return [
+            array_map(static fn (array $album): string => $album['title'], $albums),
+            array_map(static fn (array $album): ?string => $album['language'], $albums),
+        ];
+    }
+
+    /**
      * @param iterable<Song> $songs
      * @param array<string, string> $artistNames  songUuid => artistName
      * @param array<string, string> $albumTitles  albumUuid => albumTitle
      * @param array<string, bool> $availability songUuid => observed source availability
+     * @param array<string, string|null> $albumLanguages albumUuid => stored album language
      * @return list<array<string, mixed>>
      */
-    public static function collectionWithMeta(iterable $songs, array $artistNames, array $albumTitles, array $availability = []): array
+    public static function collectionWithMeta(iterable $songs, array $artistNames, array $albumTitles, array $availability = [], array $albumLanguages = []): array
     {
         $result = [];
         foreach ($songs as $song) {
-            $result[] = self::fromWithMeta($song, $artistNames, $albumTitles, $availability);
+            $result[] = self::fromWithMeta($song, $artistNames, $albumTitles, $availability, $albumLanguages);
         }
 
         return $result;

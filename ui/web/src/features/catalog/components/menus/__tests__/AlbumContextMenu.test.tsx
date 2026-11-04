@@ -155,9 +155,10 @@ describe('AlbumContextMenu', () => {
         artistName: song.artistName ?? undefined,
         duration: song.length ?? undefined,
         albumName: album.title,
+        albumLanguage: 'jpn',
         albumPublicId: album.publicId,
       }))
-      api.onGet('/api/albums/album-1').reply(200, { data: { ...album, songs } })
+      api.onGet('/api/albums/album-1').reply(200, { data: { ...album, language: 'jpn', songs } })
       const user = userEvent.setup()
       renderMenu()
 

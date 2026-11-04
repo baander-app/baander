@@ -9,6 +9,7 @@ export interface SongContextMenuData {
   available?: boolean
   artistName?: string
   albumName?: string
+  albumLanguage?: string
   duration?: number
   albumId?: string
   artistId?: string
@@ -44,6 +45,7 @@ export function useContextActions() {
         title: song.title,
         artistName: song.artistName,
         albumName: song.albumName,
+        albumLanguage: song.albumLanguage,
         albumPublicId: song.albumId,
         duration: song.duration,
       }

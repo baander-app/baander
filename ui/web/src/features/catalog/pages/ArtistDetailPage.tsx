@@ -162,6 +162,7 @@ export function ArtistDetailPage() {
       title: String(s.title ?? ''),
       artistName: artistName || undefined,
       albumName: s.albumName ? String(s.albumName) : undefined,
+      albumLanguage: typeof s.albumLanguage === 'string' ? s.albumLanguage : undefined,
       albumPublicId: typeof s.albumId === 'string' ? s.albumId : undefined,
       duration: typeof s.length === 'number' ? s.length : undefined,
     }))
