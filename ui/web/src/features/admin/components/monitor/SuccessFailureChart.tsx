@@ -1,4 +1,5 @@
 import styled from 'styled-components'
+import { textRole } from '@/shared/theme'
 
 interface SuccessFailureChartProps {
   statusCounts: Record<string, number>
@@ -38,7 +39,7 @@ const Card = styled.div`
 `
 
 const Title = styled.h3`
-  font-size: 0.875rem;
+  ${textRole('body')}
   font-weight: 500;
   color: var(--color-muted-foreground);
 `
@@ -68,7 +69,7 @@ const LegendItem = styled.div`
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  font-size: 0.875rem;
+  ${textRole('body-sm')}
 `
 
 const LegendDot = styled.div<{ $color: string }>`

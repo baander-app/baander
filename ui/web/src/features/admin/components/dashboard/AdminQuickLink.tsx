@@ -1,7 +1,7 @@
 import styled from 'styled-components'
 import { Link } from 'react-router-dom'
 import { ArrowRight } from 'lucide-react'
-import { interactiveTransition } from '@/shared/theme'
+import { interactiveTransition, textRole } from '@/shared/theme'
 
 const Card = styled(Link)`
   display: block;
@@ -28,7 +28,7 @@ const IconWrapper = styled.span`
 `
 
 const LabelText = styled.span`
-  font-size: 0.875rem;
+  ${textRole('body')}
   font-weight: 500;
 `
 
@@ -44,7 +44,7 @@ const Arrow = styled(ArrowRight)`
 
 const Description = styled.p`
   margin-top: 0.25rem;
-  font-size: 0.75rem;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
 `
 

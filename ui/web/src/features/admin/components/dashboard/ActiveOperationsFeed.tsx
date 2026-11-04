@@ -1,7 +1,8 @@
 import styled from 'styled-components'
+import { textRole } from '@/shared/theme'
 
 const Text = styled.p`
-  font-size: 13px;
+  ${textRole('body-sm')}
   color: var(--color-muted-foreground);
 `
 

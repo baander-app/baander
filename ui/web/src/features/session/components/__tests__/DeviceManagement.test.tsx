@@ -53,7 +53,7 @@ describe('DeviceManagement', () => {
     }
     renderDevices(body)
 
-    expect(await screen.findByText('Office desktop')).toBeInTheDocument()
+    expect(await screen.findByText('Office desktop')).toHaveAttribute('lang', 'en')
     expect(screen.getByText('Phone')).toBeInTheDocument()
     expect(screen.getByText('Last used today')).toBeInTheDocument()
     expect(screen.queryByText('No devices registered')).not.toBeInTheDocument()

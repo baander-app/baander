@@ -1,6 +1,6 @@
 import styled from 'styled-components'
 import type { JobListItem } from '../../api/job-monitor-api'
-import { interactiveTransition } from '@/shared/theme'
+import { interactiveTransition, textRole } from '@/shared/theme'
 
 interface JobTableRowProps {
   job: JobListItem
@@ -51,7 +51,7 @@ const Row = styled.div`
   gap: 0.5rem;
   border-radius: 0.375rem;
   padding: 0.5rem 1rem;
-  font-size: 0.875rem;
+  ${textRole('body-sm')}
   cursor: pointer;
   ${interactiveTransition(['background-color'])}
 
@@ -71,7 +71,7 @@ const StatusBadge = styled.span<{ $bg: string; $text: string }>`
   justify-content: center;
   border-radius: 50px;
   padding: 0.125rem 0.5rem;
-  font-size: 0.75rem;
+  ${textRole('caption')}
   font-weight: 500;
   background-color: ${({ $bg }) => $bg};
   color: ${({ $text }) => $text};
@@ -112,17 +112,17 @@ const ProgressFill = styled.div`
 `
 
 const ProgressLabel = styled.span`
-  font-size: 0.75rem;
+  ${textRole('caption')}
   font-variant-numeric: tabular-nums;
   color: var(--color-muted-foreground);
 `
 
 const TabularText = styled(MutedText)`
-  font-variant-numeric: tabular-nums;
+  ${textRole('mono-sm')}
 `
 
 const SmallMuted = styled.span`
-  font-size: 0.75rem;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
 `
 

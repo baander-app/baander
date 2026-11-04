@@ -3,6 +3,7 @@ import { useMutation, useQuery } from '@tanstack/react-query'
 import styled from 'styled-components'
 import { Button } from '@/shared/components/ui/button'
 import { useTranslation } from '@/shared/i18n'
+import { textRole } from '@/shared/theme'
 import {
   type AuthorizationDecision,
   type AuthorizationLookup,
@@ -16,20 +17,15 @@ import { leaveAppFor } from '../lib/browser-navigation'
 import { checkedClientRedirect } from '../lib/client-redirect'
 import { parseApiError } from '../lib/parse-api-error'
 import { retryAfterSeconds } from '../lib/retry-after'
+import { ClientRequestIntro } from './ClientRequestIntro'
 import { ScopeList } from './ScopeList'
 import { ErrorAlert, Form, FullWidthButton, Hint, Notice } from './auth-form-styles'
 
 const KNOWN_CLIENT_TYPES = new Set(['public', 'confidential'])
 
-const ClientIntro = styled.p`
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: var(--color-foreground);
-`
-
 const ClientType = styled.p`
   margin-top: 0.25rem;
-  font-size: 0.75rem;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
 `
 
@@ -207,7 +203,7 @@ export function OAuthConsent({ query }: OAuthConsentProps) {
       return (
         <Form as="div">
           <div>
-            <ClientIntro>{t('auth.consent.requestIntro', { client: details.clientName })}</ClientIntro>
+            <ClientRequestIntro messageKey="auth.consent.requestIntro" clientName={details.clientName} />
             {KNOWN_CLIENT_TYPES.has(details.clientType) && (
               <ClientType>{t(`auth.consent.clientType.${details.clientType}`)}</ClientType>
             )}

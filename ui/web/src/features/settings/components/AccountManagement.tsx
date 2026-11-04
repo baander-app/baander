@@ -6,6 +6,7 @@ import { applyCurrentUser } from '@/features/auth/lib/current-user'
 import { parseApiError } from '@/features/auth/lib/parse-api-error'
 import { putAuthMeEmail } from '@/shared/api-client/gen/endpoints'
 import { useTranslation } from '@/shared/i18n'
+import { textRole } from '@/shared/theme'
 import { Button } from '@/shared/components/ui/button'
 import { Input } from '@/shared/components/ui/input'
 import { Card, CardContent } from '@/shared/components/ui/card'
@@ -50,22 +51,19 @@ const RowText = styled.div`
 `
 
 const Label = styled.p`
-  font-size: 11px;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  ${textRole('label')}
   color: var(--color-muted-foreground);
 `
 
 const Value = styled.p`
-  font-size: 0.875rem;
+  ${textRole('body')}
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 `
 
 const ValueMuted = styled.p`
-  font-size: 0.875rem;
+  ${textRole('body')}
   color: var(--color-muted-foreground);
 `
 
@@ -98,25 +96,25 @@ const ErrorBox = styled.div`
   border-radius: var(--radius-md);
   background-color: var(--color-muted);
   padding: 0.75rem;
-  font-size: 0.875rem;
+  ${textRole('body')}
   color: var(--color-destructive);
 `
 
 const FieldLabel = styled.label`
   display: block;
   margin-bottom: 0.375rem;
-  font-size: 0.75rem;
+  ${textRole('caption')}
   font-weight: 500;
   color: var(--color-muted-foreground);
 `
 
 const Heading = styled.p`
-  font-size: 0.875rem;
+  ${textRole('body')}
   font-weight: 500;
 `
 
 const Subheading = styled.p`
-  font-size: 0.75rem;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
 `
 

@@ -1,6 +1,8 @@
 import { captureOwnership, isCurrentOwnership } from '@/shared/live/ownership'
 import { useState } from 'react'
 import styled from 'styled-components'
+import { textRole } from '@/shared/theme'
+import { ContentText } from '@/shared/typography'
 import { Button } from '@/shared/components/ui/button'
 import {
   Dialog,
@@ -15,7 +17,7 @@ import { type AdminOAuthClientResource } from '@/shared/api-client/gen/endpoints
 import { useRevokeOAuthClient } from '../../hooks/use-oauth-clients'
 
 const ErrorText = styled.p`
-  font-size: 0.8125rem;
+  ${textRole('body-sm')}
   color: var(--color-destructive);
 `
 
@@ -58,7 +60,7 @@ export function RevokeOAuthClientDialog({ client, open, onOpenChange }: RevokeOA
         <DialogHeader>
           <DialogTitle>Revoke client</DialogTitle>
           <DialogDescription>
-            Revoke {client.name}? Every token issued to it stops working and it cannot sign anyone in again.
+            Revoke <ContentText textRole="body" text={client.name} />? Every token issued to it stops working and it cannot sign anyone in again.
             This cannot be undone.
           </DialogDescription>
         </DialogHeader>

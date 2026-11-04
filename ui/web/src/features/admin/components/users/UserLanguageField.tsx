@@ -1,5 +1,6 @@
 import { useId } from 'react'
 import styled from 'styled-components'
+import { textRole } from '@/shared/theme'
 import { parseApiError, parseFieldViolations } from '@/features/auth/lib/parse-api-error'
 import { SERVER_DEFAULT_SELECTION } from '@/features/settings/email-language'
 import { Button } from '@/shared/components/ui/button'
@@ -15,20 +16,17 @@ const FieldGroup = styled.div`
 `
 
 const Label = styled.span`
-  font-size: 11px;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  ${textRole('label')}
   color: var(--color-muted-foreground);
 `
 
 const Hint = styled.p`
-  font-size: 0.6875rem;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
 `
 
 const ErrorText = styled.div`
-  font-size: 0.6875rem;
+  ${textRole('caption')}
   color: var(--color-destructive);
 `
 

@@ -5,6 +5,7 @@ import { Button } from '@/shared/components/ui/button'
 import { Card, CardContent } from '@/shared/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/components/ui/select'
 import { Skeleton } from '@/shared/components/ui/skeleton'
+import { textRole } from '@/shared/theme'
 import type { UserSettingResource } from '@/shared/api-client/gen/endpoints'
 import { EMAIL_LANGUAGE_KEY, SERVER_DEFAULT_SELECTION } from '../email-language'
 import { useResetUserSetting, useSetUserSetting, useUserSetting } from '../hooks/use-user-settings'
@@ -18,17 +19,17 @@ const CardStack = styled(CardContent)`
 `
 
 const FieldHeading = styled.p`
-  font-size: 0.875rem;
+  ${textRole('body')}
   font-weight: 500;
 `
 
 const FieldDescription = styled.p`
-  font-size: 0.75rem;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
 `
 
 const ErrorText = styled.div`
-  font-size: 0.75rem;
+  ${textRole('caption')}
   color: var(--color-destructive);
 `
 

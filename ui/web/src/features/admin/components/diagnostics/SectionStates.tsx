@@ -1,4 +1,5 @@
 import styled from 'styled-components'
+import { textRole } from '@/shared/theme'
 import { Button } from '@/shared/components/ui/button'
 import { SkeletonBar } from './diagnostics-styles'
 
@@ -18,7 +19,7 @@ const ErrorBody = styled.div`
 `
 
 const ErrorMessage = styled.p`
-  font-size: 0.875rem;
+  ${textRole('body')}
   color: var(--color-destructive);
 `
 

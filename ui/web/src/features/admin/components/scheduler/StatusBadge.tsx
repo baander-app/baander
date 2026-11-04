@@ -1,4 +1,5 @@
 import styled from 'styled-components'
+import { textRole } from '@/shared/theme'
 import type { ScheduledJob } from '../../api/scheduler-admin-api'
 
 const Wrapper = styled.span`
@@ -16,7 +17,7 @@ const Dot = styled.span<{ $color: string }>`
 `
 
 const Label = styled.span<{ $color: string }>`
-  font-size: 13px;
+  ${textRole('body-sm')}
   color: ${({ $color }) => $color};
 `
 

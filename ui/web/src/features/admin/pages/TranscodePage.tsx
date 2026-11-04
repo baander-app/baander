@@ -1,4 +1,5 @@
 import styled from 'styled-components'
+import { textRole } from '@/shared/theme'
 import { useTranscodeSessions } from '../hooks/use-transcode-admin'
 import { Cpu, CheckCircle2, XCircle, Clock, Loader2 } from 'lucide-react'
 import { StatCard } from '@/shared/components/stat-card'
@@ -56,14 +57,13 @@ const CardHeader = styled.div`
 `
 
 const CardTitle = styled.h2`
-  font-size: 0.8125rem;
-  font-weight: 500;
+  ${textRole('subtitle')}
 `
 
 const CardEmpty = styled.div`
+  ${textRole('body-sm')}
   padding: 2rem 1rem;
   text-align: center;
-  font-size: 0.8125rem;
   color: var(--color-muted-foreground);
 `
 
@@ -86,32 +86,37 @@ const SessionInfo = styled.div`
 `
 
 const SessionName = styled.div`
-  font-size: 0.8125rem;
+  ${textRole('body-sm')}
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 `
 
 const SessionMeta = styled.div`
-  font-size: 0.6875rem;
+  ${textRole('mono-sm')}
   color: var(--color-muted-foreground);
-  font-family: var(--font-mono);
 `
 
 const SegmentLabel = styled.span`
-  font-size: 0.6875rem;
+  ${textRole('mono-sm')}
   color: var(--color-muted-foreground);
-  font-variant-numeric: tabular-nums;
-  width: 4rem;
+  min-width: 4rem;
+  white-space: nowrap;
   text-align: right;
 `
 
 const ElapsedLabel = styled.span`
-  font-size: 0.6875rem;
+  ${textRole('mono-sm')}
+  color: var(--color-muted-foreground);
+  min-width: 3rem;
+  white-space: nowrap;
+  text-align: right;
+`
+
+const UpdatedAt = styled.span`
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
   font-variant-numeric: tabular-nums;
-  width: 3rem;
-  text-align: right;
 `
 
 const LoadingCard = styled.div`
@@ -241,9 +246,7 @@ export function TranscodePage() {
                       {session.priority} · video {session.videoId.slice(0, 8)}
                     </SessionMeta>
                   </SessionInfo>
-                  <span style={{ fontSize: '0.6875rem', color: 'var(--color-muted-foreground)', fontVariantNumeric: 'tabular-nums' }}>
-                    {formatTime(session.updatedAt)}
-                  </span>
+                  <UpdatedAt>{formatTime(session.updatedAt)}</UpdatedAt>
                 </SessionRow>
               )
             })}

@@ -1,4 +1,5 @@
 import styled, { css } from 'styled-components'
+import { textRole } from '@/shared/theme'
 import { Link } from 'react-router-dom'
 import { useDashboardSummary } from '../hooks/use-dashboard-summary'
 import { useTranscodeSessions } from '../hooks/use-transcode-admin'
@@ -40,11 +41,8 @@ const StatsGrid = styled.div`
 `
 
 const SectionTitle = styled.h2`
-  font-size: 0.6875rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  ${textRole('label')}
   color: var(--color-muted-foreground);
-  font-weight: 500;
   margin-bottom: 0.75rem;
 `
 
@@ -92,7 +90,7 @@ const CardHeader = styled.div`
 `
 
 const CardTitle = styled.span`
-  font-size: 0.875rem;
+  ${textRole('body')}
   font-weight: 500;
 `
 
@@ -109,14 +107,14 @@ const CardValue = styled.div`
   margin-top: 0.5rem;
 
   span {
-    font-size: 1.25rem;
+    ${textRole('subtitle')}
     font-weight: 600;
   }
 `
 
 const CardDesc = styled.p`
   margin-top: 0.25rem;
-  font-size: 0.75rem;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
 `
 
@@ -141,7 +139,7 @@ const TrendGrid = styled.div`
 `
 
 const TrendLabel = styled.span`
-  font-size: 0.6875rem;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
 `
 
@@ -150,7 +148,7 @@ const TrendChart = styled.div`
 `
 
 const MutedText = styled.span`
-  font-size: 0.6875rem;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
 `
 

@@ -5,6 +5,7 @@ import styled from 'styled-components'
 import { Button } from '@/shared/components/ui/button'
 import { Input } from '@/shared/components/ui/input'
 import { useTranslation } from '@/shared/i18n'
+import { textRole } from '@/shared/theme'
 import { createLogger } from '@/shared/lib/logger'
 import {
   type DeviceDecision,
@@ -17,6 +18,7 @@ import { useRetryCountdown } from '../hooks/use-retry-countdown'
 import { parseApiError } from '../lib/parse-api-error'
 import { retryAfterSeconds } from '../lib/retry-after'
 import { formatUserCode, isCompleteUserCode, normalizeUserCode } from '../lib/user-code'
+import { ClientRequestIntro } from './ClientRequestIntro'
 import { ScopeList } from './ScopeList'
 import {
   ErrorAlert,
@@ -50,22 +52,13 @@ interface DecisionVariables {
 }
 
 const CodeInput = styled(Input)`
-  font-family: var(--font-mono);
-  font-size: 1.125rem;
-  letter-spacing: 0.1em;
+  ${textRole('mono-sm')}
   text-align: center;
   text-transform: uppercase;
 `
 
 const Code = styled.span`
-  font-family: var(--font-mono);
-  letter-spacing: 0.05em;
-`
-
-const ClientIntro = styled.p`
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: var(--color-foreground);
+  ${textRole('mono-sm')}
 `
 
 const Actions = styled.div`
@@ -216,9 +209,7 @@ export function DeviceAuthorization({ initialCode }: DeviceAuthorizationProps) {
     case 'confirm':
       return (
         <Form as="div">
-          <ClientIntro>
-            {t('auth.device.requestIntro', { client: step.request.clientName })}
-          </ClientIntro>
+          <ClientRequestIntro messageKey="auth.device.requestIntro" clientName={step.request.clientName} />
           <Notice>
             {t('auth.device.compareCode')}
             {' '}

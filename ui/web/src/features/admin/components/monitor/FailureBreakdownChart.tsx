@@ -1,4 +1,5 @@
 import styled from 'styled-components'
+import { textRole } from '@/shared/theme'
 
 interface FailureEntry {
   class: string
@@ -22,7 +23,7 @@ const Card = styled.div`
 `
 
 const Title = styled.h3`
-  font-size: 0.875rem;
+  ${textRole('body')}
   font-weight: 500;
   color: var(--color-muted-foreground);
 `
@@ -46,7 +47,7 @@ const BarLabel = styled.span`
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 0.875rem;
+  ${textRole('mono-sm')}
   color: var(--color-muted-foreground);
 `
 
@@ -69,7 +70,7 @@ const BarValue = styled.span`
   width: 3rem;
   flex-shrink: 0;
   text-align: right;
-  font-size: 0.875rem;
+  ${textRole('mono-sm')}
   font-weight: 500;
 `
 

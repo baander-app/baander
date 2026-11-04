@@ -1,6 +1,7 @@
 import { captureOwnership, isCurrentOwnership, subscribeOwnership } from '@/shared/live/ownership'
 import { type FormEvent, useState, useEffect } from 'react'
 import styled from 'styled-components'
+import { textRole } from '@/shared/theme'
 import { Button } from '@/shared/components/ui/button'
 import { Input } from '@/shared/components/ui/input'
 import { Textarea } from '@/shared/components/ui/textarea'
@@ -37,26 +38,22 @@ const FieldGroup = styled.div`
 `
 
 const Label = styled.label`
-  font-size: 11px;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  ${textRole('label')}
   color: var(--color-muted-foreground);
 `
 
 const Hint = styled.p`
-  font-size: 0.75rem;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
 `
 
 const ErrorText = styled.p`
-  font-size: 0.8125rem;
+  ${textRole('body-sm')}
   color: var(--color-destructive);
 `
 
 const MonoTextarea = styled(Textarea)`
-  font-family: var(--font-mono);
-  font-size: 0.8125rem;
+  ${textRole('mono-sm')}
 `
 
 const TYPE_HINTS: Record<CreatableClientType, string> = {

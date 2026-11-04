@@ -1,10 +1,11 @@
 import styled from 'styled-components'
+import { textRole } from '@/shared/theme'
 
 const Wrapper = styled.div`
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  font-size: 11px;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
 `
 

@@ -1,4 +1,5 @@
 import styled from 'styled-components'
+import { textRole } from '@/shared/theme'
 
 interface TimingEntry {
   name: string
@@ -25,7 +26,7 @@ const Card = styled.div`
 `
 
 const Title = styled.h3`
-  font-size: 0.875rem;
+  ${textRole('body')}
   font-weight: 500;
   color: var(--color-muted-foreground);
 `
@@ -39,7 +40,7 @@ const Entries = styled.div`
 
 const EntryName = styled.p`
   margin-bottom: 0.5rem;
-  font-size: 0.875rem;
+  ${textRole('mono-sm')}
   font-weight: 500;
 `
 
@@ -61,7 +62,7 @@ const BarLabel = styled.span`
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 0.875rem;
+  ${textRole('body-sm')}
   color: var(--color-muted-foreground);
 `
 
@@ -84,7 +85,7 @@ const BarValue = styled.span`
   width: 4rem;
   flex-shrink: 0;
   text-align: right;
-  font-size: 0.875rem;
+  ${textRole('mono-sm')}
   font-weight: 500;
 `
 

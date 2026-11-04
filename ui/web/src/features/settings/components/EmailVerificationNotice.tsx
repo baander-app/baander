@@ -1,6 +1,7 @@
 import styled from 'styled-components'
 import { ResendVerification } from '@/features/auth/components/ResendVerification'
 import { useTranslation } from '@/shared/i18n'
+import { textRole } from '@/shared/theme'
 
 const Panel = styled.div`
   display: flex;
@@ -12,15 +13,12 @@ const Panel = styled.div`
 `
 
 const Status = styled.p`
-  font-size: 11px;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  ${textRole('label')}
   color: var(--color-muted-foreground);
 `
 
 const Message = styled.p`
-  font-size: 0.875rem;
+  ${textRole('body')}
   color: var(--color-muted-foreground);
 `
 

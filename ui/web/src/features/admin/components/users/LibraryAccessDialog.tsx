@@ -4,6 +4,8 @@ import { useDraft } from '@/shared/drafts/use-draft'
 import { captureOwnership, isCurrentOwnership, subscribeOwnership } from '@/shared/live/ownership'
 import { useAdminMutationTools } from '../../hooks/use-admin-mutation'
 import styled from 'styled-components'
+import { textRole } from '@/shared/theme'
+import { ContentText } from '@/shared/typography'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { userAdminApi, type AdminUser, type AdminUserLibraryAccess } from '../../api/user-admin-api'
 import { Button } from '@/shared/components/ui/button'
@@ -41,17 +43,13 @@ const Checkbox = styled.input.attrs({ type: 'checkbox' })`
   border-color: var(--color-border);
 `
 
-const LibraryName = styled.span`
-  font-size: 0.875rem;
-`
-
 const MutedText = styled.p`
-  font-size: 0.875rem;
+  ${textRole('body')}
   color: var(--color-muted-foreground);
 `
 
 const ErrorText = styled.p`
-  font-size: 0.6875rem;
+  ${textRole('caption')}
   color: var(--color-destructive);
 `
 
@@ -237,7 +235,7 @@ function LibraryAccessEditor({ userId, libraries, onClose, unavailable }: {
               onChange={() => toggle(library)}
               disabled={draft.status === 'unavailable'}
             />
-            <LibraryName>{library.name}</LibraryName>
+            <ContentText textRole="body" text={library.name} />
           </LibraryLabel>
         ))}
       </LibraryList>

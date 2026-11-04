@@ -1,6 +1,7 @@
 import { guardMutationCallbacks } from '@/shared/live/ownership'
 import { useState } from 'react'
 import styled from 'styled-components'
+import { textRole } from '@/shared/theme'
 import { type AdminUser } from '../../api/user-admin-api'
 import { useResetPassword } from '../../hooks/use-users'
 import { Button } from '@/shared/components/ui/button'
@@ -26,10 +27,7 @@ const FieldGroup = styled.div`
 `
 
 const Label = styled.label`
-  font-size: 11px;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  ${textRole('label')}
   color: var(--color-muted-foreground);
 `
 
@@ -38,7 +36,7 @@ const StyledInput = styled(Input)`
 `
 
 const MismatchError = styled.p`
-  font-size: 11px;
+  ${textRole('caption')}
   color: var(--color-destructive);
   margin-top: 0.25rem;
 `

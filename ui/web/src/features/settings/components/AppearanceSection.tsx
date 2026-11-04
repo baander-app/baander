@@ -1,6 +1,7 @@
 import styled from 'styled-components'
 import { Button } from '@/shared/components/ui/button'
 import { MOOD_OPTIONS, ACCENT_OPTIONS } from '@/shared/theme/theme.types'
+import { textRole } from '@/shared/theme'
 import { Card, CardContent } from '@/shared/components/ui/card'
 import { useThemeMood } from '../hooks/use-theme-mood'
 import { useAccentColor } from '../hooks/use-accent-color'
@@ -12,11 +13,8 @@ const Section = styled.section`
 `
 
 const SectionTitle = styled.h2`
-  font-size: 0.875rem;
-  font-weight: 600;
-  letter-spacing: -0.01em;
+  ${textRole('label')}
   color: var(--color-muted-foreground);
-  text-transform: uppercase;
 `
 
 const CardContentStyled = styled(CardContent)`
@@ -26,12 +24,12 @@ const CardContentStyled = styled(CardContent)`
 `
 
 const FieldHeading = styled.p`
-  font-size: 0.875rem;
+  ${textRole('body')}
   font-weight: 500;
 `
 
 const FieldDescription = styled.p`
-  font-size: 0.75rem;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
 `
 
@@ -75,7 +73,7 @@ const MoodPreviewInner = styled.div`
 `
 
 const MoodLabel = styled.span`
-  font-size: 0.75rem;
+  ${textRole('caption')}
   font-weight: 500;
 `
 

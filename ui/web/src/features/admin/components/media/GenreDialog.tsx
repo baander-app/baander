@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useDraft } from '@/shared/drafts/use-draft'
 import { captureOwnership, isCurrentOwnership, subscribeOwnership } from '@/shared/live/ownership'
 import styled from 'styled-components'
+import { textRole } from '@/shared/theme'
 import { Button } from '@/shared/components/ui/button'
 import { Input } from '@/shared/components/ui/input'
 import {
@@ -27,20 +28,17 @@ const FieldGroup = styled.div`
 `
 
 const Label = styled.label`
-  font-size: 11px;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  ${textRole('label')}
   color: var(--color-muted-foreground);
 `
 
 const StyledSelect = styled.select`
+  ${textRole('body')}
   width: 100%;
   border-radius: 0.375rem;
   border: 1px solid var(--color-border);
   background-color: var(--color-background);
   padding: 0.5rem 0.75rem;
-  font-size: 13px;
 `
 
 function slugify(text: string): string {

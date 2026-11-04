@@ -1,5 +1,5 @@
 import { guardMutationCallbacks } from '@/shared/live/ownership'
-import { focusVisibleRing } from '@/shared/theme'
+import { focusVisibleRing, textRole } from '@/shared/theme'
 import styled from 'styled-components'
 import { useState } from 'react'
 import { useLoginBlocks, useDeleteLoginBlock, useDeleteAllLoginBlocks } from '../hooks/use-login-blocks'
@@ -34,17 +34,15 @@ const TableWrapper = styled.div`
 `
 
 const StyledTable = styled.table`
+  ${textRole('body-sm')}
   width: 100%;
-  font-size: 0.8125rem;
 `
 
 const HeadRow = styled.tr`
+  ${textRole('label')}
+  font-size: var(--text-dense-size);
   border-bottom: 1px solid var(--color-border);
   text-align: left;
-  font-size: 0.6875rem;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
   color: var(--color-muted-foreground);
 `
 
@@ -74,27 +72,25 @@ const Td = styled.td`
 `
 
 const TdMono = styled.td`
+  ${textRole('mono-sm')}
   padding: 0.5rem 0.75rem;
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
 `
 
 const TdWarn = styled.td`
+  ${textRole('mono-sm')}
   padding: 0.5rem 0.75rem;
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
   color: var(--color-warning);
 `
 
 const TdMutedSmall = styled.td`
+  ${textRole('caption')}
   padding: 0.5rem 0.75rem;
-  font-size: 0.75rem;
   color: var(--color-muted-foreground);
 `
 
 const TdNowrap = styled.td`
+  ${textRole('caption')}
   padding: 0.5rem 0.75rem;
-  font-size: 0.75rem;
   color: var(--color-muted-foreground);
   white-space: nowrap;
 `
@@ -135,17 +131,17 @@ const LoadingStack = styled.div`
 `
 
 const EmptyState = styled.div`
+  ${textRole('body-sm')}
   padding: 3rem 0;
   text-align: center;
-  font-size: 0.875rem;
   color: var(--color-muted-foreground);
 `
 
 const Pagination = styled.div`
+  ${textRole('body-sm')}
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 0.8125rem;
   color: var(--color-muted-foreground);
 `
 

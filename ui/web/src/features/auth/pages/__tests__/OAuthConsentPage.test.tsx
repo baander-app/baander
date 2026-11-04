@@ -76,7 +76,9 @@ describe('OAuthConsentPage', () => {
     mockPost.mockResolvedValue({ data: { redirect_uri: approved } })
     mount()
 
-    expect(await screen.findByText('Bånder TV wants to use your Bånder account.')).toBeInTheDocument()
+    const clientName = await screen.findByText('Bånder TV')
+    expect(clientName).toHaveAttribute('lang', 'en')
+    expect(clientName.parentElement).toHaveTextContent('Bånder TV wants to use your Bånder account.')
     expect(screen.getByText('App on your device')).toBeInTheDocument()
     expect(screen.getByText('Browse and play your library')).toBeInTheDocument()
     expect(String(mockGet.mock.calls[0][1]?.params)).toBe(QUERY)

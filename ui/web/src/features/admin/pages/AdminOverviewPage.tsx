@@ -1,4 +1,5 @@
 import styled from 'styled-components'
+import { textRole } from '@/shared/theme'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui/tabs'
 import { useTabParam } from '@/shared/hooks/use-tab-search-params'
 import { useAdminCheck } from '@/features/auth/hooks/use-admin-check'
@@ -22,8 +23,7 @@ const Header = styled.div`
 `
 
 const Title = styled.h1`
-  font-size: 1.125rem;
-  font-weight: 600;
+  ${textRole('title')}
 `
 
 const TabBar = styled.div`

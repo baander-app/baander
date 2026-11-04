@@ -1,5 +1,5 @@
 import { guardMutationCallbacks } from '@/shared/live/ownership'
-import { focusVisibleRing } from '@/shared/theme'
+import { focusVisibleRing, textRole } from '@/shared/theme'
 import styled from 'styled-components'
 import { useState } from 'react'
 import { useRateLimiters, useClearRateLimiters } from '../hooks/use-rate-limiter'
@@ -23,6 +23,8 @@ const HeaderRow = styled.div`
 `
 
 const DangerButton = styled.button`
+  ${textRole('body')}
+  font-weight: 600;
   ${focusVisibleRing}
   border: 0;
   background-color: transparent;
@@ -30,7 +32,6 @@ const DangerButton = styled.button`
   border-radius: var(--radius-md);
   background: var(--color-destructive);
   padding: 0.375rem 0.75rem;
-  font-size: 0.875rem;
   color: var(--color-destructive-foreground);
 `
 
@@ -42,7 +43,7 @@ const ConfirmBox = styled.div`
 `
 
 const ConfirmText = styled.p`
-  font-size: 0.875rem;
+  ${textRole('body')}
 `
 
 const ButtonRow = styled.div`
@@ -52,6 +53,8 @@ const ButtonRow = styled.div`
 `
 
 const ConfirmDanger = styled.button`
+  ${textRole('body')}
+  font-weight: 600;
   ${focusVisibleRing}
   border: 0;
   background-color: transparent;
@@ -59,7 +62,6 @@ const ConfirmDanger = styled.button`
   border-radius: var(--radius-md);
   background: var(--color-destructive);
   padding: 0.375rem 0.75rem;
-  font-size: 0.875rem;
   color: var(--color-destructive-foreground);
 
   &:disabled {
@@ -68,6 +70,8 @@ const ConfirmDanger = styled.button`
 `
 
 const CancelButton = styled.button`
+  ${textRole('body')}
+  font-weight: 500;
   ${focusVisibleRing}
   border: 0;
   background-color: transparent;
@@ -75,7 +79,6 @@ const CancelButton = styled.button`
   border-radius: var(--radius-md);
   border: 1px solid var(--color-border);
   padding: 0.375rem 0.75rem;
-  font-size: 0.875rem;
 
   &:disabled {
     opacity: 0.5;
@@ -83,8 +86,8 @@ const CancelButton = styled.button`
 `
 
 const ErrorText = styled.p`
+  ${textRole('body')}
   margin-top: 0.5rem;
-  font-size: 0.875rem;
   color: var(--color-destructive);
 `
 
@@ -95,8 +98,8 @@ const TableWrapper = styled.div`
 `
 
 const StyledTable = styled.table`
+  ${textRole('body-sm')}
   width: 100%;
-  font-size: 0.875rem;
 `
 
 const HeadRow = styled.tr`
@@ -127,9 +130,8 @@ const Td = styled.td`
 `
 
 const TdMono = styled.td`
+  ${textRole('mono-sm')}
   padding: 0.5rem 1rem;
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
 `
 
 const TdRight = styled.td`
@@ -144,10 +146,10 @@ const TdMuted = styled.td`
 `
 
 const PolicyBadge = styled.span`
+  ${textRole('caption')}
   border-radius: var(--radius-md);
   background: var(--color-muted);
   padding: 0.125rem 0.375rem;
-  font-size: 0.75rem;
 `
 
 const SkeletonRow = styled.div`
@@ -169,8 +171,8 @@ const SkeletonBar = styled.div`
 `
 
 const PageError = styled.p`
+  ${textRole('body')}
   margin-top: 0.5rem;
-  font-size: 0.875rem;
   color: var(--color-destructive);
 `
 

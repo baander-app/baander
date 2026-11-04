@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import styled, { css } from 'styled-components'
 import { Input } from '@/shared/components/ui/input'
-import { interactiveTransition, focusVisibleRing } from '@/shared/theme'
+import { interactiveTransition, focusVisibleRing, textRole } from '@/shared/theme'
 
 // --- Presets ---
 
@@ -95,7 +95,7 @@ const ModeButton = styled.button<{ $active: boolean }>`
   color: var(--color-foreground);
   border-radius: var(--radius-md);
   padding: 0.125rem 0.5rem;
-  font-size: 11px;
+  ${textRole('caption')}
   font-weight: 500;
   ${interactiveTransition(['color', 'background-color'])}
 
@@ -125,8 +125,7 @@ const PresetButton = styled.button<{ $active: boolean }>`
   border-radius: var(--radius-md);
   border: 1px solid;
   padding: 0.25rem 0.5rem;
-  font-size: 11px;
-  font-family: monospace;
+  ${textRole('caption')}
   ${interactiveTransition(['color', 'background-color', 'border-color'])}
 
   ${({ $active }) => $active
@@ -159,9 +158,7 @@ const FieldWrapper = styled.div`
 const FieldLabel = styled.span`
   display: block;
   text-align: center;
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  ${textRole('label')}
   color: var(--color-muted-foreground);
   margin-bottom: 0.25rem;
 `
@@ -169,8 +166,7 @@ const FieldLabel = styled.span`
 const FieldInput = styled(Input)`
   height: 1.75rem;
   text-align: center;
-  font-family: monospace;
-  font-size: 12px;
+  ${textRole('mono-sm')}
 `
 
 const ResultRow = styled.div`
@@ -183,13 +179,12 @@ const Code = styled.code`
   border-radius: 0.25rem;
   background-color: var(--color-muted);
   padding: 0.125rem 0.375rem;
-  font-family: monospace;
-  font-size: 12px;
+  ${textRole('mono-sm')}
   color: var(--color-foreground);
 `
 
 const Description = styled.span`
-  font-size: 11px;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
 `
 

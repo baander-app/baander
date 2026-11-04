@@ -11,6 +11,8 @@ import {
   DialogTitle,
 } from '@/shared/components/ui/dialog';
 import { Trash2, Loader2 } from 'lucide-react';
+import { textRole } from '@/shared/theme';
+import { ContentText } from '@/shared/typography';
 import { usePasskeyRegistration } from '../hooks/use-passkey-registration';
 import { usePasskeyList, useDeletePasskey } from '../hooks/use-passkey-list';
 
@@ -30,22 +32,22 @@ const HeaderRow = styled.div`
 `
 
 const Heading = styled.p`
-  font-size: 0.875rem;
+  ${textRole('body')}
   font-weight: 500;
 `
 
 const Subheading = styled.p`
-  font-size: 0.75rem;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
 `
 
 const ErrorText = styled.p`
-  font-size: 0.75rem;
+  ${textRole('caption')}
   color: var(--color-destructive);
 `
 
 const SuccessText = styled.p`
-  font-size: 0.75rem;
+  ${textRole('caption')}
   color: var(--color-success);
 `
 
@@ -79,7 +81,7 @@ const EmptyState = styled.div`
 `
 
 const EmptyText = styled.p`
-  font-size: 0.75rem;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
 `
 
@@ -109,8 +111,8 @@ const PasskeyText = styled.div`
   min-width: 0;
 `
 
-const PasskeyName = styled.p`
-  font-size: 0.875rem;
+const PasskeyName = styled(ContentText)`
+  display: block;
   font-weight: 500;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -118,7 +120,7 @@ const PasskeyName = styled.p`
 `
 
 const PasskeyMeta = styled.p`
-  font-size: 0.75rem;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
 `
 
@@ -195,7 +197,7 @@ export function PasskeyManagement() {
             <PasskeyItem key={passkey.publicId}>
               <PasskeyInfo>
                 <PasskeyText>
-                  <PasskeyName>{passkey.name}</PasskeyName>
+                  <PasskeyName textRole="body" text={passkey.name} forwardedAs="p" />
                   <PasskeyMeta>
                     Created {formatDate(passkey.createdAt)}
                     {passkey.lastUsedAt && ` · Last used ${formatRelative(passkey.lastUsedAt)}`}
@@ -258,7 +260,7 @@ export function PasskeyManagement() {
             <DialogDescription>
               {isLastPasskey
                 ? `This is your only passkey. Deleting it means you could lose access to your account. Make sure you have another way to sign in.`
-                : `Are you sure you want to delete "${deleteTarget?.name ?? ''}"?`}
+                : <>Are you sure you want to delete &ldquo;<ContentText textRole="body" text={deleteTarget?.name ?? ''} />&rdquo;?</>}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

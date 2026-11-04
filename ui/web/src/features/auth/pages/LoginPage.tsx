@@ -6,6 +6,7 @@ import type { PasswordResetDoneState } from '../components/ResetPasswordForm'
 import { returnPathFrom } from '../lib/return-to'
 import { useAuthStore } from '../stores/auth-store'
 import styled from 'styled-components'
+import { textRole } from '@/shared/theme'
 
 const PageWrapper = styled.div`
   display: flex;
@@ -39,9 +40,7 @@ const Logo = styled.img`
 `;
 
 const Title = styled.h1`
-  font-size: 1.125rem;
-  font-weight: 600;
-  letter-spacing: -0.025em;
+  ${textRole('title')}
 `;
 
 function isPasswordResetDone(state: unknown): state is PasswordResetDoneState {

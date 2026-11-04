@@ -1,4 +1,5 @@
 import styled from 'styled-components'
+import { textRole } from '@/shared/theme'
 import { useAdminCheck } from '@/features/auth/hooks/use-admin-check'
 import { Button } from '@/shared/components/ui/button'
 import { Skeleton } from '@/shared/components/ui/skeleton'
@@ -26,17 +27,16 @@ const SectionHeader = styled.div`
 `
 
 const SectionTitle = styled.h2`
-  font-size: 0.8125rem;
-  font-weight: 500;
+  ${textRole('subtitle')}
 `
 
 const Note = styled.p`
-  font-size: 0.8125rem;
+  ${textRole('body-sm')}
   color: var(--color-muted-foreground);
 `
 
 const ErrorText = styled.p`
-  font-size: 0.875rem;
+  ${textRole('body')}
   color: var(--color-destructive);
 `
 

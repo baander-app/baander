@@ -1,13 +1,14 @@
 import styled from 'styled-components'
+import { textRole } from '@/shared/theme'
 
 const Badge = styled.span<{ $bg: string; $text: string }>`
   display: inline-flex;
   align-items: center;
   border-radius: 0.25rem;
   padding: 0.125rem 0.375rem;
-  font-size: 11px;
+  ${textRole('caption')}
+  font-size: var(--text-dense-size);
   font-weight: 500;
-  letter-spacing: 0.025em;
   background-color: ${({ $bg }) => $bg};
   color: ${({ $text }) => $text};
 `

@@ -1,4 +1,5 @@
 import styled from 'styled-components'
+import { textRole } from '@/shared/theme'
 import { XCircle } from 'lucide-react'
 import { getStatusIcon } from './job-status-icon'
 import { Button } from '@/shared/components/ui/button'
@@ -29,15 +30,12 @@ const Header = styled.div`
 `
 
 const HeaderTitle = styled.h2`
-  font-size: 11px;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  ${textRole('label')}
   color: var(--color-muted-foreground);
 `
 
 const StatusLabel = styled.span`
-  font-size: 12px;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
   display: flex;
   align-items: center;
@@ -54,7 +52,7 @@ const InfoRow = styled.div`
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 13px;
+  ${textRole('body-sm')}
 `
 
 const InfoLabel = styled.span`
@@ -112,7 +110,7 @@ export function ActiveJobCard({
             size="sm"
             onClick={() => onCancel(job.public_id)}
             disabled={isCancelling}
-            style={{ height: '1.75rem', fontSize: '12px' }}
+            style={{ height: '1.75rem' }}
           >
             <XCircle size={12} style={{ marginRight: '0.25rem' }} />
             Cancel

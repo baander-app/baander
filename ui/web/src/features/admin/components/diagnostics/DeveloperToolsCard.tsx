@@ -1,5 +1,6 @@
 import { useId } from 'react'
 import styled from 'styled-components'
+import { textRole } from '@/shared/theme'
 import { SectionCard } from '@/shared/components/section-card'
 import { Switch } from '@/shared/components/ui/switch'
 import { useDevPanelStore } from '@/shared/stores/dev-panel-store'
@@ -10,7 +11,7 @@ const Row = styled.div`
   justify-content: space-between;
   gap: var(--space-md);
   padding: 0.625rem var(--space-md);
-  font-size: 0.875rem;
+  ${textRole('body')}
 `
 
 const Label = styled.label`
@@ -19,7 +20,7 @@ const Label = styled.label`
 
 const Hint = styled.p`
   margin-top: 0.125rem;
-  font-size: 0.75rem;
+  ${textRole('caption')}
   color: color-mix(in srgb, var(--color-muted-foreground) 60%, transparent);
 `
 

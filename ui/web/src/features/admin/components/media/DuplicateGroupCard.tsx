@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { Fragment, useState } from 'react'
 import styled, { css } from 'styled-components'
 import type { DuplicateGroup as DuplicateGroupType } from '../../api/album-duplicates-api'
 import { getCoverImageUrl } from '../../api/album-duplicates-api'
@@ -15,11 +15,26 @@ import {
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
 import { toast } from 'sonner'
-import { interactiveTransition, focusVisibleRing } from '@/shared/theme'
+import { interactiveTransition, focusVisibleRing, textRole } from '@/shared/theme'
+import { ContentText } from '@/shared/typography'
 
 interface DuplicateGroupCardProps {
   group: DuplicateGroupType
   onMergeComplete?: () => void
+}
+
+/** Lists an album's artists, each name with its own language and script rules. */
+function ArtistNames({ artists }: { artists: Array<{ name: string }> }) {
+  return (
+    <>
+      {artists.map((artist, index) => (
+        <Fragment key={`${index}-${artist.name}`}>
+          {index > 0 && ', '}
+          <ContentText textRole="caption" text={artist.name} />
+        </Fragment>
+      ))}
+    </>
+  )
 }
 
 function formatConfidence(confidence: number): string {
@@ -61,12 +76,12 @@ const HeaderLeft = styled.div`
 `
 
 const CardTitle = styled.span`
-  font-size: 0.875rem;
+  ${textRole('body')}
   font-weight: 500;
 `
 
 const ConfidenceBadge = styled.span<{ $color: string }>`
-  font-size: 0.75rem;
+  ${textRole('caption')}
   font-weight: 500;
   color: ${({ $color }) => $color};
 `
@@ -100,13 +115,13 @@ const ThumbnailImg = styled.img`
 `
 
 const NoCoverLabel = styled.div`
+  ${textRole('caption')}
   height: 100%;
   width: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
   color: var(--color-muted-foreground);
-  font-size: 0.75rem;
 `
 
 const AlbumInfo = styled.div`
@@ -114,8 +129,8 @@ const AlbumInfo = styled.div`
   flex: 1;
 `
 
-const AlbumTitle = styled.p`
-  font-size: 0.875rem;
+const AlbumTitle = styled(ContentText)`
+  display: block;
   font-weight: 500;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -123,20 +138,24 @@ const AlbumTitle = styled.p`
 `
 
 const AlbumMeta = styled.div`
+  ${textRole('caption')}
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  font-size: 0.75rem;
   color: var(--color-muted-foreground);
 `
 
 const AlbumDetails = styled.div`
+  ${textRole('caption')}
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  font-size: 11px;
   color: var(--color-muted-foreground);
   margin-top: 0.125rem;
+`
+
+const Barcode = styled.span`
+  ${textRole('mono-sm')}
 `
 
 // Merge dialog styled components
@@ -148,7 +167,7 @@ const TargetList = styled.div`
 `
 
 const TargetHint = styled.p`
-  font-size: 0.75rem;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
 `
 
@@ -184,8 +203,8 @@ const TargetAlbumInfo = styled.div`
   flex: 1;
 `
 
-const TargetAlbumTitle = styled.p`
-  font-size: 0.875rem;
+const TargetAlbumTitle = styled(ContentText)`
+  display: block;
   font-weight: 500;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -193,7 +212,7 @@ const TargetAlbumTitle = styled.p`
 `
 
 const TargetAlbumMeta = styled.p`
-  font-size: 0.75rem;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -275,16 +294,16 @@ export function DuplicateGroupCard({ group, onMergeComplete }: DuplicateGroupCar
               )}
             </Thumbnail>
             <AlbumInfo>
-              <AlbumTitle>{album.title}</AlbumTitle>
+              <AlbumTitle textRole="body-sm" forwardedAs="p" text={album.title} />
               <AlbumMeta>
                 {album.year && <span>{album.year}</span>}
                 {album.artists && album.artists.length > 0 && (
-                  <span>· {album.artists.map(a => a.name).join(', ')}</span>
+                  <span>· <ArtistNames artists={album.artists} /></span>
                 )}
               </AlbumMeta>
               <AlbumDetails>
-                {album.label && <span>{album.label}</span>}
-                {album.barcode && <span>· {album.barcode}</span>}
+                {album.label && <ContentText textRole="caption" text={album.label} />}
+                {album.barcode && <span>· <Barcode>{album.barcode}</Barcode></span>}
               </AlbumDetails>
             </AlbumInfo>
           </AlbumRow>
@@ -317,10 +336,10 @@ export function DuplicateGroupCard({ group, onMergeComplete }: DuplicateGroupCar
                   )}
                 </Thumbnail>
                 <TargetAlbumInfo>
-                  <TargetAlbumTitle>{album.title}</TargetAlbumTitle>
+                  <TargetAlbumTitle textRole="body-sm" forwardedAs="p" text={album.title} />
                   <TargetAlbumMeta>
                     {album.year && `${album.year} · `}
-                    {album.artists && album.artists.map(a => a.name).join(', ')}
+                    {album.artists && <ArtistNames artists={album.artists} />}
                   </TargetAlbumMeta>
                 </TargetAlbumInfo>
                 <RadioButton $selected={targetPublicId === album.publicId}>

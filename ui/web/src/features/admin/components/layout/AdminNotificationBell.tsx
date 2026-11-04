@@ -4,7 +4,7 @@ import styled, { css } from 'styled-components'
 import { Bell } from 'lucide-react'
 import { useAdminNotifications } from '../../hooks/use-admin-notifications'
 import { useNotificationStore } from '@/features/notification/stores/notification-store'
-import { interactiveTransition, focusVisibleRing } from '@/shared/theme'
+import { interactiveTransition, focusVisibleRing, textRole } from '@/shared/theme'
 
 function relativeTime(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime()
@@ -49,14 +49,15 @@ const Badge = styled.span`
   right: -0.125rem;
   top: -0.125rem;
   display: flex;
-  height: 1rem;
+  min-height: 1rem;
   min-width: 1rem;
   align-items: center;
   justify-content: center;
   border-radius: 50%;
   background-color: var(--color-destructive);
   padding: 0 0.25rem;
-  font-size: 10px;
+  ${textRole('caption')}
+  font-size: var(--text-dense-size);
   font-weight: 500;
   color: var(--color-destructive-foreground);
 `
@@ -83,10 +84,7 @@ const PopoutHeader = styled.div`
 `
 
 const PopoutTitle = styled.span`
-  font-size: 0.75rem;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  ${textRole('label')}
   color: var(--color-muted-foreground);
 `
 
@@ -95,7 +93,7 @@ const MarkAllButton = styled.button`
   border: 0;
   background-color: transparent;
   color: var(--color-foreground);
-  font-size: 11px;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
   ${interactiveTransition(['color'])}
 
@@ -111,7 +109,7 @@ const PopoutBody = styled.div`
 const EmptyState = styled.div`
   padding: 1.5rem 0.75rem;
   text-align: center;
-  font-size: 0.75rem;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
 `
 
@@ -129,7 +127,6 @@ const NotificationItem = styled.button<{ $borderColor: string; $isRead: boolean 
   ${interactiveTransition(['background-color', 'opacity'])}
 
   &:hover { background-color: color-mix(in srgb, var(--color-highlight) 10%, transparent); }
-  ${({ $isRead }) => !$isRead && css`font-weight: 500;`}
 `
 
 const NotificationContent = styled.div`
@@ -137,15 +134,16 @@ const NotificationContent = styled.div`
   flex: 1;
 `
 
-const NotificationTitle = styled.div`
+const NotificationTitle = styled.div<{ $isRead: boolean }>`
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 13px;
+  ${textRole('body-sm')}
+  ${({ $isRead }) => !$isRead && css`font-weight: 500;`}
 `
 
 const NotificationTime = styled.div`
-  font-size: 11px;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
 `
 
@@ -214,7 +212,7 @@ export function AdminNotificationBell() {
                   onClick={() => { markRead(n.publicId); setOpen(false) }}
                 >
                   <NotificationContent>
-                    <NotificationTitle>{n.title ?? n.eventType}</NotificationTitle>
+                    <NotificationTitle $isRead={n.isRead}>{n.title ?? n.eventType}</NotificationTitle>
                     <NotificationTime>{relativeTime(n.createdAt)}</NotificationTime>
                   </NotificationContent>
                   {!n.isRead && <UnreadDot />}

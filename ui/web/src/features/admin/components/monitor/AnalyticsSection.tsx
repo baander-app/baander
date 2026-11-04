@@ -10,7 +10,7 @@ import { ThroughputChart } from './ThroughputChart'
 import { SuccessFailureChart } from './SuccessFailureChart'
 import { TimingChart } from './TimingChart'
 import { FailureBreakdownChart } from './FailureBreakdownChart'
-import { interactiveTransition, focusVisibleRing } from '@/shared/theme'
+import { interactiveTransition, focusVisibleRing, textRole } from '@/shared/theme'
 
 const pulse = keyframes`
   0%, 100% { opacity: 1; }
@@ -30,7 +30,7 @@ const Header = styled.div`
 `
 
 const Title = styled.h2`
-  font-size: 1.125rem;
+  ${textRole('subtitle')}
   font-weight: 600;
 `
 
@@ -74,7 +74,7 @@ const ErrorCard = styled.div`
 `
 
 const ErrorText = styled.p`
-  font-size: 0.875rem;
+  ${textRole('body')}
   color: var(--color-destructive);
 `
 
@@ -84,7 +84,7 @@ const RetryLink = styled.button`
   background-color: transparent;
   color: var(--color-foreground);
   margin-top: 0.5rem;
-  font-size: 0.875rem;
+  ${textRole('body')}
   color: var(--color-muted-foreground);
   text-decoration: underline;
   ${interactiveTransition(['color'])}
@@ -100,7 +100,7 @@ const EmptyCard = styled.div`
   border: 1px solid var(--color-border);
   background-color: var(--color-card);
   padding: 2rem;
-  font-size: 0.875rem;
+  ${textRole('body')}
   color: var(--color-muted-foreground);
 `
 

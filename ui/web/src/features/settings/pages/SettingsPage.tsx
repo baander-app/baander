@@ -11,6 +11,7 @@ import { AppearanceSection } from '../components/AppearanceSection';
 import { EmailLanguageSetting } from '../components/EmailLanguageSetting';
 import { DeviceManagement } from '@/features/session/components/DeviceManagement';
 import { useAdminCheck } from '@/features/auth/hooks/use-admin-check';
+import { textRole } from '@/shared/theme';
 
 const PageContainer = styled.div`
   display: flex;
@@ -23,9 +24,7 @@ const PageHeader = styled.div`
 `
 
 const PageTitle = styled.h1`
-  font-size: 1.125rem;
-  font-weight: 600;
-  letter-spacing: -0.01em;
+  ${textRole('title')}
 `
 
 const ScrollArea = styled.div`
@@ -49,11 +48,8 @@ const Section = styled.section`
 `
 
 const SectionTitle = styled.h2`
-  font-size: 0.875rem;
-  font-weight: 600;
-  letter-spacing: -0.01em;
+  ${textRole('label')}
   color: var(--color-muted-foreground);
-  text-transform: uppercase;
 `
 
 const CardRow = styled(CardContent)`
@@ -72,12 +68,12 @@ const CardStack = styled(CardContent)`
 `
 
 const FieldHeading = styled.p`
-  font-size: 0.875rem;
+  ${textRole('body')}
   font-weight: 500;
 `
 
 const FieldDescription = styled.p`
-  font-size: 0.75rem;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
 `
 

@@ -1,4 +1,5 @@
 import styled from 'styled-components'
+import { textRole } from '@/shared/theme'
 import React from 'react';
 import type { LucideIcon } from 'lucide-react'
 
@@ -27,13 +28,11 @@ const TitleGroup = styled.div`
 `
 
 const Title = styled.h1`
-  font-size: 1.125rem;
-  font-weight: 600;
-  letter-spacing: -0.01em;
+  ${textRole('title')}
 `
 
 const Subtitle = styled.p`
-  font-size: 0.875rem;
+  ${textRole('body')}
   color: var(--color-muted-foreground);
 `
 

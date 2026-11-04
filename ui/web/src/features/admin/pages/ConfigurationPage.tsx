@@ -1,4 +1,4 @@
-import { focusVisibleRing } from '@/shared/theme'
+import { focusVisibleRing, textRole } from '@/shared/theme'
 import styled from 'styled-components'
 import { useConfigCheck } from '../hooks/use-config-check'
 import type { ConfigCheckResult } from '../api/config-check-api'
@@ -6,10 +6,10 @@ import { SectionCard } from '@/shared/components/section-card'
 import { Settings2 } from 'lucide-react'
 
 const CheckRowWrapper = styled.div`
+  ${textRole('body-sm')}
   padding: 0 1rem;
   padding-top: 0.625rem;
   padding-bottom: 0.625rem;
-  font-size: 0.875rem;
 `
 
 const CheckHeader = styled.div`
@@ -21,18 +21,17 @@ const CheckHeader = styled.div`
 `
 
 const ComponentName = styled.span`
+  ${textRole('mono-sm')}
   overflow-wrap: anywhere;
   min-width: 0;
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
 `
 
 const StatusBadge = styled.span<{ $variant: 'ok' | 'fail' | 'warn' | 'na' }>`
+  ${textRole('caption')}
   display: inline-flex;
   align-items: center;
   border-radius: 9999px;
   padding: 0.125rem 0.5rem;
-  font-size: 0.75rem;
   font-weight: 500;
 
   ${({ $variant }) => {
@@ -79,8 +78,8 @@ const Message = styled.p<{ $variant: 'error' | 'warning' | 'default' }>`
 `
 
 const Suggestion = styled.p`
+  ${textRole('caption')}
   margin-top: 0.125rem;
-  font-size: 0.75rem;
   color: var(--color-muted-foreground);
 `
 
@@ -145,12 +144,12 @@ const TitleGroup = styled.div`
 `
 
 const Title = styled.h1`
-  font-size: 1.125rem;
-  font-weight: 600;
-  letter-spacing: -0.025em;
+  ${textRole('title')}
 `
 
 const RefetchButton = styled.button`
+  ${textRole('body')}
+  font-weight: 500;
   ${focusVisibleRing}
   border: 0;
   background-color: transparent;
@@ -159,7 +158,6 @@ const RefetchButton = styled.button`
   border: 1px solid var(--color-input);
   background: var(--color-background);
   padding: 0.375rem 0.75rem;
-  font-size: 0.875rem;
   transition: background-color var(--duration-hover) ease-out, color var(--duration-hover) ease-out;
 
   &:hover {
@@ -173,11 +171,11 @@ const RefetchButton = styled.button`
 `
 
 const SuccessBanner = styled.div`
+  ${textRole('body')}
   border-radius: var(--radius-md);
   border: 1px solid var(--color-success);
   background: var(--color-muted);
   padding: 0.75rem 1rem;
-  font-size: 0.875rem;
   color: var(--color-success);
 `
 
@@ -188,20 +186,20 @@ const SummaryRow = styled.div`
 `
 
 const ErrorBanner = styled.div`
+  ${textRole('body')}
   border-radius: var(--radius-md);
   border: 1px solid var(--color-destructive);
   background: var(--color-muted);
   padding: 0.75rem 1rem;
-  font-size: 0.875rem;
   color: var(--color-destructive);
 `
 
 const WarnBanner = styled.div`
+  ${textRole('body')}
   border-radius: var(--radius-md);
   border: 1px solid var(--color-warning);
   background: var(--color-muted);
   padding: 0.75rem 1rem;
-  font-size: 0.875rem;
   color: var(--color-warning);
 `
 
@@ -216,7 +214,7 @@ const CategoryGrid = styled.div`
 `
 
 const Timestamp = styled.p`
-  font-size: 0.75rem;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
 `
 
@@ -241,8 +239,8 @@ const CenteredSpinner = styled.div`
 `
 
 const ErrorText = styled.p`
+  ${textRole('body')}
   margin-top: 0.5rem;
-  font-size: 0.875rem;
   color: var(--color-destructive);
 `
 

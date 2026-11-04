@@ -1,4 +1,5 @@
 import styled from 'styled-components'
+import { textRole } from '@/shared/theme'
 import { useMetadataSyncStatus, useMetadataProviders, useTriggerMetadataSync, useTriggerGenreSync } from '../hooks/use-metadata-admin'
 import { useGenres } from '../hooks/use-genre-admin'
 import { useAuthStore } from '@/features/auth/stores/auth-store'
@@ -45,8 +46,7 @@ const CardHeader = styled.div`
 `
 
 const CardTitle = styled.h2`
-  font-size: 0.8125rem;
-  font-weight: 500;
+  ${textRole('subtitle')}
 `
 
 const Divider = styled.div`
@@ -63,7 +63,7 @@ const ProviderRow = styled.div`
 `
 
 const ProviderName = styled.span`
-  font-size: 0.8125rem;
+  ${textRole('body-sm')}
   font-weight: 500;
   width: 8rem;
 `
@@ -75,8 +75,7 @@ const StatIcon = styled.span`
 `
 
 const StatNum = styled.span`
-  font-size: 0.8125rem;
-  font-variant-numeric: tabular-nums;
+  ${textRole('mono-sm')}
 `
 
 const ConfigRow = styled.div`
@@ -87,7 +86,7 @@ const ConfigRow = styled.div`
 `
 
 const ConfigName = styled.span`
-  font-size: 0.8125rem;
+  ${textRole('body-sm')}
 `
 
 const ConfigStatus = styled.div`
@@ -97,9 +96,7 @@ const ConfigStatus = styled.div`
 `
 
 const ConfigLabel = styled.span<{ $ok?: boolean }>`
-  font-size: 0.6875rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  ${textRole('label')}
   ${({ $ok }) => $ok ? 'color: var(--color-success);' : 'color: var(--color-muted-foreground);'}
 `
 
@@ -132,15 +129,14 @@ const ErrorCard = styled.div`
 `
 
 const ErrorText = styled.p`
-  font-size: 0.875rem;
+  ${textRole('body')}
   color: var(--color-destructive);
 `
 
 const ErrorDetail = styled.p`
-  font-size: 0.6875rem;
+  ${textRole('mono-sm')}
   color: var(--color-muted-foreground);
   margin-top: 0.25rem;
-  font-family: var(--font-mono);
 `
 
 function formatTime(iso: string | null): string {

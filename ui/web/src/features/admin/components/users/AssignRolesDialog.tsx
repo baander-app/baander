@@ -3,6 +3,7 @@ import { useDraft } from '@/shared/drafts/use-draft'
 import { guardMutationCallbacks, subscribeOwnership } from '@/shared/live/ownership'
 import { useEffect, useRef } from 'react'
 import styled from 'styled-components'
+import { textRole } from '@/shared/theme'
 import { type AdminUser } from '../../api/user-admin-api'
 import { useAssignRoles } from '../../hooks/use-users'
 import { Button } from '@/shared/components/ui/button'
@@ -38,11 +39,11 @@ const RoleLabel = styled.label`
 `
 
 const RoleName = styled.span`
-  font-size: 0.875rem;
+  ${textRole('body')}
 `
 
 const WarningText = styled.span`
-  font-size: 11px;
+  ${textRole('caption')}
   color: var(--color-warning);
   display: flex;
   align-items: center;
@@ -50,7 +51,7 @@ const WarningText = styled.span`
 `
 
 const HintText = styled.span`
-  font-size: 11px;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
 `
 

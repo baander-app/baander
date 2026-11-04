@@ -3,6 +3,7 @@ import { useEffect, useRef } from 'react'
 import { useDraft } from '@/shared/drafts/use-draft'
 import { captureOwnership, isCurrentOwnership, subscribeOwnership } from '@/shared/live/ownership'
 import styled from 'styled-components'
+import { textRole } from '@/shared/theme'
 import { useUpdateScheduledJob, useSchedulableCommands, useScheduledJob } from '../../hooks/use-scheduler-admin'
 import type { ScheduledJob, UpdateScheduledJobPayload } from '../../api/scheduler-admin-api'
 import { Button } from '@/shared/components/ui/button'
@@ -36,10 +37,7 @@ const FieldGroup = styled.div`
 `
 
 const Label = styled.label`
-  font-size: 11px;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  ${textRole('label')}
   color: var(--color-muted-foreground);
 `
 
@@ -48,18 +46,18 @@ const StyledInput = styled(Input)`
 `
 
 const CommandName = styled.span`
-  font-family: monospace;
-  font-size: 12px;
+  ${textRole('mono-sm')}
 `
 
 const CommandDescription = styled.span`
   display: block;
-  font-size: 11px;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
 `
 
 const DescriptionHint = styled.span`
   margin-left: 0.25rem;
+  ${textRole('caption')}
   text-transform: none;
   color: var(--color-muted-foreground);
 `

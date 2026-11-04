@@ -1,6 +1,8 @@
 import { captureOwnership, isCurrentOwnership, subscribeOwnership } from '@/shared/live/ownership'
 import { useState, useEffect } from 'react'
 import styled from 'styled-components'
+import { textRole } from '@/shared/theme'
+import { ContentText } from '@/shared/typography'
 import { Button } from '@/shared/components/ui/button'
 import {
   Dialog,
@@ -16,7 +18,7 @@ import { useRotateOAuthClientSecret } from '../../hooks/use-oauth-clients'
 import { ClientSecretReveal } from './ClientSecretReveal'
 
 const ErrorText = styled.p`
-  font-size: 0.8125rem;
+  ${textRole('body-sm')}
   color: var(--color-destructive);
 `
 
@@ -65,7 +67,7 @@ export function RotateSecretDialog({ client, open, onOpenChange }: RotateSecretD
           <>
             <DialogHeader>
               <DialogTitle>New client secret</DialogTitle>
-              <DialogDescription>The previous secret of {client.name} no longer works.</DialogDescription>
+              <DialogDescription>The previous secret of <ContentText textRole="body" text={client.name} /> no longer works.</DialogDescription>
             </DialogHeader>
             <ClientSecretReveal clientName={client.name} secret={secret} />
             <DialogFooter>
@@ -77,7 +79,7 @@ export function RotateSecretDialog({ client, open, onOpenChange }: RotateSecretD
             <DialogHeader>
               <DialogTitle>Rotate client secret</DialogTitle>
               <DialogDescription>
-                Replace the secret of {client.name}? The current secret stops working at once, so the app
+                Replace the secret of <ContentText textRole="body" text={client.name} />? The current secret stops working at once, so the app
                 cannot sign anyone in until it is configured with the new one.
               </DialogDescription>
             </DialogHeader>

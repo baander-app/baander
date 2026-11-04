@@ -1,4 +1,5 @@
-import { focusVisibleRing } from '@/shared/theme'
+import { focusVisibleRing, textRole } from '@/shared/theme'
+import { ContentText } from '@/shared/typography'
 import styled, { css } from 'styled-components'
 import { useState } from 'react'
 import { useGenres } from '../hooks/use-genre-admin'
@@ -41,12 +42,12 @@ const ViewToggle = styled.div`
 `
 
 const ViewButton = styled.button<{ $active: boolean }>`
+  ${textRole('caption')}
   ${focusVisibleRing}
   border: 0;
   background-color: transparent;
   color: var(--color-foreground);
   padding: 0.375rem 0.75rem;
-  font-size: 0.75rem;
   transition: background-color var(--duration-hover) ease-out;
 
   ${({ $active }) => $active ? css`
@@ -68,12 +69,10 @@ const StyledTable = styled.table`
 `
 
 const HeadRow = styled.tr`
+  ${textRole('label')}
+  font-size: var(--text-dense-size);
   border-bottom: 1px solid var(--color-border);
   text-align: left;
-  font-size: 0.6875rem;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
   color: var(--color-muted-foreground);
 `
 
@@ -99,21 +98,24 @@ const BodyRow = styled.tr`
 `
 
 const TdName = styled.td`
+  ${textRole('body-sm')}
   padding: 0.625rem 1rem;
-  font-size: 0.8125rem;
+  font-weight: 500;
+`
+
+const GenreName = styled(ContentText)`
   font-weight: 500;
 `
 
 const TdMono = styled.td`
+  ${textRole('mono-sm')}
   padding: 0.625rem 1rem;
-  font-size: 0.8125rem;
   color: var(--color-muted-foreground);
-  font-family: var(--font-mono);
 `
 
 const TdMuted = styled.td`
+  ${textRole('body-sm')}
   padding: 0.625rem 1rem;
-  font-size: 0.8125rem;
   color: var(--color-muted-foreground);
 `
 
@@ -217,14 +219,14 @@ export function GenresPage() {
 
                 return (
                   <BodyRow key={genre.publicId}>
-                    <TdName>{genre.name}</TdName>
+                    <TdName><GenreName textRole="body-sm" text={genre.name} /></TdName>
                     <TdMono>{genre.slug}</TdMono>
                     <TdMono>
                       {genre.mbid
                         ? `${genre.mbid.slice(0, 8)}...`
                         : '-'}
                     </TdMono>
-                    <TdMuted>{parent?.name ?? '-'}</TdMuted>
+                    <TdMuted>{parent ? <ContentText textRole="body-sm" text={parent.name} /> : '-'}</TdMuted>
                     <TdAction>
                       <DropdownMenu>
                         <StyledTrigger>

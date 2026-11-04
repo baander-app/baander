@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import styled from 'styled-components'
+import { textRole } from '@/shared/theme'
+import { ContentText } from '@/shared/typography'
 import { Copy } from 'lucide-react'
 import { Button } from '@/shared/components/ui/button'
 import { createLogger } from '@/shared/lib/logger'
@@ -18,7 +20,7 @@ const Warning = styled.p`
   border-radius: var(--radius-md);
   background-color: var(--color-muted);
   padding: 0.75rem;
-  font-size: 0.8125rem;
+  ${textRole('body-sm')}
   color: var(--color-destructive);
 `
 
@@ -34,14 +36,13 @@ const Secret = styled.code`
   border-radius: var(--radius-md);
   background-color: var(--color-secondary);
   padding: 0.5rem 0.75rem;
-  font-family: var(--font-mono);
-  font-size: 0.8125rem;
+  ${textRole('mono-sm')}
   white-space: nowrap;
   user-select: all;
 `
 
 const CopyStatus = styled.span`
-  font-size: 0.75rem;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
 `
 
@@ -67,7 +68,7 @@ export function ClientSecretReveal({ clientName, secret }: ClientSecretRevealPro
   return (
     <Stack>
       <Warning role="alert">
-        Copy the secret for {clientName} now. It will not be shown again; if you lose it, rotate the secret.
+        Copy the secret for <ContentText textRole="body-sm" text={clientName} /> now. It will not be shown again; if you lose it, rotate the secret.
       </Warning>
       <SecretRow>
         <Secret aria-label="Client secret">{secret}</Secret>

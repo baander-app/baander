@@ -1,4 +1,6 @@
 import styled from 'styled-components'
+import { textRole } from '@/shared/theme'
+import { ContentText } from '@/shared/typography'
 import { useState } from 'react'
 import { isAxiosError } from 'axios'
 import { useUsers, useToggleUser } from '../hooks/use-users'
@@ -57,7 +59,7 @@ const PaginationRow = styled.nav`
 `
 
 const UserCount = styled.span`
-  font-size: 0.6875rem;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
   margin-left: auto;
 `
@@ -80,10 +82,8 @@ const ColumnHeader = styled.div`
 `
 
 const ColLabel = styled.span`
-  font-size: 0.6875rem;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  ${textRole('label')}
+  font-size: var(--text-dense-size);
   color: var(--color-muted-foreground);
 `
 
@@ -95,7 +95,7 @@ const UserRow = styled.div`
   padding: 0 0.5rem;
   padding-top: 0.5rem;
   padding-bottom: 0.5rem;
-  font-size: 0.8125rem;
+  ${textRole('body-sm')}
   transition: background-color 100ms ease-out;
 
   &:hover {
@@ -107,11 +107,10 @@ const EmailCell = styled.span`
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-family: var(--font-mono);
-  font-size: 0.8125rem;
+  ${textRole('mono-sm')}
 `
 
-const NameCell = styled.span`
+const NameCell = styled(ContentText)`
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -124,9 +123,9 @@ const RolesCell = styled.div`
 `
 
 const DateCell = styled.span`
-  font-size: 0.6875rem;
+  ${textRole('mono-sm')}
+  font-size: var(--text-dense-size);
   color: var(--color-muted-foreground);
-  font-family: var(--font-mono);
 `
 
 const SkeletonRow = styled.div`
@@ -150,7 +149,7 @@ const SkeletonStack = styled.div`
 const EmptyState = styled.div`
   padding: 3rem 0;
   text-align: center;
-  font-size: 0.875rem;
+  ${textRole('body')}
   color: var(--color-muted-foreground);
 `
 
@@ -206,7 +205,7 @@ export function AdminUsersPage() {
           {/* Filters */}
           <FilterRow>
             <Select value={roleFilter || '_all'} onValueChange={(v) => { setRoleFilter(v === '_all' ? '' : v); setOffset(0) }}>
-              <SelectTrigger aria-label="Filter by role" style={{ height: '1.75rem', width: '8rem', fontSize: '0.8125rem' }}>
+              <SelectTrigger aria-label="Filter by role" style={{ height: '1.75rem', width: '8rem' }}>
                 <SelectValue placeholder="All Roles" />
               </SelectTrigger>
               <SelectContent>
@@ -217,7 +216,7 @@ export function AdminUsersPage() {
               </SelectContent>
             </Select>
             <Select value={statusFilter || '_all'} onValueChange={(v) => { setStatusFilter(v === '_all' ? '' : v); setOffset(0) }}>
-              <SelectTrigger aria-label="Filter by status" style={{ height: '1.75rem', width: '8rem', fontSize: '0.8125rem' }}>
+              <SelectTrigger aria-label="Filter by status" style={{ height: '1.75rem', width: '8rem' }}>
                 <SelectValue placeholder="All Status" />
               </SelectTrigger>
               <SelectContent>
@@ -258,7 +257,7 @@ export function AdminUsersPage() {
               {users.map((user) => (
                 <UserRow key={user.publicId}>
                   <EmailCell>{user.email}</EmailCell>
-                  <NameCell>{user.name}</NameCell>
+                  <NameCell textRole="body-sm" text={user.name} />
                   <RolesCell>
                     {user.roles.map((role) => (
                       <RoleBadge key={role} role={role} />

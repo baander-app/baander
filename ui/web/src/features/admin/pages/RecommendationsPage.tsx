@@ -1,5 +1,6 @@
 import { captureOwnership, isCurrentOwnership } from '@/shared/live/ownership'
 import styled from 'styled-components'
+import { textRole } from '@/shared/theme'
 import { Sparkles, Play, Loader2 } from 'lucide-react'
 import { AdminPageHeader } from '../components/layout/AdminPageHeader'
 import { useState } from 'react'
@@ -33,11 +34,8 @@ const Container = styled.div`
 `
 
 const SectionTitle = styled.h2`
+  ${textRole('label')}
   margin-bottom: 0.75rem;
-  font-size: 0.6875rem;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
   color: var(--color-muted-foreground);
 `
 
@@ -54,20 +52,19 @@ const CoverageHeader = styled.div`
 `
 
 const BigValue = styled.span`
-  font-size: 1.5rem;
-  font-weight: 600;
+  ${textRole('title')}
   font-variant-numeric: tabular-nums;
 `
 
 const CoverageSubtext = styled.span`
-  font-size: 0.8125rem;
+  ${textRole('body-sm')}
   color: var(--color-muted-foreground);
 `
 
 const StatsRow = styled.div`
+  ${textRole('body-sm')}
   display: flex;
   gap: 1.5rem;
-  font-size: 0.8125rem;
   color: var(--color-muted-foreground);
 `
 
@@ -78,17 +75,15 @@ const StatHighlight = styled.span`
 `
 
 const StyledTable = styled.table`
+  ${textRole('body-sm')}
   width: 100%;
-  font-size: 0.8125rem;
 `
 
 const HeadRow = styled.tr`
+  ${textRole('label')}
+  font-size: var(--text-dense-size);
   border-bottom: 1px solid var(--color-border);
   text-align: left;
-  font-size: 0.6875rem;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
   color: var(--color-muted-foreground);
 `
 
@@ -122,12 +117,12 @@ const TdRight = styled.td`
 `
 
 const QualityInfo = styled.div`
-  font-size: 0.8125rem;
+  ${textRole('body-sm')}
   color: var(--color-muted-foreground);
 `
 
 const FreshnessRow = styled.div`
-  font-size: 0.8125rem;
+  ${textRole('body-sm')}
 `
 
 const FreshnessLabel = styled.span`
@@ -140,7 +135,7 @@ const FreshnessValue = styled.span`
 `
 
 const EmptyText = styled.p`
-  font-size: 0.8125rem;
+  ${textRole('body-sm')}
   color: var(--color-muted-foreground);
 `
 

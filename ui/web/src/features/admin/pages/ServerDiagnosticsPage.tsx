@@ -1,4 +1,5 @@
 import styled from 'styled-components'
+import { textRole } from '@/shared/theme'
 import { Button } from '@/shared/components/ui/button'
 import { useServerStats } from '../hooks/use-server-stats'
 import { LiveHealthBar } from '../components/dashboard/LiveHealthBar'
@@ -42,20 +43,17 @@ const Grid = styled.div`
 `
 
 const SectionTitle = styled.h2`
-  font-size: 0.6875rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  ${textRole('label')}
   color: var(--color-muted-foreground);
-  font-weight: 500;
 `
 
 const MutedSmall = styled.span`
-  font-size: 0.75rem;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
 `
 
 const ErrorText = styled.p`
-  font-size: 0.875rem;
+  ${textRole('body')}
   color: var(--color-destructive);
 `
 

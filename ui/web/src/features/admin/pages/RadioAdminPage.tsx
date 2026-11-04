@@ -1,5 +1,7 @@
 import styled from 'styled-components'
-import { useState, useMemo } from 'react'
+import { textRole } from '@/shared/theme'
+import { ContentText } from '@/shared/typography'
+import { Fragment, useState, useMemo } from 'react'
 import { Radio } from 'lucide-react'
 import { useRadioStations, useRadioCountries } from '../hooks/use-radio-admin'
 import { Skeleton } from '@/shared/components/ui/skeleton'
@@ -31,17 +33,15 @@ const TableWrapper = styled.div`
 `
 
 const StyledTable = styled.table`
+  ${textRole('body-sm')}
   width: 100%;
-  font-size: 0.8125rem;
 `
 
 const HeadRow = styled.tr`
+  ${textRole('label')}
+  font-size: var(--text-dense-size);
   border-bottom: 1px solid var(--color-border);
   text-align: left;
-  font-size: 0.6875rem;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
   color: var(--color-muted-foreground);
 `
 
@@ -73,6 +73,10 @@ const TdBold = styled.td`
   font-weight: 500;
 `
 
+const StationName = styled(ContentText)`
+  font-weight: 500;
+`
+
 const TdNum = styled.td`
   padding: 0.5rem 0;
   padding-right: 1rem;
@@ -81,10 +85,9 @@ const TdNum = styled.td`
 `
 
 const TdMono = styled.td`
+  ${textRole('mono-sm')}
   padding: 0.5rem 0;
   padding-right: 1rem;
-  font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums;
   color: var(--color-muted-foreground);
 `
 
@@ -94,7 +97,7 @@ const TdMuted = styled.td`
 `
 
 const EmptyText = styled.p`
-  font-size: 0.8125rem;
+  ${textRole('body-sm')}
   color: var(--color-muted-foreground);
 `
 
@@ -194,10 +197,17 @@ export function RadioAdminPage() {
             <tbody>
               {stations.map((station) => (
                 <BodyRow key={station.publicId}>
-                  <TdBold>{station.name}</TdBold>
+                  <TdBold><StationName textRole="body-sm" text={station.name} /></TdBold>
                   <TdNum>{station.country}</TdNum>
                   <TdMuted>
-                    {station.genres.slice(0, 2).join(', ') || '—'}
+                    {station.genres.length > 0
+                      ? station.genres.slice(0, 2).map((genre, index) => (
+                        <Fragment key={genre}>
+                          {index > 0 && ', '}
+                          <ContentText textRole="body-sm" text={genre} />
+                        </Fragment>
+                      ))
+                      : '—'}
                   </TdMuted>
                   <TdMono>
                     {station.streams[0]?.bitrate

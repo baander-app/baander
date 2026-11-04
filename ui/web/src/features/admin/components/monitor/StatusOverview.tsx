@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import styled, { keyframes } from 'styled-components'
+import { textRole } from '@/shared/theme'
 import { useStatusOverview, useAnalyticsSummary } from '../../hooks/use-job-monitor'
 
 const pulse = keyframes`
@@ -53,19 +54,20 @@ const StatCard = styled.div`
 `
 
 const StatLabel = styled.p`
-  font-size: 0.875rem;
+  ${textRole('body-sm')}
   color: var(--color-muted-foreground);
 `
 
 const StatValue = styled.p<{ $color?: string }>`
   margin-top: 0.25rem;
-  font-size: 1.5rem;
+  ${textRole('title')}
   font-weight: 700;
+  font-variant-numeric: tabular-nums;
   ${({ $color }) => $color ? `color: ${$color};` : ''}
 `
 
 const ErrorText = styled.p`
-  font-size: 0.875rem;
+  ${textRole('body')}
   color: var(--color-destructive);
 `
 

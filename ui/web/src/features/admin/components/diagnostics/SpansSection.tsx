@@ -1,4 +1,5 @@
 import styled from 'styled-components'
+import { textRole } from '@/shared/theme'
 import { Button } from '@/shared/components/ui/button'
 import { useClearSpans, useSpans } from '../../hooks/use-debug-stats'
 import type { Span } from '../../api/debug-api'
@@ -22,7 +23,7 @@ const SpanRow = styled.li`
   align-items: center;
   gap: var(--space-md);
   padding: 0.375rem var(--space-md);
-  font-size: 0.8125rem;
+  ${textRole('body-sm')}
 `
 
 const SpanName = styled.span`
@@ -36,13 +37,12 @@ const SpanName = styled.span`
 
 const SpanMeta = styled.span`
   flex-shrink: 0;
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
+  ${textRole('mono-sm')}
 `
 
 const ClearError = styled.p`
   padding: 0.625rem var(--space-md);
-  font-size: 0.875rem;
+  ${textRole('body')}
   color: var(--color-destructive);
 `
 

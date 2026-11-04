@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import styled from 'styled-components'
+import { textRole } from '@/shared/theme'
 
 const PageWrapper = styled.div`
   display: flex;
@@ -22,9 +23,7 @@ const Card = styled.div`
 
 const Title = styled.h1`
   text-align: center;
-  font-size: 1.125rem;
-  font-weight: 600;
-  letter-spacing: -0.025em;
+  ${textRole('title')}
 `;
 
 interface AuthPageLayoutProps {

@@ -1,5 +1,6 @@
 import { guardMutationCallbacks } from '@/shared/live/ownership'
 import styled from 'styled-components'
+import { ContentText } from '@/shared/typography'
 import type { ScheduledJob } from '../../api/scheduler-admin-api'
 import { useDeleteScheduledJob } from '../../hooks/use-scheduler-admin'
 import { Button } from '@/shared/components/ui/button'
@@ -12,8 +13,8 @@ import {
   DialogTitle,
 } from '@/shared/components/ui/dialog'
 
-const JobName = styled.span`
-  font-family: monospace;
+const JobName = styled(ContentText)`
+  font-weight: 500;
   color: var(--color-foreground);
 `
 
@@ -28,7 +29,7 @@ export function DeleteJobDialog({ job, open, onOpenChange }: { job: ScheduledJob
         <DialogHeader>
           <DialogTitle>Delete Scheduled Job</DialogTitle>
           <DialogDescription>
-            Permanently delete <JobName>{job.name}</JobName>? This cannot be undone.
+            Permanently delete <JobName textRole="body" text={job.name} />? This cannot be undone.
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>

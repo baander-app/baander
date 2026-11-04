@@ -1,5 +1,6 @@
 import { guardMutationCallbacks } from '@/shared/live/ownership'
 import styled from 'styled-components'
+import { textRole } from '@/shared/theme'
 import { type AdminUser } from '../../api/user-admin-api'
 import { useDeleteUser } from '../../hooks/use-users'
 import { Button } from '@/shared/components/ui/button'
@@ -13,7 +14,7 @@ import {
 } from '@/shared/components/ui/dialog'
 
 const MonoText = styled.span`
-  font-family: monospace;
+  ${textRole('mono-sm')}
   color: var(--color-foreground);
 `
 

@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import styled from 'styled-components'
 import { Button } from '@/shared/components/ui/button'
+import { textRole } from '@/shared/theme'
 
 export const Form = styled.form`
   display: flex;
@@ -12,7 +13,7 @@ export const ErrorAlert = styled.div`
   border-radius: var(--radius-md);
   background-color: color-mix(in srgb, var(--color-destructive) 10%, transparent);
   padding: 0.75rem;
-  font-size: 0.875rem;
+  ${textRole('body')}
   color: var(--color-destructive);
 `;
 
@@ -20,7 +21,7 @@ export const Notice = styled.div`
   border-radius: var(--radius-md);
   background-color: var(--color-secondary);
   padding: 0.75rem;
-  font-size: 0.875rem;
+  ${textRole('body')}
   color: var(--color-foreground);
 `;
 
@@ -29,19 +30,19 @@ export const FieldWrapper = styled.div``;
 export const Label = styled.label`
   display: block;
   margin-bottom: 0.375rem;
-  font-size: 0.75rem;
+  ${textRole('caption')}
   font-weight: 500;
   color: var(--color-muted-foreground);
 `;
 
 export const Hint = styled.p`
   margin-top: 0.375rem;
-  font-size: 0.75rem;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
 `;
 
 export const Intro = styled.p`
-  font-size: 0.875rem;
+  ${textRole('body')}
   color: var(--color-muted-foreground);
 `;
 
@@ -51,7 +52,7 @@ export const FullWidthButton = styled(Button)`
 
 export const FooterText = styled.p`
   text-align: center;
-  font-size: 0.75rem;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
 `;
 

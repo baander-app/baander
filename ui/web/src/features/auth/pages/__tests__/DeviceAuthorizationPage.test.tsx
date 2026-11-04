@@ -77,7 +77,9 @@ describe('DeviceAuthorizationPage', () => {
     serve()
     mount('/device?user_code=bcdf%20ghjk')
 
-    expect(await screen.findByText('Bånder TV wants to use your Bånder account.')).toBeInTheDocument()
+    const clientName = await screen.findByText('Bånder TV')
+    expect(clientName).toHaveAttribute('lang', 'en')
+    expect(clientName.parentElement).toHaveTextContent('Bånder TV wants to use your Bånder account.')
     expect(screen.getByText('BCDF-GHJK')).toBeInTheDocument()
     expect(screen.getByText('Browse and play your library')).toBeInTheDocument()
     expect(screen.getByText('See and change your playlists')).toBeInTheDocument()

@@ -2,7 +2,7 @@ import styled, { css } from 'styled-components'
 import { NavLink, useLocation } from 'react-router-dom'
 import { useAdminCheck } from '@/features/auth/hooks/use-admin-check'
 import { ArrowLeft } from 'lucide-react'
-import { interactiveTransition, focusVisibleRing } from '@/shared/theme'
+import { interactiveTransition, focusVisibleRing, textRole } from '@/shared/theme'
 
 interface NavItem {
   to: string
@@ -53,9 +53,8 @@ const BrandLogo = styled.img`
 `
 
 const BrandText = styled.span`
-  font-size: 0.875rem;
+  ${textRole('body')}
   font-weight: 600;
-  letter-spacing: -0.01em;
   color: var(--color-sidebar-foreground);
 `
 
@@ -80,7 +79,7 @@ const NavLinkStyled = styled(NavLink)<{ $active: boolean }>`
   display: block;
   border-radius: var(--radius-md);
   padding: 0.375rem 0.625rem;
-  font-size: 13px;
+  ${textRole('body')}
   ${focusVisibleRing}
   ${interactiveTransition(['color', 'background-color'])}
 
@@ -88,7 +87,7 @@ const NavLinkStyled = styled(NavLink)<{ $active: boolean }>`
     ? css`
         background-color: var(--color-muted);
         color: var(--color-accent-text);
-        font-weight: 500;
+        font-weight: 600;
       `
     : css`
         color: var(--color-muted-foreground);
@@ -112,7 +111,7 @@ const BackLink = styled(NavLink)`
   gap: 0.5rem;
   border-radius: var(--radius-md);
   padding: 0.375rem 0.625rem;
-  font-size: 13px;
+  ${textRole('body')}
   color: var(--color-muted-foreground);
   ${focusVisibleRing}
   ${interactiveTransition(['color', 'background-color'])}

@@ -23,6 +23,8 @@ import {
   deleteDeviceForget,
 } from '@/shared/api-client/gen/endpoints'
 import styled, { keyframes } from 'styled-components'
+import { textRole } from '@/shared/theme'
+import { ContentText } from '@/shared/typography'
 
 type Device = {
   publicId?: string
@@ -45,12 +47,12 @@ const Container = styled.div`
 `;
 
 const HeaderText = styled.p`
-  font-size: 0.875rem;
+  ${textRole('body')}
   font-weight: 500;
 `;
 
 const Subtext = styled.p`
-  font-size: 0.75rem;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
 `;
 
@@ -80,7 +82,7 @@ const EmptyIcon = styled(Monitor)`
 `;
 
 const EmptyText = styled.p`
-  font-size: 0.75rem;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
 `;
 
@@ -111,8 +113,8 @@ const DeviceIcon = styled(Monitor)`
   color: var(--color-muted-foreground);
 `;
 
-const DeviceName = styled.p`
-  font-size: 0.875rem;
+const DeviceName = styled(ContentText)`
+  display: block;
   font-weight: 500;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -120,7 +122,7 @@ const DeviceName = styled.p`
 `;
 
 const DeviceLastUsed = styled.p`
-  font-size: 0.75rem;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
 `;
 
@@ -255,7 +257,7 @@ export function DeviceManagement() {
               <DeviceInfo>
                 <DeviceIcon size={14} />
                 <div style={{ minWidth: 0 }}>
-                  <DeviceName>{device.name || 'Unknown Device'}</DeviceName>
+                  <DeviceName textRole="body" text={device.name || 'Unknown Device'} forwardedAs="p" />
                   {device.lastUsedAt && (
                     <DeviceLastUsed>
                       Last used {formatRelative(device.lastUsedAt)}
@@ -318,7 +320,7 @@ export function DeviceManagement() {
           <DialogHeader>
             <DialogTitle>Forget device</DialogTitle>
             <DialogDescription>
-              Remove &quot;{forgetTarget?.name || 'Unknown Device'}&quot; from your account?
+              Remove &quot;<ContentText textRole="body" text={forgetTarget?.name || 'Unknown Device'} />&quot; from your account?
               Session history from this device will be preserved.
             </DialogDescription>
           </DialogHeader>

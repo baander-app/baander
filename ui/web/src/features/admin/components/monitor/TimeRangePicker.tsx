@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import styled, { css } from 'styled-components'
-import { interactiveTransition, focusVisibleRing } from '@/shared/theme'
+import { interactiveTransition, focusVisibleRing, textRole } from '@/shared/theme'
 
 interface TimeRangePickerProps {
   from: string
@@ -46,7 +46,7 @@ const PresetButton = styled.button<{ $active: boolean }>`
   color: var(--color-foreground);
   border-radius: var(--radius-md);
   padding: 0.375rem 0.75rem;
-  font-size: 0.875rem;
+  ${textRole('body')}
   font-weight: 500;
   ${interactiveTransition(['color', 'background-color'])}
 
@@ -54,6 +54,7 @@ const PresetButton = styled.button<{ $active: boolean }>`
     ? css`
         background-color: var(--color-background);
         color: var(--color-foreground);
+        font-weight: 600;
       `
     : css`
         color: var(--color-muted-foreground);

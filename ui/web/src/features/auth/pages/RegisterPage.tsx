@@ -2,6 +2,7 @@ import { Navigate } from 'react-router-dom'
 import { RegisterForm } from '../components/RegisterForm'
 import { useAuthStore } from '../stores/auth-store'
 import styled from 'styled-components'
+import { textRole } from '@/shared/theme'
 
 const PageWrapper = styled.div`
   display: flex;
@@ -24,9 +25,7 @@ const Card = styled.div`
 
 const Title = styled.h1`
   text-align: center;
-  font-size: 1.125rem;
-  font-weight: 600;
-  letter-spacing: -0.025em;
+  ${textRole('title')}
 `;
 
 export function RegisterPage() {

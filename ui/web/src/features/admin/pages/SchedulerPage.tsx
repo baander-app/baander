@@ -1,4 +1,6 @@
 import styled from 'styled-components'
+import { textRole } from '@/shared/theme'
+import { ContentText } from '@/shared/typography'
 import { useState } from 'react'
 import { useScheduledJobs } from '../hooks/use-scheduler-admin'
 import type { ScheduledJob } from '../api/scheduler-admin-api'
@@ -37,26 +39,24 @@ const DividerStack = styled.div`
 
 const ColumnHeader = styled.div`
   display: grid;
-  grid-template-columns: 1.5fr 100px 1.5fr 90px 120px 120px 40px;
+  grid-template-columns: 1.5fr 110px 1.5fr 90px 120px 120px 40px;
   gap: 0.75rem;
   padding: 0.375rem 0.5rem;
 `
 
 const ColLabel = styled.span`
-  font-size: 0.6875rem;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  ${textRole('label')}
+  font-size: var(--text-dense-size);
   color: var(--color-muted-foreground);
 `
 
 const JobRow = styled.div`
   display: grid;
-  grid-template-columns: 1.5fr 100px 1.5fr 90px 120px 120px 40px;
+  grid-template-columns: 1.5fr 110px 1.5fr 90px 120px 120px 40px;
   align-items: center;
   gap: 0.75rem;
   padding: 0.5rem;
-  font-size: 0.8125rem;
+  ${textRole('body-sm')}
   transition: background-color 100ms ease-out;
 
   &:hover {
@@ -68,7 +68,7 @@ const JobNameGroup = styled.div`
   overflow: hidden;
 `
 
-const JobName = styled.span`
+const JobName = styled(ContentText)`
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -76,8 +76,8 @@ const JobName = styled.span`
   display: block;
 `
 
-const JobDesc = styled.span`
-  font-size: 0.6875rem;
+const JobDesc = styled(ContentText)`
+  font-size: var(--text-dense-size);
   color: var(--color-muted-foreground);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -86,23 +86,24 @@ const JobDesc = styled.span`
 `
 
 const JobMono = styled.span`
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
+  ${textRole('mono-sm')}
   color: var(--color-muted-foreground);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 `
 
 const JobMonoDark = styled.span`
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
+  ${textRole('mono-sm')}
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 `
 
 const JobDate = styled.span`
-  font-size: 0.6875rem;
+  ${textRole('mono-sm')}
+  font-size: var(--text-dense-size);
   color: var(--color-muted-foreground);
-  font-family: var(--font-mono);
 `
 
 const LoadingRow = styled.div`
@@ -126,7 +127,7 @@ const LoadingStack = styled.div`
 const EmptyState = styled.div`
   padding: 3rem 0;
   text-align: center;
-  font-size: 0.875rem;
+  ${textRole('body')}
   color: var(--color-muted-foreground);
 `
 
@@ -172,8 +173,8 @@ export function SchedulerPage() {
           {jobs.map((job) => (
             <JobRow key={job.publicId}>
               <JobNameGroup>
-                <JobName>{job.name}</JobName>
-                {job.description && <JobDesc>{job.description}</JobDesc>}
+                <JobName textRole="body-sm" text={job.name} />
+                {job.description && <JobDesc textRole="caption" text={job.description} />}
               </JobNameGroup>
               <JobMono>{job.expression}</JobMono>
               <JobMonoDark>{job.command}</JobMonoDark>

@@ -4,8 +4,8 @@ import { useAdminMutationTools } from '../../hooks/use-admin-mutation'
 import styled, { keyframes } from 'styled-components'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
-import { Activity, Loader, Music, RefreshCw, Stethoscope } from 'lucide-react'
-import { interactiveTransition, focusVisibleRing } from '@/shared/theme'
+import { Activity, Check, Loader, Music, RefreshCw, Stethoscope, X } from 'lucide-react'
+import { interactiveTransition, focusVisibleRing, textRole } from '@/shared/theme'
 import { useBulkFetchLyrics } from '../../hooks/use-lyrics-admin'
 import { useFlushFailedQueue } from '../../hooks/use-job-monitor'
 
@@ -72,7 +72,7 @@ const ActionButtonWrapper = styled.button`
   gap: 0.5rem;
   border-radius: var(--radius-md);
   padding: 0.375rem 0.75rem;
-  font-size: 13px;
+  ${textRole('body-sm')}
   color: var(--color-muted-foreground);
   ${interactiveTransition(['color', 'background-color'])}
 
@@ -88,14 +88,12 @@ const SpinIcon = styled(Loader)`
   animation: ${spin} 1s linear infinite;
 `
 
-const SuccessIcon = styled.span`
+const SuccessIcon = styled(Check)`
   color: var(--color-success);
-  font-size: 11px;
 `
 
-const ErrorIcon = styled.span`
+const ErrorIcon = styled(X)`
   color: var(--color-destructive);
-  font-size: 11px;
 `
 
 const Wrapper = styled.div`
@@ -114,9 +112,9 @@ function ActionButton({ config }: { config: ActionButtonConfig }) {
       {state === 'loading' ? (
         <SpinIcon size={14} />
       ) : state === 'success' ? (
-        <SuccessIcon>✓</SuccessIcon>
+        <SuccessIcon size={14} strokeWidth={1.5} />
       ) : state === 'error' ? (
-        <ErrorIcon>✗</ErrorIcon>
+        <ErrorIcon size={14} strokeWidth={1.5} />
       ) : (
         <Icon size={14} strokeWidth={1.5} />
       )}

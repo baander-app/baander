@@ -1,4 +1,5 @@
 import styled from 'styled-components'
+import { textRole } from '@/shared/theme'
 import React, { useState } from 'react'
 import { useAlbumDuplicates } from '../hooks/use-album-duplicates'
 import { useLibraries } from '@/features/library/hooks/use-libraries'
@@ -18,11 +19,11 @@ const HeaderRow = styled.div`
 `
 
 const LibrarySelect = styled.select`
+  ${textRole('body')}
   border-radius: var(--radius-md);
   border: 1px solid var(--color-border);
   background: var(--color-background);
   padding: 0.375rem 0.75rem;
-  font-size: 0.875rem;
   color: var(--color-foreground);
 
   &:focus {
@@ -66,20 +67,18 @@ const ErrorCard = styled.div`
 `
 
 const ErrorText = styled.p`
-  font-size: 0.875rem;
+  ${textRole('body')}
   color: var(--color-destructive);
 `
 
 const ErrorDetail = styled.p`
-  font-size: 0.6875rem;
+  ${textRole('mono-sm')}
   color: var(--color-muted-foreground);
   margin-top: 0.25rem;
-  font-family: var(--font-mono);
 `
 
 const DuplicateHeader = styled.h2`
-  font-size: 0.875rem;
-  font-weight: 500;
+  ${textRole('subtitle')}
 `
 
 const DuplicateStack = styled.div`
@@ -103,7 +102,7 @@ const EmptyIcon = styled(CheckCircle2)`
 `
 
 const EmptyText = styled.p`
-  font-size: 0.875rem;
+  ${textRole('body')}
   color: var(--color-muted-foreground);
 `
 
@@ -143,20 +142,17 @@ const StatCardHeader = styled.div`
 `
 
 const StatCardLabel = styled.span`
-  font-size: 0.6875rem;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  ${textRole('label')}
 `
 
 const StatCardValue = styled.div`
-  font-size: 1.25rem;
+  ${textRole('subtitle')}
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 `
 
 const StatCardSub = styled.p`
-  font-size: 0.6875rem;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
 `
 

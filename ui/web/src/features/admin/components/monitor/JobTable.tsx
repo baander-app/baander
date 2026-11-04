@@ -5,7 +5,7 @@ import { JobFilters } from './JobFilters'
 import { JobTableRow } from './JobTableRow'
 import type { JobFilters as JobFilterType } from '../../api/job-monitor-api'
 import { EmptyState } from '@/features/catalog/components/EmptyState'
-import { interactiveTransition, focusVisibleRing } from '@/shared/theme'
+import { interactiveTransition, focusVisibleRing, textRole } from '@/shared/theme'
 
 const pulse = keyframes`
   0%, 100% { opacity: 1; }
@@ -25,12 +25,12 @@ const Header = styled.div`
 `
 
 const Title = styled.h2`
-  font-size: 1.125rem;
+  ${textRole('subtitle')}
   font-weight: 600;
 `
 
 const Count = styled.span`
-  font-size: 0.875rem;
+  ${textRole('body-sm')}
   color: var(--color-muted-foreground);
 `
 
@@ -49,8 +49,7 @@ const TableHeader = styled.div`
   gap: 0.5rem;
   border-bottom: 1px solid var(--color-border);
   padding: 0.5rem 1rem;
-  font-size: 0.875rem;
-  font-weight: 500;
+  ${textRole('label')}
   color: var(--color-muted-foreground);
 `
 
@@ -73,7 +72,7 @@ const ErrorBody = styled.div`
 `
 
 const ErrorText = styled.p`
-  font-size: 0.875rem;
+  ${textRole('body')}
   color: var(--color-muted-foreground);
 `
 
@@ -85,7 +84,8 @@ const RetryBtn = styled.button`
   border-radius: var(--radius-md);
   border: 1px solid var(--color-border);
   padding: 0.375rem 0.75rem;
-  font-size: 0.875rem;
+  ${textRole('body')}
+  font-weight: 500;
   ${interactiveTransition(['background-color'])}
 
   &:hover { background-color: var(--color-highlight); }
@@ -105,7 +105,8 @@ const LoadMoreBtn = styled.button`
   border-radius: var(--radius-md);
   border: 1px solid var(--color-border);
   padding: 0.375rem 0.75rem;
-  font-size: 0.875rem;
+  ${textRole('body')}
+  font-weight: 500;
   ${interactiveTransition(['background-color'])}
 
   &:hover { background-color: var(--color-highlight); }

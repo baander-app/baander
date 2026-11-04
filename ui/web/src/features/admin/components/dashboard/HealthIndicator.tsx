@@ -1,4 +1,5 @@
 import styled from 'styled-components'
+import { textRole } from '@/shared/theme'
 
 interface HealthIndicatorProps {
   component: string
@@ -34,13 +35,12 @@ const Dot = styled.span<{ $color: string }>`
 `
 
 const Label = styled.span`
-  font-size: 13px;
+  ${textRole('body-sm')}
 `
 
 const Time = styled.span`
-  font-size: 11px;
+  ${textRole('mono-sm')}
   color: var(--color-muted-foreground);
-  font-variant-numeric: tabular-nums;
 `
 
 export function HealthIndicator({ component, status, responseTimeMs }: HealthIndicatorProps) {

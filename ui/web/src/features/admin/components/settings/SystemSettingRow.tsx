@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, type KeyboardEvent } from 'react'
 import { useDraft } from '@/shared/drafts/use-draft'
 import { captureOwnership, isCurrentOwnership, subscribeOwnership } from '@/shared/live/ownership'
 import styled from 'styled-components'
+import { textRole } from '@/shared/theme'
 import { parseFieldViolations } from '@/features/auth/lib/parse-api-error'
 import { Badge } from '@/shared/components/ui/badge'
 import { Button } from '@/shared/components/ui/button'
@@ -40,17 +41,17 @@ const NameLine = styled.div`
 `
 
 const Name = styled.span`
-  font-size: 0.8125rem;
+  ${textRole('body')}
 `
 
 const Description = styled.div`
-  font-size: 0.6875rem;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
 `
 
 const Errors = styled.div`
+  ${textRole('caption')}
   margin-top: 0.25rem;
-  font-size: 0.6875rem;
   color: var(--color-destructive);
 `
 

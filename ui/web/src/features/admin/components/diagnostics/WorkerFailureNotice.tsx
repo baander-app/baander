@@ -1,12 +1,13 @@
 import { useId } from 'react'
 import styled from 'styled-components'
+import { textRole } from '@/shared/theme'
 import type { WorkerError } from '../../api/server-stats-api'
 
 const Notice = styled.section`
   border-radius: var(--radius-md);
   border: 1px solid color-mix(in srgb, var(--color-destructive) 40%, transparent);
   padding: 0.625rem var(--space-md);
-  font-size: 0.875rem;
+  ${textRole('body')}
   color: var(--color-destructive);
 `
 

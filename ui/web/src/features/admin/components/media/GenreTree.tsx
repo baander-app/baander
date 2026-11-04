@@ -3,7 +3,8 @@ import styled, { css } from 'styled-components'
 import { type Genre } from '../../api/genre-admin-api'
 import { ChevronRight, Pencil, Trash2 } from 'lucide-react'
 import { useDeleteGenre } from '../../hooks/use-genre-admin'
-import { interactiveTransition, focusVisibleRing } from '@/shared/theme'
+import { interactiveTransition, focusVisibleRing, textRole } from '@/shared/theme'
+import { ContentText } from '@/shared/typography'
 
 interface GenreTreeNode extends Genre {
   children: GenreTreeNode[]
@@ -44,7 +45,7 @@ const EmptyContainer = styled.div`
 `
 
 const EmptyText = styled.p`
-  font-size: 0.875rem;
+  ${textRole('body-sm')}
   color: var(--color-muted-foreground);
 `
 
@@ -89,15 +90,14 @@ const ChevronIcon = styled(ChevronRight)<{ $expanded: boolean }>`
   ${({ $expanded }) => $expanded && css`transform: rotate(90deg);`}
 `
 
-const NodeName = styled.span`
+const NodeName = styled(ContentText)`
   flex: 1;
-  font-size: 13px;
 `
 
 const MbidLabel = styled.span`
-  font-size: 10px;
+  ${textRole('mono-sm')}
+  font-size: var(--text-dense-size);
   color: var(--color-muted-foreground);
-  font-family: monospace;
 `
 
 const Actions = styled.div`
@@ -157,7 +157,7 @@ function TreeNode({
         >
           <ChevronIcon size={12} strokeWidth={1.5} $expanded={expanded} />
         </ExpandButton>
-        <NodeName>{node.name}</NodeName>
+        <NodeName textRole="body-sm" text={node.name} />
         {node.mbid && <MbidLabel>MBID</MbidLabel>}
         <Actions>
           <ActionButton type="button" onClick={() => onEdit(node)}>

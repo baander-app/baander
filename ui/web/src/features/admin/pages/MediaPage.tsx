@@ -1,5 +1,6 @@
 import { guardMutationCallbacks } from '@/shared/live/ownership'
 import styled from 'styled-components'
+import { textRole } from '@/shared/theme'
 import { useMediaStorageStats, useCheckMissingImages, usePruneMissingImages } from '../hooks/use-media-admin'
 import { useAuthStore } from '@/features/auth/stores/auth-store'
 import { Image, HardDrive, Trash2, Search, AlertTriangle, CheckCircle2 } from 'lucide-react'
@@ -59,8 +60,7 @@ const CardHeader = styled.div`
 `
 
 const CardTitle = styled.h2`
-  font-size: 0.8125rem;
-  font-weight: 500;
+  ${textRole('subtitle')}
 `
 
 const Divider = styled.div`
@@ -77,7 +77,7 @@ const TypeRow = styled.div`
 `
 
 const TypeName = styled.span`
-  font-size: 0.8125rem;
+  ${textRole('body-sm')}
   font-weight: 500;
   text-transform: capitalize;
 `
@@ -89,14 +89,12 @@ const TypeStats = styled.div`
 `
 
 const TypeCount = styled.span`
-  font-size: 0.8125rem;
-  font-variant-numeric: tabular-nums;
+  ${textRole('mono-sm')}
   color: var(--color-muted-foreground);
 `
 
 const TypeSize = styled.span`
-  font-size: 0.8125rem;
-  font-variant-numeric: tabular-nums;
+  ${textRole('mono-sm')}
   font-weight: 500;
 `
 
@@ -120,14 +118,18 @@ const FeedbackHeader = styled.div`
 `
 
 const FeedbackTitle = styled.span`
-  font-size: 0.8125rem;
+  ${textRole('body-sm')}
   font-weight: 500;
 `
 
 const FeedbackDesc = styled.p`
+  ${textRole('caption')}
   margin-top: 0.25rem;
-  font-size: 0.6875rem;
   color: var(--color-muted-foreground);
+`
+
+const FeedbackDetail = styled(FeedbackDesc)`
+  ${textRole('mono-sm')}
 `
 
 const MissingList = styled.div`
@@ -138,9 +140,8 @@ const MissingList = styled.div`
 `
 
 const MissingItem = styled.div`
-  font-size: 0.6875rem;
+  ${textRole('mono-sm')}
   color: var(--color-muted-foreground);
-  font-family: var(--font-mono);
 `
 
 const StyledLink = styled(Link)`
@@ -300,10 +301,10 @@ export function MediaPage() {
       {/* Prune error */}
       {pruneMissing.isError && (
         <FeedbackCard $variant="error">
-          <FeedbackTitle style={{ color: 'var(--color-destructive)', fontSize: '0.875rem' }}>Failed to dispatch prune job.</FeedbackTitle>
-          <FeedbackDesc style={{ fontFamily: 'var(--font-mono)' }}>
+          <FeedbackTitle style={{ color: 'var(--color-destructive)' }}>Failed to dispatch prune job.</FeedbackTitle>
+          <FeedbackDetail>
             {pruneMissing.error instanceof Error ? pruneMissing.error.message : 'Unknown error'}
-          </FeedbackDesc>
+          </FeedbackDetail>
         </FeedbackCard>
       )}
 

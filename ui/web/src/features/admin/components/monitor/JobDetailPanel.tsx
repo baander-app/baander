@@ -1,5 +1,5 @@
 import { guardMutationCallbacks } from '@/shared/live/ownership'
-import { focusVisibleRing } from '@/shared/theme'
+import { focusVisibleRing, textRole } from '@/shared/theme'
 import { useState } from 'react'
 import styled, { keyframes } from 'styled-components'
 import { toast } from 'sonner'
@@ -77,8 +77,7 @@ const Title = styled.h2`
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 1.125rem;
-  font-weight: 600;
+  ${textRole('title')}
   color: var(--color-card-foreground);
 `
 
@@ -100,7 +99,7 @@ const Badge = styled.span<{ $bg: string; $text: string }>`
   align-items: center;
   border-radius: 50px;
   padding: 0.125rem 0.625rem;
-  font-size: 0.75rem;
+  ${textRole('caption')}
   font-weight: 500;
   background-color: ${({ $bg }) => $bg};
   color: ${({ $text }) => $text};
@@ -147,10 +146,7 @@ const MetadataItem = styled.div`
 `
 
 const MetadataLabel = styled.p`
-  font-size: 0.75rem;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  ${textRole('label')}
   color: var(--color-muted-foreground);
 `
 
@@ -166,13 +162,12 @@ const CodeBlock = styled.code`
   border-radius: 0.25rem;
   background-color: var(--color-muted);
   padding: 0.25rem 0.5rem;
-  font-family: monospace;
-  font-size: 0.75rem;
+  ${textRole('mono-sm')}
   color: var(--color-muted-foreground);
 `
 
 const TextValue = styled.span`
-  font-size: 0.875rem;
+  ${textRole('body-sm')}
   color: var(--color-foreground);
 `
 
@@ -185,14 +180,14 @@ const ExceptionBox = styled.div`
 `
 
 const ExceptionTitle = styled.p`
-  font-size: 0.875rem;
+  ${textRole('body')}
   font-weight: 500;
   color: var(--color-destructive);
 `
 
 const ExceptionMessage = styled.p`
   margin-top: 0.25rem;
-  font-size: 0.875rem;
+  ${textRole('mono-sm')}
   color: var(--color-muted-foreground);
 `
 
@@ -206,7 +201,7 @@ const RetryButton = styled.button`
   border-radius: var(--radius-md);
   background-color: var(--color-secondary);
   padding: 0.5rem 1rem;
-  font-size: 0.875rem;
+  ${textRole('body')}
   font-weight: 500;
   color: var(--color-secondary-foreground);
   transition: background-color 0.15s;
@@ -225,8 +220,8 @@ const CancelJobButton = styled.button`
   border-radius: var(--radius-md);
   background-color: var(--color-destructive);
   padding: 0.5rem 1rem;
-  font-size: 0.875rem;
-  font-weight: 500;
+  ${textRole('body')}
+  font-weight: 600;
   color: var(--color-destructive-foreground);
   transition: opacity 0.15s;
 
@@ -235,7 +230,7 @@ const CancelJobButton = styled.button`
 `
 
 const ConfirmText = styled.p`
-  font-size: 0.875rem;
+  ${textRole('body')}
   color: var(--color-card-foreground);
 `
 
@@ -254,7 +249,8 @@ const CancelBtn = styled.button`
   border-radius: var(--radius-md);
   border: 1px solid var(--color-border);
   padding: 0.375rem 0.75rem;
-  font-size: 0.875rem;
+  ${textRole('body')}
+  font-weight: 500;
   color: var(--color-foreground);
   transition: background-color 0.15s;
 
@@ -269,8 +265,8 @@ const DestructiveBtn = styled.button`
   border-radius: var(--radius-md);
   background-color: var(--color-destructive);
   padding: 0.375rem 0.75rem;
-  font-size: 0.875rem;
-  font-weight: 500;
+  ${textRole('body')}
+  font-weight: 600;
   color: var(--color-destructive-foreground);
   transition: opacity 0.15s;
 
@@ -298,14 +294,14 @@ const ErrorBox = styled.div`
 `
 
 const ErrorTitle = styled.p`
-  font-size: 0.875rem;
+  ${textRole('body')}
   font-weight: 500;
   color: var(--color-destructive);
 `
 
 const ErrorDetail = styled.p`
   margin-top: 0.25rem;
-  font-size: 0.75rem;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
 `
 
@@ -318,12 +314,13 @@ const ErrorCloseBtn = styled.button`
   border-radius: var(--radius-md);
   background-color: var(--color-secondary);
   padding: 0.375rem 0.75rem;
-  font-size: 0.875rem;
+  ${textRole('body')}
+  font-weight: 500;
   color: var(--color-secondary-foreground);
 `
 
 const NotFoundText = styled.p`
-  font-size: 0.875rem;
+  ${textRole('body')}
   color: var(--color-muted-foreground);
 `
 

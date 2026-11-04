@@ -1,5 +1,6 @@
 import styled from 'styled-components'
 import { useTranslation } from '@/shared/i18n'
+import { textRole } from '@/shared/theme'
 
 /**
  * Scopes the server grants (`auth.scopes.user_grants`) and the default `access-api`; others are
@@ -8,7 +9,7 @@ import { useTranslation } from '@/shared/i18n'
 const KNOWN_SCOPES = new Set(['access-api', 'profile', 'email', 'library', 'playlist'])
 
 const Intro = styled.p`
-  font-size: 0.875rem;
+  ${textRole('body')}
   color: var(--color-muted-foreground);
 `
 
@@ -18,8 +19,12 @@ const List = styled.ul`
   gap: 0.5rem;
   margin: 0;
   padding-left: 1.25rem;
-  font-size: 0.875rem;
+  ${textRole('body')}
   color: var(--color-foreground);
+`
+
+const ScopeName = styled.code`
+  ${textRole('mono-sm')}
 `
 
 interface ScopeListProps {
@@ -39,7 +44,7 @@ export function ScopeList({ scopes }: ScopeListProps) {
         ) : (
           scopes.map((scope) => (
             <li key={scope}>
-              {KNOWN_SCOPES.has(scope) ? t(`auth.scopes.${scope}`) : scope}
+              {KNOWN_SCOPES.has(scope) ? t(`auth.scopes.${scope}`) : <ScopeName>{scope}</ScopeName>}
             </li>
           ))
         )}

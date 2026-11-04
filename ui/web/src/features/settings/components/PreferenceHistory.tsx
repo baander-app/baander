@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import styled from 'styled-components'
 import { Button } from '@/shared/components/ui/button'
 import { Undo2, Loader2 } from 'lucide-react'
+import { textRole } from '@/shared/theme'
 import type { PreferenceVersion } from '../hooks/use-preference-sync'
 
 const SpinningIcon = styled(Loader2)`
@@ -32,7 +33,7 @@ const HistoryHeader = styled.div`
 `
 
 const HistoryLabel = styled.span`
-  font-size: 0.75rem;
+  ${textRole('caption')}
   font-weight: 500;
   color: var(--color-muted-foreground);
 `
@@ -52,7 +53,7 @@ const HistoryEntry = styled.div`
   border-radius: var(--radius-md);
   border: 1px solid var(--color-border);
   padding: 0.25rem 0.5rem;
-  font-size: 0.75rem;
+  ${textRole('caption')}
 `
 
 const RestoreIcon = styled(Undo2)`
@@ -118,7 +119,7 @@ export function PreferenceHistory({
         <Button
           size="sm"
           variant="ghost"
-          style={{ height: 24, padding: '0 0.5rem', fontSize: '0.75rem' }}
+          style={{ height: 'auto', minHeight: 24, padding: '0 0.5rem' }}
           onClick={() => refetch()}
           disabled={isLoading}
         >
@@ -143,7 +144,7 @@ export function PreferenceHistory({
               <Button
                 size="sm"
                 variant="ghost"
-                style={{ height: 20, padding: '0 0.375rem', fontSize: '0.75rem' }}
+                style={{ height: 'auto', minHeight: 20, padding: '0 0.375rem' }}
                 onClick={() => onRollback(entry.version)}
               >
                 <RestoreIcon size={10} />

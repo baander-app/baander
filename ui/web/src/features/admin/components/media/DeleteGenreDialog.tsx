@@ -1,5 +1,7 @@
 import { guardMutationCallbacks } from '@/shared/live/ownership'
 import styled from 'styled-components'
+import { textRole } from '@/shared/theme'
+import { ContentText } from '@/shared/typography'
 import { Button } from '@/shared/components/ui/button'
 import {
   Dialog,
@@ -12,7 +14,7 @@ import { useDeleteGenre } from '../../hooks/use-genre-admin'
 import type { Genre } from '../../api/genre-admin-api'
 
 const Message = styled.p`
-  font-size: 13px;
+  ${textRole('body')}
   color: var(--color-muted-foreground);
 `
 
@@ -36,7 +38,7 @@ export function DeleteGenreDialog({
           <DialogTitle>Delete Genre</DialogTitle>
         </DialogHeader>
         <Message>
-          Delete <strong>{genre.name}</strong>? This cannot be undone.
+          Delete <ContentText textRole="body" as="strong" text={genre.name} />? This cannot be undone.
         </Message>
         <DialogFooter>
           <Button

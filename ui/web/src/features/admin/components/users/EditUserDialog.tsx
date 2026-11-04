@@ -3,6 +3,7 @@ import { isAxiosError } from 'axios'
 import { useDraft } from '@/shared/drafts/use-draft'
 import { captureOwnership, isCurrentOwnership, subscribeOwnership } from '@/shared/live/ownership'
 import styled from 'styled-components'
+import { textRole } from '@/shared/theme'
 import { useAdminCheck } from '@/features/auth/hooks/use-admin-check'
 import { parseApiError } from '@/features/auth/lib/parse-api-error'
 import { EMAIL_LANGUAGE_KEY } from '@/features/settings/email-language'
@@ -33,10 +34,7 @@ const FieldGroup = styled.div`
 `
 
 const Label = styled.label`
-  font-size: 11px;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  ${textRole('label')}
   color: var(--color-muted-foreground);
 `
 
@@ -45,7 +43,7 @@ const StyledInput = styled(Input)`
 `
 
 const ErrorText = styled.p`
-  font-size: 0.6875rem;
+  ${textRole('caption')}
   color: var(--color-destructive);
 `
 

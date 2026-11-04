@@ -1,4 +1,5 @@
 import styled from 'styled-components'
+import { textRole } from '@/shared/theme'
 import { useLyricsCoverage, useLyricsSyncStatus, useBulkFetchLyrics } from '../hooks/use-lyrics-admin'
 import { useAuthStore } from '@/features/auth/stores/auth-store'
 import { Music, RefreshCw, CheckCircle2, XCircle } from 'lucide-react'
@@ -28,10 +29,9 @@ const Card = styled.div`
 `
 
 const CardHeader = styled.h3`
+  ${textRole('subtitle')}
   border-bottom: 1px solid var(--color-border);
   padding: 0.75rem 1rem;
-  font-size: 0.875rem;
-  font-weight: 500;
 `
 
 const CardBody = styled.div`
@@ -56,13 +56,12 @@ const StatRow = styled.div`
 `
 
 const StatLabel = styled.span`
+  ${textRole('body-sm')}
   color: var(--color-muted-foreground);
-  font-size: 0.875rem;
 `
 
 const StatValue = styled.span<{ $muted?: boolean }>`
-  font-family: var(--font-mono);
-  font-size: 0.875rem;
+  ${textRole('mono-sm')}
   ${({ $muted }) => $muted && 'color: var(--color-muted-foreground);'}
 `
 
@@ -89,16 +88,13 @@ const IconBox = styled.div`
 `
 
 const BigValue = styled.div`
-  font-size: 1.5rem;
-  font-weight: 600;
+  ${textRole('title')}
   font-variant-numeric: tabular-nums;
 `
 
 const SubLabel = styled.div`
-  font-size: 0.6875rem;
+  ${textRole('label')}
   color: var(--color-muted-foreground);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
 `
 
 const BarTrack = styled.div`
@@ -117,11 +113,8 @@ const BarFill = styled.div<{ $percentage: number; $color: string }>`
 `
 
 const SectionLabel = styled.div`
+  ${textRole('label')}
   margin-bottom: 0.5rem;
-  font-size: 0.6875rem;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
   color: var(--color-muted-foreground);
 `
 
@@ -160,19 +153,19 @@ const ActionArea = styled.div`
 `
 
 const FeedbackText = styled.p`
+  ${textRole('caption')}
   margin-top: 0.5rem;
-  font-size: 0.75rem;
   color: var(--color-muted-foreground);
 `
 
 const ErrorText = styled.p`
+  ${textRole('caption')}
   margin-top: 0.5rem;
-  font-size: 0.75rem;
   color: var(--color-destructive);
 `
 
 const EmptyText = styled.p`
-  font-size: 0.875rem;
+  ${textRole('body-sm')}
   color: var(--color-muted-foreground);
 `
 

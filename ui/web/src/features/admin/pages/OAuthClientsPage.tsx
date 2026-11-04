@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import styled from 'styled-components'
+import { textRole } from '@/shared/theme'
+import { ContentText } from '@/shared/typography'
 import { Plus } from 'lucide-react'
 import { Button } from '@/shared/components/ui/button'
 import { Skeleton } from '@/shared/components/ui/skeleton'
@@ -35,7 +37,7 @@ const HeaderRow = styled.div`
 `
 
 const Note = styled.p`
-  font-size: 0.8125rem;
+  ${textRole('body-sm')}
   color: var(--color-muted-foreground);
 `
 
@@ -51,14 +53,12 @@ const Row = styled.div<{ $columns: string }>`
   align-items: center;
   gap: 0.75rem;
   padding: 0.5rem;
-  font-size: 0.8125rem;
+  ${textRole('body-sm')}
 `
 
 const ColLabel = styled.span`
-  font-size: 0.6875rem;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  ${textRole('label')}
+  font-size: var(--text-dense-size);
   color: var(--color-muted-foreground);
 `
 
@@ -69,7 +69,7 @@ const NameCell = styled.div`
   gap: 0.125rem;
 `
 
-const NameLine = styled.span`
+const NameLine = styled(ContentText)`
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -79,14 +79,14 @@ const ClientId = styled.span`
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-family: var(--font-mono);
-  font-size: 0.6875rem;
+  ${textRole('mono-sm')}
+  font-size: var(--text-dense-size);
   color: var(--color-muted-foreground);
 `
 
 const DateCell = styled.span`
-  font-family: var(--font-mono);
-  font-size: 0.6875rem;
+  ${textRole('mono-sm')}
+  font-size: var(--text-dense-size);
   color: var(--color-muted-foreground);
 `
 
@@ -110,7 +110,7 @@ const SkeletonRow = styled(Skeleton)`
 const EmptyState = styled.div`
   padding: 3rem 0;
   text-align: center;
-  font-size: 0.875rem;
+  ${textRole('body')}
   color: var(--color-muted-foreground);
 `
 
@@ -178,7 +178,7 @@ export function OAuthClientsPage() {
           {clients.map((client) => (
             <Row key={client.clientId} $columns={columns} role="row" aria-label={client.name}>
               <NameCell role="cell">
-                <NameLine>{client.name}</NameLine>
+                <NameLine textRole="body-sm" text={client.name} />
                 <ClientId title="Client ID">{client.clientId}</ClientId>
               </NameCell>
               <span role="cell">{CLIENT_TYPE_LABELS[client.type]}</span>

@@ -6,6 +6,7 @@ import { Input } from '@/shared/components/ui/input';
 import { Button } from '@/shared/components/ui/button';
 import { parseApiError } from '../lib/parse-api-error';
 import styled from 'styled-components';
+import { textRole } from '@/shared/theme';
 
 const Form = styled.form`
   display: flex;
@@ -17,7 +18,7 @@ const ErrorAlert = styled.div`
   border-radius: var(--radius-md);
   background-color: var(--color-muted);
   padding: 0.75rem;
-  font-size: 0.875rem;
+  ${textRole('body')}
   color: var(--color-destructive);
 `;
 
@@ -26,7 +27,7 @@ const FieldWrapper = styled.div``;
 const Label = styled.label`
   display: block;
   margin-bottom: 0.375rem;
-  font-size: 0.75rem;
+  ${textRole('caption')}
   font-weight: 500;
   color: var(--color-muted-foreground);
 `;
@@ -47,7 +48,7 @@ const StyledButton = styled(Button)`
 const ForgotLink = styled(Link)`
   display: inline-block;
   margin-top: 0.375rem;
-  font-size: 0.75rem;
+  ${textRole('caption')}
   color: var(--color-accent-text);
   text-decoration: none;
 

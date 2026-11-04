@@ -1,5 +1,5 @@
 import { guardMutationCallbacks } from '@/shared/live/ownership'
-import { focusVisibleRing } from '@/shared/theme'
+import { focusVisibleRing, textRole } from '@/shared/theme'
 import { useState } from 'react'
 import styled, { keyframes } from 'styled-components'
 import { useTransportStatus, useFlushFailedQueue } from '../../hooks/use-job-monitor'
@@ -16,7 +16,7 @@ const Wrapper = styled.div`
 `
 
 const Title = styled.h2`
-  font-size: 1.125rem;
+  ${textRole('subtitle')}
   font-weight: 600;
 `
 
@@ -38,14 +38,15 @@ const Card = styled.div`
 `
 
 const CardLabel = styled.p`
-  font-size: 0.875rem;
+  ${textRole('body-sm')}
   color: var(--color-muted-foreground);
 `
 
 const CardValue = styled.p<{ $color?: string }>`
   margin-top: 0.25rem;
-  font-size: 1.5rem;
+  ${textRole('title')}
   font-weight: 700;
+  font-variant-numeric: tabular-nums;
   ${({ $color }) => $color ? `color: ${$color};` : ''}
 `
 
@@ -64,7 +65,7 @@ const ConsumerDot = styled.div<{ $running: boolean }>`
 `
 
 const ConsumerName = styled.span`
-  font-size: 0.875rem;
+  ${textRole('body-sm')}
   font-weight: 500;
 `
 
@@ -82,7 +83,7 @@ const FlushConfirmBody = styled.div`
 `
 
 const FlushText = styled.p`
-  font-size: 0.875rem;
+  ${textRole('body')}
 `
 
 const FlushActions = styled.div`
@@ -98,7 +99,8 @@ const DestructiveButton = styled.button`
   border-radius: var(--radius-md);
   background-color: var(--color-destructive);
   padding: 0.375rem 0.75rem;
-  font-size: 0.875rem;
+  ${textRole('body')}
+  font-weight: 600;
   color: var(--color-destructive-foreground);
 
   &:disabled { opacity: 0.5; }
@@ -112,7 +114,8 @@ const OutlineButton = styled.button`
   border-radius: var(--radius-md);
   border: 1px solid var(--color-border);
   padding: 0.375rem 0.75rem;
-  font-size: 0.875rem;
+  ${textRole('body')}
+  font-weight: 500;
 `
 
 const FlushRow = styled.div`
@@ -122,17 +125,17 @@ const FlushRow = styled.div`
 `
 
 const FlushCount = styled.p`
-  font-size: 0.875rem;
+  ${textRole('body')}
   font-weight: 500;
 `
 
 const FlushError = styled.p`
-  font-size: 0.875rem;
+  ${textRole('body')}
   color: var(--color-destructive);
 `
 
 const NoFailedText = styled.p`
-  font-size: 0.875rem;
+  ${textRole('body')}
   color: var(--color-muted-foreground);
 `
 
@@ -141,7 +144,8 @@ const RetryButton = styled.button`
   border: 0;
   background-color: transparent;
   color: var(--color-foreground);
-  font-size: 0.875rem;
+  ${textRole('body')}
+  font-weight: 500;
 `
 
 const SkeletonLine = styled.div`

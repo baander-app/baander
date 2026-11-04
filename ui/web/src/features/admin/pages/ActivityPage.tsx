@@ -1,4 +1,6 @@
 import styled from 'styled-components'
+import { ContentText } from '@/shared/typography'
+import { textRole } from '@/shared/theme'
 import { useState } from 'react'
 import {
   useActivitySummary,
@@ -34,7 +36,7 @@ const DateInput = styled.input`
   border: 1px solid var(--color-border);
   background: transparent;
   padding: 0 0.75rem;
-  font-size: 0.8125rem;
+  ${textRole('body')}
   color: var(--color-foreground);
 
   &:focus {
@@ -44,7 +46,7 @@ const DateInput = styled.input`
 `
 
 const DateSeparator = styled.span`
-  font-size: 0.8125rem;
+  ${textRole('body')}
   color: var(--color-muted-foreground);
 `
 
@@ -76,10 +78,7 @@ const TablesGrid = styled.div`
 
 const SectionTitle = styled.h2`
   margin-bottom: 0.75rem;
-  font-size: 0.6875rem;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  ${textRole('label')}
   color: var(--color-muted-foreground);
 `
 
@@ -91,16 +90,14 @@ const SkeletonStack = styled.div`
 
 const StyledTable = styled.table`
   width: 100%;
-  font-size: 0.8125rem;
+  ${textRole('body-sm')}
 `
 
 const TableHeadRow = styled.tr`
   border-bottom: 1px solid var(--color-border);
   text-align: left;
-  font-size: 0.6875rem;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  ${textRole('label')}
+  font-size: var(--text-dense-size);
   color: var(--color-muted-foreground);
 `
 
@@ -140,6 +137,10 @@ const TdBold = styled.td`
   font-weight: 500;
 `
 
+const BoldName = styled(ContentText)`
+  font-weight: 500;
+`
+
 const TdMuted = styled.td`
   padding: 0.375rem 0;
   padding-right: 0.75rem;
@@ -153,7 +154,7 @@ const TdRight = styled.td`
 `
 
 const EmptyText = styled.p`
-  font-size: 0.8125rem;
+  ${textRole('body-sm')}
   color: var(--color-muted-foreground);
 `
 
@@ -252,8 +253,8 @@ export function ActivityPage() {
                 {tracks.map((t, i) => (
                   <TableRow key={i}>
                     <TdNum>{i + 1}</TdNum>
-                    <TdBold>{t.track_name}</TdBold>
-                    <TdMuted>{t.artist_name ?? '—'}</TdMuted>
+                    <TdBold><BoldName textRole="body-sm" text={t.track_name} /></TdBold>
+                    <TdMuted>{t.artist_name ? <ContentText textRole="body-sm" text={t.artist_name} /> : '—'}</TdMuted>
                     <TdRight>{t.play_count.toLocaleString()}</TdRight>
                   </TableRow>
                 ))}
@@ -286,7 +287,7 @@ export function ActivityPage() {
                 {artists.map((a, i) => (
                   <TableRow key={i}>
                     <TdNum>{i + 1}</TdNum>
-                    <TdBold>{a.artist_name}</TdBold>
+                    <TdBold><BoldName textRole="body-sm" text={a.artist_name} /></TdBold>
                     <TdRight>{a.play_count.toLocaleString()}</TdRight>
                   </TableRow>
                 ))}

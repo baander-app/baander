@@ -2,7 +2,7 @@ import styled from 'styled-components'
 import { RotateCcw } from 'lucide-react'
 import { Button } from '@/shared/components/ui/button'
 import { getStatusIcon } from './job-status-icon'
-import { interactiveTransition } from '@/shared/theme'
+import { interactiveTransition, textRole } from '@/shared/theme'
 
 interface RecentJob {
   public_id: string
@@ -27,7 +27,7 @@ const Row = styled.div`
   border-radius: 0.375rem;
   border: 1px solid color-mix(in srgb, var(--color-border) 50%, transparent);
   padding: 0.5rem 0.75rem;
-  font-size: 13px;
+  ${textRole('body-sm')}
   ${interactiveTransition(['background-color'])}
 
   &:hover { background-color: color-mix(in srgb, var(--color-highlight) 20%, transparent); }
@@ -53,7 +53,7 @@ const SongCount = styled.span`
 
 const FailReason = styled.span`
   color: var(--color-destructive);
-  font-size: 11px;
+  ${textRole('caption')}
   max-width: 200px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -68,7 +68,7 @@ const RightGroup = styled.div`
 
 const TimeStamp = styled.span`
   color: var(--color-muted-foreground);
-  font-size: 12px;
+  ${textRole('caption')}
 `
 
 export function RecentJobList({
@@ -102,7 +102,7 @@ export function RecentJobList({
                 size="sm"
                 onClick={() => onRequeue(job.public_id)}
                 disabled={isRequeuing}
-                style={{ height: '1.75rem', fontSize: '11px', padding: '0 0.5rem' }}
+                style={{ height: '1.75rem', padding: '0 0.5rem' }}
               >
                 <RotateCcw size={11} style={{ marginRight: '0.25rem' }} />
                 Retry

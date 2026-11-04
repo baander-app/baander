@@ -8,6 +8,7 @@ import { AxiosError, type AxiosResponse } from 'axios'
 import { AXIOS_INSTANCE, customInstance } from '@/shared/api-client/axios-instance'
 import type { AdminUserListParams } from '../../api/user-admin-api'
 import { AdminUsersPage } from '../AdminUsersPage'
+import { declaration, rulesForElement } from '@/shared/theme/__tests__/css-text'
 
 vi.mock('@/shared/api-client/axios-instance', () => ({
   AXIOS_INSTANCE: { get: vi.fn() },
@@ -73,6 +74,20 @@ describe('admin user pagination', () => {
   afterEach(() => {
     cleanup()
     client?.clear()
+  })
+
+  it('sets the created-date cell in the mono role at the dense table size and the user name as content text', async () => {
+    mount()
+    const name = (await screen.findAllByText('User 0'))[0]
+    const created = screen.getAllByText(new Date('2026-10-01T00:00:00Z').toLocaleDateString())[0]
+    const cssText = [...document.querySelectorAll('style')].map(style => style.textContent).join('')
+    const createdRules = rulesForElement(created, cssText)
+
+    expect(createdRules.map(rule => declaration(rule, 'font-family'))).toContain('var(--font-mono)')
+    // The dense size follows the role's own size in the same rule, so the last font-size wins.
+    const sizes = createdRules.flatMap(rule => [...rule.declarations.matchAll(/font-size:\s*([^;]+)/g)].map(match => match[1].trim()))
+    expect(sizes.at(-1)).toBe('var(--text-dense-size)')
+    expect(name).toHaveAttribute('lang')
   })
 
   it('shows totals and navigates through bounded pages with correct query params', async () => {

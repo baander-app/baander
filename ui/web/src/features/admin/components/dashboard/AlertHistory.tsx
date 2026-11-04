@@ -1,12 +1,13 @@
 import { notificationCategoryColors } from '@/features/notification/category-colors'
 import styled from 'styled-components'
+import { textRole } from '@/shared/theme'
 import { useQuery } from '@tanstack/react-query'
 import { notificationApi, type NotificationItem } from '@/features/notification/api/notification-api'
 import { formatRelativeTime } from '@/shared/utils/format-relative-time'
 
 
 const EmptyText = styled.p`
-  font-size: 13px;
+  ${textRole('body-sm')}
   color: var(--color-muted-foreground);
 `
 
@@ -23,12 +24,11 @@ const Row = styled.div<{ $borderColor: string }>`
 `
 
 const RowTitle = styled.div`
-  font-size: 13px;
-  line-height: 1.25;
+  ${textRole('body-sm')}
 `
 
 const RowTime = styled.div`
-  font-size: 11px;
+  ${textRole('caption')}
   color: var(--color-muted-foreground);
   margin-top: 0.125rem;
 `
