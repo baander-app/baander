@@ -474,6 +474,7 @@ own exit code without JSON. Error output contains no credentials or raw diagnost
 
 | Command | Description |
 |---------|-------------|
+| [app:deployment:profile:show](app-deployment-profile-show.md) | Print a deployment profile and the limits derived from its media slots |
 | [app:outbox:consume](app-outbox-consume.md) | Relay durable notification events and delivery intents |
 | [app:server:coroutines](app-server-coroutines.md) | Show coroutine and channel statistics of every web server worker |
 | [app:server:drain:watch](app-server-drain-watch.md) | Kill the web server processes still running at the drain deadline (started by app:serve) |
