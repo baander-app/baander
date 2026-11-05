@@ -217,11 +217,29 @@ foreach (['low' => QualityTier::p360(), 'high' => QualityTier::p720()] as $label
         (new WebVttTimeline())->rebase($extracted, $subtitleDirectory . '/full.vtt', $sourceStartTime);
         AdaptiveBrowserFixture::writeJson($directory . '/subtitle-command-' . $tier->name . '.json', $subtitleArguments);
     }
-    $input = array_search('-i', $arguments, true);
-    if ($input === false) {
-        throw new RuntimeException('The encoder omitted its source.');
+    // Production throttles a producer that runs ahead of the playhead; the
+    // fixture paces it instead, so the player attaches to a presentation that
+    // is still publishing. -re paces input packets, and a held-frame source has
+    // only one packet per hold, so its generated frames would still arrive in
+    // bursts that close several segments at once. The realtime filter paces
+    // the frames the fps filter generates instead.
+    if ($sparse) {
+        $filters = array_search('-vf', $arguments, true);
+        if ($filters === false || !str_contains($arguments[$filters + 1], 'fps=1:')) {
+            throw new RuntimeException('The encoder omitted its sparse frame rate filter.');
+        }
+        $arguments[$filters + 1] .= ',realtime';
+        $audio = array_search('-af', $arguments, true);
+        if ($audio !== false) {
+            $arguments[$audio + 1] .= ',arealtime';
+        }
+    } else {
+        $input = array_search('-i', $arguments, true);
+        if ($input === false) {
+            throw new RuntimeException('The encoder omitted its source.');
+        }
+        array_splice($arguments, $input, 0, ['-re']);
     }
-    array_splice($arguments, $input, 0, ['-re']);
     $commands[$tier->name] = $arguments;
     $state['jobs'][$tier->name] = ['job' => $job, 'sessionId' => Uuid::generate(), 'directory' => $output];
     $readyTiers[$label] = ['name' => $tier->name, 'jobId' => $job->getPublicId()->toString(), 'width' => $tier->width, 'height' => $tier->height];
