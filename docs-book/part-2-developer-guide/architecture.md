@@ -143,3 +143,5 @@ Contexts communicate through:
 - **Symfony Messenger** — asynchronous commands between contexts (e.g., Library → Metadata for enrichment)
 - **Domain events** — for side effects that don't need immediate handling
 - **Shared kernel** — common types like `Uuid` and `PublicId` provide a shared vocabulary without coupling
+
+The [Communication Map](communication-map.md) draws these paths together with the clients, stores, worker pair and external services, and gives the rule for choosing between an inline command, an outbox event, a scheduled occurrence and a routed async message.

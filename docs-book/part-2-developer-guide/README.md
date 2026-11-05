@@ -7,6 +7,7 @@ Understand the architecture, write code following project conventions, and contr
 | Page | Description |
 |------|-------------|
 | [Architecture Overview](architecture.md) | DDD bounded contexts, four-layer structure, and shared kernel |
+| [Communication Map](communication-map.md) | How clients, the web application, transports, stores, the worker pair and external services talk, and when work is a message |
 | [Shared Kernel](shared-kernel.md) | UUID v7, cursor pagination, search, Swoole async, caching, WebSocket |
 | [Real-Time Patterns](real-time-patterns.md) | WebSocket connection registry, message protocol, party sync |
 | [Live Updates](live-updates.md) | Committed change capture, shared query refresh, ownership, and recovery |
