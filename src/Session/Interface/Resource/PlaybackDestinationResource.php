@@ -15,7 +15,7 @@ use OpenApi\Attributes as OA;
         new OA\Property(property: 'name', type: 'string'),
         new OA\Property(property: 'kind', type: 'string', enum: ['browser']),
         new OA\Property(property: 'capabilities', type: 'array', items: new OA\Items(type: 'string', enum: ['song', 'video', 'volume'])),
-        new OA\Property(property: 'incarnationId', type: 'string', format: 'uuid', nullable: true),
+        new OA\Property(property: 'incarnationId', description: 'Client-generated endpoint incarnation identifier.', type: 'string', nullable: true),
         new OA\Property(property: 'epoch', type: 'integer', minimum: 1, nullable: true),
         new OA\Property(property: 'observedState', type: 'string', enum: ['playing', 'paused', 'stopped', 'unknown'], nullable: true),
         new OA\Property(property: 'position', type: 'number', minimum: 0, nullable: true),

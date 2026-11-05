@@ -9711,7 +9711,24 @@
                         "description": "Byte range"
                     },
                     "403": {
-                        "description": "Media access denied"
+                        "description": "Media access denied",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Playback media is unavailable",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
                     }
                 }
             },
@@ -9719,10 +9736,44 @@
                 "tags": [
                     "Media"
                 ],
+                "summary": "Return the original video response headers without a body",
                 "operationId": "head_stream_original_video",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
                 "responses": {
-                    "default": {
-                        "description": ""
+                    "200": {
+                        "description": "Original video"
+                    },
+                    "206": {
+                        "description": "Byte range"
+                    },
+                    "403": {
+                        "description": "Media access denied",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Playback media is unavailable",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -9751,11 +9802,45 @@
                     "206": {
                         "description": "Byte range"
                     },
+                    "400": {
+                        "description": "Invalid audio presentation mode, rendition format or bitrate",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
                     "403": {
-                        "description": "Media access denied"
+                        "description": "Media access denied",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Playback media is unavailable",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
                     },
                     "409": {
-                        "description": "Completed rendition unavailable; negotiate delivery again"
+                        "description": "Completed rendition unavailable or the selected audio cannot be copied; negotiate delivery again. The error details carry the reason.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
                     },
                     "503": {
                         "description": "Every audio slot stayed busy for the whole start wait, so the stream copy has not started yet. The copy stays queued; retry after the Retry-After delay to follow it. The error details carry reason audio_slots_busy.",
@@ -9767,6 +9852,13 @@
                                     "example": 5
                                 }
                             }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
                         }
                     }
                 }
@@ -9775,10 +9867,83 @@
                 "tags": [
                     "Media"
                 ],
+                "summary": "Return the track audio response headers without a body",
                 "operationId": "head_stream_original_track",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
                 "responses": {
-                    "default": {
-                        "description": ""
+                    "200": {
+                        "description": "Track audio"
+                    },
+                    "206": {
+                        "description": "Byte range"
+                    },
+                    "400": {
+                        "description": "Invalid audio presentation mode, rendition format or bitrate",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Media access denied",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Playback media is unavailable",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Completed rendition unavailable or the selected audio cannot be copied; negotiate delivery again. The error details carry the reason.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "Every audio slot stayed busy for the whole start wait, so the stream copy has not started yet. The copy stays queued; retry after the Retry-After delay to follow it. The error details carry reason audio_slots_busy.",
+                        "headers": {
+                            "Retry-After": {
+                                "description": "Seconds to wait before retrying",
+                                "schema": {
+                                    "type": "integer",
+                                    "example": 5
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -18740,7 +18905,14 @@
                         }
                     },
                     "403": {
-                        "description": "Invalid or expired signature"
+                        "description": "Invalid or expired signature",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
                     },
                     "404": {
                         "description": "Completed media is unavailable"
@@ -18796,7 +18968,14 @@
                         }
                     },
                     "403": {
-                        "description": "Invalid or expired signature"
+                        "description": "Invalid or expired signature",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
                     },
                     "404": {
                         "description": "Completed media is unavailable"
@@ -18852,7 +19031,14 @@
                         "description": "Requested byte range"
                     },
                     "403": {
-                        "description": "Invalid or expired signature"
+                        "description": "Invalid or expired signature",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
                     },
                     "404": {
                         "description": "Completed media is unavailable"
@@ -18920,7 +19106,14 @@
                         "description": "Missing or invalid segment index"
                     },
                     "403": {
-                        "description": "Invalid or expired signature"
+                        "description": "Invalid or expired signature",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
                     },
                     "404": {
                         "description": "Completed media is unavailable"
@@ -26601,8 +26794,8 @@
                         "nullable": true
                     },
                     "requestId": {
+                        "description": "The client-generated request identifier, echoed for correlation.",
                         "type": "string",
-                        "format": "uuid",
                         "nullable": true
                     },
                     "jobId": {
@@ -27195,8 +27388,8 @@
                 ],
                 "properties": {
                     "attemptId": {
-                        "type": "string",
-                        "format": "uuid"
+                        "description": "Transfer attempt identifier.",
+                        "type": "string"
                     },
                     "state": {
                         "type": "string",
@@ -27208,13 +27401,13 @@
                         ]
                     },
                     "sourceIncarnationId": {
+                        "description": "Incarnation identifier of the endpoint that hands playback over.",
                         "type": "string",
-                        "format": "uuid",
                         "nullable": true
                     },
                     "targetIncarnationId": {
-                        "type": "string",
-                        "format": "uuid"
+                        "description": "Incarnation identifier of the endpoint that takes playback over.",
+                        "type": "string"
                     },
                     "position": {
                         "type": "number",
@@ -27269,8 +27462,8 @@
                         }
                     },
                     "incarnationId": {
+                        "description": "Client-generated endpoint incarnation identifier.",
                         "type": "string",
-                        "format": "uuid",
                         "nullable": true
                     },
                     "epoch": {
@@ -27318,20 +27511,20 @@
                 ],
                 "properties": {
                     "id": {
-                        "type": "string",
-                        "format": "uuid"
+                        "description": "Command identifier.",
+                        "type": "string"
                     },
                     "attemptId": {
-                        "type": "string",
-                        "format": "uuid"
+                        "description": "Transfer attempt identifier.",
+                        "type": "string"
                     },
                     "revision": {
                         "type": "integer",
                         "minimum": 0
                     },
                     "incarnationId": {
-                        "type": "string",
-                        "format": "uuid"
+                        "description": "Client-generated endpoint incarnation identifier.",
+                        "type": "string"
                     },
                     "epoch": {
                         "type": "integer",
@@ -27425,8 +27618,8 @@
                         "type": "string"
                     },
                     "incarnationId": {
-                        "type": "string",
-                        "format": "uuid"
+                        "description": "Client-generated endpoint incarnation identifier.",
+                        "type": "string"
                     },
                     "epoch": {
                         "type": "integer",
@@ -27443,8 +27636,8 @@
                         "nullable": true
                     },
                     "recoveryTabId": {
+                        "description": "Client-generated tab identifier that names the recovery record.",
                         "type": "string",
-                        "format": "uuid",
                         "nullable": true
                     },
                     "capability": {
@@ -27550,8 +27743,8 @@
                         "nullable": true
                     },
                     "activeIncarnationId": {
+                        "description": "Incarnation identifier of the endpoint that currently executes playback.",
                         "type": "string",
-                        "format": "uuid",
                         "nullable": true
                     },
                     "transfer": {
@@ -27602,8 +27795,8 @@
                         ],
                         "properties": {
                             "incarnationId": {
-                                "type": "string",
-                                "format": "uuid"
+                                "description": "Client-generated endpoint incarnation identifier.",
+                                "type": "string"
                             },
                             "outcome": {
                                 "type": "string",
@@ -27628,12 +27821,12 @@
                         ],
                         "properties": {
                             "requestId": {
-                                "type": "string",
-                                "format": "uuid"
+                                "description": "The client-generated request identifier, echoed for correlation.",
+                                "type": "string"
                             },
                             "attemptId": {
-                                "type": "string",
-                                "format": "uuid"
+                                "description": "Transfer attempt identifier.",
+                                "type": "string"
                             },
                             "state": {
                                 "type": "string",
@@ -27663,12 +27856,12 @@
                         ],
                         "properties": {
                             "requestId": {
-                                "type": "string",
-                                "format": "uuid"
+                                "description": "The client-generated request identifier, echoed for correlation.",
+                                "type": "string"
                             },
                             "commandId": {
-                                "type": "string",
-                                "format": "uuid"
+                                "description": "Identifier of the command the request produced.",
+                                "type": "string"
                             },
                             "outcome": {
                                 "type": "string",

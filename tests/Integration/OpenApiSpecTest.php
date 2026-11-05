@@ -135,9 +135,7 @@ final class OpenApiSpecTest extends KernelTestCase
                 self::assertNotSame('uuid', $property['format'] ?? null, $name . '.' . $field);
             }
         }
-        foreach (['RegisterDeviceRequest', 'ClaimSessionRequest'] as $name) {
-            self::assertSame('uuid', $spec['components']['schemas'][$name]['properties']['deviceId']['format']);
-        }
+        self::assertSame('uuid', $spec['components']['schemas']['RegisterDeviceRequest']['properties']['deviceId']['format']);
         $passkeys = $spec['paths']['/api/auth/passkey']['get']['responses']['200']['content']['application/json']['schema'];
         $this->assertPublicIdentifierSchema($passkeys['properties']['data']['items']['properties']['publicId']);
         $this->assertPublicIdentifierSchema($spec['components']['schemas']['ReorderSongsRequest']['properties']['songIds']['items']);

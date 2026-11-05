@@ -12,10 +12,10 @@ use OpenApi\Attributes as OA;
     schema: 'PlaybackCommandResource',
     required: ['id', 'attemptId', 'revision', 'incarnationId', 'epoch', 'type', 'payload', 'expiresAt'],
     properties: [
-        new OA\Property(property: 'id', type: 'string', format: 'uuid'),
-        new OA\Property(property: 'attemptId', type: 'string', format: 'uuid'),
+        new OA\Property(property: 'id', description: 'Command identifier.', type: 'string'),
+        new OA\Property(property: 'attemptId', description: 'Transfer attempt identifier.', type: 'string'),
         new OA\Property(property: 'revision', type: 'integer', minimum: 0),
-        new OA\Property(property: 'incarnationId', type: 'string', format: 'uuid'),
+        new OA\Property(property: 'incarnationId', description: 'Client-generated endpoint incarnation identifier.', type: 'string'),
         new OA\Property(property: 'epoch', type: 'integer', minimum: 1),
         new OA\Property(property: 'type', type: 'string', enum: ['prepare', 'quiesce', 'start', 'stop', 'play', 'pause', 'seek', 'load', 'observe', 'volume', 'queue']),
         new OA\Property(property: 'payload', required: ['media', 'queue', 'currentTrackIndex', 'position', 'desiredState'], properties: [

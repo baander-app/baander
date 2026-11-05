@@ -2529,7 +2529,10 @@ export interface DeliveryResource {
   reason?: string | null;
   /** @nullable */
   url?: string | null;
-  /** @nullable */
+  /**
+     * The client-generated request identifier, echoed for correlation.
+     * @nullable
+     */
   requestId?: string | null;
   /** @nullable */
   jobId?: string | null;
@@ -2923,10 +2926,15 @@ export const PlaybackTransferResourceDesiredState = {
 } as const;
 
 export interface PlaybackTransferResource {
+  /** Transfer attempt identifier. */
   attemptId: string;
   state: PlaybackTransferResourceState;
-  /** @nullable */
+  /**
+     * Incarnation identifier of the endpoint that hands playback over.
+     * @nullable
+     */
   sourceIncarnationId: string | null;
+  /** Incarnation identifier of the endpoint that takes playback over. */
   targetIncarnationId: string;
   /** @minimum 0 */
   position: number;
@@ -2967,7 +2975,10 @@ export interface PlaybackDestinationResource {
   name: string;
   kind: PlaybackDestinationResourceKind;
   capabilities: PlaybackDestinationResourceCapabilitiesItem[];
-  /** @nullable */
+  /**
+     * Client-generated endpoint incarnation identifier.
+     * @nullable
+     */
   incarnationId: string | null;
   /**
      * @minimum 1
@@ -3033,10 +3044,13 @@ export type PlaybackCommandResourcePayload = {
 };
 
 export interface PlaybackCommandResource {
+  /** Command identifier. */
   id: string;
+  /** Transfer attempt identifier. */
   attemptId: string;
   /** @minimum 0 */
   revision: number;
+  /** Client-generated endpoint incarnation identifier. */
   incarnationId: string;
   /** @minimum 1 */
   epoch: number;
@@ -3047,6 +3061,7 @@ export interface PlaybackCommandResource {
 
 export interface PlaybackEndpointResource {
   destinationId: string;
+  /** Client-generated endpoint incarnation identifier. */
   incarnationId: string;
   /** @minimum 1 */
   epoch: number;
@@ -3057,7 +3072,10 @@ export interface PlaybackEndpointResource {
   recoveryCredential?: string | null;
   /** @nullable */
   recoveryExpiresAt?: string | null;
-  /** @nullable */
+  /**
+     * Client-generated tab identifier that names the recovery record.
+     * @nullable
+     */
   recoveryTabId?: string | null;
   /**
      * Returned only to the HTTP registration caller; keep in tab memory.
@@ -3112,6 +3130,7 @@ export const PlaybackSnapshotResourceRecoveryResultOutcome = {
  * @nullable
  */
 export type PlaybackSnapshotResourceRecoveryResult = {
+  /** Client-generated endpoint incarnation identifier. */
   incarnationId: string;
   outcome: PlaybackSnapshotResourceRecoveryResultOutcome;
   /** @minimum 0 */
@@ -3134,7 +3153,9 @@ export const PlaybackSnapshotResourceTransferResultState = {
  * @nullable
  */
 export type PlaybackSnapshotResourceTransferResult = {
+  /** The client-generated request identifier, echoed for correlation. */
   requestId: string;
+  /** Transfer attempt identifier. */
   attemptId: string;
   state: PlaybackSnapshotResourceTransferResultState;
   /** @nullable */
@@ -3145,7 +3166,9 @@ export type PlaybackSnapshotResourceTransferResult = {
  * @nullable
  */
 export type PlaybackSnapshotResourceRequestResult = {
+  /** The client-generated request identifier, echoed for correlation. */
   requestId: string;
+  /** Identifier of the command the request produced. */
   commandId: string;
   /** @nullable */
   outcome: string | null;
@@ -3171,7 +3194,10 @@ export interface PlaybackSnapshotResource {
   selectedDestinationId: string | null;
   /** @nullable */
   activeDestinationId: string | null;
-  /** @nullable */
+  /**
+     * Incarnation identifier of the endpoint that currently executes playback.
+     * @nullable
+     */
   activeIncarnationId: string | null;
   transfer: PlaybackTransferResource | null;
   destinations: PlaybackDestinationResource[];
@@ -5297,7 +5323,15 @@ export type GetStreamOriginalVideoParams = {
   id: string;
 };
 
+export type HeadStreamOriginalVideoParams = {
+  id: string;
+};
+
 export type GetStreamOriginalTrackParams = {
+  id: string;
+};
+
+export type HeadStreamOriginalTrackParams = {
   id: string;
 };
 
@@ -20773,7 +20807,7 @@ export const getGetStreamOriginalVideoQueryKey = (params?: GetStreamOriginalVide
     }
 
 
-export const getGetStreamOriginalVideoQueryOptions = <TData = Awaited<ReturnType<typeof getStreamOriginalVideo>>, TError = ErrorType<void>>(params: GetStreamOriginalVideoParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamOriginalVideo>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+export const getGetStreamOriginalVideoQueryOptions = <TData = Awaited<ReturnType<typeof getStreamOriginalVideo>>, TError = ErrorType<ApiError>>(params: GetStreamOriginalVideoParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamOriginalVideo>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -20792,10 +20826,10 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type GetStreamOriginalVideoQueryResult = NonNullable<Awaited<ReturnType<typeof getStreamOriginalVideo>>>
-export type GetStreamOriginalVideoQueryError = ErrorType<void>
+export type GetStreamOriginalVideoQueryError = ErrorType<ApiError>
 
 
-export function useGetStreamOriginalVideo<TData = Awaited<ReturnType<typeof getStreamOriginalVideo>>, TError = ErrorType<void>>(
+export function useGetStreamOriginalVideo<TData = Awaited<ReturnType<typeof getStreamOriginalVideo>>, TError = ErrorType<ApiError>>(
  params: GetStreamOriginalVideoParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamOriginalVideo>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getStreamOriginalVideo>>,
@@ -20805,7 +20839,7 @@ export function useGetStreamOriginalVideo<TData = Awaited<ReturnType<typeof getS
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetStreamOriginalVideo<TData = Awaited<ReturnType<typeof getStreamOriginalVideo>>, TError = ErrorType<void>>(
+export function useGetStreamOriginalVideo<TData = Awaited<ReturnType<typeof getStreamOriginalVideo>>, TError = ErrorType<ApiError>>(
  params: GetStreamOriginalVideoParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamOriginalVideo>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getStreamOriginalVideo>>,
@@ -20815,7 +20849,7 @@ export function useGetStreamOriginalVideo<TData = Awaited<ReturnType<typeof getS
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetStreamOriginalVideo<TData = Awaited<ReturnType<typeof getStreamOriginalVideo>>, TError = ErrorType<void>>(
+export function useGetStreamOriginalVideo<TData = Awaited<ReturnType<typeof getStreamOriginalVideo>>, TError = ErrorType<ApiError>>(
  params: GetStreamOriginalVideoParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamOriginalVideo>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
@@ -20823,7 +20857,7 @@ export function useGetStreamOriginalVideo<TData = Awaited<ReturnType<typeof getS
  * @summary Deliver an authorized original video with byte ranges
  */
 
-export function useGetStreamOriginalVideo<TData = Awaited<ReturnType<typeof getStreamOriginalVideo>>, TError = ErrorType<void>>(
+export function useGetStreamOriginalVideo<TData = Awaited<ReturnType<typeof getStreamOriginalVideo>>, TError = ErrorType<ApiError>>(
  params: GetStreamOriginalVideoParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamOriginalVideo>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
@@ -20841,17 +20875,27 @@ export function useGetStreamOriginalVideo<TData = Awaited<ReturnType<typeof getS
 
 
 
-export const getHeadStreamOriginalVideoUrl = () => {
+export const getHeadStreamOriginalVideoUrl = (params: HeadStreamOriginalVideoParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
 
+  const stringifiedParams = normalizedParams.toString();
 
-  return `/api/stream/video`
+  return stringifiedParams.length > 0 ? `/api/stream/video?${stringifiedParams}` : `/api/stream/video`
 }
 
-export const headStreamOriginalVideo = async ( options?: Parameters<typeof customInstance>[1]): Promise<void> => {
+/**
+ * @summary Return the original video response headers without a body
+ */
+export const headStreamOriginalVideo = async (params: HeadStreamOriginalVideoParams, options?: Parameters<typeof customInstance>[1]): Promise<void> => {
 
-  return customInstance<void>(getHeadStreamOriginalVideoUrl(),
+  return customInstance<void>(getHeadStreamOriginalVideoUrl(params),
   {
     ...options,
     method: 'HEAD'
@@ -20866,9 +20910,9 @@ export const headStreamOriginalVideo = async ( options?: Parameters<typeof custo
 
 export const getHeadStreamOriginalVideoMutationKey = () => ['headStreamOriginalVideo'] as const;
 
-export const getHeadStreamOriginalVideoMutationOptions = <TError = ErrorType<void>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof headStreamOriginalVideo>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
-): UseMutationOptions<Awaited<ReturnType<typeof headStreamOriginalVideo>>, TError,void, TContext> => {
+export const getHeadStreamOriginalVideoMutationOptions = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof headStreamOriginalVideo>>, TError,HeadStreamOriginalVideoMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof headStreamOriginalVideo>>, TError,HeadStreamOriginalVideoMutationVariables, TContext> => {
 
 const mutationKey = getHeadStreamOriginalVideoMutationKey();
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -20880,10 +20924,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof headStreamOriginalVideo>>, void> = () => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof headStreamOriginalVideo>>, HeadStreamOriginalVideoMutationVariables> = (props) => {
+          const {params} = props ?? {};
 
-
-          return  headStreamOriginalVideo(requestOptions)
+          return  headStreamOriginalVideo(params,requestOptions)
         }
 
 
@@ -20895,15 +20939,18 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type HeadStreamOriginalVideoMutationResult = NonNullable<Awaited<ReturnType<typeof headStreamOriginalVideo>>>
 
-    export type HeadStreamOriginalVideoMutationError = ErrorType<void>
+    export type HeadStreamOriginalVideoMutationError = ErrorType<ApiError>
+    export type HeadStreamOriginalVideoMutationVariables = {params: HeadStreamOriginalVideoParams}
 
-
-    export const useHeadStreamOriginalVideo = <TError = ErrorType<void>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof headStreamOriginalVideo>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
+    /**
+ * @summary Return the original video response headers without a body
+ */
+export const useHeadStreamOriginalVideo = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof headStreamOriginalVideo>>, TError,HeadStreamOriginalVideoMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof headStreamOriginalVideo>>,
         TError,
-        void,
+        HeadStreamOriginalVideoMutationVariables,
         TContext
       > => {
       return useMutation(getHeadStreamOriginalVideoMutationOptions(options), queryClient);
@@ -20949,7 +20996,7 @@ export const getGetStreamOriginalTrackQueryKey = (params?: GetStreamOriginalTrac
     }
 
 
-export const getGetStreamOriginalTrackQueryOptions = <TData = Awaited<ReturnType<typeof getStreamOriginalTrack>>, TError = ErrorType<void>>(params: GetStreamOriginalTrackParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamOriginalTrack>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+export const getGetStreamOriginalTrackQueryOptions = <TData = Awaited<ReturnType<typeof getStreamOriginalTrack>>, TError = ErrorType<ApiError>>(params: GetStreamOriginalTrackParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamOriginalTrack>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -20968,10 +21015,10 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type GetStreamOriginalTrackQueryResult = NonNullable<Awaited<ReturnType<typeof getStreamOriginalTrack>>>
-export type GetStreamOriginalTrackQueryError = ErrorType<void>
+export type GetStreamOriginalTrackQueryError = ErrorType<ApiError>
 
 
-export function useGetStreamOriginalTrack<TData = Awaited<ReturnType<typeof getStreamOriginalTrack>>, TError = ErrorType<void>>(
+export function useGetStreamOriginalTrack<TData = Awaited<ReturnType<typeof getStreamOriginalTrack>>, TError = ErrorType<ApiError>>(
  params: GetStreamOriginalTrackParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamOriginalTrack>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getStreamOriginalTrack>>,
@@ -20981,7 +21028,7 @@ export function useGetStreamOriginalTrack<TData = Awaited<ReturnType<typeof getS
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetStreamOriginalTrack<TData = Awaited<ReturnType<typeof getStreamOriginalTrack>>, TError = ErrorType<void>>(
+export function useGetStreamOriginalTrack<TData = Awaited<ReturnType<typeof getStreamOriginalTrack>>, TError = ErrorType<ApiError>>(
  params: GetStreamOriginalTrackParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamOriginalTrack>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getStreamOriginalTrack>>,
@@ -20991,7 +21038,7 @@ export function useGetStreamOriginalTrack<TData = Awaited<ReturnType<typeof getS
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetStreamOriginalTrack<TData = Awaited<ReturnType<typeof getStreamOriginalTrack>>, TError = ErrorType<void>>(
+export function useGetStreamOriginalTrack<TData = Awaited<ReturnType<typeof getStreamOriginalTrack>>, TError = ErrorType<ApiError>>(
  params: GetStreamOriginalTrackParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamOriginalTrack>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
@@ -20999,7 +21046,7 @@ export function useGetStreamOriginalTrack<TData = Awaited<ReturnType<typeof getS
  * @summary Deliver authorized track audio with byte ranges
  */
 
-export function useGetStreamOriginalTrack<TData = Awaited<ReturnType<typeof getStreamOriginalTrack>>, TError = ErrorType<void>>(
+export function useGetStreamOriginalTrack<TData = Awaited<ReturnType<typeof getStreamOriginalTrack>>, TError = ErrorType<ApiError>>(
  params: GetStreamOriginalTrackParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamOriginalTrack>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
@@ -21017,17 +21064,27 @@ export function useGetStreamOriginalTrack<TData = Awaited<ReturnType<typeof getS
 
 
 
-export const getHeadStreamOriginalTrackUrl = () => {
+export const getHeadStreamOriginalTrackUrl = (params: HeadStreamOriginalTrackParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
 
+  const stringifiedParams = normalizedParams.toString();
 
-  return `/api/stream/original/track`
+  return stringifiedParams.length > 0 ? `/api/stream/original/track?${stringifiedParams}` : `/api/stream/original/track`
 }
 
-export const headStreamOriginalTrack = async ( options?: Parameters<typeof customInstance>[1]): Promise<void> => {
+/**
+ * @summary Return the track audio response headers without a body
+ */
+export const headStreamOriginalTrack = async (params: HeadStreamOriginalTrackParams, options?: Parameters<typeof customInstance>[1]): Promise<void> => {
 
-  return customInstance<void>(getHeadStreamOriginalTrackUrl(),
+  return customInstance<void>(getHeadStreamOriginalTrackUrl(params),
   {
     ...options,
     method: 'HEAD'
@@ -21042,9 +21099,9 @@ export const headStreamOriginalTrack = async ( options?: Parameters<typeof custo
 
 export const getHeadStreamOriginalTrackMutationKey = () => ['headStreamOriginalTrack'] as const;
 
-export const getHeadStreamOriginalTrackMutationOptions = <TError = ErrorType<void>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof headStreamOriginalTrack>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
-): UseMutationOptions<Awaited<ReturnType<typeof headStreamOriginalTrack>>, TError,void, TContext> => {
+export const getHeadStreamOriginalTrackMutationOptions = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof headStreamOriginalTrack>>, TError,HeadStreamOriginalTrackMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof headStreamOriginalTrack>>, TError,HeadStreamOriginalTrackMutationVariables, TContext> => {
 
 const mutationKey = getHeadStreamOriginalTrackMutationKey();
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -21056,10 +21113,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof headStreamOriginalTrack>>, void> = () => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof headStreamOriginalTrack>>, HeadStreamOriginalTrackMutationVariables> = (props) => {
+          const {params} = props ?? {};
 
-
-          return  headStreamOriginalTrack(requestOptions)
+          return  headStreamOriginalTrack(params,requestOptions)
         }
 
 
@@ -21071,15 +21128,18 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type HeadStreamOriginalTrackMutationResult = NonNullable<Awaited<ReturnType<typeof headStreamOriginalTrack>>>
 
-    export type HeadStreamOriginalTrackMutationError = ErrorType<void>
+    export type HeadStreamOriginalTrackMutationError = ErrorType<ApiError>
+    export type HeadStreamOriginalTrackMutationVariables = {params: HeadStreamOriginalTrackParams}
 
-
-    export const useHeadStreamOriginalTrack = <TError = ErrorType<void>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof headStreamOriginalTrack>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
+    /**
+ * @summary Return the track audio response headers without a body
+ */
+export const useHeadStreamOriginalTrack = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof headStreamOriginalTrack>>, TError,HeadStreamOriginalTrackMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof headStreamOriginalTrack>>,
         TError,
-        void,
+        HeadStreamOriginalTrackMutationVariables,
         TContext
       > => {
       return useMutation(getHeadStreamOriginalTrackMutationOptions(options), queryClient);
@@ -32968,7 +33028,7 @@ export const getGetStreamArtifactMasterQueryKey = (jobPublicId: string,
     }
 
 
-export const getGetStreamArtifactMasterQueryOptions = <TData = Awaited<ReturnType<typeof getStreamArtifactMaster>>, TError = ErrorType<void>>(jobPublicId: string,
+export const getGetStreamArtifactMasterQueryOptions = <TData = Awaited<ReturnType<typeof getStreamArtifactMaster>>, TError = ErrorType<ApiError | void>>(jobPublicId: string,
     generation: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamArtifactMaster>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
 
@@ -32988,10 +33048,10 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type GetStreamArtifactMasterQueryResult = NonNullable<Awaited<ReturnType<typeof getStreamArtifactMaster>>>
-export type GetStreamArtifactMasterQueryError = ErrorType<void>
+export type GetStreamArtifactMasterQueryError = ErrorType<ApiError | void>
 
 
-export function useGetStreamArtifactMaster<TData = Awaited<ReturnType<typeof getStreamArtifactMaster>>, TError = ErrorType<void>>(
+export function useGetStreamArtifactMaster<TData = Awaited<ReturnType<typeof getStreamArtifactMaster>>, TError = ErrorType<ApiError | void>>(
  jobPublicId: string,
     generation: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamArtifactMaster>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -33002,7 +33062,7 @@ export function useGetStreamArtifactMaster<TData = Awaited<ReturnType<typeof get
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetStreamArtifactMaster<TData = Awaited<ReturnType<typeof getStreamArtifactMaster>>, TError = ErrorType<void>>(
+export function useGetStreamArtifactMaster<TData = Awaited<ReturnType<typeof getStreamArtifactMaster>>, TError = ErrorType<ApiError | void>>(
  jobPublicId: string,
     generation: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamArtifactMaster>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -33013,7 +33073,7 @@ export function useGetStreamArtifactMaster<TData = Awaited<ReturnType<typeof get
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetStreamArtifactMaster<TData = Awaited<ReturnType<typeof getStreamArtifactMaster>>, TError = ErrorType<void>>(
+export function useGetStreamArtifactMaster<TData = Awaited<ReturnType<typeof getStreamArtifactMaster>>, TError = ErrorType<ApiError | void>>(
  jobPublicId: string,
     generation: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamArtifactMaster>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -33022,7 +33082,7 @@ export function useGetStreamArtifactMaster<TData = Awaited<ReturnType<typeof get
  * @summary Get the HLS master playlist for completed video
  */
 
-export function useGetStreamArtifactMaster<TData = Awaited<ReturnType<typeof getStreamArtifactMaster>>, TError = ErrorType<void>>(
+export function useGetStreamArtifactMaster<TData = Awaited<ReturnType<typeof getStreamArtifactMaster>>, TError = ErrorType<ApiError | void>>(
  jobPublicId: string,
     generation: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamArtifactMaster>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -33080,7 +33140,7 @@ export const getGetStreamArtifactMediaQueryKey = (jobPublicId: string,
     }
 
 
-export const getGetStreamArtifactMediaQueryOptions = <TData = Awaited<ReturnType<typeof getStreamArtifactMedia>>, TError = ErrorType<void>>(jobPublicId: string,
+export const getGetStreamArtifactMediaQueryOptions = <TData = Awaited<ReturnType<typeof getStreamArtifactMedia>>, TError = ErrorType<ApiError | void>>(jobPublicId: string,
     generation: string,
     track: 'video' | 'audio', options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamArtifactMedia>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
@@ -33101,10 +33161,10 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type GetStreamArtifactMediaQueryResult = NonNullable<Awaited<ReturnType<typeof getStreamArtifactMedia>>>
-export type GetStreamArtifactMediaQueryError = ErrorType<void>
+export type GetStreamArtifactMediaQueryError = ErrorType<ApiError | void>
 
 
-export function useGetStreamArtifactMedia<TData = Awaited<ReturnType<typeof getStreamArtifactMedia>>, TError = ErrorType<void>>(
+export function useGetStreamArtifactMedia<TData = Awaited<ReturnType<typeof getStreamArtifactMedia>>, TError = ErrorType<ApiError | void>>(
  jobPublicId: string,
     generation: string,
     track: 'video' | 'audio', options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamArtifactMedia>>, TError, TData>> & Pick<
@@ -33116,7 +33176,7 @@ export function useGetStreamArtifactMedia<TData = Awaited<ReturnType<typeof getS
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetStreamArtifactMedia<TData = Awaited<ReturnType<typeof getStreamArtifactMedia>>, TError = ErrorType<void>>(
+export function useGetStreamArtifactMedia<TData = Awaited<ReturnType<typeof getStreamArtifactMedia>>, TError = ErrorType<ApiError | void>>(
  jobPublicId: string,
     generation: string,
     track: 'video' | 'audio', options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamArtifactMedia>>, TError, TData>> & Pick<
@@ -33128,7 +33188,7 @@ export function useGetStreamArtifactMedia<TData = Awaited<ReturnType<typeof getS
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetStreamArtifactMedia<TData = Awaited<ReturnType<typeof getStreamArtifactMedia>>, TError = ErrorType<void>>(
+export function useGetStreamArtifactMedia<TData = Awaited<ReturnType<typeof getStreamArtifactMedia>>, TError = ErrorType<ApiError | void>>(
  jobPublicId: string,
     generation: string,
     track: 'video' | 'audio', options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamArtifactMedia>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
@@ -33138,7 +33198,7 @@ export function useGetStreamArtifactMedia<TData = Awaited<ReturnType<typeof getS
  * @summary Get a completed HLS track playlist
  */
 
-export function useGetStreamArtifactMedia<TData = Awaited<ReturnType<typeof getStreamArtifactMedia>>, TError = ErrorType<void>>(
+export function useGetStreamArtifactMedia<TData = Awaited<ReturnType<typeof getStreamArtifactMedia>>, TError = ErrorType<ApiError | void>>(
  jobPublicId: string,
     generation: string,
     track: 'video' | 'audio', options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamArtifactMedia>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
@@ -33197,7 +33257,7 @@ export const getGetStreamArtifactInitQueryKey = (jobPublicId: string,
     }
 
 
-export const getGetStreamArtifactInitQueryOptions = <TData = Awaited<ReturnType<typeof getStreamArtifactInit>>, TError = ErrorType<void>>(jobPublicId: string,
+export const getGetStreamArtifactInitQueryOptions = <TData = Awaited<ReturnType<typeof getStreamArtifactInit>>, TError = ErrorType<ApiError | void>>(jobPublicId: string,
     generation: string,
     track: 'video' | 'audio', options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamArtifactInit>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
@@ -33218,10 +33278,10 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type GetStreamArtifactInitQueryResult = NonNullable<Awaited<ReturnType<typeof getStreamArtifactInit>>>
-export type GetStreamArtifactInitQueryError = ErrorType<void>
+export type GetStreamArtifactInitQueryError = ErrorType<ApiError | void>
 
 
-export function useGetStreamArtifactInit<TData = Awaited<ReturnType<typeof getStreamArtifactInit>>, TError = ErrorType<void>>(
+export function useGetStreamArtifactInit<TData = Awaited<ReturnType<typeof getStreamArtifactInit>>, TError = ErrorType<ApiError | void>>(
  jobPublicId: string,
     generation: string,
     track: 'video' | 'audio', options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamArtifactInit>>, TError, TData>> & Pick<
@@ -33233,7 +33293,7 @@ export function useGetStreamArtifactInit<TData = Awaited<ReturnType<typeof getSt
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetStreamArtifactInit<TData = Awaited<ReturnType<typeof getStreamArtifactInit>>, TError = ErrorType<void>>(
+export function useGetStreamArtifactInit<TData = Awaited<ReturnType<typeof getStreamArtifactInit>>, TError = ErrorType<ApiError | void>>(
  jobPublicId: string,
     generation: string,
     track: 'video' | 'audio', options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamArtifactInit>>, TError, TData>> & Pick<
@@ -33245,7 +33305,7 @@ export function useGetStreamArtifactInit<TData = Awaited<ReturnType<typeof getSt
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetStreamArtifactInit<TData = Awaited<ReturnType<typeof getStreamArtifactInit>>, TError = ErrorType<void>>(
+export function useGetStreamArtifactInit<TData = Awaited<ReturnType<typeof getStreamArtifactInit>>, TError = ErrorType<ApiError | void>>(
  jobPublicId: string,
     generation: string,
     track: 'video' | 'audio', options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamArtifactInit>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
@@ -33255,7 +33315,7 @@ export function useGetStreamArtifactInit<TData = Awaited<ReturnType<typeof getSt
  * @summary Get completed track initialization media
  */
 
-export function useGetStreamArtifactInit<TData = Awaited<ReturnType<typeof getStreamArtifactInit>>, TError = ErrorType<void>>(
+export function useGetStreamArtifactInit<TData = Awaited<ReturnType<typeof getStreamArtifactInit>>, TError = ErrorType<ApiError | void>>(
  jobPublicId: string,
     generation: string,
     track: 'video' | 'audio', options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamArtifactInit>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
@@ -33324,7 +33384,7 @@ export const getGetStreamArtifactSegmentQueryKey = (jobPublicId: string,
     }
 
 
-export const getGetStreamArtifactSegmentQueryOptions = <TData = Awaited<ReturnType<typeof getStreamArtifactSegment>>, TError = ErrorType<void>>(jobPublicId: string,
+export const getGetStreamArtifactSegmentQueryOptions = <TData = Awaited<ReturnType<typeof getStreamArtifactSegment>>, TError = ErrorType<void | ApiError>>(jobPublicId: string,
     generation: string,
     track: 'video' | 'audio',
     params: GetStreamArtifactSegmentParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamArtifactSegment>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
@@ -33346,10 +33406,10 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type GetStreamArtifactSegmentQueryResult = NonNullable<Awaited<ReturnType<typeof getStreamArtifactSegment>>>
-export type GetStreamArtifactSegmentQueryError = ErrorType<void>
+export type GetStreamArtifactSegmentQueryError = ErrorType<void | ApiError>
 
 
-export function useGetStreamArtifactSegment<TData = Awaited<ReturnType<typeof getStreamArtifactSegment>>, TError = ErrorType<void>>(
+export function useGetStreamArtifactSegment<TData = Awaited<ReturnType<typeof getStreamArtifactSegment>>, TError = ErrorType<void | ApiError>>(
  jobPublicId: string,
     generation: string,
     track: 'video' | 'audio',
@@ -33362,7 +33422,7 @@ export function useGetStreamArtifactSegment<TData = Awaited<ReturnType<typeof ge
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetStreamArtifactSegment<TData = Awaited<ReturnType<typeof getStreamArtifactSegment>>, TError = ErrorType<void>>(
+export function useGetStreamArtifactSegment<TData = Awaited<ReturnType<typeof getStreamArtifactSegment>>, TError = ErrorType<void | ApiError>>(
  jobPublicId: string,
     generation: string,
     track: 'video' | 'audio',
@@ -33375,7 +33435,7 @@ export function useGetStreamArtifactSegment<TData = Awaited<ReturnType<typeof ge
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetStreamArtifactSegment<TData = Awaited<ReturnType<typeof getStreamArtifactSegment>>, TError = ErrorType<void>>(
+export function useGetStreamArtifactSegment<TData = Awaited<ReturnType<typeof getStreamArtifactSegment>>, TError = ErrorType<void | ApiError>>(
  jobPublicId: string,
     generation: string,
     track: 'video' | 'audio',
@@ -33386,7 +33446,7 @@ export function useGetStreamArtifactSegment<TData = Awaited<ReturnType<typeof ge
  * @summary Get a completed track segment
  */
 
-export function useGetStreamArtifactSegment<TData = Awaited<ReturnType<typeof getStreamArtifactSegment>>, TError = ErrorType<void>>(
+export function useGetStreamArtifactSegment<TData = Awaited<ReturnType<typeof getStreamArtifactSegment>>, TError = ErrorType<void | ApiError>>(
  jobPublicId: string,
     generation: string,
     track: 'video' | 'audio',

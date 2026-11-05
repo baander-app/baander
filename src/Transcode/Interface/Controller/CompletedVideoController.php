@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace App\Transcode\Interface\Controller;
 
 use App\Shared\Domain\Model\PublicId;
+use App\Shared\Interface\DTO\ApiError;
 use App\Transcode\Application\DTO\MediaTrack;
 use App\Transcode\Application\Port\CompletedVideoDeliveryPort;
 use App\Transcode\Interface\Security\SignedStreamRequest;
+use Nelmio\ApiDocBundle\Attribute\Model;
 use OpenApi\Attributes as OA;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -32,7 +34,7 @@ final readonly class CompletedVideoController
 
     #[OA\Get(summary: 'Get the HLS master playlist for completed video', responses: [
         new OA\Response(response: '200', description: 'Completed HLS master playlist', content: new OA\MediaType(mediaType: 'application/vnd.apple.mpegurl')),
-        new OA\Response(response: '403', description: 'Invalid or expired signature'),
+        new OA\Response(response: '403', description: 'Invalid or expired signature', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
         new OA\Response(response: '404', description: 'Completed media is unavailable'),
     ])]
     #[Route('/master.m3u8', name: 'master', methods: ['GET'])]
@@ -44,7 +46,7 @@ final readonly class CompletedVideoController
 
     #[OA\Get(summary: 'Get a completed HLS track playlist', responses: [
         new OA\Response(response: '200', description: 'Completed HLS media playlist', content: new OA\MediaType(mediaType: 'application/vnd.apple.mpegurl')),
-        new OA\Response(response: '403', description: 'Invalid or expired signature'),
+        new OA\Response(response: '403', description: 'Invalid or expired signature', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
         new OA\Response(response: '404', description: 'Completed media is unavailable'),
     ])]
     #[Route('/tracks/{track}/media.m3u8', name: 'media', methods: ['GET'])]
@@ -57,7 +59,7 @@ final readonly class CompletedVideoController
     #[OA\Get(summary: 'Get completed track initialization media', responses: [
         new OA\Response(response: '200', description: 'MP4 initialization media'),
         new OA\Response(response: '206', description: 'Requested byte range'),
-        new OA\Response(response: '403', description: 'Invalid or expired signature'),
+        new OA\Response(response: '403', description: 'Invalid or expired signature', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
         new OA\Response(response: '404', description: 'Completed media is unavailable'),
     ])]
     #[Route('/tracks/{track}/init.mp4', name: 'init', methods: ['GET'])]
@@ -73,7 +75,7 @@ final readonly class CompletedVideoController
         new OA\Response(response: '200', description: 'MP4 media segment'),
         new OA\Response(response: '206', description: 'Requested byte range'),
         new OA\Response(response: '400', description: 'Missing or invalid segment index'),
-        new OA\Response(response: '403', description: 'Invalid or expired signature'),
+        new OA\Response(response: '403', description: 'Invalid or expired signature', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
         new OA\Response(response: '404', description: 'Completed media is unavailable'),
     ])]
     #[Route('/tracks/{track}/segment.m4s', name: 'segment', methods: ['GET'])]

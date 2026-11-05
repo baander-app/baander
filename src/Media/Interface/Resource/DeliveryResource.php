@@ -12,7 +12,7 @@ use OpenApi\Attributes as OA;
     new OA\Property(property: 'kind', type: 'string', enum: ['original', 'cached', 'copy', 'encoded', 'incompatible']),
     new OA\Property(property: 'reason', type: 'string', nullable: true),
     new OA\Property(property: 'url', type: 'string', nullable: true),
-    new OA\Property(property: 'requestId', type: 'string', format: 'uuid', nullable: true),
+    new OA\Property(property: 'requestId', description: 'The client-generated request identifier, echoed for correlation.', type: 'string', nullable: true),
     new OA\Property(property: 'jobId', type: 'string', nullable: true),
     new OA\Property(property: 'selection', nullable: true, properties: [
         new OA\Property(property: 'container', type: 'string'),
