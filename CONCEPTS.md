@@ -271,6 +271,13 @@ A media presentation produced by repackaging selected source streams without aud
 Its identity includes the selected streams and output container, and its timing comes from the copied media rather than an encoder's fixed keyframe schedule.
 It uses the same execution ownership and publication guarantees as other presentations.
 
+### Sparse source
+
+A video source whose frame rate is below one frame per second, so each frame is held on screen for seconds.
+*Avoid:* held-frame source
+
+Encoding converts it to one generated frame per second so that segments close on regular boundaries. A seek into it starts at the key frame before the target and keeps one frame interval of audio before the start, because a held frame can begin after the audio that belongs to it. Pacing such a source by its packets still releases each hold's generated frames at once; only pacing the generated frames spreads them out.
+
 ### Completed video presentation
 
 A verified, sealed video presentation that can be delivered independently of its producer's later playback controls.
