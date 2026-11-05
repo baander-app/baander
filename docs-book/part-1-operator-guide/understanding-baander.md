@@ -11,27 +11,13 @@ Read this chapter first, then [Storage and Data](storage-and-data.md) and
 
 ## The components
 
-Baander serves a browser interface and an API from its web application. In the
-source-installation recipe, nginx receives browser traffic and forwards requests
-to the `app` service, whose Swoole server also maintains real-time connections.
-PostgreSQL and Redis are shared dependencies. Background execution has its own
-deployment, separate from the web service.
-
-| Component | What it owns | What to check when work stops |
-|---|---|---|
-| nginx and the web application | HTTP requests, authentication, browser/API responses, real-time connections and delivery of available media | Web logs, readiness and the affected request; see [Monitoring](monitoring.md) |
-| PostgreSQL | Accounts, libraries, catalog records, settings, job history, failed messages and durable execution/coordination state | Database availability, then the relevant task's stored status |
-| Redis | Asynchronous message streams, caches, PHP sessions, rate limits and short-lived authentication checks | Connectivity and the relevant stream or subsystem; see [Configuration](configuration.md) |
-| Worker deployment pair | Background consumption, scheduled work, outbox relay and media execution | Both units and actual work progress; see [Background Work](background-work.md) |
-| Source and application storage | Original media, stored images and generated playback files | Shared paths, permissions and the expected files; see [Storage and Data](storage-and-data.md) |
-| Optional registry | Server registration and discovery state in a separate service and datastore | Registry-specific signals; see [Registry](registry.md) |
-
-The **worker deployment pair** consists of control and execution containers
-admitted together under one deployment identity. Control holds the deployment
-lease and coordinates work. Execution owns native processes, including encoders.
-Each unit has its own resource limits; a private IPC volume connects them.
-The host controller manages this pair from the trusted installation host.
-Starting Compose's web service does not create the pair.
+[Deployment Topology](deployment-topology.md) shows the installation as one
+diagram: nginx in front of the web application, PostgreSQL behind the connection
+pooler, Redis, the worker deployment pair under the host controller, the shared
+storage and the optional registry. It also lists what PostgreSQL and Redis each
+hold and what their loss means, and it explains how the development instances
+differ. Read it for the picture; this chapter explains what the components do
+from files to playback and what a health result tells you.
 
 Here, a background worker means a process doing queued, scheduled or media work.
 Swoole also calls its HTTP-serving processes workers. Reloading those web workers
