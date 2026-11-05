@@ -68,6 +68,19 @@ final class PublicationWorkflowTest extends TestCase
             self::assertArrayNotHasKey('continue-on-error', $jobs[$job]);
         }
 
+        foreach ($jobs as $jobName => $job) {
+            foreach ($job['steps'] as $step) {
+                if (preg_match_all('~--revision\s+("[^"]*"|\S+)~', $step['run'] ?? '', $revisions) > 0) {
+                    // A pull request image carries the head commit it qualified, not the merge commit.
+                    self::assertSame(
+                        array_fill(0, count($revisions[1]), '"${{ github.event.pull_request.head.sha || github.sha }}"'),
+                        $revisions[1],
+                        $jobName . ' ' . $step['name'],
+                    );
+                }
+            }
+        }
+
         $build = $this->step($publisher, 'Build production image');
         self::assertStringContainsString('php scripts/build-application.php --buildx', $build['run']);
         self::assertStringContainsString('--target production', $build['run']);
@@ -427,6 +440,11 @@ SH;
             $document['jobs']['gate']['permissions'] = ['contents' => 'read', 'packages' => 'write'];
             return $document;
         }, 'packages: write'];
+        yield 'package store write without packages write' => [$workflow, $step([
+            'name' => 'Save cache',
+            'if' => "github.ref == 'refs/heads/master' && (" . self::TRUSTED . ')',
+            'run' => 'php scripts/ci-package-store.php save "$CACHE_PACKAGE" cache.tar.zst /tmp/cache',
+        ]), 'packages: write'];
         yield 'comment without pull-requests write' => [$workflow, $step([
             'name' => 'Comment',
             'if' => "github.event_name == 'pull_request' && (" . self::TRUSTED . ')',
@@ -527,13 +545,14 @@ SH;
     }
 
     #[DataProvider('privateImageProbeProvider')]
-    public function testAnonymousPullProbeFailsThePublishingJobWhenAnImageIsPublic(
+    public function testAnonymousPullProbePassesOnlyWhenTheRegistryRefusesThePull(
         string $file,
         string $job,
         string $stepName,
         string $pushStep,
         string $image,
-        bool $pullable,
+        string $refusal,
+        int $exitCode,
     ): void {
         $workflow = $this->workflow($file);
         $steps = $workflow['jobs'][$job]['steps'];
@@ -548,15 +567,16 @@ SH;
 
         $tools = $this->directory . '/tools';
         new Filesystem()->mkdir($tools);
-        // The stub plays ghcr.io: it records the call and whether any credential was configured.
+        // The stub plays ghcr.io: it records the call and whether any credential was configured,
+        // then serves the manifest or fails with the given error.
         $docker = <<<'SH'
 #!/bin/sh
 printf '%s config=%s\n' "$*" "$(ls -A "$DOCKER_CONFIG")" >> "$CALL_LOG"
-if [ "$PULLABLE" = 1 ]; then
+if [ -z "$REFUSAL" ]; then
     printf '{"schemaVersion":2,"mediaType":"application/vnd.oci.image.index.v1+json"}\n'
     exit 0
 fi
-echo 'unauthorized: authentication required' >&2
+printf '%s\n' "$REFUSAL" >&2
 exit 1
 SH;
         file_put_contents($tools . '/docker', $docker);
@@ -565,27 +585,36 @@ SH;
         $process = new Process(['/bin/sh', '-e', '-c', self::interpolate($probe['run'], $github)], dirname(__DIR__, 5), [
             'PATH' => $tools . ':' . getenv('PATH'),
             'CALL_LOG' => $this->directory . '/probe-calls',
-            'PULLABLE' => $pullable ? '1' : '0',
+            'REFUSAL' => $refusal,
             'REGISTRY' => self::interpolate($workflow['env']['REGISTRY'], $github),
             'IMAGE_NAME' => self::interpolate($workflow['env']['IMAGE_NAME'], $github),
             'DOCKER_CONFIG' => $this->directory . '/credentials',
         ]);
         $process->run();
 
-        self::assertSame($pullable ? 1 : 0, $process->getExitCode(), $process->getErrorOutput());
+        self::assertSame($exitCode, $process->getExitCode(), $process->getErrorOutput());
         self::assertSame('manifest inspect ' . $image . ":latest config=\n", file_get_contents($this->directory . '/probe-calls'));
     }
 
-    /** @return iterable<string, array{string, string, string, string, string, bool}> */
+    /** @return iterable<string, array{string, string, string, string, string, string, int}> */
     public static function privateImageProbeProvider(): iterable
     {
+        // Only a registry refusal confirms privacy; a local Docker or network failure cannot.
+        $outcomes = [
+            'served anonymously' => ['', 1],
+            'refused as unauthorized' => ['unauthorized: authentication required', 0],
+            'refused as an unknown manifest' => ['manifest unknown', 0],
+            'unreachable through the Docker API' => ['permission denied while trying to connect to the docker API', 1],
+            'unreachable through DNS' => ['dial tcp: lookup ghcr.io: no such host', 1],
+        ];
         foreach ([
             'application' => ['ci.yaml', 'build-and-push', 'Application image is not publicly pullable', 'Push verified production image', 'ghcr.io/baander-app/baander'],
             'Nginx' => ['nginx.yaml', 'build', 'Nginx image is not publicly pullable', 'Build and push Nginx image', 'ghcr.io/baander-app/baander-nginx'],
             'FFmpeg' => ['ffmpeg.yaml', 'build', 'FFmpeg image is not publicly pullable', 'Build and push FFmpeg image', 'ghcr.io/baander-app/ffmpeg-baander-static'],
         ] as $name => $case) {
-            yield $name . ' served anonymously' => [...$case, true];
-            yield $name . ' refused' => [...$case, false];
+            foreach ($outcomes as $outcome => $result) {
+                yield $name . ' ' . $outcome => [...$case, ...$result];
+            }
         }
     }
 
@@ -924,10 +953,13 @@ SH;
         foreach ([$prepare, $remove] as $step) {
             new Process(['/bin/sh', '-e', '-c', self::interpolate($step['run'], self::context(self::GITHUB))], $this->directory, $environment)->mustRun();
         }
-        self::assertSame(
-            ['buildx create --name baander-ci-101-1 --driver docker-container', 'buildx rm baander-ci-101-1'],
-            file($log, FILE_IGNORE_NEW_LINES),
+        $calls = file($log, FILE_IGNORE_NEW_LINES);
+        self::assertIsArray($calls);
+        self::assertMatchesRegularExpression(
+            '~^buildx create --name baander-ci-101-1 --driver docker-container --driver-opt image=moby/buildkit:v\d+\.\d+\.\d+@sha256:[0-9a-f]{64}$~',
+            $calls[0] ?? '',
         );
+        self::assertSame(['buildx rm baander-ci-101-1'], array_slice($calls, 1));
     }
 
     /** @return array<string, array{source: string, document: array<string, mixed>}> */
@@ -1019,10 +1051,10 @@ SH;
         foreach ($workflow['jobs'] ?? [] as $name => $job) {
             $where = $path . ' ' . $name;
             $steps = $job['steps'] ?? [];
-            $publishes = array_any($steps, static fn(array $step): bool => self::writeKind($step) === 'publish');
+            $writesPackages = array_any($steps, self::writesPackages(...));
             $comments = array_any($steps, static fn(array $step): bool => self::writeKind($step) === 'comment');
-            if ($publishes !== (($job['permissions']['packages'] ?? null) === 'write')) {
-                $violations[] = $where . ': only publishing jobs request packages: write, and every publishing job does';
+            if ($writesPackages !== (($job['permissions']['packages'] ?? null) === 'write')) {
+                $violations[] = $where . ': only jobs that publish or write to the package store request packages: write, and every such job does';
             }
             if ($comments !== (($job['permissions']['pull-requests'] ?? null) === 'write')) {
                 $violations[] = $where . ': only commenting jobs request pull-requests: write, and every commenting job does';
@@ -1068,6 +1100,17 @@ SH;
     private static function writes(array $step): bool
     {
         return self::writeKind($step) !== null;
+    }
+
+    /**
+     * Publishing an image or saving to the Forgejo package store; Forgejo may scope its workflow
+     * token by the job's permissions, so both need packages: write.
+     *
+     * @param array<string, mixed> $step
+     */
+    private static function writesPackages(array $step): bool
+    {
+        return self::writeKind($step) === 'publish' || preg_match('~ci-package-store\.php (?:save|store)\b~', $step['run'] ?? '') === 1;
     }
 
     /** @param array<string, mixed> $step */

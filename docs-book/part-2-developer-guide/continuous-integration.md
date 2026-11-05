@@ -126,9 +126,14 @@ for GitHub and once for Forgejo. It enforces the following rules, except the
   shows that it needs more time.
 - Declare `concurrency` per workflow and ref, cancelling in progress only for
   `pull_request`. Forgejo cancels superseded runs by default and GitHub does not;
-  with this setting a `master` run always finishes and publishes on both forges.
-- Keep top-level `permissions` read-only. Only publishing jobs request
-  `packages: write`, and only commenting jobs request `pull-requests: write`.
+  with this setting neither forge cancels a `master` run once it has started.
+  GitHub still holds one pending run per group, so a newer `master` push cancels
+  an older `master` run that has not started yet. The newest `master` commit
+  publishes; a commit whose run was cancelled before it started gets no image.
+- Keep top-level `permissions` read-only. Only jobs that publish an image or save to
+  the Forgejo package store request `packages: write`, because Forgejo may limit its
+  workflow token to the job's `permissions`. Only commenting jobs request
+  `pull-requests: write`.
 - Guard every write step with the trusted-run condition below.
 - Mount host paths only in GitHub-guarded steps.
 
@@ -184,9 +189,14 @@ the script first install the standalone tooling with
 The coverage comment posts to `$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/issues/<number>/comments`,
 which both forges serve.
 
-The CI image build exports its BuildKit layer cache to `/tmp/buildkit-cache`. It
-uses a named `docker-container` builder on the job's own daemon so it can export
-that cache; the default `docker` driver may refuse `--cache-to type=local`.
+The CI image build reads the restored BuildKit layer cache from `/tmp/buildkit-cache`
+and exports a new one to `/tmp/buildkit-cache-new`, which then replaces the restored
+directory. The local cache exporter does not remove old blobs from its destination,
+so exporting over the restored cache would grow it on every save; with the swap,
+each save holds only what the latest build used. The build uses a named `docker-container`
+builder on the job's own daemon so it can export that cache; the default `docker`
+driver may refuse `--cache-to type=local`. The builder's BuildKit image is pinned by
+version and digest.
 
 ## Artifacts
 

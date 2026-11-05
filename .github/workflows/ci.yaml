@@ -32,7 +32,9 @@ jobs:
             image: ${{ github.server_url == 'https://github.com' && 'ghcr.io' || vars.REGISTRY_URL }}/${{ github.server_url == 'https://github.com' && 'baander-app' || vars.REGISTRY_OWNER }}/baander-runner:latest
         permissions:
             contents: read
-            packages: read
+            # Forgejo may scope its workflow token by these permissions, and
+            # the job saves its BuildKit cache and coverage baseline as packages.
+            packages: write
             pull-requests: write
         steps:
             -   name: Free host disk on GitHub
@@ -110,15 +112,25 @@ jobs:
                 # This builder runs its BuildKit container on the job's own
                 # daemon; the build loads its images back into that daemon.
                 # The name is unique to the run and removed when the job ends.
-                run: docker buildx create --name "$CI_BUILDER" --driver docker-container
+                # The BuildKit image is pinned by digest like every other image.
+                run: |
+                    docker buildx create --name "$CI_BUILDER" --driver docker-container \
+                      --driver-opt image=moby/buildkit:v0.34.2@sha256:c5f8862f52499773af85bc07695b2379ef08e8002352b0df2c4864c91d78dabe
 
             -   name: Build CI image
                 run: |
                     php scripts/build-application.php --buildx --builder "$CI_BUILDER" \
-                      --target ci --revision "${{ github.sha }}" \
+                      --target ci --revision "${{ github.event.pull_request.head.sha || github.sha }}" \
                       --tag "$CI_IMAGE" \
-                      --cache-to type=local,dest=/tmp/buildkit-cache,mode=max \
+                      --cache-to type=local,dest=/tmp/buildkit-cache-new,mode=max \
                       --cache-from type=local,src=/tmp/buildkit-cache
+
+            -   name: Replace BuildKit cache with this build's export
+                # The local cache exporter does not remove blobs it finds in its
+                # destination, so exporting over the restored cache would grow
+                # it on every save. The later build and the saves use only
+                # what this build exported.
+                run: rm -rf /tmp/buildkit-cache && mv /tmp/buildkit-cache-new /tmp/buildkit-cache
 
             -   name: Xdebug runtime contract
                 run: BAANDER_TEST_IMAGE="$CI_IMAGE" bash scripts/test-dev-xdebug-container.sh
@@ -191,7 +203,7 @@ jobs:
             -   name: Build production worker image
                 run: |
                     php scripts/build-application.php --buildx --builder "$CI_BUILDER" --target worker \
-                      --revision "${{ github.sha }}" \
+                      --revision "${{ github.event.pull_request.head.sha || github.sha }}" \
                       --tag "${CI_IMAGE}-worker" \
                       --cache-from type=local,src=/tmp/buildkit-cache
 
@@ -199,7 +211,7 @@ jobs:
                 run: |
                     bash scripts/collect-packaged-inventory.sh \
                       --image "${CI_IMAGE}-worker" --target worker \
-                      --revision "${{ github.sha }}" \
+                      --revision "${{ github.event.pull_request.head.sha || github.sha }}" \
                       --output var/test-runs/application-inventory-worker
 
             -   name: Production worker lifecycle and dependencies
@@ -843,7 +855,7 @@ jobs:
                 run: |
                     php scripts/build-application.php --buildx \
                       --target production \
-                      --revision "${{ github.sha }}" \
+                      --revision "${{ github.event.pull_request.head.sha || github.sha }}" \
                       --tag "$REGISTRY/$IMAGE_NAME:${{ github.sha }}" \
                       --tag "$REGISTRY/$IMAGE_NAME:latest"
 
@@ -851,7 +863,7 @@ jobs:
                 run: |
                     bash scripts/collect-packaged-inventory.sh \
                       --image "$REGISTRY/$IMAGE_NAME:${{ github.sha }}" --target production \
-                      --revision "${{ github.sha }}" \
+                      --revision "${{ github.event.pull_request.head.sha || github.sha }}" \
                       --output var/test-runs/application-inventory-production
 
             -   name: Push verified production image

@@ -43,6 +43,11 @@ jobs:
         runs-on: ${{ github.server_url == 'https://github.com' && 'ubuntu-latest' || 'docker-cli' }}
         container:
             image: ${{ github.server_url == 'https://github.com' && 'ghcr.io' || vars.REGISTRY_URL }}/${{ github.server_url == 'https://github.com' && 'baander-app' || vars.REGISTRY_OWNER }}/baander-runner:latest
+        permissions:
+            contents: read
+            # Restores the Yarn cache from Forgejo's package store, and
+            # Forgejo may scope its workflow token by these permissions.
+            packages: read
         steps:
             -   name: Checkout
                 env:
@@ -126,6 +131,9 @@ jobs:
             image: ${{ github.server_url == 'https://github.com' && 'ghcr.io' || vars.REGISTRY_URL }}/${{ github.server_url == 'https://github.com' && 'baander-app' || vars.REGISTRY_OWNER }}/baander-runner:latest
         permissions:
             contents: read
+            # Forgejo may scope its workflow token by these permissions, and
+            # the job saves its Yarn cache and coverage baseline as packages.
+            packages: write
             pull-requests: write
         steps:
             -   name: Checkout
@@ -302,6 +310,11 @@ jobs:
         needs: [ quality, test ]
         container:
             image: ${{ github.server_url == 'https://github.com' && 'ghcr.io' || vars.REGISTRY_URL }}/${{ github.server_url == 'https://github.com' && 'baander-app' || vars.REGISTRY_OWNER }}/baander-runner:latest
+        permissions:
+            contents: read
+            # Restores the Yarn cache from Forgejo's package store, and
+            # Forgejo may scope its workflow token by these permissions.
+            packages: read
         steps:
             -   name: Checkout
                 env:

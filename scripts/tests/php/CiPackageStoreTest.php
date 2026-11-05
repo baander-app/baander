@@ -145,6 +145,59 @@ final class CiPackageStoreTest extends TestCase
         self::assertSame('{"lines":81.5}', file_get_contents($fetched));
     }
 
+    /**
+     * The stub sends the whole stored file but announces more, so curl reports HTTP 200 and then
+     * fails. A transfer that passes curl's time limit ends the same way, with a failure exit after
+     * the status line. The 30-second connect and 30-minute transfer limits are not exercised
+     * themselves: the store has no seam to shorten them, and waiting them out would stall the suite.
+     */
+    public function testATransferThatBreaksOffCountsAsNoResponse(): void
+    {
+        $source = $this->work . '/source';
+        mkdir($source);
+        file_put_contents($source . '/cache.bin', 'cache');
+        $save = $this->invoke('save', 'buildkit-cache', self::ARCHIVE, $source);
+        self::assertSame(0, $save->exitCode, $save->stderr);
+        $this->seed('coverage', 'metrics.json', '{"lines":81.5}');
+        file_put_contents($this->work . '/server/truncate-GET', '');
+
+        $target = $this->work . '/restored/buildkit-cache';
+        $restore = $this->invoke('restore', 'buildkit-cache', self::ARCHIVE, $target);
+        self::assertSame(0, $restore->exitCode, $restore->stderr);
+        self::assertSame([], $this->entries($target));
+        self::assertSame(['buildkit-cache'], $this->entries($this->work . '/restored'));
+        self::assertStringContainsString('no response', $restore->stdout);
+
+        $baseline = $this->work . '/baseline/metrics.json';
+        $fetch = $this->invoke('fetch', 'coverage', 'metrics.json', $baseline);
+        self::assertSame(0, $fetch->exitCode, $fetch->stderr);
+        self::assertSame([], $this->entries($this->work . '/baseline'));
+        self::assertStringContainsString('no response', $fetch->stdout);
+    }
+
+    public function testAnUnreachablePackageApiRestoresAndFetchesNothingButFailsSaves(): void
+    {
+        $api = 'http://127.0.0.1:1/api/v1';
+        $source = $this->work . '/source';
+        mkdir($source);
+        file_put_contents($source . '/cache.bin', 'cache');
+
+        $target = $this->work . '/restored/yarn-cache';
+        $restore = $this->invoke('restore', 'yarn-cache', 'yarn-cache.tar.zst', $target, $api);
+        self::assertSame(0, $restore->exitCode, $restore->stderr);
+        self::assertSame([], $this->entries($target));
+        self::assertStringContainsString('no response', $restore->stdout);
+
+        $baseline = $this->work . '/baseline/metrics.json';
+        $fetch = $this->invoke('fetch', 'coverage', 'metrics.json', $baseline, $api);
+        self::assertSame(0, $fetch->exitCode, $fetch->stderr);
+        self::assertSame([], $this->entries($this->work . '/baseline'));
+
+        $save = $this->invoke('save', 'yarn-cache', 'yarn-cache.tar.zst', $source, $api);
+        self::assertNotSame(0, $save->exitCode);
+        self::assertStringContainsString('no response', $save->stderr);
+    }
+
     public function testTheTokenComesFromTheEnvironmentAndNeverAppearsInOutput(): void
     {
         $source = $this->work . '/source';
@@ -268,6 +321,12 @@ final class CiPackageStoreTest extends TestCase
         if (is_file($root . '/fail-' . $method)) {
             http_response_code((int) file_get_contents($root . '/fail-' . $method));
             echo 'stub failure';
+            return true;
+        }
+        if (is_file($root . '/truncate-' . $method)) {
+            $content = is_file($stored) ? (string) file_get_contents($stored) : '';
+            header('Content-Length: ' . (strlen($content) + 4096));
+            echo $content;
             return true;
         }
         switch ($method) {

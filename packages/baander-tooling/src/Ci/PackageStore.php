@@ -13,11 +13,16 @@ use Baander\Tooling\Process\{CommandExecutor, CompletionPolicy, ProcessResult, P
  * Every file lives at `<api>/packages/<owner>/generic/<package>/latest/<file>`. Restores and
  * baseline fetches treat an absent or unreadable package as "nothing stored", so a cold cache
  * never fails a job. Saves and stores replace the previous file and fail when the upload fails.
- * The token reaches curl through its standard input, never through the command line or output.
+ * A transfer that does not complete, whether refused, broken off or past its time limit, counts
+ * as no response. The token reaches curl through its standard input, never through the command
+ * line or output.
  */
 final readonly class PackageStore
 {
     private const string VERSION = 'latest';
+    private const int CONNECT_TIMEOUT_SECONDS = 30;
+    /** Long enough for a multi-gigabyte BuildKit archive; a stalled transfer still ends the step. */
+    private const int TRANSFER_TIMEOUT_SECONDS = 1800;
 
     public function __construct(
         private CommandExecutor $executor,
@@ -158,6 +163,8 @@ final readonly class PackageStore
             new ProcessSpec(
                 argv: [
                     'curl', '--silent', '--show-error', '--config', '-',
+                    '--connect-timeout', (string) self::CONNECT_TIMEOUT_SECONDS,
+                    '--max-time', (string) self::TRANSFER_TIMEOUT_SECONDS,
                     '--request', $method, '--write-out', '%{http_code}', ...$options, $url,
                 ],
                 stdin: 'header = "Authorization: token ' . addcslashes($this->token, '"\\') . "\"\n",
@@ -166,10 +173,13 @@ final readonly class PackageStore
         );
     }
 
-    /** The HTTP status curl reported, or 0 when no response arrived. */
+    /**
+     * The HTTP status curl reported, or 0 when no complete response arrived. curl still reports the
+     * status line of a transfer it broke off, so any curl failure counts as no response.
+     */
     private static function status(ProcessResult $response): int
     {
-        return preg_match('/^\d{3}$/', $response->stdout) ? (int) $response->stdout : 0;
+        return $response->exitCode === 0 && preg_match('/^\d{3}$/', $response->stdout) ? (int) $response->stdout : 0;
     }
 
     private static function describe(int $status): string
