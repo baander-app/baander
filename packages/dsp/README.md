@@ -50,7 +50,7 @@ The reference suite can also inspect existing web-served artifacts directly:
 node --test packages/dsp/tests/*.test.mjs
 ```
 
-Forgejo runs the same gate with Emscripten 6.0.3. Its installer is pinned to
+CI runs the same gate on both forges with Emscripten 6.0.3. Its installer is pinned to
 the official SDK's 6.0.3 tag commit,
 `db04e88298d9916fc51fcd3743045ca3eb695127`.
 

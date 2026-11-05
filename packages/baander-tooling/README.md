@@ -315,6 +315,31 @@ retain collected findings when another requested source fails.
 CI runs the local command without network access alongside the tooling gates.
 Online assessment is an explicit maintenance action; it is not a scheduled CI gate.
 
+## CI package store
+
+On Forgejo, CI keeps its caches and coverage baselines in the Forgejo generic
+package registry through `scripts/ci-package-store.php`, which wraps
+`Ci\PackageStore`. GitHub uses `actions/cache` for the same data; the
+[CI guide](../../docs-book/part-2-developer-guide/continuous-integration.md#caches-and-coverage-baselines)
+lists the packages and keys. The command takes an operation, a package, a file and
+a path:
+
+| Operation | Effect |
+| --- | --- |
+| `restore` | Downloads the archive `<file>` and extracts it into the empty directory `<path>` |
+| `save` | Archives the directory `<path>` and replaces `<file>` with it |
+| `fetch` | Downloads the baseline `<file>` to `<path>` |
+| `store` | Replaces the baseline `<file>` with the file at `<path>` |
+
+Every file lives in version `latest` of the package, owned by the owner named in
+`GITHUB_REPOSITORY`. The command reads the API base from `GITHUB_API_URL` and the
+token from `FORGEJO_TOKEN`; the token reaches `curl` through standard input, never
+the command line. A missing or unreadable package, or an archive that cannot be
+extracted, restores an empty directory or fetches nothing and exits 0, so a cold
+cache never fails a job. `store` without a baseline file stores nothing and exits 0.
+A failed upload fails `save` and `store`. Install the standalone loader with
+`composer --working-dir=scripts install --no-dev` before calling it.
+
 ## Checks
 
 Tooling tests use the root Composer dependencies for PHPUnit, without booting the

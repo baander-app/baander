@@ -294,13 +294,17 @@ manual recovery. This worker adds resource limits beyond the API/voter budget.
 
 ### Nightly qualification and retained diagnostics
 
-The [nightly workflow](../.forgejo/workflows/registry-nightly.yaml) runs at 02:17 UTC
-(`17 2 * * *`) and supports manual dispatch through the same job. It runs the
-existing `fuzz` recipe with five voters for both partition/failover and isolated
-binary restore, then the parser fuzzer and its ASan negative control. The job has
-a 45-minute timeout. Forgejo activates schedules from the default branch; this
-local implementation has no observed hosted scheduled run. Activation and observation
-remain pending a later authorized push and merge.
+The [nightly workflow](../.github/workflows/registry-nightly.yaml) runs at 02:17 UTC
+(`17 2 * * *`) and supports manual dispatch through the same job. Forgejo and GitHub
+both run it from the shared workflow tree described in
+[Continuous Integration](../docs-book/part-2-developer-guide/continuous-integration.md).
+It runs the existing `fuzz` recipe with five voters for both partition/failover and
+isolated binary restore, then the parser fuzzer and its ASan negative control. The
+job has a 45-minute timeout on both forges. Each forge activates schedules from its
+default branch, and GitHub suspends a public repository's schedules after 60 days
+without repository activity. No hosted scheduled run has been observed on either
+forge yet; activation and observation remain pending a later authorized push and
+merge.
 
 To repeat the nightly recipe inside a runner provisioned as described above,
 install `clang-19` and `libclang-rt-19-dev` along with the native build tools, then

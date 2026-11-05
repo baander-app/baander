@@ -1,5 +1,11 @@
 # Bånder
 
+[![CI](https://github.com/baander-app/baander/actions/workflows/ci.yaml/badge.svg)](https://github.com/baander-app/baander/actions/workflows/ci.yaml)
+[![Frontend CI](https://github.com/baander-app/baander/actions/workflows/frontend.yaml/badge.svg)](https://github.com/baander-app/baander/actions/workflows/frontend.yaml)
+[![Public website](https://github.com/baander-app/baander/actions/workflows/website.yaml/badge.svg)](https://github.com/baander-app/baander/actions/workflows/website.yaml)
+[![DSP analysis qualification](https://github.com/baander-app/baander/actions/workflows/dsp-analysis.yaml/badge.svg)](https://github.com/baander-app/baander/actions/workflows/dsp-analysis.yaml)
+[![Registry nightly qualification](https://github.com/baander-app/baander/actions/workflows/registry-nightly.yaml/badge.svg)](https://github.com/baander-app/baander/actions/workflows/registry-nightly.yaml)
+
 Bånder is a self-hosted server for organizing and playing a personal media
 collection. You provide the media files and run the server; Bånder turns those
 files into a catalog you can search, browse and play through a web interface.
@@ -153,7 +159,9 @@ Start with the [developer guide](docs-book/part-2-developer-guide/README.md) for
 architecture and API references, then use the [development environment guide](docs-book/part-2-developer-guide/development-environment.md)
 and [frontend guide](docs-book/part-2-developer-guide/frontend-development.md) for
 working on the code. The [testing guide](docs-book/part-2-developer-guide/testing.md)
-names the current runners and runtime checks. Follow the
+names the current runners and runtime checks, and the
+[CI guide](docs-book/part-2-developer-guide/continuous-integration.md) explains how
+Forgejo and GitHub run the same workflows. Follow the
 [contribution instructions](docs-book/part-2-developer-guide/contributing.md) for
 project conventions and the contribution workflow.
 

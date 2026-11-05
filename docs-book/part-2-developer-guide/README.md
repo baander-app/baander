@@ -23,6 +23,7 @@ Understand the architecture, write code following project conventions, and contr
 | [Search](search.md) | PGroonga full-text search, making a context searchable |
 | [Database Naming](database-naming.md) | Index, unique-constraint and foreign-key names in migrations and mappings |
 | [Testing](testing.md) | Disposable PHPUnit runners, browser qualification, live-update capacity and evidence boundaries |
+| [Continuous Integration](continuous-integration.md) | Shared workflows on Forgejo and GitHub, caches, image visibility and the operator runbook |
 | [Frontend Development](frontend-development.md) | React + TypeScript + Vite + styled-components |
 
 ## Bounded Contexts

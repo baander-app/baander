@@ -806,7 +806,10 @@ passing results and live qualification limits belong in the roadmap.
 CI also runs the harness suite in the `tooling` runtime from
 `docker/runner/Dockerfile`, without Python, pcntl or posix. The
 `docker/runner/tooling-test.Dockerfile` copies source and Composer dependencies
-from the application CI image, so this check needs no host bind mount.
+from the application CI image, so this check needs no host bind mount. The CI
+image's build context keeps `.github/workflows` and `.github/actions` and excludes
+the rest of `.github`, so the workflow contract tests read the shared workflow
+tree inside the image.
 
 Use an application image that satisfies the current Composer lockfile. To build
 one locally and select it for the disposable runners:
@@ -1285,13 +1288,14 @@ modes, including container mode from a workspace with only the former runner scr
 and no host PHP or Composer dependencies. The PHP orchestration now requires the
 host tooling baseline in both modes. The fixture image does not certify the
 production build.
-Forgejo now includes a
+CI now includes a
 blocking operator lifecycle step using container mode and
 `BAANDER_TEST_CHECKOUT_IN_IMAGE=1` to copy source and dependencies from the built
 image. Its `quality-gate` job sets `BAANDER_TEST_DOCKER_SOCKET_PATH` from the
 repository variable of the same name, defaulting to `/var/run/docker.sock`. Set
 that variable for a runner with a different daemon-host socket path. Adding that
-gate does not establish a passing Forgejo run. Status does not certify readiness.
+gate does not establish a passing CI run on either forge. Status does not certify
+readiness.
 
 The standalone lifecycle runner pauses Redis and PostgreSQL in separate disposable
 operator projects, with no HTTP container and an ordinary maximum of two:
@@ -1370,11 +1374,11 @@ It then uses
 against that exact immutable image. This skips the fixture rebuild and injects no
 source, dependencies, keys or cache into the worker. Test preparation and Docker
 authority remain in separate containers. The scope is the worker lifecycle,
-outbox and scheduler, without OAuth certification. Forgejo now includes blocking
+outbox and scheduler, without OAuth certification. CI now includes blocking
 context-exclusion, production-worker build and production-lifecycle steps. Their
-configuration does not establish a passing Forgejo run. The recorded immutable-image
-lifecycle and combined Chromium playback/recovery gates passed before the paired
-deployment change. Retain image identity, phase, containment and cleanup evidence
+configuration does not establish a passing CI run on either forge. The recorded
+immutable-image lifecycle and combined Chromium playback/recovery gates passed
+before the paired deployment change. Retain image identity, phase, containment and cleanup evidence
 with the runner's artifacts before claiming a result for a newer deployment.
 The production recipes select PHP 8.5.12 and Composer 2.11.1 on the Debian 13
 (trixie) PHP ZTS base. Native Swoole is pinned to Composer's required 6.2.4. PIE
@@ -1847,7 +1851,7 @@ It requires `BAANDER_TEST_TWO_COMMAND=1` and an executable browser checkpoint;
 the deployment wrapper supplies two-command mode. Invalid values or missing
 prerequisites fail before services start. The production runner selects
 `BAANDER_TEST_USE_IMAGE=1`, preserving the immutable worker-image contract.
-Forgejo enables client controls in its production browser job; the configuration
+CI enables client controls in its production browser job; the configuration
 alone does not establish a passing run.
 
 The browser pauses playback and commits three positions through the movie
@@ -2945,7 +2949,7 @@ docker build -f docker/nginx/Dockerfile.test -t baander-websocket-proxy-test:loc
 bash scripts/test-websocket-proxy-logs.sh
 ```
 
-Forgejo runs both security drills as blocking steps.
+CI runs both security drills as blocking steps.
 
 ### Safari Playback of an Encoding Rendition (Manual)
 
@@ -3126,17 +3130,24 @@ publisher requires both analyses to succeed, in addition to its test gates.
 
 ## Application publication gates
 
-The application publisher in `.forgejo/workflows/ci.yaml` requires backend quality,
-frontend quality, and DSP qualification. Frontend qualification includes the embedded
-player and Chromium authentication, audio graph, and store-debugger suites. Checkout
-steps in the application, frontend, and DSP workflows fetch and verify the event SHA,
-so a later branch update cannot replace the source under qualification.
+The application publisher in `.github/workflows/ci.yaml` requires backend quality,
+frontend quality, DSP qualification and every Registry qualification job (release
+and sanitize builds, containers, threads, fuzzing and static analysis). Frontend
+qualification includes the embedded player and Chromium authentication, audio
+graph, and store-debugger suites. Forgejo and GitHub both run this workflow; see
+[Continuous Integration](continuous-integration.md). Checkout steps in the gate
+workflows fetch and verify the pull request's head commit, or the event SHA for
+other events, so a later branch update cannot replace the source under
+qualification, and both forges qualify the same commit.
 
 `PublicationWorkflowTest` checks the actual YAML dependency graph, executes gate shell
 commands with failing local tools, and exercises checkouts against a local Git remote
-whose branch advances. It rejects unavailable or mismatched event commits. These are
-local contracts and shell regressions; they do not certify a live Forgejo scheduler.
-Standalone CLI and base-image publication policies need their own review.
+whose branch advances. It rejects unavailable or mismatched event commits. It
+evaluates each workflow condition once for GitHub and once for Forgejo, covering the
+runner label, registry, cache and baseline store, artifact action, trusted-run
+guards and the GitHub-only steps, and it enforces the shared tree's rules. These are
+local contracts and shell regressions; they do not certify either forge's live
+scheduler. Standalone CLI and base-image publication policies need their own review.
 
 ## Frontend Testing
 

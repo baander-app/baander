@@ -231,7 +231,8 @@ runtime runner creates an internal Docker network and disposable PostgreSQL and
 Redis, generates test-only OAuth keys and removes its containers on exit. It has a
 360-second outer deadline. Malformed-input sockets have three-second deadlines;
 WebSocket and outage probes use bounded request budgets of up to ten seconds. It does not reset the
-development database. The Forgejo workflow runs it as a blocking step.
+development database. The [CI workflow](continuous-integration.md) runs it as a
+blocking step on both forges.
 
 ```bash
 BAANDER_TEST_IMAGE=baander-ci-prewarm:local bash scripts/test-security-runtime-container.sh

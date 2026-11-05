@@ -122,7 +122,7 @@ the [development environment guide](../../docs-book/part-2-developer-guide/devel
 
 ## CI artifact
 
-The `Public website` Forgejo workflow checks token drift, builds the site and runs
+The `Public website` workflow, which both forges run, checks token drift, builds the site and runs
 the site browser suite in the repository's PHP 8.5 runner image. It retains
 `website.tar.gz` and its SHA-256 checksum for 14 days under an artifact named
 `public-website-<commit>`. The archive includes the hidden `.vercel/output/`

@@ -440,6 +440,14 @@ functional/integration lane owns a disposable Compose project with separate
 PostgreSQL, Redis and application containers. Together, the lane manifests must
 contain every discovered test file exactly once.
 
+## Continuous integration
+
+### Forge
+
+A host for the repository that runs its CI: the self-hosted Forgejo instance or
+GitHub. Both forges run the same workflow files from `.github/workflows`, and each
+supplies its own runner, image registry, cache store and coverage-baseline store.
+
 ## Dependency maintenance
 
 ### Dependency policy
