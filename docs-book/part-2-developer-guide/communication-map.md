@@ -59,7 +59,7 @@ flowchart TB
     pair ~~~ external
     clients -->|HTTPS| api
     clients -->|ticket| ws
-    companion -.->|planned| api
+    companion -.-> api
     clients -.->|lookup| registry
     api -->|dispatch| bus
     bus -->|inline| aggregates
@@ -74,6 +74,7 @@ flowchart TB
     scheduler -->|consume| execution
     execution -->|failed| failed
     execution -->|queued| external
+    api -->|request-time| external
 ```
 
 The map shows paths, not deployment. [Deployment Topology](../part-1-operator-guide/deployment-topology.md)
