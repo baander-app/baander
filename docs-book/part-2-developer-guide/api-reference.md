@@ -235,6 +235,28 @@ Every token request carries a `DPoP` header with a proof JWT (RFC 9449) signed b
 
 Each nonce works once and expires after `auth.dpop.nonce_ttl` seconds (default 300). Successful token responses include a `DPoP-Nonce` header for the client's next proof. At the first-party endpoints, a request without a `DPoP` header gets a `400` `ApiError`, and an invalid proof gets the `use_dpop_nonce` answer. The OAuth token endpoint answers a missing or invalid proof with `400` and `{"error": "invalid_dpop_proof", "error_description": "..."}` (RFC 9449), with a `DPoP-Nonce` header as well.
 
+The sequence below shows the handshake against one token endpoint; `/api/auth/login`, `/api/auth/refresh`, and `/api/oauth/token` all follow it.
+
+```mermaid
+sequenceDiagram
+    accTitle: DPoP token handshake and bound API request
+    accDescr: The client sends a token request with a proof that has no nonce. The token endpoint stores a nonce in Redis and answers 400 use_dpop_nonce with a DPoP-Nonce header. The client repeats the request with the nonce in its proof. The endpoint consumes the nonce and returns a token pair whose access token carries the key thumbprint, plus a fresh nonce. The client then calls a resource endpoint with Authorization DPoP and a proof carrying the access token hash, and receives the resource.
+    participant C as Client
+    participant T as Token endpoint
+    participant R as Redis nonce store
+    participant A as Resource endpoint
+    C->>T: Token request, DPoP proof without nonce
+    T->>R: Store nonce (TTL auth.dpop.nonce_ttl)
+    T-->>C: 400 use_dpop_nonce, DPoP-Nonce header
+    C->>T: Token request, DPoP proof with nonce
+    T->>R: Consume nonce (single use)
+    T-->>C: Token pair, access token carries cnf.jkt, fresh DPoP-Nonce
+    C->>A: Authorization: DPoP accessToken, DPoP proof with ath
+    A-->>C: Resource (proof and cnf.jkt binding verified)
+```
+
+The challenge differs by endpoint only in how a missing or invalid proof is answered: the first-party endpoints give the `ApiError` and the `use_dpop_nonce` answer described above, and the OAuth token endpoint gives `invalid_dpop_proof` for both.
+
 Issued tokens are bound to the proof key: the access token carries `cnf.jkt`. API requests send `Authorization: DPoP <accessToken>` with a `DPoP` proof from the same key that includes the access token hash (`ath`). Signed stream delivery URLs do not need a proof.
 
 ### Password Login
@@ -285,7 +307,7 @@ A refused refresh token answers `401`; sign in again. `503` with `Retry-After` m
 
 ### Client Fingerprint Binding
 
-Password login, passkey login, and the token endpoint accept an optional `X-Baander-Client-Fingerprint` header. If it is sent, the access token is bound to that value, and every API request with the token must send the same header or get `401` (`AUTH_INVALID_TOKEN`). Refresh keeps the binding. Tokens issued without the header ignore it. WebSocket connections authenticated with a query token do not check it.
+Password login, passkey login, and the token endpoint accept an optional `X-Baander-Client-Fingerprint` header. If it is sent, the access token is bound to that value, and every API request with the token must send the same header or get `401` (`AUTH_INVALID_TOKEN`). Refresh keeps the binding. Tokens issued without the header ignore it. The WebSocket upgrade authenticates with a handshake ticket issued over HTTP and does not carry the fingerprint header; see [Real-Time Patterns](real-time-patterns.md#authentication).
 
 ### OAuth 2.0 Authorization Server
 
