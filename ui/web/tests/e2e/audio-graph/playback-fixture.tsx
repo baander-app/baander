@@ -1,9 +1,11 @@
 import React, { useEffect } from 'react'
 import { createRoot } from 'react-dom/client'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useAudioPlayback } from '@/features/player/hooks/use-audio-playback'
 import { usePlayerStore } from '@/features/player/stores/player-store'
 import { getCurrentTime, subscribe as subscribeToTime } from '@/features/player/stores/player-time-tracker'
 import { audioService } from '@/features/player/services/audio-service'
+import { startPlaybackSession } from './playback-session'
 
 export interface MediaSnapshot {
   track: string | undefined
@@ -48,7 +50,12 @@ export function Fixture() {
   return null
 }
 usePlayerStore.setState({ queue: [], currentTrack: null, currentIndex: -1, isPlaying: false, volume: 60, muted: false, repeat: 'off', shuffle: false })
-createRoot(document.getElementById('root')!).render(React.createElement(Fixture))
+startPlaybackSession()
+// The application mounts the hook under its query client; playback session state is read from it.
+const queryClient = new QueryClient()
+createRoot(document.getElementById('root')!).render(
+  React.createElement(QueryClientProvider, { client: queryClient }, React.createElement(Fixture)),
+)
 
 const fixture = {
   renderFade,

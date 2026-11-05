@@ -280,9 +280,14 @@ async function stereoAnalysis(options: StereoAnalysisOptions): Promise<StereoAna
   const context = graph.audioContext
   const source = context.createBufferSource()
   const buffer = context.createBuffer(options.signal === 'mono' ? 1 : 2, context.sampleRate, context.sampleRate)
-  // An integer number of periods in every 2048-frame analyser window makes
-  // the expected RMS independent of the browser's sampling time.
-  const frequency = context.sampleRate / 64
+  // A whole number of half-periods in every metering window makes the expected
+  // RMS independent of when the meter samples. The fallback reads 2048-frame
+  // analyser windows; the worklet's dynamics meter integrates a rectangular
+  // 10 ms window, which holds 7.5 periods of sampleRate / 64 only at 48 kHz.
+  const meterWindowFrames = Math.round(context.sampleRate / 100)
+  const frequency = options.mode === 'fallback'
+    ? context.sampleRate / 64
+    : 15 * context.sampleRate / (2 * meterWindowFrames)
   for (let i = 0; i < buffer.length; i++) {
     const value = Math.sin(2 * Math.PI * frequency * i / context.sampleRate)
     buffer.getChannelData(0)[i] = options.signal === 'right' ? 0 : 0.2 * value

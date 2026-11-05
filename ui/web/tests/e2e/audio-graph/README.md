@@ -44,6 +44,15 @@ These checks establish element reuse and overlap; they do not measure a
 sample-accurate gap between decoded tracks. External activity recording, EQ
 state reapplication, and WASM analysis modules are fixture substitutes.
 
+As in the application, player controls become session commands that the real
+`PlaybackCommandRunner` executes through the hook's music playback adapter.
+`playback-session.ts` stands in for the server's listening
+session, with this browser as its active destination. It turns each control into
+the command the server would issue and sends the next control only after the
+destination settles the previous one. The disposable server also answers the
+catalogue lookup for the queued tracks and negotiates delivery. It offers the
+original file until the browser reports that it cannot play it.
+
 Additional native offline renders start a crossfade at context time two seconds
 and inspect both channels before, during, and after the ramp, including
 cancellation midway through the fade.

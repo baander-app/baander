@@ -4,7 +4,8 @@ console.warn('WARNING: Playback tests can produce audible tones or media through
 
 export default defineConfig({
   testDir: '.', testMatch: '**/*.spec.ts', workers: 1, fullyParallel: false,
-  timeout: 20_000, globalTimeout: 120_000, retries: 0,
+  // The whole suite takes about two and a half minutes; each test keeps its own 20 s limit.
+  timeout: 20_000, globalTimeout: 300_000, retries: 0,
   forbidOnly: !!process.env.CI, reporter: [['list']],
   outputDir: '../../../test-results/audio-graph',
 })

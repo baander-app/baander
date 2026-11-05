@@ -69,7 +69,8 @@ interface MediaState {
   error: number | null
   errorMessage: string
   buffered: number[][]
-  seekable: number[][]
+  // Null when the caller did not ask for it; see `PLAYHEAD_ONLY`.
+  seekable: number[][] | null
   playRejection: string | null
 }
 
@@ -78,7 +79,7 @@ interface MediaProbe {
   seek(time: number): void
   play(): void
   pause(): void
-  state(): MediaState
+  state(observeSeekable: boolean): MediaState
 }
 
 declare global {
@@ -338,7 +339,7 @@ function installMediaProbe(): void {
       log('probe:pause')
       audio.pause()
     },
-    state() {
+    state(observeSeekable) {
       return {
         events: [...events],
         now: performance.now(),
@@ -354,17 +355,22 @@ function installMediaProbe(): void {
         error: audio.error?.code ?? null,
         errorMessage: audio.error?.message ?? '',
         buffered: ranges(audio.buffered),
-        seekable: ranges(audio.seekable),
+        seekable: observeSeekable ? ranges(audio.seekable) : null,
         playRejection,
       }
     },
   }
 }
 
-const state = (page: Page) => page.evaluate(() => window.mediaProbe.state())
+// WebKit's GStreamer backend stalls a length-delimited MP3 at its first frames when
+// `seekable.start()`/`end()` are polled while it starts loading: its duration collapses to
+// the playhead. Waits that only watch the playhead therefore leave `seekable` unread.
+const PLAYHEAD_ONLY = { observeSeekable: false }
+const state = (page: Page, { observeSeekable = true } = {}) =>
+  page.evaluate(observe => window.mediaProbe.state(observe), observeSeekable)
 const open = (page: Page, url: string) => page.evaluate(source => window.mediaProbe.open(source), url)
 const round = (value: number) => Number(value.toFixed(3))
-const covers = (ranges: number[][], time: number) => ranges.some(([start, end]) => start <= time && time < end)
+const covers = (ranges: number[][] | null, time: number) => ranges?.some(([start, end]) => start <= time && time < end) ?? false
 
 async function openProbe(browser: Browser, origin: string): Promise<Page> {
   const page = await browser.newPage({ ignoreHTTPSErrors: true })
@@ -374,10 +380,15 @@ async function openProbe(browser: Browser, origin: string): Promise<Page> {
   return page
 }
 
-async function waitFor(page: Page, condition: (current: MediaState) => boolean, timeoutMs: number): Promise<MediaState> {
+async function waitFor(
+  page: Page,
+  condition: (current: MediaState) => boolean,
+  timeoutMs: number,
+  observation = { observeSeekable: true },
+): Promise<MediaState> {
   const deadline = Date.now() + timeoutMs
   for (;;) {
-    const current = await state(page)
+    const current = await state(page, observation)
     if (condition(current) || Date.now() > deadline) {
       return current
     }
@@ -460,7 +471,7 @@ for (const engine of [chromium, firefox, webkit]) {
       const pages = await Promise.all(cases.map(() => openProbe(browser!, server.origin)))
       const outcomes = await Promise.all(pages.map(async (page, index) => {
         await open(page, urls[index])
-        const beforeCut = await waitFor(page, current => current.time >= PLAYING_BEFORE_CUT, 8000)
+        const beforeCut = await waitFor(page, current => current.time >= PLAYING_BEFORE_CUT, 8000, PLAYHEAD_ONLY)
         server.cut(cases[index].id, cases[index].cut)
 
         return { beforeCut, settled: await settle(page, 1500, 10_000) }
@@ -517,7 +528,7 @@ for (const engine of [chromium, firefox, webkit]) {
       const playing = await Promise.all(pages.map(async (page, index) => {
         await open(page, urls[index])
 
-        return waitFor(page, current => current.time >= PLAYING_BEFORE_CUT, 8000)
+        return waitFor(page, current => current.time >= PLAYING_BEFORE_CUT, 8000, PLAYHEAD_ONLY)
       }))
 
       // The player keeps the last position the element reported, because

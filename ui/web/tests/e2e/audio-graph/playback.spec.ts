@@ -58,7 +58,10 @@ test('native crossfade plays both elements before the outgoing ended event', asy
   expect(overlap.elements[1].loads).toBe(1)
   expect(overlap.elements.every(element => element.volume === 1 && !element.muted)).toBe(true)
   await expect.poll(async () => (await snapshot(page)).outputGain).toBeCloseTo(.6, 3)
-  await page.evaluate(() => { window.playbackFixture.volume(37); window.playbackFixture.mute(true) })
+  // The destination applies each volume command before the next control; mute remembers that volume.
+  await page.evaluate(() => window.playbackFixture.volume(37))
+  await expect.poll(async () => (await snapshot(page)).outputGain).toBeCloseTo(.37, 3)
+  await page.evaluate(() => window.playbackFixture.mute(true))
   const muted = await snapshot(page)
   expect(muted.elements.every(element => element.volume === 1 && !element.muted)).toBe(true)
   await expect.poll(async () => (await snapshot(page)).outputGain).toBeCloseTo(0, 3)
@@ -72,8 +75,9 @@ test('native crossfade plays both elements before the outgoing ended event', asy
 test('promoted native media owns seek, pause, time updates and volume/mute', async ({ page, origin }) => {
   await start(page, origin)
   await track(page, 'second')
+  await page.evaluate(() => window.playbackFixture.volume(37))
+  await expect.poll(async () => (await snapshot(page)).outputGain).toBeCloseTo(.37, 3)
   await page.evaluate(() => {
-    window.playbackFixture.volume(37)
     window.playbackFixture.mute(true)
     window.playbackFixture.pause()
   })
@@ -115,7 +119,7 @@ test('manual track selection interrupts overlap and prevents stale transition pl
 })
 
 
-test('native pending play rejection cannot overwrite a newer manual selection', async ({ page, origin }) => {
+test('a newer manual selection waits for a pending load and then replaces it', async ({ page, origin }) => {
   let releaseFirst!: () => void
   let releaseThird!: () => void
   let requestedFirst!: () => void
@@ -134,15 +138,19 @@ test('native pending play rejection cannot overwrite a newer manual selection', 
     await page.evaluate(() => window.playbackFixture.start(false))
     await firstRequested
     await page.evaluate(() => window.playbackFixture.manual())
-    // Native play() rejects the replaced pending source while the new HTTP response is held.
+    // The session sends the next control only after the destination settles the pending load.
     await page.waitForTimeout(200)
     const waiting = await snapshot(page)
-    expect(waiting.track).toBe('third')
-    expect(waiting.playing).toBe(true)
+    expect(waiting.track).toBeUndefined()
+    expect(waiting.playing).toBe(false)
+    expect(waiting.elements.every(element => element.paused)).toBe(true)
     releaseThird()
     releaseFirst()
     await track(page, 'third')
-    expect((await snapshot(page)).playing).toBe(true)
+    const selected = await snapshot(page)
+    expect(selected.playing).toBe(true)
+    expect(selected.elements.filter((_, index) => index !== selected.active).every(element => element.paused)).toBe(true)
+    await expect.poll(() => page.evaluate(() => window.playbackFixture.activity())).toEqual(['first', 'third'])
   } finally { releaseFirst(); releaseThird() }
 })
 
@@ -169,7 +177,7 @@ for (const cancel of [false, true]) {
 }
 
 for (const action of ['next', 'previous'] as const) {
-  test(`native ${action} playback failure clears the playing state for its selected track`, async ({ page, origin }) => {
+  test(`native ${action} playback failure keeps the current track playing`, async ({ page, origin }) => {
     const failedId = action === 'next' ? 'second' : 'third'
     await page.route('**/api/stream/track?*', async route => {
       if (new URL(route.request().url()).searchParams.get('id') === failedId) {
@@ -181,8 +189,12 @@ for (const action of ['next', 'previous'] as const) {
       window.playbackFixture.seek(0)
       window.playbackFixture[action]()
     }, action)
-    await expect.poll(async () => (await snapshot(page)).track).toBe(failedId)
-    await expect.poll(async () => (await snapshot(page)).playing).toBe(false)
+    // The destination rejects a target it cannot prepare and leaves the active source untouched.
+    await expect.poll(async () => (await snapshot(page)).elements.find(element => element.id === failedId)?.error).toBe(4)
+    const state = await snapshot(page)
+    expect(state.track).toBe('first')
+    expect(state.playing).toBe(true)
+    expect(state.elements[state.active]).toMatchObject({ id: 'first', paused: false, error: null })
   })
 }
 
@@ -261,7 +273,7 @@ for (const repeat of [false, true]) {
   })
 }
 
-test('pending context resume cannot stop newer native playback after first → third → first selection', async ({ page, origin }) => {
+test('a held context resume delays newer selections until it settles, then first → third → first plays', async ({ page, origin }) => {
   await start(page, origin)
   await expect.poll(() => page.evaluate(() => window.playbackFixture.activity())).toEqual(['first'])
   await page.evaluate(() => window.playbackFixture.pause())
@@ -272,6 +284,13 @@ test('pending context resume cannot stop newer native playback after first → t
   })
   await expect.poll(() => page.evaluate(() => window.playbackFixture.resumePending())).toBe(true)
   await page.evaluate(() => window.playbackFixture.select(2))
+  // The session sends the selection only after the destination settles the pending play.
+  await page.waitForTimeout(200)
+  const waiting = await snapshot(page)
+  expect(waiting.track).toBe('first')
+  expect(waiting.playing).toBe(false)
+  expect(waiting.elements.every(element => element.paused)).toBe(true)
+  await page.evaluate(() => window.playbackFixture.rejectHeldResume())
   await track(page, 'third')
   await expect.poll(() => page.evaluate(() => window.playbackFixture.activity())).toEqual(['first', 'third'])
   await page.evaluate(() => window.playbackFixture.select(0))
@@ -280,11 +299,11 @@ test('pending context resume cannot stop newer native playback after first → t
   const selected = await snapshot(page)
   expectActive(selected, 'first', 0)
   const nativeTime = selected.elements[0].time
-  await page.evaluate(() => window.playbackFixture.rejectHeldResume())
   await expect.poll(async () => {
     const state = await snapshot(page)
     return { playing: state.playing, paused: state.elements[0].paused, advanced: state.elements[0].time > nativeTime + 0.1 }
   }).toEqual({ playing: true, paused: false, advanced: true })
+  // Playing on records nothing more: each selection was recorded exactly once.
   expect(await page.evaluate(() => window.playbackFixture.activity())).toEqual(['first', 'third', 'first'])
 })
 
@@ -308,7 +327,8 @@ test('owned native MediaError after a successful play stops playback and allows 
   await track(page, 'third')
   const recovered = await snapshot(page)
   expect(recovered.elements[recovered.active].error).toBeNull()
-  expectActive(recovered, 'third', 0)
+  // With the graph connected, a new selection loads into the inactive element.
+  expectActive(recovered, 'third', 1)
   const nativeTime = recovered.elements[recovered.active].time
   await expect.poll(async () => {
     const state = await snapshot(page)

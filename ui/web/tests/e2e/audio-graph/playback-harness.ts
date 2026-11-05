@@ -38,6 +38,8 @@ export const test = base.extend<Record<never, never>, { origin: string }>({
       const bundle = await build({ bundle: true, write: false, platform: 'browser', format: 'iife',
         entryPoints: [fileURLToPath(new URL('./playback-fixture.tsx', import.meta.url))], absWorkingDir: webRoot,
         alias: { '@': sourceRoot }, nodePaths: [resolve(webRoot, 'node_modules')],
+        // Vite replaces import.meta.env at build time; the IIFE bundle gets the production values.
+        define: { 'import.meta.env': JSON.stringify({ MODE: 'production', BASE_URL: '/', DEV: false, PROD: true, SSR: false }) },
         plugins: [{ name: 'external-services', setup(plugin) {
           plugin.onResolve({ filter: /^(?:react(?:-dom)?|zustand|scheduler|sonner|axios|@tanstack\/(?:react-query|query-core))(?:\/.*)?$/ }, args => ({
             path: require.resolve(args.path === 'axios' ? 'axios/dist/browser/axios.cjs' : args.path),
@@ -96,6 +98,27 @@ export const test = base.extend<Record<never, never>, { origin: string }>({
           if (range) response.writeHead(206, { 'Content-Range': `bytes ${start}-${end}/${long.length}`, 'Content-Length': end - start + 1 })
           else response.setHeader('Content-Length', long.length)
           sendSlowly(response, start, end)
+        } else if (url.pathname === '/api/songs/') {
+          // The catalogue answers the runner's queue lookup; every fixture track is playable.
+          const lengths: Record<string, number> = { first: 4, second: 5, third: 6, long: 20 }
+          const ids = (url.searchParams.get('publicIds') ?? '').split(',').filter(id => id in lengths)
+          response.setHeader('Content-Type', 'application/json')
+          response.end(JSON.stringify({
+            data: ids.map(id => ({ publicId: id, title: id, available: true, length: lengths[id] })),
+            meta: { next_cursor: null, prev_cursor: null, has_next_page: false, has_previous_page: false, total: ids.length, per_page: ids.length },
+          }))
+        } else if (url.pathname === '/api/stream/delivery' && request.method === 'POST') {
+          // Delivery negotiation offers the original file until the browser reports it cannot play it.
+          let body = ''
+          request.setEncoding('utf8')
+          request.on('data', chunk => { body += chunk })
+          request.on('end', () => {
+            const delivery = JSON.parse(body) as { id: string; sourcePlaybackFailed?: boolean }
+            response.setHeader('Content-Type', 'application/json')
+            response.end(JSON.stringify(delivery.sourcePlaybackFailed
+              ? { kind: 'encoded', reason: 'browser_rejected_source', url: null }
+              : { kind: 'original', reason: null, url: `/api/stream/track?id=${encodeURIComponent(delivery.id)}` }))
+          })
         } else if (url.pathname === '/fixture.js') {
           response.setHeader('Content-Type', 'application/javascript')
           response.end('window.Worker=class {postMessage(){} terminate(){}};\n' + bundle.outputFiles[0].text)
