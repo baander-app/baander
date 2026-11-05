@@ -755,11 +755,16 @@ final class SignedDeliveryFirewallTest extends TestCase
         return $jwt;
     }
 
+    /**
+     * A library video with a 1080p source, so playback admits all three quality tiers and
+     * signing dispatches one session per tier; a source without a height admits 360p alone.
+     */
     private function createVideoLibrary(bool $grant): VideoEntity
     {
         $library = new LibraryEntity('Disposable library', bin2hex(random_bytes(16)), self::$directory, 'video', 'local');
         $movie = new MovieEntity(new PublicId(), $library, 'Disposable movie');
         $video = new VideoEntity(new PublicId(), self::$directory . '/segment.mp4', bin2hex(random_bytes(16)));
+        $video->setHeight(1080);
         $this->persist($library);
         $this->persist($movie);
         $this->persist($video);
