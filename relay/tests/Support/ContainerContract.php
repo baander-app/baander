@@ -610,14 +610,26 @@ final class ContainerContract
         );
         $command = $this->queryCommand('database-curl.conf');
         array_splice($command, 2, 0, ['-i']);
-        $query = $this->docker(
+        $read = fn(): array => $this->docker(
             [
                 ...$command,
                 '--data-binary',
                 '@-',
                 'https://node-4.rqlite.baander.app:4001/db/query?level=linearizable&associative',
             ],
-            input: json_encode(["SELECT revision FROM registries WHERE public_id='container-contract'"], JSON_THROW_ON_ERROR),
+            false,
+            json_encode(["SELECT revision FROM registries WHERE public_id='container-contract'"], JSON_THROW_ON_ERROR),
+        );
+        // The replacement reports that it joined before it has heard from the
+        // leader, and until then it answers a linearizable read with 503.
+        $query = null;
+        $this->waitFor(
+            function () use ($read, &$query): bool {
+                $query = $read();
+                return $query['code'] === 0;
+            },
+            30,
+            'Replacement never served a linearizable read',
         );
         $rows = json_decode($query['stdout'], true, flags: JSON_THROW_ON_ERROR)['results'][0]['rows'];
         Runtime::requireThat($rows === [['revision' => $revision]], 'Replacement did not read acknowledged revision');
