@@ -10,11 +10,11 @@ use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'listening_sessions')]
-#[ORM\Index(name: 'idx_playback_selected_destination', columns: ['selected_destination_id', 'user_id'])]
-#[ORM\Index(name: 'idx_playback_active_incarnation', columns: ['active_incarnation_id', 'user_id'])]
+#[ORM\Index(name: 'idx_listening_sessions_selected_destination_id_user_id', columns: ['selected_destination_id', 'user_id'])]
+#[ORM\Index(name: 'idx_listening_sessions_active_incarnation_id_user_id', columns: ['active_incarnation_id', 'user_id'])]
 #[ORM\UniqueConstraint(name: 'uniq_listening_sessions_public_id', columns: ['public_id'])]
 #[ORM\UniqueConstraint(name: 'uniq_listening_sessions_user_id', columns: ['user_id'])]
-#[ORM\UniqueConstraint(name: 'uniq_playback_session_owner', columns: ['id', 'user_id'])]
+#[ORM\UniqueConstraint(name: 'uniq_listening_sessions_id_user_id', columns: ['id', 'user_id'])]
 class ListeningSessionEntity
 {
     #[ORM\Id]

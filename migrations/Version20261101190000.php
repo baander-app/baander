@@ -32,18 +32,20 @@ final class Version20261101190000 extends AbstractMigration
                 THEN jsonb_build_object('kind','song','publicId',queue->>current_track_index) ELSE NULL END
             SQL);
         $this->addSql(<<<'SQL'
-            ALTER TABLE listening_sessions ADD CONSTRAINT uniq_playback_session_owner UNIQUE (id,user_id)
+            ALTER TABLE listening_sessions ADD CONSTRAINT uniq_listening_sessions_id_user_id UNIQUE (id,user_id)
             SQL);
         $this->addSql(<<<'SQL'
             CREATE TABLE playback_destinations (
-                id uuid PRIMARY KEY, public_id text NOT NULL UNIQUE,
-                user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                id uuid PRIMARY KEY, public_id text NOT NULL,
+                user_id uuid NOT NULL,
                 device_id uuid NOT NULL, endpoint_id uuid,
                 name text NOT NULL, kind text NOT NULL DEFAULT 'browser',
                 capabilities jsonb NOT NULL DEFAULT '["song","video"]',
                 created_at timestamptz NOT NULL,
-                CONSTRAINT uniq_playback_destination_owner UNIQUE(id,user_id),
-                CONSTRAINT uniq_playback_destination_tab UNIQUE(user_id,device_id,endpoint_id)
+                CONSTRAINT fk_playback_destinations_user_id FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+                CONSTRAINT uniq_playback_destinations_public_id UNIQUE(public_id),
+                CONSTRAINT uniq_playback_destinations_id_user_id UNIQUE(id,user_id),
+                CONSTRAINT uniq_playback_destinations_user_id_device_id_endpoint_id UNIQUE(user_id,device_id,endpoint_id)
             )
             SQL);
         $this->addSql(<<<'SQL'
@@ -53,18 +55,18 @@ final class Version20261101190000 extends AbstractMigration
                 expires_at timestamptz NOT NULL, retired_at timestamptz,
                 observed_volume double precision CHECK(observed_volume>=0 AND observed_volume<=1),
                 observed_state text NOT NULL DEFAULT 'unknown', position double precision NOT NULL DEFAULT 0 CHECK(position>=0),
-                CONSTRAINT fk_playback_incarnation_destination FOREIGN KEY(destination_id,user_id)
+                CONSTRAINT fk_playback_destination_incarnations_destination_id_user_id FOREIGN KEY(destination_id,user_id)
                     REFERENCES playback_destinations(id,user_id) ON DELETE CASCADE,
-                CONSTRAINT uniq_playback_incarnation_owner UNIQUE(id,user_id),
-                CONSTRAINT uniq_playback_incarnation_epoch UNIQUE(destination_id,epoch)
+                CONSTRAINT uniq_playback_destination_incarnations_id_user_id UNIQUE(id,user_id),
+                CONSTRAINT uniq_playback_destination_incarnations_destination_id_epoch UNIQUE(destination_id,epoch)
             )
             SQL);
         $this->addSql(<<<'SQL'
-            ALTER TABLE listening_sessions ADD CONSTRAINT fk_playback_selected_destination FOREIGN KEY(selected_destination_id,user_id)
+            ALTER TABLE listening_sessions ADD CONSTRAINT fk_listening_sessions_selected_destination_id_user_id FOREIGN KEY(selected_destination_id,user_id)
             REFERENCES playback_destinations(id,user_id)
             SQL);
         $this->addSql(<<<'SQL'
-            ALTER TABLE listening_sessions ADD CONSTRAINT fk_playback_active_incarnation FOREIGN KEY(active_incarnation_id,user_id)
+            ALTER TABLE listening_sessions ADD CONSTRAINT fk_listening_sessions_active_incarnation_id_user_id FOREIGN KEY(active_incarnation_id,user_id)
             REFERENCES playback_destination_incarnations(id,user_id)
             SQL);
         $this->addSql(<<<'SQL'
@@ -75,15 +77,15 @@ final class Version20261101190000 extends AbstractMigration
                 desired_state text NOT NULL CHECK(desired_state IN ('playing','paused','stopped')),
                 position double precision NOT NULL CHECK(position>=0), revision integer NOT NULL,
                 expires_at timestamptz NOT NULL, created_at timestamptz NOT NULL,
-                CONSTRAINT fk_playback_transfer_session FOREIGN KEY(session_id,user_id) REFERENCES listening_sessions(id,user_id) ON DELETE CASCADE,
-                CONSTRAINT fk_playback_transfer_source FOREIGN KEY(source_incarnation_id,user_id) REFERENCES playback_destination_incarnations(id,user_id),
-                CONSTRAINT fk_playback_transfer_target FOREIGN KEY(target_incarnation_id,user_id) REFERENCES playback_destination_incarnations(id,user_id),
-                CONSTRAINT uniq_playback_transfer_request UNIQUE(session_id,request_id),
-                CONSTRAINT uniq_playback_transfer_owner UNIQUE(id,user_id)
+                CONSTRAINT fk_playback_transfers_session_id_user_id FOREIGN KEY(session_id,user_id) REFERENCES listening_sessions(id,user_id) ON DELETE CASCADE,
+                CONSTRAINT fk_playback_transfers_source_incarnation_id_user_id FOREIGN KEY(source_incarnation_id,user_id) REFERENCES playback_destination_incarnations(id,user_id),
+                CONSTRAINT fk_playback_transfers_target_incarnation_id_user_id FOREIGN KEY(target_incarnation_id,user_id) REFERENCES playback_destination_incarnations(id,user_id),
+                CONSTRAINT uniq_playback_transfers_session_id_request_id UNIQUE(session_id,request_id),
+                CONSTRAINT uniq_playback_transfers_id_user_id UNIQUE(id,user_id)
             )
             SQL);
         $this->addSql(<<<'SQL'
-            CREATE UNIQUE INDEX uniq_playback_current_transfer ON playback_transfers(session_id)
+            CREATE UNIQUE INDEX uniq_playback_transfers_current ON playback_transfers(session_id)
             WHERE state NOT IN ('committed','failed')
             SQL);
         $this->addSql(<<<'SQL'
@@ -93,22 +95,22 @@ final class Version20261101190000 extends AbstractMigration
                 epoch integer, revision integer NOT NULL,
                 type text NOT NULL CHECK(type IN ('prepare','quiesce','start','stop','play','pause','seek','load','observe','volume','queue')),
                 payload jsonb NOT NULL, outcome text, acknowledged_at timestamptz,
-                CONSTRAINT chk_playback_command_authority CHECK (
+                CONSTRAINT chk_playback_commands_authority CHECK (
                     (incarnation_id IS NULL AND epoch IS NULL AND outcome IS NOT NULL AND outcome='retained' AND acknowledged_at IS NOT NULL AND type IN ('load','play','pause','seek','stop'))
                     OR (incarnation_id IS NOT NULL AND epoch IS NOT NULL AND epoch>0)
                 ),
                 expires_at timestamptz NOT NULL, created_at timestamptz NOT NULL,
-                CONSTRAINT fk_playback_command_session FOREIGN KEY(session_id,user_id) REFERENCES listening_sessions(id,user_id) ON DELETE CASCADE,
-                CONSTRAINT fk_playback_command_endpoint FOREIGN KEY(incarnation_id,user_id) REFERENCES playback_destination_incarnations(id,user_id),
-                CONSTRAINT uniq_playback_command_request UNIQUE(session_id,request_id,type,incarnation_id,revision)
+                CONSTRAINT fk_playback_commands_session_id_user_id FOREIGN KEY(session_id,user_id) REFERENCES listening_sessions(id,user_id) ON DELETE CASCADE,
+                CONSTRAINT fk_playback_commands_incarnation_id_user_id FOREIGN KEY(incarnation_id,user_id) REFERENCES playback_destination_incarnations(id,user_id),
+                CONSTRAINT uniq_playback_commands_request_replay UNIQUE(session_id,request_id,type,incarnation_id,revision)
             )
             SQL);
         $this->addSql(<<<'SQL'
             CREATE INDEX idx_playback_commands_replay ON playback_commands(incarnation_id,created_at) WHERE acknowledged_at IS NULL
             SQL);
-        $this->addSql("CREATE INDEX idx_playback_pending_controls ON playback_commands(session_id,created_at) WHERE acknowledged_at IS NULL AND type IN ('play','pause','seek','load','stop','volume','queue')");
-        $this->addSql('CREATE INDEX idx_playback_selected_destination ON listening_sessions(selected_destination_id,user_id)');
-        $this->addSql('CREATE INDEX idx_playback_active_incarnation ON listening_sessions(active_incarnation_id,user_id)');
+        $this->addSql("CREATE INDEX idx_playback_commands_pending_controls ON playback_commands(session_id,created_at) WHERE acknowledged_at IS NULL AND type IN ('play','pause','seek','load','stop','volume','queue')");
+        $this->addSql('CREATE INDEX idx_listening_sessions_selected_destination_id_user_id ON listening_sessions(selected_destination_id,user_id)');
+        $this->addSql('CREATE INDEX idx_listening_sessions_active_incarnation_id_user_id ON listening_sessions(active_incarnation_id,user_id)');
         $this->addSql(<<<'SQL'
             INSERT INTO playback_destinations(id,public_id,user_id,device_id,endpoint_id,name,kind,created_at)
             SELECT d.id,d.public_id,d.user_id,d.device_id,NULL,coalesce(d.name,'Browser'),'browser',d.created_at

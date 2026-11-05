@@ -25,7 +25,7 @@ final class Version20261101210000 extends AbstractMigration
                 ADD COLUMN recovery_expires_at TIMESTAMPTZ DEFAULT NULL,
                 ADD COLUMN recovery_revoked_at TIMESTAMPTZ DEFAULT NULL,
                 ADD COLUMN recovery_result JSONB DEFAULT NULL,
-                ADD CONSTRAINT chk_playback_local_recovery_authority CHECK (
+                ADD CONSTRAINT chk_playback_destination_incarnations_local_recovery_authority CHECK (
                     (NOT local_recovery_eligible AND tab_id IS NULL AND recovery_credential_hash IS NULL
                         AND recovery_expires_at IS NULL AND recovery_revoked_at IS NULL AND recovery_result IS NULL)
                     OR (local_recovery_eligible AND tab_id IS NOT NULL AND recovery_credential_hash IS NOT NULL

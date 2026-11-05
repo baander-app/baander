@@ -18,8 +18,8 @@ final class Version20261101203000 extends AbstractMigration
     {
         $this->addSql("SET LOCAL lock_timeout = '2s'");
         $this->addSql(<<<'SQL'
-            ALTER TABLE playback_commands DROP CONSTRAINT chk_playback_command_authority,
-            ADD CONSTRAINT chk_playback_command_authority CHECK (
+            ALTER TABLE playback_commands DROP CONSTRAINT chk_playback_commands_authority,
+            ADD CONSTRAINT chk_playback_commands_authority CHECK (
                 (incarnation_id IS NULL AND epoch IS NULL AND outcome IS NOT NULL AND outcome='retained'
                     AND acknowledged_at IS NOT NULL AND type IN ('load','play','pause','seek','stop','queue'))
                 OR (incarnation_id IS NOT NULL AND epoch IS NOT NULL AND epoch>0)

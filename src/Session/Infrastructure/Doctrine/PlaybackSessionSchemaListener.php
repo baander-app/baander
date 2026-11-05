@@ -18,7 +18,7 @@ final class PlaybackSessionSchemaListener
             return;
         }
         $table = $schema->getTable('listening_sessions');
-        $table->addForeignKeyConstraint('playback_destinations', ['selected_destination_id', 'user_id'], ['id', 'user_id'], [], 'fk_playback_selected_destination');
-        $table->addForeignKeyConstraint('playback_destination_incarnations', ['active_incarnation_id', 'user_id'], ['id', 'user_id'], [], 'fk_playback_active_incarnation');
+        $table->addForeignKeyConstraint('playback_destinations', ['selected_destination_id', 'user_id'], ['id', 'user_id'], [], 'fk_listening_sessions_selected_destination_id_user_id');
+        $table->addForeignKeyConstraint('playback_destination_incarnations', ['active_incarnation_id', 'user_id'], ['id', 'user_id'], [], 'fk_listening_sessions_active_incarnation_id_user_id');
     }
 }
