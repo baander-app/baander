@@ -44,7 +44,62 @@ function validateDiagram(block) {
   }
 }
 
-async function createDiagramRenderer(request) {
+// The two helpers below run inside the Mermaid page, serialized by Playwright, so they must stay self-contained.
+// Reduces Mermaid's parsed diagram to the names a stamped SVG needs: node and cluster ids and edge endpoints.
+function describeDiagram(parsed) {
+  if (parsed.type !== 'flowchart-v2') return { type: parsed.type };
+  return {
+    type: 'flowchart',
+    nodes: [...parsed.db.getVertices().values()].map(vertex => ({ id: vertex.id, domId: vertex.domId })),
+    clusters: parsed.db.getSubGraphs().map(subgraph => subgraph.id),
+    edges: parsed.db.getEdges().map(edge => ({ id: edge.id, from: edge.start, to: edge.end, visible: edge.stroke !== 'invisible' })),
+  };
+}
+
+// Stamps endpoint data onto the rendered SVG so a page script can follow one connection at a time.
+function stampConnections(root, diagram) {
+  if (diagram.type === 'sequence') {
+    // Mermaid draws each message's text lines right before the message line, so a message claims the texts before it.
+    let texts = [];
+    for (const element of root.querySelectorAll('text.messageText, [data-et="message"]')) {
+      if (element.getAttribute('data-et') !== 'message') {
+        texts.push(element);
+        continue;
+      }
+      if (!texts.length) throw new Error(`Sequence message ${element.getAttribute('data-id')} has no message text to pair with`);
+      for (const text of texts) {
+        text.setAttribute('data-from', element.getAttribute('data-from'));
+        text.setAttribute('data-to', element.getAttribute('data-to'));
+      }
+      texts = [];
+    }
+    if (texts.length) throw new Error(`${texts.length} sequence message texts follow no message line`);
+    return;
+  }
+  if (diagram.type !== 'flowchart') return;
+  const prefix = `${root.getAttribute('id')}-`;
+  const stampGroups = (selector, attribute, names, kind) => {
+    for (const group of root.querySelectorAll(selector)) {
+      const name = names.get(group.getAttribute('id'));
+      if (name === undefined) throw new Error(`${kind} ${group.getAttribute('id')} matches no parsed ${kind.toLowerCase()}`);
+      group.setAttribute(attribute, name);
+    }
+  };
+  stampGroups('g.node', 'data-node', new Map(diagram.nodes.map(node => [prefix + node.domId, node.id])), 'Node');
+  stampGroups('g.cluster', 'data-cluster', new Map(diagram.clusters.map(id => [prefix + id, id])), 'Cluster');
+  const edges = new Map(diagram.edges.map(edge => [edge.id, edge]));
+  const stampEdge = (element, id) => {
+    const edge = edges.get(id);
+    if (!edge) throw new Error(`Edge ${id} matches no parsed edge`);
+    if (!edge.visible) return;
+    element.setAttribute('data-from', edge.from);
+    element.setAttribute('data-to', edge.to);
+  };
+  for (const path of root.querySelectorAll('path[data-et="edge"]')) stampEdge(path, path.getAttribute('data-id'));
+  for (const label of root.querySelectorAll('g.edgeLabel > g.label[data-id]')) stampEdge(label.parentNode, label.getAttribute('data-id'));
+}
+
+async function createDiagramRenderer(request, options) {
   let font;
   let themeCss;
   try {
@@ -81,6 +136,9 @@ async function createDiagramRenderer(request) {
     }, font.toString('base64'));
     const bundle = await readFile(fileURLToPath(new URL('../node_modules/mermaid/dist/mermaid.min.js', import.meta.url)), 'utf8');
     await page.addScriptTag({ content: bundle });
+    // options.describeDiagram replaces the parsed-diagram description; it receives the default describer as its second argument.
+    const describe = options.describeDiagram ?? describeDiagram;
+    await page.addScriptTag({ content: `window.describeDiagram = ${describeDiagram}; window.describe = ${describe}; window.stampConnections = ${stampConnections};` });
     return {
       close: () => browser.close(),
       async render(block, appearance) {
@@ -141,6 +199,7 @@ async function createDiagramRenderer(request) {
               `.edgeLabel rect.background, .labelBkg { fill: ${canvas}; opacity: 1; }`,
             ].join(''),
           });
+          const diagram = window.describe(await window.mermaid.mermaidAPI.getDiagramFromText(source), window.describeDiagram);
           const rendered = await window.mermaid.render(`diagram-${seed}`, source);
           // Mermaid includes these unused animation defaults even in static flowcharts.
           const svg = rendered.svg
@@ -160,6 +219,7 @@ async function createDiagramRenderer(request) {
           round('.node rect.label-container, .node rect.basic', '8');
           round('.cluster > rect', '12');
           round('.edgeLabel rect.background', '6');
+          window.stampConnections(root, diagram);
           return { svg: new XMLSerializer().serializeToString(root), width: viewBox[2], height: viewBox[3] };
         }, { source: block.source, appearance, seed });
         if (blockedRequests.length) throw new Error('Diagram attempted to request an external resource');
@@ -172,7 +232,7 @@ async function createDiagramRenderer(request) {
   }
 }
 
-export async function renderBlocks(request) {
+export async function renderBlocks(request, options = {}) {
   if (!request || !Array.isArray(request.blocks)) throw new Error('The render request must contain a blocks array');
   const result = Object.create(null);
   let highlighter;
@@ -186,7 +246,7 @@ export async function renderBlocks(request) {
       try {
         if (block.language === 'mermaid') {
           validateDiagram(block);
-          diagrams ??= await createDiagramRenderer(request);
+          diagrams ??= await createDiagramRenderer(request, options);
           const light = await diagrams.render(block, 'light');
           const dark = await diagrams.render(block, 'dark');
           result[block.id] = { kind: 'diagram', light: light.svg, dark: dark.svg, width: Math.max(light.width, dark.width), height: Math.max(light.height, dark.height) };

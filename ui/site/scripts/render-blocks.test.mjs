@@ -16,6 +16,12 @@ const resources = {
 };
 const block = (language, source, id = language) => ({ id, language, source, page: 'part-2-developer-guide/testing.md', ordinal: 3 });
 const decode = html => html.replace(/<[^>]*>/g, '').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&');
+// Lists every start tag of a serialized SVG in document order as { name, ...attributes }.
+const tags = svg => [...svg.matchAll(/<([a-zA-Z]+)((?:\s+[\w:-]+="[^"]*")*)\s*\/?>/g)]
+  .map(([, name, attributes]) => ({ name, ...Object.fromEntries([...attributes.matchAll(/([\w:-]+)="([^"]*)"/g)].map(([, key, value]) => [key, value])) }));
+const withClass = (list, name) => list.filter(tag => tag.class?.split(/\s+/).includes(name));
+const connections = tag => [tag['data-from'], tag['data-to']];
+const diagram = async (source, id = 'diagram') => (await renderBlocks({ blocks: [block('mermaid', source, id)], ...resources }))[id];
 
 test('all maintained languages preserve source and use only safe semantic spans', async () => {
   const sources = {
@@ -110,6 +116,77 @@ test('diagram failures identify the source page and block', async () => {
   await assert.rejects(renderBlocks({ blocks: [block('mermaid', 'flowchart LR\n A-->B')], ...resources, fontPath: '/missing/geist.woff2' }), /testing\.md.*block 3.*font/i);
 });
 
+
+test('flowchart nodes, edges and edge labels carry endpoint data from the parsed diagram', async () => {
+  const item = await diagram('flowchart LR\n a_b -->|goes to| b\n');
+  assert.deepEqual(Object.keys(item).sort(), ['dark', 'height', 'kind', 'light', 'width']);
+  const list = tags(item.light);
+  assert.deepEqual(withClass(list, 'node').map(tag => tag['data-node']), ['a_b', 'b']);
+  const edges = list.filter(tag => tag.name === 'path' && tag['data-et'] === 'edge');
+  assert.equal(edges.length, 1);
+  assert.deepEqual(connections(edges[0]), ['a_b', 'b']);
+  const labelIndex = list.findIndex(tag => tag.name === 'g' && tag.class === 'label' && tag['data-id'] === edges[0]['data-id']);
+  assert.ok(labelIndex > 0, 'The edge label group carries the edge id');
+  const labelGroup = list[labelIndex - 1];
+  assert.equal(labelGroup.class, 'edgeLabel');
+  assert.deepEqual(connections(labelGroup), ['a_b', 'b']);
+});
+
+test('an edge ending on a subgraph names the subgraph, and the cluster carries its source id', async () => {
+  const item = await diagram('flowchart LR\n subgraph s[Label]\n  y\n end\n x --> s\n');
+  const list = tags(item.light);
+  assert.deepEqual(withClass(list, 'cluster').map(tag => tag['data-cluster']), ['s']);
+  assert.deepEqual(withClass(list, 'node').map(tag => tag['data-node']).sort(), ['x', 'y']);
+  const edges = list.filter(tag => tag.name === 'path' && tag['data-et'] === 'edge');
+  assert.deepEqual(edges.map(connections), [['x', 's']]);
+});
+
+test('two edges between the same pair keep distinct ids and share their endpoints', async () => {
+  const item = await diagram('flowchart LR\n a -->|one| b\n a -->|two| b\n');
+  const edges = tags(item.light).filter(tag => tag.name === 'path' && tag['data-et'] === 'edge');
+  assert.equal(edges.length, 2);
+  assert.deepEqual(edges.map(connections), [['a', 'b'], ['a', 'b']]);
+  assert.notEqual(edges[0]['data-id'], edges[1]['data-id']);
+});
+
+test('invisible layout edges keep their class and carry no endpoints', async () => {
+  const item = await diagram('flowchart LR\n a ~~~ b\n');
+  const list = tags(item.light);
+  const edges = list.filter(tag => tag.name === 'path' && tag['data-et'] === 'edge');
+  assert.equal(edges.length, 1);
+  assert.ok(withClass(edges, 'edge-thickness-invisible').length === 1);
+  assert.deepEqual(list.flatMap(connections).filter(Boolean), [], 'No element carries endpoints for a layout edge');
+  assert.deepEqual(withClass(list, 'node').map(tag => tag['data-node']), ['a', 'b']);
+});
+
+test('sequence message texts carry the endpoints of their message lines in document order', async () => {
+  const item = await diagram('sequenceDiagram\n participant A\n participant B\n A->>B: hello\n B-->>A: reply<br/>again\n');
+  const list = tags(item.light);
+  const lines = list.filter(tag => tag['data-et'] === 'message');
+  assert.deepEqual(lines.map(connections), [['A', 'B'], ['B', 'A']]);
+  const texts = withClass(list.filter(tag => tag.name === 'text'), 'messageText');
+  assert.deepEqual(texts.map(connections), [['A', 'B'], ['B', 'A'], ['B', 'A']]);
+});
+
+test('an edge path without a parsed edge fails the render and names the page and block', async () => {
+  const describeDiagram = (parsed, describe) => {
+    const description = describe(parsed);
+    description.edges.pop();
+    return description;
+  };
+  await assert.rejects(
+    renderBlocks({ blocks: [block('mermaid', 'flowchart LR\n a --> b\n b --> c\n')], ...resources }, { describeDiagram }),
+    /testing\.md, block 3: .*L_b_c_0.*matches no parsed edge/,
+  );
+});
+
+test('light and dark variants carry identical endpoint data', async () => {
+  const item = await diagram('flowchart TB\n subgraph s[Group]\n  a -->|one| b\n end\n a ~~~ c\n c --> s\n');
+  const data = svg => tags(svg).map(tag => ['data-node', 'data-cluster', 'data-from', 'data-to'].map(key => tag[key])).filter(values => values.some(Boolean));
+  const light = data(item.light);
+  assert.ok(light.length >= 6);
+  assert.deepEqual(data(item.dark), light);
+});
 
 test('CLI writes the agreed manifest and preserves its output on failure with actionable Chromium guidance', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'baander-render-blocks-'));
