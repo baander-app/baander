@@ -61,8 +61,12 @@ Checkpoint, 2026-11-05:
 - Helper tests (`node --test scripts/*.test.mjs` in `ui/site`): 4 passed.
 - prose-fix review applied to every new or changed page.
 - The CI gate is the GitHub public website workflow, which runs on changes under `docs-book/`; Forgejo has no website gate.
+- `ce-code-review` ran (review `20261105-200600-58aa65a1`, "Ready with fixes"): its one confirmed finding, the Transcode page's streaming table calling the required `generation` query optional, is applied; the build passed again at 210 pages. Two advisory testing notes are recorded below.
 
 Open items for this plan:
+
+- The Mermaid helper's own tests (`ui/site/scripts/render-blocks.test.mjs`) still render only the three original flowchart pages, so the book's first sequence diagram is checked by the website build and the browser spec but not by the helper's font, marker and no-foreignObject assertions.
+- The browser spec's diagram page list is kept by hand; nothing asserts that every docs-book page with a Mermaid fence is listed, and the spec expects exactly one figure per listed page.
 
 - The Auth context guide still names a task transport that no longer exists; it belongs to a later documentation pass.
 - Two entries under `docs/solutions` name a transport that no longer exists and a single combined consumer; they are candidates for `ce-compound-refresh`.
