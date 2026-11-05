@@ -20,7 +20,8 @@ on:
             - 'composer.*'
             - 'Makefile'
             - 'docker/runner/Dockerfile'
-            - '.forgejo/workflows/website.yaml'
+            - '.github/workflows/website.yaml'
+            - '.github/actions/**'
     pull_request:
         types: [ opened, synchronize, reopened ]
         paths:
@@ -39,21 +40,36 @@ on:
             - 'composer.*'
             - 'Makefile'
             - 'docker/runner/Dockerfile'
-            - '.forgejo/workflows/website.yaml'
+            - '.github/workflows/website.yaml'
+            - '.github/actions/**'
+
+permissions:
+    contents: read
+
+concurrency:
+    group: website-${{ github.ref }}
+    cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
     website:
-        runs-on: docker-cli
+        runs-on: ${{ github.server_url == 'https://github.com' && 'ubuntu-latest' || 'docker-cli' }}
         container:
-            image: ${{ vars.REGISTRY_URL }}/${{ vars.REGISTRY_OWNER }}/baander-runner:latest
+            image: ${{ github.server_url == 'https://github.com' && 'ghcr.io' || vars.REGISTRY_URL }}/${{ github.server_url == 'https://github.com' && 'baander-app' || vars.REGISTRY_OWNER }}/baander-runner:latest
         steps:
             -   name: Checkout
+                env:
+                    GIT_TOKEN: ${{ secrets.GITHUB_TOKEN }}
                 run: |
+                    if [ "$GITHUB_SERVER_URL" = https://github.com ]; then
+                        auth="basic $(printf 'x-access-token:%s' "$GIT_TOKEN" | base64 | tr -d '\n')"
+                    else
+                        auth="token $GIT_TOKEN"
+                    fi
                     git init -q
-                    git remote add origin ${{ forgejo.event.repository.clone_url }}
-                    git -c http.extraHeader="Authorization: token ${{ secrets.GITHUB_TOKEN }}" fetch -q origin "${{ forgejo.sha }}"
-                    git checkout -q --detach "${{ forgejo.sha }}"
-                    test "$(git rev-parse HEAD)" = "${{ forgejo.sha }}"
+                    git remote add origin ${{ github.event.repository.clone_url }}
+                    git -c http.extraHeader="Authorization: $auth" fetch -q origin "${{ github.event.pull_request.head.sha || github.sha }}"
+                    git checkout -q --detach "${{ github.event.pull_request.head.sha || github.sha }}"
+                    test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha || github.sha }}"
 
             -   name: Check website PHP runtime
                 run: php -r 'if (PHP_VERSION_ID < 80500 || !extension_loaded("dom") || !extension_loaded("mbstring") || !extension_loaded("tokenizer")) { throw new RuntimeException("Website builds require PHP 8.5, DOM, mbstring and tokenizer."); }'
@@ -91,10 +107,22 @@ jobs:
                     tar -czf var/website.tar.gz -C var/website .
                     sha256sum var/website.tar.gz > var/website.tar.gz.sha256
 
-            -   name: Retain verified website
-                uses: https://github.com/actions/upload-artifact@ff15f0306b3f739f7b6fd43fb5d26cd321bd4de5
+            -   name: Retain verified website on GitHub
+                if: github.server_url == 'https://github.com'
+                uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
                 with:
-                    name: public-website-${{ forgejo.sha }}
+                    name: public-website-${{ github.sha }}
+                    path: |
+                        var/website.tar.gz
+                        var/website.tar.gz.sha256
+                    if-no-files-found: error
+                    retention-days: 14
+
+            -   name: Retain verified website on Forgejo
+                if: github.server_url != 'https://github.com'
+                uses: ./.github/actions/forgejo-upload-artifact
+                with:
+                    name: public-website-${{ github.sha }}
                     path: |
                         var/website.tar.gz
                         var/website.tar.gz.sha256

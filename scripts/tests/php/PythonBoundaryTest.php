@@ -34,8 +34,8 @@ final class PythonBoundaryTest extends TestCase
         'scripts/tests/php/BackupContractTest.php',
         'scripts/tests/php/EnrollmentIssuerTest.php',
         'scripts/tests/php/RegistryContainerWorkflowTest.php',
-        '.forgejo/workflows/ci.yaml',
-        '.forgejo/workflows/registry-nightly.yaml',
+        '.github/workflows/ci.yaml',
+        '.github/workflows/registry-nightly.yaml',
     ];
 
     private const array RUNTIME_ASSERTIONS = [
@@ -87,7 +87,8 @@ final class PythonBoundaryTest extends TestCase
             'relay/tools',
             'relay/docker',
             'docker',
-            '.forgejo/workflows',
+            '.github/workflows',
+            '.github/actions',
             '.agents/skills/prose-fix/scripts',
         ] as $directory) {
             $files = new RecursiveCallbackFilterIterator(
@@ -111,7 +112,7 @@ final class PythonBoundaryTest extends TestCase
         yield 'Shell heredoc' => ['scripts/check.sh', "python3 - <<'PY'\nimport json\nPY\n", false];
         yield 'PHP-generated launcher' => ['scripts/check.php', '<?php $body = "#!/usr/bin/env python3\\n";', false];
         yield 'Inline bridge inside subject caller' => ['relay/tests/test_backup.php', '<?php $argv = ["python3", "-c", "import backup"];', true];
-        yield 'Old unittest inside subject CI job' => ['.forgejo/workflows/ci.yaml', 'run: python3 -m unittest discover', true];
+        yield 'Old unittest inside subject CI job' => ['.github/workflows/ci.yaml', 'run: python3 -m unittest discover', true];
     }
 
     #[DataProvider('forbiddenHarnesses')]
@@ -142,7 +143,8 @@ final class PythonBoundaryTest extends TestCase
             'relay/tools/',
             'relay/docker/',
             'docker/',
-            '.forgejo/workflows/',
+            '.github/workflows/',
+            '.github/actions/',
             '.agents/skills/prose-fix/scripts/',
         ];
         if (str_starts_with($path, 'packages/dsp/') && basename($path) === 'Makefile') {

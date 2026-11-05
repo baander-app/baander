@@ -27,7 +27,7 @@ on:
             - 'ui/web/src/features/player/services/audio-processor.ts'
             - 'scripts/test-dsp-analysis.sh'
             - 'scripts/build-wasm.ts'
-            - '.forgejo/workflows/dsp-analysis.yaml'
+            - '.github/workflows/dsp-analysis.yaml'
     pull_request:
         types: [opened, synchronize, reopened]
         paths:
@@ -54,21 +54,35 @@ on:
             - 'ui/web/src/features/player/services/audio-processor.ts'
             - 'scripts/test-dsp-analysis.sh'
             - 'scripts/build-wasm.ts'
-            - '.forgejo/workflows/dsp-analysis.yaml'
+            - '.github/workflows/dsp-analysis.yaml'
+
+permissions:
+    contents: read
+
+concurrency:
+    group: dsp-analysis-${{ github.ref }}
+    cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
     qualify:
-        runs-on: docker-cli
+        runs-on: ${{ github.server_url == 'https://github.com' && 'ubuntu-latest' || 'docker-cli' }}
         container:
-            image: ${{ vars.REGISTRY_URL }}/${{ vars.REGISTRY_OWNER }}/baander-runner:latest
+            image: ${{ github.server_url == 'https://github.com' && 'ghcr.io' || vars.REGISTRY_URL }}/${{ github.server_url == 'https://github.com' && 'baander-app' || vars.REGISTRY_OWNER }}/baander-runner:latest
         steps:
             - name: Checkout
+              env:
+                  GIT_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               run: |
+                  if [ "$GITHUB_SERVER_URL" = https://github.com ]; then
+                      auth="basic $(printf 'x-access-token:%s' "$GIT_TOKEN" | base64 | tr -d '\n')"
+                  else
+                      auth="token $GIT_TOKEN"
+                  fi
                   git init -q
-                  git remote add origin ${{ forgejo.event.repository.clone_url }}
-                  git -c http.extraHeader="Authorization: token ${{ secrets.GITHUB_TOKEN }}" fetch -q origin "${{ forgejo.sha }}"
-                  git checkout -q --detach "${{ forgejo.sha }}"
-                  test "$(git rev-parse HEAD)" = "${{ forgejo.sha }}"
+                  git remote add origin ${{ github.event.repository.clone_url }}
+                  git -c http.extraHeader="Authorization: $auth" fetch -q origin "${{ github.event.pull_request.head.sha || github.sha }}"
+                  git checkout -q --detach "${{ github.event.pull_request.head.sha || github.sha }}"
+                  test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha || github.sha }}"
 
             - name: Install pinned Emscripten
               run: |

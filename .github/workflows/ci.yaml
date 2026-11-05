@@ -8,57 +8,90 @@ on:
         types: [ opened, synchronize, reopened ]
 
 env:
-    REGISTRY: ${{ vars.REGISTRY_URL }}
-    IMAGE_NAME: ${{ vars.REGISTRY_OWNER }}/baander
-    POSTGRES_IMAGE: ${{ vars.REGISTRY_OWNER }}/baander-postgres
+    REGISTRY: ${{ github.server_url == 'https://github.com' && 'ghcr.io' || vars.REGISTRY_URL }}
+    IMAGE_NAME: ${{ github.server_url == 'https://github.com' && 'baander-app' || vars.REGISTRY_OWNER }}/baander
+    POSTGRES_IMAGE: ${{ github.server_url == 'https://github.com' && 'baander-app' || vars.REGISTRY_OWNER }}/baander-postgres
     COVERAGE_PACKAGE: coverage-backend
     BUILDKIT_CACHE_PACKAGE: buildkit-cache-backend
-    CI_IMAGE: baander-ci:${{ forgejo.run_id }}-${{ forgejo.run_attempt }}
+    CI_IMAGE: baander-ci:${{ github.run_id }}-${{ github.run_attempt }}
+
+permissions:
+    contents: read
+
+concurrency:
+    group: ci-${{ github.ref }}
+    cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
     quality-gate:
-        runs-on: docker-cli
+        runs-on: ${{ github.server_url == 'https://github.com' && 'ubuntu-latest' || 'docker-cli' }}
         env:
             BAANDER_TEST_DOCKER_SOCKET_PATH: ${{ vars.BAANDER_TEST_DOCKER_SOCKET_PATH || '/var/run/docker.sock' }}
         container:
-            image: ${{ vars.REGISTRY_URL }}/${{ vars.REGISTRY_OWNER }}/baander-runner:latest
+            image: ${{ github.server_url == 'https://github.com' && 'ghcr.io' || vars.REGISTRY_URL }}/${{ github.server_url == 'https://github.com' && 'baander-app' || vars.REGISTRY_OWNER }}/baander-runner:latest
+        permissions:
+            contents: read
+            packages: read
+            pull-requests: write
         steps:
-            -   name: Checkout
+            -   name: Free host disk on GitHub
+                # The hosted runner ships toolchains this job never uses. The
+                # job runs in a container, so a sibling container removes them
+                # from the host through the Docker socket. On a self-hosted
+                # runner this would delete host directories, so it runs on
+                # GitHub only.
+                if: github.server_url == 'https://github.com'
                 run: |
+                    docker run --rm \
+                      -v /usr/share/dotnet:/cleanup/dotnet \
+                      -v /usr/local/lib/android:/cleanup/android \
+                      -v /opt/ghc:/cleanup/ghc \
+                      -v /opt/hostedtoolcache:/cleanup/hostedtoolcache \
+                      -v /:/host:ro \
+                      --entrypoint /bin/sh \
+                      "$REGISTRY/${IMAGE_NAME%/*}/baander-runner:latest" \
+                      -c 'find /cleanup -mindepth 2 -delete; df -h /host'
+
+            -   name: Checkout
+                env:
+                    GIT_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                run: |
+                    if [ "$GITHUB_SERVER_URL" = https://github.com ]; then
+                        auth="basic $(printf 'x-access-token:%s' "$GIT_TOKEN" | base64 | tr -d '\n')"
+                    else
+                        auth="token $GIT_TOKEN"
+                    fi
                     git init -q
-                    git remote add origin ${{ forgejo.event.repository.clone_url }}
-                    git -c http.extraHeader="Authorization: token ${{ secrets.GITHUB_TOKEN }}" fetch -q origin "${{ forgejo.sha }}"
-                    git checkout -q --detach "${{ forgejo.sha }}"
-                    test "$(git rev-parse HEAD)" = "${{ forgejo.sha }}"
+                    git remote add origin ${{ github.event.repository.clone_url }}
+                    git -c http.extraHeader="Authorization: $auth" fetch -q origin "${{ github.event.pull_request.head.sha || github.sha }}"
+                    git checkout -q --detach "${{ github.event.pull_request.head.sha || github.sha }}"
+                    test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha || github.sha }}"
 
             -   name: Prepare standalone PHP tooling
                 run: composer --working-dir=scripts install --no-dev --no-interaction --no-scripts --no-plugins
 
             -   name: Login to Container Registry
-                run: echo "${{ secrets.REGISTRY_TOKEN }}" | docker login ${{ env.REGISTRY }} -u ${{ forgejo.actor }} --password-stdin
+                if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+                env:
+                    REGISTRY_PASSWORD: ${{ secrets.REGISTRY_TOKEN || github.token }}
+                run: printf '%s\n' "$REGISTRY_PASSWORD" | docker login "$REGISTRY" -u "${{ github.actor }}" --password-stdin
 
             -   name: Pull PostgreSQL image
                 run: docker pull ${{ env.REGISTRY }}/${{ env.POSTGRES_IMAGE }}:latest
 
-            -   name: Restore BuildKit cache
+            -   name: Restore BuildKit cache on Forgejo
+                if: github.server_url != 'https://github.com'
                 env:
                     FORGEJO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-                run: |
-                    API="$GITHUB_API_URL"
-                    OWNER="${GITHUB_REPOSITORY%%/*}"
-                    HTTP=$(curl -sf -o buildkit-cache.tar.zst -w '%{http_code}' \
-                      "$API/packages/$OWNER/generic/$BUILDKIT_CACHE_PACKAGE/latest/buildkit-cache.tar.zst" \
-                      -H "Authorization: token $FORGEJO_TOKEN" 2>/dev/null || echo '000')
-                    if [ "$HTTP" = "200" ]; then
-                      mkdir -p /tmp/buildkit-cache
-                      tar -xf buildkit-cache.tar.zst -C /tmp/buildkit-cache || true
-                      rm -f buildkit-cache.tar.zst
-                      echo "Restored BuildKit cache"
-                    else
-                      rm -f buildkit-cache.tar.zst
-                      mkdir -p /tmp/buildkit-cache
-                      echo "No BuildKit cache found, starting fresh"
-                    fi
+                run: php scripts/ci-package-store.php restore "$BUILDKIT_CACHE_PACKAGE" buildkit-cache.tar.zst /tmp/buildkit-cache
+
+            -   name: Restore BuildKit cache on GitHub
+                if: github.server_url == 'https://github.com'
+                uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+                with:
+                    path: /tmp/buildkit-cache
+                    key: buildkit-cache-backend-${{ github.sha }}
+                    restore-keys: buildkit-cache-backend-
 
             -   name: Docker build context contract
                 run: bash scripts/test-docker-context.sh
@@ -73,7 +106,7 @@ jobs:
             -   name: Build CI image
                 run: |
                     php scripts/build-application.php --buildx \
-                      --target ci --revision "${{ forgejo.sha }}" \
+                      --target ci --revision "${{ github.sha }}" \
                       --tag "$CI_IMAGE" \
                       --cache-to type=local,dest=/tmp/buildkit-cache,mode=max \
                       --cache-from type=local,src=/tmp/buildkit-cache
@@ -149,7 +182,7 @@ jobs:
             -   name: Build production worker image
                 run: |
                     php scripts/build-application.php --buildx --target worker \
-                      --revision "${{ forgejo.sha }}" \
+                      --revision "${{ github.sha }}" \
                       --tag "${CI_IMAGE}-worker" \
                       --cache-from type=local,src=/tmp/buildkit-cache
 
@@ -157,7 +190,7 @@ jobs:
                 run: |
                     bash scripts/collect-packaged-inventory.sh \
                       --image "${CI_IMAGE}-worker" --target worker \
-                      --revision "${{ forgejo.sha }}" \
+                      --revision "${{ github.sha }}" \
                       --output var/test-runs/application-inventory-worker
 
             -   name: Production worker lifecycle and dependencies
@@ -240,7 +273,7 @@ jobs:
 
             -   name: Python-free workflow contracts
                 run: |
-                    TOOLING_IMAGE="baander-tooling:${{ forgejo.run_id }}-${{ forgejo.run_attempt }}"
+                    TOOLING_IMAGE="baander-tooling:${{ github.run_id }}-${{ github.run_attempt }}"
                     docker build --target tooling --file docker/runner/Dockerfile \
                       --tag "$TOOLING_IMAGE" .
                     docker build --file docker/runner/tooling-test.Dockerfile \
@@ -356,9 +389,9 @@ jobs:
             -   name: Extract coverage metrics
                 run: php scripts/validate-backend-coverage.php coverage
 
-            -   name: Preserve backend verification artifacts
-                if: always()
-                uses: https://github.com/actions/upload-artifact@ff15f0306b3f739f7b6fd43fb5d26cd321bd4de5
+            -   name: Preserve backend verification artifacts on GitHub
+                if: always() && github.server_url == 'https://github.com'
+                uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
                 with:
                     name: backend-verification
                     path: |
@@ -368,65 +401,72 @@ jobs:
                     if-no-files-found: ignore
                     retention-days: 14
 
-            -   name: Store baseline (master only)
-                if: forgejo.ref == 'refs/heads/master'
+            -   name: Preserve backend verification artifacts on Forgejo
+                if: always() && github.server_url != 'https://github.com'
+                uses: ./.github/actions/forgejo-upload-artifact
+                with:
+                    name: backend-verification
+                    path: |
+                        var/test-runs/
+                        var/test-isolation/
+                        coverage/
+                    if-no-files-found: ignore
+                    retention-days: 14
+
+            -   name: Stage coverage baseline (master only)
+                if: github.ref == 'refs/heads/master'
+                run: |
+                    mkdir -p var/coverage-baseline
+                    cp coverage/metrics.json var/coverage-baseline/metrics.json
+
+            -   name: Store baseline (master only) on Forgejo
+                if: github.server_url != 'https://github.com' && github.ref == 'refs/heads/master' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
                 continue-on-error: true
                 env:
                     FORGEJO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-                run: |
-                    API="$GITHUB_API_URL"
-                    OWNER="${GITHUB_REPOSITORY%%/*}"
-                    if [ ! -f coverage/metrics.json ]; then
-                      echo "⚠️ coverage/metrics.json not found — skipping baseline upload"
-                      exit 0
-                    fi
-                    curl -sf -o /dev/null -X DELETE \
-                      "$API/packages/$OWNER/generic/$COVERAGE_PACKAGE/latest/metrics.json" \
-                      -H "Authorization: token $FORGEJO_TOKEN" || true
-                    HTTP=$(curl -s -o /dev/null -w '%{http_code}' -X PUT \
-                      "$API/packages/$OWNER/generic/$COVERAGE_PACKAGE/latest/metrics.json" \
-                      -H "Authorization: token $FORGEJO_TOKEN" \
-                      -H "Content-Type: application/json" \
-                      --data-binary @coverage/metrics.json)
-                    if [ "$HTTP" -ge 200 ] && [ "$HTTP" -lt 300 ]; then
-                      echo "Stored backend baseline (HTTP $HTTP)"
-                    else
-                      echo "⚠️ Failed to store baseline (HTTP $HTTP)"
-                    fi
+                run: php scripts/ci-package-store.php store "$COVERAGE_PACKAGE" metrics.json var/coverage-baseline/metrics.json
 
-            -   name: Save BuildKit cache (master only)
-                if: forgejo.ref == 'refs/heads/master'
+            -   name: Store baseline (master only) on GitHub
+                if: github.server_url == 'https://github.com' && github.ref == 'refs/heads/master' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+                uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+                with:
+                    path: var/coverage-baseline
+                    key: coverage-backend-${{ github.sha }}
+
+            -   name: Save BuildKit cache (master only) on Forgejo
+                if: github.server_url != 'https://github.com' && github.ref == 'refs/heads/master' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
                 env:
                     FORGEJO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-                run: |
-                    API="$GITHUB_API_URL"
-                    OWNER="${GITHUB_REPOSITORY%%/*}"
+                run: php scripts/ci-package-store.php save "$BUILDKIT_CACHE_PACKAGE" buildkit-cache.tar.zst /tmp/buildkit-cache
 
-                    tar -cf - -C / tmp/buildkit-cache | zstd -o buildkit-cache.tar.zst
+            -   name: Save BuildKit cache (master only) on GitHub
+                if: github.server_url == 'https://github.com' && github.ref == 'refs/heads/master' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+                uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+                with:
+                    path: /tmp/buildkit-cache
+                    key: buildkit-cache-backend-${{ github.sha }}
 
-                    curl -sf -o /dev/null -X DELETE \
-                      "$API/packages/$OWNER/generic/$BUILDKIT_CACHE_PACKAGE/latest/buildkit-cache.tar.zst" \
-                      -H "Authorization: token $FORGEJO_TOKEN" || true
+            -   name: Restore coverage baseline (PR only) on Forgejo
+                if: github.server_url != 'https://github.com' && github.event_name == 'pull_request' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+                env:
+                    FORGEJO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                run: php scripts/ci-package-store.php fetch "$COVERAGE_PACKAGE" metrics.json var/coverage-baseline/metrics.json
 
-                    HTTP=$(curl -sf -o /dev/null -w '%{http_code}' -X PUT \
-                      "$API/packages/$OWNER/generic/$BUILDKIT_CACHE_PACKAGE/latest/buildkit-cache.tar.zst" \
-                      -H "Authorization: token $FORGEJO_TOKEN" \
-                      -H "Content-Type: application/zstd" \
-                      --data-binary @buildkit-cache.tar.zst)
-                    echo "Stored BuildKit cache (HTTP $HTTP)"
+            -   name: Restore coverage baseline (PR only) on GitHub
+                if: github.server_url == 'https://github.com' && github.event_name == 'pull_request' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+                uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+                with:
+                    path: var/coverage-baseline
+                    key: coverage-backend-${{ github.sha }}
+                    restore-keys: coverage-backend-
 
             -   name: Post coverage comment (PR only)
-                if: forgejo.event_name == 'pull_request'
+                if: github.event_name == 'pull_request' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
                 env:
-                    FORGEJO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-                    PR_NUMBER: ${{ forgejo.event.number }}
+                    COMMENT_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                    PR_NUMBER: ${{ github.event.number }}
                 run: |
-                    API="$GITHUB_API_URL"
-                    OWNER="${GITHUB_REPOSITORY%%/*}"
-
-                    MASTER_JSON=$(curl -sf \
-                      "$API/packages/$OWNER/generic/$COVERAGE_PACKAGE/latest/metrics.json" \
-                      -H "Authorization: token $FORGEJO_TOKEN" 2>/dev/null || echo '{}')
+                    MASTER_JSON=$(cat var/coverage-baseline/metrics.json 2>/dev/null || echo '{}')
 
                     COMMENT=$(node -e "
                       const cur = require('./coverage/metrics.json');
@@ -453,8 +493,8 @@ jobs:
 
                     ESCAPED=$(node -e "process.stdout.write(JSON.stringify(process.argv[1]))" "$COMMENT")
                     HTTP=$(curl -sf -o /dev/null -w '%{http_code}' -X POST \
-                      "$API/repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments" \
-                      -H "Authorization: token $FORGEJO_TOKEN" \
+                      "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments" \
+                      -H "Authorization: token $COMMENT_TOKEN" \
                       -H "Content-Type: application/json" \
                       -d "{\"body\": $ESCAPED}")
                     echo "Posted backend coverage comment (HTTP $HTTP)"
@@ -465,17 +505,24 @@ jobs:
                     docker image rm "$CI_IMAGE" "${CI_IMAGE}-worker" 2>/dev/null || true
 
     frontend-quality:
-        runs-on: docker-cli
+        runs-on: ${{ github.server_url == 'https://github.com' && 'ubuntu-latest' || 'docker-cli' }}
         container:
-            image: ${{ vars.REGISTRY_URL }}/${{ vars.REGISTRY_OWNER }}/baander-runner:latest
+            image: ${{ github.server_url == 'https://github.com' && 'ghcr.io' || vars.REGISTRY_URL }}/${{ github.server_url == 'https://github.com' && 'baander-app' || vars.REGISTRY_OWNER }}/baander-runner:latest
         steps:
             -   name: Checkout
+                env:
+                    GIT_TOKEN: ${{ secrets.GITHUB_TOKEN }}
                 run: |
+                    if [ "$GITHUB_SERVER_URL" = https://github.com ]; then
+                        auth="basic $(printf 'x-access-token:%s' "$GIT_TOKEN" | base64 | tr -d '\n')"
+                    else
+                        auth="token $GIT_TOKEN"
+                    fi
                     git init -q
-                    git remote add origin ${{ forgejo.event.repository.clone_url }}
-                    git -c http.extraHeader="Authorization: token ${{ secrets.GITHUB_TOKEN }}" fetch -q origin "${{ forgejo.sha }}"
-                    git checkout -q --detach "${{ forgejo.sha }}"
-                    test "$(git rev-parse HEAD)" = "${{ forgejo.sha }}"
+                    git remote add origin ${{ github.event.repository.clone_url }}
+                    git -c http.extraHeader="Authorization: $auth" fetch -q origin "${{ github.event.pull_request.head.sha || github.sha }}"
+                    git checkout -q --detach "${{ github.event.pull_request.head.sha || github.sha }}"
+                    test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha || github.sha }}"
             -   name: Shared checks
                 working-directory: ui/shared
                 run: |
@@ -511,17 +558,24 @@ jobs:
                 run: yarn test:store-debug
 
     dsp-quality:
-        runs-on: docker-cli
+        runs-on: ${{ github.server_url == 'https://github.com' && 'ubuntu-latest' || 'docker-cli' }}
         container:
-            image: ${{ vars.REGISTRY_URL }}/${{ vars.REGISTRY_OWNER }}/baander-runner:latest
+            image: ${{ github.server_url == 'https://github.com' && 'ghcr.io' || vars.REGISTRY_URL }}/${{ github.server_url == 'https://github.com' && 'baander-app' || vars.REGISTRY_OWNER }}/baander-runner:latest
         steps:
             -   name: Checkout
+                env:
+                    GIT_TOKEN: ${{ secrets.GITHUB_TOKEN }}
                 run: |
+                    if [ "$GITHUB_SERVER_URL" = https://github.com ]; then
+                        auth="basic $(printf 'x-access-token:%s' "$GIT_TOKEN" | base64 | tr -d '\n')"
+                    else
+                        auth="token $GIT_TOKEN"
+                    fi
                     git init -q
-                    git remote add origin ${{ forgejo.event.repository.clone_url }}
-                    git -c http.extraHeader="Authorization: token ${{ secrets.GITHUB_TOKEN }}" fetch -q origin "${{ forgejo.sha }}"
-                    git checkout -q --detach "${{ forgejo.sha }}"
-                    test "$(git rev-parse HEAD)" = "${{ forgejo.sha }}"
+                    git remote add origin ${{ github.event.repository.clone_url }}
+                    git -c http.extraHeader="Authorization: $auth" fetch -q origin "${{ github.event.pull_request.head.sha || github.sha }}"
+                    git checkout -q --detach "${{ github.event.pull_request.head.sha || github.sha }}"
+                    test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha || github.sha }}"
             -   name: Install pinned Emscripten
                 run: |
                     git init -q /tmp/baander-dsp-emsdk
@@ -536,24 +590,31 @@ jobs:
                     bash scripts/test-dsp-analysis.sh
 
     registry-quality:
-        runs-on: docker-cli
+        runs-on: ${{ github.server_url == 'https://github.com' && 'ubuntu-latest' || 'docker-cli' }}
         timeout-minutes: 30
         strategy:
             matrix:
                 mode: [ release, sanitize ]
         container:
-            image: ${{ vars.REGISTRY_URL }}/${{ vars.REGISTRY_OWNER }}/baander-runner:latest
+            image: ${{ github.server_url == 'https://github.com' && 'ghcr.io' || vars.REGISTRY_URL }}/${{ github.server_url == 'https://github.com' && 'baander-app' || vars.REGISTRY_OWNER }}/baander-runner:latest
             options: --tmpfs /run/baander-registry-full-disk:rw,noexec,nosuid,nodev,size=128m,mode=0700
         env:
             REGISTRY_FULL_DISK_ROOT: /run/baander-registry-full-disk
         steps:
             -   name: Checkout
+                env:
+                    GIT_TOKEN: ${{ secrets.GITHUB_TOKEN }}
                 run: |
+                    if [ "$GITHUB_SERVER_URL" = https://github.com ]; then
+                        auth="basic $(printf 'x-access-token:%s' "$GIT_TOKEN" | base64 | tr -d '\n')"
+                    else
+                        auth="token $GIT_TOKEN"
+                    fi
                     git init -q
-                    git remote add origin ${{ forgejo.event.repository.clone_url }}
-                    git -c http.extraHeader="Authorization: token ${{ secrets.GITHUB_TOKEN }}" fetch -q origin "${{ forgejo.sha }}"
-                    git checkout -q --detach "${{ forgejo.sha }}"
-                    test "$(git rev-parse HEAD)" = "${{ forgejo.sha }}"
+                    git remote add origin ${{ github.event.repository.clone_url }}
+                    git -c http.extraHeader="Authorization: $auth" fetch -q origin "${{ github.event.pull_request.head.sha || github.sha }}"
+                    git checkout -q --detach "${{ github.event.pull_request.head.sha || github.sha }}"
+                    test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha || github.sha }}"
             -   name: Prepare standalone PHP tooling
                 run: |
                     composer --working-dir=scripts install --no-dev --no-interaction --no-scripts --no-plugins
@@ -566,18 +627,25 @@ jobs:
                 run: REGISTRY_SUBJECT_PYTHON=/usr/bin/python3 bash scripts/test-registry.sh ${{ matrix.mode }}
 
     registry-static-quality:
-        runs-on: docker-cli
+        runs-on: ${{ github.server_url == 'https://github.com' && 'ubuntu-latest' || 'docker-cli' }}
         timeout-minutes: 30
         container:
-            image: ${{ vars.REGISTRY_URL }}/${{ vars.REGISTRY_OWNER }}/baander-runner:latest
+            image: ${{ github.server_url == 'https://github.com' && 'ghcr.io' || vars.REGISTRY_URL }}/${{ github.server_url == 'https://github.com' && 'baander-app' || vars.REGISTRY_OWNER }}/baander-runner:latest
         steps:
             -   name: Checkout
+                env:
+                    GIT_TOKEN: ${{ secrets.GITHUB_TOKEN }}
                 run: |
+                    if [ "$GITHUB_SERVER_URL" = https://github.com ]; then
+                        auth="basic $(printf 'x-access-token:%s' "$GIT_TOKEN" | base64 | tr -d '\n')"
+                    else
+                        auth="token $GIT_TOKEN"
+                    fi
                     git init -q
-                    git remote add origin ${{ forgejo.event.repository.clone_url }}
-                    git -c http.extraHeader="Authorization: token ${{ secrets.GITHUB_TOKEN }}" fetch -q origin "${{ forgejo.sha }}"
-                    git checkout -q --detach "${{ forgejo.sha }}"
-                    test "$(git rev-parse HEAD)" = "${{ forgejo.sha }}"
+                    git remote add origin ${{ github.event.repository.clone_url }}
+                    git -c http.extraHeader="Authorization: $auth" fetch -q origin "${{ github.event.pull_request.head.sha || github.sha }}"
+                    git checkout -q --detach "${{ github.event.pull_request.head.sha || github.sha }}"
+                    test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha || github.sha }}"
             -   name: Prepare standalone PHP tooling
                 run: |
                     composer --working-dir=scripts install --no-dev --no-interaction --no-scripts --no-plugins
@@ -590,20 +658,27 @@ jobs:
                 run: bash scripts/test-registry-static.sh
 
     registry-container-quality:
-        runs-on: docker-cli
+        runs-on: ${{ github.server_url == 'https://github.com' && 'ubuntu-latest' || 'docker-cli' }}
         timeout-minutes: 45
         env:
             REGISTRY_INVENTORY_OUTPUT: var/test-runs/registry-inventory
         container:
-            image: ${{ vars.REGISTRY_URL }}/${{ vars.REGISTRY_OWNER }}/baander-runner:latest
+            image: ${{ github.server_url == 'https://github.com' && 'ghcr.io' || vars.REGISTRY_URL }}/${{ github.server_url == 'https://github.com' && 'baander-app' || vars.REGISTRY_OWNER }}/baander-runner:latest
         steps:
             -   name: Checkout
+                env:
+                    GIT_TOKEN: ${{ secrets.GITHUB_TOKEN }}
                 run: |
+                    if [ "$GITHUB_SERVER_URL" = https://github.com ]; then
+                        auth="basic $(printf 'x-access-token:%s' "$GIT_TOKEN" | base64 | tr -d '\n')"
+                    else
+                        auth="token $GIT_TOKEN"
+                    fi
                     git init -q
-                    git remote add origin ${{ forgejo.event.repository.clone_url }}
-                    git -c http.extraHeader="Authorization: token ${{ secrets.GITHUB_TOKEN }}" fetch -q origin "${{ forgejo.sha }}"
-                    git checkout -q --detach "${{ forgejo.sha }}"
-                    test "$(git rev-parse HEAD)" = "${{ forgejo.sha }}"
+                    git remote add origin ${{ github.event.repository.clone_url }}
+                    git -c http.extraHeader="Authorization: $auth" fetch -q origin "${{ github.event.pull_request.head.sha || github.sha }}"
+                    git checkout -q --detach "${{ github.event.pull_request.head.sha || github.sha }}"
+                    test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha || github.sha }}"
             -   name: Prepare standalone PHP tooling
                 run: |
                     composer --working-dir=scripts install --no-dev --no-interaction --no-scripts --no-plugins
@@ -616,9 +691,18 @@ jobs:
                 run: bash scripts/test-registry-container.sh
             -   name: Qualify encrypted registry backup and recovery
                 run: bash scripts/test-registry-backup.sh
-            -   name: Preserve packaged Registry inventories
-                if: always()
-                uses: https://github.com/actions/upload-artifact@ff15f0306b3f739f7b6fd43fb5d26cd321bd4de5
+            -   name: Preserve packaged Registry inventories on GitHub
+                if: always() && github.server_url == 'https://github.com'
+                uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+                with:
+                    name: registry-packaged-inventory
+                    path: var/test-runs/registry-inventory/
+                    if-no-files-found: error
+                    retention-days: 14
+
+            -   name: Preserve packaged Registry inventories on Forgejo
+                if: always() && github.server_url != 'https://github.com'
+                uses: ./.github/actions/forgejo-upload-artifact
                 with:
                     name: registry-packaged-inventory
                     path: var/test-runs/registry-inventory/
@@ -626,18 +710,25 @@ jobs:
                     retention-days: 14
 
     registry-thread-quality:
-        runs-on: docker-cli
+        runs-on: ${{ github.server_url == 'https://github.com' && 'ubuntu-latest' || 'docker-cli' }}
         timeout-minutes: 30
         container:
-            image: ${{ vars.REGISTRY_URL }}/${{ vars.REGISTRY_OWNER }}/baander-runner:latest
+            image: ${{ github.server_url == 'https://github.com' && 'ghcr.io' || vars.REGISTRY_URL }}/${{ github.server_url == 'https://github.com' && 'baander-app' || vars.REGISTRY_OWNER }}/baander-runner:latest
         steps:
             -   name: Checkout
+                env:
+                    GIT_TOKEN: ${{ secrets.GITHUB_TOKEN }}
                 run: |
+                    if [ "$GITHUB_SERVER_URL" = https://github.com ]; then
+                        auth="basic $(printf 'x-access-token:%s' "$GIT_TOKEN" | base64 | tr -d '\n')"
+                    else
+                        auth="token $GIT_TOKEN"
+                    fi
                     git init -q
-                    git remote add origin ${{ forgejo.event.repository.clone_url }}
-                    git -c http.extraHeader="Authorization: token ${{ secrets.GITHUB_TOKEN }}" fetch -q origin "${{ forgejo.sha }}"
-                    git checkout -q --detach "${{ forgejo.sha }}"
-                    test "$(git rev-parse HEAD)" = "${{ forgejo.sha }}"
+                    git remote add origin ${{ github.event.repository.clone_url }}
+                    git -c http.extraHeader="Authorization: $auth" fetch -q origin "${{ github.event.pull_request.head.sha || github.sha }}"
+                    git checkout -q --detach "${{ github.event.pull_request.head.sha || github.sha }}"
+                    test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha || github.sha }}"
             -   name: Prepare standalone PHP tooling
                 run: |
                     composer --working-dir=scripts install --no-dev --no-interaction --no-scripts --no-plugins
@@ -653,18 +744,25 @@ jobs:
                 run: REGISTRY_SUBJECT_PYTHON=/usr/bin/python3 bash scripts/test-registry.sh thread
 
     registry-fuzz-quality:
-        runs-on: docker-cli
+        runs-on: ${{ github.server_url == 'https://github.com' && 'ubuntu-latest' || 'docker-cli' }}
         timeout-minutes: 45
         container:
-            image: ${{ vars.REGISTRY_URL }}/${{ vars.REGISTRY_OWNER }}/baander-runner:latest
+            image: ${{ github.server_url == 'https://github.com' && 'ghcr.io' || vars.REGISTRY_URL }}/${{ github.server_url == 'https://github.com' && 'baander-app' || vars.REGISTRY_OWNER }}/baander-runner:latest
         steps:
             -   name: Checkout
+                env:
+                    GIT_TOKEN: ${{ secrets.GITHUB_TOKEN }}
                 run: |
+                    if [ "$GITHUB_SERVER_URL" = https://github.com ]; then
+                        auth="basic $(printf 'x-access-token:%s' "$GIT_TOKEN" | base64 | tr -d '\n')"
+                    else
+                        auth="token $GIT_TOKEN"
+                    fi
                     git init -q
-                    git remote add origin ${{ forgejo.event.repository.clone_url }}
-                    git -c http.extraHeader="Authorization: token ${{ secrets.GITHUB_TOKEN }}" fetch -q origin "${{ forgejo.sha }}"
-                    git checkout -q --detach "${{ forgejo.sha }}"
-                    test "$(git rev-parse HEAD)" = "${{ forgejo.sha }}"
+                    git remote add origin ${{ github.event.repository.clone_url }}
+                    git -c http.extraHeader="Authorization: $auth" fetch -q origin "${{ github.event.pull_request.head.sha || github.sha }}"
+                    git checkout -q --detach "${{ github.event.pull_request.head.sha || github.sha }}"
+                    test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha || github.sha }}"
             -   name: Prepare standalone PHP tooling
                 run: |
                     composer --working-dir=scripts install --no-dev --no-interaction --no-scripts --no-plugins
@@ -680,53 +778,95 @@ jobs:
                 run: REGISTRY_SUBJECT_PYTHON=/usr/bin/python3 bash scripts/test-registry.sh fuzz
 
     build-and-push:
-        runs-on: docker-cli
+        runs-on: ${{ github.server_url == 'https://github.com' && 'ubuntu-latest' || 'docker-cli' }}
         needs: [ quality-gate, frontend-quality, dsp-quality, registry-quality, registry-container-quality, registry-thread-quality, registry-fuzz-quality, registry-static-quality ]
         container:
-            image: ${{ vars.REGISTRY_URL }}/${{ vars.REGISTRY_OWNER }}/baander-runner:latest
+            image: ${{ github.server_url == 'https://github.com' && 'ghcr.io' || vars.REGISTRY_URL }}/${{ github.server_url == 'https://github.com' && 'baander-app' || vars.REGISTRY_OWNER }}/baander-runner:latest
+        permissions:
+            contents: read
+            packages: write
         steps:
-            -   name: Checkout
+            -   name: Free host disk on GitHub
+                # See the quality gate; the production build needs the space too.
+                if: github.server_url == 'https://github.com'
                 run: |
+                    docker run --rm \
+                      -v /usr/share/dotnet:/cleanup/dotnet \
+                      -v /usr/local/lib/android:/cleanup/android \
+                      -v /opt/ghc:/cleanup/ghc \
+                      -v /opt/hostedtoolcache:/cleanup/hostedtoolcache \
+                      -v /:/host:ro \
+                      --entrypoint /bin/sh \
+                      "$REGISTRY/${IMAGE_NAME%/*}/baander-runner:latest" \
+                      -c 'find /cleanup -mindepth 2 -delete; df -h /host'
+
+            -   name: Checkout
+                env:
+                    GIT_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                run: |
+                    if [ "$GITHUB_SERVER_URL" = https://github.com ]; then
+                        auth="basic $(printf 'x-access-token:%s' "$GIT_TOKEN" | base64 | tr -d '\n')"
+                    else
+                        auth="token $GIT_TOKEN"
+                    fi
                     git init -q
-                    git remote add origin ${{ forgejo.event.repository.clone_url }}
-                    git -c http.extraHeader="Authorization: token ${{ secrets.GITHUB_TOKEN }}" fetch -q origin "${{ forgejo.sha }}"
-                    git checkout -q --detach "${{ forgejo.sha }}"
-                    test "$(git rev-parse HEAD)" = "${{ forgejo.sha }}"
+                    git remote add origin ${{ github.event.repository.clone_url }}
+                    git -c http.extraHeader="Authorization: $auth" fetch -q origin "${{ github.event.pull_request.head.sha || github.sha }}"
+                    git checkout -q --detach "${{ github.event.pull_request.head.sha || github.sha }}"
+                    test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha || github.sha }}"
 
             -   name: Prepare standalone PHP tooling
                 run: composer --working-dir=scripts install --no-dev --no-interaction --no-scripts --no-plugins
 
             -   name: Login to Container Registry
-                run: echo "${{ secrets.REGISTRY_TOKEN }}" | docker login ${{ env.REGISTRY }} -u ${{ forgejo.actor }} --password-stdin
+                if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+                env:
+                    REGISTRY_PASSWORD: ${{ secrets.REGISTRY_TOKEN || github.token }}
+                run: printf '%s\n' "$REGISTRY_PASSWORD" | docker login "$REGISTRY" -u "${{ github.actor }}" --password-stdin
 
             -   name: Build production image
                 run: |
                     php scripts/build-application.php --buildx \
                       --target production \
-                      --revision "${{ forgejo.sha }}" \
-                      --tag "$REGISTRY/$IMAGE_NAME:${{ forgejo.sha }}" \
+                      --revision "${{ github.sha }}" \
+                      --tag "$REGISTRY/$IMAGE_NAME:${{ github.sha }}" \
                       --tag "$REGISTRY/$IMAGE_NAME:latest"
 
             -   name: Collect and verify production packaged inventory
                 run: |
                     bash scripts/collect-packaged-inventory.sh \
-                      --image "$REGISTRY/$IMAGE_NAME:${{ forgejo.sha }}" --target production \
-                      --revision "${{ forgejo.sha }}" \
+                      --image "$REGISTRY/$IMAGE_NAME:${{ github.sha }}" --target production \
+                      --revision "${{ github.sha }}" \
                       --output var/test-runs/application-inventory-production
 
             -   name: Push verified production image
-                if: forgejo.ref == 'refs/heads/master'
+                if: github.ref == 'refs/heads/master' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
                 run: |
                     OUTPUT=var/test-runs/application-inventory-production
-                    docker push "$REGISTRY/$IMAGE_NAME:${{ forgejo.sha }}" > "$OUTPUT/push-revision.log" 2>&1
+                    docker push "$REGISTRY/$IMAGE_NAME:${{ github.sha }}" > "$OUTPUT/push-revision.log" 2>&1
                     cat "$OUTPUT/push-revision.log"
-                    docker image inspect "$REGISTRY/$IMAGE_NAME:${{ forgejo.sha }}" > "$OUTPUT/published-image-inspect.json"
+                    docker image inspect "$REGISTRY/$IMAGE_NAME:${{ github.sha }}" > "$OUTPUT/published-image-inspect.json"
                     docker push "$REGISTRY/$IMAGE_NAME:latest" > "$OUTPUT/push-latest.log" 2>&1
                     cat "$OUTPUT/push-latest.log"
 
-            -   name: Preserve production packaged inventory
-                if: always()
-                uses: https://github.com/actions/upload-artifact@ff15f0306b3f739f7b6fd43fb5d26cd321bd4de5
+            -   name: Application image is not publicly pullable
+                # GHCR keeps the package private until an operator changes
+                # it; the image may not be redistributed yet.
+                if: github.server_url == 'https://github.com' && github.ref == 'refs/heads/master'
+                run: sh scripts/ghcr-private-probe.sh "$REGISTRY/$IMAGE_NAME"
+
+            -   name: Preserve production packaged inventory on GitHub
+                if: always() && github.server_url == 'https://github.com'
+                uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+                with:
+                    name: application-packaged-inventory-production
+                    path: var/test-runs/application-inventory-production/
+                    if-no-files-found: ignore
+                    retention-days: 14
+
+            -   name: Preserve production packaged inventory on Forgejo
+                if: always() && github.server_url != 'https://github.com'
+                uses: ./.github/actions/forgejo-upload-artifact
                 with:
                     name: application-packaged-inventory-production
                     path: var/test-runs/application-inventory-production/

@@ -9,6 +9,7 @@ final class DockerContext
     private const array EXCLUDED = [
         '.git/sentinel',
         '.github/sentinel',
+        '.github/ISSUE_TEMPLATE/sentinel',
         '.claude/sentinel',
         '.agents/sentinel',
         '.codex/sentinel',
@@ -73,6 +74,8 @@ final class DockerContext
         'docker/general/start-operator.sh',
         'packages/baander-tooling/resources/application-layout.json',
         'packages/baander-tooling/resources/tooling-defaults.json',
+        '.github/workflows/ci.yaml',
+        '.github/actions/forgejo-upload-artifact/action.yml',
     ];
 
     /** @param list<string> $arguments */

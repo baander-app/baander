@@ -1,4 +1,10 @@
+# Only the workflow tree and its local actions reach the image; the workflow
+# contract tests read them.
 .github
+!.github/
+.github/*
+!.github/workflows/
+!.github/actions/
 .claude
 .git
 # Agent indexes, sessions, profiling captures and editor state are host-only.

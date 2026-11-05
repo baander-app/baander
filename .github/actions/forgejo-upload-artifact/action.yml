@@ -1,0 +1,30 @@
+name: Forgejo upload artifact
+description: >-
+    Uploads a workflow artifact on Forgejo through Forgejo's fork of
+    upload-artifact. Upstream releases refuse any server other than
+    github.com, so workflows call this action only on Forgejo and use the
+    upstream action on GitHub.
+
+inputs:
+    name:
+        description: Artifact name.
+        required: true
+    path:
+        description: Files, directories or wildcard patterns to upload, one per line.
+        required: true
+    if-no-files-found:
+        description: What to do when the path matches no files (warn, error or ignore).
+        default: warn
+    retention-days:
+        description: Days to keep the artifact; 0 uses the server default.
+        default: '0'
+
+runs:
+    using: composite
+    steps:
+        -   uses: https://code.forgejo.org/forgejo/upload-artifact@16871d9e8cfcf27ff31822cac382bbb5450f1e1e # v4
+            with:
+                name: ${{ inputs.name }}
+                path: ${{ inputs.path }}
+                if-no-files-found: ${{ inputs.if-no-files-found }}
+                retention-days: ${{ inputs.retention-days }}
