@@ -536,6 +536,10 @@ jobs:
         runs-on: ${{ github.server_url == 'https://github.com' && 'ubuntu-latest' || 'docker-cli' }}
         container:
             image: ${{ github.server_url == 'https://github.com' && 'ghcr.io' || vars.REGISTRY_URL }}/${{ github.server_url == 'https://github.com' && 'baander-app' || vars.REGISTRY_OWNER }}/baander-runner:latest
+        env:
+            # GitHub mounts a home directory owned by the runner user into a job
+            # container that runs as root, and Firefox refuses to start there.
+            HOME: /root
         steps:
             -   name: Checkout
                 env:

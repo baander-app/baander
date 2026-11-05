@@ -128,6 +128,9 @@ for GitHub and once for Forgejo. It enforces the following rules, except the
 - Give a step that sources `emsdk_env.sh` `shell: bash`. GitHub runs steps in a job
   container under `sh` by default, where the script cannot find its own directory
   and `emcc` never reaches `PATH`.
+- Set `HOME: /root` on a container job that installs Playwright browsers. GitHub
+  mounts a home directory owned by the runner's user into the root container, and
+  Firefox refuses to start there.
 - Make `timeout-minutes` resolve to a number of minutes on both forges. Both forges
   use the same timeouts; give a job a per-forge expression only after a GitHub run
   shows that it needs more time.

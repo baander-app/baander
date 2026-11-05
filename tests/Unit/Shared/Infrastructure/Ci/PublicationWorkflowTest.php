@@ -429,6 +429,11 @@ SH;
         yield 'login reachable from a fork' => [$workflow, $step(['name' => 'Login', 'run' => 'docker login registry.baander.app']), 'trusted-run'];
         yield 'host mount without forge guard' => [$workflow, $step(['name' => 'Clean', 'run' => 'docker run --rm -v /opt/ghc:/cleanup/ghc alpine true']), 'host paths'];
         yield 'checkout without safe directory' => [$workflow, $step(['name' => 'Checkout', 'run' => "git init -q\ngit fetch -q origin main"]), 'safe directory'];
+        yield 'Playwright in a container without root home' => [$workflow, static function (array $document): array {
+            $document['jobs']['gate']['container'] = ['image' => 'ghcr.io/baander-app/baander-runner:latest'];
+            $document['jobs']['gate']['steps'][] = ['name' => 'Browsers', 'run' => 'yarn exec playwright install --with-deps firefox'];
+            return $document;
+        }, 'HOME'];
         yield 'Emscripten environment under sh' => [$workflow, $step(['name' => 'Build', 'run' => ". /tmp/emsdk/emsdk_env.sh\nemcc --version"]), 'under bash'];
         yield 'missing concurrency' => [$workflow, static function (array $document): array {
             unset($document['concurrency']);
@@ -1062,6 +1067,10 @@ SH;
             $where = $path . ' ' . $name;
             $steps = $job['steps'] ?? [];
             $writesPackages = array_any($steps, self::writesPackages(...));
+            $browsers = array_any($steps, static fn(array $step): bool => str_contains($step['run'] ?? '', 'playwright install'));
+            if ($browsers && isset($job['container']) && ($job['env']['HOME'] ?? null) !== '/root') {
+                $violations[] = $where . ': a container job that installs Playwright browsers sets HOME to /root, because Firefox refuses the runner-owned home directory GitHub mounts';
+            }
             $comments = array_any($steps, static fn(array $step): bool => self::writeKind($step) === 'comment');
             if ($writesPackages !== (($job['permissions']['packages'] ?? null) === 'write')) {
                 $violations[] = $where . ': only jobs that publish or write to the package store request packages: write, and every such job does';
