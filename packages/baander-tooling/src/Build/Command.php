@@ -25,7 +25,7 @@ final class Command
                 continue;
             }
             $key = substr($argument, 2);
-            if (!str_starts_with($argument, '--') || !in_array($key, ['source', 'target', 'revision', 'tag', 'cache-from', 'cache-to', 'compose-env'], true)) {
+            if (!str_starts_with($argument, '--') || !in_array($key, ['source', 'target', 'revision', 'tag', 'cache-from', 'cache-to', 'builder', 'compose-env'], true)) {
                 throw new \InvalidArgumentException('Unknown build argument: ' . $argument);
             }
             $value = array_shift($arguments);
@@ -42,11 +42,11 @@ final class Command
         $target = $values['target'] ?? null;
         $tags = $values['tag'];
         if (!is_string($target) || $tags === []) {
-            throw new \InvalidArgumentException('Use php scripts/build-application.php --target TARGET --tag IMAGE [--source DIRECTORY] [--revision REVISION] [--buildx] [--cache-from VALUE] [--cache-to VALUE] [--compose-env FILE].');
+            throw new \InvalidArgumentException('Use php scripts/build-application.php --target TARGET --tag IMAGE [--source DIRECTORY] [--revision REVISION] [--buildx [--builder NAME]] [--cache-from VALUE] [--cache-to VALUE] [--compose-env FILE].');
         }
         ApplicationLayout::load($source . '/packages/baander-tooling/resources/application-layout.json');
         $configuration = ToolingConfiguration::forRepository($source, $environment);
-        $options = new BuildOptions($buildx, array_slice($tags, 1), $values['cache-from'], $values['cache-to']);
+        $options = new BuildOptions($buildx, array_slice($tags, 1), $values['cache-from'], $values['cache-to'], $values['builder'] ?? null);
         $processes = new EngineExecutor(new ExecutionContext($environment));
         $temporary = sys_get_temp_dir() . '/baander.app-build-' . bin2hex(random_bytes(8));
         $failure = null;

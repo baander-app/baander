@@ -877,6 +877,59 @@ SH;
         ];
     }
 
+    public function testCacheExportingBuildsUseAContainerBuilderPreparedOnBothForges(): void
+    {
+        $builds = 0;
+        foreach (self::GATE_WORKFLOWS as $file) {
+            foreach ($this->workflow($file)['jobs'] as $jobName => $job) {
+                $names = array_column($job['steps'], 'name');
+                foreach ($job['steps'] as $index => $step) {
+                    $run = $step['run'] ?? '';
+                    if (!str_contains($run, 'build-application.php') || preg_match('~--cache-(?:to|from)\b~', $run) !== 1) {
+                        continue;
+                    }
+                    ++$builds;
+                    self::assertStringContainsString('--builder "$CI_BUILDER"', $run, $file . ' ' . $jobName . ' ' . $step['name']);
+                    $prepare = array_search('Prepare BuildKit container builder', $names, true);
+                    self::assertIsInt($prepare, $file . ' ' . $jobName);
+                    self::assertLessThan($index, $prepare, $file . ' ' . $jobName . ' ' . $step['name']);
+                }
+            }
+        }
+        self::assertSame(2, $builds);
+
+        $gate = $this->workflow('ci.yaml')['jobs']['quality-gate'];
+        self::assertSame('baander-ci-${{ github.run_id }}-${{ github.run_attempt }}', $gate['env']['CI_BUILDER']);
+        $prepare = $this->step($gate, 'Prepare BuildKit container builder');
+        $remove = $this->step($gate, 'Remove BuildKit container builder');
+        self::assertSame('always()', $remove['if']);
+        self::assertSame('Remove BuildKit container builder', $gate['steps'][array_key_last($gate['steps'])]['name']);
+        foreach ([self::GITHUB, self::FORGEJO] as $server) {
+            foreach ([self::context($server), self::context($server, 'pull_request'), self::context($server, 'pull_request', self::FORK)] as $context) {
+                self::assertTrue(self::runs($prepare, $context, $gate), $server);
+            }
+        }
+        self::assertNull(self::writeKind($prepare));
+
+        $tools = $this->directory . '/tools-builder';
+        new Filesystem()->mkdir($tools);
+        file_put_contents($tools . '/docker', "#!/bin/sh\nprintf '%s\\n' \"\$*\" >> \"\$CALL_LOG\"\n[ \"\$2\" != rm ] || exit 1\n");
+        chmod($tools . '/docker', 0755);
+        $log = $this->directory . '/builder-calls';
+        $environment = [
+            'PATH' => $tools . ':' . getenv('PATH'),
+            'CALL_LOG' => $log,
+            'CI_BUILDER' => 'baander-ci-101-1',
+        ];
+        foreach ([$prepare, $remove] as $step) {
+            new Process(['/bin/sh', '-e', '-c', self::interpolate($step['run'], self::context(self::GITHUB))], $this->directory, $environment)->mustRun();
+        }
+        self::assertSame(
+            ['buildx create --name baander-ci-101-1 --driver docker-container', 'buildx rm baander-ci-101-1'],
+            file($log, FILE_IGNORE_NEW_LINES),
+        );
+    }
+
     /** @return array<string, array{source: string, document: array<string, mixed>}> */
     private static function documents(string $root): array
     {

@@ -7,7 +7,7 @@ namespace Baander\Tooling\Tests;
 use Baander\Tooling\Build\{ApplicationImage, BuildOptions};
 use Baander\Tooling\Docker\{Client, Target};
 use Baander\Tooling\Configuration\ToolingConfiguration;
-use Baander\Tooling\Process\{CommandExecutor, CompletionPolicy, ProcessResult, ProcessSpec, RunningProcess};
+use Baander\Tooling\Process\{CommandExecutor, CompletionPolicy, EngineExecutor, ExecutionContext, ProcessResult, ProcessSpec, RunningProcess};
 use PHPUnit\Framework\TestCase;
 
 final class ApplicationBuildContractTest extends TestCase
@@ -95,6 +95,79 @@ final class ApplicationBuildContractTest extends TestCase
         self::assertContains('type=local,src=/tmp/cache', $arguments);
         self::assertContains('type=local,dest=/tmp/cache,mode=max', $arguments);
         self::assertContains('OPERATOR_HELPER_IMAGE=registry.baander.app/docker:qualification', $arguments);
+    }
+
+    public function testNamedBuilderIsConfirmedOnTheCapturedDaemonBeforeTheBuildSelectsIt(): void
+    {
+        $this->layout('/srv/baander');
+        $executor = new ApplicationImageExecutor('/srv/baander');
+        $this->builder($executor)->build($this->source, 'ci', 'revision', 'baander-build:qualification', options: new BuildOptions(
+            buildx: true,
+            cacheTo: ['type=local,dest=/tmp/cache,mode=max'],
+            builder: 'baander-ci',
+        ));
+        self::assertSame(['--host', 'unix:///run/docker.sock', 'buildx', 'inspect', 'baander-ci'], array_slice($executor->commands[0]->argv, 1));
+        self::assertSame(['--host', 'unix:///run/docker.sock', 'buildx', 'build', '--builder', 'baander-ci', '--load'], array_slice($executor->commands[1]->argv, 1, 7));
+        self::assertCount(1, array_keys($executor->commands[1]->argv, '--builder', true));
+    }
+
+    public function testUnconfirmedNamedBuilderNeverBuilds(): void
+    {
+        $this->layout('/srv/baander');
+        $executor = new ApplicationImageExecutor('/srv/baander');
+        $executor->builderDriver = 'remote';
+        try {
+            $this->builder($executor)->build($this->source, 'ci', 'revision', 'baander-build:qualification', options: new BuildOptions(buildx: true, builder: 'baander-ci'));
+            self::fail('A remote builder was accepted.');
+        } catch (\RuntimeException $error) {
+            self::assertStringContainsString('docker-container driver', $error->getMessage());
+        }
+        self::assertCount(1, $executor->commands);
+    }
+
+    public function testNamedBuilderRequiresBuildx(): void
+    {
+        $this->expectExceptionMessage('buildx');
+        new BuildOptions(builder: 'baander-ci');
+    }
+
+    public function testCommandThreadsAnExplicitBuilderToTheBuild(): void
+    {
+        $this->layout('/srv/baander');
+        $docker = $this->source . '/docker-builder.fixture';
+        $calls = $this->source . '/calls.fixture';
+        file_put_contents($docker, '#!' . PHP_BINARY . "\n" . <<<'PHP'
+<?php
+file_put_contents(getenv('BAANDER_BUILD_FIXTURE_CALLS'), json_encode(array_slice($argv, 1)) . "\n", FILE_APPEND);
+if (in_array('info', $argv, true)) {
+    echo '{"ID":"build-fixture"}';
+} elseif (array_slice($argv, 3, 2) === ['buildx', 'inspect']) {
+    echo "Name:          baander-ci\nDriver:        docker-container\n\nNodes:\nName:          baander-ci0\nEndpoint:      unix:///run/baander-build-fixture.sock\n";
+} elseif (in_array('inspect', $argv, true)) {
+    echo json_encode([['Id' => 'sha256:' . str_repeat('b', 64), 'Config' => [
+        'Env' => ['APP_HOME=/srv/baander'], 'WorkingDir' => '/srv/baander',
+        'Labels' => ['org.baander.application-layout' => '{"version":1,"root":"/srv/baander"}'],
+    ]]]);
+}
+PHP);
+        chmod($docker, 0700);
+        $environment = ['BAANDER_DOCKER_EXECUTABLE' => $docker, 'DOCKER_HOST' => 'unix:///run/baander-build-fixture.sock', 'BAANDER_BUILD_FIXTURE_CALLS' => $calls, 'BUILDX_BUILDER' => 'foreign'];
+        $executor = new EngineExecutor(new ExecutionContext($environment));
+        try {
+            $result = $executor->run(new ProcessSpec(
+                [PHP_BINARY, dirname(__DIR__, 2) . '/build-application.php', '--source', $this->source, '--buildx', '--builder', 'baander-ci',
+                    '--target', 'ci', '--tag', 'baander:qualification', '--cache-to', 'type=local,dest=/tmp/cache,mode=max'],
+                environment: $environment,
+            ), new CompletionPolicy(null));
+        } finally {
+            $executor->close();
+        }
+        self::assertSame(0, $result->exitCode, $result->stderr);
+        $arguments = array_map(static fn(string $line): array => json_decode($line, true, flags: JSON_THROW_ON_ERROR), file($calls, FILE_IGNORE_NEW_LINES));
+        self::assertContains(['--host', 'unix:///run/baander-build-fixture.sock', 'buildx', 'inspect', 'baander-ci'], $arguments);
+        $builds = array_values(array_filter($arguments, static fn(array $call): bool => array_slice($call, 2, 2) === ['buildx', 'build']));
+        self::assertCount(1, $builds);
+        self::assertSame(['buildx', 'build', '--builder', 'baander-ci', '--load'], array_slice($builds[0], 2, 5));
     }
 
     public function testRuntimeEntrypointsUseSelectedRootArgumentsAndReplaceTheirShell(): void
@@ -209,12 +282,16 @@ final class ApplicationImageExecutor implements CommandExecutor
     /** @var list<ProcessSpec> */
     public array $commands = [];
     public int $imageEntries = 1;
+    public string $builderDriver = 'docker-container';
 
     public function __construct(private readonly string $imageRoot) {}
 
     public function run(ProcessSpec $command, CompletionPolicy $policy = new CompletionPolicy()): ProcessResult
     {
         $this->commands[] = $command;
+        if (array_slice($command->argv, 3, 2) === ['buildx', 'inspect']) {
+            return new ProcessResult(0, null, false, false, "Name:          baander-ci\nDriver:        {$this->builderDriver}\n\nNodes:\nName:          baander-ci0\nEndpoint:      unix:///run/docker.sock\n", '', 0);
+        }
         $output = in_array('inspect', $command->argv, true) ? json_encode(array_fill(0, $this->imageEntries, [
             'Id' => 'sha256:' . str_repeat('a', 64),
             'Config' => ['Env' => ['APP_HOME=' . $this->imageRoot], 'WorkingDir' => $this->imageRoot, 'Labels' => ['org.baander.application-layout' => '{"version":1,"root":"/srv/baander"}']],

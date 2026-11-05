@@ -107,12 +107,16 @@ layout metadata, then checks the built image's immutable ID and layout. The
 Dockerfile requires that argument and has no independent application-root default.
 `--buildx` loads the result into the selected daemon. Repeat `--tag` for additional
 tags; `--source`, `--revision`, `--cache-from` and `--cache-to` supply build inputs.
-`--compose-env FILE` writes the inspected immutable image and its `APP_HOME` for
-Compose consumers. Use that generated file when the consuming Compose command
-requires it.
+With `--buildx`, `--builder NAME` selects a named BuildKit builder instead of the
+daemon's default one. `--compose-env FILE` writes the inspected immutable image and
+its `APP_HOME` for Compose consumers. Use that generated file when the consuming
+Compose command requires it.
 
-`Docker\Client` pins builds to the selected daemon's default BuildKit builder.
-It removes ambient `BUILDX_BUILDER` and `BUILDKIT_HOST` settings and enables
+`Docker\Client` pins builds to the selected daemon's default BuildKit builder
+unless `--builder NAME` names another. It accepts that builder only when
+`docker buildx inspect` on the captured daemon shows the `docker-container` driver
+with every node on the captured endpoint, and `--load` still delivers the image to
+that daemon. It removes ambient `BUILDX_BUILDER` and `BUILDKIT_HOST` settings and enables
 BuildKit only in the build command's environment; the caller's environment stays
 unchanged. A remote builder cannot override the captured daemon selection.
 

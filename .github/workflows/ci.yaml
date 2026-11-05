@@ -27,6 +27,7 @@ jobs:
         runs-on: ${{ github.server_url == 'https://github.com' && 'ubuntu-latest' || 'docker-cli' }}
         env:
             BAANDER_TEST_DOCKER_SOCKET_PATH: ${{ vars.BAANDER_TEST_DOCKER_SOCKET_PATH || '/var/run/docker.sock' }}
+            CI_BUILDER: baander-ci-${{ github.run_id }}-${{ github.run_attempt }}
         container:
             image: ${{ github.server_url == 'https://github.com' && 'ghcr.io' || vars.REGISTRY_URL }}/${{ github.server_url == 'https://github.com' && 'baander-app' || vars.REGISTRY_OWNER }}/baander-runner:latest
         permissions:
@@ -103,9 +104,17 @@ jobs:
                     corepack yarn build
                     node scripts/verify-build.mjs
 
+            -   name: Prepare BuildKit container builder
+                # The Docker driver exports a local build cache only with the
+                # containerd image store, which GitHub's hosted Docker lacks.
+                # This builder runs its BuildKit container on the job's own
+                # daemon; the build loads its images back into that daemon.
+                # The name is unique to the run and removed when the job ends.
+                run: docker buildx create --name "$CI_BUILDER" --driver docker-container
+
             -   name: Build CI image
                 run: |
-                    php scripts/build-application.php --buildx \
+                    php scripts/build-application.php --buildx --builder "$CI_BUILDER" \
                       --target ci --revision "${{ github.sha }}" \
                       --tag "$CI_IMAGE" \
                       --cache-to type=local,dest=/tmp/buildkit-cache,mode=max \
@@ -181,7 +190,7 @@ jobs:
 
             -   name: Build production worker image
                 run: |
-                    php scripts/build-application.php --buildx --target worker \
+                    php scripts/build-application.php --buildx --builder "$CI_BUILDER" --target worker \
                       --revision "${{ github.sha }}" \
                       --tag "${CI_IMAGE}-worker" \
                       --cache-from type=local,src=/tmp/buildkit-cache
@@ -503,6 +512,12 @@ jobs:
                 if: always()
                 run: |
                     docker image rm "$CI_IMAGE" "${CI_IMAGE}-worker" 2>/dev/null || true
+
+            -   name: Remove BuildKit container builder
+                # Each run creates its own builder, so concurrent jobs on a
+                # shared self-hosted daemon never share or race for one.
+                if: always()
+                run: docker buildx rm "$CI_BUILDER" 2>/dev/null || true
 
     frontend-quality:
         runs-on: ${{ github.server_url == 'https://github.com' && 'ubuntu-latest' || 'docker-cli' }}

@@ -15,9 +15,13 @@ final readonly class BuildOptions
         public array $additionalTags = [],
         public array $cacheFrom = [],
         public array $cacheTo = [],
+        public ?string $builder = null,
     ) {
         if (!$buildx && ($cacheFrom !== [] || $cacheTo !== [])) {
             throw new \InvalidArgumentException('Build cache exporters require buildx.');
+        }
+        if (!$buildx && $builder !== null) {
+            throw new \InvalidArgumentException('A named builder requires buildx.');
         }
     }
 }

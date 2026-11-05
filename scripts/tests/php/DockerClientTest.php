@@ -39,6 +39,11 @@ if ($args[0] === 'context') {
 if (in_array('group', $args, true)) { preg_match('/^\d+ \(.*\) \S+ \d+ (\d+)/', file_get_contents('/proc/self/stat'), $match); echo getmypid() === (int) $match[1] ? 'contained' : 'shared'; exit; }
 if (in_array('stall', $args, true)) { usleep(2000000); exit; }
 if (in_array('info', $args, true)) { echo json_encode(['ID' => trim(file_get_contents(getenv('FAKE_ROOT') . '/id'))]); exit; }
+if (array_slice($args, 2, 2) === ['buildx', 'inspect']) {
+    $builder = getenv('FAKE_ROOT') . '/builders/' . basename($args[4] ?? '');
+    if (!is_file($builder)) { fwrite(STDERR, "ERROR: no builder found\n"); exit(1); }
+    echo file_get_contents($builder); exit;
+}
 if (in_array('compose', $args, true)) { exit(71); }
 if (in_array('inspect', $args, true)) { echo 'sha256:' . str_repeat('a', 64); exit; }
 echo json_encode($args);
@@ -175,6 +180,100 @@ CLI);
             self::fail('An ambiguous or foreign builder was accepted.');
         } catch (\InvalidArgumentException $error) {
             self::assertStringContainsString('builder', $error->getMessage());
+        }
+        self::assertSame('', file_get_contents($this->root . '/calls'));
+    }
+
+    /** @param list<string> $endpoints */
+    private function builder(string $name, string $driver, array $endpoints): void
+    {
+        if (!is_dir($this->root . '/builders')) {
+            mkdir($this->root . '/builders', 0700);
+        }
+        $nodes = array_map(static fn(int $index, string $endpoint): string => sprintf("Name:                  %s%d\nEndpoint:              %s\nStatus:                inactive\n", $name, $index, $endpoint), array_keys($endpoints), $endpoints);
+        file_put_contents($this->root . '/builders/' . $name, sprintf("Name:          %s\nDriver:        %s\nLast Activity: 2026-11-05 07:51:10 +0000 UTC\n\nNodes:\n%s", $name, $driver, implode("\n", $nodes)));
+    }
+
+    /** @return list<array{list<string>,array<string,string|false>}> */
+    private function calls(): array
+    {
+        return array_map(static fn(string $line): array => json_decode($line, true, flags: JSON_THROW_ON_ERROR) |> (static fn(array $call): array => [$call[0], $call[4]]), file($this->root . '/calls', FILE_IGNORE_NEW_LINES));
+    }
+
+    public function testConfirmedContainerBuilderOnCapturedDaemonSelectsOnlyThatBuilder(): void
+    {
+        $this->builder('baander-ci', 'docker-container', ['unix:///selected.sock']);
+        $client = new Client($this->executor, $this->resolve(), $this->environment + ['BUILDX_BUILDER' => 'foreign', 'BUILDKIT_HOST' => 'tcp://foreign.baander.app:1234']);
+        file_put_contents($this->root . '/calls', '');
+        $selected = $client->withBuilder('baander-ci');
+        [[$inspection]] = $this->calls();
+        self::assertSame(['--host', 'unix:///selected.sock', 'buildx', 'inspect', 'baander-ci'], $inspection);
+
+        $selected->run(['buildx', 'build', '--load', '--cache-to', 'type=local,dest=/tmp/baander-cache', './context']);
+        $selected->run(['buildx', 'build', '--builder', 'baander-ci', '--load', './context']);
+        [, [$inserted, $environment], [$explicit]] = $this->calls();
+        self::assertSame(['--host', 'unix:///selected.sock', 'buildx', 'build', '--builder', 'baander-ci', '--load', '--cache-to', 'type=local,dest=/tmp/baander-cache', './context'], $inserted);
+        self::assertSame(['--host', 'unix:///selected.sock', 'buildx', 'build', '--builder', 'baander-ci', '--load', './context'], $explicit);
+        self::assertFalse($environment['BUILDX_BUILDER']);
+        self::assertFalse($environment['BUILDKIT_HOST']);
+        self::assertSame($selected, $selected->withBuilder('baander-ci'));
+        self::assertSame($client, $client->withBuilder('default'));
+
+        foreach ([[$selected, ['buildx', 'build', '--builder', 'default']], [$client, ['buildx', 'build', '--builder', 'baander-ci']]] as [$owner, $arguments]) {
+            try {
+                $owner->run($arguments);
+                self::fail('A build selected a builder other than its client\'s confirmed builder.');
+            } catch (\InvalidArgumentException $error) {
+                self::assertStringContainsString('builder', $error->getMessage());
+            }
+        }
+        self::assertCount(3, $this->calls());
+    }
+
+    /** @return iterable<string,array{list<string>,string}> */
+    public static function unconfirmedBuilders(): iterable
+    {
+        yield 'daemon driver' => [['unix:///selected.sock'], 'docker'];
+        yield 'remote driver' => [['tcp://buildkit.baander.app:1234'], 'remote'];
+        yield 'kubernetes driver' => [['kubernetes:///baander-ci'], 'kubernetes'];
+        yield 'container on another daemon' => [['unix:///other.sock'], 'docker-container'];
+        yield 'container on a remote daemon' => [['tcp://docker.baander.app:2376'], 'docker-container'];
+        yield 'container through a context name' => [['selected'], 'docker-container'];
+        yield 'one node elsewhere' => [['unix:///selected.sock', 'unix:///other.sock'], 'docker-container'];
+        yield 'no nodes' => [[], 'docker-container'];
+    }
+
+    /** @param list<string> $endpoints */
+    #[DataProvider('unconfirmedBuilders')]
+    public function testBuilderOutsideTheCapturedDaemonContainerDriverIsRejected(array $endpoints, string $driver): void
+    {
+        $this->builder('baander-ci', $driver, $endpoints);
+        $client = new Client($this->executor, $this->resolve(), $this->environment);
+        try {
+            $client->withBuilder('baander-ci');
+            self::fail('An unconfirmed builder was accepted.');
+        } catch (\RuntimeException $error) {
+            self::assertStringContainsString('docker-container driver on the captured Docker daemon', $error->getMessage());
+        }
+    }
+
+    public function testMissingOrMalformedBuilderNameFailsBeforeAnyBuild(): void
+    {
+        $client = new Client($this->executor, $this->resolve(), $this->environment);
+        try {
+            $client->withBuilder('baander-ci');
+            self::fail('A missing builder was accepted.');
+        } catch (\RuntimeException $error) {
+            self::assertStringContainsString('baander-ci', $error->getMessage());
+        }
+        file_put_contents($this->root . '/calls', '');
+        foreach (['--builder=foreign', '', 'baander ci', '../baander-ci'] as $name) {
+            try {
+                $client->withBuilder($name);
+                self::fail('A malformed builder name was accepted.');
+            } catch (\InvalidArgumentException $error) {
+                self::assertStringContainsString('builder name', $error->getMessage());
+            }
         }
         self::assertSame('', file_get_contents($this->root . '/calls'));
     }

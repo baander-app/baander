@@ -13,8 +13,38 @@ use Baander\Tooling\Process\RunningProcess;
 
 final readonly class Client
 {
+    private string $builder;
+
     /** @param array<string,string> $environment */
-    public function __construct(public CommandExecutor $executor, public Target $target, private array $environment) {}
+    public function __construct(public CommandExecutor $executor, public Target $target, private array $environment)
+    {
+        $this->builder = 'default';
+    }
+
+    /**
+     * Returns a client whose builds use the named buildx builder. The builder must run its BuildKit container through
+     * the docker-container driver on the captured daemon, so a builder name can never move a build to another engine.
+     */
+    public function withBuilder(string $name): self
+    {
+        if ($name === $this->builder) {
+            return $this;
+        }
+        if (preg_match('/^[A-Za-z0-9][A-Za-z0-9._-]*$/D', $name) !== 1) {
+            throw new \InvalidArgumentException('Invalid buildx builder name: ' . $name);
+        }
+        $inspection = $this->run(['buildx', 'inspect', $name], check: false);
+        if ($inspection->exitCode !== 0) {
+            throw new \RuntimeException('Buildx builder ' . $name . ' cannot be inspected: ' . trim($inspection->stderr));
+        }
+        preg_match_all('/^(Name|Driver|Endpoint):[ \t]*(\S*)[ \t]*$/m', $inspection->stdout, $fields);
+        $field = static fn(string $key): array => array_values(array_intersect_key($fields[2], array_keys($fields[1], $key, true) |> array_flip(...)));
+        $endpoints = $field('Endpoint');
+        if (($field('Name')[0] ?? null) !== $name || $field('Driver') !== ['docker-container'] || $endpoints === [] || array_unique($endpoints) !== [$this->target->endpoint]) {
+            throw new \RuntimeException('Buildx builder ' . $name . ' must use the docker-container driver on the captured Docker daemon ' . $this->target->endpoint . '.');
+        }
+        return clone($this, ['builder' => $name]);
+    }
 
     /** @param array<string,string> $environment
      * @return array<string,string>
@@ -36,7 +66,7 @@ final readonly class Client
         $environment = self::transportEnvironment(array_replace($this->environment, $env ?? []));
         $buildOffset = self::buildOffset($arguments);
         if ($buildOffset !== null) {
-            $arguments = self::pinBuilder($arguments, $buildOffset);
+            $arguments = $this->pinBuilder($arguments, $buildOffset);
             unset($environment['BUILDX_BUILDER'], $environment['BUILDKIT_HOST']);
             $environment['DOCKER_BUILDKIT'] = '1';
         }
@@ -83,7 +113,7 @@ final readonly class Client
     /** @param list<string> $arguments
      * @return list<string>
      */
-    private static function pinBuilder(array $arguments, int $offset): array
+    private function pinBuilder(array $arguments, int $offset): array
     {
         $selected = false;
         for ($index = 0; $index < count($arguments) && $arguments[$index] !== '--'; ++$index) {
@@ -94,12 +124,12 @@ final readonly class Client
             } else {
                 continue;
             }
-            if ($selected || $builder !== 'default') {
-                throw new \InvalidArgumentException('Builds require exactly one default builder on the captured Docker daemon.');
+            if ($selected || $builder !== $this->builder) {
+                throw new \InvalidArgumentException('Builds require exactly one ' . $this->builder . ' builder on the captured Docker daemon.');
             }
             $selected = true;
         }
-        return $selected ? $arguments : [...array_slice($arguments, 0, $offset), '--builder', 'default', ...array_slice($arguments, $offset)];
+        return $selected ? $arguments : [...array_slice($arguments, 0, $offset), '--builder', $this->builder, ...array_slice($arguments, $offset)];
     }
 
     /** @param list<string> $arguments

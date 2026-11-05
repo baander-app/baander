@@ -14,7 +14,7 @@ final readonly class BuildRequest
     public static function fromSource(string $source, string $target, string $revision, string $tag, ImageSelection $operatorHelper, BuildOptions $options = new BuildOptions()): self
     {
         $layout = ApplicationLayout::load($source . '/packages/baander-tooling/resources/application-layout.json');
-        $arguments = $options->buildx ? ['buildx', 'build', '--load'] : ['build'];
+        $arguments = $options->buildx ? ['buildx', 'build', ...($options->builder === null ? [] : ['--builder', $options->builder]), '--load'] : ['build'];
         foreach ([$tag, ...$options->additionalTags] as $name) {
             array_push($arguments, '--tag', $name);
         }
