@@ -128,7 +128,7 @@ A long-running handler lets an operator cancel its job. It calls `JobCancellatio
 
 ### Routing
 
-Messenger routes a dispatched message by the workloads map in `config/packages/messenger.php`: a message listed there with its `default` flag on, or one whose dispatcher names a transport with a `TransportNamesStamp`, goes to that transport's Redis stream, and every other message runs inline in the calling process.
+Messenger routes a dispatched message by the workloads map in `config/packages/messenger.php`. A message that the map lists with its `default` flag on, or whose dispatcher names a transport in a `TransportNamesStamp`, goes to that transport's Redis stream. Every other message runs inline in the calling process.
 
 ```mermaid
 flowchart TB
@@ -148,6 +148,8 @@ flowchart TB
     retry -->|Attempts left| consumer
     retry -->|Attempts exhausted| failed[(failed_messages)]
 ```
+
+The consumers that read these streams are described below.
 
 The admitted worker deployment owns the Redis `async` (`MESSENGER_TRANSPORT_DSN`)
 and `scheduler` consumers, outbox relay, scheduler and media execution. The web

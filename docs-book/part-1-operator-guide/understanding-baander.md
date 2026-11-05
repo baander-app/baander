@@ -11,13 +11,9 @@ Read this chapter first, then [Storage and Data](storage-and-data.md) and
 
 ## The components
 
-[Deployment Topology](deployment-topology.md) shows the installation as one
-diagram: nginx in front of the web application, PostgreSQL behind the connection
-pooler, Redis, the worker deployment pair under the host controller, the shared
-storage and the optional registry. It also lists what PostgreSQL and Redis each
-hold and what their loss means, and it explains how the development instances
-differ. Read it for the picture; this chapter explains what the components do
-from files to playback and what a health result tells you.
+The components, their dependencies and what PostgreSQL and Redis each hold are
+drawn in [Deployment Topology](deployment-topology.md). This chapter follows the
+journey from files to playback and explains what a health result tells you.
 
 Here, a background worker means a process doing queued, scheduled or media work.
 Swoole also calls its HTTP-serving processes workers. Reloading those web workers

@@ -3,9 +3,8 @@
 When a scan stalls or a page stops answering, the first question is which
 container to look at. A Baander installation spreads over a Compose web stack,
 a worker deployment pair that Compose does not start, shared storage, and two
-stores with different durability. This page puts those pieces on one diagram,
-says what PostgreSQL and Redis hold and what losing each would mean, and
-explains how the local development instances differ from the installed recipe.
+stores with different durability. The diagram below shows where each piece
+runs, and the table after it says what each store holds.
 
 ```mermaid
 flowchart TB
@@ -58,8 +57,8 @@ on its Swoole server, which answers HTTP requests and holds the WebSocket
 connections for real-time updates. The diagram labels the proxy "nginx
 (recipe)" because the source-installation recipe ships an nginx service; the
 proxy itself is your choice. Whatever sits in front of `app` must be the only
-address the application trusts for forwarded headers, so that clients cannot
-pick their own identity. See the
+address the application trusts for forwarded headers, so that a client cannot
+supply its own forwarded address. See the
 [proxy trust setting](configuration.md#rate-limiting) in Configuration.
 
 ## PostgreSQL behind the connection pooler
@@ -78,9 +77,8 @@ PostgreSQL directly. See
 
 The web application and both worker units use Redis directly. It carries the
 `async` and `scheduler` message streams, the cache pools, PHP sessions,
-rate-limit state and the DPoP nonces and proof identifiers that give API
-requests their replay protection. The
-worker's consumers also write their heartbeat here, which is how the web
+rate-limit state and the DPoP nonces and proof identifiers used for replay
+protection. The worker's consumers also write their heartbeat here, which is how the web
 container's health check learns that a consumer is alive. While Redis is
 unreachable, requests that need rate-limit or DPoP state answer `503` with a
 retry delay instead of guessing. See [Redis](configuration.md#redis) in
@@ -104,8 +102,8 @@ web application, PostgreSQL, the pooler and Redis, and starting the web stack
 starts no worker. The dotted edges in the diagram mark that difference.
 
 Web and the pair start under the same deployment profile. The small-host
-household profile fixes two shared copy slots and permits no server-side
-re-encoding; see [Deployment profiles](configuration.md#deployment-profiles) in
+household profile, for example, fixes two shared copy slots and permits stream
+copy but no re-encoding; see [Deployment profiles](configuration.md#deployment-profiles) in
 Configuration. The pair's admission, lifecycle and recovery are explained in
 [The worker deployment pair](background-work.md#the-worker-deployment-pair).
 
@@ -134,8 +132,8 @@ the registry itself; see [Registry](registry.md).
 
 ## What PostgreSQL and Redis hold
 
-The two stores are not interchangeable. PostgreSQL is the authoritative record;
-Redis holds work in flight and short-lived state.
+PostgreSQL is the authoritative record; Redis holds work in flight and
+short-lived state.
 
 | Store | What it holds | What its loss means | Detail |
 |---|---|---|---|
@@ -143,9 +141,9 @@ Redis holds work in flight and short-lived state.
 | Redis | The `async` and `scheduler` message streams, cache, PHP sessions, rate limits, DPoP nonces and the worker heartbeat. | Events the relay had not yet handed off replay from the outbox, and the scheduler can materialize pending occurrences again from PostgreSQL. Work already acknowledged into a stream is gone; inventory it and use the task's own retry. Sessions, rate limits and nonces start empty. The repository Compose file declares no persistent Redis volume. | [What must be preserved](storage-and-data.md#what-must-be-preserved) and [Partial failures](backup-and-recovery.md#partial-failures) |
 
 The web server runs its health checks every 60 seconds and alerts
-administrators once when Redis becomes unreachable, because the alert is a row
-in PostgreSQL; a PostgreSQL outage cannot be recorded as an alert, so PostgreSQL
-must be watched from outside. See [Health Checks](monitoring.md#health-checks)
+administrators once per Redis outage. The alert is a row in PostgreSQL, so a
+PostgreSQL outage cannot be recorded as an alert and PostgreSQL must be watched
+from outside. See [Health Checks](monitoring.md#health-checks)
 in Monitoring and [Health alerts](notifications.md#health-alerts) in
 Notifications.
 

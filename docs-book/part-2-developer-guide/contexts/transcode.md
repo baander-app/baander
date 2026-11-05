@@ -1,6 +1,6 @@
 # Transcode
 
-`src/Transcode/` handles CMAF video transcoding via FFmpeg. It is the most infrastructure-heavy context in the codebase: it manages long-running encoding jobs, produces HLS v6 and DASH manifests, implements a seek-aware segment priority queue, and hands every FFmpeg command to the worker deployment pair, where the execution unit runs the native encoder.
+`src/Transcode/` handles CMAF video transcoding via FFmpeg. It is the most infrastructure-heavy context in the codebase: it manages long-running encoding jobs, produces HLS v6 and DASH manifests, implements a seek-aware segment priority queue, and hands FFmpeg commands to the worker deployment pair, where the execution unit runs the native encoder.
 
 ## Lifecycle
 
@@ -9,7 +9,7 @@ A transcode runs across the web application, PostgreSQL, the worker deployment p
 ```mermaid
 flowchart TD
     accTitle: From a session request to served segments
-    accDescr: The web request commits the transcode session and its execution request in PostgreSQL. The control unit claims the request when a media job slot is free and sends bounded native requests to the execution unit over the private IPC socket. FFmpeg writes the generation directory on shared storage, the child persists job state with fenced writes, the web application serves the published files and the browser is told to reread.
+    accDescr: The web request commits the transcode session and its execution request in PostgreSQL. The control unit claims the request when a media job slot is free and sends bounded native requests to the execution unit over the private IPC socket. FFmpeg writes the generation directory on shared storage, the child persists job state with fenced writes, the web application serves the published files and the browser rereads after a change hint.
     subgraph web[Web application]
         request[Session request]
         delivery["Manifest, segment and job endpoints"]
@@ -194,7 +194,7 @@ Endpoints are split between session management and streaming delivery.
 
 ### FFmpeg
 
-The FFmpeg classes build commands and read their results. `ProcessExecutor` sends every command through the native execution client that the media job child configures at launch, so inside the worker pair a command runs only in the execution unit; a worker that requires native execution refuses to run a command locally, and the local `proc_open` path exists for standalone tools.
+The FFmpeg classes build commands and read their results. `ProcessExecutor` sends every command through the native execution client that the media job child configures at launch, so inside the worker pair a command runs only in the execution unit. A worker that requires native execution refuses to run a command locally; the local `proc_open` path exists for standalone tools.
 
 | Component | Purpose |
 |-----------|---------|
@@ -237,4 +237,4 @@ Encoding runs in the worker deployment pair, not in the web server. The control 
 | `NativeProcessSpawner`, `TranscodeProcessPool` | Submit the encoder, probes and subtitle helpers as native execution attempts through `NativeExecutionClientInterface` and retire them with a confirmed outcome |
 | `NativeExecutionClient` (Shared) | Speaks to the native execution daemon over the Unix socket on the private IPC volume; every request carries the deployment namespace, boot, lease epoch, client slot and generation |
 | Native execution daemon | `bin/worker-native.php` in the execution unit; runs FFmpeg, probes and helpers and reports each attempt's state, output and exit code |
-| Lease loss | A child whose lease or deployment authority lapses stops its encoder and persists nothing further; after the lease expires the next claim starts a new transcode execution generation, so output of the old generation is not delivered as current output |
+| Lease loss | A child whose lease or deployment authority lapses stops its encoder and stops persisting state; after the lease expires the next claim starts a new transcode execution generation, so output of the old generation is not delivered as current output |

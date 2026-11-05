@@ -255,8 +255,6 @@ sequenceDiagram
     A-->>C: Resource (proof and cnf.jkt binding verified)
 ```
 
-The challenge differs by endpoint only in how a missing or invalid proof is answered: the first-party endpoints give the `ApiError` and the `use_dpop_nonce` answer described above, and the OAuth token endpoint gives `invalid_dpop_proof` for both.
-
 Issued tokens are bound to the proof key: the access token carries `cnf.jkt`. API requests send `Authorization: DPoP <accessToken>` with a `DPoP` proof from the same key that includes the access token hash (`ath`). Signed stream delivery URLs do not need a proof.
 
 ### Password Login
