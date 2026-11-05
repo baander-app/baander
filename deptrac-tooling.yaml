@@ -233,6 +233,15 @@ deptrac:
           type: directory
           value: /packages/baander-tooling/src/JavaScriptDependencies/
     -
+      name: Ci
+      collectors:
+        -
+          type: classLike
+          value: ^Baander\\Tooling\\Ci\\
+        -
+          type: directory
+          value: /packages/baander-tooling/src/Ci/
+    -
       name: ComposerSemver
       collectors:
         -
@@ -405,8 +414,12 @@ deptrac:
     JavaScriptDependencies:
       - Configuration
       - Process
+    Ci:
+      - Filesystem
+      - Process
     ComposerSemver: {  }
     CLI:
+      - Ci
       - Deployment
       - JavaScriptDependencies
       - Dependencies
