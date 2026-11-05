@@ -1,0 +1,61 @@
+name: Build Runner Image
+
+on:
+    push:
+        branches:
+            - master
+        paths:
+            - 'docker/runner/**'
+            - '.github/workflows/runner.yaml'
+    workflow_dispatch:
+
+env:
+    REGISTRY: ${{ github.server_url == 'https://github.com' && 'ghcr.io' || vars.REGISTRY_URL }}
+    IMAGE_NAME: ${{ github.server_url == 'https://github.com' && 'baander-app' || vars.REGISTRY_OWNER }}/baander-runner
+
+permissions:
+    contents: read
+
+concurrency:
+    group: runner-image-${{ github.ref }}
+    cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+    build:
+        runs-on: ${{ github.server_url == 'https://github.com' && 'ubuntu-latest' || 'docker-cli' }}
+        container:
+            image: docker:cli
+        permissions:
+            contents: read
+            packages: write
+        steps:
+            -   name: Checkout
+                env:
+                    GIT_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                run: |
+                    if [ "$GITHUB_SERVER_URL" = https://github.com ]; then
+                        auth="basic $(printf 'x-access-token:%s' "$GIT_TOKEN" | base64 | tr -d '\n')"
+                    else
+                        auth="token $GIT_TOKEN"
+                    fi
+                    git init -q
+                    git remote add origin ${{ github.event.repository.clone_url }}
+                    git -c http.extraHeader="Authorization: $auth" fetch -q origin ${{ github.ref }}
+                    git checkout -q FETCH_HEAD
+
+            -   name: Login to Container Registry
+                if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+                env:
+                    REGISTRY_PASSWORD: ${{ secrets.REGISTRY_TOKEN || github.token }}
+                run: printf '%s\n' "$REGISTRY_PASSWORD" | docker login "$REGISTRY" -u "${{ github.actor }}" --password-stdin
+
+            -   name: Build runner image
+                run: |
+                    docker build \
+                      --file docker/runner/Dockerfile \
+                      -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest \
+                      -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
+                      docker/runner
+
+            -   name: Push runner image
+                run: docker push --all-tags ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}

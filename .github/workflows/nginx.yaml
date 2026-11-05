@@ -1,0 +1,66 @@
+name: Build Nginx Image
+
+on:
+    push:
+        branches:
+            - master
+        paths:
+            - 'docker/nginx/**'
+            - '.github/workflows/nginx.yaml'
+    workflow_dispatch:
+
+env:
+    REGISTRY: ${{ github.server_url == 'https://github.com' && 'ghcr.io' || vars.REGISTRY_URL }}
+    IMAGE_NAME: ${{ github.server_url == 'https://github.com' && 'baander-app' || vars.REGISTRY_OWNER }}/baander-nginx
+
+permissions:
+    contents: read
+
+concurrency:
+    group: nginx-image-${{ github.ref }}
+    cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+    build:
+        runs-on: ${{ github.server_url == 'https://github.com' && 'ubuntu-latest' || 'docker-cli' }}
+        container:
+            image: ${{ github.server_url == 'https://github.com' && 'ghcr.io' || vars.REGISTRY_URL }}/${{ github.server_url == 'https://github.com' && 'baander-app' || vars.REGISTRY_OWNER }}/baander-runner:latest
+        permissions:
+            contents: read
+            packages: write
+        steps:
+            -   name: Checkout
+                env:
+                    GIT_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                run: |
+                    if [ "$GITHUB_SERVER_URL" = https://github.com ]; then
+                        auth="basic $(printf 'x-access-token:%s' "$GIT_TOKEN" | base64 | tr -d '\n')"
+                    else
+                        auth="token $GIT_TOKEN"
+                    fi
+                    git init -q
+                    git remote add origin ${{ github.event.repository.clone_url }}
+                    git -c http.extraHeader="Authorization: $auth" fetch -q origin ${{ github.ref }}
+                    git checkout -q FETCH_HEAD
+
+            -   name: Login to Container Registry
+                if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+                env:
+                    REGISTRY_PASSWORD: ${{ secrets.REGISTRY_TOKEN || github.token }}
+                run: printf '%s\n' "$REGISTRY_PASSWORD" | docker login "$REGISTRY" -u "${{ github.actor }}" --password-stdin
+
+            -   name: Build and push Nginx image
+                run: |
+                    docker buildx build \
+                      --file docker/nginx/Dockerfile \
+                      --build-arg BUILD_ARGUMENT_ENV=dev \
+                      --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest \
+                      --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
+                      --push \
+                      docker/
+
+            -   name: Nginx image is not publicly pullable
+                # GHCR keeps the package private until an operator changes
+                # it; the image may not be redistributed yet.
+                if: github.server_url == 'https://github.com'
+                run: sh scripts/ghcr-private-probe.sh "$REGISTRY/$IMAGE_NAME"
