@@ -57,8 +57,8 @@ final readonly class PackageStore
         $target = Paths::absolutePath($directory);
         $parent = dirname($target);
         $this->directory($parent);
-        $download = $parent . '/.' . basename($target) . '.download-' . bin2hex(random_bytes(6));
-        $staging = $parent . '/.' . basename($target) . '.restore-' . bin2hex(random_bytes(6));
+        $download = self::sibling($target, 'download');
+        $staging = self::sibling($target, 'restore');
         try {
             $status = self::status($this->request('GET', $package, $file, ['--output', $download]));
             if ($status !== 200) {
@@ -107,7 +107,7 @@ final readonly class PackageStore
     {
         $path = Paths::absolutePath($destination);
         $this->directory(dirname($path));
-        $download = dirname($path) . '/.' . basename($path) . '.download-' . bin2hex(random_bytes(6));
+        $download = self::sibling($path, 'download');
         try {
             $status = self::status($this->request('GET', $package, $file, ['--output', $download]));
             if ($status !== 200) {
@@ -182,6 +182,12 @@ final readonly class PackageStore
         if (!is_dir($path) && !@mkdir($path, 0755, true) && !is_dir($path)) {
             throw new \RuntimeException("Cannot create directory: {$path}");
         }
+    }
+
+    /** A hidden, uniquely named path beside the target, so a rename into place stays on one filesystem. */
+    private static function sibling(string $target, string $kind): string
+    {
+        return dirname($target) . '/.' . basename($target) . '.' . $kind . '-' . bin2hex(random_bytes(6));
     }
 
     private static function remove(string $path): void
