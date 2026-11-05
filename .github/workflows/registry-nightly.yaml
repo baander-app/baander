@@ -29,6 +29,7 @@ jobs:
                     else
                         auth="token $GIT_TOKEN"
                     fi
+                    git config --global --add safe.directory "$PWD"
                     git init -q
                     git remote add origin ${{ github.event.repository.clone_url }}
                     git -c http.extraHeader="Authorization: $auth" fetch -q origin "${{ github.event.pull_request.head.sha || github.sha }}"

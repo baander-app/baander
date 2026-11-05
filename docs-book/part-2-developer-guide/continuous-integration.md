@@ -95,8 +95,10 @@ it would delete real directories.
 
 Every job in the shared workflows checks out with a shell script instead of
 `actions/checkout`; only the GitHub-only AAC native addon workflow uses the action.
-Gate jobs
-fetch `github.event.pull_request.head.sha || github.sha`, check it out detached and
+The script first marks the workspace as a safe directory in the container's global
+Git configuration, as `actions/checkout` does. On GitHub the job container runs as
+root while the hosted runner's user owns the workspace, and Git refuses a repository
+owned by another user. Gate jobs fetch `github.event.pull_request.head.sha || github.sha`, check it out detached and
 fail unless `HEAD` is that commit. On a GitHub pull request `github.sha` is a
 temporary merge commit, while Forgejo's is the head commit; fetching the head commit
 on both makes both forges qualify the same code. A branch that advances during the
@@ -121,6 +123,8 @@ for GitHub and once for Forgejo. It enforces the following rules, except the
   each guarded by the forge expression. The test checks the artifact, cache and
   baseline twins.
 - Make `runs-on` resolve to a hosted label on GitHub and to `docker-cli` on Forgejo.
+- Run `git config --global --add safe.directory "$PWD"` before a checkout script
+  initialises the workspace.
 - Make `timeout-minutes` resolve to a number of minutes on both forges. Both forges
   use the same timeouts; give a job a per-forge expression only after a GitHub run
   shows that it needs more time.

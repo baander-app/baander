@@ -54,6 +54,17 @@ For the same reason a GitHub-only job (the AAC addon) still resolves to `docker-
 on Forgejo and skips through its `if:`. Forgejo evaluates `if:` only after a runner
 has picked up the job.
 
+**Trust the workspace before a shell checkout touches it.** The shell checkout that
+works on Forgejo failed on the first GitHub run with
+`fatal: detected dubious ownership in repository at '/__w/baander/baander'`. GitHub
+mounts a workspace owned by the hosted runner's user into a job container that runs
+as root, and Git refuses a repository that another user owns. Every checkout now
+runs `git config --global --add safe.directory "$PWD"` before `git init -q`, as
+`actions/checkout` does. The setting is global because later steps in the job also
+run Git. `PublicationWorkflowTest` rejects a workspace `git init` without it and
+runs the checkout scripts with a throwaway `HOME`, so the test never writes to a
+developer's own Git configuration.
+
 **Select the buildx builder through the build tool, not the workflow.** GitHub's
 hosted Docker uses the `docker` driver, which may refuse `--cache-to type=local`, so the
 CI image build needs a `docker-container` builder. The first plan added a
@@ -99,10 +110,11 @@ The guide's runbook lists the order.
 
 ## Why This Matters
 
-Most of these traps fail silently: a skipped workflow, a job that waits in the queue, a step
-that has no effect, a cache that never restores, a false pass. The forge-neutral port
-caught them only through review and by reading the Forgejo source, not through a red
-run. A regression shows up as CI that is slower, missing or wrongly green, and nothing
+Most of these traps fail silently: a skipped workflow, a job that waits in the queue,
+a step that has no effect, a cache that never restores, a false pass. Apart from the
+checkout ownership error, which failed the first GitHub run, the forge-neutral port
+caught them through review and by reading the Forgejo source, not through a red run.
+A regression shows up as CI that is slower, missing or wrongly green, and nothing
 points back to these causes.
 
 ## When to Apply

@@ -428,6 +428,7 @@ SH;
         yield 'write step without trusted-run guard' => [$workflow, $step(['name' => 'Save', 'if' => "github.ref == 'refs/heads/master'", 'uses' => 'actions/cache/save@' . str_repeat('a', 40)]), 'trusted-run'];
         yield 'login reachable from a fork' => [$workflow, $step(['name' => 'Login', 'run' => 'docker login registry.baander.app']), 'trusted-run'];
         yield 'host mount without forge guard' => [$workflow, $step(['name' => 'Clean', 'run' => 'docker run --rm -v /opt/ghc:/cleanup/ghc alpine true']), 'host paths'];
+        yield 'checkout without safe directory' => [$workflow, $step(['name' => 'Checkout', 'run' => "git init -q\ngit fetch -q origin main"]), 'safe directory'];
         yield 'missing concurrency' => [$workflow, static function (array $document): array {
             unset($document['concurrency']);
             return $document;
@@ -854,8 +855,16 @@ SH;
         return new Process(
             ['/bin/bash', '-e', '-c', self::interpolate($script, self::checkoutContext($remote, $sha, $server, $mergeSha))],
             $workspace,
-            ['GIT_TOKEN' => 'local-test-token', 'GITHUB_SERVER_URL' => $server],
+            ['GIT_TOKEN' => 'local-test-token', 'GITHUB_SERVER_URL' => $server, 'HOME' => $this->home(), 'GIT_CONFIG_NOSYSTEM' => '1'],
         );
+    }
+
+    /** A throwaway home directory, so the checkout's global git configuration never reaches the developer's own. */
+    private function home(): string
+    {
+        $home = $this->directory . '/home';
+        new Filesystem()->mkdir($home);
+        return $home;
     }
 
     /** @return array<string, mixed> */
@@ -1078,6 +1087,12 @@ SH;
             }
             foreach ($steps as $step) {
                 $label = $where . ' ' . ($step['name'] ?? $step['uses'] ?? 'step');
+                $run = $step['run'] ?? '';
+                $init = preg_match('~^\s*git init -q\s*$~m', $run, $match, PREG_OFFSET_CAPTURE) === 1 ? $match[0][1] : null;
+                $safe = strpos($run, 'git config --global --add safe.directory "$PWD"');
+                if ($init !== null && ($safe === false || $safe > $init)) {
+                    $violations[] = $label . ': must trust the workspace as a safe directory before initialising it, because the job container user does not own it on GitHub';
+                }
                 if ($pullRequests && self::writes($step)) {
                     $fork = array_any(
                         [self::GITHUB, self::FORGEJO],
