@@ -41,6 +41,32 @@ Open items for this plan:
 - The coverage comment steps still interpolate the stored baseline into `node -e` as code, as the Forgejo workflows did.
 - `PackageStore` error paths without tests: restore into a non-empty target, constructor validation, and saving a missing directory.
 
+## System overview pages
+
+Delivered, 2026-11-05, on branch `docs/system-overview-pages` (local, not pushed), from the
+[system overview pages plan](docs/plans/2026-11-05-1910-docs-system-overview-pages-plan.md):
+the operator guide's [Deployment Topology](docs-book/part-1-operator-guide/deployment-topology.md)
+and the developer guide's [Communication Map](docs-book/part-2-developer-guide/communication-map.md),
+with the routing diagram on CQRS and Messaging, the transcode lifecycle on the Transcode
+context page and the DPoP handshake on API Reference. The Transcode context page's
+infrastructure sections and streaming route table now describe the worker pair design and
+the current routes, and API Reference no longer mentions query-token WebSocket
+authentication. Understanding Baander, Architecture Overview, both guide indexes and the
+documentation root point at the new pages.
+
+Checkpoint, 2026-11-05:
+
+- `php scripts/build-website.php`: 210 manual pages, every relative link and fragment resolved, five new Mermaid blocks rendered through the local helper.
+- Browser rendering spec (`corepack yarn test:browser` in `ui/site`): 59 passed. Its diagram page list now names the two hubs, the Transcode context page, CQRS and Messaging and API Reference, so the first sequence diagram passes the same width, variant and alt checks as the flowcharts.
+- Helper tests (`node --test scripts/*.test.mjs` in `ui/site`): 4 passed.
+- prose-fix review applied to every new or changed page.
+- The CI gate is the GitHub public website workflow, which runs on changes under `docs-book/`; Forgejo has no website gate.
+
+Open items for this plan:
+
+- The Auth context guide still names a task transport that no longer exists; it belongs to a later documentation pass.
+- Two entries under `docs/solutions` name a transport that no longer exists and a single combined consumer; they are candidates for `ce-compound-refresh`.
+
 ## Small-host household deployment
 
 The user confirmed the

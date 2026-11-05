@@ -23,7 +23,16 @@ function fences(file: string): { language: string; source: string }[] {
     .map((match) => ({ language: match[1].trim(), source: match[2] }));
 }
 
-const diagramPages = ['live-updates', 'application-threat-model', 'registry-threat-model'];
+const diagramPages = [
+  { chapter: 'operator-guide', directory: 'part-1-operator-guide', path: 'deployment-topology' },
+  { chapter: 'developer-guide', directory: 'part-2-developer-guide', path: 'communication-map' },
+  { chapter: 'developer-guide', directory: 'part-2-developer-guide', path: 'live-updates' },
+  { chapter: 'developer-guide', directory: 'part-2-developer-guide', path: 'application-threat-model' },
+  { chapter: 'developer-guide', directory: 'part-2-developer-guide', path: 'registry-threat-model' },
+  { chapter: 'developer-guide', directory: 'part-2-developer-guide', path: 'cqrs-and-messaging' },
+  { chapter: 'developer-guide', directory: 'part-2-developer-guide', path: 'contexts/transcode' },
+  { chapter: 'developer-guide', directory: 'part-2-developer-guide', path: 'api-reference' },
+];
 
 async function visibleVariant(figure: Locator, appearance: 'light' | 'dark'): Promise<void> {
   const hidden = appearance === 'light' ? 'dark' : 'light';
@@ -43,8 +52,9 @@ for (const width of [1440, 390]) {
     test.describe(`${width}px ${colorScheme} static manual`, () => {
       test.use({ javaScriptEnabled: false, viewport: { width, height: 1000 }, colorScheme });
       test('diagrams, original source and keyboard scrolling work without JavaScript', async ({ page }) => {
-        for (const slug of diagramPages) {
-          await page.goto(`/docs/developer-guide/${slug}/`);
+        for (const { chapter, directory, path } of diagramPages) {
+          const slug = path.replaceAll('/', '-');
+          await page.goto(`/docs/${chapter}/${path}/`);
           const figure = page.locator('figure.diagram');
           await expect(figure).toHaveCount(1);
           await visibleVariant(figure, colorScheme);
@@ -75,7 +85,7 @@ for (const width of [1440, 390]) {
           await disclosure.locator('summary').focus();
           await disclosure.locator('summary').press('Enter');
           await expect(disclosure).toHaveAttribute('open', '');
-          const original = fences(`part-2-developer-guide/${slug}.md`).find((block) => block.language === 'mermaid')!;
+          const original = fences(`${directory}/${path}.md`).find((block) => block.language === 'mermaid')!;
           expect(await disclosure.locator('code').textContent()).toBe(original.source);
         }
       });
