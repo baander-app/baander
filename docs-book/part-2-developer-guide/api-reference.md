@@ -240,19 +240,16 @@ The sequence below shows the handshake against one token endpoint; `/api/auth/lo
 ```mermaid
 sequenceDiagram
     accTitle: DPoP token handshake and bound API request
-    accDescr: The client sends a token request with a proof that has no nonce. The token endpoint stores a nonce in Redis and answers 400 use_dpop_nonce with a DPoP-Nonce header. The client repeats the request with the nonce in its proof. The endpoint consumes the nonce and returns a token pair whose access token carries the key thumbprint, plus a fresh nonce. The client then calls a resource endpoint with Authorization DPoP and a proof carrying the access token hash, and receives the resource.
+    accDescr: The client sends a token request with a proof that has no nonce. The token endpoint issues a nonce and answers 400 use_dpop_nonce with a DPoP-Nonce header. The client repeats the request with the nonce in its proof. The endpoint consumes the nonce and returns a token pair whose access token carries the key thumbprint, plus a fresh nonce. The client then calls a resource endpoint with Authorization DPoP and a proof carrying the access token hash, and receives the resource.
     participant C as Client
     participant T as Token endpoint
-    participant R as Redis nonce store
-    participant A as Resource endpoint
-    C->>T: Token request, DPoP proof without nonce
-    T->>R: Store nonce (TTL auth.dpop.nonce_ttl)
-    T-->>C: 400 use_dpop_nonce, DPoP-Nonce header
-    C->>T: Token request, DPoP proof with nonce
-    T->>R: Consume nonce (single use)
-    T-->>C: Token pair, access token carries cnf.jkt, fresh DPoP-Nonce
-    C->>A: Authorization: DPoP accessToken, DPoP proof with ath
-    A-->>C: Resource (proof and cnf.jkt binding verified)
+    participant A as Resource
+    C->>T: Proof without nonce
+    T-->>C: 400 use_dpop_nonce
+    C->>T: Proof with nonce
+    T-->>C: Tokens, next nonce
+    C->>A: Token + proof (ath)
+    A-->>C: Resource
 ```
 
 Issued tokens are bound to the proof key: the access token carries `cnf.jkt`. API requests send `Authorization: DPoP <accessToken>` with a `DPoP` proof from the same key that includes the access token hash (`ath`). Signed stream delivery URLs do not need a proof.

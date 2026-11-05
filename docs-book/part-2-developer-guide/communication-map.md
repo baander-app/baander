@@ -15,19 +15,20 @@ flowchart TB
     accTitle: Communication map of a Baander installation
     accDescr: The browser application and the Electron app call the HTTP API over HTTPS with DPoP proofs and open the WebSocket with a ticket issued over HTTP; the planned local casting companion is drawn with a dotted edge. The HTTP API dispatches on the message bus, which runs inline handlers against the aggregates in PostgreSQL or sends routed messages to the Redis async stream. Committed events enter the outbox, which the control unit relays to the async stream; capture triggers fill the change inbox, whose revisions reach the WebSocket as change hints. The control unit also relays scheduled occurrences to the scheduler stream. The execution unit consumes both streams, writes exhausted deliveries to the failed messages table and calls the external metadata, email, push and webhook services; the web application calls external services only for request-time work. Redis also holds DPoP nonces, WebSocket tickets and the worker heartbeat. The registry is reached by clients only.
     subgraph clients[Clients]
-        browser[Browser single-page application]
+        browser[Browser app]
         electron[Electron app]
-        companion["Local casting companion (planned)"]
+        companion["Casting companion (planned)"]
+        registry[Registry]
     end
     subgraph app[Web application]
-        api[HTTP API with firewall and DPoP]
+        api["HTTP API (firewall, DPoP)"]
         ws[WebSocket]
         bus[Message bus]
     end
     subgraph postgres[PostgreSQL]
         aggregates[(Aggregates)]
         outbox[(Outbox)]
-        inbox[(Change inbox and revisions)]
+        inbox[(Change inbox)]
         failed[(Failed messages)]
         outbox ~~~ inbox
         inbox ~~~ failed
@@ -35,7 +36,7 @@ flowchart TB
     subgraph redis[Redis]
         async[(async stream)]
         scheduler[(scheduler stream)]
-        nonces[(Nonces, tickets and heartbeat)]
+        nonces[(Nonces, tickets, heartbeat)]
         async ~~~ scheduler
         scheduler ~~~ nonces
     end
@@ -51,31 +52,28 @@ flowchart TB
         providers ~~~ push
         email ~~~ webhooks
     end
-    registry[Registry]
     clients ~~~ app
     app ~~~ postgres
     postgres ~~~ redis
     redis ~~~ pair
     pair ~~~ external
-    clients -->|HTTPS with DPoP| api
-    clients -->|ticket, then upgrade| ws
+    clients -->|HTTPS| api
+    clients -->|ticket| ws
     companion -.->|planned| api
     clients -.->|lookup| registry
     api -->|dispatch| bus
-    bus -->|inline handler| aggregates
-    bus -->|routed message| async
-    aggregates -->|committed event| outbox
-    aggregates -->|capture trigger| inbox
-    inbox -->|change hint| ws
-    outbox -->|relay| control
-    control -->|relayed message| async
+    bus -->|inline| aggregates
+    bus -->|routed| async
+    aggregates -->|event| outbox
+    aggregates -->|capture| inbox
+    inbox -->|hint| ws
+    outbox -->|relayed by control| async
     control -->|occurrences| scheduler
-    control <-->|IPC volume| execution
+    control <-->|IPC| execution
     async -->|consume| execution
     scheduler -->|consume| execution
-    execution -->|exhausted retries| failed
-    execution -->|queued delivery and sync| external
-    api -->|request-time calls| external
+    execution -->|failed| failed
+    execution -->|queued| external
 ```
 
 The map shows paths, not deployment. [Deployment Topology](../part-1-operator-guide/deployment-topology.md)

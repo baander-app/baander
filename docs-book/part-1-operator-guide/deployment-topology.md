@@ -10,7 +10,10 @@ runs, and the table after it says what each store holds.
 flowchart TB
     accTitle: Deployment topology of a Baander installation
     accDescr: Browsers and apps reach nginx, which forwards to the web application with its Swoole HTTP and WebSocket server. The web application and the worker deployment pair reach PostgreSQL through the connection pooler and use Redis directly. The host controller, outside Compose, deploys the control and execution units, which a private IPC volume joins. The web application and the execution unit share the source media, images and generated output. The optional registry runs outside the installation host and is reached by clients only.
-    clients[Browsers and apps]
+    subgraph outside[Outside the host]
+        clients[Browsers and apps]
+        registry[Optional registry]
+    end
     subgraph host[Installation host]
         subgraph web[Compose web stack]
             nginx["nginx (recipe)"]
@@ -30,15 +33,14 @@ flowchart TB
             output[(Generated output)]
         end
     end
-    registry[Optional registry]
+    clients -.->|discovery| registry
     clients -->|HTTPS| nginx
     nginx -->|HTTP| app
     app --> pooler
     pooler --> postgres
     app --> redis
     postgres ~~~ controller
-    controller -.->|deploys| control
-    controller -.->|deploys| execution
+    controller -.->|deploys| pair
     control <-->|IPC volume| execution
     control --> pooler
     execution --> pooler
@@ -46,7 +48,6 @@ flowchart TB
     execution --> redis
     app --> storage
     execution --> storage
-    clients -.->|discovery| registry
 ```
 
 ## The browser path

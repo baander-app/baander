@@ -23,15 +23,17 @@ function fences(file: string): { language: string; source: string }[] {
     .map((match) => ({ language: match[1].trim(), source: match[2] }));
 }
 
+// `fits` asserts the diagram lays out inside its column at desktop width, so a
+// page meant to be read without horizontal scrolling fails when a redraw widens it.
 const diagramPages = [
-  { chapter: 'operator-guide', directory: 'part-1-operator-guide', path: 'deployment-topology' },
-  { chapter: 'developer-guide', directory: 'part-2-developer-guide', path: 'communication-map' },
-  { chapter: 'developer-guide', directory: 'part-2-developer-guide', path: 'live-updates' },
-  { chapter: 'developer-guide', directory: 'part-2-developer-guide', path: 'application-threat-model' },
-  { chapter: 'developer-guide', directory: 'part-2-developer-guide', path: 'registry-threat-model' },
-  { chapter: 'developer-guide', directory: 'part-2-developer-guide', path: 'cqrs-and-messaging' },
-  { chapter: 'developer-guide', directory: 'part-2-developer-guide', path: 'contexts/transcode' },
-  { chapter: 'developer-guide', directory: 'part-2-developer-guide', path: 'api-reference' },
+  { chapter: 'operator-guide', directory: 'part-1-operator-guide', path: 'deployment-topology', fits: true },
+  { chapter: 'developer-guide', directory: 'part-2-developer-guide', path: 'communication-map', fits: true },
+  { chapter: 'developer-guide', directory: 'part-2-developer-guide', path: 'live-updates', fits: true },
+  { chapter: 'developer-guide', directory: 'part-2-developer-guide', path: 'application-threat-model', fits: false },
+  { chapter: 'developer-guide', directory: 'part-2-developer-guide', path: 'registry-threat-model', fits: false },
+  { chapter: 'developer-guide', directory: 'part-2-developer-guide', path: 'cqrs-and-messaging', fits: true },
+  { chapter: 'developer-guide', directory: 'part-2-developer-guide', path: 'contexts/transcode', fits: true },
+  { chapter: 'developer-guide', directory: 'part-2-developer-guide', path: 'api-reference', fits: true },
 ];
 
 async function visibleVariant(figure: Locator, appearance: 'light' | 'dark'): Promise<void> {
@@ -52,7 +54,7 @@ for (const width of [1440, 390]) {
     test.describe(`${width}px ${colorScheme} static manual`, () => {
       test.use({ javaScriptEnabled: false, viewport: { width, height: 1000 }, colorScheme });
       test('diagrams, original source and keyboard scrolling work without JavaScript', async ({ page }) => {
-        for (const { chapter, directory, path } of diagramPages) {
+        for (const { chapter, directory, path, fits } of diagramPages) {
           const slug = path.replaceAll('/', '-');
           await page.goto(`/docs/${chapter}/${path}/`);
           const figure = page.locator('figure.diagram');
@@ -68,6 +70,9 @@ for (const width of [1440, 390]) {
             content: element.scrollWidth,
           }));
           expect(geometry.content).toBeGreaterThanOrEqual(geometry.viewport);
+          if (fits && width === 1440) {
+            expect(geometry.content, `${path} must fit its column without horizontal scrolling`).toBe(geometry.viewport);
+          }
           const image = figure.locator(`img.diagram-${colorScheme}`);
           expect(await image.evaluate((element: HTMLImageElement) => element.getBoundingClientRect().width))
             .toBe(Number(await image.getAttribute('width')));

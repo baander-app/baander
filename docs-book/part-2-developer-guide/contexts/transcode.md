@@ -12,14 +12,14 @@ flowchart TD
     accDescr: The web request commits the transcode session and its execution request in PostgreSQL. The control unit claims the request when a media job slot is free and sends bounded native requests to the execution unit over the private IPC socket. FFmpeg writes the generation directory on shared storage, the child persists job state with fenced writes, the web application serves the published files and the browser rereads after a change hint.
     subgraph web[Web application]
         request[Session request]
-        delivery["Manifest, segment and job endpoints"]
+        delivery[Served manifests and segments]
     end
     subgraph pg[PostgreSQL]
         runtime[(Execution request)]
         jobs[(Job and session state)]
     end
     subgraph control[Control unit]
-        coordinator[Media coordinator] -->|Free media job slot| child[Media job child]
+        coordinator[Media coordinator] -->|Free slot| child[Media job child]
     end
     subgraph execution[Execution unit]
         daemon[Native execution daemon]
@@ -27,12 +27,12 @@ flowchart TD
     subgraph storage[Shared storage]
         generation[(Generation directory)]
     end
-    request -->|Session and request in one transaction| runtime
+    request -->|One transaction| runtime
     runtime -->|Pending request| coordinator
-    child -->|Claim and lease renewal| runtime
-    child -->|Bounded native request over the IPC socket| daemon
-    daemon -->|FFmpeg fragments and manifest| generation
-    child -->|Generation-fenced writes| jobs
+    child -->|Claim, renew lease| runtime
+    child -->|Native request over the IPC socket| daemon
+    daemon -->|FFmpeg output| generation
+    child -->|Fenced writes| jobs
     generation --> delivery
     jobs --> delivery
     jobs -->|Change hint| browser[Browser]
