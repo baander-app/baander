@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { test as base, expect, type Locator } from '@playwright/test';
+import { test as base, expect, type Locator, type Page } from '@playwright/test';
 
 const test = base.extend<{ localRequests: void }>({
   localRequests: [async ({ context, baseURL }, use) => {
@@ -129,6 +129,32 @@ for (const colorScheme of ['light', 'dark'] as const) {
 const opacity = (locator: Locator) => locator.evaluate((element) => Number(getComputedStyle(element).opacity));
 const inlineStroke = (locator: Locator) => locator.evaluate((element) => (element as SVGElement).style.stroke);
 
+// The announcement a flowchart node should produce: its label, then its visible edge count.
+const announcement = (svg: Locator, name: string) => svg.evaluate((root, node) => {
+  const group = root.querySelector(`g.node[data-node="${node}"]`);
+  if (!group) throw new Error(`No node ${node}`);
+  const rows = [...group.querySelectorAll('.text-outer-tspan')].map((row) => row.textContent ?? '');
+  const label = (rows.length ? rows.join(' ') : group.querySelector('.label')?.textContent ?? '').replace(/\s+/g, ' ').trim();
+  const edges = [...root.querySelectorAll('path[data-et="edge"][data-from][data-to]')]
+    .filter((edge) => !edge.classList.contains('edge-thickness-invisible'))
+    .filter((edge) => edge.getAttribute('data-from') === node || edge.getAttribute('data-to') === node);
+  return edges.length ? `${label}. ${edges.length} connection${edges.length === 1 ? '' : 's'}:` : `${label}. No connections.`;
+}, name);
+
+// A point five pixels beside a line a quarter of the way along it: outside the drawn
+// stroke, inside the twelve-pixel hit stroke.
+const besideLine = (locator: Locator) => locator.evaluate((element) => {
+  const path = element as SVGGeometryElement;
+  const length = path.getTotalLength();
+  const matrix = path.getScreenCTM()!;
+  const at = new DOMPoint(path.getPointAtLength(length / 4).x, path.getPointAtLength(length / 4).y).matrixTransform(matrix);
+  const ahead = new DOMPoint(path.getPointAtLength(length / 4 + 1).x, path.getPointAtLength(length / 4 + 1).y).matrixTransform(matrix);
+  const norm = Math.hypot(ahead.x - at.x, ahead.y - at.y) || 1;
+  return { x: at.x - ((ahead.y - at.y) / norm) * 5, y: at.y + ((ahead.x - at.x) / norm) * 5 };
+});
+
+const classAt = (page: Page, point: { x: number; y: number }) => page.evaluate(([x, y]) => document.elementFromPoint(x, y)?.getAttribute('class') ?? null, [point.x, point.y]);
+
 test.describe('interactive diagrams', () => {
   test.use({ viewport: { width: 1440, height: 1000 }, colorScheme: 'light' });
 
@@ -170,14 +196,11 @@ test.describe('interactive diagrams', () => {
     const hit = svg.locator(`path.diagram-hit[data-hit-for="${await edge.getAttribute('data-id')}"]`);
     await expect(hit).toHaveCount(1);
     await hit.scrollIntoViewIfNeeded();
-    const point = await hit.evaluate((element) => {
-      const path = element as SVGPathElement;
-      const along = path.getPointAtLength(path.getTotalLength() / 4);
-      const { x, y } = new DOMPoint(along.x, along.y).matrixTransform(path.getScreenCTM()!);
-      return { x, y };
-    });
+    const point = await besideLine(hit);
+    expect(await classAt(page, point)).toBe('diagram-hit');
     await page.mouse.move(point.x, point.y);
     await expect(edge).toHaveClass(/is-active/);
+    await expect(svg.locator(':scope > title')).toHaveCount(0);
   });
 
   test('a sequence message emphasizes its text and lifelines', async ({ page }) => {
@@ -189,6 +212,35 @@ test.describe('interactive diagrams', () => {
     await expect(svg.locator('[data-et="life-line"][data-id="C"]')).toHaveClass(/is-related/);
     await expect(svg.locator('[data-et="life-line"][data-id="T"]')).toHaveClass(/is-related/);
     await expect(svg.locator('[data-et="life-line"][data-id="A"]')).toHaveClass(/is-receded/);
+    await page.mouse.move(0, 0);
+    await expect(svg.locator('.is-active')).toHaveCount(0);
+    // A pointer beside a message line lands on its widened hit line.
+    const hit = svg.locator('line.diagram-hit').first();
+    await hit.scrollIntoViewIfNeeded();
+    const point = await besideLine(hit);
+    expect(await classAt(page, point)).toBe('diagram-hit');
+    await page.mouse.move(point.x, point.y);
+    await expect(svg.locator('[data-et="message"].is-active')).toHaveCount(1);
+    await expect(svg.locator('[data-et="message"].is-active')).toHaveAttribute('data-id', (await hit.getAttribute('data-hit-for'))!);
+  });
+
+  test('a sequence diagram steps through its messages', async ({ page }) => {
+    await page.goto('/docs/developer-guide/api-reference/');
+    const figure = page.locator('figure.diagram');
+    const svg = await visibleInteractive(figure, 'light');
+    const region = figure.getByRole('region');
+    const texts = svg.locator('text.messageText[data-from]');
+    const active = svg.locator('text.messageText.is-active');
+    await region.focus();
+    await region.press('Enter');
+    await expect(active).toHaveText(await texts.first().textContent() ?? '');
+    await region.press('ArrowDown');
+    await expect(active).toHaveText(await texts.nth(1).textContent() ?? '');
+    await region.press('End');
+    await expect(active).toHaveText(await texts.last().textContent() ?? '');
+    await expect(figure.locator('p[aria-live="polite"]')).toContainText(/^.+ from .+ to .+$/);
+    await region.press('Escape');
+    await expect(svg.locator('.is-active')).toHaveCount(0);
   });
 
   test('Enter steps through nodes with announcements and Escape restores scrolling', async ({ page }) => {
@@ -203,14 +255,15 @@ test.describe('interactive diagrams', () => {
     await region.press('ArrowRight');
     await expect.poll(() => region.evaluate((element) => element.scrollLeft)).toBeGreaterThan(0);
     await region.evaluate((element) => { element.scrollLeft = 0; });
+    const names = await svg.locator('g.node').evaluateAll((nodes) => nodes.map((node) => node.getAttribute('data-node')!));
+    const announcer = figure.locator('p[aria-live="polite"]');
     await region.press('Enter');
+    await expect(announcer).toContainText(await announcement(svg, names[0]));
     await region.press('ArrowRight');
     const active = svg.locator('g.node.is-active');
     await expect(active).toHaveCount(1);
-    const name = await svg.locator('g.node').nth(1).getAttribute('data-node');
-    await expect(active).toHaveAttribute('data-node', name!);
-    const announcer = figure.locator('p[aria-live="polite"]');
-    await expect(announcer).toContainText(/connection/);
+    await expect(active).toHaveAttribute('data-node', names[1]);
+    await expect(announcer).toContainText(await announcement(svg, names[1]));
     await expect(figure.locator('p.diagram-hint')).toContainText('Escape');
     // Stepping brings the active node into the region instead of paging it.
     expect(await figure.evaluate((element) => {
@@ -225,6 +278,74 @@ test.describe('interactive diagrams', () => {
     await expect(svg.locator('.is-receded')).toHaveCount(0);
     await region.press('ArrowRight');
     await expect.poll(() => region.evaluate((element) => element.scrollLeft)).toBeGreaterThan(0);
+  });
+
+  test('Home, End and the arrows move between nodes and around a node\'s edges', async ({ page }) => {
+    await page.goto('/docs/developer-guide/application-threat-model/');
+    const figure = page.locator('figure.diagram');
+    const svg = await visibleInteractive(figure, 'light');
+    const region = figure.getByRole('region');
+    const names = await svg.locator('g.node').evaluateAll((nodes) => nodes.map((node) => node.getAttribute('data-node')!));
+    const degree = async (name: string) => svg.locator(`path[data-et="edge"][data-from="${name}"], path[data-et="edge"][data-to="${name}"]`).count();
+    const degrees = await Promise.all(names.map(degree));
+    const busy = degrees.indexOf(Math.max(...degrees));
+    expect(degrees[busy]).toBeGreaterThan(1);
+    const active = svg.locator('g.node.is-active');
+    const activeEdge = svg.locator('path[data-et="edge"].is-active');
+    const ends = async () => [await activeEdge.getAttribute('data-from'), await activeEdge.getAttribute('data-to')];
+    await region.focus();
+    await region.press('Enter');
+    await expect(active).toHaveAttribute('data-node', names[0]);
+    await region.press('ArrowLeft');
+    await expect(active).toHaveAttribute('data-node', names[0]);
+    await region.press('End');
+    await expect(active).toHaveAttribute('data-node', names[names.length - 1]);
+    await region.press('ArrowRight');
+    await expect(active).toHaveAttribute('data-node', names[names.length - 1]);
+    await region.press('Home');
+    await expect(active).toHaveAttribute('data-node', names[0]);
+    for (let step = 0; step < busy; step += 1) await region.press('ArrowRight');
+    await expect(active).toHaveAttribute('data-node', names[busy]);
+    await region.press('ArrowDown');
+    await expect(activeEdge).toHaveCount(1);
+    expect(await ends()).toContain(names[busy]);
+    await expect(svg.locator(`g.node[data-node="${names[busy]}"]`)).toHaveClass(/is-related/);
+    const firstEdge = await activeEdge.getAttribute('data-id');
+    await region.press('ArrowUp');
+    await expect(activeEdge).toHaveCount(1);
+    expect(await ends()).toContain(names[busy]);
+    expect(await activeEdge.getAttribute('data-id')).not.toBe(firstEdge);
+    await region.press('ArrowRight');
+    await expect(active).toHaveAttribute('data-node', names[busy + 1]);
+  });
+
+  test('Enter starts stepping at a pinned edge', async ({ page }) => {
+    await page.goto('/docs/developer-guide/communication-map/');
+    const figure = page.locator('figure.diagram');
+    const svg = await visibleInteractive(figure, 'light');
+    const edge = svg.locator('path[data-et="edge"][data-from="outbox"][data-to="async"]');
+    await svg.locator('g.edgeLabel[data-from="outbox"][data-to="async"]').click();
+    await expect(edge).toHaveClass(/is-active/);
+    await figure.getByRole('region').press('Enter');
+    await expect(edge).toHaveClass(/is-active/);
+    await expect(figure.locator('p.diagram-hint')).toContainText('Escape');
+    await figure.getByRole('region').press('ArrowDown');
+    const activeEdge = svg.locator('path[data-et="edge"].is-active');
+    await expect(activeEdge).toHaveCount(1);
+    expect([await activeEdge.getAttribute('data-from'), await activeEdge.getAttribute('data-to')]).toContain('outbox');
+  });
+
+  test('a click on plain content releases a pin and a click on a control keeps it', async ({ page }) => {
+    await page.goto('/docs/developer-guide/communication-map/');
+    const figure = page.locator('figure.diagram');
+    const svg = await visibleInteractive(figure, 'light');
+    const node = svg.locator('g.node[data-node="execution"]');
+    await node.click();
+    await expect(node).toHaveClass(/is-active/);
+    await figure.locator('summary').click();
+    await expect(node).toHaveClass(/is-active/);
+    await page.locator('.manual-article p').first().click();
+    await expect(svg.locator('.is-active')).toHaveCount(0);
   });
 
   test('a pinned node survives a theme switch with its scroll position', async ({ page }) => {
@@ -250,11 +371,32 @@ test.describe('interactive diagrams', () => {
     const figure = page.locator('figure.diagram');
     await expect(figure.locator('img.diagram-light')).toBeVisible();
     await expect(figure.locator('svg.diagram-interactive')).toHaveCount(0);
-    await page.unroute('**/assets/diagrams/*-light.svg');
-    await page.route('**/assets/diagrams/*-light.svg', (route) => route.fulfill({ status: 404 }));
-    await page.reload();
-    await expect(figure.locator('img.diagram-light')).toBeVisible();
-    await expect(figure.locator('svg.diagram-interactive')).toHaveCount(0);
+    const rejected = [
+      { status: 404 },
+      { status: 200, contentType: 'image/svg+xml', body: '<html xmlns="http://www.w3.org/1999/xhtml"><p>not a diagram</p></html>' },
+      { status: 200, contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg"><g>' },
+    ];
+    for (const response of rejected) {
+      await page.unroute('**/assets/diagrams/*-light.svg');
+      await page.route('**/assets/diagrams/*-light.svg', (route) => route.fulfill(response));
+      await page.reload();
+      await expect(figure.locator('img.diagram-light')).toBeVisible();
+      await expect(figure.locator('svg.diagram-interactive')).toHaveCount(0);
+    }
+    expect(errors).toEqual([]);
+  });
+
+  test('a rejected other variant leaves its image after a theme switch', async ({ page }) => {
+    const errors: string[] = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    await page.route('**/assets/diagrams/*-dark.svg', (route) => route.fulfill({ status: 404 }));
+    await page.goto('/docs/developer-guide/live-updates/');
+    const figure = page.locator('figure.diagram');
+    await visibleInteractive(figure, 'light');
+    await page.getByRole('button', { name: 'Switch to dark mode' }).click();
+    await expect(figure.locator('img.diagram-dark')).toBeVisible();
+    await expect(figure.locator('svg.diagram-interactive')).toHaveCount(1);
+    await expect(figure.locator('svg.diagram-interactive')).toBeHidden();
     expect(errors).toEqual([]);
   });
 });
@@ -270,7 +412,20 @@ test.describe('interactive diagrams on touch', () => {
     await node.scrollIntoViewIfNeeded();
     await node.tap();
     await expect(node).toHaveClass(/is-active/);
-    await expect(figure.locator('p[aria-live="polite"]')).toContainText(/connection/);
+    await expect(figure.locator('p[aria-live="polite"]')).toContainText(await announcement(svg, 'execution'));
+    // A pan that starts on the canvas, and a touch that moves or is cancelled, leave the pin alone.
+    await svg.dispatchEvent('pointerdown', { pointerType: 'touch', clientX: 5, clientY: 5, isPrimary: true });
+    await svg.dispatchEvent('pointercancel', { pointerType: 'touch', isPrimary: true });
+    await expect(node).toHaveClass(/is-active/);
+    const other = svg.locator('g.node[data-node="browser"]');
+    await other.dispatchEvent('pointerdown', { pointerType: 'touch', clientX: 10, clientY: 10, isPrimary: true });
+    await other.dispatchEvent('pointerup', { pointerType: 'touch', clientX: 40, clientY: 10, isPrimary: true });
+    await expect(other).not.toHaveClass(/is-active/);
+    await other.dispatchEvent('pointerdown', { pointerType: 'touch', clientX: 10, clientY: 10, isPrimary: true });
+    await other.dispatchEvent('pointercancel', { pointerType: 'touch', isPrimary: true });
+    await other.dispatchEvent('pointerup', { pointerType: 'touch', clientX: 11, clientY: 10, isPrimary: true });
+    await expect(other).not.toHaveClass(/is-active/);
+    await expect(node).toHaveClass(/is-active/);
     const edge = svg.locator('path[data-et="edge"][data-from="outbox"][data-to="async"]');
     const hit = svg.locator(`path.diagram-hit[data-hit-for="${await edge.getAttribute('data-id')}"]`);
     await hit.dispatchEvent('pointerdown', { pointerType: 'touch', clientX: 10, clientY: 10, isPrimary: true });

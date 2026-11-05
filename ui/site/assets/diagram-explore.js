@@ -67,8 +67,8 @@
   // One document listener and one theme observer serve every figure on the page.
   const controllers = new Set();
   const listen = () => {
-    document.addEventListener('pointerdown', (event) => {
-      for (const controller of controllers) controller.pointerDown(event);
+    document.addEventListener('click', (event) => {
+      for (const controller of controllers) controller.click(event);
     });
     new MutationObserver(() => {
       for (const controller of controllers) controller.themeChanged();
@@ -95,6 +95,8 @@
     const svg = document.importNode(root, true);
     for (const name of ['width', 'height']) svg.setAttribute(name, image.getAttribute(name));
     for (const name of ['aria-labelledby', 'aria-describedby', 'aria-roledescription']) svg.removeAttribute(name);
+    // An inline SVG's own title would show as a browser tooltip; the label below carries the name.
+    for (const child of svg.querySelectorAll(':scope > title, :scope > desc')) child.remove();
     svg.setAttribute('role', 'img');
     svg.setAttribute('aria-label', image.alt);
     svg.classList.add(variant, 'diagram-interactive');
@@ -114,6 +116,10 @@
     hit.setAttribute('class', 'diagram-hit');
     hit.setAttribute('data-hit-for', key);
     hit.setAttribute('aria-hidden', 'true');
+    // Mermaid's id-scoped element rules outrank the stylesheet's class rule, so the width is inline.
+    hit.style.fill = 'none';
+    hit.style.stroke = 'transparent';
+    hit.style.strokeWidth = '12px';
     element.after(hit);
     return hit;
   };
@@ -194,13 +200,21 @@
       actors.get(id).push(element);
       if (!names.has(id) && element.dataset.et === 'participant') names.set(id, words(element.querySelector('text')) || id);
     }
-    const texts = [...svg.querySelectorAll('text.messageText[data-from][data-to]')];
-    const messages = [...svg.querySelectorAll('[data-et="message"][data-from][data-to]')].map((element, index) => {
+    // Mermaid draws a message's text rows before its line, so each line takes the rows
+    // since the previous line, as the renderer paired them when stamping endpoints.
+    const messages = [];
+    let rows = [];
+    for (const element of svg.querySelectorAll('text.messageText[data-from][data-to], [data-et="message"][data-from][data-to]')) {
+      if (element.dataset.et !== 'message') {
+        rows.push(element);
+        continue;
+      }
       const { from, to } = element.dataset;
-      const position = texts.findIndex((text) => text.dataset.from === from && text.dataset.to === to);
-      const own = position < 0 ? [] : texts.splice(position, 1);
-      return { ...lineItem('message', String(index), element, words(own[0]) || 'message'), texts: own, from, to };
-    });
+      const texts = rows;
+      rows = [];
+      const name = texts.map(words).filter(Boolean).join(' ') || 'message';
+      messages.push({ ...lineItem('message', element.dataset.id ?? String(messages.length), element, name), texts, from, to });
+    }
     return {
       kind: 'sequence', actors, names,
       items: messages, steps: messages,
@@ -483,22 +497,18 @@
         render();
         syncHint();
       });
-      region.addEventListener('scroll', () => {
-        scrollLeft = region.scrollLeft;
-      }, { passive: true });
-      // A pointer that lands on plain content, inside the figure or outside it, releases
-      // the pin and stepping; one that lands on a diagram element or a page control
-      // such as the theme toggle leaves them, so a pinned element survives the switch.
-      register({
-        pointerDown: (event) => {
-          if (!pin && !step) return;
-          const target = event.target instanceof Element ? event.target : null;
-          if (!target || target.closest(CONTROLS)) return;
-          if (current && figure.contains(target) && itemAt(current, target)) return;
-          clearAll();
-        },
-        themeChanged: () => show(visibleVariant()),
-      });
+    };
+
+    // A click or tap on plain content, inside the figure or outside it, releases the pin
+    // and stepping. One on a diagram element or a page control such as the theme toggle
+    // leaves them, so a pinned element survives the switch; a pan or a scrollbar drag
+    // produces no click and leaves them too.
+    const click = (event) => {
+      if (!pin && !step) return;
+      const target = event.target instanceof Element ? event.target : null;
+      if (!target || target.closest(CONTROLS)) return;
+      if (current && figure.contains(target) && itemAt(current, target)) return;
+      clearAll();
     };
 
     // Shows the variant the theme asks for, fetching it on first use; the active
@@ -536,6 +546,12 @@
       render();
     };
 
+    // The theme observer and the scroll memory start before the first fetch, so a
+    // switch or a scroll during it is not lost.
+    region.addEventListener('scroll', () => {
+      scrollLeft = region.scrollLeft;
+    }, { passive: true });
+    register({ click, themeChanged: () => show(visibleVariant()) });
     show(visibleVariant());
   };
 
