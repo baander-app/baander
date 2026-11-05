@@ -553,6 +553,13 @@
     },
     {
       "parent": "users",
+      "child": "playback_destinations",
+      "foreign_key": "user_id",
+      "action": "CASCADE",
+      "capture": "child-row-or-exempt"
+    },
+    {
+      "parent": "users",
       "child": "player_preferences",
       "foreign_key": "user_id",
       "action": "CASCADE",
@@ -1060,11 +1067,11 @@
       "mapping": "src/Session/Infrastructure/Doctrine/Entity/ListeningSessionEntity.php",
       "classification": "capture",
       "operations": ["INSERT", "UPDATE", "DELETE"],
-      "relevant_columns": ["id", "public_id", "user_id", "active_device_id", "queue", "current_track_index", "playback_state", "created_at"],
+      "relevant_columns": ["id", "public_id", "user_id", "active_device_id", "queue", "current_track_index", "playback_state", "created_at", "revision", "media", "desired_state", "observed_state", "selected_destination_id", "active_incarnation_id"],
       "excluded_columns": ["position", "last_used_at", "updated_at"],
       "families": ["sessions"],
       "scope_routes": ["user"],
-      "readers": ["src/Session/Infrastructure/Doctrine/Repository/ListeningSessionDoctrineRepository.php"],
+      "readers": ["src/Session/Infrastructure/Doctrine/Repository/ListeningSessionDoctrineRepository.php", "src/Session/Infrastructure/Doctrine/PlaybackStore.php"],
       "response_cache": "authoritative-read"
     },
     {
@@ -1276,6 +1283,30 @@
       "mapping": "src/Auth/Infrastructure/Doctrine/Entity/PasswordResetTokenEntity.php",
       "classification": "excluded",
       "reason": "Secret challenge storage; password/security outcome changes users and is captured there."
+    },
+    {
+      "table": "playback_commands",
+      "mapping": "migrations/Version20261101190000.php",
+      "classification": "excluded",
+      "reason": "Durable command intents, acknowledgements and replay bookkeeping; the session snapshot relay delivers pending commands to their incarnation and the browser snapshot query refetches nothing on a sessions hint."
+    },
+    {
+      "table": "playback_destination_incarnations",
+      "mapping": "migrations/Version20261101190000.php",
+      "classification": "excluded",
+      "reason": "Endpoint epochs, lease expiry, observed position and volume; lease renewals and observations must never capture, and the session snapshot relay publishes availability changes."
+    },
+    {
+      "table": "playback_destinations",
+      "mapping": "migrations/Version20261101190000.php",
+      "classification": "excluded",
+      "reason": "Playback endpoint registry read only through the playback snapshot, which the session snapshot relay pushes to bound connections; no HTTP query family refetches it."
+    },
+    {
+      "table": "playback_transfers",
+      "mapping": "migrations/Version20261101190000.php",
+      "classification": "excluded",
+      "reason": "Transfer attempt fencing and replay identity; the session snapshot relay publishes the current transfer state and no HTTP query family refetches it."
     },
     {
       "table": "player_preferences",
@@ -1731,6 +1762,11 @@
       "families": ["devices", "account"],
       "reader": "src/Session/Infrastructure/Doctrine/Repository/DeviceDoctrineRepository.php",
       "policy": "Active-visible bounded sampling of last-seen, passkey last-used and credential expiry; heartbeat-only writes do not capture."
+    },
+    {
+      "families": ["sessions"],
+      "reader": "src/Session/Infrastructure/Swoole/PlaybackCommandRelay.php",
+      "policy": "Per-connection playback snapshot digest comparison every second over the session protocol; destination, incarnation, transfer and command changes publish through this relay, not through capture."
     }
   ]
 }
