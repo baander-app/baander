@@ -77,8 +77,24 @@ final class CoveredIndexPersistenceTest extends TestCase
         $owned = 'uniq_transcode_jobs_owner_user_id_video_id_quality_tier_name';
         $video = 'idx_transcode_jobs_video_id';
         self::assertFalse($table->hasIndex('uniq_transcode_jobs_video_id_quality_tier_name'));
-        self::assertSame(['owner_user_id', 'video_id', 'quality_tier_name'], $table->getIndex($owned)->getColumns());
+        // Copy presentations made the job identity per presentation and request; the owner and video
+        // columns still lead, so owner lookups keep using this index.
+        self::assertSame(
+            ['owner_user_id', 'video_id', 'quality_tier_name', 'presentation_key', 'request_id'],
+            $table->getIndex($owned)->getColumns(),
+        );
         self::assertSame(['video_id'], $table->getIndex($video)->getColumns());
+
+        // Both B-tree indexes can serve a video_id condition, the unique one by scanning all its entries.
+        // On an empty table those scans cost the same and the planner keeps whichever index it saw
+        // first, which is the one with the highest OID; only populated statistics make the choice a costed one.
+        $owner = $this->createUser();
+        $videos = array_map(fn (): string => $this->createVideo()->toString(), range(1, 8));
+        $connection->executeStatement(<<<'SQL'
+            INSERT INTO transcode_jobs (id, public_id, video_id, owner_user_id, quality_tier_name, request_id, created_at, updated_at)
+            SELECT gen_random_uuid(), 'covered-index-probe-' || n, (:videos::uuid[])[1 + n % 8], :owner, '1080p', 'covered-index-probe-' || n, now(), now()
+            FROM generate_series(1, 320) AS n
+            SQL, ['videos' => '{' . implode(',', $videos) . '}', 'owner' => $owner->toString()]);
 
         $connection->executeStatement('ANALYZE transcode_jobs');
         $connection->executeStatement('SET LOCAL enable_seqscan = off');
