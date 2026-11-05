@@ -95,6 +95,7 @@ jobs:
                   /tmp/baander-dsp-emsdk/emsdk activate 6.0.3
 
             - name: Build and qualify analysis modules
+              shell: bash
               run: |
                   . /tmp/baander-dsp-emsdk/emsdk_env.sh
                   bash scripts/test-dsp-analysis.sh

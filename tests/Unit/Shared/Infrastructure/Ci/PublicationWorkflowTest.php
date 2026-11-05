@@ -429,6 +429,7 @@ SH;
         yield 'login reachable from a fork' => [$workflow, $step(['name' => 'Login', 'run' => 'docker login registry.baander.app']), 'trusted-run'];
         yield 'host mount without forge guard' => [$workflow, $step(['name' => 'Clean', 'run' => 'docker run --rm -v /opt/ghc:/cleanup/ghc alpine true']), 'host paths'];
         yield 'checkout without safe directory' => [$workflow, $step(['name' => 'Checkout', 'run' => "git init -q\ngit fetch -q origin main"]), 'safe directory'];
+        yield 'Emscripten environment under sh' => [$workflow, $step(['name' => 'Build', 'run' => ". /tmp/emsdk/emsdk_env.sh\nemcc --version"]), 'under bash'];
         yield 'missing concurrency' => [$workflow, static function (array $document): array {
             unset($document['concurrency']);
             return $document;
@@ -1092,6 +1093,9 @@ SH;
                 $safe = strpos($run, 'git config --global --add safe.directory "$PWD"');
                 if ($init !== null && ($safe === false || $safe > $init)) {
                     $violations[] = $label . ': must trust the workspace as a safe directory before initialising it, because the job container user does not own it on GitHub';
+                }
+                if (str_contains($run, 'emsdk_env.sh') && ($step['shell'] ?? null) !== 'bash') {
+                    $violations[] = $label . ': must run under bash, because emsdk_env.sh cannot find its directory under the sh that GitHub uses by default in a job container';
                 }
                 if ($pullRequests && self::writes($step)) {
                     $fork = array_any(

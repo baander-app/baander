@@ -125,6 +125,9 @@ for GitHub and once for Forgejo. It enforces the following rules, except the
 - Make `runs-on` resolve to a hosted label on GitHub and to `docker-cli` on Forgejo.
 - Run `git config --global --add safe.directory "$PWD"` before a checkout script
   initialises the workspace.
+- Give a step that sources `emsdk_env.sh` `shell: bash`. GitHub runs steps in a job
+  container under `sh` by default, where the script cannot find its own directory
+  and `emcc` never reaches `PATH`.
 - Make `timeout-minutes` resolve to a number of minutes on both forges. Both forges
   use the same timeouts; give a job a per-forge expression only after a GitHub run
   shows that it needs more time.
