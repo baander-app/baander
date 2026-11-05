@@ -1,8 +1,33 @@
 # Baander roadmap
 
-Updated: 2026-11-04. This roadmap selects future work and records unresolved
+Updated: 2026-11-05. This roadmap selects future work and records unresolved
 acceptance. Current operating contracts belong in the linked guides; completed
 milestones and their verification evidence remain in Git history.
+
+## Forge-neutral CI
+
+The user confirmed the
+[forge-neutral CI plan](docs/plans/2026-11-04-2318-feat-forge-neutral-ci-plan.md),
+delivered on branch `feat/forge-neutral-ci` (local, not pushed).
+Forgejo and GitHub run the same workflows from `.github/workflows`. Each workflow selects its runner, registry, cache store and artifact action from `github.server_url`.
+On GitHub, the runner and PostgreSQL images are public GHCR packages and the application, Nginx and FFmpeg images are private ones; a probe fails the job when a private image can be pulled anonymously.
+The [CI guide](docs-book/part-2-developer-guide/continuous-integration.md) describes the setup and the operator runbook.
+
+Checkpoint, 2026-11-05:
+
+- Tooling suite: 1,505 tests, 9 skipped, no failures, run before the review fixes. After them, the changed tooling tests (`CiPackageStoreTest`, `DockerClientTest`, `ApplicationBuildContractTest`, `PythonBoundaryTest`) pass: 66 tests.
+- `PublicationWorkflowTest` in the CI image: 117 tests, 1,862 assertions. The Docker context check passes, and actionlint 1.7.7 reports only an existing shellcheck note in `aac-native.yml`.
+- Static gates pass: PHPStan and Deptrac (0 violations) in the CI image, plus the tooling analysis, format and architecture checks.
+- `ce-simplify-code` and `ce-code-review` ran (review `20261105-100116-b0d0eade`, "Ready with fixes"). Its two confirmed findings and four residual risks were applied (4895ea248), and this entry closes its roadmap finding.
+
+Open items for this plan:
+
+- Dual-forge acceptance has not run, because nothing is pushed. In order, it needs the image workflows on `master` on both forges, the GitHub operator steps in the runbook, then the gate workflows through a pull request on each forge, one `master` commit green on both, and one scheduled nightly run on each.
+- Unverified until those runs: GitHub accepting the shell checkout's `x-access-token` basic authentication; Forgejo resolving the local artifact action after the shell checkout; whether Forgejo 15 scopes its workflow token by `permissions`; whether socket-launched test containers bind-mount workspace paths, which differ from the host paths on GitHub; and whether the backend gate fits a hosted runner's 16 GB of memory and 14 GB of disk, and how long each job takes there.
+- A cancelled Forgejo run may skip the step that removes its per-run BuildKit builder and leave that builder's container on the shared daemon.
+- `PublicationWorkflowTest` grew to about 1,400 lines, including a workflow-expression evaluator and a tree linter that could move into test-support classes.
+- The coverage comment steps still interpolate the stored baseline into `node -e` as code, as the Forgejo workflows did.
+- `PackageStore` error paths without tests: restore into a non-empty target, constructor validation, and saving a missing directory.
 
 ## Small-host household deployment
 
