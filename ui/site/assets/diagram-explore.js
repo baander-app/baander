@@ -15,6 +15,8 @@
   ].join(', ');
   const STEP_KEYS = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'];
   const TAP_SLOP = 8;
+  // A click that follows a tap this closely is the same gesture.
+  const TAP_CLICK_WINDOW = 700;
   // Page controls a pointer may land on without releasing a pinned element.
   const CONTROLS = 'a[href], button, input, select, textarea, summary';
   const HINT_IDLE = 'Enter steps through connections';
@@ -45,8 +47,37 @@
       if (state) element.classList.add(state);
     }
   };
+  const isBox = (item) => item.kind === 'node' || item.kind === 'cluster';
+  // The visible parts of an item: its own element, an edge's label, a message's text.
+  const parts = (item) => [item.element, item.label, ...(item.texts ?? [])];
+  const sameRef = (a, b) => a?.kind === b?.kind && a?.key === b?.key;
+  const cycle = (position, count, forward) => {
+    if (position < 0) return forward ? 0 : count - 1;
+    return (position + (forward ? 1 : -1) + count) % count;
+  };
+  const stepTarget = (steps, index, key) => {
+    if (key === 'Home') return steps[0];
+    if (key === 'End') return steps[steps.length - 1];
+    const forward = key === 'ArrowRight' || key === 'ArrowDown';
+    return steps[clamp(index + (forward ? 1 : -1), steps.length)];
+  };
 
   let hintCount = 0;
+
+  // One document listener and one theme observer serve every figure on the page.
+  const controllers = new Set();
+  const listen = () => {
+    document.addEventListener('pointerdown', (event) => {
+      for (const controller of controllers) controller.pointerDown(event);
+    });
+    new MutationObserver(() => {
+      for (const controller of controllers) controller.themeChanged();
+    }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+  };
+  const register = (controller) => {
+    if (!controllers.size) listen();
+    controllers.add(controller);
+  };
 
   // The built asset is accepted only when it really is an SVG document.
   const fetchSvg = async (src) => {
@@ -147,7 +178,7 @@
       edges.push(edge);
     }
     return {
-      kind: 'flowchart', nodes, edges,
+      kind: 'flowchart',
       items: [...nodes, ...edges],
       steps: nodes.filter((item) => item.kind === 'node'),
       twins: activeMarkers(svg, edges.map((edge) => edge.element)),
@@ -171,7 +202,7 @@
       return { ...lineItem('message', String(index), element, words(own[0]) || 'message'), texts: own, from, to };
     });
     return {
-      kind: 'sequence', messages, actors, names,
+      kind: 'sequence', actors, names,
       items: messages, steps: messages,
       twins: activeMarkers(svg, messages.map((message) => message.element)),
     };
@@ -181,11 +212,11 @@
     const model = svg.querySelector('[data-et="message"]') ? sequenceModel(svg) : flowchartModel(svg);
     const byElement = new Map();
     for (const item of model.items) {
-      for (const element of [item.element, item.hit, item.label, ...(item.texts ?? [])]) {
+      for (const element of [...parts(item), item.hit]) {
         if (element) byElement.set(element, item);
       }
     }
-    return { svg, ...model, byElement, active: null };
+    return { svg, ...model, byElement, active: null, styled: [] };
   };
 
   const ref = (item) => ({ kind: item.kind, key: item.key });
@@ -209,7 +240,7 @@
   // so the lines that belong together are colored together; only the active element's
   // label box takes the highlight fill.
   const style = (view, item, isActive) => {
-    if (item.kind === 'node' || item.kind === 'cluster') {
+    if (isBox(item)) {
       if (!item.shape) return;
       item.shape.style.fill = HIGHLIGHT;
       item.shape.style.stroke = RING;
@@ -226,7 +257,7 @@
   };
 
   const unstyle = (item) => {
-    if (item.kind === 'node' || item.kind === 'cluster') {
+    if (isBox(item)) {
       item.shape?.style.removeProperty('fill');
       item.shape?.style.removeProperty('stroke');
       return;
@@ -251,13 +282,11 @@
         states.set(edge.from === active ? edge.to : edge.from, 'is-related');
       }
     }
-    for (const item of view.items) setState([item.element, item.label], states.get(item) ?? 'is-receded');
+    for (const item of view.items) setState(parts(item), states.get(item) ?? 'is-receded');
   };
 
   const paintSequence = (view, active) => {
-    for (const message of view.messages) {
-      setState([message.element, ...message.texts], message === active ? 'is-active' : 'is-receded');
-    }
+    for (const message of view.items) setState(parts(message), message === active ? 'is-active' : 'is-receded');
     for (const [id, elements] of view.actors) {
       setState(elements, id === active.from || id === active.to ? 'is-related' : 'is-receded');
     }
@@ -268,15 +297,15 @@
     for (const styled of view.styled) unstyle(styled);
     view.active = null;
     view.styled = [];
-    for (const item of view.items) setState([item.element, item.label, ...(item.texts ?? [])], null);
+    for (const item of view.items) setState(parts(item), null);
     for (const elements of view.actors?.values() ?? []) setState(elements, null);
   };
 
   const paintView = (view, item) => {
     if (view.active === item) return;
-    for (const styled of view.styled ?? []) unstyle(styled);
+    for (const styled of view.styled) unstyle(styled);
     view.active = item;
-    view.styled = item.kind === 'node' || item.kind === 'cluster' ? [item, ...item.edges] : [item];
+    view.styled = isBox(item) ? [item, ...item.edges] : [item];
     (view.kind === 'sequence' ? paintSequence : paintFlowchart)(view, item);
     style(view, item, true);
     for (const edge of view.styled.slice(1)) style(view, edge, false);
@@ -297,8 +326,10 @@
     let step = null;
     let touch = null;
     let lastTap = -Infinity;
-    let announcer = null;
-    let hint = null;
+    const announcer = html('p', 'visually-hidden');
+    announcer.setAttribute('aria-live', 'polite');
+    const hint = html('p', 'diagram-hint', HINT_IDLE);
+    hint.hidden = true;
 
     const visibleVariant = () => VARIANTS.find((variant) => shown(views[variant]?.svg ?? images[variant])) ?? null;
 
@@ -317,11 +348,10 @@
     };
 
     const announce = (item) => {
-      if (announcer && item) announcer.textContent = describe(current, item);
+      if (item) announcer.textContent = describe(current, item);
     };
 
     const syncHint = () => {
-      if (!hint) return;
       hint.hidden = !region.matches(':focus-visible');
       hint.textContent = step ? HINT_STEPPING : HINT_IDLE;
     };
@@ -341,7 +371,7 @@
     const togglePin = (item) => {
       if (!item) return;
       step = null;
-      pin = pin && pin.kind === item.kind && pin.key === item.key ? null : ref(item);
+      pin = sameRef(pin, item) ? null : ref(item);
       render();
       if (pin) announce(item);
       syncHint();
@@ -377,7 +407,7 @@
       });
       svg.addEventListener('click', (event) => {
         // A tap already handled its pin on pointerup.
-        if (event.pointerType === 'touch' || event.timeStamp - lastTap < 700 || view !== current) return;
+        if (event.pointerType === 'touch' || event.timeStamp - lastTap < TAP_CLICK_WINDOW || view !== current) return;
         togglePin(itemAt(view, event.target));
       });
     };
@@ -394,13 +424,9 @@
           announce(owner);
           return;
         }
-        const forward = key === 'ArrowDown';
-        step.edge = step.edge < 0 ? (forward ? 0 : count - 1) : (step.edge + (forward ? 1 : -1) + count) % count;
+        step.edge = cycle(step.edge, count, key === 'ArrowDown');
       } else {
-        const next = key === 'Home' ? steps[0]
-          : key === 'End' ? steps[steps.length - 1]
-            : steps[clamp(index + (key === 'ArrowRight' || key === 'ArrowDown' ? 1 : -1), steps.length)];
-        step = { ref: ref(next), edge: -1 };
+        step = { ref: ref(stepTarget(steps, index, key)), edge: -1 };
       }
       const item = stepItem();
       render();
@@ -426,12 +452,8 @@
     };
 
     const bindRegion = () => {
-      announcer = html('p', 'visually-hidden');
-      announcer.setAttribute('aria-live', 'polite');
       const description = html('p', 'visually-hidden', HINT_LONG);
       description.id = `diagram-hint-${++hintCount}`;
-      hint = html('p', 'diagram-hint', HINT_IDLE);
-      hint.hidden = true;
       region.after(hint);
       figure.append(announcer, description);
       region.setAttribute('aria-describedby', description.id);
@@ -455,7 +477,7 @@
       // Stepping belongs to the focused region, so leaving it ends stepping; a pin is
       // a pointer choice and stays until the pointer releases it.
       region.addEventListener('blur', () => {
-        if (hint) hint.hidden = true;
+        hint.hidden = true;
         if (!step) return;
         step = null;
         render();
@@ -467,15 +489,16 @@
       // A pointer that lands on plain content, inside the figure or outside it, releases
       // the pin and stepping; one that lands on a diagram element or a page control
       // such as the theme toggle leaves them, so a pinned element survives the switch.
-      document.addEventListener('pointerdown', (event) => {
-        if (!pin && !step) return;
-        const target = event.target instanceof Element ? event.target : null;
-        if (!target || target.closest(CONTROLS)) return;
-        if (current && figure.contains(target) && itemAt(current, target)) return;
-        clearAll();
+      register({
+        pointerDown: (event) => {
+          if (!pin && !step) return;
+          const target = event.target instanceof Element ? event.target : null;
+          if (!target || target.closest(CONTROLS)) return;
+          if (current && figure.contains(target) && itemAt(current, target)) return;
+          clearAll();
+        },
+        themeChanged: () => show(visibleVariant()),
       });
-      const observer = new MutationObserver(() => show(visibleVariant()));
-      observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
     };
 
     // Shows the variant the theme asks for, fetching it on first use; the active

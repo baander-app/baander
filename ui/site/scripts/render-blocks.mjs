@@ -141,9 +141,10 @@ async function createDiagramRenderer(request, options) {
     await page.addScriptTag({ content: `window.describeDiagram = ${describeDiagram}; window.describe = ${describe}; window.stampConnections = ${stampConnections};` });
     return {
       close: () => browser.close(),
-      async render(block, appearance) {
+      // The description does not depend on the appearance, so the second variant reuses the first's.
+      async render(block, appearance, described = null) {
         const seed = createHash('sha256').update(`${block.id}:${appearance}`).digest('hex').slice(0, 20);
-        const result = await page.evaluate(async ({ source, appearance, seed }) => {
+        const result = await page.evaluate(async ({ source, appearance, seed, described }) => {
           document.documentElement.dataset.theme = appearance === 'light' ? 'balanced' : 'dark';
           const css = getComputedStyle(document.documentElement);
           const color = role => {
@@ -199,7 +200,7 @@ async function createDiagramRenderer(request, options) {
               `.edgeLabel rect.background, .labelBkg { fill: ${canvas}; opacity: 1; }`,
             ].join(''),
           });
-          const diagram = window.describe(await window.mermaid.mermaidAPI.getDiagramFromText(source), window.describeDiagram);
+          const diagram = described ?? window.describe(await window.mermaid.mermaidAPI.getDiagramFromText(source), window.describeDiagram);
           const rendered = await window.mermaid.render(`diagram-${seed}`, source);
           // Mermaid includes these unused animation defaults even in static flowcharts.
           const svg = rendered.svg
@@ -220,8 +221,8 @@ async function createDiagramRenderer(request, options) {
           round('.cluster > rect', '12');
           round('.edgeLabel rect.background', '6');
           window.stampConnections(root, diagram);
-          return { svg: new XMLSerializer().serializeToString(root), width: viewBox[2], height: viewBox[3] };
-        }, { source: block.source, appearance, seed });
+          return { svg: new XMLSerializer().serializeToString(root), width: viewBox[2], height: viewBox[3], diagram };
+        }, { source: block.source, appearance, seed, described });
         if (blockedRequests.length) throw new Error('Diagram attempted to request an external resource');
         return result;
       },
@@ -248,7 +249,7 @@ export async function renderBlocks(request, options = {}) {
           validateDiagram(block);
           diagrams ??= await createDiagramRenderer(request, options);
           const light = await diagrams.render(block, 'light');
-          const dark = await diagrams.render(block, 'dark');
+          const dark = await diagrams.render(block, 'dark', light.diagram);
           result[block.id] = { kind: 'diagram', light: light.svg, dark: dark.svg, width: Math.max(light.width, dark.width), height: Math.max(light.height, dark.height) };
         } else if (languages.has(block.language)) {
           if (!highlighter) {

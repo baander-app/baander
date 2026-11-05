@@ -154,7 +154,7 @@ test('invisible layout edges keep their class and carry no endpoints', async () 
   const list = tags(item.light);
   const edges = list.filter(tag => tag.name === 'path' && tag['data-et'] === 'edge');
   assert.equal(edges.length, 1);
-  assert.ok(withClass(edges, 'edge-thickness-invisible').length === 1);
+  assert.equal(withClass(edges, 'edge-thickness-invisible').length, 1);
   assert.deepEqual(list.flatMap(connections).filter(Boolean), [], 'No element carries endpoints for a layout edge');
   assert.deepEqual(withClass(list, 'node').map(tag => tag['data-node']), ['a', 'b']);
 });
