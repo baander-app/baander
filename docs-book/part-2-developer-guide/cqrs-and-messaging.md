@@ -126,6 +126,29 @@ A long-running handler lets an operator cancel its job. It calls `JobCancellatio
 
 ## Async Processing
 
+### Routing
+
+Messenger routes a dispatched message by the workloads map in `config/packages/messenger.php`: a message listed there with its `default` flag on, or one whose dispatcher names a transport with a `TransportNamesStamp`, goes to that transport's Redis stream, and every other message runs inline in the calling process.
+
+```mermaid
+flowchart TB
+    accTitle: Routing a dispatched message
+    accDescr: The bus checks the workloads map and the message's default flag or the dispatcher's transport stamp. An unrouted message runs inline in the calling process. A routed message enters the async or scheduler Redis stream, where a worker consumer runs the handler. A failed handler is retried with backoff until its attempts run out, then the message is stored in the failed_messages table. A job cancelled at a checkpoint is acknowledged without retry.
+    dispatch[Dispatch on the bus] --> listed{In the workloads map?}
+    listed -->|No| inline[Inline handler in the calling process]
+    listed -->|Yes| selected{Default flag on or dispatcher-stamped transport?}
+    selected -->|No| inline
+    selected -->|async| async["async transport: Redis stream messages"]
+    selected -->|scheduler| scheduler["scheduler transport: Redis stream scheduler_occurrences"]
+    async --> consumer[Worker consumer runs the handler]
+    scheduler --> consumer
+    consumer -->|Success| acked[Delivery acknowledged]
+    consumer -->|Cancelled at a checkpoint| acked
+    consumer -->|Failure| retry[Retry with backoff]
+    retry -->|Attempts left| consumer
+    retry -->|Attempts exhausted| failed[(failed_messages)]
+```
+
 The admitted worker deployment owns the Redis `async` (`MESSENGER_TRANSPORT_DSN`)
 and `scheduler` consumers, outbox relay, scheduler and media execution. The web
 container runs `app:serve` without task workers or a CPU pool. Consumer names
