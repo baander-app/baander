@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")/.."
-: "${BAANDER_TEST_IMAGE:?Set BAANDER_TEST_IMAGE to the CI image with PHP, FFmpeg 5 and test dependencies.}"
+: "${BAANDER_TEST_IMAGE:?Set BAANDER_TEST_IMAGE to the CI image with PHP, FFmpeg 7 and test dependencies.}"
 audio_profile="${BAANDER_TEST_AUDIO_PROFILE:-streaming_stereo}"
 case "$audio_profile" in
     streaming_stereo|opus_stereo) ;;

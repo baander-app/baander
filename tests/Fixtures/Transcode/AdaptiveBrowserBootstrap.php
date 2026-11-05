@@ -52,8 +52,8 @@ $run = static function (array $arguments, float $timeout = 60): string {
     return $process->getOutput();
 };
 $version = strtok($run(['/usr/bin/ffmpeg', '-version']), "\n");
-if (!is_string($version) || !str_starts_with($version, 'ffmpeg version 5.')) {
-    throw new RuntimeException('The browser qualification requires FFmpeg 5: ' . (string) $version);
+if (!is_string($version) || !str_starts_with($version, 'ffmpeg version 7.')) {
+    throw new RuntimeException('The browser qualification requires FFmpeg 7: ' . (string) $version);
 }
 if ($shortAudio) {
     $source = $directory . '/source.mov';
