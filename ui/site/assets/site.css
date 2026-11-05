@@ -266,6 +266,28 @@ code, kbd, samp, pre { font-family: var(--font-mono); }
   background-position: 8px 8px;
 }
 .diagram-viewport img { max-width: none; margin-inline: auto; }
+.diagram-viewport svg { display: block; max-width: none; margin-inline: auto; }
+/* Interactive diagrams: the page script swaps the image for the built SVG and marks
+   the active element, its connections and everything else; Mermaid's own styles are
+   id-scoped, so fills and strokes are set inline by the script and only opacity,
+   cursors and the hit targets live here. */
+.diagram-interactive .node, .diagram-interactive .cluster, .diagram-interactive .edgeLabel,
+.diagram-interactive [data-et="edge"], .diagram-interactive .diagram-hit,
+.diagram-interactive [data-et="message"], .diagram-interactive .messageText { cursor: pointer; }
+.diagram-interactive .node, .diagram-interactive .cluster, .diagram-interactive .edgeLabel,
+.diagram-interactive [data-et="edge"], .diagram-interactive [data-et="message"],
+.diagram-interactive .messageText, .diagram-interactive [data-et="life-line"],
+.diagram-interactive [data-et="participant"] { transition: opacity var(--duration-fast); }
+.diagram-interactive .is-receded { opacity: 0.22; }
+.diagram-interactive .diagram-hit { fill: none; stroke: transparent; stroke-width: 12px; pointer-events: stroke; }
+.diagram-hint { margin-top: 8px; font-size: 14px; color: var(--color-muted-foreground); }
+.diagram-hint[hidden] { display: none; }
+@media (prefers-reduced-motion: reduce) {
+  .diagram-interactive .node, .diagram-interactive .cluster, .diagram-interactive .edgeLabel,
+  .diagram-interactive [data-et="edge"], .diagram-interactive [data-et="message"],
+  .diagram-interactive .messageText, .diagram-interactive [data-et="life-line"],
+  .diagram-interactive [data-et="participant"] { transition: none; }
+}
 .diagram > a { margin-top: 16px; font-size: 14px; }
 .diagram details { margin-top: 16px; }
 .diagram summary { cursor: pointer; width: fit-content; color: var(--color-muted-foreground); }

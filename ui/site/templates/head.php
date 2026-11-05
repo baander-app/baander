@@ -44,6 +44,7 @@ $image = $site['origin'] . SearchMetadata::SOCIAL_IMAGE;
     <link rel="stylesheet" href="/assets/site/search.css">
     <script type="module" src="/assets/site/search.js"></script>
     <script src="/assets/site/manual-navigation.js" defer></script>
+    <script src="/assets/site/diagram-explore.js" defer></script>
   <?php endif; ?>
   <script src="/assets/site/appearance.js"></script>
   <?php if (isset($page['script'])): ?>
