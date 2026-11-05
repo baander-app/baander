@@ -20,10 +20,21 @@ Checkpoint, 2026-11-05:
 - Static gates pass: PHPStan and Deptrac (0 violations) in the CI image, plus the tooling analysis, format and architecture checks.
 - `ce-simplify-code` and `ce-code-review` ran (review `20261105-100116-b0d0eade`, "Ready with fixes"). Its two confirmed findings and four residual risks were applied (4895ea248), and this entry closes its roadmap finding.
 
+Checkpoint, 2026-11-05, GitHub rollout of `master` at 1477e2fcc:
+
+- The runner, PostgreSQL and Nginx image workflows published to GHCR; the image workflows of one push race the runner build, so the PostgreSQL and Nginx runs passed on their second attempt. The runner package was made public by hand. The Nginx privacy probe passed, and the public website gate passed.
+- Three forge-specific defects found by the first GitHub runs are fixed and covered by `PublicationWorkflowTest` (120 tests, 1,880 assertions): the job container does not own the workspace (`safe.directory`), job-container steps run under `sh` so `emsdk_env.sh` cannot find its directory (`shell: bash`), and Firefox refuses the runner-owned home directory (`HOME: /root`).
+- Four failures predate the port and reproduced locally in the CI image. The root `.pnp.cjs` from a package setup no longer in use made esbuild reject `i18next` and `hls.js` in the audio graph harness; the transcode browser fixtures required FFmpeg 5 while the images ship 7.1 since the Debian 13 move; the registry container contract read a replacement voter before it had heard from the leader; and the audio graph playback fixture predated session-driven playback. The audio graph suite passes 56 of 56 in Playwright 1.64.1, the publication check and all twelve adaptive movie runs pass, and the registry container qualification passes.
+- The 14 backend failures that also failed on master are fixed: `SignedDeliveryFirewallTest` (184 tests), `OpenApiSpecTest` (26), `CoveredIndexPersistenceTest` (3), `DatabaseNamingConventionTest` (2), `CaptureCoverageTest` with `tests/Unit/Shared/LiveUpdates` (33), plus `CommittedCaptureTest` (21) and `InitialSchemaMigrationTest` (23) for the new capture trigger migration, each in the CI image.
+- Static gates pass in the CI image: PHPStan, Deptrac (0 violations), `lint:container`, the OpenAPI drift check and the web client drift check. The held-frame transcode fixtures pace their producers with the `realtime` and `arealtime` filters, because `-re` paces packets and a held-frame source has one packet per hold.
+
 Open items for this plan:
 
-- Dual-forge acceptance has not run, because nothing is pushed. In order, it needs the image workflows on `master` on both forges, the GitHub operator steps in the runbook, then the gate workflows through a pull request on each forge, one `master` commit green on both, and one scheduled nightly run on each.
-- Unverified until those runs: GitHub accepting the shell checkout's `x-access-token` basic authentication; Forgejo resolving the local artifact action after the shell checkout; whether Forgejo 15 scopes its workflow token by `permissions`; whether socket-launched test containers bind-mount workspace paths, which differ from the host paths on GitHub; and whether the backend gate fits a hosted runner's 16 GB of memory and 14 GB of disk, and how long each job takes there.
+- Dual-forge acceptance is partial. On GitHub the gates have not yet run green on one `master` commit with these fixes, and the backend gate's steps after the progressive DASH check have not run there. Forgejo runs are unverified because the API token file does not exist. Still needed: one `master` commit green on both forges, the gate workflows through a pull request on each, and one scheduled nightly run on each.
+- Unverified on GitHub: whether Forgejo 15 scopes its workflow token by `permissions`; whether socket-launched test containers bind-mount workspace paths on the hosted runner; and whether the backend gate fits a hosted runner's 16 GB of memory and 14 GB of disk, and how long each job takes there. GitHub accepts the shell checkout's `x-access-token` basic authentication.
+- The held-frame transcode fixtures publish the frames generated after the source's last packet about ten seconds late: the frames leave the `realtime` filter one per second, but the muxer receives them together once the filter graph reaches its end, with or without x264 frame threading, `sync-lookahead`, strict interleaving or the encoder's frame sync. Playback stalls for about ten seconds in every held-frame run, as it did under `-re`, and the runs pass.
+- `uniq_transcode_jobs_owner_user_id_video_id_quality_tier_name` names three of its five columns; a consistently shortened column form would be truer to the naming guide.
+- `ui/web/src/features/session/live-coverage.ts` lists only `listening_sessions` and `devices` as the sources of `session.sessions`, although the snapshot also reads the four playback tables, and that capture now targets a query the relay feeds; whether the table should stay captured is undecided.
 - A cancelled Forgejo run may skip the step that removes its per-run BuildKit builder and leave that builder's container on the shared daemon.
 - `PublicationWorkflowTest` grew to about 1,400 lines, including a workflow-expression evaluator and a tree linter that could move into test-support classes.
 - The coverage comment steps still interpolate the stored baseline into `node -e` as code, as the Forgejo workflows did.
@@ -42,7 +53,7 @@ Open items for this plan:
 - The web control socket twice closed an `app:server:stats` request without answering under load (household repeats 1 and 2, 2026-11-03); the cause is unknown. The harness now retries and records such samples.
 - The preset inherits `OTEL_ENABLED=true` with an unreachable `host.docker.internal` endpoint from `.env`, so web workers spend time on failing span exports. The preset should disable export unless the operator configures a collector.
 - After a PostgreSQL crash the worker pair stops ("deployment reconciliation is required") and stays stopped until an operator intervenes.
-- `CaptureCoverageTest` still fails on master's playback-destination tables and six `listening_sessions` columns; whether to capture or exclude each needs a decision.
+- `CaptureCoverageTest` passed once the playback-destination tables were excluded and the six `listening_sessions` columns captured on 2026-11-05 (see Forge-neutral CI).
 - `ce-simplify-code` ran (4c24a9bb5); its affected tooling, backend and web tests passed. Shipping gates not yet run: `ce-code-review`, the full backend suites, worker runtime container suites, affected browser playback specs and a documentation build. `baander-database:latest` has not been rebuilt, so existing instances still run PostgreSQL without the THP launcher.
 - The household profile has not been requalified since the configurable media capacity work added the connection pooler and removed its container limits; its published measurements predate both changes.
 
@@ -66,7 +77,7 @@ Checkpoint, 2026-11-04:
 Open items for this plan:
 
 - At the default 8 software video slots, the reference host keeps about two 1080p `libx264` encodes in real time, not eight, so operators who convert video in software must lower the slots. The default was the user's choice and is unchanged.
-- Backend failures that also occur on master: `SignedDeliveryFirewallTest` (8), `OpenApiSpecTest` (2), `CoveredIndexPersistenceTest` (1), `DatabaseNamingConventionTest` (1) and `CaptureCoverageTest` (2).
+- The 14 backend failures that also occurred on master (`SignedDeliveryFirewallTest`, `OpenApiSpecTest`, `CoveredIndexPersistenceTest`, `DatabaseNamingConventionTest`, `CaptureCoverageTest`) were fixed on 2026-11-05 (see Forge-neutral CI).
 - Not run: the static FFmpeg image's full build, the controls drill at 8 + 12 (the default drills keep the 3 + 1 fixture), and NVENC, QSV and AMF on real hardware. The NVENC device-request shape that containment verification compares was not checked against a Docker NVIDIA runtime.
 - Existing PostgreSQL volumes need `REINDEX` and `ALTER DATABASE … REFRESH COLLATION VERSION` on the Debian 13 database image; `baander-database:latest` and the persistent instance were not touched.
 - Transcode execution ownership renewal runs on the application pool, where a client can wait up to PgBouncer's default 120 s; the ownership lease is 15 s. The load proofs saturated that pool without a missed renewal, but a burst of long application transactions could delay renewals past the lease.
@@ -151,13 +162,11 @@ applied. These findings remain visible in online output. Yarn still reports thre
 upstream dash.js peer requirements in the `@svta/cml-*` packages; the real DASH
 playback check passes for the tested path.
 
-Native audio qualification remains partial. Four worklet meter assertions produce
-the same numerical failures on the previous Chromium. The interruption suite
-passes five of six cases; current WebKit fails the prerequisite that a held MP3
-advance at least one second before the cut. The original HTTP fixture passes with
-exact Playwright 1.60.0/WebKit, so this is a new browser qualification gap. WebKit
-retains its original HTTP fixture, and the assertions remain unchanged. These
-observations do not establish an application audio regression or authorize a playback redesign.
+Native audio qualification completed on 2026-11-05: the four worklet meter
+assertions failed because the test tone did not fit the meter's 10 ms window at
+44.1 kHz, and the WebKit interruption case stalled because the test polled
+`seekable` while a length-delimited MP3 started loading. Neither was an
+application audio regression (see Forge-neutral CI).
 
 ## PHP dependency and runtime refresh
 
