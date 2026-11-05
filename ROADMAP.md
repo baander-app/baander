@@ -72,6 +72,41 @@ Open items for this plan:
 - The Auth context guide still names a task transport that no longer exists; it belongs to a later documentation pass.
 - Two entries under `docs/solutions` name a transport that no longer exists and a single combined consumer; they are candidates for `ce-compound-refresh`.
 
+## Interactive manual diagrams
+
+Delivered, 2026-11-05, on branch `feat/interactive-manual-diagrams` (local, not pushed), from the
+[interactive manual diagrams plan](docs/plans/2026-11-05-2113-feat-interactive-manual-diagrams-plan.md).
+Every Mermaid diagram in the published manual is interactive without a change to its source.
+The docs page script `ui/site/assets/diagram-explore.js` swaps the static image for the built,
+sanitized SVG once the fetch returns a real SVG document, and lets the reader follow one
+connection at a time: pointing at a node colors its edges and their far ends with the ring
+color and recedes the rest; pointing at an edge, its label or a wide invisible hit path
+emphasizes that edge and both endpoints; a sequence message lights its text and lifelines.
+A click or tap pins, Enter steps through nodes and their edges with a live-region
+announcement and a visible hint, Escape leaves. The other theme's variant is fetched on the
+first switch with the pin and scroll position carried over, and a click on a page control
+keeps the pin. Without JavaScript, or when the asset is rejected, the page is as built. The
+render helper stamps each node, cluster, edge and label with its endpoints from Mermaid's
+parsed graph and fails the build on an edge it cannot match.
+
+Checkpoint, 2026-11-05:
+
+- Helper tests (`node --test scripts/render-blocks.test.mjs` in `ui/site`): 11 passed, seven of them for the endpoint data, clusters, a double edge, invisible edges, a sequence and the unmatched-edge failure.
+- PHP tooling suite (`vendor/bin/phpunit -c phpunit-tooling.xml.dist`): 1,509 tests, 12,969 assertions, 9 skipped, no failures; the figure markup and the sanitizer are unchanged.
+- `php scripts/build-website.php`: 210 manual pages; the built figures are unchanged apart from the script tag on docs pages, so the search index carries no diagram text, as before.
+- Typecheck (`corepack yarn typecheck` in `ui/site`, tests included): clean; `@types/node` is now a declared development dependency.
+- Browser spec (`corepack yarn test:browser` in `ui/site`): 71 passed, and the no-JavaScript sweep is unchanged. Its 13 JavaScript-enabled cases cover the swap and accessible name, node and edge emphasis including a pointer beside the hit stroke, a sequence message and its hit line, stepping with Home, End and both arrow axes with the announcer's full text, stepping from a pinned edge, pin release by click, a pinned node across a theme switch, rejected assets (wrong content type, 404, wrong root, broken XML, a failing other variant), and tap, pan and swipe on a touch viewport. The touch cases run through a `test.use` touch viewport in the spec rather than a separate Playwright project.
+- Fidelity check: with the script tag stripped from the built pages, every JavaScript-enabled case fails except the rejected-asset case, which asserts the fallback and holds by construction.
+- `ce-simplify-code` ran (b3395f43e). `ce-code-review` ran (review `20261105-222752-9012df74`, "Ready with fixes", eight reviewers, the cross-model pass disabled by checkout config). Its eleven findings are applied (d2170e791): a sequence hit line that Mermaid's id-scoped rule narrowed to 2px, wrapped message rows paired with the wrong message, the inlined title showing as a tooltip, a pin lost to a pan or scrollbar drag, a theme switch or scroll during the first fetch lost, and five spec cases that passed without proving their behaviour.
+
+Open items for this plan:
+
+- Publishing: the user-run Vercel promotion of the rebuilt site, after which this entry records the deployment.
+- No built page carries two diagram figures, so the shared document listener, the hint ids and cross-figure pin release are untested in a browser; the spec also lacks an OS-level theme change without the toggle and a wrapped (`<br/>`) sequence message.
+- The render helper's `describeDiagram` option exists only so a test can force an unmatched edge; it should not grow further test-only hooks.
+- The inlined SVG carries its own embedded font subset, so page font slicing (`PageFonts`) never sees diagram labels; a diagram with non-Latin labels has not been checked.
+- The diagram fade uses the fast duration token with the browser's default easing; `ui/DESIGN.md` states ease-out for the app shell and is silent for the static site.
+
 ## Small-host household deployment
 
 The user confirmed the
