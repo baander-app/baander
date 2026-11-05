@@ -1,6 +1,7 @@
 ---
 title: Run one workflow tree on Forgejo and GitHub without silent skips
 date: "2026-11-05"
+last_updated: "2026-11-05"
 category: developer-experience
 module: CI workflows shared by Forgejo and GitHub
 problem_type: developer_experience
@@ -12,6 +13,7 @@ applies_when:
   - Choosing a per-forge value for runs-on, a registry, a cache or an artifact action
   - Changing how build-application.php selects a buildx builder or exports BuildKit cache
   - Changing the anonymous-pull probe for private GHCR images
+  - Adding a step to a container job that starts a browser, sources an environment script or pulls an image published by the same push
 retire_when: "Forgejo merges workflow directories or exposes forgejo_server_version when it resolves runs-on, or GitHub's docker buildx driver accepts --cache-to type=local; check the Forgejo release notes and the docker/buildx driver documentation"
 tags: [forgejo, github-actions, workflows, buildkit, buildx, ghcr, ci, forge]
 ---
@@ -63,7 +65,49 @@ runs `git config --global --add safe.directory "$PWD"` before `git init -q`, as
 `actions/checkout` does. The setting is global because later steps in the job also
 run Git. `PublicationWorkflowTest` rejects a workspace `git init` without it and
 runs the checkout scripts with a throwaway `HOME`, so the test never writes to a
-developer's own Git configuration.
+developer's own Git configuration. The two traps below come from the same job
+container: GitHub gives it a different shell and a different home directory from
+the ones Forgejo's runner image gave the same steps, and nothing in the workflow
+files shows the difference.
+
+**Give a step that sources `emsdk_env.sh` `shell: bash`.** On GitHub a `run:` step
+inside a job container executes under `sh -e` unless the step names a shell. The
+first GitHub run installed Emscripten and then failed the next step with
+`Error: unable to determine 'emsdk' directory` and `emcc: command not found` (exit
+127): `emsdk_env.sh` finds its own directory only under bash, so `emcc` never reached
+`PATH`. The DSP steps set `shell: bash` (`.github/workflows/ci.yaml:622`,
+`.github/workflows/dsp-analysis.yaml:98`), and `PublicationWorkflowTest` rejects a
+step that sources `emsdk_env.sh` without it
+(`tests/Unit/Shared/Infrastructure/Ci/PublicationWorkflowTest.php:1106`).
+
+**Set `HOME: /root` on container jobs that start Firefox.** GitHub mounts
+`/github/home`, owned by the hosted runner's user, as the root container's home
+directory, the same ownership split as the workspace. Playwright's Firefox refuses
+to start there: "Firefox is unable to launch if the $HOME folder isn't owned by the
+current user". Chromium and WebKit start, so the website job passed while the two
+jobs that start Firefox inside the job container failed; the backend gate's Firefox
+step is unaffected because it runs its browser in the Playwright image. A job-level
+`env` sets `HOME: /root`
+(`.github/workflows/ci.yaml:542`, `.github/workflows/frontend.yaml:136`,
+`.github/workflows/website.yaml:61`), and the contract test requires it on every
+container job that installs Playwright browsers
+(`tests/Unit/Shared/Infrastructure/Ci/PublicationWorkflowTest.php:1071`), so the
+exposure does not depend on which browsers a job happens to use today.
+
+**Expect the first image push to fail, and make the runner package public by hand.**
+The image workflows of one push run in parallel with the runner build, and each of
+them runs inside the runner image, so on the first push the PostgreSQL and Nginx runs
+failed with `manifest unknown` and passed when re-run after the runner image was
+published. A gate job that declares neither `packages: read` nor `packages: write`
+could not pull the private runner image at all: GitHub pulls the job container with
+the job's own token before any step runs, so the pull was refused with `denied`,
+while the jobs that declared `packages: write` for the package store pulled it. A `docker login` step runs too
+late to help. That, not convenience, is why the runbook makes the runner package
+public. GitHub has no API for changing a container package's visibility: `gh api
+/orgs/baander-app/packages/container/baander-runner --jq .visibility` only reads it,
+and the package settings page does not save the change until the package name is
+typed into its confirmation dialog, which cost one extra round here. An anonymous
+`docker manifest inspect` with an empty `DOCKER_CONFIG` confirms the result.
 
 **Select the buildx builder through the build tool, not the workflow.** GitHub's
 hosted Docker uses the `docker` driver, which may refuse `--cache-to type=local`, so the
@@ -72,7 +116,7 @@ CI image build needs a `docker-container` builder. The first plan added a
 `Docker\Client` appended `--builder default` to every buildx call that named no
 builder, so the build kept running on the default builder and the step had no
 effect. The fix passes the builder explicitly (`--builder "$CI_BUILDER"`,
-`.github/workflows/ci.yaml:122`), and `Client::withBuilder()` accepts it only when
+`.github/workflows/ci.yaml:123`), and `Client::withBuilder()` accepts it only when
 `docker buildx inspect` shows the `docker-container` driver with every node on the
 captured daemon (`packages/baander-tooling/src/Docker/Client.php:43`). That keeps the
 rule that no builder name can move a build to another engine.
@@ -82,7 +126,7 @@ as `baander-ci` collides on Forgejo, where concurrent jobs share one Docker daem
 one job's cleanup removes another job's builder, and a cancelled job leaves a BuildKit
 container behind. The workflow uses
 `baander-ci-${{ github.run_id }}-${{ github.run_attempt }}` (`ci.yaml:30`) and runs
-`docker buildx rm` at job end (`ci.yaml:532`).
+`docker buildx rm` at job end (`ci.yaml:533`).
 
 **Archive caches relative to their directory.** The old Forgejo save step ran
 `tar -cf - -C / tmp/buildkit-cache`, and the restore step extracted into
@@ -91,7 +135,7 @@ container behind. The workflow uses
 every step still passed because the extract ended in `|| true`. `PackageStore`, which
 `scripts/ci-package-store.php` drives, archives with `--directory <dir> .` so save and
 restore are symmetric. The build also exports to a fresh `/tmp/buildkit-cache-new`
-and swaps it in (`ci.yaml:125`, `ci.yaml:133`), because a local cache exported over
+and swaps it in (`ci.yaml:126`, `ci.yaml:134`), because a local cache exported over
 its own source only grows.
 
 **Make the privacy probe fail closed, and test "permission denied" first.**
@@ -111,9 +155,10 @@ The guide's runbook lists the order.
 ## Why This Matters
 
 Most of these traps fail silently: a skipped workflow, a job that waits in the queue,
-a step that has no effect, a cache that never restores, a false pass. Apart from the
-checkout ownership error, which failed the first GitHub run, the forge-neutral port
-caught them through review and by reading the Forgejo source, not through a red run.
+a step that has no effect, a cache that never restores, a false pass. The first
+GitHub runs failed loudly on three of them, the checkout ownership, the `sh` default
+shell and the home-directory ownership, and the forge-neutral port caught the rest
+through review and by reading the Forgejo source, not through a red run.
 A regression shows up as CI that is slower, missing or wrongly green, and nothing
 points back to these causes.
 
@@ -124,6 +169,8 @@ points back to these causes.
 - When touching builder selection in `packages/baander-tooling/src/Docker/Client.php`
   or the BuildKit cache steps in `ci.yaml`.
 - When editing the patterns in `scripts/ghcr-private-probe.sh`.
+- When adding a step to a container job that starts a browser, sources an
+  environment script or pulls an image that the same push publishes.
 
 ## Examples
 
