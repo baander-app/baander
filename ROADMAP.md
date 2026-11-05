@@ -62,6 +62,7 @@ Checkpoint, 2026-11-05:
 - prose-fix review applied to every new or changed page.
 - The CI gate is the GitHub public website workflow, which runs on changes under `docs-book/`; Forgejo has no website gate.
 - `ce-code-review` ran (review `20261105-200600-58aa65a1`, "Ready with fixes"): its one confirmed finding, the Transcode page's streaming table calling the required `generation` query optional, is applied; the build passed again at 210 pages. Two advisory testing notes are recorded below.
+- Published, 2026-11-05: master at c8edf1cba merged and pushed to both forges, the artifact rebuilt at that revision and promoted on Vercel (`https://baander-jpybm97ob-martin-juuls-projects.vercel.app`, aliased to `https://baander.app`). Over `https://baander.app`: the homepage, the two hub pages, the Transcode context page and API Reference answer 200 with valid HTTPS, each hub carries one rendered diagram figure, the route-table fix is live, and an unknown URL answers 404. The preview deployment sits behind Vercel's deployment protection, so its checks were run over production instead.
 
 Open items for this plan:
 
