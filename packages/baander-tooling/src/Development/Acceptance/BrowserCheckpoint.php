@@ -73,11 +73,26 @@ final class BrowserCheckpoint
         return $status;
     }
 
-    public function run(string $phase, string $artifacts, string $baseUrl): int
+    /** Validates the Docker network the browser container joins: the host network, or another container's namespace. */
+    public static function network(string $network): string
+    {
+        if ($network === '' || $network === 'host') {
+            return 'host';
+        }
+        if (preg_match('/^container:[A-Za-z0-9][A-Za-z0-9_.-]*$/D', $network) !== 1) {
+            throw new \InvalidArgumentException('Browser network must be "host" or "container:<name>".');
+        }
+        return $network;
+    }
+
+    /** The browser joins the host network unless the checkpoint names a container whose network namespace it shares,
+     *  so a drill whose web listens only inside its own namespace can be reached at that namespace's loopback origin. */
+    public function run(string $phase, string $artifacts, string $baseUrl, string $network = 'host'): int
     {
         if ($phase === 'cleanup') {
             return self::cleanup($artifacts, $this->environment);
         }
+        $network = self::network($network);
         $engine = $this->environment['BAANDER_TEST_BROWSER_ENGINE'] ?? '';
         $engine = $engine === '' ? 'chromium' : $engine;
         if (!in_array($engine, ['chromium', 'firefox'], true)) {
@@ -100,7 +115,7 @@ final class BrowserCheckpoint
             AtomicFile::writeJson($artifacts . '/browser-budget.json', ['cleanup' => $this->configuration->budgets->seconds('cleanup')]);
             new ResourceLedger($marker, $this->docker, $this->environment)->create(ResourceKind::Container, $container, [
                 '--network',
-                'host',
+                $network,
                 '--memory=2g',
                 '--pids-limit=256',
                 '-e',

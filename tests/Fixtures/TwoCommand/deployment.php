@@ -614,7 +614,7 @@ if ($mode === 'prepare') {
     $movies = new LibraryEntity('Two command movies', 'two-command-movies', '/media/source', 'movie', 'local');
     $album = new AlbumEntity(new PublicId(), $library, 'Two command album', 'two-command-album');
     $song = new SongEntity(new PublicId(), $album, 'Worker audio', AUDIO, (int) filesize(AUDIO), 'audio/flac');
-    $video = new VideoEntity(new PublicId(), VIDEO, hash_file('sha256', VIDEO));
+    $video = new VideoEntity(new PublicId(), VIDEO, hash_file('xxh3', VIDEO));
     $catalogProbe = new Process(\App\Transcode\Infrastructure\FFmpeg\FFprobeArguments::video(VIDEO, 'ffprobe'), timeout: 30);
     $catalogProbe->mustRun();
     $video->setProbe(\App\Transcode\Domain\ValueObject\VideoProbeResult::fromProbeOutput(

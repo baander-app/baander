@@ -18,11 +18,12 @@ try {
     $repository = dirname(__DIR__);
     chdir($repository);
     $arguments = $argv ?? [];
-    if (count($arguments) !== 4) {
-        throw new RuntimeException('Usage: test-two-command-browser-checkpoint.php PHASE ARTIFACTS BASE_URL');
+    if (count($arguments) < 4 || count($arguments) > 5) {
+        throw new RuntimeException('Usage: test-two-command-browser-checkpoint.php PHASE ARTIFACTS BASE_URL [NETWORK]');
     }
     $environment = getenv();
     [$script, $phase, $artifacts, $baseUrl] = $arguments;
+    $network = BrowserCheckpoint::network($arguments[4] ?? 'host');
     if ($phase === 'cleanup') {
         exit(BrowserCheckpoint::cleanup($artifacts, $environment));
     }
@@ -33,7 +34,7 @@ try {
     } else {
         $target = new TargetResolver($executor, $environment)->resolve($configuration->docker, $artifacts . '/browser-transport');
     }
-    $status = new BrowserCheckpoint(new Client($executor, $target, $environment), $configuration, $environment, $repository)->run($phase, $artifacts, $baseUrl);
+    $status = new BrowserCheckpoint(new Client($executor, $target, $environment), $configuration, $environment, $repository)->run($phase, $artifacts, $baseUrl, $network);
     $executor->close();
     exit($status);
 } catch (Throwable $error) {

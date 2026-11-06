@@ -10,6 +10,9 @@ use Throwable;
 
 final readonly class OperatorProvisioning
 {
+    /** The web's origin inside its own network namespace: the application URL every drill client and the browser use. */
+    public const string WEB_ORIGIN = 'http://127.0.0.1:9501';
+
     public function __construct(private OperatorQualification $qualification) {}
 
     public function startWeb(): void
@@ -33,9 +36,9 @@ final readonly class OperatorProvisioning
             '-e',
             'OTEL_ENABLED=false',
             '-e',
-            'APP_URL=http://127.0.0.1:9501',
+            'APP_URL=' . self::WEB_ORIGIN,
             '-e',
-            'DEFAULT_URI=http://127.0.0.1:9501',
+            'DEFAULT_URI=' . self::WEB_ORIGIN,
             '-e',
             'APP_DOMAIN=127.0.0.1',
             ...$this->qualification->state->mediaMounts,
