@@ -565,6 +565,67 @@ face and that the page declares and requests only slices its text reaches first.
 Each new check failed once against a deliberately broken build. Open: the user
 previews the rebuilt site before publication.
 
+### Website layout stability
+
+Delivered on branch `fix/site-layout-shift` from the
+[website layout shift plan](docs/plans/2026-11-06-2239-fix-site-layout-shift-plan.md).
+Every page of the public website painted once and then rearranged itself. Measured
+in headless Chromium at 1440 by 900 before the change: the theme toggle appeared on
+DOM ready and grew the header from 23 to 44 pixels, a shift of 0.037 on every page;
+the search script appended its form into an empty mount and pushed the chapter list
+down 144 pixels; and Geist arrived after first paint with no preload, widening the
+header nav from 390 to 468 pixels and, on the operator guide, adding a line to a
+paragraph that moved the list below it 26 pixels, a shift of 0.118.
+
+The header renders the toggle at full size and the stylesheet reveals it once the
+head script has marked the root with a theme, so the header has one size with and
+without the script. Manual pages render the search form in the HTML with the field
+disabled; the script enables it, and without JavaScript the status line gives way
+to the message that search needs JavaScript. Every page preloads the Latin Geist
+face, pages whose text reaches Geist Mono preload that face too, and the published
+theme declares metric-matched fallback faces after each Geist family: a regular and
+a bold face over Arial or Liberation Sans, a Roboto pair behind them for Android,
+and one over Courier New or Liberation Mono, each scaled to Geist's advance width
+with Geist's line box and limited to the Latin slice's range. Arrow glyphs, which
+that slice lacks, sit in fixed-width slots so the Noto glyph that replaces the
+system one moves nothing. The document keeps a stable scrollbar gutter, and the
+section heading size is capped one pixel lower so a heading that filled its column
+to the pixel does not wrap in the fallback.
+
+A new browser spec loads the homepage, the operator guide and the bAAC page at
+desktop and phone widths over a throttled network and CPU and fails on any layout
+shift after first paint; a second case holds the font files back until after first
+paint and fails when any line moves on the swap; a third blocks the Geist files and
+compares block heights and single-line row widths with the Geist rendering on the
+homepage and the operator guide at both widths, and inline code on the developer
+testing page. The suite runs Chromium with font hinting off, because headless
+Chromium on Linux otherwise rounds the fallback's fractional size to whole pixels.
+
+Verification checkpoint: 87 Website tooling PHPUnit tests with 1,253 assertions,
+PHPStan and php-cs-fixer clean, site typecheck, 11 node tests, a fresh
+`make website-build` of 210 pages, and 91 Chromium browser checks, nineteen of them
+new. Break-it-first runs against the built site: restoring the hidden toggle and its
+DOM-ready reveal failed the shift check at both widths with the original 0.0369;
+removing the fallback faces failed the held-font case on all six page and width
+combinations and the width comparison, 393 against 400 pixels for the header nav;
+removing the preload links failed the shift check on the homepage even with the
+fallback present. Hiding the toggle with a stylesheet rule keyed on the root marker
+and removing the fallback faces alone did not fail the plain shift check, because
+the head script marks the root before first paint and the preload lands before
+paint under the throttled profile; the held-font case exists for that reason. The
+code review's independent reproduction found the bold and phone-width gaps the
+first fallback left, and the Android gap; all three are closed above.
+
+Open: one scaling factor per weight range cannot match every line, so a long page
+dense with inline code still wraps a few paragraphs differently in the fallback,
+three of 465 blocks at desktop width and 28 at phone width on the developer testing
+page, and headings that fill their column to the pixel can wrap in the bold
+fallback; the medium weight renders in the regular face and runs 1.5 to 2.4 percent
+narrow. Linux Chromium with full font hinting can still gain a line in the fallback
+and wrap the phone-width nav on the swap; the suite does not measure that
+rendering. Diagram pages, where the diagram script swaps an image for an inline
+SVG, are not in the shift check. Firefox is not measured.
+
 ### Source-installation documentation
 
 Disposable installation verified frontend loading, administrator login, worker
