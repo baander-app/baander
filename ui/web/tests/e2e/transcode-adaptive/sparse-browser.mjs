@@ -330,7 +330,8 @@ try {
       assert(frameTicks.some((tick, index) => index > 0 && Math.abs(tick - frameTicks[index - 1] - 1) < 0.02),
         'The actual native frame callbacks must expose the forty-millisecond movie cadence')
       receipt.frameCadence = { sourceRate: 25, expectedFrames: fixture.expectedDuration * 25,
-        decodedFrames: state.decodedFrames, callbacks: colorFrames.length, uniquePresentedFrames: uniqueFrames.size }
+        decodedFrames: state.decodedFrames, callbacks: colorFrames.length, uniquePresentedFrames: uniqueFrames.size,
+        laggedCallbacks: state.frameObserver.lagged }
     }
     for (const [color, sourceBegin, sourceEnd] of [['red', fixture.sourceStartTime, 10], ['green', 10, 20], ['blue', 20, 30]]) {
       const frames = colorFrames.filter(frame => frame.color === color)
