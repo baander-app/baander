@@ -4,7 +4,6 @@ include __DIR__ . '/header.php';
 ?>
 <div class="manual-layout">
   <aside class="chapter-sidebar" aria-label="Manual navigation">
-    <?php // The form is rendered here so the sidebar has its final layout before the search script enables it. ?>
     <section id="manual-search" aria-label="Search manuals">
       <label for="manual-search-input">Search manuals</label>
       <input id="manual-search-input" type="search" placeholder="Find a task or topic" autocomplete="off" spellcheck="false" aria-describedby="manual-search-status" aria-controls="manual-search-results" disabled>

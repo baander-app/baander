@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Baander\Tooling\Tests\Website;
 
+use Baander\Tooling\Website\PageFonts;
 use Baander\Tooling\Website\Publication;
 use PHPUnit\Framework\TestCase;
 
@@ -122,7 +123,7 @@ final class PublicationTest extends TestCase
             self::assertStringNotContainsString('font-display', $rule[0], 'A local face needs no display policy');
         }
         self::assertSame(1, preg_match('~^@font-face \{[^}]*"Geist Variable";[^}]*\}\s*@font-face \{[^}]*"Geist Fallback";~', $css), 'The fallback follows the Geist face it stands in for');
-        preg_match_all('/(--font-(?:ui|mono)(?:-[a-z]+)?):\s*([^;]+);/', $css, $declarations, PREG_SET_ORDER);
+        preg_match_all(PageFonts::STACK_DECLARATION, $css, $declarations, PREG_SET_ORDER);
         $stacks = array_column($declarations, 2, 1);
         self::assertCount(8, $stacks);
         foreach (['--font-ui', '--font-ui-ja', '--font-ui-ko', '--font-ui-hant'] as $stack) {

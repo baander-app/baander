@@ -36,18 +36,12 @@ final class Publication
         'Geist Variable' => [
             'family' => 'Geist Fallback',
             'local' => ['Arial', 'Liberation Sans'],
-            'size-adjust' => '102.7646%',
-            'ascent-override' => '97.7963%',
-            'descent-override' => '28.7064%',
-            'line-gap-override' => '0%',
+            'metrics' => ['size-adjust' => '102.7646%', 'ascent-override' => '97.7963%', 'descent-override' => '28.7064%', 'line-gap-override' => '0%'],
         ],
         'Geist Mono Variable' => [
             'family' => 'Geist Mono Fallback',
             'local' => ['Courier New', 'Liberation Mono'],
-            'size-adjust' => '99.9837%',
-            'ascent-override' => '100.5164%',
-            'descent-override' => '29.5048%',
-            'line-gap-override' => '0%',
+            'metrics' => ['size-adjust' => '99.9837%', 'ascent-override' => '100.5164%', 'descent-override' => '29.5048%', 'line-gap-override' => '0%'],
         ],
     ];
 
@@ -87,11 +81,13 @@ final class Publication
         }
         $tone = file_get_contents($root . '/ui/site/theme-tone.css')
             ?: throw new RuntimeException('The site theme tone is missing: ui/site/theme-tone.css.');
-        $geist = array_map(static fn(string $family): string => '"' . $family . '",', array_keys(self::FALLBACKS));
-        $withFallback = array_map(static fn(string $family, array $fallback): string => '"' . $family . '", "' . $fallback['family'] . '",', array_keys(self::FALLBACKS), self::FALLBACKS);
+        $fallbacks = array_combine(
+            array_map(static fn(string $family): string => '"' . $family . '",', array_keys(self::FALLBACKS)),
+            array_map(static fn(string $family, array $fallback): string => '"' . $family . '", "' . $fallback['family'] . '",', array_keys(self::FALLBACKS), self::FALLBACKS),
+        );
         $stacks = preg_replace_callback(
-            '/(--font-(?:ui|mono)(?:-[a-z]+)?:\s*)([^;]+;)/',
-            static fn(array $declaration): string => $declaration[1] . str_replace($geist, $withFallback, $declaration[2]),
+            PageFonts::STACK_DECLARATION,
+            static fn(array $declaration): string => $declaration[1] . ': ' . strtr($declaration[2], $fallbacks) . ';',
             $tokens,
         );
 
@@ -224,7 +220,7 @@ final class Publication
         $reached = array_map(static fn(array $face): string => basename($face['file']), $faces);
         $links = [];
         foreach ($latinFaces as $family => $path) {
-            if ($family === self::PRELOADED_FAMILY || in_array(self::FONTS[$family] . '-latin-wght-normal.woff2', $reached, true)) {
+            if ($family === self::PRELOADED_FAMILY || in_array(self::latinFile(self::FONTS[$family]), $reached, true)) {
                 $links[] = '<link rel="preload" as="font" type="font/woff2" crossorigin href="' . $path . '">';
             }
         }
@@ -257,11 +253,18 @@ final class Publication
     {
         $faces = [];
         foreach (self::FONTS as $family => $font) {
-            $package = self::fontPackage($root, $font);
-            $faces[$family] = self::copyHashed($package . '/files/' . $font . '-latin-wght-normal.woff2', $staging, $font . '-latin-wght-normal', 'woff2');
+            $package = $root . '/ui/site/node_modules/@fontsource-variable/' . $font;
+            $file = self::latinFile($font);
+            $faces[$family] = self::copyHashed($package . '/files/' . $file, $staging, basename($file, '.woff2'), 'woff2');
             self::copyHashed($package . '/LICENSE', $staging, $font . '-LICENSE', 'txt');
         }
         return $faces;
+    }
+
+    /** The file name of a Fontsource package's Latin variable slice. */
+    private static function latinFile(string $font): string
+    {
+        return $font . '-latin-wght-normal.woff2';
     }
 
     /**
@@ -273,34 +276,20 @@ final class Publication
      */
     private static function fonts(string $root, array $faces): string
     {
+        $packages = PageFonts::load($root);
         $rules = '';
         foreach ($faces as $family => $path) {
             $fallback = self::FALLBACKS[$family];
             $rules .= self::faceRule($family, $path)
                 . "@font-face {\n  font-family: \"{$fallback['family']}\";\n"
                 . '  src: ' . implode(', ', array_map(static fn(string $name): string => 'local("' . $name . '")', $fallback['local'])) . ";\n";
-            foreach (['size-adjust', 'ascent-override', 'descent-override', 'line-gap-override'] as $metric) {
-                $rules .= "  {$metric}: {$fallback[$metric]};\n";
+            foreach ($fallback['metrics'] as $metric => $value) {
+                $rules .= "  {$metric}: {$value};\n";
             }
-            $rules .= '  unicode-range: ' . self::latinRange($root, self::FONTS[$family]) . ";\n}\n";
+            $font = self::FONTS[$family];
+            $rules .= '  unicode-range: ' . $packages->declaredRange($font, self::latinFile($font)) . ";\n}\n";
         }
         return $rules;
-    }
-
-    /** The unicode range of the package's Latin slice, as its stylesheet declares it. */
-    private static function latinRange(string $root, string $font): string
-    {
-        $index = self::fontPackage($root, $font) . '/index.css';
-        $css = file_get_contents($index) ?: throw self::missing($index);
-        if (!preg_match('/@font-face\s*\{[^}]*\/' . preg_quote($font, '/') . '-latin-wght-normal\.woff2\)[^}]*unicode-range:\s*([^;]+);/', $css, $range)) {
-            throw new RuntimeException('The Latin slice of ' . $font . ' declares no unicode range in ' . $index);
-        }
-        return trim($range[1]);
-    }
-
-    private static function fontPackage(string $root, string $font): string
-    {
-        return $root . '/ui/site/node_modules/@fontsource-variable/' . $font;
     }
 
     /** @return string the published path of the copy */

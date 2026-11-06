@@ -21,6 +21,7 @@ interface Pagefind {
 
 // The page renders the field, status line and results list, so the sidebar already has its final
 // layout; this script only enables the field and wires it.
+// `status` is taken by the window in this classic script, so the page's elements get their own names here.
 const mount = document.querySelector<HTMLElement>('#manual-search');
 const field = mount?.querySelector<HTMLInputElement>('#manual-search-input');
 const statusLine = mount?.querySelector<HTMLElement>('#manual-search-status');
