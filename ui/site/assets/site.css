@@ -62,7 +62,10 @@ code, kbd, samp, pre { font-family: var(--font-mono); }
 }
 .app-screenshot figcaption { grid-area: 2 / 1; margin-top: 16px; color: var(--color-muted-foreground); text-align: center; font-size: 11px; }
 .home-section { padding: 64px 0; border-bottom: 1px solid var(--color-border); }
-.section-intro h2 { margin: 16px 0 24px; font-size: clamp(28px, 3.2vw, 38px); }
+/* Capped at 37px so a one-line heading in a half-width column keeps a few pixels of slack: the bold
+   fallback face runs slightly wider than Geist, and a heading that fills its column to the pixel would
+   wrap in the fallback and jump when Geist arrives. */
+.section-intro h2 { margin: 16px 0 24px; font-size: clamp(28px, 3.2vw, 37px); }
 .section-intro p:not(.eyebrow) { color: var(--color-muted-foreground); margin-bottom: 24px; }
 .operating-model, .hosting { display: grid; grid-template-columns: 1fr 1fr; gap: 64px; align-items: start; }
 .experience-feature { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 32px; align-items: center; }

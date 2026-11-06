@@ -103,31 +103,47 @@ final class PublicationTest extends TestCase
         self::assertStringEndsWith(':root[data-theme="dark"] { --color-foreground: #e6e6e9; }', $css, 'The site tone follows the shared tokens');
     }
 
-    public function testTheThemeDeclaresAMetricMatchedFallbackFaceAfterEachGeistFamily(): void
+    public function testTheThemeDeclaresMetricMatchedFallbackFacesAfterEachGeistFamily(): void
     {
         $root = $this->directory . '/source';
         $this->writeSources($root);
         Publication::assets($root, $this->directory);
         $css = (string) file_get_contents($this->directory . '/assets/site/theme.css');
-        $fallbacks = [
-            'Geist Fallback' => 'local("Arial"), local("Liberation Sans")',
-            'Geist Mono Fallback' => 'local("Courier New"), local("Liberation Mono")',
+        $faces = [
+            'Geist Fallback' => ['100 500' => 'local("Arial"), local("Liberation Sans")', '600 900' => 'local("Arial Bold"), local("Liberation Sans Bold")'],
+            'Geist Fallback Roboto' => ['100 500' => 'local("Roboto")', '600 900' => 'local("Roboto Bold")'],
+            'Geist Mono Fallback' => ['100 900' => 'local("Courier New"), local("Liberation Mono")'],
         ];
-        foreach ($fallbacks as $family => $sources) {
-            self::assertSame(1, preg_match('~@font-face \{[^}]*font-family: "' . $family . '";[^}]*\}~', $css, $rule), $family . ' is declared once');
-            self::assertStringContainsString('src: ' . $sources . ';', $rule[0]);
-            self::assertStringContainsString('unicode-range: ' . self::RANGES['latin'] . ';', $rule[0], 'The fallback stands in only for the characters of the Latin Geist slice');
-            foreach (['size-adjust', 'ascent-override', 'descent-override', 'line-gap-override'] as $metric) {
-                self::assertMatchesRegularExpression('~\b' . $metric . ': \d+(?:\.\d{1,4})?%;~', $rule[0], $family . ' sets ' . $metric);
+        $metrics = ['size-adjust', 'ascent-override', 'descent-override', 'line-gap-override'];
+        foreach ($faces as $family => $weights) {
+            self::assertSame(count($weights), preg_match_all('~@font-face \{[^}]*font-family: "' . $family . '";[^}]*\}~', $css, $rules), $family . ' declares one face per weight range');
+            $values = [];
+            foreach (array_values($weights) as $index => $sources) {
+                $rule = $rules[0][$index];
+                $weight = array_keys($weights)[$index];
+                self::assertStringContainsString("font-weight: {$weight};\n  src: {$sources};", $rule, $family . ' ' . $weight);
+                self::assertStringContainsString('unicode-range: ' . self::RANGES['latin'] . ';', $rule, 'The fallback stands in only for the characters of the Latin Geist slice');
+                foreach ($metrics as $metric) {
+                    self::assertSame(1, preg_match('~\b' . $metric . ': (\d+(?:\.\d{1,4})?%);~', $rule, $value), $family . ' ' . $weight . ' sets ' . $metric);
+                    $values[$weight][$metric] = $value[1];
+                }
+                self::assertStringNotContainsString('font-display', $rule, 'A local face needs no display policy');
             }
-            self::assertStringNotContainsString('font-display', $rule[0], 'A local face needs no display policy');
+            if (count($values) === 2) {
+                self::assertNotSame($values['100 500']['size-adjust'], $values['600 900']['size-adjust'], $family . ' scales its bold face to the bold Geist widths');
+            }
         }
-        self::assertSame(1, preg_match('~^@font-face \{[^}]*"Geist Variable";[^}]*\}\s*@font-face \{[^}]*"Geist Fallback";~', $css), 'The fallback follows the Geist face it stands in for');
+        self::assertSame(
+            1,
+            preg_match('~^@font-face \{[^}]*"Geist Variable";[^}]*\}\s*@font-face \{[^}]*"Geist Fallback";[^}]*font-weight: 100 500;[^}]*\}\s*@font-face \{[^}]*"Geist Fallback";[^}]*font-weight: 600 900;[^}]*\}\s*'
+                . '@font-face \{[^}]*"Geist Fallback Roboto";[^}]*font-weight: 100 500;[^}]*\}\s*@font-face \{[^}]*"Geist Fallback Roboto";[^}]*font-weight: 600 900;[^}]*\}\s*@font-face \{[^}]*"Geist Mono Variable";~', $css),
+            'The fallback faces follow the Geist face they stand in for, regular before bold',
+        );
         preg_match_all(PageFonts::STACK_DECLARATION, $css, $declarations, PREG_SET_ORDER);
         $stacks = array_column($declarations, 2, 1);
         self::assertCount(8, $stacks);
         foreach (['--font-ui', '--font-ui-ja', '--font-ui-ko', '--font-ui-hant'] as $stack) {
-            self::assertStringStartsWith('"Geist Variable", "Geist Fallback", "Noto Sans Variable",', $stacks[$stack], $stack);
+            self::assertStringStartsWith('"Geist Variable", "Geist Fallback", "Geist Fallback Roboto", "Noto Sans Variable",', $stacks[$stack], $stack);
             self::assertStringNotContainsString('Mono Fallback', $stacks[$stack]);
         }
         foreach (['--font-mono', '--font-mono-ja', '--font-mono-ko', '--font-mono-hant'] as $stack) {
