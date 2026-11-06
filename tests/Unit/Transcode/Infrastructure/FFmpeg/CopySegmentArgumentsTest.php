@@ -19,8 +19,12 @@ final class CopySegmentArgumentsTest extends TestCase
         self::assertSame(['0:7', '0:2'], $this->values($args, '-map'));
         self::assertSame(['copy'], $this->values($args, '-c'));
         self::assertSame(['6.170000'], $this->values($args, '-ss'));
-        self::assertSame(['-6.170000'], $this->values($args, '-itsoffset'));
-        foreach (['-vf', '-af', '-b:v', '-b:a', '-force_key_frames', '-shortest', '-r'] as $option) {
+        self::assertSame(['-6.170000'], $this->values($args, '-output_ts_offset'));
+        $input = array_search('-i', $args, true);
+        self::assertIsInt($input);
+        self::assertLessThan($input, array_search('-ss', $args, true), 'The boundary seek is an input option');
+        self::assertGreaterThan($input, array_search('-output_ts_offset', $args, true), 'The boundary offset is an output option so the read burst starts at the boundary');
+        foreach (['-vf', '-af', '-b:v', '-b:a', '-force_key_frames', '-shortest', '-r', '-itsoffset'] as $option) {
             self::assertNotContains($option, $args);
         }
         self::assertSame('/output/manifest.mpd', $args[array_key_last($args)]);

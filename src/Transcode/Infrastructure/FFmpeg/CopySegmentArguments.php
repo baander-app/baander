@@ -35,10 +35,11 @@ final class CopySegmentArguments
         if ($sourceBoundary > 0) {
             array_push($arguments, '-seek_timestamp', '1', '-ss', sprintf('%.6f', $sourceBoundary));
         }
+        // Under -copyts FFmpeg counts the burst from the seek boundary, and an input
+        // offset would push the burst out by that boundary, so the boundary is
+        // normalised on the output side instead.
         array_push(
             $arguments,
-            '-itsoffset',
-            sprintf('%.6f', -$sourceBoundary),
             '-readrate_initial_burst',
             (string) self::INITIAL_BURST_SECONDS,
             '-readrate',
@@ -79,6 +80,8 @@ final class CopySegmentArguments
             'init-$RepresentationID$.mp4',
             '-media_seg_name',
             'track-$RepresentationID$-seg-$Number%05d$.m4s',
+            '-output_ts_offset',
+            sprintf('%.6f', -$sourceBoundary),
             rtrim($outputDirectory, '/') . '/manifest.mpd'
         );
         return $arguments;
