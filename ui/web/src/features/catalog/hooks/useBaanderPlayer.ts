@@ -536,6 +536,8 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, coor
             ...(action === 'progress' ? { generation: current.generation, revision: current.revision } : {}),
             ...(chain ? { generation: chain.generation, requestId: crypto.randomUUID() } : {}),
           }
+          if (chain) performance.mark('baander:seek-send', { detail: { position: payload.position, generation: payload.generation,
+            targetPosition: seekTarget?.position ?? null, remaining: chain.remaining } })
           const send = () => AXIOS_INSTANCE.post<{ data?: PostTranscodeSessionPosition200 }>(
             `/api/transcode/sessions/${sessionId}/position`, payload, { signal: abort.signal, timeout: 5000 })
           let response
@@ -679,6 +681,9 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, coor
     }
     const enqueueSeek = (position: number) => {
       if (!snapshot?.sessionId) return
+      performance.mark('baander:seek-intent', { detail: { position, chain: seekChain === null ? 'new' : 'existing',
+        started: seekChain?.started ?? null, remaining: seekChain?.remaining ?? null,
+        pendingTarget: seekChain?.pendingTarget?.position ?? null } })
       completion = null
       seekIntentRevision++
       if (canonicalSeekRecovery !== null) {
@@ -802,6 +807,8 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, coor
       }
     })
     const seek = (time: number) => {
+      performance.mark('baander:seek-entry', { detail: { time, active: active(), terminal, snapshot: Boolean(snapshot),
+        session: snapshot?.sessionId ?? null, sourceDuration } })
       if (!active() || terminal || !snapshot || !Number.isFinite(time) || sourceDuration <= 0) return
       const position = Math.max(0, Math.min(sourceDuration, time))
       if (!snapshot.sessionId) {

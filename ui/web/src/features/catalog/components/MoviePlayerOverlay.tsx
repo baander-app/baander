@@ -113,6 +113,7 @@ export function MoviePlayerOverlay({ title, videoId, sourceDuration = 0, onClose
 
   const displayedTime = draftPosition ?? (local ? pendingSeekPosition : null) ?? currentTime
   const commitSeek = (value: number) => {
+    performance.mark('baander:seek-commit', { detail: { value, cancelled: cancelledSeek.current, local, videoId } })
     setDraft(null)
     if (!cancelledSeek.current) seekTo(value)
   }
@@ -144,7 +145,10 @@ export function MoviePlayerOverlay({ title, videoId, sourceDuration = 0, onClose
       </VideoContainer>
 
       <TitleBar>
-        <Button variant="ghost" size="sm" disabled={!connected || !selected} onClick={() => { submit({ action: playing ? 'pause' : 'play' }) }}>
+        <Button variant="ghost" size="sm" disabled={!connected || !selected} onClick={() => {
+          performance.mark('baander:control-click', { detail: { action: playing ? 'pause' : 'play', connected, selected, local, videoId } })
+          submit({ action: playing ? 'pause' : 'play' })
+        }}>
           {playing ? 'Pause' : 'Play'}
         </Button>
         <Button variant="ghost" size="sm" disabled={!connected || !selected} onClick={() => { submit({ action: 'stop' }) }}>Stop</Button>
