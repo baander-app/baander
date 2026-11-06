@@ -551,6 +551,22 @@ SH;
         self::assertSame('docker pull ${{ env.REGISTRY }}/${{ env.POSTGRES_IMAGE }}:latest', $this->step($workflow['jobs']['quality-gate'], 'Pull PostgreSQL image')['run']);
     }
 
+    public function testCiPullsTheExternalFixtureImagesBeforeTheFixtureLanes(): void
+    {
+        $job = $this->workflow('ci.yaml')['jobs']['quality-gate'];
+        $names = array_map(static fn(array $step): ?string => $step['name'] ?? null, $job['steps']);
+        $pull = array_search('Pull fixture images', $names, true);
+        self::assertNotFalse($pull, 'The fixture lanes resolve their images without pulling, so a fresh runner needs them pulled first');
+        self::assertGreaterThan(array_search('Prepare standalone PHP tooling', $names, true), $pull);
+        self::assertLessThan(array_search('Production worker lifecycle and dependencies', $names, true), $pull);
+        $run = $this->step($job, 'Pull fixture images')['run'];
+        self::assertStringContainsString('docker pull', $run);
+        self::assertStringContainsString('images->role($argv[1])->reference', $run);
+        foreach (['fixtureRedis', 'mailpit'] as $role) {
+            self::assertStringContainsString($role, $run);
+        }
+    }
+
     #[DataProvider('privateImageProbeProvider')]
     public function testAnonymousPullProbePassesOnlyWhenTheRegistryRefusesThePull(
         string $file,

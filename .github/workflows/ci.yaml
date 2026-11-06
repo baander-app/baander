@@ -83,6 +83,12 @@ jobs:
             -   name: Pull PostgreSQL image
                 run: docker pull ${{ env.REGISTRY }}/${{ env.POSTGRES_IMAGE }}:latest
 
+            -   name: Pull fixture images
+                run: |
+                    for role in fixtureRedis mailpit; do
+                        docker pull "$(php -r 'require "scripts/bootstrap.php"; echo \Baander\Tooling\Configuration\ToolingConfiguration::forRepository(getcwd(), getenv())->images->role($argv[1])->reference;' "$role")"
+                    done
+
             -   name: Restore BuildKit cache on Forgejo
                 if: github.server_url != 'https://github.com'
                 env:
