@@ -3,13 +3,23 @@ export function installFrameObserver(environment = globalThis) {
   const video = environment.document.querySelector('#video')
   const { VideoFrame, performance, setTimeout, clearTimeout } = environment
   const observer = environment.sparseFrameObserver = {
-    errors: [], droppedErrors: 0, constructed: 0, closed: 0, pending: 0, maxPending: 0, callbacks: 0, stopped: false,
+    errors: [], droppedErrors: 0, lagged: 0, laggedFrames: [], droppedLagged: 0,
+    constructed: 0, closed: 0, pending: 0, maxPending: 0, callbacks: 0, stopped: false,
   }
+  const TOLERANCE = 0.000001
   const ownedFrames = new Set()
   const pendingCopies = new Set()
+  // Sequence -> colour record, or null for a lagged sequence that publishes nothing.
   const completed = new Map()
   let nextPublished = 0
   let callbackId
+  const publish = () => {
+    while (completed.has(nextPublished)) {
+      const record = completed.get(nextPublished)
+      completed.delete(nextPublished++)
+      if (record) environment.sparseColorFrames.push(record)
+    }
+  }
   const stop = () => {
     observer.stopped = true
     if (callbackId !== undefined) video.cancelVideoFrameCallback(callbackId)
@@ -70,7 +80,21 @@ export function installFrameObserver(environment = globalThis) {
         visibleRect: visibleRect ? { x: visibleRect.x, y: visibleRect.y, width: visibleRect.width, height: visibleRect.height } : null }
       phase = 'timestamp'
       const snapshotTime = frame.timestamp / 1000000
-      if (!Number.isFinite(snapshotTime) || Math.abs(snapshotTime - metadata.mediaTime) > 0.000001) {
+      const gap = snapshotTime - metadata.mediaTime
+      const frameDuration = Number.isFinite(frame.duration) && frame.duration > 0 ? frame.duration / 1000000 : null
+      if (Number.isFinite(gap) && gap > TOLERANCE && frameDuration !== null && gap <= frameDuration + TOLERANCE) {
+        // The callback ran late enough for the compositor to present the next
+        // frame before the snapshot was taken, which happens on slow hosts. The
+        // observation is lost, not wrong: count it, keep its evidence, and go on.
+        observer.lagged++
+        if (observer.laggedFrames.length < 16) observer.laggedFrames.push({ ...diagnostic, stages: { ...diagnostic.stages } })
+        else observer.droppedLagged++
+        completed.set(sequence, null)
+        publish()
+        closeOwned(frame)
+        return
+      }
+      if (!Number.isFinite(snapshotTime) || Math.abs(gap) > TOLERANCE) {
         throw new Error(`Native snapshot timestamp ${snapshotTime} does not match callback ${metadata.mediaTime}`)
       }
       phase = 'crop'
@@ -107,10 +131,7 @@ export function installFrameObserver(environment = globalThis) {
           }
           record.rgb = [...pixels.slice(0, 3)]
           completed.set(sequence, record)
-          while (completed.has(nextPublished)) {
-            environment.sparseColorFrames.push(completed.get(nextPublished))
-            completed.delete(nextPublished++)
-          }
+          publish()
         } catch (error) { fail('copy', error, sequence, diagnostic) } finally { closeOwned(frame) }
       })().finally(() => { pendingCopies.delete(task); observer.pending-- })
       pendingCopies.add(task)

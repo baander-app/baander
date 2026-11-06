@@ -46,7 +46,7 @@ function harness(specifications = []) {
       if (spec.constructorError) throw new Error(spec.constructorError)
       this.spec = spec
       this.timestamp = spec.timestamp ?? currentMetadata.mediaTime * 1000000
-      this.duration = 40000
+      this.duration = spec.duration === undefined ? 40000 : spec.duration
       this.format = 'I420'
       this.codedWidth = this.displayWidth = 64
       this.codedHeight = this.displayHeight = 48
@@ -96,34 +96,121 @@ function harness(specifications = []) {
     timeoutAutomatically: value => { autoTimeout = value } }
 }
 
-test('timestamp mismatch stays fatal and retains detached callback, native and clock diagnostics before close', async () => {
-  const h = harness([{ timestamp: 24640000, afterConstructClock: 24.64, mutateMetadataOnClose: true }])
+test('a snapshot one frame after its callback is a lagged observation that is closed, unpublished and non-fatal', async () => {
+  const h = harness([{ timestamp: 24640000, afterConstructClock: 24.64, mutateMetadataOnClose: true }, {}, {}])
   const metadata = h.fire()
-  assert.deepEqual(h.events, ['request', 'request', 'constructor', 'cancel', 'close'])
-  const error = plain(h.observer.errors[0])
-  assert.equal(error.phase, 'timestamp')
-  assert.equal(error.message, 'Error: Native snapshot timestamp 24.64 does not match callback 24.6')
-  assert.equal(error.diagnostic.sequence, 0)
-  assert.equal(error.diagnostic.at, 100)
-  assert.equal(error.diagnostic.callback.mediaTime, 24.6)
-  assert.equal(error.diagnostic.callback.presentedFrames, 607)
-  assert.equal(error.diagnostic.callback.captureTime, null)
-  assert.deepEqual(error.diagnostic.stages, { entryAt: 10, entryClock: 24.6,
+  assert.deepEqual(h.events, ['request', 'request', 'constructor', 'close'])
+  assert.deepEqual(plain(h.observer.errors), [])
+  assert.equal(h.observer.stopped, false)
+  assert.equal(h.observer.lagged, 1)
+  assert.equal(h.observer.droppedLagged, 0)
+  const lagged = plain(h.observer.laggedFrames[0])
+  assert.equal(lagged.sequence, 0)
+  assert.equal(lagged.at, 100)
+  assert.equal(lagged.callback.mediaTime, 24.6)
+  assert.equal(lagged.callback.presentedFrames, 607)
+  assert.equal(lagged.callback.captureTime, null)
+  assert.deepEqual(lagged.stages, { entryAt: 10, entryClock: 24.6,
     afterConstructAt: 11, afterConstructClock: 24.64, copyStartedAt: null, afterCopyCallAt: null, completedAt: null })
-  assert.deepEqual(error.diagnostic.native, { timestamp: 24640000, snapshotTime: 24.64,
+  assert.deepEqual(lagged.native, { timestamp: 24640000, snapshotTime: 24.64,
     duration: 40000, format: 'I420', codedWidth: 64, codedHeight: 48, displayWidth: 64, displayHeight: 48,
     visibleRect: { x: 0, y: 0, width: 64, height: 48 } })
   assert.equal(metadata.mediaTime, -1)
-  assert.equal(h.frames[0].timestamp, -1)
-  assert.equal(h.frames[0].visibleRect.x, 999)
   assert.equal(h.frames[0].copyCount, 0)
   assert.equal(h.frames[0].closeCount, 1)
   assert.equal(h.environment.sparseColorFrames.length, 0)
+  assert.equal(h.callbacks.size, 1)
+  h.fire({ mediaTime: 24.64, presentedFrames: 608 })
+  h.fire({ mediaTime: 24.68, presentedFrames: 609 })
+  await flush()
+  const samples = plain(h.environment.sparseColorFrames)
+  assert.deepEqual(samples.map(sample => sample.sequence), [1, 2])
+  assert.deepEqual(samples.map(sample => sample.time), [24.64, 24.68])
+  assert.deepEqual(plain(h.observer.errors), [])
   const cleanup = await h.stop()
-  assert.equal(cleanup.constructed, cleanup.closed)
+  assert.equal(cleanup.lagged, 1)
+  assert.equal(cleanup.constructed, 3)
+  assert.equal(cleanup.closed, 3)
   assert.equal(cleanup.pending, 0)
   assert.equal(cleanup.stopped, true)
-  assert.deepEqual(plain(h.observer.errors[0]), error)
+  assert.deepEqual(plain(h.observer.laggedFrames[0]), lagged)
+})
+
+for (const [name, spec, snapshotTime] of [
+  ['a snapshot earlier than its callback', { timestamp: 24560000, afterConstructClock: 24.56 }, 24.56],
+  ['a snapshot two frames after its callback', { timestamp: 24680000, afterConstructClock: 24.68 }, 24.68],
+  ['a snapshot one frame after its callback without a frame duration', { timestamp: 24640000, afterConstructClock: 24.64, duration: null }, 24.64],
+]) {
+  test(`${name} stays fatal and retains detached callback, native and clock diagnostics before close`, async () => {
+    const h = harness([{ ...spec, mutateMetadataOnClose: true }])
+    const metadata = h.fire()
+    assert.deepEqual(h.events, ['request', 'request', 'constructor', 'cancel', 'close'])
+    assert.equal(h.observer.lagged, 0)
+    assert.equal(h.observer.laggedFrames.length, 0)
+    const error = plain(h.observer.errors[0])
+    assert.equal(error.phase, 'timestamp')
+    assert.equal(error.message, `Error: Native snapshot timestamp ${snapshotTime} does not match callback 24.6`)
+    assert.equal(error.diagnostic.sequence, 0)
+    assert.equal(error.diagnostic.at, 100)
+    assert.equal(error.diagnostic.callback.mediaTime, 24.6)
+    assert.equal(error.diagnostic.callback.presentedFrames, 607)
+    assert.equal(error.diagnostic.callback.captureTime, null)
+    assert.deepEqual(error.diagnostic.stages, { entryAt: 10, entryClock: 24.6,
+      afterConstructAt: 11, afterConstructClock: snapshotTime, copyStartedAt: null, afterCopyCallAt: null, completedAt: null })
+    assert.deepEqual(error.diagnostic.native, { timestamp: spec.timestamp, snapshotTime,
+      duration: spec.duration === undefined ? 40000 : spec.duration, format: 'I420',
+      codedWidth: 64, codedHeight: 48, displayWidth: 64, displayHeight: 48,
+      visibleRect: { x: 0, y: 0, width: 64, height: 48 } })
+    assert.equal(metadata.mediaTime, -1)
+    assert.equal(h.frames[0].timestamp, -1)
+    assert.equal(h.frames[0].visibleRect.x, 999)
+    assert.equal(h.frames[0].copyCount, 0)
+    assert.equal(h.frames[0].closeCount, 1)
+    assert.equal(h.environment.sparseColorFrames.length, 0)
+    const cleanup = await h.stop()
+    assert.equal(cleanup.constructed, cleanup.closed)
+    assert.equal(cleanup.pending, 0)
+    assert.equal(cleanup.stopped, true)
+    assert.deepEqual(plain(h.observer.errors[0]), error)
+  })
+}
+
+test('lagged diagnostics stay bounded at sixteen while every lagged frame is counted and closed', async () => {
+  const h = harness(Array.from({ length: 17 }, () => ({ timestamp: 24640000, afterConstructClock: 24.64 })))
+  for (let index = 0; index < 17; index++) h.fire()
+  assert.equal(h.observer.lagged, 17)
+  assert.equal(h.observer.laggedFrames.length, 16)
+  assert.equal(h.observer.droppedLagged, 1)
+  assert.deepEqual(plain(h.observer.laggedFrames).map(lagged => lagged.sequence), Array.from({ length: 16 }, (_, index) => index))
+  assert.deepEqual(plain(h.observer.errors), [])
+  assert.equal(h.observer.stopped, false)
+  assert(h.frames.every(frame => frame.closeCount === 1 && frame.copyCount === 0))
+  assert.equal(h.environment.sparseColorFrames.length, 0)
+  const cleanup = await h.stop()
+  assert.equal(cleanup.constructed, 17)
+  assert.equal(cleanup.closed, 17)
+  assert.equal(cleanup.pending, 0)
+})
+
+test('a lagged frame between a deferred copy and a matching frame keeps later samples publishing in order', async () => {
+  const h = harness([{ copy: 'defer' }, { timestamp: 24640000, afterConstructClock: 24.64 }, {}])
+  h.fire()
+  h.fire()
+  h.fire({ mediaTime: 24.68, presentedFrames: 609 })
+  await flush()
+  assert.equal(h.observer.lagged, 1)
+  assert.equal(h.observer.pending, 1)
+  assert.equal(h.environment.sparseColorFrames.length, 0)
+  h.frames[0].resolve()
+  await flush()
+  const samples = plain(h.environment.sparseColorFrames)
+  assert.deepEqual(samples.map(sample => sample.sequence), [0, 2])
+  assert.deepEqual(samples.map(sample => sample.time), [24.6, 24.68])
+  assert.deepEqual(plain(h.observer.errors), [])
+  const cleanup = await h.stop()
+  assert.equal(cleanup.pending, 0)
+  assert.equal(cleanup.constructed, 3)
+  assert.equal(cleanup.closed, 3)
 })
 
 test('constructor failure keeps entry evidence and explicit unavailable stages without claiming a frame', async () => {
