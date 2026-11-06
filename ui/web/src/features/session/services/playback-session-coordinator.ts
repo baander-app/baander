@@ -61,6 +61,7 @@ export class PlaybackSessionCoordinator {
   private readonly pendingRequests = new Map<string, PendingRequest>()
   private readonly registrationReady = new Set<() => void>()
   private intentTail: Promise<void> = Promise.resolve()
+  private queuedSeek: { intent: { action: 'seek'; position: number }; result: Promise<void> } | null = null
   private disposed = false
   private connection = 0
   private localQualified = false
@@ -352,7 +353,9 @@ export class PlaybackSessionCoordinator {
     const presenceAge = this.presenceConfirmedAt === null ? null : Date.now() - this.presenceConfirmedAt
     if (this.snapshot?.activeIncarnationId === this.endpoint.incarnationId && available()
       && presenceAge !== null && presenceAge >= 0 && presenceAge < PRESENCE_INTERVAL_MS) return this.endpoint
+    performance.mark('baander:ensure-local-observe', { detail: { available: available(), presenceAge, active: this.snapshot?.activeIncarnationId ?? null, destinations: this.snapshot?.destinations.map(destination => `${destination.incarnationId}:${destination.available}`) ?? null } })
     await this.observe()
+    performance.mark('baander:ensure-local-observed', { detail: { available: available(), current: this.current(), ready: this.ready, endpoint: this.endpoint?.incarnationId ?? null } })
     if (!this.current() || !this.ready || !this.endpoint) throw new Error('Playback connection is unavailable.')
     if (available()) return this.endpoint
 
@@ -454,12 +457,27 @@ export class PlaybackSessionCoordinator {
 
   request(intent: PlaybackIntent): Promise<void> {
     const captured = structuredClone(intent)
-    const result = this.intentTail.then(() => this.executeIntent(captured))
+    performance.mark('baander:intent-request', { detail: { action: captured.action, ready: this.ready, endpoint: this.endpoint?.incarnationId ?? null, active: this.snapshot?.activeIncarnationId ?? null, pending: this.pendingRequests.size } })
+    // Scrubbing commits several positions while an earlier intent is still executing;
+    // only the last one matters, so consecutive queued seeks collapse into one. A seek
+    // never jumps ahead of another queued intent: a later non-seek intent closes the window.
+    if (captured.action === 'seek' && this.queuedSeek) {
+      this.queuedSeek.intent.position = captured.position
+      return this.queuedSeek.result
+    }
+    const queued = captured.action === 'seek' ? { intent: captured, result: Promise.resolve() } : null
+    const result = this.intentTail.then(() => {
+      if (queued && this.queuedSeek === queued) this.queuedSeek = null
+      return this.executeIntent(captured)
+    })
+    if (queued) queued.result = result
+    this.queuedSeek = queued
     this.intentTail = result.catch(() => {})
     return result
   }
 
   private async executeIntent(intent: PlaybackIntent): Promise<void> {
+    performance.mark('baander:intent-execute', { detail: { action: intent.action, current: this.current(), ready: this.ready, snapshot: !!this.snapshot, endpoint: this.endpoint?.incarnationId ?? null, active: this.snapshot?.activeIncarnationId ?? null, pending: this.pendingRequests.size, transfer: !!this.snapshot?.transfer } })
     if (!this.current() || !this.ready || !this.snapshot || !this.endpoint) throw new Error('Playback connection is unavailable.')
     try {
       if (intent.action === 'stop-local-video') {
@@ -491,7 +509,11 @@ export class PlaybackSessionCoordinator {
       if ((intent.action === 'load' || intent.action === 'play') && !this.snapshot.activeIncarnationId && !this.snapshot.transfer) {
         await this.performTransfer(this.endpoint.incarnationId)
       }
-    } catch (error) { this.fail(error); throw error }
+      performance.mark('baander:intent-done', { detail: { action: intent.action, active: this.snapshot?.activeIncarnationId ?? null } })
+    } catch (error) {
+      performance.mark('baander:intent-error', { detail: { action: intent.action, message: error instanceof Error ? error.message : String(error) } })
+      this.fail(error); throw error
+    }
   }
 
   private async postControl(payload: Record<string, unknown>): Promise<ControlSnapshot> {

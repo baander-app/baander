@@ -277,6 +277,41 @@ describe('browser playback coordination', () => {
     expect(probes).toBe(scenario === 'failed probe' ? 2 : 1)
   })
 
+  it('collapses seeks committed while an earlier intent executes into the latest position', async () => {
+    const h = controlledServer()
+    const first = requestPlayback({ action: 'seek', position: 22 })
+    await vi.waitFor(() => expect(h.requests).toHaveLength(1))
+    const second = requestPlayback({ action: 'seek', position: 26 })
+    const third = requestPlayback({ action: 'seek', position: 30 })
+    h.settle(0)
+    h.publish()
+    await first
+    await vi.waitFor(() => expect(h.requests).toHaveLength(2))
+    expect(h.requests[1].payload).toMatchObject({ action: 'seek', position: 30 })
+    h.settle(1)
+    h.publish()
+    await Promise.all([second, third])
+    expect(h.requests).toHaveLength(2)
+  })
+
+  it('keeps a seek behind a later non-seek intent instead of collapsing across it', async () => {
+    const h = controlledServer()
+    const first = requestPlayback({ action: 'seek', position: 22 })
+    await vi.waitFor(() => expect(h.requests).toHaveLength(1))
+    const second = requestPlayback({ action: 'seek', position: 26 })
+    const pause = requestPlayback({ action: 'pause' })
+    const third = requestPlayback({ action: 'seek', position: 30 })
+    for (let index = 0; index < 4; index++) {
+      await vi.waitFor(() => expect(h.requests).toHaveLength(index + 1))
+      h.settle(index)
+      h.publish()
+    }
+    await Promise.all([first, second, pause, third])
+    expect(h.requests.map(request => [request.payload.action, request.payload.position])).toEqual([
+      ['seek', 22], ['seek', 26], ['pause', undefined], ['seek', 30],
+    ])
+  })
+
   it('retries the same logical request with the replacement endpoint delivery identity', async () => {
     const h = controlledServer()
     const pending = requestPlayback({ action: 'pause' })
