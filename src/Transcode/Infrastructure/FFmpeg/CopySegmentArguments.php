@@ -10,6 +10,16 @@ use InvalidArgumentException;
 /** Builds a copy-only fragmented MP4 presentation with its source timing intact. */
 final class CopySegmentArguments
 {
+    /**
+     * A stream copy is bound by disk, not by an encoder, so left alone it publishes a
+     * whole movie before the session subscriber's lead throttle looks again. The input
+     * is read in one burst of this many source seconds, then at the read rate below,
+     * so the lead over the playhead starts under the throttle's 72-second pause mark
+     * and keeps regrowing after it resumes at 36 seconds.
+     */
+    public const int INITIAL_BURST_SECONDS = 48;
+    public const float READ_RATE = 2.0;
+
     public function __construct(private readonly string $ffmpegPath = '/usr/bin/ffmpeg')
     {
     }
@@ -25,7 +35,19 @@ final class CopySegmentArguments
         if ($sourceBoundary > 0) {
             array_push($arguments, '-seek_timestamp', '1', '-ss', sprintf('%.6f', $sourceBoundary));
         }
-        array_push($arguments, '-itsoffset', sprintf('%.6f', -$sourceBoundary), '-i', $sourcePath, '-map', '0:' . $selection->videoStreamIndex);
+        array_push(
+            $arguments,
+            '-itsoffset',
+            sprintf('%.6f', -$sourceBoundary),
+            '-readrate_initial_burst',
+            (string) self::INITIAL_BURST_SECONDS,
+            '-readrate',
+            sprintf('%.1f', self::READ_RATE),
+            '-i',
+            $sourcePath,
+            '-map',
+            '0:' . $selection->videoStreamIndex,
+        );
         if ($selection->audioStreamIndex !== null) {
             array_push($arguments, '-map', '0:' . $selection->audioStreamIndex);
         }

@@ -26,6 +26,22 @@ final class CopySegmentArgumentsTest extends TestCase
         self::assertSame('/output/manifest.mpd', $args[array_key_last($args)]);
     }
 
+    public function testReadsTheSourceInOneBurstAndThenAtABoundedRateSoTheLeadThrottleGoverns(): void
+    {
+        $builder = new CopySegmentArguments();
+        $selection = new PresentationSelection('copy', 'source-hash', 0, 1, 'mp4');
+        $args = $builder->build('/source.mkv', $selection, '/output');
+
+        self::assertSame(['48'], $this->values($args, '-readrate_initial_burst'));
+        self::assertSame(['2.0'], $this->values($args, '-readrate'));
+        $input = array_search('-i', $args, true);
+        self::assertIsInt($input);
+        self::assertLessThan($input, array_search('-readrate_initial_burst', $args, true), 'The burst is an input option');
+        self::assertLessThan($input, array_search('-readrate', $args, true), 'The read rate is an input option');
+        self::assertLessThan(72, CopySegmentArguments::INITIAL_BURST_SECONDS, 'The burst stays under the lead throttle pause mark');
+        self::assertGreaterThan(1.0, CopySegmentArguments::READ_RATE, 'The lead regrows after the throttle resumes');
+    }
+
     public function testVideoWithoutAudioMapsOnlySelectedVideo(): void
     {
         $builder = new CopySegmentArguments();
