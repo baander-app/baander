@@ -199,7 +199,7 @@ try {
     return [sourceTime < 10 ? 'red' : sourceTime < 20 ? 'green' : 'blue']
   }
   function verifyPlayback() {
-    assert.deepEqual(state.frameObserver.errors, [], 'Native frame capture must not fail or lose observations')
+    assert.deepEqual(state.frameObserver.errors, [], 'Native frame capture must not fail')
     assert.deepEqual(failures, [], 'All media and transport operations must succeed')
     assert.deepEqual(state.errors, [], 'The production adapter must not report an error')
     assert.equal(state.mediaError, null)

@@ -140,6 +140,9 @@ for (const [name, spec, snapshotTime] of [
   ['a snapshot earlier than its callback', { timestamp: 24560000, afterConstructClock: 24.56 }, 24.56],
   ['a snapshot two frames after its callback', { timestamp: 24680000, afterConstructClock: 24.68 }, 24.68],
   ['a snapshot one frame after its callback without a frame duration', { timestamp: 24640000, afterConstructClock: 24.64, duration: null }, 24.64],
+  ['a snapshot a fraction of a frame after its callback', { timestamp: 24610000, afterConstructClock: 24.61 }, 24.61],
+  ['a snapshot one frame after its callback with a zero frame duration', { timestamp: 24640000, afterConstructClock: 24.64, duration: 0 }, 24.64],
+  ['a snapshot one frame after its callback with a negative frame duration', { timestamp: 24640000, afterConstructClock: 24.64, duration: -40000 }, 24.64],
 ]) {
   test(`${name} stays fatal and retains detached callback, native and clock diagnostics before close`, async () => {
     const duration = spec.duration === undefined ? 40000 : spec.duration

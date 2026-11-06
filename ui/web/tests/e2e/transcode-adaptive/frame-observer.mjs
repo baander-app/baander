@@ -86,10 +86,11 @@ export function installFrameObserver(environment = globalThis) {
       const snapshotTime = frame.timestamp / 1000000
       const gap = snapshotTime - metadata.mediaTime
       const frameDuration = Number.isFinite(frame.duration) && frame.duration > 0 ? frame.duration / 1000000 : null
-      if (gap > TOLERANCE && frameDuration !== null && gap <= frameDuration + TOLERANCE) {
-        // The callback ran late enough for the compositor to present the next
-        // frame before the snapshot was taken, which happens on slow hosts. The
-        // observation is lost, not wrong: count it, keep its evidence, and go on.
+      if (frameDuration !== null && Math.abs(gap - frameDuration) <= TOLERANCE) {
+        // The snapshot is exactly the next frame: the callback ran late enough
+        // for the compositor to present it before the snapshot was taken, which
+        // happens on slow hosts. The observation is lost, not wrong: count it,
+        // keep its evidence, and go on. Any other gap is a real mismatch.
         observer.lagged++
         if (observer.laggedFrames.length < MAX_LAGGED_DIAGNOSTICS) observer.laggedFrames.push(detach(diagnostic))
         else observer.droppedLagged++
