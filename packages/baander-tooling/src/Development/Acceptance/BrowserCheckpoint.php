@@ -73,26 +73,38 @@ final class BrowserCheckpoint
         return $status;
     }
 
-    /** Validates the Docker network the browser container joins: the host network, or another container's namespace. */
+    /** Validates the Docker network the browser container joins: the host network, another container's namespace,
+     *  or a named Docker network. */
     public static function network(string $network): string
     {
         if ($network === '' || $network === 'host') {
             return 'host';
         }
-        if (preg_match('/^container:[A-Za-z0-9][A-Za-z0-9_.-]*$/D', $network) !== 1) {
-            throw new \InvalidArgumentException('Browser network must be "host" or "container:<name>".');
+        if (preg_match('/^(container:)?[A-Za-z0-9][A-Za-z0-9_.-]*$/D', $network) !== 1) {
+            throw new \InvalidArgumentException('Browser network must be "host", "container:<name>" or a Docker network name.');
         }
         return $network;
     }
 
+    /** Validates the "host:port" the browser's loopback forwards to; empty disables forwarding. */
+    public static function upstream(string $upstream): string
+    {
+        if ($upstream !== '' && preg_match('/^[A-Za-z0-9][A-Za-z0-9_.-]*:[1-9][0-9]{0,4}$/D', $upstream) !== 1) {
+            throw new \InvalidArgumentException('Browser upstream must be "host:port".');
+        }
+        return $upstream;
+    }
+
     /** The browser joins the host network unless the checkpoint names a container whose network namespace it shares,
-     *  so a drill whose web listens only inside its own namespace can be reached at that namespace's loopback origin. */
-    public function run(string $phase, string $artifacts, string $baseUrl, string $network = 'host'): int
+     *  or a Docker network with an upstream the browser's own loopback forwards to, so a drill whose web listens only at
+     *  its loopback origin is reached at that origin and a replaced web container is followed through its network alias. */
+    public function run(string $phase, string $artifacts, string $baseUrl, string $network = 'host', string $upstream = ''): int
     {
         if ($phase === 'cleanup') {
             return self::cleanup($artifacts, $this->environment);
         }
         $network = self::network($network);
+        $upstream = self::upstream($upstream);
         $engine = $this->environment['BAANDER_TEST_BROWSER_ENGINE'] ?? '';
         $engine = $engine === '' ? 'chromium' : $engine;
         if (!in_array($engine, ['chromium', 'firefox'], true)) {
@@ -120,6 +132,7 @@ final class BrowserCheckpoint
                 '--pids-limit=256',
                 '-e',
                 'BAANDER_TEST_BROWSER_ENGINE=' . $engine,
+                ...($upstream === '' ? [] : ['-e', 'BAANDER_TEST_WEB_UPSTREAM=' . $upstream]),
                 '--entrypoint',
                 'node',
                 $image->id,

@@ -241,11 +241,12 @@ final class OperatorQualification
     {
         $hook = $this->configuration->environment['BAANDER_TEST_TWO_COMMAND_CHECKPOINT'] ?? '';
         if ($hook !== '') {
-            // The browser shares the web's network namespace and reaches it at the
-            // application origin, so its Origin header matches the websocket and CORS
-            // policies the same way the drill's in-container clients do.
+            // The browser joins the drill network and reaches the web through its own
+            // loopback at the application origin, so its Origin header matches the websocket
+            // and CORS policies the same way the drill's in-container clients do, and the
+            // web's network alias keeps that path valid when the web container is replaced.
             $this->commands->run(
-                [$hook, $phase, $this->state->artifacts, OperatorProvisioning::WEB_ORIGIN, 'container:' . $this->state->webName],
+                [$hook, $phase, $this->state->artifacts, OperatorProvisioning::WEB_ORIGIN, $this->state->runId, 'web:9501'],
                 terminationGrace: 40,
             );
         }

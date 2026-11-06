@@ -51,7 +51,8 @@ final readonly class OperatorProvisioning
             'app:serve',
             '--no-interaction',
         ]);
-        $this->qualification->docker(['network', 'connect', $s->runId, $s->webName]);
+        // The alias outlives the container, so a browser that forwards to it follows a web replacement.
+        $this->qualification->docker(['network', 'connect', '--alias', 'web', $s->runId, $s->webName]);
         $ready = false;
         for ($attempt = 0; $attempt < 60; ++$attempt) {
             if ($this->qualification->docker(['exec', $s->webName, 'curl', '-fsS', '-o', '/dev/null', 'http://127.0.0.1:9501/live'], false)->exitCode === 0) {
