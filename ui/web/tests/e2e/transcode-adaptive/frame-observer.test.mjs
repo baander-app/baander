@@ -142,6 +142,7 @@ for (const [name, spec, snapshotTime] of [
   ['a snapshot one frame after its callback without a frame duration', { timestamp: 24640000, afterConstructClock: 24.64, duration: null }, 24.64],
 ]) {
   test(`${name} stays fatal and retains detached callback, native and clock diagnostics before close`, async () => {
+    const duration = spec.duration === undefined ? 40000 : spec.duration
     const h = harness([{ ...spec, mutateMetadataOnClose: true }])
     const metadata = h.fire()
     assert.deepEqual(h.events, ['request', 'request', 'constructor', 'cancel', 'close'])
@@ -157,8 +158,7 @@ for (const [name, spec, snapshotTime] of [
     assert.equal(error.diagnostic.callback.captureTime, null)
     assert.deepEqual(error.diagnostic.stages, { entryAt: 10, entryClock: 24.6,
       afterConstructAt: 11, afterConstructClock: snapshotTime, copyStartedAt: null, afterCopyCallAt: null, completedAt: null })
-    assert.deepEqual(error.diagnostic.native, { timestamp: spec.timestamp, snapshotTime,
-      duration: spec.duration === undefined ? 40000 : spec.duration, format: 'I420',
+    assert.deepEqual(error.diagnostic.native, { timestamp: spec.timestamp, snapshotTime, duration, format: 'I420',
       codedWidth: 64, codedHeight: 48, displayWidth: 64, displayHeight: 48,
       visibleRect: { x: 0, y: 0, width: 64, height: 48 } })
     assert.equal(metadata.mediaTime, -1)

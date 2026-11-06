@@ -7,6 +7,7 @@ export function installFrameObserver(environment = globalThis) {
     constructed: 0, closed: 0, pending: 0, maxPending: 0, callbacks: 0, stopped: false,
   }
   const TOLERANCE = 0.000001
+  const MAX_LAGGED_DIAGNOSTICS = 16
   const ownedFrames = new Set()
   const pendingCopies = new Set()
   // Sequence -> colour record, or null for a lagged sequence that publishes nothing.
@@ -24,10 +25,13 @@ export function installFrameObserver(environment = globalThis) {
     observer.stopped = true
     if (callbackId !== undefined) video.cancelVideoFrameCallback(callbackId)
   }
+  // Detach a diagnostic from the live objects it was built from, so a frame
+  // closed or metadata mutated later cannot change the recorded evidence.
+  const detach = diagnostic => ({ ...diagnostic, stages: { ...diagnostic.stages } })
   const fail = (phase, error, sequence, diagnostic) => {
     stop()
     if (observer.errors.length < 64) observer.errors.push({ phase, sequence, message: String(error).slice(0, 1024),
-      ...(diagnostic ? { diagnostic: { ...diagnostic, stages: { ...diagnostic.stages } } } : {}) })
+      ...(diagnostic ? { diagnostic: detach(diagnostic) } : {}) })
     else observer.droppedErrors++
   }
   const closeOwned = frame => {
@@ -82,12 +86,12 @@ export function installFrameObserver(environment = globalThis) {
       const snapshotTime = frame.timestamp / 1000000
       const gap = snapshotTime - metadata.mediaTime
       const frameDuration = Number.isFinite(frame.duration) && frame.duration > 0 ? frame.duration / 1000000 : null
-      if (Number.isFinite(gap) && gap > TOLERANCE && frameDuration !== null && gap <= frameDuration + TOLERANCE) {
+      if (gap > TOLERANCE && frameDuration !== null && gap <= frameDuration + TOLERANCE) {
         // The callback ran late enough for the compositor to present the next
         // frame before the snapshot was taken, which happens on slow hosts. The
         // observation is lost, not wrong: count it, keep its evidence, and go on.
         observer.lagged++
-        if (observer.laggedFrames.length < 16) observer.laggedFrames.push({ ...diagnostic, stages: { ...diagnostic.stages } })
+        if (observer.laggedFrames.length < MAX_LAGGED_DIAGNOSTICS) observer.laggedFrames.push(detach(diagnostic))
         else observer.droppedLagged++
         completed.set(sequence, null)
         publish()
