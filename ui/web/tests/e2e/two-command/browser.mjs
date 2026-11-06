@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { createServer } from 'node:http'
 import { mkdir, writeFile } from 'node:fs/promises'
+import { connect, createServer as createTcpServer } from 'node:net'
 import { chromium, firefox } from 'playwright-core'
 
 const evidence = '/work/evidence'
@@ -12,6 +13,25 @@ let context
 try {
   assert(['chromium', 'firefox'].includes(requestedEngine), `Unsupported browser engine: ${requestedEngine}`)
   await mkdir(evidence, { recursive: true })
+  // The web listens only at its loopback origin. On a shared Docker network the browser
+  // reaches it through its own loopback, forwarded to the web's network alias, which the
+  // drill resolves again for every connection, so a replaced web container is followed.
+  const upstream = process.env.BAANDER_TEST_WEB_UPSTREAM ?? ''
+  if (upstream !== '') {
+    const [upstreamHost, upstreamPort] = upstream.split(':')
+    assert(upstreamHost && /^\d+$/.test(upstreamPort ?? ''), `Invalid web upstream: ${upstream}`)
+    const forwarder = createTcpServer(client => {
+      const target = connect(Number(upstreamPort), upstreamHost)
+      const close = () => { client.destroy(); target.destroy() }
+      client.on('error', close)
+      target.on('error', close)
+      client.pipe(target).pipe(client)
+    })
+    await new Promise((resolve, reject) => {
+      forwarder.once('error', reject)
+      forwarder.listen(Number(upstreamPort), '127.0.0.1', resolve)
+    })
+  }
   const engine = requestedEngine === 'firefox' ? firefox : chromium
   browser = await engine.launch(requestedEngine === 'chromium'
     ? { channel: 'chromium', headless: true, args: ['--mute-audio'] } : { headless: true })
@@ -128,7 +148,8 @@ await page.route('**/api/stream/sign', async route => {
 let video
 let snapshot
 let initialGeneration
-let soughtGeneration
+// The paused cursor the browser leaves on its own session before the operator phases.
+let restingCursor
 const phases = []
 const mediaResponses = []
 const apiResponses = []
@@ -482,6 +503,62 @@ async function pausedAt(position, minimumGeneration) {
       && Math.abs(snapshot.startTime + state.time - position) < 2
       && currentSource(state)
   }, 'the attached player to restore its paused global position')
+}
+
+// The fixture's dialogue track carries cues for 0-15 s, 15-40 s and 90-150 s of the source.
+function dialogueCueAt(position) {
+  if (position < 15) return 'Dialogue early'
+  if (position < 40) return 'Dialogue late'
+  if (position >= 90 && position < 150) return 'Dialogue sought'
+  return null
+}
+
+async function restingCursorNow() {
+  const state = await mediaState()
+  assert(snapshot?.ready, 'The browser must hold a ready owned session before the operator phases')
+  const paused = state.paused && snapshot.status === 'paused'
+  return { position: paused ? snapshot.startTime + state.time : null, generation: snapshot.generation, sessionId: snapshot.sessionId, jobId: snapshot.jobId }
+}
+
+// After a reload or a web replacement, recovery releases the browser's runner: the page
+// lists the movie as paused, its Play button reopens the overlay, and the overlay's Play
+// resumes playback locally from the recovered cursor. The signed playback snapshot only
+// arrives once a local player attaches again, so the paused position is read from the
+// overlay's timeline.
+async function resumeReleasedPlayback(owner, position, label, started) {
+  if (await seekSlider().count() === 0) await page.getByRole('button', { name: 'Play', exact: true }).click()
+  let reopenedPosition
+  try {
+    await until(async () => {
+      if (await seekSlider().count() === 0) return false
+      reopenedPosition = await sliderValue()
+      return Math.abs(reopenedPosition - position) < 2
+    }, `the overlay to show the recovered paused position after ${label}`)
+  } catch (error) {
+    throw new Error(`${error.message} (paused at ${position}, overlay shows ${reopenedPosition})`)
+  }
+  assert.equal(await page.locator('video').count(), 0, `Playback must not mount a video after ${label} before it resumes locally`)
+  clientControls.push({ action: `${label}-released-paused`, at: Date.now(), elapsedMs: Date.now() - started, position, reopenedPosition, playback: null })
+  const resumeStarted = Date.now()
+  await page.getByRole('button', { name: 'Play', exact: true }).click()
+  video = await page.locator('video').elementHandle()
+  assert(video, `Resuming after ${label} must mount a new video element`)
+  await until(async () => {
+    const state = await mediaState()
+    return state.connected && !state.paused && state.ready >= 2 && state.error === null && !state.seeking
+      && hasDecodedFrame(state) && snapshot?.ready && snapshot.status === 'running' && currentSource(state)
+      && snapshot.startTime + state.time >= position - 2
+  }, `resuming after ${label} to decode from the recovered position`)
+  // The session hands playback to this browser once the runner acknowledges the start; a
+  // native pause before that acknowledgement would leave the transfer unconfirmed.
+  await until(async () => await page.getByRole('button', { name: 'Pause', exact: true }).count() > 0,
+    `the playback session to confirm the local playback resumed after ${label}`)
+  // The fresh player places its cursor at the recovered position with at most one source seek.
+  assert(snapshot.generation >= owner.generation && snapshot.generation <= owner.generation + 1,
+    `Resuming after ${label} may place the cursor with at most one source seek (generation ${owner.generation} to ${snapshot.generation})`)
+  samePlayback(owner, snapshot.generation)
+  owner.generation = snapshot.generation
+  await recordClientControl(`${label}-resumed`, resumeStarted, { position, reopenedPosition })
 }
 
 function ownedPlayback() {
@@ -1155,22 +1232,58 @@ async function reconnectPausedPlayback(owner, prefix) {
   await resumeAndDecode(owner, `${prefix}-resume`)
 }
 
+// The movie seek control is a Radix slider: the element with the slider role is its
+// thumb, which carries the accessible bounds and value, while pointer gestures land on
+// the root that Radix renders with a text direction attribute.
+function seekSlider() {
+  return page.getByRole('slider', { name: 'Seek movie' })
+}
+
+async function sliderMax(slider = seekSlider()) {
+  return Number(await slider.getAttribute('aria-valuemax'))
+}
+
+async function sliderValue(slider = seekSlider()) {
+  return Number(await slider.getAttribute('aria-valuenow'))
+}
+
+// The player marks each seek commit, seek entry, queued intent and transport send with a
+// performance mark; the marks are ordered evidence of what the player did with a gesture.
+const pageErrors = []
+page.on('pageerror', error => { pageErrors.push({ at: Date.now(), kind: 'pageerror', message: error.message }) })
+page.on('console', message => {
+  if (message.type() === 'error' || message.type() === 'warning') pageErrors.push({ at: Date.now(), kind: message.type(), message: message.text().slice(0, 500) })
+})
+
+async function seekMarks() {
+  return page.evaluate(() => ['baander:seek-commit', 'baander:seek-entry', 'baander:seek-intent', 'baander:seek-send',
+    'baander:control-click', 'baander:intent-request', 'baander:intent-execute', 'baander:intent-done', 'baander:intent-error',
+    'baander:ensure-local-observe', 'baander:ensure-local-observed']
+    .flatMap(name => performance.getEntriesByName(name).map(entry => ({ name, at: Math.round(entry.startTime), ...entry.detail })))
+    .sort((left, right) => left.at - right.at))
+}
+
+async function sliderTrackBox(slider = seekSlider()) {
+  const box = await slider.locator('xpath=ancestor::*[@dir][1]').boundingBox()
+  assert(box, 'The source timeline must be visible')
+  return box
+}
+
 async function commitSourceSeek(position, sourceDuration = snapshot.duration) {
-  const timeline = page.getByRole('slider', { name: 'Seek movie' })
-  assert.equal(Number(await timeline.getAttribute('max')), sourceDuration, 'Source seeking must span the full source duration')
+  const timeline = seekSlider()
+  assert.equal(await sliderMax(timeline), sourceDuration, 'Source seeking must span the full source duration')
   assert(position >= 0 && position < sourceDuration, 'The source target must fit the source duration')
   if (position === 0) {
     await timeline.focus()
     await timeline.press('Home')
     return 0
   }
-  const box = await timeline.boundingBox()
-  assert(box, 'The source timeline must be visible')
+  const box = await sliderTrackBox(timeline)
   await page.mouse.move(box.x + box.width * position / sourceDuration, box.y + box.height / 2)
   await page.mouse.down()
   try {
-    // Read the browser's actual range value before pointer-up commits the draft.
-    return Number(await timeline.inputValue())
+    // Read the slider's actual value before pointer-up commits the draft.
+    return await sliderValue(timeline)
   } finally {
     await page.mouse.up()
   }
@@ -1490,9 +1603,9 @@ async function proveSeekOutages(owner, expectedPosition) {
         && state.ready >= 2 && hasDecodedFrame(state) && !state.seeking && state.error === null && currentSource(state)
     }, 'decoded paused playback before an uncertain source seek')
     const generation = owner.generation
-    const sourceDuration = Number(await page.getByRole('slider', { name: 'Seek movie' }).getAttribute('max'))
+    const sourceDuration = await sliderMax()
     assert.equal(sourceDuration, snapshot.duration, 'The captured source range must match the ready source duration')
-    const initialSliderPosition = Number(await page.getByRole('slider', { name: 'Seek movie' }).inputValue())
+    const initialSliderPosition = await sliderValue()
     const candidates = mode === 'before-forwarding'
       ? [expectedPosition + 24, expectedPosition + 48] : [expectedPosition - 8, expectedPosition + 8]
     const firstTarget = candidates.filter(value => value >= 0 && value < sourceDuration)
@@ -1608,10 +1721,19 @@ async function proveSeekOutages(owner, expectedPosition) {
     page.on('requestfailed', requestFailed)
     await page.route(positionRoute, interceptSeek)
     try {
-      proof.committedTargets.push(await commitSourceSeek(targets[0], sourceDuration))
+      // Each commit also records what the slider shows afterwards: the thumb settles on the
+      // pending seek position the player accepted, so a dropped commit is visible here.
+      const commitAndRecord = async target => {
+        const committed = await commitSourceSeek(target, sourceDuration)
+        proof.committedTargets.push(committed)
+        ;(proof.commits ??= []).push({ at: Date.now(), target, committed, shown: await sliderValue(),
+          text: await seekSlider().getAttribute('aria-valuetext') })
+        proof.intents = await seekMarks()
+      }
+      await commitAndRecord(targets[0])
       if (mode === 'accepted-response-loss') {
         await waitFor(() => { checkOwnership(); return proof.firstResponse }, 'the genuine first seek response to be held')
-        for (const target of targets.slice(1)) proof.committedTargets.push(await commitSourceSeek(target, sourceDuration))
+        for (const target of targets.slice(1)) await commitAndRecord(target)
         assert.equal(proof.attempts.length, 1, 'All newer slider targets must queue while the first transport attempt is pending')
         queuedTargetsReady = true
         proof.queuedAt = Date.now()
@@ -1688,10 +1810,10 @@ async function proveMovieEndpoint(baseUrl, credentials) {
     return snapshot?.ready && state.connected && !state.paused && state.ready >= 2
       && state.time > 0.25 && state.decodedFrames > 0 && state.error === null && currentSource(state)
   }, 'the actual movie player to decode its signed source')
-  const timeline = page.getByRole('slider', { name: 'Seek movie' })
+  const timeline = seekSlider()
   proof.initial = { at: Date.now(), playback: safePlayback(snapshot),
     signing: playbackSnapshots.filter(item => item.accepted).map(item => ({ at: item.at, ...safePlayback(item) })),
-    slider: { max: await timeline.getAttribute('max'), value: await timeline.inputValue(),
+    slider: { max: await timeline.getAttribute('aria-valuemax'), value: await timeline.getAttribute('aria-valuenow'),
       valueText: await timeline.getAttribute('aria-valuetext') }, media: safeMedia(await mediaState()) }
   // Retain the real old-resolver response and range before the endpoint assertion can fail.
   await persist()
@@ -1789,7 +1911,7 @@ async function proveMovieEndpoint(baseUrl, credentials) {
     const exact = await acceptSeek(sourceEnd, exactStarted, owner.generation)
     await waitReady(exact, state => state.paused && snapshot.status === 'paused' && state.ready >= 2
       && Math.abs(snapshot.startTime + state.time - sourceEnd) <= 0.1)
-    await waitFor(async () => Number(await timeline.inputValue()) === sourceEnd,
+    await waitFor(async () => await sliderValue(timeline) === sourceEnd,
       'exact-end restoration to retain the global slider endpoint')
     await replay('exact-end')
     const tailStarted = Date.now()
@@ -1956,6 +2078,7 @@ async function checkpoint({ phase, baseUrl, credentials }) {
     await renewPlaybackCapabilities(owner)
     await reconnectPausedPlayback(owner, 'source-network')
     initialGeneration = snapshot.generation
+    restingCursor = await restingCursorNow()
     await page.screenshot({ path: `${evidence}/desktop.png` })
     await page.setViewportSize({ width: 390, height: 844 })
     await page.screenshot({ path: `${evidence}/mobile.png` })
@@ -1967,7 +2090,7 @@ async function checkpoint({ phase, baseUrl, credentials }) {
     await proveSeekOutages(owner, credentials.expectedSeekPosition)
     await pausePlayback(owner, 'pause')
     const started = Date.now()
-    const initialSliderPosition = Number(await page.getByRole('slider', { name: 'Seek movie' }).inputValue())
+    const initialSliderPosition = await sliderValue()
     const firstTarget = [credentials.expectedSeekPosition - 8, credentials.expectedSeekPosition + 8]
       .filter(position => position >= 0 && position < snapshot.duration)
       .sort((left, right) => Math.abs(right - initialSliderPosition) - Math.abs(left - initialSliderPosition))[0]
@@ -2047,7 +2170,19 @@ async function checkpoint({ phase, baseUrl, credentials }) {
     owner.generation = snapshot.generation
     await resumeAndDecode(owner, 'resume-after-seek')
     await reconnectPausedPlayback(owner, 'network')
-    await pausePlayback(owner, 'pause-before-remount')
+    // Recovery restores the position the playback session last recorded. A native pause
+    // reaches the session only with the next presence observation, so the pause before
+    // the reload goes through the overlay, whose command is acknowledged with its position.
+    const sessionAcks = () => apiResponses.filter(item => item.path === '/api/session/ack' && item.status === 200).length
+    const pauseButton = page.getByRole('button', { name: 'Pause', exact: true })
+    await until(async () => await pauseButton.count() > 0, 'the playback session to observe the resumed playback', 20000)
+    const acksBeforePause = sessionAcks()
+    const pauseStarted = Date.now()
+    await pauseButton.click()
+    await until(async () => (await mediaState()).paused && snapshot?.status === 'paused' && sessionAcks() > acksBeforePause,
+      'the overlay pause to commit and be acknowledged to the playback session')
+    samePlayback(owner)
+    await recordClientControl('pause-before-remount', pauseStarted)
     let pausedPosition
     await until(async () => {
       const state = await mediaState()
@@ -2064,28 +2199,43 @@ async function checkpoint({ phase, baseUrl, credentials }) {
     const previousVideo = video
     snapshot = undefined
     await page.reload()
-    await page.getByRole('button', { name: 'Play', exact: true }).click()
-    video = await page.locator('video').elementHandle()
-    assert(video, 'Reload must mount a new video element')
     await previousVideo.dispose()
-    await pausedAt(pausedPosition, owner.generation)
-    samePlayback(owner)
-    await recordClientControl('remounted-paused', remountStarted, { pausedPosition })
-    await resumeAndDecode(owner, 'resume-after-remount')
+    await resumeReleasedPlayback(owner, pausedPosition, 'remount', remountStarted)
     await pausePlayback(owner, 'final-pause')
     // Leave a different paused cursor so the following operator seek changes position.
     await seekSourceAndDecode(owner, credentials.expectedSeekPosition + 5, 'final-seek-paused', true)
+    restingCursor = await restingCursorNow()
   } else if (phase === 'sought-paused') {
-    await pausedAt(credentials.expectedSeekPosition, initialGeneration + 1)
-    soughtGeneration = snapshot.generation
-    await selectSubtitles('sought-paused-dialogue-choice', 'Dialogue')
-    await observeSubtitles('sought-paused', credentials.expectedSeekPosition >= 90 ? 'Dialogue sought' : 'Dialogue late')
+    // Video admission belongs to a client session: the operator's pause and seek act on
+    // the operator's own session and must leave the browser's owned session untouched.
+    assert.equal(snapshot.sessionId, restingCursor.sessionId, 'An operator seek on another session must not replace the browser\'s owned session')
+    assert.equal(snapshot.generation, restingCursor.generation, 'An operator seek on another session must not advance the browser\'s generation')
+    if (restingCursor.position === null) {
+      // Without client controls the browser left its playback running; it pauses here itself.
+      assert(!(await mediaState()).paused && snapshot.status === 'running', 'An operator pause on another session must not pause the browser\'s playback')
+      await pausePlayback(ownedPlayback(), 'sought-paused-pause')
+      restingCursor = await restingCursorNow()
+    }
+    await pausedAt(restingCursor.position, restingCursor.generation)
+    const cue = dialogueCueAt(restingCursor.position)
+    if (cue !== null) {
+      await selectSubtitles('sought-paused-dialogue-choice', 'Dialogue')
+      await observeSubtitles('sought-paused', cue)
+    }
   } else if (phase === 'web-restarted') {
-    await pausedAt(credentials.expectedSeekPosition, soughtGeneration)
+    // Replacing web drops the live connection. Recovery releases the browser's runner, and
+    // once web returns the browser resumes its own session from the recovered cursor.
+    const started = Date.now()
+    const owner = { jobId: restingCursor.jobId, sessionId: restingCursor.sessionId, generation: restingCursor.generation }
+    await resumeReleasedPlayback(owner, restingCursor.position, 'web-restart', started)
+    await pausePlayback(owner, 'web-restart-pause')
+    restingCursor = await restingCursorNow()
   } else if (phase === 'worker-contained') {
     assert((await mediaState()).connected, 'Worker containment must retain the attached player')
   } else if (phase === 'worker-recovered') {
-    await pausedAt(credentials.expectedSeekPosition, soughtGeneration + 1)
+    // Worker recovery re-executes an interrupted copy under a new generation; a copy that
+    // had already sealed keeps its generation.
+    await pausedAt(restingCursor.position, restingCursor.generation)
     const before = await mediaState()
     await video.evaluate(element => element.play())
     await until(async () => {
@@ -2125,8 +2275,12 @@ const server = createServer(async (request, response) => {
     if (state?.source) state.source = new URL(state.source).pathname
     const playback = snapshot ? safePlayback(snapshot) : null
     const mediaEvents = await page.evaluate(() => window.__twoCommandMediaEvents ?? []).catch(() => [])
+    const seekMarksAtFailure = await seekMarks().catch(() => null)
+    const alertsAtFailure = await page.getByRole('alert').allTextContents().catch(() => null)
+    const statusAtFailure = await page.getByRole('status').allTextContents().catch(() => null)
     await writeFile(`${evidence}/failure.json`, JSON.stringify({
-      browser: browserInfo, error: error.message, state, playback, playbackSnapshots, clientControls, subtitleObservations, networkInterruptions, mediaEvents: [...previousMediaEvents, ...mediaEvents], mediaResponses, apiResponses, nativeResponseEvidence, manifestEvidence, mediaRequestOrder, capabilityRenewals, progressOutages, statusOutages, seekOutages, movieCompletions,
+      browser: browserInfo, error: error.message, state, playback, playbackSnapshots, clientControls, subtitleObservations, networkInterruptions, mediaEvents: [...previousMediaEvents, ...mediaEvents], mediaResponses, apiResponses, nativeResponseEvidence, manifestEvidence, mediaRequestOrder, capabilityRenewals, progressOutages, statusOutages, seekOutages, movieCompletions, seekMarks: seekMarksAtFailure,
+      alerts: alertsAtFailure, statuses: statusAtFailure, pageErrors,
     }, null, 2))
     await page.screenshot({ path: `${evidence}/failure.png` }).catch(() => {})
     response.writeHead(500, { 'Content-Type': 'application/json' })
