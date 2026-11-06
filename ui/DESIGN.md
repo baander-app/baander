@@ -31,12 +31,17 @@ The website uses the application's font stacks on every page: Geist and Geist
 Mono for Latin, Latin Extended, Vietnamese and Cyrillic, and Noto for other
 scripts and for symbols Geist lacks. It self-hosts them as variable faces under
 content-hashed names. Every page declares the Latin subsets of Geist and Geist
-Mono. After rendering, the build walks each page's text in font-stack order and
-links a stylesheet that declares only the other slices its characters reach first;
-pages that reach the same slices share one stylesheet. Search results show text
-from other pages, so the search script links one stylesheet for all indexed text
-when it first shows results. `code`, `kbd`, `samp` and `pre` use the mono stack
-on every page. Rendered diagrams embed the Latin Geist face.
+Mono, preloads the Latin Geist face, and preloads the Latin Geist Mono face when
+its text reaches the mono stack. The published theme places a fallback face after
+each Geist family: Arial or Liberation Sans for Geist, Courier New or Liberation
+Mono for Geist Mono, scaled to Geist's advance width and line box, so text does
+not move when the fonts arrive. After rendering, the build walks each page's text
+in font-stack order and links a stylesheet that declares only the other slices its
+characters reach first; pages that reach the same slices share one stylesheet.
+Search results show text from other pages, so the search script links one
+stylesheet for all indexed text when it first shows results. `code`, `kbd`, `samp`
+and `pre` use the mono stack on every page. Rendered diagrams embed the Latin
+Geist face.
 
 The typography page at `/typography/` shows every supported script in live text
 and gets its fonts the same way. It restates the application's language reorders
