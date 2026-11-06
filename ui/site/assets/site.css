@@ -1,5 +1,7 @@
 * { box-sizing: border-box; }
-html { scroll-padding-top: 32px; }
+/* The gutter is reserved whether or not the page scrolls, so centred content stays put when a page's
+   height crosses the viewport on desktops with classic scrollbars. */
+html { scroll-padding-top: 32px; scrollbar-gutter: stable; }
 body {
   margin: 0;
   background: var(--color-background);
@@ -17,6 +19,9 @@ p, figure { margin: 0; }
 h1, h2, h3 { margin: 0; }
 code, kbd, samp, pre { font-family: var(--font-mono); }
 ::selection { color: var(--color-highlight-foreground); background: var(--color-highlight); }
+/* Arrow glyphs come from a Noto slice that arrives after the Latin faces. Each sits in a slot of fixed
+   width, so swapping the system glyph for the bundled one moves nothing around it. */
+.arrow { display: inline-block; width: 1em; text-align: left; }
 .visually-hidden, .skip-link:not(:focus) { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .skip-link:focus { position: absolute; z-index: 10; top: 16px; left: 16px; padding: 16px; background: var(--color-background); }
 .site-header { border-bottom: 1px solid var(--color-border); }
@@ -229,8 +234,11 @@ code, kbd, samp, pre { font-family: var(--font-mono); }
 .manual-article .heading-permalink { margin-left: 8px; color: var(--color-muted-foreground); font-size: .65em; font-weight: 400; text-decoration: none; }
 .manual-article .heading-permalink:hover { color: var(--color-accent-text); }
 .header-actions { display: flex; align-items: center; gap: 24px; }
-.theme-toggle { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 44px; width: 44px; min-height: 44px; padding: 0; border: 1px solid var(--color-input-boundary); border-radius: var(--radius-md); background: var(--color-background); color: var(--color-foreground); cursor: pointer; }
-.theme-toggle[hidden] { display: none; }
+/* The toggle keeps its box from the first paint and becomes visible once the appearance script, which
+   runs in the head, has marked the root with a theme; without JavaScript the box stays empty. The header
+   therefore has the same size before and after the script runs. */
+.theme-toggle { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 44px; width: 44px; min-height: 44px; padding: 0; border: 1px solid var(--color-input-boundary); border-radius: var(--radius-md); background: var(--color-background); color: var(--color-foreground); cursor: pointer; visibility: hidden; }
+:root[data-theme] .theme-toggle { visibility: visible; }
 .theme-toggle:hover { background: var(--color-highlight); }
 .theme-toggle:active { background: var(--color-secondary); }
 .theme-toggle .theme-icon-moon { display: none; }

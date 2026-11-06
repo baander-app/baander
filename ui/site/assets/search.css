@@ -23,6 +23,24 @@
   color: var(--color-muted-foreground);
 }
 
+/* The page renders the form before the search script runs. Without JavaScript the field stays
+   disabled and the message below it replaces the status line, so the two never contradict. */
+#manual-search input:disabled {
+  color: var(--color-muted-foreground);
+  cursor: not-allowed;
+}
+
+#manual-search noscript {
+  display: block;
+  margin-top: 0.5rem;
+  color: var(--color-muted-foreground);
+  font-size: 0.875rem;
+}
+
+:root:not([data-theme]) #manual-search-status {
+  display: none;
+}
+
 #manual-search input:focus-visible,
 #manual-search a:focus-visible {
   outline: 2px solid var(--color-ring);

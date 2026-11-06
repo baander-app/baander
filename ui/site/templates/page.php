@@ -4,7 +4,14 @@ include __DIR__ . '/header.php';
 ?>
 <div class="manual-layout">
   <aside class="chapter-sidebar" aria-label="Manual navigation">
-    <section id="manual-search" aria-label="Search manuals"><noscript>Search needs JavaScript. Browse the chapters below to find a topic.</noscript></section>
+    <?php // The form is rendered here so the sidebar has its final layout before the search script enables it. ?>
+    <section id="manual-search" aria-label="Search manuals">
+      <label for="manual-search-input">Search manuals</label>
+      <input id="manual-search-input" type="search" placeholder="Find a task or topic" autocomplete="off" spellcheck="false" aria-describedby="manual-search-status" aria-controls="manual-search-results" disabled>
+      <noscript>Search needs JavaScript. Browse the chapters below to find a topic.</noscript>
+      <p id="manual-search-status" role="status" aria-live="polite">Search the operator and developer guides.</p>
+      <ol id="manual-search-results" hidden></ol>
+    </section>
     <details class="chapter-navigation" open>
       <summary>Manual chapters</summary>
       <nav aria-label="Manual chapters">
@@ -84,7 +91,7 @@ include __DIR__ . '/header.php';
       <span class="visually-hidden" data-pagefind-meta="guide"><?= $page['guide'] === 'developer' ? 'Developer guide' : 'Operator manual' ?></span>
       <?= $page['html'] ?>
     </article>
-    <div class="manual-source"><a href="<?= $escape(preg_replace('~/tree/~', '/blob/', $site['revisionUrl']) . '/docs-book/' . $page['source']) ?>">Read this page's source <span aria-hidden="true">↗</span></a></div>
+    <div class="manual-source"><a href="<?= $escape(preg_replace('~/tree/~', '/blob/', $site['revisionUrl']) . '/docs-book/' . $page['source']) ?>">Read this page's source <span class="arrow" aria-hidden="true">↗</span></a></div>
   </main>
 </div>
 <?php include __DIR__ . '/footer.php'; ?>

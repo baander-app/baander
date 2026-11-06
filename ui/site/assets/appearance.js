@@ -51,20 +51,22 @@
     if (reducedMotion.matches) clearCrossfade();
   });
 
+  // The header renders the toggle at full size and the stylesheet reveals it once the root
+  // carries a theme, which this script set above, so the header never changes size. Clicks are
+  // handled from the document so the button works from its first paint, before the body has parsed.
+  document.addEventListener('click', (event) => {
+    if (!(event.target instanceof Element) || !event.target.closest('[data-appearance-toggle]')) return;
+    choice = document.documentElement.dataset.theme === 'balanced' ? 'dark' : 'light';
+    apply(true);
+    try {
+      localStorage.setItem(storageKey, choice);
+    } catch {
+      // Keep the manual choice for this page when storage is unavailable.
+    }
+  });
   const connect = () => {
     button = document.querySelector('[data-appearance-toggle]');
-    if (!button) return;
-    apply();
-    button.addEventListener('click', () => {
-      choice = document.documentElement.dataset.theme === 'balanced' ? 'dark' : 'light';
-      apply(true);
-      try {
-        localStorage.setItem(storageKey, choice);
-      } catch {
-        // Keep the manual choice for this page when storage is unavailable.
-      }
-    });
-    button.hidden = false;
+    if (button) apply();
   };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', connect, { once: true });
   else connect();

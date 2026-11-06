@@ -301,6 +301,8 @@ test('manual remains readable and navigable with JavaScript disabled', async ({ 
     const page = await context.newPage();
     await page.goto('/docs/operator-guide/getting-started/');
     await expect(page.locator('main h1')).toBeVisible();
+    await expect(page.getByRole('searchbox', { name: 'Search manuals' })).toBeDisabled();
+    await expect(page.locator('#manual-search-status')).toBeHidden();
     await expect(page.locator('#manual-search noscript')).toBeVisible();
     expect(await page.locator('#manual-search noscript').evaluate((element) => element.textContent)).toContain('Search needs JavaScript.');
     await page.getByRole('navigation', { name: 'Manual chapters', exact: true }).getByRole('link', { name: 'Library Management', exact: true }).click();
@@ -344,16 +346,20 @@ async function fontCoverage(page: import('@playwright/test').Page, root: string)
       const [start, end = start] = part.trim().replace(/^u\+/i, '').split('-');
       return [Number.parseInt(start, 16), Number.parseInt(end, 16)] as const;
     });
+    // The metric-matched fallback faces name only installed fonts, so they are not bundled faces
+    // and never satisfy a character; only faces that load a bundled file take part.
     const faces = [...document.styleSheets].flatMap((sheet) => [...sheet.cssRules])
       .filter((rule): rule is CSSFontFaceRule => rule instanceof CSSFontFaceRule)
-      .map((rule) => {
+      .flatMap((rule) => {
+        const file = /url\("?([^")]+)"?\)/.exec(rule.style.getPropertyValue('src'));
+        if (file === null) return [];
         const range = rule.style.getPropertyValue('unicode-range');
-        return {
+        return [{
           family: rule.style.getPropertyValue('font-family').replace(/^"|"$/g, ''),
-          file: new URL(/url\("?([^")]+)"?\)/.exec(rule.style.getPropertyValue('src'))![1], location.href).pathname,
+          file: new URL(file[1], location.href).pathname,
           pageFont: /\/assets\/site\/fonts\/page-[0-9a-f]{16}\.css$/.test(rule.parentStyleSheet?.href ?? ''),
           ranges: ranges(range === '' || /^U\+0-10FFFF$/i.test(range) ? siteWideLatin : range),
-        };
+        }];
       });
     const reached = new Set<string>();
     const missing = new Set<string>();
