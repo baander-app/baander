@@ -32,7 +32,7 @@ the player stall instead.
 
 - `BAANDER_TEST_VIDEO_SCENARIO=sparse-seek` and `matroska-delayed-seek` failed with
   `AssertionError: Retain a growing playlist`
-  (`ui/web/tests/e2e/transcode-adaptive/sparse-browser.mjs:365`). The fresh
+  (`ui/web/tests/e2e/transcode-adaptive/sparse-browser.mjs:366`). The fresh
   scenarios of the same sources passed.
 - The attach check passed: `/__adaptive/status` reported `complete: false` with
   two of four segments (`sparse-browser.mjs:285`). The first media playlist the
@@ -118,7 +118,10 @@ learning on FFmpeg 7 records a ten-second hold of a different shape under
 
 - Pace a fixture producer at the point where the frames it must publish exist.
   For a held-frame source that is after the `fps` filter; `-re`, `-readrate` and
-  any other input-side pacing keep the burst. The fixture refuses to run a sparse
+  any other input-side pacing keep the burst, because one input packet carries a
+  whole hold. Where packets are the published unit, as in a stream copy,
+  input-side pacing is the right tool (see the copy pacing learning under
+  Related). The fixture refuses to run a sparse
   scenario whose command lacks the `fps=1:` filter, so a change to the encoder's
   sparse branch surfaces here rather than as a flaky playlist assertion.
 - Pace every track the muxer interleaves. A paced video track beside an unpaced
@@ -140,3 +143,6 @@ learning on FFmpeg 7 records a ten-second hold of a different shape under
   FFmpeg 7.1.
 - [Local gate images](../developer-experience/local-gate-images-and-webkit-harness-runs.md):
   the CI image these scenarios run in.
+- [Pace a stream copy with a read-rate burst counted from the seek boundary](../performance-issues/pace-a-stream-copy-with-a-read-rate-burst-counted-from-the-seek-boundary.md):
+  the production copy, where packets are the published unit and input-side
+  pacing bounds the lead.
