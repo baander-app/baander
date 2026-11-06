@@ -23,7 +23,10 @@ export default defineConfig({
     baseURL,
     ignoreHTTPSErrors: true,
     browserName: 'chromium',
-    launchOptions: { args: ['--host-resolver-rules=MAP website.baander.app 127.0.0.1,MAP * ~NOTFOUND', '--no-proxy-server'] },
+    // Headless Chromium on Linux hints fonts to whole-pixel sizes by default, which discards the
+    // fractional size-adjust of the metric-matched fallback faces; desktop browsers position glyphs
+    // at fractional sizes, so the suite renders text the way they do.
+    launchOptions: { args: ['--host-resolver-rules=MAP website.baander.app 127.0.0.1,MAP * ~NOTFOUND', '--no-proxy-server', '--font-render-hinting=none'] },
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
   },
