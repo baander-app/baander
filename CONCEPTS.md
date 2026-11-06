@@ -271,6 +271,12 @@ A media presentation produced by repackaging selected source streams without aud
 Its identity includes the selected streams and output container, and its timing comes from the copied media rather than an encoder's fixed keyframe schedule.
 It uses the same execution ownership and publication guarantees as other presentations.
 
+A copy is bound by disk rather than an encoder, so its producer reads the source in one initial burst and then at a bounded multiple of real time; the burst is counted from the seek boundary, and the lead throttle governs it from there.
+
+### Lead throttle
+
+The bound the session subscriber keeps on how far a producer's published media runs ahead of the playhead: the producer's process is stopped once its lead reaches the pause mark and continued once the lead has shrunk to the resume mark. It applies to every producer, encode or copy, and a seek restarts the producer rather than repositioning it.
+
 ### Sparse source
 
 A video source whose frame rate is below one frame per second, so each frame is held on screen for seconds.
