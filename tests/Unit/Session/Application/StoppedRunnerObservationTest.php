@@ -48,6 +48,35 @@ final class StoppedRunnerObservationTest extends TestCase
         self::assertSame($track->toString(), $session->media()?->publicId->toString());
     }
 
+    public function testADeliberateStopKeepsTheRunnerAndItsStoppedState(): void
+    {
+        $owner = new Uuid();
+        $runner = new Uuid();
+        $destination = new Uuid();
+        $track = new PublicId();
+        $session = ListeningSession::create($owner, [$track->toString()], 0, 27.5);
+        $session->control('load', new PlaybackMedia('song', $track), null, null, null, PlaybackState::Playing);
+        $session->commitDestination($runner, $destination, PlaybackState::Playing, 27.5);
+        $session->control('stop', null, null, null, null, null);
+        $revision = $session->revision();
+        $store = $this->store($session, $runner);
+        $store->expects(self::once())->method('observe')->with($runner->toString(), 'stopped', 0.0, null);
+        $store->expects(self::once())->method('saveSession')->with($session);
+
+        $this->coordinator($store)->execute(
+            $owner,
+            PlaybackOperation::Observe,
+            ['incarnationId' => $runner->toString(), 'expectedRevision' => $revision, 'observedState' => 'stopped', 'position' => 0],
+            'capability',
+        );
+
+        self::assertSame($runner, $session->activeIncarnationId());
+        self::assertSame($destination, $session->selectedDestinationId());
+        self::assertSame($revision, $session->revision());
+        self::assertSame(PlaybackState::Stopped, $session->desiredState());
+        self::assertSame('stopped', $session->observedState()->value);
+    }
+
     public function testAPausedObservationKeepsTheRunner(): void
     {
         $owner = new Uuid();

@@ -6,6 +6,7 @@ namespace Tests\Unit\Transcode\Infrastructure\FFmpeg;
 
 use App\Transcode\Domain\ValueObject\PresentationSelection;
 use App\Transcode\Infrastructure\FFmpeg\CopySegmentArguments;
+use App\Transcode\Infrastructure\Swoole\TranscodeSessionSubscriber;
 use PHPUnit\Framework\TestCase;
 
 final class CopySegmentArgumentsTest extends TestCase
@@ -42,7 +43,8 @@ final class CopySegmentArgumentsTest extends TestCase
         self::assertIsInt($input);
         self::assertLessThan($input, array_search('-readrate_initial_burst', $args, true), 'The burst is an input option');
         self::assertLessThan($input, array_search('-readrate', $args, true), 'The read rate is an input option');
-        self::assertLessThan(72, CopySegmentArguments::INITIAL_BURST_SECONDS, 'The burst stays under the lead throttle pause mark');
+        self::assertLessThan(TranscodeSessionSubscriber::PAUSE_LEAD_SECONDS, CopySegmentArguments::INITIAL_BURST_SECONDS, 'The burst stays under the lead throttle pause mark');
+        self::assertGreaterThan(TranscodeSessionSubscriber::RESUME_LEAD_SECONDS, CopySegmentArguments::INITIAL_BURST_SECONDS, 'The burst reaches past the throttle resume mark so the first window is usable at once');
         self::assertGreaterThan(1.0, CopySegmentArguments::READ_RATE, 'The lead regrows after the throttle resumes');
     }
 

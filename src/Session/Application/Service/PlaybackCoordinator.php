@@ -140,10 +140,11 @@ final readonly class PlaybackCoordinator implements PlaybackCoordinationInterfac
                     $this->store->observe($endpoint['id'], $state, $position, $observedVolume);
                     if ($session->activeIncarnationId()?->toString() === $endpoint['id'] && $transfer === null && !$this->store->hasPendingControl($session->getId()->toString())) {
                         $this->expectRevision($session, $input);
-                        if ($state === 'stopped') {
-                            // The runner's own stop report is the proof its silence needs: the session
-                            // continues without an executor, so the same browser can start again after
-                            // an outage that outlived its registration.
+                        if ($state === 'stopped' && $session->desiredState() !== PlaybackState::Stopped) {
+                            // A runner that stops without being told to has lost its playback, as after
+                            // an outage that outlived its registration. Its own stop report is the proof
+                            // its silence needs: the session continues without an executor, so the same
+                            // browser can start again. A deliberate stop keeps its runner and selection.
                             $session->releaseStoppedRunner($position);
                         } else {
                             $session->observePlayback(ObservedPlaybackState::from($state), $position);

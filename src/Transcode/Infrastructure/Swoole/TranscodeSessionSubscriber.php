@@ -37,6 +37,9 @@ use Throwable;
 final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
 {
     private const int LEASE_SECONDS = 15;
+    /** The lead throttle stops a producer this far ahead of the playhead and resumes it at the lower mark. */
+    public const float PAUSE_LEAD_SECONDS = 72.0;
+    public const float RESUME_LEAD_SECONDS = 36.0;
 
     /** @param Closure(): SegmentEncoder $segmentEncoder resolved lazily so copy sessions never build an encoder */
     public function __construct(
@@ -345,9 +348,9 @@ final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
                         continue;
                     }
                     $ahead = ($videoTrack?->end() ?? 0.0) - $localPosition;
-                    if ($ahead >= 72.0) {
+                    if ($ahead >= self::PAUSE_LEAD_SECONDS) {
                         $throttled = true;
-                    } elseif ($ahead <= 36.0) {
+                    } elseif ($ahead <= self::RESUME_LEAD_SECONDS) {
                         $throttled = false;
                     }
                     Async::sleep(0.1);

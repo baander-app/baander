@@ -1252,7 +1252,6 @@ async function sliderValue(slider = seekSlider()) {
 
 // The player marks each seek commit, seek entry, queued intent and transport send with a
 // performance mark; the marks are ordered evidence of what the player did with a gesture.
-// The player's performance marks, in order of occurrence within the current document.
 async function playerMarks() {
   return page.evaluate(() => performance.getEntriesByType('mark')
     .filter(entry => entry.name.startsWith('baander:'))
@@ -2213,10 +2212,9 @@ async function checkpoint({ phase, baseUrl, credentials }) {
     }
     await pausedAt(restingCursor.position, restingCursor.generation)
     const cue = dialogueCueAt(restingCursor.position)
-    if (cue !== null) {
-      await selectSubtitles('sought-paused-dialogue-choice', 'Dialogue')
-      await observeSubtitles('sought-paused', cue)
-    }
+    assert(cue !== null, `The resting cursor at ${restingCursor.position} must sit on a dialogue cue so the subtitle proof runs`)
+    await selectSubtitles('sought-paused-dialogue-choice', 'Dialogue')
+    await observeSubtitles('sought-paused', cue)
   } else if (phase === 'web-restarted') {
     // Replacing web drops the live connection. Recovery releases the browser's runner, and
     // once web returns the browser resumes its own session from the recovered cursor.
