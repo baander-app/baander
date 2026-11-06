@@ -23,8 +23,7 @@ try {
     const forwarder = createTcpServer(client => {
       const target = connect(Number(upstreamPort), upstreamHost)
       const close = () => { client.destroy(); target.destroy() }
-      client.on('error', close)
-      target.on('error', close)
+      for (const socket of [client, target]) { socket.on('error', close); socket.on('close', close) }
       client.pipe(target).pipe(client)
     })
     await new Promise((resolve, reject) => {
@@ -133,6 +132,11 @@ await context.addInitScript(() => {
   }
 })
 const page = await context.newPage()
+const pageErrors = []
+page.on('pageerror', error => { appendBounded(pageErrors, { at: Date.now(), kind: 'pageerror', message: error.message }) })
+page.on('console', message => {
+  if (message.type() === 'error' || message.type() === 'warning') appendBounded(pageErrors, { at: Date.now(), kind: message.type(), message: message.text().slice(0, 500) })
+})
 let shortSigningLifetime = true
 await page.route('**/api/stream/sign', async route => {
   if (!shortSigningLifetime || route.request().method() !== 'POST') {
@@ -147,7 +151,6 @@ await page.route('**/api/stream/sign', async route => {
 })
 let video
 let snapshot
-let initialGeneration
 // The paused cursor the browser leaves on its own session before the operator phases.
 let restingCursor
 const phases = []
@@ -1249,18 +1252,11 @@ async function sliderValue(slider = seekSlider()) {
 
 // The player marks each seek commit, seek entry, queued intent and transport send with a
 // performance mark; the marks are ordered evidence of what the player did with a gesture.
-const pageErrors = []
-page.on('pageerror', error => { pageErrors.push({ at: Date.now(), kind: 'pageerror', message: error.message }) })
-page.on('console', message => {
-  if (message.type() === 'error' || message.type() === 'warning') pageErrors.push({ at: Date.now(), kind: message.type(), message: message.text().slice(0, 500) })
-})
-
-async function seekMarks() {
-  return page.evaluate(() => ['baander:seek-commit', 'baander:seek-entry', 'baander:seek-intent', 'baander:seek-send',
-    'baander:control-click', 'baander:intent-request', 'baander:intent-execute', 'baander:intent-done', 'baander:intent-error',
-    'baander:ensure-local-observe', 'baander:ensure-local-observed']
-    .flatMap(name => performance.getEntriesByName(name).map(entry => ({ name, at: Math.round(entry.startTime), ...entry.detail })))
-    .sort((left, right) => left.at - right.at))
+// The player's performance marks, in order of occurrence within the current document.
+async function playerMarks() {
+  return page.evaluate(() => performance.getEntriesByType('mark')
+    .filter(entry => entry.name.startsWith('baander:'))
+    .map(entry => ({ name: entry.name, at: Math.round(entry.startTime), ...entry.detail })))
 }
 
 async function sliderTrackBox(slider = seekSlider()) {
@@ -1726,9 +1722,9 @@ async function proveSeekOutages(owner, expectedPosition) {
       const commitAndRecord = async target => {
         const committed = await commitSourceSeek(target, sourceDuration)
         proof.committedTargets.push(committed)
-        ;(proof.commits ??= []).push({ at: Date.now(), target, committed, shown: await sliderValue(),
-          text: await seekSlider().getAttribute('aria-valuetext') })
-        proof.intents = await seekMarks()
+        const [shown, text] = await Promise.all([sliderValue(), seekSlider().getAttribute('aria-valuetext')])
+        ;(proof.commits ??= []).push({ at: Date.now(), target, committed, shown, text })
+        proof.intents = await playerMarks()
       }
       await commitAndRecord(targets[0])
       if (mode === 'accepted-response-loss') {
@@ -2077,7 +2073,6 @@ async function checkpoint({ phase, baseUrl, credentials }) {
     await observeSubtitles('attached', 'Dialogue early')
     await renewPlaybackCapabilities(owner)
     await reconnectPausedPlayback(owner, 'source-network')
-    initialGeneration = snapshot.generation
     restingCursor = await restingCursorNow()
     await page.screenshot({ path: `${evidence}/desktop.png` })
     await page.setViewportSize({ width: 390, height: 844 })
@@ -2275,11 +2270,11 @@ const server = createServer(async (request, response) => {
     if (state?.source) state.source = new URL(state.source).pathname
     const playback = snapshot ? safePlayback(snapshot) : null
     const mediaEvents = await page.evaluate(() => window.__twoCommandMediaEvents ?? []).catch(() => [])
-    const seekMarksAtFailure = await seekMarks().catch(() => null)
+    const marksAtFailure = await playerMarks().catch(() => null)
     const alertsAtFailure = await page.getByRole('alert').allTextContents().catch(() => null)
     const statusAtFailure = await page.getByRole('status').allTextContents().catch(() => null)
     await writeFile(`${evidence}/failure.json`, JSON.stringify({
-      browser: browserInfo, error: error.message, state, playback, playbackSnapshots, clientControls, subtitleObservations, networkInterruptions, mediaEvents: [...previousMediaEvents, ...mediaEvents], mediaResponses, apiResponses, nativeResponseEvidence, manifestEvidence, mediaRequestOrder, capabilityRenewals, progressOutages, statusOutages, seekOutages, movieCompletions, seekMarks: seekMarksAtFailure,
+      browser: browserInfo, error: error.message, state, playback, playbackSnapshots, clientControls, subtitleObservations, networkInterruptions, mediaEvents: [...previousMediaEvents, ...mediaEvents], mediaResponses, apiResponses, nativeResponseEvidence, manifestEvidence, mediaRequestOrder, capabilityRenewals, progressOutages, statusOutages, seekOutages, movieCompletions, marks: marksAtFailure,
       alerts: alertsAtFailure, statuses: statusAtFailure, pageErrors,
     }, null, 2))
     await page.screenshot({ path: `${evidence}/failure.png` }).catch(() => {})

@@ -355,9 +355,10 @@ export class PlaybackSessionCoordinator {
       && presenceAge !== null && presenceAge >= 0 && presenceAge < PRESENCE_INTERVAL_MS) return this.endpoint
     performance.mark('baander:ensure-local-observe', { detail: { available: available(), presenceAge, active: this.snapshot?.activeIncarnationId ?? null, destinations: this.snapshot?.destinations.map(destination => `${destination.incarnationId}:${destination.available}`) ?? null } })
     await this.observe()
-    performance.mark('baander:ensure-local-observed', { detail: { available: available(), current: this.current(), ready: this.ready, endpoint: this.endpoint?.incarnationId ?? null } })
+    const observedAvailable = available()
+    performance.mark('baander:ensure-local-observed', { detail: { available: observedAvailable, current: this.current(), ready: this.ready, endpoint: this.endpoint?.incarnationId ?? null } })
     if (!this.current() || !this.ready || !this.endpoint) throw new Error('Playback connection is unavailable.')
-    if (available()) return this.endpoint
+    if (observedAvailable) return this.endpoint
 
     this.disconnect()
     let finish: (() => void) | undefined

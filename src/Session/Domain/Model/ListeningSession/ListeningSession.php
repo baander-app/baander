@@ -206,9 +206,7 @@ final class ListeningSession
     {
         $this->observePlayback(ObservedPlaybackState::Paused, $position);
         $this->state->desiredState = PlaybackState::Paused;
-        $this->state->activeIncarnationId = null;
-        $this->state->selectedDestinationId = null;
-        $this->advanceRevision();
+        $this->releaseConfirmedPausedRunner();
     }
 
     public function retainUncertainRunner(): void

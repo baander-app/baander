@@ -73,15 +73,14 @@ final class BrowserCheckpoint
         return $status;
     }
 
-    /** Validates the Docker network the browser container joins: the host network, another container's namespace,
-     *  or a named Docker network. */
+    /** Validates the Docker network the browser container joins: the host network or a named Docker network. */
     public static function network(string $network): string
     {
         if ($network === '' || $network === 'host') {
             return 'host';
         }
-        if (preg_match('/^(container:)?[A-Za-z0-9][A-Za-z0-9_.-]*$/D', $network) !== 1) {
-            throw new \InvalidArgumentException('Browser network must be "host", "container:<name>" or a Docker network name.');
+        if (preg_match('/^[A-Za-z0-9][A-Za-z0-9_.-]*$/D', $network) !== 1) {
+            throw new \InvalidArgumentException('Browser network must be "host" or a Docker network name.');
         }
         return $network;
     }
@@ -95,9 +94,9 @@ final class BrowserCheckpoint
         return $upstream;
     }
 
-    /** The browser joins the host network unless the checkpoint names a container whose network namespace it shares,
-     *  or a Docker network with an upstream the browser's own loopback forwards to, so a drill whose web listens only at
-     *  its loopback origin is reached at that origin and a replaced web container is followed through its network alias. */
+    /** The browser joins the host network unless the checkpoint names a Docker network and an upstream the browser's
+     *  own loopback forwards to, so a drill whose web listens only at its loopback origin is reached at that origin and
+     *  a replaced web container is followed through its network alias. */
     public function run(string $phase, string $artifacts, string $baseUrl, string $network = 'host', string $upstream = ''): int
     {
         if ($phase === 'cleanup') {

@@ -16,11 +16,6 @@ final class DevelopmentBrowserNetworkTest extends TestCase
         self::assertSame('host', BrowserCheckpoint::network('host'));
     }
 
-    public function testAContainerNamespaceIsAccepted(): void
-    {
-        self::assertSame('container:baander-worker-web-1a2b', BrowserCheckpoint::network('container:baander-worker-web-1a2b'));
-    }
-
     public function testANamedDockerNetworkIsAccepted(): void
     {
         self::assertSame('baander-worker-operator-1793989271-435080', BrowserCheckpoint::network('baander-worker-operator-1793989271-435080'));
@@ -36,9 +31,7 @@ final class DevelopmentBrowserNetworkTest extends TestCase
     /** @return iterable<string, array{string}> */
     public static function rejectedNetworkProvider(): iterable
     {
-        yield 'an empty container name' => ['container:'];
-        yield 'a container name with a space' => ['container:web name'];
-        yield 'a leading separator' => ['container:-web'];
+        yield 'a container namespace' => ['container:baander-worker-web-1a2b'];
         yield 'a network name with a space' => ['drill network'];
         yield 'a network name with a leading separator' => ['-drill'];
     }
