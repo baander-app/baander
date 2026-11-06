@@ -42,7 +42,7 @@ That run then failed "Source seeking must span the full source duration, 0 !== 1
 
 - R1. The copy command reads its source with an initial burst and then at a bounded multiple of real time, so the published lead over the playhead stays inside the worker's throttle band.
 - R2. The burst and rate are named constants next to the copy command, documented against the throttle thresholds, and covered by the copy argument unit test.
-- R3. The segment encoder media tests that run the copy command still pass in the CI image.
+- R3. The video copy presentation integration test, the one test that runs the copy command through FFmpeg, still passes in the CI image, proving the arguments are accepted and the packets and boundary are unchanged.
 
 **Drill seek control**
 
@@ -57,7 +57,7 @@ That run then failed "Source seeking must span the full source duration, 0 !== 1
 
 - AE1. **Covers R1, R2.** Given a copy selection with audio, when the arguments are built, then the input options carry the burst seconds and the read rate before the source, and the output options are unchanged.
 - AE2. **Covers R4.** Given the overlay's slider at duration 180 and position 12, when the drill reads it, then it reports 180 and 12 from the accessible attributes.
-- AE3. **Covers R1, R4, R5.** Given the two-command Chromium drill in the rebuilt worker image on this host, when the attached phase runs, then the published window is shorter than the burst plus a few seconds of playback, the seek beyond the window succeeds, and the phase completes.
+- AE3. **Covers R1, R4, R5.** Given the two-command Chromium drill in the rebuilt worker image on this host, when the attached phase runs, then the published window ends no later than the throttle's 72-second pause mark plus one segment, leaving source beyond it so the beyond-window seek target exceeds the published end by more than six seconds, the seek beyond the window succeeds, and the phase completes.
 
 ### Scope Boundaries
 
@@ -70,9 +70,9 @@ That run then failed "Source seeking must span the full source duration, 0 !== 1
 
 ### Key Technical Decisions
 
-- KTD1. **FFmpeg read-rate pacing with an initial burst.** The copy command passes `-readrate_initial_burst` and `-readrate` as input options before `-i`; the image's FFmpeg 7.1.5 supports both. The burst is 48 seconds, under the 72-second pause threshold so the first window appears at once and the throttle governs from there; the rate is 2.0 so the lead regrows after a resume at 36 seconds. Both are constants on the builder with a comment naming the thresholds in the session subscriber. (session-settled: user-directed, inherited from the Key Decision governing R1 and R2 — chosen over restating the proof for copies.)
+- KTD1. **FFmpeg read-rate pacing with an initial burst.** The copy command passes `-readrate_initial_burst` and `-readrate` as input options before `-i`; the image's FFmpeg 7.1.5 supports both. The burst is 48 seconds, under the 72-second pause threshold so the first window appears at once and the throttle governs from there; the rate is 2.0 so the lead regrows after a resume at 36 seconds. Both are constants on the builder with a comment naming the thresholds in the session subscriber. Under `-copyts` FFmpeg measures the burst from the `-ss` boundary, and an input-side `-itsoffset` pushes the burst out by that boundary, so a copy restarted at a seek would publish its remainder unpaced; the boundary normalisation therefore moves to the output side as `-output_ts_offset` before the manifest path, which leaves the manifests and packet timestamps unchanged. (session-settled: user-directed, inherited from the Key Decision governing R1 and R2 — chosen over restating the proof for copies.)
 - KTD2. **Accessible slider helpers in the drill.** The drill gains helpers that resolve the slider's root element (the nearest ancestor with a text direction attribute, which Radix renders on its root), read `aria-valuemax` and `aria-valuenow`, and translate a target position to a pointer coordinate on the root's box. Every site that read `max`, the input value or the thumb's box uses them. Keyboard Home and End keep working on the thumb.
-- KTD3. **Media tests prove the command still copies.** The existing segment encoder media tests exercise copy commands on short sources that stay inside the burst, so they prove the arguments are accepted; the local drill proves the pacing on a long source.
+- KTD3. **The copy presentation test proves the command still copies.** `tests/Integration/VideoCopyPresentationTest.php` runs the copy command on a 17 s fixture seeked from an irregular keyframe, inside the burst, so it proves the arguments are accepted and the packets and boundary are unchanged; the segment encoder media tests never spawn the copy command. The local drill proves the pacing on a long source.
 
 ### Sources
 
@@ -91,13 +91,14 @@ That run then failed "Source seeking must span the full source duration, 0 !== 1
 - **Requirements:** R1, R2, R3. Implements KTD1, KTD3.
 - **Dependencies:** none.
 - **Files:** `src/Transcode/Infrastructure/FFmpeg/CopySegmentArguments.php`, `tests/Unit/Transcode/Infrastructure/FFmpeg/CopySegmentArgumentsTest.php`.
-- **Approach:** Add the two constants and insert the two input options immediately before `-i`, after the boundary seek options, so they apply to the single input. Extend the unit test to assert both values and their placement before the input.
+- **Approach:** Add the two constants and insert the two input options immediately before `-i`, after the boundary seek options, so they apply to the single input. Move the boundary normalisation from the input `-itsoffset` to an output `-output_ts_offset` placed before the manifest path, per KTD1. Extend the unit test to assert both pacing values and their placement before the input, and the negative boundary offset after it.
 - **Patterns to follow:** The builder's existing option ordering and the test's option-value helper.
 - **Test scenarios:**
   - Covers AE1. Copy with audio: `-readrate_initial_burst` is 48 and `-readrate` is 2, both at indexes before `-i`.
-  - Copy without audio: the same two options are present once each.
+  - Copy with a non-zero boundary: the seek options stay before `-i`, and `-output_ts_offset` carries the negative boundary after `-i`; no `-itsoffset` remains.
+  - Copy without audio: the same two pacing options are present once each.
   - The excluded encode options the existing test lists are still absent.
-- **Verification:** The copy argument unit test passes, and the segment encoder media tests pass in the CI image.
+- **Verification:** The copy argument unit test passes, and the video copy presentation integration test passes in the CI image.
 
 ### U2. Drive the Radix slider in the drill
 
@@ -130,7 +131,7 @@ That run then failed "Source seeking must span the full source duration, 0 !== 1
 | Check | Command or outcome | Applies to |
 |---|---|---|
 | Copy argument unit test | `BAANDER_TEST_IMAGE=baander-ci-prewarm:local bash scripts/test-unit-container.sh --filter CopySegmentArgumentsTest` passes | U1 |
-| Segment encoder media tests | the same runner with `--filter 'SegmentEncoder.*MediaTest'` passes | U1 |
+| Video copy presentation test | `BAANDER_TEST_IMAGE=baander-ci-prewarm:local bash scripts/test-backend-container.sh tests/Integration/VideoCopyPresentationTest.php` passes; its 17 s fixture stays inside the burst, so it proves the arguments and the unchanged packets and boundary | U1 |
 | PHP static gates | PHPStan on `src` in the CI image reports no errors | U1 |
 | Two-command drill | `scripts/test-two-command-deployment-container.sh` in `baander-ci-prewarm:local-worker` rebuilt from the branch, with the CI step's environment plus `BAANDER_TEST_DOCKER_SOCKET_PATH`, passes the attached phase | U1, U2 |
 | Whitespace and prose | `git diff --check`; the prose audit on the roadmap text | U3 |
