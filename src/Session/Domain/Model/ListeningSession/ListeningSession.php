@@ -200,6 +200,17 @@ final class ListeningSession
         $this->advanceRevision();
     }
 
+    /** The active runner has reported that it stopped at the given cursor, so the session keeps the
+     *  cursor and continues without an executor until a later control starts one. */
+    public function releaseStoppedRunner(float $position): void
+    {
+        $this->observePlayback(ObservedPlaybackState::Paused, $position);
+        $this->state->desiredState = PlaybackState::Paused;
+        $this->state->activeIncarnationId = null;
+        $this->state->selectedDestinationId = null;
+        $this->advanceRevision();
+    }
+
     public function retainUncertainRunner(): void
     {
         $this->state->desiredState = PlaybackState::Paused;
