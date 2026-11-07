@@ -91,7 +91,7 @@ dc exec app php bin/console app:health:check
 
 These commands update the web/dependency stack. The separately admitted worker
 uses an immutable image and boot identity. Before changing its image or storage
-recipe, use the host [deployment controller](commands/README.md#worker-deployment)
+recipe, use the host [deployment controller](worker-deployment.md)
 to recover and retire the old deployment, then create/start a new boot with the
 updated image and manifest. Never enable automatic worker restart or place its
 children under another supervisor. Prepare shared media volumes before starting
@@ -113,7 +113,7 @@ git log --oneline <current-tag>..HEAD
 Before upgrading an instance with older queued messages:
 
 1. Stop producers and preserve queued and retrying Redis work while retiring the
-   old worker deployment through the [deployment controller](commands/README.md#worker-deployment).
+   old worker deployment through the [deployment controller](worker-deployment.md).
 2. Preserve Redis streams and the PostgreSQL database, which contains failed
    messages, outbox rows and job history. See the
    [recovery inventory](backup-and-recovery.md#choose-the-recovery-set). Removing

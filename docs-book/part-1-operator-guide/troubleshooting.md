@@ -173,7 +173,7 @@ unsupported codec, FFmpeg, worker execution or resource exhaustion.
    deployment's controller status. Inspect that unit's logs for probe or encoder
    errors. FFmpeg runs in this worker image; checking it in `app` only checks web.
    If the worker image is missing the binary, correct and rebuild the
-   [worker image](commands/README.md#worker-deployment), then follow the confirmed
+   [worker image](worker-deployment.md#building-the-worker-image), then follow the confirmed
    retirement and fresh-boot procedure in [Upgrading](upgrading.md).
    Repeatedly retrying the job will not add the binary.
 3. Inspect the source path and permissions in the container executing the work.

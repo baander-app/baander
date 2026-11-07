@@ -135,7 +135,7 @@ admission can change within the profile's bounds; all ordinary consumers remain
 resident when parked. Media slots remain independent of the ordinary target.
 [System Requirements](system-requirements.md#choose-media-slots) gives the measured
 cost of each job and how to choose the slots; see
-[Worker deployment](commands/README.md#worker-deployment) for the storage recipe.
+[Worker deployment](worker-deployment.md) for the storage recipe.
 
 ## Job Monitoring and State
 
@@ -219,7 +219,7 @@ A web restart [drains client connections](upgrading.md#stopping-and-restarting-t
 
 A worker stop closes admission and stops its job children and encoder groups. A replacement requires explicit deployment recovery and retirement of the old container. Execution claims use database-clock leases, ownership tokens and generation checks; replacement work cannot publish through an old claim. PostgreSQL runtime rows are authoritative. Files under `var/transcode_state/` do not authorize execution.
 
-See [Monitoring](monitoring.md) for job status and [Worker deployment](commands/README.md#worker-deployment) for recovery.
+See [Monitoring](monitoring.md) for job status and [Worker deployment](worker-deployment.md) for recovery.
 
 ## Hardware Acceleration
 
@@ -243,7 +243,7 @@ Name the encoder in the managed preset's private configuration under
 A source install builds the same profile with
 [app:deployment:profile:show](commands/app-deployment-profile-show.md) and its
 `--hardware-accelerator` and `--hardware-device` options, and sets the worker
-manifest's `deviceGroup`; see [Worker deployment](commands/README.md#worker-deployment).
+manifest's `deviceGroup`; see [Worker deployment](worker-deployment.md).
 The hardware encoder is part of the profile, so web, workers and the worker manifest
 agree on it, and changing it changes the profile fingerprint. A hardware encoder
 requires at least one video slot.
@@ -395,7 +395,7 @@ Audio transcoding is switched on and capped with the [server settings](#settings
 - **Derived output** uses `CONVERT_STORAGE_PATH`, default `/storage/conversions`, mounted at the same path in web and worker.
 - **Application storage and state** require shared writable worker volumes covering `APP_HOME/storage` and `APP_HOME/var/transcode_state`, where `APP_HOME` is the image application path generated during [installation](getting-started.md).
 - **Source media** uses an explicit `MEDIA_STORAGE_PATH`, for example `/media/library`, covered by a read-only worker source volume. Use the identical source root in both roles. Preserve web access needed for authorized library deletion.
-- **Capacity** comes from the startup profile: `full` permits as many video jobs and audio renditions as its [media slots](configuration.md#media-slots), 8 and 12 by default; `household` permits two shared copy jobs and no encoding. The [host manifest](commands/README.md#worker-deployment) carries the same profile; it declares no memory or process reservations.
+- **Capacity** comes from the startup profile: `full` permits as many video jobs and audio renditions as its [media slots](configuration.md#media-slots), 8 and 12 by default; `household` permits two shared copy jobs and no encoding. The [host manifest](worker-deployment.md#manifest-format) carries the same profile; it declares no memory or process reservations.
 
 ## Checking playback
 

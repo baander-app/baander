@@ -91,7 +91,7 @@ controller's separate `readiness` action and inspect progress and logs as descri
 in [Observe background work](background-work.md#observe-background-work).
 Controller `status` returns `readiness: "not_checked"`; it is an ownership and state
 observation, not a readiness test. See [app:outbox:consume](commands/app-outbox-consume.md) for relay behavior
-and [Worker deployment](commands/README.md#worker-deployment) for ownership,
+and [Worker deployment](worker-deployment.md) for ownership,
 drain and explicit recovery procedures. Restarting web leaves background work
 with the worker deployment.
 

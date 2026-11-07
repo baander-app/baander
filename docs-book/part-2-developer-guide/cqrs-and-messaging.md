@@ -158,7 +158,7 @@ and `scheduler` consumers, outbox relay, scheduler and media execution. The web
 container runs `app:serve` without task workers or a CPU pool. Consumer names
 include the deployment and boot identity. [Background Work](../part-1-operator-guide/background-work.md)
 owns the operator explanation of admission, observation, lifecycle and uncertain
-outcomes; [Worker deployment](../part-1-operator-guide/commands/README.md#worker-deployment)
+outcomes; [Worker deployment](../part-1-operator-guide/worker-deployment.md)
 provides the manifest and host-command reference.
 
 ### Message contract and retries

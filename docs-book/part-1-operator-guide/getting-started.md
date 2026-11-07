@@ -35,7 +35,7 @@ evidence, environment adaptations and verification limits.
 FFmpeg, Node and Corepack are supplied by the app image. The web frontend selects
 its Yarn version from the repository's `packageManager` field.
 
-Read [Worker deployment](commands/README.md#worker-deployment) before provisioning
+Read [Worker deployment](worker-deployment.md) before provisioning
 storage or choosing host resources. Its version 8 procedure is authoritative for
 the worker manifest, credentials, volume ownership and admission checks.
 
@@ -332,7 +332,7 @@ access. If nginx is recreated, inspect its address again, update the setting and
 restart app. See [Configuration](configuration.md#rate-limiting) for the shared
 proxy trust setting.
 
-Follow [Worker deployment](commands/README.md#worker-deployment) to build the worker
+Follow [Worker deployment](worker-deployment.md) to build the worker
 image, prepare its private IPC volume and credentials, and create and start the
 version 8 deployment from the host. First export the application layout selected by
 the builder in that host shell; the controller requires it when interpreting the

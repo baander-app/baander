@@ -14,7 +14,7 @@ before carrying a command between environments.
 ## Reading path
 
 1. **Understand the instance.** [Understanding Baander](understanding-baander.md) introduces the journey from files to playback. [Deployment Topology](deployment-topology.md) shows the components in one diagram and what PostgreSQL and Redis hold. [Storage and Data](storage-and-data.md) identifies the stores, their writers and what must be preserved.
-2. **Set it up.** Check [System Requirements](system-requirements.md) for your profile, follow [Getting Started](getting-started.md), then use [Configuration](configuration.md) for settings and [Background Work](background-work.md) for the separate worker deployment and its operating limits.
+2. **Set it up.** Check [System Requirements](system-requirements.md) for your profile, follow [Getting Started](getting-started.md), then use [Configuration](configuration.md) for settings, [Worker Deployment](worker-deployment.md) for the worker manifest, credentials and host controller, and [Background Work](background-work.md) for queue flow and operating limits.
 3. **Run it day to day.** Use [Library Management](library-management.md), [User Management](user-management.md), [External APIs](external-apis.md), [Transcoding](transcoding.md), [Notifications](notifications.md) and [Watch Parties](watch-parties.md) for the work your instance supports.
 4. **Observe and diagnose.** [Monitoring](monitoring.md) explains health, job and transport evidence. [Troubleshooting](troubleshooting.md) starts from symptoms and connects them to the responsible stage.
 5. **Maintain and recover.** Read [Backup and Recovery](backup-and-recovery.md) before [Upgrading](upgrading.md) or a recovery action. [Security](security.md) covers credential changes and account/session effects. The optional [Registry](registry.md) has separate storage and recovery requirements.
@@ -33,6 +33,7 @@ before carrying a command between environments.
 | Understand original playback or converted audio/video | [Transcoding](transcoding.md) |
 | Configure email, push or webhooks | [Notifications](notifications.md) |
 | Use synchronized playback through the supported API | [Watch Parties](watch-parties.md) |
+| Provision, configure or run the worker pair from a host manifest | [Worker Deployment](worker-deployment.md) |
 | Inspect, replace or recover background workers | [Background Work](background-work.md) |
 | Preserve data or assess a restore | [Backup and Recovery](backup-and-recovery.md) |
 | Update code and schema | [Upgrading](upgrading.md) |
@@ -58,6 +59,7 @@ before carrying a command between environments.
 | --- | --- |
 | Web, proxy and real-time connections | [Deployment Topology](deployment-topology.md), [Monitoring](monitoring.md) |
 | Control/execution pair, queues, scheduler and outbox | [Background Work](background-work.md) |
+| Worker manifest, credentials and host controller | [Worker Deployment](worker-deployment.md) |
 | PostgreSQL, Redis, source media and generated output | [Storage and Data](storage-and-data.md) |
 | Native encoding and delivery files | [Transcoding](transcoding.md) |
 | Optional registration/discovery service | [Registry](registry.md) |

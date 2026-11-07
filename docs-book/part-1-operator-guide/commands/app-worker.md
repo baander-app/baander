@@ -6,14 +6,14 @@ coordination. Execution runs resident ordinary `async` consumers, one separate
 `scheduler` consumer and the native execution daemon.
 Native probes, encoders, CPU helpers and scheduled console children run in
 execution. The host `bin/worker-deployment.php` supplies the options from a version
-7 manifest; see [Worker deployment](README.md#worker-deployment).
+8 manifest; see [Worker deployment](../worker-deployment.md).
 
 ## Quick start
 
 The host deployment controller constructs this command and runs it as PID 1 in
 each admitted worker container. Do not launch it with `dc exec` or as an
 additional web-container process. Use the host
-[manifest reference](README.md#worker-deployment) to provision the pair, and
+[manifest reference](../worker-deployment.md#manifest-format) to provision the pair, and
 [Background work](../background-work.md#stop-replace-or-recover-workers) for
 start, stop, replacement and uncertain outcomes.
 
@@ -49,7 +49,7 @@ execution cgroup evidence, measured against the host because the cgroup has no
 limits, and updates admission through boot/epoch-fenced IPC; it does not consume
 ordinary work.
 
-The [manifest reference](README.md#worker-deployment) defines profile bounds and
+The [manifest reference](../worker-deployment.md#autoscaling-and-ordinary-consumers) defines profile bounds and
 the measured `full` maximum-two example and its workload limits. Missing
 measurements prevent growth and reduce ordinary admission to at most one. Severe memory/PID pressure closes admission;
 recovery needs fresh samples. Status exposes slot counts, decision reason and

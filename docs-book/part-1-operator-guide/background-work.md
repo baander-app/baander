@@ -8,7 +8,7 @@ therefore does not establish that background work is progressing.
 This chapter explains that path and the worker pair that runs it. Use
 [Library management](library-management.md) for scan procedures,
 [Monitoring](monitoring.md) for progress and failure signals, and the
-[worker deployment reference](commands/README.md#worker-deployment) for the exact
+[worker deployment reference](worker-deployment.md) for the exact
 manifest, credentials and host commands.
 
 ## The worker deployment pair
@@ -112,7 +112,7 @@ containers carry no CPU, memory or PID limit and no CPU set; the media slots and
 the ordinary concurrency bound their work. The manifest is an operating recipe,
 not a measurement of what any library will need. Its measured concurrency example
 has workload and host limits documented in the
-[worker deployment reference](commands/README.md#worker-deployment).
+[worker deployment reference](worker-deployment.md).
 
 Execution starts all configured ordinary consumer slots at boot. The autoscaler
 changes the **ordinary admission target**: how many slots may acquire permission
@@ -195,7 +195,7 @@ worker-controller procedure below applies when managing the pair separately.
 A web worker reload or web drain does not retire the worker deployment. The
 worker pair has its own lease, boot and containment boundary. Follow
 [Upgrading](upgrading.md) for an ordered replacement; use the
-[worker deployment reference](commands/README.md#worker-deployment) for lifecycle
+[worker deployment reference](worker-deployment.md) for lifecycle
 commands and manifest requirements.
 
 Child exit, peer failure, authority loss, `SIGTERM` or `SIGINT` starts a worker

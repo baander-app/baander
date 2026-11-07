@@ -12,7 +12,7 @@ Behavior that an administrator may want to change while the server runs, such as
 | Configuration | Applies to | How a change takes effect |
 |---------------|------------|---------------------------|
 | Web environment and Symfony configuration | Web application and console commands launched with that environment | Restart the running app after changing environment values; use the [upgrade procedure](upgrading.md) for release or image changes. A new console process reads its own environment. |
-| Worker image and admitted credentials | The control/execution worker pair | Follow [worker deployment](commands/README.md#worker-deployment) and [upgrading](upgrading.md). Changed deployment recipes require retirement and a fresh boot; editing a file does not alter running containers. |
+| Worker image and admitted credentials | The control/execution worker pair | Follow [worker deployment](worker-deployment.md) and [upgrading](upgrading.md). Changed deployment recipes require retirement and a fresh boot; editing a file does not alter running containers. |
 | Worker manifest | Host controller and the admitted profile/storage recipe | Use the exact manifest for observation and recovery. Changes to its profile or recipe require a new admitted deployment. |
 | Server settings | Application behavior that reads a setting while running | Use the admin UI, settings CLI or API described below. Each feature reads the setting when it acts; already completed work is not undone. |
 | User settings | One user's explicitly stored preferences | Change through the account UI, admin tools or user settings API. Removing a choice restores the applicable default. |
@@ -653,7 +653,7 @@ A fresh install has an active scheduled job, **Generate recommendations**, that 
 
 The setting governs only that job. [`app:recommendation:generate`](commands/app-recommendation-generate.md), the admin action and schedules an administrator creates always generate.
 
-You can change the job's schedule, pause it, or switch it to full mode in the scheduler admin. A full run loads every song and the listening history of every user, and it runs inside the scheduler worker, whose memory is limited (the [worker deployment manifest](commands/README.md#worker-deployment) requires a reservation of at least 320 MiB for it). On a large library it may run out of memory or time, which is why the seeded job is incremental.
+You can change the job's schedule, pause it, or switch it to full mode in the scheduler admin. A full run loads every song and the listening history of every user, and it runs inside the scheduler worker, whose memory is limited (the [worker deployment manifest](worker-deployment.md#manifest-format) requires a reservation of at least 320 MiB for it). On a large library it may run out of memory or time, which is why the seeded job is incremental.
 
 ### Email language
 
@@ -698,7 +698,7 @@ Administrators read and change a user's settings through the admin API and the C
 
 - Keep deployment credentials out of Git and image build contexts. The source
   installation uses `.env.dev.local`; the worker credentials file has its own
-  ownership and mode requirements in the [worker deployment reference](commands/README.md#worker-deployment).
+  ownership and mode requirements in the [worker deployment reference](worker-deployment.md#ipc-and-media-volumes).
 - All env vars in `.env` can be overridden by setting real environment variables in your container runtime (Docker Compose, Kubernetes, etc.).
 - For each deployment, generate a unique `APP_SECRET` with `php -r 'echo bin2hex(random_bytes(32));'`.
 - OAuth keys should be at least 2048-bit RSA. Generate with `openssl genrsa -out private.key 2048` and `openssl rsa -in private.key -pubout > public.key`.
