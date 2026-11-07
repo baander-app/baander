@@ -52,7 +52,7 @@ jobs:
                       --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest \
                       --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
                       --push \
-                      docker/ffmpeg/
+                      .
 
             -   name: FFmpeg image is not publicly pullable
                 # GHCR keeps the package private until an operator changes

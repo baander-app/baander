@@ -141,6 +141,22 @@ RUN curl -sL -o libaribb24.tar.gz https://github.com/nkoriyama/aribb24/archive/r
     && make -j"$(nproc)" \
     && make install
 
+# --- bAAC (packages/baander-aac, repository checkout) ---
+# Installed with the workspace prefix through DESTDIR so that libbaac.pc
+# points at the paths FFmpeg's configure sees after the merge below.
+FROM lib-builder AS baac-builder
+WORKDIR /build
+COPY packages/baander-aac /build/baander-aac
+RUN cmake -S /build/baander-aac -B /build/baander-aac-build -G Ninja \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_INSTALL_PREFIX=/usr/src/ffmpeg-build-script/workspace \
+        -DCMAKE_INSTALL_LIBDIR=lib \
+        -DBAAC_AAC_BUILD_TESTS=OFF -DBAAC_AAC_BUILD_TOOLS=OFF -DBAAC_AAC_SHARED=OFF \
+    && cmake --build /build/baander-aac-build \
+    && DESTDIR=/dist cmake --install /build/baander-aac-build \
+    && PKG_CONFIG_PATH=/dist/usr/src/ffmpeg-build-script/workspace/lib/pkgconfig \
+       PKG_CONFIG_SYSROOT_DIR=/dist pkg-config --static --libs libbaac
+
 # --- librsvg 2.56.5 ---
 FROM lib-builder AS librsvg-builder
 WORKDIR /build
@@ -165,6 +181,7 @@ COPY --from=libtwolame-builder /dist/ /usr/src/ffmpeg-build-script/workspace/
 COPY --from=libvmaf-builder    /dist/ /usr/src/ffmpeg-build-script/workspace/
 COPY --from=libaribb24-builder /dist/ /usr/src/ffmpeg-build-script/workspace/
 COPY --from=librsvg-builder    /dist/ /usr/src/ffmpeg-build-script/workspace/
+COPY --from=baac-builder       /dist/usr/src/ffmpeg-build-script/workspace/ /usr/src/ffmpeg-build-script/workspace/
 
 RUN set -xe \
     && WORKSPACE=/usr/src/ffmpeg-build-script/workspace \

@@ -206,6 +206,11 @@ install(TARGETS baander-aac
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
 install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
     FILES_MATCHING PATTERN "*.h")
+# pkg-config file for consumers that link the static library, such as the
+# FFmpeg wrapper: Libs.private names the C++ runtime a static link needs.
+configure_file(cmake/libbaac.pc.in ${CMAKE_CURRENT_BINARY_DIR}/libbaac.pc @ONLY)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/libbaac.pc
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig)
 
 if(BAAC_AAC_BUILD_TOOLS AND BAAC_AAC_BUILD_ENCODER AND BAAC_AAC_BUILD_DECODER)
     add_executable(baac tools/baac.cpp)
