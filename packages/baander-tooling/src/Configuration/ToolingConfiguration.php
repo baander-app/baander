@@ -261,7 +261,7 @@ final readonly class ToolingConfiguration
         if (isset($result['docker']['context'])) {
             unset($result['docker']['host']);
         }
-        foreach (['BAANDER_TEST_IMAGE' => 'application', 'BAANDER_TEST_POSTGRES_IMAGE' => 'postgres', 'BAANDER_TEST_REDIS_IMAGE' => 'fixtureRedis', 'BAANDER_TEST_PROXY_IMAGE' => 'proxy', 'BAANDER_TEST_DOCKER_CLI_IMAGE' => 'operatorHelper', 'BAANDER_BROWSER_IMAGE' => 'browser', 'BAANDER_DEVELOPMENT_REDIS_IMAGE' => 'developmentRedis', 'BAANDER_NGINX_IMAGE' => 'nginx', 'BAANDER_TEST_MAILPIT_IMAGE' => 'mailpit'] as $name => $role) {
+        foreach (['BAANDER_TEST_IMAGE' => 'application', 'BAANDER_TEST_POSTGRES_IMAGE' => 'postgres', 'BAANDER_TEST_REDIS_IMAGE' => 'fixtureRedis', 'BAANDER_TEST_PROXY_IMAGE' => 'proxy', 'BAANDER_TEST_DOCKER_CLI_IMAGE' => 'operatorHelper', 'BAANDER_BROWSER_IMAGE' => 'browser', 'BAANDER_DEVELOPMENT_REDIS_IMAGE' => 'developmentRedis', 'BAANDER_NGINX_IMAGE' => 'nginx', 'BAANDER_TEST_MAILPIT_IMAGE' => 'mailpit', 'BAANDER_FFMPEG_IMAGE' => 'ffmpeg'] as $name => $role) {
             if (isset($environment[$name]) && $environment[$name] !== '') {
                 $result['images'][$role]['reference'] = $environment[$name];
             }

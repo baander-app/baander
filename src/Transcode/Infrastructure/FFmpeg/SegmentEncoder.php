@@ -22,7 +22,6 @@ use App\Transcode\Domain\ValueObject\VideoProbeResult;
 final class SegmentEncoder
 {
     private const float SEGMENT_DURATION = 6.0; // seconds per CMAF segment
-    private const string FFMPEG_PATH = '/usr/bin/ffmpeg';
     private const int X265_POOL_THREADS = 6;
 
     public function __construct(
@@ -38,6 +37,7 @@ final class SegmentEncoder
             '',
         ),
         private readonly float $bitrateMultiplier = 1.0,
+        private readonly string $ffmpegPath = '/usr/bin/ffmpeg',
     ) {}
 
     /**
@@ -188,7 +188,7 @@ final class SegmentEncoder
         $segmentDuration = (int) ceil(self::SEGMENT_DURATION);
 
         $args = [
-            self::FFMPEG_PATH,
+            $this->ffmpegPath,
             '-hide_banner',
             '-nostats',
             '-loglevel',

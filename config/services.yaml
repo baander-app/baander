@@ -1163,11 +1163,13 @@ services:
     App\Transcode\Infrastructure\Swoole\TranscodeProcessPool:
         arguments:
             $ffprobePath: '%env(FFPROBE_PATH)%'
+            $ffmpegPath: '%env(FFMPEG_PATH)%'
 
     App\Transcode\Infrastructure\FFmpeg\SegmentEncoder:
         arguments:
             $encoderProfile: '@App\Transcode\Domain\ValueObject\EncoderProfile'
             $bitrateMultiplier: '%env(float:HW_BITRATE_MULTIPLIER)%'
+            $ffmpegPath: '%env(FFMPEG_PATH)%'
 
     App\Transcode\Infrastructure\FFmpeg\AacImplementationProbe:
         arguments:

@@ -28,6 +28,7 @@ final class ToolingSourcePolicyTest extends TestCase
         yield 'concatenated root' => ['<?php $path = "/var/www/" . "html/bin/console";', 'application-root'];
         yield 'application image' => ['<?php $image = "martinjuul/baander-app:latest";', 'default-image'];
         yield 'browser image' => ['<?php $image = "mcr.microsoft.com/playwright:v1.60.0-noble";', 'default-image'];
+        yield 'ffmpeg image' => ['<?php $image = "ghcr.io/baander-app/ffmpeg-baander-static:latest";', 'default-image'];
         yield 'concatenated image' => ['<?php $image = "martinjuul/" . "baander-app:latest";', 'default-image'];
         yield 'manual helper' => ['<?php require __DIR__ . "/helper.php";', 'manual-loader'];
         yield 'manual helper called autoload' => ['<?php $autoload = __DIR__ . "/helper.php"; require $autoload;', 'manual-loader'];

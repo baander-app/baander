@@ -10,9 +10,14 @@
 # Stage 1: base
 # System dependencies, Node.js, and the pie tool.
 # Provides the common foundation for both builder and runtime.
-# FFmpeg is installed from Debian apt (build with: make build-ffmpeg for static).
+# FFmpeg comes from the project's static image (docker/ffmpeg/Dockerfile),
+# selected through the FFMPEG_IMAGE build argument that the tooling fills
+# from its image catalog.
 # -----------------------------------------------------------------------------
 ARG OPERATOR_HELPER_IMAGE=scratch
+ARG FFMPEG_IMAGE=scratch
+FROM ${FFMPEG_IMAGE} AS ffmpeg-dist
+
 FROM php:8.5.12-zts-trixie AS base
 
 ARG LIBURING_VERSION=2.13
@@ -96,11 +101,16 @@ RUN set -xe && \
 
 COPY --from=ghcr.io/php/pie:bin /pie /bin/pie
 
-# Install FFmpeg from Debian apt
+# The project's FFmpeg build replaces Debian's package at the path the native
+# execution daemon allows; its shared-library needs come from the list the
+# static image derived from the built binaries.
+ARG FFMPEG_IMAGE
+RUN test "$FFMPEG_IMAGE" != scratch || { echo 'FFMPEG_IMAGE is required. Use php scripts/build-application.php, which fills it from the tooling image catalog.' >&2; exit 1; }
+COPY --from=ffmpeg-dist /usr/local/bin/ffmpeg /usr/local/bin/ffprobe /usr/bin/
+COPY docker/ffmpeg/runtime-packages.txt /opt/baander/ffmpeg-runtime-packages.txt
 RUN set -xe && \
     DEBIAN_FRONTEND=noninteractive apt-get update -qq && \
-    DEBIAN_FRONTEND=noninteractive apt-get install -yqq -o=Dpkg::Use-Pty=0 \
-        ffmpeg && \
+    grep -v '^#' /opt/baander/ffmpeg-runtime-packages.txt | DEBIAN_FRONTEND=noninteractive xargs apt-get install -yqq -o=Dpkg::Use-Pty=0 && \
     rm -rf /var/lib/apt/lists/*
 
 # -----------------------------------------------------------------------------
@@ -431,6 +441,14 @@ RUN set -xe && \
         vainfo \
         && rm -rf /var/lib/apt/lists/* && \
     apt-get clean
+
+# The project FFmpeg must list every accelerator and hardware encoder the
+# application can select and resolve all of its shared objects here, where the
+# runtime libraries are installed.
+COPY scripts/ffmpeg-capability-gate.sh /usr/local/bin/ffmpeg-capability-gate
+COPY docker/ffmpeg/expected-capabilities.txt /opt/baander/ffmpeg-expected-capabilities.txt
+RUN chmod +x /usr/local/bin/ffmpeg-capability-gate && \
+    ffmpeg-capability-gate /usr/bin/ffmpeg /opt/baander/ffmpeg-expected-capabilities.txt
 
 # Copy compiled PHP extensions (entire directory tree)
 COPY --from=builder /usr/local/lib/php/ /usr/local/lib/php/

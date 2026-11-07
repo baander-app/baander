@@ -44,7 +44,7 @@ final readonly class HardwareTranscodeDiagnostics implements HardwareTranscodeDi
                 . ' -b:v %d -maxrate %d -bufsize %d'
                 . ' -movflags +frag_keyframe+separate_moof+default_base_moof'
                 . ' -an -f mp4 %s',
-                '/usr/local/bin/ffmpeg',
+                '/usr/bin/ffmpeg',
                 $hwAccelFlags !== '' ? $hwAccelFlags . ' ' : '',
                 $decoderFlags !== '' ? $decoderFlags . ' ' : '',
                 $encoderFlags,

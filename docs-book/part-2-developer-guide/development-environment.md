@@ -128,6 +128,12 @@ make preview-status
 make preview-url
 ```
 
+The application image copies FFmpeg from the project's static FFmpeg image, a
+private package in the container registry. A host that builds the application
+image needs either a registry login that can pull it or
+`BAANDER_FFMPEG_IMAGE` pointing at a locally built copy, such as the output of
+`docker buildx build -f docker/ffmpeg/Dockerfile -t ffmpeg-baander-static:local .`.
+
 Use the URL returned by `make preview-url` for browser work. For Playwright:
 
 ```bash

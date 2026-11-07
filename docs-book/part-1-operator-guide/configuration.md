@@ -587,8 +587,8 @@ Limits applied when scanning media libraries, to prevent path traversal, oversiz
 |----------|---------|-------------|
 | `MEDIA_STORAGE_PATH` | `/storage/media` | Root directory for original media files. |
 | `CONVERT_STORAGE_PATH` | `/storage/conversions` | Root directory for transcoded/converted output. |
-| `FFMPEG_PATH` | `/usr/local/bin/ffmpeg` | Path to the FFmpeg binary. |
-| `FFPROBE_PATH` | `/usr/local/bin/ffprobe` | Path to the FFprobe binary. |
+| `FFMPEG_PATH` | `/usr/bin/ffmpeg` | Path to the FFmpeg binary; the application image installs the project's own FFmpeg build there. |
+| `FFPROBE_PATH` | `/usr/bin/ffprobe` | Path to the FFprobe binary. |
 
 ## Stream Authentication
 

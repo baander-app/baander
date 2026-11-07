@@ -11,7 +11,7 @@ final readonly class BuildRequest
     /** @param list<string> $arguments */
     private function __construct(public array $arguments, public ApplicationLayout $layout, private string $target) {}
 
-    public static function fromSource(string $source, string $target, string $revision, string $tag, ImageSelection $operatorHelper, BuildOptions $options = new BuildOptions()): self
+    public static function fromSource(string $source, string $target, string $revision, string $tag, ImageSelection $operatorHelper, ImageSelection $ffmpeg, BuildOptions $options = new BuildOptions()): self
     {
         $layout = ApplicationLayout::load($source . '/packages/baander-tooling/resources/application-layout.json');
         $arguments = $options->buildx ? ['buildx', 'build', ...($options->builder === null ? [] : ['--builder', $options->builder]), '--load'] : ['build'];
@@ -26,6 +26,7 @@ final readonly class BuildRequest
         $arguments = [
             ...$arguments, '--target', $target,
             '--build-arg', 'OPERATOR_HELPER_IMAGE=' . $operatorHelper->reference,
+            '--build-arg', 'FFMPEG_IMAGE=' . $ffmpeg->reference,
             '--build-arg', 'APP_HOME=' . $layout->root,
             '--build-arg', 'BAANDER_SOURCE_REVISION=' . $revision,
             '--label', ApplicationLayout::IMAGE_LABEL . '=' . json_encode($layout->toArray(), JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR),

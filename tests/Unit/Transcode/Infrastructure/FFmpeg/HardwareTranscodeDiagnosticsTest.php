@@ -23,7 +23,7 @@ final class HardwareTranscodeDiagnosticsTest extends TestCase
         self::assertSame('', $report->decoderFlags);
         self::assertSame([], $report->sourceDecoders);
         self::assertSame(['720p', '1080p', '4K'], array_keys($report->sampleCommands));
-        self::assertStringStartsWith('/usr/local/bin/ffmpeg -y  -i source.mkv -c:v libx265', $report->sampleCommands['720p']);
+        self::assertStringStartsWith('/usr/bin/ffmpeg -y  -i source.mkv -c:v libx265', $report->sampleCommands['720p']);
         self::assertStringContainsString(' -b:v 2800000 -maxrate 4200000 -bufsize 5600000', $report->sampleCommands['720p']);
         self::assertStringContainsString(' -b:v 5000000 -maxrate 7500000 -bufsize 10000000', $report->sampleCommands['1080p']);
         self::assertStringContainsString(' -b:v 20000000 -maxrate 30000000 -bufsize 40000000', $report->sampleCommands['4K']);
@@ -49,7 +49,7 @@ final class HardwareTranscodeDiagnosticsTest extends TestCase
             'mpeg2video' => 'mpeg2_cuvid',
             'vp9' => 'vp9_cuvid',
         ], $report->sourceDecoders);
-        self::assertStringStartsWith('/usr/local/bin/ffmpeg -y -hwaccel cuda -hwaccel_output_format cuda -c:v h264_cuvid  -i source.mkv -c:v hevc_nvenc', $report->sampleCommands['720p']);
+        self::assertStringStartsWith('/usr/bin/ffmpeg -y -hwaccel cuda -hwaccel_output_format cuda -c:v h264_cuvid  -i source.mkv -c:v hevc_nvenc', $report->sampleCommands['720p']);
         self::assertSame([['baac', 'libbaac', 'Yes', 'Yes'], ['fdk_aac', 'libfdk_aac', 'No', 'No'], ['ffmpeg', 'aac', 'Yes', 'Yes']], $report->aacImplementations);
     }
 

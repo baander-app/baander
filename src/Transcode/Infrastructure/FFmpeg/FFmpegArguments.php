@@ -10,12 +10,12 @@ use App\Transcode\Domain\ValueObject\EncoderProfile;
 final class FFmpegArguments
 {
     /** @return list<string> */
-    public static function subtitleExtraction(string $sourcePath, int $streamIndex, string $outputPath, ?float $sourceTimestampOrigin = null): array
+    public static function subtitleExtraction(string $sourcePath, int $streamIndex, string $outputPath, ?float $sourceTimestampOrigin = null, string $ffmpegPath = '/usr/bin/ffmpeg'): array
     {
         if ($streamIndex < 0 || ($sourceTimestampOrigin !== null && (!is_finite($sourceTimestampOrigin) || $sourceTimestampOrigin < 0.0))) {
             throw new \InvalidArgumentException('Invalid subtitle stream index or source timestamp origin.');
         }
-        $arguments = ['/usr/bin/ffmpeg', '-nostdin', '-y', '-threads', '2'];
+        $arguments = [$ffmpegPath, '-nostdin', '-y', '-threads', '2'];
         if ($sourceTimestampOrigin !== null) {
             array_push($arguments, '-copyts', '-itsoffset', sprintf('%.6f', -$sourceTimestampOrigin));
         }

@@ -862,6 +862,14 @@ $runner = new ProcessRunner();',
             'reason' => 'Independent catalog or image-selection assertion checks the documented default.',
         ],
         [
+            'path' => 'scripts/tests/php/ImageCatalogTest.php',
+            'rule' => 'default-image',
+            'anchor' => '        self::assertSame(\'mcr.microsoft.com/playwright:v1.64.1-noble\', $images->role(\'browser\')->reference);
+        self::assertSame(\'ghcr.io/baander-app/ffmpeg-baander-static:latest\', $images->role(\'ffmpeg\')->reference);',
+            'count' => 1,
+            'reason' => 'Independent catalog or image-selection assertion checks the documented default.',
+        ],
+        [
             'path' => 'scripts/tests/php/MessagingWorkflowTest.php',
             'rule' => 'process-runner',
             'anchor' => '        PHP_CODE;

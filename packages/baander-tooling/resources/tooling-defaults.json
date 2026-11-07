@@ -54,6 +54,12 @@
             "capabilities": [
                 "docker-cli"
             ]
+        },
+        "ffmpeg": {
+            "reference": "ghcr.io/baander-app/ffmpeg-baander-static:latest",
+            "capabilities": [
+                "ffmpeg"
+            ]
         }
     },
     "docker": {
