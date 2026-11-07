@@ -16,6 +16,7 @@ The output is organized into sections:
 - **FFmpeg Input Flags** — the hwaccel flags and decoder flags the profile generates.
 - **Decoder Resolution Per Source Codec** (hardware profiles only) — which decoder is selected for `h264`, `hevc`, `av1`, `mpeg2video`, and `vp9` sources.
 - **Sample FFmpeg Commands** — a full init-segment encode command for each quality tier (720p, 1080p, 4K) against an h264 source.
+- **AAC Implementations** — the three positions of the `transcode.aac_implementation` setting (`baac`, `fdk_aac`, `ffmpeg`), the FFmpeg codec name behind each, and whether the FFmpeg binary offers it as encoder and as decoder. A `No` means an encode that selects that position fails before it starts.
 - **Hardware Accelerator Reference** — every `HardwareAccelerator` case with its HEVC/H264 encoders, hwaccel method, hardware-tonemap support, and whether it needs a device path.
 
 ## Exit codes

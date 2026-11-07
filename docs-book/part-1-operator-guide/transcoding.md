@@ -312,18 +312,49 @@ GET /api/stream/track?id=<track public ID>&format=mp3&bitrate=192000
 
 ### Settings
 
-Two [server settings](configuration.md#server-settings) govern audio transcoding. Baander reads them on every request. Video transcoding is outside both. In `full`, a direct format request while `transcode.enabled` is off receives `403`; enabling it still cannot authorize encoding in `household`.
+Three [server settings](configuration.md#server-settings) govern audio transcoding. Baander reads them on every request. Video transcoding is outside the first two. The AAC implementation also covers the audio track of DASH video sessions. In `full`, a direct format request while `transcode.enabled` is off receives `403`; enabling it still cannot authorize encoding in `household`.
 
 | Setting | Default | Effect |
 |---------|---------|--------|
 | `transcode.enabled` | `false` | Allows audio encoding only when the startup profile also permits it. Original and negotiated stream-copy delivery do not enable encoding. |
 | `transcode.max_bitrate` | `320` | The highest bitrate, in kbps: `128`, `192`, `256` or `320`. A higher requested bitrate is lowered to it, and a request without a bitrate gets it. |
+| `transcode.aac_implementation` | `baac` | Which codec implementation FFmpeg uses for AAC: `baac` (bAAC, Bånder's own codec), `fdk_aac` (Fraunhofer's fdk-aac) or `ffmpeg` (FFmpeg's built-in codec). See [AAC implementation](#aac-implementation). |
 
 Baander then rounds the bitrate down to the highest step of a fixed ladder that does not exceed it: 64, 96, 128, 160, 192, 256 and 320 kbps. A request below 64 kbps gets 64 kbps. The Opus ladder stops at 256 kbps, so an Opus stream never exceeds 256 kbps, whatever the maximum. Because only these steps exist, each track has at most seven renditions per format.
 
 An unsupported format, a bitrate that is not a positive whole number, or a bitrate without a format gets `400`. A failed encode gets `500` and is logged with the track, format and bitrate.
 
 Renditions are admitted through durable PostgreSQL runtime state. Under `full`, the media role runs as many audio encodes at once as its audio slots, 12 by default, independently of its video slots. Requests for the same source fingerprint, format and bitrate join the same accepted work. Web waits up to 60 seconds for output to start; an unavailable worker or failed generation produces an encode failure rather than an inline web encode. When every audio slot stays busy for that whole wait, `/api/stream/track` and `/api/stream/original/track` answer `503` with `Retry-After: 5` and the reason `audio_slots_busy`. The work keeps its place in the queue, and the web player's retry follows it once a slot frees.
+
+### AAC implementation
+
+The FFmpeg in the application image carries three AAC codecs: bAAC, the codec
+Bånder develops in `packages/baander-aac`; Fraunhofer's fdk-aac; and FFmpeg's
+own. The `transcode.aac_implementation` setting selects which one encodes AAC
+renditions and the audio track of DASH video sessions, and which one decodes an
+AAC source for those encodes. bAAC is the default so that real playback
+exercises the codec before the desktop app depends on it; the other two
+positions are the operator's way back if a stream sounds wrong.
+
+The setting applies to encodes only. Stream copies, probing and the decoder of
+a source that is not AAC never change with it. A rendition reads the setting
+when it starts. A DASH session fixes the implementation when it is created and
+keeps it until the session ends, through pauses and seeks, so a change applies
+to sessions created afterwards. Cached renditions and completed presentations
+are neither re-encoded nor removed by a change; the cache sweep remains the way
+to clear them.
+
+Change it in the admin settings page under Media, or on the command line:
+
+```bash
+make exec cmd="php bin/console app:settings:set transcode.aac_implementation fdk_aac"
+```
+
+When the FFmpeg binary in use lacks the selected implementation, for example an
+operator's own FFmpeg path, an AAC encode fails before it starts with the reason
+`AAC implementation "bAAC" is not available in this FFmpeg build`;
+[`debug:hw-transcode`](commands/debug-hw-transcode.md) lists the implementations
+the binary offers.
 
 ### Cached renditions
 

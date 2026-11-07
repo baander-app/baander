@@ -15,6 +15,7 @@ Turn on audio transcoding and cap it at 192 kbps:
 ```bash
 make exec cmd="php bin/console app:settings:set transcode.enabled true"
 make exec cmd="php bin/console app:settings:set transcode.max_bitrate 192"
+make exec cmd="php bin/console app:settings:set transcode.aac_implementation fdk_aac"
 ```
 
 Return a setting to its default:
