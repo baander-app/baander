@@ -359,7 +359,7 @@ Keep these settings in place:
 
 ## See also
 
-- [Testing](testing.md#application-publication-gates) — the gates CI runs and the
+- [Testing](testing/backend-runners.md#application-publication-gates) — the gates CI runs and the
   workflow contract test.
 - [Registry nightly qualification](../../relay/README.md#nightly-qualification-and-retained-diagnostics)
   — the nightly recipe and its retained evidence.

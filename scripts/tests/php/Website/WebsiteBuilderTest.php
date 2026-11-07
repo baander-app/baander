@@ -53,9 +53,12 @@ final class WebsiteBuilderTest extends TestCase
     public function testBoundedContextsChapterFoldsItsPagesUnderOneNavigationEntry(): void
     {
         mkdir($this->root . '/docs-book/part-2-developer-guide/contexts', 0700, true);
+        mkdir($this->root . '/docs-book/part-2-developer-guide/testing', 0700, true);
         file_put_contents($this->root . '/ui/site/templates/page.php', '<?php echo json_encode($navigation, JSON_THROW_ON_ERROR);');
-        $this->source('part-2-developer-guide/README.md', "# Developer\n[Guide](guide.md)\n[Contexts](contexts/README.md)");
+        $this->source('part-2-developer-guide/README.md', "# Developer\n[Guide](guide.md)\n[Testing](testing/README.md)\n[Contexts](contexts/README.md)");
         $this->source('part-2-developer-guide/guide.md', '# Guide');
+        $this->source('part-2-developer-guide/testing/README.md', "# Testing\n## Backend\n[Runners](backend-runners.md)");
+        $this->source('part-2-developer-guide/testing/backend-runners.md', '# Backend Runners');
         $this->source('part-2-developer-guide/contexts/README.md', "# Bounded Contexts\n[Guide](../guide.md)\n[Auth](auth.md)\n[Catalog](catalog.md#models)\n[Auth again](auth.md)");
         $this->source('part-2-developer-guide/contexts/auth.md', '# Auth');
         $this->source('part-2-developer-guide/contexts/catalog.md', "# Catalog\n## Models");
@@ -64,6 +67,9 @@ final class WebsiteBuilderTest extends TestCase
         self::assertSame([
             ['url' => '/docs/developer-guide/', 'title' => 'Developer'],
             ['url' => '/docs/developer-guide/guide/', 'title' => 'Guide'],
+            ['url' => '/docs/developer-guide/testing/', 'title' => 'Testing', 'children' => [
+                ['url' => '/docs/developer-guide/testing/backend-runners/', 'title' => 'Backend Runners', 'group' => 'Backend'],
+            ]],
             ['url' => '/docs/developer-guide/contexts/', 'title' => 'Bounded Contexts', 'children' => [
                 ['url' => '/docs/developer-guide/contexts/auth/', 'title' => 'Auth'],
                 ['url' => '/docs/developer-guide/contexts/catalog/', 'title' => 'Catalog'],

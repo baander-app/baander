@@ -158,7 +158,7 @@ capacity. The first burst follows harness work and already initialized duration
 history. During media pressure, three video encoders were active and one audio
 encoder was deliberately stopped after initial output to retain its occupied slot;
 uninterrupted audio throughput during pressure was not measured. See the
-[qualification record](../part-2-developer-guide/testing.md#ordinary-worker-autoscaling-qualification)
+[qualification record](../part-2-developer-guide/testing/workers-and-messaging.md#ordinary-worker-autoscaling-qualification)
 for results and limits. The internal profile constructor remains conservative at
 maximum one; every production manifest must supply all fourteen fields explicitly.
 

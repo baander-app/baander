@@ -142,7 +142,7 @@ E2E_BASE_URL="$(make preview-url)" yarn --cwd ui/web e2e:headless
 ```
 
 The browser runner requires an explicit isolated preview URL. It does not provision
-an app or fall back to the persistent instance. See [Testing](testing.md) for the
+an app or fall back to the persistent instance. See [Testing](testing/README.md) for the
 separate disposable backend coordinator and frontend suites.
 
 ## Local tooling settings

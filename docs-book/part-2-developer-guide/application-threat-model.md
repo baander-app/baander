@@ -7,7 +7,7 @@ covers a signed-in user attempting to read another user's data, a stolen token,
 a malicious outbound destination, and unavailable infrastructure.
 
 The evidence applies to the checkout and runtime recorded by each verification
-run, not to an independently assessed deployment. The [testing guide](testing.md)
+run, not to an independently assessed deployment. The [testing guide](testing/README.md)
 documents the runners and their artifact locations.
 The separate [registry threat model](registry-threat-model.md) covers the C++
 service's credential ownership, replay, parsing, TLS and quorum boundaries. The
@@ -226,7 +226,7 @@ exhaustive taint analysis of logging or external observability.
 
 ## Reproduce the checkpoint
 
-Use the CI image and disposable runners from [Testing](testing.md). The security
+Use the CI image and disposable runners from [Testing](testing/README.md). The security
 runtime runner creates an internal Docker network and disposable PostgreSQL and
 Redis, generates test-only OAuth keys and removes its containers on exit. It has a
 360-second outer deadline. Malformed-input sockets have three-second deadlines;

@@ -56,7 +56,7 @@ The producer runtime drill verifies that operator user creation, user registrati
 and email verification commit domain writes and event capture in one transaction.
 Other event producers still need their transaction boundaries reviewed. See
 [CQRS and Messaging](../../part-2-developer-guide/cqrs-and-messaging.md#durable-event-replay)
-and [Testing](../../part-2-developer-guide/testing.md) for the mechanism and runtime
+and [Testing](../../part-2-developer-guide/testing/runtime-drills.md) for the mechanism and runtime
 coverage.
 
 ## Exit codes

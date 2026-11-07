@@ -250,7 +250,7 @@ experiments do not authorize implementation or indefinite reruns. Reconcile the
 become actionable when their named environment, access or decision is available.
 
 Read [AGENTS.md](AGENTS.md) for workflow, [CONCEPTS.md](CONCEPTS.md) for shared terms
-and the [testing guide](docs-book/part-2-developer-guide/testing.md) for current
+and the [testing guide](docs-book/part-2-developer-guide/testing/README.md) for current
 runners and verification boundaries. Historical suite counts apply to their own
 trees; they are not acceptance evidence for a new change.
 
@@ -372,7 +372,7 @@ sessions. Unconditional cancellation from React effect cleanup is not prescribed
 24.60-second callback remains unexplained. Failure diagnostics are delivered and
 the mismatch did not recur in the prescribed runs; these results do not prove its
 cause or universal capture stability. The
-[sparse playback guide](docs-book/part-2-developer-guide/testing.md#sparse-movie-playback)
+[sparse playback guide](docs-book/part-2-developer-guide/testing/media-and-playback.md#sparse-movie-playback)
 retains the contract and evidence. No tolerance change or further implementation
 is selected by this historical failure.
 
@@ -383,20 +383,20 @@ Keep these limits separate from selected work:
 - Safari/native HLS, DASH browser playback and subtitles, full live FFmpeg DASH
   EOF, formal CMAF conformance, interactive audio switching, native caption-menu
   interaction and caption pixels remain unqualified. The
-  [testing guide](docs-book/part-2-developer-guide/testing.md) distinguishes tested
+  [testing guide](docs-book/part-2-developer-guide/testing/media-and-playback.md) distinguishes tested
   HLS/Chromium/Firefox workflows from these paths. The separate native pressure
   observer still expects the old HLS muxer output and is not qualified for the
   current demuxed output.
 - General variable-rate gaps, timestamp discontinuities, additional origins,
   arbitrary containers, hardware and untested browser/format combinations remain
-  outside the measured cases. A [Selected video endpoint](docs-book/part-2-developer-guide/testing.md#selected-video-endpoint-playback)
+  outside the measured cases. A [Selected video endpoint](docs-book/part-2-developer-guide/testing/media-and-playback.md#selected-video-endpoint-playback)
   is qualified only for its calibrated metadata paths; missing or stale metadata
   still uses an estimate. Existing checks do not establish general cache or
   performance qualification.
 - Software colour checks qualify BT.2020 SDR handling and PQ/HLG tone mapping;
   they do not establish general HDR browser acceptance, complete reference-vector
   coverage, display-gamut certification or Dolby Vision support. See the
-  [testing guide](docs-book/part-2-developer-guide/testing.md) for the measured cases.
+  [testing guide](docs-book/part-2-developer-guide/testing/media-and-playback.md) for the measured cases.
 - Native codec acceptance remains conditional on the selected release path.
   [AAC reference coverage](packages/baander-aac/docs/README.md) does not
   exercise the 34-band and phase decoder paths; listening tests and the HE-AAC

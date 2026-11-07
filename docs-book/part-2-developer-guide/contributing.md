@@ -90,7 +90,7 @@ The files in [`.agents/rules/`](../../.agents/rules/) are the authoritative sour
 
 ## Running Tests
 
-See the [Testing](testing.md) page for the full test suite guide.
+See the [Testing](testing/README.md) page for the full test suite guide.
 
 ## JavaScript Dependency Maintenance
 

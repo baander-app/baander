@@ -374,7 +374,7 @@ pending changes have been published.
 
 Run the frontend coverage and protocol suites with
 `yarn --cwd ui/web test tests/live-updates`. Run the backend contract suites through
-the [disposable test runner](testing.md) with
+the [disposable test runner](testing/backend-runners.md) with
 `bash scripts/test-backend-container.sh tests/Unit/Shared/LiveUpdates`.
 The shared fixtures must pass on both sides before a protocol change is integrated.
 
@@ -385,7 +385,7 @@ row records sources, audiences, mirrors, response-cache policy, key variants,
 dependencies, and a nonempty `unitProofs` list. The test rejects empty
 proof lists and verifies that the referenced proofs exist; it does not establish
 end-to-end behavior by itself. Browser and capacity
-qualification remain separate checkpoints in the [testing guide](testing.md#live-update-qualification).
+qualification remain separate checkpoints in the [testing guide](testing/live-updates.md#live-update-qualification).
 
 The browser scenarios cover cross-client permissions and notifications, interrupted
 delivery and wake, managed reload/restart, a real scan and worker ingestion, retained

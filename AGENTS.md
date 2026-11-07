@@ -44,7 +44,7 @@ writer and review those updates with the implementation.
 Use `baander.app` or its subdomains in test code, fixtures and email addresses; no
 placeholder domains. Mock HTTP and DNS or route to disposable local services, never
 production. Preserve literal IP cases for network and security tests. The
-[testing guide](docs-book/part-2-developer-guide/testing.md) names the current
+[testing guide](docs-book/part-2-developer-guide/testing/README.md) names the current
 runners; the authoritative gates run in the CI image.
 
 For PostgreSQL schema, migration, query and connection work, follow

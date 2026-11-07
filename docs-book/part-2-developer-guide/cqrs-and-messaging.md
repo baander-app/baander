@@ -171,7 +171,7 @@ Consumers still need idempotency for external effects.
 
 A message that exhausts its retries goes to the `failed` transport. That transport is a PostgreSQL table, `failed_messages`, created by a migration rather than by Messenger (`auto_setup: false`) and excluded from Doctrine schema comparison. Its receiver is listable, so `messenger:failed:show`, `messenger:failed:retry` and `messenger:failed:remove` work by message ID, and the admin endpoints in [Monitoring](../part-1-operator-guide/monitoring.md#failed-messages) use the same receiver. Tests use this table too; the other transports are in-memory.
 
-Tests use in-memory ordinary transports. See [Testing](testing.md) for the disposable-service delivery, retry and runtime drills.
+Tests use in-memory ordinary transports. See [Testing](testing/workers-and-messaging.md) for the disposable-service delivery, retry and runtime drills.
 
 ## Durable Event Replay
 
@@ -193,7 +193,7 @@ for relay operation and its monitoring limit.
 Operator user creation, user registration and email verification commit their
 domain writes and event capture in one transaction. The producer runtime drill
 verifies those three auth producers; other event producers still need their
-transaction boundaries reviewed. See [Testing](testing.md) for the outbox and
+transaction boundaries reviewed. See [Testing](testing/runtime-drills.md) for the outbox and
 producer drills and the limits of their coverage.
 
 Library scans commit each directory's file-index updates and
@@ -216,5 +216,5 @@ a complete audit of all event producers.
 
 - [Coding Conventions](coding-conventions.md) — CQRS rules and common mistakes
 - [Real-Time Patterns](real-time-patterns.md) — how events feed into WebSocket pushes
-- [Testing](testing.md) — how to test handlers
+- [Testing](testing/conventions.md) — how to test handlers
 - [Background Work](../part-1-operator-guide/background-work.md) — operate consumers, scheduling, outbox relay and native execution

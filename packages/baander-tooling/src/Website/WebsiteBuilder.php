@@ -46,7 +46,11 @@ final class WebsiteBuilder
         'developer' => ['name' => 'Developer guide', 'url' => '/docs/developer-guide/'],
     ];
     /** Chapter indexes whose linked pages fold out under the chapter in the manual navigation. */
-    private const array FOLD_OUT_CHAPTERS = ['part-1-operator-guide/commands/README.md', 'part-2-developer-guide/contexts/README.md'];
+    private const array FOLD_OUT_CHAPTERS = [
+        'part-1-operator-guide/commands/README.md',
+        'part-2-developer-guide/contexts/README.md',
+        'part-2-developer-guide/testing/README.md',
+    ];
     /** @var array<string,list<array{url:string,title:string,children?:list<array{url:string,title:string,group?:string}>}>> */
     private array $navigation = ['operator' => [], 'developer' => []];
 

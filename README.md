@@ -158,7 +158,7 @@ qualification remains pending; the guide records the prerequisites and known blo
 Start with the [developer guide](docs-book/part-2-developer-guide/README.md) for the
 architecture and API references, then use the [development environment guide](docs-book/part-2-developer-guide/development-environment.md)
 and [frontend guide](docs-book/part-2-developer-guide/frontend-development.md) for
-working on the code. The [testing guide](docs-book/part-2-developer-guide/testing.md)
+working on the code. The [testing guide](docs-book/part-2-developer-guide/testing/README.md)
 names the current runners and runtime checks, and the
 [CI guide](docs-book/part-2-developer-guide/continuous-integration.md) explains how
 Forgejo and GitHub run the same workflows. Follow the

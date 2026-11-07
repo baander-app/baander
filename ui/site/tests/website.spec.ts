@@ -80,17 +80,25 @@ test('visitor reaches operating model and source-based installation', async ({ p
   await expect(section).toBeInViewport();
 });
 
-test('bounded contexts fold out as their own chapter in the developer navigation', async ({ page }) => {
+test('bounded contexts and testing fold out as their own chapters in the developer navigation', async ({ page }) => {
   const chapters = page.getByRole('navigation', { name: 'Manual chapters' });
   const fold = chapters.locator('.chapter-fold details').filter({ has: page.locator('summary', { hasText: 'Bounded Contexts' }) });
+  const testingFold = chapters.locator('.chapter-fold details').filter({ has: page.locator('summary', { hasText: 'Testing' }) });
   await page.goto('/docs/developer-guide/contexts/auth/');
   await expect(fold).toHaveAttribute('open', '');
+  await expect(testingFold).not.toHaveAttribute('open', '');
   await expect(fold.getByRole('link', { name: 'Auth', exact: true })).toHaveAttribute('aria-current', 'page');
   await expect(fold.getByRole('link', { name: 'Overview', exact: true })).toHaveAttribute('href', '/docs/developer-guide/contexts/');
   expect(await fold.getByRole('link').count()).toBe(23);
   await page.goto('/docs/developer-guide/testing/');
   await expect(fold).not.toHaveAttribute('open', '');
-  await expect(chapters.getByRole('link', { name: 'Testing', exact: true })).toHaveAttribute('aria-current', 'page');
+  await expect(testingFold).toHaveAttribute('open', '');
+  await expect(testingFold.getByRole('link', { name: 'Overview', exact: true })).toHaveAttribute('aria-current', 'page');
+  expect(await testingFold.getByRole('link').count()).toBe(9);
+  await page.goto('/docs/developer-guide/architecture/');
+  await expect(fold).not.toHaveAttribute('open', '');
+  await expect(testingFold).not.toHaveAttribute('open', '');
+  await expect(chapters.getByRole('link', { name: 'Architecture Overview', exact: true })).toHaveAttribute('aria-current', 'page');
   await expect(chapters.locator('.chapter-group > ul > li > a[href^="/docs/developer-guide/contexts/"]')).toHaveCount(0);
   const summary = fold.locator('summary');
   await summary.focus();

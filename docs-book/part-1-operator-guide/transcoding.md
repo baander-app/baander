@@ -277,7 +277,7 @@ with fewer streams: 1.12x with 8 and 0.91x with 10. A deployment that sets
 `VIDEO_ENCODER` to `h264_vaapi` should therefore set `videoSlots` to 8 on that GPU.
 The video engine was fully busy at every step. Each stream used about 0.03 CPU
 seconds per second of output up to 12 streams, and up to 0.063 at 14 and 16. The
-[hardware cost measurement](../part-2-developer-guide/testing.md#hardware-encoder-cost)
+[hardware cost measurement](../part-2-developer-guide/testing/media-and-playback.md#hardware-encoder-cost)
 records the figures. Other GPUs, codecs and sources sustain different counts, so
 set `videoSlots` after trying the host's own load.
 

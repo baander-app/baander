@@ -2,7 +2,7 @@
 
 A step-by-step walkthrough for adding a new feature to an existing bounded context. The example adds a "favorite album" endpoint to the Playlist context, covering the full path from domain model to API endpoint.
 
-See [Coding Conventions](coding-conventions.md) and [Testing](testing.md) for detailed pattern references.
+See [Coding Conventions](coding-conventions.md) and [Testing](testing/README.md) for detailed pattern references.
 
 ## Overview
 

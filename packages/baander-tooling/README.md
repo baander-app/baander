@@ -174,7 +174,7 @@ fixture-only provider responses and native launch logging to the production
 images. `prepare --from` copies an unchanged fixture dataset into a new owned
 volume and borrows its exact images for another run. Run the invoking machine
 and browser outside the measured host. See the
-[qualification procedure](../../docs-book/part-2-developer-guide/testing.md#household-deployment-qualification)
+[qualification procedure](../../docs-book/part-2-developer-guide/testing/media-and-playback.md#household-deployment-qualification)
 for the configuration and evidence required.
 
 Qualification `stop` retains data for a restart check. Its `--cleanup` option
