@@ -981,6 +981,13 @@ ctest
 the tests. Options: `BAAC_AAC_BUILD_ENCODER`, `BAAC_AAC_BUILD_DECODER`,
 `BAAC_AAC_BUILD_TESTS`, `BAAC_AAC_BUILD_TOOLS`, `BAAC_AAC_SHARED`.
 
+`cmake --install .` installs the library, the public headers under
+`include/baac/` and a pkg-config file, `libbaac.pc`, whose `Libs.private`
+names the C++ runtime, so a C program linking the static library resolves
+it. FFmpeg's `--enable-libbaac` finds the codec through that file; the
+project's FFmpeg image builds it this way
+([`docker/ffmpeg/baac/README.md`](../../../docker/ffmpeg/baac/README.md)).
+
 SIMD: the vector operations, the radix-2 FFT stages and the MDCT twiddles
 dispatch at runtime through one function table (`include/aac_dsp.h`) to
 SSE2, AVX2 (x86) or NEON (ARM); only `src/simd/avx2.cpp` is compiled with
