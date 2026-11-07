@@ -97,4 +97,4 @@ Device mutation routes address a device by its 21-character `PublicId` (`{public
 | `PlaybackCommandRelay` | Swoole relay | Implements `PlaybackConnectionsInterface`; polls bound WebSocket connections and delivers changed snapshots and pending commands |
 | `ListeningSessionInteractionAdapter` | Messaging adapter | Implements Shared's `ListeningSessionInteractionInterface` to bridge WebSocket frames and connection binding to `PlaybackCoordinator` and `PlaybackCommandRelay` |
 
-See [Live updates](../live-updates.md) for the WebSocket delivery model and its runtime ownership.
+See [Live updates](../architecture/live-updates.md) for the WebSocket delivery model and its runtime ownership.

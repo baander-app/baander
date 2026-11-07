@@ -77,4 +77,4 @@ All endpoints are prefixed with `/api`.
 |---------|---------|
 | `app:discovery:register` (`DiscoveryRegisterCommand`) | Register a server from its URL, name and version; dispatches `RegisterServerCommand` |
 
-See the [Architecture](../architecture.md#communication-between-contexts) page for details on inter-context event flow.
+See the [Architecture](../architecture/overview.md#communication-between-contexts) page for details on inter-context event flow.

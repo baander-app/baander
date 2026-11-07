@@ -79,4 +79,4 @@ All endpoints are prefixed with `/api/admin/qol` and require admin roles.
 | `BudgetGuard` | Port implementation | Mid-stream capacity check against sampled CPU (implements `BudgetGuardInterface`) |
 | `StreamBudgetExceptionListener` | Exception listener | Converts `StreamBudgetExhausted` into a structured HTTP 503 JSON response |
 
-See the [Architecture](../architecture.md#communication-between-contexts) page for details on cross-context event flow, and the [Anti-Corruption Layer](../architecture.md#anti-corruption-layer) page for the streaming-decorator chain.
+See the [Architecture](../architecture/overview.md#communication-between-contexts) page for details on cross-context event flow, and the [Anti-Corruption Layer](../architecture/overview.md#anti-corruption-layer) page for the streaming-decorator chain.

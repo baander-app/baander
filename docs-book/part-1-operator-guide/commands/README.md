@@ -5,7 +5,7 @@ background jobs and the server. Application console commands run inside the
 application container; worker deployment uses a separate host entrypoint.
 
 For an installed instance, use the host shell and `dc` function established in
-[Getting started](../getting-started.md#command-context):
+[Getting started](../getting-started/installation.md#command-context):
 
 ```bash
 dc exec app php bin/console app:user:create --help
@@ -16,12 +16,12 @@ container, in its application directory. Some reference pages retain
 `make exec cmd="php bin/console …"` development examples. Those select the
 checkout's preview, not the installed instance. For installed-instance work, run
 the same console arguments with `dc exec app php bin/console …`. See
-[Which installation a command targets](../understanding-baander.md#which-installation-a-command-targets)
+[Which installation a command targets](../getting-started/understanding-baander.md#which-installation-a-command-targets)
 before changing targets. Paths used by a console command are container paths.
 
 ## Worker deployment
 
-Application console commands run inside `app`, while the control/execution worker pair is provisioned and operated from the host through `bin/worker-deployment.php` (or `scripts/deploy-household.php`). See [Worker Deployment](../worker-deployment.md) for how the worker pair functions, the version 8 manifest and credentials format, and the host lifecycle commands, and [Background Work](../background-work.md) for queue flow, observation and recovery.
+Application console commands run inside `app`, while the control/execution worker pair is provisioned and operated from the host through `bin/worker-deployment.php` (or `scripts/deploy-household.php`). See [Worker Deployment](../workers/worker-deployment.md) for how the worker pair functions, the version 8 manifest and credentials format, and the host lifecycle commands, and [Background Work](../workers/background-work.md) for queue flow, observation and recovery.
 
 ## Auth & Users
 
@@ -230,7 +230,7 @@ Application console commands run inside `app`, while the control/execution worke
 
 ### Failed messages
 
-Messages that exhaust their retries land in the failure transport, a PostgreSQL table. Two Baander commands work on the whole transport, including messages waiting out a retry delay, as the admin endpoints under `/api/monitor/transport/failed` do (see [Monitoring](../monitoring.md#failed-messages)):
+Messages that exhaust their retries land in the failure transport, a PostgreSQL table. Two Baander commands work on the whole transport, including messages waiting out a retry delay, as the admin endpoints under `/api/monitor/transport/failed` do (see [Monitoring](../operations/job-monitoring.md#failed-messages)):
 
 | Command | Description |
 |---------|-------------|

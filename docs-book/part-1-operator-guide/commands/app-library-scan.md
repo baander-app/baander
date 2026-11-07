@@ -5,7 +5,7 @@ Scan a media library, or every library, for new, changed, returning, or missing 
 ## Quick start
 
 Run from the installed-instance host shell with the `dc` function from
-[Getting started](../getting-started.md#command-context). Paths name locations
+[Getting started](../getting-started/installation.md#command-context). Paths name locations
 inside the application container.
 
 ```bash
@@ -45,7 +45,7 @@ dc exec app php bin/console app:library:scan my-music --release
 Discovery supports `music` and `movie`; scans of other registered library types
 fail as unsupported. A successful scan confirms discovery and committed ingestion
 intents, while catalog import continues in the worker pair. See
-[Library management](../library-management.md) for the stages and their observable
+[Library management](../media/library-management.md) for the stages and their observable
 results.
 
 Starting a scan claims the library: its scan status becomes `scanning`, and while the claim holds, neither the admin panel nor this command starts another scan of it, and a delete with files ([app:album:delete](app-album-delete.md), [app:song:delete](app-song-delete.md)) is refused. A delete with files claims the library the same way while it runs, without changing the scan status; a scan started then is refused with the message that a delete with files is in progress (reason `library_busy`, holder `delete`). The command claims the library, then runs the scan in its own process and prints each stage: the claim, then the number of files discovered, processed and skipped, the number of directories queued for ingestion, and the job ID. The run appears in the job monitor under that ID, like a scan the admin panel queues. Ingesting the queued directories happens afterwards in the worker containers.

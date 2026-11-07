@@ -6,7 +6,7 @@ Delete an outgoing webhook. The command does what `DELETE /api/webhooks/{id}` do
 
 The Make examples below target the checkout's development preview. For an
 installed instance, use the `dc` function from
-[Getting started](../getting-started.md#command-context) and replace
+[Getting started](../getting-started/installation.md#command-context) and replace
 `make exec cmd="php bin/console …"` with `dc exec app php bin/console …`.
 
 ```bash

@@ -5,7 +5,7 @@ Register a new media library. This tells Baander where to find media files on di
 ## Quick start
 
 Run from the installed-instance host shell with the `dc` function from
-[Getting started](../getting-started.md#command-context). Paths name locations
+[Getting started](../getting-started/installation.md#command-context). Paths name locations
 inside the application container.
 
 ```bash
@@ -40,7 +40,7 @@ dc exec app php bin/console app:library:create 'My Music' /media/library/music m
 Registration accepts all five type names, but the discovery and ingestion path
 currently handles only `music` and `movie`. Registering another type does not make
 it ingestible; its scan fails as unsupported. See
-[Library management](../library-management.md) for the supported import path.
+[Library management](../media/library-management.md) for the supported import path.
 
 The library path must be accessible from inside the app container. If you're using Docker, make sure the directory is mounted as a volume. Check it first with [app:library:validate-path](app-library-validate-path.md).
 

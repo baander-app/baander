@@ -7,7 +7,7 @@ limit or a CPU set; Redis keeps only its own dataset limit,
 bound media work: 8 video and 12 audio jobs unless the configuration's `media`
 object sets other counts. Each service gets an out-of-memory score so that web and
 media work are killed before Redis, PostgreSQL, the pooler and the control worker.
-[System Requirements](../../docs-book/part-1-operator-guide/system-requirements.md)
+[System Requirements](../../docs-book/part-1-operator-guide/getting-started/system-requirements.md)
 explains how to choose the slots and lists the consumption measured on
 3 November 2026, before the pooler was added and the limits were removed. A 4 GB
 host, ARM builds and Raspberry Pi hardware remain unqualified.
@@ -21,7 +21,7 @@ are local build tags. Set all six references to images available on the selected
 Docker daemon. The deployment command resolves each reference to an immutable
 image ID; it does not build or pull images.
 The application image must include the compiled web assets in `public/`. From a
-clean source checkout, first [build the frontend](../../docs-book/part-1-operator-guide/getting-started.md#6-install-and-build-the-web-frontend),
+clean source checkout, first [build the frontend](../../docs-book/part-1-operator-guide/getting-started/installation.md#6-install-and-build-the-web-frontend),
 then build the three application images with the same revision:
 
 ```sh
@@ -50,7 +50,7 @@ rendering refuses a rootless daemon, which cannot apply the negative
 out-of-memory scores. The web container has no Docker socket.
 The account bootstrap commands documented in the operator guide remain applicable;
 this preset creates no default account. After first startup, run `app:auth:setup-clients`
-and [create an administrator](../../docs-book/part-1-operator-guide/user-management.md)
+and [create an administrator](../../docs-book/part-1-operator-guide/administration/user-management.md)
 in the web container. OAuth key
 generation is automatic for an empty secrets volume and preserves an existing pair.
 
@@ -71,14 +71,14 @@ named volumes, loads the selected PostgreSQL configuration, gives the database
 role and the pooler's auth file one SCRAM verifier, runs pending schema
 migrations through the pooler, initializes a missing OAuth key pair, verifies
 effective database settings, starts web services and launches the worker pair.
-See [Connection pooler](../../docs-book/part-1-operator-guide/configuration.md#connection-pooler)
+See [Connection pooler](../../docs-book/part-1-operator-guide/configuration/deployment-profiles.md#connection-pooler)
 for the pooler's aliases and pools.
 
 The household profile permits original media delivery and stream copy, with one
 ordinary consumer and two shared copy slots. It forbids audio and video encoding
 and rejects a `media` object. Set `profile` to `full` to select full operation,
 and add `media` with `videoSlots` and `audioSlots` to change its slots; see
-[Media slots](../../docs-book/part-1-operator-guide/configuration.md#media-slots). Starting again retires the old
+[Media slots](../../docs-book/part-1-operator-guide/configuration/deployment-profiles.md#media-slots). Starting again retires the old
 worker pair before installing the selected release; no live profile toggle exists.
 
 Stop retires workers and removes service containers and the private network. It

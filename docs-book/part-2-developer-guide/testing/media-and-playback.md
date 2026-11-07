@@ -345,7 +345,7 @@ evidence covers single-intention pause/seek/reconnect and reattachment with the
 earlier encoder output. Rapid native scrubbing also retains the latest queued
 target across an in-flight seek, with pause/resume ordering and generation
 authority preserved; see
-[Playback controls and generations](../../part-1-operator-guide/transcoding.md#playback-controls-and-generations).
+[Playback controls and generations](../../part-1-operator-guide/media/transcoding.md#playback-controls-and-generations).
 That interaction contract has focused backend and player-hook regressions; the
 recorded single-intention drill does not establish browser pressure coverage of
 rapid scrubbing. The launch observer matches the current DASH `manifest.mpd`

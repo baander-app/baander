@@ -134,4 +134,4 @@ All endpoints are prefixed with `/api`.
 | `app:radio:station:list` (`RadioStationListCommand`) | List the synced radio stations, optionally filtered by country or search text |
 | `app:radio:sync` (`SyncSubscribedCountriesCommand`) | Sync stations for all subscribed countries |
 
-See the [Architecture](../architecture.md#anti-corruption-layer) page for details on the station sync anti-corruption layer.
+See the [Architecture](../architecture/overview.md#anti-corruption-layer) page for details on the station sync anti-corruption layer.

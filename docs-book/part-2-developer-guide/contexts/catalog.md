@@ -269,4 +269,4 @@ Routes under `/api/admin/albums` and `/api/admin/songs` (controllers `AdminAlbum
 | `app:genre:song:add`, `app:genre:song:remove`, `app:genre:album:add`, `app:genre:album:remove` | Assign or remove a genre |
 | `app:e2e:ingest-video` | Ingest a test video file for end-to-end tests |
 
-See the [Search](../search.md) page for details on PGroonga full-text search.
+See the [Search](../development/search.md) page for details on PGroonga full-text search.

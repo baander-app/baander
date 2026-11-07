@@ -140,7 +140,7 @@ profiles, read-only source and writable derived volumes, and a private IPC volum
 Both units run without CPU, memory or PID limits and without CPU sets; the fixture
 checks that Docker reports no limit on either unit and that each unit starts at
 its out-of-memory score, −500 for control and 300 for execution. See the
-[operator recipe](../../part-1-operator-guide/worker-deployment.md).
+[operator recipe](../../part-1-operator-guide/workers/worker-deployment.md).
 With no explicit override in the shared Docker configuration, setup captures the
 runner's ambient Docker connection. The explicit socket mapping supplies the
 controller's daemon-host bind source when the runner is itself a container.

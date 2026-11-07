@@ -2,12 +2,12 @@
 
 Print inotify events for explicitly watched directories. The command reports events;
 it does not scan libraries or dispatch ingestion. See
-[Library management](../library-management.md) for catalog discovery and import.
+[Library management](../media/library-management.md) for catalog discovery and import.
 
 ## Quick start
 
 Run from the installed-instance host shell with the `dc` function from
-[Getting started](../getting-started.md#command-context). Paths name locations
+[Getting started](../getting-started/installation.md#command-context). Paths name locations
 inside the application container. The examples use the source-installation media
 root; substitute your configured paths and ensure each directory exists first.
 

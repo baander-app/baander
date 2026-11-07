@@ -27,7 +27,7 @@ test('visitors discover bAAC and its direct route has one canonical URL', async 
   await expect(page.getByRole('heading', { name: 'Server transcoding through FFmpeg' })).toBeVisible();
   await expect(page.locator('#integration')).toContainText('libbaac');
   await expect(page.locator('#integration').getByRole('link', { name: 'AAC implementation' }))
-    .toHaveAttribute('href', '/docs/operator-guide/transcoding/#aac-implementation');
+    .toHaveAttribute('href', '/docs/operator-guide/media/transcoding/#aac-implementation');
   await expect(page.getByRole('navigation', { name: 'Main navigation' }).getByRole('link', { name: 'bAAC', exact: true }))
     .toHaveAttribute('aria-current', 'page');
   await expect(page.getByRole('navigation', { name: 'Footer navigation' }).getByRole('link', { name: 'bAAC', exact: true }))

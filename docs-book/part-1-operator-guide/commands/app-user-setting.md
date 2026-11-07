@@ -6,7 +6,7 @@ Show, set or reset one user's settings, such as the language Baander emails them
 
 The Make examples below target the checkout's development preview. For an
 installed instance, use the `dc` function from
-[Getting started](../getting-started.md#command-context) and replace
+[Getting started](../getting-started/installation.md#command-context) and replace
 `make exec cmd="php bin/console …"` with `dc exec app php bin/console …`.
 
 List a user's settings:
@@ -62,7 +62,7 @@ With `--json`, `get` without a key prints the array `GET /api/admin/users/{publi
 
 Every `set` and `reset` writes an info log entry with the actor, the target user's ID, the key, and the old and new stored values; a change made here is logged with the actor `cli`. Console access carries full authority, so the command asks for no role. In the admin API, an administrator can read a user's settings, and only a super administrator can change them.
 
-Currently `language` is the only user setting. Its values are `en` (English), `da` (Dansk) and `th` (ไทย). See [Email language](../configuration.md#email-language) for how Baander picks the language of each email.
+Currently `language` is the only user setting. Its values are `en` (English), `da` (Dansk) and `th` (ไทย). See [Email language](../configuration/server-settings.md#email-language) for how Baander picks the language of each email.
 
 ## Exit codes
 

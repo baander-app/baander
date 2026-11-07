@@ -13,7 +13,7 @@ skill; choose by section when a document mixes explanation, reference, and proce
 | Register | Documents and sections |
 |---|---|
 | Chen | `README.md`; introductions and task explanations in `docs-book/part-1-operator-guide/`; tutorials, troubleshooting, and development guides in `docs-book/part-2-developer-guide/` and `dev-docs/` |
-| Knuth | Ordered deployment, upgrade, recovery, and key-management procedures, including procedural sections of `docs-book/part-1-operator-guide/getting-started.md`, `upgrading.md`, and `security.md` |
+| Knuth | Ordered deployment, upgrade, recovery, and key-management procedures, including procedural sections of `docs-book/part-1-operator-guide/getting-started/installation.md`, `maintenance/upgrading.md`, and `maintenance/security.md` |
 | Stroustrup | Architecture, bounded-context descriptions, API and configuration references, coding conventions, and designs in `docs/plans/` and `STRATEGY.md` |
 | Mixed | CLI pages in `docs-book/part-1-operator-guide/commands/`: Stroustrup for arguments, options, and behavior; Knuth for ordered procedures; Chen for examples and troubleshooting. Contribution guides: Stroustrup for rules and Chen for workflow explanations. |
 
@@ -24,7 +24,7 @@ A user-specified voice overrides these defaults.
 - `docs-book/README.md` separates the operator and developer audiences. Keep operator
   instructions focused on running an instance; explain implementation details where
   the reader needs them to understand or develop the system.
-- `docs-book/part-2-developer-guide/contributing.md` records documentation maintenance
+- `docs-book/part-2-developer-guide/contributing/contributing.md` records documentation maintenance
   rules. It names `.agents/rules/` as the authoritative coding conventions and
   describes regeneration of CLI documentation. Read the relevant source when editing
   derived guidance; flag disagreements rather than resolving them through rewording.

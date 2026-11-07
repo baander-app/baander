@@ -124,7 +124,7 @@ Run the rendering fixtures and dedicated site browser suite after building:
 The suite starts its own disposable static server. It uses a locally routed
 `website.baander.app` origin and does not require the application preview. Real
 application screenshot capture uses the separate worktree preview described in
-the [development environment guide](../../docs-book/part-2-developer-guide/development-environment.md).
+the [development environment guide](../../docs-book/part-2-developer-guide/getting-started/development-environment.md).
 
 ## CI artifact
 

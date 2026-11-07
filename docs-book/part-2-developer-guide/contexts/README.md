@@ -1,6 +1,6 @@
 # Bounded Contexts
 
-Each bounded context owns one business capability, with its own domain model, rules and language. Each page below covers one context, or the Shared kernel that the contexts build on: its domain models, ports, infrastructure, API endpoints and relationships with other contexts. For the four-layer structure and how contexts communicate, start with the [Architecture Overview](../architecture.md).
+Each bounded context owns one business capability, with its own domain model, rules and language. Each page below covers one context, or the Shared kernel that the contexts build on: its domain models, ports, infrastructure, API endpoints and relationships with other contexts. For the four-layer structure and how contexts communicate, start with the [Architecture Overview](../architecture/overview.md).
 
 | Page | Description |
 |------|-------------|

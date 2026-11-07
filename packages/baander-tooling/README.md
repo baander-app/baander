@@ -324,7 +324,7 @@ Online assessment is an explicit maintenance action; it is not a scheduled CI ga
 On Forgejo, CI keeps its caches and coverage baselines in the Forgejo generic
 package registry through `scripts/ci-package-store.php`, which wraps
 `Ci\PackageStore`. GitHub uses `actions/cache` for the same data; the
-[CI guide](../../docs-book/part-2-developer-guide/continuous-integration.md#caches-and-coverage-baselines)
+[CI guide](../../docs-book/part-2-developer-guide/contributing/continuous-integration.md#caches-and-coverage-baselines)
 lists the packages and keys. The command takes an operation, a package, a file and
 a path:
 

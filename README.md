@@ -29,7 +29,7 @@ for artists, albums and songs directly. Album covers can be extracted from embed
 artwork, so a tagged music collection provides the starting point for browsing.
 Recent listening on the home page helps you return to music you have already played.
 
-The [library guide](docs-book/part-1-operator-guide/library-management.md) explains
+The [library guide](docs-book/part-1-operator-guide/media/library-management.md) explains
 scanning, supported file formats, cover extraction and file watching.
 
 ## Add metadata, artwork and lyrics
@@ -45,8 +45,8 @@ Automatic metadata synchronization and automatic lyrics fetching for newly index
 music are optional settings, both off by default. Operators can also start these
 jobs explicitly.
 
-See [external APIs](docs-book/part-1-operator-guide/external-apis.md) for provider
-setup and the [library guide](docs-book/part-1-operator-guide/library-management.md#what-happens-to-new-music)
+See [external APIs](docs-book/part-1-operator-guide/media/external-apis.md) for provider
+setup and the [library guide](docs-book/part-1-operator-guide/media/library-management.md#what-happens-to-new-music)
 for the settings that apply when a scan discovers new music.
 
 ## Listen in the web player
@@ -79,7 +79,7 @@ manifests and media segments to the client. Video transcoding supports multiple
 quality tiers; the actual playback formats depend on the worker's encoder
 capabilities and the client.
 
-The [transcoding guide](docs-book/part-1-operator-guide/transcoding.md) covers video
+The [transcoding guide](docs-book/part-1-operator-guide/media/transcoding.md) covers video
 and audio conversion, quality settings and execution capacity. Browser codec
 support and host resources still matter when choosing a playback setup.
 
@@ -94,9 +94,9 @@ Notifications can appear in the application or be delivered through configured
 email, browser push and webhook channels. Email and push require their respective
 service settings and keys; webhooks are managed by administrators.
 
-The [user-management guide](docs-book/part-1-operator-guide/user-management.md)
-explains account administration. The [notification guide](docs-book/part-1-operator-guide/notifications.md)
-and [security guide](docs-book/part-1-operator-guide/security.md) cover channel setup
+The [user-management guide](docs-book/part-1-operator-guide/administration/user-management.md)
+explains account administration. The [notification guide](docs-book/part-1-operator-guide/administration/notifications.md)
+and [security guide](docs-book/part-1-operator-guide/maintenance/security.md) cover channel setup
 and operating an instance with its own credentials.
 
 ## How an instance runs
@@ -123,7 +123,7 @@ connects the system explanation to configuration, monitoring, upgrades and recov
 Start with the **[operator manual](docs-book/part-1-operator-guide/README.md)**.
 Its reading path explains the components and data stores before installation,
 then connects routine tasks to monitoring, maintenance and recovery. If you are
-ready to install, the [source-installation guide](docs-book/part-1-operator-guide/getting-started.md)
+ready to install, the [source-installation guide](docs-book/part-1-operator-guide/getting-started/installation.md)
 walks through configuration and TLS, shared storage, image builds, database
 initialization, OAuth keys, the first administrator account, the frontend build,
 worker deployment and a first library scan.
@@ -131,7 +131,7 @@ worker deployment and a first library scan.
 Bånder is a pre-release project. The current setup builds from source and uses a
 development-oriented Docker Compose stack. Starting Compose alone does not provide
 a complete instance: background processing requires the separately admitted worker
-pair explained in [Background Work](docs-book/part-1-operator-guide/background-work.md).
+pair explained in [Background Work](docs-book/part-1-operator-guide/workers/background-work.md).
 
 A disposable source-installation check verified frontend loading, administrator
 login, worker startup and a sample music scan through ingestion and browser
@@ -149,20 +149,20 @@ The HTTP API connects the web interface to library management, catalog queries,
 playback and account services.
 
 For local development, complete the one-time DNS and certificate setup in the
-[development environment guide](docs-book/part-2-developer-guide/development-environment.md),
+[development environment guide](docs-book/part-2-developer-guide/getting-started/development-environment.md),
 then use `make dev-up`, `make dev-down`, `make dev-status`, `make preview-up` and
 `make preview-down`. The persistent `baander.test` instance follows remote `master`;
 a preview runs the current worktree with separate writable state. Host runtime
 qualification remains pending; the guide records the prerequisites and known blockers.
 
 Start with the [developer guide](docs-book/part-2-developer-guide/README.md) for the
-architecture and API references, then use the [development environment guide](docs-book/part-2-developer-guide/development-environment.md)
-and [frontend guide](docs-book/part-2-developer-guide/frontend-development.md) for
+architecture and API references, then use the [development environment guide](docs-book/part-2-developer-guide/getting-started/development-environment.md)
+and [frontend guide](docs-book/part-2-developer-guide/development/frontend-development.md) for
 working on the code. The [testing guide](docs-book/part-2-developer-guide/testing/README.md)
 names the current runners and runtime checks, and the
-[CI guide](docs-book/part-2-developer-guide/continuous-integration.md) explains how
+[CI guide](docs-book/part-2-developer-guide/contributing/continuous-integration.md) explains how
 Forgejo and GitHub run the same workflows. Follow the
-[contribution instructions](docs-book/part-2-developer-guide/contributing.md) for
+[contribution instructions](docs-book/part-2-developer-guide/contributing/contributing.md) for
 project conventions and the contribution workflow.
 
 ## License

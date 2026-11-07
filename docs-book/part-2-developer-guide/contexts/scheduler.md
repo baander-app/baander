@@ -125,4 +125,4 @@ All endpoints are prefixed with `/api` and live under the admin namespace.
 | `app:scheduler:run` (`SchedulerRunCommand`) | Record a durable manual request for a scheduled job (CLI counterpart of `POST /api/admin/scheduler/jobs/{id}/trigger`) |
 | `app:scheduler:commands` (`SchedulerCommandsCommand`) | List the commands a scheduled job can run, with their parameters |
 
-See [Architecture](../architecture.md) for the project's layer and context boundaries.
+See [Architecture](../architecture/overview.md) for the project's layer and context boundaries.

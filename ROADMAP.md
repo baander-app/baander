@@ -11,7 +11,7 @@ selects its runner, registry, cache store and artifact action from
 `github.server_url`. On GitHub, the runner, PostgreSQL and FFmpeg images are public
 GHCR packages, and the application and Nginx images are private ones that a probe
 checks after each push. The
-[CI guide](docs-book/part-2-developer-guide/continuous-integration.md) describes the
+[CI guide](docs-book/part-2-developer-guide/contributing/continuous-integration.md) describes the
 setup and the operator runbook.
 
 Open items:
@@ -66,8 +66,8 @@ Open items:
 ## System overview pages
 
 Delivered and published on 2026-11-05: the operator guide's
-[Deployment Topology](docs-book/part-1-operator-guide/deployment-topology.md) and the
-developer guide's [Communication Map](docs-book/part-2-developer-guide/communication-map.md).
+[Deployment Topology](docs-book/part-1-operator-guide/getting-started/deployment-topology.md) and the
+developer guide's [Communication Map](docs-book/part-2-developer-guide/architecture/communication-map.md).
 
 Open items:
 
@@ -105,7 +105,7 @@ Open items:
 The user confirmed the
 [small-host household deployment plan](docs/plans/2026-11-02-1819-feat-small-host-household-deployment-plan.md).
 It defines a separate profile for 2,000 songs, 50 movies and 250 TV episodes, with 1–2 simultaneous streams alongside normal scanning and metadata updates.
-[System Requirements](docs-book/part-1-operator-guide/system-requirements.md) publishes the measured figures and their limits.
+[System Requirements](docs-book/part-1-operator-guide/getting-started/system-requirements.md) publishes the measured figures and their limits.
 
 Open items for this plan:
 
@@ -122,7 +122,7 @@ Delivered on 2026-11-04: full-profile operators set the video and audio job slot
 and 12 by default or 12 video slots with a configured hardware encoder; no container
 carries a CPU, memory or PID limit; all database traffic goes through PgBouncer with
 separate application and control pools.
-[System Requirements](docs-book/part-1-operator-guide/system-requirements.md)
+[System Requirements](docs-book/part-1-operator-guide/getting-started/system-requirements.md)
 publishes the per-job costs and the reference margins.
 
 Open items:
@@ -191,7 +191,7 @@ Delivered and merged on 2026-11-07: the project's static FFmpeg 8.1 build carrie
 bAAC as the `libbaac` encoder and decoder beside fdk-aac and FFmpeg's built-in AAC
 codec, and the application image runs it at `/usr/bin`. The
 `transcode.aac_implementation` setting selects the implementation (see the
-[transcoding guide](docs-book/part-1-operator-guide/transcoding.md#aac-implementation)).
+[transcoding guide](docs-book/part-1-operator-guide/media/transcoding.md#aac-implementation)).
 The `ffmpeg` role of the tooling image catalog pins the published image by digest.
 VAAPI is qualified on the RX 9070 XT.
 
@@ -261,7 +261,7 @@ website, shared packages and test/build tooling. TypeScript 6.0.3 remains in the
 web and shared packages because typescript-eslint requires a compiler below 6.1;
 the site and embedded player use 7.0.2.
 
-The [maintenance guide](docs-book/part-2-developer-guide/contributing.md#javascript-dependency-maintenance)
+The [maintenance guide](docs-book/part-2-developer-guide/contributing/contributing.md#javascript-dependency-maintenance)
 documents offline ownership checks and explicit online dependency, advisory and
 patch inspection. Nine exact site resolutions reduce the Vercel dependency tree
 from 44 advisory records to 22, removing its critical finding. Remaining fixes
@@ -284,7 +284,7 @@ Five root packages remain behind stable because the latest reli-prof 0.12.0 pins
 their shared dependencies: Monolog, Webmozart Assert, Amp, Parallel and
 MonologBundle. Exact versions, upstream references and solver blockers are
 recorded in the
-[dependency guide](docs-book/part-2-developer-guide/php-dependencies.md) and tooling
+[dependency guide](docs-book/part-2-developer-guide/getting-started/php-dependencies.md) and tooling
 policy.
 
 TSDuck native qualification is blocked, as explicitly accepted by the user on
@@ -405,7 +405,7 @@ Keep these limits separate from selected work:
   do not select unused codec work or reopen intentional encoder design decisions.
 - Other existing limits belong in the [scan guide](docs-book/part-1-operator-guide/commands/app-library-scan.md),
   [Transcode context](docs-book/part-2-developer-guide/contexts/transcode.md) and
-  [messaging guide](docs-book/part-2-developer-guide/cqrs-and-messaging.md).
+  [messaging guide](docs-book/part-2-developer-guide/development/cqrs-and-messaging.md).
   Delivered directory publication does not complete the broader event-producer
   transaction-boundary audit. None of these boundaries selects a new task here.
 
@@ -446,7 +446,7 @@ when checking that deployment decision.
 ## Application release acceptance
 
 - **Recovery:** rehearse application backup restoration before migration rollout.
-  Follow the [upgrade guide](docs-book/part-1-operator-guide/upgrading.md); this
+  Follow the [upgrade guide](docs-book/part-1-operator-guide/maintenance/upgrading.md); this
   prerequisite does not reopen covered fresh-install or migration behavior.
 - **Redistribution:** resolve the application's observed notice, provenance and
   embedded-dependency gaps before qualifying a release image. The
@@ -545,7 +545,7 @@ The installation used a named checkout volume for the remote Docker daemon,
 a supported controller container for host PHP extensions, an accepted disposable
 self-signed certificate and internal networks. It did not qualify the literal
 host-PHP procedure, external metadata providers, other media workflows or host
-hardware. The [source-installation guide](docs-book/part-1-operator-guide/getting-started.md)
+hardware. The [source-installation guide](docs-book/part-1-operator-guide/getting-started/installation.md)
 contains the current procedure; the pinned history above retains detailed evidence,
 suite counts and environment adaptations.
 

@@ -189,7 +189,7 @@ include __DIR__ . '/header.php';
       <p class="eyebrow">From files to playback</p>
       <h2 id="how-title">Your files. A connected library.</h2>
       <p>You provide the media and run the server. Bånder brings your music and movies into a catalog you can browse and play in your web browser.</p>
-      <a class="text-action" href="/docs/operator-guide/understanding-baander/">Understand your instance <span class="arrow" aria-hidden="true">→</span></a>
+      <a class="text-action" href="/docs/operator-guide/getting-started/understanding-baander/">Understand your instance <span class="arrow" aria-hidden="true">→</span></a>
     </div>
     <ol class="process-list">
       <li><span class="step-number" aria-hidden="true">01</span><div><h3>Connect your media</h3><p>Add a library pointing to your media files. A scan discovers what's there; background work adds it to the catalog.</p></div></li>
@@ -208,9 +208,9 @@ include __DIR__ . '/header.php';
     </div>
     <div class="hosting-reference">
       <p class="eyebrow">Before your first scan</p>
-      <a href="/docs/operator-guide/understanding-baander/"><span>The components</span><span class="arrow" aria-hidden="true">↗</span></a>
-      <a href="/docs/operator-guide/storage-and-data/"><span>Storage and data</span><span class="arrow" aria-hidden="true">↗</span></a>
-      <a href="/docs/operator-guide/background-work/"><span>Background work</span><span class="arrow" aria-hidden="true">↗</span></a>
+      <a href="/docs/operator-guide/getting-started/understanding-baander/"><span>The components</span><span class="arrow" aria-hidden="true">↗</span></a>
+      <a href="/docs/operator-guide/getting-started/storage-and-data/"><span>Storage and data</span><span class="arrow" aria-hidden="true">↗</span></a>
+      <a href="/docs/operator-guide/workers/background-work/"><span>Background work</span><span class="arrow" aria-hidden="true">↗</span></a>
       <p>Use the guide's checkpoints to verify your installation, catalog and playback.</p>
     </div>
   </section>
@@ -224,9 +224,9 @@ include __DIR__ . '/header.php';
     </div>
     <div class="manual-chapters">
       <a href="/docs/operator-guide/getting-started/"><span class="eyebrow">Get started</span><h3>Install your instance</h3><span class="arrow" aria-hidden="true">→</span></a>
-      <a href="/docs/operator-guide/library-management/"><span class="eyebrow">Your collection</span><h3>Add and scan libraries</h3><span class="arrow" aria-hidden="true">→</span></a>
-      <a href="/docs/operator-guide/monitoring/"><span class="eyebrow">Day to day</span><h3>Observe your instance</h3><span class="arrow" aria-hidden="true">→</span></a>
-      <a href="/docs/operator-guide/backup-and-recovery/"><span class="eyebrow">Maintenance</span><h3>Back up and recover</h3><span class="arrow" aria-hidden="true">→</span></a>
+      <a href="/docs/operator-guide/media/library-management/"><span class="eyebrow">Your collection</span><h3>Add and scan libraries</h3><span class="arrow" aria-hidden="true">→</span></a>
+      <a href="/docs/operator-guide/operations/"><span class="eyebrow">Day to day</span><h3>Observe your instance</h3><span class="arrow" aria-hidden="true">→</span></a>
+      <a href="/docs/operator-guide/maintenance/backup-and-recovery/"><span class="eyebrow">Maintenance</span><h3>Back up and recover</h3><span class="arrow" aria-hidden="true">→</span></a>
     </div>
     <p class="developer-path">Working on Bånder itself? <a href="/docs/developer-guide/">Read the developer guide <span class="arrow" aria-hidden="true">→</span></a></p>
   </section>

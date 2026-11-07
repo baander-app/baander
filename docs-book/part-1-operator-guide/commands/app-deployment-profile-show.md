@@ -8,7 +8,7 @@ source install uses it to get the web environment values and the worker manifest
 
 The Make examples below target the checkout's development preview. For an
 installed instance, use the `dc` function from
-[Getting started](../getting-started.md#command-context) and replace
+[Getting started](../getting-started/installation.md#command-context) and replace
 `make exec cmd="php bin/console …"` with `dc exec app php bin/console …`.
 
 ```bash
@@ -38,7 +38,7 @@ encoder is not carried over. An option without `--identifier` builds the effecti
 profile's kind. An unset slot option takes the default: 8 video and 12 audio jobs.
 With a hardware encoder, unset video slots take a separate measured default instead:
 12 on the reference GPU. See
-[Hardware acceleration](../transcoding.md#hardware-acceleration) for what the
+[Hardware acceleration](../media/transcoding.md#hardware-acceleration) for what the
 hardware encoder changes.
 
 The text output starts with the two environment lines for web and the source

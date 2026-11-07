@@ -14,7 +14,7 @@ can run. Installing upstream `libtsduck` alone does not supply that bridge.
 
 Native qualification and its automatic CI gate remain blocked pending a separately
 scoped bridge implementation. See the
-[TSDuck qualification blocker](../../../docs-book/part-2-developer-guide/php-dependencies.md#tsduck-qualification-blocker)
+[TSDuck qualification blocker](../../../docs-book/part-2-developer-guide/getting-started/php-dependencies.md#tsduck-qualification-blocker)
 for the recorded failure and required qualification command. The polling and
 thread-safety descriptions below define the intended behavior; they do not certify
 an available native implementation.

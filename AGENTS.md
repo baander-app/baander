@@ -86,7 +86,7 @@ under `.agents/`.
 
 ## Local development instances
 
-Use the [development environment guide](docs-book/part-2-developer-guide/development-environment.md)
+Use the [development environment guide](docs-book/part-2-developer-guide/getting-started/development-environment.md)
 for host setup and lifecycle. Agent work uses `make preview-up` and the isolated
 URL from `make preview-url`; pass that URL explicitly as `E2E_BASE_URL` for browser
 checks. The `.test` instance names are an explicit exception to the `baander.app`

@@ -55,9 +55,9 @@ final class WebsiteBuilderTest extends TestCase
         mkdir($this->root . '/docs-book/part-2-developer-guide/contexts', 0700, true);
         mkdir($this->root . '/docs-book/part-2-developer-guide/testing', 0700, true);
         file_put_contents($this->root . '/ui/site/templates/page.php', '<?php echo json_encode($navigation, JSON_THROW_ON_ERROR);');
-        $this->source('part-2-developer-guide/README.md', "# Developer\n[Guide](guide.md)\n[Testing](testing/README.md)\n[Contexts](contexts/README.md)");
+        $this->source('part-2-developer-guide/README.md', "# Developer\n[Guide](guide.md)\n[Runners shortcut](testing/backend-runners.md)\n[Testing](testing/README.md)\n[Contexts](contexts/README.md)");
         $this->source('part-2-developer-guide/guide.md', '# Guide');
-        $this->source('part-2-developer-guide/testing/README.md', "# Testing\n## Backend\n[Runners](backend-runners.md)");
+        $this->source('part-2-developer-guide/testing/README.md', "# Testing\n[Auth cross-link](../contexts/auth.md)\n## Backend\n[Runners](backend-runners.md)");
         $this->source('part-2-developer-guide/testing/backend-runners.md', '# Backend Runners');
         $this->source('part-2-developer-guide/contexts/README.md', "# Bounded Contexts\n[Guide](../guide.md)\n[Auth](auth.md)\n[Catalog](catalog.md#models)\n[Auth again](auth.md)");
         $this->source('part-2-developer-guide/contexts/auth.md', '# Auth');

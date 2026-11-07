@@ -6,7 +6,7 @@ Generate a new VAPID key pair for Web Push notifications. These keys are require
 
 The Make examples below target the checkout's development preview. For an
 installed instance, use the `dc` function from
-[Getting started](../getting-started.md#command-context) and replace
+[Getting started](../getting-started/installation.md#command-context) and replace
 `make exec cmd="php bin/console …"` with `dc exec app php bin/console …`.
 
 ```bash
@@ -33,7 +33,7 @@ VAPID (Voluntary Application Server Identification) keys let your server authent
 
 Provision both keys through the instance's private environment configuration.
 The public key can be shared with the frontend; keep the private key secret.
-Follow [Notifications](../notifications.md) when applying configuration to web
+Follow [Notifications](../administration/notifications.md) when applying configuration to web
 and workers. Generating keys only prints a pair; it changes no active
 configuration or subscription.
 

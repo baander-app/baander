@@ -248,7 +248,7 @@ New migrations use `VersionYYYYMMDDHHMMSS` and normal timestamp ordering after
 guard rejects existing user objects while initialization is pending, and the
 unknown-history guard rejects records from the former chain. Neither ordinary
 confirmation nor `--no-interaction` bypasses these checks. See the
-[manual reset procedure](../../part-1-operator-guide/upgrading.md#manual-reset-of-an-existing-database)
+[manual reset procedure](../../part-1-operator-guide/maintenance/upgrading.md#manual-reset-of-an-existing-database)
 for an existing database; a reset needs explicit owner approval for that target.
 
 ## Coverage
@@ -284,7 +284,7 @@ and sanitize builds, containers, threads, fuzzing and static analysis). Frontend
 qualification runs `ui/shared` checks, the embedded player checks, web checks,
 `yarn test:browser-auth` (Chromium and WebKit), `yarn test:audio-graph` (Chromium,
 Firefox and WebKit), and `yarn test:store-debug` (Chromium). Forgejo and GitHub both run this workflow; see
-[Continuous Integration](../continuous-integration.md). Checkout steps in the gate
+[Continuous Integration](../contributing/continuous-integration.md). Checkout steps in the gate
 workflows fetch and verify the pull request's head commit, or the event SHA for
 other events, so a later branch update cannot replace the source under
 qualification, and both forges qualify the same commit.

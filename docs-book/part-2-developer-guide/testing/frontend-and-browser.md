@@ -26,7 +26,7 @@ media is read-only and writable state is isolated; workers use the snapshot from
 `make preview-up`. The local `.test` preview names are the explicit exception to
 the `baander.app` fixture rule for this application browser workflow. Scripted
 browser-auth and DSP suites retain their own disposable servers.
-See [Frontend Development](../frontend-development.md) for more details.
+See [Frontend Development](../development/frontend-development.md) for more details.
 
 For focused styling checks against that preview, run:
 
@@ -135,7 +135,7 @@ The active-media error regression reloads an already playing element to a local
 reselection recovery.
 
 Two specs cover a stream that the server cuts midway, as it does when the web
-server [drains](../../part-1-operator-guide/upgrading.md#stopping-and-restarting-the-web-server).
+server [drains](../../part-1-operator-guide/maintenance/upgrading.md#stopping-and-restarting-the-web-server).
 `media-interruption.spec.ts` plays a plain `<audio>` element in Chromium, Firefox
 and WebKit through a loopback proxy that resets the connection mid-body, for a
 chunked response and for a Content-Length response. It asserts that each engine

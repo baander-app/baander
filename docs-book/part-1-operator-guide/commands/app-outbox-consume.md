@@ -4,14 +4,14 @@ Relay committed domain events, then committed notification delivery intents.
 Library directory events publish ingestion messages to Redis `async`; other
 events reach the durable notification and admin-alert listeners. Control's
 [app:worker](app-worker.md) supervisor owns this relay. Use its logs and
-[Background work](../background-work.md#observe-background-work) to investigate a
+[Background work](../workers/background-work.md#observe-background-work) to investigate a
 backlog before considering a separate manual pass.
 
 ## Quick start
 
 The Make examples below target the checkout's development preview. For an
 installed instance, use the `dc` function from
-[Getting started](../getting-started.md#command-context) and replace
+[Getting started](../getting-started/installation.md#command-context) and replace
 `make exec cmd="php bin/console …"` with `dc exec app php bin/console …`.
 
 Process one batch of each queue and exit:
@@ -48,14 +48,14 @@ delivery intents use leased claims and retry backoff, reaching dead-letter state
 after five failed attempts. Records awaiting a retry stay eligible for a later
 pass once their delay has elapsed.
 
-The [health endpoints](../monitoring.md#what-is-checked) check the Redis consumer;
+The [health endpoints](../operations/health-and-metrics.md#what-is-checked) check the Redis consumer;
 they do not yet check this relay. The worker deployment owns its lifecycle; see
-[Background work](../background-work.md#stop-replace-or-recover-workers) for drain and recovery procedures.
+[Background work](../workers/background-work.md#stop-replace-or-recover-workers) for drain and recovery procedures.
 
 The producer runtime drill verifies that operator user creation, user registration
 and email verification commit domain writes and event capture in one transaction.
 Other event producers still need their transaction boundaries reviewed. See
-[CQRS and Messaging](../../part-2-developer-guide/cqrs-and-messaging.md#durable-event-replay)
+[CQRS and Messaging](../../part-2-developer-guide/development/cqrs-and-messaging.md#durable-event-replay)
 and [Testing](../../part-2-developer-guide/testing/runtime-drills.md) for the mechanism and runtime
 coverage.
 

@@ -5,7 +5,7 @@ Check the health of all system components (database, Redis, the background worke
 ## Quick start
 
 Run from the installed-instance host shell with the `dc` function from
-[Getting started](../getting-started.md#command-context). Paths name locations
+[Getting started](../getting-started/installation.md#command-context). Paths name locations
 inside the application container.
 
 ```bash
@@ -22,8 +22,8 @@ or during a fresh `stopped` phase. A heartbeat that disappears after this proces
 has seen it, an invalid heartbeat, or a stale heartbeat reads `FAIL`. Freshness
 allows 90 seconds for `busy` and 45 seconds for other phases. This signal does
 not prove that every consumer, the scheduler, the outbox relay or media execution
-is making progress. See [Monitoring](../monitoring.md#health-checks) and
-[Background work](../background-work.md#observe-background-work) for those checks.
+is making progress. See [Monitoring](../operations/health-and-metrics.md#health-checks) and
+[Background work](../workers/background-work.md#observe-background-work) for those checks.
 
 The `worker_profile` row compares this process's deployment profile with the one
 the active worker boot was started with. It reads `FAIL` when they differ, for
@@ -35,7 +35,7 @@ profile's fingerprint.
 
 The exit status describes this container, so it leaves out the background worker, its deployment profile and memory; the web server alerts administrators about those instead. If no other component is unhealthy, the command prints `This container is healthy.` and exits with code 0. If the worker, its profile or memory is unhealthy, it also prints a warning that names them as unhealthy but not counted toward this container. If any other component is unhealthy, it exits with code 1.
 
-The command runs in its own PHP process, so the `memory` row measures that process against its `memory_limit`, not the web server's workers. The [`/health` endpoint](../monitoring.md#health-checks) reports the workers.
+The command runs in its own PHP process, so the `memory` row measures that process against its `memory_limit`, not the web server's workers. The [`/health` endpoint](../operations/health-and-metrics.md#health-checks) reports the workers.
 
 This is the same check used by the Docker healthcheck, which the web image defines in `Dockerfile` and the development stack in `docker-compose.yml`.
 

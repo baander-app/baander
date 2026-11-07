@@ -10,7 +10,7 @@ The plain `php bin/console` commands on this page run inside a dedicated
 application-image container, in its application directory, with the instance's
 private configuration and required storage mounts. During offline cutover the
 normal application and worker containers stay stopped; `dc exec` cannot target
-a stopped container. Follow [Security](../security.md#rotating-oauth-20-keys)
+a stopped container. Follow [Security](../maintenance/security.md#rotating-oauth-20-keys)
 for the installed-instance preparation and cutover context.
 
 Run the command as the account that will own the secret files. Use a new absolute

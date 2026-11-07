@@ -59,4 +59,4 @@ All endpoints are prefixed with `/api` and require an authenticated user.
 | `FavoriteTargetAccess` | Port implementation | Implements `FavoriteTargetAccessInterface`, checking target existence and library access (`user_library_access`) |
 | `FavoritesForeignKeys` | Doctrine foreign key provider | Declares `fk_user_favorites_user_id` (`user_favorites.user_id` → `users.id`, `ON DELETE CASCADE`) |
 
-See the [Architecture](../architecture.md#bounded-context-map) page for context map placement.
+See the [Architecture](../architecture/overview.md#bounded-context-map) page for context map placement.

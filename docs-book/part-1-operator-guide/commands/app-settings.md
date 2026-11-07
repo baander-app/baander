@@ -1,6 +1,6 @@
 # app:settings
 
-Read and change Baander's server settings from the command line. Four commands make up the family: `app:settings:list`, `app:settings:get`, `app:settings:set` and `app:settings:reset`. They do the same work as the admin **Settings** page and the `/api/admin/settings` endpoints, through the same validation, and the change takes effect without a restart. [Server settings](../configuration.md#server-settings) lists every setting, its default and what it controls.
+Read and change Baander's server settings from the command line. Four commands make up the family: `app:settings:list`, `app:settings:get`, `app:settings:set` and `app:settings:reset`. They do the same work as the admin **Settings** page and the `/api/admin/settings` endpoints, through the same validation, and the change takes effect without a restart. [Server settings](../configuration/server-settings.md#server-settings) lists every setting, its default and what it controls.
 
 ## Quick start
 
@@ -96,7 +96,7 @@ Resetting a setting that has no stored value succeeds and changes nothing.
 
 The commands change only server-wide settings. A user's own settings, such as their email language, are changed with [app:user:setting](app-user-setting.md).
 
-Console access carries full authority, so the commands ask for no role. In the admin API, any administrator can read the settings, but only a super administrator can change or reset them (see [Server settings](../configuration.md#server-settings)).
+Console access carries full authority, so the commands ask for no role. In the admin API, any administrator can read the settings, but only a super administrator can change or reset them (see [Server settings](../configuration/server-settings.md#server-settings)).
 
 ## Exit codes
 

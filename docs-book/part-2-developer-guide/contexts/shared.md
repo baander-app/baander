@@ -18,7 +18,7 @@ When you need a primitive type, async utility, or shared controller, look here f
 | `MediaReadScope` | Combines an optional authenticated actor UUID with a `LibraryReadScope` |
 | `FilesystemType` | Filesystem backend type (`Local`) |
 
-`PublicId` uses 21 characters matching `^[0-9a-zA-Z_-]{21}$`, for example `V1StGXR8_Z5jdHi6B-myT`. Identifier types remain endpoint-specific; see [PublicId](../shared-kernel.md#publicid) for UUID and protocol identifier exceptions.
+`PublicId` uses 21 characters matching `^[0-9a-zA-Z_-]{21}$`, for example `V1StGXR8_Z5jdHi6B-myT`. Identifier types remain endpoint-specific; see [PublicId](../architecture/shared-kernel.md#publicid) for UUID and protocol identifier exceptions.
 
 ### Pagination
 
@@ -87,7 +87,7 @@ Async jobs dispatched via Symfony Messenger are tracked, and can be cancelled, t
 | `JobCancellationCheckpointInterface` | Application port that handlers call between items; `check()` throws `JobCancelledException` once the job was cancelled |
 | `JobMonitorService` | Queries job status and history |
 
-See the [CQRS and Messaging](../cqrs-and-messaging.md) page for dispatching patterns.
+See the [CQRS and Messaging](../development/cqrs-and-messaging.md) page for dispatching patterns.
 
 ## Messenger
 
@@ -188,7 +188,7 @@ System settings live in `system_settings` (`key text` primary key, `value jsonb`
 | `PATCH /api/admin/settings` | `app:settings:set` | Validate all, then write; `422` with per-key messages |
 | `DELETE /api/admin/settings/{key}` | `app:settings:reset` | Reset to the default; `404` for an unknown key |
 
-The user settings endpoints are in [UserPreference](user-preference.md#user-settings), and the administrator's view of a user's settings is in [Auth](auth.md#admin--user-settings). The operator reference is [Server settings](../../part-1-operator-guide/configuration.md#server-settings).
+The user settings endpoints are in [UserPreference](user-preference.md#user-settings), and the administrator's view of a user's settings is in [Auth](auth.md#admin--user-settings). The operator reference is [Server settings](../../part-1-operator-guide/configuration/server-settings.md#server-settings).
 
 ### Adding a setting
 
@@ -250,6 +250,6 @@ Shared response types used across contexts:
 
 ## See Also
 
-- [Shared Kernel (detailed)](../shared-kernel.md) — UUID v7 usage, cursor pagination, and Redis configuration
-- [Real-Time Patterns](../real-time-patterns.md) — WebSocket architecture
-- [CQRS and Messaging](../cqrs-and-messaging.md) — Job monitoring and task dispatching
+- [Shared Kernel (detailed)](../architecture/shared-kernel.md) — UUID v7 usage, cursor pagination, and Redis configuration
+- [Real-Time Patterns](../architecture/real-time-patterns.md) — WebSocket architecture
+- [CQRS and Messaging](../development/cqrs-and-messaging.md) — Job monitoring and task dispatching

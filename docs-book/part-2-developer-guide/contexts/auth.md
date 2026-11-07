@@ -386,10 +386,10 @@ Password login, passkey login, and every grant at the token endpoint accept an o
 | `DpopNonceManager` | Security | Issues and consumes the single-use nonces in Redis; a nonce is handed out only after it was stored, and an unreachable store raises `DpopStoreUnavailableException` |
 | `RedisDpopJtiCache` | Cache | `DpopJtiCacheInterface` on Redis: one set-if-absent-with-expiry command per proof |
 | `DpopBindingListener` | Security | Requires a proof from the token's key on every API request made with an access token; answers an unavailable store with `DpopStoreUnavailableResponse` (`503`) |
-| `RateLimitListener` | Security | Per-IP and per-client limits for the auth and OAuth endpoints (see [Rate limiting](../../part-1-operator-guide/configuration.md#rate-limiting)) |
+| `RateLimitListener` | Security | Per-IP and per-client limits for the auth and OAuth endpoints (see [Rate limiting](../../part-1-operator-guide/configuration/authentication-and-limits.md#rate-limiting)) |
 | Doctrine entities | ORM | Persistence for all models |
 | Doctrine repositories | ORM | Repository implementations for all aggregates |
 | Voter classes | Security | Authorization checks for protected resources; `UserManagementVoter` applies the user management settings |
 | `AfterResponseMailer` | Mail | Sends credential emails after the response, in the recipient's email language |
 
-See the [Architecture](../architecture.md#anti-corruption-layer) page for details on the League anti-corruption layer.
+See the [Architecture](../architecture/overview.md#anti-corruption-layer) page for details on the League anti-corruption layer.

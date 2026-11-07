@@ -48,7 +48,7 @@ test('all maintained languages preserve source and use only safe semantic spans'
 test('real diagrams have deterministic paired SVGs, Geist labels, complete markers and dimensions', async () => {
   const blocks = [];
   for (const [index, name] of ['live-updates', 'application-threat-model', 'registry-threat-model'].entries()) {
-    const markdown = await readFile(new URL(`docs-book/part-2-developer-guide/${name}.md`, root), 'utf8');
+    const markdown = await readFile(new URL(`docs-book/part-2-developer-guide/architecture/${name}.md`, root), 'utf8');
     blocks.push(block('mermaid', markdown.match(/```mermaid\n([\s\S]*?)```/)[1], `diagram-${index}`));
   }
   blocks.push(block('mermaid', 'flowchart LR\n A["Bånder &amp; long label with quotes #quot;test#quot;"] --> B[Done]\n', 'unicode'));
