@@ -6,6 +6,7 @@ namespace App\Tests\Integration;
 
 use App\Kernel;
 use App\QoL\Infrastructure\Worker\WorkerQoLLifecycle;
+use App\Shared\Application\DTO\DeploymentProfile;
 use App\Shared\Infrastructure\Worker\NativeExecutionClientInterface;
 use App\Transcode\Application\Port\EncodePresentationPort;
 use App\Transcode\Application\Port\TranscodeLoopStarterInterface;
@@ -24,11 +25,10 @@ final class HouseholdMediaContainerTest extends TestCase
 {
     public function testCopyWorkerServicesResolveWithoutAnEncoderProfile(): void
     {
-        $directory = sys_get_temp_dir() . '/baander-household-container-' . bin2hex(random_bytes(8));
+        $directory = sys_get_temp_dir() . '/baander-remux-container-' . bin2hex(random_bytes(8));
         $savedEnv = $_ENV;
         $savedServer = $_SERVER;
-        $_ENV['BAANDER_DEPLOYMENT_PROFILE'] = $_SERVER['BAANDER_DEPLOYMENT_PROFILE'] = 'household';
-        $_ENV['BAANDER_DEPLOYMENT_PROFILE_JSON'] = $_SERVER['BAANDER_DEPLOYMENT_PROFILE_JSON'] = '';
+        $_ENV['BAANDER_DEPLOYMENT_PROFILE'] = $_SERVER['BAANDER_DEPLOYMENT_PROFILE'] = (new DeploymentProfile('remux', 2, 4, 1, sharedCopySlots: 2))->toJson();
         $_ENV['CONVERT_STORAGE_PATH'] = $_SERVER['CONVERT_STORAGE_PATH'] = $directory . '/convert';
         $kernel = new HouseholdMediaKernel($directory);
 

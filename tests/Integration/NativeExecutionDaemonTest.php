@@ -281,7 +281,7 @@ final class NativeExecutionDaemonTest extends TestCase
 
     public function testWrongBootCannotInspectOrSignalCurrentAttempt(): void
     {
-        $wrong = new NativeExecutionClient($this->directory . '/native.sock', 'baander.app:workers', str_repeat('b', 32), 1, 'media-video-0', 1, new DeploymentProfile('full'));
+        $wrong = new NativeExecutionClient($this->directory . '/native.sock', 'baander.app:workers', str_repeat('b', 32), 1, 'media-video-0', 1, new DeploymentProfile());
         $this->expectException(NativeExecutionException::class);
         $wrong->handshake();
     }
@@ -292,8 +292,8 @@ final class NativeExecutionDaemonTest extends TestCase
         self::assertIsResource($socket);
         $request = ['id' => str_repeat('c', 32), 'namespace' => 'baander.app:workers', 'bootId' => str_repeat('a', 32),
             'epoch' => 1, 'clientId' => 'media-video-0', 'generation' => 1, 'operation' => 'submit', 'attempt' => 1,
-            'deploymentProfile' => (new DeploymentProfile('full'))->toJson(),
-            'limits' => NativeExecutionProtocol::limits(new DeploymentProfile('full')),
+            'deploymentProfile' => (new DeploymentProfile())->toJson(),
+            'limits' => NativeExecutionProtocol::limits(new DeploymentProfile()),
             'argv' => ['ffmpeg', '-version'], 'timeout' => 5];
         $frame = json_encode($request, JSON_THROW_ON_ERROR) . "\n";
         self::assertSame(strlen($frame), fwrite($socket, $frame));
@@ -328,7 +328,7 @@ final class NativeExecutionDaemonTest extends TestCase
     {
         $old = $this->client->submit(['ffmpeg', '-version'], 5);
         $this->finish($old);
-        $replacement = new NativeExecutionClient($this->directory . '/native.sock', 'baander.app:workers', str_repeat('a', 32), 1, 'media-video-0', 2, new DeploymentProfile('full'));
+        $replacement = new NativeExecutionClient($this->directory . '/native.sock', 'baander.app:workers', str_repeat('a', 32), 1, 'media-video-0', 2, new DeploymentProfile());
         self::assertTrue($replacement->handshake()['ready']);
         self::assertSame('unknown', $replacement->signal($old, 'stop')['state']);
         $this->expectException(NativeExecutionException::class);
@@ -363,7 +363,7 @@ final class NativeExecutionDaemonTest extends TestCase
 
     public function testOnlyTheProfilesDerivedClientsAreAdmitted(): void
     {
-        foreach (array_keys((new DeploymentProfile('full'))->nativeClientCommandCaps()) as $id) {
+        foreach (array_keys((new DeploymentProfile())->nativeClientCommandCaps()) as $id) {
             self::assertTrue($this->clientNamed($id)->handshake()['ready'], $id);
         }
         foreach (['media-video-8', 'media-audio-12', 'media-copy-0', 'media'] as $id) {
@@ -380,7 +380,7 @@ final class NativeExecutionDaemonTest extends TestCase
 
     public function testEveryConfiguredSlotOfALargeProfileConnects(): void
     {
-        $profile = new DeploymentProfile('full', 8, 12);
+        $profile = new DeploymentProfile(videoEncoderSlots: 8, audioEncoderSlots: 12);
         $fixture = new \App\Tests\Support\NativeExecutionFixture('baander.app:workers', str_repeat('d', 32), profile: $profile);
         try {
             foreach (array_keys($profile->nativeClientCommandCaps()) as $id) {
@@ -395,7 +395,7 @@ final class NativeExecutionDaemonTest extends TestCase
 
     public function testPeerCapHoldsAFurtherClientInTheBacklogUntilAPeerCloses(): void
     {
-        $profile = new DeploymentProfile('full');
+        $profile = new DeploymentProfile();
         $idle = [];
         try {
             for ($index = 0; $index < $profile->nativeClientLimit() + 4; ++$index) {
@@ -437,7 +437,7 @@ final class NativeExecutionDaemonTest extends TestCase
     public function testGenerationCannotReplaceAnUnreapedRunningCommand(): void
     {
         $this->client->submit(['ffmpeg', '-nostdin', '-re', '-f', 'lavfi', '-i', 'anullsrc', '-f', 'null', '-'], 10);
-        $replacement = new NativeExecutionClient($this->directory . '/native.sock', 'baander.app:workers', str_repeat('a', 32), 1, 'media-video-0', 2, new DeploymentProfile('full'));
+        $replacement = new NativeExecutionClient($this->directory . '/native.sock', 'baander.app:workers', str_repeat('a', 32), 1, 'media-video-0', 2, new DeploymentProfile());
         try {
             $replacement->handshake();
             self::fail('A replacement generation cannot supersede owned native work.');
@@ -461,7 +461,7 @@ final class NativeExecutionDaemonTest extends TestCase
     {
         $first = null;
         for ($generation = 1; $generation <= 66; ++$generation) {
-            $this->client = new NativeExecutionClient($this->directory . '/native.sock', 'baander.app:workers', str_repeat('a', 32), 1, 'media-video-0', $generation, new DeploymentProfile('full'));
+            $this->client = new NativeExecutionClient($this->directory . '/native.sock', 'baander.app:workers', str_repeat('a', 32), 1, 'media-video-0', $generation, new DeploymentProfile());
             $handle = $this->client->submit(['ffprobe', '-version'], 5);
             $first ??= $handle;
             self::assertSame(0, $this->finish($handle)['exitCode']);
@@ -475,7 +475,7 @@ final class NativeExecutionDaemonTest extends TestCase
     {
         $argv = ['ffmpeg', '-nostdin', '-threads', '1', '-filter_threads', '1', '-filter_complex_threads', '1',
             '-re', '-f', 'lavfi', '-i', 'anullsrc=r=8000:cl=mono', '-threads', '1', '-f', 'null', '-'];
-        $profile = new DeploymentProfile('full');
+        $profile = new DeploymentProfile();
         $running = [];
         foreach ($profile->nativeClientCommandCaps() as $id => $allowance) {
             $client = $id === 'media-video-0' ? $this->client : $this->clientNamed($id);
@@ -529,7 +529,7 @@ final class NativeExecutionDaemonTest extends TestCase
 
     public function testTerminalResultsRemainReadableUntilReleaseReopensCapacity(): void
     {
-        $limit = (new DeploymentProfile('full'))->nativeResultLimit();
+        $limit = (new DeploymentProfile())->nativeResultLimit();
         $handles = [];
         for ($sequence = 1; $sequence <= $limit; ++$sequence) {
             $handle = $this->client->submit(['ffmpeg', '-version'], 5, $sequence);
@@ -578,7 +578,7 @@ function mkdir(string $path, int $mode, bool $recursive): bool
 }
 require $argv[1] . '/vendor/autoload.php';
 try {
-    exit((new NativeExecutionDaemon('baander.app:workers', str_repeat('a', 32), 1, new \App\Shared\Application\DTO\DeploymentProfile('full')))->run($argv[2]));
+    exit((new NativeExecutionDaemon('baander.app:workers', str_repeat('a', 32), 1, new \App\Shared\Application\DTO\DeploymentProfile()))->run($argv[2]));
 } catch (\Throwable $error) {
     fwrite(STDERR, $error->getMessage());
     exit(1);
@@ -595,7 +595,7 @@ PHP;
                 usleep(10_000);
             }
             self::assertFileExists($socketPath, (string) file_get_contents($this->directory . '/peer-log'));
-            $peer = new NativeExecutionClient($socketPath, 'baander.app:workers', str_repeat('a', 32), 1, 'media-control', 1, new DeploymentProfile('full'));
+            $peer = new NativeExecutionClient($socketPath, 'baander.app:workers', str_repeat('a', 32), 1, 'media-control', 1, new DeploymentProfile());
             self::assertTrue($peer->handshake()['ready']);
         } finally {
             proc_terminate($process);
@@ -613,20 +613,20 @@ PHP;
     public function testDifferentDeploymentProfileCannotHandshake(): void
     {
         $wrong = new NativeExecutionClient($this->directory . '/native.sock', 'baander.app:workers', str_repeat('a', 32), 1,
-            'media-copy-0', 1, new DeploymentProfile('household'));
+            'media-copy-0', 1, new DeploymentProfile('remux', 2, 4, 1, sharedCopySlots: 2));
         $this->expectException(NativeExecutionException::class);
         $wrong->handshake();
     }
 
-    public function testHouseholdPreservesAuxiliaryCapacityForBothCopySlotsAndControl(): void
+    public function testRemuxPreservesAuxiliaryCapacityForBothCopySlotsAndControl(): void
     {
-        $profile = new DeploymentProfile('household');
-        $fixture = new \App\Tests\Support\NativeExecutionFixture('baander.app:household', str_repeat('c', 32), profile: $profile);
+        $profile = new DeploymentProfile('remux', 2, 4, 1, sharedCopySlots: 2);
+        $fixture = new \App\Tests\Support\NativeExecutionFixture('baander.app:remux', str_repeat('c', 32), profile: $profile);
         $clients = [];
         $handles = [];
         try {
             foreach (['media-copy-0' => 2, 'media-copy-1' => 2, 'media-control' => 1] as $id => $capacity) {
-                $client = new NativeExecutionClient($fixture->socketPath(), 'baander.app:household', str_repeat('c', 32), 1, $id, 1, $profile);
+                $client = new NativeExecutionClient($fixture->socketPath(), 'baander.app:remux', str_repeat('c', 32), 1, $id, 1, $profile);
                 $clients[$id] = $client;
                 for ($index = 0; $index < $capacity; ++$index) {
                     $handles[] = [$client, $client->submit(['ffmpeg', '-nostdin', '-re', '-f', 'lavfi', '-i', 'anullsrc', '-f', 'null', '-'], 10)];
@@ -643,7 +643,7 @@ PHP;
             foreach ($handles as [$client, $handle]) {
                 self::assertSame('running', $client->inspect($handle)['state']);
             }
-            $supervisor = new NativeExecutionClient($fixture->socketPath(), 'baander.app:household', str_repeat('c', 32), 1, 'supervisor', 1, $profile);
+            $supervisor = new NativeExecutionClient($fixture->socketPath(), 'baander.app:remux', str_repeat('c', 32), 1, 'supervisor', 1, $profile);
             self::assertTrue($supervisor->handshake()['ready']);
         } finally {
             $fixture->close();
@@ -657,7 +657,7 @@ PHP;
 
     private function clientNamed(string $id): NativeExecutionClient
     {
-        return new NativeExecutionClient($this->directory . '/native.sock', 'baander.app:workers', str_repeat('a', 32), 1, $id, 1, new DeploymentProfile('full'));
+        return new NativeExecutionClient($this->directory . '/native.sock', 'baander.app:workers', str_repeat('a', 32), 1, $id, 1, new DeploymentProfile());
     }
 
     /** @return array<string, mixed> */

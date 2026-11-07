@@ -1,1 +1,1 @@
-{"webWorkers":4,"doctrinePoolSlots":10,"ordinaryConsumerLimit":4,"sharedCopySlots":0,"videoEncoderSlots":12,"audioEncoderSlots":12,"identifier":"full","hardware":{"accelerator":"vaapi","device":"/dev/dri/renderD128"}}
+{"capability":"transcode","webWorkers":4,"doctrinePoolSlots":10,"ordinaryConsumerLimit":4,"sharedCopySlots":0,"videoEncoderSlots":12,"audioEncoderSlots":12,"hardware":{"accelerator":"vaapi","device":"/dev/dri/renderD128"}}

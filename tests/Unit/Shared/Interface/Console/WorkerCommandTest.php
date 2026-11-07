@@ -158,7 +158,7 @@ final class WorkerCommandTest extends TestCase
     private function options(): array
     {
         return ['--deployment' => 'baander.app:workers', '--boot-id' => str_repeat('a', 32),
-            '--deployment-profile' => (new \App\Shared\Application\DTO\DeploymentProfile('full'))->toJson(),
+            '--deployment-profile' => (new \App\Shared\Application\DTO\DeploymentProfile())->toJson(),
             '--autoscaling-profile' => (new \App\Shared\Application\DTO\WorkerAutoscalingProfile())->toJson(),
             '--unit' => 'execution',
             '--lock-dir' => '/tmp/baander-worker-locks', '--ipc-dir' => '/run/baander-worker'];

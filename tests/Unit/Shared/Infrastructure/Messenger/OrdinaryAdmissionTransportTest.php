@@ -30,11 +30,11 @@ final class OrdinaryAdmissionTransportTest extends TestCase
         $this->boot = str_repeat('a', 32);
         mkdir($this->directory, 0700);
         mkdir($this->directory . '/' . $this->boot, 0700);
-        $this->ledger = new AdmissionLedger($this->directory, new DeploymentLease('worker.baander.app', $this->boot, 1), new WorkerAutoscalingProfile(maximumConcurrency: 4), new \App\Shared\Application\DTO\DeploymentProfile('full'));
+        $this->ledger = new AdmissionLedger($this->directory, new DeploymentLease('worker.baander.app', $this->boot, 1), new WorkerAutoscalingProfile(maximumConcurrency: 4), new \App\Shared\Application\DTO\DeploymentProfile());
         $now = hrtime(true) / 1e9;
         $this->ledger->initialize($now);
         foreach (['control', 'execution'] as $unit) {
-            (new \App\Shared\Infrastructure\Worker\WorkerPeerHandshake($this->directory, 'worker.baander.app', $this->boot, $unit, $now, new \App\Shared\Application\DTO\DeploymentProfile('full')))->publish(1, true, false, $now);
+            (new \App\Shared\Infrastructure\Worker\WorkerPeerHandshake($this->directory, 'worker.baander.app', $this->boot, $unit, $now, new \App\Shared\Application\DTO\DeploymentProfile()))->publish(1, true, false, $now);
         }
         $this->ledger->publishDecision(4, 'test-demand', [], $now);
     }

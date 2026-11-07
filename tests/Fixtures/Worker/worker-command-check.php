@@ -101,7 +101,7 @@ if (in_array($mode, ['reserve-pair', 'claim-unit', 'register-unit', 'start-unit'
     if ($mode === 'reserve-pair') {
         $controlRecipe = hash('sha256', 'control:2944:129:cpu0');
         $executionRecipe = hash('sha256', 'execution:4480:256:cpu1,2:console320');
-        $accepted = $inventory->reserveBoot($namespace, $bootId, hash('sha256', $controlRecipe . $executionRecipe), (new App\Shared\Application\DTO\DeploymentProfile('full'))->fingerprint(), $daemon, $controlRecipe, $executionRecipe);
+        $accepted = $inventory->reserveBoot($namespace, $bootId, hash('sha256', $controlRecipe . $executionRecipe), (new App\Shared\Application\DTO\DeploymentProfile())->fingerprint(), $daemon, $controlRecipe, $executionRecipe);
     } else {
         $unit = App\Shared\Application\DTO\DeploymentUnit::from($arguments[4] ?? '');
         if ($mode === 'claim-unit') {
@@ -735,7 +735,7 @@ foreach (['messages' => ($profile ?? throw new RuntimeException('No resident aut
 }
 if ($mode === 'readiness-observation') {
     try {
-        $observed = \App\Shared\Infrastructure\Worker\WorkerReadinessObservation::observe($namespace, $bootId, $expectedEpoch, $unit, $profile->toJson(), dirname(__DIR__, 3), (new \App\Shared\Application\DTO\DeploymentProfile('full'))->toJson());
+        $observed = \App\Shared\Infrastructure\Worker\WorkerReadinessObservation::observe($namespace, $bootId, $expectedEpoch, $unit, $profile->toJson(), dirname(__DIR__, 3), (new \App\Shared\Application\DTO\DeploymentProfile())->toJson());
         $observation = ['success' => true, 'roles' => $observed];
     } catch (Throwable $error) {
         $safeMessages = [

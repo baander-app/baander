@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Shared\Infrastructure\Worker;
 
+use App\Shared\Application\DTO\DeploymentProfile;
 use App\Shared\Application\DTO\DeploymentUnit;
-
 use App\Shared\Infrastructure\Worker\DeploymentContainerRecipe;
 use App\Shared\Infrastructure\Worker\DeploymentRuntimeEnvironment;
 use App\Shared\Infrastructure\Worker\RegisteredDeploymentStart;
@@ -59,12 +59,11 @@ final class DeploymentContainerRecipeTest extends TestCase
     }
 
     #[DataProvider('profileEnvironmentCases')]
-    public function testProfileVariablesAppearOnceAcrossArgumentsAndEnvironmentFile(string $identifier, bool $includeJson): void
+    public function testProfileVariableAppearsOnceAcrossArgumentsAndEnvironmentFile(DeploymentProfile $profile, bool $inEnvironmentFile): void
     {
-        $profile = new \App\Shared\Application\DTO\DeploymentProfile($identifier);
-        $variables = ['APP_ENV' => 'prod', 'BAANDER_DEPLOYMENT_PROFILE' => $identifier];
-        if ($includeJson) {
-            $variables['BAANDER_DEPLOYMENT_PROFILE_JSON'] = $profile->toJson();
+        $variables = ['APP_ENV' => 'prod'];
+        if ($inEnvironmentFile) {
+            $variables['BAANDER_DEPLOYMENT_PROFILE'] = $profile->toJson();
         }
         $environment = new DeploymentRuntimeEnvironment($variables);
         $recipe = $this->recipe(['runtimeEnvironment' => $environment, 'deploymentProfile' => $profile]);
@@ -76,19 +75,24 @@ final class DeploymentContainerRecipeTest extends TestCase
                     $entries[] = $arguments[$index + 1];
                 }
             }
-            foreach (['BAANDER_DEPLOYMENT_PROFILE' => $profile->identifier, 'BAANDER_DEPLOYMENT_PROFILE_JSON' => $profile->toJson()] as $key => $value) {
-                $matching = array_values(array_filter($entries, static fn(string $entry): bool => str_starts_with($entry, $key . '=')));
-                self::assertSame([$key . '=' . $value], $matching);
-            }
+            $matching = array_values(array_filter($entries, static fn(string $entry): bool => str_starts_with($entry, 'BAANDER_DEPLOYMENT_PROFILE')));
+            self::assertSame(['BAANDER_DEPLOYMENT_PROFILE=' . $profile->toJson()], $matching);
         });
     }
 
-    /** @return iterable<string,array{string,bool}> */
+    /** @return iterable<string,array{DeploymentProfile,bool}> */
     public static function profileEnvironmentCases(): iterable
     {
-        yield 'full runtime profile' => ['full', true];
-        yield 'household runtime profile' => ['household', true];
-        yield 'household identifier with canonical JSON fallback' => ['household', false];
+        yield 'transcode profile in the environment file' => [new DeploymentProfile(), true];
+        yield 'remux profile in the environment file' => [new DeploymentProfile('remux', 2, 4, 1, sharedCopySlots: 2), true];
+        yield 'remux profile from the recipe' => [new DeploymentProfile('remux', 2, 4, 1, sharedCopySlots: 2), false];
+    }
+
+    public function testFingerprintFollowsTheDeploymentSettings(): void
+    {
+        $remux = $this->recipe(['deploymentProfile' => new DeploymentProfile('remux', 2, 4, 1, sharedCopySlots: 2)]);
+        self::assertSame($remux->fingerprint(), $this->recipe(['deploymentProfile' => new DeploymentProfile('remux', 2, 4, 1, sharedCopySlots: 2)])->fingerprint());
+        self::assertNotSame($remux->fingerprint(), $this->recipe(['deploymentProfile' => new DeploymentProfile('remux', 2, 4, 1, sharedCopySlots: 3)])->fingerprint());
     }
 
     public function testPopulatedRuntimeConfigurationCannotSilentlyUseImageDefaults(): void
@@ -114,8 +118,7 @@ final class DeploymentContainerRecipeTest extends TestCase
             '--label', 'app.baander.worker.namespace=recipe.baander.app', '--label', 'app.baander.worker.boot-id=' . self::BOOT,
             '--label', 'app.baander.worker.role=control', '--env', 'BAANDER_WORKER_NAMESPACE=recipe.baander.app',
             '--env', 'BAANDER_WORKER_BOOT_ID=' . self::BOOT, '--env', 'BAANDER_WORKER_UNIT=control',
-            '--env', 'BAANDER_DEPLOYMENT_PROFILE=full',
-            '--env', 'BAANDER_DEPLOYMENT_PROFILE_JSON=' . (new \App\Shared\Application\DTO\DeploymentProfile('full'))->toJson(),
+            '--env', 'BAANDER_DEPLOYMENT_PROFILE=' . (new DeploymentProfile())->toJson(),
             '--mount', 'type=volume,src=worker-ipc,dst=/run/baander-worker,volume-nocopy', '--entrypoint', '/usr/local/bin/php', self::IMAGE,
             '/app/bin/worker.php', '--name=literal $(touch /tmp/unsafe);`echo unsafe`',
         ], $recipe->createArguments());
@@ -227,7 +230,7 @@ final class DeploymentContainerRecipeTest extends TestCase
             'appHome' => '/var/www/html', 'namespace' => 'recipe.baander.app', 'bootId' => self::BOOT, 'daemonId' => 'docker-daemon', 'imageId' => self::IMAGE,
             'command' => ['/usr/local/bin/php', '/app/bin/worker.php'], 'network' => 'none',
             'unit' => DeploymentUnit::Control, 'ipcVolume' => 'worker-ipc',
-            'deploymentProfile' => new \App\Shared\Application\DTO\DeploymentProfile('full'),
+            'deploymentProfile' => new DeploymentProfile(),
         ], $overrides));
     }
 }

@@ -38,12 +38,12 @@ final class DeploymentHardwareEncoderTest extends TestCase
 
     public function testNvencRequestsTheNvidiaGpusWithoutADeviceOrGroup(): void
     {
-        $recipe = $this->recipe(DeploymentUnit::Execution, new DeploymentProfile('full', 8, 12, new HardwareEncoder('nvenc')));
+        $recipe = $this->recipe(DeploymentUnit::Execution, new DeploymentProfile(videoEncoderSlots: 8, audioEncoderSlots: 12, hardware: new HardwareEncoder('nvenc')));
         $arguments = $recipe->createArguments();
 
         self::assertSame(['--gpus', 'all,"capabilities=compute,utility,video"'], self::option($arguments, '--gpus'));
         self::assertSame([], array_values(array_intersect($arguments, ['--device', '--group-add'])));
-        self::assertSame([], array_values(array_intersect($this->recipe(DeploymentUnit::Control, new DeploymentProfile('full', 8, 12, new HardwareEncoder('nvenc')))->createArguments(), ['--gpus'])));
+        self::assertSame([], array_values(array_intersect($this->recipe(DeploymentUnit::Control, new DeploymentProfile(videoEncoderSlots: 8, audioEncoderSlots: 12, hardware: new HardwareEncoder('nvenc')))->createArguments(), ['--gpus'])));
     }
 
     public function testDeviceWithoutItsGroupIsRejectedForExecution(): void
@@ -56,7 +56,7 @@ final class DeploymentHardwareEncoderTest extends TestCase
 
     public function testDeviceAndGroupParticipateInTheExecutionFingerprint(): void
     {
-        $software = $this->recipe(DeploymentUnit::Execution, new DeploymentProfile('full', 8, 12));
+        $software = $this->recipe(DeploymentUnit::Execution, new DeploymentProfile(videoEncoderSlots: 8, audioEncoderSlots: 12));
         $vaapi = $this->recipe(DeploymentUnit::Execution, self::vaapi(), 485);
         $otherGroup = $this->recipe(DeploymentUnit::Execution, self::vaapi(), 44);
 
@@ -69,8 +69,8 @@ final class DeploymentHardwareEncoderTest extends TestCase
     public function testInspectionMatchesOnlyTheAdmittedDeviceGroupAndGpus(DeploymentUnit $unit, ?string $accelerator, array $inspection, bool $matches): void
     {
         $profile = match ($accelerator) {
-            null => new DeploymentProfile('full', 8, 12),
-            'nvenc' => new DeploymentProfile('full', 8, 12, new HardwareEncoder('nvenc')),
+            null => new DeploymentProfile(videoEncoderSlots: 8, audioEncoderSlots: 12),
+            'nvenc' => new DeploymentProfile(videoEncoderSlots: 8, audioEncoderSlots: 12, hardware: new HardwareEncoder('nvenc')),
             default => self::vaapi(),
         };
         $recipe = $this->recipe($unit, $profile, $accelerator === 'vaapi' ? 485 : null);
@@ -162,7 +162,7 @@ final class DeploymentHardwareEncoderTest extends TestCase
 
     private static function vaapi(): DeploymentProfile
     {
-        return new DeploymentProfile('full', 8, 12, new HardwareEncoder('vaapi', self::DEVICE));
+        return new DeploymentProfile(videoEncoderSlots: 8, audioEncoderSlots: 12, hardware: new HardwareEncoder('vaapi', self::DEVICE));
     }
 
     private function recipe(DeploymentUnit $unit, DeploymentProfile $profile, ?int $deviceGroup = null): DeploymentContainerRecipe
@@ -173,7 +173,7 @@ final class DeploymentHardwareEncoderTest extends TestCase
 
     private static function environment(): DeploymentRuntimeEnvironment
     {
-        return new DeploymentRuntimeEnvironment(['BAANDER_DEPLOYMENT_PROFILE' => 'full', 'BAANDER_DEPLOYMENT_PROFILE_JSON' => self::vaapi()->toJson()]);
+        return new DeploymentRuntimeEnvironment(['BAANDER_DEPLOYMENT_PROFILE' => self::vaapi()->toJson()]);
     }
 
     /**

@@ -48,7 +48,7 @@ trait ScannedAudioCopyProof
         self::assertInstanceOf(VideoPortInterface::class, $videos);
         $settings = $this->createStub(SystemSettingsPortInterface::class);
         $settings->method('get')->willReturnCallback(static fn (string $key): mixed => $key === TranscodeSettingDefinitions::ENABLED ? false : 192);
-        $profile = new DeploymentProfile('household');
+        $profile = new DeploymentProfile('remux', 2, 4, 1, sharedCopySlots: 2);
         $policy = new MediaExecutionPolicy($profile);
         $runtime = new AudioRenditionRuntime($connection);
         $cache = new AudioRenditionCache($policy, new SegmentFileResolver($root . '/copies'), $runtime, new NullLogger(), new FixedAacImplementationSetting(), pollIntervalSeconds: .005, startTimeoutSeconds: 5);
@@ -63,8 +63,7 @@ trait ScannedAudioCopyProof
         $controller = new OriginalMediaController($policy, $settings, $scopes, $access, $videos, $streams, $cache, $signatures);
         $native = new NativeExecutionFixture('baander.app:test', str_repeat('b', 32), profile: $profile);
         $worker = new Process([PHP_BINARY, dirname(__DIR__) . '/Fixtures/Media/audio-rendition-worker.php', $schema, '.05'], env: [
-            'BAANDER_DEPLOYMENT_PROFILE' => $profile->identifier,
-            'BAANDER_DEPLOYMENT_PROFILE_JSON' => $profile->toJson(),
+            'BAANDER_DEPLOYMENT_PROFILE' => $profile->toJson(),
             'BAANDER_NATIVE_SOCKET' => $native->socketPath(),
             'BAANDER_WORKER_NAMESPACE' => 'baander.app:test',
             'BAANDER_WORKER_BOOT_ID' => str_repeat('b', 32),

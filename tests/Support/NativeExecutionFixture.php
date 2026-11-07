@@ -14,7 +14,7 @@ final class NativeExecutionFixture
     private readonly Process $daemon;
     public readonly NativeExecutionClient $client;
 
-    public function __construct(string $namespace, string $bootId, int $epoch = 1, DeploymentProfile $profile = new DeploymentProfile('full'))
+    public function __construct(string $namespace, string $bootId, int $epoch = 1, DeploymentProfile $profile = new DeploymentProfile())
     {
         $this->directory = sys_get_temp_dir() . '/baander-native-' . bin2hex(random_bytes(8));
         if (!mkdir($this->directory, 0700)) {
@@ -22,8 +22,7 @@ final class NativeExecutionFixture
         }
         $socket = $this->directory . '/native.sock';
         $this->daemon = new Process([PHP_BINARY, dirname(__DIR__, 2) . '/bin/worker-native.php'], env: [
-            'BAANDER_DEPLOYMENT_PROFILE' => $profile->identifier,
-            'BAANDER_DEPLOYMENT_PROFILE_JSON' => $profile->toJson(),
+            'BAANDER_DEPLOYMENT_PROFILE' => $profile->toJson(),
             'BAANDER_NATIVE_SOCKET' => $socket,
             'BAANDER_WORKER_NAMESPACE' => $namespace,
             'BAANDER_WORKER_BOOT_ID' => $bootId,

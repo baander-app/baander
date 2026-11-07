@@ -14,13 +14,13 @@ use PHPUnit\Framework\TestCase;
 
 final class DeploymentOperatorManifestTest extends TestCase
 {
-    public function testHouseholdManifestKeepsItsProfile(): void
+    public function testRemuxManifestKeepsItsProfile(): void
     {
-        $household = new \App\Shared\Application\DTO\DeploymentProfile('household');
+        $remux = new \App\Shared\Application\DTO\DeploymentProfile('remux', 2, 4, 1, sharedCopySlots: 2);
         $manifest = DeploymentOperatorManifest::fromJson($this->json([
-            'deploymentProfile' => json_decode($household->toJson(), true, flags: JSON_THROW_ON_ERROR),
+            'deploymentProfile' => json_decode($remux->toJson(), true, flags: JSON_THROW_ON_ERROR),
         ]), '/var/www/html');
-        self::assertEquals($household, $manifest->deploymentProfile);
+        self::assertEquals($remux, $manifest->deploymentProfile);
     }
 
     public function testCreatedUnitsCarryNoResourceLimitAndTheirKillOrderScore(): void
@@ -162,10 +162,10 @@ final class DeploymentOperatorManifestTest extends TestCase
     {
         $mounts = self::mounts();
         $mounts[0] = ['source' => '/tmp', 'target' => '/media/library', 'readOnly' => true, 'role' => 'source'];
-        $manifest = DeploymentOperatorManifest::fromJson($this->json(['version' => 8, 'sourceMountPolicy' => 'local-development', 'mediaMounts' => $mounts]), '/var/www/html');
+        $manifest = DeploymentOperatorManifest::fromJson($this->json(['version' => 9, 'sourceMountPolicy' => 'local-development', 'mediaMounts' => $mounts]), '/var/www/html');
         self::assertContains('type=bind,src=/tmp,dst=/media/library,readonly,bind-propagation=rprivate,bind-recursive=readonly', $manifest->recipe(DeploymentUnit::Control, new DeploymentRuntimeEnvironment())->createArguments());
         $this->expectException(InvalidArgumentException::class);
-        DeploymentOperatorManifest::fromJson($this->json(['version' => 8, 'sourceMountPolicy' => 'production', 'mediaMounts' => $mounts]), '/var/www/html');
+        DeploymentOperatorManifest::fromJson($this->json(['version' => 9, 'sourceMountPolicy' => 'production', 'mediaMounts' => $mounts]), '/var/www/html');
     }
 
     /** @return list<array{volume:string,target:string,readOnly:bool,role:string}> */
@@ -226,7 +226,7 @@ final class DeploymentOperatorManifestTest extends TestCase
             }
         }
         yield 'unsupported version' => ['version', 1];
-        yield 'obsolete manifest version' => ['version', 7];
+        yield 'obsolete manifest version' => ['version', 8];
         yield 'unknown source policy' => ['sourceMountPolicy', 'permissive'];
         yield 'unknown argv' => ['command', ['/bin/sh', '-c', 'arbitrary command']];
         yield 'unknown environment' => ['environment', ['APP_SECRET' => 'test-only-secret']];
@@ -273,7 +273,7 @@ final class DeploymentOperatorManifestTest extends TestCase
         yield 'null' => ['null'];
         yield 'oversized' => [str_repeat(' ', 8193)];
         yield 'excess depth' => [str_repeat('[', 9) . '0' . str_repeat(']', 9)];
-        yield 'numeric overflow' => [str_replace('"version":8', '"version":9223372036854775808', json_encode(self::fields(), JSON_THROW_ON_ERROR))];
+        yield 'numeric overflow' => [str_replace('"version":9', '"version":9223372036854775808', json_encode(self::fields(), JSON_THROW_ON_ERROR))];
     }
 
     /** @param array<string,mixed> $overrides */

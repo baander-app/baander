@@ -52,8 +52,7 @@ final readonly class DeploymentOperatorManifest
             throw new InvalidArgumentException('Worker manifest requires an ordinary concurrency within the profile and a scheduled console reservation of at least one PHP process.');
         }
         foreach (DeploymentUnit::cases() as $unit) {
-            $this->recipe($unit, new DeploymentRuntimeEnvironment(['BAANDER_DEPLOYMENT_PROFILE' => $deploymentProfile->identifier,
-                'BAANDER_DEPLOYMENT_PROFILE_JSON' => $deploymentProfile->toJson()]));
+            $this->recipe($unit, new DeploymentRuntimeEnvironment(['BAANDER_DEPLOYMENT_PROFILE' => $deploymentProfile->toJson()]));
         }
     }
 
@@ -81,8 +80,8 @@ final readonly class DeploymentOperatorManifest
         if (array_diff(array_keys($fields), $expected) !== [] || array_diff($expected, array_keys($fields)) !== []) {
             throw new InvalidArgumentException('Operator manifest has unknown or missing fields.');
         }
-        if (self::integer($fields, 'version') !== 8) {
-            throw new InvalidArgumentException('Operator manifest version must be 8.');
+        if (self::integer($fields, 'version') !== 9) {
+            throw new InvalidArgumentException('Operator manifest version must be 9.');
         }
         if (!is_array($fields['mediaMounts']) || !array_is_list($fields['mediaMounts'])) {
             throw new InvalidArgumentException('Operator media mounts require an ordered list.');
@@ -123,8 +122,7 @@ final readonly class DeploymentOperatorManifest
 
     public function recipe(DeploymentUnit $unit, DeploymentRuntimeEnvironment $environment): DeploymentContainerRecipe
     {
-        if (DeploymentProfile::resolve($environment->variables['BAANDER_DEPLOYMENT_PROFILE'] ?? 'full',
-            $environment->variables['BAANDER_DEPLOYMENT_PROFILE_JSON'] ?? null) != $this->deploymentProfile) {
+        if (DeploymentProfile::resolve($environment->variables['BAANDER_DEPLOYMENT_PROFILE'] ?? '') != $this->deploymentProfile) {
             throw new InvalidArgumentException('Worker manifest and web deployment profiles must agree.');
         }
         $recipe = new DeploymentContainerRecipe($this->namespace, $this->bootId, $this->daemonId, $this->imageId,
