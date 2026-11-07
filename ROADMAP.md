@@ -616,6 +616,15 @@ paint under the throttled profile; the held-font case exists for that reason. Th
 code review's independent reproduction found the bold and phone-width gaps the
 first fallback left, and the Android gap; all three are closed above.
 
+Published on 2026-11-07 from the merge commit `8c25541e1` as the prebuilt Vercel
+deployment `baander-b64pozzrb-martin-juuls-projects.vercel.app`, aliased to
+`https://baander.app`. Live checks: the homepage, nested manual URLs, the bAAC and
+typography pages answer 200; an unknown URL answers 404; a manual URL without its
+trailing slash redirects with 308; the search bundle, the preload links, the
+rendered search form, the four fallback faces, the Roboto family in the stacks
+and the 404 page's arrow slot are all present; the font files carry the immutable
+cache header; HTTPS verifies.
+
 Open: one scaling factor per weight range cannot match every line, so a long page
 dense with inline code still wraps a few paragraphs differently in the fallback,
 three of 465 blocks at desktop width and 28 at phone width on the developer testing
