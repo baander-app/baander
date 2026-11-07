@@ -1,134 +1,104 @@
 # Baander roadmap
 
-Updated: 2026-11-05. This roadmap selects future work and records unresolved
+Updated: 2026-11-07. This roadmap selects future work and records unresolved
 acceptance. Current operating contracts belong in the linked guides; completed
 milestones and their verification evidence remain in Git history.
 
 ## Forge-neutral CI
 
-The user confirmed the
-[forge-neutral CI plan](docs/plans/2026-11-04-2318-feat-forge-neutral-ci-plan.md),
-delivered on branch `feat/forge-neutral-ci` (local, not pushed).
-Forgejo and GitHub run the same workflows from `.github/workflows`. Each workflow selects its runner, registry, cache store and artifact action from `github.server_url`.
-On GitHub, the runner and PostgreSQL images are public GHCR packages and the application, Nginx and FFmpeg images are private ones; a probe fails the job when a private image can be pulled anonymously.
-The [CI guide](docs-book/part-2-developer-guide/continuous-integration.md) describes the setup and the operator runbook.
+Forgejo and GitHub run the same workflows from `.github/workflows`; each workflow
+selects its runner, registry, cache store and artifact action from
+`github.server_url`. On GitHub, the runner, PostgreSQL and FFmpeg images are public
+GHCR packages, and the application and Nginx images are private ones that a probe
+checks after each push. The
+[CI guide](docs-book/part-2-developer-guide/continuous-integration.md) describes the
+setup and the operator runbook.
 
-Checkpoint, 2026-11-05:
+Open items:
 
-- Tooling suite: 1,505 tests, 9 skipped, no failures, run before the review fixes. After them, the changed tooling tests (`CiPackageStoreTest`, `DockerClientTest`, `ApplicationBuildContractTest`, `PythonBoundaryTest`) pass: 66 tests.
-- `PublicationWorkflowTest` in the CI image: 117 tests, 1,862 assertions. The Docker context check passes, and actionlint 1.7.7 reports only an existing shellcheck note in `aac-native.yml`.
-- Static gates pass: PHPStan and Deptrac (0 violations) in the CI image, plus the tooling analysis, format and architecture checks.
-- `ce-simplify-code` and `ce-code-review` ran (review `20261105-100116-b0d0eade`, "Ready with fixes"). Its two confirmed findings and four residual risks were applied (4895ea248), and this entry closes its roadmap finding.
-
-Checkpoint, 2026-11-05, GitHub rollout of `master` at 1477e2fcc:
-
-- The runner, PostgreSQL and Nginx image workflows published to GHCR; the image workflows of one push race the runner build, so the PostgreSQL and Nginx runs passed on their second attempt. The runner package was made public by hand. The Nginx privacy probe passed, and the public website gate passed.
-- Three forge-specific defects found by the first GitHub runs are fixed and covered by `PublicationWorkflowTest` (120 tests, 1,880 assertions): the job container does not own the workspace (`safe.directory`), job-container steps run under `sh` so `emsdk_env.sh` cannot find its directory (`shell: bash`), and Firefox refuses the runner-owned home directory (`HOME: /root`).
-- Four failures predate the port and reproduced locally in the CI image. The root `.pnp.cjs` from a package setup no longer in use made esbuild reject `i18next` and `hls.js` in the audio graph harness; the transcode browser fixtures required FFmpeg 5 while the images ship 7.1 since the Debian 13 move; the registry container contract read a replacement voter before it had heard from the leader; and the audio graph playback fixture predated session-driven playback. The audio graph suite passes 56 of 56 in Playwright 1.64.1, the publication check and all twelve adaptive movie runs pass, and the registry container qualification passes.
-- The 14 backend failures that also failed on master are fixed: `SignedDeliveryFirewallTest` (184 tests), `OpenApiSpecTest` (26), `CoveredIndexPersistenceTest` (3), `DatabaseNamingConventionTest` (2), `CaptureCoverageTest` with `tests/Unit/Shared/LiveUpdates` (33), plus `CommittedCaptureTest` (21) and `InitialSchemaMigrationTest` (23) for the new capture trigger migration, each in the CI image.
-- Static gates pass in the CI image: PHPStan, Deptrac (0 violations), `lint:container`, the OpenAPI drift check and the web client drift check. The held-frame transcode fixtures pace their producers with the `realtime` and `arealtime` filters, because `-re` paces packets and a held-frame source has one packet per hold.
-
-Checkpoint, 2026-11-06, late native snapshot capture ([plan](docs/plans/2026-11-06-1156-fix-late-native-snapshot-capture-plan.md), branch `fix/late-native-snapshot-capture`):
-
-- Every GitHub run of the backend gate since 6f76024cb had failed at the ordinary delayed-audio movie scenario. The frame observer's native snapshot was one 40 ms frame ahead of its callback (13.40 against 13.36 in run 42121036684, 15.40 against 15.36 in run 42120445948) because the hosted runner let the compositor present the next frame before the snapshot was taken; playback itself was correct in both runs, and the same scenario passed locally.
-- The observer now records a snapshot that is exactly one native frame duration after its callback as a lagged observation and keeps running (384938b7e, 6f9630ba2, 797b3a431). A snapshot earlier than the callback, a fraction of a frame or more than one frame later, or without a positive frame duration stays fatal with the same diagnostics. The lagged count and up to sixteen lagged diagnostics reach the receipt, and the ordinary frame cadence receipt names the count (f5c81054e). The encoder, the fixture commands and the playback assertions are unchanged.
-- Verification: frame observer and video cancellation unit tests pass 71 of 71. In `baander-ci-prewarm:local` with Chromium 156.0.8078.80, `ordinary-delayed-fresh` passed twice (739 of 740 callbacks sampled with 1 lagged, then 738 with 0 lagged), `ordinary-delayed-seek` passed (595 callbacks, 0 lagged) and `sparse-fresh` passed (29 callbacks, 0 lagged). No lint covers these modules: `eslint .` in `ui/web` matches TypeScript files only.
-- `ce-simplify-code` and `ce-code-review` ran (review `20261106-121121-a9dd7822`, focused depth, "Ready with fixes"). Its advisory finding and both testing gaps were applied (797b3a431): the lagged window is exactly one frame, and sub-frame, zero-duration and negative-duration snapshots are pinned as fatal.
-- GitHub run 42209384188 of `master` at f7c27b773 passed every movie scenario, then failed the next step that had never run there, "Production worker lifecycle and dependencies": the fixture lanes resolve `redis/redis-stack-server:edge` and `axllent/mailpit:v1.31.4` by inspection without pulling, and a fresh hosted runner has neither (the long-lived Forgejo runner had them cached). The gate now pulls both from the image catalog in a "Pull fixture images" step after the PostgreSQL pull, pinned by `PublicationWorkflowTest` (121 tests in the CI image).
-- GitHub run 42216012711 (881239211) passed the fixture pull and the worker lifecycle step, then failed "Independent web and worker media ownership in Chromium": the browser reached the disposable web through its randomly published host port while `APP_URL` named `http://127.0.0.1:9501`, so every websocket ticket request answered 403 with "WebSocket Origin is not allowed" and the player never attached ("Playback connection is unavailable"). The two-command browser container now joins the web container's network namespace and uses that origin, like the drill's in-container clients (`BrowserCheckpoint::network`, `DevelopmentBrowserNetworkTest`). Locally in `baander-ci-prewarm:local-worker` the tickets then answered 200 and the attach phase ran; it exposed a second drift, the two-command movie stored a SHA-256 hash while the owned-copy path added on 2026-11-02 verifies the admitted source with xxh3, so the browser's copy job failed with "The admitted source changed before copy execution". The fixture now stores xxh3 like the library scanners, and the copy job completes locally. Tooling suite, architecture, format and PHPStan gates pass.
-
-Checkpoint, 2026-11-06, two-command copy pacing ([plan](docs/plans/2026-11-06-1659-fix-two-command-copy-pacing-plan.md), branch `fix/two-command-copy-pacing`):
-
-- The owned stream copy is paced at its source (a7fea7b3d, 7d9c4c5b6): the copy command reads 48 seconds in one burst and then at twice real time, so its lead over the playhead starts under the throttle's 72-second pause mark and the throttle governs it from there. The seek boundary is normalised on the output side, because under `-copyts` FFmpeg counts the burst from the seek boundary and an input offset would push the burst out by that boundary, leaving a restarted copy unpaced. The pause and resume marks are named constants on the session subscriber, and the burst test is bound to them (7cf695486). `CopySegmentArgumentsTest` passes 3 tests and `VideoCopyPresentationTest` 2 tests with 105 assertions in the CI image, so the packets and boundary are unchanged.
-- The drill reads the movie timeline through its accessible slider (536f2773c), and the browser playback coordinator collapses seeks queued behind an executing intent into the latest position (659baa4d9); the drill's scrubbing proof had sent an outdated target after the current one. The overlay's play and pause clicks and the coordinator's intent path leave performance marks that the drill copies into its failure capture (40e7e235d).
-- Two proofs predated the owned-copy path and the recovery design. After a reload, the page's Play button only reopens the overlay when the session already holds the movie, and recovery releases the browser's runner, so the drill now reopens the overlay at the recovered position, resumes through the overlay's Play, waits for the session to confirm the local playback and accepts the one source seek that places the cursor. The operator's pause and seek act on the operator's own session, so the sought-paused, web-restarted and worker-recovered checkpoints prove the browser's own cursor, session and generation survive those phases. A native pause reaches the session only with the next presence observation, so the pause before a reload goes through the overlay.
-- Replacing web during the drill had orphaned the browser container in the dead web container's network namespace. The browser now joins the drill network and forwards its own loopback port to the web's network alias for every connection (4a5cf3460), so the origin is unchanged and a replaced web is followed; the container-namespace form of the checkpoint is gone (37d546e72).
-- A browser without automatic local recovery (Firefox lacks the remote playback state the eligibility check reads) could not resume its own playback after an outage that outlived its 30-second registration: its stop proof left the old incarnation active and unavailable, so Play was refused as unconfirmed. A runner's own stop report now releases the session at the reported cursor unless the session asked for the stop (e37d56eae, 7cf695486); `StoppedRunnerObservationTest` pins the release, the deliberate stop, a paused report and a bystander's report (4 tests), and `PlaybackTransferPersistenceTest` keeps the transfer after a stop proof.
-- Verification in the CI image: the Session unit tests pass 319 tests with 1,748 assertions, `PlaybackTransferPersistenceTest` and `LocalPlaybackRecoveryPersistenceTest` 36 tests, PHPStan and Deptrac report no errors; the tooling suite, architecture, format and PHPStan gates pass; the web typecheck and lint pass and the session and catalog tests pass 418 of 418. In `baander-ci-prewarm:local-worker` rebuilt from 7cf695486, the two-command drill passed every phase in Chromium 156.0.8078.80 and in Firefox 157.0, each ending at generation 15 with one movie completion.
-- `ce-simplify-code` and `ce-code-review` ran (review `20261106-211245-c95060f2`, full depth, "Ready with fixes"). Its one defect was applied: the release had also fired after a deliberate Stop, turning the stopped session into paused; the comment cleanup and the subtitle-proof assertion were applied as well.
-
-Open items for this plan:
-
-- Dual-forge acceptance is partial. On GitHub the gates have not yet run green on one `master` commit with these fixes. The ordinary-scenario failure that stopped every run is fixed (2026-11-06), and the backend gate's steps after the ordinary movie scenarios have still not run there; the next push shows whether they pass.
-- The lagged tolerance measures the duration of the snapshotted frame, which equals the callback frame's duration for the constant-rate fixtures (25 fps, or one frame per second); a variable-rate source would misclassify. The lagged rate has no ceiling of its own: the unchanged 60 percent coverage thresholds bound it, and the receipt's lagged count is the signal.
-- The two-command drill passes locally in both engines after the copy pacing checkpoint. On GitHub the last run before it (42235123759, 7a06bdcf4) failed the Chromium step at the slider proof, so no hosted run has executed the later proofs since the owned-copy path landed, and the next push shows whether the hosted runner agrees. The gate's following step, "Selected video endpoint through movie completion and replay", fails locally in the rebuilt image at its exact-end endpoint seek: the seek to the 42-second source end is accepted and the worker pauses at 42 with a window from 18 seconds, but the session's seek control stays unacknowledged until a stop supersedes it 20 seconds later and the player is torn down ("The playback request was superseded."). That proof has not run anywhere since the owned-copy path either; its receipts are in `var/test-runs/20261106-movie-endpoint-chromium`. Still needed: one `master` commit green on both forges, the gate workflows through a pull request on each, and one scheduled nightly run on each.
-- The copy's lead after the first throttle pause is unmeasured. FFmpeg's read-rate clock keeps running while the producer is stopped, so a resumed copy may publish its accrued allowance in one burst before the throttle stops it again; the drill samples only the first window. Measure the published end across a pause and resume cycle before changing the rate.
-- A native pause reaches the playback session only with the next presence observation, up to ten seconds later, so a reload inside that window recovers an older cursor. The overlay's own controls are acknowledged with their position at once.
-- Forgejo acceptance is deferred (user decision, 2026-11-05). The instance's only runner (`docker-cli`, `node`) had been offline since the last executed run on 2026-10-26, so every run since then waited. After it was restarted on 2026-11-05, every job of the oldest queued run (c91b42cdb) that runs inside the Forgejo registry's `baander-runner:latest` (built 2026-10-15) failed within a minute, while the `docker:cli` runner build ran; the cause is unread because Forgejo 15's API lists runs and tasks but serves no job logs or cancellation, and the queue still holds the stale runs for c91b42cdb, fcf5eb305 and 1477e2fcc ahead of 6f76024cb. Resuming needs: cancel the stale runs in the web UI, read one failed job's log there, and rebuild the Forgejo runner image from the current tree.
-- Unverified on GitHub: whether Forgejo 15 scopes its workflow token by `permissions`; whether socket-launched test containers bind-mount workspace paths on the hosted runner; and whether the backend gate fits a hosted runner's 16 GB of memory and 14 GB of disk, and how long each job takes there. GitHub accepts the shell checkout's `x-access-token` basic authentication.
-- The held-frame transcode fixtures publish the frames generated after the source's last packet about ten seconds late: the frames leave the `realtime` filter one per second, but the muxer receives them together once the filter graph reaches its end, with or without x264 frame threading, `sync-lookahead`, strict interleaving or the encoder's frame sync. Playback stalls for about ten seconds in every held-frame run, as it did under `-re`, and the runs pass.
-- `uniq_transcode_jobs_owner_user_id_video_id_quality_tier_name` names three of its five columns; a consistently shortened column form would be truer to the naming guide.
-- `ui/web/src/features/session/live-coverage.ts` lists only `listening_sessions` and `devices` as the sources of `session.sessions`, although the snapshot also reads the four playback tables, and that capture now targets a query the relay feeds; whether the table should stay captured is undecided.
-- A cancelled Forgejo run may skip the step that removes its per-run BuildKit builder and leave that builder's container on the shared daemon.
-- `PublicationWorkflowTest` grew to about 1,400 lines, including a workflow-expression evaluator and a tree linter that could move into test-support classes.
-- The coverage comment steps still interpolate the stored baseline into `node -e` as code, as the Forgejo workflows did.
-- `PackageStore` error paths without tests: restore into a non-empty target, constructor validation, and saving a missing directory.
+- Dual-forge acceptance is partial: no `master` commit has yet run every gate green
+  on both forges, the gate workflows have not run through a pull request on each,
+  and no scheduled nightly has run on each.
+- The two-command drill passes locally in Chromium and Firefox, but no hosted run has
+  executed its proofs since the owned-copy path landed. The gate's "Selected video
+  endpoint through movie completion and replay" step fails locally at its exact-end
+  seek: the seek to the 42-second source end is accepted and the worker pauses at 42,
+  but the session's seek control stays unacknowledged until a stop supersedes it 20
+  seconds later ("The playback request was superseded."). Receipts are in
+  `var/test-runs/20261106-movie-endpoint-chromium`.
+- Forgejo acceptance is deferred (user decision, 2026-11-05). Every job of the oldest
+  queued run that ran inside the Forgejo registry's `baander-runner:latest` (built
+  2026-10-15) failed within a minute, and Forgejo 15's API serves no job logs or
+  cancellation. Resuming needs: cancel the stale runs in the web UI, read one failed
+  job's log there, and rebuild the Forgejo runner image from the current tree.
+- Unverified on GitHub: whether Forgejo 15 scopes its workflow token by
+  `permissions`; whether socket-launched test containers bind-mount workspace paths
+  on the hosted runner; and whether the backend gate fits a hosted runner's memory
+  and disk.
+- The frame observer's lagged tolerance measures the snapshotted frame's duration,
+  which equals the callback frame's for the constant-rate fixtures; a variable-rate
+  source would misclassify. The lagged rate has no ceiling of its own beyond the 60
+  percent coverage thresholds.
+- The copy's lead after the first throttle pause is unmeasured. FFmpeg's read-rate
+  clock keeps running while the producer is stopped, so a resumed copy may publish
+  its accrued allowance in one burst; measure the published end across a pause and
+  resume cycle before changing the rate.
+- A native pause reaches the playback session only with the next presence
+  observation, up to ten seconds later, so a reload inside that window recovers an
+  older cursor.
+- The held-frame transcode fixtures publish the frames generated after the source's
+  last packet about ten seconds late, so playback stalls for about ten seconds in
+  every held-frame run; the runs pass.
+- `uniq_transcode_jobs_owner_user_id_video_id_quality_tier_name` names three of its
+  five columns.
+- `ui/web/src/features/session/live-coverage.ts` lists only `listening_sessions` and
+  `devices` as the sources of `session.sessions`, although the snapshot also reads
+  the four playback tables; whether that capture should stay is undecided.
+- A cancelled Forgejo run may skip the step that removes its per-run BuildKit builder
+  and leave that builder's container on the shared daemon.
+- `PublicationWorkflowTest` is about 1,400 lines, including a workflow-expression
+  evaluator and a tree linter that could move into test-support classes.
+- The coverage comment steps still interpolate the stored baseline into `node -e` as
+  code.
+- `PackageStore` error paths without tests: restore into a non-empty target,
+  constructor validation, and saving a missing directory.
 
 ## System overview pages
 
-Delivered, 2026-11-05, on branch `docs/system-overview-pages` (local, not pushed), from the
-[system overview pages plan](docs/plans/2026-11-05-1910-docs-system-overview-pages-plan.md):
-the operator guide's [Deployment Topology](docs-book/part-1-operator-guide/deployment-topology.md)
-and the developer guide's [Communication Map](docs-book/part-2-developer-guide/communication-map.md),
-with the routing diagram on CQRS and Messaging, the transcode lifecycle on the Transcode
-context page and the DPoP handshake on API Reference. The Transcode context page's
-infrastructure sections and streaming route table now describe the worker pair design and
-the current routes, and API Reference no longer mentions query-token WebSocket
-authentication. Understanding Baander, Architecture Overview, both guide indexes and the
-documentation root point at the new pages.
+Delivered and published on 2026-11-05: the operator guide's
+[Deployment Topology](docs-book/part-1-operator-guide/deployment-topology.md) and the
+developer guide's [Communication Map](docs-book/part-2-developer-guide/communication-map.md).
 
-Checkpoint, 2026-11-05:
+Open items:
 
-- `php scripts/build-website.php`: 210 manual pages, every relative link and fragment resolved, five new Mermaid blocks rendered through the local helper.
-- Browser rendering spec (`corepack yarn test:browser` in `ui/site`): 59 passed. Its diagram page list now names the two hubs, the Transcode context page, CQRS and Messaging and API Reference, so the first sequence diagram passes the same width, variant and alt checks as the flowcharts.
-- Helper tests (`node --test scripts/*.test.mjs` in `ui/site`): 4 passed.
-- prose-fix review applied to every new or changed page.
-- The CI gate is the GitHub public website workflow, which runs on changes under `docs-book/`; Forgejo has no website gate.
-- `ce-code-review` ran (review `20261105-200600-58aa65a1`, "Ready with fixes"): its one confirmed finding, the Transcode page's streaming table calling the required `generation` query optional, is applied; the build passed again at 210 pages. Two advisory testing notes are recorded below.
-- Published, 2026-11-05: master at c8edf1cba merged and pushed to both forges, the artifact rebuilt at that revision and promoted on Vercel (`https://baander-jpybm97ob-martin-juuls-projects.vercel.app`, aliased to `https://baander.app`). Over `https://baander.app`: the homepage, the two hub pages, the Transcode context page and API Reference answer 200 with valid HTTPS, each hub carries one rendered diagram figure, the route-table fix is live, and an unknown URL answers 404. The preview deployment sits behind Vercel's deployment protection, so its checks were run over production instead.
-
-Open items for this plan:
-
-- The Mermaid helper's own tests (`ui/site/scripts/render-blocks.test.mjs`) still render only the three original flowchart pages, so the book's first sequence diagram is checked by the website build and the browser spec but not by the helper's font, marker and no-foreignObject assertions.
-- The browser spec's diagram page list is kept by hand; nothing asserts that every docs-book page with a Mermaid fence is listed, and the spec expects exactly one figure per listed page.
-
-- The Auth context guide still names a task transport that no longer exists; it belongs to a later documentation pass.
-- Two entries under `docs/solutions` name a transport that no longer exists and a single combined consumer; they are candidates for `ce-compound-refresh`.
+- The Mermaid helper's own tests (`ui/site/scripts/render-blocks.test.mjs`) render
+  only the three original flowchart pages, so the book's first sequence diagram is
+  checked by the website build and the browser spec but not by the helper's font,
+  marker and no-foreignObject assertions.
+- The browser spec's diagram page list is kept by hand; nothing asserts that every
+  docs-book page with a Mermaid fence is listed.
+- The Auth context guide still names a task transport that no longer exists.
+- Two entries under `docs/solutions` name a transport that no longer exists and a
+  single combined consumer; they are candidates for `ce-compound-refresh`.
 
 ## Interactive manual diagrams
 
-Delivered, 2026-11-05, on branch `feat/interactive-manual-diagrams` (local, not pushed), from the
-[interactive manual diagrams plan](docs/plans/2026-11-05-2113-feat-interactive-manual-diagrams-plan.md).
-Every Mermaid diagram in the published manual is interactive without a change to its source.
-The docs page script `ui/site/assets/diagram-explore.js` swaps the static image for the built,
-sanitized SVG once the fetch returns a real SVG document, and lets the reader follow one
-connection at a time: pointing at a node colors its edges and their far ends with the ring
-color and recedes the rest; pointing at an edge, its label or a wide invisible hit path
-emphasizes that edge and both endpoints; a sequence message lights its text and lifelines.
-A click or tap pins, Enter steps through nodes and their edges with a live-region
-announcement and a visible hint, Escape leaves. The other theme's variant is fetched on the
-first switch with the pin and scroll position carried over, and a click on a page control
-keeps the pin. Without JavaScript, or when the asset is rejected, the page is as built. The
-render helper stamps each node, cluster, edge and label with its endpoints from Mermaid's
-parsed graph and fails the build on an edge it cannot match.
+Delivered and published on 2026-11-05: every Mermaid diagram in the published manual
+is interactive, through `ui/site/assets/diagram-explore.js`, without a change to its
+source.
 
-Checkpoint, 2026-11-05:
+Open items:
 
-- Helper tests (`node --test scripts/render-blocks.test.mjs` in `ui/site`): 11 passed, seven of them for the endpoint data, clusters, a double edge, invisible edges, a sequence and the unmatched-edge failure.
-- PHP tooling suite (`vendor/bin/phpunit -c phpunit-tooling.xml.dist`): 1,509 tests, 12,969 assertions, 9 skipped, no failures; the figure markup and the sanitizer are unchanged.
-- `php scripts/build-website.php`: 210 manual pages; the built figures are unchanged apart from the script tag on docs pages, so the search index carries no diagram text, as before.
-- Typecheck (`corepack yarn typecheck` in `ui/site`, tests included): clean; `@types/node` is now a declared development dependency.
-- Browser spec (`corepack yarn test:browser` in `ui/site`): 71 passed, and the no-JavaScript sweep is unchanged. Its 13 JavaScript-enabled cases cover the swap and accessible name, node and edge emphasis including a pointer beside the hit stroke, a sequence message and its hit line, stepping with Home, End and both arrow axes with the announcer's full text, stepping from a pinned edge, pin release by click, a pinned node across a theme switch, rejected assets (wrong content type, 404, wrong root, broken XML, a failing other variant), and tap, pan and swipe on a touch viewport. The touch cases run through a `test.use` touch viewport in the spec rather than a separate Playwright project.
-- Fidelity check: with the script tag stripped from the built pages, every JavaScript-enabled case fails except the rejected-asset case, which asserts the fallback and holds by construction.
-- `ce-simplify-code` ran (b3395f43e). `ce-code-review` ran (review `20261105-222752-9012df74`, "Ready with fixes", eight reviewers, the cross-model pass disabled by checkout config). Its eleven findings are applied (d2170e791): a sequence hit line that Mermaid's id-scoped rule narrowed to 2px, wrapped message rows paired with the wrong message, the inlined title showing as a tooltip, a pin lost to a pan or scrollbar drag, a theme switch or scroll during the first fetch lost, and five spec cases that passed without proving their behaviour.
-- Published, 2026-11-05: master at a7d509cd6 merged and pushed to both forges, the artifact rebuilt at that revision and promoted on Vercel (`https://baander-1nk4pdt83-martin-juuls-projects.vercel.app`, aliased to `https://baander.app`). Over `https://baander.app`: Deployment Topology, Communication Map and API Reference answer 200 and carry the diagram script tag, the script and the topology SVG asset answer 200 with their content types, and the topology image is the narrowed 670-pixel build. This promotion also carries the narrowed diagrams of 37259b0fa, which had not been promoted before.
-
-Open items for this plan:
-
-- No built page carries two diagram figures, so the shared document listener, the hint ids and cross-figure pin release are untested in a browser; the spec also lacks an OS-level theme change without the toggle and a wrapped (`<br/>`) sequence message.
-- The render helper's `describeDiagram` option exists only so a test can force an unmatched edge; it should not grow further test-only hooks.
-- The inlined SVG carries its own embedded font subset, so page font slicing (`PageFonts`) never sees diagram labels; a diagram with non-Latin labels has not been checked.
-- The diagram fade uses the fast duration token with the browser's default easing; `ui/DESIGN.md` states ease-out for the app shell and is silent for the static site.
+- No built page carries two diagram figures, so the shared document listener, the
+  hint ids and cross-figure pin release are untested in a browser; the spec also
+  lacks an OS-level theme change without the toggle and a wrapped (`<br/>`) sequence
+  message.
+- The render helper's `describeDiagram` option exists only so a test can force an
+  unmatched edge; it should not grow further test-only hooks.
+- The inlined SVG carries its own embedded font subset, so page font slicing never
+  sees diagram labels; a diagram with non-Latin labels has not been checked.
+- The diagram fade uses the fast duration token with the browser's default easing;
+  `ui/DESIGN.md` states ease-out for the app shell and is silent for the static site.
 
 ## Small-host household deployment
 
@@ -143,39 +113,43 @@ Open items for this plan:
 - The web control socket twice closed an `app:server:stats` request without answering under load (household repeats 1 and 2, 2026-11-03); the cause is unknown. The harness now retries and records such samples.
 - The preset inherits `OTEL_ENABLED=true` with an unreachable `host.docker.internal` endpoint from `.env`, so web workers spend time on failing span exports. The preset should disable export unless the operator configures a collector.
 - After a PostgreSQL crash the worker pair stops ("deployment reconciliation is required") and stays stopped until an operator intervenes.
-- `CaptureCoverageTest` passed once the playback-destination tables were excluded and the six `listening_sessions` columns captured on 2026-11-05 (see Forge-neutral CI).
 - `ce-simplify-code` ran (4c24a9bb5); its affected tooling, backend and web tests passed. Shipping gates not yet run: `ce-code-review`, the full backend suites, worker runtime container suites, affected browser playback specs and a documentation build. `baander-database:latest` has not been rebuilt, so existing instances still run PostgreSQL without the THP launcher.
 - The household profile has not been requalified since the configurable media capacity work added the connection pooler and removed its container limits; its published measurements predate both changes.
 
 ## Configurable media capacity
 
-The user confirmed the
-[configurable media capacity plan](docs/plans/2026-11-03-1905-feat-configurable-media-capacity-plan.md),
-delivered on branch `feat/configurable-media-capacity` (local, not pushed).
-Full-profile operators set the video and audio job slots: 8 and 12 by default, or 12 video slots with a configured hardware encoder. The slots are Bånder's only bound on media work.
-No container carries a CPU, memory or PID limit, and an `oom_score_adj` kill order protects the stateful services.
-All database traffic goes through PgBouncer 1.26.1 with separate application and control pools, and the images moved to Debian 13 with FFmpeg 7.1.
-[System Requirements](docs-book/part-1-operator-guide/system-requirements.md) publishes the per-job costs and the reference margins.
+Delivered on 2026-11-04: full-profile operators set the video and audio job slots, 8
+and 12 by default or 12 video slots with a configured hardware encoder; no container
+carries a CPU, memory or PID limit; all database traffic goes through PgBouncer with
+separate application and control pools.
+[System Requirements](docs-book/part-1-operator-guide/system-requirements.md)
+publishes the per-job costs and the reference margins.
 
-Checkpoint, 2026-11-04:
+Open items:
 
-- The 8 + 12 software load proof (`var/u10/software/media-load.json`) and the 12 + 12 VAAPI load proof (`var/u10/hardware/media-load.json`) passed every criterion on the Ryzen 7 5800X3D and RX 9070 XT. Every job completed with no containment, restart or OOM kill, lease helpers stayed at or below 0.40 s against a 1.5 s deadline, and PostgreSQL backends peaked at 30 of 32. Software video ran at 0.251–0.256x real time and hardware video at 1.26–1.28x. Alone, `libx264` ran at 1.08x, `libx265` at 1.30x, `h264_vaapi` at 9.4x and `hevc_vaapi` at 13.7x.
-- Full backend suite on `baander-ci:capacity` and `baander-database:capacity` (`var/test-runs/20261104-122123-1848a3a1`, 11,568 tests): the native lane passed 913 tests, and the only failures are the 14 that also fail on master (listed below).
-- Tooling suite: 1,455 tests, 9 skipped, no failures. Static gates pass: PHPStan, Deptrac (0 violations) and `lint:container` in the CI image, plus the tooling analysis, format and architecture checks.
-- `ce-simplify-code` (a007a8f63) and `ce-code-review` ran. The review's one code finding was applied (5bb051540), and this entry closes its roadmap finding. Four learnings were recorded under `docs/solutions/`.
-
-Open items for this plan:
-
-- At the default 8 software video slots, the reference host keeps about two 1080p `libx264` encodes in real time, not eight, so operators who convert video in software must lower the slots. The default was the user's choice and is unchanged.
-- The 14 backend failures that also occurred on master (`SignedDeliveryFirewallTest`, `OpenApiSpecTest`, `CoveredIndexPersistenceTest`, `DatabaseNamingConventionTest`, `CaptureCoverageTest`) were fixed on 2026-11-05 (see Forge-neutral CI).
-- Not run: the controls drill at 8 + 12 (the default drills keep the 3 + 1 fixture), and NVENC, QSV and AMF on real hardware. The static FFmpeg image now builds; see bAAC in the server transcoder. The NVENC device-request shape that containment verification compares was not checked against a Docker NVIDIA runtime.
-- Existing PostgreSQL volumes need `REINDEX` and `ALTER DATABASE … REFRESH COLLATION VERSION` on the Debian 13 database image; `baander-database:latest` and the persistent instance were not touched.
-- Transcode execution ownership renewal runs on the application pool, where a client can wait up to PgBouncer's default 120 s; the ownership lease is 15 s. The load proofs saturated that pool without a missed renewal, but a burst of long application transactions could delay renewals past the lease.
-- The control pool fails a media authority query that waits more than one second. In the 8 + 12 software pass it peaked at 8 of 8 server connections with no wait; larger slot counts are unproven.
-- The pooler's `admin_users` is the application role, so web and worker processes could pause or stop the pooler; the development checks need only `stats_users`.
-- When a progress report races the write that records a failed encode, that write is refused and the failure stays unrecorded on that path (behaviour that predates this plan).
-- The governor's warm-up encodes predict about 40% of the host per 1080p stream, against about 21% measured for full encodes. Nothing is vetoed, because each media child budgets only its own stream.
-- Test gaps: the functional suite connects to PostgreSQL directly, so transaction-pooling incompatibilities surface only in the worker drills, and `HostCpus` and the boot-row fingerprint check constraint have no direct tests.
+- At the default 8 software video slots, the reference host keeps about two 1080p
+  `libx264` encodes in real time, not eight, so operators who convert video in
+  software must lower the slots. The default was the user's choice and is unchanged.
+- Not run: the controls drill at 8 + 12 (the default drills keep the 3 + 1 fixture),
+  and NVENC, QSV and AMF on real hardware. The NVENC device-request shape that
+  containment verification compares was not checked against a Docker NVIDIA runtime.
+- Existing PostgreSQL volumes need `REINDEX` and
+  `ALTER DATABASE … REFRESH COLLATION VERSION` on the Debian 13 database image;
+  `baander-database:latest` and the persistent instance were not touched.
+- Transcode execution ownership renewal runs on the application pool, where a client
+  can wait up to PgBouncer's default 120 s; the ownership lease is 15 s. A burst of
+  long application transactions could delay renewals past the lease.
+- The control pool fails a media authority query that waits more than one second;
+  slot counts above 8 + 12 are unproven against it.
+- The pooler's `admin_users` is the application role, so web and worker processes
+  could pause or stop the pooler; the development checks need only `stats_users`.
+- When a progress report races the write that records a failed encode, that write is
+  refused and the failure stays unrecorded on that path.
+- The governor's warm-up encodes predict about 40% of the host per 1080p stream,
+  against about 21% measured for full encodes.
+- Test gaps: the functional suite connects to PostgreSQL directly, so
+  transaction-pooling incompatibilities surface only in the worker drills, and
+  `HostCpus` and the boot-row fingerprint check constraint have no direct tests.
 - The development `docker-compose.yml` sets no `oom_score_adj`.
 
 ## Playback destinations and notifications
@@ -213,35 +187,48 @@ retry-after-network-failure case remains outside this recovery check.
 
 ## bAAC in the server transcoder
 
-The user confirmed the
-[bAAC FFmpeg and transcoder plan](docs/plans/2026-11-07-0918-feat-baac-ffmpeg-transcoder-plan.md),
-delivered on branch `feat/baac-ffmpeg-transcoder` (local, not pushed).
-The project's static FFmpeg 8.1 build carries bAAC from `packages/baander-aac` as the `libbaac` encoder and decoder beside fdk-aac and FFmpeg's built-in AAC codec, and the application image runs that build at `/usr/bin` in place of Debian's package.
-The system setting `transcode.aac_implementation` (`baac` by default, `fdk_aac`, `ffmpeg`; admin and `app:settings:set`) selects the AAC encoder and the decoder of AAC sources for audio renditions and DASH sessions. A session fixes it at creation, cache and presentation identities ignore it, a missing implementation is refused before the encoder starts, and a rendition that failed under one implementation is encoded again once another is selected.
-The [transcoding guide](docs-book/part-1-operator-guide/transcoding.md#aac-implementation) documents the setting.
+Delivered and merged on 2026-11-07: the project's static FFmpeg 8.1 build carries
+bAAC as the `libbaac` encoder and decoder beside fdk-aac and FFmpeg's built-in AAC
+codec, and the application image runs it at `/usr/bin`. The
+`transcode.aac_implementation` setting selects the implementation (see the
+[transcoding guide](docs-book/part-1-operator-guide/transcoding.md#aac-implementation)).
+The `ffmpeg` role of the tooling image catalog pins the published image by digest.
+VAAPI is qualified on the RX 9070 XT.
 
-Checkpoint, 2026-11-07:
+Open items:
 
-- The static image built locally (451 MB). Its smoke encodes stereo and 5.1 with bAAC and decodes the result with the built-in decoder and with bAAC at 39.6 to 41.5 dB SNR, keeps the 5.1 channel order and conceals a damaged ADTS frame. The capability gate finds all 40 listed accelerators, hardware encoders, AAC encoders and decoders, filters and demuxers, and every shared object resolves.
-- The CI image built against it runs `ffmpeg version 8.1` with `--enable-libbaac`, has no Debian FFmpeg package and passes the same gate.
-- Backend suites on that image with bAAC as the default: unit and static-analysis rules 8,436 tests, functional 1,497 tests, integration 1,770 tests. Its failures were the migration-history pins in `InitialSchemaMigrationTest` (updated, 25e57d843, and passing), a PGroonga lookup error in `LibraryDirectoryPublicationTest` that passed on rerun, and the playback transfer failure listed below. PHPStan, Deptrac (0 violations), `lint:container` and the OpenAPI check pass. The tooling suite ran 1,523 tests with 9 skipped; its one failure, the Python boundary on the smoke script, was fixed (b2962c80f) and `PythonBoundaryTest` passes. The tooling analysis, format, architecture and source-policy checks pass, and the settings frontend tests pass 451 tests.
-- The suites found two FFmpeg 8.1 build gaps against Debian's package, both fixed (8898c5d39): no DASH demuxer (libxml2 was missing), which failed every copy presentation at its output probe, and no `scale_cuda`/`yadif_cuda` (no clang CUDA compilation) for the NVENC path. The gate now lists both, so the build fails if they go missing again.
-- Probe drift, ffprobe 7.1 against 8.1 on generated MP4, Matroska, WebM, MOV, MPEG-TS, FLAC and MP3 sources: packet timestamps match everywhere. Matroska and WebM sources whose audio has priming now report a container start of 0 instead of a small negative value, so `VideoProbeResult` derives a video end for them and their DASH audio takes the padded path instead of the shortest-stream cut. Only new or re-probed videos see this; their presentations re-encode once.
-- VAAPI qualification on the AMD Radeon RX 9070 XT, 2026-11-07, with a worker image built from `fc473c9a6` against the static FFmpeg image. The worker's start-up qualification (native daemon, VAAPI deployment profile, render node and its group, no network or capabilities) qualified `hevc_vaapi` and, when named, `h264_vaapi`, as the previous Debian 7.1 worker image does. `debug:hw-transcode` on the published snapshot reports the VAAPI profile and all three AAC implementations as encoder and decoder. The hardware cost harness (`media-cost-hardware-1794064471-3277643`) ran `hevc_vaapi` at 16.1x alone and 1.26x for the slowest of 12 streams, and `h264_vaapi` at 9.67x alone and 0.78x at 12, against 13.3x, 1.12x and 8.98x recorded on FFmpeg 7.1.
-- Merged into `master` as `fc473c9a6` and pushed to both remotes. The website was published from that commit as the prebuilt Vercel deployment `baander-38fhhv2pr-martin-juuls-projects.vercel.app`, aliased to `https://baander.app`. The protected preview and the live domain both served the homepage, the bAAC page with its server-transcoding section, the transcoding guide's `#aac-implementation` anchor and search with HTTP 200, and an unknown URL with 404, over valid HTTPS.
-- The adaptive browser check passed in Chromium 156 under bAAC and under FFmpeg's built-in codec; the producer commands used `libbaac` and `aac` respectively. The documentation site built (210 manual pages).
-- `ce-simplify-code` (7f571d2d6) and `ce-code-review` ran. The review's five findings were applied: Forgejo CI reads the FFmpeg image from its own registry (80755fd59), the smoke and gate require every implementation (8898c5d39), a failed codec listing raises instead of being cached (e50014407), failed renditions retry after a switch (17a52426f), and the refusal branches have tests (042a46070).
-
-Open items for this plan:
-
-- Confirm that master's CI passes on `7cf6db42b`, the first run with the pinned FFmpeg image; it was still running on 2026-11-07. The two runs before it (`fc473c9a6`, `b9f7ef3ca`) failed at "Build CI image" because no FFmpeg image was published yet.
-- Decide whether `ffmpeg-baander-static` stays public. The image is built with fdk-aac under `--enable-nonfree`, which FFmpeg marks as not redistributable, and GHCR now serves it anonymously. The user allowed the public package (2026-11-07) before this was raised. The alternatives are making the package private again (CI pulls it with its workflow token) or dropping fdk-aac, which removes the `fdk_aac` position of the setting.
-- Check that `ffmpeg.yaml` ran and published on Forgejo after the merge push. Forgejo CI reads `ffmpeg-baander-static:latest` from the Forgejo registry and fails at "Build CI image" without it.
-- The first GitHub run of `ffmpeg.yaml` (from `fc473c9a6`) built and published the image in about 87 minutes from a cold cache, then failed only its anonymous-pull check, because the package is public; the user allowed that, and the check was removed (a8e8ec2b4). The `ffmpeg` role now pins `sha256:dbec52eb…4cd8aa`, which pulls anonymously, reports FFmpeg 8.1 and passes the 40-entry gate.
-- NVENC and QSV were not run on hardware; the gate only proves their components are compiled in. VAAPI is qualified (see the checkpoint).
-- Not run: the stream-copy pacing re-check that `docs/solutions/performance-issues/pace-a-stream-copy-with-a-read-rate-burst-counted-from-the-seek-boundary.md` asks for at the next FFmpeg major. The testing guide's statement that `-shortest` buffers up to ten seconds is unverified on FFmpeg 8.
-- Found and not fixed (outside this plan): the NVENC HDR path emits `tonemap_cuda`, a filter neither Debian's FFmpeg nor this build has; `PlaybackTransferPersistenceTest::testReconnectUsesExplicitOldEndpointStopProofWithoutInheritingItsAuthority` fails with the branch's code on both FFmpeg builds, and the branch changes no Session code; `packages/baander-aac`'s `test_usac_enc` byte-identical fixture fails on this host's compiler; `MediaWorkerRunnerTest::testSerialAudioJobsReuseOneSlotWithIncreasingLaunchGenerations` failed once under CPU load and passes alone; GitHub reports 178 Dependabot alerts on the default branch (3 critical, 78 high), which this work did not change.
-- Review advisories left for a decision: a rendition whose source codec ffprobe cannot report decodes with FFmpeg's default decoder instead of the selected one; the libbaac decoder labels 7- and 8-channel output with an unspecified layout unless the container gives one; it neither trims nor drains decoder delay, which matters only for MPEG Surround sources; the unused `FFmpegAdapter` per-segment encoders read the live setting rather than a session's.
+- Confirm that master's CI passes on `7cf6db42b`, the first run with the pinned
+  FFmpeg image; the two runs before it failed at "Build CI image" because no FFmpeg
+  image was published yet.
+- Decide whether `ffmpeg-baander-static` stays public. The image is built with
+  fdk-aac under `--enable-nonfree`, which FFmpeg marks as not redistributable, and
+  GHCR serves it anonymously. The user allowed the public package (2026-11-07) before
+  this was raised. The alternatives are making the package private again (CI pulls it
+  with its workflow token) or dropping fdk-aac, which removes the `fdk_aac` position
+  of the setting.
+- Check that `ffmpeg.yaml` ran and published on Forgejo. Forgejo CI reads
+  `ffmpeg-baander-static:latest` from the Forgejo registry and fails at
+  "Build CI image" without it.
+- NVENC and QSV were not run on hardware; the capability gate only proves their
+  components are compiled in.
+- Not run: the stream-copy pacing re-check that
+  `docs/solutions/performance-issues/pace-a-stream-copy-with-a-read-rate-burst-counted-from-the-seek-boundary.md`
+  asks for at the next FFmpeg major. The testing guide's statement that `-shortest`
+  buffers up to ten seconds is unverified on FFmpeg 8.
+- Found and not fixed: the NVENC HDR path emits `tonemap_cuda`, a filter neither
+  Debian's FFmpeg nor this build has;
+  `PlaybackTransferPersistenceTest::testReconnectUsesExplicitOldEndpointStopProofWithoutInheritingItsAuthority`
+  fails on master code on both FFmpeg builds; `packages/baander-aac`'s
+  `test_usac_enc` byte-identical fixture fails on this host's compiler;
+  `MediaWorkerRunnerTest::testSerialAudioJobsReuseOneSlotWithIncreasingLaunchGenerations`
+  failed once under CPU load and passes alone; GitHub reports 178 Dependabot alerts
+  on the default branch (3 critical, 78 high).
+- Review advisories left for a decision: a rendition whose source codec ffprobe
+  cannot report decodes with FFmpeg's default decoder instead of the selected one;
+  the libbaac decoder labels 7- and 8-channel output with an unspecified layout unless
+  the container gives one; it neither trims nor drains decoder delay, which matters
+  only for MPEG Surround sources; the unused `FFmpegAdapter` per-segment encoders read
+  the live setting rather than a session's.
 
 ## Learning and plan maintenance
 
@@ -283,12 +270,6 @@ minimatch advisory requiring version 11; its compatible Babel security update is
 applied. These findings remain visible in online output. Yarn still reports three
 upstream dash.js peer requirements in the `@svta/cml-*` packages; the real DASH
 playback check passes for the tested path.
-
-Native audio qualification completed on 2026-11-05: the four worklet meter
-assertions failed because the test tone did not fit the meter's 10 ms window at
-44.1 kHz, and the WebKit interruption case stalled because the test polled
-`seekable` while a length-delimited MP3 started loading. Neither was an
-application audio regression (see Forge-neutral CI).
 
 ## PHP dependency and runtime refresh
 
@@ -514,158 +495,44 @@ then read one with `git show ef388275de15f5d63af5a7bb1a056ccf20183841:<path>`.
 The six plans retained by that cleanup contain unfinished or partly superseded commitments;
 their retention does not resume deferred work or validate historical assumptions.
 
+The roadmap and plans before the 2026-11-07 cleanup are preserved at
+`b9a67726f`. Read the delivered checkpoints of forge-neutral CI, the system overview
+pages, interactive diagrams, configurable media capacity, bAAC and the website
+typography work with `git show b9a67726f:ROADMAP.md`, and the plans retired then with
+`git show b9a67726f:docs/plans/<file>`.
+
 The entries below preserve the installation guides' linked checkpoint and the
-open items left by the AAC codec work.
+open items left by delivered work.
 
 ### Geist and Noto typography
 
-Delivered on branch `feat/geist-noto-typography` from the
-[typography plan](docs/plans/2026-11-04-1910-feat-geist-noto-typography-plan.md):
-Geist and Geist Mono with self-hosted Noto fallbacks in the web app, Electron and
-the public site; ten type roles with phone sizes below 768px; the 12px floor with
-11px only in admin tables, badges and chips; per-element script rules; per-item
-content language from the stored album or movie language, then script detection;
-album and song API language fields; and a one-year immutable cache header for
-`/assets`.
+Geist and Geist Mono with self-hosted Noto fallbacks are delivered in the web app,
+Electron and the public site. Open:
 
-Verification checkpoint at the review-fix commits on that branch:
-
-- Web: typecheck and lint clean (0 errors), 269 Vitest files with 3,283 tests
-  passing, the typography census passing, the generated API client current, and
-  the production build verified.
-- Typography harness: 24 of 24 checks in Chromium, Firefox and WebKit (WebKit in
-  the `mcr.microsoft.com/playwright:v1.64.1-noble` image).
-- Design tokens: build check current and 76 tests passing. Website: typecheck, 4
-  node tests, 75 tooling PHPUnit tests and 47 Chromium browser checks. Electron:
-  typecheck, 75 tests, build, and the runtime smoke test in built and development
-  modes.
-- Backend in the CI image: PHPStan, Deptrac, container lint and the OpenAPI check
-  clean; the Catalog and Playlist functional suites passing; the unit suite at
-  7,434 tests with 2 failures in `CaptureCoverageTest`, which fail identically on
-  `master` and predate this work.
-- Code review: full multi-agent review, verdict ready with fixes; both confirmed
-  findings fixed.
-
-Open items:
-
-- The real-screen styling specs (`tests/e2e/styling`) and a first-paint
-  measurement have not run, because the preview instance cannot start: its saved
-  release references a data-store image that is no longer on the host. The main
-  stylesheet measures 456 kB raw and 157 kB compressed, of which the 489
-  `@font-face` rules take about 412 kB raw.
-- Considered and not done: song resources still split the album title and
-  language into two maps; radio genre chips render genre names without a content
-  language; `input` and `textarea` use a 2.0 line-height inside the fixed 2rem
-  field height, which WebKit may render with the caret off-centre.
+- The real-screen styling specs (`tests/e2e/styling`) and a first-paint measurement
+  have not run. The main stylesheet measures 456 kB raw and 157 kB compressed, of
+  which the `@font-face` rules take about 412 kB raw.
+- Considered and not done: song resources still split the album title and language
+  into two maps; radio genre chips render genre names without a content language;
+  `input` and `textarea` use a 2.0 line-height inside the fixed 2rem field height,
+  which WebKit may render with the caret off-centre.
 
 ### Website typography page
 
-Delivered on branch `feat/typography-page` from the
-[typography page plan](docs/plans/2026-11-04-2140-feat-typography-page-plan.md):
-a `/typography/` page linked from the header and footer, with live specimens of
-every supported script, Japanese, Simplified and Traditional Han forms, the script
-rules with and without each rule, and the ten type roles read from the design
-tokens. The build ships only the 36 Geist and Noto slices (1,493,344 bytes) that the
-page's text reaches first along its font stack; no other page declares a Noto face.
-
-Verification checkpoint: 81 tooling PHPUnit tests, PHPStan and php-cs-fixer clean
-on the changed PHP, site typecheck, 4 node tests, a fresh `make website-build`, and
-56 Chromium browser checks, including glyph order, the script rules, bundled faces
-and the absence of Noto requests on other pages. The user previewed the page
-before publication. Open: the Korean samples need a native-speaker check, and the
-header's `↗` renders from Noto Sans SC on this page because Geist's Latin slice
-lacks it.
-
-### Website font stack
-
-Delivered on branch `feat/site-font-stack` from the
-[website font stack plan](docs/plans/2026-11-04-2207-feat-site-font-stack-plan.md):
-every page now uses the application's font stack, which replaces the earlier
-decision to load Noto only on the typography page. After rendering, the build
-selects the slices each page's text reaches first and links them as one
-content-hashed stylesheet per distinct set: eight sets across 211 pages. 200
-pages need only the Noto Sans SC slice that covers the header's `↗` (9,224 bytes);
-the largest set outside the typography page holds four slices (160,732 bytes).
-Search results link one stylesheet (four slices, 162,300 bytes) when they first
-appear. `code`, `kbd`, `samp` and `pre` use the mono stack on every page.
-
-Verification checkpoint: 84 Website tooling PHPUnit tests, PHPStan and
-php-cs-fixer clean on the changed PHP, site typecheck, 4 node tests, a fresh
-`make website-build`, and 59 Chromium browser checks. On the homepage, a manual
-page and bAAC, those checks confirm that every character renders from a bundled
-face and that the page declares and requests only slices its text reaches first.
-Each new check failed once against a deliberately broken build. Open: the user
-previews the rebuilt site before publication.
+The `/typography/` page is delivered and published. Open: the Korean samples need a
+native-speaker check, and the header's `↗` renders from Noto Sans SC because Geist's
+Latin slice lacks it.
 
 ### Website layout stability
 
-Delivered on branch `fix/site-layout-shift` from the
-[website layout shift plan](docs/plans/2026-11-06-2239-fix-site-layout-shift-plan.md).
-Every page of the public website painted once and then rearranged itself. Measured
-in headless Chromium at 1440 by 900 before the change: the theme toggle appeared on
-DOM ready and grew the header from 23 to 44 pixels, a shift of 0.037 on every page;
-the search script appended its form into an empty mount and pushed the chapter list
-down 144 pixels; and Geist arrived after first paint with no preload, widening the
-header nav from 390 to 468 pixels and, on the operator guide, adding a line to a
-paragraph that moved the list below it 26 pixels, a shift of 0.118.
-
-The header renders the toggle at full size and the stylesheet reveals it once the
-head script has marked the root with a theme, so the header has one size with and
-without the script. Manual pages render the search form in the HTML with the field
-disabled; the script enables it, and without JavaScript the status line gives way
-to the message that search needs JavaScript. Every page preloads the Latin Geist
-face, pages whose text reaches Geist Mono preload that face too, and the published
-theme declares metric-matched fallback faces after each Geist family: a regular and
-a bold face over Arial or Liberation Sans, a Roboto pair behind them for Android,
-and one over Courier New or Liberation Mono, each scaled to Geist's advance width
-with Geist's line box and limited to the Latin slice's range. Arrow glyphs, which
-that slice lacks, sit in fixed-width slots so the Noto glyph that replaces the
-system one moves nothing. The document keeps a stable scrollbar gutter, and the
-section heading size is capped one pixel lower so a heading that filled its column
-to the pixel does not wrap in the fallback.
-
-A new browser spec loads the homepage, the operator guide and the bAAC page at
-desktop and phone widths over a throttled network and CPU and fails on any layout
-shift after first paint; a second case holds the font files back until after first
-paint and fails when any line moves on the swap; a third blocks the Geist files and
-compares block heights and single-line row widths with the Geist rendering on the
-homepage and the operator guide at both widths, and inline code on the developer
-testing page. The suite runs Chromium with font hinting off, because headless
-Chromium on Linux otherwise rounds the fallback's fractional size to whole pixels.
-
-Verification checkpoint: 87 Website tooling PHPUnit tests with 1,253 assertions,
-PHPStan and php-cs-fixer clean, site typecheck, 11 node tests, a fresh
-`make website-build` of 210 pages, and 91 Chromium browser checks, nineteen of them
-new. Break-it-first runs against the built site: restoring the hidden toggle and its
-DOM-ready reveal failed the shift check at both widths with the original 0.0369;
-removing the fallback faces failed the held-font case on all six page and width
-combinations and the width comparison, 393 against 400 pixels for the header nav;
-removing the preload links failed the shift check on the homepage even with the
-fallback present. Hiding the toggle with a stylesheet rule keyed on the root marker
-and removing the fallback faces alone did not fail the plain shift check, because
-the head script marks the root before first paint and the preload lands before
-paint under the throttled profile; the held-font case exists for that reason. The
-code review's independent reproduction found the bold and phone-width gaps the
-first fallback left, and the Android gap; all three are closed above.
-
-Published on 2026-11-07 from the merge commit `8c25541e1` as the prebuilt Vercel
-deployment `baander-b64pozzrb-martin-juuls-projects.vercel.app`, aliased to
-`https://baander.app`. Live checks: the homepage, nested manual URLs, the bAAC and
-typography pages answer 200; an unknown URL answers 404; a manual URL without its
-trailing slash redirects with 308; the search bundle, the preload links, the
-rendered search form, the four fallback faces, the Roboto family in the stacks
-and the 404 page's arrow slot are all present; the font files carry the immutable
-cache header; HTTPS verifies.
-
-Open: one scaling factor per weight range cannot match every line, so a long page
-dense with inline code still wraps a few paragraphs differently in the fallback,
-three of 465 blocks at desktop width and 28 at phone width on the developer testing
-page, and headings that fill their column to the pixel can wrap in the bold
-fallback; the medium weight renders in the regular face and runs 1.5 to 2.4 percent
-narrow. Linux Chromium with full font hinting can still gain a line in the fallback
-and wrap the phone-width nav on the swap; the suite does not measure that
-rendering. Diagram pages, where the diagram script swaps an image for an inline
-SVG, are not in the shift check. Firefox is not measured.
+The public website no longer shifts its layout after first paint; the layout shift
+browser spec guards it. Open: one scaling factor per weight range cannot match every
+line, so a long page dense with inline code still wraps a few paragraphs differently
+in the fallback, and headings that fill their column to the pixel can wrap in the
+bold fallback; the medium weight renders in the regular face and runs 1.5 to 2.4
+percent narrow. Linux Chromium with full font hinting can still gain a line in the
+fallback on the swap. Diagram pages are not in the shift check, and Firefox is not
+measured.
 
 ### Source-installation documentation
 
@@ -739,6 +606,16 @@ Figures and limits are in the
 [codec README](packages/baander-aac/docs/README.md).
 
 ## Roadmap maintenance
+
+Cleanup, 2026-11-07: removed the delivered checkpoints and resolved items of
+forge-neutral CI, the system overview pages, interactive diagrams, configurable media
+capacity, bAAC in the server transcoder, web dependency refresh and the website
+typography, font stack and layout stability work; open items, limits and release
+gates stay. Twelve delivered plans were retired and the two solution docs that cited
+them now point at the pinned revision. Eight plans remain, each with undelivered
+work. The roadmap and plans before this cleanup are preserved at `b9a67726f`. The four
+incoming anchors (`#application-release-acceptance`, `#completed-work-and-evidence`,
+`#local-development-workflow`, `#source-installation-documentation`) are kept.
 
 Cleanup, 2026-11-03: removed implemented work from every section, reducing the
 roadmap from 3,789 to 432 lines. Fully delivered sections were removed; partly

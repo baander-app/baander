@@ -180,5 +180,6 @@ sprintf('nullsrc=s=%dx%d:d=0.1', $tier->width, $tier->height)
   the operator procedure for existing data volumes.
 - [Hardware Acceleration](../../../docs-book/part-1-operator-guide/transcoding.md#hardware-acceleration):
   hardware encoder configuration, the test encode and the seccomp finding.
-- `docs/plans/2026-11-03-1905-feat-configurable-media-capacity-plan.md`: why the
+- The configurable media capacity plan, retired and readable with
+  `git show b9a67726f:docs/plans/2026-11-03-1905-feat-configurable-media-capacity-plan.md`: why the
   images moved (Mesa 22.3.6 cannot initialize RDNA4 VAAPI).
