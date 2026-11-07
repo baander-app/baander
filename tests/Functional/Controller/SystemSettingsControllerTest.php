@@ -37,6 +37,13 @@ final class SystemSettingsControllerTest extends TestCase
         $this->assertSame('system', $bitrate['scope']);
         $this->assertSame(['value' => 192, 'label' => '192 kbps'], $bitrate['options'][1]);
         $this->assertTrue($bitrate['enforced']);
+
+        $implementation = $definitions['transcode.aac_implementation'];
+        $this->assertSame('enum', $implementation['type']);
+        $this->assertSame('baac', $implementation['default']);
+        $this->assertSame(['baac', 'fdk_aac', 'ffmpeg'], array_column($implementation['options'], 'value'));
+        $this->assertSame(['value' => 'fdk_aac', 'label' => 'Fraunhofer fdk-aac'], $implementation['options'][1]);
+        $this->assertTrue($implementation['enforced']);
     }
 
     public function testTheBackendHonoursEverySettingItDefines(): void
