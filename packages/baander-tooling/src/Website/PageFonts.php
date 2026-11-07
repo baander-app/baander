@@ -24,6 +24,9 @@ final readonly class PageFonts
     /** The shared stack variables the page reads, by the variant a language selects. */
     private const array STACKS = ['ui' => '--font-ui', 'mono' => '--font-mono'];
 
+    /** A stack declaration in the built design tokens: the variable name, then the families in fallback order. */
+    public const string STACK_DECLARATION = '/(--font-(?:ui|mono)(?:-[a-z]+)?):\s*([^;]+);/';
+
     /** Languages that move their own Han family to the front of the stacks, as `:lang()` matches them. */
     private const array LANGUAGE_VARIANTS = ['ja' => '-ja', 'ko' => '-ko', 'zh-hant' => '-hant', 'zh-tw' => '-hant', 'zh-hk' => '-hant', 'zh-mo' => '-hant'];
 
@@ -42,7 +45,7 @@ final readonly class PageFonts
         $theme = file_get_contents($root . '/ui/design-tokens/build/web/theme.css')
             ?: throw new RuntimeException('The shared font stacks are missing; rebuild design tokens.');
         $stacks = [];
-        preg_match_all('/(--font-(?:ui|mono)(?:-[a-z]+)?):\s*([^;]+);/', $theme, $declarations, PREG_SET_ORDER);
+        preg_match_all(self::STACK_DECLARATION, $theme, $declarations, PREG_SET_ORDER);
         foreach ($declarations as [, $name, $value]) {
             $stacks[$name] ??= array_map(static fn(string $family): string => trim($family, " \t\n\"'"), explode(',', $value));
         }
@@ -157,6 +160,19 @@ final readonly class PageFonts
             }
         }
         return '';
+    }
+
+    /** The unicode range a Fontsource package declares for one of its slice files, as its stylesheet states it. */
+    public function declaredRange(string $package, string $file): string
+    {
+        foreach ($this->faces as $faces) {
+            foreach ($faces as $face) {
+                if ($face['package'] === $package && basename($face['file']) === $file) {
+                    return $face['range'];
+                }
+            }
+        }
+        throw new RuntimeException('The font package ' . $package . ' declares no face for ' . $file . '.');
     }
 
     /** @return iterable<Text> the rendered text below the node, without script, style or template content */

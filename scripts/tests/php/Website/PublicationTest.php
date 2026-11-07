@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Baander\Tooling\Tests\Website;
 
+use Baander\Tooling\Website\PageFonts;
 use Baander\Tooling\Website\Publication;
 use PHPUnit\Framework\TestCase;
 
@@ -17,6 +18,12 @@ final class PublicationTest extends TestCase
         'vietnamese' => 'U+0102-0103,U+0110-0111,U+0128-0129,U+0168-0169,U+01A0-01A1,U+01AF-01B0,U+0300-0301,U+0303-0304,U+0308-0309,U+0323,U+0329,U+1EA0-1EF9,U+20AB',
         'latin-ext' => 'U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF',
         'latin' => 'U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD',
+    ];
+
+    /** The published Latin Geist faces as the shared assets step names them, which page publication preloads. */
+    private const array LATIN_FACES = [
+        'Geist Variable' => '/assets/site/fonts/geist-latin-wght-normal-0123456789abcdef.woff2',
+        'Geist Mono Variable' => '/assets/site/fonts/geist-mono-latin-wght-normal-fedcba9876543210.woff2',
     ];
 
     private string $directory;
@@ -69,20 +76,8 @@ final class PublicationTest extends TestCase
     public function testSharedAssetsSelfHostLatinGeistUnderContentHashedNamesWithLicenses(): void
     {
         $root = $this->directory . '/source';
-        mkdir($root . '/ui/web/public', 0700, true);
-        mkdir($root . '/ui/design-tokens/build/web', 0700, true);
-        file_put_contents($root . '/ui/web/public/logo.svg', '<svg></svg>');
-        file_put_contents($root . '/ui/design-tokens/build/web/theme.css', ':root[data-theme="balanced"]:not([data-accent]) { color-scheme: light; --color-background: #f5f5f5; }');
-        mkdir($root . '/ui/site', 0700, true);
-        file_put_contents($root . '/ui/site/theme-tone.css', ':root[data-theme="dark"] { --color-foreground: #e6e6e9; }');
-        foreach (['geist', 'geist-mono'] as $font) {
-            $package = $root . '/ui/site/node_modules/@fontsource-variable/' . $font;
-            mkdir($package . '/files', 0700, true);
-            file_put_contents($package . '/LICENSE', 'SIL OPEN FONT LICENSE for ' . $font);
-            file_put_contents($package . '/files/' . $font . '-latin-wght-normal.woff2', $font . ' latin fixture');
-            file_put_contents($package . '/files/' . $font . '-cyrillic-wght-normal.woff2', $font . ' cyrillic fixture');
-        }
-        Publication::assets($root, $this->directory);
+        $this->writeSources($root);
+        $published = Publication::assets($root, $this->directory);
         $fonts = $this->directory . '/assets/site/fonts';
         self::assertFileExists($this->directory . '/assets/site/logo.svg');
         $files = array_map(basename(...), glob($fonts . '/*') ?: []);
@@ -90,13 +85,14 @@ final class PublicationTest extends TestCase
         $hash = static fn(string $content): string => substr(hash('sha256', $content), 0, 16);
         self::assertSame([
             'geist-LICENSE-' . $hash('SIL OPEN FONT LICENSE for geist') . '.txt',
-            'geist-latin-wght-normal-' . $hash('geist latin fixture') . '.woff2',
+            'geist-latin-wght-normal-' . $hash('geist-latin-wght-normal fixture') . '.woff2',
             'geist-mono-LICENSE-' . $hash('SIL OPEN FONT LICENSE for geist-mono') . '.txt',
-            'geist-mono-latin-wght-normal-' . $hash('geist-mono latin fixture') . '.woff2',
+            'geist-mono-latin-wght-normal-' . $hash('geist-mono-latin-wght-normal fixture') . '.woff2',
         ], $files, 'Only the Latin faces and their licenses ship, and no Inter or JetBrains Mono file');
         $css = file_get_contents($this->directory . '/assets/site/theme.css');
         foreach (['Geist Variable' => 'geist', 'Geist Mono Variable' => 'geist-mono'] as $family => $font) {
-            $face = '/assets/site/fonts/' . $font . '-latin-wght-normal-' . $hash($font . ' latin fixture') . '.woff2';
+            $face = '/assets/site/fonts/' . $font . '-latin-wght-normal-' . $hash($font . '-latin-wght-normal fixture') . '.woff2';
+            self::assertSame($face, $published[$family], 'The published Latin faces are returned for page publication to preload');
             self::assertMatchesRegularExpression(
                 '~@font-face \{[^}]*font-family: "' . $family . '";[^}]*font-weight: 100 900;[^}]*font-display: swap;[^}]*src: url\(\'' . preg_quote($face, '~') . '\'\) format\(\'woff2\'\);[^}]*\}~',
                 $css,
@@ -105,6 +101,89 @@ final class PublicationTest extends TestCase
         self::assertStringContainsString('@media (prefers-color-scheme: light)', $css);
         self::assertStringContainsString(':root:not([data-theme])', $css);
         self::assertStringEndsWith(':root[data-theme="dark"] { --color-foreground: #e6e6e9; }', $css, 'The site tone follows the shared tokens');
+    }
+
+    public function testTheThemeDeclaresMetricMatchedFallbackFacesAfterEachGeistFamily(): void
+    {
+        $root = $this->directory . '/source';
+        $this->writeSources($root);
+        Publication::assets($root, $this->directory);
+        $css = (string) file_get_contents($this->directory . '/assets/site/theme.css');
+        $faces = [
+            'Geist Fallback' => ['100 500' => 'local("Arial"), local("Liberation Sans")', '600 900' => 'local("Arial Bold"), local("Liberation Sans Bold")'],
+            'Geist Fallback Roboto' => ['100 500' => 'local("Roboto")', '600 900' => 'local("Roboto Bold")'],
+            'Geist Mono Fallback' => ['100 900' => 'local("Courier New"), local("Liberation Mono")'],
+        ];
+        $metrics = ['size-adjust', 'ascent-override', 'descent-override', 'line-gap-override'];
+        foreach ($faces as $family => $weights) {
+            self::assertSame(count($weights), preg_match_all('~@font-face \{[^}]*font-family: "' . $family . '";[^}]*\}~', $css, $rules), $family . ' declares one face per weight range');
+            $values = [];
+            foreach (array_values($weights) as $index => $sources) {
+                $rule = $rules[0][$index];
+                $weight = array_keys($weights)[$index];
+                self::assertStringContainsString("font-weight: {$weight};\n  src: {$sources};", $rule, $family . ' ' . $weight);
+                self::assertStringContainsString('unicode-range: ' . self::RANGES['latin'] . ';', $rule, 'The fallback stands in only for the characters of the Latin Geist slice');
+                foreach ($metrics as $metric) {
+                    self::assertSame(1, preg_match('~\b' . $metric . ': (\d+(?:\.\d{1,4})?%);~', $rule, $value), $family . ' ' . $weight . ' sets ' . $metric);
+                    $values[$weight][$metric] = $value[1];
+                }
+                self::assertStringNotContainsString('font-display', $rule, 'A local face needs no display policy');
+            }
+            if (count($values) === 2) {
+                self::assertNotSame($values['100 500']['size-adjust'], $values['600 900']['size-adjust'], $family . ' scales its bold face to the bold Geist widths');
+            }
+        }
+        self::assertSame(
+            1,
+            preg_match('~^@font-face \{[^}]*"Geist Variable";[^}]*\}\s*@font-face \{[^}]*"Geist Fallback";[^}]*font-weight: 100 500;[^}]*\}\s*@font-face \{[^}]*"Geist Fallback";[^}]*font-weight: 600 900;[^}]*\}\s*'
+                . '@font-face \{[^}]*"Geist Fallback Roboto";[^}]*font-weight: 100 500;[^}]*\}\s*@font-face \{[^}]*"Geist Fallback Roboto";[^}]*font-weight: 600 900;[^}]*\}\s*@font-face \{[^}]*"Geist Mono Variable";~', $css),
+            'The fallback faces follow the Geist face they stand in for, regular before bold',
+        );
+        preg_match_all(PageFonts::STACK_DECLARATION, $css, $declarations, PREG_SET_ORDER);
+        $stacks = array_column($declarations, 2, 1);
+        self::assertCount(8, $stacks);
+        foreach (['--font-ui', '--font-ui-ja', '--font-ui-ko', '--font-ui-hant'] as $stack) {
+            self::assertStringStartsWith('"Geist Variable", "Geist Fallback", "Geist Fallback Roboto", "Noto Sans Variable",', $stacks[$stack], $stack);
+            self::assertStringNotContainsString('Mono Fallback', $stacks[$stack]);
+        }
+        foreach (['--font-mono', '--font-mono-ja', '--font-mono-ko', '--font-mono-hant'] as $stack) {
+            self::assertStringStartsWith('"Geist Mono Variable", "Geist Mono Fallback", "Noto Sans Mono Variable",', $stacks[$stack], $stack);
+            self::assertSame(1, substr_count($stacks[$stack], 'Fallback'), $stack . ' names one fallback');
+        }
+    }
+
+    public function testPublicationLeavesTheSharedDesignTokensUnchanged(): void
+    {
+        $root = $this->directory . '/source';
+        $this->writeSources($root);
+        $tokens = $root . '/ui/design-tokens/build/web/theme.css';
+        $before = (string) file_get_contents($tokens);
+        self::assertStringNotContainsString('Fallback', $before);
+        $staging = $this->directory . '/staging';
+        mkdir($staging . '/page', 0700, true);
+        file_put_contents($staging . '/page/index.html', self::page('<p>Text <code>run</code></p>'));
+        Publication::pageFonts($root, $staging, '.type-mono', Publication::assets($root, $staging));
+        self::assertSame($before, file_get_contents($tokens));
+        self::assertStringContainsString('"Geist Fallback"', (string) file_get_contents($staging . '/assets/site/theme.css'));
+    }
+
+    public function testEveryPagePreloadsLatinGeistAndAPageWithMonoTextAlsoPreloadsGeistMono(): void
+    {
+        $preload = static fn(string $path): string => '<link rel="preload" as="font" type="font/woff2" crossorigin href="' . $path . '">';
+        $plain = $this->publishPageFonts('<h1>Install</h1><p>Scan your music folders.</p>');
+        self::assertSame(1, substr_count($plain['html'], 'rel="preload"'), 'A page without mono text preloads one face');
+        self::assertStringContainsString($preload(self::LATIN_FACES['Geist Variable']) . "\n  " . self::THEME_LINK, $plain['html']);
+        self::assertStringNotContainsString(self::LATIN_FACES['Geist Mono Variable'], $plain['html']);
+
+        $mono = $this->publishPageFonts('<p>直</p><pre><code>php artisan baander:scan</code></pre>');
+        self::assertSame(2, substr_count($mono['html'], 'rel="preload"'));
+        self::assertStringContainsString(
+            $preload(self::LATIN_FACES['Geist Variable']) . "\n  " . $preload(self::LATIN_FACES['Geist Mono Variable'])
+                . "\n  " . '<link rel="stylesheet" href="' . $this->fontLink($mono['page']) . '">' . "\n  " . self::THEME_LINK,
+            $mono['html'],
+            'Preloads come first, then the page faces, then the shared theme',
+        );
+        self::assertStringContainsString(self::LATIN_FACES['Geist Mono Variable'], $this->publishPageFonts('<p><span class="type-mono">1:42:07</span></p>')['html'], 'The site’s own mono classes count');
     }
 
     public function testAPageGetsTheFirstCoveringFaceOfEachCharacterAlongItsFontStack(): void
@@ -131,7 +210,11 @@ final class PublicationTest extends TestCase
         $published = $this->publishPageFonts($body);
         self::assertSame([], $published['files'], 'The site-wide Latin Geist face already covers the text');
         self::assertNull($published['stylesheet']);
-        self::assertSame(self::page($body), $published['html'], 'The page is left as rendered');
+        self::assertSame(
+            str_replace(self::THEME_LINK, '<link rel="preload" as="font" type="font/woff2" crossorigin href="' . self::LATIN_FACES['Geist Variable'] . '">' . "\n  " . self::THEME_LINK, self::page($body)),
+            $published['html'],
+            'The page is left as rendered, apart from the preload',
+        );
     }
 
     public function testPagesThatReachTheSameFacesShareOneStylesheet(): void
@@ -255,14 +338,14 @@ final class PublicationTest extends TestCase
     {
         $root = $this->directory . '/source';
         if (!is_dir($root)) {
-            $this->writeFontPackages($root);
+            $this->writeSources($root);
         }
         $staging = $this->directory . '/staging-' . bin2hex(random_bytes(4));
         foreach ($bodies as $url => $body) {
             is_dir($staging . $url) || mkdir($staging . $url, 0700, true);
             file_put_contents($staging . $url . 'index.html', self::page($body));
         }
-        Publication::pageFonts($root, $staging, '.type-mono');
+        Publication::pageFonts($root, $staging, '.type-mono', self::LATIN_FACES);
         return $staging;
     }
 
@@ -276,7 +359,7 @@ final class PublicationTest extends TestCase
      * Publishes the fonts of one page with the given body and returns the published font files, the faces
      * without their hashes, the page's font stylesheet and the page as published.
      *
-     * @return array{files:list<string>,faces:list<string>,stylesheet:?string,html:string}
+     * @return array{files:list<string>,faces:list<string>,stylesheet:?string,html:string,page:string}
      */
     private function publishPageFonts(string $body): array
     {
@@ -291,12 +374,20 @@ final class PublicationTest extends TestCase
             'faces' => $faces,
             'stylesheet' => $link === null ? null : (string) file_get_contents($staging . $link),
             'html' => (string) file_get_contents($staging . '/page/index.html'),
+            'page' => $staging . '/page/index.html',
         ];
     }
 
-    /** Writes the shared font stacks and Fontsource-shaped packages for every family they name. */
-    private function writeFontPackages(string $root): void
+    /**
+     * Writes the sources the shared assets read: branding, the site tone, the design tokens with the
+     * shared font stacks, and Fontsource-shaped packages for every family the stacks name.
+     */
+    private function writeSources(string $root): void
     {
+        mkdir($root . '/ui/web/public', 0700, true);
+        mkdir($root . '/ui/site', 0700, true);
+        file_put_contents($root . '/ui/web/public/logo.svg', '<svg></svg>');
+        file_put_contents($root . '/ui/site/theme-tone.css', ':root[data-theme="dark"] { --color-foreground: #e6e6e9; }');
         $default = ['"Noto Sans SC Variable"', '"Noto Sans TC Variable"', '"Noto Sans JP Variable"', '"Noto Sans KR Variable"'];
         $orders = ['' => $default, '-ja' => ['"Noto Sans JP Variable"', '"Noto Sans SC Variable"', '"Noto Sans TC Variable"', '"Noto Sans KR Variable"'],
             '-ko' => ['"Noto Sans KR Variable"', '"Noto Sans SC Variable"', '"Noto Sans TC Variable"', '"Noto Sans JP Variable"'],
@@ -308,7 +399,10 @@ final class PublicationTest extends TestCase
                 . "  --font-mono{$variant}: " . implode(', ', ['"Geist Mono Variable"', '"Noto Sans Mono Variable"', ...$scripts, 'monospace']) . ";\n";
         }
         mkdir($root . '/ui/design-tokens/build/web', 0700, true);
-        file_put_contents($root . '/ui/design-tokens/build/web/theme.css', ":root {\n{$stacks}}\n");
+        file_put_contents(
+            $root . '/ui/design-tokens/build/web/theme.css',
+            ":root {\n{$stacks}}\n" . ':root[data-theme="balanced"]:not([data-accent]) { color-scheme: light; --color-background: #f5f5f5; }' . "\n",
+        );
         $standard = static fn(string ...$subsets): array => array_intersect_key(self::RANGES, array_flip($subsets));
         $packages = [
             'geist' => ['Geist Variable', $standard('cyrillic', 'vietnamese', 'latin-ext', 'latin')],

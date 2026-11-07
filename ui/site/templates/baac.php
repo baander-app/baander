@@ -18,8 +18,8 @@ $familyNotes = [
     <p class="baac-lead">AAC encoding and decoding for Bånder.</p>
     <p>bAAC is a C++17 codec library with a C API, a command-line tool and a Node/Electron binding. Explore what it implements and how its recorded measurements compare with other AAC codecs.</p>
     <div class="actions">
-      <a class="button" href="<?= $source('docs/README.md') ?>">Read the source guide <span aria-hidden="true">↗</span></a>
-      <a class="text-action" href="#quality">Compare the measurements <span aria-hidden="true">↓</span></a>
+      <a class="button" href="<?= $source('docs/README.md') ?>">Read the source guide <span class="arrow" aria-hidden="true">↗</span></a>
+      <a class="text-action" href="#quality">Compare the measurements <span class="arrow" aria-hidden="true">↓</span></a>
     </div>
     <p class="release-note">Pre-release · Version 0.1.0 · Source-build and API guidance</p>
   </section>

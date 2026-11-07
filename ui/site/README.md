@@ -57,9 +57,15 @@ fonts, then builds search from the rendered manual pages. For each rendered page
 also copies the Geist and Noto slices that the page's text reaches first along the
 font stack, beyond the shared Latin faces, and links their rules from the page's
 head. Search results get one such stylesheet for all indexed text, which the
-search script links when it first shows results. Change token inputs in
-`ui/design-tokens/` and regenerate them with its existing build command rather than
-editing generated CSS.
+search script links when it first shows results. Every page preloads the Latin
+Geist face, and a page whose text reaches the mono stack preloads the Latin Geist
+Mono face too. The published theme places fallback faces after each Geist family:
+Arial or Liberation Sans for Geist, with a bold face for the heavier weights and a
+Roboto pair behind them for Android, and Courier New or Liberation Mono for Geist
+Mono, each scaled to Geist's advance width and line box, so text painted before the
+fonts arrive keeps its width and line count. Change token inputs in `ui/design-tokens/`
+and regenerate them with its existing build command rather than editing generated
+CSS.
 
 The bAAC page at `/baac/` reads the recorded CSV and JSON results under
 `packages/baander-aac/bench/results/`. Its charts and tables share the same

@@ -19,35 +19,19 @@ interface Pagefind {
   search(query: string): Promise<SearchResponse>;
 }
 
+// The page renders the field, status line and results list, so the sidebar already has its final
+// layout; this script only enables the field and wires it.
+// `status` is taken by the window in this classic script, so the page's elements get their own names here.
 const mount = document.querySelector<HTMLElement>('#manual-search');
-if (mount) {
-  mountSearch(mount);
+const field = mount?.querySelector<HTMLInputElement>('#manual-search-input');
+const statusLine = mount?.querySelector<HTMLElement>('#manual-search-status');
+const resultList = mount?.querySelector<HTMLOListElement>('#manual-search-results');
+if (mount && field && statusLine && resultList) {
+  mountSearch(mount, field, statusLine, resultList);
 }
 
-function mountSearch(container: HTMLElement): void {
-  const label = document.createElement('label');
-  label.htmlFor = 'manual-search-input';
-  label.textContent = 'Search manuals';
-
-  const input = document.createElement('input');
-  input.id = label.htmlFor;
-  input.type = 'search';
-  input.placeholder = 'Find a task or topic';
-  input.autocomplete = 'off';
-  input.spellcheck = false;
-  input.setAttribute('aria-describedby', 'manual-search-status');
-  input.setAttribute('aria-controls', 'manual-search-results');
-
-  const status = document.createElement('p');
-  status.id = 'manual-search-status';
-  status.setAttribute('role', 'status');
-  status.setAttribute('aria-live', 'polite');
-  status.textContent = 'Search the operator and developer guides.';
-
-  const results = document.createElement('ol');
-  results.id = 'manual-search-results';
-  results.hidden = true;
-  container.append(label, input, status, results);
+function mountSearch(container: HTMLElement, input: HTMLInputElement, status: HTMLElement, results: HTMLOListElement): void {
+  input.disabled = false;
 
   let generation = 0;
   let timer: ReturnType<typeof setTimeout> | undefined;

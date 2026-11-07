@@ -66,8 +66,8 @@ final class Command
             ];
             $pages = new WebsiteBuilder($root, $revisionUrl)->build(
                 static function (string $staging) use ($executor, $root): void {
-                    Publication::assets($root, $staging);
-                    Publication::pageFonts($root, $staging, self::MONO_SELECTOR);
+                    $latinFaces = Publication::assets($root, $staging);
+                    Publication::pageFonts($root, $staging, self::MONO_SELECTOR, $latinFaces);
                     $executor->run(new ProcessSpec(
                         ['corepack', 'yarn', 'build', $staging . '/assets/site/search.js'],
                         cwd: $root . '/ui/site',

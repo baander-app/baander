@@ -63,6 +63,30 @@ test('equalizer slides respond to controls and keyboard, and stay still without 
   await expect(carousel).toBeFocused();
 });
 
+for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
+  test(`${viewport.width}px: the header has one size and nav position whether or not the appearance script has run`, async ({ page, browser, baseURL }) => {
+    const geometry = (target: import('@playwright/test').Page) => target.evaluate(() => ({
+      header: document.querySelector('.site-header')!.getBoundingClientRect().height,
+      navLeft: document.querySelector('.site-header nav')!.getBoundingClientRect().left,
+      navTop: document.querySelector('.site-header nav')!.getBoundingClientRect().top,
+    }));
+    await page.setViewportSize(viewport);
+    await page.goto('/');
+    await expect(page.locator('[data-appearance-toggle]')).toBeVisible();
+    const withScript = await geometry(page);
+    const context = await browser.newContext({ javaScriptEnabled: false, baseURL, viewport });
+    await context.route('**/*', (route) => new URL(route.request().url()).origin === new URL(baseURL!).origin ? route.continue() : route.abort());
+    try {
+      const plain = await context.newPage();
+      await plain.goto('/');
+      await expect(plain.locator('[data-appearance-toggle]')).toBeHidden();
+      expect(await geometry(plain)).toEqual(withScript);
+    } finally {
+      await context.close();
+    }
+  });
+}
+
 test.describe('static homepage', () => {
   test.use({ javaScriptEnabled: false });
   test('without JavaScript every equalizer feature and screenshot remains readable', async ({ page }) => {
