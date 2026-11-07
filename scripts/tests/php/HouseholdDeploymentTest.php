@@ -12,6 +12,7 @@ use Baander\Tooling\Configuration\{ApplicationLayout, JsonObject};
 use Baander\Tooling\Deployment\Household;
 use Baander\Tooling\Deployment\KillOrder;
 use Baander\Tooling\Deployment\Pooler;
+use Baander\Tooling\Deployment\PostgresConfiguration;
 use Baander\Tooling\Deployment\PostgresSettings;
 use Baander\Tooling\Docker\{Client, Target};
 use Baander\Tooling\Filesystem\AtomicFile;
@@ -25,11 +26,12 @@ use PHPUnit\Framework\TestCase;
 
 final class HouseholdDeploymentTest extends TestCase
 {
-    /** @return array<string,mixed> */
+    /** @return array<string,mixed> A remux deployment of two web workers, four database slots, one consumer and two copy slots. */
     public static function configuration(): array
     {
         return [
-            'version' => 1, 'name' => 'baander-household', 'profile' => 'household',
+            'version' => 2, 'name' => 'baander-household', 'capability' => 'remux',
+            'size' => ['webWorkers' => 2, 'databaseSlots' => 4, 'ordinaryConsumers' => 1, 'sharedBuffersMiB' => 128, 'workMemMiB' => 4, 'copySlots' => 2],
             'origin' => 'http://baander.app:8080',
             'listen' => ['address' => '127.0.0.1', 'port' => 8080],
             'images' => array_fill_keys(['application', 'worker', 'operator', 'postgres', 'gateway', 'redis'], 'baander/fixture:local'),
@@ -37,12 +39,24 @@ final class HouseholdDeploymentTest extends TestCase
         ];
     }
 
+    /**
+     * A transcode deployment of four web workers, ten database slots and four consumers.
+     *
+     * @param array<string,int> $size
+     * @return array<string,mixed>
+     */
+    public static function transcodeConfiguration(array $size = []): array
+    {
+        return array_replace(self::configuration(), ['capability' => 'transcode',
+            'size' => [...['webWorkers' => 4, 'databaseSlots' => 10, 'ordinaryConsumers' => 4, 'sharedBuffersMiB' => 256, 'workMemMiB' => 16], ...$size]]);
+    }
+
     public function testRenderedServicesCarryNoContainerLimitsAndRenderTheKillOrder(): void
     {
-        $household = HouseholdConfiguration::fromArray(self::configuration());
-        $full = HouseholdConfiguration::fromArray(array_replace(self::configuration(), ['profile' => 'full']));
-        self::assertSame(['redisMaxmemoryMiB' => 192], $household->resources);
-        self::assertSame($household->resources, $full->resources);
+        $remux = HouseholdConfiguration::fromArray(self::configuration());
+        $transcode = HouseholdConfiguration::fromArray(self::transcodeConfiguration());
+        self::assertSame(['redisMaxmemoryMiB' => 192], $remux->resources);
+        self::assertSame($remux->resources, $transcode->resources);
         foreach ([['resources' => ['webMemoryMiB' => 1536]], ['resources' => ['operatorMemoryMiB' => 512]], ['resources' => ['postgresMemoryMiB' => 1536]], ['controlCpuSet' => [0]], ['executionCpuSet' => [1]]] as $override) {
             try {
                 HouseholdConfiguration::fromArray(array_replace(self::configuration(), $override));
@@ -51,20 +65,21 @@ final class HouseholdDeploymentTest extends TestCase
                 self::assertStringContainsString('Unknown key', $error->getMessage());
             }
         }
-        self::assertSame('household', $household->profile);
-        self::assertSame('full', $full->profile);
-        self::assertSame('baander-household-media', $household->volumes['media']);
-        self::assertSame('private-database-secret', $household->environment['DB_PASSWORD']);
+        self::assertSame('remux', $remux->capability);
+        self::assertSame('transcode', $transcode->capability);
+        self::assertSame('baander-household-media', $remux->volumes['media']);
+        self::assertSame('private-database-secret', $remux->environment['DB_PASSWORD']);
         $layout = ApplicationLayout::fromArray(['version' => 1, 'root' => '/srv/baander']);
         $scores = ['web' => KillOrder::WEB, 'postgres' => KillOrder::POSTGRES, 'pooler' => KillOrder::POOLER, 'redis' => KillOrder::REDIS, 'gateway' => KillOrder::GATEWAY];
-        foreach ([[$household, $this->profile()], [$full, $this->profile('full')]] as [$configuration, $profile]) {
-            $compose = HouseholdRenderer::render($configuration, $this->images(), $layout, $profile, 'max_connections = 20', 'owner');
+        foreach ([[$remux, $this->profile()], [$transcode, $this->profile('transcode')]] as [$configuration, $profile]) {
+            $compose = HouseholdRenderer::render($configuration, $this->images(), $layout, $profile, 'max_connections = 21', 'owner');
             self::assertSame(array_keys($scores), array_keys($compose['services']));
             foreach ($compose['services'] as $name => $service) {
                 foreach (['mem_limit', 'memswap_limit', 'mem_reservation', 'pids_limit', 'cpus', 'cpu_shares', 'cpuset', 'cpu_quota', 'cpu_period', 'deploy'] as $limit) {
-                    self::assertArrayNotHasKey($limit, $service, $configuration->profile . ' ' . $name . ' ' . $limit);
+                    self::assertArrayNotHasKey($limit, $service, $configuration->capability . ' ' . $name . ' ' . $limit);
                 }
-                self::assertSame($scores[$name], $service['oom_score_adj'], $configuration->profile . ' ' . $name);
+                self::assertSame($scores[$name], $service['oom_score_adj'], $configuration->capability . ' ' . $name);
+                self::assertSame($configuration->capability, $service['labels']['org.baander.deployment.capability'], $name);
             }
             self::assertStringContainsString('--maxmemory 192mb', $compose['services']['redis']['command'][2]);
         }
@@ -91,22 +106,25 @@ final class HouseholdDeploymentTest extends TestCase
         self::assertLessThan(0, KillOrder::POSTGRES);
     }
 
-    public function testHouseholdRendersItsSharedCopyProfileAndNativeLimitsUnchanged(): void
+    public function testRemuxRendersItsSharedCopyProfileAndNativeLimitsUnchanged(): void
     {
-        $application = new DeploymentProfile('household');
+        $application = new DeploymentProfile('remux', 2, 4, 1, sharedCopySlots: 2);
         $deployment = json_decode($application->toJson(), true, flags: JSON_THROW_ON_ERROR);
         $runtime = ['phpHeapMiB' => $application->phpHeapMiB(), 'phpProcessMemoryMiB' => $application->phpProcessMemoryMiB(),
             'nativeManagerHeapMiB' => $application->nativeManagerHeapMiB(), 'nativeCommandLimit' => $application->nativeCommandLimit(),
             'nativeResultLimit' => $application->nativeResultLimit(), 'nativeClientLimit' => $application->nativeClientLimit(),
             'mediaHelperLimit' => $application->mediaHelperLimit(), 'scheduledConsoleMiB' => $application->phpProcessMemoryMiB()];
-        $profile = ImageProfile::fromArray(['version' => 1, 'deployment' => $deployment, 'autoscaling' => ['minimumConcurrency' => 1, 'maximumConcurrency' => 1], 'runtime' => $runtime]);
+        $profile = ImageProfile::fromArray(['version' => 2, 'deployment' => $deployment, 'autoscaling' => ['minimumConcurrency' => 1, 'maximumConcurrency' => 1], 'runtime' => $runtime]);
         $before = $profile->toArray();
         $configuration = HouseholdConfiguration::fromArray(self::configuration());
-        $compose = HouseholdRenderer::render($configuration, $this->images(), ApplicationLayout::fromArray(['version' => 1, 'root' => '/srv/baander']), $profile, 'max_connections = 20', 'owner');
-        $rendered = json_decode(str_replace('$$', '$', $compose['services']['web']['environment']['BAANDER_DEPLOYMENT_PROFILE_JSON']), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame(['capability' => 'remux', 'webWorkers' => 2, 'doctrinePoolSlots' => 4, 'ordinaryConsumerLimit' => 1, 'sharedCopySlots' => 2,
+            'videoEncoderSlots' => null, 'audioEncoderSlots' => null, 'hardware' => null], $configuration->profileSettings());
+        $compose = HouseholdRenderer::render($configuration, $this->images(), ApplicationLayout::fromArray(['version' => 1, 'root' => '/srv/baander']), $profile, 'max_connections = 21', 'owner');
+        $rendered = json_decode(str_replace('$$', '$', $compose['services']['web']['environment']['BAANDER_DEPLOYMENT_PROFILE']), true, flags: JSON_THROW_ON_ERROR);
         self::assertSame($profile->deployment, $rendered);
+        self::assertEquals($application, DeploymentProfile::fromJson(json_encode($rendered, JSON_THROW_ON_ERROR)));
         self::assertSame([2, 0, 0], [$rendered['sharedCopySlots'], $rendered['videoEncoderSlots'], $rendered['audioEncoderSlots']]);
-        self::assertSame($rendered, json_decode(HouseholdRenderer::workerEnvironment($configuration, $profile)['BAANDER_DEPLOYMENT_PROFILE_JSON'], true, flags: JSON_THROW_ON_ERROR));
+        self::assertSame($rendered, json_decode(HouseholdRenderer::workerEnvironment($configuration, $profile)['BAANDER_DEPLOYMENT_PROFILE'], true, flags: JSON_THROW_ON_ERROR));
         self::assertSame($before, $profile->toArray());
         self::assertSame($profile->fingerprint(), $compose['services']['web']['labels']['org.baander.deployment.fingerprint']);
     }
@@ -136,7 +154,7 @@ final class HouseholdDeploymentTest extends TestCase
         });
         try {
             try {
-                new Household($store, new Client($executor, $target, []), $executor, [], dirname(__DIR__, 3))->render(HouseholdConfiguration::fromArray(self::configuration()));
+                new Household($store, new Client($executor, $target, []), $executor, [])->render(HouseholdConfiguration::fromArray(self::configuration()));
                 self::fail('Rendered for a rootless daemon.');
             } catch (\RuntimeException $error) {
                 self::assertStringContainsString('negative out-of-memory scores', $error->getMessage());
@@ -148,89 +166,128 @@ final class HouseholdDeploymentTest extends TestCase
         }
     }
 
-    public function testPostgresConnectionsAreSizedFromThePoolerServerPools(): void
+    public function testPoolsAndConnectionsAreDerivedFromTheDeploymentSize(): void
     {
-        self::assertSame(20, Pooler::maxConnections(['application' => 10, 'control' => 4, 'direct' => 3], 3));
-        self::assertSame(35, Pooler::maxConnections(['application' => 20, 'control' => 8, 'direct' => 4], 3));
-        self::assertSame(9, Pooler::maxConnections(['application' => 1, 'control' => 1, 'direct' => 0], 7));
-        foreach (['household' => '/deploy/household/postgresql.conf', 'full' => '/docker/postgres/conf/postgresql.conf'] as $profile => $path) {
-            $configuration = HouseholdConfiguration::fromArray(array_replace(self::configuration(), ['profile' => $profile]));
-            $content = file_get_contents(dirname(__DIR__, 3) . $path);
-            self::assertIsString($content);
+        $remux = Pooler::pools($this->profile()->deployment);
+        self::assertSame(['application' => 10, 'control' => 4, 'direct' => 4], $remux);
+        self::assertSame(21, Pooler::maxConnections($remux));
+        $transcode = Pooler::pools($this->profile('transcode')->deployment);
+        self::assertSame(['application' => 20, 'control' => 8, 'direct' => 4], $transcode);
+        self::assertSame(35, Pooler::maxConnections($transcode));
+        self::assertSame($transcode, Pooler::defaultPools());
+
+        foreach ([[self::configuration(), $remux, 21], [self::transcodeConfiguration(), $transcode, 35]] as [$data, $pools, $connections]) {
+            $configuration = HouseholdConfiguration::fromArray($data);
+            $content = PostgresConfiguration::render($configuration->size['sharedBuffersMiB'], $configuration->size['workMemMiB'], $pools);
             $rendered = HouseholdRenderer::configurationFiles($configuration, $content)['postgres_configuration']['content'];
             $settings = new PostgresSettings($rendered)->expectedSettings();
-            self::assertSame(Pooler::maxConnections(Pooler::POOLS[$profile], (int) $settings['superuser_reserved_connections']), (int) $settings['max_connections'], $profile);
+            self::assertSame((string) $connections, $settings['max_connections'], $configuration->capability);
+            self::assertSame((string) Pooler::SUPERUSER_SLOTS, $settings['superuser_reserved_connections'], $configuration->capability);
         }
     }
 
-    public function testConfigurationRejectsUnknownProfilesAndHostSourceMounts(): void
+    public function testPostgresMemoryIsDerivedFromSharedBuffers(): void
+    {
+        foreach ([128 => ['64MB', '32MB', '512MB'], 1024 => ['256MB', '128MB', '4096MB']] as $sharedBuffers => [$maintenance, $autovacuum, $cache]) {
+            $settings = new PostgresSettings(PostgresConfiguration::render($sharedBuffers, 8, Pooler::defaultPools()))->expectedSettings();
+            self::assertSame(
+                [$sharedBuffers . 'MB', '8MB', $maintenance, $autovacuum, $cache],
+                [$settings['shared_buffers'], $settings['work_mem'], $settings['maintenance_work_mem'], $settings['autovacuum_work_mem'], $settings['effective_cache_size']],
+            );
+        }
+    }
+
+    public function testDevelopmentDatabaseConfigurationIsTheRenderedDefaultDeployment(): void
+    {
+        $example = HouseholdConfiguration::fromArray(JsonObject::read(dirname(__DIR__, 3) . '/deploy/household/example-16gb-transcode.json'));
+        self::assertSame(
+            PostgresConfiguration::render($example->size['sharedBuffersMiB'], $example->size['workMemMiB'], Pooler::defaultPools()),
+            file_get_contents(dirname(__DIR__, 3) . '/docker/postgres/conf/postgresql.conf'),
+        );
+        $compose = file_get_contents(dirname(__DIR__, 3) . '/docker-compose.yml');
+        self::assertIsString($compose);
+        foreach (['APPLICATION' => 'application', 'CONTROL' => 'control'] as $variable => $pool) {
+            self::assertSame(1, preg_match_all('/^\s+BAANDER_POOLER_' . $variable . '_POOL_SIZE:\s*"?(\d+)"?\s*$/m', $compose, $matches), $variable);
+            self::assertSame(Pooler::defaultPools()[$pool], (int) $matches[1][0], $variable);
+        }
+    }
+
+    public function testConfigurationRejectsRetiredKeysOutOfRangeSizesAndHostSourceMounts(): void
     {
         $data = self::configuration();
+        $size = $data['size'];
         foreach ([
-            [['profile' => 'tiny'], 'Select the household or full deployment profile.'],
-            [['media' => ['/home/operator/music']], 'The household profile runs fixed shared copy slots and accepts no media configuration.'],
-            [['profile' => 'full', 'media' => ['/home/operator/music']], 'media must be an object.'],
+            [['capability' => 'tiny'], 'Select the transcode or remux deployment capability.'],
+            [['profile' => 'household'], 'Unknown key in household configuration.'],
+            [['media' => ['videoSlots' => 8]], 'Unknown key in household configuration.'],
+            [['version' => 1], 'Unsupported household configuration version.'],
+            [['size' => ['sharedBuffersMiB' => 16] + $size], 'Deployment size requires sharedBuffersMiB between 32 and 16384.'],
+            [['size' => ['workMemMiB' => 2048] + $size], 'Deployment size requires workMemMiB between 1 and 1024.'],
+            [['size' => array_diff_key($size, ['copySlots' => true])], 'Deployment size requires copySlots.'],
+            [['size' => array_diff_key($size, ['webWorkers' => true])], 'Deployment size requires webWorkers.'],
             [['volumes' => ['media' => '/home/operator/music']], 'Persistent storage requires named Docker volumes.'],
-            [['environment' => $data['environment'] + ['BAANDER_DEPLOYMENT_PROFILE' => 'full']], 'Deployment derives environment variable BAANDER_DEPLOYMENT_PROFILE.'],
+            [['environment' => $data['environment'] + ['BAANDER_DEPLOYMENT_PROFILE' => '{}']], 'Deployment derives environment variable BAANDER_DEPLOYMENT_PROFILE.'],
         ] as [$override, $message]) {
             try {
                 HouseholdConfiguration::fromArray(array_replace($data, $override));
-                self::fail('Accepted an invalid household configuration.');
+                self::fail('Accepted an invalid household configuration: ' . $message);
             } catch (\InvalidArgumentException $error) {
                 self::assertSame($message, $error->getMessage());
             }
         }
     }
 
-    public function testFullPresetCarriesItsMediaSlotsIntoTheRenderedProfile(): void
+    public function testTranscodeSizeCarriesItsMediaSlotsIntoTheRenderedProfile(): void
     {
-        $configuration = HouseholdConfiguration::fromArray(array_replace(self::configuration(), ['profile' => 'full', 'media' => ['videoSlots' => 4, 'audioSlots' => 0]]));
-        self::assertSame([4, 0], [$configuration->slots('video'), $configuration->slots('audio')]);
-        self::assertSame(['videoSlots' => 4, 'audioSlots' => 0], $configuration->toArray()['media']);
+        $configuration = HouseholdConfiguration::fromArray(self::transcodeConfiguration(['videoSlots' => 4, 'audioSlots' => 0]));
+        self::assertSame([4, 0], [$configuration->profileSettings()['videoEncoderSlots'], $configuration->profileSettings()['audioEncoderSlots']]);
+        self::assertSame(0, $configuration->profileSettings()['sharedCopySlots']);
+        self::assertSame(['videoSlots' => 4, 'audioSlots' => 0], array_intersect_key($configuration->toArray()['size'], ['videoSlots' => true, 'audioSlots' => true]));
         self::assertEquals($configuration, HouseholdConfiguration::fromArray($configuration->toArray()));
-        $partial = HouseholdConfiguration::fromArray(array_replace(self::configuration(), ['profile' => 'full', 'media' => ['audioSlots' => 6]]));
-        self::assertSame([null, 6], [$partial->slots('video'), $partial->slots('audio')]);
-        $unset = HouseholdConfiguration::fromArray(array_replace(self::configuration(), ['profile' => 'full']));
-        self::assertSame([null, null], [$unset->slots('video'), $unset->slots('audio')]);
-        self::assertArrayNotHasKey('media', $unset->toArray());
+        $partial = HouseholdConfiguration::fromArray(self::transcodeConfiguration(['audioSlots' => 6]));
+        self::assertSame([null, 6], [$partial->profileSettings()['videoEncoderSlots'], $partial->profileSettings()['audioEncoderSlots']]);
+        $unset = HouseholdConfiguration::fromArray(self::transcodeConfiguration());
+        self::assertSame([null, null], [$unset->profileSettings()['videoEncoderSlots'], $unset->profileSettings()['audioEncoderSlots']]);
+        self::assertArrayNotHasKey('videoSlots', $unset->toArray()['size']);
 
-        $deployment = new DeploymentProfile('full', 4, 0);
+        $deployment = new DeploymentProfile(videoEncoderSlots: 4, audioEncoderSlots: 0);
         $profile = ImageProfile::fromArray([
-            'version' => 1,
+            'version' => 2,
             'deployment' => json_decode($deployment->toJson(), true, flags: JSON_THROW_ON_ERROR),
             'autoscaling' => ['minimumConcurrency' => 1, 'maximumConcurrency' => 1],
             'runtime' => ['phpHeapMiB' => 256, 'scheduledConsoleMiB' => 320, 'nativeCommandLimit' => $deployment->nativeCommandLimit()],
         ]);
         $compose = HouseholdRenderer::render($configuration, $this->images(), ApplicationLayout::fromArray(['version' => 1, 'root' => '/srv/baander']), $profile, 'max_connections = 35', 'owner');
-        $rendered = $compose['services']['web']['environment']['BAANDER_DEPLOYMENT_PROFILE_JSON'];
+        $rendered = $compose['services']['web']['environment']['BAANDER_DEPLOYMENT_PROFILE'];
         self::assertEquals($deployment, DeploymentProfile::fromJson($rendered));
-        self::assertEquals($deployment, DeploymentProfile::fromJson(HouseholdRenderer::workerEnvironment($configuration, $profile)['BAANDER_DEPLOYMENT_PROFILE_JSON']));
+        self::assertEquals($deployment, DeploymentProfile::fromJson(HouseholdRenderer::workerEnvironment($configuration, $profile)['BAANDER_DEPLOYMENT_PROFILE']));
         self::assertSame($profile->fingerprint(), $compose['services']['web']['labels']['org.baander.deployment.fingerprint']);
     }
 
-    public function testFullPresetCarriesItsHardwareEncoderToTheProfileAndNoComposeService(): void
+    public function testTranscodeCarriesItsHardwareEncoderToTheProfileAndNoComposeService(): void
     {
-        $media = ['hardware' => ['accelerator' => 'vaapi', 'device' => '/dev/dri/renderD128', 'group' => 485]];
-        $configuration = HouseholdConfiguration::fromArray(array_replace(self::configuration(), ['profile' => 'full', 'media' => $media]));
+        $hardware = ['accelerator' => 'vaapi', 'device' => '/dev/dri/renderD128', 'group' => 485];
+        $configuration = HouseholdConfiguration::fromArray(self::transcodeConfiguration() + ['hardware' => $hardware]);
         self::assertSame(['accelerator' => 'vaapi', 'device' => '/dev/dri/renderD128'], $configuration->hardware());
+        self::assertSame(['accelerator' => 'vaapi', 'device' => '/dev/dri/renderD128'], $configuration->profileSettings()['hardware']);
         self::assertSame(485, $configuration->hardwareGroup());
-        self::assertSame([null, null], [$configuration->slots('video'), $configuration->slots('audio')]);
-        self::assertSame($media, $configuration->toArray()['media']);
+        self::assertSame([null, null], [$configuration->profileSettings()['videoEncoderSlots'], $configuration->profileSettings()['audioEncoderSlots']]);
+        self::assertSame($hardware, $configuration->toArray()['hardware']);
         self::assertEquals($configuration, HouseholdConfiguration::fromArray($configuration->toArray()));
-        $derived = HouseholdConfiguration::fromArray(array_replace(self::configuration(), ['profile' => 'full', 'media' => ['hardware' => ['accelerator' => 'nvenc']]]));
+        $derived = HouseholdConfiguration::fromArray(self::transcodeConfiguration() + ['hardware' => ['accelerator' => 'nvenc']]);
         self::assertSame(['accelerator' => 'nvenc', 'device' => null], $derived->hardware());
         self::assertNull($derived->hardwareGroup());
 
-        $deployment = new DeploymentProfile('full', hardware: new HardwareEncoder('vaapi', '/dev/dri/renderD128'));
+        $deployment = new DeploymentProfile(hardware: new HardwareEncoder('vaapi', '/dev/dri/renderD128'));
         $profile = ImageProfile::fromArray([
-            'version' => 1,
+            'version' => 2,
             'deployment' => json_decode($deployment->toJson(), true, flags: JSON_THROW_ON_ERROR),
             'autoscaling' => ['minimumConcurrency' => 1, 'maximumConcurrency' => 1],
             'runtime' => ['phpHeapMiB' => 256, 'scheduledConsoleMiB' => 320],
         ]);
         $compose = HouseholdRenderer::render($configuration, $this->images(), ApplicationLayout::fromArray(['version' => 1, 'root' => '/srv/baander']), $profile, 'max_connections = 35', 'owner');
-        self::assertEquals($deployment, DeploymentProfile::fromJson(str_replace('$$', '$', $compose['services']['web']['environment']['BAANDER_DEPLOYMENT_PROFILE_JSON'])));
-        self::assertEquals($deployment, DeploymentProfile::fromJson(HouseholdRenderer::workerEnvironment($configuration, $profile)['BAANDER_DEPLOYMENT_PROFILE_JSON']));
+        self::assertEquals($deployment, DeploymentProfile::fromJson(str_replace('$$', '$', $compose['services']['web']['environment']['BAANDER_DEPLOYMENT_PROFILE'])));
+        self::assertEquals($deployment, DeploymentProfile::fromJson(HouseholdRenderer::workerEnvironment($configuration, $profile)['BAANDER_DEPLOYMENT_PROFILE']));
         // Only the execution worker, which the worker lifecycle creates, receives the device.
         foreach ($compose['services'] as $name => $service) {
             foreach (['devices', 'group_add', 'gpus', 'device_cgroup_rules', 'privileged', 'cap_add'] as $field) {
@@ -240,28 +297,28 @@ final class HouseholdDeploymentTest extends TestCase
                 self::assertArrayNotHasKey($limit, $service, $name . ' must not carry ' . $limit);
             }
         }
-        self::assertNotSame($this->profile('full')->fingerprint(), $compose['services']['web']['labels']['org.baander.deployment.fingerprint']);
+        self::assertNotSame($this->profile('transcode')->fingerprint(), $compose['services']['web']['labels']['org.baander.deployment.fingerprint']);
     }
 
-    public function testHardwareEncoderConfigurationRequiresItsShape(): void
+    public function testHardwareEncoderConfigurationRequiresItsShapeAndATranscodeDeployment(): void
     {
         foreach ([
-            [['hardware' => 'vaapi'], 'hardware must be an object.'],
-            [['hardware' => ['device' => '/dev/dri/renderD128']], 'Missing or invalid accelerator.'],
-            [['hardware' => ['accelerator' => 'vaapi', 'device' => 128]], 'Missing or invalid device.'],
-            [['hardware' => ['accelerator' => 'vaapi', 'device' => '/dev/dri/renderD128', 'group' => -1]], 'The hardware encoder group must be a numeric group ID.'],
-            [['hardware' => ['accelerator' => 'vaapi', 'device' => '/dev/dri/renderD128', 'group' => '485']], 'The hardware encoder group must be a numeric group ID.'],
-            [['hardware' => ['accelerator' => 'vaapi', 'devices' => ['/dev/dri/renderD128']]], 'Unknown key in hardware encoder configuration.'],
-        ] as [$media, $message]) {
+            ['vaapi', 'hardware must be an object.'],
+            [['device' => '/dev/dri/renderD128'], 'Missing or invalid accelerator.'],
+            [['accelerator' => 'vaapi', 'device' => 128], 'Missing or invalid device.'],
+            [['accelerator' => 'vaapi', 'device' => '/dev/dri/renderD128', 'group' => -1], 'The hardware encoder group must be a numeric group ID.'],
+            [['accelerator' => 'vaapi', 'device' => '/dev/dri/renderD128', 'group' => '485'], 'The hardware encoder group must be a numeric group ID.'],
+            [['accelerator' => 'vaapi', 'devices' => ['/dev/dri/renderD128']], 'Unknown key in hardware encoder configuration.'],
+        ] as [$hardware, $message]) {
             try {
-                HouseholdConfiguration::fromArray(array_replace(self::configuration(), ['profile' => 'full', 'media' => $media]));
+                HouseholdConfiguration::fromArray(self::transcodeConfiguration() + ['hardware' => $hardware]);
                 self::fail('Accepted an invalid hardware encoder: ' . $message);
             } catch (\InvalidArgumentException $error) {
                 self::assertSame($message, $error->getMessage());
             }
         }
-        $this->expectExceptionMessage('The household profile runs fixed shared copy slots and accepts no media configuration.');
-        HouseholdConfiguration::fromArray(array_replace(self::configuration(), ['media' => ['hardware' => ['accelerator' => 'vaapi', 'device' => '/dev/dri/renderD128']]]));
+        $this->expectExceptionMessage('A remux deployment runs no hardware encoder.');
+        HouseholdConfiguration::fromArray(self::configuration() + ['hardware' => ['accelerator' => 'vaapi', 'device' => '/dev/dri/renderD128']]);
     }
 
     public function testThePoolerClientLimitIsTheOneTheSlotMaximumsAreDerivedFrom(): void
@@ -272,48 +329,87 @@ final class HouseholdDeploymentTest extends TestCase
         self::assertSame(MediaSlotBounds::POOLER_CLIENT_LIMIT, (int) $matches[1][0]);
     }
 
-    public function testHouseholdPresetRejectsMediaSlots(): void
-    {
-        foreach ([['videoSlots' => 8], ['audioSlots' => 0], []] as $media) {
-            try {
-                HouseholdConfiguration::fromArray(array_replace(self::configuration(), ['media' => $media]));
-                self::fail('Accepted media slots for the household profile.');
-            } catch (\InvalidArgumentException $error) {
-                self::assertSame('The household profile runs fixed shared copy slots and accepts no media configuration.', $error->getMessage());
-            }
-        }
-    }
-
-    public function testMediaSlotsRequireKnownKindsAndWholeNonNegativeCounts(): void
+    public function testEachCapabilityRefusesTheOtherCapabilitysMediaSlots(): void
     {
         foreach ([
-            [['subtitleSlots' => 1], 'Unknown key in media configuration.'],
-            [['videoSlots' => -1], 'Media videoSlots must be zero or more jobs.'],
-            [['audioSlots' => '12'], 'Media audioSlots must be zero or more jobs.'],
-            [['videoSlots' => 2.0], 'Media videoSlots must be zero or more jobs.'],
-        ] as [$media, $message]) {
+            [self::configuration(), ['videoSlots' => 8], 'Unknown key in deployment size for remux.'],
+            [self::configuration(), ['audioSlots' => 0], 'Unknown key in deployment size for remux.'],
+            [self::transcodeConfiguration(), ['copySlots' => 2], 'Unknown key in deployment size for transcode.'],
+        ] as [$data, $slots, $message]) {
             try {
-                HouseholdConfiguration::fromArray(array_replace(self::configuration(), ['profile' => 'full', 'media' => $media]));
-                self::fail('Accepted invalid media slots.');
+                HouseholdConfiguration::fromArray(array_replace($data, ['size' => [...$data['size'], ...$slots]]));
+                self::fail('Accepted another capability\'s media slots: ' . json_encode($slots));
             } catch (\InvalidArgumentException $error) {
                 self::assertSame($message, $error->getMessage());
             }
         }
     }
 
-    public function testExampleConfigurationRendersForEachProfile(): void
+    public function testSizeSettingsRequireKnownKeysAndWholeNonNegativeCounts(): void
     {
-        $example = JsonObject::read(dirname(__DIR__, 3) . '/deploy/household/example.json');
-        $layout = ApplicationLayout::fromArray(['version' => 1, 'root' => '/srv/baander']);
         foreach ([
-            'household' => [$example, null],
-            'full' => [array_replace($example, ['profile' => 'full']), null],
-            'full with media' => [array_replace($example, ['profile' => 'full', 'media' => ['videoSlots' => 8, 'audioSlots' => 12]]), 8],
-        ] as $case => [$data, $videoSlots]) {
-            $configuration = HouseholdConfiguration::fromArray($data);
-            self::assertSame($videoSlots, $configuration->slots('video'), $case);
-            $compose = HouseholdRenderer::render($configuration, $this->images(), $layout, $this->profile($configuration->profile), 'max_connections = 35', 'owner');
-            self::assertSame($configuration->profile, $compose['services']['web']['environment']['BAANDER_DEPLOYMENT_PROFILE'], $case);
+            [['subtitleSlots' => 1], 'Unknown key in deployment size for transcode.'],
+            [['videoSlots' => -1], 'Deployment size videoSlots must be a non-negative integer.'],
+            [['audioSlots' => '12'], 'Deployment size audioSlots must be a non-negative integer.'],
+            [['videoSlots' => 2.0], 'Deployment size videoSlots must be a non-negative integer.'],
+            [['webWorkers' => '4'], 'Deployment size webWorkers must be a non-negative integer.'],
+        ] as [$size, $message]) {
+            try {
+                HouseholdConfiguration::fromArray(self::transcodeConfiguration($size));
+                self::fail('Accepted invalid size settings: ' . $message);
+            } catch (\InvalidArgumentException $error) {
+                self::assertSame($message, $error->getMessage());
+            }
+        }
+    }
+
+    public function testEachShippedExampleValidatesAndRendersItsCapability(): void
+    {
+        $examples = glob(dirname(__DIR__, 3) . '/deploy/household/example-*.json') ?: [];
+        self::assertCount(6, $examples);
+        $layout = ApplicationLayout::fromArray(['version' => 1, 'root' => '/srv/baander']);
+        foreach ($examples as $path) {
+            $configuration = HouseholdConfiguration::fromArray(JsonObject::read($path));
+            self::assertStringEndsWith('-' . $configuration->capability . '.json', $path);
+            $settings = $configuration->profileSettings();
+            $deployment = new DeploymentProfile(
+                $settings['capability'],
+                $settings['webWorkers'],
+                $settings['doctrinePoolSlots'],
+                $settings['ordinaryConsumerLimit'],
+                $settings['sharedCopySlots'],
+                $settings['videoEncoderSlots'],
+                $settings['audioEncoderSlots'],
+            );
+            $profile = ImageProfile::fromArray(['version' => 2, 'deployment' => json_decode($deployment->toJson(), true, flags: JSON_THROW_ON_ERROR),
+                'autoscaling' => ['minimumConcurrency' => 1, 'maximumConcurrency' => 1], 'runtime' => ['phpHeapMiB' => 256, 'scheduledConsoleMiB' => 320]]);
+            $pools = Pooler::pools($profile->deployment);
+            $postgres = PostgresConfiguration::render($configuration->size['sharedBuffersMiB'], $configuration->size['workMemMiB'], $pools);
+            $compose = HouseholdRenderer::render($configuration, $this->images(), $layout, $profile, $postgres, 'owner');
+            self::assertEquals($deployment, DeploymentProfile::fromJson($compose['services']['web']['environment']['BAANDER_DEPLOYMENT_PROFILE']), $path);
+            self::assertSame((string) $pools['application'], $compose['services']['pooler']['environment']['BAANDER_POOLER_APPLICATION_POOL_SIZE'], $path);
+            self::assertSame((string) Pooler::maxConnections($pools), new PostgresSettings($postgres)->expectedSettings()['max_connections'], $path);
+        }
+    }
+
+    public function testRenderedEnvironmentsDisableTelemetryUnlessTheOperatorSetsIt(): void
+    {
+        $layout = ApplicationLayout::fromArray(['version' => 1, 'root' => '/srv/baander']);
+        $default = HouseholdConfiguration::fromArray(self::configuration());
+        $web = HouseholdRenderer::render($default, $this->images(), $layout, $this->profile(), 'max_connections = 21', 'owner')['services']['web']['environment'];
+        self::assertSame('false', $web['OTEL_ENABLED']);
+        self::assertArrayNotHasKey('OTEL_EXPORTER_OTLP_ENDPOINT', $web);
+        $worker = HouseholdRenderer::workerEnvironment($default, $this->profile());
+        self::assertSame('false', $worker['OTEL_ENABLED']);
+        self::assertArrayNotHasKey('OTEL_EXPORTER_OTLP_ENDPOINT', $worker);
+
+        $data = self::configuration();
+        $data['environment'] += ['OTEL_ENABLED' => 'true', 'OTEL_EXPORTER_OTLP_ENDPOINT' => 'http://collector.baander.app:4318'];
+        $configured = HouseholdConfiguration::fromArray($data);
+        $web = HouseholdRenderer::render($configured, $this->images(), $layout, $this->profile(), 'max_connections = 21', 'owner')['services']['web']['environment'];
+        $worker = HouseholdRenderer::workerEnvironment($configured, $this->profile());
+        foreach ([$web, $worker] as $environment) {
+            self::assertSame(['true', 'http://collector.baander.app:4318'], [$environment['OTEL_ENABLED'], $environment['OTEL_EXPORTER_OTLP_ENDPOINT']]);
         }
     }
 
@@ -336,8 +432,7 @@ final class HouseholdDeploymentTest extends TestCase
         $configuration = HouseholdConfiguration::fromArray($data);
         $profile = $this->profile();
         $workerEnvironment = HouseholdRenderer::workerEnvironment($configuration, $profile);
-        self::assertSame('household', $workerEnvironment['BAANDER_DEPLOYMENT_PROFILE']);
-        self::assertSame($profile->deployment, json_decode($workerEnvironment['BAANDER_DEPLOYMENT_PROFILE_JSON'], true, flags: JSON_THROW_ON_ERROR));
+        self::assertSame($profile->deployment, json_decode($workerEnvironment['BAANDER_DEPLOYMENT_PROFILE'], true, flags: JSON_THROW_ON_ERROR));
         $images = $this->images();
         $layout = ApplicationLayout::fromArray(['version' => 1, 'root' => '/srv/baander']);
         $compose = HouseholdRenderer::render($configuration, $images, $layout, $profile, 'max_connections = 36', 'owner');
@@ -365,7 +460,7 @@ final class HouseholdDeploymentTest extends TestCase
         self::assertNotContains($configuration->volumes['secrets'], array_column(HouseholdRenderer::mediaMounts($configuration, $layout), 'volume'));
         self::assertArrayNotHasKey('DB_PASSWORD', $workerEnvironment);
         self::assertArrayNotHasKey('APP_DOMAIN', $workerEnvironment);
-        self::assertSame('household', $compose['services']['web']['environment']['BAANDER_DEPLOYMENT_PROFILE']);
+        self::assertSame($profile->deployment, json_decode(str_replace('$$', '$', $compose['services']['web']['environment']['BAANDER_DEPLOYMENT_PROFILE']), true, flags: JSON_THROW_ON_ERROR));
     }
 
     public function testRendererRoutesClientsThroughAPoolerThatAloneMountsItsCredentials(): void
@@ -395,9 +490,9 @@ final class HouseholdDeploymentTest extends TestCase
         self::assertSame('postgresql://baander_control:private-database-secret@pooler:6432/baander_control?serverVersion=18&charset=utf8', $web['DATABASE_CONTROL_URL']);
         $workers = HouseholdRenderer::workerEnvironment($configuration, $this->profile());
         self::assertSame([$web['DATABASE_URL'], $web['DATABASE_CONTROL_URL']], [$workers['DATABASE_URL'], $workers['DATABASE_CONTROL_URL']]);
-        $full = HouseholdConfiguration::fromArray(array_replace(self::configuration(), ['profile' => 'full']));
-        $fullPooler = HouseholdRenderer::render($full, $this->images(), $layout, $this->profile('full'), 'max_connections = 35', 'owner')['services']['pooler'];
-        self::assertSame(['20', '8'], [$fullPooler['environment']['BAANDER_POOLER_APPLICATION_POOL_SIZE'], $fullPooler['environment']['BAANDER_POOLER_CONTROL_POOL_SIZE']]);
+        $transcode = HouseholdConfiguration::fromArray(self::transcodeConfiguration());
+        $transcodePooler = HouseholdRenderer::render($transcode, $this->images(), $layout, $this->profile('transcode'), 'max_connections = 35', 'owner')['services']['pooler'];
+        self::assertSame(['20', '8'], [$transcodePooler['environment']['BAANDER_POOLER_APPLICATION_POOL_SIZE'], $transcodePooler['environment']['BAANDER_POOLER_CONTROL_POOL_SIZE']]);
     }
 
     public function testPoolerCredentialsRunFromTheDatabaseImageWithTheCredentialsVolumeAndNoPasswordInArguments(): void
@@ -417,7 +512,7 @@ final class HouseholdDeploymentTest extends TestCase
             return $actual->run($command, $policy);
         });
         $target = new Target($directory . '/docker', 'unix:///run/baander.app-docker.sock', 'owned-daemon', null, null);
-        $deployment = new Household($store, new Client($executor, $target, getenv()), $executor, getenv(), dirname(__DIR__, 3));
+        $deployment = new Household($store, new Client($executor, $target, getenv()), $executor, getenv());
         try {
             new \ReflectionMethod(Household::class, 'poolerCredentials')->invoke(
                 $deployment,
@@ -440,11 +535,11 @@ final class HouseholdDeploymentTest extends TestCase
         }
     }
 
-    public function testRendererRejectsMixedProfiles(): void
+    public function testRendererRejectsAResolvedProfileOfAnotherCapability(): void
     {
         $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('Configured and resolved deployment profiles disagree.');
-        HouseholdRenderer::render(HouseholdConfiguration::fromArray(array_replace(self::configuration(), ['profile' => 'full'])), $this->images(), ApplicationLayout::load(), $this->profile(), 'max_connections = 36', 'owner');
+        $this->expectExceptionMessage('Configured and resolved deployment capabilities disagree.');
+        HouseholdRenderer::render(HouseholdConfiguration::fromArray(self::transcodeConfiguration()), $this->images(), ApplicationLayout::load(), $this->profile(), 'max_connections = 36', 'owner');
     }
 
     public function testMigrationsTransferGeneratedCredentialsThroughTheRealDisposableWrapper(): void
@@ -465,7 +560,7 @@ final class HouseholdDeploymentTest extends TestCase
         });
         $target = new Target($directory . '/docker', 'unix:///run/baander.app-docker.sock', 'owned-daemon', null, null);
         $configuration = HouseholdConfiguration::fromArray(self::configuration());
-        $deployment = new Household($store, new Client($executor, $target, getenv()), $executor, getenv(), dirname(__DIR__, 3));
+        $deployment = new Household($store, new Client($executor, $target, getenv()), $executor, getenv());
         try {
             new \ReflectionMethod(Household::class, 'migrate')->invoke(
                 $deployment,
@@ -580,7 +675,7 @@ final class HouseholdDeploymentTest extends TestCase
             'target' => $target->toArray(), 'profile' => $this->profile()->toArray(), 'profileFingerprint' => $this->profile()->fingerprint(),
             'composeFile' => $directory . '/compose-fixture.json', 'composeHash' => hash('sha256', '{}'), 'configurationVolumes' => []]);
         try {
-            $test(new Household($store, new Client($executor, $target, []), $executor, [], dirname(__DIR__, 3)), $store, $commands);
+            $test(new Household($store, new Client($executor, $target, []), $executor, []), $store, $commands);
         } finally {
             Collector::remove($directory);
         }
@@ -596,11 +691,13 @@ final class HouseholdDeploymentTest extends TestCase
         return $images;
     }
 
-    private function profile(string $identifier = 'household'): ImageProfile
+    /** The resolved profile of the remux configuration, or of the transcode configuration with the image's slot defaults. */
+    private function profile(string $capability = 'remux'): ImageProfile
     {
+        $deployment = $capability === 'remux' ? new DeploymentProfile('remux', 2, 4, 1, sharedCopySlots: 2) : new DeploymentProfile();
         return ImageProfile::fromArray([
-            'version' => 1,
-            'deployment' => ['identifier' => $identifier, 'hardware' => null, 'webWorkers' => 2, 'doctrinePoolSlots' => 4],
+            'version' => 2,
+            'deployment' => json_decode($deployment->toJson(), true, flags: JSON_THROW_ON_ERROR),
             'autoscaling' => ['minimumConcurrency' => 1, 'maximumConcurrency' => 1],
             'runtime' => ['phpHeapMiB' => 256, 'scheduledConsoleMiB' => 320],
         ]);

@@ -10,12 +10,15 @@ use Baander\Tooling\Docker\{Client, Target};
 use Baander\Tooling\Filesystem\AtomicFile;
 use Baander\Tooling\Fixtures\Runtime;
 use Baander\Tooling\Inventory\Collector;
-use Baander\Tooling\Process\{EngineExecutor, ExecutionContext, ProcessSpec, CommandExecutor, CompletionPolicy};
+use Baander\Tooling\Filesystem\PrivateDirectory;
+use Baander\Tooling\Process\{EngineExecutor, ExecutionContext, ProcessResult, ProcessSpec, CommandExecutor, CompletionPolicy};
 use Baander\Tooling\Fixtures\Household\{Observer, Qualification};
 use PHPUnit\Framework\TestCase;
 
 final class HouseholdQualificationTest extends TestCase
 {
+    private const array SIZE = ['webWorkers' => 2, 'databaseSlots' => 4, 'ordinaryConsumers' => 1, 'sharedBuffersMiB' => 128, 'workMemMiB' => 4, 'copySlots' => 2];
+
     public function testConfigurationDeclaresWholeHostAndLongWorkloadBeforePreparation(): void
     {
         $configuration = $this->configuration();
@@ -86,6 +89,118 @@ final class HouseholdQualificationTest extends TestCase
             self::assertArrayNotHasKey('activeRun', $saved);
             self::assertSame('Simulated observer startup failure.', AtomicFile::readJson($directory . '/runs/original-overlap-1/receipt.json')['failure']);
         });
+    }
+
+    public function testHostWithSwapRefusesStartAndScenarioBeforeAnyDeploymentIsCreated(): void
+    {
+        $calls = [];
+        $this->withPreparedQualification(function (Qualification $qualification, array $state, string $directory): void {
+            try {
+                $qualification->start();
+                self::fail('A host with swap unexpectedly started.');
+            } catch (\RuntimeException $error) {
+                self::assertStringContainsString('swap', $error->getMessage());
+            }
+            self::assertSame('prepared', AtomicFile::readJson($directory . '/qualification.json')['phase']);
+            self::assertDirectoryDoesNotExist($directory . '/runs');
+            $state['phase'] = 'running';
+            $state['provision'] = ['libraries' => []];
+            $state['playbackSlots'] = [];
+            AtomicFile::writeJson($directory . '/qualification.json', $state);
+            try {
+                $qualification->scenario('original-overlap', 1, 1);
+                self::fail('A host with swap unexpectedly ran a scenario.');
+            } catch (\RuntimeException $error) {
+                self::assertStringContainsString('swap', $error->getMessage());
+            }
+            self::assertSame('running', AtomicFile::readJson($directory . '/qualification.json')['phase']);
+            self::assertDirectoryDoesNotExist($directory . '/runs');
+        }, function (CommandExecutor&\PHPUnit\Framework\MockObject\Stub $executor) use (&$calls): void {
+            $executor->method('run')->willReturnCallback(self::hostMemoryDocker(1024 ** 3, $calls));
+        });
+        $created = array_values(array_filter($calls, static fn(ProcessSpec $call): bool => ($call->argv[3] ?? null) === 'create'));
+        self::assertCount(2, $created);
+        foreach ($created as $call) {
+            self::assertContains('type=bind,src=/proc,dst=/host/proc,readonly', $call->argv);
+        }
+        self::assertFalse(array_any($calls, static fn(ProcessSpec $call): bool => in_array('compose', $call->argv, true) || in_array('volume', $call->argv, true)));
+    }
+
+    public function testHostMemoryCheckNeedsAMeasuredHostWithinTheConstraintAndNoSwap(): void
+    {
+        Qualification::assertHostMemory(['memTotalBytes' => 4 * 1024 ** 3, 'swapTotalBytes' => 0], 4 * 1024 ** 3);
+        $refused = 0;
+        foreach ([['memTotalBytes' => 4 * 1024 ** 3 + 1, 'swapTotalBytes' => 0], ['memTotalBytes' => null, 'swapTotalBytes' => 0],
+            ['memTotalBytes' => 4 * 1024 ** 3, 'swapTotalBytes' => 4096], ['memTotalBytes' => 4 * 1024 ** 3, 'swapTotalBytes' => null]] as $memory) {
+            try {
+                Qualification::assertHostMemory($memory, 4 * 1024 ** 3);
+                self::fail('Accepted an unsuitable host.');
+            } catch (\RuntimeException) {
+                ++$refused;
+            }
+        }
+        self::assertSame(4, $refused);
+    }
+
+    public function testDeploymentReplacementFailsWhenTheNewBootKeepsTheOldFingerprint(): void
+    {
+        $before = ['profileFingerprint' => str_repeat('a', 64), 'composeHash' => str_repeat('b', 64), 'size' => self::SIZE, 'workerBootId' => str_repeat('c', 32)];
+        $after = ['profileFingerprint' => str_repeat('d', 64), 'composeHash' => str_repeat('e', 64), 'size' => array_replace(self::SIZE, ['webWorkers' => 1]), 'workerBootId' => str_repeat('f', 32)];
+        $receipt = ['failure' => null, 'before' => $before, 'after' => $after, 'serving' => ['workersReady' => true, 'healthy' => true, 'catalogIntact' => true]];
+        self::assertSame('passed', Qualification::replacementCheck($receipt)['status']);
+        $receipt['after']['profileFingerprint'] = $before['profileFingerprint'];
+        $check = Qualification::replacementCheck($receipt);
+        self::assertSame('failed', $check['status']);
+        self::assertSame(['The new boot has the same deployment fingerprint as the old one.'], $check['failures']);
+        unset($receipt['after'], $receipt['serving']);
+        $receipt['failure'] = 'Simulated start failure.';
+        self::assertContains('Simulated start failure.', Qualification::replacementCheck($receipt)['failures']);
+    }
+
+    public function testDeploymentReplacementNeedsADifferentDeclaredSizeAndNoPlayers(): void
+    {
+        $configuration = $this->configuration();
+        $configuration['replacementSize'] = array_replace(self::SIZE, ['webWorkers' => 1]);
+        self::assertSame(1, Qualification::validateConfiguration($configuration)['replacementSize']['webWorkers']);
+        try {
+            Qualification::validateConfiguration(array_replace($configuration, ['replacementSize' => self::SIZE]));
+            self::fail('Accepted an unchanged replacement size.');
+        } catch (\InvalidArgumentException $error) {
+            self::assertStringContainsString('differ', $error->getMessage());
+        }
+        $this->withPreparedQualification(function (Qualification $qualification): void {
+            try {
+                $qualification->scenario('deployment-replacement');
+                self::fail('Replaced without a declared size.');
+            } catch (\RuntimeException $error) {
+                self::assertStringContainsString('replacementSize', $error->getMessage());
+            }
+            $this->expectException(\InvalidArgumentException::class);
+            $qualification->scenario('deployment-replacement', 1, 1);
+        });
+    }
+
+    public function testHealthyAnswerNeedsHttpOkAndNoUnhealthyCheck(): void
+    {
+        $body = ['status' => 'healthy', 'checks' => [['component' => 'postgresql', 'status' => 'healthy'], ['component' => 'memory', 'status' => 'not_available']]];
+        self::assertTrue(Qualification::healthy(['httpStatus' => 200, 'body' => $body]));
+        self::assertFalse(Qualification::healthy(['httpStatus' => 503, 'body' => $body]));
+        $body['checks'][] = ['component' => 'worker', 'status' => 'unhealthy'];
+        self::assertFalse(Qualification::healthy(['httpStatus' => 200, 'body' => $body]));
+        self::assertFalse(Qualification::healthy(['httpStatus' => null, 'body' => null]));
+    }
+
+    public function testOnlyOomEventsOfThisDeploymentCount(): void
+    {
+        $event = static fn(array $attributes, string $action = 'oom'): string => json_encode(['Action' => $action, 'Actor' => ['ID' => str_repeat('a', 64), 'Attributes' => $attributes]], JSON_THROW_ON_ERROR);
+        $events = implode("\n", [
+            $event(['name' => 'household-web-1', 'org.baander.household.owner' => 'owner']),
+            $event(['name' => 'household-execution', 'app.baander.worker.namespace' => 'household']),
+            $event(['name' => 'household-web-1', 'org.baander.household.owner' => 'owner'], 'die'),
+            $event(['name' => 'unrelated', 'org.baander.household.owner' => 'other']),
+        ]) . "\n";
+        self::assertSame(['household-web-1', 'household-execution'], Qualification::ownedOomEvents($events, 'household', 'owner'));
+        self::assertSame([], Qualification::ownedOomEvents('', 'household', 'owner'));
     }
 
     public function testSeedReuseAcceptsUnchangedImportedSeedAndRejectsUnsafeSources(): void
@@ -335,10 +450,11 @@ final class HouseholdQualificationTest extends TestCase
         file_put_contents($directory . '/samples.jsonl', json_encode(['epochSeconds' => 13, 'processes' => []], JSON_THROW_ON_ERROR) . "\n");
         file_put_contents($directory . '/database.jsonl', json_encode(['epochSeconds' => 15, 'snapshot' => ['jobs' => ['groups' => [['name' => 'SyncSongMessage', 'status' => 'running', 'count' => 1]]]]], JSON_THROW_ON_ERROR) . "\n");
         try {
-            $proof = Qualification::copyOverlapProof($directory, 30);
+            $proof = Qualification::copyOverlapProof($directory, 30, 2);
             self::assertTrue($proof['observed']);
             self::assertSame(2, $proof['copyLaunchesDuringMaintenance']);
             self::assertSame(0, $proof['sampledSimultaneousCopyProcessesLowerBound']);
+            self::assertTrue(Qualification::copyOverlapProof($directory, 30, 1)['observed']);
         } finally {
             Collector::remove($directory);
         }
@@ -354,17 +470,17 @@ final class HouseholdQualificationTest extends TestCase
         file_put_contents($directory . '/samples.jsonl', json_encode(['epochSeconds' => 23, 'processes' => []], JSON_THROW_ON_ERROR) . "\n");
         file_put_contents($directory . '/database.jsonl', json_encode(['epochSeconds' => 25, 'snapshot' => ['jobs' => ['groups' => [['name' => 'SyncSongMessage', 'status' => 'running', 'count' => 1]]]]], JSON_THROW_ON_ERROR) . "\n");
         try {
-            $proof = Qualification::copyOverlapProof($directory, 30);
+            $proof = Qualification::copyOverlapProof($directory, 30, 2);
             self::assertTrue($proof['observed']);
             self::assertSame(2, $proof['copyLaunchesDuringMaintenance']);
             self::assertSame(20.0, $proof['maintenanceCommandFinishedEpoch']);
             self::assertSame(30.0, $proof['maintenanceFinishedEpoch']);
             self::assertSame(25.0, $proof['lastPendingMetadataEpoch']);
-            self::assertFalse(Qualification::copyOverlapProof($directory, 21)['observed']);
+            self::assertFalse(Qualification::copyOverlapProof($directory, 21, 2)['observed']);
             file_put_contents($directory . '/native.jsonl', json_encode($launch + ['at' => 26], JSON_THROW_ON_ERROR) . "\n" . json_encode($launch + ['at' => 27], JSON_THROW_ON_ERROR) . "\n");
-            self::assertFalse(Qualification::copyOverlapProof($directory, 30)['observed']);
+            self::assertFalse(Qualification::copyOverlapProof($directory, 30, 2)['observed']);
             file_put_contents($directory . '/database.jsonl', json_encode(['epochSeconds' => 25, 'snapshot' => ['jobs' => ['groups' => [['name' => 'SyncSongMessage', 'status' => 'completed', 'count' => 1]]]]], JSON_THROW_ON_ERROR) . "\n");
-            self::assertFalse(Qualification::copyOverlapProof($directory, 30)['observed']);
+            self::assertFalse(Qualification::copyOverlapProof($directory, 30, 2)['observed']);
         } finally {
             Collector::remove($directory);
         }
@@ -462,14 +578,15 @@ final class HouseholdQualificationTest extends TestCase
         $runtime = new Runtime(dirname(__DIR__, 3), 5, getenv(), ToolingConfiguration::resolve());
         $executor = $this->createStub(CommandExecutor::class);
         if ($configureExecutor === null) {
-            $executor->method('run')->willThrowException(new \RuntimeException('Simulated observer startup failure.'));
+            $executor->method('run')->willReturnCallback(self::hostMemoryDocker(0));
         } else {
             $configureExecutor($executor);
         }
-        $target = new Target('/usr/bin/docker', 'unix:///run/baander.app-docker.sock', 'fixture-daemon', null, null);
+        PrivateDirectory::prepare($directory);
+        $target = new Target(self::cleanupDocker($directory), 'unix:///run/baander.app-docker.sock', 'fixture-daemon', null, null);
         $deployment = new HouseholdStateStore($directory . '/deployment');
         $deployment->save(['version' => 1, 'phase' => 'prepared', 'configuration' => $configuration['deployment'],
-            'profile' => ['version' => 1, 'deployment' => ['identifier' => 'household', 'hardware' => null, 'webWorkers' => 2, 'doctrinePoolSlots' => 4],
+            'profile' => ['version' => 2, 'deployment' => ['capability' => 'remux', 'hardware' => null, 'webWorkers' => 2, 'doctrinePoolSlots' => 4],
                 'autoscaling' => ['minimumConcurrency' => 1, 'maximumConcurrency' => 1], 'runtime' => ['phpHeapMiB' => 256, 'scheduledConsoleMiB' => 320]],
             'layout' => ['version' => 1, 'root' => '/srv/baander'], 'owner' => 'fixture-owner']);
         $state = ['version' => 1, 'phase' => 'prepared', 'target' => $target->toArray(), 'configuration' => $configuration,
@@ -484,11 +601,51 @@ final class HouseholdQualificationTest extends TestCase
         }
     }
 
+    /**
+     * Answers the host memory observation container and fails every later Docker command, so a test sees
+     * exactly what a qualification action does once the host check has passed or refused.
+     *
+     * @param list<ProcessSpec> $calls
+     * @return \Closure(ProcessSpec): ProcessResult
+     */
+    private static function hostMemoryDocker(int $swapBytes, array &$calls = []): \Closure
+    {
+        $memoryContainer = str_repeat('9', 64);
+        return static function (ProcessSpec $command) use ($swapBytes, &$calls, $memoryContainer): ProcessResult {
+            $calls[] = $command;
+            $arguments = array_slice($command->argv, 3);
+            $output = match (true) {
+                $arguments === ['info', '--format', '{{json .}}'] => '{"ID":"fixture-daemon"}',
+                ($arguments[0] ?? null) === 'create' && str_contains(implode(' ', $arguments), '->memory()') => $memoryContainer,
+                $arguments === ['start', '--attach', $memoryContainer] => json_encode(['memTotalBytes' => 4 * 1024 ** 3, 'swapTotalBytes' => $swapBytes], JSON_THROW_ON_ERROR),
+                $arguments === ['inspect', '--format', '{{.State.ExitCode}}', $memoryContainer] => '0',
+                default => throw new \RuntimeException('Simulated observer startup failure.'),
+            };
+            return new ProcessResult(0, null, false, false, $output, '', 0);
+        };
+    }
+
+    /** A Docker command for resource cleanup that finds no remaining test container. */
+    private static function cleanupDocker(string $directory): string
+    {
+        $path = $directory . '/docker';
+        file_put_contents($path, <<<'SH'
+            #!/bin/sh
+            shift 2
+            case "$1 $2" in
+              "info --format") printf '{"ID":"fixture-daemon"}\n' ;;
+              "container inspect") printf 'Error: No such container: %s\n' "$4" >&2; exit 1 ;;
+            esac
+            SH);
+        chmod($path, 0700);
+        return $path;
+    }
+
     /** @return array<string,mixed> */
     private function configuration(): array
     {
         return ['version' => 1, 'name' => 'baander-household', 'deployment' => [
-            'version' => 1, 'name' => 'baander-household', 'profile' => 'household', 'origin' => 'http://baander.app:8080',
+            'version' => 2, 'name' => 'baander-household', 'capability' => 'remux', 'size' => self::SIZE, 'origin' => 'http://baander.app:8080',
             'listen' => ['address' => '127.0.0.1', 'port' => 8080],
             'images' => array_fill_keys(['application', 'worker', 'operator', 'postgres', 'gateway', 'redis'], 'baander/fixture:local'),
             'environment' => ['APP_SECRET' => 'private-app', 'STREAM_URL_HMAC_SECRET' => 'private-stream', 'DB_USERNAME' => 'baander', 'DB_PASSWORD' => 'private-db', 'DB_DATABASE' => 'baander', 'REDIS_PASSWORD' => 'private-redis'],

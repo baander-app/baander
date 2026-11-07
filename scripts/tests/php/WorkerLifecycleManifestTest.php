@@ -10,7 +10,7 @@ use PHPUnit\Framework\TestCase;
 
 final class WorkerLifecycleManifestTest extends TestCase
 {
-    public function testCurrentFullProfilePassesLifecyclePreflight(): void
+    public function testCurrentTranscodeProfilePassesLifecyclePreflight(): void
     {
         $this->check($this->manifest());
         self::addToAssertionCount(1);
@@ -21,11 +21,11 @@ final class WorkerLifecycleManifestTest extends TestCase
     {
         $manifest = $this->manifest();
         match ($change) {
-            'version' => $manifest['version'] = 6,
+            'version' => $manifest['version'] = 8,
             'memory' => $manifest['controlMemoryMiB'] = 2944,
             'pids' => $manifest['executionPidsLimit'] = 257,
             'cpus' => $manifest['executionCpuSet'] = [1],
-            'identifier' => $manifest['deploymentProfile']['identifier'] = 'household',
+            'capability' => $manifest['deploymentProfile']['capability'] = 'remux',
             'capacity' => $manifest['deploymentProfile']['webWorkers'] = 99,
             'unknown' => $manifest['deploymentProfile']['unknown'] = true,
             'type' => $manifest['deploymentProfile']['webWorkers'] = '4',
@@ -38,7 +38,7 @@ final class WorkerLifecycleManifestTest extends TestCase
     /** @return iterable<string,array{string}> */
     public static function invalidManifests(): iterable
     {
-        foreach (['version', 'memory', 'pids', 'cpus', 'identifier', 'capacity', 'unknown', 'type'] as $change) {
+        foreach (['version', 'memory', 'pids', 'cpus', 'capability', 'capacity', 'unknown', 'type'] as $change) {
             yield $change => [$change];
         }
     }
@@ -46,7 +46,7 @@ final class WorkerLifecycleManifestTest extends TestCase
     /** @return array<string,mixed> */
     private function manifest(): array
     {
-        return ['version' => 8, 'autoscaling' => ['maximumConcurrency' => 2],
+        return ['version' => 9, 'autoscaling' => ['maximumConcurrency' => 2],
             'deploymentProfile' => OperatorConfiguration::json(dirname(__DIR__, 3) . '/tests/Fixtures/Worker/deployment-profile.json')];
     }
 

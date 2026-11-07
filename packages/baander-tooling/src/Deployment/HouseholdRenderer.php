@@ -10,16 +10,18 @@ final class HouseholdRenderer
 {
     public const string POSTGRES_CONFIG_PATH = '/etc/baander/postgresql.conf';
 
+    /** OpenTelemetry export stays off unless the configuration's environment sets a collector. */
+    public const array ENVIRONMENT_DEFAULTS = ['OTEL_ENABLED' => 'false'];
+
     /** @return array<string,string> */
     public static function environment(HouseholdConfiguration $configuration, ImageProfile $profile): array
     {
         $env = $configuration->environment;
         $redis = 'redis://default:' . rawurlencode($env['REDIS_PASSWORD']) . '@redis:6379';
-        return array_replace($env, Pooler::urls($env['DB_USERNAME'], $env['DB_PASSWORD'], $env['DB_DATABASE']), [
+        return array_replace(self::ENVIRONMENT_DEFAULTS, $env, Pooler::urls($env['DB_USERNAME'], $env['DB_PASSWORD'], $env['DB_DATABASE']), [
             'APP_ENV' => 'prod', 'APP_DEBUG' => '0', 'APP_URL' => $configuration->origin,
             'DEFAULT_URI' => $configuration->origin, 'APP_DOMAIN' => (string) parse_url($configuration->origin, PHP_URL_HOST),
-            'BAANDER_DEPLOYMENT_PROFILE' => $configuration->profile,
-            'BAANDER_DEPLOYMENT_PROFILE_JSON' => json_encode($profile->deployment, JSON_THROW_ON_ERROR),
+            'BAANDER_DEPLOYMENT_PROFILE' => json_encode($profile->deployment, JSON_THROW_ON_ERROR),
             'REDIS_URL' => $redis, 'MESSENGER_TRANSPORT_DSN' => $redis . '/messages',
             'MAILER_DSN' => $env['MAILER_DSN'] ?? 'null://null',
             'MEDIA_STORAGE_PATH' => '/storage/media', 'CONVERT_STORAGE_PATH' => '/storage/conversions',
@@ -34,7 +36,7 @@ final class HouseholdRenderer
             'REDIS_PASSWORD', 'MESSENGER_TRANSPORT_DSN', 'MAILER_DSN',
             'CONVERT_STORAGE_PATH', 'MEDIA_STORAGE_PATH', 'MAIL_FROM_ADDRESS', 'MAIL_FROM_NAME',
             'VAPID_PRIVATE_KEY', 'VAPID_PUBLIC_KEY', 'STREAM_URL_HMAC_SECRET', 'APP_URL', 'DEFAULT_URI',
-            'BAANDER_DEPLOYMENT_PROFILE', 'BAANDER_DEPLOYMENT_PROFILE_JSON',
+            'BAANDER_DEPLOYMENT_PROFILE', 'OTEL_ENABLED', 'OTEL_EXPORTER_OTLP_ENDPOINT',
         ]));
     }
 
@@ -43,8 +45,8 @@ final class HouseholdRenderer
      */
     public static function render(HouseholdConfiguration $configuration, array $images, ApplicationLayout $layout, ImageProfile $profile, string $postgresConfiguration, string $owner): array
     {
-        if (($profile->deployment['identifier'] ?? null) !== $configuration->profile) {
-            throw new \InvalidArgumentException('Configured and resolved deployment profiles disagree.');
+        if (($profile->deployment['capability'] ?? null) !== $configuration->capability) {
+            throw new \InvalidArgumentException('Configured and resolved deployment capabilities disagree.');
         }
         foreach (HouseholdConfiguration::IMAGE_ROLES as $role) {
             if (preg_match('/^sha256:[a-f0-9]{64}$/D', $images[$role]['id'] ?? '') !== 1) {
@@ -52,7 +54,7 @@ final class HouseholdRenderer
             }
         }
         $environment = self::environment($configuration, $profile);
-        $labels = ['org.baander.household' => $configuration->name, 'org.baander.household.owner' => $owner, 'org.baander.deployment.profile' => $configuration->profile, 'org.baander.deployment.fingerprint' => $profile->fingerprint()];
+        $labels = ['org.baander.household' => $configuration->name, 'org.baander.household.owner' => $owner, 'org.baander.deployment.capability' => $configuration->capability, 'org.baander.deployment.fingerprint' => $profile->fingerprint()];
         $common = ['restart' => 'unless-stopped', 'labels' => $labels, 'networks' => ['private'], 'security_opt' => ['no-new-privileges:true']];
         $webMounts = self::mediaMounts($configuration, $layout);
         $webMounts = array_map(static fn(array $mount): array => ['type' => 'volume', 'source' => array_search($mount['volume'], $configuration->volumes, true), 'target' => $mount['target'], 'read_only' => $mount['readOnly']], $webMounts);
@@ -75,7 +77,7 @@ final class HouseholdRenderer
             ],
             Pooler::SERVICE => $common + Pooler::service(
                 $images['postgres']['id'],
-                Pooler::environment($configuration->profile, $environment['DB_USERNAME'], $environment['DB_DATABASE'], 'postgres'),
+                Pooler::environment(Pooler::pools($profile->deployment), $environment['DB_USERNAME'], $environment['DB_DATABASE'], 'postgres'),
                 'pooler_credentials',
                 'postgres',
             ) + ['cap_drop' => ['ALL'], 'oom_score_adj' => KillOrder::POOLER],

@@ -1,0 +1,39 @@
+{
+    "version": 2,
+    "name": "baander-8gb-transcode",
+    "capability": "transcode",
+    "size": {
+        "webWorkers": 2,
+        "databaseSlots": 6,
+        "ordinaryConsumers": 2,
+        "sharedBuffersMiB": 192,
+        "workMemMiB": 8,
+        "videoSlots": 3,
+        "audioSlots": 6
+    },
+    "origin": "http://baander.app:8080",
+    "listen": {
+        "address": "127.0.0.1",
+        "port": 8080
+    },
+    "images": {
+        "application": "martinjuul/baander-app:latest",
+        "worker": "baander-worker:local",
+        "operator": "baander-operator:local",
+        "postgres": "baander-database:latest",
+        "gateway": "nginx:stable-alpine",
+        "redis": "redis:7-alpine"
+    },
+    "environment": {
+        "APP_SECRET": "replace-with-a-private-random-value",
+        "STREAM_URL_HMAC_SECRET": "replace-with-a-separate-private-random-value",
+        "DB_USERNAME": "baander",
+        "DB_PASSWORD": "replace-with-a-private-database-password",
+        "DB_DATABASE": "baander",
+        "REDIS_PASSWORD": "replace-with-a-private-redis-password",
+        "MAILER_DSN": "null://null"
+    },
+    "resources": {
+        "redisMaxmemoryMiB": 192
+    }
+}

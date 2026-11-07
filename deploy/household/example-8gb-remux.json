@@ -1,9 +1,20 @@
 {
-    "version": 1,
-    "name": "baander-household",
-    "profile": "household",
+    "version": 2,
+    "name": "baander-8gb-remux",
+    "capability": "remux",
+    "size": {
+        "webWorkers": 2,
+        "databaseSlots": 6,
+        "ordinaryConsumers": 2,
+        "sharedBuffersMiB": 192,
+        "workMemMiB": 8,
+        "copySlots": 4
+    },
     "origin": "http://baander.app:8080",
-    "listen": {"address": "127.0.0.1", "port": 8080},
+    "listen": {
+        "address": "127.0.0.1",
+        "port": 8080
+    },
     "images": {
         "application": "martinjuul/baander-app:latest",
         "worker": "baander-worker:local",

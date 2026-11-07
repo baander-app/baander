@@ -56,7 +56,7 @@ final class HouseholdNativeAuditTest extends TestCase
 
     public function testMissingJournalCannotClaimCompleteObservation(): void
     {
-        $result = NativeAudit::read('/tmp/baander-missing-audit-' . bin2hex(random_bytes(8)), true, true);
+        $result = NativeAudit::read('/tmp/baander-missing-audit-' . bin2hex(random_bytes(8)), true, true, 'remux');
         self::assertFalse($result['complete']);
     }
 
@@ -66,7 +66,7 @@ final class HouseholdNativeAuditTest extends TestCase
         self::assertIsString($path);
         try {
             file_put_contents($path, json_encode(['event' => 'start', 'at' => 1.0, 'pid' => 10, 'executable' => 'ffmpeg', 'arguments' => ['-i', 'source', 'output']], JSON_THROW_ON_ERROR) . "\n");
-            $result = NativeAudit::read($path, true, true);
+            $result = NativeAudit::read($path, true, true, 'remux');
             self::assertFalse($result['complete']);
             self::assertSame(1, $result['unclassifiedLaunches']);
             self::assertSame(0, $result['forbiddenLaunches']);
@@ -81,23 +81,23 @@ final class HouseholdNativeAuditTest extends TestCase
         self::assertIsString($path);
         try {
             file_put_contents($path, json_encode(['event' => 'start', 'at' => 1.0, 'pid' => 10, 'executable' => 'ffprobe', 'arguments' => ['source']], JSON_THROW_ON_ERROR) . "\n");
-            self::assertTrue(NativeAudit::read($path, true, true)['complete']);
-            self::assertFalse(NativeAudit::read($path, true, false)['complete']);
+            self::assertTrue(NativeAudit::read($path, true, true, 'remux')['complete']);
+            self::assertFalse(NativeAudit::read($path, true, false, 'remux')['complete']);
             file_put_contents($path, "not json\n", FILE_APPEND);
-            self::assertFalse(NativeAudit::read($path, true, true)['complete']);
+            self::assertFalse(NativeAudit::read($path, true, true, 'remux')['complete']);
         } finally {
             unlink($path);
         }
     }
 
-    public function testEncodingIsRecordedButPermittedForTheFullProfileBaseline(): void
+    public function testEncodingIsForbiddenUnderRemuxAndRecordedUnderTranscode(): void
     {
         $path = tempnam(sys_get_temp_dir(), 'baander-native-audit-');
         self::assertIsString($path);
         try {
             file_put_contents($path, json_encode(['event' => 'start', 'at' => 1.0, 'pid' => 10, 'executable' => 'ffmpeg', 'arguments' => ['-i', 'source', '-c:a', 'aac', 'output']], JSON_THROW_ON_ERROR) . "\n");
-            self::assertSame(1, NativeAudit::read($path, true, true, 'household')['forbiddenLaunches']);
-            $baseline = NativeAudit::read($path, true, true, 'full');
+            self::assertSame(1, NativeAudit::read($path, true, true, 'remux')['forbiddenLaunches']);
+            $baseline = NativeAudit::read($path, true, true, 'transcode');
             self::assertSame(1, $baseline['byOperation']['encode']);
             self::assertSame(0, $baseline['forbiddenLaunches']);
         } finally {

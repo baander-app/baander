@@ -4,19 +4,19 @@ declare(strict_types=1);
 
 namespace Baander\Tooling\Tests;
 
-use Baander\Tooling\Deployment\PostgresSettings;
+use Baander\Tooling\Deployment\{Pooler, PostgresConfiguration, PostgresSettings};
 use PHPUnit\Framework\TestCase;
 
 final class HouseholdPostgresSettingsTest extends TestCase
 {
-    public function testHouseholdBudgetAndFullBudgetRemainSeparate(): void
+    public function testRemuxAndDefaultTranscodeBudgetsRemainSeparate(): void
     {
-        $household = $this->household();
-        self::assertSame('20', $household->expectedSettings()['max_connections']);
-        self::assertSame('128MB', $household->expectedSettings()['shared_buffers']);
-        $full = new PostgresSettings(file_get_contents(dirname(__DIR__, 3) . '/docker/postgres/conf/postgresql.conf'));
-        self::assertSame('35', $full->expectedSettings()['max_connections']);
-        self::assertSame('256MB', $full->expectedSettings()['shared_buffers']);
+        $remux = $this->household();
+        self::assertSame('21', $remux->expectedSettings()['max_connections']);
+        self::assertSame('128MB', $remux->expectedSettings()['shared_buffers']);
+        $transcode = new PostgresSettings(file_get_contents(dirname(__DIR__, 3) . '/docker/postgres/conf/postgresql.conf'));
+        self::assertSame('35', $transcode->expectedSettings()['max_connections']);
+        self::assertSame('256MB', $transcode->expectedSettings()['shared_buffers']);
     }
 
     public function testActualPostgresUnitsAndExtensionSettingsAreAccepted(): void
@@ -104,9 +104,11 @@ final class HouseholdPostgresSettingsTest extends TestCase
         self::assertStringNotContainsString('PASSWORD', $sql);
     }
 
+    /** The rendered configuration of a remux deployment with two web workers and two copy slots. */
     private function household(): PostgresSettings
     {
-        return new PostgresSettings(file_get_contents(dirname(__DIR__, 3) . '/deploy/household/postgresql.conf'));
+        $pools = Pooler::pools(['webWorkers' => 2, 'sharedCopySlots' => 2, 'videoEncoderSlots' => 0, 'audioEncoderSlots' => 0]);
+        return new PostgresSettings(PostgresConfiguration::render(128, 4, $pools));
     }
 
     /** @return array<string,mixed> */

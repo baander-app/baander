@@ -51,8 +51,8 @@ final class WorkerLifecycleTest extends TestCase
     private function configuration(array $overrides = []): WorkerConfiguration
     {
         $profile = ImageProfile::fromArray([
-            'version' => 1,
-            'deployment' => ['identifier' => 'household', 'hardware' => null, 'webWorkers' => 2, 'doctrinePoolSlots' => 4],
+            'version' => 2,
+            'deployment' => json_decode(new \App\Shared\Application\DTO\DeploymentProfile('remux', 2, 4, 1, sharedCopySlots: 2)->toJson(), true, flags: JSON_THROW_ON_ERROR),
             'autoscaling' => ['minimumConcurrency' => 1, 'maximumConcurrency' => 1],
             'runtime' => ['phpHeapMiB' => 256, 'scheduledConsoleMiB' => 320],
         ]);
@@ -106,7 +106,7 @@ final class WorkerLifecycleTest extends TestCase
         sort($fields);
         sort($saved);
         self::assertSame($fields, $saved);
-        self::assertSame(8, $manifest['version']);
+        self::assertSame(9, $manifest['version']);
         self::assertNull($manifest['deviceGroup']);
         self::assertSame('production', $manifest['sourceMountPolicy']);
         self::assertSame(320, $manifest['scheduledConsoleMiB']);
@@ -131,7 +131,7 @@ final class WorkerLifecycleTest extends TestCase
             return in_array('info', $arguments, true) ? '{"ID":"daemon"}' : '';
         });
         $deployment = AtomicFile::readJson(dirname(__DIR__, 3) . '/tests/Fixtures/Worker/deployment-profile.json');
-        $profile = ImageProfile::fromArray(['version' => 1, 'deployment' => $deployment,
+        $profile = ImageProfile::fromArray(['version' => 2, 'deployment' => $deployment,
             'autoscaling' => AtomicFile::readJson(dirname(__DIR__, 3) . '/tests/Fixtures/Worker/autoscaling-profile.json'),
             'runtime' => ['phpHeapMiB' => 256, 'scheduledConsoleMiB' => 320]]);
         $record = null;
@@ -144,7 +144,7 @@ final class WorkerLifecycleTest extends TestCase
         self::assertIsString($contents);
         $manifest = DeploymentOperatorManifest::fromJson($contents, '/srv/baander');
         self::assertSame(320 * 1024 ** 2, $manifest->scheduledConsoleBytes);
-        self::assertSame('full', $manifest->deploymentProfile->identifier);
+        self::assertSame('transcode', $manifest->deploymentProfile->capability);
     }
 
     public function testHardwareManifestMapsTheDeviceAndItsHostGroupIntoExecutionOnly(): void
@@ -156,8 +156,8 @@ final class WorkerLifecycleTest extends TestCase
             return in_array('info', $arguments, true) ? '{"ID":"daemon"}' : '';
         });
         // /dev/null stands in for the render node: a character device whose group the host reports.
-        $deployment = new \App\Shared\Application\DTO\DeploymentProfile('full', hardware: new \App\Shared\Application\DTO\HardwareEncoder('vaapi', '/dev/null'));
-        $profile = ImageProfile::fromArray(['version' => 1, 'deployment' => json_decode($deployment->toJson(), true, flags: JSON_THROW_ON_ERROR),
+        $deployment = new \App\Shared\Application\DTO\DeploymentProfile(hardware: new \App\Shared\Application\DTO\HardwareEncoder('vaapi', '/dev/null'));
+        $profile = ImageProfile::fromArray(['version' => 2, 'deployment' => json_decode($deployment->toJson(), true, flags: JSON_THROW_ON_ERROR),
             'autoscaling' => AtomicFile::readJson(dirname(__DIR__, 3) . '/tests/Fixtures/Worker/autoscaling-profile.json'),
             'runtime' => ['phpHeapMiB' => 256, 'scheduledConsoleMiB' => 320]]);
         $mounts = [
@@ -172,7 +172,7 @@ final class WorkerLifecycleTest extends TestCase
         $manifest = DeploymentOperatorManifest::fromJson($contents, '/srv/baander');
         self::assertSame(stat('/dev/null')['gid'], $manifest->deviceGroup);
         self::assertEquals($deployment, $manifest->deploymentProfile);
-        $environment = new \App\Shared\Infrastructure\Worker\DeploymentRuntimeEnvironment(['BAANDER_DEPLOYMENT_PROFILE' => 'full', 'BAANDER_DEPLOYMENT_PROFILE_JSON' => $deployment->toJson()]);
+        $environment = new \App\Shared\Infrastructure\Worker\DeploymentRuntimeEnvironment(['BAANDER_DEPLOYMENT_PROFILE' => $deployment->toJson()]);
         $execution = $manifest->recipe(\App\Shared\Application\DTO\DeploymentUnit::Execution, $environment);
         $control = $manifest->recipe(\App\Shared\Application\DTO\DeploymentUnit::Control, $environment);
         self::assertSame([['/dev/null'], [stat('/dev/null')['gid']]], [$execution->devices, $execution->groups]);
@@ -185,11 +185,11 @@ final class WorkerLifecycleTest extends TestCase
 
     public function testHardwareDeviceThatIsNotADeviceNodeIsRefusedBeforePreparation(): void
     {
-        $deployment = new \App\Shared\Application\DTO\DeploymentProfile('full', hardware: new \App\Shared\Application\DTO\HardwareEncoder('vaapi', '/dev/dri/baander-missing-render-node'));
-        $profile = ImageProfile::fromArray(['version' => 1, 'deployment' => json_decode($deployment->toJson(), true, flags: JSON_THROW_ON_ERROR),
+        $deployment = new \App\Shared\Application\DTO\DeploymentProfile(hardware: new \App\Shared\Application\DTO\HardwareEncoder('vaapi', '/dev/dri/baander-missing-render-node'));
+        $profile = ImageProfile::fromArray(['version' => 2, 'deployment' => json_decode($deployment->toJson(), true, flags: JSON_THROW_ON_ERROR),
             'autoscaling' => ['minimumConcurrency' => 1, 'maximumConcurrency' => 1], 'runtime' => ['phpHeapMiB' => 256, 'scheduledConsoleMiB' => 320]]);
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('set media.hardware.group');
+        $this->expectExceptionMessage('set hardware.group');
         $this->configuration(['profile' => $profile])->deviceGroup();
     }
 

@@ -39,7 +39,7 @@ class WorkerLifecycle
         $sharedVolumes = array_values(array_unique(array_column($configuration->mediaMounts, 'volume')));
         $ipc = $configuration->namespace . '-ipc-' . $boot;
         $manifest = [
-            'version' => 8,
+            'version' => 9,
             'sourceMountPolicy' => $configuration->sourceMountPolicy,
             'namespace' => $configuration->namespace,
             'bootId' => $boot,

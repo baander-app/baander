@@ -150,7 +150,8 @@ final class HouseholdApplicationTest extends TestCase
         $runner ??= new HouseholdApplicationRunner();
         $docker = new Client($runner, new Target('/usr/bin/docker', 'unix:///fixture.sock', 'fixture', null, null), []);
         $configuration = [
-            'version' => 1, 'name' => 'household-fixture', 'profile' => 'household',
+            'version' => 2, 'name' => 'household-fixture', 'capability' => 'remux',
+            'size' => ['webWorkers' => 2, 'databaseSlots' => 4, 'ordinaryConsumers' => 1, 'sharedBuffersMiB' => 128, 'workMemMiB' => 4, 'copySlots' => 2],
             'origin' => 'https://baander.app', 'listen' => ['address' => '127.0.0.1', 'port' => 8080],
             'images' => array_fill_keys(['application', 'worker', 'operator', 'postgres', 'gateway', 'redis'], 'baander/fixture:local'),
             'environment' => ['APP_SECRET' => 'private-app-secret', 'STREAM_URL_HMAC_SECRET' => 'private-stream-secret', 'DB_USERNAME' => 'baander', 'DB_PASSWORD' => 'private-database-secret', 'DB_DATABASE' => 'baander', 'REDIS_PASSWORD' => 'private-redis-secret'],

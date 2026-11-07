@@ -56,6 +56,14 @@ final class HouseholdMeasurementTest extends TestCase
         self::assertSame($sample, json_decode(trim(file_get_contents($this->root . '/samples.jsonl')), true, flags: JSON_THROW_ON_ERROR));
     }
 
+    public function testHostMemoryReadsTotalMemoryAndSwapFromMeminfo(): void
+    {
+        $sampler = new HostSampler($this->root . '/proc', $this->root . '/cgroup');
+        self::assertSame(['memTotalBytes' => 4096 * 1024, 'swapTotalBytes' => 1024 * 1024], $sampler->memory());
+        file_put_contents($this->root . '/proc/meminfo', "MemTotal: 4096 kB\nMemAvailable: 2048 kB\n");
+        self::assertSame(['memTotalBytes' => 4096 * 1024, 'swapTotalBytes' => null], $sampler->memory());
+    }
+
     public function testAuditedNativeExecutableKeepsItsConcurrencyClassification(): void
     {
         unlink($this->root . '/proc/41/exe');

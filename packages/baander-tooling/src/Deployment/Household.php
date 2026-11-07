@@ -18,7 +18,6 @@ final readonly class Household
         private Client $docker,
         private CommandExecutor $executor,
         private array $environment,
-        private string $source,
         private float $cleanupSeconds = 120.0,
     ) {}
 
@@ -50,7 +49,7 @@ final readonly class Household
             $target = $saved === null
                 ? new TargetResolver($executor, $environment)->resolve($configuration->docker, $store->directory . '/transport')
                 : Target::fromArray($saved['target']);
-            $household = new self($store, new Client($executor, $target, $environment), $executor, $environment, $source, $configuration->budgets->seconds('cleanup'));
+            $household = new self($store, new Client($executor, $target, $environment), $executor, $environment, $configuration->budgets->seconds('cleanup'));
             $result = match ($action) {
                 'render' => $household->render(HouseholdConfiguration::fromArray(JsonObject::read($options['--config']))),
                 'start' => $household->start(HouseholdConfiguration::fromArray(JsonObject::read($options['--config']))),
@@ -100,14 +99,11 @@ final readonly class Household
                 $this->docker,
                 $resolved->id,
                 $candidateLayout,
-                $configuration->profile,
+                $configuration->profileSettings(),
                 $this->store->directory . '/profile-' . $role . '.json',
                 $this->environment,
                 $this->cleanupSeconds,
                 $measurement,
-                videoSlots: $configuration->slots('video'),
-                audioSlots: $configuration->slots('audio'),
-                hardware: $configuration->hardware(),
             );
             if (($layout !== null && $layout->toArray() !== $candidateLayout->toArray())
                 || ($profile !== null && $profile->fingerprint() !== $candidateProfile->fingerprint())) {
@@ -119,11 +115,7 @@ final readonly class Household
         if ($layout === null || $profile === null) {
             throw new \RuntimeException('Missing application release identity.');
         }
-        $postgresPath = $configuration->profile === 'household' ? '/deploy/household/postgresql.conf' : '/docker/postgres/conf/postgresql.conf';
-        $postgres = file_get_contents($this->source . $postgresPath);
-        if ($postgres === false) {
-            throw new \RuntimeException('Cannot read the selected PostgreSQL configuration.');
-        }
+        $postgres = PostgresConfiguration::render($configuration->size['sharedBuffersMiB'], $configuration->size['workMemMiB'], Pooler::pools($profile->deployment));
         new PostgresSettings($postgres);
         $compose = HouseholdRenderer::render($configuration, $images, $layout, $profile, $postgres, $owner);
         $content = json_encode($compose, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR) . "\n";
@@ -243,7 +235,7 @@ final readonly class Household
         }
         $this->docker->validateIdentity();
         $profile = ImageProfile::fromArray($state['profile']);
-        if (($state['configuration']['profile'] ?? null) !== $profile->deployment['identifier'] || !hash_equals($state['profileFingerprint'], $profile->fingerprint())) {
+        if (($state['configuration']['capability'] ?? null) !== $profile->deployment['capability'] || !hash_equals($state['profileFingerprint'], $profile->fingerprint())) {
             throw new \RuntimeException('Saved deployment profile changed; preserve state for recovery.');
         }
     }
@@ -440,7 +432,7 @@ PHP;
     private function report(array $state): array
     {
         $configuration = HouseholdConfiguration::fromArray($state['configuration']);
-        return ['name' => $configuration->name, 'phase' => $state['phase'], 'profile' => $configuration->profile,
+        return ['name' => $configuration->name, 'phase' => $state['phase'], 'capability' => $configuration->capability,
             'profileFingerprint' => $state['profileFingerprint'], 'origin' => $configuration->origin,
             'composeFile' => $this->composeFile(), 'redisMaxmemoryMiB' => $configuration->resources['redisMaxmemoryMiB'], 'dataVolumes' => $configuration->volumes, 'configurationVolumes' => $state['configurationVolumes']];
     }

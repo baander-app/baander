@@ -18,29 +18,56 @@ final class Pooler
     public const string CREDENTIALS_PATH = '/etc/baander-pooler/credentials';
     public const string CONTROL_SUFFIX = '_control';
 
+    /** Application server connections per web worker. */
+    public const int APPLICATION_CONNECTIONS_PER_WEB_WORKER = 5;
+    /** Control server connections the lease agents and the scheduler need without media work. */
+    public const int MINIMUM_CONTROL_CONNECTIONS = 4;
+    /** Direct connections for verification, checkpoints, the pooler credentials step and an operator's psql session. */
+    public const int DIRECT_CONNECTIONS = 4;
+    public const int SUPERUSER_SLOTS = 3;
+
     /**
-     * Server connections per profile, against the client concurrency measured before the
-     * pooler: the household profile peaked at about 19 client backends (two web workers with
-     * four Doctrine slots each, one consumer, two shared copy jobs and the control children),
-     * the full profile at about 30 (four web workers with ten slots each, four consumers and
-     * four media jobs). Transaction pooling holds a server connection only for a transaction,
-     * so the application pools cover every household web slot at once and half of the full
-     * profile's, and further clients wait for the next free connection. The control pools
-     * cover two lease agents, the scheduler and each media job's short authority check.
-     * The direct reserve serves verification, checkpoints, the pooler credentials step and
-     * an operator's psql session. PostgreSQL's max_connections adds its superuser slots.
+     * Server connections derived from the deployment size, against the client concurrency
+     * measured before the pooler: two web workers with four Doctrine slots each, one consumer,
+     * two shared copy jobs and the control children peaked at about 19 client backends; four web
+     * workers with ten slots each, four consumers and four media jobs at about 30. Transaction
+     * pooling holds a server connection only for a transaction, so five application connections
+     * per web worker cover every slot of the smaller size at once and half of the larger one's,
+     * and further clients wait for the next free connection. The control pool covers two lease
+     * agents and the scheduler, and grows by two connections for every five media slots for
+     * their short authority checks.
+     *
+     * @param array<string,mixed> $deployment The resolved deployment profile's settings.
+     * @return array{application:int,control:int,direct:int}
      */
-    public const array POOLS = [
-        'household' => ['application' => 10, 'control' => 4, 'direct' => 3],
-        'full' => ['application' => 20, 'control' => 8, 'direct' => 4],
-    ];
+    public static function pools(array $deployment): array
+    {
+        $media = (int) $deployment['sharedCopySlots'] + (int) $deployment['videoEncoderSlots'] + (int) $deployment['audioEncoderSlots'];
+
+        return [
+            'application' => self::APPLICATION_CONNECTIONS_PER_WEB_WORKER * (int) $deployment['webWorkers'],
+            'control' => max(self::MINIMUM_CONTROL_CONNECTIONS, intdiv(2 * $media + 4, 5)),
+            'direct' => self::DIRECT_CONNECTIONS,
+        ];
+    }
+
+    /**
+     * The pools of the default deployment, the 16 GB transcode starting point, which development
+     * instances and the source installation run when no deployment profile is set.
+     *
+     * @return array{application:int,control:int,direct:int}
+     */
+    public static function defaultPools(): array
+    {
+        return self::pools(['webWorkers' => 4, 'sharedCopySlots' => 0, 'videoEncoderSlots' => 8, 'audioEncoderSlots' => 12]);
+    }
 
     /** PostgreSQL's max_connections: both pools, the direct reserve and the superuser slots.
      * @param array{application:int,control:int,direct:int} $pools
      */
-    public static function maxConnections(array $pools, int $superuserSlots): int
+    public static function maxConnections(array $pools): int
     {
-        return $pools['application'] + $pools['control'] + $pools['direct'] + $superuserSlots;
+        return $pools['application'] + $pools['control'] + $pools['direct'] + self::SUPERUSER_SLOTS;
     }
 
     /** @return array{DATABASE_URL:string,DATABASE_CONTROL_URL:string} */
@@ -57,16 +84,17 @@ final class Pooler
     /**
      * The pooler service's environment; baander-pooler renders PgBouncer's configuration from it.
      *
+     * @param array{application:int,control:int,direct:int} $pools
      * @return array<string,string>
      */
-    public static function environment(string $profile, string $user, string $database, string $serverHost): array
+    public static function environment(array $pools, string $user, string $database, string $serverHost): array
     {
         return [
             'BAANDER_POOLER_USER' => $user,
             'BAANDER_POOLER_DATABASE' => $database,
             'BAANDER_POOLER_SERVER_HOST' => $serverHost,
-            'BAANDER_POOLER_APPLICATION_POOL_SIZE' => (string) self::POOLS[$profile]['application'],
-            'BAANDER_POOLER_CONTROL_POOL_SIZE' => (string) self::POOLS[$profile]['control'],
+            'BAANDER_POOLER_APPLICATION_POOL_SIZE' => (string) $pools['application'],
+            'BAANDER_POOLER_CONTROL_POOL_SIZE' => (string) $pools['control'],
         ];
     }
 

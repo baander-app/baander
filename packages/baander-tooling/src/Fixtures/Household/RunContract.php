@@ -6,25 +6,35 @@ namespace Baander\Tooling\Fixtures\Household;
 
 final readonly class RunContract
 {
+    /** Measured runs; a deployment replacement is a lifecycle check with its own receipt. */
+    public const array SCENARIOS = ['cold-startup', 'original-overlap', 'fresh-copy-overlap', 'mixed-overlap', 'recovery', 'insufficient-memory'];
+    /** Scenarios that run real players while normal background work runs. */
+    public const array PLAYBACK_SCENARIOS = ['original-overlap', 'fresh-copy-overlap', 'mixed-overlap', 'recovery', 'insufficient-memory'];
+
     /** @param array<string,mixed> $document */
     private function __construct(private array $document) {}
 
     /** @param array<string,mixed> $document */
     public static function fromArray(array $document): self
     {
-        foreach (['version', 'scenario', 'profile', 'imageId', 'startedMonotonic', 'sampleIntervalSeconds', 'maxSampleGapSeconds', 'durationSeconds', 'maintenanceDeadlineSeconds', 'requiredRoles', 'configuredLimits', 'dataset', 'schedule'] as $key) {
+        foreach (['version', 'scenario', 'capability', 'size', 'players', 'imageId', 'startedMonotonic', 'sampleIntervalSeconds', 'maxSampleGapSeconds', 'durationSeconds', 'maintenanceDeadlineSeconds', 'requiredRoles', 'configuredLimits', 'dataset', 'schedule'] as $key) {
             self::require(array_key_exists($key, $document), 'Run contract is missing ' . $key . '.');
         }
-        self::require($document['version'] === 1, 'Unknown run contract version.');
-        self::require(in_array($document['scenario'], ['cold-startup', 'original-overlap', 'fresh-copy-overlap', 'mixed-overlap', 'recovery', 'profile-replacement', 'insufficient-memory'], true), 'Invalid scenario.');
-        self::require(in_array($document['profile'], ['full', 'household'], true), 'Invalid deployment profile.');
+        self::require($document['version'] === 2, 'Unknown run contract version.');
+        self::require(in_array($document['scenario'], self::SCENARIOS, true), 'Invalid scenario.');
+        self::require(in_array($document['capability'], ['transcode', 'remux'], true), 'Invalid deployment capability.');
+        $size = $document['size'];
+        self::require(is_array($size) && $size !== [] && !array_is_list($size)
+            && !array_any($size, static fn(mixed $value): bool => !is_int($value) || $value < 0), 'Run requires the deployment size.');
+        $players = in_array($document['scenario'], self::PLAYBACK_SCENARIOS, true) ? [1, 2] : [0];
+        self::require(in_array($document['players'], $players, true), 'Playback scenarios run one or two players; other runs run none.');
         self::require(is_string($document['imageId']) && preg_match('/^sha256:[a-f0-9]{64}$/D', $document['imageId']) === 1, 'Run image must be immutable.');
         foreach (['startedMonotonic', 'sampleIntervalSeconds', 'maxSampleGapSeconds', 'durationSeconds', 'maintenanceDeadlineSeconds'] as $key) {
             self::require((is_int($document[$key]) || is_float($document[$key])) && is_finite((float) $document[$key]) && $document[$key] >= 0, 'Invalid run timing: ' . $key . '.');
         }
         self::require($document['sampleIntervalSeconds'] > 0 && $document['maxSampleGapSeconds'] >= $document['sampleIntervalSeconds'], 'Sampling gap must cover the sampling interval.');
         self::require($document['durationSeconds'] > 0 && $document['maxSampleGapSeconds'] < $document['durationSeconds'] && $document['maintenanceDeadlineSeconds'] >= $document['durationSeconds'], 'Maintenance deadline must include the load interval.');
-        self::require(!self::overlap($document['scenario']) || $document['durationSeconds'] >= 1800, 'Overlap scenarios require at least 1800 seconds.');
+        self::require(!in_array($document['scenario'], self::PLAYBACK_SCENARIOS, true) || $document['durationSeconds'] >= 1800, 'Playback scenarios require at least 1800 seconds.');
         $roles = $document['requiredRoles'];
         self::require(is_array($roles) && array_is_list($roles) && $roles !== [] && count(array_unique($roles, SORT_REGULAR)) === count($roles), 'Run requires distinct service roles.');
         foreach ($roles as $role) {
@@ -48,14 +58,15 @@ final readonly class RunContract
         return new self($document);
     }
 
+    /** Overlap runs must keep every player progressing; recovery and insufficient-memory runs record playback without requiring it. */
     public function requiresPlayback(): bool
     {
-        return self::overlap($this->document['scenario']);
+        return str_ends_with($this->document['scenario'], '-overlap');
     }
 
-    private static function overlap(string $scenario): bool
+    public function players(): int
     {
-        return str_ends_with($scenario, '-overlap');
+        return $this->document['players'];
     }
 
     /** @return array<string,mixed> */

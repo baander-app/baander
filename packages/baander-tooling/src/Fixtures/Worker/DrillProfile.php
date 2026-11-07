@@ -7,7 +7,7 @@ namespace Baander\Tooling\Fixtures\Worker;
 use InvalidArgumentException;
 
 /**
- * The full deployment profile a worker drill runs: the fixture's three video and one audio
+ * The transcode deployment profile a worker drill runs: the fixture's three video and one audio
  * slot unless BAANDER_TEST_DEPLOYMENT_PROFILE names another profile file. Web, both worker
  * units and the drill's clients take their job counts from it.
  */
@@ -15,7 +15,7 @@ final readonly class DrillProfile
 {
     public const string ENVIRONMENT = 'BAANDER_TEST_DEPLOYMENT_PROFILE';
     public const string DEFAULT_PATH = 'tests/Fixtures/Worker/deployment-profile.json';
-    private const array FIELDS = ['webWorkers', 'doctrinePoolSlots', 'ordinaryConsumerLimit', 'sharedCopySlots', 'videoEncoderSlots', 'audioEncoderSlots', 'identifier', 'hardware'];
+    private const array FIELDS = ['capability', 'webWorkers', 'doctrinePoolSlots', 'ordinaryConsumerLimit', 'sharedCopySlots', 'videoEncoderSlots', 'audioEncoderSlots', 'hardware'];
 
     /** @param array<string,mixed> $value */
     private function __construct(
@@ -42,11 +42,11 @@ final readonly class DrillProfile
     /** @param array<mixed> $value */
     public static function fromArray(string $path, array $value): self
     {
-        if (array_keys($value) !== self::FIELDS || $value['identifier'] !== 'full') {
-            throw new InvalidArgumentException('A drill runs a full deployment profile with exactly the serialized profile fields in order', 2);
+        if (array_keys($value) !== self::FIELDS || $value['capability'] !== 'transcode') {
+            throw new InvalidArgumentException('A drill runs a transcode deployment profile with exactly the serialized profile fields in order', 2);
         }
         foreach (self::FIELDS as $field) {
-            if (!in_array($field, ['identifier', 'hardware'], true) && (!is_int($value[$field]) || $value[$field] < 0)) {
+            if (!in_array($field, ['capability', 'hardware'], true) && (!is_int($value[$field]) || $value[$field] < 0)) {
                 throw new InvalidArgumentException('Deployment profile field ' . $field . ' requires a non-negative integer', 2);
             }
         }

@@ -181,7 +181,7 @@ final readonly class OperatorProvisioning
             'POSTGRES_DB=worker_operator_test',
             $this->qualification->commands->runtime->image('postgres')->id,
             // The load proof runs the database image's own configuration, whose connection
-            // limit is the full profile's pools plus the direct reserve and superuser slots.
+            // limit is the default deployment's pools plus the direct reserve and superuser slots.
             ...($this->load() ? ['postgres', '-c', 'config_file=/etc/postgresql/postgresql.conf'] : []),
         ]);
         $this->qualification->docker(['network', 'connect', '--alias', 'postgres', $s->runId, $s->runId . '-postgres']);
@@ -449,7 +449,7 @@ final readonly class OperatorProvisioning
         $maximum = (int) $value;
         $profile['maximumConcurrency'] = $maximum;
         $manifest = [
-            'version' => 8,
+            'version' => 9,
             'sourceMountPolicy' => $this->qualification->configuration->developmentSource ? 'local-development' : 'production',
             'namespace' => $s->namespace,
             'bootId' => $s->boot,
@@ -495,8 +495,7 @@ final readonly class OperatorProvisioning
         $direct = 'postgresql://baander:test-only@postgres:5432/worker_operator_test?serverVersion=18&charset=utf8';
         $runtime = [
             // Web and both units run the same profile, so web health and policy see the drill's slots.
-            'BAANDER_DEPLOYMENT_PROFILE' => 'full',
-            'BAANDER_DEPLOYMENT_PROFILE_JSON' => $deployment->json(),
+            'BAANDER_DEPLOYMENT_PROFILE' => $deployment->json(),
             'APP_ENV' => 'prod',
             'APP_DEBUG' => '0',
             'APP_SECRET' => 'operator-test-only',
@@ -632,7 +631,7 @@ final readonly class OperatorProvisioning
         }
         $this->qualification->resources->runContainer($arguments, log: $this->qualification->artifact('pooler-credentials.log'));
         $environment = [];
-        foreach (Pooler::environment('full', 'baander', 'worker_operator_test', 'postgres') as $key => $value) {
+        foreach (Pooler::environment(Pooler::defaultPools(), 'baander', 'worker_operator_test', 'postgres') as $key => $value) {
             array_push($environment, '-e', $key . '=' . $value);
         }
         $this->qualification->resources->startContainer($s->runId . '-pooler', [

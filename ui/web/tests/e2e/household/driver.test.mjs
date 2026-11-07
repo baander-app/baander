@@ -116,3 +116,34 @@ test('mixed playback pairs original music with an original video', () => {
   twoVideos.slots[0] = { ...twoVideos.slots[1], email: 'first@baander.app', password: 'private-first' }
   assert.throws(() => validateConfiguration(twoVideos), /one audio and one video/)
 })
+
+test('one player runs a single slot and needs no second account', () => {
+  const single = { ...config(), scenario: 'original-overlap', players: 1,
+    slots: [{ kind: 'video', publicId: 'original-video', pagePath: '/movies/original-movie', expectedDelivery: 'original' }] }
+  const parsed = validateConfiguration(single)
+  assert.equal(parsed.players, 1)
+  assert.equal(parsed.slots.length, 1)
+  assert.throws(() => validateConfiguration({ ...single, slots: [...single.slots, { ...single.slots[0], email: 'second@baander.app', password: 'private-second' }] }), /one playback slot per player/)
+  assert.throws(() => validateConfiguration({ ...single, players: 3 }), /players must be 1 or 2/)
+  const slots = [{ kind: 'video', expectedDelivery: 'copy' }]
+  assert.equal(playersAdvancing([samples()[1]], [samples()[0]], slots), true)
+  assert.equal(playersAdvancing([samples()[1], samples()[1]], [samples()[0], samples()[0]], slots), false)
+})
+
+test('two players remain the default', () => {
+  assert.equal(validateConfiguration(config()).players, 2)
+  const single = config()
+  single.slots = single.slots.slice(0, 1)
+  assert.throws(() => validateConfiguration(single), /one playback slot per player/)
+})
+
+test('recovery and insufficient-memory runs play original media', () => {
+  for (const scenario of ['recovery', 'insufficient-memory']) {
+    const value = { ...config(), scenario }
+    value.slots = value.slots.map(slot => ({ ...slot, kind: 'video', publicId: 'original-video', pagePath: '/movies/original-movie' }))
+    assert.equal(validateConfiguration(value).scenario, scenario)
+    value.slots[0].expectedDelivery = 'copy'
+    assert.throws(() => validateConfiguration(value), /disagree/)
+  }
+  assert.throws(() => validateConfiguration({ ...config(), scenario: 'deployment-replacement' }), /Unknown playback scenario/)
+})

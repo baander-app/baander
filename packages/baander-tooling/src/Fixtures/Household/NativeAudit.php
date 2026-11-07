@@ -77,13 +77,15 @@ final class NativeAudit
             ? 'copy' : 'unknown';
     }
 
-    /** @return array<string,mixed> */
-    public static function read(string $path, bool $verifiedBefore, bool $verifiedAfter, string $profile = 'household'): array
+    /** A remux deployment forbids every encoder launch; a transcode deployment records them.
+     * @return array<string,mixed>
+     */
+    public static function read(string $path, bool $verifiedBefore, bool $verifiedAfter, string $capability): array
     {
-        if (!in_array($profile, ['household', 'full'], true)) {
-            throw new \InvalidArgumentException('Unknown native audit deployment profile.');
+        if (!in_array($capability, ['remux', 'transcode'], true)) {
+            throw new \InvalidArgumentException('Unknown native audit deployment capability.');
         }
-        $result = ['complete' => false, 'launches' => 0, 'forbiddenLaunches' => 0, 'unclassifiedLaunches' => 0, 'byOperation' => [], 'errors' => []];
+        $result = ['complete' => false, 'capability' => $capability, 'launches' => 0, 'forbiddenLaunches' => 0, 'unclassifiedLaunches' => 0, 'byOperation' => [], 'errors' => []];
         if (!$verifiedBefore || !$verifiedAfter) {
             $result['errors'][] = 'Native executable wrappers were not verified before and after the run.';
         }
@@ -114,7 +116,7 @@ final class NativeAudit
                 }
                 $operation = self::classify($record['executable'], $record['arguments']);
                 $result['byOperation'][$operation] = ($result['byOperation'][$operation] ?? 0) + 1;
-                $result['forbiddenLaunches'] += (int) ($operation === 'encode' && $profile === 'household');
+                $result['forbiddenLaunches'] += (int) ($operation === 'encode' && $capability === 'remux');
                 $result['unclassifiedLaunches'] += (int) ($operation === 'unknown');
             }
         } finally {

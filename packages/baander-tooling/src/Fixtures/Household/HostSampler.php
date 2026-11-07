@@ -139,6 +139,16 @@ final class HostSampler
             'missing' => array_values(array_unique($this->missing))];
     }
 
+    /** The whole-host memory and swap sizes; a missing counter reads as null.
+     * @return array{memTotalBytes:?int,swapTotalBytes:?int}
+     */
+    public function memory(): array
+    {
+        $this->missing = [];
+        $meminfo = $this->keyValues($this->read($this->procRoot . '/meminfo', 'host:meminfo'), true);
+        return ['memTotalBytes' => $meminfo['MemTotal'] ?? null, 'swapTotalBytes' => $meminfo['SwapTotal'] ?? null];
+    }
+
     /** @param array<string,mixed> $sample */
     public function append(string $path, array $sample): void
     {

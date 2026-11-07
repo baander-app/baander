@@ -95,11 +95,17 @@ services:
             PGDATA: /var/lib/postgresql/data/baanderdev
         volumes:
             - postgres_data:/var/lib/postgresql/data
+            # The 16 GB transcode starting point's settings, rendered by the deployment tooling.
+            - ./docker/postgres/conf/postgresql.conf:/etc/baander/postgresql.conf:ro
         command: >
             postgres
+            -c config_file=/etc/baander/postgresql.conf
             -c logging_collector=on
             -c log_directory=/var/log/postgresql
             -c log_filename=postgresql-%Y-%m-%d_%H%M%S.log
+            -c log_statement=mod
+            -c log_min_duration_statement=1000
+            -c log_line_prefix='%t [%p]: [%l-1] user=%u,db=%d,app=%a,client=%h '
         healthcheck:
             test: [ "CMD-SHELL", "pg_isready -U ${DB_USERNAME:-baander} -d ${DB_DATABASE:-baander}" ]
             interval: 10s
@@ -145,6 +151,7 @@ services:
             BAANDER_POOLER_USER: ${DB_USERNAME:-baander}
             BAANDER_POOLER_DATABASE: ${DB_DATABASE:-baander}
             BAANDER_POOLER_SERVER_HOST: database
+            # The 16 GB transcode starting point's pools; a tooling test keeps them derived.
             BAANDER_POOLER_APPLICATION_POOL_SIZE: 20
             BAANDER_POOLER_CONTROL_POOL_SIZE: 8
         volumes:

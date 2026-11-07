@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Baander\Tooling\Tests;
 
+use Baander\Tooling\Deployment\Pooler;
 use Baander\Tooling\Fixtures\Worker\DrillProfile;
 use Baander\Tooling\Fixtures\Worker\MediaLoad;
 use Baander\Tooling\Fixtures\Worker\MediaLoadVerifier;
@@ -32,11 +33,11 @@ final class WorkerMediaLoadTest extends TestCase
         self::assertSame(485, $hardware->deviceGroup(static fn(string $device): int => $device === '/dev/dri/renderD128' ? 485 : 0));
     }
 
-    public function testDrillProfileRejectsHouseholdUnknownFieldsAndAMissingDevice(): void
+    public function testDrillProfileRejectsRemuxUnknownFieldsAndAMissingDevice(): void
     {
         $valid = OperatorConfiguration::json(self::ROOT . '/' . MediaLoad::profilePath('hardware'));
         foreach ([
-            'household' => ['identifier' => 'household'] + $valid,
+            'remux' => ['capability' => 'remux'] + $valid,
             'reordered' => array_reverse($valid, true),
             'negative' => ['videoEncoderSlots' => -1] + $valid,
             'hardware' => ['hardware' => ['device' => '/dev/dri/renderD128']] + $valid,
@@ -149,6 +150,7 @@ final class WorkerMediaLoadTest extends TestCase
     public function testVerifierPassesACompleteReceiptAndNamesEachViolatedCriterion(): void
     {
         self::assertSame([], MediaLoadVerifier::failures(self::receipt()));
+        $total = array_sum(Pooler::defaultPools());
         $cases = [
             'learning decision' => [static fn(array &$r) => $r['governor']['runDecisions'][1]['governorState'] = 'learning', 'while the governor was learning'],
             'downgrade' => [static fn(array &$r) => $r['governor']['runDecisions'][0]['allowedTier'] = '720p', 'was downgraded from 1080p to 720p'],
@@ -161,7 +163,7 @@ final class WorkerMediaLoadTest extends TestCase
             'uncertain' => [static fn(array &$r) => $r['failures']['nativeFailures'][] = ['unit' => 'control'], '1 native execution failures'],
             'restart' => [static fn(array &$r) => $r['containment']['unitsAfterRun']['control']['restarts'] = 1, 'stopped or restarted'],
             'oom' => [static fn(array &$r) => $r['oom']['unitOomKills']['execution'] = 1, 'recorded an OOM kill'],
-            'backends' => [static fn(array &$r) => $r['database']['peak']['total'] = 33, 'total backends peaked at 33 above 32'],
+            'backends' => [static fn(array &$r) => $r['database']['peak']['total'] = $total + 1, 'total backends peaked at ' . ($total + 1) . ' above ' . $total],
             'saturation' => [static fn(array &$r) => $r['database']['pools']['application']['saturatedRunSamples'] = 4, 'saturated the application pool in only 4 of 10'],
             'lease' => [static fn(array &$r) => $r['leases']['control']['overDeadline'][] = ['seconds' => 1.6], 'control lease helpers exceeded the 1.5-second deadline'],
             'native answer' => [static fn(array &$r) => $r['native']['connectToAnswer']['maxSeconds'] = 1.2, 'took 1.2 seconds to answer'],
@@ -183,6 +185,7 @@ final class WorkerMediaLoadTest extends TestCase
     {
         $stream = static fn(string $job): array => ['job' => $job, 'codec' => 'libx264', 'path' => 'software', 'completedAt' => 200.0, 'steadySpeed' => .55, 'realTimeMargin' => -.45];
         $decision = static fn(string $job): array => ['jobId' => $job, 'governorState' => 'active', 'requestedTier' => '1080p', 'allowedTier' => '1080p'];
+        $pools = Pooler::defaultPools();
         return [
             'profile' => ['videoEncoderSlots' => 2, 'audioEncoderSlots' => 3],
             'video' => ['expectedPath' => 'software', 'streams' => [$stream('a'), $stream('b')]],
@@ -195,7 +198,7 @@ final class WorkerMediaLoadTest extends TestCase
             'oom' => ['dockerEvents' => 0, 'unitOomKills' => ['control' => 0, 'execution' => 0], 'oomKilledContainers' => []],
             'nativeLaunches' => ['overlappingLaunches' => 0, 'duplicateGenerations' => 0, 'runJobLaunches' => [1, 1]],
             'native' => ['deadlineSeconds' => 1.0, 'errors' => [], 'connectToAnswer' => ['maxSeconds' => .05]],
-            'database' => ['samples' => 20, 'runSamples' => 10, 'errors' => 0, 'limits' => ['application' => 20, 'control' => 8, 'direct' => 4, 'total' => 32],
+            'database' => ['samples' => 20, 'runSamples' => 10, 'errors' => 0, 'limits' => [...$pools, 'total' => array_sum($pools)],
                 'peak' => ['application' => 20, 'control' => 3, 'direct' => 2, 'total' => 25], 'pools' => ['application' => ['saturatedRunSamples' => 9]]],
             'leases' => ['deadlineSeconds' => 1.5, 'control' => ['runHelpers' => 2, 'overDeadline' => []], 'execution' => ['runHelpers' => 40, 'overDeadline' => []]],
             'killOrder' => ['control' => ['samples' => 10], 'execution' => ['samples' => 10]],

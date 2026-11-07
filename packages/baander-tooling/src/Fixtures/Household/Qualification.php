@@ -15,12 +15,19 @@ use Baander\Tooling\Resources\{DisposableContainer, ImageLedger, ResourceKind, R
 final class Qualification
 {
     private const float COLD_MINIMUM_SECONDS = 5.0;
+    private const int POSTGRES_OUTAGE_SECONDS = 30;
+    private const int RECOVERY_DEADLINE_SECONDS = 300;
+    private const int HEALTH_DEADLINE_SECONDS = 120;
+    /** Player failures that show playback stopped advancing, as opposed to a run that never measured. */
+    private const array STALL_FAILURES = ['continuous-stall', 'post-ready-waiting-or-stalled'];
     /** @var array<string,int> */
     private array $observedRoles = [];
     /** @var list<string> */
     private array $unexpectedExits = [];
     /** @var list<array{epochSeconds:float,output:string}> */
     private array $webControlRetries = [];
+    /** @var array<string,true> Roles the scenario restarts on purpose; their new PID is not an unexpected exit. */
+    private array $restartingRoles = [];
     /** @param array<string,mixed> $configuration */
     public function __construct(private readonly Runtime $runtime, private readonly Client $docker, private readonly string $directory, private readonly array $configuration)
     {
@@ -41,8 +48,8 @@ final class Qualification
                 continue;
             }
             $value = array_shift($arguments);
-            if (!in_array($key, ['--config', '--state', '--scenario', '--repeat', '--from'], true) || !is_string($value) || $value === '' || isset($options[$key])) {
-                throw new \InvalidArgumentException('Use qualify-household.php prepare|start|scenario|stop|report --state DIRECTORY [--config FILE] [--from SEED_STATE] [--scenario NAME --repeat NUMBER] [--cleanup].');
+            if (!in_array($key, ['--config', '--state', '--scenario', '--repeat', '--players', '--from'], true) || !is_string($value) || $value === '' || isset($options[$key])) {
+                throw new \InvalidArgumentException('Use qualify-household.php prepare|start|scenario|stop|report --state DIRECTORY [--config FILE] [--from SEED_STATE] [--scenario NAME --repeat NUMBER [--players 1|2]] [--cleanup].');
             }
             $options[$key] = $value;
         }
@@ -51,6 +58,9 @@ final class Qualification
         }
         if ((isset($options['--cleanup']) && $action !== 'stop') || (isset($options['--repeat']) && ($action !== 'scenario' || preg_match('/^[123]$/D', $options['--repeat']) !== 1))) {
             throw new \InvalidArgumentException('Use --cleanup only for stop and --repeat 1, 2 or 3 only for a scenario.');
+        }
+        if (isset($options['--players']) && ($action !== 'scenario' || preg_match('/^[12]$/D', $options['--players']) !== 1)) {
+            throw new \InvalidArgumentException('Use --players 1 or 2 only for a scenario.');
         }
         $directory = $options['--state'];
         PrivateDirectory::prepare($directory);
@@ -78,7 +88,7 @@ final class Qualification
             $result = match ($action) {
                 'prepare' => $qualification->prepare($from),
                 'start' => $qualification->start(),
-                'scenario' => $qualification->scenario((string) ($options['--scenario'] ?? ''), (int) ($options['--repeat'] ?? 1)),
+                'scenario' => $qualification->scenario((string) ($options['--scenario'] ?? ''), (int) ($options['--repeat'] ?? 1), isset($options['--players']) ? (int) $options['--players'] : null),
                 'stop' => $qualification->stop(($options['--cleanup'] ?? false) === true),
                 'report' => $qualification->report(),
             };
@@ -97,7 +107,7 @@ final class Qualification
      */
     public static function validateConfiguration(array $value): array
     {
-        JsonObject::keys($value, ['version', 'name', 'deployment', 'datasetRun', 'fixtureTimeoutSeconds', 'durationSeconds', 'maintenanceDeadlineSeconds', 'observerMemoryMiB', 'nodeExecutable', 'chromiumExecutablePath', 'host'], 'household qualification');
+        JsonObject::keys($value, ['version', 'name', 'deployment', 'replacementSize', 'datasetRun', 'fixtureTimeoutSeconds', 'durationSeconds', 'maintenanceDeadlineSeconds', 'observerMemoryMiB', 'nodeExecutable', 'chromiumExecutablePath', 'host'], 'household qualification');
         if (($value['version'] ?? null) !== 1 || !is_array($value['deployment'] ?? null) || !is_array($value['host'] ?? null)) {
             throw new \InvalidArgumentException('Qualification requires version, deployment and host evidence.');
         }
@@ -129,6 +139,13 @@ final class Qualification
             throw new \InvalidArgumentException('Record whole-host memory constraint, storage and hardware description.');
         }
         $value['deployment'] = $deployment->toArray();
+        if (array_key_exists('replacementSize', $value)) {
+            $replacement = HouseholdConfiguration::fromArray(array_replace($value['deployment'], ['size' => $value['replacementSize']]));
+            if ($replacement->size == $deployment->size) {
+                throw new \InvalidArgumentException('The replacement size must differ from the deployment size.');
+            }
+            $value['replacementSize'] = $replacement->size;
+        }
         return $value;
     }
 
@@ -373,6 +390,7 @@ CODE;
         if (!in_array($state['phase'], ['prepared', 'stopped'], true)) {
             throw new \RuntimeException('Start requires prepared or stopped qualification state.');
         }
+        $hostMemory = $this->requireHostMemory($state);
         if (isset($state['provision'])) {
             unset($state['shutdown'], $state['shutdownOperatorMeasurements']);
             $this->household()->start(HouseholdConfiguration::fromArray($state['effectiveDeployment']));
@@ -385,7 +403,7 @@ CODE;
         $state['phase'] = 'starting';
         $state['activeRun'] = 'cold-startup';
         $this->save($state);
-        $receipt = ['version' => 1, 'scenario' => 'cold-startup', 'failure' => null, 'cleanup' => []];
+        $receipt = ['version' => 1, 'scenario' => 'cold-startup', 'failure' => null, 'hostMemory' => $hostMemory, 'cleanup' => []];
         $observer = null;
         $contract = null;
         try {
@@ -443,14 +461,21 @@ CODE;
     }
 
     /** @return array<string,mixed> */
-    public function scenario(string $scenario, int $repeat = 1): array
+    public function scenario(string $scenario, int $repeat = 1, ?int $players = null): array
     {
-        if (!in_array($scenario, ['original-overlap', 'fresh-copy-overlap', 'mixed-overlap'], true) || $repeat < 1 || $repeat > 3) {
-            throw new \InvalidArgumentException('Select one overlap scenario and repeat 1, 2 or 3. Recovery and profile replacement use their separate owned lifecycle checks.');
+        if ($scenario === 'deployment-replacement') {
+            if ($players !== null) {
+                throw new \InvalidArgumentException('A deployment replacement runs no players.');
+            }
+            return $this->replaceDeployment($repeat);
+        }
+        $players ??= 2;
+        if (!in_array($scenario, RunContract::PLAYBACK_SCENARIOS, true) || $repeat < 1 || $repeat > 3 || !in_array($players, [1, 2], true)) {
+            throw new \InvalidArgumentException('Select original-overlap, fresh-copy-overlap, mixed-overlap, recovery, insufficient-memory or deployment-replacement, repeat 1, 2 or 3, and 1 or 2 players.');
         }
         $state = $this->state();
         if ($state['phase'] !== 'running' || !isset($state['provision'], $state['playbackSlots'])) {
-            throw new \RuntimeException('Start and complete first import before an overlap scenario.');
+            throw new \RuntimeException('Start and complete first import before a playback scenario.');
         }
         if (($state['borrowers'] ?? []) !== []) {
             throw new \RuntimeException('A shared fixture seed cannot run source-mutating scenarios. Use a prepared child.');
@@ -459,6 +484,7 @@ CODE;
         if (isset($state['runs'][$key]) || ($scenario === 'fresh-copy-overlap' && $state['freshCopyConsumed'])) {
             throw new \RuntimeException('Use a fresh qualification/deployment state for this repeat; fresh copy sources cannot be reused.');
         }
+        $hostMemory = $this->requireHostMemory($state);
         $directory = $this->directory . '/runs/' . $key;
         PrivateDirectory::prepare($directory);
         $state['activeRun'] = $key;
@@ -472,7 +498,8 @@ CODE;
         $browser = null;
         $browserConfiguration = null;
         $contract = null;
-        $receipt = ['version' => 1, 'scenario' => $scenario, 'repeat' => $repeat, 'failure' => null, 'cleanup' => []];
+        $ready = $players === 1 ? 'The real player' : 'Both real players';
+        $receipt = ['version' => 1, 'scenario' => $scenario, 'repeat' => $repeat, 'players' => $players, 'failure' => null, 'hostMemory' => $hostMemory, 'cleanup' => []];
         try {
             if ($scenario === 'fresh-copy-overlap' && $this->existingCopyJobs($state) !== []) {
                 throw new \RuntimeException('Fresh-copy sources already have jobs; use a fresh deployment.');
@@ -480,7 +507,7 @@ CODE;
             $observer = $this->observer($state, $directory);
             $observer->start($this->configuration['maintenanceDeadlineSeconds'] + 600);
             $marker = $observer->update($this->roles(), 'measured');
-            $contract = $this->contract($state, $scenario, $marker['monotonic']);
+            $contract = $this->contract($state, $scenario, $marker['monotonic'], $players);
             AtomicFile::writeJson($directory . '/contract.json', $contract->toArray());
             $receipt['started'] = $marker;
             $receipt['operatorBoundary'] = $this->operatorInventory();
@@ -492,7 +519,7 @@ CODE;
             $receipt['changedFileDiscoveryExercised'] = false;
             $maintenance = $this->startMaintenance($state, $directory);
             $receipt['maintenanceStartedBeforeBrowser'] = true;
-            $browserConfiguration = $this->browserConfiguration($state, $scenario, $directory);
+            $browserConfiguration = $this->browserConfiguration($state, $scenario, $directory, $players);
             AtomicFile::writeJson($directory . '/browser.json', $browserConfiguration);
             $browser = $this->runtime->start(
                 [$this->configuration['nodeExecutable'], $this->runtime->root . '/ui/web/tests/e2e/household/driver.mjs', $directory . '/browser.json'],
@@ -501,16 +528,18 @@ CODE;
                 stderrLogPath: $directory . '/browser.stderr',
             );
 
-            $this->runtime->await(function () use ($browser, $browserConfiguration): bool {
+            $this->runtime->await(function () use ($browser, $browserConfiguration, $ready): bool {
                 if (!$this->runtime->alive($browser)) {
-                    throw new \RuntimeException('Browser exited before both real players became ready.');
+                    throw new \RuntimeException('Browser exited before ' . lcfirst($ready) . ' became ready.');
                 }
                 return is_file($browserConfiguration['readyPath']);
-            }, 300, .1, 'Both browser players did not become ready.');
-            $ready = AtomicFile::readJson($browserConfiguration['readyPath']);
-            $receipt['browserReady'] = $ready;
+            }, 300, .1, $ready . ' did not become ready.');
+            $receipt['browserReady'] = AtomicFile::readJson($browserConfiguration['readyPath']);
             $application = new Application($this->docker, $this->deploymentState(), $state['provision']['libraries']);
             $readyMarker = $observer->update($this->roles(), 'measured');
+            if ($scenario === 'recovery') {
+                $receipt['recovery'] = $this->interruptPostgres($observer, $maintenance);
+            }
             $receipt['maintenance'] = $this->waitMaintenance(
                 $state,
                 $application,
@@ -542,7 +571,7 @@ CODE;
             $receipt['browser'] = AtomicFile::readJson($browserConfiguration['outputPath'] . '.summary.json');
             $receipt['nativeAfter'] = $this->verifyNativeWrappers($state);
             $this->operatorCheckpoint();
-            $receipt['freshCopyPlans'] = $scenario === 'fresh-copy-overlap' ? $this->freshCopyPlans($receipt['browser'], $marker['epochSeconds']) : [];
+            $receipt['freshCopyPlans'] = $scenario === 'fresh-copy-overlap' ? $this->freshCopyPlans($receipt['browser'], $marker['epochSeconds'], $players) : [];
         } catch (\Throwable $error) {
             $receipt['failure'] = $error->getMessage();
             $state['phase'] = 'scenario-failed';
@@ -553,12 +582,16 @@ CODE;
                 AtomicFile::write($browserConfiguration['stopPath'], "stop\n");
                 $this->runtime->wait($browser, false);
             }
+            // Playback recorded before the failure stays evidence, notably for a run below the claimed size.
+            if ($browserConfiguration !== null && !isset($receipt['browser']) && is_file($browserConfiguration['outputPath'] . '.summary.json')) {
+                $receipt['browser'] = AtomicFile::readJson($browserConfiguration['outputPath'] . '.summary.json');
+            }
         } finally {
             if ($observer !== null) {
                 $receipt = $this->finishObservation($state, $observer, $directory, $receipt);
             }
             if ($scenario === 'fresh-copy-overlap' && $receipt['failure'] === null) {
-                $receipt['copyMaintenanceOverlap'] = self::copyOverlapProof($directory, (float) ($receipt['maintenance']['metadata']['completedAtEpochSeconds'] ?? 0));
+                $receipt['copyMaintenanceOverlap'] = self::copyOverlapProof($directory, (float) ($receipt['maintenance']['metadata']['completedAtEpochSeconds'] ?? 0), $players);
             }
             AtomicFile::writeJson($directory . '/receipt.json', $receipt);
             $state['runs'][$key] = $directory;
@@ -572,6 +605,259 @@ CODE;
             }
         }
         return ['scenario' => $key, 'directory' => $directory, 'failure' => $receipt['failure'], 'qualificationClaim' => false];
+    }
+
+    /**
+     * Stops PostgreSQL while the players stream and background work is queued, starts it again, and waits
+     * until the worker pair and the web workers answer again.
+     *
+     * @return array<string,mixed>
+     */
+    private function interruptPostgres(Observer $observer, RunningProcess $maintenance): array
+    {
+        // The maintenance commands only dispatch; their work must be queued before the outage, not refused by it.
+        while ($this->runtime->alive($maintenance)) {
+            $observer->update($this->roles(), 'measured');
+            $this->runtime->pause(1);
+        }
+        if (($maintenance->result()->exitCode ?? 1) !== 0) {
+            throw new \RuntimeException('Normal maintenance commands failed before PostgreSQL stopped.');
+        }
+        $deployment = $this->deploymentState();
+        $name = $deployment['configuration']['name'];
+        $file = $deployment['composeFile'];
+        $this->restartingRoles['postgres'] = true;
+        $stopped = $observer->update($this->roles(), 'measured');
+        $this->docker->compose($name, $file, ['stop', '--timeout', '30', 'postgres'], timeout: 60);
+        $until = Runtime::now() + self::POSTGRES_OUTAGE_SECONDS;
+        while (Runtime::now() < $until) {
+            $observer->update($this->roles(), 'measured');
+            $this->runtime->pause(1);
+        }
+        $this->docker->compose($name, $file, ['up', '--detach', '--wait', '--no-recreate', '--no-deps', 'postgres'], timeout: 180);
+        $started = $observer->update($this->roles(), 'measured');
+        unset($this->restartingRoles['postgres']);
+        $deadline = Runtime::now() + self::RECOVERY_DEADLINE_SECONDS;
+        $unrecovered = [];
+        while (true) {
+            $observer->update($this->roles(), 'measured');
+            try {
+                $this->operatorCheckpoint();
+                $this->diagnostics();
+                break;
+            } catch (\Throwable $error) {
+                $unrecovered[$error->getMessage()] = true;
+                if (Runtime::now() >= $deadline) {
+                    throw new \RuntimeException('The deployment did not recover within ' . self::RECOVERY_DEADLINE_SECONDS . ' seconds after PostgreSQL restarted: ' . $error->getMessage());
+                }
+                $this->runtime->pause(10);
+            }
+        }
+        $recovered = $observer->update($this->roles(), 'measured');
+        return ['recovered' => true, 'postgresStopped' => $stopped, 'postgresStarted' => $started, 'recoveredAt' => $recovered,
+            'outageSeconds' => $started['monotonic'] - $stopped['monotonic'], 'recoverySeconds' => $recovered['monotonic'] - $started['monotonic'],
+            'checksBeforeRecovery' => array_slice(array_keys($unrecovered), 0, 20)];
+    }
+
+    /**
+     * Replaces the running deployment with a boot of another size and confirms that the new boot serves the
+     * imported catalog. Successive repeats alternate between the configured size and the replacement size.
+     *
+     * @return array<string,mixed>
+     */
+    private function replaceDeployment(int $repeat): array
+    {
+        if ($repeat < 1 || $repeat > 3) {
+            throw new \InvalidArgumentException('Select repeat 1, 2 or 3.');
+        }
+        if (!isset($this->configuration['replacementSize'])) {
+            throw new \RuntimeException('Declare replacementSize in the qualification configuration before replacing the deployment.');
+        }
+        $state = $this->state();
+        if ($state['phase'] !== 'running' || !isset($state['provision'])) {
+            throw new \RuntimeException('Start and complete first import before replacing the deployment.');
+        }
+        $key = 'deployment-replacement-' . $repeat;
+        if (isset($state['runs'][$key])) {
+            throw new \RuntimeException('Use a fresh qualification/deployment state for this repeat.');
+        }
+        $hostMemory = $this->requireHostMemory($state);
+        $directory = $this->directory . '/runs/' . $key;
+        PrivateDirectory::prepare($directory);
+        $current = $state['effectiveDeployment'];
+        $size = $current['size'] == $this->configuration['replacementSize'] ? $this->configuration['deployment']['size'] : $this->configuration['replacementSize'];
+        $replacement = array_replace($current, ['size' => $size]);
+        $state['activeRun'] = $key;
+        $state['phase'] = 'scenario-running';
+        $this->save($state);
+        $receipt = ['version' => 1, 'scenario' => 'deployment-replacement', 'repeat' => $repeat, 'failure' => null, 'hostMemory' => $hostMemory,
+            'before' => $this->bootIdentity()];
+        try {
+            $this->household()->start(HouseholdConfiguration::fromArray($replacement));
+            $state['effectiveDeployment'] = $replacement;
+            AtomicFile::writeJson($this->directory . '/deployment-configuration.json', $replacement);
+            $receipt['after'] = $this->bootIdentity();
+            $receipt['serving'] = $this->serving($state);
+        } catch (\Throwable $error) {
+            $receipt['failure'] = $error->getMessage();
+        } finally {
+            $receipt['check'] = self::replacementCheck($receipt);
+            AtomicFile::writeJson($directory . '/receipt.json', $receipt);
+            $state['runs'][$key] = $directory;
+            $state['phase'] = $receipt['failure'] === null ? 'running' : 'scenario-failed';
+            unset($state['activeRun']);
+            $this->save($state);
+        }
+        return ['scenario' => $key, 'directory' => $directory, 'failure' => $receipt['check']['failures'][0] ?? null, 'qualificationClaim' => false];
+    }
+
+    /** @return array{profileFingerprint:mixed,composeHash:mixed,size:mixed,workerBootId:mixed} */
+    private function bootIdentity(): array
+    {
+        $deployment = $this->deploymentState();
+        $workers = new HouseholdStateStore($this->directory . '/deployment')->workers()->load();
+        return ['profileFingerprint' => $deployment['profileFingerprint'] ?? null, 'composeHash' => $deployment['composeHash'] ?? null,
+            'size' => $deployment['configuration']['size'] ?? null, 'workerBootId' => $workers['boot_id'] ?? null];
+    }
+
+    /**
+     * @param array<string,mixed> $state
+     * @return array<string,mixed>
+     */
+    private function serving(array $state): array
+    {
+        $this->operatorCheckpoint();
+        $diagnostics = $this->diagnostics();
+        $snapshot = $this->database(new DatabaseSampler(array_map(static fn(array $library): string => $library['id'], $state['provision']['libraries']), gmdate('Y-m-d\TH:i:s') . 'Z'));
+        $health = $this->health();
+        return ['workersReady' => true, 'webWorkers' => $diagnostics['web'], 'health' => $health, 'healthy' => self::healthy($health),
+            'catalogIntact' => self::catalogIntact($snapshot)];
+    }
+
+    /**
+     * Asks the new boot's gateway for the application health report until it answers healthy or the deadline passes.
+     *
+     * @return array{httpStatus:?int,body:mixed}
+     */
+    private function health(): array
+    {
+        $deployment = $this->deploymentState();
+        $program = '$context = stream_context_create(["http" => ["timeout" => 10, "ignore_errors" => true]]);'
+            . ' $body = @file_get_contents("http://gateway/health", false, $context);'
+            . ' $status = preg_match("~^HTTP/\\\\S+ ([0-9]{3})~", http_get_last_response_headers()[0] ?? "", $match) === 1 ? (int) $match[1] : null;'
+            . ' echo json_encode(["httpStatus" => $status, "body" => is_string($body) ? json_decode($body, true) : null], JSON_THROW_ON_ERROR);';
+        $deadline = Runtime::now() + self::HEALTH_DEADLINE_SECONDS;
+        do {
+            $result = $this->docker->compose($deployment['configuration']['name'], $deployment['composeFile'], ['exec', '-T', 'web', 'php', '-r', $program], timeout: 30, check: false);
+            $health = $result->exitCode === 0 ? json_decode(trim($result->stdout), true) : null;
+            $health = is_array($health) ? ['httpStatus' => is_int($health['httpStatus'] ?? null) ? $health['httpStatus'] : null, 'body' => $health['body'] ?? null] : ['httpStatus' => null, 'body' => null];
+            if (self::healthy($health) || Runtime::now() >= $deadline) {
+                return $health;
+            }
+            $this->runtime->pause(5);
+        } while (true);
+    }
+
+    /** @param array{httpStatus:?int,body:mixed} $health */
+    public static function healthy(array $health): bool
+    {
+        $body = $health['body'];
+        return $health['httpStatus'] === 200 && is_array($body) && ($body['status'] ?? null) === 'healthy' && is_array($body['checks'] ?? null)
+            && !array_any($body['checks'], static fn(mixed $check): bool => !is_array($check) || ($check['status'] ?? null) === 'unhealthy');
+    }
+
+    /** @param array<string,mixed> $snapshot */
+    public static function catalogIntact(array $snapshot): bool
+    {
+        foreach (['music' => 2000, 'movies' => 50, 'episodes' => 250] as $role => $count) {
+            $library = $snapshot['libraries'][$role] ?? [];
+            if (($library['exists'] ?? false) !== true || ($library['indexedAvailableFiles'] ?? null) !== $count || ($library[$role === 'music' ? 'songs' : 'videos'] ?? null) !== $count) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * A replacement passes only when a different boot, built from the changed size, serves the retained catalog.
+     *
+     * @param array<string,mixed> $receipt
+     * @return array{version:int,scenario:string,status:string,failures:list<string>}
+     */
+    public static function replacementCheck(array $receipt): array
+    {
+        $failures = [];
+        if (is_string($receipt['failure'] ?? null)) {
+            $failures[] = $receipt['failure'];
+        }
+        $before = is_array($receipt['before'] ?? null) ? $receipt['before'] : [];
+        $after = $receipt['after'] ?? null;
+        if (!is_array($after)) {
+            $failures[] = 'The replacement boot was not recorded.';
+        } else {
+            if (!is_string($after['profileFingerprint'] ?? null) || $after['profileFingerprint'] === ($before['profileFingerprint'] ?? null)) {
+                $failures[] = 'The new boot has the same deployment fingerprint as the old one.';
+            }
+            if (!is_array($after['size'] ?? null) || $after['size'] == ($before['size'] ?? null)) {
+                $failures[] = 'The new boot kept the old size.';
+            }
+            if (!is_string($after['workerBootId'] ?? null) || $after['workerBootId'] === ($before['workerBootId'] ?? null)) {
+                $failures[] = 'The worker pair was not replaced.';
+            }
+        }
+        $serving = is_array($receipt['serving'] ?? null) ? $receipt['serving'] : [];
+        if (($serving['workersReady'] ?? null) !== true) {
+            $failures[] = 'The new worker pair did not report ready.';
+        }
+        if (($serving['healthy'] ?? null) !== true) {
+            $failures[] = 'The new boot did not answer its health check as healthy.';
+        }
+        if (($serving['catalogIntact'] ?? null) !== true) {
+            $failures[] = 'The new boot does not serve the imported catalog.';
+        }
+        $failures = array_values(array_unique($failures));
+        return ['version' => 1, 'scenario' => 'deployment-replacement', 'status' => $failures === [] ? 'passed' : 'failed', 'failures' => $failures];
+    }
+
+    /**
+     * Refuses a host larger than the declared constraint or with swap; both would hide whether the deployment fits.
+     *
+     * @param array<string,mixed> $memory
+     */
+    public static function assertHostMemory(array $memory, int $constraintBytes): void
+    {
+        if (!is_int($memory['memTotalBytes'] ?? null) || $memory['memTotalBytes'] > $constraintBytes) {
+            throw new \RuntimeException('Docker host exceeds the declared whole-host memory constraint.');
+        }
+        if (($memory['swapTotalBytes'] ?? null) !== 0) {
+            throw new \RuntimeException('Docker host has swap; turn swap off before qualification.');
+        }
+    }
+
+    /**
+     * @param array<string,mixed> $state
+     * @return array{memTotalBytes:?int,swapTotalBytes:?int}
+     */
+    private function requireHostMemory(array $state): array
+    {
+        $receipt = $this->directory . '/host-memory-resources.json';
+        if (is_file($receipt) && !ResourceLedger::recover($receipt, $this->runtime->environment, $this->runtime->configuration->budgets->seconds('cleanup'))->successful()) {
+            throw new \RuntimeException('Host memory observation recovery remains incomplete: ' . $receipt);
+        }
+        $layout = ApplicationLayout::fromArray($this->deploymentState()['layout']);
+        $program = 'require ' . var_export($layout->path('scripts/vendor/autoload.php'), true)
+            . '; echo json_encode(new \Baander\Tooling\Fixtures\Household\HostSampler("/host/proc")->memory(), JSON_THROW_ON_ERROR);';
+        $output = DisposableContainer::run($this->docker, $receipt, [
+            '--network', 'none', '--read-only', '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges', '--security-opt', 'label=disable',
+            '--mount', 'type=bind,src=/proc,dst=/host/proc,readonly', '--entrypoint', 'php', $state['images']['app'], '-d', 'memory_limit=32M', '-r', $program,
+        ], $this->runtime->environment, $this->runtime->configuration->budgets->seconds('cleanup'), timeout: 30)->stdout;
+        $memory = json_decode($output, true, flags: JSON_THROW_ON_ERROR);
+        if (!is_array($memory)) {
+            throw new \RuntimeException('Host memory observation is invalid.');
+        }
+        $memory = ['memTotalBytes' => is_int($memory['memTotalBytes'] ?? null) ? $memory['memTotalBytes'] : null, 'swapTotalBytes' => is_int($memory['swapTotalBytes'] ?? null) ? $memory['swapTotalBytes'] : null];
+        self::assertHostMemory($memory, $this->configuration['host']['constraintBytes']);
+        return $memory;
     }
 
     /** @return array<string,mixed> */
@@ -667,7 +953,10 @@ CODE;
         $state = $this->state();
         $runs = [];
         foreach ($state['runs'] as $key => $directory) {
-            if (is_file($directory . '/contract.json') && is_file($directory . '/evidence.json')) {
+            if (is_file($directory . '/receipt.json') && is_array(($receipt = AtomicFile::readJson($directory . '/receipt.json'))['check'] ?? null)) {
+                $runs[$key] = $receipt['check'];
+                AtomicFile::writeJson($directory . '/report.json', $receipt['check']);
+            } elseif (is_file($directory . '/contract.json') && is_file($directory . '/evidence.json')) {
                 $result = RunReport::evaluate(RunContract::fromArray(AtomicFile::readJson($directory . '/contract.json')), $directory . '/samples.jsonl', AtomicFile::readJson($directory . '/evidence.json'));
                 AtomicFile::writeJson($directory . '/report.json', $result);
                 $runs[$key] = $result;
@@ -675,7 +964,8 @@ CODE;
                 $runs[$key] = ['status' => 'incomplete', 'receipt' => $directory . '/receipt.json'];
             }
         }
-        return $this->publicState($state) + ['reports' => $runs, 'limits' => ['singleDeploymentOnly' => true, 'acceptedConfigurationRequiresThreeFreshRepeats' => true, 'recoveryProfileReplacementAndInsufficientMemoryRequireSeparateLifecycleEvidence' => true]];
+        return $this->publicState($state) + ['reports' => $runs, 'limits' => ['singleDeploymentOnly' => true, 'acceptedConfigurationRequiresThreeFreshRepeats' => true,
+            'claimAlsoRequiresRestartRecoveryDeploymentReplacementAndInsufficientMemoryEvidence' => true]];
     }
 
     /** The web server accepted a control request but returned no answer; a later request can still succeed. */
@@ -745,8 +1035,8 @@ CODE;
     public static function renamePlan(array $dataset, string $scenario, int $repeat, ?string $currentPath = null): array
     {
         $songs = array_values(array_filter($dataset['files'], static fn(array $file): bool => $file['kind'] === 'song'));
-        if (count($songs) !== 2000 || !in_array($scenario, ['original-overlap', 'fresh-copy-overlap', 'mixed-overlap'], true) || $repeat < 1 || $repeat > 3) {
-            throw new \InvalidArgumentException('A file change requires the complete dataset and a declared overlap.');
+        if (count($songs) !== 2000 || !in_array($scenario, RunContract::PLAYBACK_SCENARIOS, true) || $repeat < 1 || $repeat > 3) {
+            throw new \InvalidArgumentException('A file change requires the complete dataset and a declared playback scenario.');
         }
         $song = $songs[1999];
         $extension = pathinfo($song['path'], PATHINFO_EXTENSION);
@@ -826,7 +1116,7 @@ CODE;
     }
 
     /** @return array<string,mixed> */
-    public static function copyOverlapProof(string $directory, float $metadataCompletedEpoch): array
+    public static function copyOverlapProof(string $directory, float $metadataCompletedEpoch, int $players): array
     {
         $output = @file_get_contents($directory . '/maintenance.stdout');
         if (!is_string($output) || preg_match('/^BAANDER_MAINTENANCE_START:([0-9.]+)$/m', $output, $start) !== 1
@@ -894,7 +1184,7 @@ CODE;
             }
             fclose($samples);
         }
-        return ['observed' => $launches >= 2, 'copyLaunchesDuringMaintenance' => $launches,
+        return ['observed' => $launches >= $players, 'copyLaunchesDuringMaintenance' => $launches,
             'sampledSimultaneousCopyProcessesLowerBound' => $peak, 'maintenanceStartedEpoch' => $from,
             'maintenanceCommandFinishedEpoch' => $commandFinished, 'maintenanceFinishedEpoch' => $metadataCompletedEpoch,
             'lastPendingMetadataEpoch' => $lastPending];
@@ -949,17 +1239,18 @@ CODE;
     /** @param array<string,mixed> $state
      * @return array<string,mixed>
      */
-    private function browserConfiguration(array $state, string $scenario, string $directory): array
+    private function browserConfiguration(array $state, string $scenario, string $directory, int $players): array
     {
         $catalog = $state['playbackSlots'];
-        $selected = match ($scenario) {
-            'original-overlap' => $catalog['originalVideos'],
+        // Recovery and insufficient-memory runs play the original-overlap workload; one player keeps the first slot.
+        $selected = array_slice(match ($scenario) {
+            'original-overlap', 'recovery', 'insufficient-memory' => $catalog['originalVideos'],
             'fresh-copy-overlap' => $catalog['copyVideos'],
             'mixed-overlap' => [$catalog['music'], $catalog['originalVideos'][0]],
             default => throw new \InvalidArgumentException('Unknown browser workload.'),
-        };
+        }, 0, $players);
         $users = AtomicFile::readJson($this->directory . '/users.json');
-        $offset = array_search($scenario, ['original-overlap', 'fresh-copy-overlap', 'mixed-overlap'], true) * 2;
+        $offset = ['fresh-copy-overlap' => 2, 'mixed-overlap' => 4][$scenario] ?? 0;
         $slots = [];
         foreach ($selected as $index => $item) {
             $audio = isset($item['songPublicId']);
@@ -969,22 +1260,27 @@ CODE;
                 'email' => $users[$offset + $index]['email'], 'password' => $users[$offset + $index]['password']];
         }
         return ['baseURL' => $state['effectiveDeployment']['origin'], 'scenario' => $scenario, 'durationSeconds' => $this->configuration['durationSeconds'],
-            'slots' => $slots, 'outputPath' => $directory . '/browser.jsonl', 'readyPath' => $directory . '/browser-ready.json', 'stopPath' => $directory . '/browser-stop',
+            'players' => $players, 'slots' => $slots, 'outputPath' => $directory . '/browser.jsonl', 'readyPath' => $directory . '/browser-ready.json', 'stopPath' => $directory . '/browser-stop',
             'startupTimeoutSeconds' => 180] + (isset($this->configuration['chromiumExecutablePath']) ? ['chromiumExecutablePath' => $this->configuration['chromiumExecutablePath']] : []);
     }
 
     /** @param array<string,mixed> $state */
-    private function contract(array $state, string $scenario, float $started): RunContract
+    private function contract(array $state, string $scenario, float $started, int $players = 0): RunContract
     {
         $deployment = $this->deploymentState();
         // Deployment services and worker units run without a container memory limit; only the harness's own observer keeps one.
         $limits = array_fill_keys(['web', 'redis', 'gateway', 'postgres', 'control', 'execution'], ['memoryMaxBytes' => 'max']);
         $limits['observer'] = ['memoryMaxBytes' => $this->configuration['observerMemoryMiB'] * 1024 ** 2];
-        return RunContract::fromArray(['version' => 1, 'scenario' => $scenario, 'profile' => $deployment['configuration']['profile'], 'imageId' => $state['images']['app'],
+        $schedule = [['atSeconds' => 0, 'action' => $scenario === 'cold-startup' ? 'start-stack-provision-and-normal-scan' : 'start-normal-scan-before-browser'], ['atSeconds' => 0, 'action' => 'normal-metadata-sync-after-scan']];
+        if ($scenario === 'recovery') {
+            $schedule[] = ['atSeconds' => 0, 'action' => 'stop-postgresql-for-' . self::POSTGRES_OUTAGE_SECONDS . '-seconds-after-dispatch-then-restart'];
+        }
+        return RunContract::fromArray(['version' => 2, 'scenario' => $scenario, 'capability' => $deployment['configuration']['capability'], 'size' => $deployment['configuration']['size'],
+            'players' => $players, 'imageId' => $state['images']['app'],
             'startedMonotonic' => $started, 'sampleIntervalSeconds' => 1, 'maxSampleGapSeconds' => 3, 'durationSeconds' => $scenario === 'cold-startup' ? self::COLD_MINIMUM_SECONDS : $this->configuration['durationSeconds'],
             'maintenanceDeadlineSeconds' => $this->configuration['maintenanceDeadlineSeconds'], 'requiredRoles' => array_keys($limits), 'configuredLimits' => $limits,
             'dataset' => ['songs' => 2000, 'movies' => 50, 'episodes' => 250, 'preparedBeforeRun' => true, 'fixtureDigest' => $state['datasetDigest']],
-            'schedule' => [['atSeconds' => 0, 'action' => $scenario === 'cold-startup' ? 'start-stack-provision-and-normal-scan' : 'start-normal-scan-before-browser'], ['atSeconds' => 0, 'action' => 'normal-metadata-sync-after-scan']],
+            'schedule' => $schedule,
             'host' => $this->configuration['host'],
             'initialConditions' => ['catalog' => $scenario === 'cold-startup' ? 'empty-catalog-first-import' : 'previously-imported-catalog',
                 'filesystemCache' => 'not-cleared-generation-may-have-warmed-page-cache', 'overlayDigest' => $state['images']['manifestDigest'],
@@ -1001,23 +1297,27 @@ CODE;
         $playback = [];
         foreach ($receipt['browser']['slots'] ?? [] as $slot) {
             $playback[] = ['id' => (string) $slot['index'], 'observedSeconds' => $slot['measuredSeconds'], 'progressSeconds' => $slot['totalPositionAdvanceSeconds'],
-                'progressObservations' => $slot['samples'], 'stalls' => ($slot['passed'] ?? false) ? 0 : 1];
+                'progressObservations' => $slot['samples'], 'stalls' => ($slot['passed'] ?? false) ? 0 : 1,
+                'stalled' => array_intersect($slot['failures'] ?? [], self::STALL_FAILURES) !== []];
         }
         $failures = [];
         if (($receipt['metadataProof']['complete'] ?? false) !== true) {
             $failures[] = 'Scenario-scoped metadata refresh requests were not completely verified.';
         }
         if ($contract->toArray()['scenario'] === 'fresh-copy-overlap' && ($receipt['copyMaintenanceOverlap']['observed'] ?? false) !== true) {
-            $failures[] = 'Two fresh copy launches during maintenance were not observed.';
+            $failures[] = 'A fresh copy launch per player during maintenance was not observed.';
         }
         if ($contract->requiresPlayback() && ($receipt['changedFileDiscoveryExercised'] ?? false) !== true) {
             $failures[] = 'Changed-file discovery was not verified.';
         }
-        if ($receipt['failure'] !== null || (($receipt['browser']['passed'] ?? true) !== true)) {
-            $failures[] = $receipt['failure'] ?? 'Browser playback did not pass.';
+        if ($receipt['failure'] !== null) {
+            $failures[] = $receipt['failure'];
+        } elseif ($contract->requiresPlayback() && ($receipt['browser']['passed'] ?? false) !== true) {
+            $failures[] = 'Browser playback did not pass.';
         }
         return ['contractFingerprint' => $contract->fingerprint(), 'completedMonotonic' => $receipt['completedMonotonic'] ?? null, 'playback' => $playback,
             'queues' => $receipt['maintenance'] ?? [], 'operatorMeasurements' => ['workload' => $receipt['operatorMeasurements'] ?? null], 'helperMeasurements' => $receipt['helperMeasurements'] ?? null, 'metadataProof' => $receipt['metadataProof'] ?? null, 'nativeAudit' => $receipt['nativeAudit'] ?? ['complete' => false, 'forbiddenLaunches' => null],
+            'oomKilledContainers' => $receipt['oomKilledContainers'] ?? null, 'recovery' => $receipt['recovery'] ?? null,
             'unexpectedExits' => [...$failures, ...($receipt['unexpectedExits'] ?? [])], 'cleanup' => ['normalExit' => false, 'pairRetired' => false, 'dataVolumesRetained' => false, 'fixturesRemoved' => false]];
     }
 
@@ -1163,6 +1463,12 @@ CODE;
             $receipt['helperMeasurements'] = ['boundaryVerified' => false, 'collectionErrors' => [$error->getMessage()]];
         }
         try {
+            $receipt['oomKilledContainers'] = $this->oomKilledContainers((float) ($receipt['started']['epochSeconds'] ?? 0));
+        } catch (\Throwable $error) {
+            $receipt['oomKilledContainers'] = null;
+            $this->unexpectedExits[] = 'Container OOM events could not be read: ' . $error->getMessage();
+        }
+        try {
             $receipt['metadataProof'] = $this->metadataProof($state, $directory, $receipt['started']['epochSeconds'] ?? 0, $receipt['completedEpochSeconds'] ?? 0);
         } catch (\Throwable $error) {
             $receipt['metadataProof'] = ['complete' => false, 'errors' => [$error->getMessage()]];
@@ -1297,7 +1603,38 @@ CODE;
         }
         $path = $directory . '/native.jsonl';
         $copy = $this->docker->run(['cp', $web['Id'] . ':' . $state['images']['nativeAuditPath'], $path], check: false);
-        return NativeAudit::read($path, $before && $copy->exitCode === 0, $after, $state['effectiveDeployment']['profile']);
+        return NativeAudit::read($path, $before && $copy->exitCode === 0, $after, $this->deploymentState()['configuration']['capability']);
+    }
+
+    /** @return list<string> */
+    private function oomKilledContainers(float $sinceEpochSeconds): array
+    {
+        $events = $this->docker->run(['events', '--since', (string) (int) floor($sinceEpochSeconds), '--until', (string) (time() + 1),
+            '--filter', 'type=container', '--filter', 'event=oom', '--format', '{{json .}}'], timeout: 30)->stdout;
+        return self::ownedOomEvents($events, $this->configuration['name'], $this->deploymentState()['owner']);
+    }
+
+    /**
+     * The containers of this deployment that Docker reported an OOM kill for; the kernel counts a kill even
+     * when the container has no memory limit of its own.
+     *
+     * @return list<string>
+     */
+    public static function ownedOomEvents(string $events, string $deploymentName, string $owner): array
+    {
+        $containers = [];
+        foreach (explode("\n", trim($events)) as $line) {
+            if ($line === '') {
+                continue;
+            }
+            $event = json_decode($line, true, flags: JSON_THROW_ON_ERROR);
+            $attributes = $event['Actor']['Attributes'] ?? [];
+            if (($event['Action'] ?? $event['status'] ?? null) === 'oom' && (($attributes['org.baander.household.owner'] ?? null) === $owner
+                || ($attributes['app.baander.worker.namespace'] ?? null) === $deploymentName)) {
+                $containers[] = (string) ($attributes['name'] ?? $event['Actor']['ID'] ?? 'unknown');
+            }
+        }
+        return array_values(array_unique($containers));
     }
 
     /** @param array<string,mixed> $state
@@ -1321,7 +1658,7 @@ CODE;
     /** @param array<string,mixed> $browser
      * @return list<array<string,mixed>>
      */
-    private function freshCopyPlans(array $browser, float $started): array
+    private function freshCopyPlans(array $browser, float $started, int $players): array
     {
         $ids = [];
         foreach ($browser['slots'] ?? [] as $slot) {
@@ -1333,15 +1670,15 @@ CODE;
             }
         }
         $ids = array_values(array_unique($ids));
-        if (count($ids) !== 2) {
-            throw new \RuntimeException('Fresh copy requires two distinct owned jobs.');
+        if (count($ids) !== $players) {
+            throw new \RuntimeException('Fresh copy requires one distinct owned job per player.');
         }
         $list = implode(',', array_map(static fn(string $id): string => "'" . $id . "'", $ids));
         $sql = "SELECT coalesce(jsonb_agg(jsonb_build_object('id',j.public_id,'created',extract(epoch from j.created_at),'selection',s.desired->'presentationSelection')), '[]'::jsonb) FROM transcode_jobs j JOIN transcode_runtime_state s ON s.job_id=j.id WHERE j.public_id IN ({$list})";
         $deployment = $this->deploymentState();
         $environment = $deployment['configuration']['environment'];
         $plans = json_decode(trim($this->docker->compose($deployment['configuration']['name'], $deployment['composeFile'], ['exec', '-T', 'postgres', 'psql', '-X', '-qAt', '-v', 'ON_ERROR_STOP=1', '-U', $environment['DB_USERNAME'], '-d', $environment['DB_DATABASE']], input: $sql)->stdout), true, flags: JSON_THROW_ON_ERROR);
-        if (count($plans) !== 2 || array_any($plans, static fn(array $plan): bool => ($plan['selection']['mode'] ?? null) !== 'copy' || ($plan['created'] ?? 0) < $started - 300)) {
+        if (count($plans) !== $players || array_any($plans, static fn(array $plan): bool => ($plan['selection']['mode'] ?? null) !== 'copy' || ($plan['created'] ?? 0) < $started - 300)) {
             throw new \RuntimeException('Copy jobs are stale or their persisted plans permit encoding.');
         }
         return $plans;
@@ -1531,7 +1868,7 @@ CODE;
         }
         $roles = Observer::rolesFromInspection(json_decode($this->docker->run(['inspect', ...array_values(array_unique($ids))])->stdout, true, flags: JSON_THROW_ON_ERROR), $this->configuration['name'], $deployment['owner']);
         foreach ($this->observedRoles as $role => $pid) {
-            if (($roles[$role] ?? null) !== $pid) {
+            if (!isset($this->restartingRoles[$role]) && ($roles[$role] ?? null) !== $pid) {
                 $this->unexpectedExits[] = 'Required role exited or changed PID: ' . $role;
             }
         }
@@ -1547,7 +1884,7 @@ CODE;
 
     private function household(): Household
     {
-        return new Household(new HouseholdStateStore($this->directory . '/deployment'), $this->docker, $this->runtime->executor, $this->runtime->environment, $this->runtime->root, $this->runtime->configuration->budgets->seconds('cleanup'));
+        return new Household(new HouseholdStateStore($this->directory . '/deployment'), $this->docker, $this->runtime->executor, $this->runtime->environment, $this->runtime->configuration->budgets->seconds('cleanup'));
     }
 
     /** @return array<string,mixed> */
@@ -1588,7 +1925,8 @@ CODE;
      */
     private function publicState(array $state): array
     {
-        return ['version' => 1, 'name' => $this->configuration['name'], 'phase' => $state['phase'], 'profile' => $this->configuration['deployment']['profile'],
+        $deployment = $state['effectiveDeployment'] ?? $this->configuration['deployment'];
+        return ['version' => 1, 'name' => $this->configuration['name'], 'phase' => $state['phase'], 'capability' => $deployment['capability'], 'size' => $deployment['size'],
             'stateDirectory' => $this->directory, 'datasetDigest' => $state['datasetDigest'] ?? null, 'runs' => $state['runs'], 'qualificationClaim' => false];
     }
 }

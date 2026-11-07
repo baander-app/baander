@@ -107,7 +107,7 @@ class Workers
                 $this->connections->client($instance['docker']),
                 $release['images']['worker_image']['resolvedId'],
                 $layout,
-                'full',
+                ImageProfile::DEFAULT_SETTINGS,
                 $this->store->directory($instance['id']) . '/worker-profile-resources.json',
                 $this->connections->environment(),
                 $cleanupSeconds,

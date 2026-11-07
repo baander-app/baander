@@ -17,6 +17,11 @@ export const thresholds = Object.freeze({
   minimumMeasurementSeconds: 1800,
 })
 
+// Recovery and insufficient-memory runs play the original-overlap workload.
+const scenarioDeliveries = Object.freeze({
+  'original-overlap': 'original', 'fresh-copy-overlap': 'copy', 'mixed-overlap': 'original', recovery: 'original', 'insufficient-memory': 'original',
+})
+
 function requireValue(condition, message) {
   if (!condition) throw new Error(message)
 }
@@ -26,9 +31,11 @@ export function validateConfiguration(value) {
   const url = new URL(value.baseURL)
   requireValue(['http:', 'https:'].includes(url.protocol) && !url.username && !url.password
     && !url.search && !url.hash && url.pathname === '/', 'baseURL must be an HTTP(S) origin')
-  requireValue(['original-overlap', 'fresh-copy-overlap', 'mixed-overlap'].includes(value.scenario), 'Unknown overlap scenario')
+  requireValue(Object.hasOwn(scenarioDeliveries, value.scenario), 'Unknown playback scenario')
   requireValue(Number.isInteger(value.durationSeconds) && value.durationSeconds >= thresholds.minimumMeasurementSeconds, 'durationSeconds must be at least 1800')
-  requireValue(Array.isArray(value.slots) && value.slots.length === 2, 'Exactly two playback slots are required')
+  const players = value.players ?? 2
+  requireValue(players === 1 || players === 2, 'players must be 1 or 2')
+  requireValue(Array.isArray(value.slots) && value.slots.length === players, 'Provide one playback slot per player')
   const slots = value.slots.map((slot, index) => {
     requireValue(slot && ['audio', 'video'].includes(slot.kind), `Slot ${index} requires audio or video`)
     requireValue(typeof slot.publicId === 'string' && /^[A-Za-z0-9_-]+$/.test(slot.publicId), `Slot ${index} requires a publicId`)
@@ -42,10 +49,9 @@ export function validateConfiguration(value) {
     requireValue(typeof email === 'string' && email.includes('@') && typeof password === 'string' && password.length > 0, `Slot ${index} requires login credentials`)
     return { ...slot, pagePath, email, password }
   })
-  requireValue(slots[0].email.toLowerCase() !== slots[1].email.toLowerCase(), 'Two distinct accounts are required to preserve independent playback ownership')
-  const deliveries = slots.map(slot => slot.expectedDelivery).sort().join(',')
-  requireValue(deliveries === ({ 'original-overlap': 'original,original', 'fresh-copy-overlap': 'copy,copy', 'mixed-overlap': 'original,original' })[value.scenario], 'Slot deliveries disagree with scenario')
-  if (value.scenario === 'mixed-overlap') requireValue(slots.map(slot => slot.kind).sort().join(',') === 'audio,video', 'Mixed playback requires one audio and one video slot')
+  if (players === 2) requireValue(slots[0].email.toLowerCase() !== slots[1].email.toLowerCase(), 'Two distinct accounts are required to preserve independent playback ownership')
+  requireValue(slots.every(slot => slot.expectedDelivery === scenarioDeliveries[value.scenario]), 'Slot deliveries disagree with scenario')
+  if (value.scenario === 'mixed-overlap' && players === 2) requireValue(slots.map(slot => slot.kind).sort().join(',') === 'audio,video', 'Mixed playback requires one audio and one video slot')
   for (const key of ['outputPath', 'readyPath', 'stopPath']) {
     requireValue(typeof value[key] === 'string' && isAbsolute(value[key]), `${key} must be an absolute path`)
   }
@@ -53,7 +59,7 @@ export function validateConfiguration(value) {
   const startupTimeoutSeconds = value.startupTimeoutSeconds ?? 180
   requireValue(Number.isInteger(startupTimeoutSeconds) && startupTimeoutSeconds > 0 && startupTimeoutSeconds <= 900, 'startupTimeoutSeconds must be 1–900')
   if (value.chromiumExecutablePath !== undefined) requireValue(typeof value.chromiumExecutablePath === 'string' && isAbsolute(value.chromiumExecutablePath), 'chromiumExecutablePath must be absolute')
-  return { ...value, baseURL: url.origin, slots, startupTimeoutSeconds }
+  return { ...value, baseURL: url.origin, players, slots, startupTimeoutSeconds }
 }
 
 export function summarizeSlot(samples, expectedDelivery, kind, durationSeconds) {
@@ -151,7 +157,7 @@ export function summarizeSlot(samples, expectedDelivery, kind, durationSeconds) 
 }
 
 export function playersAdvancing(samples, previous, slots) {
-  return previous !== null && previous.length === 2 && samples.length === 2 && samples.every((sample, index) =>
+  return previous !== null && previous.length === slots.length && samples.length === slots.length && samples.every((sample, index) =>
     sample.delivery === slots[index].expectedDelivery
     && sample.media && !sample.media.paused && !sample.media.ended && !sample.media.errorCode && sample.media.readyState >= 2
     && previous[index]?.presentationPosition !== null
@@ -398,10 +404,10 @@ export async function run(configuration) {
     }
     if (interrupted || existsSync(config.stopPath)) stopRequested = true
     const initial = await Promise.all(clients.map(client => snapshot(client.page, client.state)))
-    requireValue(!interrupted && !existsSync(config.stopPath) && playersAdvancing(initial, previous, config.slots), 'Both real players did not reach advancing playback before startup deadline')
+    requireValue(!interrupted && !existsSync(config.stopPath) && playersAdvancing(initial, previous, config.slots), `${config.slots.length === 1 ? 'The real player' : 'Both real players'} did not reach advancing playback before startup deadline`)
     measurementStart = { epochMs: Date.now(), monotonicMs: performance.now() }
     initial.forEach((sample, index) => { clients[index].state.samples.push(sample); record({ type: 'sample', slot: index, ...sample }) })
-    atomicJson(config.readyPath, { version: 1, measurementStart, scenario: config.scenario, slots: clients.map(({ state, slot }) => ({ index: state.index, kind: state.kind, publicId: slot.publicId, delivery: state.delivery, jobId: state.jobId })) })
+    atomicJson(config.readyPath, { version: 1, measurementStart, scenario: config.scenario, players: config.players, slots: clients.map(({ state, slot }) => ({ index: state.index, kind: state.kind, publicId: slot.publicId, delivery: state.delivery, jobId: state.jobId })) })
     while (performance.now() - measurementStart.monotonicMs < config.durationSeconds * 1000) {
       if (interrupted || existsSync(config.stopPath)) { stopRequested = true; break }
       const target = measurementStart.monotonicMs + clients[0].state.samples.length * 1000
@@ -419,7 +425,7 @@ export async function run(configuration) {
     const slots = clients.map(({ slot, state }) => ({ index: state.index, kind: slot.kind, publicId: slot.publicId,
       expectedDelivery: slot.expectedDelivery, observedDecisions: state.decisions, pageErrors: state.pageErrors,
       ...summarizeSlot(state.samples, slot.expectedDelivery, slot.kind, config.durationSeconds) }))
-    const passed = !failure && !stopRequested && slots.length === 2 && slots.every(slot => slot.passed && slot.pageErrors === 0)
+    const passed = !failure && !stopRequested && slots.length === config.slots.length && slots.every(slot => slot.passed && slot.pageErrors === 0)
     for (const { page, state } of clients) {
       if (!passed) await page.screenshot({ path: `${artifacts}/slot-${state.index}.png`, fullPage: true }).catch(() => {})
     }
@@ -428,7 +434,7 @@ export async function run(configuration) {
     await Promise.all([...pending])
     for (const { context } of clients) await context.close().catch(() => {})
     if (browser) await browser.close().catch(() => {})
-    const summary = { version: 1, passed, failure, stopRequested, interrupted, scenario: config.scenario, thresholds,
+    const summary = { version: 1, passed, failure, stopRequested, interrupted, scenario: config.scenario, players: config.players, thresholds,
       durationSeconds: config.durationSeconds, measurementStart, finishedEpochMs: Date.now(),
       driverElapsedSeconds: (performance.now() - started) / 1000, slots,
       observer: { location: 'external-host-outside-constrained-vm', usage: usage(), chromium: finalBrowserUsage,

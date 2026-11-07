@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Baander\Tooling\Tests;
 
-use Baander\Tooling\Fixtures\Household\{RunContract, RunReport};
+use Baander\Tooling\Fixtures\Household\{NativeAudit, RunContract, RunReport};
 use Baander\Tooling\Deployment\Household;
 use PHPUnit\Framework\TestCase;
 
@@ -22,10 +22,12 @@ final class HouseholdRunReportTest extends TestCase
         unlink($this->path);
     }
 
-    private function contract(): RunContract
+    private function contract(string $scenario = 'original-overlap', int $players = 2): RunContract
     {
         return RunContract::fromArray([
-            'version' => 1, 'scenario' => 'original-overlap', 'profile' => 'household', 'imageId' => 'sha256:' . str_repeat('a', 64),
+            'version' => 2, 'scenario' => $scenario, 'capability' => 'remux', 'players' => $players,
+            'size' => ['webWorkers' => 2, 'databaseSlots' => 4, 'ordinaryConsumers' => 1, 'sharedBuffersMiB' => 128, 'workMemMiB' => 4, 'copySlots' => 2],
+            'imageId' => 'sha256:' . str_repeat('a', 64),
             'deploymentOwner' => 'boot', 'workerNamespace' => 'fixture', 'operatorImageId' => 'sha256:' . str_repeat('c', 64), 'workerImageId' => 'sha256:' . str_repeat('d', 64),
             'startedMonotonic' => 100.0, 'sampleIntervalSeconds' => 1.0, 'maxSampleGapSeconds' => 3.0,
             'durationSeconds' => 1800.0, 'maintenanceDeadlineSeconds' => 2400.0,
@@ -44,7 +46,7 @@ final class HouseholdRunReportTest extends TestCase
             'contractFingerprint' => $contract->fingerprint(), 'completedMonotonic' => 1900.0,
             'playback' => [['id' => 'one', ...$playback], ['id' => 'two', ...$playback]],
             'queues' => ['scan' => $queue, 'metadata' => $queue],
-            'nativeAudit' => ['complete' => true, 'forbiddenLaunches' => 0], 'unexpectedExits' => [],
+            'nativeAudit' => ['complete' => true, 'capability' => 'remux', 'forbiddenLaunches' => 0], 'oomKilledContainers' => [], 'unexpectedExits' => [],
             'operatorMeasurements' => ['workload' => $this->operatorInput(['readiness', 'readiness'], 100.0, 1900.0), 'shutdown' => $this->operatorInput(['status', 'recover'], 1900.0, 1910.0)],
             'helperMeasurements' => $this->helperInput($contract),
             'cleanup' => ['normalExit' => true, 'pairRetired' => true, 'dataVolumesRetained' => true, 'fixturesRemoved' => true],
@@ -84,9 +86,7 @@ final class HouseholdRunReportTest extends TestCase
 
     public function testColdStartRequiresTransientStartupPeaksAndRejectsHelperOom(): void
     {
-        $document = $this->contract()->toArray();
-        $document['scenario'] = 'cold-startup';
-        $contract = RunContract::fromArray($document);
+        $contract = $this->contract('cold-startup', 0);
         $this->samples();
         $evidence = $this->evidence($contract);
         $evidence['operatorMeasurements']['workload'] = $this->operatorInput(['prepare', 'ipc-initialize', 'create', 'start', 'readiness'], 100, 1900);
@@ -113,7 +113,7 @@ final class HouseholdRunReportTest extends TestCase
         self::assertContains('Scenario helper measurement is incomplete or failed.', RunReport::evaluate($contract, $this->path, $evidence)['failures']);
     }
 
-    private function samples(?int $missingSequence = null, bool $oom = false, bool $swapGrowth = false, bool $groupSwapGrowth = false, int|string $webMemoryMaxBytes = 'max'): void
+    private function samples(?int $missingSequence = null, bool $oom = false, bool $swapGrowth = false, bool $groupSwapGrowth = false, int|string $webMemoryMaxBytes = 'max', bool $oomKill = false): void
     {
         $stream = fopen($this->path, 'wb');
         for ($index = 0; $index <= 1800; ++$index) {
@@ -121,7 +121,7 @@ final class HouseholdRunReportTest extends TestCase
                 continue;
             }
             $group = ['path' => '/web', 'roles' => ['web'], 'memoryCurrentBytes' => 100, 'memoryPeakBytes' => 120, 'memoryMaxBytes' => $webMemoryMaxBytes,
-                'memoryEvents' => ['oom' => $oom && $index === 1800 ? 1 : 0, 'oom_kill' => 0], 'swapCurrentBytes' => 0, 'swapPeakBytes' => 0, 'swapMaxBytes' => 'max', 'pidsCurrent' => 1, 'pidsMax' => 'max'];
+                'memoryEvents' => ['oom' => $oom && $index === 1800 ? 1 : 0, 'oom_kill' => $oomKill && $index >= 900 ? 1 : 0], 'swapCurrentBytes' => 0, 'swapPeakBytes' => 0, 'swapMaxBytes' => 'max', 'pidsCurrent' => 1, 'pidsMax' => 'max'];
             $observer = array_replace($group, ['path' => '/observer', 'roles' => ['observer'], 'memoryMaxBytes' => 1024, 'swapMaxBytes' => 0, 'pidsMax' => 32]);
             $sample = ['version' => 1, 'captureWindowSeconds' => 0.01, 'sequence' => $index, 'monotonic' => 100 + $index,
                 'host' => ['memTotalBytes' => 4096, 'memAvailableBytes' => 3000, 'swapTotalBytes' => 1000, 'swapFreeBytes' => $swapGrowth ? 1000 - $index / 2 : 1000,
@@ -361,6 +361,99 @@ final class HouseholdRunReportTest extends TestCase
         $this->samples(webMemoryMaxBytes: 1024);
         $result = RunReport::evaluate($contract, $this->path, $this->evidence($contract));
         self::assertContains('Effective cgroup limits differ from the declared configuration.', $result['failures']);
+    }
+
+    public function testRemuxRunWithAnEncoderLaunchFailsTheReport(): void
+    {
+        $contract = $this->contract();
+        $this->samples();
+        $journal = tempnam(sys_get_temp_dir(), 'baander-native-audit-');
+        self::assertIsString($journal);
+        try {
+            file_put_contents($journal, json_encode(['event' => 'start', 'at' => 1.0, 'pid' => 10, 'executable' => 'ffmpeg', 'arguments' => ['-i', 'source', '-c:v', 'libx264', '-c:a', 'aac', 'output']], JSON_THROW_ON_ERROR) . "\n");
+            $evidence = $this->evidence($contract);
+            $evidence['nativeAudit'] = NativeAudit::read($journal, true, true, 'remux');
+            $result = RunReport::evaluate($contract, $this->path, $evidence);
+            self::assertSame('failed', $result['status']);
+            self::assertContains('Prohibited native launch evidence does not pass.', $result['failures']);
+            $evidence['nativeAudit'] = NativeAudit::read($journal, true, true, 'transcode');
+            self::assertContains('Native launch audit applied another capability than the run contract.', RunReport::evaluate($contract, $this->path, $evidence)['failures']);
+        } finally {
+            unlink($journal);
+        }
+    }
+
+    public function testOnePlayerOverlapPassesWithOneProgressingPlayerAndNoSecond(): void
+    {
+        $contract = $this->contract(players: 1);
+        $this->samples();
+        $evidence = $this->evidence($contract);
+        $evidence['playback'] = array_slice($evidence['playback'], 0, 1);
+        $result = RunReport::evaluate($contract, $this->path, $evidence);
+        self::assertSame('passed', $result['status']);
+        self::assertSame(1, $result['players']);
+        $evidence['playback'][0]['stalls'] = 1;
+        self::assertContains('Playback progress or interruption evidence does not pass.', RunReport::evaluate($contract, $this->path, $evidence)['failures']);
+        $twoPlayers = $this->evidence($contract);
+        self::assertContains('Playback progress records do not match the declared player count.', RunReport::evaluate($contract, $this->path, $twoPlayers)['failures']);
+    }
+
+    public function testPlaybackScenariosDeclareOneOrTwoPlayersAndOtherRunsNone(): void
+    {
+        $document = $this->contract()->toArray();
+        foreach ([[0, 'original-overlap'], [3, 'recovery'], [1, 'cold-startup']] as [$players, $scenario]) {
+            try {
+                RunContract::fromArray(array_replace($document, ['players' => $players, 'scenario' => $scenario]));
+                self::fail('Accepted ' . $players . ' players for ' . $scenario . '.');
+            } catch (\InvalidArgumentException $error) {
+                self::assertStringContainsString('players', $error->getMessage());
+            }
+        }
+        $this->expectException(\InvalidArgumentException::class);
+        RunContract::fromArray(array_replace($document, ['capability' => 'household']));
+    }
+
+    public function testInsufficientMemoryPassesOnAnOomKillOrAStallAndFailsWhenTheRunCompletesCleanly(): void
+    {
+        $contract = $this->contract('insufficient-memory');
+        $this->samples();
+        $clean = RunReport::evaluate($contract, $this->path, $this->evidence($contract));
+        self::assertSame('failed', $clean['status']);
+        self::assertSame(['The deployment completed without an OOM kill or a playback stall.'], $clean['failures']);
+        self::assertFalse($clean['memoryFitSupported']);
+
+        $evidence = $this->evidence($contract);
+        $evidence['oomKilledContainers'] = ['fixture-web-1'];
+        $killed = RunReport::evaluate($contract, $this->path, $evidence);
+        self::assertSame('passed', $killed['status']);
+        self::assertContains('OOM activity was observed.', $killed['workloadFailures']);
+        self::assertFalse($killed['memoryFitSupported']);
+
+        $evidence = $this->evidence($contract);
+        $evidence['playback'][1]['stalled'] = true;
+        $evidence['playback'][1]['stalls'] = 1;
+        self::assertSame(['two'], RunReport::evaluate($contract, $this->path, $evidence)['insufficientMemory']['stalledPlayers']);
+        self::assertSame('passed', RunReport::evaluate($contract, $this->path, $evidence)['status']);
+
+        $this->samples(oomKill: true);
+        $sampled = RunReport::evaluate($contract, $this->path, $this->evidence($contract));
+        self::assertSame('passed', $sampled['status']);
+        self::assertSame(1, $sampled['insufficientMemory']['oomKills']);
+
+        $evidence = $this->evidence($contract);
+        $evidence['contractFingerprint'] = str_repeat('0', 64);
+        self::assertSame('failed', RunReport::evaluate($contract, $this->path, $evidence)['status']);
+    }
+
+    public function testRecoveryRequiresTheDeploymentToRecoverButNotUninterruptedPlayback(): void
+    {
+        $contract = $this->contract('recovery');
+        $this->samples();
+        $evidence = $this->evidence($contract);
+        $evidence['playback'][0]['stalls'] = 1;
+        self::assertContains('The deployment did not recover after PostgreSQL restarted.', RunReport::evaluate($contract, $this->path, $evidence)['failures']);
+        $evidence['recovery'] = ['recovered' => true];
+        self::assertSame('passed', RunReport::evaluate($contract, $this->path, $evidence)['status']);
     }
 
     public function testUnpreparedDatasetIsRefused(): void

@@ -12,18 +12,24 @@ final readonly class HouseholdConfiguration
     public const array VOLUME_ROLES = ['media', 'storage', 'conversions', 'transcode_state', 'postgres', 'redis', 'secrets', 'pooler_credentials'];
     /** Redis's own dataset bound, enforced by Redis itself rather than by a container limit. */
     public const array RESOURCE_DEFAULTS = ['redisMaxmemoryMiB' => 192];
-    public const array MEDIA_SLOT_KEYS = ['videoSlots', 'audioSlots'];
+    public const array CAPABILITIES = ['transcode', 'remux'];
+    /** Size settings every deployment states; the image validates the process settings' bounds. */
+    public const array REQUIRED_SIZE_KEYS = ['webWorkers', 'databaseSlots', 'ordinaryConsumers', 'sharedBuffersMiB', 'workMemMiB'];
+    /** Media settings per capability: remux requires copy slots; unset transcode slots take the image's defaults. */
+    public const array MEDIA_SIZE_KEYS = ['remux' => ['copySlots'], 'transcode' => ['videoSlots', 'audioSlots']];
+    /** PostgreSQL memory bounds in MiB, as [minimum, maximum]. */
+    public const array POSTGRES_BOUNDS = ['sharedBuffersMiB' => [32, 16384], 'workMemMiB' => [1, 1024]];
     public const array HARDWARE_KEYS = ['accelerator', 'device', 'group'];
     /** @param array<string,ImageSelection> $images
      * @param array<string,string> $environment
      * @param array<string,int> $resources
      * @param array<string,string> $volumes
-     * @param array{videoSlots?:int,audioSlots?:int,hardware?:array{accelerator:string,device?:string,group?:int}}|null $media Full
-     *     profile slot counts, where unset kinds use the profile default, and the hardware encoder.
+     * @param array<string,int> $size Process, media and PostgreSQL size settings.
+     * @param array{accelerator:string,device?:string,group?:int}|null $hardwareEncoder A transcode deployment's hardware encoder.
      */
     private function __construct(
         public string $name,
-        public string $profile,
+        public string $capability,
         public string $origin,
         public string $listenAddress,
         public int $listenPort,
@@ -31,23 +37,32 @@ final readonly class HouseholdConfiguration
         public array $environment,
         public array $resources,
         public array $volumes,
-        public ?array $media,
+        public array $size,
+        public ?array $hardwareEncoder,
     ) {}
 
     /** @param array<string,mixed> $data */
     public static function fromArray(array $data): self
     {
-        JsonObject::keys($data, ['version', 'name', 'profile', 'origin', 'listen', 'images', 'environment', 'resources', 'volumes', 'media'], 'household configuration');
-        if (($data['version'] ?? null) !== 1) {
+        JsonObject::keys($data, ['version', 'name', 'capability', 'size', 'hardware', 'origin', 'listen', 'images', 'environment', 'resources', 'volumes'], 'household configuration');
+        if (($data['version'] ?? null) !== 2) {
             throw new \InvalidArgumentException('Unsupported household configuration version.');
         }
         $name = self::string($data, 'name');
         if (preg_match('/^[a-z][a-z0-9-]{2,40}$/D', $name) !== 1) {
             throw new \InvalidArgumentException('Deployment name requires 3–41 lowercase letters, digits or hyphens.');
         }
-        $profile = self::string($data, 'profile');
-        if (!in_array($profile, ['household', 'full'], true)) {
-            throw new \InvalidArgumentException('Select the household or full deployment profile.');
+        $capability = self::string($data, 'capability');
+        if (!in_array($capability, self::CAPABILITIES, true)) {
+            throw new \InvalidArgumentException('Select the transcode or remux deployment capability.');
+        }
+        $size = self::size(self::map($data, 'size'), $capability);
+        $hardware = null;
+        if (array_key_exists('hardware', $data)) {
+            if ($capability !== 'transcode') {
+                throw new \InvalidArgumentException('A remux deployment runs no hardware encoder.');
+            }
+            $hardware = self::hardwareEncoder(self::map($data, 'hardware'));
         }
         $origin = self::string($data, 'origin');
         $url = parse_url($origin);
@@ -76,7 +91,7 @@ final readonly class HouseholdConfiguration
         foreach (['APP_SECRET', 'STREAM_URL_HMAC_SECRET', 'DB_USERNAME', 'DB_PASSWORD', 'DB_DATABASE', 'REDIS_PASSWORD'] as $key) {
             self::string($environment, $key);
         }
-        foreach (['BAANDER_DEPLOYMENT_PROFILE', 'BAANDER_DEPLOYMENT_PROFILE_JSON', 'APP_ENV', 'APP_DEBUG', 'DATABASE_URL', 'DATABASE_CONTROL_URL', 'REDIS_URL', 'MESSENGER_TRANSPORT_DSN', 'APP_URL', 'DEFAULT_URI', 'APP_DOMAIN', 'MEDIA_STORAGE_PATH', 'CONVERT_STORAGE_PATH', 'APP_HOME', 'OAUTH_PRIVATE_KEY_PATH', 'OAUTH_PUBLIC_KEY_PATH'] as $key) {
+        foreach (['BAANDER_DEPLOYMENT_PROFILE', 'APP_ENV', 'APP_DEBUG', 'DATABASE_URL', 'DATABASE_CONTROL_URL', 'REDIS_URL', 'MESSENGER_TRANSPORT_DSN', 'APP_URL', 'DEFAULT_URI', 'APP_DOMAIN', 'MEDIA_STORAGE_PATH', 'CONVERT_STORAGE_PATH', 'APP_HOME', 'OAUTH_PRIVATE_KEY_PATH', 'OAUTH_PUBLIC_KEY_PATH'] as $key) {
             if (array_key_exists($key, $environment)) {
                 throw new \InvalidArgumentException('Deployment derives environment variable ' . $key . '.');
             }
@@ -106,13 +121,27 @@ final readonly class HouseholdConfiguration
         if (count(array_unique($volumes)) !== count($volumes)) {
             throw new \InvalidArgumentException('Persistent volume roles must have distinct names.');
         }
-        return new self($name, $profile, rtrim($origin, '/'), $address, $listen['port'], $selections, $environment, $resources, $volumes, self::media($data, $profile));
+        return new self($name, $capability, rtrim($origin, '/'), $address, $listen['port'], $selections, $environment, $resources, $volumes, $size, $hardware);
     }
 
-    /** The configured slot count of a media kind, or null when the profile default applies. */
-    public function slots(string $kind): ?int
+    /**
+     * The deployment profile settings the images build their profile from; unset transcode slots
+     * take the image's defaults.
+     *
+     * @return array{capability:string,webWorkers:int,doctrinePoolSlots:int,ordinaryConsumerLimit:int,sharedCopySlots:int,videoEncoderSlots:?int,audioEncoderSlots:?int,hardware:array{accelerator:string,device:?string}|null}
+     */
+    public function profileSettings(): array
     {
-        return $this->media[$kind . 'Slots'] ?? null;
+        return [
+            'capability' => $this->capability,
+            'webWorkers' => $this->size['webWorkers'],
+            'doctrinePoolSlots' => $this->size['databaseSlots'],
+            'ordinaryConsumerLimit' => $this->size['ordinaryConsumers'],
+            'sharedCopySlots' => $this->size['copySlots'] ?? 0,
+            'videoEncoderSlots' => $this->size['videoSlots'] ?? null,
+            'audioEncoderSlots' => $this->size['audioSlots'] ?? null,
+            'hardware' => $this->hardware(),
+        ];
     }
 
     /**
@@ -122,43 +151,38 @@ final readonly class HouseholdConfiguration
      */
     public function hardware(): ?array
     {
-        $hardware = $this->media['hardware'] ?? null;
-        return $hardware === null ? null : ['accelerator' => $hardware['accelerator'], 'device' => $hardware['device'] ?? null];
+        return $this->hardwareEncoder === null ? null : ['accelerator' => $this->hardwareEncoder['accelerator'], 'device' => $this->hardwareEncoder['device'] ?? null];
     }
 
     /** The group that opens the hardware encoder device, when the operator overrides the device's own group. */
     public function hardwareGroup(): ?int
     {
-        return $this->media['hardware']['group'] ?? null;
+        return $this->hardwareEncoder['group'] ?? null;
     }
 
-    /** @param array<string,mixed> $data
-     * @return array{videoSlots?:int,audioSlots?:int,hardware?:array{accelerator:string,device?:string,group?:int}}|null
+    /** @param array<string,mixed> $size
+     * @return array<string,int>
      */
-    private static function media(array $data, string $profile): ?array
+    private static function size(array $size, string $capability): array
     {
-        if (!array_key_exists('media', $data)) {
-            return null;
-        }
-        if ($profile === 'household') {
-            throw new \InvalidArgumentException('The household profile runs fixed shared copy slots and accepts no media configuration.');
-        }
-        $media = self::map($data, 'media');
-        JsonObject::keys($media, [...self::MEDIA_SLOT_KEYS, 'hardware'], 'media configuration');
-        $slots = [];
-        foreach (self::MEDIA_SLOT_KEYS as $key) {
-            if (!array_key_exists($key, $media)) {
-                continue;
+        $media = self::MEDIA_SIZE_KEYS[$capability];
+        JsonObject::keys($size, [...self::REQUIRED_SIZE_KEYS, ...$media], 'deployment size for ' . $capability);
+        foreach ([...self::REQUIRED_SIZE_KEYS, ...($capability === 'remux' ? $media : [])] as $key) {
+            if (!array_key_exists($key, $size)) {
+                throw new \InvalidArgumentException('Deployment size requires ' . $key . '.');
             }
-            if (!is_int($media[$key]) || $media[$key] < 0) {
-                throw new \InvalidArgumentException('Media ' . $key . ' must be zero or more jobs.');
+        }
+        foreach ($size as $key => $value) {
+            if (!is_int($value) || $value < 0) {
+                throw new \InvalidArgumentException('Deployment size ' . $key . ' must be a non-negative integer.');
             }
-            $slots[$key] = $media[$key];
         }
-        if (array_key_exists('hardware', $media)) {
-            $slots['hardware'] = self::hardwareEncoder(self::map($media, 'hardware'));
+        foreach (self::POSTGRES_BOUNDS as $key => [$minimum, $maximum]) {
+            if ($size[$key] < $minimum || $size[$key] > $maximum) {
+                throw new \InvalidArgumentException(sprintf('Deployment size requires %s between %d and %d.', $key, $minimum, $maximum));
+            }
         }
-        return $slots === [] ? null : $slots;
+        return $size;
     }
 
     /** The image's deployment profile validates the accelerator and device; this checks their shape.
@@ -184,11 +208,11 @@ final readonly class HouseholdConfiguration
     /** @return array<string,mixed> */
     public function toArray(): array
     {
-        return ['version' => 1, 'name' => $this->name, 'profile' => $this->profile, 'origin' => $this->origin,
+        return ['version' => 2, 'name' => $this->name, 'capability' => $this->capability, 'size' => $this->size, 'origin' => $this->origin,
             'listen' => ['address' => $this->listenAddress, 'port' => $this->listenPort],
             'images' => array_map(static fn(ImageSelection $image): string => $image->reference, $this->images),
             'environment' => $this->environment, 'resources' => $this->resources, 'volumes' => $this->volumes]
-            + ($this->media === null ? [] : ['media' => $this->media]);
+            + ($this->hardwareEncoder === null ? [] : ['hardware' => $this->hardwareEncoder]);
     }
 
     /** @param array<string,mixed> $data */

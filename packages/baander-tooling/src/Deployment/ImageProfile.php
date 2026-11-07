@@ -10,19 +10,33 @@ use Baander\Tooling\Resources\DisposableContainer;
 
 final readonly class ImageProfile
 {
+    public const array CAPABILITIES = ['transcode', 'remux'];
+    /** The default deployment's settings: the 16 GB transcode starting point with the image's slot defaults. */
+    public const array DEFAULT_SETTINGS = ['capability' => 'transcode', 'webWorkers' => 4, 'doctrinePoolSlots' => 10, 'ordinaryConsumerLimit' => 4,
+        'sharedCopySlots' => 0, 'videoEncoderSlots' => null, 'audioEncoderSlots' => null, 'hardware' => null];
+
     private const string PROGRAM = <<<'PHP'
 require $argv[2] . '/vendor/autoload.php';
-$slots = static fn (string $value): ?int => $value === '' ? null : (int) $value;
 try {
-    $hardware = $argv[5] === '' ? null : new \App\Shared\Application\DTO\HardwareEncoder($argv[5], $argv[6] === '' ? null : $argv[6]);
-    $profile = new \App\Shared\Application\DTO\DeploymentProfile($argv[1], $slots($argv[3]), $slots($argv[4]), $hardware);
-} catch (\InvalidArgumentException $error) {
+    $settings = json_decode($argv[1], true, 4, JSON_THROW_ON_ERROR);
+    $hardware = $settings['hardware'] === null ? null : new \App\Shared\Application\DTO\HardwareEncoder($settings['hardware']['accelerator'], $settings['hardware']['device']);
+    $profile = new \App\Shared\Application\DTO\DeploymentProfile(
+        $settings['capability'],
+        $settings['webWorkers'],
+        $settings['doctrinePoolSlots'],
+        $settings['ordinaryConsumerLimit'],
+        $settings['sharedCopySlots'],
+        $settings['videoEncoderSlots'],
+        $settings['audioEncoderSlots'],
+        $hardware,
+    );
+} catch (\InvalidArgumentException|\JsonException|\TypeError $error) {
     fwrite(STDERR, $error->getMessage() . "\n");
     exit(2);
 }
 $autoscaling = new \App\Shared\Application\DTO\WorkerAutoscalingProfile();
 echo json_encode([
-    'version' => 1,
+    'version' => 2,
     'deployment' => json_decode($profile->toJson(), true, flags: JSON_THROW_ON_ERROR),
     'autoscaling' => json_decode($autoscaling->toJson(), true, flags: JSON_THROW_ON_ERROR),
     'runtime' => [
@@ -43,7 +57,7 @@ PHP;
     public int $webWorkers;
     public int $doctrinePoolSlots;
 
-    /** @param array<string,mixed> $deployment Integer settings, the identifier and the hardware encoder or null.
+    /** @param array<string,mixed> $deployment Integer settings, the capability and the hardware encoder or null.
      * @param array<string,int> $autoscaling
      * @param array<string,int> $runtime
      */
@@ -56,27 +70,24 @@ PHP;
     }
 
     /**
-     * Asks the image for the deployment profile with the given media slots and hardware encoder;
-     * null slots take the image's defaults, and settings the image's profile rejects fail with its reason.
+     * Asks the image for the deployment profile built from the configured settings; null slots
+     * take the image's defaults, and settings the image's profile rejects fail with its reason.
      *
+     * @param array{capability:string,webWorkers:int,doctrinePoolSlots:int,ordinaryConsumerLimit:int,sharedCopySlots:int,videoEncoderSlots:?int,audioEncoderSlots:?int,hardware:array{accelerator:string,device:?string}|null} $settings
      * @param array<string,string> $environment
      * @param array{bootstrap:string,onCompletion:\Closure,path:string}|null $measurement
-     * @param array{accelerator:string,device:?string}|null $hardware
      */
-    public static function resolve(Client $docker, string $imageId, ApplicationLayout $layout, string $profileId, string $receiptPath, array $environment, float $cleanupSeconds, ?array $measurement = null, ?int $videoSlots = null, ?int $audioSlots = null, ?array $hardware = null): self
+    public static function resolve(Client $docker, string $imageId, ApplicationLayout $layout, array $settings, string $receiptPath, array $environment, float $cleanupSeconds, ?array $measurement = null): self
     {
-        if (preg_match('/^sha256:[a-f0-9]{64}$/D', $imageId) !== 1 || !in_array($profileId, ['full', 'household'], true)) {
-            throw new \InvalidArgumentException('Profile resolution requires an immutable image and a supported deployment profile.');
-        }
-        if (($videoSlots !== null && $videoSlots < 0) || ($audioSlots !== null && $audioSlots < 0)) {
-            throw new \InvalidArgumentException('Media slots must be zero or more jobs.');
+        if (preg_match('/^sha256:[a-f0-9]{64}$/D', $imageId) !== 1 || !in_array($settings['capability'], self::CAPABILITIES, true)) {
+            throw new \InvalidArgumentException('Profile resolution requires an immutable image and a supported deployment capability.');
         }
         $docker->validateIdentity();
         $result = DisposableContainer::run($docker, $receiptPath, [
             '--network', 'none', '--read-only', '--cap-drop', 'ALL', '--cgroupns', 'private',
             '--security-opt', 'no-new-privileges', '--workdir', $layout->root,
-            '--entrypoint', 'php', $imageId, '-r', ($measurement['bootstrap'] ?? '') . "\n" . self::PROGRAM, $profileId, $layout->root,
-            (string) $videoSlots, (string) $audioSlots, $hardware['accelerator'] ?? '', $hardware['device'] ?? '',
+            '--entrypoint', 'php', $imageId, '-r', ($measurement['bootstrap'] ?? '') . "\n" . self::PROGRAM,
+            json_encode($settings, JSON_THROW_ON_ERROR), $layout->root,
         ], $environment, $cleanupSeconds, timeout: 30, onCompletion: $measurement['onCompletion'] ?? null);
         if (strlen($result->stdout) > 8192) {
             throw new \RuntimeException('The image deployment profile exceeds its bounded response size.');
@@ -86,10 +97,12 @@ PHP;
             throw new \RuntimeException('The image did not return a deployment profile object.');
         }
         $profile = self::fromArray($document);
-        if ($profile->deployment['identifier'] !== $profileId
-            || ($videoSlots !== null && ($profile->deployment['videoEncoderSlots'] ?? null) !== $videoSlots)
-            || ($audioSlots !== null && ($profile->deployment['audioEncoderSlots'] ?? null) !== $audioSlots)
-            || $profile->deployment['hardware'] !== $hardware) {
+        foreach ($settings as $name => $value) {
+            if ($value !== null && ($profile->deployment[$name] ?? null) !== $value) {
+                throw new \RuntimeException('The image returned a different deployment profile.');
+            }
+        }
+        if ($profile->deployment['hardware'] !== $settings['hardware']) {
             throw new \RuntimeException('The image returned a different deployment profile.');
         }
         return $profile;
@@ -99,19 +112,19 @@ PHP;
     public static function fromArray(array $document): self
     {
         JsonObject::keys($document, ['version', 'deployment', 'autoscaling', 'runtime'], 'image profile');
-        if (($document['version'] ?? null) !== 1 || !is_array($document['deployment'] ?? null)) {
+        if (($document['version'] ?? null) !== 2 || !is_array($document['deployment'] ?? null)) {
             throw new \InvalidArgumentException('Unsupported image deployment profile.');
         }
-        $identifier = $document['deployment']['identifier'] ?? null;
-        if (!is_string($identifier) || !in_array($identifier, ['full', 'household'], true)) {
-            throw new \InvalidArgumentException('Unknown image deployment profile.');
+        $capability = $document['deployment']['capability'] ?? null;
+        if (!is_string($capability) || !in_array($capability, self::CAPABILITIES, true)) {
+            throw new \InvalidArgumentException('Unknown image deployment capability.');
         }
         $fields = $document['deployment'];
         if (!array_key_exists('hardware', $fields)) {
             throw new \InvalidArgumentException('Image deployment profile omits its hardware encoder.');
         }
         $hardware = self::hardware($fields['hardware']);
-        unset($fields['identifier'], $fields['hardware']);
+        unset($fields['capability'], $fields['hardware']);
         $deployment = self::integerMap($fields);
         $autoscaling = self::integerMap($document['autoscaling'] ?? null);
         $runtime = self::integerMap($document['runtime'] ?? null);
@@ -121,7 +134,7 @@ PHP;
         self::requirePositive($autoscaling, 'maximumConcurrency');
         self::requirePositive($runtime, 'phpHeapMiB');
         self::requirePositive($runtime, 'scheduledConsoleMiB');
-        return new self(['identifier' => $identifier, 'hardware' => $hardware, ...$deployment], $autoscaling, $runtime);
+        return new self(['capability' => $capability, 'hardware' => $hardware, ...$deployment], $autoscaling, $runtime);
     }
 
     /** @return array{accelerator:string,device:?string}|null */
@@ -163,7 +176,7 @@ PHP;
     /** @return array<string,mixed> */
     public function toArray(): array
     {
-        return ['version' => 1, 'deployment' => $this->deployment, 'autoscaling' => $this->autoscaling, 'runtime' => $this->runtime];
+        return ['version' => 2, 'deployment' => $this->deployment, 'autoscaling' => $this->autoscaling, 'runtime' => $this->runtime];
     }
 
     public function fingerprint(): string

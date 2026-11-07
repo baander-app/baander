@@ -21,7 +21,7 @@ final class RunReport
         };
         $measured = ['samples' => 0, 'totalHostMemBytes' => null, 'minimumHostAvailableBytes' => null,
             'peakHostUsedBytes' => 0, 'peakCgroupCurrentBytes' => 0, 'cgroups' => [], 'observerPeakBytes' => 0,
-            'nativeProcessPeak' => 0, 'nativeThreadPeak' => 0, 'swapGrowthBytes' => 0, 'peakSwapGrowthBytes' => 0,
+            'nativeProcessPeak' => 0, 'nativeThreadPeak' => 0, 'deploymentOomKills' => 0, 'swapGrowthBytes' => 0, 'peakSwapGrowthBytes' => 0,
             'cgroupSwapGrowthBytes' => 0, 'peakCgroupSwapGrowthBytes' => 0,
             'swapInPages' => 0, 'swapOutPages' => 0, 'memoryPressureAvg10Peak' => ['some' => 0.0, 'full' => 0.0]];
         $first = null;
@@ -29,6 +29,8 @@ final class RunReport
         $nextSequence = 0;
         $initialSwap = null;
         $initialCgroupSwap = [];
+        $initialOomKills = [];
+        $oomKills = [];
         $initialVmstat = null;
         $seenRoles = [];
         $stream = @fopen($samplesPath, 'rb');
@@ -144,8 +146,15 @@ final class RunReport
                         $events = $group['memoryEvents'] ?? [];
                         if (!self::counter($events['oom'] ?? null) || !self::counter($events['oom_kill'] ?? null)) {
                             $fail('Cgroup OOM event evidence is missing.');
-                        } elseif ($events['oom'] > 0 || $events['oom_kill'] > 0) {
-                            $fail('OOM activity was observed.');
+                        } else {
+                            if ($events['oom'] > 0 || $events['oom_kill'] > 0) {
+                                $fail('OOM activity was observed.');
+                            }
+                            if (!in_array('observer', $group['roles'], true)) {
+                                // Counters are cgroup lifetimes: only kills after the first sample belong to this run.
+                                $initialOomKills[$identity] ??= $measured['samples'] === 1 ? $events['oom_kill'] : 0;
+                                $oomKills[$identity] = max($oomKills[$identity] ?? 0, $events['oom_kill'] - $initialOomKills[$identity]);
+                            }
                         }
                         $current = self::counter($group['memoryCurrentBytes'] ?? null) ? $group['memoryCurrentBytes'] : 0;
                         $peak = self::counter($group['memoryPeakBytes'] ?? null) ? $group['memoryPeakBytes'] : 0;
@@ -231,6 +240,7 @@ final class RunReport
                 fclose($stream);
             }
         }
+        $measured['deploymentOomKills'] = array_sum($oomKills);
         if ($first === null || $last === null || $first - $declaration['startedMonotonic'] > $declaration['maxSampleGapSeconds']
             || $last - $declaration['startedMonotonic'] < $declaration['durationSeconds']) {
             $fail('Samples do not cover the declared run duration.');
@@ -247,8 +257,8 @@ final class RunReport
         }
         if ($contract->requiresPlayback()) {
             $playback = $evidence['playback'] ?? null;
-            if (!is_array($playback) || count($playback) !== 2) {
-                $fail('Two playback progress records are required.');
+            if (!is_array($playback) || count($playback) !== $contract->players()) {
+                $fail('Playback progress records do not match the declared player count.');
             } else {
                 $ids = [];
                 foreach ($playback as $record) {
@@ -278,6 +288,19 @@ final class RunReport
         }
         if (($evidence['nativeAudit']['forbiddenLaunches'] ?? null) !== 0) {
             $fail('Prohibited native launch evidence does not pass.');
+        }
+        if (($evidence['nativeAudit']['capability'] ?? null) !== $declaration['capability']) {
+            $fail('Native launch audit applied another capability than the run contract.');
+        }
+        $oomKilledContainers = $evidence['oomKilledContainers'] ?? null;
+        if (!is_array($oomKilledContainers) || !array_is_list($oomKilledContainers)) {
+            $fail('Container OOM event evidence is missing.');
+            $oomKilledContainers = [];
+        } elseif ($oomKilledContainers !== []) {
+            $fail('OOM activity was observed.');
+        }
+        if ($declaration['scenario'] === 'recovery' && ($evidence['recovery']['recovered'] ?? null) !== true) {
+            $fail('The deployment did not recover after PostgreSQL restarted.');
         }
         if (($evidence['unexpectedExits'] ?? null) !== []) {
             $fail('Unexpected process exit evidence does not pass.');
@@ -338,11 +361,46 @@ final class RunReport
                 $fail('Shutdown, retirement or cleanup evidence is incomplete.');
             }
         }
-        return ['version' => 1, 'status' => $failures === [] ? 'passed' : 'failed', 'contractFingerprint' => $contract->fingerprint(),
-            'failures' => array_keys($failures), 'configuredLimits' => $declaration['configuredLimits'], 'measured' => $measured, 'operatorMeasurements' => $operatorAudits, 'helperMeasurements' => $helperAudit,
-            'memoryFitSupported' => $failures === [] && $measured['swapGrowthBytes'] === 0 && $measured['cgroupSwapGrowthBytes'] === 0, 'scope' => 'single-run',
+        $status = $failures === [] ? 'passed' : 'failed';
+        $workloadFailures = array_keys($failures);
+        $insufficientMemory = null;
+        if ($declaration['scenario'] === 'insufficient-memory') {
+            $insufficientMemory = self::insufficientMemory($measured['deploymentOomKills'], $oomKilledContainers, $evidence['playback'] ?? []);
+            $failures = [];
+            if (($evidence['contractFingerprint'] ?? null) !== $contract->fingerprint() || $measured['samples'] === 0) {
+                $failures['The insufficient-memory evidence does not match its declared, measured run.'] = true;
+            }
+            if (!$insufficientMemory['observed']) {
+                $failures['The deployment completed without an OOM kill or a playback stall.'] = true;
+            }
+            $status = $failures === [] ? 'passed' : 'failed';
+        }
+        return ['version' => 1, 'status' => $status, 'scenario' => $declaration['scenario'], 'capability' => $declaration['capability'], 'size' => $declaration['size'],
+            'players' => $declaration['players'], 'contractFingerprint' => $contract->fingerprint(),
+            'failures' => array_keys($failures), 'workloadFailures' => $workloadFailures, 'insufficientMemory' => $insufficientMemory, 'configuredLimits' => $declaration['configuredLimits'], 'measured' => $measured, 'operatorMeasurements' => $operatorAudits, 'helperMeasurements' => $helperAudit,
+            'memoryFitSupported' => $insufficientMemory === null && $failures === [] && $measured['swapGrowthBytes'] === 0 && $measured['cgroupSwapGrowthBytes'] === 0, 'scope' => 'single-run',
             'maxAttempts' => ['scan' => $evidence['queues']['scan']['maxAttempts'] ?? null, 'metadata' => $evidence['queues']['metadata']['maxAttempts'] ?? null],
             'retries' => ['scan' => $evidence['queues']['scan']['retried'] ?? null, 'metadata' => $evidence['queues']['metadata']['retried'] ?? null]];
+    }
+
+    /**
+     * A run below the claimed size shows the failure the claim guards against: the kernel killed a
+     * deployment process for memory, or a player stalled.
+     *
+     * @param list<mixed> $oomKilledContainers
+     * @param mixed $playback
+     * @return array{observed:bool,oomKills:int,oomKilledContainers:list<mixed>,stalledPlayers:list<string>}
+     */
+    public static function insufficientMemory(int $oomKills, array $oomKilledContainers, mixed $playback): array
+    {
+        $stalled = [];
+        foreach (is_array($playback) ? $playback : [] as $record) {
+            if (is_array($record) && ($record['stalled'] ?? null) === true && is_string($record['id'] ?? null)) {
+                $stalled[] = $record['id'];
+            }
+        }
+        return ['observed' => $oomKills > 0 || $oomKilledContainers !== [] || $stalled !== [], 'oomKills' => $oomKills,
+            'oomKilledContainers' => $oomKilledContainers, 'stalledPlayers' => $stalled];
     }
 
     /** @param list<array<string,mixed>> $receipts
