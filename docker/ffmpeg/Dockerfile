@@ -183,14 +183,23 @@ COPY --from=libaribb24-builder /dist/ /usr/src/ffmpeg-build-script/workspace/
 COPY --from=librsvg-builder    /dist/ /usr/src/ffmpeg-build-script/workspace/
 COPY --from=baac-builder       /dist/usr/src/ffmpeg-build-script/workspace/ /usr/src/ffmpeg-build-script/workspace/
 
+# The bAAC wrapper: sources copied into the FFmpeg tree, the registration
+# patch checked before it is applied so that drift fails the build.
+COPY docker/ffmpeg/baac /usr/src/baac
+COPY docker/ffmpeg/smoke.sh /usr/src/smoke.sh
+
 RUN set -xe \
     && WORKSPACE=/usr/src/ffmpeg-build-script/workspace \
     && export PKG_CONFIG_PATH="$WORKSPACE/lib/pkgconfig:/usr/local/lib/x86_64-linux-gnu/pkgconfig:/usr/local/lib/pkgconfig:/usr/local/share/pkgconfig:/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/lib/pkgconfig:/usr/share/pkgconfig:/usr/lib64/pkgconfig" \
     && FFMPEG_SRC="$(ls -d /usr/src/ffmpeg-build-script/packages/FFmpeg-* | head -1)" \
     && cd "$FFMPEG_SRC" \
+    && cp /usr/src/baac/libavcodec/*.c libavcodec/ \
+    && git apply --check -p1 /usr/src/baac/ffmpeg-8.1-libbaac.patch \
+    && git apply -p1 /usr/src/baac/ffmpeg-8.1-libbaac.patch \
     && FFMPEG_CONFIGURATION="$(grep '^FFMPEG_CONFIGURATION=' ffbuild/config.mak | cut -d= -f2-)" \
     && make distclean || true \
     && eval "./configure $FFMPEG_CONFIGURATION \
+        --enable-libbaac \
         --enable-libfribidi \
         --enable-libharfbuzz \
         --enable-libass \
@@ -202,7 +211,8 @@ RUN set -xe \
         --enable-libaribb24 \
         --enable-librsvg" \
     && make -j"$(nproc)" \
-    && make install
+    && make install \
+    && SMOKE_EXPECT_FDK=1 bash /usr/src/smoke.sh "$WORKSPACE/bin/ffmpeg" "$WORKSPACE/bin/ffprobe" /tmp/smoke
 
 # ============================================================
 # Runtime image

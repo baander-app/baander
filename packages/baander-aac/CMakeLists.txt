@@ -204,7 +204,9 @@ include(GNUInstallDirs)
 install(TARGETS baander-aac
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
-install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+# Headers go under include/baac so that names such as bitstream.h and sbr.h
+# cannot shadow a consumer's own headers; the public API is <baac/aac.h>.
+install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/baac
     FILES_MATCHING PATTERN "*.h")
 # pkg-config file for consumers that link the static library, such as the
 # FFmpeg wrapper: Libs.private names the C++ runtime a static link needs.
