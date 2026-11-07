@@ -57,17 +57,21 @@ class AacImplementationProbe
         if ($this->codecs !== null) {
             return $this->codecs;
         }
-        $encoders = self::names($this->exec([$this->ffmpegPath, '-hide_banner', '-encoders']));
-        $decoders = self::names($this->exec([$this->ffmpegPath, '-hide_banner', '-decoders']));
-        $this->codecs = [];
+        // A listing that fails or names no codec says nothing about the build, so it raises
+        // instead of being cached as "no implementation available".
+        $encoders = self::names($this->exec([$this->ffmpegPath, '-hide_banner', '-encoders']))
+            ?: throw new RuntimeException(sprintf('FFmpeg at %s listed no encoders', $this->ffmpegPath));
+        $decoders = self::names($this->exec([$this->ffmpegPath, '-hide_banner', '-decoders']))
+            ?: throw new RuntimeException(sprintf('FFmpeg at %s listed no decoders', $this->ffmpegPath));
+        $codecs = [];
         foreach (AacImplementation::cases() as $implementation) {
-            $this->codecs[$implementation->value] = [
+            $codecs[$implementation->value] = [
                 'encoder' => in_array($implementation->encoderName(), $encoders, true),
                 'decoder' => in_array($implementation->decoderName(), $decoders, true),
             ];
         }
 
-        return $this->codecs;
+        return $this->codecs = $codecs;
     }
 
     /** @return list<string> */
@@ -88,6 +92,9 @@ class AacImplementationProbe
     {
         if (ProcessExecutor::usesNativeExecution()) {
             $result = ProcessExecutor::exec($command, 30);
+            if ($result['code'] !== 0) {
+                throw new RuntimeException(sprintf('FFmpeg codec listing exited with code %d', $result['code']));
+            }
 
             return $result['output'];
         }
@@ -100,7 +107,10 @@ class AacImplementationProbe
             if ($process === false) {
                 throw new RuntimeException(sprintf('Failed to execute: %s', $command[0]));
             }
-            proc_close($process);
+            $code = proc_close($process);
+            if ($code !== 0) {
+                throw new RuntimeException(sprintf('FFmpeg codec listing exited with code %d', $code));
+            }
             rewind($output);
             $listing = stream_get_contents($output);
 
