@@ -4,7 +4,7 @@
 #
 #   smoke.sh <ffmpeg-binary> <ffprobe-binary> [work-dir]
 #
-# SMOKE_EXPECT_FDK=1 also requires the libfdk_aac encoder (the image build).
+# SMOKE_EXPECT_FDK=1 also requires the libfdk_aac encoder and decoder (the image build).
 # SMOKE_EXPECT_MAJOR (default 8.1) is the FFmpeg release the patch targets.
 set -euo pipefail
 
@@ -60,67 +60,55 @@ first_pts=$("$FFPROBE" -hide_banner -v error -show_entries packet=pts -of csv=p=
 start_time=$("$FFPROBE" -hide_banner -v error -show_entries stream=start_time -of csv=p=0 "$WORK/tone.m4a")
 step "fMP4 priming: first packet pts=${first_pts}, stream start_time=${start_time}"
 
-decode_and_compare() {
-  local decoder=$1 input=$2 reference=$3 channels=$4 label=$5
-  "$FFMPEG" -hide_banner -v error -y -c:a:0 "$decoder" -i "$input" -f f32le "$WORK/$label.f32le"
-  python3 -I - "$reference" "$WORK/$label.f32le" "$channels" "$label" <<'PY'
-import array, math, sys
-ref_path, out_path, channels, label = sys.argv[1], sys.argv[2], int(sys.argv[3]), sys.argv[4]
-ref = array.array('f'); ref.frombytes(open(ref_path, 'rb').read())
-out = array.array('f'); out.frombytes(open(out_path, 'rb').read())
-frames_ref = len(ref) // channels
-frames_out = len(out) // channels
-# Align on the best lag within one encoder delay plus a frame (the ADTS
-# path keeps the priming, the MP4 path trims it) and measure the SNR over
-# the middle of the signal.
-best = (-1e9, 0)
-lo, hi = 24000, min(frames_ref, 72000)
-for lag in range(0, 3072, 32):
-    if frames_out <= hi + lag:
-        continue
-    num = den = 0.0
-    for f in range(lo, hi, 7):
-        for c in range(channels):
-            r = ref[f * channels + c]; o = out[(f + lag) * channels + c]
-            num += r * r; den += (r - o) * (r - o)
-    snr = 10 * math.log10(num / den) if den > 0 else 200.0
-    if snr > best[0]:
-        best = (snr, lag)
-snr, lag = best
-rms = []
-for c in range(channels):
-    acc = 0.0; n = 0
-    for f in range(lo, hi, 7):
-        v = out[(f + lag) * channels + c]; acc += v * v; n += 1
-    rms.append(math.sqrt(acc / n))
-order_ok = all(rms[i] < rms[i + 1] for i in range(channels - 1)) if channels > 2 else True
-print(f"smoke: {label}: {frames_out} frames, lag {lag}, SNR {snr:.1f} dB, channel rms {[round(x, 3) for x in rms]}")
-if snr < 20.0:
-    sys.exit(f"smoke: FAIL: {label}: SNR {snr:.1f} dB below 20 dB")
-if not order_ok:
-    sys.exit(f"smoke: FAIL: {label}: channel order differs from the input")
-PY
+# Per-channel RMS level in dB over the middle second of a decode, after the
+# given filter chain. FFmpeg's astats prints one "RMS level dB" per channel.
+rms_levels() {
+  local decoder=$1 input=$2 filters=$3
+  "$FFMPEG" -hide_banner -nostats -v info -c:a:0 "$decoder" -i "$input" \
+    -af "${filters}atrim=start=0.5:end=1.5,astats=measure_overall=none:measure_perchannel=RMS_level" -f null - 2>&1 \
+    | awk '/RMS level dB:/ { print $NF }'
 }
 
+# Decodes an output and compares it with the tone it was encoded from. The
+# test signals are pure tones, so notching each tone frequency out leaves the
+# coding noise and distortion: the level difference is a signal-to-noise ratio
+# that needs no sample alignment between input and output, and the per-channel
+# levels show whether the channels kept their order.
+decode_and_compare() {
+  local decoder=$1 input=$2 channels=$3 label=$4 notch=$5
+  local total residual
+  total=$(rms_levels "$decoder" "$input" "")
+  residual=$(rms_levels "$decoder" "$input" "$notch")
+  [ "$(echo "$total" | wc -l)" = "$channels" ] || fail "$label: expected $channels channels, astats reported: $total"
+  paste <(echo "$total") <(echo "$residual") | awk -v label="$label" -v channels="$channels" '
+    { signal[NR] = $1; snr = $1 - $2; if (NR == 1 || snr < worst) worst = snr }
+    END {
+      line = sprintf("smoke: %s: worst channel SNR %.1f dB, channel levels", label, worst)
+      for (c = 1; c <= NR; c++) line = line sprintf(" %.1f", signal[c])
+      print line " dB"
+      if (worst < 20) { print "smoke: FAIL: " label ": SNR below 20 dB" > "/dev/stderr"; exit 1 }
+      if (channels > 2) for (c = 1; c < NR; c++) if (signal[c] >= signal[c + 1]) {
+        print "smoke: FAIL: " label ": channel order differs from the input" > "/dev/stderr"; exit 1
+      }
+    }' || exit 1
+}
+
+stereo_notch="bandreject=f=1000:width_type=h:width=100,"
+six_notch="bandreject=f=440:width_type=h:width=60,bandreject=f=60:width_type=h:width=20,"
+
 step "decode the libbaac output with FFmpeg's built-in decoder"
-decode_and_compare aac "$WORK/tone.aac" "$WORK/tone.f32le" 2 adts-via-aac
-decode_and_compare aac "$WORK/tone.m4a" "$WORK/tone.f32le" 2 mp4-via-aac
-decode_and_compare aac "$WORK/six.m4a" "$WORK/six.f32le" 6 six-via-aac
+decode_and_compare aac "$WORK/tone.aac" 2 adts-via-aac "$stereo_notch"
+decode_and_compare aac "$WORK/tone.m4a" 2 mp4-via-aac "$stereo_notch"
+decode_and_compare aac "$WORK/six.m4a" 6 six-via-aac "$six_notch"
 
 step "decode the libbaac output with libbaac"
-decode_and_compare libbaac "$WORK/tone.aac" "$WORK/tone.f32le" 2 adts-via-libbaac
-decode_and_compare libbaac "$WORK/tone.m4a" "$WORK/tone.f32le" 2 mp4-via-libbaac
-decode_and_compare libbaac "$WORK/six.m4a" "$WORK/six.f32le" 6 six-via-libbaac
+decode_and_compare libbaac "$WORK/tone.aac" 2 adts-via-libbaac "$stereo_notch"
+decode_and_compare libbaac "$WORK/tone.m4a" 2 mp4-via-libbaac "$stereo_notch"
+decode_and_compare libbaac "$WORK/six.m4a" 6 six-via-libbaac "$six_notch"
 # A damaged ADTS frame decodes through concealment without aborting.
-python3 -I - "$WORK/tone.aac" "$WORK/damaged.aac" <<'PY'
-import sys
-data = bytearray(open(sys.argv[1], 'rb').read())
-# Corrupt the payload of a frame in the middle, not the sync word.
-mid = len(data) // 2
-for i in range(mid + 10, mid + 60):
-    data[i] ^= 0x5A
-open(sys.argv[2], 'wb').write(data)
-PY
+# Zero part of a frame's payload in the middle of the stream, past its sync word.
+cp "$WORK/tone.aac" "$WORK/damaged.aac"
+dd if=/dev/zero of="$WORK/damaged.aac" bs=1 seek=$(( $(stat -c %s "$WORK/tone.aac") / 2 + 10 )) count=50 conv=notrunc status=none
 "$FFMPEG" -hide_banner -v error -y -c:a:0 libbaac -i "$WORK/damaged.aac" -f null - || fail "libbaac aborted on a damaged ADTS frame"
 step "damaged ADTS frame decoded with concealment"
 
