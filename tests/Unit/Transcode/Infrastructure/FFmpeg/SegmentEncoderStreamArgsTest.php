@@ -30,7 +30,7 @@ final class SegmentEncoderStreamArgsTest extends TestCase
     ): SegmentEncoder {
         $profile = new EncoderProfile($accel, $codec, '', '', '', '');
 
-        return new SegmentEncoder(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile('full')), $this->createStub(\App\Transcode\Application\Port\FFmpegPortInterface::class), $this->createStub(\App\Transcode\Application\Port\TranscodeStoragePortInterface::class), $profile);
+        return new SegmentEncoder(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile()), $this->createStub(\App\Transcode\Application\Port\FFmpegPortInterface::class), $this->createStub(\App\Transcode\Application\Port\TranscodeStoragePortInterface::class), $profile);
     }
 
     /**
@@ -324,7 +324,7 @@ final class SegmentEncoderStreamArgsTest extends TestCase
     {
         $profile = new EncoderProfile(HardwareAccelerator::Vaapi, 'hevc_vaapi', 'h264', 'vaapi',
             '/dev/dri/device with spaces', 'vaapi');
-        $encoder = new SegmentEncoder(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile('full')), $this->createStub(\App\Transcode\Application\Port\FFmpegPortInterface::class), $this->createStub(\App\Transcode\Application\Port\TranscodeStoragePortInterface::class), $profile);
+        $encoder = new SegmentEncoder(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile()), $this->createStub(\App\Transcode\Application\Port\FFmpegPortInterface::class), $this->createStub(\App\Transcode\Application\Port\TranscodeStoragePortInterface::class), $profile);
         $args = $encoder->buildStreamArgs('/source.mp4', QualityTier::p720(), '', '/output');
         self::assertSame('/dev/dri/device with spaces', $args[array_search('-hwaccel_device', $args, true) + 1]);
         $video = self::inputArguments($args, 0);
@@ -340,7 +340,7 @@ final class SegmentEncoderStreamArgsTest extends TestCase
     {
         $profile = new EncoderProfile(HardwareAccelerator::Vaapi, 'hevc_vaapi', 'h264', 'vaapi',
             '/dev/dri/device with spaces', 'vaapi');
-        $encoder = new SegmentEncoder(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile('full')), $this->createStub(\App\Transcode\Application\Port\FFmpegPortInterface::class), $this->createStub(\App\Transcode\Application\Port\TranscodeStoragePortInterface::class), $profile);
+        $encoder = new SegmentEncoder(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile()), $this->createStub(\App\Transcode\Application\Port\FFmpegPortInterface::class), $this->createStub(\App\Transcode\Application\Port\TranscodeStoragePortInterface::class), $profile);
         foreach ([null, 4.0] as $origin) {
             $args = $encoder->buildStreamArgs('/source.mkv', QualityTier::p720(), '', '/output',
                 startSegment: 4, audioStreamIndex: 2, sourceFrameRate: 0.1, sourceTimestampOrigin: $origin);

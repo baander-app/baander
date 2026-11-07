@@ -47,7 +47,7 @@ final class StreamControllerRangeTest extends TestCase
             new Uuid(),
             LibraryReadScope::unrestricted(),
         ));
-        $this->controller = new StreamController(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile('full')), $stream, $scopes, $this->createStub(AudioRenditionPortInterface::class), $this->createStub(SystemSettingsPortInterface::class));
+        $this->controller = new StreamController(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile()), $stream, $scopes, $this->createStub(AudioRenditionPortInterface::class), $this->createStub(SystemSettingsPortInterface::class));
     }
 
     protected function tearDown(): void

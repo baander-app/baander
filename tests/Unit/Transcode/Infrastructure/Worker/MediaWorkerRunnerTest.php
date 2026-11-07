@@ -79,8 +79,8 @@ final class MediaWorkerRunnerTest extends TestCase
     /** @return iterable<string, array{\App\Shared\Application\DTO\DeploymentProfile,int,list<string>,int}> */
     public static function deploymentCapacities(): iterable
     {
-        yield 'full' => [new \App\Shared\Application\DTO\DeploymentProfile('full', 3, 1), 4, ['media-audio-0', 'media-video-0', 'media-video-1', 'media-video-2'], 3];
-        yield 'household' => [new \App\Shared\Application\DTO\DeploymentProfile('household'), 2, ['media-copy-0', 'media-copy-1'], 1];
+        yield 'transcode' => [new \App\Shared\Application\DTO\DeploymentProfile(videoEncoderSlots: 3, audioEncoderSlots: 1), 4, ['media-audio-0', 'media-video-0', 'media-video-1', 'media-video-2'], 3];
+        yield 'remux' => [new \App\Shared\Application\DTO\DeploymentProfile('remux', 2, 4, 1, sharedCopySlots: 2), 2, ['media-copy-0', 'media-copy-1'], 1];
     }
 
     public function testEveryConfiguredVideoSlotLaunchesAndNoneBeyondIt(): void
@@ -102,7 +102,7 @@ final class MediaWorkerRunnerTest extends TestCase
         $deadline = microtime(true) + 5;
         $fullAt = null;
         try {
-            (new MediaWorkerRunner($video, $audio, $authority, new \App\Shared\Application\DTO\DeploymentProfile('full', 8, 0), $script))->run(
+            (new MediaWorkerRunner($video, $audio, $authority, new \App\Shared\Application\DTO\DeploymentProfile(videoEncoderSlots: 8, audioEncoderSlots: 0), $script))->run(
                 static function () use ($log, $deadline, &$fullAt): bool {
                     if (is_file($log) && count(file($log)) >= 8) {
                         $fullAt ??= microtime(true);
@@ -145,7 +145,7 @@ final class MediaWorkerRunnerTest extends TestCase
         $authority = $this->createStub(MediaWorkerAuthorityInterface::class);
         $deadline = hrtime(true) + 3_000_000_000;
         try {
-            (new MediaWorkerRunner($video, $audio, $authority, new \App\Shared\Application\DTO\DeploymentProfile('household'), $script))->run(
+            (new MediaWorkerRunner($video, $audio, $authority, new \App\Shared\Application\DTO\DeploymentProfile('remux', 2, 4, 1, sharedCopySlots: 2), $script))->run(
                 static fn (): bool => (is_file($log) && count(file($log)) >= 2) || hrtime(true) >= $deadline,
             );
             $launches = array_map(static fn (string $line): array => json_decode($line, true, flags: JSON_THROW_ON_ERROR), file($log));
@@ -172,7 +172,7 @@ final class MediaWorkerRunnerTest extends TestCase
         $authority = $this->createStub(MediaWorkerAuthorityInterface::class);
         $deadline = hrtime(true) + 10_000_000_000;
         try {
-            (new MediaWorkerRunner($video, $audio, $authority, new \App\Shared\Application\DTO\DeploymentProfile('full'), $script))->run(static function () use ($log, $deadline): bool {
+            (new MediaWorkerRunner($video, $audio, $authority, new \App\Shared\Application\DTO\DeploymentProfile(), $script))->run(static function () use ($log, $deadline): bool {
                 return (is_file($log) && count(file($log)) >= 65) || hrtime(true) >= $deadline;
             });
             $launches = array_map(static fn(string $line): array => json_decode($line, true, flags: JSON_THROW_ON_ERROR), file($log));
@@ -208,7 +208,7 @@ final class MediaWorkerRunnerTest extends TestCase
         $deadline = microtime(true) + 3;
         try {
             try {
-                (new MediaWorkerRunner($video, $audio, $authority, new \App\Shared\Application\DTO\DeploymentProfile('full'), $script))->run(static fn (): bool => microtime(true) >= $deadline);
+                (new MediaWorkerRunner($video, $audio, $authority, new \App\Shared\Application\DTO\DeploymentProfile(), $script))->run(static fn (): bool => microtime(true) >= $deadline);
                 self::fail('Role continued after execution authority became uncertain.');
             } catch (\RuntimeException $error) {
                 self::assertStringContainsString($loseAuthority ? 'authority lost' : 'exited unexpectedly', $error->getMessage());
@@ -238,6 +238,6 @@ final class MediaWorkerRunnerTest extends TestCase
         $audio->expects(self::never())->method('pending');
         $authority->expects(self::once())->method('assertActive')->willThrowException(new \RuntimeException('authority lost'));
         $this->expectExceptionMessage('authority lost');
-        (new MediaWorkerRunner($video, $audio, $authority, new \App\Shared\Application\DTO\DeploymentProfile('full')))->run(static fn (): bool => false, static function (): void { self::fail('Uninitialized role reported readiness.'); });
+        (new MediaWorkerRunner($video, $audio, $authority, new \App\Shared\Application\DTO\DeploymentProfile()))->run(static fn (): bool => false, static function (): void { self::fail('Uninitialized role reported readiness.'); });
     }
 }

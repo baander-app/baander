@@ -59,13 +59,13 @@ final class DeliveryDecisionServiceTest extends TestCase
         $metadata = new TrackStreamMetadata('track', 'song.mp3', '/library/song.mp3', 'audio/mpeg', 100, 'mp3', 128000, 48000, 2, 10.0,
             'mp3', 0, '0123456789abcdef');
         $destination = new DeliveryDestination(['mp3'], audioCodecs: ['mp3'], sourcePlaybackFailed: true);
-        $full = $this->service(profile: 'full', metadata: $metadata)->track(new Uuid(), new PublicId(), $destination);
+        $full = $this->service(profile: new DeploymentProfile(), metadata: $metadata)->track(new Uuid(), new PublicId(), $destination);
         self::assertSame(DeliveryKind::Encoded, $full->kind);
         self::assertSame('browser_rejected_source', $full->reason);
-        $household = $this->service(metadata: $metadata)->track(new Uuid(), new PublicId(), $destination);
-        self::assertSame(DeliveryKind::Incompatible, $household->kind);
-        self::assertSame('browser_rejected_source', $household->reason);
-        $disabled = $this->service(profile: 'full', enabled: false, metadata: $metadata)->track(new Uuid(), new PublicId(), $destination);
+        $remux = $this->service(metadata: $metadata)->track(new Uuid(), new PublicId(), $destination);
+        self::assertSame(DeliveryKind::Incompatible, $remux->kind);
+        self::assertSame('browser_rejected_source', $remux->reason);
+        $disabled = $this->service(profile: new DeploymentProfile(), enabled: false, metadata: $metadata)->track(new Uuid(), new PublicId(), $destination);
         self::assertSame(DeliveryKind::Incompatible, $disabled->kind);
         self::assertSame('audio_transcoding_disabled', $disabled->reason);
     }
@@ -129,7 +129,7 @@ final class DeliveryDecisionServiceTest extends TestCase
         $unsupported = $service->video(new Uuid(), new PublicId(), new DeliveryDestination(['mp4'], ['h264'], ['aac'], audioStreamIndex: 11));
         self::assertSame(DeliveryKind::Incompatible, $unsupported->kind);
         self::assertSame('audio_stream_selection_requires_remux', $unsupported->reason);
-        $full = $this->service(videos: $videos, profile: 'full')->video(new Uuid(), new PublicId(), new DeliveryDestination(['mp4'], ['h264'], ['aac'], audioStreamIndex: 11));
+        $full = $this->service(videos: $videos, profile: new DeploymentProfile())->video(new Uuid(), new PublicId(), new DeliveryDestination(['mp4'], ['h264'], ['aac'], audioStreamIndex: 11));
         self::assertSame(DeliveryKind::Incompatible, $full->kind);
     }
 
@@ -143,7 +143,7 @@ final class DeliveryDecisionServiceTest extends TestCase
         self::assertStringContainsString('format=mp3', (string) $decision->url);
     }
 
-    public function testHouseholdCanReadCompatibleCompleteAudioWithEncodingToggleOff(): void
+    public function testRemuxCanReadCompatibleCompleteAudioWithEncodingToggleOff(): void
     {
         $audio = $this->createMock(AudioRenditionPortInterface::class);
         $audio->expects(self::never())->method('open');
@@ -170,7 +170,7 @@ final class DeliveryDecisionServiceTest extends TestCase
     {
         $audio = $this->createMock(AudioRenditionPortInterface::class);
         $audio->expects(self::never())->method('findComplete');
-        $decision = $this->service(audio: $audio, enabled: false, profile: 'full')->track(new Uuid(), new PublicId(), new DeliveryDestination(['mp3'], audioCodecs: ['mp3']));
+        $decision = $this->service(audio: $audio, enabled: false, profile: new DeploymentProfile())->track(new Uuid(), new PublicId(), new DeliveryDestination(['mp3'], audioCodecs: ['mp3']));
         self::assertSame(DeliveryKind::Incompatible, $decision->kind);
         self::assertSame('audio_transcoding_disabled', $decision->reason);
     }
@@ -192,8 +192,9 @@ final class DeliveryDecisionServiceTest extends TestCase
         self::assertSame('/accepted', $result->url);
     }
 
-    private function service(?PlaybackMediaAccessInterface $access = null, ?VideoPortInterface $videos = null, ?AudioRenditionPortInterface $audio = null, bool $enabled = true, string $profile = 'household', ?CompletedVideoArtifactPort $artifacts = null, ?TrackStreamMetadata $metadata = null, ?CopyPresentationPortInterface $copies = null): DeliveryDecisionService
+    private function service(?PlaybackMediaAccessInterface $access = null, ?VideoPortInterface $videos = null, ?AudioRenditionPortInterface $audio = null, bool $enabled = true, ?DeploymentProfile $profile = null, ?CompletedVideoArtifactPort $artifacts = null, ?TrackStreamMetadata $metadata = null, ?CopyPresentationPortInterface $copies = null): DeliveryDecisionService
     {
+        $profile ??= new DeploymentProfile('remux', 2, 4, 1, sharedCopySlots: 2);
         $scopes = $this->createStub(MediaReadScopeProviderInterface::class);
         $scopes->method('forUser')->willReturn(MediaReadScope::authenticated(new Uuid(), LibraryReadScope::unrestricted()));
         $streams = $this->createStub(StreamPortInterface::class);
@@ -203,8 +204,8 @@ final class DeliveryDecisionServiceTest extends TestCase
         $settings->method('get')->willReturnCallback(static fn (string $key): mixed => $key === TranscodeSettingDefinitions::ENABLED ? $enabled : 192);
         return new DeliveryDecisionService($access ?? $this->createStub(PlaybackMediaAccessInterface::class), $scopes,
             $videos ?? $this->createStub(VideoPortInterface::class), $streams,
-            new DeliveryCompatibility(new MediaExecutionPolicy(DeploymentProfile::resolve($profile))),
-            new MediaExecutionPolicy(DeploymentProfile::resolve($profile)),
+            new DeliveryCompatibility(new MediaExecutionPolicy($profile)),
+            new MediaExecutionPolicy($profile),
             $audio ?? $this->createStub(AudioRenditionPortInterface::class), $settings,
             $artifacts ?? $this->createStub(CompletedVideoArtifactPort::class), $copies ?? $this->createStub(CopyPresentationPortInterface::class));
     }

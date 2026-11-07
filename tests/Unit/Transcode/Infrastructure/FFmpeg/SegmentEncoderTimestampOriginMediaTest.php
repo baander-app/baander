@@ -100,7 +100,7 @@ final class SegmentEncoderTimestampOriginMediaTest extends TestCase
         self::assertTrue($probe->hasAudio());
         self::assertCount(1, $probe->subtitleStreams);
         $this->assertSubtitles($source, $probe->sourceTimestampOrigin);
-        $encoder = new SegmentEncoder(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile('full')), $this->createStub(FFmpegPortInterface::class), $this->createStub(TranscodeStoragePortInterface::class), EncoderProfile::software($encoderName));
+        $encoder = new SegmentEncoder(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile()), $this->createStub(FFmpegPortInterface::class), $this->createStub(TranscodeStoragePortInterface::class), EncoderProfile::software($encoderName));
         $tier = new QualityTier('fixture', 64, 64, 100_000, 200_000, 200_000,
             $encoderName === 'libx264' ? 'avc1' : 'hvc1', $encoderName === 'libx264' ? 'avc1.64001f' : 'hvc1.1.6.L93.B0');
         $profile = AudioProfile::fromString($audioProfile);

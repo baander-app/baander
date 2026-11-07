@@ -72,7 +72,7 @@ final class EncodePresentationAdapterTest extends TestCase
     {
         $videos = $this->createStub(VideoPortInterface::class);
         $videos->method('findByUuid')->willReturn($video);
-        return new EncodePresentationAdapter($videos, $snapshots, new MediaExecutionPolicy(new DeploymentProfile('full')), $this->createStub(FFmpegPortInterface::class), $this->createStub(TranscodeStoragePortInterface::class));
+        return new EncodePresentationAdapter($videos, $snapshots, new MediaExecutionPolicy(new DeploymentProfile()), $this->createStub(FFmpegPortInterface::class), $this->createStub(TranscodeStoragePortInterface::class));
     }
 
     private function video(): Video
