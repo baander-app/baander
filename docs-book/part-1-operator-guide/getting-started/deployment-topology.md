@@ -17,7 +17,7 @@ flowchart TB
     subgraph host[Installation host]
         subgraph web[Compose web stack]
             nginx["nginx (recipe)"]
-            app["Web application with Swoole HTTP and WebSocket"]
+            app[Web application]
             pooler[Connection pooler]
             postgres[(PostgreSQL)]
             redis[(Redis)]

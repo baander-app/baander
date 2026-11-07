@@ -21,10 +21,10 @@ flowchart TD
     end
     inbox -->|Committed rows| projector[Revision projector]
     projector --> revisions[Scoped revisions]
-    revisions --> subscription[Worker subscription with current authority]
-    subscription -->|WebSocket change hint| coordinator[Browser read coordinator]
-    coordinator --> reads[Authorized HTTP resource reads]
-    reads --> views[Mounted views and protected mirrors]
+    revisions --> subscription[Worker subscription]
+    subscription -->|Change hint| coordinator[Read coordinator]
+    coordinator --> reads[HTTP reads]
+    reads --> views[Mounted views]
 ```
 
 ## Registering a reader

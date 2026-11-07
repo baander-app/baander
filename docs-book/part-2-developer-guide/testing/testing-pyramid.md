@@ -10,12 +10,12 @@ When you change a domain rule, an HTTP controller, a database query, or a browse
 flowchart BT
     accTitle: Bånder testing pyramid and static gates
     accDescr: Verification starts at the bottom with static analysis and AST censuses alongside unit, PHPStan rule, tooling, Vitest, Electron Node, and native CTest and WASM suites. Above that sit single-connection Symfony functional tests, then multi-connection and fault-injected backend integration tests, then Playwright loopback browser harnesses and isolated preview E2E suites, and finally production-mode live-update capacity qualification, PID-1 runtime drills, and manual hardware checks at the top.
-    static["Static & Architecture Gates: PHPStan, Deptrac, AST censuses"]
-    layer1["1. Unit, Static Rules & Native Modules: tests/Unit/, PHPStan rules, Tooling, Vitest, Electron Node, CTest & WASM"]
-    layer2["2. Backend Functional Tests: tests/Functional/ — KernelBrowser, X-Baander-Test-User-Id, DAMA single-connection rollback"]
-    layer3["3. Backend Integration Tests: tests/Integration/ — Multi-connection concurrency, OAuth/DPoP & Redis outages, migrations, FFmpeg"]
-    layer4["4. Browser Harnesses & Preview E2E: Playwright loopback harnesses (Auth, Audio, Typography, Store) + isolated preview E2E"]
-    layer5["5. Production Runtime Drills & Live Capacity: PID-1 app:serve & worker drills, 32-principal prod capacity, manual Safari checks"]
+    static[Static gates]
+    layer1[1. Unit & native]
+    layer2[2. Functional]
+    layer3[3. Integration]
+    layer4[4. Browser E2E]
+    layer5[5. Runtime drills]
 
     static --> layer1
     layer1 --> layer2

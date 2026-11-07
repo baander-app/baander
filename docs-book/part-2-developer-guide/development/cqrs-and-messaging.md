@@ -136,19 +136,19 @@ Messenger routes a dispatched message by the workloads map in `config/packages/m
 flowchart TB
     accTitle: Routing a dispatched message
     accDescr: The bus checks the workloads map and the message's default flag or the dispatcher's transport stamp. An unrouted message runs inline in the calling process. A routed message enters the async or scheduler Redis stream, where a worker consumer runs the handler. A failed handler is retried with backoff until its attempts run out, then the message is stored in the failed_messages table. A job cancelled at a checkpoint is acknowledged without retry.
-    dispatch[Dispatch on the bus] --> listed{In the workloads map?}
-    listed -->|No| inline[Inline handler in the calling process]
-    listed -->|Yes| selected{Default flag on or dispatcher-stamped transport?}
+    dispatch[Bus dispatch] --> listed{In workloads map?}
+    listed -->|No| inline[Inline handler]
+    listed -->|Yes| selected{Default or stamped?}
     selected -->|No| inline
-    selected -->|async| async["async transport: Redis stream messages"]
-    selected -->|scheduler| scheduler["scheduler transport: Redis stream scheduler_occurrences"]
-    async --> consumer[Worker consumer runs the handler]
+    selected -->|async| async[(async stream)]
+    selected -->|scheduler| scheduler[(scheduler stream)]
+    async --> consumer[Worker consumer]
     scheduler --> consumer
-    consumer -->|Success| acked[Delivery acknowledged]
-    consumer -->|Cancelled at a checkpoint| acked
-    consumer -->|Failure| retry[Retry with backoff]
+    consumer -->|Success| acked[Acknowledged]
+    consumer -->|Cancelled| acked
+    consumer -->|Failure| retry[Retry backoff]
     retry -->|Attempts left| consumer
-    retry -->|Attempts exhausted| failed[(failed_messages)]
+    retry -->|Exhausted| failed[(Failed messages)]
 ```
 
 The consumers that read these streams are described below.

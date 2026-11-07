@@ -17,11 +17,11 @@ flowchart TB
     subgraph clients[Clients]
         browser[Browser app]
         electron[Electron app]
-        companion["Casting companion (planned)"]
+        companion["Casting (planned)"]
         registry[Registry]
     end
     subgraph app[Web application]
-        api["HTTP API (firewall, DPoP)"]
+        api[HTTP API]
         ws[WebSocket]
         bus[Message bus]
     end
@@ -36,7 +36,7 @@ flowchart TB
     subgraph redis[Redis]
         async[(async stream)]
         scheduler[(scheduler stream)]
-        nonces[(Nonces, tickets, heartbeat)]
+        nonces[(Nonces & tickets)]
         async ~~~ scheduler
         scheduler ~~~ nonces
     end
@@ -67,7 +67,7 @@ flowchart TB
     aggregates -->|event| outbox
     aggregates -->|capture| inbox
     inbox -->|hint| ws
-    outbox -->|relayed by control| async
+    outbox -->|relay| async
     control -->|occurrences| scheduler
     control <-->|IPC| execution
     async -->|consume| execution
