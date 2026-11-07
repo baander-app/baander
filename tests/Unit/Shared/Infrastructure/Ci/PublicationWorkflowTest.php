@@ -540,7 +540,7 @@ SH;
         yield 'runner' => ['runner.yaml', 'baander-runner', true];
         yield 'PostgreSQL' => ['postgres.yaml', 'baander-postgres', true];
         yield 'Nginx' => ['nginx.yaml', 'baander-nginx', false];
-        yield 'FFmpeg' => ['ffmpeg.yaml', 'ffmpeg-baander-static', false];
+        yield 'FFmpeg' => ['ffmpeg.yaml', 'ffmpeg-baander-static', true];
     }
 
     public function testCiPullsThePostgresImageFromEachForgesRegistry(): void
@@ -633,7 +633,6 @@ SH;
         foreach ([
             'application' => ['ci.yaml', 'build-and-push', 'Application image is not publicly pullable', 'Push verified production image', 'ghcr.io/baander-app/baander'],
             'Nginx' => ['nginx.yaml', 'build', 'Nginx image is not publicly pullable', 'Build and push Nginx image', 'ghcr.io/baander-app/baander-nginx'],
-            'FFmpeg' => ['ffmpeg.yaml', 'build', 'FFmpeg image is not publicly pullable', 'Build and push FFmpeg image', 'ghcr.io/baander-app/ffmpeg-baander-static'],
         ] as $name => $case) {
             foreach ($outcomes as $outcome => $result) {
                 yield $name . ' ' . $outcome => [...$case, ...$result];

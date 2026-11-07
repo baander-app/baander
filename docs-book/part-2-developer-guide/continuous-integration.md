@@ -232,7 +232,7 @@ refuse any server other than github.com.
 | `baander-runner` | `runner.yaml` | Private registry | Public on GHCR |
 | `baander-postgres` | `postgres.yaml` | Private registry | Public on GHCR |
 | `baander-nginx` | `nginx.yaml` | Private registry | Private on GHCR, checked after each push |
-| `ffmpeg-baander-static` | `ffmpeg.yaml` | Private registry | Private on GHCR, checked after each push |
+| `ffmpeg-baander-static` | `ffmpeg.yaml` | Private registry | Public on GHCR |
 | `baander` | `ci.yaml`, `build-and-push` job | Private registry | Private on GHCR, checked after each push |
 
 Each push tags the image `latest` and with the commit SHA. On GitHub the images are
@@ -243,21 +243,19 @@ through the `ffmpeg` role of the tooling image catalog
 (`packages/baander-tooling/resources/tooling-defaults.json`), passed to the build as
 `FFMPEG_IMAGE`. The role names the GHCR image. On Forgejo, `ci.yaml` sets
 `BAANDER_FFMPEG_IMAGE` to the copy in the Forgejo registry, which `ffmpeg.yaml`
-publishes there; a developer host sets the same variable to a local build. Because
-the GHCR image is private, the application image cannot be built by a pull request
-from a fork, which has no registry login. The FFmpeg image carries bAAC from
-`packages/baander-aac`, fdk-aac and FFmpeg's built-in AAC codec, enables VAAPI,
-NVENC and QSV explicitly, and proves itself at build time: a smoke encodes and
-decodes with bAAC, and `scripts/ffmpeg-capability-gate.sh` checks that the binary
-lists every accelerator, hardware encoder and AAC implementation the application can
-select, and that its shared objects resolve. The same gate runs when the application
-image is built.
+publishes there; a developer host sets the same variable to a local build. The
+FFmpeg image carries bAAC from `packages/baander-aac`, fdk-aac and FFmpeg's built-in
+AAC codec, enables VAAPI, NVENC and QSV explicitly, and proves itself at build time:
+a smoke encodes and decodes with bAAC, and `scripts/ffmpeg-capability-gate.sh`
+checks that the binary lists every accelerator, hardware encoder and AAC
+implementation the application can select, and that its shared objects resolve. The
+same gate runs when the application image is built.
 
-The runner and PostgreSQL images are CI tooling and may be public. The application
-image keeps notice, provenance and embedded-dependency gaps that the
-[application release acceptance](../../ROADMAP.md#application-release-acceptance)
-requires closing before redistribution, and the Nginx and FFmpeg images stay private
-with it.
+The runner and PostgreSQL images are CI tooling and may be public, and so may the
+FFmpeg image. The application image keeps notice, provenance and embedded-dependency
+gaps that the [application release
+acceptance](../../ROADMAP.md#application-release-acceptance) requires closing before
+redistribution, and the Nginx image stays private with it.
 
 The runner workflow builds inside the public `docker:cli` image. Every other job
 runs inside `baander-runner`, and the CI quality gate pulls `baander-postgres`, so
@@ -270,7 +268,7 @@ verifies its packaged inventory, but pushes only from `master`.
 
 GHCR creates every new package as private, and GitHub documents visibility changes
 only in its web interface, so an operator makes each change by hand. A package can
-therefore become public by mistake. After each push of the Nginx, FFmpeg or
+therefore become public by mistake. After each push of the Nginx or
 application image, the job runs `scripts/ghcr-private-probe.sh`. The script runs
 `docker manifest inspect` for the image's `latest` tag with an empty Docker
 configuration, so no stored login takes part:
@@ -336,9 +334,10 @@ Keep these settings in place:
 5. **Publish the Nginx image.** The Nginx workflow also runs inside the runner image.
    If its first run failed for the same reason, dispatch `nginx.yaml` again. The
    image stays private.
-6. **Publish the FFmpeg image.** The FFmpeg workflow never runs on push. Dispatch it
-   once with `gh workflow run ffmpeg.yaml --repo baander-app/baander` to create its
-   package. The image stays private.
+6. **Publish the FFmpeg image.** A push to `master` that touches the codec, the FFmpeg
+   image or its gate starts the FFmpeg workflow; otherwise dispatch it with
+   `gh workflow run ffmpeg.yaml --repo baander-app/baander` to create its package.
+   The image may be public.
 7. **Push the gate workflows.** Their first runs pull both public images.
 
 ### When GitHub needs attention

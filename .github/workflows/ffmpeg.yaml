@@ -79,9 +79,3 @@ jobs:
                       --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
                       --push \
                       .
-
-            -   name: FFmpeg image is not publicly pullable
-                # GHCR keeps the package private until an operator changes
-                # it; the image may not be redistributed yet.
-                if: github.server_url == 'https://github.com'
-                run: sh scripts/ghcr-private-probe.sh "$REGISTRY/$IMAGE_NAME"
