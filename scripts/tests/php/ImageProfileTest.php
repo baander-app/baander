@@ -230,7 +230,7 @@ final class ImageProfileTest extends TestCase
     public function testUnknownCapabilityCannotBeHydrated(): void
     {
         $document = $this->document();
-        $document['deployment']['capability'] = 'household';
+        $document['deployment']['capability'] = 'unknown';
         $this->expectException(\InvalidArgumentException::class);
         ImageProfile::fromArray($document);
     }
@@ -285,7 +285,7 @@ final class ImageProfileTest extends TestCase
     {
         $this->withDocker(function (Client $docker, string $directory): void {
             try {
-                ImageProfile::resolve($docker, 'sha256:' . str_repeat('a', 64), ApplicationLayout::load(), self::remuxSettings(['capability' => 'household']), $directory . '/resources.json', getenv(), 5);
+                ImageProfile::resolve($docker, 'sha256:' . str_repeat('a', 64), ApplicationLayout::load(), self::remuxSettings(['capability' => 'unknown']), $directory . '/resources.json', getenv(), 5);
                 self::fail('Resolved an unknown capability.');
             } catch (\InvalidArgumentException) {
                 self::assertFileDoesNotExist($directory . '/calls.jsonl');

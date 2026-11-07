@@ -19,7 +19,7 @@ final class PostgresConfiguration
     public static function render(int $sharedBuffersMiB, int $workMemMiB, array $pools): string
     {
         foreach (['sharedBuffersMiB' => $sharedBuffersMiB, 'workMemMiB' => $workMemMiB] as $key => $value) {
-            [$minimum, $maximum] = HouseholdConfiguration::POSTGRES_BOUNDS[$key];
+            [$minimum, $maximum] = PresetConfiguration::POSTGRES_BOUNDS[$key];
             if ($value < $minimum || $value > $maximum) {
                 throw new \InvalidArgumentException(sprintf('PostgreSQL %s requires %d through %d MiB.', $key, $minimum, $maximum));
             }

@@ -35,6 +35,6 @@ final class DeploymentProfileEnvVarProcessorTest extends TestCase
     {
         $processor = new DeploymentProfileEnvVarProcessor();
         $this->expectException(\InvalidArgumentException::class);
-        $processor->getEnv('baander_web_workers', 'BAANDER_DEPLOYMENT_PROFILE', static fn (string $name): string => 'household');
+        $processor->getEnv('baander_web_workers', 'BAANDER_DEPLOYMENT_PROFILE', static fn (string $name): string => 'full');
     }
 }

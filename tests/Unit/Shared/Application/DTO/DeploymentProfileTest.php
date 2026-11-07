@@ -137,7 +137,7 @@ final class DeploymentProfileTest extends TestCase
         yield 'remux without copy slots' => [['capability' => 'remux'], 'between 1 and 8 copy slots'];
         yield 'remux with nine copy slots' => [['capability' => 'remux', 'sharedCopySlots' => 9], 'between 1 and 8 copy slots'];
         yield 'transcode with copy slots' => [['sharedCopySlots' => 2], 'Transcode deployments run video and audio slots, not copy slots'];
-        yield 'unknown capability' => [['capability' => 'household'], 'capability must be transcode or remux'];
+        yield 'unknown capability' => [['capability' => 'full'], 'capability must be transcode or remux'];
     }
 
     /** @param array{webWorkers?: int, doctrinePoolSlots?: int, ordinaryConsumerLimit?: int} $settings */
@@ -329,7 +329,7 @@ final class DeploymentProfileTest extends TestCase
     public function testRetiredProfileNameInTheEnvironmentFails(): void
     {
         $saved = $_SERVER['BAANDER_DEPLOYMENT_PROFILE'] ?? null;
-        $_SERVER['BAANDER_DEPLOYMENT_PROFILE'] = 'household';
+        $_SERVER['BAANDER_DEPLOYMENT_PROFILE'] = 'full';
         try {
             $this->expectException(\InvalidArgumentException::class);
             DeploymentProfile::fromEnvironment();

@@ -43,8 +43,8 @@ it('signs configured API URLs and closes the reply port', async () => {
 });
 
 it('binds the proof to the request scheme of a plain-HTTP API origin', async () => {
-  window.__BAANDER_API_URL__ = 'http://household.baander.app:8080';
-  const url = 'http://household.baander.app:8080/api/stream/video';
+  window.__BAANDER_API_URL__ = 'http://preset.baander.app:8080';
+  const url = 'http://preset.baander.app:8080/api/stream/video';
   const { port, done } = sign(active, url); await done;
   expect(crypto.proof).toHaveBeenCalledWith(crypto.key, 'GET', url, expect.objectContaining({ accessToken: 'token' }));
   expect(port.postMessage).toHaveBeenCalledWith(expect.objectContaining({ proof: 'proof' }));

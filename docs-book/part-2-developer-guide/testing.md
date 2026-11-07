@@ -1492,7 +1492,7 @@ BAANDER_TEST_IMAGE=baander-worker:test BAANDER_TEST_OPERATOR_IN_CONTAINER=1 \
   bash scripts/test-worker-control-capacity-container.sh
 ```
 
-It uses disposable services and a version 8 paired deployment whose units carry
+It uses disposable services and a version 9 paired deployment whose units carry
 no limits or CPU sets, with 320 MiB for scheduled console execution. Its host
 preflight requires four CPUs and 15 GiB. The drill runs two phases:
 
@@ -1761,7 +1761,7 @@ BAANDER_TEST_IMAGE=baander-worker:test BAANDER_TEST_POSTGRES_IMAGE=baander-datab
 reads its slot counts from it, and without it they keep the fixture's three video
 and one audio slot. The load proof needs twelve permitted CPUs and 25 GiB of host
 memory. It starts PostgreSQL with the database image's own configuration and the
-pooler from the same image, with the full profile's pools.
+pooler from the same image, with the default deployment's pools.
 
 Preparation copies a 120-second excerpt of the source's picture unchanged, with
 AAC audio, and cuts 600-second FLAC tracks from its soundtrack. The client then
@@ -2192,9 +2192,9 @@ These cases qualify the selected software movie path and Chromium HLS, not
 arbitrary discontinuities, additional source origins, hardware, other browsers,
 DASH browser playback or formal CMAF conformance.
 
-### Household deployment qualification
+### Deployment qualification
 
-`scripts/qualify-household.php` measures a complete disposable deployment on a
+`scripts/qualify-deployment.php` measures a complete disposable deployment on a
 constrained Linux host or VM. The browser driver runs on the invoking machine;
 run that machine outside the measured host. Limiting one container on a larger host does not test
 whether the complete deployment fits that memory size.
@@ -2205,7 +2205,7 @@ The private JSON configuration has these fields:
 | --- | --- |
 | `version` | `1`. |
 | `name` | The disposable deployment name; it must match `deployment.name`. |
-| `deployment` | A complete deployment configuration in the format of the `deploy/household/example-*.json` files, including `capability` and `size`, with private secrets and selected production images. |
+| `deployment` | A complete deployment configuration in the format of the `deploy/preset/example-*.json` files, including `capability` and `size`, with private secrets and selected production images. |
 | `replacementSize` | Optional. A `size` object for the same capability that differs from `deployment.size`; the `deployment-replacement` scenario requires it. |
 | `datasetRun` | A stable lowercase fixture identifier, reused for comparable datasets. |
 | `host.constraintBytes` | The actual memory constraint of the complete target host or VM. |
@@ -2243,20 +2243,20 @@ does not enrich movies through TMDB; the report retains those counts without
 claiming that movie metadata enrichment was exercised.
 
 ```bash
-fixture_state=/absolute/private/household-fixtures
-fixture_config=/absolute/private/household-fixtures.json
-qualification_state=/absolute/private/household-run
-qualification_config=/absolute/private/household-qualification.json
-php scripts/qualify-household.php prepare --config "$fixture_config" --state "$fixture_state"
-php scripts/qualify-household.php prepare --from "$fixture_state" --config "$qualification_config" --state "$qualification_state"
-php scripts/qualify-household.php start --state "$qualification_state"
-php scripts/qualify-household.php scenario --state "$qualification_state" --scenario original-overlap --repeat 1 --players 1
-php scripts/qualify-household.php scenario --state "$qualification_state" --scenario fresh-copy-overlap --repeat 1 --players 1
-php scripts/qualify-household.php scenario --state "$qualification_state" --scenario mixed-overlap --repeat 1 --players 1
-php scripts/qualify-household.php stop --state "$qualification_state"
-php scripts/qualify-household.php start --state "$qualification_state"
-php scripts/qualify-household.php stop --state "$qualification_state" --cleanup
-php scripts/qualify-household.php report --state "$qualification_state"
+fixture_state=/absolute/private/qualification-fixtures
+fixture_config=/absolute/private/qualification-fixtures.json
+qualification_state=/absolute/private/qualification-run
+qualification_config=/absolute/private/qualification.json
+php scripts/qualify-deployment.php prepare --config "$fixture_config" --state "$fixture_state"
+php scripts/qualify-deployment.php prepare --from "$fixture_state" --config "$qualification_config" --state "$qualification_state"
+php scripts/qualify-deployment.php start --state "$qualification_state"
+php scripts/qualify-deployment.php scenario --state "$qualification_state" --scenario original-overlap --repeat 1 --players 1
+php scripts/qualify-deployment.php scenario --state "$qualification_state" --scenario fresh-copy-overlap --repeat 1 --players 1
+php scripts/qualify-deployment.php scenario --state "$qualification_state" --scenario mixed-overlap --repeat 1 --players 1
+php scripts/qualify-deployment.php stop --state "$qualification_state"
+php scripts/qualify-deployment.php start --state "$qualification_state"
+php scripts/qualify-deployment.php stop --state "$qualification_state" --cleanup
+php scripts/qualify-deployment.php report --state "$qualification_state"
 ```
 
 The scenarios are:
@@ -2297,7 +2297,7 @@ Each child's `stop --cleanup` removes its own data while retaining the shared
 images. After every child has completed cleanup, remove the fixture source:
 
 ```bash
-php scripts/qualify-household.php stop --state "$fixture_state" --cleanup
+php scripts/qualify-deployment.php stop --state "$fixture_state" --cleanup
 ```
 
 Reports retain host and cgroup memory, swap, pressure, process samples, database
