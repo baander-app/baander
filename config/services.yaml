@@ -4,8 +4,7 @@ imports:
 # yaml-language-server: $schema=../vendor/symfony/dependency-injection/Loader/schema/services.schema.json
 
 parameters:
-    env(BAANDER_DEPLOYMENT_PROFILE): 'full'
-    env(BAANDER_DEPLOYMENT_PROFILE_JSON): ''
+    env(BAANDER_DEPLOYMENT_PROFILE): ''
     env(WEBHOOK_LAN_ALLOWLIST): ''
     app.domain: '%env(APP_DOMAIN)%'
     app.name: 'Bånder'
@@ -63,8 +62,7 @@ services:
     App\Shared\Application\DTO\DeploymentProfile:
         factory: ['App\Shared\Application\DTO\DeploymentProfile', 'resolve']
         arguments:
-            $identifier: '%env(BAANDER_DEPLOYMENT_PROFILE)%'
-            $serialized: '%env(default::BAANDER_DEPLOYMENT_PROFILE_JSON)%'
+            $serialized: '%env(BAANDER_DEPLOYMENT_PROFILE)%'
 
     App\Transcode\Application\Service\MediaExecutionPolicy:
         arguments:

@@ -11,13 +11,12 @@ final class DeploymentProfileEnvVarProcessor implements EnvVarProcessorInterface
 {
     public function getEnv(string $prefix, string $name, \Closure $getEnv): int
     {
-        $identifier = $getEnv($name);
-        $serialized = $getEnv('BAANDER_DEPLOYMENT_PROFILE_JSON');
-        if (!is_string($identifier) || !is_string($serialized)) {
-            throw new \InvalidArgumentException('Deployment profile environment values must be strings.');
+        $serialized = $getEnv($name);
+        if (!is_string($serialized)) {
+            throw new \InvalidArgumentException('The deployment profile environment value must be a string.');
         }
 
-        $profile = DeploymentProfile::resolve($identifier, $serialized === '' ? null : $serialized);
+        $profile = DeploymentProfile::resolve($serialized);
 
         return match ($prefix) {
             'baander_web_workers' => $profile->webWorkers,
