@@ -344,6 +344,11 @@ to sessions created afterwards. Cached renditions and completed presentations
 are neither re-encoded nor removed by a change; the cache sweep remains the way
 to clear them.
 
+A rendition that failed while encoding or decoding through one implementation
+is encoded again on its next request once another implementation is selected,
+so switching away from a faulty codec also recovers the tracks it broke. A
+failed rendition that neither produced AAC nor read an AAC source stays failed.
+
 Change it in the admin settings page under Media, or on the command line:
 
 ```bash
