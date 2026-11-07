@@ -241,15 +241,17 @@ Each push tags the image `latest` and with the commit SHA. On GitHub the images 
 The application image copies `ffmpeg` and `ffprobe` from `ffmpeg-baander-static`
 through the `ffmpeg` role of the tooling image catalog
 (`packages/baander-tooling/resources/tooling-defaults.json`), passed to the build as
-`FFMPEG_IMAGE`. The role names the GHCR image; a Forgejo runner or a developer
-host points it at its own copy with `BAANDER_FFMPEG_IMAGE`. Because that image is
-private, the application image cannot be built by a pull request from a fork, which
-has no registry login. The FFmpeg image carries bAAC from `packages/baander-aac`,
-fdk-aac and FFmpeg's built-in AAC codec, enables VAAPI, NVENC and QSV explicitly,
-and proves itself at build time: a smoke encodes and decodes with bAAC, and
-`scripts/ffmpeg-capability-gate.sh` checks that the binary lists every accelerator and
-hardware encoder the application can select and that its shared objects resolve. The
-same gate runs when the application image is built.
+`FFMPEG_IMAGE`. The role names the GHCR image. On Forgejo, `ci.yaml` sets
+`BAANDER_FFMPEG_IMAGE` to the copy in the Forgejo registry, which `ffmpeg.yaml`
+publishes there; a developer host sets the same variable to a local build. Because
+the GHCR image is private, the application image cannot be built by a pull request
+from a fork, which has no registry login. The FFmpeg image carries bAAC from
+`packages/baander-aac`, fdk-aac and FFmpeg's built-in AAC codec, enables VAAPI,
+NVENC and QSV explicitly, and proves itself at build time: a smoke encodes and
+decodes with bAAC, and `scripts/ffmpeg-capability-gate.sh` checks that the binary
+lists every accelerator, hardware encoder and AAC implementation the application can
+select, and that its shared objects resolve. The same gate runs when the application
+image is built.
 
 The runner and PostgreSQL images are CI tooling and may be public. The application
 image keeps notice, provenance and embedded-dependency gaps that the
