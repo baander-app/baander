@@ -5,6 +5,9 @@ The persistent instance follows remote `master` in its own checkout. A preview r
 this worktree's PHP and Vite source with a separate database, Redis, keys and
 writable storage. Changing an agent branch does not change the persistent checkout.
 
+For the fastest default setup without configuration options, start with
+[Quick Start](quick-start.md).
+
 ## Prerequisites and host setup
 
 The controller requires Linux, PHP 8.5+ with Swoole, Composer, Bash, GNU coreutils,

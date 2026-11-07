@@ -19,6 +19,7 @@ Understand the architecture, write code following project conventions, and contr
 
 | Page | Description |
 |------|-------------|
+| [Quick Start](quick-start.md) | Path of least resistance for local DNS, a trusted CA, and a running preview |
 | [Development Environment](development-environment.md) | Docker setup, Makefile commands, IDE config, and Xdebug |
 | [PHP Dependencies](php-dependencies.md) | Runtime selections, Composer updates, patch reviews and maintenance checks |
 | [Coding Conventions](coding-conventions.md) | Domain models, value objects, repositories, CQRS, ports, and anti-corruption |
