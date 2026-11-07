@@ -131,12 +131,13 @@ final class AddFavoriteAlbumHandler
 
 ## 6. Doctrine Entity
 
-Add a Doctrine entity in `Infrastructure/Doctrine/Entity/` for persistence. These are separate from domain models and contain ORM mapping annotations.
+Add a Doctrine entity in `Infrastructure/Doctrine/Entity/` for persistence. These are separate from domain models and contain ORM mapping attributes. Store foreign identifiers across bounded contexts as scalar `Uuid` columns rather than Doctrine `#[ORM\ManyToOne]` associations to foreign context entities, and declare cross-context foreign keys in a `*ForeignKeys` schema listener (such as `FavoritesForeignKeys` or `NotificationForeignKeys`).
 
 ```php
 // src/Playlist/Infrastructure/Doctrine/Entity/FavoriteAlbumEntity.php
 namespace App\Playlist\Infrastructure\Doctrine\Entity;
 
+use App\Shared\Domain\Model\Uuid;
 use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity]
@@ -150,22 +151,20 @@ class FavoriteAlbumEntity
     #[ORM\GeneratedValue(strategy: 'NONE')]
     private Uuid $id;
 
-    #[ORM\ManyToOne(targetEntity: UserEntity::class)]
-    #[ORM\JoinColumn(name: 'user_id', referencedColumnName: 'id', nullable: false, onDelete: 'CASCADE')]
-    private UserEntity $user;
+    #[ORM\Column(name: 'user_id', type: 'uuid')]
+    private Uuid $userId;
 
-    #[ORM\ManyToOne(targetEntity: AlbumEntity::class)]
-    #[ORM\JoinColumn(name: 'album_id', referencedColumnName: 'id', nullable: false, onDelete: 'CASCADE')]
-    private AlbumEntity $album;
+    #[ORM\Column(name: 'album_id', type: 'uuid')]
+    private Uuid $albumId;
 
     #[ORM\Column(type: 'datetime_immutable')]
     private \DateTimeImmutable $addedAt;
 
-    public function __construct(Uuid $id, UserEntity $user, AlbumEntity $album)
+    public function __construct(Uuid $id, Uuid $userId, Uuid $albumId)
     {
         $this->id = $id;
-        $this->user = $user;
-        $this->album = $album;
+        $this->userId = $userId;
+        $this->albumId = $albumId;
         $this->addedAt = new \DateTimeImmutable();
     }
 
@@ -276,24 +275,23 @@ make migrate
 
 ## 9. Resource
 
-Resources extend `AbstractResource` and transform domain models to API responses via a static `from()` method. They live in `Interface/Resource/`.
+Resources extend `AbstractResource` and transform domain models to API responses via a static `from()` method. They live in `Interface/Resource/` and expose 21-character `PublicId` values rather than internal `Uuid` keys.
 
 ```php
 // src/Playlist/Interface/Resource/FavoriteAlbumResource.php
 namespace App\Playlist\Interface\Resource;
 
 use App\Shared\Interface\Resource\AbstractResource;
-use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\Model\PublicId;
 
 final class FavoriteAlbumResource extends AbstractResource
 {
     public static function from(mixed $source): array
     {
-        // $source could be a Uuid (album ID) or a domain model
-        assert($source instanceof Uuid);
+        assert($source instanceof PublicId);
 
         return [
-            'albumId' => $source->toString(),
+            'albumPublicId' => $source->toString(),
         ];
     }
 
@@ -306,50 +304,51 @@ final class FavoriteAlbumResource extends AbstractResource
 
 ## 10. Request DTO
 
-Request DTOs use promoted properties with Symfony validation attributes and `#[OA\Schema]` for OpenAPI docs. They live in `Interface/Request/`.
+Request DTOs use promoted properties with Symfony validation attributes and `#[OA\Schema]` for OpenAPI docs. They live in `Interface/Request/` and accept public IDs on public transport boundaries.
 
 ```php
 // src/Playlist/Interface/Request/AddFavoriteAlbumRequest.php
 namespace App\Playlist\Interface\Request;
 
 use OpenApi\Attributes as OA;
-use Symfony\Component\Validator\Constraints\NotBlank;
+use Symfony\Component\Validator\Constraints as Assert;
 
 #[OA\Schema(
     schema: 'AddFavoriteAlbumRequest',
-    required: ['albumId'],
+    required: ['albumPublicId'],
     properties: [
-        new OA\Property(property: 'albumId', type: 'string', format: 'uuid', example: '550e8400-e29b-41d4-a716-446655440000'),
+        new OA\Property(property: 'albumPublicId', type: 'string', example: 'V1StGXR8_Z5jdHi6B-myT'),
     ],
 )]
 final readonly class AddFavoriteAlbumRequest
 {
     public function __construct(
-        #[NotBlank(message: 'Album ID is required.')]
-        public string $albumId = '',
+        #[Assert\NotBlank(message: 'Album public ID is required.')]
+        #[Assert\Regex(pattern: '/^[A-Za-z0-9_-]{21}$/D', message: 'Album public ID must be a 21-character NanoID.')]
+        public string $albumPublicId = '',
     ) {}
 }
 ```
 
 ## 11. Controller
 
-Controllers live in `Interface/Controller/` and depend on port interfaces. Routes are defined via `#[Route]` attributes directly on the controller class and methods.
+Controllers live in `Interface/Controller/` and depend on port interfaces. Routes are defined via `#[Route]` attributes directly on the controller class and methods. Resolve the authenticated user via `AuthenticatedUserIdentityInterface`.
 
 ```php
 // src/Playlist/Interface/Controller/FavoriteAlbumController.php
 namespace App\Playlist\Interface\Controller;
 
+use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
+use App\Catalog\Application\Port\AlbumPortInterface;
 use App\Playlist\Application\Port\FavoriteAlbumPortInterface;
 use App\Playlist\Interface\Request\AddFavoriteAlbumRequest;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
-use App\Shared\Domain\Model\Uuid;
-use Nelmio\ApiDocBundle\Attribute\Model;
+use App\Shared\Domain\Model\PublicId;
 use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
 use Symfony\Component\Routing\Attribute\Route;
-use Symfony\Bundle\SecurityBundle\Security;
 
 #[OA\Tag(name: 'Favorites')]
 #[Route('/api/favorites/albums', name: 'favorite_album_')]
@@ -358,7 +357,8 @@ final class FavoriteAlbumController extends AbstractController
     use ApiResponsesTrait;
 
     public function __construct(
-        private readonly Security $security,
+        private readonly AuthenticatedUserIdentityInterface $userIdentity,
+        private readonly AlbumPortInterface $albumPort,
         private readonly FavoriteAlbumPortInterface $favoriteAlbumService,
     ) {}
 
@@ -369,23 +369,27 @@ final class FavoriteAlbumController extends AbstractController
         responses: [
             new OA\Response(response: '201', description: 'Added to favorites'),
             new OA\Response(response: '401', description: 'Not authenticated'),
+            new OA\Response(response: '404', description: 'Album not found'),
             new OA\Response(response: '422', description: 'Validation error'),
         ],
     )]
     #[Route('', name: 'store', methods: ['POST'])]
     public function store(#[MapRequestPayload] AddFavoriteAlbumRequest $payload): JsonResponse
     {
-        $user = $this->security->getUser();
-        if ($user === null) {
+        $userId = $this->userIdentity->resolveAuthenticatedUserId();
+        if ($userId === null) {
             return $this->unauthorized();
         }
 
-        $userId = Uuid::fromString($user->getId());
-        $albumId = Uuid::fromString($payload->albumId);
+        $albumPublicId = PublicId::fromString($payload->albumPublicId);
+        $album = $this->albumPort->findByPublicId($albumPublicId);
+        if ($album === null) {
+            return $this->notFound('Album not found.');
+        }
 
-        $this->favoriteAlbumService->addFavorite($userId, $albumId);
+        $this->favoriteAlbumService->addFavorite($userId, $album->getId());
 
-        return $this->created(['albumId' => $albumId->toString()]);
+        return $this->created(['albumPublicId' => $albumPublicId->toString()]);
     }
 }
 ```
@@ -410,7 +414,7 @@ final class FavoriteAlbumTest extends TestCase
 {
     public function testCreatesWithAlbumIdAndTimestamp(): void
     {
-        $albumId = Uuid::v4();
+        $albumId = new Uuid();
         $before = new \DateTimeImmutable();
 
         $favorite = new FavoriteAlbum($albumId, new \DateTimeImmutable());
@@ -430,18 +434,18 @@ Test that the resource correctly transforms domain models to API responses.
 namespace App\Tests\Unit\Playlist\Interface\Resource;
 
 use App\Playlist\Interface\Resource\FavoriteAlbumResource;
-use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\Model\PublicId;
 use PHPUnit\Framework\TestCase;
 
 final class FavoriteAlbumResourceTest extends TestCase
 {
-    public function testFromTransformsAlbumIdToArray(): void
+    public function testFromTransformsAlbumPublicIdToArray(): void
     {
-        $albumId = Uuid::v4();
+        $albumPublicId = new PublicId();
 
-        $result = FavoriteAlbumResource::from($albumId);
+        $result = FavoriteAlbumResource::from($albumPublicId);
 
-        $this->assertSame($albumId->toString(), $result['albumId']);
+        $this->assertSame($albumPublicId->toString(), $result['albumPublicId']);
     }
 }
 ```
@@ -454,6 +458,7 @@ Functional tests live in `tests/Functional/` and use the kernel container. Exten
 // tests/Functional/Controller/FavoriteAlbumControllerTest.php
 namespace App\Tests\Functional\Controller;
 
+use App\Shared\Domain\Model\PublicId;
 use App\Tests\Functional\TestCase;
 
 final class FavoriteAlbumControllerTest extends TestCase
@@ -461,21 +466,21 @@ final class FavoriteAlbumControllerTest extends TestCase
     public function testAddFavoriteRequiresAuth(): void
     {
         $response = $this->anonymousRequest('POST', '/api/favorites/albums', [
-            'albumId' => (string) \App\Shared\Domain\Model\Uuid::v4(),
+            'albumPublicId' => (string) new PublicId(),
         ]);
 
         $this->assertJsonResponse($response, 401);
     }
 
-    public function testAddFavoriteReturns201(): void
+    public function testAddFavoriteForUnknownAlbumReturns404(): void
     {
         $user = $this->createTestUser();
 
         $response = $this->authenticatedRequest('POST', '/api/favorites/albums', $user, [
-            'albumId' => (string) \App\Shared\Domain\Model\Uuid::v4(),
+            'albumPublicId' => (string) new PublicId(),
         ]);
 
-        $this->assertSame(201, $response->getStatusCode());
+        $this->assertSame(404, $response->getStatusCode());
     }
 }
 ```
@@ -484,7 +489,7 @@ Run the tests:
 
 ```bash
 make phpunit
-# or a specific file:
+# or a specific file inside the preview container:
 make exec cmd="./vendor/bin/phpunit tests/Unit/Playlist/Domain/Model/FavoriteAlbumTest.php"
 ```
 
@@ -508,6 +513,7 @@ src/<Context>/
 │   │   └── Repository/
 │   └── <Context>Service.php
 └── Interface/
+    ├── Console/
     ├── Controller/
     ├── Request/
     └── Resource/
@@ -517,18 +523,19 @@ Start with the domain model and repository interface, then build outward. Regist
 
 ## Adding a Console Command
 
-Console commands live in `Interface/Console/` within a bounded context. Use Symfony's `#[AsCommand]` attribute.
+Console commands live in `Interface/Console/` within a bounded context and follow the `app:<noun>[:<sub>]:<verb>` naming convention with a singular noun. Admin-facing commands use `AdminCommandSupport`, and admin controller routes mark their CLI counterpart with `#[CliCounterpart('app:...')]`. Every console command also requires a reference page in `docs-book/part-1-operator-guide/commands/` and an entry in `docs-book/part-1-operator-guide/commands/README.md` (`CommandDocsCoverageTest` enforces both).
 
 ```php
 // src/Playlist/Interface/Console/SyncSmartPlaylistsCommand.php
 namespace App\Playlist\Interface\Console;
 
+use App\Playlist\Application\Port\PlaylistPortInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
-#[AsCommand(name: 'playlist:sync-smart', description: 'Sync all smart playlists')]
+#[AsCommand(name: 'app:playlist:sync-smart', description: 'Sync all smart playlists')]
 final class SyncSmartPlaylistsCommand extends Command
 {
     public function __construct(

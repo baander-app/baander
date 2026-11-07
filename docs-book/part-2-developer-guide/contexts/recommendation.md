@@ -8,17 +8,29 @@
 
 | Property | Description |
 |----------|-------------|
-| `score` | Numeric relevance score from the source algorithm |
-| `sourceType` | Type of entity that generated the recommendation |
+| `id` | Internal `Uuid` identifier |
+| `publicId` | External 21-character `PublicId` identifier |
+| `name` | Originating strategy name (for example `collaborative`, `content`, `genre`, or `default`) |
+| `sourceType` | Source entity type (`RecommendationType`) |
 | `sourceId` | ID of the source entity |
-| `targetUser` | User who receives the recommendation |
-| `recommendationType` | Which algorithm produced this recommendation |
+| `targetType` | Target entity type (`RecommendationType`) |
+| `targetId` | ID of the recommended target entity |
+| `score` | Numeric relevance score from the originating strategy |
+| `position` | Optional ordering position |
+| `userId` | Optional `Uuid` of the user who receives the recommendation |
+| `createdAt` | Creation timestamp |
+| `updatedAt` | Last update timestamp |
+
+### Aggregate Root: RecommendationJob
+
+`RecommendationJob` tracks an asynchronous or foreground recommendation generation run through a mutable `RecommendationJobState` state object (`id`, `publicId`, `isFull`, `userId`, `status`, `totalSongs`, `completedSongs`, `currentStrategy`, `strategyCounts`, `failReason`, `startedAt`, `completedAt`, `createdAt`, `updatedAt`, `metadata`, `originalJobId`, `originalJobPublicId`).
 
 ### Value Objects
 
 | Type | Kind | Description |
 |------|------|-------------|
-| `RecommendationType` | Enum | Classifies the originating algorithm (collaborative, content-based, genre, database relation) |
+| `RecommendationType` | `final readonly class` | Validated entity type (`song`, `album`, `artist`, `movie`, `video`) |
+| `RecommendationJobStatus` | Enum | Lifecycle status of a recommendation job: `Pending` (`pending`, queued), `InProgress` (`in_progress`, running), `Completed` (`completed`), `Failed` (`failed`), `Cancelled` (`cancelled`) |
 
 ## Domain Services
 
@@ -37,6 +49,9 @@ Each domain service implements one recommendation algorithm:
 |---------|---------|---------|
 | `SaveRecommendationCommand` | `SaveRecommendationHandler` | Persist a single computed recommendation |
 | `GenerateRecommendationsCommand` | `GenerateRecommendationsHandler` | Run recommendation generation (dispatched by the console command, the admin action and the scheduler) |
+| `ExecuteRecommendationJobCommand` | `ExecuteRecommendationJobHandler` | Execute a queued recommendation job on the `async` Messenger transport |
+| `CancelRecommendationJobCommand` | `CancelRecommendationJobHandler` | Cancel a pending or in-progress recommendation job |
+| `RequeueRecommendationJobCommand` | `RequeueRecommendationJobHandler` | Create and dispatch a new recommendation job from a failed or cancelled job |
 | `DeleteRecommendationCommand` | `DeleteRecommendationHandler` | Remove one recommendation by UUID |
 | `DeleteRecommendationsBySourceCommand` | `DeleteRecommendationsBySourceHandler` | Remove all recommendations originating from a source entity |
 
@@ -46,50 +61,94 @@ Each domain service implements one recommendation algorithm:
 
 The handler reads the system setting `recommendations.auto_generate` (off by default, contributed by `RecommendationSettingDefinitions`) when a command with `automatic: true` arrives. While the setting is off, the handler logs at info level and returns `skipped: recommendations.auto_generate is off`, which the scheduler records as the job's last result. Commands without `automatic`, from `app:recommendation:generate`, the admin action or a schedule an administrator creates, always generate. An unknown mode throws instead of falling back to incremental.
 
-The command has no transport route, so the handler runs in the dispatching process: the scheduler worker for scheduled runs. There the CPU process pool is not running, and the handler generates synchronously. An incremental run loads the songs updated in the last seven days; a full run loads every song. Both load every user's listening history, so a full run on a large library can exhaust the scheduler worker's memory or time, which is why the seeded job is incremental.
+Unless `$command->foreground` is `true` (used by the CLI commands `app:recommendation:generate` and `app:recommendation:job:requeue`), `GenerateRecommendationsHandler` creates a `RecommendationJob` and dispatches `ExecuteRecommendationJobCommand` to the `async` Messenger transport (`ExecuteRecommendationJobHandler`). An incremental run loads the songs updated in the last seven days; a full run loads every song. Both load every user's listening history, which is why the seeded scheduled job is incremental.
 
 ## Queries & Query Handlers
 
-| Query | Purpose |
-|-------|---------|
-| `GetRecommendationQuery` | Fetch a single recommendation by UUID |
-| `GetRecommendationsForUserQuery` | All recommendations for the authenticated user |
-| `GetRecommendationsBySourceQuery` | Recommendations generated by a specific source entity |
-| `GetTargetingRecommendationsQuery` | Recommendations targeting a specific entity type and ID |
+| Query | Handler | Purpose |
+|-------|---------|---------|
+| `GetRecommendationQuery` | `GetRecommendationHandler` | Fetch a single recommendation by UUID |
+| `GetRecommendationsForUserQuery` | `GetRecommendationsForUserHandler` | All recommendations for the authenticated user |
+| `GetPersonalizedRecommendationsQuery` | `GetPersonalizedRecommendationsHandler` | Aggregated "For You" recommendations with explanations and per-strategy scores |
+| `GetRecommendationsBySourceQuery` | `GetRecommendationsBySourceHandler` | Recommendations generated by a specific source entity |
+| `GetTargetingRecommendationsQuery` | `GetTargetingRecommendationsHandler` | Recommendations targeting a specific entity type and ID |
+| `GetRecommendationJobQuery` | `GetRecommendationJobHandler` | Fetch a single recommendation job by `publicId` |
+| `ListRecommendationJobsQuery` | `ListRecommendationJobsHandler` | List recent recommendation jobs, optionally filtered by status |
 
 ## Ports
 
-| Port | Purpose |
-|------|---------|
-| `RecommendationInsightsPortInterface` | Read access to recommendation insights |
-| `RecommendationJobPortInterface` | Recommendation job lifecycle operations |
+| Port | Purpose | Implemented By |
+|------|---------|----------------|
+| `RecommendationRepositoryInterface` | Domain repository contract for `Recommendation` persistence and queries | `RecommendationRepository` |
+| `RecommendationJobRepositoryInterface` | Domain repository contract for `RecommendationJob` persistence and queries | `RecommendationJobRepository` |
+| `RecommendationInsightsPortInterface` | Read access to recommendation coverage, source quality, and freshness metrics | `RecommendationInsightsRepository` |
+| `RecommendationJobPortInterface` | Recommendation job lifecycle operations | `RecommendationJobService` |
+| `RecommendationPublicIdentityInterface` | Resolves and projects public and internal identifiers for recommendations and catalog entities | `RecommendationPublicIdentity` |
 
 ## API Endpoints
 
-All endpoints live under `RecommendationController` with the `/api/recommendations` prefix.
+### User Endpoints
+
+User endpoints live under `RecommendationController` with the `/api/recommendations` prefix.
 
 | Method | Path | Purpose |
 |--------|------|---------|
-| GET | `/api/recommendations` | List recommendations for the current user (cursor-paginated) |
+| GET | `/api/recommendations/` | List recommendations for the current user (`limit` query parameter, max 200, default 50) |
+| GET | `/api/recommendations/for-you` | Personalized recommendations with explanation breakdown (`RecommendationController::forYou`, `limit` max 100) |
 | GET | `/api/recommendations/source/{sourceType}/{sourceId}` | Recommendations by source entity |
 | GET | `/api/recommendations/targeting/{targetType}/{targetId}` | Recommendations targeting a specific entity |
-| POST | `/api/recommendations` | Create a recommendation |
-| DELETE | `/api/recommendations/{uuid}` | Delete a single recommendation |
+| POST | `/api/recommendations/` | Create a recommendation |
+| DELETE | `/api/recommendations/{publicId}` | Delete a single recommendation by `publicId` |
 | DELETE | `/api/recommendations/source/{sourceType}/{sourceId}` | Delete all recommendations for a source |
+
+### Admin Endpoints
+
+Admin endpoints live under `RecommendationAdminController` with the `/api/admin/recommendations` prefix and require `ROLE_ADMIN`.
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET | `/api/admin/recommendations/coverage` | Recommendation coverage statistics |
+| GET | `/api/admin/recommendations/source-quality` | Recommendation source quality breakdown |
+| GET | `/api/admin/recommendations/freshness` | Recommendation freshness metrics |
+| POST | `/api/admin/recommendations/generate` | Trigger recommendation generation |
+| GET | `/api/admin/recommendations/jobs` | List recent recommendation jobs |
+| GET | `/api/admin/recommendations/jobs/{publicId}` | Get recommendation job status |
+| POST | `/api/admin/recommendations/jobs/{publicId}/requeue` | Requeue a failed or cancelled recommendation job |
+| DELETE | `/api/admin/recommendations/jobs/{publicId}` | Cancel a pending or in-progress recommendation job |
 
 ## Cross-Context Relationships
 
 | Direction | Context | Details |
 |-----------|---------|---------|
-| Depends on | Shared | `Uuid`, `PublicId` |
-| Depends on | Catalog | Artist and genre references (read-only) |
+| Depends on | Shared | `Uuid`, `PublicId`, and `SystemSettingsPortInterface` for `recommendations.auto_generate` |
+| Depends on | Activity | `ActivityPortInterface` for user listening histories |
+| Depends on | Auth | `AuthenticatedUserIdentityInterface` for authenticated user resolution |
+| Depends on | Catalog | Song, artist, and genre references (read-only) |
+| Depends on | Library | `LibraryReadScopeProviderInterface` for scoping visible catalog entities |
 | Depends on | Scheduler | `GenerateRecommendationsCommand` is schedulable through the `Scheduler Schedulable Contract` Deptrac layer |
-| Depends on | Shared | `SystemSettingsPortInterface` for `recommendations.auto_generate` |
 | Depended on by | — | No contexts depend on Recommendation directly |
 
 ## Infrastructure
 
 | Component | Type | Purpose |
 |-----------|------|---------|
-| `RecommendationEntity` | Doctrine entity | ORM entity mapped to the recommendations table |
-| `RecommendationRepository` | Doctrine repository | Implements the domain repository interface |
+| `RecommendationEntity` | Doctrine entity | ORM entity mapped to the `recommendations` table |
+| `RecommendationJobEntity` | Doctrine entity | ORM entity mapped to the `recommendation_jobs` table |
+| `RecommendationRepository` | Doctrine repository | Implements `RecommendationRepositoryInterface` |
+| `RecommendationJobRepository` | Doctrine repository | Implements `RecommendationJobRepositoryInterface` |
+| `RecommendationInsightsRepository` | Doctrine repository | Implements `RecommendationInsightsPortInterface` |
+| `RecommendationJobService` | Port implementation | Implements `RecommendationJobPortInterface` with row-locked status transitions |
+| `RecommendationPublicIdentity` | Port implementation | Implements `RecommendationPublicIdentityInterface` |
+| `RecommendationMessagePayloadCodec` | Messenger codec | Encodes and decodes `ExecuteRecommendationJobCommand` on the `async` transport |
+| `RecommendationJobCleanupService` | Swoole listener | Marks orphaned `pending` and stale `in_progress` recommendation jobs as `failed` on server start |
+
+### Console Commands
+
+| Command | Purpose |
+|---------|---------|
+| `app:recommendation:generate` (`RecommendationGenerateCommand`) | Generate music recommendations with every strategy in the foreground process |
+| `app:recommendation:stats` (`RecommendationStatsCommand`) | Show recommendation coverage, source quality, and freshness |
+| `app:recommendation:job:list` (`RecommendationJobListCommand`) | List the most recent recommendation jobs, newest first |
+| `app:recommendation:job:show` (`RecommendationJobShowCommand`) | Show one recommendation job's status, progress, counts, and metadata |
+| `app:recommendation:job:cancel` (`RecommendationJobCancelCommand`) | Cancel a pending or running recommendation job |
+| `app:recommendation:job:requeue` (`RecommendationJobRequeueCommand`) | Requeue a failed or cancelled recommendation job and run the new job in the foreground process |

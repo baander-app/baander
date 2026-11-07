@@ -113,8 +113,9 @@ Authorization or DPoP header on an upgrade. The client first calls
 `/api/ws?ticket=<ticket>`; Swoole's upgrade handler checks the route, framing
 and Origin, and `WsTicketAuthenticator` has Redis consume the ticket atomically
 before a fresh database query checks the token. The socket then carries change
-hints, which name what to reread and carry no resource contents, party sync
-messages and transcode position controls.
+hints, which name what to reread and carry no resource contents, playback
+session coordination messages, party sync messages and transcode position
+controls.
 [Real-Time Patterns](real-time-patterns.md) owns the connection registry, the
 message protocol and [the ticket authentication](real-time-patterns.md#authentication);
 [Live Updates](live-updates.md) owns the committed-change path that feeds it.
@@ -138,7 +139,7 @@ captures domain events in the producing transaction, so an event exists only
 if its write committed; the control unit's relay reconstructs each event and
 dispatches it to durable listeners, which hand further messages to `async`
 (for example, a committed `LibraryDirectoryIndexed` becomes a `FilesDiscovered`
-message). Session and transcode listeners stay on the live dispatcher in the
+message). Party and transcode listeners stay on the live dispatcher in the
 producing process. [Durable Event Replay](cqrs-and-messaging.md#durable-event-replay)
 owns that path. The change inbox is filled by capture triggers in the same
 transaction as the business write; `DoctrineLiveChangeProjector` folds its
@@ -225,7 +226,7 @@ consumer identity, worker deployment pair) is defined in [CONCEPTS.md](../../CON
 | Kind | Choose it when | How it is routed | Where it runs | Where it fails to |
 |------|----------------|------------------|---------------|-------------------|
 | Inline command | The caller needs the result in the same request or process, and the work is short enough to hold the request. | Not in the workloads map, or in it with `default` off and dispatched without a transport stamp. | The calling process: the HTTP worker, the console command or the worker that dispatched it. | The caller; the exception reaches the request or command. |
-| Domain event through the outbox | A committed write must have a side effect, possibly in another context, that survives the producing process. | Captured in the PostgreSQL outbox in the producing transaction and relayed by the control unit to durable listeners, which hand further messages to `async`; session and transcode listeners also run live in the producing process. | The control unit's relay for the listeners; the execution unit for the messages they queue. | The outbox record's dead-letter state; a queued message then follows the routed row. |
+| Domain event through the outbox | A committed write must have a side effect, possibly in another context, that survives the producing process. | Captured in the PostgreSQL outbox in the producing transaction and relayed by the control unit to durable listeners, which hand further messages to `async`; party and transcode listeners also run live in the producing process. | The control unit's relay for the listeners; the execution unit for the messages they queue. | The outbox record's dead-letter state; a queued message then follows the routed row. |
 | Scheduled occurrence | Work recurs on a schedule or is triggered as a registered job. | The control unit records the occurrence in PostgreSQL and relays it to the `scheduler` stream as `ExecuteScheduledOccurrenceCommand`, which the map routes by default. | The execution unit's separate `scheduler` consumer. | `failed_messages`; the schedule also records its own last result. |
 | Routed async command | Work is long, calls a provider, or must not hold the request: scans, enrichment, image derivatives, email, push. | In the workloads map with `default` on, or with `default` off and dispatched with a `TransportNamesStamp` naming `async`. | The execution unit's ordinary `async` consumers. | `failed_messages`. |
 

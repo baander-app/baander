@@ -47,12 +47,14 @@ flowchart TD
 |------|-------------|
 | `TranscodeJob` | A single encoding job with status, progress tracking, and quality tier |
 | `TranscodeSession` | A live transcoding session with real-time state, priority, and lifecycle |
-| `SegmentMetadata` | Metadata for an encoded segment |
+
+`TranscodeJobState` and `TranscodeSessionState` hold constructor/create/reconstitute in sync per the project's aggregate root convention.
 
 ### Value Objects
 
 | Type | Kind | Description |
 |------|------|-------------|
+| `SegmentMetadata` | Value object | Metadata for an encoded segment (index, duration, size, keyframe, encoding time, and completion timestamp) |
 | `QualityTier` | Value object | HEVC quality definitions (resolution, bitrate, codec parameters) |
 | `AudioProfile` | Value object | Audio encoding settings (codec, bitrate, channels) |
 | `LoudnessStandard` | Value object | Audio normalization targets (e.g., EBU R128) |
@@ -67,6 +69,7 @@ flowchart TD
 |---------|---------|
 | `QualityLadder` | Defines the available quality tiers and their encoding parameters |
 | `AudioProcessingRules` | Rules for audio encoding, normalization, and loudness targeting |
+| `VideoProcessingRules` | Video encoder flags, GOP sizing, RFC 6381 codec strings, and HDR tone-mapping rules |
 
 ## Commands & Handlers
 
@@ -78,7 +81,9 @@ flowchart TD
 | `CancelTranscodeSessionCommand` | `CancelTranscodeSessionHandler` | Cancel a session and clean up resources |
 | `UpdateTranscodeSessionCommand` | `UpdateTranscodeSessionHandler` | Update session state |
 | `UpdateTranscodePositionCommand` | `UpdateTranscodePositionHandler` | Update playback position (drives the segment priority queue) |
+| `FailInterruptedTranscodeSessionsCommand` | `FailInterruptedTranscodeSessionsHandler` | Mark non-terminal sessions for interrupted jobs as failed |
 | `CleanupOrphanedJobsCommand` | `CleanupOrphanedJobsHandler` | Remove stale or incomplete jobs |
+| — (`app:transcode:cache-sweep`) | `SweepTranscodeCacheHandler` | Sweep idle video and audio rendition cache directories by TTL and LRU size budget |
 
 ## Ports
 
@@ -150,20 +155,22 @@ Endpoints are split between session management and streaming delivery.
 
 | Method | Path | Purpose |
 |--------|------|---------|
-| GET | `/api/transcode/sessions` | List transcoding sessions |
+| GET | `/api/transcode/sessions` | List active transcoding sessions for the authenticated user |
+| GET | `/api/transcode/sessions/list` | List all transcoding sessions for the authenticated user |
 | POST | `/api/transcode/sessions` | Create a new session |
-| GET | `/api/transcode/sessions/{uuid}` | Get a single session |
-| PATCH | `/api/transcode/sessions/{uuid}` | Update a session |
-| PATCH | `/api/transcode/sessions/{uuid}/pause` | Pause a session |
-| PATCH | `/api/transcode/sessions/{uuid}/resume` | Resume a paused session |
-| POST | `/api/transcode/sessions/{uuid}/position` | Update playback position |
-| DELETE | `/api/transcode/sessions/{uuid}` | Cancel a session |
+| GET | `/api/transcode/sessions/{publicId}` | Get a single session |
+| PATCH | `/api/transcode/sessions/{publicId}` | Update a session |
+| PATCH | `/api/transcode/sessions/{publicId}/pause` | Pause a session |
+| PATCH | `/api/transcode/sessions/{publicId}/resume` | Resume a paused session |
+| POST | `/api/transcode/sessions/{publicId}/position` | Update playback position |
+| DELETE | `/api/transcode/sessions/{publicId}` | Cancel a session |
 
 ### Job Management
 
 | Method | Path | Purpose |
 |--------|------|---------|
-| GET | `/api/transcode/jobs` | List transcoding jobs |
+| GET | `/api/transcode/jobs` | List orphaned transcoding jobs in accessible libraries |
+| GET | `/api/transcode/jobs/list` | List transcoding jobs for the authenticated user |
 | GET | `/api/transcode/jobs/{publicId}` | Get a single job status |
 | GET | `/api/transcode/jobs/{publicId}/metrics` | Job encoding metrics |
 | POST | `/api/transcode/jobs/cleanup` | Trigger orphaned-job cleanup |
@@ -181,8 +188,12 @@ Endpoints are split between session management and streaming delivery.
 | GET | `/api/transcode/{jobPublicId}/tracks/{track}/init.mp4` | Init segment for the video or audio track (signed URL) |
 | GET | `/api/transcode/{jobPublicId}/tracks/{track}/segment.m4s?index={index}` | Media segment for the video or audio track (signed URL) |
 | GET | `/api/transcode/{jobPublicId}/subtitles/{language}/{segment}.vtt` | Subtitle segment (signed URL) |
+| GET | `/api/transcode/artifacts/{jobPublicId}/{generation}/master.m3u8` | Completed video HLS master playlist (`CompletedVideoController`, signed URL) |
+| GET | `/api/transcode/artifacts/{jobPublicId}/{generation}/tracks/{track}/media.m3u8` | Completed video HLS track playlist (`CompletedVideoController`, signed URL) |
+| GET | `/api/transcode/artifacts/{jobPublicId}/{generation}/tracks/{track}/init.mp4` | Completed video track initialization segment (`CompletedVideoController`, signed URL) |
+| GET | `/api/transcode/artifacts/{jobPublicId}/{generation}/tracks/{track}/segment.m4s?index={index}` | Completed video track media segment (`CompletedVideoController`, signed URL) |
 
-The media playlist, init segment, media segment and subtitle segment routes take a required `generation` query naming the pinned transcode execution generation. The signed URLs in the master manifest carry it; a request without it answers `404`.
+The live media playlist, init segment, media segment and subtitle segment routes take a required `generation` query naming the pinned transcode execution generation. The signed URLs in the master manifest carry it; a request without it answers `404`. Completed video artifact routes carry `{generation}` in the URL path.
 
 ## Cross-Context Relationships
 
@@ -192,7 +203,7 @@ The media playlist, init segment, media segment and subtitle segment routes take
 | Depended on by | Party | References transcode jobs for synchronized playback |
 | Depended on by | Media | The track stream transcodes audio through `AudioRenditionPortInterface` and reads `TranscodeSettingDefinitions` keys (the `Transcode Audio Rendition Contract` Deptrac layer) |
 | Depended on by | Notification | Listens to transcode domain events for user notifications |
-| Depends on | QoL | QoL contracts only. `StreamAdmissionListener` (on `TranscodeSessionAttached`, priority 1) and `StreamCompletionListener` (on `TranscodeJobCompleted`) call the stream-admission contract; `QualityFilteringStreamingDecorator` filters manifests by the allowed-tier contract (decoration priority -1, below the cache decorator); `QualityLadderPort` and `EncoderProfileFingerprintAdapter` implement QoL contracts |
+| Depends on | QoL | QoL contracts only. `TranscodeSessionSubscriber` injects `StreamAdmissionPortInterface` directly to evaluate stream admission and record completion; `QualityFilteringStreamingDecorator` wraps `TranscodeStreamingService` (decoration priority `-1`) to filter manifests by the allowed-tier contract; `QualityLadderPort` and `EncoderProfileFingerprintAdapter` implement QoL contracts |
 
 ## Infrastructure
 
@@ -214,8 +225,9 @@ The FFmpeg classes build commands and read their results. `ProcessExecutor` send
 
 | Component | Purpose |
 |-----------|---------|
-| `HlsSegmentWriter` | Writes HLS segments to storage |
-| `HlsManifestGenerator` | Generates HLS v6 playlists |
+| `FMP4SegmentWriter` | Writes fMP4 segments to storage |
+| `ManifestGenerator` | Generates HLS v6 playlists |
+| `WebVttTimeline` | Clips and rebases WebVTT subtitle cues to the local timeline of a restarted video generation |
 | `QualityLadderRenderer` | Renders quality tier information for clients |
 | `DashManifestGenerator` | Generates DASH manifests |
 
@@ -242,3 +254,13 @@ Encoding runs in the worker deployment pair, not in the web server. The control 
 | `NativeExecutionClient` (Shared) | Speaks to the native execution daemon over the Unix socket on the private IPC volume; every request carries the deployment namespace, boot, lease epoch, client slot and generation |
 | Native execution daemon | `bin/worker-native.php` in the execution unit; runs FFmpeg, probes and helpers and reports each attempt's state, output and exit code |
 | Lease loss | A child whose lease or deployment authority lapses stops its encoder and stops persisting state; after the lease expires the next claim starts a new transcode execution generation, so output of the old generation is not delivered as current output |
+
+### Console Commands
+
+| Command | Purpose |
+|---------|---------|
+| `app:transcode:session:list` (`TranscodeSessionListCommand`) | List the active transcode sessions of every user, or of one user with `--user` (CLI counterpart of `GET /api/transcode/sessions/`) |
+| `app:transcode:session:show` (`TranscodeSessionShowCommand`) | Show one transcode session by `PublicId` (CLI counterpart of `GET /api/transcode/sessions/{publicId}`) |
+| `app:transcode:job:cleanup` (`TranscodeJobCleanupCommand`) | Remove transcode jobs that no session uses, with their output (CLI counterpart of `POST /api/transcode/jobs/cleanup`) |
+| `app:transcode:cache-sweep` (`SweepTranscodeCacheCommand`) | Sweep old transcode segment cache directories (TTL + LRU size budget; schedulable console command) |
+| `debug:hw-transcode` (`DebugHwTranscodeCommand`) | Show the last worker-published hardware encoder profile and sample FFmpeg commands |

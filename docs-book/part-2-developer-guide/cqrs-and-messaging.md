@@ -71,6 +71,8 @@ final class CreatePlaylistHandler
 }
 ```
 
+When a handler must persist a domain write and capture an outbox event atomically, wrap the write and event dispatch in `TransactionPortInterface` so both share one database commit boundary (see [Durable Event Replay](#durable-event-replay)).
+
 ## Dispatching from a Controller
 
 Controllers inject `MessageBusInterface` and dispatch commands:
@@ -176,7 +178,7 @@ Tests use in-memory ordinary transports. See [Testing](testing.md) for the dispo
 Live domain events enter the outbox. For `LibraryDirectoryIndexed`, a Library
 dispatcher converts the committed event into the existing `FilesDiscovered`
 message and sends it to `async`. Other events continue through the private
-notification dispatcher, where notification and admin-alert listeners run. Session
+notification dispatcher, where notification and admin-alert listeners run. Party
 and transcode listeners stay on the live dispatcher. A notification event's receipt,
 notification records and channel delivery intents commit in one transaction;
 replaying the same outbox ID skips an already committed receipt.

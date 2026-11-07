@@ -31,6 +31,10 @@ yarn install
 | i18next | Internationalization |
 | Sonner | Toast notifications |
 | @dnd-kit | Drag-and-drop (sortable lists, playlists) |
+| @tanstack/react-virtual | Virtualized lists and grids (required for collections > 50 items) |
+| hls.js / dashjs | Adaptive HLS and DASH media playback |
+| three | WebGL 3D rendering for audio visualizers |
+| @fontsource-variable/* | Self-hosted Geist and Noto variable font families |
 
 ## Project Structure
 
@@ -41,32 +45,52 @@ ui/web/
 │   ├── App.tsx                   # Root component, router setup
 │   ├── index.css                 # Generated design-token CSS imports
 │   ├── features/                 # Feature modules (one per domain)
+│   │   ├── admin/                #   Admin panel
 │   │   ├── auth/                 #   Login, registration, protected routes
 │   │   ├── catalog/              #   Artists, albums, songs, genres, search
-│   │   ├── player/               #   Audio/video playback, controls, equalizer
-│   │   ├── playlist/             #   Playlist management
-│   │   ├── admin/                #   Admin panel
+│   │   ├── concerts/             #   Concert videos
+│   │   ├── ebooks/               #   E-books and reader
 │   │   ├── equalizer/            #   Audio equalizer
 │   │   ├── layout/               #   App shell, sidebar, header
-│   │   └── settings/             #   User settings and preferences
+│   │   ├── library/              #   Library selection and management
+│   │   ├── movies/               #   Movies and adaptive playback
+│   │   ├── notification/         #   In-app notifications and push subscriptions
+│   │   ├── player/               #   Audio/video playback, controls, equalizer
+│   │   ├── playlist/             #   Playlist management
+│   │   ├── podcasts/             #   Podcast shows and episodes
+│   │   ├── radio/                #   Internet radio stations
+│   │   ├── session/              #   Devices, playback sessions, and party mode
+│   │   ├── settings/             #   User settings and preferences
+│   │   ├── tv/                   #   TV shows, seasons, and episodes
+│   │   └── visualizer/           #   Real-time audio visualizers
 │   └── shared/                   # Cross-feature shared code
 │       ├── api-client/           #   Generated API client + Axios instance
 │       │   ├── axios-instance.ts #   Custom Axios configuration
 │       │   └── gen/endpoints/    #   Orval-generated hooks and types
+│       ├── auth/                 #   IndexedDB credential store and DPoP lifecycle
 │       ├── components/           #   Shared UI components
 │       │   ├── ui/               #   Shared primitives (Button, Dialog, etc.)
 │       │   ├── ErrorBoundary.tsx
 │       │   ├── LoadingSkeleton.tsx
 │       │   └── ...
+│       ├── crypto/               #   Web Crypto and DPoP helpers
+│       ├── drafts/               #   Unsaved edit draft retention
 │       ├── hooks/                #   Shared React hooks
 │       ├── i18n/                 #   Translation files and config
-│       ├── theme/                #   ThemeProvider, GlobalStyles, theme resolution
-│       └── lib/                  #   Shared utilities
+│       ├── lib/                  #   Shared utilities
+│       ├── live/                 #   Live-update WebSocket and recovery coordinator
+│       ├── stores/               #   Store wrappers (withStoreDebug, withNoopGuard, storage)
+│       ├── theme/                #   ThemeProvider, GlobalStyles, textRole, theme resolution
+│       ├── typography/           #   ContentText and script-aware typography
+│       └── utils/                #   Formatting and domain helpers
 ├── tests/                        # Additional tests, setup, performance, browser suites
 │   ├── setup.ts                  # Vitest global setup
+│   ├── e2e/                      #   Playwright application and standalone browser suites
 │   ├── features/                 #   Feature-level tests
+│   ├── live-updates/             #   Live-update protocol, census, and recovery tests
+│   ├── perf/                     #   Performance benchmarks
 │   ├── shared/                   #   Shared component tests
-│   └── perf/                     #   Performance benchmarks
+│   └── typography/               #   Typography census and script rules
 ├── orval.config.ts               # Orval code generation config
 ├── vite.config.ts                # Vite build and dev server config
 ├── vitest.perf.config.ts         # Separate config for perf tests
@@ -127,7 +151,15 @@ Runs `yarn typecheck` followed by `vite build`. Type checking covers the app and
 | `yarn test:coverage` | Run tests with coverage report |
 | `yarn test:perf` | Run performance benchmarks |
 | `yarn generate` | Regenerate the API client from OpenAPI spec |
+| `yarn generate:check` | Regenerate the API client and verify no uncommitted diff remains |
+| `yarn test:browser-auth` | Run the Playwright browser authentication and DPoP transport suite |
+| `yarn test:audio-graph` | Run the Playwright Web Audio graph and media recovery suite |
+| `yarn test:store-debug` | Run the Playwright store isolation and debugger suite |
+| `yarn test:typography` | Run the Playwright multi-script typography suite |
+| `yarn e2e` | Run Playwright headed against an explicitly configured disposable app |
 | `yarn e2e:headless` | Run Playwright against an explicitly configured disposable app |
+| `yarn e2e:ui` | Open Playwright UI mode against an explicitly configured disposable app |
+| `yarn e2e:debug` | Run Playwright in debug mode against an explicitly configured disposable app |
 
 ## API Client Generation
 
@@ -159,17 +191,22 @@ Regenerate the client after any backend API changes (new endpoints, modified req
 The generated Orval hooks wrap TanStack Query. Use them directly in components:
 
 ```tsx
-import { useGetArtists } from '@/shared/api-client/gen/endpoints';
+import { useGetArtistIndex } from '@/shared/api-client/gen/endpoints';
 
 function ArtistsList() {
-  const { data, isLoading } = useGetArtists({ page: 1 });
+  const { data, isLoading } = useGetArtistIndex({ page: 1 });
   // ...
 }
 ```
 
 ### Zustand Stores
 
-Feature stores live in `features/<name>/stores/`. The auth store (`features/auth/stores/auth-store.ts`) is the primary example. Create a store when state is shared across many components or needs to persist beyond component lifecycle.
+Feature stores live in `features/<name>/stores/`. Create a store when state is shared across many components or needs to persist beyond component lifecycle:
+
+- Wrap store creators with outermost `withStoreDebug` from `@/shared/stores/` for opt-in development tracing.
+- For persisted stores, use `withNoopGuard` inside `persist` and `createSelectiveJSONStorage` from `@/shared/stores/` with an explicit `partialize` projection that excludes DOM references and transient state.
+- Keep the high-frequency playback clock in `player-time-tracker` outside durable Zustand state.
+- Authentication credentials and non-exportable DPoP keys use their own IndexedDB lifecycle (`features/auth/stores/auth-store.ts` and `src/shared/auth/`) rather than `localStorage`.
 
 ## Icons
 
@@ -264,15 +301,21 @@ command-line tool and the measured interoperability with FFmpeg.
 
 Shared UI components live in `src/shared/components/ui/`. Their current styling uses styled-components; components such as dialogs and menus retain Radix behavior. They include:
 
-Button, Card, Dialog, Sheet, Dropdown Menu, Context Menu, Command, Input, Textarea, Select, Slider, Tabs, Toggle, Tooltip, Scroll Area, Skeleton, Separator, Badge, Table, Toast (Sonner), and custom components like `DndSortable`, `FilterBar`, and `SortSelect`.
+Button, Card, Dialog, Sheet, Dropdown Menu, Context Menu, Command, Input, InputGroup, Textarea, Select, Slider, Switch, Tabs, Toggle, Tooltip, Scroll Area, Skeleton, Separator, Badge, Table, Toast (Sonner), and custom components like `DndSortable`, `FilterBar`, and `SortSelect`.
 
 Theme resolution and global CSS variables live in `src/shared/theme/`; generated
-design-token CSS is imported by `src/index.css`. The retained `components.json`
+design-token CSS is imported by `src/index.css`. Set interface typography with
+`textRole(role)` from `@/shared/theme` and user/catalog content titles with
+`ContentText` from `@/shared/typography` (passing the item's stored language and
+choosing the tag via the `element` prop rather than `as`). `tests/typography/census.test.ts`
+rejects literal font sizes, light weights, literal letter-spacing, and unapproved font
+families. The retained `components.json`
 contains shadcn generation metadata; it does not mean the current build uses
 Tailwind. Read the actual primitive before changing its variants or behavior.
 
 ## Backend Integration
 
 For authentication and endpoint contracts, see [Auth](contexts/auth.md) and
-[API Reference](api-reference.md). See [Real-Time Patterns](real-time-patterns.md)
-for WebSocket, and [AGENTS.md](../../AGENTS.md) for agent instructions.
+[API Reference](api-reference.md). See [Live Updates](live-updates.md) and
+[Real-Time Patterns](real-time-patterns.md)
+for WebSocket and live synchronization, and [AGENTS.md](../../AGENTS.md) for agent instructions.

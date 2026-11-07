@@ -23,10 +23,20 @@ The Catalog context manages the core media catalog: artists, albums, songs, movi
 | `ArtistRole` | Artist role on a track (primary artist, featured, etc.) |
 | `DiscogsId` | Discogs release identifier |
 | `MusicbrainzId` | MusicBrainz identifier |
+| `DuplicateGroup` | Group of duplicate albums sharing a normalized title and primary artist |
+| `LockedFields` | Lockable-field rules shared by `Album`, `Song`, and `Artist` |
+| `GenreReadView` | Read model (`Domain/ReadModel/`) for genre hierarchy and counts |
+
+### Domain Services
+
+| Service | Purpose |
+|---------|---------|
+| `AlbumDuplicateDetector` | Groups albums by normalized title and primary artist into `DuplicateGroup` instances |
+| `TitleNormalizer` | Normalizes album titles for duplicate comparison |
 
 ## Commands & Handlers
 
-The API controllers and the console commands dispatch the same commands and queries, so each edit, delete and cover change has one use case. A malformed public ID or UUID, an invalid value, or a rejected file raises `InvalidInputException` (HTTP 422, console exit `INVALID`). A missing item or credit raises `NotFoundException` (HTTP 404).
+The API controllers and the console commands dispatch the same commands and queries, so each edit, delete and cover change has one use case. A malformed public ID, an invalid value, or a rejected file raises `InvalidInputException` (HTTP 422, console exit `INVALID`). A missing item or credit raises `NotFoundException` (HTTP 404).
 
 | Command | Handler | Purpose |
 |---------|---------|---------|
@@ -92,7 +102,7 @@ The public delete routes pass only the public ID, so they keep the audio files a
 
 ## Artist Credits
 
-A credit links an artist to a song or an album (`CreditTarget`) with an `ArtistRole`; the song or album is named by its UUID. The `ArtistPortInterface` credit methods return `false` instead of throwing, and the handlers turn that into a 404 for an unknown artist, song or album, or an artist without the named credit. `ChangeArtistCreditRoleCommand` names the credit to change by its current role. The current role may be omitted when the artist has a single credit on the target; with several credits, omitting it is a 422. When the new role is one the artist already holds on the target, the changed credit is removed.
+A credit links an artist to a song or an album (`CreditTarget`) with an `ArtistRole`. In `AddArtistCreditCommand`, `ChangeArtistCreditRoleCommand`, and `RemoveArtistCreditCommand`, the target song or album is named by its 21-character `PublicId`, which `ArtistCreditInput::targetId()` resolves to a `Uuid`. The `ArtistPortInterface` credit methods return `false` instead of throwing, and the handlers turn that into a 404 for an unknown artist, song or album, or an artist without the named credit. `ChangeArtistCreditRoleCommand` names the credit to change by its current role. The current role may be omitted when the artist has a single credit on the target; with several credits, omitting it is a 422. When the new role is one the artist already holds on the target, the changed credit is removed.
 
 ## Ports
 
@@ -107,6 +117,8 @@ A credit links an artist to a song or an album (`CreditTarget`) with an `ArtistR
 | `MoviePortInterface` | Movie CRUD operations |
 | `SongPortInterface` | Song CRUD operations; `delete()` never touches the audio file |
 | `SongLookupInterface` | Song lookups published to Lyrics and Playlist |
+| `VideoPortInterface` | Video lookup and source metadata operations (`VideoService`) |
+| `SongAvailabilityPortInterface` | Batch file-availability checks for songs (`SongAvailability`) |
 
 ## Domain Events
 
@@ -209,12 +221,18 @@ Routes under `/api/admin/albums` and `/api/admin/songs` (controllers `AdminAlbum
 | Direction | Context | Details |
 |-----------|---------|---------|
 | Depends on | Shared | `Uuid`, `PublicId`, `CursorPage`, `PgroongaSearchTrait`, `Searchable`, `TransactionPortInterface` |
-| Depends on | Library | `LibraryMediaFilesInterface` checks and deletes audio files for album and song deletes and their previews |
+| Depends on | Library | `LibraryMediaFilesInterface` checks and deletes audio files for album and song deletes and their previews; `CatalogStatsQuery` implements `LibraryContentStatsInterface` |
 | Depends on | Media | `ImagePortInterface` and `StoragePortInterface` store and delete cover images |
 | Depends on | Filesystem | `MimeDetectorPortInterface` checks cover files |
 | Depends on | Playlist | `PlaylistDeletionPreviewPortInterface` names the playlists a delete affects |
-| Depended on by | Activity | References songs and albums |
-| Depended on by | Playlist | References songs |
+| Depends on | Lyrics | `FilesDiscoveredHandler` requests lyrics fetches through `LyricsFetchRequestInterface` |
+| Depends on | Metadata | `FilesDiscoveredHandler` requests album metadata syncs (`AlbumMetadataSyncRequestInterface`) and dispatches `ExtractAlbumCoverCommand` |
+| Depends on | Transcode | `FilesDiscoveredHandler` probes audio and video files through `AudioProbePortInterface` and `VideoProbePortInterface` |
+| Depended on by | Activity | References songs, albums, artists, and movies |
+| Depended on by | Library | `CatalogStatsQuery` implements `LibraryContentStatsInterface` |
+| Depended on by | Lyrics | Reads songs through `SongLookupInterface` |
+| Depended on by | Media | Uses `VideoPortInterface`, `SongRepositoryInterface`, and `SongAvailabilityPortInterface` |
+| Depended on by | Playlist | References songs through `SongLookupInterface` |
 | Depended on by | Recommendation | References artists and genres |
 | Depended on by | Metadata | Enriches catalog entities |
 
@@ -222,10 +240,13 @@ Routes under `/api/admin/albums` and `/api/admin/songs` (controllers `AdminAlbum
 
 | Component | Type | Purpose |
 |-----------|------|---------|
-| Doctrine entities | ORM | Persistence for all 6 aggregate roots |
-| Doctrine repositories | ORM | Repository implementations with `PgroongaSearchTrait` for full-text search |
-| Event listeners | Event | React to domain events (e.g., metadata sync reactions) |
-| `AlbumService`, `SongService`, `ArtistService`, `MovieService`, `GenreService`, `AlbumDuplicateService`, `SongLookupService` | Port implementation | Implement the matching ports |
+| Doctrine entities | ORM | Persistence for all 6 aggregate roots, plus `MovieCollectionEntity` and link entities |
+| Doctrine repositories | ORM | Repository implementations with `PgroongaSearchTrait` for full-text search, plus `MovieCollectionRepository` |
+| `CatalogStatsQuery`, `CatalogReadScopeQuery` | Doctrine query | Implement `LibraryContentStatsInterface` and catalog read-scope queries |
+| `AdminRateLimitListener` | Event listener | Rate-limits `POST /api/albums/covers/extract` |
+| `AlbumVoter` | Security | Voter for album access checks |
+| `CatalogMessagePayloadCodec` | Messaging | Messenger payload codec for catalog commands |
+| `AlbumService`, `SongService`, `ArtistService`, `MovieService`, `GenreService`, `VideoService`, `SongAvailability`, `AlbumDuplicateService`, `SongLookupService` | Port implementation | Implement the matching ports |
 | `AlbumMergeService` | Port implementation | Implements `AlbumMergePortInterface`: moves songs, fills metadata the target lacks, and skips the target's locked fields |
 
 ### Console Commands

@@ -1,6 +1,6 @@
 # Search
 
-Baander uses PGroonga (a PostgreSQL extension for full-text search) to power search across catalog entities (albums, artists, songs, movies, videos). Search is integrated at the repository level via the `PgroongaSearchTrait`.
+Baander uses PGroonga (a PostgreSQL extension for full-text search) to power search across catalog entities (albums, artists, songs, and movies). Search is integrated at the repository level via the `PgroongaSearchTrait`.
 
 ## How It Works
 
@@ -37,10 +37,13 @@ The `Searchable` interface requires a `search(SearchOptions $options): SearchRes
 
 ### 2. Use `PgroongaSearchTrait` in the repository implementation
 
-The trait provides two query builders:
+The trait provides three query builders:
 
-- **`buildScoredQuery()`** — returns entities with relevance scores (for search results)
-- **`buildFilterQuery()`** — applies text matching as a filter within a cursor-paginated listing
+- **`buildScoredQuery()`** — returns entities with relevance scores (`pgroonga_score`)
+- **`buildScopedScoredQuery()`** — returns entities with relevance scores restricted by a native SQL visibility and filter predicate
+- **`buildFilterQuery()`** — applies text matching as a filter within a query builder listing
+
+Catalog repositories enforce library visibility through `CatalogReadScopeQuery::native()`, delegating `search(SearchOptions $options)` to `searchVisible($options, LibraryReadScope::unrestricted())`:
 
 ```php
 // src/Catalog/Infrastructure/Doctrine/Repository/AlbumRepository.php
@@ -50,12 +53,20 @@ final class AlbumRepository implements AlbumRepositoryInterface
 
     public function search(SearchOptions $options): SearchResult
     {
-        $result = $this->buildScoredQuery(
+        return $this->searchVisible($options, LibraryReadScope::unrestricted());
+    }
+
+    public function searchVisible(SearchOptions $options, LibraryReadScope $scope): SearchResult
+    {
+        $nativeScope = CatalogReadScopeQuery::native($scope, 'e.library_id', 'scope_library_ids');
+        $result = $this->buildScopedScoredQuery(
             options: $options,
             em: $this->entityManager,
             entityClass: AlbumEntity::class,
             tableName: 'albums',
             searchColumn: 'title',
+            whereSql: $nativeScope['sql'],
+            parameters: $nativeScope['params'],
         );
 
         $models = array_map(
@@ -86,14 +97,19 @@ WITH (plugins='token_filters/stem', tokenizer='TokenNgram',
 
 ## SearchOptions
 
-The `SearchOptions` value object carries the search parameters:
+The `SearchOptions` value object (`src/Shared/Domain/Model/SearchOptions.php`) holds private properties read via getters (`getQuery()`, `getLimit()`, `getOffset()`, `getFilters()`, etc.) and updated via immutable `with*()` methods:
 
 | Property | Type | Description |
 |----------|------|-------------|
 | `query` | `string` | The search text |
-| `limit` | `int` | Maximum results to return |
-| `offset` | `int` | Number of results to skip |
-| `filters` | `array` | Additional filter criteria |
+| `fields` | `list<string>` | Specific fields to search (`[]` uses the repository default) |
+| `limit` | `int` | Maximum results to return (default `20`, capped at `100`) |
+| `offset` | `int` | Number of results to skip (default `0`) |
+| `minScore` | `float` | Minimum relevance score threshold (default `0.0`) |
+| `filters` | `array<string, mixed>` | Additional filter criteria |
+| `cursor` | `?Cursor` | Optional cursor token for cursor-paginated search |
+| `sortField` | `?string` | Optional field to sort by |
+| `sortOrder` | `string` | Sort direction (`'asc'` or `'desc'`, default `'asc'`) |
 
 When `query` is empty, `buildFilterQuery()` returns all items (no text filter applied). This makes the same repository method work for both search and listing.
 

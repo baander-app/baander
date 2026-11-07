@@ -12,7 +12,7 @@ PostgreSQL index and constraint names in Baander follow one scheme: a type prefi
 | Index with a non-B-tree access method or an extension operator class | `idx_<table>_<columns>_<suffix>` | `idx_songs_title_pgroonga`, `idx_songs_public_id_trgm` |
 | Migration-only partial, expression or polymorphic index | `idx_<table>_<purpose>`, or `uniq_<table>_<purpose>` when unique | `idx_albums_cover_image_null`, `idx_images_imageable`, `uniq_genres_name_lower` |
 | Primary key | `<table>_pkey` (PostgreSQL default) | `songs_pkey` |
-| Check constraint | `chk_<table>_<purpose>` | `chk_oauth_device_codes_single_decision` |
+| Check constraint | `chk_<table>_<purpose>` (preferred for new constraints; existing migrations also retain PostgreSQL `<table>_<column>_check` names and shortened prefixes such as `chk_transcode_runtime_*` and `chk_audio_rendition_*`) | `chk_oauth_device_codes_single_decision` |
 
 - List columns in index order, separated by underscores: `idx_notifications_user_id_created_at`.
 - A B-tree index takes no suffix. The suffixes for other indexes are defined in [Extension Indexes](#extension-indexes).
@@ -64,7 +64,7 @@ The database image installs PGroonga package `4.0.5-1`. The operator classes and
 - **Association foreign keys** cannot be named in a mapping. DBAL matches foreign keys by definition, so a migration-chosen `fk_` name does not show up as drift.
 - **Implicit foreign-key indexes.** For every mapped or declared foreign key, DBAL adds an index named `IDX_<hash>` unless an index on exactly the same columns already exists. When a migration creates that single-column index itself, declare it on the entity with its `idx_` name, as `PushSubscriptionEntity` does; otherwise schema comparison reports a rename to `IDX_<hash>`. Do not create that index when another index already leads with the foreign-key column, such as a unique index on `(user_id, media_type)`: the composite index serves the lookups, and because DBAL then adds the same `IDX_<hash>` to both the mapped and the introspected table, schema comparison stays clean.
 
-`tests/Integration/DatabaseNamingConventionTest.php` reads the migrated catalog and fails on any foreign key, unique constraint or index whose name breaks these rules. It also checks that schema comparison is clean.
+`tests/Integration/DatabaseNamingConventionTest.php` reads the migrated catalog and fails on any foreign key, unique constraint, primary key or index (`contype IN ('f', 'u', 'p', 'x')`) whose name breaks these rules; `CHECK` constraints (`contype = 'c'`) are not currently inspected by that test. It also checks that schema comparison is clean.
 
 ## See Also
 

@@ -8,8 +8,8 @@ The Discovery context handles local-network server discovery and device pairing.
 
 | Model | Purpose |
 |-------|---------|
-| `ServerInstance` | A registered self-hosted server instance (URL, name, version, API key, status) |
-| `PairingSession` | A short-lived pairing session linking a client to a server via a pairing code |
+| `ServerInstance` | A registered self-hosted server instance (`ServerInstanceState`: URL, name, version, API key, status) |
+| `PairingSession` | A short-lived pairing session (`PairingSessionState`) linking a client to a server via a pairing code |
 
 ### Value Objects
 
@@ -66,6 +66,8 @@ All endpoints are prefixed with `/api`.
 |-----------|------|---------|
 | `ServerInstanceEntity` / `PairingSessionEntity` | Doctrine entity | Persistence for both aggregates |
 | `ServerInstanceRepository` / `PairingSessionRepository` | Doctrine repository | Repository implementations for both aggregates |
+| `DiscoveryForeignKeys` | Doctrine foreign key provider | Declares `fk_pairing_sessions_server_id` (`pairing_sessions.server_id` → `server_instances.id`, `ON DELETE CASCADE`) |
+| `DiscoveryRateLimitListener` | Event listener | Per-IP rate limiting on `POST /api/discovery/register`, `POST /api/discovery/pairing-code`, and `POST /api/discovery/complete-pairing` |
 | `ServerInstanceService` | Port implementation | Backs `ServerInstancePortInterface` |
 | `DiscoveryService` | Port implementation | Backs `DiscoveryPortInterface` |
 

@@ -20,6 +20,7 @@ State value objects `SyncedPartySessionState` and `PartyMemberState` keep constr
 |-------|---------|
 | `PartySessionCreated` | Emitted when a new party is created |
 | `MemberJoined` | Emitted when a user joins a party |
+| `MemberLeft` | Emitted when a user leaves a party |
 | `PartySessionEnded` | Emitted when a party is closed |
 
 ## Commands and Handlers
@@ -38,14 +39,19 @@ State value objects `SyncedPartySessionState` and `PartyMemberState` keep constr
 
 ## Ports
 
-| Port | Purpose |
-|------|---------|
-| `PartySessionPortInterface` | Session lifecycle operations (create, end, query) |
-| `PartyMemberPortInterface` | Member operations (join, leave, role transfer) |
+| Port | Purpose | Implemented By |
+|------|---------|----------------|
+| `SyncedPartySessionRepositoryInterface` | Domain repository contract for `SyncedPartySession` persistence and queries | `SyncedPartySessionRepository` |
+| `PartyMemberRepositoryInterface` | Domain repository contract for `PartyMember` persistence and queries | `PartyMemberRepository` |
+| `PartySessionPortInterface` | Session lifecycle operations (create, end, query) | `PartySessionService` |
+| `PartyMemberPortInterface` | Member operations (join, leave, role transfer) | `PartyMemberService` |
+| `PartyMediaAccessPortInterface` | Verifies that the host may play the session's video and that any named transcode job encodes it | `PartyMediaAccess` |
+| `PartyPublicIdentityPortInterface` | Resolves public and internal identifiers for party sessions, members, users, videos, and transcode jobs | `PartyPublicIdentity` |
+| `PlaybackSynchronizationPortInterface` | Wall-clock position calculation and jitter compensation | `PlaybackSynchronizer` |
 
 ## API Endpoints
 
-REST endpoints use `/api/party/sessions`. Session `{uuid}` parameters are UUIDs, not `PublicId` NanoIDs. Session resources expose both `uuid` and the separate 21-character `publicId`.
+REST endpoints use `/api/party/sessions`. Every session route parameter is `{publicId}` (a 21-character `PublicId`), and `PartySessionResource` exposes `publicId` rather than internal UUIDs.
 
 ### Party Sessions
 
@@ -53,24 +59,24 @@ REST endpoints use `/api/party/sessions`. Session `{uuid}` parameters are UUIDs,
 |--------|------|------------|---------|
 | GET | `/api/party/sessions/` | `PartySessionController` | List parties |
 | POST | `/api/party/sessions/` | `PartySessionController` | Create a new party |
-| GET | `/api/party/sessions/{uuid}` | `PartySessionController` | Get a single party session |
-| DELETE | `/api/party/sessions/{uuid}` | `PartySessionController` | End a party session |
+| GET | `/api/party/sessions/{publicId}` | `PartySessionController` | Get a single party session |
+| DELETE | `/api/party/sessions/{publicId}` | `PartySessionController` | End a party session |
 
 ### Party Members
 
 | Method | Path | Controller | Purpose |
 |--------|------|------------|---------|
-| POST | `/api/party/sessions/{uuid}/join` | `PartySessionController` | Join a party |
-| POST | `/api/party/sessions/{uuid}/leave` | `PartySessionController` | Leave a party |
-| GET | `/api/party/sessions/{uuid}/members/` | `PartyMemberController` | List party members |
-| PATCH | `/api/party/sessions/{uuid}/members/me` | `PartyMemberController` | Update the current member's playback preferences |
-| POST | `/api/party/sessions/{uuid}/members/transfer-host` | `PartyMemberController` | Transfer the host role |
+| POST | `/api/party/sessions/{publicId}/join` | `PartySessionController` | Join a party |
+| POST | `/api/party/sessions/{publicId}/leave` | `PartySessionController` | Leave a party |
+| GET | `/api/party/sessions/{publicId}/members/` | `PartyMemberController` | List party members |
+| PATCH | `/api/party/sessions/{publicId}/members/me` | `PartyMemberController` | Update the current member's playback preferences |
+| POST | `/api/party/sessions/{publicId}/members/transfer-host` | `PartyMemberController` | Transfer the host role |
 
 ### Playback
 
 | Method | Path | Controller | Purpose |
 |--------|------|------------|---------|
-| POST | `/api/party/sessions/{uuid}/sync` | `PartySessionController` | Sync playback state |
+| POST | `/api/party/sessions/{publicId}/sync` | `PartySessionController` | Sync playback state |
 
 ### WebSocket
 
@@ -78,16 +84,16 @@ REST endpoints use `/api/party/sessions`. Session `{uuid}` parameters are UUIDs,
 |------|------------|---------|
 | `GET /ws/party/{sessionPublicId}/` | `PartyWebSocketController` | HTTP lookup of session details and WebSocket connection URL |
 
-The lookup takes the session's 21-character `PublicId`, rather than its UUID. It sits outside the default `/api` OpenAPI export. Playback messages and state broadcasts use the shared WebSocket runtime, not the HTTP lookup controller.
+The lookup takes the session's 21-character `PublicId`. It sits outside the default `/api` OpenAPI export. Playback messages and state broadcasts use the shared WebSocket runtime, not the HTTP lookup controller.
 
 ## Cross-Context Dependencies
 
 | Direction | Context | Relationship |
 |-----------|---------|-------------|
-| Depends on | Shared | Uses `Uuid` for identifiers |
-| Depends on | Transcode | References video and transcode job data |
+| Depends on | Shared | Uses `Uuid`, `PublicId`, and `LivePartyRoomsPortInterface` |
+| Depends on | Catalog | `PartyPublicIdentity` and `PartyMediaAccess` resolve video records |
+| Depends on | Transcode | References video playback access (`PlaybackAccessInterface`) and transcode job data |
 | Depends on | Auth | User identification and authentication |
-| Depended on by | Notification | Party events trigger notifications |
 
 ## Infrastructure
 
@@ -105,9 +111,10 @@ The lookup takes the session's 21-character `PublicId`, rather than its UUID. It
 |---------|---------|
 | `PartySessionService` | Session lifecycle management |
 | `PartyMemberService` | Member management |
-| `PlaybackSynchronizer` | Wall-clock sync with jitter compensation |
-
-The `Infrastructure/Playback/` directory contains the jitter compensation and synchronization logic.
+| `PartyMediaAccess` | Checks video playback access and transcode job ownership via `PlaybackAccessInterface` |
+| `PartyPublicIdentity` | Translates between internal `Uuid` values and 21-character `PublicId` values |
+| `PlaybackSynchronizer` | Wall-clock sync with jitter compensation (`src/Party/Infrastructure/PlaybackSynchronizer.php`) |
+| `LivePartyRoomListener` | Removes departed members from live WebSocket party rooms on `MemberLeft` and closes rooms on `PartySessionEnded` |
 
 ### WebSocket
 

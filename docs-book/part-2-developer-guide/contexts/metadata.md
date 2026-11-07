@@ -1,6 +1,6 @@
 # Metadata
 
-The Metadata context enriches catalog entities with data from external music APIs: Discogs, Last.fm, Spotify, MusicBrainz, and TasteDive. It handles metadata matching (pairing scanned files with external records), cover art retrieval, and audio file tag parsing (FLAC, ID3, OGG, WAV).
+The Metadata context enriches catalog entities with data from external music and movie APIs: Discogs, Last.fm, Spotify, MusicBrainz, TasteDive, CoverArtArchive, and TMDB (`TmdbAdapter` and `MovieMetadataEnricher`). It handles metadata matching (pairing scanned files with external records), cover art retrieval, and audio file tag parsing (FLAC, ID3, OGG, WAV).
 
 ## Domain Models
 
@@ -23,11 +23,13 @@ The Metadata context enriches catalog entities with data from external music API
 | `SyncGenresMessage` | `SyncGenresHandler` | Queue a forced sync of every album and its songs; returns the number queued |
 | `SyncSongMessage` | `SyncSongHandler` | Enrich a single song |
 
+Application enricher services (`AlbumMetadataEnricher`, `ArtistMetadataEnricher`, `SongMetadataEnricher`, and `MovieMetadataEnricher` in `Application/MovieMetadataEnricher.php`) perform the external lookups and write enriched fields and genres back to Catalog through its ports.
+
 ## Automatic Sync of New Albums
 
 While the `metadata.auto_sync` system setting is on, Catalog ingest asks Metadata to sync each album it creates. `FilesDiscoveredHandler` calls `AlbumMetadataSyncRequestInterface::requestSync()` once the flush that stores the new album has run, before it adds the album's songs or reports failed files. A retry or rescan finds the album and creates none, so it requests nothing. Because a retry would not request the sync again, the request is best-effort: if it throws, ingest logs the error with the album ID and carries on. A full library metadata sync from the admin panel picks the album up.
 
-`AlbumMetadataSyncRequester` reads the setting on every call. When the setting is on, it calls `MetadataSyncOrchestrator::syncAlbum()` for each album. The orchestrator dispatches `SyncAlbumMessage`, which runs later from the `swoole_task` queue, or from the Redis `async` transport outside the Swoole server, so ingest does not wait for the external lookups. The setting is off by default.
+`AlbumMetadataSyncRequester` reads the setting on every call. When the setting is on, it calls `MetadataSyncOrchestrator::syncAlbum()` for each album. The orchestrator dispatches `SyncAlbumMessage`, which runs later from the Redis `async` transport, so ingest does not wait for the external lookups. The setting is off by default.
 
 The admin sync, `POST /api/admin/metadata/trigger-sync`, and `app:metadata:sync` dispatch `SyncMetadataCommand` and ignore the setting. The command runs it through `JobMonitorAdministrationInterface::runInline()`, which records the run in the job monitor. An unknown source is rejected with a 422 response or an invalid-input exit.
 
@@ -62,16 +64,31 @@ Routes under `/api/admin/metadata` (controller `MetadataAdminController`, gated 
 | POST | `/api/admin/metadata/trigger-sync` | `MetadataAdminController` | Queue a sync for every library, or with `source: genres` only the genre sync; returns the number of jobs queued |
 | GET | `/api/admin/metadata/providers` | `MetadataAdminController` | List configured metadata providers |
 
+### Console Commands
+
+| Command | Class | Purpose |
+|---------|-------|---------|
+| `app:metadata:sync` | `MetadataSyncCommand` | Queue a metadata sync for every library, or with `--source=genres` only the genre sync |
+| `app:metadata:status` | `MetadataStatusCommand` | Show metadata sync status: track coverage, last sync time, and sync job counts by type |
+| `app:metadata:providers` | `MetadataProvidersCommand` | List metadata providers and whether each one is enabled and configured |
+
 ## Cross-Context Dependencies
 
 | Direction | Context | Relationship |
 |-----------|---------|-------------|
-| Depends on | Shared | Uses `Uuid` for identifiers, and `SystemSettingsPortInterface` for `metadata.auto_sync` |
-| Depends on | Catalog | Updates albums, artists, and songs with enriched data |
+| Depends on | Shared | Uses `Uuid` for identifiers, `PublicHttpClient` and `Async` for external HTTP calls, and `SystemSettingsPortInterface` for `metadata.auto_sync` |
+| Depends on | Catalog | Updates albums, artists, songs, movies, and genres via `AlbumPortInterface`, `ArtistPortInterface`, `SongPortInterface`, `MoviePortInterface`, and `GenrePortInterface`; `MetadataContentReader` implements `MetadataContentReaderPortInterface` |
 | Depends on | Library | `MetadataSyncOrchestrator` looks up libraries through `LibraryPortInterface` |
-| Depended on by | Catalog | Ingest requests a sync of each new album through `AlbumMetadataSyncRequestInterface` (the `Metadata Album Sync Request Contract` Deptrac layer) |
+| Depends on | Media | `ExtractAlbumCoverHandler` stores cover art via `ImagePortInterface` and `StoragePortInterface` |
+| Depended on by | Catalog | Ingest reads embedded tags via `MetadataContentReaderPortInterface`, dispatches `ExtractAlbumCoverCommand`, and requests a sync of each new album through `AlbumMetadataSyncRequestInterface` (the `Metadata Album Sync Request Contract` Deptrac layer) |
 
 ## Infrastructure
+
+| Component | Purpose |
+|-----------|---------|
+| `MetadataContentReader` | Implements Catalog's `MetadataContentReaderPortInterface` by detecting audio format via `FormatDetector` and delegating to the matching tag reader |
+| `MetadataAdminService` | Implements `MetadataAdminPortInterface`, querying `songs`, `genre_song`, and `job_monitors` for sync status and reporting configured providers |
+| `MetadataMessagePayloadCodec` | Encodes and decodes `ExtractAlbumCoverCommand`, `SyncMetadataCommand`, `SyncAlbumMessage`, `SyncLibraryMessage`, and `SyncSongMessage` for the `async` transport and job monitor |
 
 ### External API Adapters
 
@@ -85,6 +102,7 @@ Each adapter lives under `Infrastructure/Api/<Provider>/` and includes its own D
 | `MusicBrainzAdapter` | `Infrastructure/Api/MusicBrainz/` |
 | `TasteDiveAdapter` | `Infrastructure/Api/TasteDive/` |
 | `CoverArtArchiveAdapter` | `Infrastructure/Api/CoverArtArchive/` |
+| `TmdbAdapter` | `Infrastructure/Api/Tmdb/` (`Infrastructure/Api/Tmdb/TmdbAdapter.php`; DTOs: `TmdbMovieDto`, `TmdbCollectionDto`, `TmdbGenreDto`, `TmdbSearchResultDto`) |
 
 ### Audio Format Readers
 

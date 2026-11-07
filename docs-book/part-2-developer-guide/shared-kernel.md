@@ -15,6 +15,10 @@
 | `SearchOptions` | Search query parameters | `Domain/Model/SearchOptions.php` |
 | `SearchResult` | Search result with relevance data | `Domain/Model/SearchResult.php` |
 | `JobStatus` | Async job status enum | `Domain/Model/JobStatus.php` |
+| `SystemSetting` | Persisted server setting aggregate | `Domain/Model/SystemSetting.php` |
+| `LibraryReadScope` | Library visibility filter for catalog and media queries | `Domain/ValueObject/LibraryReadScope.php` |
+| `MediaReadScope` | Media visibility scope across libraries and party sessions | `Domain/ValueObject/MediaReadScope.php` |
+| `FilesystemType` | Storage filesystem classification (`local`, `network`, etc.) | `Domain/ValueObject/FilesystemType.php` |
 
 ### UUID v7
 
@@ -65,13 +69,13 @@ Infrastructure code may call `Async::sleep()` directly.
 
 Never call `sleep()`, `usleep()`, or `Swoole\Coroutine::sleep()` directly.
 
-### Process Pool
+### Server Control and Native Execution
 
-`Swoole\ProcessPool` provides isolated worker processes for CPU-bound work (like FFmpeg transcoding). Workers communicate via Unix sockets (`SWOOLE_IPC_UNIXSOCK`).
+`ServerControlPortInterface` coordinates state across Swoole HTTP workers (via an in-server coordinator for HTTP requests and a `0600` Unix socket for CLI commands). CPU-bound media probing and FFmpeg encoding run outside the web server in the worker deployment pair through `NativeExecutionClientInterface` (`bin/worker-native.php`).
 
 ### WebSocket
 
-- `WebSocketConnectionRegistry` — tracks active WebSocket connections
+- `WebSocketConnectionRegistry` — tracks active WebSocket connections (`user_id`, `access_token_id`, `worker_id`, `connected_at`)
 - `WebSocketPusher` — pushes messages to connected clients
 
 ## Job Monitoring
@@ -89,7 +93,7 @@ See the [Real-Time Patterns](real-time-patterns.md) page for WebSocket details.
 ## Redis
 
 - **Caching** — tag-aware cache pools via `RedisTagAwareAdapter`. The `noeviction` policy is required for tag invalidation to work correctly.
-- **Session storage** — user sessions stored in Redis
+- **Ephemeral coordination and streams** — Messenger `async` and `scheduler` streams, DPoP nonces and replay JTI markers, single-use WebSocket handshake tickets, rate-limiter state, and worker health heartbeats.
 
 ## Controllers
 
@@ -99,11 +103,15 @@ The Shared kernel provides several shared controllers:
 |-----------|------|---------|
 | `HealthCheckController` | `/health`, `/ready`, `/live` | Health and readiness probes |
 | `ServerStatsControllerWithCoroutines` | `/api/debug/stats` | Server diagnostics |
+| `WorkerStatsController` | `/api/debug/workers` | Swoole worker diagnostics |
+| `CoroutineStatsController` | `/api/debug/coroutines` | Active coroutine diagnostics |
+| `SpanDebugController` | `/api/debug/spans` | Request and operation span diagnostics |
 | `JobMonitorController` | `/api/monitor/*` | Job status and management |
+| `SystemSettingsController` | `/api/admin/settings` | System settings administration |
 | `PrometheusMetricsController` | `/metrics` | Prometheus metrics endpoint |
-| `WebSocketController` | `/ws` | WebSocket endpoint |
+| `WebSocketController` | `/api/ws` | WebSocket endpoint |
 
-The health probes, `/metrics` and `/ws` sit outside the `/api` routes covered by the default OpenAPI export. `/metrics` serves Prometheus text rather than an API resource envelope.
+The health probes, `/metrics` and `/api/ws` sit outside the HTTP REST routes covered by the default OpenAPI export. `/metrics` serves Prometheus text rather than an API resource envelope.
 
 ## DTOs
 

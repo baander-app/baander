@@ -4,17 +4,17 @@ Each bounded context owns one business capability, with its own domain model, ru
 
 | Page | Description |
 |------|-------------|
-| [Activity](activity.md) | Listen history and favorites tracking |
+| [Activity](activity.md) | Play history, love/skip tracking, recently played items, and play analytics |
 | [Auth](auth.md) | OAuth 2.0 server, passkeys, TOTP, and DPoP |
 | [Catalog](catalog.md) | Artists, albums, songs, movies, videos, and genres |
-| [Command](command.md) | CLI utilities (OpenAPI export) |
+| [Command](command.md) | CLI utilities (OpenAPI export, documentation generation, dev setup, OAuth key generation) |
 | [Discovery](discovery.md) | LAN server discovery and device pairing |
 | [Favorites](favorites.md) | User favorites (songs, artists, albums) |
-| [Filesystem](filesystem.md) | MIME detection and inotify file watching |
+| [Filesystem](filesystem.md) | Local/read-only filesystem abstractions, MIME detection, and inotify file watching |
 | [Library](library.md) | Media library management and file scanning |
 | [Lyrics](lyrics.md) | Lyrics storage and retrieval |
-| [Media](media.md) | Image storage, streaming, and BlurHash |
-| [Metadata](metadata.md) | External API enrichment (Discogs, Last.fm, Spotify, MusicBrainz) |
+| [Media](media.md) | Image storage, media streaming, playback delivery negotiation, and BlurHash |
+| [Metadata](metadata.md) | Audio/video tag parsing and external API enrichment (Discogs, Last.fm, Spotify, MusicBrainz, TasteDive, CoverArtArchive, TMDB) |
 | [Notification](notification.md) | Push, email, webhook, and in-app notifications |
 | [Party](party.md) | Synchronized watch-party playback |
 | [Playlist](playlist.md) | Manual and smart playlist management |

@@ -6,9 +6,11 @@ The Playlist context manages user-created playlists (manual song collections) an
 
 | Model | Type | Purpose |
 |-------|------|---------|
-| `Playlist` | Aggregate Root | A playlist with name, description, visibility, and song list |
+| `Playlist` | Aggregate Root | A playlist with name, description, visibility, collaborator IDs, and song list |
 | `SmartPlaylist` | Aggregate Root | A playlist with dynamic content populated by rules |
 | `PlaylistSong` | Model | A song within a playlist with an ordered position |
+| `PlaylistPersistenceSnapshot` | Value Object | Captures persistence version, song positions, and collaborator IDs for compare-and-swap writes and revision hashing |
+| `PlaylistReadView` | Read Model | Viewer-scoped projection with owner and collaborator public IDs and visible song count |
 
 ## Domain Events
 
@@ -31,11 +33,14 @@ The Playlist context manages user-created playlists (manual song collections) an
 
 ## Ports
 
-| Port | Purpose |
-|------|---------|
-| `PlaylistPortInterface` | Playlist CRUD operations |
-| `PlaylistCollaboratorResolverInterface` | Turns a user's public id into the user id, through the Auth user-identifier contract's public-id lookup only |
-| `PlaylistSongVisibilityInterface` | Answers whether a song is visible under a read scope, through the Catalog song-lookup contract |
+| Port | Purpose | Implemented By |
+|------|---------|----------------|
+| `PlaylistRepositoryInterface` | Domain repository contract for `Playlist` persistence, compare-and-swap writes, and read projections | `PlaylistRepository` |
+| `PlaylistPortInterface` | Playlist CRUD operations | `PlaylistService` |
+| `PlaylistDeletionPreviewPortInterface` | Lists distinct playlists containing given song IDs for catalog deletion previews | `PlaylistService` |
+| `PlaylistAudienceReader` | Resolves readable playlist IDs for a principal during live-update audience routing | `DoctrinePlaylistAudienceReader` |
+| `PlaylistCollaboratorResolverInterface` | Turns a user's public id into the user id, through the Auth user-identifier contract's public-id lookup only | `PlaylistCollaboratorResolver` |
+| `PlaylistSongVisibilityInterface` | Answers whether a song is visible under a read scope, through the Catalog song-lookup contract | `PlaylistSongVisibility` |
 
 ## API Endpoints
 
@@ -43,7 +48,7 @@ All endpoints are prefixed with `/api`.
 
 | Method | Path | Controller | Purpose |
 |--------|------|------------|---------|
-| GET | `/api/playlists` | `PlaylistController` | List user's playlists (cursor-paginated) |
+| GET | `/api/playlists` | `PlaylistController` | List the playlists the user owns or collaborates on |
 | POST | `/api/playlists` | `PlaylistController` | Create a new playlist |
 | GET | `/api/playlists/{publicId}` | `PlaylistController` | Get a single playlist with its songs |
 | PATCH | `/api/playlists/{publicId}` | `PlaylistController` | Update playlist metadata |
@@ -106,10 +111,10 @@ retried as conflicts.
 
 | Direction | Context | Relationship |
 |-----------|---------|-------------|
-| Depends on | Shared | Uses `Uuid`, `PublicId`, `CursorPaginatedResponse` |
-| Depends on | Catalog | References songs from the catalog |
-| Depended on by | Activity | Playlist play events feed listen history |
-| Depended on by | Recommendation | Playlist data informs music suggestions |
+| Depends on | Shared | Uses `Uuid` and `PublicId` |
+| Depends on | Auth | Uses `AuthenticatedUserIdentityInterface` and `UserIdentifierResolverInterface` |
+| Depends on | Library | Uses `LibraryReadScopeProviderInterface` to scope visible songs and counts |
+| Depends on | Catalog | References songs and checks visibility and availability (`SongPortInterface`, `SongLookupInterface`, `SongAvailabilityPortInterface`) |
 
 ## Infrastructure
 
@@ -138,6 +143,9 @@ the in-memory object.
 
 | Service | Purpose |
 |---------|---------|
-| `PlaylistService` | Playlist and song management operations |
+| `PlaylistRepository` | Doctrine implementation of `PlaylistRepositoryInterface` with compare-and-swap persistence |
+| `PlaylistService` | Implements `PlaylistPortInterface` and `PlaylistDeletionPreviewPortInterface` |
+| `DoctrinePlaylistAudienceReader` | Implements `PlaylistAudienceReader` for live-update audience routing |
 | `PlaylistCollaboratorResolver` | Adapter for the collaborator resolver port |
 | `PlaylistSongVisibility` | Adapter for the song visibility port |
+| `PlaylistVoter` | Authorization voter evaluating `VIEW`, `EDIT_SONGS`, `EDIT`, `DELETE`, `MANAGE_COLLABORATORS`, and `LEAVE` on `Playlist` aggregates |

@@ -1,6 +1,6 @@
 # Real-Time Patterns
 
-Baander has one real-time transport: a WebSocket connection served by Swoole. It carries watch-party sync and member events, listening-session sync, transcode position reports, and server pushes to a user's open connections. Notifications and the admin pages do not hold a stream open; they read over HTTP, as [Delivery without a stream](#delivery-without-a-stream) describes.
+Baander has one real-time transport: a WebSocket connection served by Swoole at `/api/ws`. It carries `live.*` live-update subscriptions and change hints, watch-party sync and member events, playback-session coordination, transcode position reports, and server pushes to a user's open connections. Notifications and admin views do not hold dedicated SSE streams open; they refresh through WebSocket `live.changed` hints and coordinated HTTP reads, as [Delivery without a stream](#delivery-without-a-stream) and [Live Updates](live-updates.md) describe.
 
 ## WebSocket
 
@@ -12,11 +12,11 @@ WebSocket connections are managed through Swoole's process mode. The `WebSocketC
 
 | Table | Purpose | Key format |
 |-------|---------|------------|
-| `connections` | Maps file descriptor to user identity and worker ID | `{fd}` |
+| `connections` | Maps file descriptor to `user_id`, `access_token_id`, `worker_id`, and `connected_at` | `{fd}` |
 | `roomMembers` | Maps room membership (for broadcasting) | `{room}\0{fd}` |
 | `fdRooms` | Reverse index: which rooms a connection belongs to | `{fd}\0{room}` |
 
-Each user is limited to 10 concurrent WebSocket connections. Orphaned entries (connections whose underlying TCP socket has closed) are cleaned up by `cleanupOrphans()`, which calls `Swoole\Server::isEstablished()` to verify the connection is still alive.
+`access_token_id` binds the connection to its authorizing token chain so logout, token revocation, and `RevokedSocketReconciler` can close affected connections across workers. Each user is limited to 10 concurrent WebSocket connections. Orphaned entries (connections whose underlying TCP socket has closed) are cleaned up by `cleanupOrphans()`, which calls `Swoole\Server::isEstablished()` to verify the connection is still alive.
 
 ### Message Pushing
 
@@ -24,8 +24,8 @@ Each user is limited to 10 concurrent WebSocket connections. Orphaned entries (c
 
 | Method | Target | Use case |
 |--------|--------|----------|
-| `pushToConnection(fd, payload)` | Single connection by file descriptor | Replies, error messages |
-| `push(userId, payload)` | All connections for a user | User-scoped notifications |
+| `pushToConnection(fd, payload)` | Single connection by file descriptor | Replies, error messages, `live.*` frames |
+| `push(userId, payload)` | All connections for a user | User-scoped playback snapshots |
 | `broadcast(room, payload)` | All members of a room | Party member events |
 
 All payloads are JSON-encoded before sending. Failed pushes (disconnected clients) are logged and silently skipped.
@@ -36,11 +36,11 @@ A room's members receive everything broadcast to it, so a connection joins a roo
 
 | Room | Joined by | Left by | Broadcasts |
 |------|-----------|---------|------------|
-| `party:{sessionId}` | `party.join`, after `JoinPartySessionCommand` accepts the user as a member of the party | Every socket of a member who leaves the party, with `party.leave` or `POST /api/party/sessions/{uuid}/leave`; every socket when the party ends; one socket with `room.leave` or by closing | `party.member_event` |
+| `party:{sessionUuid}` | `party.join` (client passes party `publicId` as `sessionId`, resolved to the party's internal UUID after `JoinPartySessionCommand` accepts the user) | Every socket of a member who leaves the party, with `party.leave` or `POST /api/party/sessions/{publicId}/leave`; every socket when the party ends; one socket with `room.leave` or by closing | `party.member_event` |
 
 A party room follows the party's membership. `LeavePartySessionHandler` dispatches `MemberLeft`, and `EndPartySessionHandler` (or a leave that ends the party) dispatches `PartySessionEnded`. `LivePartyRoomListener` in Party Infrastructure hears both and calls `LivePartyRoomsPortInterface`. Its implementation, `SwooleLivePartyRooms`, takes every socket of the member out of the room and sends the sockets left in it one `party.member_event` leave event, or empties the room when the party ends. The registry's tables are shared by every worker, so the worker that runs the leave changes sockets on any worker. Outside an HTTP worker of the running server (a console command, a Messenger worker, a test kernel) the port does nothing.
 
-No other room exists. Pushes to one user, such as `session.claimed` and `session.state`, go through `push(userId, payload)` and need no room. `room.join` joins nothing: it answers a party room with `Party rooms are joined with party.join` and any other name with `Unknown room`, and logs a warning. No client sends it. A new room kind gets its join rule in `WebSocketRoomPolicy` and a row here.
+No other room exists. Pushes to one user, such as `session.snapshot`, go through `push(userId, payload)` and need no room. `room.join` joins nothing: it answers a party room with `Party rooms are joined with party.join` and any other name with `Unknown room`, and logs a warning. No client sends it. A new room kind gets its join rule in `WebSocketRoomPolicy` and a row here.
 
 A room name may be at most 52 bytes long. Swoole keeps only the first 63 bytes of a table key, and a membership key adds a NUL and the connection's fd (up to 10 digits) to the name.
 
@@ -52,17 +52,23 @@ The controller dispatches messages by `type` field:
 |-------------|-----------|-------------|
 | `connected` | Server to client | Sent on successful handshake |
 | `ping` / `pong` | Both | Keep-alive |
+| `live.subscribe` | Client to server | Subscribe the connection to live-update hints; answered with `live.ready` |
+| `live.ready` / `live.changed` / `live.reset` / `live.health` | Server to client | Live-update subscription baseline, family change hints, authorization reset, and pipeline health (see [Live Updates](live-updates.md#message-contract)) |
 | `room.join` | Client to server | Refused for every room; see [Rooms](#rooms) |
 | `room.leave` | Client to server | Leave a room the connection is in; answered with `room.left` |
-| `party.join` / `party.leave` | Client to server | Join or leave a watch-party session |
-| `party.playback` | Client to server | Play, pause, or seek (host only) |
+| `party.join` / `party.leave` | Client to server | Join or leave a watch-party session (`party.join` answers the sender with `party.joined`) |
+| `party.playback` | Client to server | Play, pause, or seek (host only); answered with `party.playback_updated` |
 | `party.sync` | Client to server | Report client position for drift correction |
 | `party.sync_response` | Server to client | Server-adjusted position after sync |
 | `party.member_event` | Server to room broadcast | Member joined (from `party.join`) or left (from `SwooleLivePartyRooms`, for a leave over the WebSocket or HTTP) |
-| `session.join` | Client to server | Join the user's listening session from a device; answered with `session.joined` |
-| `session.playback` | Client to server | Play, pause or seek the listening session; answered with `session.playback_result` |
-| `session.sync` | Client to server | Report a device's position; answered with `session.sync_result` |
-| `session.claimed` / `session.state` | Server to the user's connections | A device took over the listening session, or its queue changed (`SessionEventSubscriber`) |
+| `session.endpoint` | Client to server | Register or refresh a playback endpoint; answered with `session.snapshot` |
+| `session.transfer` | Client to server | Initiate a playback transfer to a destination; answered with `session.snapshot` |
+| `session.ack` | Client to server | Acknowledge a playback transfer on the target endpoint; answered with `session.snapshot` |
+| `session.control` | Client to server | Apply a playback control command (`play`, `pause`, `seek`, queue updates); answered with `session.snapshot` |
+| `session.observe` | Client to server | Report observed playback state and position from the active endpoint; answered with `session.snapshot` |
+| `session.reconcile` | Client to server | Reconcile an uncertain transfer or endpoint state; answered with `session.snapshot` |
+| `session.snapshot` | Both | Request the current playback snapshot (client to server) or receive the updated playback snapshot (server to client reply and `PlaybackCommandRelay` push) |
+| `session.error` | Server to client | Error reply for a `session.*` operation |
 | `transcode.position` | Client to server | Report the playback position of a transcode session; answered with `transcode.position_ack` |
 | `error` | Server to client | Error response with message |
 
@@ -92,12 +98,10 @@ A client whose connection drops obtains a fresh ticket before reconnecting.
 
 ## Delivery without a stream
 
-Server-sent event (SSE) endpoints for notifications and job monitoring were removed: their coroutines held pooled services for up to an hour each and exhausted the service pools. Each now works without a stream:
+Server-sent event (SSE) endpoints for notifications and job monitoring were removed: their coroutines held pooled services for up to an hour each and exhausted the service pools. Each now refreshes through the WebSocket live-update protocol (`live.changed` hints) and coordinated HTTP reads (see [Live Updates](live-updates.md)):
 
-- **Notifications** are stored, then read over HTTP. The web client fetches the list and the unread count when the notification views load and refetches them once they are older than 30 seconds. `CreateNotificationHandler` also dispatches a `SendPushCommand`, which delivers a Web Push message to each browser subscription the user registered, unless push is turned off for the server or the user turned off push for that category.
-- **Admin pages** poll their endpoints with React Query: server diagnostics every 5 seconds, the dashboard every 10 seconds, the job monitor every 15 to 30 seconds.
-
-The WebSocket channel does not carry admin job events yet.
+- **Notifications** are stored, then read over HTTP when the view mounts or when a `live.changed` hint for the `notifications` family arrives. `CreateNotificationHandler` also dispatches a `SendPushCommand`, which delivers a Web Push message to each browser subscription the user registered, unless push is turned off for the server or the user turned off push for that category.
+- **Admin pages** subscribe to their live-update families (`admin-jobs`, `admin-runtime`, `admin-users`, `admin-settings`, `admin-alerts`, `admin-security`, `admin-metadata`, `admin-media`, `deployment-definitions`) through `LiveQueryCoordinator`. Committed writes to `job_monitors`, `scheduled_jobs`, and `failed_messages` push immediate `live.changed` hints, while live telemetry readers use bounded `sampleIntervalMs` sampling (5,000ms for job status and server stats, 10,000ms for spans, and 30,000ms for analytics) while visible and online.
 
 ## Party Sync Protocol
 
@@ -130,18 +134,17 @@ Host-initiated actions are dispatched as CQRS commands via Messenger:
 | `PausePlaybackCommand` | `PausePlaybackHandler` | Captures current position into `pausedAtPosition`, sets `Paused` |
 | `SeekPlaybackCommand` | `SeekPlaybackHandler` | Sets `wallClockPosition` to target, resets start timestamp |
 
-All three handlers dispatch a `PlaybackPositionChanged` domain event via `EventDispatcherInterface`, which the broader system can react to.
+When the party session has an associated `transcodeJobId`, all three handlers dispatch a `PlaybackPositionChanged` (`App\Transcode\Domain\Event\PlaybackPositionChanged`) domain event via `EventDispatcherInterface` so the transcode subscriber can steer the media worker.
 
 ### Sync Protocol
 
 Non-host participants periodically report their local playback position to the server. The sync flow:
 
 1. Client sends `party.sync` with its current position and measured latency.
-2. `SyncPlaybackHandler` calls `SyncedPartySession::syncPlayback()` on the aggregate root.
-3. The aggregate root computes the server's current position via `getCurrentPosition()`.
-4. If drift exceeds `clientLatency + 1.0` seconds, the server position is returned for correction.
-5. If drift is within tolerance, the server position is returned as the authoritative position.
-6. `PlaybackSynchronizer` (called from infrastructure) additionally updates per-member jitter compensation.
+2. `SyncPlaybackHandler` delegates to `PlaybackSynchronizer::synchronize()` (`PlaybackSynchronizationPortInterface`).
+3. `PlaybackSynchronizer` verifies party membership and calls `PartySessionPortInterface::syncPlayback()`, which computes the server's current position via `getCurrentPosition()` on `SyncedPartySession`.
+4. If drift exceeds `clientLatency + 1.0` seconds, the server position is returned for correction; otherwise, the server position is returned as the authoritative position without requiring a seek.
+5. `PlaybackSynchronizer` updates the member's smoothed EMA jitter (initializing to `jitter` when `currentJitter <= 0`) and saves the member.
 
 ### Jitter Compensation
 
@@ -165,8 +168,8 @@ When the host seeks, the flow is:
 1. Host sends `party.playback` with `action: "seek"` and a `position` value.
 2. `SeekPlaybackHandler` calls `session.seekTo(position)` on the aggregate root.
 3. If playing, `wallClockPosition` is set to the new position and `playbackStartedAt` is reset to `now()`. If paused, `pausedAtPosition` is updated instead.
-4. A `PlaybackPositionChanged` event is dispatched.
-5. All participants receive the update and seek their local player to the new position.
+4. When the party session has a `transcodeJobId`, a `PlaybackPositionChanged` event is dispatched.
+5. `WebSocketController` replies `party.playback_updated` to the host, and participants converge to the new position through `party.sync` / `party.sync_response` and `live.changed` (`party` family) reads.
 
 ## Authentication
 

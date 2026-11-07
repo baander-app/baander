@@ -127,9 +127,10 @@ Use `guardMutationCallbacks` for per-call callbacks and check again after every
 that has already suspended.
 
 Hold only the affected families. A global pause while any mutation is pending
-would stop unrelated notifications and other readers during a slow save. Session
-creation and device claims also need their own hold, with the confirmed cache
-write inside the ownership check and before releasing it. Do not use the total
+would stop unrelated notifications and other readers during a slow save. Device
+rename and forget mutations hold `['devices']`, with the confirmed cache write
+inside the ownership check and before releasing it, while playback session
+coordination runs through `PlaybackSessionCoordinator`. Do not use the total
 mutation count as a substitute for these scopes.
 
 An initial query deferred by admission or a family hold is still pending, even
@@ -271,9 +272,10 @@ policy when no message arrives.
 
 ## Browser ownership
 
-The authenticated application owns one shared transport. Listening-session sync
-receives that transport and subscribes only when a session exists. Establishing a
-connection for freshness does not join a listening session or claim a device.
+The authenticated application owns one shared transport. `PlaybackSessionCoordinator`
+starts whenever a principal is signed in, retains that shared transport, and
+registers the browser playback endpoint on connect (`POST /api/session/endpoints`
+and `session.endpoint`) rather than opening a second socket or claiming a device.
 
 Swoole's configured 300-second idle check uses
 [the server's last receive time](https://github.com/swoole/swoole-src/blob/v6.2.0/src/server/master.cc#L1693),

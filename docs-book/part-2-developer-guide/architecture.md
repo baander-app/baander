@@ -12,27 +12,27 @@ Baander has 21 bounded contexts plus a Shared kernel. Most contexts follow the f
 
 | Context | Responsibility | Layers |
 |---------|---------------|--------|
-| Activity | Listen history tracking | Full |
+| Activity | Play history, love/skip tracking, recently played items, and play analytics | Full |
 | Auth | Login, OAuth 2.0 authorization server, DPoP-bound tokens, passkeys, TOTP | Full |
 | Catalog | Artists, albums, songs, movies, videos, genres | Full |
-| Command | CLI commands (OpenAPI export) | Interface only — no domain logic, just thin wrappers around other contexts |
+| Command | CLI utilities (OpenAPI export, documentation generation, dev setup, OAuth key generation) | Interface only — no domain logic, just thin wrappers around other contexts |
 | Discovery | LAN server discovery and device pairing | Full |
 | Favorites | User favorites (songs, artists, albums) | Full |
-| Filesystem | File operations, MIME detection, inotify watching | Domain + Infrastructure — no Application or Interface layers |
+| Filesystem | Local and read-only filesystem abstractions, MIME detection, inotify watching | Application + Infrastructure + Console command — no Domain layer |
 | Library | Media library management and file scanning | Full |
-| Lyrics | Lyrics handling | Domain + Infrastructure only — no Application or Interface layers |
-| Media | File handling, streaming, image storage | Full |
-| Metadata | External API enrichment (Discogs, Last.fm, MusicBrainz) | Full |
+| Lyrics | Lyrics fetching, LRC parsing, and bulk coverage management | Full |
+| Media | Image storage, media streaming, playback delivery negotiation, and BlurHash | Full |
+| Metadata | Tag parsing and external API enrichment (Discogs, Last.fm, Spotify, MusicBrainz, TasteDive, CoverArtArchive, TMDB) | Full |
 | Notification | Notifications, webhooks, preferences | Full |
 | Party | Synchronized watch-party playback | Full |
-| Playlist | Playlist CRUD | Full |
+| Playlist | Playlist CRUD and collaboration | Full |
 | QoL | Stream governance and quality-of-life allocation | Service-based (no aggregate roots) |
 | Radio | Internet radio, country subscriptions, station starring | Full |
-| Recommendation | Music recommendations | Full |
-| Scheduler | Cron-like scheduled job execution | Full |
-| Session | Listening sessions and registered devices | Full |
-| Transcode | CMAF video transcoding via FFmpeg | Full |
-| UserPreference | User preferences (accent color, sidebar) | Full |
+| Recommendation | Music recommendations and background generation jobs | Full |
+| Scheduler | Cron-like scheduled job and occurrence execution | Full |
+| Session | Playback coordination, listening sessions, and registered devices | Full |
+| Transcode | CMAF video transcoding, audio renditions, and stream-copy presentations via FFmpeg | Full |
+| UserPreference | User preferences (accent color, sidebar, theme, layout, audio, player, EQ) and user settings | Full |
 
 The **Shared kernel** (`src/Shared/`) is not a bounded context — it provides cross-cutting infrastructure used by all contexts. It follows the full four-layer structure.
 
@@ -46,10 +46,10 @@ src/
 ├── Command/             # Utility context (CLI wrappers)
 ├── Discovery/           # Bounded context (LAN discovery + device pairing)
 ├── Favorites/           # Bounded context
-├── Filesystem/          # Utility context (file ops, inotify)
+├── Filesystem/          # Utility context (filesystem ports, MIME detection, inotify)
 ├── Kernel.php           # HTTP kernel
 ├── Library/             # Bounded context
-├── Lyrics/              # Utility context (domain + infra only)
+├── Lyrics/              # Bounded context (lyrics fetching + LRC parsing)
 ├── Media/               # Bounded context
 ├── Metadata/            # Bounded context
 ├── Notification/        # Bounded context
@@ -59,7 +59,7 @@ src/
 ├── Radio/               # Bounded context (internet radio)
 ├── Recommendation/      # Bounded context
 ├── Scheduler/           # Bounded context (scheduled jobs)
-├── Session/             # Bounded context (listening sessions + devices)
+├── Session/             # Bounded context (playback coordination + devices)
 ├── Shared/              # Cross-cutting kernel (not a bounded context)
 ├── Transcode/           # Bounded context
 └── UserPreference/      # Bounded context
@@ -71,22 +71,23 @@ Each bounded context follows the same four-layer architecture:
 src/<Context>/
 ├── Domain/              # Business rules — entities, value objects, repository interfaces
 │   ├── Event/           # Domain events (if any)
-│   ├── Model/           # Entities (aggregate roots) and value objects
+│   ├── Model/           # Entities (aggregate roots), state objects, and value objects
 │   ├── Repository/      # Repository interfaces
 │   └── Service/         # Domain services (if any)
 ├── Application/         # Use cases — command/query handlers, DTOs, ports
 │   ├── Command/         # Command DTOs (CQRS)
 │   ├── CommandHandler/  # Command handlers (CQRS)
-│   ├── Port/            # Inbound interfaces (used by controllers)
+│   ├── Port/            # Inbound and outbound interfaces
 │   └── DTO/             # Application-level DTOs
 ├── Infrastructure/      # Technical details — Doctrine repositories, external adapters
 │   ├── Doctrine/
 │   │   ├── Entity/      # ORM entities (separate from domain models)
 │   │   └── Repository/  # Repository implementations
 │   └── Adapter/         # External service adapters
-└── Interface/           # API layer — controllers, requests, resources
+└── Interface/           # API and CLI layer — controllers, console commands, requests, resources
+    ├── Console/         # CLI commands (if any)
     ├── Controller/      # HTTP controllers
-    ├── DTO/             # Request/response DTOs
+    ├── Request/         # Validated HTTP request DTOs
     └── Resource/        # API response transformers
 ```
 
@@ -113,8 +114,8 @@ API entry points. Controllers, request DTOs, response resources. Coordinates bet
 `src/Shared/` contains cross-cutting infrastructure used by all contexts:
 
 - **Domain models** — `Uuid` (v7), `PublicId`, `Email`, cursor pagination types
-- **Swoole runtime** — async primitives, process pool, WebSocket support
-- **Messenger** — job monitoring middleware, task dispatching
+- **Swoole runtime** — async primitives, server control operations, WebSocket support
+- **Messenger** — job monitoring and cancellation middleware, workload catalog, JSON message codec
 - **Caching** — Redis tag-aware cache pools
 - **Search** — PGroonga full-text search trait
 - **Security** — the WebSocket handshake authenticator
@@ -137,11 +138,14 @@ League\OAuth2\Server\Repositories\RefreshTokenRepositoryInterface:
 
 `ResourceServerFactory` builds the `ResourceServer` with `DpopAwareBearerTokenValidator`, which also checks the token's audience. `OAuth2Authenticator` calls it for API requests, including WebSocket ticket issuance. The raw upgrade uses `WsTicketAuthenticator` and the Auth ticket-redemption port; it never accepts an OAuth query token. The revocation endpoint uses the two aliased repositories. The domain layer only knows about `App\Auth\Domain\Repository\OAuth\AccessTokenRepositoryInterface` — never the League class.
 
+The same boundary pattern applies to cross-context decorators and external provider clients. `QualityFilteringStreamingDecorator` wraps `TranscodeStreamingService` behind `TranscodeStreamingPortInterface`, intersecting the video's available quality ladder with the tiers permitted by `StreamAdmissionPortInterface` from `QoL` so `Transcode`'s domain and core streaming service remain decoupled from stream-governance rules. Outbound adapters such as `IprdStationSyncAdapter` (`StationSyncPortInterface` in `Radio`), `LrclibClient` (`LyricsProviderPortInterface` in `Lyrics`), and the `Metadata` provider adapters translate external HTTP payloads into internal DTOs and domain models before any state reaches the application layer.
+
 ## Communication Between Contexts
 
 Contexts communicate through:
-- **Symfony Messenger** — asynchronous commands between contexts (e.g., Library → Metadata for enrichment)
-- **Domain events** — for side effects that don't need immediate handling
+- **Symfony Messenger** — asynchronous commands between contexts (e.g., Library's outbox relay dispatches `FilesDiscovered` to Catalog, and Catalog requests Metadata enrichment and Lyrics fetches)
+- **Application ports** — synchronous cross-context contracts wired in `config/services.yaml`
+- **Domain events** — captured in the PostgreSQL outbox for durable replay, or dispatched live inside the producing process for real-time room and transcode subscribers
 - **Shared kernel** — common types like `Uuid` and `PublicId` provide a shared vocabulary without coupling
 
 The [Communication Map](communication-map.md) draws these paths together with the clients, stores, worker pair and external services, and gives the rule for choosing between an inline command, an outbox event, a scheduled occurrence and a routed async message.

@@ -506,7 +506,7 @@ playback. Performance assertions use counts rather than timing-sensitive thresho
 | **Functional** | `tests/Functional/` | With Symfony kernel container, database, and services |
 | **Integration** | `tests/Integration/` | Database, transport, and other integration contracts against configured test services |
 
-Four suites cover the session work of ROADMAP item 5 and run through the
+Five suites cover the session and token-refresh lifecycle and run through the
 functional runner in the CI image (`BAANDER_TEST_IMAGE=baander-ci-prewarm:local
 bash scripts/test-functional-container.sh <file>`); the integration ones need the
 runner's disposable PostgreSQL and Redis and do not run on the host:
@@ -1170,7 +1170,8 @@ running:
 BAANDER_TEST_DISABLE_SWOOLE=1 bash scripts/test-backend-container.sh \
   tests/Fixtures/MessengerWithoutSwooleTest.php \
   tests/Unit/Shared/Infrastructure/Messenger/SwooleFallbackHandlerRegistrationTest.php \
-  tests/Integration/MessengerJsonDeliveryTest.php
+  tests/Integration/MessengerJsonDeliveryTest.php \
+  tests/Integration/MessengerAdmissionLifecycleTest.php
 ```
 
 The coordinator removes the dedicated Swoole loader inside each disposable app
@@ -2546,8 +2547,8 @@ server name resolve to the same real command and preserve its options.
 The functional runner creates an isolated PostgreSQL/Redis network, extracts the
 checkout into a fresh directory, and runs Doctrine migrations twice before
 executing the requested PHPUnit paths or options. With no arguments it selects `tests/Functional`.
-A fresh database executes `Version20261017000000` and the forward migrations
-through `Version20261018130000`; the second run checks that recorded migrations
+A fresh database executes `Version20261017000000` and all forward migrations in
+`migrations/` (currently through `Version20261107120000`); the second run checks that recorded migrations
 leave no pending work. The paired-deployment migration must also reject unresolved
 or inconsistent singleton history and preserve confirmed retirement records.
 Integration tests and runtime fixtures use
@@ -2713,13 +2714,14 @@ final class StartPlaybackHandlerTest extends TestCase
 
         $handler = new StartPlaybackHandler($sessionPort, $eventDispatcher);
 
+        $hostUserId = Uuid::v4();
         $session = /* ... create or reconstitute a PartySession ... */;
 
         $sessionPort->method('findByUuid')->willReturn($session);
         $sessionPort->expects($this->once())->method('startPlayback');
         $eventDispatcher->expects($this->once())->method('dispatch');
 
-        $command = new StartPlaybackCommand(sessionId: $session->getId(), position: 0);
+        $command = new StartPlaybackCommand(sessionId: $session->getId(), userId: $hostUserId, position: 0.0);
         ($handler)($command);
     }
 }
@@ -2772,7 +2774,7 @@ Controllers use two different response shapes — know which one your test expec
 | `successResponse($data)` | `{"data": {...}}` | Most GET, PATCH, PUT responses |
 | `created($data)` | `{...}` (flat, no wrapper) | POST 201 responses — the data is the top-level object |
 | `paginatedResponse($p)` | `{"data": [...], "meta": {...}}` | List endpoints with pagination |
-| `errorResponse($msg, $status)` | `{"error": $msg, "status": $status}` | Error responses |
+| `errorResponse($msg, $status)` | `{"error": {"message": $msg, "code": $status, "details": {...}}}` (`details` omitted when empty) | Error responses |
 
 When asserting on a `created()` response, decode the body directly instead of passing `'data'` as the expected key:
 
@@ -3018,7 +3020,7 @@ it by hand, on macOS and on iOS, against the development stack:
    Safari version.
 2. Play a track whose original file Safari plays, and wait until it has played
    for at least 30 seconds.
-3. Restart the web container with `docker compose restart app`.
+3. Restart the web container with `make restart-app` (or `make restart INSTANCE=persistent` for the persistent instance).
 4. Record whether the player showed "Reconnecting…" or "Tap to resume", whether
    it resumed the same track, and how far the resumed position was from the
    position at the restart.
@@ -3033,6 +3035,8 @@ reconnecting state is a defect in the player's recovery
 (`ui/web/src/features/player/stores/player-playback-recovery.ts`).
 
 ### Example: Functional Test (Full Pattern)
+
+`AddFavoriteRequest` validates that `entityPublicId` is a 21-character `PublicId` (`/^[A-Za-z0-9_-]{21}$/D`), and `AddFavoriteHandler` checks through `FavoriteTargetAccessInterface` that the target entity exists in a library visible to the user:
 
 ```php
 final class FavoritesControllerTest extends TestCase
@@ -3061,21 +3065,27 @@ final class FavoritesControllerTest extends TestCase
     {
         $user = $this->createTestUser();
 
-        $response = $this->authenticatedRequest('POST', '/api/favorites/', $user, [
-            'entityType' => 'song',
-            'entityPublicId' => 'song-create',
-        ]);
-
+        $response = $this->addFavorite($user, 'song', 'song-create');
         $this->assertSame(201, $response->getStatusCode());
+
         $data = json_decode($response->getContent(), true, 512, JSON_THROW_ON_ERROR);
         $this->assertSame('song', $data['entityType']);
     }
 
-    private function addFavorite($user, string $entityType, string $entityPublicId)
+    private function addFavorite(User $user, string $entityType, string $entityPublicId): Response
     {
+        $library = new \App\Library\Infrastructure\Doctrine\Entity\LibraryEntity('Favorites', 'favorites-' . bin2hex(random_bytes(4)), '/media/favorites/' . bin2hex(random_bytes(4)), 'music', 'local');
+        $album = new \App\Catalog\Infrastructure\Doctrine\Entity\AlbumEntity(new \App\Shared\Domain\Model\PublicId(), $library, 'Favorite album', 'album');
+        $song = new \App\Catalog\Infrastructure\Doctrine\Entity\SongEntity(new \App\Shared\Domain\Model\PublicId(), $album, 'Favorite song', '/media/favorites/song.flac', 1, 'audio/flac');
+        foreach ([$library, $album, $song] as $entity) {
+            $this->entityManager->persist($entity);
+        }
+        $this->entityManager->flush();
+        static::getContainer()->get(\App\Library\Application\Port\LibraryAccessPortInterface::class)->grant($user->getId(), $library->getId());
+        $publicId = $entityType === 'song' ? $song->getPublicId() : $album->getPublicId();
         return $this->authenticatedRequest('POST', '/api/favorites/', $user, [
             'entityType' => $entityType,
-            'entityPublicId' => $entityPublicId,
+            'entityPublicId' => $publicId->toString(),
         ]);
     }
 }
@@ -3083,7 +3093,7 @@ final class FavoritesControllerTest extends TestCase
 
 ## Functional Test Coverage
 
-The functional suite covers these controllers (tests live in `tests/Functional/Controller/`):
+`tests/Functional/Controller/` contains 58 controller test suites (and `tests/Functional/` contains over 120 suites across bounded contexts, console commands, and infrastructure). Representative controller suites include:
 
 | Context | Controller | Tests | Notes |
 |---------|-----------|-------|-------|
@@ -3124,10 +3134,7 @@ ownership warning in this guide was stale.
 
 ### Design Gaps Pinned by Tests (Not Yet Fixed)
 
-Some tests document known design-level gaps by asserting the *current* behavior rather than the ideal:
-
-- **Dead-code optimistic locking** — AudioPreferences, LayoutPreferences, and PlayerPreferences controllers catch `RuntimeException` for version conflicts, but `saveForUser()` never throws it. The 409 response path is unreachable.
-- **Favorites missing Choice constraint** — `AddFavoriteRequest.entityType` has `NotBlank` but no `Choice`, so invalid types pass DTO validation and crash in `FavoriteType::from()` with a 500.
+The two design gaps previously pinned here have been resolved and are covered by functional regression tests: `AudioPreferencesController`, `LayoutPreferencesController`, and `PlayerPreferencesController` now catch `PreferenceVersionConflict` and return `409 Conflict`, and `AddFavoriteRequest::$entityType` now carries `#[Assert\Choice]` and returns `422` on invalid types.
 
 ## Static Analysis
 
@@ -3151,8 +3158,9 @@ publisher requires both analyses to succeed, in addition to its test gates.
 The application publisher in `.github/workflows/ci.yaml` requires backend quality,
 frontend quality, DSP qualification and every Registry qualification job (release
 and sanitize builds, containers, threads, fuzzing and static analysis). Frontend
-qualification includes the embedded player and Chromium authentication, audio
-graph, and store-debugger suites. Forgejo and GitHub both run this workflow; see
+qualification runs `ui/shared` checks, the embedded player checks, web checks,
+`yarn test:browser-auth` (Chromium and WebKit), `yarn test:audio-graph` (Chromium,
+Firefox and WebKit), and `yarn test:store-debug` (Chromium). Forgejo and GitHub both run this workflow; see
 [Continuous Integration](continuous-integration.md). Checkout steps in the gate
 workflows fetch and verify the pull request's head commit, or the event SHA for
 other events, so a later branch update cannot replace the source under

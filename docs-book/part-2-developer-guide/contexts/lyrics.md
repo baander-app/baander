@@ -23,6 +23,8 @@ The Lyrics context stores song lyrics and fetches them from [LRCLIB](https://lrc
 
 `FetchLyricsCommand` has no transport route, so the on-demand fetch of one song, from the API or `app:song:lyrics:fetch`, handles it synchronously. The bulk fetch and the automatic requests below queue it on the `async` transport with a `TransportNamesStamp`, spaced by a `DelayStamp`; the bulk fetch spaces its fetches by the command's delay, 500 ms by default. The bulk fetch handler therefore returns once the fetches are queued, so the admin request does not wait for LRCLIB. Without a limit, both the admin page and `app:lyrics:fetch` queue every song without lyrics. `app:lyrics:fetch` runs the bulk fetch through `JobMonitorAdministrationInterface::runInline()`, which records the run in the job monitor.
 
+`BulkFetchLyricsHandler` and `FetchLyricsHandler` coordinate delayed bulk work through `QueuedLyricsFetchesInterface` (`RedisQueuedLyricsFetches`). Before dispatching `FetchLyricsCommand`, the bulk handler calls `markQueued()` for the song with a TTL that lasts until a day after the song's delayed fetch is due, so overlapping bulk runs skip songs already waiting in the queue; `FetchLyricsHandler` calls `clearQueued()` in a `finally` block once the fetch runs. Each bulk-queued `FetchLyricsCommand` carries its bulk run UUID. If the bulk job is cancelled while queueing, `BulkFetchLyricsHandler` calls `markRunCancelled()`; if the bulk job finishes queueing, it links the job-monitor ID to the run via `recordJobRun()`, and `RedisQueuedLyricsFetches` implements `QueuedJobWorkInterface` so cancelling the finished bulk job in the job monitor also marks the run cancelled. When `FetchLyricsHandler` sees `isRunCancelled()` for its run UUID, it skips the LRCLIB lookup and clears the song's queued mark.
+
 `LrclibClient` returns null or an empty list when LRCLIB has nothing, and `LrclibUnavailable` when a request fails, LRCLIB answers with another error, or the body is unreadable. A request that gets no data for 10 seconds, or takes longer than 10 seconds in all, fails as well, so a stalled LRCLIB cannot hold a request or worker open. `FetchLyricsHandler` turns that into a `LyricsFetchResult`: found, not found, or LRCLIB unavailable. It never throws for an outage, so a queued fetch is acknowledged without a retry. The per-song route and `app:song:lyrics:fetch` call `lyricsOrFail()`, which throws `LyricsProviderUnavailableException` (HTTP 503, exit 1); search and apply throw it directly.
 
 A fetch for a song that has lyrics returns them without calling LRCLIB. Apply refuses that song with a conflict (HTTP 409). Both store through `LyricsRepositoryInterface::add()`, an `INSERT ... ON CONFLICT (song_id) DO NOTHING` that reports whether it stored anything, because another fetch or apply can store lyrics for the song while one waits on LRCLIB. An apply that loses that race answers the same conflict, and a fetch that loses it returns the stored lyrics. Catching the unique violation instead would close the entity manager. Several songs can store the same LRCLIB record, such as one recording on an album and a compilation, or one album in two libraries, so `lrclib_id` is not unique.
@@ -43,6 +45,7 @@ The bulk fetch, the on-demand fetch and the LRCLIB search are not gated by the s
 | `LyricsAdminPortInterface` | Lyrics coverage and sync status for the admin API and `app:lyrics:coverage` and `app:lyrics:status` |
 | `LrclibClientInterface` | LRCLIB HTTP API contract, implemented by `LrclibClient` (anti-corruption layer) |
 | `LyricsFetchRequestInterface` | Published contract for Catalog ingest: requests fetches for new songs while `lyrics.auto_fetch` is on (the `Lyrics Fetch Request Contract` Deptrac layer) |
+| `QueuedLyricsFetchesInterface` | Tracks delayed song fetches and cancelled bulk runs so overlapping bulk runs do not queue a song twice and cancelled bulk runs skip remaining queued `FetchLyricsCommand` messages |
 
 ## API Endpoints
 
@@ -56,6 +59,17 @@ The bulk fetch, the on-demand fetch and the LRCLIB search are not gated by the s
 | POST | `/api/admin/lyrics/bulk-fetch` | `ROLE_SUPER_ADMIN` | Queue a fetch for every song without lyrics, or up to the body's optional `limit`; an empty body is accepted |
 | GET | `/api/admin/lyrics/sync-status` | `ROLE_ADMIN` | Counts of the `FetchLyricsCommand` and `BulkFetchLyricsCommand` jobs in the job monitor |
 
+### Console Commands
+
+| Command | Class | Purpose |
+|---------|-------|---------|
+| `app:lyrics:fetch` | `LyricsFetchCommand` | Queue a lyrics fetch from LRCLIB for every song without lyrics, or up to `--limit` |
+| `app:lyrics:coverage` | `LyricsCoverageCommand` | Show lyrics coverage statistics |
+| `app:lyrics:status` | `LyricsStatusCommand` | Show `FetchLyricsCommand` and `BulkFetchLyricsCommand` job counts from the job monitor |
+| `app:song:lyrics:fetch` | `SongLyricsFetchCommand` | Fetch the lyrics of one song from LRCLIB synchronously |
+| `app:lyrics:search` | `LyricsSearchCommand` | Search LRCLIB by keywords and list the results with their IDs |
+| `app:lyrics:apply` | `LyricsApplyCommand` | Store an LRCLIB search result as the lyrics of a song that has none |
+
 ## Infrastructure
 
 | Component | Purpose |
@@ -63,12 +77,14 @@ The bulk fetch, the on-demand fetch and the LRCLIB search are not gated by the s
 | `LyricsService` | Implements `LyricsPortInterface` through the repository |
 | `LrclibClient` | Symfony HttpClient adapter for the LRCLIB API |
 | `LyricsRepository`, `LyricsAdminRepository` | Doctrine persistence and admin statistics |
+| `RedisQueuedLyricsFetches` | Implements `QueuedLyricsFetchesInterface` and `QueuedJobWorkInterface` using expiring Redis keys to deduplicate queued songs across bulk runs and cancel remaining queued fetches when a bulk job is cancelled |
 | `LyricsMessagePayloadCodec` | Encodes `FetchLyricsCommand` for the `async` transport, and `BulkFetchLyricsCommand` for the job monitor's stored payload |
 
 ## Cross-Context Dependencies
 
 | Direction | Context | Relationship |
 |-----------|---------|--------------|
-| Depends on | Shared | `Uuid`, and `SystemSettingsPortInterface` for `lyrics.auto_fetch` |
+| Depends on | Shared | `Uuid`, `PublicId`, `LibraryReadScope`, `QueuedJobWorkInterface`, and `SystemSettingsPortInterface` for `lyrics.auto_fetch` |
 | Depends on | Catalog | `SongLookupInterface`: a visible song by public ID, song-ID pages for the bulk fetch, and the LRCLIB signature as `SongLyricSignature` |
+| Depends on | Library | `LyricsController` uses `LibraryReadScopeProviderInterface` to scope song lookups to the caller's accessible libraries |
 | Depended on by | Catalog | Ingest requests fetches for new songs through `LyricsFetchRequestInterface` |

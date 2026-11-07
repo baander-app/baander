@@ -6,9 +6,11 @@ The Auth context signs users in, issues their tokens, and validates those tokens
 
 ### Aggregate Roots
 
+`User` (`UserState`) is the domain aggregate root. `Client`, `AccessToken`, `RefreshToken`, `AuthCode`, `DeviceCode`, `Passkey`, `ThirdPartyCredential`, and `LoginBlock` are auth and OAuth domain models (each with a `*State` object) managed through their repositories.
+
 | Model | Purpose |
 |-------|---------|
-| `User` | User account |
+| `User` | User account (`UserState`; aggregate root) |
 | `Client` | OAuth 2.0 client application |
 | `AccessToken` | Issued access token |
 | `RefreshToken` | Issued refresh token |
@@ -28,15 +30,26 @@ The Auth context signs users in, issues their tokens, and validates those tokens
 | `ClientSecret` | A confidential client's plain-text secret, held only between generation and the one response that shows it; stored as its SHA-256 digest |
 | `ClientType` | Enum of client kinds: `first_party`, `personal_access`, `device`, `public`, `confidential`; `isAdministered()` is true for the last three |
 | `DpopValidationResult` | Result of DPoP header validation |
+| `TokenId` | URL-safe random token identifier for access tokens, refresh tokens, and authorization codes |
+| `TokenMetadata` | Issuance environment and IP history (`oauth_token_metadata`) for an access token |
+
+### Domain Services
+
+| Service | Purpose |
+|---------|---------|
+| `TokenChainValidator` | Checks refresh token rotation integrity against the predecessor token (`TokenChainViolationException`) |
 
 ## Commands & Handlers
 
-Commands and handlers are organized into feature namespaces under `Application/Command/` and `Application/CommandHandler/`: `OAuth/`, `Passkey/`, `Totp/`, and `User/`. Password login is checked by `PasswordAuthenticator` on the API firewall, not by a command. Five application services under `Application/Service/` are shared by the OAuth handlers: `TokenPairIssuer` mints every new token pair, `OAuthClientAuthenticator` identifies and authenticates the client of an OAuth request, `PendingDeviceCodeFinder` resolves a user code as the user typed it, `AuthorizationRequestValidator` checks an authorization request for the signed-in user, and `ClientRevoker` revokes a client together with its tokens.
+Commands and handlers are organized into feature namespaces under `Application/Command/` and `Application/CommandHandler/`: `LoginBlock/`, `OAuth/`, `Passkey/`, `Totp/`, and `User/`. Password login is checked by `PasswordAuthenticator` on the API firewall, not by a command. Five application services under `Application/Service/` are shared by the OAuth handlers: `TokenPairIssuer` mints every new token pair, `OAuthClientAuthenticator` identifies and authenticates the client of an OAuth request, `PendingDeviceCodeFinder` resolves a user code as the user typed it, `AuthorizationRequestValidator` checks an authorization request for the signed-in user, and `ClientRevoker` revokes a client together with its tokens.
 
 | Command | Handler | Purpose |
 |---------|---------|---------|
 | `RegisterUserCommand` | `RegisterUserHandler` | Self-registration; seeds the email language from the browser (User/) |
 | `CreateUserCommand` | `CreateUserHandler` | Operator-created users (User/) |
+| `RenameUserCommand` | `RenameUserHandler` | Update a user's display name from the admin API or `app:user:rename` (User/) |
+| `DeleteUserCommand` | `DeleteUserHandler` | Delete a user account from the admin API or `app:user:delete` (User/) |
+| `SetUserRolesCommand` | `SetUserRolesHandler` | Replace a user's roles from the admin API or `app:user:roles` (User/) |
 | `DisableUserCommand` | `DisableUserHandler` | Disable a user account (User/) |
 | `EnableUserCommand` | `EnableUserHandler` | Re-enable a disabled account (User/) |
 | `RequestPasswordResetCommand` | `RequestPasswordResetHandler` | Issue a password reset token for the account with that email (User/) |
@@ -58,6 +71,7 @@ Commands and handlers are organized into feature namespaces under `Application/C
 | `RegisterClientCommand` | `RegisterClientHandler` | Register a device, public or confidential client for the admin API and `app:oauth:client:create` (OAuth/) |
 | `RotateClientSecretCommand` | `RotateClientSecretHandler` | Give a confidential client a new secret for the admin API and `app:oauth:client:rotate-secret` (OAuth/) |
 | `RevokeRegisteredClientCommand` | `RevokeRegisteredClientHandler` | Revoke a device, public or confidential client and its tokens for the admin API and `app:oauth:client:revoke` (OAuth/) |
+| `PurgeExpiredOAuthCodesCommand` | `PurgeExpiredOAuthCodesHandler` | Delete authorization and device codes expired more than one hour ago (`app:oauth:purge-codes` and daily schedule; OAuth/) |
 | `RegisterPasskeyCommand` | `RegisterPasskeyHandler` | Add a WebAuthn passkey (Passkey/) |
 | `AuthenticatePasskeyCommand` | `AuthenticatePasskeyHandler` | Verify a WebAuthn assertion during passkey login (Passkey/) |
 | `VerifyEmailCommand` | `VerifyEmailHandler` | Redeem a verification token and mark the address verified (User/) |
@@ -65,8 +79,10 @@ Commands and handlers are organized into feature namespaces under `Application/C
 | `ChangeEmailCommand` | `ChangeEmailHandler` | Every email change: the user's own, the admin panel's and `app:user:change-email` (User/) |
 | `EnableTotpCommand` | `EnableTotpHandler` | Enable TOTP 2FA (Totp/) |
 | `DisableTotpCommand` | `DisableTotpHandler` | Disable TOTP 2FA (Totp/) |
+| `DeleteLoginBlockCommand` | `DeleteLoginBlockHandler` | Delete one honeypot login block by `PublicId` (LoginBlock/) |
+| `DeleteAllLoginBlocksCommand` | `DeleteAllLoginBlocksHandler` | Delete all honeypot login blocks (LoginBlock/) |
 
-Four queries serve the OAuth endpoints. `GetAuthorizationRequestQuery` (`GetAuthorizationRequestHandler`) checks an authorization request and describes it for the consent page. `GetDeviceAuthorizationQuery` (`GetDeviceAuthorizationHandler`) shows the user which client a user code belongs to. `ListPersonalAccessClientsQuery` (`ListPersonalAccessClientsHandler`) lists the current user's personal access clients, and `ListRegisteredClientsQuery` (`ListRegisteredClientsHandler`) lists every client except personal access clients for the admin API and `app:oauth:client:list`.
+Six queries serve the OAuth and admin endpoints. `GetAuthorizationRequestQuery` (`GetAuthorizationRequestHandler`) checks an authorization request and describes it for the consent page. `GetDeviceAuthorizationQuery` (`GetDeviceAuthorizationHandler`) shows the user which client a user code belongs to. `ListPersonalAccessClientsQuery` (`ListPersonalAccessClientsHandler`) lists the current user's personal access clients, and `ListRegisteredClientsQuery` (`ListRegisteredClientsHandler`) lists every client except personal access clients for the admin API and `app:oauth:client:list`. `ListUsersQuery` (`ListUsersHandler`) lists users for `GET /api/admin/users` and `app:user:list`, and `ListLoginBlocksQuery` (`ListLoginBlocksHandler`) lists honeypot login blocks for `GET /api/admin/login-blocks` and `app:login-block:list`.
 
 ## Ports
 
@@ -77,6 +93,8 @@ Four queries serve the OAuth endpoints. `GetAuthorizationRequestQuery` (`GetAuth
 | `PasswordHasherInterface` | Password hashing |
 | `TotpVerifierInterface` | TOTP code verification |
 | `UserPortInterface` | User operations |
+| `UserIdentifierResolverInterface` | Resolve a user's `Uuid` or `PublicId` from an email address or public ID (`UserLookup`) |
+| `CurrentUserAuthorityReader` | Read current user authority (`CurrentUserAuthority`) for live-update authorization (`DoctrineCurrentUserAuthorityReader`) |
 | `PasswordResetTokenRepositoryInterface` | Each user's single outstanding reset token, stored as a SHA-256 hash and redeemed once |
 | `PasswordResetRequestThrottleInterface` | Per-account limit on password reset requests, keyed by normalized email |
 | `PasswordResetDeliveryInterface` | Emails the reset link after the response is sent; never persists or logs the token |
@@ -87,6 +105,10 @@ Four queries serve the OAuth endpoints. `GetAuthorizationRequestQuery` (`GetAuth
 | `EmailVerificationResendThrottleInterface` | Per-user limit on verification resend requests |
 | `OAuthSecretBundleInterface` | Prepare and validate key bundles for `app:auth:rotate-secrets` |
 | `OAuthTokenInvalidatorInterface` | Delete all token rows during offline key rotation |
+| `WebSocketTicketIssuerInterface` | Issue single-use 30-second WebSocket handshake tickets (`WebSocketTickets`) |
+| `WebSocketTicketRedeemerInterface` | Redeem a single-use WebSocket handshake ticket (`WebSocketTickets`) |
+| `WebSocketTicketStoreInterface` | Store and atomically consume WebSocket handshake tickets in Redis (`RedisWebSocketTicketStore`) |
+| `WebSocketTokenStatusInterface` | Check whether the access token backing a WebSocket ticket is still live (`DoctrineWebSocketTokenStatus`) |
 
 ## Password Reset and Password Changes
 
@@ -98,7 +120,7 @@ Four queries serve the OAuth endpoints. `GetAuthorizationRequestQuery` (`GetAuth
 
 Sending is shared with the verification email through `AfterResponseMailer`, which queues a `CredentialEmail` and sends it. The `CredentialEmail` carries the user ID, not a language. When `AfterResponseMailer` sends the email, it asks `UserSettingsContractInterface::resolveLanguage()` for the recipient's [email language](#email-language) and passes that locale explicitly to the translator and the templates; it never changes the shared translator's locale. Resolving the language at send time keeps the per-account lookup out of the request, so a reset request for a real account still takes as long as one for an unknown address. If the lookup fails, the email is sent in English and the failure is logged with the exception class only.
 
-The mailer calls the mailer transport directly rather than `MailerInterface`. `MailerInterface` dispatches a `SendEmailMessage` on the message bus, and a later routing change could put the token into Redis or the `failed_messages` table. Notification email (`SendEmailCommand` on `swoole_task`) can be retried from those stores; a reset email cannot, and does not need to be, because the user can ask for a new link. A failed send is logged with the user ID and exception class only, since transport errors can quote the recipient. The templates are `templates/email/auth/password_reset.{txt,html}.twig`, translated through the `password_reset_email` keys in the `auth` domain.
+The mailer calls the mailer transport directly rather than `MailerInterface`. `MailerInterface` dispatches a `SendEmailMessage` on the message bus, and a later routing change could put the token into Redis or the `failed_messages` table. Notification email (`SendEmailCommand` on `async`) can be retried from those stores; a reset email cannot, and does not need to be, because the user can ask for a new link. A failed send is logged with the user ID and exception class only, since transport errors can quote the recipient. The templates are `templates/email/auth/password_reset.{txt,html}.twig`, translated through the `password_reset_email` keys in the `auth` domain.
 
 The web pages are `/forgot-password` and `/reset-password` in `ui/web/src/features/auth/`. The reset page reads the token from the fragment, removes the fragment from the address bar, and clears the local session after a successful reset, because the server has revoked it.
 
@@ -110,7 +132,7 @@ All three password paths (`ResetPasswordHandler`, `SetUserPasswordHandler`, `Cha
 
 Redemption is a single `DELETE … RETURNING`, so a token works once even under concurrent requests. `VerifyEmailHandler` runs that statement in the same transaction that marks the address verified and records `EmailVerified`; if the commit fails, the token stays redeemable. The handler accepts the token only while the account still has the address the token was issued for and is not disabled. Every other case, including an unknown, expired or used token, gets one generic `400`.
 
-`EmailVerificationIssuer` is the single place tokens are issued. Its `issue()` stores the hash for the user's current address inside the caller's transaction and returns the raw token. It issues nothing for a verified address or a disabled account. Its `deliver()` hands the token to `EmailVerificationDeliveryInterface` after the commit, so a rolled-back registration or email change never emails a link. Three callers use it. `RegisterUserHandler` issues on registration. `ChangeEmailHandler` issues on every email change: `PUT /api/auth/me/email`, `PATCH /api/admin/users/{id}` and `app:user:change-email` all dispatch `ChangeEmailCommand`. `ResendEmailVerificationHandler` serves `POST /api/auth/me/email/verification`. The resend endpoint answers the same `200` whether it sent an email or not; over the per-user limit (`auth_email_verification_user`) it sends nothing. Redemption and resend requests share the per-IP limit `auth_email_verification_ip`, which answers `429` with `Retry-After`.
+`EmailVerificationIssuer` is the single place tokens are issued. Its `issue()` stores the hash for the user's current address inside the caller's transaction and returns the raw token. It issues nothing for a verified address or a disabled account. Its `deliver()` hands the token to `EmailVerificationDeliveryInterface` after the commit, so a rolled-back registration or email change never emails a link. Three callers use it. `RegisterUserHandler` issues on registration. `ChangeEmailHandler` issues on every email change: `PUT /api/auth/me/email`, `PATCH /api/admin/users/{publicId}` and `app:user:change-email` all dispatch `ChangeEmailCommand`. `ResendEmailVerificationHandler` serves `POST /api/auth/me/email/verification`. The resend endpoint answers the same `200` whether it sent an email or not; over the per-user limit (`auth_email_verification_user`) it sends nothing. Redemption and resend requests share the per-IP limit `auth_email_verification_ip`, which answers `429` with `Retry-After`.
 
 `MailerEmailVerificationDelivery` builds the link `APP_URL/verify-email#token=…` and queues the email on `AfterResponseMailer`. That is the reset email's path: it sends after the response and straight to the mailer transport, so a slow or failing mail server neither delays an HTTP response nor fails a registration. The templates are `templates/email/auth/email_verification.{txt,html}.twig`, translated through the `email_verification_email` keys in the `auth` domain. Both auth emails are written in the recipient's email language. `AfterResponseMailer` reads it through the UserPreference settings contract when it sends the email, after the response, so the request does no per-account work. If the lookup fails, the email is sent in English and the failure is logged without the address or the link.
 
@@ -175,35 +197,37 @@ All endpoints except the two `/.well-known/` documents are under `/api`.
 | POST | `/api/oauth/device/approve` | Approve or deny a device request |
 | GET, POST | `/api/oauth/clients/` | List or create the current user's personal access clients |
 | DELETE | `/api/oauth/clients/{publicId}` | Revoke one of the current user's clients and its tokens |
+| POST | `/api/ws/tickets` | Issue a single-use 30-second WebSocket handshake ticket (`WebSocketTicketController`) |
+| GET | `/api/live/recovery` | Recover current live-update authorization and health (`LiveRecoveryController`) |
 | GET | `/.well-known/oauth-authorization-server` | Authorization server metadata (RFC 8414) |
 | GET | `/.well-known/jwks.json` | JSON Web Key Set for verifying access tokens |
 
 ### Admin — User Management
 
-All routes under `/api/admin/users` (controller `AdminUserController`, gated `ROLE_ADMIN`). Listing needs `USER_MANAGEMENT_LIST` and creating needs `USER_MANAGEMENT_CREATE`; every other route requires `ROLE_SUPER_ADMIN`. `UserManagementVoter` grants both attributes to super administrators. It grants them to other administrators only while the system settings `admin.can_view_users` and `admin.can_create_users` are on, reading them on every vote, and grants creation only when every requested role is `ROLE_USER`. The console commands are not gated by these settings.
+All routes under `/api/admin/users` (controller `AdminUserController`, gated `ROLE_ADMIN`; `{publicId}` is validated as a 21-character `PublicId`). Listing needs `USER_MANAGEMENT_LIST` and creating needs `USER_MANAGEMENT_CREATE`; every other route requires `ROLE_SUPER_ADMIN`. `UserManagementVoter` grants both attributes to super administrators. It grants them to other administrators only while the system settings `admin.can_view_users` and `admin.can_create_users` are on, reading them on every vote, and grants creation only when every requested role is `ROLE_USER`. The console commands (`app:user:list`, `app:user:create`, `app:user:rename`, `app:user:change-email`, `app:user:delete`, `app:user:roles`, `app:user:reset-password`, `app:user:disable`, `app:user:enable`, and `app:dev:create-users`) are not gated by these settings.
 
 | Method | Path | Purpose |
 |--------|------|---------|
-| GET | `/api/admin/users` | List users (paginated, filter by role/disabled) |
-| POST | `/api/admin/users` | Create a user |
-| PATCH | `/api/admin/users/{id}` | Update a user's name or email (email CLI: `app:user:change-email`) |
-| DELETE | `/api/admin/users/{id}` | Delete a user |
-| POST | `/api/admin/users/{id}/roles` | Assign roles |
-| POST | `/api/admin/users/{id}/reset-password` | Reset a user's password and sign them out (CLI: `app:user:reset-password`) |
-| POST | `/api/admin/users/{id}/disable` | Disable a user |
-| POST | `/api/admin/users/{id}/enable` | Enable a user |
+| GET | `/api/admin/users` | List users (paginated, filter by role/disabled; CLI: `app:user:list`) |
+| POST | `/api/admin/users` | Create a user (CLI: `app:user:create`; dev seeding: `app:dev:create-users`) |
+| PATCH | `/api/admin/users/{publicId}` | Update a user's name or email (CLI: `app:user:rename`, `app:user:change-email`) |
+| DELETE | `/api/admin/users/{publicId}` | Delete a user (CLI: `app:user:delete`) |
+| POST | `/api/admin/users/{publicId}/roles` | Assign roles (CLI: `app:user:roles`) |
+| POST | `/api/admin/users/{publicId}/reset-password` | Reset a user's password and sign them out (CLI: `app:user:reset-password`) |
+| POST | `/api/admin/users/{publicId}/disable` | Disable a user (CLI: `app:user:disable`) |
+| POST | `/api/admin/users/{publicId}/enable` | Enable a user (CLI: `app:user:enable`) |
 
 ### Admin — User Settings
 
-Routes under `/api/admin/users/{id}/settings` (controller `AdminUserSettingsController`). `{id}` is the user's UUID; any other value is `404`.
+Routes under `/api/admin/users/{publicId}/settings` (controller `AdminUserSettingsController`). `{publicId}` is the user's 21-character public ID; any other value (including a UUID) is `404`.
 
 | Method | Path | Role | Purpose |
 |--------|------|------|---------|
-| GET | `/api/admin/users/{id}/settings` | `ROLE_ADMIN` | List the user's settings, with a stored value that is no longer allowed marked `storedValueValid: false` |
-| PUT | `/api/admin/users/{id}/settings/{key}` | `ROLE_SUPER_ADMIN` | Set the user's choice (body `{"value": …}`), for every user setting, including ones users cannot change themselves; `422` for an invalid value |
-| DELETE | `/api/admin/users/{id}/settings/{key}` | `ROLE_SUPER_ADMIN` | Remove the user's choice |
+| GET | `/api/admin/users/{publicId}/settings` | `ROLE_ADMIN` + `USER_MANAGEMENT_LIST` | List the user's settings, with a stored value that is no longer allowed marked `storedValueValid: false` |
+| PUT | `/api/admin/users/{publicId}/settings/{key}` | `ROLE_SUPER_ADMIN` | Set the user's choice (body `{"value": …}`), for every user setting, including ones users cannot change themselves; `422` for an invalid value |
+| DELETE | `/api/admin/users/{publicId}/settings/{key}` | `ROLE_SUPER_ADMIN` | Remove the user's choice |
 
-`app:user:setting get|set|reset <identifier> [key] [value]` is the console counterpart; it accepts an email address or UUID. The endpoints and the command share the application service `AdminUserSettings`, which resolves the user with `UserLookup`, calls `UserSettingsContractInterface`, and logs every set and reset at info level with `actor_id` (the signed-in administrator, or `cli`), `target_id`, `key`, `old_value` and `new_value`. The logged values are the stored ones; `null` means no choice.
+`app:user:setting get|set|reset <identifier> [key] [value]` is the console counterpart; it accepts an email address or public ID (not a UUID, per `UserLookup::byIdentifier()`). The endpoints and the command share the application service `AdminUserSettings`, which resolves the user with `UserLookup`, calls `UserSettingsContractInterface`, and logs every set and reset at info level with `actor_id` (the signed-in administrator, or `cli`), `target_id`, `key`, `old_value` and `new_value`. The logged values are the stored ones; `null` means no choice.
 
 Deleting a user deletes their access tokens (`fk_oauth_access_tokens_user_id` is `ON DELETE CASCADE`), and the existing cascades from `oauth_access_tokens` then delete the matching refresh tokens and token metadata. The user's authorization codes and device codes are deleted with them as well (`fk_oauth_device_codes_user_id` uses `ON DELETE CASCADE`).
 
@@ -220,13 +244,13 @@ All routes under `/api/admin/oauth/clients` (controller `AdminOAuthClientControl
 
 ### Admin — Login Blocks
 
-All routes under `/api/admin/login-blocks` (controller `AdminLoginBlockController`, gated `ROLE_ADMIN`; deletes require `ROLE_SUPER_ADMIN`).
+All routes under `/api/admin/login-blocks` (controller `AdminLoginBlockController`, gated `ROLE_ADMIN`; deletes require `ROLE_SUPER_ADMIN` and `{publicId}` is validated as a 21-character `PublicId`).
 
 | Method | Path | Purpose |
 |--------|------|---------|
-| GET | `/api/admin/login-blocks` | List recent honeypot blocks (paginated) |
-| DELETE | `/api/admin/login-blocks/{id}` | Delete a single block |
-| DELETE | `/api/admin/login-blocks` | Delete all blocks |
+| GET | `/api/admin/login-blocks` | List recent honeypot blocks (paginated; CLI: `app:login-block:list`) |
+| DELETE | `/api/admin/login-blocks/{publicId}` | Delete a single block (CLI: `app:login-block:delete <publicId>`) |
+| DELETE | `/api/admin/login-blocks` | Delete all blocks (CLI: `app:login-block:delete --all`) |
 
 ## Token Issuance
 
@@ -250,7 +274,7 @@ All four endpoints require a `DPoP` header carrying a proof (RFC 9449) with a se
 
 At the token endpoint, `TokenEndpointDpopListener` checks the proof before any grant runs, through `DpopTokenRequestVerifier::inspect()`, and stores a valid one on the request as `VerifiedDpopProof`. A rejected proof comes back as a `DpopProofRejection`, which the listener answers in RFC 9449 terms: `400` `use_dpop_nonce` when the proof lacks a fresh nonce, and `400` `invalid_dpop_proof` when the proof is missing or invalid, each with `error_description`, a `DPoP-Nonce` header, `Cache-Control: no-store` and `Pragma: no-cache`. Because a polling device spends a nonce on every request, every answer the controller gives, OAuth errors included, carries the next `DPoP-Nonce`; only the `503` below carries none.
 
-Tokens are bound to the proof key: the access token JWT carries `cnf.jkt`, and the thumbprint is stored with the token (`dpop_jkt`). Refresh requires a proof signed by the same key, and the new pair keeps the binding. `DpopBindingListener` requires a matching proof on every API request made with the token, except signed stream delivery URLs, where the proof is not read and no `jti` is recorded. `OAuth2Authenticator` refuses a DPoP-bound token presented with the `Bearer` scheme on every route the `api` firewall authenticates; the WebSocket handshake authenticates its query token through its own authenticator and is unaffected. Replay protection records each proof's `jti` through `DpopJtiCacheInterface::isReplay()`, one atomic set-if-absent command with an expiry equal to the proof acceptance window (the larger of `auth.dpop.nonce_ttl` and twice `auth.dpop.clock_skew`).
+Tokens are bound to the proof key: the access token JWT carries `cnf.jkt`, and the thumbprint is stored with the token (`dpop_jkt`). Refresh requires a proof signed by the same key, and the new pair keeps the binding. `DpopBindingListener` requires a matching proof on every API request made with the token, except signed stream delivery URLs, where the proof is not read and no `jti` is recorded. `OAuth2Authenticator` refuses a DPoP-bound token presented with the `Bearer` scheme on every route the `api` firewall authenticates (including `POST /api/ws/tickets`, which issues the single-use ticket that `/api/ws?ticket=...` redeems through `WsTicketAuthenticator`). Replay protection records each proof's `jti` through `DpopJtiCacheInterface::isReplay()`, one atomic set-if-absent command with an expiry equal to the proof acceptance window (the larger of `auth.dpop.nonce_ttl` and twice `auth.dpop.clock_skew`).
 
 #### DPoP store outage
 
@@ -338,7 +362,7 @@ A client name is trimmed and at most 100 characters. A rejected registration rai
 
 ### Client Fingerprint Binding
 
-Password login, passkey login, and every grant at the token endpoint accept an optional `X-Baander-Client-Fingerprint` header. When present, it is stored in `oauth_token_metadata` and binds the access token: `OAuth2Authenticator` rejects any request with that token whose header is missing or different (`401`, `AUTH_INVALID_TOKEN`). If the metadata lookup fails, the request is rejected. Refresh copies the binding to the new token. Tokens issued without the header are unbound and ignore it. No first-party client sends the header today, and the WebSocket query-token authenticator does not check it.
+Password login, passkey login, and every grant at the token endpoint accept an optional `X-Baander-Client-Fingerprint` header. When present, it is stored in `oauth_token_metadata` and binds the access token: `OAuth2Authenticator` rejects any request with that token whose header is missing or different (`401`, `AUTH_INVALID_TOKEN`). If the metadata lookup fails, the request is rejected. Refresh copies the binding to the new token. Tokens issued without the header are unbound and ignore it. No first-party client sends the header today; `POST /api/ws/tickets` runs under the `api` firewall (`OAuth2Authenticator` + `DpopBindingListener`), so client fingerprint checks apply before a WebSocket ticket is issued, and `/api/ws?ticket=...` redeems the single-use ticket through `WsTicketAuthenticator`.
 
 ## Cross-Context Relationships
 

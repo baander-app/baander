@@ -44,7 +44,9 @@ Protocol identifiers have separate meanings. OAuth token IDs, WebAuthn credentia
 
 ### Device and Playback Identities
 
-A device resource exposes both `publicId`, its persisted public identity, and `deviceId`, the browser-generated UUID token used to register that device. Rename and forget requests at `/api/devices/{deviceId}` take the resource's public ID despite the parameter name. Registration, session claims and the `X-Baander-Device-Id` header take the browser token. A listening session's `activeDeviceId` carries the device public ID, so clients resolve their own browser token through the device list before comparing ownership.
+A device resource exposes both `publicId`, its persisted public identity, and `deviceId`, the browser-generated UUID token used to register that device. Rename and forget requests at `/api/devices/{deviceId}` take the resource's public ID despite the parameter name. Device registration takes the browser token as `deviceId`.
+
+Playback coordination routes under `/api/session` (`POST /api/session/endpoints`, `/transfer`, `/ack`, `/observe`, `/control`, `/reconcile`, `/recover-local`, and `GET /api/session/snapshot`) identify the playback endpoint capability through the `X-Baander-Playback-Endpoint` header. `PlaybackSnapshotResource` exposes `selectedDestinationId` and `activeDestinationId` (persisted device public IDs), `activeIncarnationId` (the client-generated incarnation UUID), and `destinations[]` (`destinationId` + `incarnationId`), so clients resolve their own browser token through the device list before comparing destination ownership.
 
 An EQ profile's `publicId` identifies the profile for updates, deletion and activation. Its optional `deviceId` is an audio-output token supplied by the client; it does not refer to a persisted device. `activeProfileId` carries the selected profile's public ID.
 
@@ -155,7 +157,7 @@ Application errors generally follow the `ApiError` format. Protocol endpoints an
 }
 ```
 
-Validation errors include a `details` key with field-level messages:
+Validation errors include a `details` key mapping each field path to its list of violation messages:
 
 ```json
 {
@@ -163,8 +165,8 @@ Validation errors include a `details` key with field-level messages:
     "message": "Validation failed",
     "code": 422,
     "details": {
-      "name": "This value should not be blank.",
-      "email": "This is not a valid email address."
+      "name": ["This value should not be blank."],
+      "email": ["This is not a valid email address."]
     }
   }
 }
@@ -173,8 +175,8 @@ Validation errors include a `details` key with field-level messages:
 | Field | Type | Description |
 |-------|------|-------------|
 | `message` | `string` | Human-readable error description. |
-| `code` | `int` | HTTP status code. |
-| `details` | `object`, optional | Field-level error details for validation failures. |
+| `code` | `int \| string` | HTTP status code on standard `ApiError` responses, or a string error code (`AUTH_INVALID_CREDENTIALS`, `AUTH_TOTP_REQUIRED`, `AUTH_INVALID_TOKEN`) on authenticator failures. |
+| `details` | `object`, optional | Field-level error details for validation failures or structured error reasons. |
 
 ## Authentication
 
@@ -270,7 +272,7 @@ DPoP: <proof>
 
 Passkey login uses the browser's WebAuthn API:
 
-1. `POST /api/auth/passkey/authenticate/options` (optionally with `userId`) returns `{challengeKey, options}`.
+1. `POST /api/auth/passkey/authenticate/options` (optionally with `userId`) returns `{"data": {"challengeKey": "...", "options": { ... }}}`.
 2. The client calls `navigator.credentials.get()` with `options`.
 3. The client sends the assertion with a `DPoP` header:
 

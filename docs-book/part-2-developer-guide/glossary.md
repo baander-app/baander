@@ -1,16 +1,16 @@
 # Glossary
 
-Terms used throughout the developer documentation.
+Terms used throughout the developer documentation. For the project's complete domain, identity, media, and runtime vocabulary, see [CONCEPTS.md](../../CONCEPTS.md).
 
 ## DDD (Domain-Driven Design)
 
 | Term | Definition |
 |------|-----------|
 | **Aggregate Root** | An entity that serves as the entry point to a cluster of related objects. It has a repository interface and enforces invariants across its children. Example: `Album` is an aggregate root — it manages its own fields and rules. |
-| **Anti-Corruption Layer** | A set of adapters that isolate domain code from external libraries. Baander applies it to League OAuth2 Server, which only validates access tokens; Auth issues tokens with its own handlers. The domain only knows internal interfaces, not League's. |
+| **Anti-Corruption Layer** | A set of adapters or decorators that isolate domain code from external libraries, provider protocols, or cross-context internals. Baander applies it to League OAuth2 Server (which only validates access tokens), to `QualityFilteringStreamingDecorator` between `QoL` and `Transcode`, and to external metadata/station adapters. |
 | **Bounded Context** | A distinct area of the codebase that models a specific business capability with its own domain language, rules, and data. Example: the Playlist context knows nothing about Transcoding. |
 | **Command** | A CQRS write operation — a DTO that carries input data to a handler. Commands are immutable (`final readonly class`). Example: `CreatePlaylistCommand`. |
-| **Domain Event** | A signal that something happened in the domain. Events are dispatched by handlers and listened to by other contexts. Example: `TranscodeJobCompleted`. |
+| **Domain Event** | A signal that something happened in the domain. Events are captured in the PostgreSQL outbox for durable replay or dispatched live inside the producing process. Example: `TranscodeJobCompleted`. |
 | **Domain Model** | A PHP class in `Domain/Model/` that encapsulates business rules. Aggregate roots use a state object pattern; value objects are immutable with a public constructor. |
 | **Four-Layer Architecture** | Domain, Application, Infrastructure, Interface. Dependencies flow inward: Interface depends on Application, Application depends on Domain. Domain has no framework dependencies. |
 | **Port** | An interface in the Application layer that defines a capability (e.g., `PlaylistPortInterface`). Controllers inject ports; infrastructure implements them. This decouples the API layer from domain logic. |
@@ -22,13 +22,15 @@ Terms used throughout the developer documentation.
 
 | Term | Definition |
 |------|-----------|
+| **Change Inbox** | The PostgreSQL table (`live_change_inbox`) populated by database triggers in the same transaction as a business write and projected into scoped revisions that drive WebSocket `live.changed` hints. |
 | **CQRS** | Command Query Responsibility Segregation. Write operations (commands) are handled separately from read operations (queries) via Symfony Messenger. |
 | **Doctrine Entity** | An ORM mapping class in `Infrastructure/Doctrine/Entity/` that represents a database row. Separate from the domain model — repositories convert between the two. |
-| **Messenger** | Symfony's message bus system. Routes commands to handlers, supports async processing via Redis transport. |
+| **Messenger** | Symfony's message bus system. Routes commands to handlers inline or through the Redis `async` and `scheduler` streams. |
+| **Outbox** | The PostgreSQL table (`domain_event_outbox`) that captures domain events inside the producing transaction so the control unit can relay them durably after commit. |
 | **PGroonga** | A PostgreSQL extension for fast full-text search, used by the `PgroongaSearchTrait` in repositories. |
 | **Port Pattern** | The canonical dependency inversion pattern in Baander. Application ports define interfaces; infrastructure implements them; controllers depend on ports. |
-| **Process Pool** | A Swoole-managed pool of worker processes used for CPU-bound tasks like FFmpeg transcoding. |
-| **WebSocket** | Bidirectional real-time communication and Baander's only real-time transport: watch-party sync and member events, listening-session sync, and server pushes to a user's connections. |
+| **WebSocket** | Bidirectional real-time communication at `/api/ws` (authenticated with a single-use ticket from `POST /api/ws/tickets`) and Baander's only real-time transport: `live.*` change hints, watch-party sync and member events, playback-session coordination, and transcode position controls. |
+| **Worker Deployment Pair** | The control and execution containers admitted together under one deployment namespace and boot identity (`worker-control` and `worker-execution`), joined by a private IPC volume to run background consumers, scheduled occurrences, outbox replay, and native FFmpeg/probe processes. |
 
 ## Data Types
 

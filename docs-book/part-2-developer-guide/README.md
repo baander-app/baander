@@ -12,6 +12,8 @@ Understand the architecture, write code following project conventions, and contr
 | [Real-Time Patterns](real-time-patterns.md) | WebSocket connection registry, message protocol, party sync |
 | [Live Updates](live-updates.md) | Committed change capture, shared query refresh, ownership, and recovery |
 | [API Reference](api-reference.md) | OpenAPI spec, REST patterns, and authentication flows |
+| [Application Threat Model](application-threat-model.md) | Trust boundaries, DPoP/WebSocket/media controls, rate limiters, and outbound destination policies |
+| [Registry Threat Model](registry-threat-model.md) | Security boundaries, transport controls, and verification for the C++ server-discovery registry |
 
 ## Development
 
@@ -25,7 +27,7 @@ Understand the architecture, write code following project conventions, and contr
 | [Database Naming](database-naming.md) | Index, unique-constraint and foreign-key names in migrations and mappings |
 | [Testing](testing.md) | Disposable PHPUnit runners, browser qualification, live-update capacity and evidence boundaries |
 | [Continuous Integration](continuous-integration.md) | Shared workflows on Forgejo and GitHub, caches, image visibility and the operator runbook |
-| [Frontend Development](frontend-development.md) | React + TypeScript + Vite + styled-components |
+| [Frontend Development](frontend-development.md) | React + TypeScript + Vite + styled-components, TanStack Query, Zustand, Electron, and bAAC |
 
 ## Bounded Contexts
 

@@ -77,15 +77,16 @@ resolves its runner label.
 | Checkout credentials | `Authorization: token <workflow token>` | Basic authentication as `x-access-token` with the workflow token |
 | Caches and coverage baselines | Forgejo generic packages through `scripts/ci-package-store.php` | `actions/cache` |
 | Artifacts | `.github/actions/forgejo-upload-artifact` | `actions/upload-artifact` v7.0.2 |
-| Host disk cleanup | None | Before the CI quality gate and the application build |
+| Host disk cleanup | None | Before the CI quality gate, the application build and the static FFmpeg build |
 | Anonymous-pull check | None | After pushing the Nginx, FFmpeg and application images |
 
 Registry login passes `secrets.REGISTRY_TOKEN || github.token` as the password, with
 `github.actor` as the user. Job timeouts are the same on both forges.
 
-The CI quality gate and the production build in `ci.yaml` need the disk that a
+The CI quality gate and the production build in `ci.yaml` and the static FFmpeg
+build in `ffmpeg.yaml` need the disk that a
 hosted runner's preinstalled toolchains occupy. On GitHub they first run a
-short-lived container through the mounted Docker socket. It bind-mounts the host's
+short-lived `Free host disk on GitHub` container through the mounted Docker socket. It bind-mounts the host's
 preinstalled .NET, Android, GHC and hosted-toolcache directories, deletes their
 contents and reports the host's free space. A plain `run:` step would only reach
 the job container. The step is GitHub-only, because on the self-hosted Forgejo host
@@ -219,6 +220,10 @@ Both forges keep the same artifacts for 14 days:
 | `application-packaged-inventory-production` | `ci.yaml` | Always |
 | `public-website-<sha>` | `website.yaml` | After a successful build; the archive and its SHA-256 sum |
 | `registry-nightly-<run-id>-<attempt>` | `registry-nightly.yaml` | Always; the nightly evidence directory |
+
+The GitHub-only `aac-native.yml` workflow separately uploads `baander_aac-<target>`
+prebuilt addon artifacts (`linux-x64`, `win32-x64`, `darwin-x64`, `darwin-arm64`)
+with 30-day retention and attaches them to GitHub releases on `aac-native-v*` tags.
 
 GitHub uploads with `actions/upload-artifact`. Forgejo uploads through the
 `.github/actions/forgejo-upload-artifact` composite action, which wraps Forgejo's

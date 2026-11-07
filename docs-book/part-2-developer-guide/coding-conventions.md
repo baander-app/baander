@@ -88,6 +88,7 @@ final readonly class Uuid implements Stringable, JsonSerializable
 - Value objects are `final readonly class`
 - Never put Doctrine annotations in domain models
 - Add new fields to the state object when extending an aggregate root
+- Use internal `Uuid` (v7 default) for persistence keys, foreign keys, and domain events; expose 21-character `PublicId` NanoIDs on public routes, relationships, cursors, and WebSocket payloads (see [CONCEPTS.md](../../CONCEPTS.md))
 
 ## Repositories
 
@@ -210,12 +211,27 @@ Baander uses League OAuth2 Server only to validate access tokens through its `Re
 
 Extends `AbstractResource` with a static `from()` method that transforms domain models to API responses.
 
+### HTTP Headers and Identity
+
+- Prefix Baander-defined HTTP headers with `X-Baander-` (for example, `X-Baander-Client-Fingerprint`, `X-Baander-Playback-Endpoint`); keep standard protocol, proxy, and security header names.
+- Resolve the signed-in user in controllers through `App\Auth\Application\Port\AuthenticatedUserIdentityInterface` rather than calling `$this->security->getUser()` directly.
+
+## Admin Actions and Console Parity
+
+Every action on the admin pages has a console command counterpart, and CLI execution runs with full authority (`Actor::CLI` and unrestricted library read scope). See [`.agents/rules/admin-cli-parity.md`](../../.agents/rules/admin-cli-parity.md) for the complete specification.
+
+- **Shared use case:** A controller method and its CLI command dispatch the same Application command, query, or port. Business logic lives in Application, never in the controller or command alone.
+- **Route attributes:** Mark every admin-guarded route (and every non-admin route called by an admin page) with `#[CliCounterpart('app:noun:verb')]` or `#[CliParityExemption(...)]`. `AdminCliParityTest` verifies these markings and checks that every counterpart has a documentation page under `docs-book/part-1-operator-guide/commands/`.
+- **Command naming and helpers:** Name commands `app:<noun>[:<sub>]:<verb>` with a singular noun and build them on `App\Shared\Interface\Console\AdminCommandSupport`.
+- **Shared exceptions:** Throw `NotFoundException` (`404` / exit `1`), `ConflictException` (`409` / exit `1`), or `InvalidInputException` (`422` / exit `2`) from handlers instead of `RuntimeException`, and let the HTTP exception subscriber and `AdminCommandSupport::dispatch()` map them consistently.
+
 ## Database Conventions
 
-- **Primary keys**: Always UUID v7 via the `Uuid` domain model
+- **Primary keys**: Always UUID v7 via the `Uuid` domain model (unless an internal integer sequence or text key has a documented purpose)
 - **String columns**: Always `TEXT`, never `VARCHAR(n)` — length validation belongs in the application layer
+- **Timestamps**: Always `TIMESTAMPTZ` without explicit precision (`datetime_immutable` mapped via `InstantType`)
 - **JSON columns**: Always `JSONB`
-- **Index and constraint names**: Follow [Database Naming](database-naming.md)
+- **Foreign keys and indexes**: Index every foreign key column and follow [Database Naming](database-naming.md)
 
 ## See Also
 

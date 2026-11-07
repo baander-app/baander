@@ -12,14 +12,15 @@ The controller requires Linux, PHP 8.5+ with Swoole, Composer, Bash, GNU coreuti
 through dnsmasq, mkcert, and a working systemd user manager. Docker must provide
 cgroup v2 and publish loopback port 443 for the invoking user. Each worker pair
 requires at least two daemon CPUs and 8448 MiB of daemon RAM; allow additional
-resources for web, dependencies and concurrent instances. Use Yarn for frontend
-work; never run npm.
+resources for web, dependencies and concurrent instances. Use Yarn for `ui/`
+workspaces; never run npm there (`tests/e2e` and `packages/baander-aac` use npm).
 
 The selected image stack uses PHP 8.5.12, Swoole 6.2.4 and Composer 2.11.1.
 The PHP ZTS application base, the Node tooling stage, the PostgreSQL 18
 database image and the runner image build on Debian 13 (trixie).
-Dependency maintenance needs PHP 8.5 or newer and exactly Composer 2.11.1 on
-`PATH`; its local check does not require Swoole. See
+Dependency maintenance needs PHP 8.5 or newer with the Swoole extension loaded
+(`Baander\Tooling\Runtime\Requirements::check()`) and exactly Composer 2.11.1 on
+`PATH`. See
 [PHP dependency maintenance](php-dependencies.md) for the seven projects, local
 and online checks, retained fixes and recorded upgrade blockers.
 
@@ -132,7 +133,7 @@ The application image copies FFmpeg from the project's static FFmpeg image, a
 private package in the container registry. A host that builds the application
 image needs either a registry login that can pull it or
 `BAANDER_FFMPEG_IMAGE` pointing at a locally built copy, such as the output of
-`docker buildx build -f docker/ffmpeg/Dockerfile -t ffmpeg-baander-static:local .`.
+`docker buildx build -f docker/ffmpeg/Dockerfile -t ffmpeg-baander-static:local --load .`.
 
 Use the URL returned by `make preview-url` for browser work. For Playwright:
 

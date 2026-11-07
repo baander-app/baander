@@ -4,13 +4,13 @@ Contributions are welcome. This page covers the workflow and conventions for con
 
 ## Getting Started
 
-1. Set up the [development environment](development-environment.md)
-2. Run tests to verify everything works: `make phpunit`
-3. Run static analysis: `make phpstan`
+1. Set up the [development environment](development-environment.md) and install standalone tooling loaders with `composer tooling:autoload`
+2. Select a local CI test container (`BAANDER_TEST_IMAGE`) and run the test suite: `make phpunit`
+3. Run static analysis (`make phpstan`) or the full local gate (`make ci`, which runs `composer validate --no-check-version`, `composer normalize --dry-run`, `phpstan`, `deptrac`, and `phpunit`)
 
 ## Branch Naming
 
-Use conventional prefixes:
+Planned feature work uses a branch named after the plan file under `docs/plans/` (see [AGENTS.md](../../AGENTS.md)). Other changes use conventional prefixes:
 
 | Prefix | Purpose | Example |
 |--------|---------|---------|
@@ -47,7 +47,7 @@ chore(infra): update Docker build, supervisord, FFmpeg, and email templates
 
 1. Create a feature branch from the default branch
 2. Make your changes with tests
-3. Run `make phpunit` and `make phpstan` — both must pass
+3. Run `make ci` (or `make phpunit` and `make phpstan` in the `BAANDER_TEST_IMAGE` container) — all gates must pass
 4. Push and open a pull request
 5. Address review feedback
 
@@ -57,7 +57,7 @@ Reviewers check for:
 
 - **DDD conventions** — domain models use state objects, ports for dependencies, repositories implement domain interfaces
 - **Test coverage** — new behavior has tests; domain logic is tested without mocks
-- **No breaking changes** — API changes are additive; database migrations don't drop columns
+- **Pre-release design policy** — while there are no production deployments ([AGENTS.md](../../AGENTS.md)), favor the intended future design over backward compatibility, remove obsolete paths, and add no compatibility layers or migration fallbacks for hypothetical installations
 - **Code style** — matches existing patterns in the codebase
 
 ## Documentation Maintenance
@@ -70,7 +70,10 @@ CLI reference.
 
 | Code Change | Documentation to Update |
 |-------------|------------------------|
-| Add or modify a CLI command | Use the [documentation-maintainer](../../.agents/skills/documentation-maintainer/SKILL.md) CLI mode to update [CLI Reference](../part-1-operator-guide/commands/README.md) |
+| Add or modify a CLI command | Use the [documentation-maintainer](../../.agents/skills/documentation-maintainer/SKILL.md) CLI mode to update [CLI Reference](../part-1-operator-guide/commands/README.md) (`CommandDocsCoverageTest` checks every `app:*` command) |
+| Add or modify an admin endpoint | Declare `#[CliCounterpart]` or `#[CliParityExemption]` on the admin route (`AdminCliParityTest`) and document the counterpart command in `docs-book/part-1-operator-guide/commands/` |
+| Introduce a new entity, named process, or status concept | Add an entry to [CONCEPTS.md](../../CONCEPTS.md) |
+| Deliver a planned item or verification checkpoint | Record the delivered scope, suite counts, and static gates in [ROADMAP.md](../../ROADMAP.md) |
 | Change a DDD convention | Update `.agents/rules/ddd-*.md`, then update [Coding Conventions](coding-conventions.md) |
 | Add or change an environment variable | Update `.env.example`, then update [Configuration](../part-1-operator-guide/configuration.md) |
 | Add or change an API endpoint | Update [API Reference](api-reference.md) |
@@ -92,7 +95,8 @@ See the [Testing](testing.md) page for the full test suite guide.
 ## JavaScript Dependency Maintenance
 
 After changing a web dependency, inspect its manifest and owned lock with the
-read-only checker:
+read-only checker or its Composer script aliases (`composer check:js-dependencies:local`
+and `composer check:js-dependencies`):
 
 ```bash
 php scripts/check-js-dependencies.php --local-only --format json
@@ -101,13 +105,16 @@ php scripts/check-js-dependencies.php --online --format json
 
 Local mode is the default and makes no requests. The
 [JavaScript policy](../../packages/baander-tooling/resources/javascript-dependencies.json)
-classifies eight manifests: web, player, site and shared own independent Yarn
-locks; `tests/e2e` owns its npm lock. The DPoP and BlurHash library manifests have
-no independent installs, and design tokens use Node builtins. Discovery reports
-unclassified manifests within those source trees. Local inspection checks lock
-presence, npm root requirements, browser versions, resolutions and authored patch
-hashes. It leaves Yarn lock semantics and resolved versions to the package manager
-in online mode.
+classifies eight manifests inside its `scopeDirectories` (`ui/web`, `ui/site`,
+`ui/shared`, `ui/design-tokens`, and `tests/e2e`): web, player, site and shared
+own independent Yarn locks; `tests/e2e` owns its npm lock. The DPoP and BlurHash
+library manifests have no independent installs, and design tokens use Node
+builtins. Discovery reports unclassified manifests within those source trees;
+`ui/electron/package.json`, `ui/rn/package.json`, and
+`packages/baander-aac/package.json` sit outside `scopeDirectories`. Local
+inspection checks lock presence, npm root requirements, browser versions,
+resolutions and authored patch hashes. It leaves Yarn lock semantics and
+resolved versions to the package manager in online mode.
 
 Online mode requires Yarn and npm on `PATH`, registry access and the applicable
 Yarn project state. It collects resolved versions through `yarn info` or npm's
