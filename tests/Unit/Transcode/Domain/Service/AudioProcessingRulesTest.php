@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Transcode\Domain\Service;
 
 use App\Transcode\Domain\Service\AudioProcessingRules;
+use App\Transcode\Domain\ValueObject\AacImplementation;
 use App\Transcode\Domain\ValueObject\AudioProfile;
 use App\Transcode\Domain\ValueObject\LoudnessStandard;
 use PHPUnit\Framework\TestCase;
@@ -126,20 +127,20 @@ class AudioProcessingRulesTest extends TestCase
         $this->assertStringContainsString('osr=48000', $filter);
     }
 
-    public function testCodecOptionsForAac(): void
+    public function testCodecOptionsForAacNameTheSelectedImplementation(): void
     {
         $profile = AudioProfile::streamingStereo();
-        $options = AudioProcessingRules::codecOptions($profile);
 
-        $this->assertStringContainsString('-c:a aac', $options);
-        $this->assertStringContainsString('-b:a 128k', $options);
+        $this->assertStringContainsString('-c:a libbaac -b:a 128k', AudioProcessingRules::codecOptions($profile, AacImplementation::Baac));
+        $this->assertStringContainsString('-c:a libfdk_aac -b:a 128k', AudioProcessingRules::codecOptions($profile, AacImplementation::FdkAac));
+        $this->assertStringContainsString('-c:a aac -b:a 128k', AudioProcessingRules::codecOptions($profile, AacImplementation::Ffmpeg));
         // -q:a is a no-op when -b:a is already set; no longer emitted
     }
 
     public function testCodecOptionsForOpus(): void
     {
         $profile = AudioProfile::opusStereo();
-        $options = AudioProcessingRules::codecOptions($profile);
+        $options = AudioProcessingRules::codecOptions($profile, AacImplementation::Baac);
 
         $this->assertStringContainsString('-c:a libopus', $options);
         $this->assertStringContainsString('-b:a 96k', $options);

@@ -42,13 +42,20 @@ $client = new class(NativeExecutionClient::fromEnvironment($profile->sharedCopyS
     public function release(NativeExecutionHandle $handle): bool { return $this->inner->release($handle); }
 };
 ProcessExecutor::configureNativeExecution($client);
+// The disposable schema has no settings table; the fixture runs the setting's default.
+$settings = new class implements \App\Shared\Application\Port\SystemSettingsPortInterface {
+    public function get(string $key): bool|int|string
+    {
+        return \App\Transcode\Domain\ValueObject\AacImplementation::Baac->value;
+    }
+};
 try {
     $deadline = microtime(true) + 5;
     while (microtime(true) < $deadline) {
         foreach ($runtime->pending() as $pending) {
             $claim = $runtime->claim($pending->key, new MediaWorkerIdentity('baander.app:test', str_repeat('b', 32), 'media', 1));
             if ($claim !== null) {
-                (new AudioRenditionExecutor(new \App\Transcode\Application\Service\MediaExecutionPolicy(\App\Shared\Application\DTO\DeploymentProfile::fromEnvironment()), $runtime, new NullLogger(), '/usr/bin/ffmpeg'))->run($claim, static fn (): bool => false);
+                (new AudioRenditionExecutor(new \App\Transcode\Application\Service\MediaExecutionPolicy(\App\Shared\Application\DTO\DeploymentProfile::fromEnvironment()), $runtime, new NullLogger(), $settings, '/usr/bin/ffmpeg'))->run($claim, static fn (): bool => false);
                 return;
             }
         }

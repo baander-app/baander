@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Transcode\Infrastructure\FFmpeg;
 
 use App\Shared\Application\DTO\DeploymentProfile;
+use App\Shared\Application\Port\SystemSettingsPortInterface;
 use App\Transcode\Application\Exception\MediaEncodingProhibitedException;
 use App\Transcode\Application\Port\FFmpegPortInterface;
 use App\Transcode\Application\Port\TranscodeStoragePortInterface;
@@ -25,7 +26,7 @@ final class MediaExecutionBoundaryTest extends TestCase
     public function testHouseholdRejectsEveryTypedAdapterEncoderBeforeSourceOrOutputAccess(string $operation): void
     {
         $policy = new MediaExecutionPolicy(new DeploymentProfile('household'));
-        $adapter = new FFmpegAdapter($policy, new NullLogger(), new FFprobeAdapter(new JsonEncoder()), new FMP4SegmentWriter($policy), new JsonEncoder());
+        $adapter = new FFmpegAdapter($policy, new NullLogger(), new FFprobeAdapter(new JsonEncoder()), new FMP4SegmentWriter($policy), new JsonEncoder(), $this->createStub(SystemSettingsPortInterface::class));
         $this->expectException(MediaEncodingProhibitedException::class);
         match ($operation) {
             'video init' => $adapter->encodeInitSegment('/absent/source', QualityTier::p720(), '/absent/output'),
