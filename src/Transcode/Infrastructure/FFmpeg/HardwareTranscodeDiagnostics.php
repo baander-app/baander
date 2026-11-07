@@ -7,12 +7,13 @@ namespace App\Transcode\Infrastructure\FFmpeg;
 use App\Transcode\Application\DTO\HardwareTranscodeDiagnosticsReport;
 use App\Transcode\Application\Port\HardwareTranscodeDiagnosticsInterface;
 use App\Transcode\Domain\Service\VideoProcessingRules;
+use App\Transcode\Domain\ValueObject\AacImplementation;
 use App\Transcode\Domain\ValueObject\HardwareAccelerator;
 use App\Transcode\Domain\ValueObject\QualityTier;
 
 final readonly class HardwareTranscodeDiagnostics implements HardwareTranscodeDiagnosticsInterface
 {
-    public function __construct(private WorkerEncoderCapabilitiesSnapshotStore $snapshots)
+    public function __construct(private WorkerEncoderCapabilitiesSnapshotStore $snapshots, private AacImplementationProbe $aacProbe)
     {
     }
 
@@ -56,6 +57,12 @@ final readonly class HardwareTranscodeDiagnostics implements HardwareTranscodeDi
             $sampleCommands[$tier->name] = $cmd;
         }
 
+        $aacRows = [];
+        foreach (AacImplementation::cases() as $implementation) {
+            $available = $this->aacProbe->isAvailable($implementation);
+            $aacRows[] = [$implementation->value, $implementation->encoderName(), $available ? 'Yes' : 'No', $available ? 'Yes' : 'No'];
+        }
+
         $refRows = [];
         foreach (HardwareAccelerator::cases() as $case) {
             $refRows[] = [
@@ -84,6 +91,7 @@ final readonly class HardwareTranscodeDiagnostics implements HardwareTranscodeDi
             sourceDecoders: $sourceDecoders,
             sampleCommands: $sampleCommands,
             acceleratorReference: $refRows,
+            aacImplementations: $aacRows,
         );
     }
 }

@@ -10,6 +10,7 @@ final readonly class HardwareTranscodeDiagnosticsReport
      * @param array<string, string> $sourceDecoders Source codec to resolved decoder.
      * @param array<string, string> $sampleCommands Quality tier to sample command.
      * @param list<array{string, string, string, string, string, string}> $acceleratorReference
+     * @param list<array{string, string, string, string}> $aacImplementations Setting value, FFmpeg codec name, encoder and decoder availability.
      */
     public function __construct(
         public string $workerIdentity,
@@ -27,6 +28,7 @@ final readonly class HardwareTranscodeDiagnosticsReport
         public array $sourceDecoders,
         public array $sampleCommands,
         public array $acceleratorReference,
+        public array $aacImplementations = [],
     ) {
     }
 }

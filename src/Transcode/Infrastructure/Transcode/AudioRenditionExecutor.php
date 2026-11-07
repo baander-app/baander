@@ -14,6 +14,7 @@ use App\Transcode\Application\Port\AudioRenditionRuntimePort;
 use App\Transcode\Application\Settings\TranscodeSettingDefinitions;
 use App\Transcode\Domain\ValueObject\AacImplementation;
 use App\Transcode\Infrastructure\Storage\SegmentFileResolver;
+use App\Transcode\Infrastructure\FFmpeg\AacImplementationProbe;
 use App\Transcode\Infrastructure\FFmpeg\ProcessExecutor;
 use App\Shared\Infrastructure\Worker\NativeExecutionException;
 use Psr\Log\LoggerInterface;
@@ -30,6 +31,7 @@ final class AudioRenditionExecutor
         private readonly AudioRenditionRuntimePort $runtime,
         private readonly LoggerInterface $logger,
         private readonly SystemSettingsPortInterface $settings,
+        private readonly AacImplementationProbe $aacProbe,
         private readonly string $ffmpegPath,
         private readonly string $ffprobePath = '/usr/bin/ffprobe',
     ) {}
@@ -127,6 +129,9 @@ final class AudioRenditionExecutor
             }
             if ($sourceCodec === 'aac') {
                 $decoder = ['-c:a:0', $implementation->decoderName()];
+            }
+            if ($input->format === AudioRenditionFormat::Aac || $sourceCodec === 'aac') {
+                $this->aacProbe->assertAvailable($implementation);
             }
         }
         $arguments = [

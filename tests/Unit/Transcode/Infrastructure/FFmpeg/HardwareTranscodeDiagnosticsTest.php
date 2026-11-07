@@ -50,6 +50,7 @@ final class HardwareTranscodeDiagnosticsTest extends TestCase
             'vp9' => 'vp9_cuvid',
         ], $report->sourceDecoders);
         self::assertStringStartsWith('/usr/local/bin/ffmpeg -y -hwaccel cuda -hwaccel_output_format cuda -c:v h264_cuvid  -i source.mkv -c:v hevc_nvenc', $report->sampleCommands['720p']);
+        self::assertSame([['baac', 'libbaac', 'Yes', 'Yes'], ['fdk_aac', 'libfdk_aac', 'No', 'No'], ['ffmpeg', 'aac', 'Yes', 'Yes']], $report->aacImplementations);
     }
 
     public function testMissingWorkerEvidenceIsUnavailable(): void
@@ -57,7 +58,7 @@ final class HardwareTranscodeDiagnosticsTest extends TestCase
         $store = new WorkerEncoderCapabilitiesSnapshotStore(sys_get_temp_dir() . '/absent-baander-' . bin2hex(random_bytes(8)));
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Worker encoder capabilities are unavailable');
-        new HardwareTranscodeDiagnostics($store)->inspect();
+        new HardwareTranscodeDiagnostics($store, new \App\Tests\Support\StubAacImplementationProbe(['libbaac', 'aac'], ['libbaac', 'aac']))->inspect();
     }
 
     private function inspectPublishedProfile(EncoderProfile $profile, float $multiplier): \App\Transcode\Application\DTO\HardwareTranscodeDiagnosticsReport
@@ -67,7 +68,7 @@ final class HardwareTranscodeDiagnosticsTest extends TestCase
         $store = new WorkerEncoderCapabilitiesSnapshotStore($path);
         try {
             $store->publish($profile, $multiplier, 'worker-baander');
-            return new HardwareTranscodeDiagnostics($store)->inspect();
+            return new HardwareTranscodeDiagnostics($store, new \App\Tests\Support\StubAacImplementationProbe(['libbaac', 'aac'], ['libbaac', 'aac']))->inspect();
         } finally {
             unlink($path);
             rmdir($directory);

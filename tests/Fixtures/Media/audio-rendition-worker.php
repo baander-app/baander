@@ -55,7 +55,7 @@ try {
         foreach ($runtime->pending() as $pending) {
             $claim = $runtime->claim($pending->key, new MediaWorkerIdentity('baander.app:test', str_repeat('b', 32), 'media', 1));
             if ($claim !== null) {
-                (new AudioRenditionExecutor(new \App\Transcode\Application\Service\MediaExecutionPolicy(\App\Shared\Application\DTO\DeploymentProfile::fromEnvironment()), $runtime, new NullLogger(), $settings, '/usr/bin/ffmpeg'))->run($claim, static fn (): bool => false);
+                (new AudioRenditionExecutor(new \App\Transcode\Application\Service\MediaExecutionPolicy(\App\Shared\Application\DTO\DeploymentProfile::fromEnvironment()), $runtime, new NullLogger(), $settings, new \App\Transcode\Infrastructure\FFmpeg\AacImplementationProbe('/usr/bin/ffmpeg'), '/usr/bin/ffmpeg'))->run($claim, static fn (): bool => false);
                 return;
             }
         }

@@ -25,6 +25,8 @@ use App\Transcode\Domain\ValueObject\SessionState;
 use App\Transcode\Domain\ValueObject\SubtitleTrackInfo;
 use App\Transcode\Domain\ValueObject\TranscodeStatus;
 use App\Transcode\Domain\ValueObject\VideoProbeResult;
+use App\Transcode\Application\DTO\DesiredTranscodeState;
+use App\Transcode\Infrastructure\FFmpeg\AacImplementationProbe;
 use App\Transcode\Infrastructure\FFmpeg\SegmentEncoder;
 use App\Transcode\Infrastructure\FFmpeg\CopySourceTiming;
 use App\Transcode\Infrastructure\FFmpeg\EncodePresentationIdentity;
@@ -54,6 +56,7 @@ final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
         private readonly TranscodeExecutionOwnershipPort $ownership,
         private readonly TranscodeExecutionOwnershipPort $controlOwnership,
         private readonly TranscodeStreamManager $streamManager,
+        private readonly AacImplementationProbe $aacProbe,
         private readonly LoopLockRenewalTimerInterface $renewalTimer = new SwooleLoopLockRenewalTimer(),
         private readonly ?StreamAdmissionPortInterface $admission = null,
     ) {}
@@ -234,6 +237,7 @@ final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
                         $filters = $copy ? '' : $this->encoder()->buildVideoFilters($probe, $tier);
                         $audioFilters = $copy ? '' : $this->encoder()->buildAudioFiltersForProfile($probe, $active->runtime->desired->audioProfile);
                         $this->assertCurrent($active, $local, $stopRequested);
+                        $this->assertAacImplementationAvailable($active->runtime->desired, $copy, $hasAudio, $probe->selectedAudioStream()?->codec);
                         $this->streamManager->startStream($job, $source, $tier, $filters, $start, $output, $active->runtime->desired->audioProfile, $audioFilters, $active->runtime->generation, $hasAudio, $probe->framerate, $probe->sourceTimestampOrigin, audioStreamOrdinal: $probe->selectedAudioStreamOrdinal() ?? 0, presentationSelection: $copy ? $selection : null, sourceBoundary: $sourceBoundary, sourceDuration: $probe->videoEnd ?? 0.0, aacImplementation: $active->runtime->desired->aacImplementation, sourceAudioCodec: $probe->selectedAudioStream()?->codec);
                         $this->assertCurrent($active, $local, $stopRequested);
                         $generation = $active->runtime->generation;
@@ -443,6 +447,18 @@ final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
     private function encoder(): SegmentEncoder
     {
         return ($this->segmentEncoder)();
+    }
+
+    /** An encode that would use the session's AAC implementation fails before the spawn when the binary lacks it. */
+    private function assertAacImplementationAvailable(DesiredTranscodeState $desired, bool $copy, bool $hasAudio, ?string $sourceAudioCodec): void
+    {
+        $implementation = $desired->aacImplementation;
+        if ($copy || !$hasAudio || $implementation === null) {
+            return;
+        }
+        if ($desired->audioProfile->codec === 'aac' || $sourceAudioCodec === 'aac') {
+            $this->aacProbe->assertAvailable($implementation);
+        }
     }
 
     /** @param callable(): bool $stopRequested */
