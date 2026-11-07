@@ -47,6 +47,7 @@ Understand the architecture, write code following project conventions, and contr
 | Page | Description |
 |------|-------------|
 | [Testing](testing/README.md) | Disposable PHPUnit runners, browser qualification, live-update capacity and evidence boundaries |
+| [Testing Pyramid and E2E Layers](testing/testing-pyramid.md) | Testing pyramid, unit vs functional vs integration boundaries, and the four E2E verification layers |
 | [Bounded Contexts](contexts/README.md) | Domain models, ports, API endpoints and cross-context relationships for each context and the Shared kernel |
 
 ## Contributing

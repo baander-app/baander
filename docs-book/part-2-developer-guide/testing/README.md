@@ -50,6 +50,7 @@ Key environment and fixture rules across all suites:
 
 | Guide | Coverage |
 |-------|----------|
+| [Testing Pyramid and E2E Layers](testing-pyramid.md) | Five-layer testing pyramid, boundaries between `Unit`, `Functional`, and `Integration` suites, and the four end-to-end browser verification layers |
 | [Backend Runners and Coverage](backend-runners.md) | Host prerequisites, tooling checks, `test-backend-container.sh` lane scheduling (`Unit`, native, functional/integration stacks), coverage validation, `phpstan` / `deptrac`, and CI publication gates |
 | [Unit and Functional Conventions](conventions.md) | Manual domain construction, `App\Tests\Functional\TestCase` helpers, `X-Baander-Test-User-Id` authentication, `successResponse()` vs `created()` shapes, `jsonb` float round-trips, DAMA transaction isolation, and controller coverage |
 | [Security, Firewall, and Network Suites](security-and-firewall.md) | Refresh-token reuse grace and concurrency (`RefreshTokenGraceTest`, `RefreshTokenConcurrencyTest`), DPoP Redis outage behavior (`DpopStoreOutageTest`), signed video delivery and catalog/playlist mutation firewall matrices, atomic rate-limit storage, and outbound destination / native DNS bounds |

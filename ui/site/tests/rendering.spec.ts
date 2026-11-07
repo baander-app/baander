@@ -34,6 +34,7 @@ const diagramPages = [
   { chapter: 'developer-guide', directory: 'part-2-developer-guide', path: 'development/cqrs-and-messaging', fits: true },
   { chapter: 'developer-guide', directory: 'part-2-developer-guide', path: 'contexts/transcode', fits: true },
   { chapter: 'developer-guide', directory: 'part-2-developer-guide', path: 'development/api-authentication', fits: true },
+  { chapter: 'developer-guide', directory: 'part-2-developer-guide', path: 'testing/testing-pyramid', fits: true },
 ];
 
 async function visibleVariant(figure: Locator, appearance: 'light' | 'dark'): Promise<void> {

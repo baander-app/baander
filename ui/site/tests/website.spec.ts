@@ -96,7 +96,7 @@ test('chapters fold out as collapsible categories in the manual navigation', asy
   await expect(fold).not.toHaveAttribute('open', '');
   await expect(testingFold).toHaveAttribute('open', '');
   await expect(testingFold.getByRole('link', { name: 'Overview', exact: true })).toHaveAttribute('aria-current', 'page');
-  expect(await testingFold.getByRole('link').count()).toBe(9);
+  expect(await testingFold.getByRole('link').count()).toBe(10);
   await page.goto('/docs/developer-guide/architecture/overview/');
   await expect(fold).not.toHaveAttribute('open', '');
   await expect(testingFold).not.toHaveAttribute('open', '');
