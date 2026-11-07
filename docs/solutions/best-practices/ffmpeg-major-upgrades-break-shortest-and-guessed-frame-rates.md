@@ -1,6 +1,7 @@
 ---
 title: End movie audio at a stated video end and read the average frame rate across FFmpeg upgrades
 date: "2026-11-04"
+last_updated: "2026-11-07"
 category: best-practices
 module: Transcode segment encoding and source probing
 problem_type: best_practice
@@ -11,13 +12,14 @@ applies_when:
   - Changing how the segment encoder ends audio relative to the movie
   - Reading a source frame rate or duration from ffprobe stream fields
   - Media tests fail on audio track ends, publication timing or probed frame rates after an image change
+  - Comparing probe results for the same source across two FFmpeg versions
 symptoms:
   - Segment encoder media tests fail with audio ending short of the video end or missing its final frame
   - The first progressive segment is published seconds later than before
   - Probe results report the wrong frame rate for sub-1 fps sources
 root_cause: wrong_api
 resolution_type: code_fix
-tags: [ffmpeg, ffprobe, shortest, apad, frame-rate, segment-encoder, upgrade, debian-13]
+tags: [ffmpeg, ffprobe, shortest, apad, frame-rate, segment-encoder, upgrade, start-time]
 ---
 
 # End movie audio at a stated video end and read the average frame rate across FFmpeg upgrades
@@ -35,7 +37,7 @@ Two things the encoder relied on had shifted under it:
 
 - **`-shortest`.** The encoder padded audio with `apad` and let `-shortest` stop
   the output at the end of the video. On FFmpeg 7.1, the investigation recorded
-  in commit `97c84d760` found that `-shortest` holds up to ten seconds of frames
+  in commit `eefd89fc6` found that `-shortest` holds up to ten seconds of frames
   before the first DASH segment is published, and drops the last AAC frame that
   crosses the video end. In that commit's paced production command (30 s movie,
   4 s audio, seek to segment 1), the first video segment appeared at 17.43 s
@@ -44,18 +46,18 @@ Two things the encoder relied on had shifted under it:
   14.000000 s. Opus came out exact both ways.
 - **`r_frame_rate`.** The probe took the source frame rate from ffprobe's
   `r_frame_rate`, which is a guessed base rate. On FFmpeg 7 it overstates sub-1
-  fps Matroska tracks: commit `ff31d0d27` records 1/5 for a 0.1 fps H.264 track
+  fps Matroska tracks: commit `083c9128c` records 1/5 for a 0.1 fps H.264 track
   and 7/2 for a 0.7 fps HEVC track. MPEG-TS overstated such rates on 5.1 and 7.1
   alike (1/2 for 0.1 fps). The encoder treats a source below 1 fps as sparse and
   adds an `fps` filter
-  (`src/Transcode/Infrastructure/FFmpeg/SegmentEncoder.php:156-159`), so a 0.7 fps
+  (`src/Transcode/Infrastructure/FFmpeg/SegmentEncoder.php:159-162`), so a 0.7 fps
   source reported as 3.5 fps loses that handling.
 
 Two intermediate steps fell short:
 
 - **Removing `-shortest` alone.** With `whole_dur` padding, the padded audio is
   cheap to produce and runs ahead of the movie. Without strict interleaving, the
-  DASH muxer flushed audio before the first video packet. Commit `97c84d760`
+  DASH muxer flushed audio before the first video packet. Commit `eefd89fc6`
   records empty and fragmentary leading audio segments in about one in ten
   sparse delayed-audio encodes. With `-max_interleave_delta 0`, 0 of 40 runs
   failed.
@@ -64,18 +66,18 @@ Two intermediate steps fell short:
   when the video stream does not state its own end, and a container estimate is
   not a verified end for the selected video (see
   [Selected video endpoint](../../../CONCEPTS.md#selected-video-endpoint)).
-  Commit `10b16b057` narrowed the input to a new `videoEnd` field that is set
+  Commit `756699118` narrowed the input to a new `videoEnd` field that is set
   only when the video stream itself states its end. A source with only the
   container estimate keeps `-shortest`.
 
-These commits are local to `feat/configurable-media-capacity` and unmerged as of
-2026-11-04; their hashes may change when the branch merges. Their subjects find
-them after a rebase:
+These commits were made on `feat/configurable-media-capacity` and reached
+`master` with the hashes below; their subjects find them if history is rewritten
+again:
 
-- `ff31d0d27` fix(transcode): take the source frame rate from ffprobe's average rate
-- `8eadca948` test(transcode): make media fixtures independent of the FFmpeg version
-- `97c84d760` fix(transcode): end movie audio at the probed video end instead of -shortest
-- `10b16b057` fix(transcode): end audio at the video end only when the stream states it
+- `083c9128c` fix(transcode): take the source frame rate from ffprobe's average rate
+- `879f51701` test(transcode): make media fixtures independent of the FFmpeg version
+- `eefd89fc6` fix(transcode): end movie audio at the probed video end instead of -shortest
+- `756699118` fix(transcode): end audio at the video end only when the stream states it
 
 ## Guidance
 
@@ -89,8 +91,8 @@ aresample=first_pts=0,apad=packet_size=1024:whole_dur=D,atrim=end=D
 
 Omit `-shortest` in that case. Every command with audio also sets
 `-max_interleave_delta 0`, so padded audio cannot reach the muxer ahead of the
-first video packet. See `SegmentEncoder.php:164-172` for the filter and
-`SegmentEncoder.php:288-295` for the output options.
+first video packet. See `SegmentEncoder.php:167-175` for the filter and
+`SegmentEncoder.php:300-307` for the output options.
 
 **Take the end only from the video stream.** `VideoProbeResult::$videoEnd`
 (`src/Transcode/Domain/ValueObject/VideoProbeResult.php:44`) is null unless the
@@ -100,15 +102,22 @@ stream states its end: MOV or MP4 stream timing, or the Matroska track
 duration.
 
 **Read frame rates from `avg_frame_rate`.** `streamFramerate`
-(`VideoProbeResult.php:343-357`) uses `avg_frame_rate` and falls back to
+(`VideoProbeResult.php:352-357`) uses `avg_frame_rate` and falls back to
 `r_frame_rate` only when the average is missing, unknown or not finite. The two
 agree for 24, 29.97 and 60 fps, for interlaced 25i and 29.97i, and for B-frame
 sources. For variable-rate sources the average differs from the base rate (22.5
 for a 30/15 fps mix), which is the intended trade.
 
+**Compare probe output field by field across the upgrade.** Generate a small set
+of sources (MP4, MOV, Matroska, WebM, MPEG-TS, FLAC, MP3; with and without audio
+priming), probe each with both versions using the application's own
+`FFprobeArguments`, and diff what `VideoProbeResult` produces, not the raw
+JSON. A changed field there changes presentation identities and filter graphs,
+so it re-encodes cached presentations of re-probed videos once.
+
 **Treat an FFmpeg major upgrade as a behaviour change.** Run the media suites on
 the new image before relying on it, and read each failure as a possible FFmpeg
-change before changing the expectation. The fixture fixes in commit `8eadca948`
+change before changing the expectation. The fixture fixes in commit `879f51701`
 list other FFmpeg 7 changes the tests hit: encoder-side `-color_primaries` and
 `-color_trc` are ignored, ffprobe's frame `pkt_duration_time` became
 `duration_time`, muxers interleave strictly by timestamp, a MOV container's
@@ -127,12 +136,28 @@ An explicit end in the filter graph does not depend on how the muxer decides
 which stream is shortest. The average frame rate comes from the stream's frames
 and duration rather than from a guessed base rate.
 
+**FFmpeg 7.1 to 8.1.** The images moved to the project's static FFmpeg 8.1
+build on branch `feat/baac-ffmpeg-transcoder` (2026-11-07). Its probe-drift
+check, run that day on generated sources, found packet timestamps identical
+between the versions and one parsed change. For a Matroska or WebM source whose
+audio carries encoder priming, ffprobe 7.1 reported the container `start_time`
+as a small negative value (-0.021 s for AAC, -0.007 s for Opus in that check),
+and 8.1 reports 0. The parser accepts only a non-negative container start as the
+timestamp origin (`VideoProbeResult.php:259-260` and `nonnegativeTimestamp`,
+line 329), so on 7.1 such a source had no `videoEnd` even when its track stated
+a `DURATION`, and its audio fell back to `-shortest`. On 8.1 the same source gets
+a `videoEnd` and takes the explicit `whole_dur`/`atrim` end; its probed duration
+also drops by the priming. MP4, MOV, MPEG-TS and FLAC results were unchanged.
+Whether `-shortest` on 8.1 still holds back the first segment was not measured.
+
 **Residual risk.** Callers without a stated video end still use `-shortest` and
 still get FFmpeg 7's behaviour: a later first publication and an AAC track that
 can end short of the video by part of a frame. This applies to formats other
 than MOV, MP4 and Matroska (MPEG-TS and AVI, for example), to MOV files that fall
 back to the format duration, to Matroska files without a track `DURATION` tag,
-and to a seek that starts at or past the stated end. A future FFmpeg change to
+and to a seek that starts at or past the stated end. On FFmpeg 7.1 it also
+covered Matroska and WebM sources with primed audio; 8.1 moved those to the
+explicit end, as described above. A future FFmpeg change to
 `-shortest` would land on these sources first.
 
 ## When to Apply
