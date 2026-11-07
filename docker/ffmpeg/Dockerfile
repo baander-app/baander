@@ -14,10 +14,9 @@ RUN set -xe \
       yasm \
       gettext \
       libfontconfig1-dev \
-      libcairo2-dev \
-      libpango1.0-dev \
-      libgdk-pixbuf-2.0-dev \
       libfftw3-dev \
+      libva-dev \
+      libdrm-dev \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
@@ -98,7 +97,8 @@ RUN curl -sL -o chromaprint.tar.gz https://github.com/acoustid/chromaprint/relea
     && cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/dist -DCMAKE_INSTALL_LIBDIR=lib \
         -DBUILD_SHARED_LIBS=OFF -DBUILD_TOOLS=OFF -DFFT_LIB=fftw3 -DCMAKE_POLICY_VERSION_MINIMUM=3.5 .. \
     && make -j"$(nproc)" \
-    && make install
+    && make install \
+    && printf 'Libs.private: -lfftw3 -lstdc++ -lm\n' >> /dist/lib/pkgconfig/libchromaprint.pc
 
 # --- libspeex 1.2.1 ---
 FROM lib-builder AS libspeex-builder
@@ -141,6 +141,27 @@ RUN curl -sL -o libaribb24.tar.gz https://github.com/nkoriyama/aribb24/archive/r
     && make -j"$(nproc)" \
     && make install
 
+# --- nv-codec-headers 13.0.19.0 ---
+# The build script installs these only when nvcc is present, which it is not
+# here; NVENC, NVDEC and CUVID need the headers alone.
+FROM lib-builder AS nvcodec-builder
+WORKDIR /build
+RUN curl -sL -o nvcodec.tar.gz https://github.com/FFmpeg/nv-codec-headers/releases/download/n13.0.19.0/nv-codec-headers-13.0.19.0.tar.gz \
+    && mkdir nvcodec && tar xzf nvcodec.tar.gz -C nvcodec --strip-components 1 \
+    && cd nvcodec \
+    && make install PREFIX=/dist
+
+# --- libvpl 2.15.0 (QSV dispatcher; the runtime is loaded on the host) ---
+FROM lib-builder AS libvpl-builder
+WORKDIR /build
+RUN curl -sL -o libvpl.tar.gz https://github.com/intel/libvpl/archive/refs/tags/v2.15.0.tar.gz \
+    && mkdir libvpl && tar xzf libvpl.tar.gz -C libvpl --strip-components 1 \
+    && cmake -S libvpl -B libvpl/build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_INSTALL_PREFIX=/dist -DCMAKE_INSTALL_LIBDIR=lib -DBUILD_SHARED_LIBS=OFF \
+        -DBUILD_TOOLS=OFF -DBUILD_EXAMPLES=OFF -DBUILD_TESTS=OFF -DINSTALL_EXAMPLE_CODE=OFF \
+    && cmake --build libvpl/build \
+    && cmake --install libvpl/build
+
 # --- bAAC (packages/baander-aac, repository checkout) ---
 # Installed with the workspace prefix through DESTDIR so that libbaac.pc
 # points at the paths FFmpeg's configure sees after the merge below.
@@ -157,20 +178,13 @@ RUN cmake -S /build/baander-aac -B /build/baander-aac-build -G Ninja \
     && PKG_CONFIG_PATH=/dist/usr/src/ffmpeg-build-script/workspace/lib/pkgconfig \
        PKG_CONFIG_SYSROOT_DIR=/dist pkg-config --static --libs libbaac
 
-# --- librsvg 2.56.5 ---
-FROM lib-builder AS librsvg-builder
-WORKDIR /build
-RUN curl -sL -o librsvg.tar.xz https://download.gnome.org/sources/librsvg/2.56/librsvg-2.56.5.tar.xz \
-    && mkdir librsvg && tar xf librsvg.tar.xz -C librsvg --strip-components 1 \
-    && cd librsvg \
-    && ./configure --prefix=/dist --disable-shared --enable-static --disable-introspection --disable-pixbuf-loader \
-    && make -j"$(nproc)" \
-    && make install
-
 # ============================================================
 # FFmpeg final: merge all library artifacts and rebuild
 # ============================================================
-FROM ffmpeg-base AS ffmpeg-final
+# ffmpeg-prepared holds the merged workspace and the patched tree inputs
+# without running configure, so a failing configure can be reproduced in a
+# container built from this stage.
+FROM ffmpeg-base AS ffmpeg-prepared
 
 # Merge library artifacts into workspace (COPY adds files, does not clobber)
 COPY --from=librist-builder    /dist/ /usr/src/ffmpeg-build-script/workspace/
@@ -180,7 +194,8 @@ COPY --from=libspeex-builder   /dist/ /usr/src/ffmpeg-build-script/workspace/
 COPY --from=libtwolame-builder /dist/ /usr/src/ffmpeg-build-script/workspace/
 COPY --from=libvmaf-builder    /dist/ /usr/src/ffmpeg-build-script/workspace/
 COPY --from=libaribb24-builder /dist/ /usr/src/ffmpeg-build-script/workspace/
-COPY --from=librsvg-builder    /dist/ /usr/src/ffmpeg-build-script/workspace/
+COPY --from=nvcodec-builder    /dist/ /usr/src/ffmpeg-build-script/workspace/
+COPY --from=libvpl-builder     /dist/ /usr/src/ffmpeg-build-script/workspace/
 COPY --from=baac-builder       /dist/usr/src/ffmpeg-build-script/workspace/ /usr/src/ffmpeg-build-script/workspace/
 
 # The bAAC wrapper: sources copied into the FFmpeg tree, the registration
@@ -188,18 +203,31 @@ COPY --from=baac-builder       /dist/usr/src/ffmpeg-build-script/workspace/ /usr
 COPY docker/ffmpeg/baac /usr/src/baac
 COPY docker/ffmpeg/smoke.sh /usr/src/smoke.sh
 
+FROM ffmpeg-prepared AS ffmpeg-final
 RUN set -xe \
     && WORKSPACE=/usr/src/ffmpeg-build-script/workspace \
     && export PKG_CONFIG_PATH="$WORKSPACE/lib/pkgconfig:/usr/local/lib/x86_64-linux-gnu/pkgconfig:/usr/local/lib/pkgconfig:/usr/local/share/pkgconfig:/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/lib/pkgconfig:/usr/share/pkgconfig:/usr/lib64/pkgconfig" \
+    && sed -i "s#/dist#$WORKSPACE#g" "$WORKSPACE"/lib/pkgconfig/*.pc \
     && FFMPEG_SRC="$(ls -d /usr/src/ffmpeg-build-script/packages/FFmpeg-* | head -1)" \
     && cd "$FFMPEG_SRC" \
+    && printf '%s\n' "${FFMPEG_SRC##*-}" > VERSION \
     && cp /usr/src/baac/libavcodec/*.c libavcodec/ \
     && git apply --check -p1 /usr/src/baac/ffmpeg-8.1-libbaac.patch \
     && git apply -p1 /usr/src/baac/ffmpeg-8.1-libbaac.patch \
     && FFMPEG_CONFIGURATION="$(grep '^FFMPEG_CONFIGURATION=' ffbuild/config.mak | cut -d= -f2-)" \
-    && make distclean || true \
+    && { make distclean || true; } \
     && eval "./configure $FFMPEG_CONFIGURATION \
         --enable-libbaac \
+        --extra-libs=-lstdc++ \
+        --enable-vaapi \
+        --enable-libdrm \
+        --disable-xlib \
+        --disable-libxcb \
+        --enable-ffnvcodec \
+        --enable-nvenc \
+        --enable-nvdec \
+        --enable-cuvid \
+        --enable-libvpl \
         --enable-libfribidi \
         --enable-libharfbuzz \
         --enable-libass \
@@ -208,10 +236,13 @@ RUN set -xe \
         --enable-libtwolame \
         --enable-libvmaf \
         --enable-librist \
-        --enable-libaribb24 \
-        --enable-librsvg" \
+        --enable-libaribb24" \
     && make -j"$(nproc)" \
-    && make install \
+    && make install
+
+# The smoke runs in its own layer so that a change to it does not rebuild FFmpeg.
+RUN set -xe \
+    && WORKSPACE=/usr/src/ffmpeg-build-script/workspace \
     && SMOKE_EXPECT_FDK=1 bash /usr/src/smoke.sh "$WORKSPACE/bin/ffmpeg" "$WORKSPACE/bin/ffprobe" /tmp/smoke
 
 # ============================================================
@@ -219,9 +250,19 @@ RUN set -xe \
 # ============================================================
 FROM debian:trixie-slim
 
+# The binaries link Debian's shared libva, libdrm and the libraries behind
+# the builder's -dev packages; the list is what ldd on the built binaries
+# reports, and the gate proves it resolves.
+COPY docker/ffmpeg/runtime-packages.txt docker/ffmpeg/expected-capabilities.txt /opt/baander/
+COPY scripts/ffmpeg-capability-gate.sh /usr/local/bin/ffmpeg-capability-gate
 COPY --from=ffmpeg-final /usr/src/ffmpeg-build-script/workspace/bin/ffmpeg /usr/local/bin/ffmpeg
 COPY --from=ffmpeg-final /usr/src/ffmpeg-build-script/workspace/bin/ffprobe /usr/local/bin/ffprobe
 
-RUN chmod +x /usr/local/bin/ffmpeg /usr/local/bin/ffprobe
+RUN set -xe \
+    && DEBIAN_FRONTEND=noninteractive apt-get update -qq \
+    && grep -v '^#' /opt/baander/runtime-packages.txt | xargs apt-get install -yqq --no-install-recommends \
+    && rm -rf /var/lib/apt/lists/* \
+    && chmod +x /usr/local/bin/ffmpeg /usr/local/bin/ffprobe /usr/local/bin/ffmpeg-capability-gate \
+    && ffmpeg-capability-gate /usr/local/bin/ffmpeg /opt/baander/expected-capabilities.txt
 
 ENTRYPOINT ["/usr/local/bin/ffmpeg"]
