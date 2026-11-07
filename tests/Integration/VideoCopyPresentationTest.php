@@ -99,7 +99,7 @@ final class VideoCopyPresentationTest extends TestCase
             $worker = new TranscodeSessionSubscriber(new MediaExecutionPolicy($profile), $jobs, $sessions, $storage,
                 new TranscodeProcessPool($native->client, $logger, new JsonEncoder(), new DeploymentProfile('full')), $encoder, $videos, $logger, $ownership, $ownership, $manager, new \App\Tests\Support\StubAacImplementationProbe(), $timer);
             $worker->run($claim, static fn(): bool => false);
-            self::assertSame(TranscodeStatus::Completed, $job->getStatus(), json_encode($outcomes));
+            self::assertSame(TranscodeStatus::Completed, $job->getStatus(), json_encode([$outcomes, $job->getFailReason()]));
             self::assertContains('ready', $outcomes);
             self::assertSame('complete', array_last($outcomes));
             $directory = $job->getOutputDirectory();

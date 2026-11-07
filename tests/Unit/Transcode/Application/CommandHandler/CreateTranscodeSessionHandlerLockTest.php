@@ -148,7 +148,7 @@ final class CreateTranscodeSessionHandlerLockTest extends TestCase
         $this->ownership->method('find')->willReturnOnConsecutiveCalls($this->snapshot($outcome), $this->snapshot($outcome), $this->snapshot('accepted'));
         $this->sessions->expects(self::never())->method('findByUuid');
         $this->sessions->expects(self::once())->method('createSession')->willReturn($this->session);
-        $this->ownership->expects(self::once())->method('admit')->with($this->job->getId(), $this->session->getId(), $this->command->requestId, self::isInstanceOf(DesiredTranscodeState::class))->willReturn($this->snapshot('pending'));
+        $this->ownership->expects(self::once())->method('admit')->with($this->job->getId(), $this->session->getId(), $this->command->requestId, self::callback(static fn (DesiredTranscodeState $desired): bool => $desired->aacImplementation === \App\Transcode\Domain\ValueObject\AacImplementation::FdkAac))->willReturn($this->snapshot('pending'));
         self::assertSame($this->session, ($this->handler)($this->command));
     }
 
@@ -178,7 +178,8 @@ final class CreateTranscodeSessionHandlerLockTest extends TestCase
     private function settings(): \App\Shared\Application\Port\SystemSettingsPortInterface
     {
         $settings = $this->createStub(\App\Shared\Application\Port\SystemSettingsPortInterface::class);
-        $settings->method('get')->willReturn('baac');
+        // A non-default position, so the admitted state shows it came from the setting.
+        $settings->method('get')->willReturn('fdk_aac');
         return $settings;
     }
 }

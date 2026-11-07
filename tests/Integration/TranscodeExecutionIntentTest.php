@@ -82,7 +82,7 @@ final class TranscodeExecutionIntentTest extends TestCase
             $this->insertSession();
             $this->runtime->admit($this->jobId, $this->sessionId, 'start', new DesiredTranscodeState(AudioProfile::streamingStereo(), presentationSelection: new \App\Transcode\Domain\ValueObject\PresentationSelection('copy', 'source-hash', 2, 4, 'mp4')));
         });
-        self::assertNull($this->runtime->find($this->jobId)?->desired->aacImplementation, 'a copy session stores no implementation');
+        self::assertNull($this->runtime->find($this->jobId)?->desired->aacImplementation, 'a state admitted without an implementation, as the copy presentation service admits it, stores none');
         $this->first->executeStatement("UPDATE transcode_runtime_state SET desired = desired - 'aacImplementation'");
         self::assertNull($this->runtime->find($this->jobId)?->desired->aacImplementation);
         $controlled = $this->runtime->control($this->jobId, $this->sessionId, 'pause-legacy', status: 'paused', seek: false)->runtime;
