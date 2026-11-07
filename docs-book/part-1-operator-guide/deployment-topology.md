@@ -102,10 +102,11 @@ Compose knows nothing about the pair: `docker-compose.yml` declares nginx, the
 web application, PostgreSQL, the pooler and Redis, and starting the web stack
 starts no worker. The dotted edges in the diagram mark that difference.
 
-Web and the pair start under the same deployment profile. The small-host
-household profile, for example, fixes two shared copy slots and permits stream
-copy but no re-encoding; see [Deployment profiles](configuration.md#deployment-profiles) in
-Configuration. The pair's admission, lifecycle and recovery are explained in
+Web and the pair start under the same deployment profile, which carries the
+deployment's capability and size. A `remux` deployment, for example, runs shared
+copy slots and permits stream copy but no re-encoding; see
+[Deployment capability and size](configuration.md#deployment-capability-and-size)
+in Configuration. The pair's admission, lifecycle and recovery are explained in
 [The worker deployment pair](background-work.md#the-worker-deployment-pair).
 
 ## Shared storage

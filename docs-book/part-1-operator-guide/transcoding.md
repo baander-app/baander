@@ -1,13 +1,13 @@
 # Transcoding
 
 Baander selects a delivery path from the receiving client's media capabilities and
-the deployment's startup profile. Compatible files can play directly; other sources
+whether the deployment is `transcode` or `remux`. Compatible files can play directly; other sources
 may use an existing artifact, stream copy or encoding.
 
-Under `full`, video encoding produces CMAF segments served through HLS v6 and DASH.
+Under `transcode`, video encoding produces CMAF segments served through HLS v6 and DASH.
 Music can be encoded to Opus, AAC or MP3 when audio transcoding is enabled.
-Under `household`, audio and video re-encoding are prohibited. See
-[Deployment profiles](configuration.md#deployment-profiles) and
+Under `remux`, audio and video re-encoding are prohibited. See
+[Deployment capability and size](configuration.md#deployment-capability-and-size) and
 [Audio Transcoding](#audio-transcoding).
 
 Before testing conversion, confirm that the media is in the catalog, its source path is readable, and the independent worker deployment is running with shared output storage. A healthy web endpoint alone does not establish encoder availability. [Storage and Data](storage-and-data.md#shared-media-paths) explains the mounts; [Background Work](background-work.md) explains the deployment and its recovery boundary.
@@ -29,13 +29,13 @@ checks the source and access rights, then returns one of these outcomes:
 | Original | A signed source file plays through the native media element. |
 | Cached | A compatible completed artifact plays without starting a producer. |
 | Copy | An owned job repackages selected streams without audio or video re-encoding. Video uses adaptive delivery. |
-| Encoded | The `full` profile may start the existing encoding path, subject to audio settings where applicable. |
+| Encoded | A `transcode` deployment may start the existing encoding path, subject to audio settings where applicable. |
 | Incompatible | Playback stops with an explanation; capacity retries cannot enable a prohibited conversion. |
 
 A cached artifact authorizes delivery only. Missing, partial or evicted output
 returns to negotiation; it does not grant permission to regenerate encoded media
-in `household`. Text subtitles keep their adaptive delivery path. A subtitle
-burn-in request requires re-encoding and is incompatible with `household`.
+under `remux`. Text subtitles keep their adaptive delivery path. A subtitle
+burn-in request requires re-encoding and is incompatible with `remux`.
 
 For an active video job, web commits the session and its durable execution intent
 together. The independent worker claims that intent, probes the source and starts
@@ -86,7 +86,7 @@ remain playback failures.
 
 ## Quality Tiers
 
-The `full` profile's encoded quality ladder defines six HEVC tiers. The client selects a tier at session creation time based on its capabilities and available bandwidth. Original and copied video retain the source's encoded quality.
+The `transcode` capability's encoded quality ladder defines six HEVC tiers. The client selects a tier at session creation time based on its capabilities and available bandwidth. Original and copied video retain the source's encoded quality.
 
 | Tier | Resolution | Video Bitrate | Max Bitrate | Buffer Size | Codec |
 |------|-----------|---------------|-------------|-------------|-------|
@@ -116,11 +116,11 @@ An encoded session is assigned an audio profile that controls codec, bitrate, ch
 
 ## Worker execution capacity
 
-Under `full`, the media role admits as many video jobs and audio renditions at
+Under `transcode`, the media role admits as many video jobs and audio renditions at
 once as the profile has [media slots](configuration.md#media-slots): 8 video and 12
 audio by default. Stream copy uses the slots of its kind, and a kind with zero
-slots is refused. Under `household`, audio and video copy jobs share two slots,
-and encoding is refused. Each video job has a fresh PHP kernel and one private CPU
+slots is refused. Under `remux`, audio and video copy jobs share the configured
+copy slots, 1 to 8, and encoding is refused. Each video job has a fresh PHP kernel and one private CPU
 helper, started before any database or Redis connection opens. FFmpeg processes and their
 process groups belong to the worker deployment. Web has no CPU pool or encoder
 fallback.
@@ -223,15 +223,15 @@ See [Monitoring](monitoring.md) for job status and [Worker deployment](commands/
 
 ## Hardware Acceleration
 
-The `full` worker encodes video in software unless the deployment profile names a
-hardware encoder. The household profile cannot re-encode, so it accepts no hardware
-encoder and skips encoder qualification.
+A `transcode` worker encodes video in software unless the deployment profile names
+a hardware encoder. A `remux` deployment cannot re-encode, so it accepts no
+hardware encoder and skips encoder qualification.
 
-Name the encoder in the managed preset's private configuration under
-`media.hardware`:
+Name the encoder in the managed preset's private configuration with a top-level
+`hardware` entry beside `capability` and `size`:
 
 ```json
-"media": {"hardware": {"accelerator": "vaapi", "device": "/dev/dri/renderD128"}}
+"hardware": {"accelerator": "vaapi", "device": "/dev/dri/renderD128"}
 ```
 
 | Field | Meaning |
@@ -268,7 +268,7 @@ software encoder.
 
 With a hardware encoder, unset video slots take the measured hardware default of
 12. Audio stays at 12, and the video maximum still follows the pooler bound: 145
-slots in `full`.
+slots at the 16 GB starting point.
 
 The default of 12 follows `hevc_vaapi`, the encoder media control picks by default.
 On an AMD Radeon RX 9070 XT with VAAPI, every 1080p stream ran at 1.12x real time
@@ -300,7 +300,7 @@ with the default profile and without seccomp. Keep the default profile; do not a
 ## Audio Transcoding
 
 Music playback first negotiates original, cached or copied delivery. If encoding
-is needed, `full` and the audio setting must both allow it. Direct API clients can
+is needed, the `transcode` capability and the audio setting must both allow it. Direct API clients can
 request an encoded format explicitly:
 
 ```
@@ -312,7 +312,7 @@ GET /api/stream/track?id=<track public ID>&format=mp3&bitrate=192000
 
 ### Settings
 
-Three [server settings](configuration.md#server-settings) govern audio transcoding. Baander reads them on every request. Video transcoding is outside the first two. The AAC implementation also covers the audio track of DASH video sessions. In `full`, a direct format request while `transcode.enabled` is off receives `403`; enabling it still cannot authorize encoding in `household`.
+Three [server settings](configuration.md#server-settings) govern audio transcoding. Baander reads them on every request. Video transcoding is outside the first two. The AAC implementation also covers the audio track of DASH video sessions. Under `transcode`, a direct format request while `transcode.enabled` is off receives `403`; enabling it still cannot authorize encoding under `remux`.
 
 | Setting | Default | Effect |
 |---------|---------|--------|
@@ -324,7 +324,7 @@ Baander then rounds the bitrate down to the highest step of a fixed ladder that 
 
 An unsupported format, a bitrate that is not a positive whole number, or a bitrate without a format gets `400`. A failed encode gets `500` and is logged with the track, format and bitrate.
 
-Renditions are admitted through durable PostgreSQL runtime state. Under `full`, the media role runs as many audio encodes at once as its audio slots, 12 by default, independently of its video slots. Requests for the same source fingerprint, format and bitrate join the same accepted work. Web waits up to 60 seconds for output to start; an unavailable worker or failed generation produces an encode failure rather than an inline web encode. When every audio slot stays busy for that whole wait, `/api/stream/track` and `/api/stream/original/track` answer `503` with `Retry-After: 5` and the reason `audio_slots_busy`. The work keeps its place in the queue, and the web player's retry follows it once a slot frees.
+Renditions are admitted through durable PostgreSQL runtime state. Under `transcode`, the media role runs as many audio encodes at once as its audio slots, 12 by default, independently of its video slots. Requests for the same source fingerprint, format and bitrate join the same accepted work. Web waits up to 60 seconds for output to start; an unavailable worker or failed generation produces an encode failure rather than an inline web encode. When every audio slot stays busy for that whole wait, `/api/stream/track` and `/api/stream/original/track` answer `503` with `Retry-After: 5` and the reason `audio_slots_busy`. The work keeps its place in the queue, and the web player's retry follows it once a slot frees.
 
 ### AAC implementation
 
@@ -371,7 +371,7 @@ If a completed cache file has been evicted, a compare-and-swap against its
 completed generation resets the same canonical runtime row to pending when the
 requested execution is permitted. The next worker claim advances its generation
 and rebuilds the file; concurrent readers do not create another canonical row.
-Completed-artifact reuse in `household` does not authorize an encoded rebuild.
+Completed-artifact reuse under `remux` does not authorize an encoded rebuild.
 
 The transcode cache sweep (`app:transcode:cache-sweep`) treats each track's renditions, all formats and bitrates together, as one cache unit under the same age limit and size budget as video segments. A track's renditions count as in use while an encode has written to a partial rendition recently.
 
@@ -395,7 +395,7 @@ Audio transcoding is switched on and capped with the [server settings](#settings
 - **Derived output** uses `CONVERT_STORAGE_PATH`, default `/storage/conversions`, mounted at the same path in web and worker.
 - **Application storage and state** require shared writable worker volumes covering `APP_HOME/storage` and `APP_HOME/var/transcode_state`, where `APP_HOME` is the image application path generated during [installation](getting-started.md).
 - **Source media** uses an explicit `MEDIA_STORAGE_PATH`, for example `/media/library`, covered by a read-only worker source volume. Use the identical source root in both roles. Preserve web access needed for authorized library deletion.
-- **Capacity** comes from the startup profile: `full` permits as many video jobs and audio renditions as its [media slots](configuration.md#media-slots), 8 and 12 by default; `household` permits two shared copy jobs and no encoding. The [host manifest](commands/README.md#worker-deployment) carries the same profile; it declares no memory or process reservations.
+- **Capacity** comes from the startup profile: `transcode` permits as many video jobs and audio renditions as its [media slots](configuration.md#media-slots), 8 and 12 by default; `remux` permits as many copy jobs as its shared copy slots and no encoding. The [host manifest](commands/README.md#worker-deployment) carries the same profile; it declares no memory or process reservations.
 
 ## Checking playback
 

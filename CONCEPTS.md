@@ -373,32 +373,49 @@ that is foreign, stale, draining or dated ahead of the reader's clock, or one
 still missing or not ready after startup, is a peer failure: the unit drains, and its draining
 heartbeat then drains the other unit.
 
-### Small-host household profile
+### Deployment capability
 
-A startup profile for household playback and ordinary library maintenance with
-fixed media slots. It permits original-file playback, compatible
-completed artifacts and two shared audio/video copy jobs, but no server-side audio
-or video re-encoding. Web and worker processes use the same profile; changing it
-requires deployment replacement.
+The media work a deployment may run, chosen before startup: `transcode` permits
+server-side audio and video re-encoding in its video and audio slots, and `remux`
+permits original-file playback, compatible completed artifacts and stream copy in
+shared copy slots, but no re-encoding on any path. Capability is independent of
+size, so any capability combines with any size within the bounds. Web and worker
+processes carry the same capability in their startup profile; changing it requires
+deployment replacement. Not to be confused with the FFmpeg capability gate.
 
-Per-service consumption has been measured on a large host; the smallest host
-size, a 4 GB fit and Raspberry Pi support remain unqualified.
+### Deployment size
+
+The bounded settings that fit a deployment to its host: web workers, database
+connection slots per web worker, resident ordinary consumers, media slots and
+PostgreSQL memory. Values outside a bound are refused before anything starts. The
+pooler pools and PostgreSQL's connection and maintenance settings are derived from
+the size rather than set separately. Changing the size requires deployment
+replacement.
+
+### Size starting point
+
+A documented deployment size for a 4, 8 or 16 GB host, shipped as one example
+configuration per capability, from which an operator adjusts. Only the 4 GB remux
+starting point is meant to carry a qualification claim, for one stream alongside
+library maintenance, and its qualification run is still pending; the 8 and 16 GB
+starting points are unqualified guidance.
 
 ### Media job slot
 
-One unit of concurrent media work a deployment admits: a video slot runs one
-video conversion or stream copy, an audio slot one audio rendition or stream copy.
-Original-file and completed-artifact playback use no slot. The startup profile
-carries the slot counts: the full profile takes operator-set counts with a default
-for each kind, and zero disables a kind; the household profile has two fixed
-shared copy slots. Baander's native command, result and client limits are derived
-from the slots, and the pooler's client limit bounds how many slots a profile
-accepts. Slots are Baander's only bound on media work: containers carry no CPU or
-memory limits, and operators lower the slots when their host cannot keep up.
+One unit of concurrent media work a deployment admits. A transcode deployment has
+video and audio slots: a video slot runs one video conversion or stream copy, an
+audio slot one audio rendition or stream copy, each kind has a default, and zero
+disables a kind. A remux deployment has shared copy slots, each running one audio
+or video stream copy. Original-file and completed-artifact playback use no slot.
+The startup profile carries the slot counts. Baander's native command, result and
+client limits are derived from the slots, and the pooler's client limit bounds how
+many video and audio slots a profile accepts. Slots are Baander's only bound on
+media work: containers carry no CPU or memory limits, and operators lower the
+slots when their host cannot keep up.
 
 ### Configured hardware encoder
 
-The accelerator and device a `full` deployment's startup profile names for video
+The accelerator and device a transcode deployment's startup profile names for video
 encoding. Only the execution worker receives the device and its group. Media
 control must pass a test encode on it at worker start or fails instead of encoding
 in software, and unset video slots take the hardware default.

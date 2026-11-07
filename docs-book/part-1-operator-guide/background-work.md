@@ -28,20 +28,19 @@ work; execution also needs its native daemon ready. A running container alone
 does not establish that these conditions hold. Startup fails if the pair cannot
 reach admission within 30 seconds.
 
-The host controller creates and starts the pair from an admitted version 8
+The host controller creates and starts the pair from an admitted version 9
 manifest. The complete-stack preset starts this pair through its host controller;
 starting only the web Compose service does not start workers. Worker runtime uses the credentials
 and image selected for that pair, separately from web configuration. See
 [Configuration](configuration.md#where-a-change-takes-effect) before changing either.
 
-The [startup profile](configuration.md#deployment-profiles) binds both units and
-web to the same capabilities. `full` permits encoding, with the video and audio
-[media slots](configuration.md#media-slots) it was started with; `household` has
-one resident ordinary consumer and two shared copy slots, with no audio or video
-encoding.
-Both profiles retain the scheduler, outbox relay and media coordination. Change
-profiles by replacing the admitted deployment, not by changing a running worker's
-environment.
+The [startup profile](configuration.md#deployment-capability-and-size) binds both
+units and web to the same capability and size. `transcode` permits encoding, with
+the video and audio [media slots](configuration.md#media-slots) it was started
+with; `remux` runs its configured shared copy slots, with no audio or video
+encoding. Every capability retains the scheduler, outbox relay and media
+coordination. Change capability or size by replacing the admitted deployment, not
+by changing a running worker's environment.
 
 ## From request to result
 
@@ -131,10 +130,10 @@ fresh samples are needed for recovery. Missing consumer evidence stays unknown;
 it does not count as an idle consumer or an empty queue. Check the decision reason
 and evidence age before treating low concurrency as a fault.
 
-Media execution has its own ownership. Under `full`, control's media coordinator
-admits at most as many video jobs and audio renditions as the profile's slots, 8
-and 12 by default. Under `household`, audio
-and video copy jobs share two slots; jobs requiring re-encoding are refused. Original
+Media execution has its own ownership. Under `transcode`, control's media
+coordinator admits at most as many video jobs and audio renditions as the
+profile's slots, 8 and 12 by default. Under `remux`, audio and video copy jobs
+share the configured copy slots; jobs requiring re-encoding are refused. Original
 files and compatible completed artifacts do not need a live producer. The coordinator
 sends bounded native requests over
 the private socket to execution, where FFmpeg, probes and helpers run. Each native
@@ -187,7 +186,7 @@ execution logs. [Monitoring](monitoring.md) connects these signals to diagnostic
 
 ## Stop, replace or recover workers
 
-When using `scripts/deploy-household.php`, keep its private state directory and use
+When using `scripts/deploy-preset.php`, keep its private state directory and use
 its `stop` and `start` actions for replacement. They retain named data volumes and
 recover the saved worker record before starting the selected release. The direct
 worker-controller procedure below applies when managing the pair separately.

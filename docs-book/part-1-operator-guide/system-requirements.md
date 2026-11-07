@@ -21,25 +21,31 @@ host; they are a starting point, not a guarantee for yours.
 [Getting Started](getting-started.md#prerequisites) lists the complete
 prerequisites and the installation order.
 
-## Choose a profile
+## Choose a capability and size
 
-The profile is selected before startup and applies to web and workers together.
-[Deployment profiles](configuration.md#deployment-profiles) describes each setting.
+Capability and size are chosen before startup and apply to web and workers
+together. [Deployment capability and size](configuration.md#deployment-capability-and-size)
+describes each setting and its bounds.
 
-| Capability | `household` | `full` |
+| Capability | `remux` | `transcode` |
 | --- | --- | --- |
 | Original-file and cached playback | Unlimited by job slots | Unlimited by job slots |
-| Stream copy (remux) | 2 shared audio/video jobs | Uses the slots of its kind |
-| Video conversion | None | 8 concurrent jobs by default |
-| Audio conversion | None | 12 concurrent jobs by default |
-| Web workers | 2 | 4 |
-| Resident background consumers | 1 | Up to 4 |
+| Stream copy | Shared copy slots, 1–8 | Uses the slots of its kind |
+| Video conversion | None | Video slots, 8 by default |
+| Audio conversion | None | Audio slots, 12 by default |
 
-Only playback that needs a live copy or conversion occupies a job slot. In
-`household`, a destination that would need re-encoding receives a compatibility
-explanation instead; see [Transcoding](transcoding.md). The household slots are
-fixed. In `full`, the operator sets the video and audio slot counts; zero slots
-disable that kind of conversion and stream copy.
+Only playback that needs a live copy or conversion occupies a job slot. Under
+`remux`, a destination that would need re-encoding receives a compatibility
+explanation instead; see [Transcoding](transcoding.md). Under `transcode`, zero
+slots disable that kind of conversion and stream copy.
+
+Start the size from the [starting point](configuration.md#size-starting-points)
+nearest the host's memory: 4, 8 or 16 GB. None of them is qualified yet. The 4 GB
+`remux` starting point is meant to carry a claim: one stream while a library scan
+and metadata updates run, on an x86 host with 4 GiB of memory and swap off. Its
+qualification run is pending. A second simultaneous stream at 4 GB is not refused,
+but it is outside that claim. The 8 and 16 GB starting points are unqualified
+guidance.
 
 ## Choose media slots
 
@@ -52,8 +58,8 @@ them for any slot pair before you deploy it.
 
 Choose the slots by trial and error:
 
-1. Start from the default of 8 video and 12 audio slots.
-2. Load the host with the playback your household actually runs at once, and watch
+1. Start from your starting point's slots, or the default of 8 video and 12 audio.
+2. Load the host with the playback your listeners actually run at once, and watch
    whether converted streams keep playing in real time. A stream whose encode
    falls behind stalls while the player waits for the next segment.
 3. If encodes fall behind, lower the slots of that kind and try again. Further
@@ -66,9 +72,9 @@ Changing the slots replaces the deployment; it is not a live setting.
 
 ### Reference margins at the default slots
 
-On 4 November 2026, a full deployment ran every default slot at once on the
-reference host described below: an AMD Ryzen 7 5800X3D with an AMD Radeon RX 9070
-XT. Each video slot converted a 128-second 1080p30 excerpt of Big Buck Bunny to
+On 4 November 2026, a `transcode` deployment with four web workers ran every
+default slot at once on the reference host described below: an AMD Ryzen 7
+5800X3D with an AMD Radeon RX 9070 XT. Each video slot converted a 128-second 1080p30 excerpt of Big Buck Bunny to
 1080p, and each audio slot converted 600-second tracks one after another, while
 signed-in web clients browsed the library. A stream's real-time margin is its
 steady speed minus one; a negative margin means the encode fell behind playback.
@@ -161,8 +167,8 @@ the default 8 + 12 with every slot encoding, the media processes alone peak near
 6.5 GiB (8 × (557 + 92) MiB for HEVC video jobs, plus 12 × (56 + 66) MiB for audio
 renditions). The 557 MiB HEVC peak was measured with four pool threads; the
 six-thread peak was not measured. Web, PostgreSQL, Redis and the worker units come on top of that; the
-[household measurements](#household-measurements) show their consumption under a
-two-player workload. Lower the slots if the host cannot hold that sum with room
+[earlier household measurements](#measurements-before-the-pooler) show their
+consumption under a two-player workload. Lower the slots if the host cannot hold that sum with room
 for the page cache.
 
 ### Kill order
@@ -200,8 +206,8 @@ Clients therefore reach PostgreSQL through a transaction-mode
 [connection pooler](configuration.md#connection-pooler), which holds a server
 connection only for the length of a transaction. PostgreSQL's connection count
 follows the pooler's server pools rather than the number of web, worker and media
-clients: the preset's PostgreSQL files set `max_connections` to 20 for
-`household` and 35 for `full`.
+clients: the rendered PostgreSQL file sets `max_connections` to 21 at the 4 GB
+`remux` starting point and 35 at the 16 GB `transcode` starting point.
 More slots add pooler clients, not PostgreSQL backends.
 
 The Bånder database image starts PostgreSQL with transparent huge pages disabled.
@@ -209,15 +215,20 @@ With the host mode `always`, huge pages could otherwise inflate each such
 connection to about 95 MiB and exhaust host memory unpredictably. Keep the
 image's entrypoint when you override the PostgreSQL command.
 
-### Household measurements
+### Measurements before the pooler
 
-These peaks come from the qualification on 3 November 2026, taken before the
-connection pooler was added and before container limits were removed. Each
+These peaks come from the qualification on 3 November 2026. They measure the
+previous `household` and `full` profiles, before the connection pooler was added,
+before container limits were removed and before profiles were replaced by
+capability and size. The household profile ran what is now `remux` with 2 web
+workers, 4 database slots, 1 ordinary consumer and 2 copy slots, the process values
+of the 4 GB starting point; the full profile ran the process and slot values of
+the 16 GB `transcode` starting point. Each
 deployment served two simultaneous players for at least 30 minutes while a library
 scan and metadata synchronisation ran. In every completed scenario both players
 advanced without a stall, and no service was killed for lack of memory.
 
-| Component | `household` peak (MiB) | `full` peak (MiB) |
+| Component | Household peak (MiB) | Full peak (MiB) |
 | --- | ---: | ---: |
 | Web server | 1,080–1,426 | 1,006–1,536 |
 | PostgreSQL | 462–768 | 472–844 |
@@ -232,25 +243,31 @@ of three household deployments and one full deployment. A container's peak
 includes reclaimable page cache from media files and database pages. The web
 server's peak therefore rose toward its former 1,536 MiB limit during streaming
 without indicating memory exhaustion. Under this two-player workload, both
-profiles consumed similar memory. The household profile has not been requalified
-with the pooler and without container limits; [the roadmap](../../ROADMAP.md)
-records that open work.
+profiles consumed similar memory. No size has been measured with the pooler and
+without container limits; the pending 4 GB qualification will replace these
+figures for the 4 GB `remux` starting point. [The roadmap](../../ROADMAP.md) records that
+open work.
 
 ### Not yet established
 
 - **Smallest host size.** The measurements ran on a workstation with 62.7 GiB of
   RAM and no whole-host memory cap. They show per-service consumption, not the
   smallest host on which a complete deployment fits.
-- **4 GB hosts and Raspberry Pi.** Neither a 4 GB host nor ARM hardware has been
+- **4 GB hosts.** The 4 GB `remux` starting point awaits its qualification run on a
+  4 GiB x86 VM with swap off. A second simultaneous stream at 4 GB stays outside
+  the claim, and the 4 GB `transcode` starting point is unqualified.
+- **8 and 16 GB hosts.** Their starting points are unqualified guidance.
+- **ARM and Raspberry Pi.** No ARM hardware, including the Raspberry Pi, has been
   qualified.
 - **Shared host figures.** The measured deployments ran concurrently on one host,
   so host-wide memory pressure and swap describe several stacks at once.
 - **The complete workload.** The mixed music-and-video scenario and three
-  complete household repetitions did not finish before the measurements ended.
+  complete repetitions of the household profile did not finish before the
+  3 November measurements ended.
   [The roadmap](../../ROADMAP.md) lists the open qualification work.
 - **Slot counts above the defaults.** Media authority checks use the pooler's
-  control pool, whose size was chosen before the slots grew. Counts above 8 video
-  and 12 audio rely on that pool's one-second wait and are unproven.
+  control pool, which grows with the media slots. Counts above 8 video and 12
+  audio rely on that pool's one-second wait and are unproven.
 
 ## CPU
 

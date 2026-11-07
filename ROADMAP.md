@@ -107,14 +107,36 @@ The user confirmed the
 It defines a separate profile for 2,000 songs, 50 movies and 250 TV episodes, with 1–2 simultaneous streams alongside normal scanning and metadata updates.
 [System Requirements](docs-book/part-1-operator-guide/system-requirements.md) publishes the measured figures and their limits.
 
-Open items for this plan:
+The profile split is delivered: the
+[capability and size deployment settings plan](docs/plans/2026-11-07-1804-feat-capability-and-size-deployment-settings-plan.md)
+(U1–U8) replaced the `full` and `household` profiles with a `transcode` or `remux`
+capability and bounded size settings, derived the pooler pools and PostgreSQL
+settings from the size, made the source installation load the rendered 16 GB
+PostgreSQL file, turned OpenTelemetry export off in the preset unless configured,
+renamed the preset to `deploy/preset/` with 4, 8 and 16 GB examples per capability,
+and extended the qualification harness for the 4 GiB, swap-off claim. The operator
+manifest is version 9.
 
-- Qualification is incomplete. No deployment finished the mixed music-and-video scenario, the household profile lacks three complete repetitions, and the restart and cleanup steps of a complete chain, profile replacement and recovery checks were not run. The smallest host size, a 4 GB fit and Raspberry Pi support remain unqualified.
+Open items:
+
+- The 4 GB `remux` qualification run (U9) is pending. It needs libvirtd on the
+  workstation, which was unreachable on 2026-11-07, and runs on a 4 GiB x86 VM with
+  swap off: three comparable repetitions, the restart, recovery and
+  deployment-replacement checks, and the insufficient-memory run. Until it passes,
+  the published measurements remain those of the previous household profile from
+  3 November 2026, before the pooler and the removal of container limits, and no
+  host size is qualified.
+- The 8 and 16 GB starting points are unqualified guidance; their qualification is
+  deferred. ARM64 images and Raspberry Pi hardware are outside this plan.
+- `PlaybackTransferPersistenceTest::testReconnectUsesExplicitOldEndpointStopProofWithoutInheritingItsAuthority`
+  in the Integration suite fails on this branch, which changes no playback code; the
+  failure is independent of this work and not yet diagnosed.
+- The preview `preview-fd790a887b6899cb` has a saved checkpoint that references a
+  removed PostgreSQL image; it needs a reset or rebuild, which has not been done or
+  authorized.
 - The web control socket twice closed an `app:server:stats` request without answering under load (household repeats 1 and 2, 2026-11-03); the cause is unknown. The harness now retries and records such samples.
-- The preset inherits `OTEL_ENABLED=true` with an unreachable `host.docker.internal` endpoint from `.env`, so web workers spend time on failing span exports. The preset should disable export unless the operator configures a collector.
 - After a PostgreSQL crash the worker pair stops ("deployment reconciliation is required") and stays stopped until an operator intervenes.
 - `ce-simplify-code` ran (4c24a9bb5); its affected tooling, backend and web tests passed. Shipping gates not yet run: `ce-code-review`, the full backend suites, worker runtime container suites, affected browser playback specs and a documentation build. `baander-database:latest` has not been rebuilt, so existing instances still run PostgreSQL without the THP launcher.
-- The household profile has not been requalified since the configurable media capacity work added the connection pooler and removed its container limits; its published measurements predate both changes.
 
 ## Configurable media capacity
 

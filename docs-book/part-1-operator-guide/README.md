@@ -14,7 +14,7 @@ before carrying a command between environments.
 ## Reading path
 
 1. **Understand the instance.** [Understanding Baander](understanding-baander.md) introduces the journey from files to playback. [Deployment Topology](deployment-topology.md) shows the components in one diagram and what PostgreSQL and Redis hold. [Storage and Data](storage-and-data.md) identifies the stores, their writers and what must be preserved.
-2. **Set it up.** Check [System Requirements](system-requirements.md) for your profile, follow [Getting Started](getting-started.md), then use [Configuration](configuration.md) for settings and [Background Work](background-work.md) for the separate worker deployment and its operating limits.
+2. **Set it up.** Check [System Requirements](system-requirements.md) to choose a capability and size, follow [Getting Started](getting-started.md), then use [Configuration](configuration.md) for settings and [Background Work](background-work.md) for the separate worker deployment and its operating limits.
 3. **Run it day to day.** Use [Library Management](library-management.md), [User Management](user-management.md), [External APIs](external-apis.md), [Transcoding](transcoding.md), [Notifications](notifications.md) and [Watch Parties](watch-parties.md) for the work your instance supports.
 4. **Observe and diagnose.** [Monitoring](monitoring.md) explains health, job and transport evidence. [Troubleshooting](troubleshooting.md) starts from symptoms and connects them to the responsible stage.
 5. **Maintain and recover.** Read [Backup and Recovery](backup-and-recovery.md) before [Upgrading](upgrading.md) or a recovery action. [Security](security.md) covers credential changes and account/session effects. The optional [Registry](registry.md) has separate storage and recovery requirements.
@@ -24,7 +24,7 @@ before carrying a command between environments.
 | I need to… | Start here |
 | --- | --- |
 | See how the pieces fit together | [Deployment Topology](deployment-topology.md) |
-| Size a host or choose a deployment profile | [System Requirements](system-requirements.md) |
+| Size a host or choose a deployment capability | [System Requirements](system-requirements.md) |
 | Install an instance and scan its first library | [Getting Started](getting-started.md) |
 | Change an environment variable or server setting | [Configuration](configuration.md) |
 | Add media, scan again or inspect file-watcher limits | [Library Management](library-management.md) |
