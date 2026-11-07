@@ -543,6 +543,13 @@ It reports whether the results match or the comparison is unavailable and leaves
 
 The public name of Bånder's AAC encoder and decoder library.
 
+### AAC implementation setting
+
+The system setting that selects which codec implementation FFmpeg uses for AAC encoding and decoding across the server's transcodes: bAAC by default, Fraunhofer's fdk-aac, or FFmpeg's built-in codec.
+*Avoid: kill switch, which names only the act of moving off bAAC.*
+
+A change applies to transcodes started afterwards; running sessions and cached renditions keep the implementation that produced them.
+
 ### HE-AAC profile
 
 The AAC profile that determines whether AAC-LC codes the whole spectrum, HE-AAC v1 adds Spectral band replication or HE-AAC v2 adds Parametric stereo as well.
