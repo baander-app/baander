@@ -8,6 +8,7 @@ use App\Transcode\Application\DTO\TranscodeRenditionSet;
 use App\Transcode\Application\Port\FFmpegPortInterface;
 use App\Transcode\Application\Port\TranscodeStoragePortInterface;
 use App\Transcode\Domain\Model\TranscodeJob;
+use App\Transcode\Domain\ValueObject\AacImplementation;
 use App\Transcode\Domain\ValueObject\AudioProfile;
 use App\Transcode\Domain\ValueObject\EncoderProfile;
 use App\Transcode\Domain\ValueObject\QualityTier;
@@ -40,6 +41,9 @@ $audioProfile = match (getenv('BAANDER_ADAPTIVE_AUDIO_PROFILE') ?: 'streaming_st
     'opus_stereo' => AudioProfile::opusStereo(),
     default => throw new RuntimeException('The adaptive fixture supports only streaming_stereo and opus_stereo.'),
 };
+// The AAC implementation a DASH session would carry; the production default unless chosen.
+$aacImplementation = AacImplementation::tryFrom(getenv('BAANDER_ADAPTIVE_AAC_IMPLEMENTATION') ?: 'baac')
+    ?? throw new RuntimeException('The adaptive fixture supports only the baac, fdk_aac and ffmpeg AAC implementations.');
 if ($scenario !== 'adaptive' && $audioProfile->name !== 'streaming_stereo') {
     throw new RuntimeException('Movie qualification scenarios require streaming_stereo audio.');
 }
@@ -206,7 +210,7 @@ foreach (['low' => QualityTier::p360(), 'high' => QualityTier::p720()] as $label
     $arguments = $encoder->buildStreamArgs($source, $tier, $encoder->buildVideoFilters($probe, $tier), $output,
         startSegment: $sourceStartTime > 0 ? 1 : null, audioStreamIndex: $selectedAudioOrdinal, audioProfile: $audioProfile, audioFilters: $encoder->buildAudioFiltersForProfile($probe, $audioProfile), hasAudio: true,
         sourceFrameRate: $probe->framerate, sourceTimestampOrigin: $probe->sourceTimestampOrigin,
-        sourceDuration: $probe->videoEnd ?? 0.0);
+        sourceDuration: $probe->videoEnd ?? 0.0, aacImplementation: $aacImplementation, sourceAudioCodec: $probe->selectedAudioStream()?->codec);
     if ($hasSubtitles) {
         $track = $probe->subtitleStreams[0] ?? throw new RuntimeException('The delayed movie must contain its embedded subtitle.');
         $subtitleDirectory = $output . '/subtitles/' . $track->trackKey();

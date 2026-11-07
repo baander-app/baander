@@ -1982,8 +1982,11 @@ it. Unit tests
 stub the setting and the codec listing to cover each position and a binary
 that lacks one. To run the media suites under another position, set it in the
 test database before the run, or change the default in
-`TranscodeSettingDefinitions` locally; no environment variable selects it. The
-image build itself checks every implementation: its smoke encodes and decodes
+`TranscodeSettingDefinitions` locally; no environment variable selects it for
+the backend suites. The adaptive browser check takes
+`BAANDER_TEST_AAC_IMPLEMENTATION` (`baac` by default, `fdk_aac` or `ffmpeg`)
+and encodes its DASH audio with that implementation. The image build itself
+checks every implementation: its smoke encodes and decodes
 with bAAC, and the capability gate requires each implementation as encoder and
 as decoder.
 
