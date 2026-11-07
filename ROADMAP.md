@@ -117,17 +117,46 @@ renamed the preset to `deploy/preset/` with 4, 8 and 16 GB examples per capabili
 and extended the qualification harness for the 4 GiB, swap-off claim. The operator
 manifest is version 9.
 
+Verification checkpoint (2026-11-07, branch `feat/capability-and-size-deployment-settings`,
+local commits only, not pushed): unit suite 8,447 tests and tooling suite 1,537 tests
+pass in `baander-ci-prewarm:local`; functional and integration suites pass except the
+playback test below; phpstan, deptrac, container lint, OpenAPI check and the tooling
+format and architecture checks pass. `ce-simplify-code` ran (12b6a5755). `ce-code-review`
+run `20261107-205049-41172ade` returned "Ready with fixes"; its three confirmed findings
+(worker allowlist rejecting the OpenTelemetry keys, an out-of-bounds size stopping a
+running preset, the household-era upgrade path) are fixed in fa240b3d0.
+
 Open items:
 
-- The 4 GB `remux` qualification run (U9) is pending. It needs libvirtd on the
-  workstation, which was unreachable on 2026-11-07, and runs on a 4 GiB x86 VM with
-  swap off: three comparable repetitions, the restart, recovery and
-  deployment-replacement checks, and the insufficient-memory run. Until it passes,
-  the published measurements remain those of the previous household profile from
-  3 November 2026, before the pooler and the removal of container limits, and no
-  host size is qualified.
+- The 4 GB `remux` qualification run (U9) has not run. A first attempt on 2026-11-07
+  was stopped during setup. It reuses the QEMU guest in `~/.cache/baander-household-vm/`
+  (start it with `-m 4096`, no libvirtd needed; images `baander-app:local`,
+  `baander-worker:local` and `baander-operator:local` were built from fa240b3d0).
+  It needs three comparable repetitions of the one-player scenarios, restart,
+  recovery and deployment replacement on 4 GiB with swap off, then the
+  insufficient-memory run on 3 GiB; KTD8 governs any size reduction. Afterwards,
+  publish the values in `deploy/preset/example-4gb-remux.json` and the measured host
+  size in System Requirements. Until then no host size is qualified, and the
+  published measurements are those of the previous household profile from
+  3 November 2026.
+- Blocker for U9: the local `baander-database:latest` image lacks the
+  `baander-pooler-credentials` executable the preset runs, so the database image must
+  be rebuilt from `docker/postgres/Dockerfile` before the preset can start.
 - The 8 and 16 GB starting points are unqualified guidance; their qualification is
   deferred. ARM64 images and Raspberry Pi hardware are outside this plan.
+- The plan's KTD3 lists remux pools 10/4/3; the code uses four direct connections for
+  every size (10/4/4, `max_connections` 21). The docs follow the code; update the plan
+  text.
+- Qualification harness follow-ups from review: the deployment-replacement scenario
+  does not check fixture borrowers; recovery fails if web or worker processes restart
+  during the PostgreSQL outage; `Qualification.php` grew to about 1,900 lines and its
+  recovery and replacement logic could move into its own class.
+- `docker-compose.yml` now loads the rendered 16 GB PostgreSQL file, so the source
+  installation's `max_connections` is 35 instead of PostgreSQL's default 100; check
+  that host tools connecting directly still fit the four direct connections.
+- `make docs` is shadowed by the `docs/` directory and needs a running preview;
+  declare it `.PHONY` or document `php scripts/build-website.php`.
+- Push the branch and open the PR when asked.
 - `PlaybackTransferPersistenceTest::testReconnectUsesExplicitOldEndpointStopProofWithoutInheritingItsAuthority`
   in the Integration suite fails on this branch, which changes no playback code; the
   failure is independent of this work and not yet diagnosed.
@@ -136,7 +165,7 @@ Open items:
   authorized.
 - The web control socket twice closed an `app:server:stats` request without answering under load (household repeats 1 and 2, 2026-11-03); the cause is unknown. The harness now retries and records such samples.
 - After a PostgreSQL crash the worker pair stops ("deployment reconciliation is required") and stays stopped until an operator intervenes.
-- `ce-simplify-code` ran (4c24a9bb5); its affected tooling, backend and web tests passed. Shipping gates not yet run: `ce-code-review`, the full backend suites, worker runtime container suites, affected browser playback specs and a documentation build. `baander-database:latest` has not been rebuilt, so existing instances still run PostgreSQL without the THP launcher.
+- Affected browser playback specs and the worker runtime container suites have not run against the new profile.
 
 ## Configurable media capacity
 
