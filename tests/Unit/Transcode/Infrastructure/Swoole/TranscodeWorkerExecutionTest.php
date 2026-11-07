@@ -23,6 +23,7 @@ use App\Transcode\Application\Port\TranscodeJobPortInterface;
 use App\Transcode\Application\Port\TranscodeSessionPortInterface;
 use App\Transcode\Domain\Model\TranscodeJob;
 use App\Transcode\Domain\Model\TranscodeSession;
+use App\Transcode\Domain\ValueObject\AacImplementation;
 use App\Transcode\Domain\ValueObject\AudioProfile;
 use App\Transcode\Domain\ValueObject\EncoderProfile;
 use App\Transcode\Domain\ValueObject\QualityTier;
@@ -192,7 +193,7 @@ final class TranscodeWorkerExecutionTest extends TestCase
         $this->spawner = new VideoExecutionSpawner();
         $streams = new TranscodeStreamManager($this->createStub(SegmentAvailabilityInterface::class), $storage, $lazyEncoder, new NullLogger(), $this->spawner);
         $this->helpers = new TranscodeProcessPool($pool, new NullLogger(), new JsonEncoder(), new \App\Shared\Application\DTO\DeploymentProfile('full'));
-        $this->workerForPolicy = fn(\App\Transcode\Application\Service\MediaExecutionPolicy $policy): TranscodeSessionSubscriber => new TranscodeSessionSubscriber($policy, $jobs, $sessions, $storage, $this->helpers, $lazyEncoder, $videos, new NullLogger(), $ownership, $control, $streams, $this->timer, $admission);
+        $this->workerForPolicy = fn(\App\Transcode\Application\Service\MediaExecutionPolicy $policy, ?\App\Transcode\Infrastructure\FFmpeg\AacImplementationProbe $probe = null): TranscodeSessionSubscriber => new TranscodeSessionSubscriber($policy, $jobs, $sessions, $storage, $this->helpers, $lazyEncoder, $videos, new NullLogger(), $ownership, $control, $streams, $probe ?? new \App\Tests\Support\StubAacImplementationProbe(), $this->timer, $admission);
         $this->worker = ($this->workerForPolicy)(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile('full')));
     }
 
@@ -203,6 +204,71 @@ final class TranscodeWorkerExecutionTest extends TestCase
             $entry->isDir() ? rmdir($entry->getPathname()) : unlink($entry->getPathname());
         }
         rmdir($this->root);
+    }
+
+    public function testAMissingSelectedAacImplementationFailsTheJobBeforeTheEncoderStarts(): void
+    {
+        $this->current = $this->claim(1, 1, implementation: AacImplementation::Baac);
+        $probe = new \App\Tests\Support\StubAacImplementationProbe(['libfdk_aac', 'aac'], ['libfdk_aac', 'aac']);
+        $worker = ($this->workerForPolicy)(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile('full')), $probe);
+        $worker->run($this->current, static fn(): bool => false);
+        self::assertContains('failed', $this->observed);
+        self::assertSame([], $this->spawner->commands, 'no encoder was spawned');
+        self::assertSame('AAC implementation "bAAC" is not available in this FFmpeg build', $this->job->getFailReason());
+    }
+
+    public function testAnAvailableSelectedAacImplementationReachesTheEncoderCommand(): void
+    {
+        $this->current = $this->claim(1, 1, implementation: AacImplementation::FdkAac);
+        $this->worker->run($this->current, static fn(): bool => false);
+        self::assertNotContains('failed', $this->observed);
+        self::assertNotSame([], $this->spawner->commands);
+        self::assertSame('libfdk_aac', $this->spawner->commands[0][array_search('-c:a', $this->spawner->commands[0], true) + 1]);
+    }
+
+    public function testACopySessionNeverNeedsTheSelectedAacImplementation(): void
+    {
+        $this->copyWorker();
+        $this->current = $this->claim(1, 1, implementation: AacImplementation::Baac);
+        $worker = ($this->workerForPolicy)(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile('household')), $this->probeWithout('libbaac'));
+        $worker->run($this->current, static fn(): bool => false);
+        self::assertSame(['accepted', 'ready', 'complete'], $this->observed);
+    }
+
+    public function testASourceWithoutAudioNeverNeedsTheSelectedAacImplementation(): void
+    {
+        $this->sourceHasAudio = false;
+        $this->current = $this->claim(1, 1, implementation: AacImplementation::Baac);
+        ($this->workerForPolicy)(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile('full')), $this->probeWithout('libbaac'))->run($this->current, static fn(): bool => false);
+        self::assertNotContains('failed', $this->observed);
+        self::assertNotSame([], $this->spawner->commands);
+    }
+
+    public function testAnOpusSessionFromAnAacSourceNeedsTheSelectedImplementationAsDecoder(): void
+    {
+        $this->current = $this->claim(1, 1, profile: AudioProfile::opusStereo(), implementation: AacImplementation::Baac);
+        ($this->workerForPolicy)(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile('full')), $this->probeWithout('libbaac'))->run($this->current, static fn(): bool => false);
+        self::assertContains('failed', $this->observed);
+        self::assertSame([], $this->spawner->commands, 'no encoder was spawned');
+        self::assertSame('AAC implementation "bAAC" is not available in this FFmpeg build', $this->job->getFailReason());
+    }
+
+    public function testAnOpusSessionFromANonAacSourceNeverNeedsTheSelectedImplementation(): void
+    {
+        $this->sourceAudioStreams = [['index' => 1, 'codec_type' => 'audio', 'codec_name' => 'flac', 'channels' => 2, 'sample_rate' => '48000']];
+        $this->current = $this->claim(1, 1, profile: AudioProfile::opusStereo(), implementation: AacImplementation::Baac);
+        ($this->workerForPolicy)(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile('full')), $this->probeWithout('libbaac'))->run($this->current, static fn(): bool => false);
+        self::assertNotContains('failed', $this->observed);
+        self::assertNotSame([], $this->spawner->commands);
+        self::assertNotContains('libbaac', $this->spawner->commands[0]);
+    }
+
+    private function probeWithout(string $codec): \App\Tests\Support\StubAacImplementationProbe
+    {
+        $all = ['libbaac', 'libfdk_aac', 'aac'];
+        $present = array_values(array_diff($all, [$codec]));
+
+        return new \App\Tests\Support\StubAacImplementationProbe($present, $present);
     }
 
     public function testHouseholdRejectsRecoveredVideoBeforeNativeWorkAndTerminatesTheClaim(): void
@@ -1028,10 +1094,10 @@ final class TranscodeWorkerExecutionTest extends TestCase
         self::assertSame($start * 6.0, (float) $metadata['startTime']);
     }
 
-    private function claim(int $generation, int $revision, string $status = 'running', ?AudioProfile $profile = null, float $position = 0.0): TranscodeExecutionClaim
+    private function claim(int $generation, int $revision, string $status = 'running', ?AudioProfile $profile = null, float $position = 0.0, ?AacImplementation $implementation = null): TranscodeExecutionClaim
     {
         return new TranscodeExecutionClaim(new TranscodeRuntimeSnapshot($this->job->getId(), $this->session->getId(), 'request',
-            new DesiredTranscodeState($profile ?? AudioProfile::streamingStereo(), $status, $position, presentationSelection: $this->job->getPresentationSelection()), $revision, 0, $generation, 'pending', null, null, true),
+            new DesiredTranscodeState($profile ?? AudioProfile::streamingStereo(), $status, $position, presentationSelection: $this->job->getPresentationSelection(), aacImplementation: $implementation), $revision, 0, $generation, 'pending', null, null, true),
             new MediaWorkerIdentity('test', str_repeat('a', 32), 'media', 1), str_repeat('b', 64));
     }
 

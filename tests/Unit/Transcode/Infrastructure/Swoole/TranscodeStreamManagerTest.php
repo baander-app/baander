@@ -91,6 +91,15 @@ final class TranscodeStreamManagerTest extends TestCase
         self::assertNotContains('1:a:0', $this->spawner->lastCommand);
     }
 
+    public function testTheSessionsAacImplementationReachesTheSpawnedCommand(): void
+    {
+        $this->manager->startStream($this->makeJob(), '/src.mkv', QualityTier::p720(), '', audioStreamOrdinal: 1,
+            aacImplementation: \App\Transcode\Domain\ValueObject\AacImplementation::FdkAac, sourceAudioCodec: 'aac');
+        $command = $this->spawner->lastCommand;
+        self::assertSame('libfdk_aac', $command[array_search('-c:a:1', $command, true) + 1]);
+        self::assertSame('libfdk_aac', $command[array_search('-c:a', $command, true) + 1]);
+    }
+
     public function testOpaqueNativeAttemptCarriesNoLocalProcessDescriptors(): void
     {
         $this->manager->startStream($this->makeJob(), '/src.mkv', QualityTier::p720(), '');

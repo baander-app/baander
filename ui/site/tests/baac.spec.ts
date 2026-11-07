@@ -24,8 +24,10 @@ test('visitors discover bAAC and its direct route has one canonical URL', async 
   await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', 'https://baander.app/baac/');
   await expect(page.getByRole('link', { name: 'Read the source guide' }))
     .toHaveAttribute('href', /^https:\/\/github\.com\/baander-app\/baander\/blob\/[a-f0-9]{40}\/packages\/baander-aac\/docs\/README\.md$/);
-  await expect(page.getByRole('heading', { name: 'Planned: transcoder and FFmpeg integration' })).toBeVisible();
-  await expect(page.locator('#integration')).toContainText('That work is planned');
+  await expect(page.getByRole('heading', { name: 'Server transcoding through FFmpeg' })).toBeVisible();
+  await expect(page.locator('#integration')).toContainText('libbaac');
+  await expect(page.locator('#integration').getByRole('link', { name: 'AAC implementation' }))
+    .toHaveAttribute('href', '/docs/operator-guide/transcoding/#aac-implementation');
   await expect(page.getByRole('navigation', { name: 'Main navigation' }).getByRole('link', { name: 'bAAC', exact: true }))
     .toHaveAttribute('aria-current', 'page');
   await expect(page.getByRole('navigation', { name: 'Footer navigation' }).getByRole('link', { name: 'bAAC', exact: true }))

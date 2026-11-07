@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Transcode\Domain\Service;
 
+use App\Transcode\Domain\ValueObject\AacImplementation;
 use App\Transcode\Domain\ValueObject\AudioProfile;
 use App\Transcode\Domain\ValueObject\LoudnessStandard;
 
@@ -137,14 +138,14 @@ final class AudioProcessingRules
     /**
      * Codec-specific FFmpeg encoding options.
      */
-    public static function codecOptions(AudioProfile $profile): string
+    public static function codecOptions(AudioProfile $profile, AacImplementation $aacImplementation): string
     {
         $bitrate = (int) ($profile->bitrate / 1000);
 
         return match ($profile->codec) {
             'opus' => sprintf('-c:a libopus -b:a %dk -application audio', $bitrate),
             'ac3' => sprintf('-c:a ac3 -b:a %dk', $bitrate),
-            default => sprintf('-c:a aac -b:a %dk', $bitrate),
+            default => sprintf('-c:a %s -b:a %dk', $aacImplementation->encoderName(), $bitrate),
         };
     }
 

@@ -11,6 +11,9 @@ env:
     REGISTRY: ${{ github.server_url == 'https://github.com' && 'ghcr.io' || vars.REGISTRY_URL }}
     IMAGE_NAME: ${{ github.server_url == 'https://github.com' && 'baander-app' || vars.REGISTRY_OWNER }}/baander
     POSTGRES_IMAGE: ${{ github.server_url == 'https://github.com' && 'baander-app' || vars.REGISTRY_OWNER }}/baander-postgres
+    # The application image copies FFmpeg from the static FFmpeg image. GitHub keeps the
+    # tooling catalog's reference (empty means unset); Forgejo reads its own registry copy.
+    BAANDER_FFMPEG_IMAGE: ${{ github.server_url != 'https://github.com' && format('{0}/{1}/ffmpeg-baander-static:latest', vars.REGISTRY_URL, vars.REGISTRY_OWNER) || '' }}
     COVERAGE_PACKAGE: coverage-backend
     BUILDKIT_CACHE_PACKAGE: buildkit-cache-backend
     CI_IMAGE: baander-ci:${{ github.run_id }}-${{ github.run_attempt }}

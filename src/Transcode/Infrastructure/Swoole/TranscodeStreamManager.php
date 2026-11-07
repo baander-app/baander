@@ -15,6 +15,7 @@ use App\Transcode\Application\Port\TranscodeStoragePortInterface;
 use App\Transcode\Domain\Exception\FFmpegProcessFailedException;
 use App\Transcode\Domain\Model\TranscodeJob;
 use App\Transcode\Domain\ValueObject\QualityTier;
+use App\Transcode\Domain\ValueObject\AacImplementation;
 use App\Transcode\Domain\ValueObject\AudioProfile;
 use App\Transcode\Infrastructure\FFmpeg\SegmentEncoder;
 use App\Transcode\Infrastructure\FFmpeg\CopySegmentArguments;
@@ -91,6 +92,8 @@ final class TranscodeStreamManager
         ?PresentationSelection $presentationSelection = null,
         float $sourceBoundary = 0.0,
         float $sourceDuration = 0.0,
+        ?AacImplementation $aacImplementation = null,
+        ?string $sourceAudioCodec = null,
     ): string {
         $tierName = is_string($tier) ? $tier : $tier->name;
         $jobId = $job->getId();
@@ -124,6 +127,8 @@ final class TranscodeStreamManager
             sourceFrameRate: $sourceFrameRate,
             sourceTimestampOrigin: $sourceTimestampOrigin,
             sourceDuration: $sourceDuration,
+            aacImplementation: $aacImplementation,
+            sourceAudioCodec: $sourceAudioCodec,
         );
 
         $this->logger->info('Starting long-lived video stream', [

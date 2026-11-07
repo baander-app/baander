@@ -1,6 +1,13 @@
 name: Build FFmpeg Image
 
 on:
+    push:
+        branches: [ master ]
+        paths:
+            - 'packages/baander-aac/**'
+            - 'docker/ffmpeg/**'
+            - 'scripts/ffmpeg-capability-gate.sh'
+            - '.github/workflows/ffmpeg.yaml'
     workflow_dispatch:
 
 env:
@@ -17,6 +24,7 @@ concurrency:
 jobs:
     build:
         runs-on: ${{ github.server_url == 'https://github.com' && 'ubuntu-latest' || 'docker-cli' }}
+        timeout-minutes: 300
         container:
             image: ${{ github.server_url == 'https://github.com' && 'ghcr.io' || vars.REGISTRY_URL }}/${{ github.server_url == 'https://github.com' && 'baander-app' || vars.REGISTRY_OWNER }}/baander-runner:latest
         permissions:
@@ -38,6 +46,24 @@ jobs:
                     git -c http.extraHeader="Authorization: $auth" fetch -q origin ${{ github.ref }}
                     git checkout -q FETCH_HEAD
 
+            -   name: Free host disk on GitHub
+                # The static FFmpeg build compiles a large dependency set; the
+                # hosted runner's unused toolchains make room for it, removed
+                # through the Docker socket by a sibling container. On a
+                # self-hosted runner this would delete host directories, so it
+                # runs on GitHub only.
+                if: github.server_url == 'https://github.com'
+                run: |
+                    docker run --rm \
+                      -v /usr/share/dotnet:/cleanup/dotnet \
+                      -v /usr/local/lib/android:/cleanup/android \
+                      -v /opt/ghc:/cleanup/ghc \
+                      -v /opt/hostedtoolcache:/cleanup/hostedtoolcache \
+                      -v /:/host:ro \
+                      --entrypoint /bin/sh \
+                      "$REGISTRY/${IMAGE_NAME%/*}/baander-runner:latest" \
+                      -c 'find /cleanup -mindepth 2 -delete; df -h /host'
+
             -   name: Login to Container Registry
                 if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
                 env:
@@ -52,7 +78,7 @@ jobs:
                       --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest \
                       --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
                       --push \
-                      docker/ffmpeg/
+                      .
 
             -   name: FFmpeg image is not publicly pullable
                 # GHCR keeps the package private until an operator changes

@@ -116,7 +116,7 @@ final class OwnedTranscodeJobTest extends TestCase
         $transaction->method('run')->willReturnCallback(static fn(callable $operation): mixed => $operation());
         $presentations = $this->createStub(\App\Transcode\Application\Port\EncodePresentationPort::class);
         $presentations->method('select')->willReturn(new PresentationSelection('encode', 'source-hash', 0, 1, 'mp4', 'encoder-config'));
-        $handler = new CreateTranscodeSessionHandler(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile('full')), $jobs, $sessions, $storage, $ownership, $transaction, $this->createStub(SleeperInterface::class), $presentations);
+        $handler = new CreateTranscodeSessionHandler(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile('full')), $jobs, $sessions, $storage, $ownership, $transaction, $this->createStub(SleeperInterface::class), $presentations, $this->settings());
         $video = Uuid::generate();
         $alice = Uuid::generate();
         $bob = Uuid::generate();
@@ -131,6 +131,13 @@ final class OwnedTranscodeJobTest extends TestCase
         self::assertCount(2, $repository->jobs);
     }
 
+
+    private function settings(): \App\Shared\Application\Port\SystemSettingsPortInterface
+    {
+        $settings = $this->createStub(\App\Shared\Application\Port\SystemSettingsPortInterface::class);
+        $settings->method('get')->willReturn('baac');
+        return $settings;
+    }
 }
 
 final class OwnedJobRepository implements TranscodeJobRepositoryInterface

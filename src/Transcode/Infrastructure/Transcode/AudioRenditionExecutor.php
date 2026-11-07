@@ -4,13 +4,17 @@ declare(strict_types=1);
 
 namespace App\Transcode\Infrastructure\Transcode;
 
+use App\Shared\Application\Port\SystemSettingsPortInterface;
 use App\Transcode\Application\DTO\MediaOperation;
 use App\Transcode\Application\Service\MediaExecutionPolicy;
 use App\Transcode\Application\DTO\AudioRenditionClaim;
 use App\Transcode\Application\DTO\AudioRenditionInput;
 use App\Transcode\Application\Port\AudioRenditionFormat;
 use App\Transcode\Application\Port\AudioRenditionRuntimePort;
+use App\Transcode\Application\Settings\TranscodeSettingDefinitions;
+use App\Transcode\Domain\ValueObject\AacImplementation;
 use App\Transcode\Infrastructure\Storage\SegmentFileResolver;
+use App\Transcode\Infrastructure\FFmpeg\AacImplementationProbe;
 use App\Transcode\Infrastructure\FFmpeg\ProcessExecutor;
 use App\Shared\Infrastructure\Worker\NativeExecutionException;
 use Psr\Log\LoggerInterface;
@@ -26,6 +30,8 @@ final class AudioRenditionExecutor
         private readonly MediaExecutionPolicy $executionPolicy,
         private readonly AudioRenditionRuntimePort $runtime,
         private readonly LoggerInterface $logger,
+        private readonly SystemSettingsPortInterface $settings,
+        private readonly AacImplementationProbe $aacProbe,
         private readonly string $ffmpegPath,
         private readonly string $ffprobePath = '/usr/bin/ffprobe',
     ) {}
@@ -37,6 +43,7 @@ final class AudioRenditionExecutor
         $lock = null;
         $final = $claim->runtime->generationDirectory() . '/' . $input->sourceSignature;
         $partial = $final . SegmentFileResolver::PARTIAL_SUFFIX;
+        $aacUsed = null;
         try {
             $this->executionPolicy->assertAllowed($input->mode === 'copy' ? MediaOperation::AudioStreamCopy : MediaOperation::AudioEncode);
             clearstatcache(true, $input->sourcePath);
@@ -70,7 +77,7 @@ final class AudioRenditionExecutor
             if (!$this->runtime->start($claim, $partial, $final)) {
                 return;
             }
-            if (!$this->encode($claim, $partial, $stopRequested)) {
+            if (!$this->encode($claim, $partial, $stopRequested, $aacUsed)) {
                 $this->runtime->defer($claim);
                 return;
             }
@@ -86,10 +93,10 @@ final class AudioRenditionExecutor
             if ($error->uncertain) {
                 throw $error;
             }
-            $this->runtime->fail($claim, $error->getMessage());
+            $this->runtime->fail($claim, $error->getMessage(), $aacUsed);
             $this->logger->error('Audio rendition native execution rejected: {reason}', ['reason' => $error->getMessage()]);
         } catch (Throwable $error) {
-            $this->runtime->fail($claim, $error->getMessage());
+            $this->runtime->fail($claim, $error->getMessage(), $aacUsed);
             $this->logger->error('Audio rendition worker failed: {reason}', ['reason' => $error->getMessage(), 'rendition' => $claim->runtime->key]);
         } finally {
             // A stale worker can clean only its own generation's incomplete file.
@@ -103,21 +110,43 @@ final class AudioRenditionExecutor
         }
     }
 
-    /** @param callable(): bool $stopRequested */
-    private function encode(AudioRenditionClaim $claim, string $partial, callable $stopRequested): bool
+    /**
+     * @param callable(): bool $stopRequested
+     * @param-out AacImplementation|null $aacUsed the implementation the encode runs AAC through, so a failure can record it
+     */
+    private function encode(AudioRenditionClaim $claim, string $partial, callable $stopRequested, ?AacImplementation &$aacUsed): bool
     {
         $input = $claim->runtime->input;
         if ($input->mode === 'copy' && !$this->verifyCopySource($claim, $stopRequested)) {
             return false;
         }
+        $decoder = [];
+        $implementation = null;
+        if ($input->mode !== 'copy') {
+            // The AAC implementation setting selects the encoder of AAC renditions
+            // and the decoder of AAC sources; the source codec comes from a probe,
+            // and only an AAC source gets the decoder forced on its first stream.
+            $implementation = AacImplementation::from((string) $this->settings->get(TranscodeSettingDefinitions::AAC_IMPLEMENTATION));
+            $sourceCodec = $this->probeSourceAudioCodec($claim, $stopRequested);
+            if ($sourceCodec === false) {
+                return false;
+            }
+            if ($sourceCodec === 'aac') {
+                $decoder = ['-c:a:0', $implementation->decoderName()];
+            }
+            if ($input->format === AudioRenditionFormat::Aac || $sourceCodec === 'aac') {
+                $aacUsed = $implementation;
+                $this->aacProbe->assertAvailable($implementation);
+            }
+        }
         $arguments = [
             $this->ffmpegPath, '-nostdin', '-hide_banner', '-loglevel', 'error', '-y',
-            '-threads', '1', '-filter_threads', '1', '-filter_complex_threads', '1', '-i', $input->sourcePath,
+            '-threads', '1', '-filter_threads', '1', '-filter_complex_threads', '1', ...$decoder, '-i', $input->sourcePath,
         ];
         if ($input->mode === 'copy') {
             array_push($arguments, '-map', '0:' . $input->streamIndex, '-c:a', 'copy', '-vn', '-sn', '-dn', '-movflags', '+faststart', '-f', 'mp4', $partial);
         } else {
-            $arguments = [...$arguments, '-map', '0:a:0', ...self::codecArguments($input->format), '-threads', '1', '-b:a', (string) $input->bitrate, $partial];
+            $arguments = [...$arguments, '-map', '0:a:0', ...self::codecArguments($input->format, $implementation), '-threads', '1', '-b:a', (string) $input->bitrate, $partial];
         }
         $result = $this->execute($claim, $arguments, self::TIMEOUT_SECONDS, $stopRequested);
         if ($result === null) {
@@ -128,6 +157,29 @@ final class AudioRenditionExecutor
             throw new RuntimeException(sprintf('Audio process exited with code %d: %s', $result['code'], substr(trim($result['error']), -2000)));
         }
         return true;
+    }
+
+    /**
+     * The codec of the first audio stream, null when ffprobe cannot say, or
+     * false when the attempt was stopped.
+     *
+     * @param callable(): bool $stopRequested
+     */
+    private function probeSourceAudioCodec(AudioRenditionClaim $claim, callable $stopRequested): string|null|false
+    {
+        $input = $claim->runtime->input;
+        $probe = $this->execute($claim, [$this->ffprobePath, '-v', 'error', '-select_streams', 'a:0',
+            '-show_entries', 'stream=codec_name', '-of', 'json', $input->sourcePath], 60, $stopRequested);
+        if ($probe === null) {
+            return false;
+        }
+        $data = $probe['code'] === 0 ? json_decode($probe['output'], true, 32) : null;
+        $codec = is_array($data) ? ($data['streams'][0]['codec_name'] ?? null) : null;
+        if (!is_string($codec)) {
+            $this->logger->warning('Audio rendition source codec unknown; decoding with FFmpeg\'s default decoder', ['rendition' => $claim->runtime->key]);
+            return null;
+        }
+        return $codec;
     }
 
     /** @param callable(): bool $stopRequested */
@@ -203,11 +255,11 @@ final class AudioRenditionExecutor
     }
 
     /** @return list<string> */
-    private static function codecArguments(AudioRenditionFormat $format): array
+    private static function codecArguments(AudioRenditionFormat $format, AacImplementation $aacImplementation): array
     {
         return match ($format) {
             AudioRenditionFormat::Opus => ['-c:a', 'libopus', '-f', 'ogg'],
-            AudioRenditionFormat::Aac => ['-c:a', 'aac', '-f', 'adts'],
+            AudioRenditionFormat::Aac => ['-c:a', $aacImplementation->encoderName(), '-f', 'adts'],
             AudioRenditionFormat::Mp3 => ['-c:a', 'libmp3lame', '-write_xing', '0', '-f', 'mp3'],
         };
     }

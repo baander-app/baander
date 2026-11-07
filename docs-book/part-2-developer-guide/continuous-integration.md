@@ -22,7 +22,7 @@ store. The workflows select them at run time; nothing is edited per forge.
 | `runner.yaml` | Build Runner Image | Pushes to `master` that touch `docker/runner/**`, and dispatch | Publishes `baander-runner` |
 | `postgres.yaml` | Build PostgreSQL Image | Pushes to `master` that touch `docker/postgres/**`, and dispatch | Publishes `baander-postgres` |
 | `nginx.yaml` | Build Nginx Image | Pushes to `master` that touch `docker/nginx/**`, and dispatch | Publishes `baander-nginx` |
-| `ffmpeg.yaml` | Build FFmpeg Image | Manual dispatch only | Publishes `ffmpeg-baander-static` |
+| `ffmpeg.yaml` | Build FFmpeg Image | Pushes to `master` that touch `packages/baander-aac/**`, `docker/ffmpeg/**` or the capability gate script, and dispatch | Publishes `ffmpeg-baander-static` |
 | `aac-native.yml` | AAC native addon | Pushes, tags and pull requests that touch `packages/baander-aac/**` | GitHub only; see below |
 
 A workflow with path filters lists its own file among them, so editing the
@@ -237,6 +237,21 @@ refuse any server other than github.com.
 
 Each push tags the image `latest` and with the commit SHA. On GitHub the images are
 `ghcr.io/baander-app/<name>`.
+
+The application image copies `ffmpeg` and `ffprobe` from `ffmpeg-baander-static`
+through the `ffmpeg` role of the tooling image catalog
+(`packages/baander-tooling/resources/tooling-defaults.json`), passed to the build as
+`FFMPEG_IMAGE`. The role names the GHCR image. On Forgejo, `ci.yaml` sets
+`BAANDER_FFMPEG_IMAGE` to the copy in the Forgejo registry, which `ffmpeg.yaml`
+publishes there; a developer host sets the same variable to a local build. Because
+the GHCR image is private, the application image cannot be built by a pull request
+from a fork, which has no registry login. The FFmpeg image carries bAAC from
+`packages/baander-aac`, fdk-aac and FFmpeg's built-in AAC codec, enables VAAPI,
+NVENC and QSV explicitly, and proves itself at build time: a smoke encodes and
+decodes with bAAC, and `scripts/ffmpeg-capability-gate.sh` checks that the binary
+lists every accelerator, hardware encoder and AAC implementation the application can
+select, and that its shared objects resolve. The same gate runs when the application
+image is built.
 
 The runner and PostgreSQL images are CI tooling and may be public. The application
 image keeps notice, provenance and embedded-dependency gaps that the

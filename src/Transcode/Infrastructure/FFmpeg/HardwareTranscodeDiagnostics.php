@@ -7,13 +7,17 @@ namespace App\Transcode\Infrastructure\FFmpeg;
 use App\Transcode\Application\DTO\HardwareTranscodeDiagnosticsReport;
 use App\Transcode\Application\Port\HardwareTranscodeDiagnosticsInterface;
 use App\Transcode\Domain\Service\VideoProcessingRules;
+use App\Transcode\Domain\ValueObject\AacImplementation;
 use App\Transcode\Domain\ValueObject\HardwareAccelerator;
 use App\Transcode\Domain\ValueObject\QualityTier;
 
 final readonly class HardwareTranscodeDiagnostics implements HardwareTranscodeDiagnosticsInterface
 {
-    public function __construct(private WorkerEncoderCapabilitiesSnapshotStore $snapshots)
-    {
+    public function __construct(
+        private WorkerEncoderCapabilitiesSnapshotStore $snapshots,
+        private AacImplementationProbe $aacProbe,
+        private string $ffmpegPath,
+    ) {
     }
 
     public function inspect(): HardwareTranscodeDiagnosticsReport
@@ -43,7 +47,7 @@ final readonly class HardwareTranscodeDiagnostics implements HardwareTranscodeDi
                 . ' -b:v %d -maxrate %d -bufsize %d'
                 . ' -movflags +frag_keyframe+separate_moof+default_base_moof'
                 . ' -an -f mp4 %s',
-                '/usr/local/bin/ffmpeg',
+                $this->ffmpegPath,
                 $hwAccelFlags !== '' ? $hwAccelFlags . ' ' : '',
                 $decoderFlags !== '' ? $decoderFlags . ' ' : '',
                 $encoderFlags,
@@ -54,6 +58,16 @@ final readonly class HardwareTranscodeDiagnostics implements HardwareTranscodeDi
             );
 
             $sampleCommands[$tier->name] = $cmd;
+        }
+
+        $aacRows = [];
+        foreach (AacImplementation::cases() as $implementation) {
+            $aacRows[] = [
+                $implementation->value,
+                $implementation->encoderName(),
+                $this->aacProbe->offersEncoder($implementation) ? 'Yes' : 'No',
+                $this->aacProbe->offersDecoder($implementation) ? 'Yes' : 'No',
+            ];
         }
 
         $refRows = [];
@@ -84,6 +98,7 @@ final readonly class HardwareTranscodeDiagnostics implements HardwareTranscodeDi
             sourceDecoders: $sourceDecoders,
             sampleCommands: $sampleCommands,
             acceleratorReference: $refRows,
+            aacImplementations: $aacRows,
         );
     }
 }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Transcode\Infrastructure\FFmpeg;
 
+use App\Transcode\Domain\ValueObject\AacImplementation;
 use App\Transcode\Domain\ValueObject\AudioProfile;
 use App\Transcode\Domain\ValueObject\EncoderProfile;
 use App\Transcode\Domain\ValueObject\HardwareAccelerator;
@@ -764,4 +765,65 @@ final class SegmentEncoderStreamArgsTest extends TestCase
             \App\Transcode\Domain\ValueObject\AudioProfile::streamingStereo()));
     }
 
+    public function testTheSelectedAacImplementationNamesTheEncoderAndDecodesOnlyAacSources(): void
+    {
+        foreach ([[AacImplementation::Baac, 'libbaac'], [AacImplementation::FdkAac, 'libfdk_aac'], [AacImplementation::Ffmpeg, 'aac']] as [$implementation, $codec]) {
+            $args = $this->encoder()->buildStreamArgs('/source.mkv', QualityTier::p720(), '', '/output',
+                audioStreamIndex: 2, audioProfile: AudioProfile::streamingStereo(), aacImplementation: $implementation, sourceAudioCodec: 'aac');
+            $decoder = array_search('-c:a:2', $args, true);
+            self::assertNotFalse($decoder, $implementation->value);
+            self::assertSame($codec, $args[$decoder + 1]);
+            $inputs = array_keys($args, '-i', true);
+            self::assertGreaterThan($inputs[0], $decoder, 'the decoder follows the video input');
+            self::assertLessThan($inputs[1], $decoder, 'the decoder precedes the audio input');
+            self::assertSame($codec, $args[array_search('-c:a', $args, true) + 1]);
+            self::assertNotContains('-c:a:0', $args);
+        }
+    }
+
+    #[DataProvider('undecodedSources')]
+    public function testOnlyAnAacSourceGetsTheForcedDecoder(?string $sourceCodec): void
+    {
+        $args = $this->encoder()->buildStreamArgs('/source.mkv', QualityTier::p720(), '', '/output',
+            audioProfile: AudioProfile::streamingStereo(), aacImplementation: AacImplementation::Baac, sourceAudioCodec: $sourceCodec);
+        self::assertNotContains('-c:a:0', $args);
+        self::assertSame('libbaac', $args[array_search('-c:a', $args, true) + 1]);
+    }
+
+    /** @return iterable<string, array{?string}> */
+    public static function undecodedSources(): iterable
+    {
+        yield 'LATM source keeps FFmpeg\'s own decoder' => ['aac_latm'];
+        yield 'AC-3 source' => ['ac3'];
+        yield 'unknown source codec' => [null];
+    }
+
+    public function testWithoutAnImplementationTheBuiltInEncoderIsNamedAndTheRestIsIdentical(): void
+    {
+        $builtIn = $this->encoder()->buildStreamArgs('/source.mkv', QualityTier::p720(), '', '/output',
+            audioProfile: AudioProfile::streamingStereo(), sourceDuration: 14.0);
+        $selected = $this->encoder()->buildStreamArgs('/source.mkv', QualityTier::p720(), '', '/output',
+            audioProfile: AudioProfile::streamingStereo(), sourceDuration: 14.0, aacImplementation: AacImplementation::Baac, sourceAudioCodec: 'aac');
+        self::assertSame('aac', $builtIn[array_search('-c:a', $builtIn, true) + 1]);
+        $normalise = static function (array $args): array {
+            $out = [];
+            for ($i = 0; $i < count($args); $i++) {
+                if ($args[$i] === '-c:a:0') { $i++; continue; }
+                if ($args[$i] === '-c:a') { $out[] = '-c:a'; $out[] = 'CODEC'; $i++; continue; }
+                $out[] = $args[$i];
+            }
+            return $out;
+        };
+        self::assertSame($normalise($builtIn), $normalise($selected));
+        self::assertContains('aresample=first_pts=0,apad=packet_size=1024:whole_dur=14.000000,atrim=end=14.000000', $selected);
+        self::assertContains('-max_interleave_delta', $selected);
+    }
+
+    public function testAnOpusProfileIgnoresTheAacImplementation(): void
+    {
+        $args = $this->encoder()->buildStreamArgs('/source.mkv', QualityTier::p720(), '', '/output',
+            audioProfile: AudioProfile::opusStereo(), aacImplementation: AacImplementation::Baac, sourceAudioCodec: 'aac');
+        self::assertSame('libopus', $args[array_search('-c:a', $args, true) + 1]);
+        self::assertSame('libbaac', $args[array_search('-c:a:0', $args, true) + 1], 'an AAC source is still decoded by the selected implementation');
+    }
 }

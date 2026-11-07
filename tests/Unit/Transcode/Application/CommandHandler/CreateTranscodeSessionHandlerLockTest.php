@@ -70,7 +70,7 @@ final class CreateTranscodeSessionHandlerLockTest extends TestCase
             self::assertFalse($this->insideTransaction, 'Waiting cannot hold the producer transaction.');
             $this->sleeps[] = $seconds;
         });
-        $this->handler = new CreateTranscodeSessionHandler(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile('full')), $this->jobs, $this->sessions, $storage, $this->ownership, $transaction, $sleeper, $presentations);
+        $this->handler = new CreateTranscodeSessionHandler(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile('full')), $this->jobs, $this->sessions, $storage, $this->ownership, $transaction, $sleeper, $presentations, $this->settings());
     }
 
     private function snapshot(string $outcome): TranscodeRuntimeSnapshot
@@ -148,7 +148,7 @@ final class CreateTranscodeSessionHandlerLockTest extends TestCase
         $this->ownership->method('find')->willReturnOnConsecutiveCalls($this->snapshot($outcome), $this->snapshot($outcome), $this->snapshot('accepted'));
         $this->sessions->expects(self::never())->method('findByUuid');
         $this->sessions->expects(self::once())->method('createSession')->willReturn($this->session);
-        $this->ownership->expects(self::once())->method('admit')->with($this->job->getId(), $this->session->getId(), $this->command->requestId, self::isInstanceOf(DesiredTranscodeState::class))->willReturn($this->snapshot('pending'));
+        $this->ownership->expects(self::once())->method('admit')->with($this->job->getId(), $this->session->getId(), $this->command->requestId, self::callback(static fn (DesiredTranscodeState $desired): bool => $desired->aacImplementation === \App\Transcode\Domain\ValueObject\AacImplementation::FdkAac))->willReturn($this->snapshot('pending'));
         self::assertSame($this->session, ($this->handler)($this->command));
     }
 
@@ -173,5 +173,13 @@ final class CreateTranscodeSessionHandlerLockTest extends TestCase
         $this->ownership->method('admit')->willReturn($this->snapshot('pending'));
         $this->ownership->expects(self::once())->method('expireAdmission')->willReturn(false);
         self::assertSame($this->session, ($this->handler)($this->command));
+    }
+
+    private function settings(): \App\Shared\Application\Port\SystemSettingsPortInterface
+    {
+        $settings = $this->createStub(\App\Shared\Application\Port\SystemSettingsPortInterface::class);
+        // A non-default position, so the admitted state shows it came from the setting.
+        $settings->method('get')->willReturn('fdk_aac');
+        return $settings;
     }
 }

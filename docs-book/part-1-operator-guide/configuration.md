@@ -587,8 +587,8 @@ Limits applied when scanning media libraries, to prevent path traversal, oversiz
 |----------|---------|-------------|
 | `MEDIA_STORAGE_PATH` | `/storage/media` | Root directory for original media files. |
 | `CONVERT_STORAGE_PATH` | `/storage/conversions` | Root directory for transcoded/converted output. |
-| `FFMPEG_PATH` | `/usr/local/bin/ffmpeg` | Path to the FFmpeg binary. |
-| `FFPROBE_PATH` | `/usr/local/bin/ffprobe` | Path to the FFprobe binary. |
+| `FFMPEG_PATH` | `/usr/bin/ffmpeg` | Path to the FFmpeg binary; the application image installs the project's own FFmpeg build there. |
+| `FFPROBE_PATH` | `/usr/bin/ffprobe` | Path to the FFprobe binary. |
 
 ## Stream Authentication
 
@@ -643,6 +643,7 @@ A stored value can stop being allowed, for example when a setting's allowed valu
 | `recommendations.auto_generate` | `false` | Let the daily **Generate recommendations** job generate. See [Scheduled recommendations](#scheduled-recommendations). |
 | `transcode.enabled` | `false` | Allow on-the-fly audio transcoding when the startup profile permits encoding. It cannot enable encoding in `household`. See [Audio transcoding](transcoding.md#audio-transcoding). |
 | `transcode.max_bitrate` | `320` | The highest bitrate of a transcoded audio stream, in kbps: `128`, `192`, `256` or `320`. It is also the bitrate used when a client asks for none. |
+| `transcode.aac_implementation` | `baac` | The codec implementation FFmpeg uses for AAC encodes and for decoding AAC sources in them: `baac`, `fdk_aac` or `ffmpeg`. See [AAC implementation](transcoding.md#aac-implementation). |
 
 Every setting in the table is enforced. Four features arrived with server settings and start switched off: audio transcoding, metadata sync for new albums, lyrics fetch for new tracks, and scheduled recommendations. Turn on the ones you want.
 

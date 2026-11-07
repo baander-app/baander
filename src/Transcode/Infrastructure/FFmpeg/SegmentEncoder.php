@@ -11,6 +11,7 @@ use App\Transcode\Application\Port\TranscodeStoragePortInterface;
 use App\Transcode\Domain\Model\TranscodeJob;
 use App\Transcode\Domain\Model\TranscodeSession;
 use App\Transcode\Domain\Service\VideoProcessingRules;
+use App\Transcode\Domain\ValueObject\AacImplementation;
 use App\Transcode\Domain\ValueObject\ColorSpace;
 use App\Transcode\Domain\ValueObject\AudioProfile;
 use App\Transcode\Domain\ValueObject\EncoderProfile;
@@ -21,7 +22,6 @@ use App\Transcode\Domain\ValueObject\VideoProbeResult;
 final class SegmentEncoder
 {
     private const float SEGMENT_DURATION = 6.0; // seconds per CMAF segment
-    private const string FFMPEG_PATH = '/usr/bin/ffmpeg';
     private const int X265_POOL_THREADS = 6;
 
     public function __construct(
@@ -37,6 +37,7 @@ final class SegmentEncoder
             '',
         ),
         private readonly float $bitrateMultiplier = 1.0,
+        private readonly string $ffmpegPath = '/usr/bin/ffmpeg',
     ) {}
 
     /**
@@ -145,6 +146,8 @@ final class SegmentEncoder
         float $sourceFrameRate = 0.0,
         ?float $sourceTimestampOrigin = null,
         float $sourceDuration = 0.0,
+        ?AacImplementation $aacImplementation = null,
+        ?string $sourceAudioCodec = null,
     ): array {
         $this->executionPolicy->assertAllowed(MediaOperation::VideoEncode);
         if ($sourceTimestampOrigin !== null && (!is_finite($sourceTimestampOrigin) || $sourceTimestampOrigin < 0.0)) {
@@ -185,7 +188,7 @@ final class SegmentEncoder
         $segmentDuration = (int) ceil(self::SEGMENT_DURATION);
 
         $args = [
-            self::FFMPEG_PATH,
+            $this->ffmpegPath,
             '-hide_banner',
             '-nostats',
             '-loglevel',
@@ -230,6 +233,11 @@ final class SegmentEncoder
                     $args[] = '-noaccurate_seek';
                 }
             }
+            // The selected AAC decoder, scoped to the mapped audio stream: an
+            // unscoped -c:a would relabel every audio stream of the input.
+            if ($aacImplementation !== null && $sourceAudioCodec === 'aac') {
+                array_push($args, sprintf('-c:a:%d', $audioStreamIndex), $aacImplementation->decoderName());
+            }
             array_push($args, '-i', $sourcePath);
         }
 
@@ -254,7 +262,11 @@ final class SegmentEncoder
         if ($hasAudio) {
             $audioProfile ??= AudioProfile::streamingStereo();
             $args[] = '-c:a';
-            $args[] = $audioProfile->codec === 'opus' ? 'libopus' : $audioProfile->codec;
+            $args[] = match ($audioProfile->codec) {
+                'opus' => 'libopus',
+                'aac' => ($aacImplementation ?? AacImplementation::Ffmpeg)->encoderName(),
+                default => $audioProfile->codec,
+            };
             $args[] = '-b:a';
             $args[] = (string) $audioProfile->bitrate;
             $args[] = '-ac';

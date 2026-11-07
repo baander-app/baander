@@ -60,6 +60,9 @@ final class AudioRenditionRuntimeEntity
     #[ORM\Column(name: 'error', type: 'text', nullable: true)]
     private ?string $error;
 
+    #[ORM\Column(name: 'failed_aac_implementation', type: 'text', nullable: true)]
+    private ?string $failedAacImplementation;
+
     #[ORM\Column(name: 'worker_namespace', type: 'text', nullable: true)]
     private ?string $workerNamespace;
 

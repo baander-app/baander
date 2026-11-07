@@ -30,6 +30,7 @@ final class TranscodeProcessPool
         private readonly JsonEncoder $jsonEncoder,
         private readonly DeploymentProfile $deploymentProfile,
         private readonly string $ffprobePath = '/usr/bin/ffprobe',
+        private readonly string $ffmpegPath = '/usr/bin/ffmpeg',
     ) {}
 
     public function isRunning(): bool
@@ -66,7 +67,7 @@ final class TranscodeProcessPool
             throw new \RuntimeException('Unable to create subtitle output directory.');
         }
         $key = sprintf('extract_subtitles:%s:%d:s%d', $job->getId()->toString(), $generation, $streamIndex);
-        $argv = FFmpegArguments::subtitleExtraction($sourcePath, $streamIndex, $outputPath . '.part', $sourceTimestampOrigin);
+        $argv = FFmpegArguments::subtitleExtraction($sourcePath, $streamIndex, $outputPath . '.part', $sourceTimestampOrigin, $this->ffmpegPath);
         $this->submit($key, $argv, 120, $outputPath, $startTime);
         return $key;
     }

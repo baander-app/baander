@@ -88,6 +88,10 @@ final class DebugHwTranscodeCommand extends Command
             $io->newLine();
         }
 
+        // --- AAC implementations the binary offers ---
+        $io->section('AAC Implementations');
+        $io->table(['Setting value', 'FFmpeg codec', 'Encoder', 'Decoder'], $report->aacImplementations);
+
         // --- HardwareAccelerator reference table ---
         $io->section('Hardware Accelerator Reference');
         $io->table(

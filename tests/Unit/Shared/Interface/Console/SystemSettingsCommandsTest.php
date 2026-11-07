@@ -67,6 +67,28 @@ final class SystemSettingsCommandsTest extends TestCase
         $this->assertArrayNotHasKey('transcode.max_bitrate', $this->rows);
     }
 
+    public function testSetStoresTheAacImplementationAndGetReadsItBack(): void
+    {
+        $set = new CommandTester(new SettingsSetCommand($this->bus, $this->settings));
+        $this->assertSame(Command::SUCCESS, $set->execute(['key' => 'transcode.aac_implementation', 'value' => 'fdk_aac']));
+        $this->assertSame('fdk_aac', $this->rows['transcode.aac_implementation']);
+
+        $get = new CommandTester(new SettingsGetCommand($this->settings));
+        $this->assertSame(Command::SUCCESS, $get->execute(['key' => 'transcode.aac_implementation']));
+        $this->assertMatchesRegularExpression('/Value\s+"fdk_aac"/', $get->getDisplay());
+    }
+
+    public function testSetRejectsAnUnknownAacImplementation(): void
+    {
+        $tester = new CommandTester(new SettingsSetCommand($this->bus, $this->settings));
+
+        $exitCode = $tester->execute(['key' => 'transcode.aac_implementation', 'value' => 'xhe']);
+
+        $this->assertSame(Command::FAILURE, $exitCode);
+        $this->assertStringContainsString('transcode.aac_implementation: Must be one of: baac, fdk_aac, ffmpeg.', $tester->getDisplay());
+        $this->assertArrayNotHasKey('transcode.aac_implementation', $this->rows);
+    }
+
     public function testSetRejectsAnUnknownKey(): void
     {
         $tester = new CommandTester(new SettingsSetCommand($this->bus, $this->settings));

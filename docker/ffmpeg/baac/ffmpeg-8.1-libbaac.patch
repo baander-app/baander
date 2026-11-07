@@ -1,0 +1,58 @@
+--- a/configure
++++ b/configure
+@@ -231,6 +231,7 @@
+                            and libraw1394 [no]
+   --enable-libdvdnav       enable libdvdnav, needed for DVD demuxing [no]
+   --enable-libdvdread      enable libdvdread, needed for DVD demuxing [no]
++  --enable-libbaac         enable AAC de/encoding via bAAC (libbaac) [no]
+   --enable-libfdk-aac      enable AAC de/encoding via libfdk-aac [no]
+   --enable-libflite        enable flite (voice synthesis) support via libflite [no]
+   --enable-libfontconfig   enable libfontconfig, useful for drawtext filter [no]
+@@ -2010,6 +2011,7 @@
+ EXTERNAL_LIBRARY_VERSION3_LIST="
+     gmp
+     libaribb24
++    libbaac
+     liblensfun
+     libopencore_amrnb
+     libopencore_amrwb
+@@ -3762,6 +3764,9 @@
+ libaribb24_decoder_deps="libaribb24"
+ libaribcaption_decoder_deps="libaribcaption"
+ libcelt_decoder_deps="libcelt"
++libbaac_decoder_deps="libbaac"
++libbaac_encoder_deps="libbaac"
++libbaac_encoder_select="audio_frame_queue"
+ libcodec2_decoder_deps="libcodec2"
+ libcodec2_encoder_deps="libcodec2"
+ libdav1d_decoder_deps="libdav1d"
+@@ -7247,6 +7252,7 @@
+                              { check_lib libcelt celt/celt.h celt_decoder_create_custom -lcelt0 ||
+                                die "ERROR: libcelt must be installed and version must be >= 0.11.0."; }
+ enabled libcaca           && require_pkg_config libcaca caca caca.h caca_create_canvas
++enabled libbaac           && require_pkg_config libbaac libbaac baac/aac.h aac_encoder_create
+ enabled libcodec2         && require libcodec2 codec2/codec2.h codec2_create -lcodec2
+ enabled libdav1d          && require_pkg_config libdav1d "dav1d >= 1.0.0" "dav1d/dav1d.h" dav1d_version
+ enabled libdavs2          && require_pkg_config libdavs2 "davs2 >= 1.6.0" davs2.h davs2_decoder_open
+--- a/libavcodec/allcodecs.c
++++ b/libavcodec/allcodecs.c
+@@ -784,6 +784,8 @@
+ /* preferred over libaribb24 */
+ extern const FFCodec ff_libaribcaption_decoder;
+ extern const FFCodec ff_libaribb24_decoder;
++extern const FFCodec ff_libbaac_encoder;
++extern const FFCodec ff_libbaac_decoder;
+ extern const FFCodec ff_libcelt_decoder;
+ extern const FFCodec ff_libcodec2_encoder;
+ extern const FFCodec ff_libcodec2_decoder;
+--- a/libavcodec/Makefile
++++ b/libavcodec/Makefile
+@@ -1171,6 +1171,8 @@
+ OBJS-$(CONFIG_LIBAOM_AV1_ENCODER)         += libaomenc.o libaom.o
+ OBJS-$(CONFIG_LIBARIBB24_DECODER)         += libaribb24.o ass.o
+ OBJS-$(CONFIG_LIBARIBCAPTION_DECODER)     += libaribcaption.o ass.o
++OBJS-$(CONFIG_LIBBAAC_DECODER)            += libbaacdec.o
++OBJS-$(CONFIG_LIBBAAC_ENCODER)            += libbaacenc.o
+ OBJS-$(CONFIG_LIBCELT_DECODER)            += libcelt_dec.o
+ OBJS-$(CONFIG_LIBCODEC2_DECODER)          += libcodec2.o
+ OBJS-$(CONFIG_LIBCODEC2_ENCODER)          += libcodec2.o

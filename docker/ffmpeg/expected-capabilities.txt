@@ -1,0 +1,47 @@
+# Accelerators and hardware encoders the application can select, taken from
+# Debian trixie's ffmpeg 7.1.5 and filtered to the capability probe's
+# patterns (nvenc, vaapi, _qsv, _amf). The static build must list them all.
+hwaccel cuda
+hwaccel vaapi
+hwaccel qsv
+encoder av1_nvenc
+encoder av1_qsv
+encoder av1_vaapi
+encoder h264_nvenc
+encoder h264_qsv
+encoder h264_vaapi
+encoder hevc_nvenc
+encoder hevc_qsv
+encoder hevc_vaapi
+encoder mjpeg_qsv
+encoder mjpeg_vaapi
+encoder mpeg2_qsv
+encoder mpeg2_vaapi
+encoder vp8_vaapi
+encoder vp9_vaapi
+encoder vp9_qsv
+# The AAC implementations the transcode.aac_implementation setting can select,
+# each needed as encoder and as decoder.
+encoder libbaac
+decoder libbaac
+encoder libfdk_aac
+decoder libfdk_aac
+encoder aac
+decoder aac
+# Filters the video filter builder emits for software, VAAPI, QSV and NVENC
+# work, and the demuxer that probes published DASH manifests.
+filter zscale
+filter tonemap
+filter tonemap_vaapi
+filter hwupload
+filter hwdownload
+filter hwupload_cuda
+filter scale_vaapi
+filter deinterlace_vaapi
+filter scale_qsv
+filter deinterlace_qsv
+filter scale_cuda
+filter yadif_cuda
+demuxer dash
+demuxer mov
+demuxer matroska

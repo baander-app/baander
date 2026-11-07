@@ -1,11 +1,16 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")/.."
-: "${BAANDER_TEST_IMAGE:?Set BAANDER_TEST_IMAGE to the CI image with PHP, FFmpeg 7 and test dependencies.}"
+: "${BAANDER_TEST_IMAGE:?Set BAANDER_TEST_IMAGE to the CI image with PHP, FFmpeg 8 and test dependencies.}"
 audio_profile="${BAANDER_TEST_AUDIO_PROFILE:-streaming_stereo}"
 case "$audio_profile" in
     streaming_stereo|opus_stereo) ;;
     *) echo 'BAANDER_TEST_AUDIO_PROFILE must be streaming_stereo or opus_stereo.' >&2; exit 1 ;;
+esac
+aac_implementation="${BAANDER_TEST_AAC_IMPLEMENTATION:-baac}"
+case "$aac_implementation" in
+    baac|fdk_aac|ffmpeg) ;;
+    *) echo 'BAANDER_TEST_AAC_IMPLEMENTATION must be baac, fdk_aac or ffmpeg.' >&2; exit 1 ;;
 esac
 scenario="${BAANDER_TEST_VIDEO_SCENARIO:-adaptive}"
 case "$scenario" in
@@ -101,6 +106,7 @@ cp "$workspace/browser/bundle-inputs.json" "$artifacts/bundle-inputs.json"
 timeout 30s docker create --name "$fixture" --network none --memory=2g --pids-limit=128 --user root \
     -e BAANDER_ADAPTIVE_DIRECTORY=/tmp/baander-adaptive \
     -e BAANDER_ADAPTIVE_AUDIO_PROFILE="$audio_profile" \
+    -e BAANDER_ADAPTIVE_AAC_IMPLEMENTATION="$aac_implementation" \
     -e BAANDER_ADAPTIVE_SCENARIO="$scenario" \
     --entrypoint php "$BAANDER_TEST_IMAGE" /var/www/html/tests/Fixtures/Transcode/AdaptiveBrowserBootstrap.php >/dev/null
 fixture_created=1

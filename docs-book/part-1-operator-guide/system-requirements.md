@@ -94,8 +94,10 @@ content: `libx264` at 1.08×, `libx265` at 1.30×, `h264_vaapi` at 9.4× and
 ### Measured software cost per job
 
 These costs were measured on 3 November 2026 with FFmpeg 5.1 in the Debian 12
-worker image, before the images moved to Debian 13 and FFmpeg 7.1. The host was
-an AMD Ryzen 7 5800X3D (8 cores, 16 threads) with other heavy work paused. The
+worker image, before the images moved to Debian 13 and FFmpeg 7.1. The images
+have since moved to the project's own FFmpeg 8.1 build; neither these costs nor
+the hardware costs below have been measured on it. The host was an AMD Ryzen 7
+5800X3D (8 cores, 16 threads) with other heavy work paused. The
 execution unit was confined to eight logical CPUs for the measurement, so the
 eight-at-once figures describe eight encodes sharing eight CPUs. Each video job
 encoded a synthetic 1080p30 H.264/AAC source.

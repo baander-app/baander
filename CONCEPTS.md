@@ -461,6 +461,15 @@ A host for the repository that runs its CI: the self-hosted Forgejo instance or
 GitHub. Both forges run the same workflow files, and each supplies its own runner,
 image registry, cache store and coverage-baseline store.
 
+### Capability gate
+
+The build-time check that an FFmpeg binary lists every accelerator, encoder,
+decoder, filter and demuxer the application can select, and that every shared
+library it loads resolves. It runs where the binary is built and again where the
+application image adopts it, so a component lost to a changed build fails the
+image build instead of a transcode. It checks only the capabilities listed for
+it, so new media features add their components to that list.
+
 ## Dependency maintenance
 
 ### Dependency policy
@@ -542,6 +551,13 @@ It reports whether the results match or the comparison is unavailable and leaves
 ### bAAC
 
 The public name of Bånder's AAC encoder and decoder library.
+
+### AAC implementation setting
+
+The system setting that selects which codec implementation FFmpeg uses for AAC encoding and decoding across the server's transcodes: bAAC by default, Fraunhofer's fdk-aac, or FFmpeg's built-in codec.
+*Avoid: kill switch, which names only the act of moving off bAAC.*
+
+A change applies to transcodes started afterwards; running sessions and cached renditions keep the implementation that produced them. A rendition that failed while encoding or decoding AAC through one implementation is encoded again on its next request once another implementation is selected.
 
 ### HE-AAC profile
 

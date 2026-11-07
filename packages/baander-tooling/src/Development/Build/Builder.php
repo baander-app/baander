@@ -89,7 +89,7 @@ class Builder
     public function build(Client $docker, string $source, string $target, string $revision): string
     {
         $tag = 'baander-development-' . $target . ':' . $revision . '-' . basename($source);
-        $request = BuildRequest::fromSource($source, $target, $revision, $tag, $this->configuration->images->role('operatorHelper'));
+        $request = BuildRequest::fromSource($source, $target, $revision, $tag, $this->configuration->images->role('operatorHelper'), $this->configuration->images->role('ffmpeg'));
         $docker->run($request->arguments, timeout: null, logPath: dirname($source) . '/' . basename($source) . '-' . $target . '.log');
         return $request->imageId($docker->run(['image', 'inspect', $tag])->stdout);
     }

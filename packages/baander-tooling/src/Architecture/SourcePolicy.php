@@ -92,7 +92,7 @@ final class SourcePolicy
             if (str_contains($value, '/var/www/html')) {
                 $diagnostics[] = self::diagnostic($relativePath, $string['line'], 'application-root', 'Resolve the application root through ApplicationLayout.', $string['offset']);
             }
-            if (preg_match('~(?:martinjuul/baander-app|baander-database|baander-websocket-proxy-test|mcr\.microsoft\.com/playwright|redis/redis-stack-server|axllent/mailpit|nginx):[A-Za-z0-9_.-]+|redis:[0-9][A-Za-z0-9_.-]*-alpine|docker:[0-9][A-Za-z0-9_.-]*-cli~', $value)) {
+            if (preg_match('~(?:martinjuul/baander-app|baander-database|baander-websocket-proxy-test|ffmpeg-baander-static|mcr\.microsoft\.com/playwright|redis/redis-stack-server|axllent/mailpit|nginx):[A-Za-z0-9_.-]+|redis:[0-9][A-Za-z0-9_.-]*-alpine|docker:[0-9][A-Za-z0-9_.-]*-cli~', $value)) {
                 $diagnostics[] = self::diagnostic($relativePath, $string['line'], 'default-image', 'Resolve image defaults through ImageCatalog.', $string['offset']);
             }
             if (preg_match('~(?:Baander\\\\Tooling\\\\Development\\\\(?:Runner|Docker)\b|Development/(?:Runner|Docker)\.php)~', $value)) {

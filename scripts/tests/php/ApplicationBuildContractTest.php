@@ -95,6 +95,7 @@ final class ApplicationBuildContractTest extends TestCase
         self::assertContains('type=local,src=/tmp/cache', $arguments);
         self::assertContains('type=local,dest=/tmp/cache,mode=max', $arguments);
         self::assertContains('OPERATOR_HELPER_IMAGE=registry.baander.app/docker:qualification', $arguments);
+        self::assertContains('FFMPEG_IMAGE=registry.baander.app/ffmpeg:qualification', $arguments);
     }
 
     public function testNamedBuilderIsConfirmedOnTheCapturedDaemonBeforeTheBuildSelectsIt(): void
@@ -273,7 +274,7 @@ PHP);
 
     private function builder(ApplicationImageExecutor $executor): ApplicationImage
     {
-        return new ApplicationImage(new Client($executor, new Target('/usr/bin/docker', 'unix:///run/docker.sock', 'qualification', null, null), []), ToolingConfiguration::resolve(['images' => ['operatorHelper' => ['reference' => 'registry.baander.app/docker:qualification']]])->images);
+        return new ApplicationImage(new Client($executor, new Target('/usr/bin/docker', 'unix:///run/docker.sock', 'qualification', null, null), []), ToolingConfiguration::resolve(['images' => ['operatorHelper' => ['reference' => 'registry.baander.app/docker:qualification'], 'ffmpeg' => ['reference' => 'registry.baander.app/ffmpeg:qualification']]])->images);
     }
 }
 

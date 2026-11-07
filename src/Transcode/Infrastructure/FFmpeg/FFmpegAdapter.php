@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace App\Transcode\Infrastructure\FFmpeg;
 
+use App\Shared\Application\Port\SystemSettingsPortInterface;
 use App\Transcode\Application\DTO\MediaOperation;
 use App\Transcode\Application\Service\MediaExecutionPolicy;
 use App\Transcode\Application\Port\FFmpegPortInterface;
 use App\Transcode\Domain\Service\AudioProcessingRules;
+use App\Transcode\Application\Settings\TranscodeSettingDefinitions;
 use App\Transcode\Domain\Service\VideoProcessingRules;
+use App\Transcode\Domain\ValueObject\AacImplementation;
 use App\Transcode\Domain\ValueObject\AudioProfile;
 use App\Transcode\Domain\ValueObject\EncoderProfile;
 use App\Transcode\Domain\ValueObject\HardwareAccelerator;
@@ -28,6 +31,7 @@ final class FFmpegAdapter implements FFmpegPortInterface
         private readonly FFprobeAdapter $ffprobeAdapter,
         private readonly FMP4SegmentWriter $fmp4Writer,
         private readonly JsonEncoder $jsonEncoder,
+        private readonly SystemSettingsPortInterface $settings,
         private readonly string $ffmpegPath = '/usr/bin/ffmpeg',
         private readonly EncoderProfile $encoderProfile = new EncoderProfile(
             HardwareAccelerator::None,
@@ -43,6 +47,11 @@ final class FFmpegAdapter implements FFmpegPortInterface
     public function probeVideo(string $sourcePath): VideoProbeResult
     {
         return $this->ffprobeAdapter->probeVideo($sourcePath);
+    }
+
+    private function aacImplementation(): AacImplementation
+    {
+        return AacImplementation::from((string) $this->settings->get(TranscodeSettingDefinitions::AAC_IMPLEMENTATION));
     }
 
     public function encodeInitSegment(
@@ -73,7 +82,7 @@ final class FFmpegAdapter implements FFmpegPortInterface
             mkdir($dir, 0755, true);
         }
 
-        $codecOptions = AudioProcessingRules::codecOptions(AudioProfile::fromString($audioProfile['name'] ?? 'streaming_stereo'));
+        $codecOptions = AudioProcessingRules::codecOptions(AudioProfile::fromString($audioProfile['name'] ?? 'streaming_stereo'), $this->aacImplementation());
 
         $vf = $videoFilters !== '' ? ['-vf', $videoFilters] : [];
         $af = $audioFilters !== '' ? ['-af', $audioFilters] : [];
@@ -150,7 +159,7 @@ final class FFmpegAdapter implements FFmpegPortInterface
         }
 
         $profile = AudioProfile::fromString($audioProfile['name'] ?? 'streaming_stereo');
-        $codecOptions = AudioProcessingRules::codecOptions($profile);
+        $codecOptions = AudioProcessingRules::codecOptions($profile, $this->aacImplementation());
 
         $cmd = [
             $this->ffmpegPath, '-nostdin', '-y', '-i', $sourcePath, '-vn', '-t', '0.001',
@@ -189,7 +198,7 @@ final class FFmpegAdapter implements FFmpegPortInterface
 
         $afArg = $audioFilters !== '' ? ['-af', $audioFilters] : [];
         $profile = AudioProfile::fromString($audioProfile['name'] ?? 'streaming_stereo');
-        $codecOptions = AudioProcessingRules::codecOptions($profile);
+        $codecOptions = AudioProcessingRules::codecOptions($profile, $this->aacImplementation());
 
         $cmd = [
             $this->ffmpegPath, '-nostdin', '-y', '-ss', sprintf('%.6f', $startTime),
