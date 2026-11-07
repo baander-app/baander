@@ -16,7 +16,7 @@ $familyNotes = [
     <p class="eyebrow">The codec library</p>
     <h1 id="baac-title">bAAC</h1>
     <p class="baac-lead">AAC encoding and decoding for Bånder.</p>
-    <p>bAAC is a C++17 codec library with a C API, a command-line tool and a Node/Electron binding. Explore what it implements and how its recorded measurements compare with other AAC codecs.</p>
+    <p>bAAC is a C++17 codec library with a C API, a command-line tool, a Node/Electron binding and an FFmpeg codec that Bånder's server transcoder uses by default. Explore what it implements and how its recorded measurements compare with other AAC codecs.</p>
     <div class="actions">
       <a class="button" href="<?= $source('docs/README.md') ?>">Read the source guide <span class="arrow" aria-hidden="true">↗</span></a>
       <a class="text-action" href="#quality">Compare the measurements <span class="arrow" aria-hidden="true">↓</span></a>
@@ -35,7 +35,7 @@ $familyNotes = [
   <section class="baac-section" id="integration" aria-labelledby="integration-title">
     <div class="baac-section-heading">
       <p class="eyebrow">What it does</p>
-      <h2 id="integration-title">A library and an Electron bridge.</h2>
+      <h2 id="integration-title">A library, an FFmpeg codec and an Electron bridge.</h2>
     </div>
     <div class="baac-copy-grid">
       <div>
@@ -44,14 +44,15 @@ $familyNotes = [
         <p>Implemented tools and checked interoperability differ. ER RVLC/HCR, LD-SBR and several USAC/spatial tools have approximations, unverified external streams or refused modes. Read the <a href="<?= $source('docs/README.md#what-it-does') ?>">capabilities and limitations</a> before choosing a profile.</p>
       </div>
       <div>
-        <h3>Current Bånder integration</h3>
+        <h3>Electron integration</h3>
         <p>Electron's main-process <code>AacService</code> exposes the native binding through registered IPC handlers and a preload bridge. The packaging configuration includes native files. This integration does not establish bAAC as the default playback path in the web application.</p>
         <p>Start with the <a href="<?= $source('docs/README.md#building') ?>">source-build guide</a>, <a href="<?= $source('docs/README.md#api') ?>">C API</a> and <a href="<?= $source('docs/README.md#node-api-binding-baanderaac-native') ?>">Node-API binding</a>. Public package availability and release binaries are not established by these measurements.</p>
       </div>
     </div>
     <div class="baac-note">
-      <h3>Planned: transcoder and FFmpeg integration</h3>
-      <p>We plan to integrate bAAC into Bånder's server-side transcoder and FFmpeg build, extending its use beyond the Electron application. That work is planned; the current integration described above is the Electron service and bridge.</p>
+      <h3>Server transcoding through FFmpeg</h3>
+      <p>Bånder's own FFmpeg build carries bAAC as the <code>libbaac</code> encoder and decoder, beside Fraunhofer's fdk-aac and FFmpeg's built-in AAC codec. In FFmpeg, bAAC encodes AAC-LC in mono, stereo and 5.1. The server transcoder uses it by default to encode AAC audio renditions and the audio of DASH video sessions, and to decode AAC sources for those encodes. Stream copies and probes keep FFmpeg's own handling.</p>
+      <p>An operator can move the server to fdk-aac or the built-in codec with the <code>transcode.aac_implementation</code> setting, from the admin settings or the console. A DASH session keeps the implementation it started with, and a switch re-encodes no cached rendition. The operator guide's <a href="/docs/operator-guide/transcoding/#aac-implementation">AAC implementation</a> section describes the setting.</p>
     </div>
   </section>
 
