@@ -186,6 +186,16 @@ RUN cmake -S /build/baander-aac -B /build/baander-aac-build -G Ninja \
 # container built from this stage.
 FROM ffmpeg-base AS ffmpeg-prepared
 
+# libxml2 gives FFmpeg its DASH demuxer, which probes the published manifests;
+# clang compiles the CUDA filters (scale_cuda, yadif_cuda) the NVENC path uses.
+# They are installed here rather than in base-builder so that the library
+# stages above keep their cache.
+RUN set -xe \
+    && DEBIAN_FRONTEND=noninteractive apt-get update -qq \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -yqq -o=Dpkg::Use-Pty=0 libxml2-dev clang \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
 # Merge library artifacts into workspace (COPY adds files, does not clobber)
 COPY --from=librist-builder    /dist/ /usr/src/ffmpeg-build-script/workspace/
 COPY --from=libass-builder     /dist/ /usr/src/ffmpeg-build-script/workspace/
@@ -223,6 +233,8 @@ RUN set -xe \
         --enable-libdrm \
         --disable-xlib \
         --disable-libxcb \
+        --enable-libxml2 \
+        --enable-cuda-llvm \
         --enable-ffnvcodec \
         --enable-nvenc \
         --enable-nvdec \

@@ -26,13 +26,14 @@ esac
 encoders=$("$FFMPEG" -hide_banner -encoders)
 echo "$encoders" | grep -q ' libbaac ' || fail "libbaac encoder missing"
 step "libbaac encoder present"
+decoders=$("$FFMPEG" -hide_banner -decoders)
+echo "$decoders" | grep -q ' libbaac ' || fail "libbaac decoder missing"
+step "libbaac decoder present"
 if [ "${SMOKE_EXPECT_FDK:-0}" = 1 ]; then
   echo "$encoders" | grep -q ' libfdk_aac ' || fail "libfdk_aac encoder missing"
-  step "libfdk_aac encoder present"
+  echo "$decoders" | grep -q ' libfdk_aac ' || fail "libfdk_aac decoder missing"
+  step "libfdk_aac encoder and decoder present"
 fi
-decoders=$("$FFMPEG" -hide_banner -decoders)
-have_baac_decoder=0
-echo "$decoders" | grep -q ' libbaac ' && have_baac_decoder=1
 
 # A stereo tone and a 5.1 signal with a distinct amplitude per channel.
 "$FFMPEG" -hide_banner -v error -y -f lavfi -i "sine=frequency=1000:sample_rate=48000:duration=2" \
@@ -106,13 +107,12 @@ decode_and_compare aac "$WORK/tone.aac" "$WORK/tone.f32le" 2 adts-via-aac
 decode_and_compare aac "$WORK/tone.m4a" "$WORK/tone.f32le" 2 mp4-via-aac
 decode_and_compare aac "$WORK/six.m4a" "$WORK/six.f32le" 6 six-via-aac
 
-if [ "$have_baac_decoder" = 1 ]; then
-  step "decode the libbaac output with libbaac"
-  decode_and_compare libbaac "$WORK/tone.aac" "$WORK/tone.f32le" 2 adts-via-libbaac
-  decode_and_compare libbaac "$WORK/tone.m4a" "$WORK/tone.f32le" 2 mp4-via-libbaac
-  decode_and_compare libbaac "$WORK/six.m4a" "$WORK/six.f32le" 6 six-via-libbaac
-  # A damaged ADTS frame decodes through concealment without aborting.
-  python3 -I - "$WORK/tone.aac" "$WORK/damaged.aac" <<'PY'
+step "decode the libbaac output with libbaac"
+decode_and_compare libbaac "$WORK/tone.aac" "$WORK/tone.f32le" 2 adts-via-libbaac
+decode_and_compare libbaac "$WORK/tone.m4a" "$WORK/tone.f32le" 2 mp4-via-libbaac
+decode_and_compare libbaac "$WORK/six.m4a" "$WORK/six.f32le" 6 six-via-libbaac
+# A damaged ADTS frame decodes through concealment without aborting.
+python3 -I - "$WORK/tone.aac" "$WORK/damaged.aac" <<'PY'
 import sys
 data = bytearray(open(sys.argv[1], 'rb').read())
 # Corrupt the payload of a frame in the middle, not the sync word.
@@ -121,10 +121,7 @@ for i in range(mid + 10, mid + 60):
     data[i] ^= 0x5A
 open(sys.argv[2], 'wb').write(data)
 PY
-  "$FFMPEG" -hide_banner -v error -y -c:a:0 libbaac -i "$WORK/damaged.aac" -f null - || fail "libbaac aborted on a damaged ADTS frame"
-  step "damaged ADTS frame decoded with concealment"
-else
-  step "libbaac decoder not present; decoder checks skipped"
-fi
+"$FFMPEG" -hide_banner -v error -y -c:a:0 libbaac -i "$WORK/damaged.aac" -f null - || fail "libbaac aborted on a damaged ADTS frame"
+step "damaged ADTS frame decoded with concealment"
 
 echo "smoke: OK"

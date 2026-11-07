@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
-# Checks an FFmpeg binary against the hardware capabilities the application
-# can select, and that every shared object the binaries need resolves.
+# Checks an FFmpeg binary against the hardware capabilities, AAC codecs, filters
+# and demuxers the application can select, and that every shared object the
+# binaries need resolves.
 #
 #   ffmpeg-capability-gate.sh <ffmpeg-binary> <expected-capabilities.txt>
 #
-# The expected file lists one capability per line: `hwaccel <name>` or
-# `encoder <name>`. ffprobe is expected beside ffmpeg.
+# The expected file lists one capability per line: `hwaccel <name>`,
+# `encoder <name>`, `decoder <name>`, `filter <name>` or `demuxer <name>`.
+# ffprobe is expected beside ffmpeg.
 set -euo pipefail
 
 FFMPEG=${1:?ffmpeg binary}
@@ -15,11 +17,17 @@ FFPROBE="$(dirname "$FFMPEG")/ffprobe"
 missing=0
 hwaccels=$("$FFMPEG" -hide_banner -hwaccels | tail -n +2)
 encoders=$("$FFMPEG" -hide_banner -encoders | awk 'NR > 10 || /^ [VAS]/ { print $2 }')
+decoders=$("$FFMPEG" -hide_banner -decoders | awk 'NR > 10 || /^ [VAS]/ { print $2 }')
+filters=$("$FFMPEG" -hide_banner -filters | awk 'NR > 8 { print $2 }')
+demuxers=$("$FFMPEG" -hide_banner -demuxers | awk '$1 ~ /D/ { print $2 }' | tr ',' '\n')
 while read -r kind name; do
   case "$kind" in
     ''|'#'*) continue ;;
     hwaccel) echo "$hwaccels" | grep -qx "$name" || { echo "gate: missing hwaccel $name" >&2; missing=1; } ;;
     encoder) echo "$encoders" | grep -qx "$name" || { echo "gate: missing encoder $name" >&2; missing=1; } ;;
+    decoder) echo "$decoders" | grep -qx "$name" || { echo "gate: missing decoder $name" >&2; missing=1; } ;;
+    filter) echo "$filters" | grep -qx "$name" || { echo "gate: missing filter $name" >&2; missing=1; } ;;
+    demuxer) echo "$demuxers" | grep -qx "$name" || { echo "gate: missing demuxer $name" >&2; missing=1; } ;;
     *) echo "gate: unknown entry '$kind $name' in $EXPECTED" >&2; exit 2 ;;
   esac
 done < "$EXPECTED"
@@ -37,4 +45,4 @@ if [ "$missing" != 0 ]; then
   echo "gate: FAIL" >&2
   exit 1
 fi
-echo "gate: OK ($(grep -c -E '^(hwaccel|encoder) ' "$EXPECTED") capabilities present, shared objects resolved)"
+echo "gate: OK ($(grep -c -E '^(hwaccel|encoder|decoder|filter|demuxer) ' "$EXPECTED") capabilities present, shared objects resolved)"

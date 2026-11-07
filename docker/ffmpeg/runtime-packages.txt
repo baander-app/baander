@@ -4,3 +4,4 @@ libdrm2
 libfontconfig1
 libfreetype6
 libfftw3-double3
+libxml2

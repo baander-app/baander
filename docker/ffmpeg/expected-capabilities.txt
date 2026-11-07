@@ -20,3 +20,28 @@ encoder mpeg2_vaapi
 encoder vp8_vaapi
 encoder vp9_vaapi
 encoder vp9_qsv
+# The AAC implementations the transcode.aac_implementation setting can select,
+# each needed as encoder and as decoder.
+encoder libbaac
+decoder libbaac
+encoder libfdk_aac
+decoder libfdk_aac
+encoder aac
+decoder aac
+# Filters the video filter builder emits for software, VAAPI, QSV and NVENC
+# work, and the demuxer that probes published DASH manifests.
+filter zscale
+filter tonemap
+filter tonemap_vaapi
+filter hwupload
+filter hwdownload
+filter hwupload_cuda
+filter scale_vaapi
+filter deinterlace_vaapi
+filter scale_qsv
+filter deinterlace_qsv
+filter scale_cuda
+filter yadif_cuda
+demuxer dash
+demuxer mov
+demuxer matroska
