@@ -13,8 +13,11 @@ use App\Transcode\Domain\ValueObject\QualityTier;
 
 final readonly class HardwareTranscodeDiagnostics implements HardwareTranscodeDiagnosticsInterface
 {
-    public function __construct(private WorkerEncoderCapabilitiesSnapshotStore $snapshots, private AacImplementationProbe $aacProbe)
-    {
+    public function __construct(
+        private WorkerEncoderCapabilitiesSnapshotStore $snapshots,
+        private AacImplementationProbe $aacProbe,
+        private string $ffmpegPath,
+    ) {
     }
 
     public function inspect(): HardwareTranscodeDiagnosticsReport
@@ -44,7 +47,7 @@ final readonly class HardwareTranscodeDiagnostics implements HardwareTranscodeDi
                 . ' -b:v %d -maxrate %d -bufsize %d'
                 . ' -movflags +frag_keyframe+separate_moof+default_base_moof'
                 . ' -an -f mp4 %s',
-                '/usr/bin/ffmpeg',
+                $this->ffmpegPath,
                 $hwAccelFlags !== '' ? $hwAccelFlags . ' ' : '',
                 $decoderFlags !== '' ? $decoderFlags . ' ' : '',
                 $encoderFlags,
@@ -59,8 +62,12 @@ final readonly class HardwareTranscodeDiagnostics implements HardwareTranscodeDi
 
         $aacRows = [];
         foreach (AacImplementation::cases() as $implementation) {
-            $available = $this->aacProbe->isAvailable($implementation);
-            $aacRows[] = [$implementation->value, $implementation->encoderName(), $available ? 'Yes' : 'No', $available ? 'Yes' : 'No'];
+            $aacRows[] = [
+                $implementation->value,
+                $implementation->encoderName(),
+                $this->aacProbe->offersEncoder($implementation) ? 'Yes' : 'No',
+                $this->aacProbe->offersDecoder($implementation) ? 'Yes' : 'No',
+            ];
         }
 
         $refRows = [];

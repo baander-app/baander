@@ -34,6 +34,8 @@ final class AacImplementationProbeTest extends TestCase
     {
         $probe = new StubAacImplementationProbe(['libbaac', 'aac'], ['aac']);
         self::assertFalse($probe->isAvailable(AacImplementation::Baac), 'an encoder without its decoder is unavailable');
+        self::assertTrue($probe->offersEncoder(AacImplementation::Baac));
+        self::assertFalse($probe->offersDecoder(AacImplementation::Baac));
         self::assertTrue($probe->isAvailable(AacImplementation::Ffmpeg));
     }
 }

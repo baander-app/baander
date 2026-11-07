@@ -31,9 +31,17 @@ class AacImplementationProbe
 
     public function isAvailable(AacImplementation $implementation): bool
     {
-        $codec = $this->codecs()[$implementation->encoderName()] ?? ['encoder' => false, 'decoder' => false];
+        return $this->offersEncoder($implementation) && $this->offersDecoder($implementation);
+    }
 
-        return $codec['encoder'] && $codec['decoder'];
+    public function offersEncoder(AacImplementation $implementation): bool
+    {
+        return $this->codecs()[$implementation->value]['encoder'];
+    }
+
+    public function offersDecoder(AacImplementation $implementation): bool
+    {
+        return $this->codecs()[$implementation->value]['decoder'];
     }
 
     public function assertAvailable(AacImplementation $implementation): void
@@ -53,7 +61,7 @@ class AacImplementationProbe
         $decoders = self::names($this->exec([$this->ffmpegPath, '-hide_banner', '-decoders']));
         $this->codecs = [];
         foreach (AacImplementation::cases() as $implementation) {
-            $this->codecs[$implementation->encoderName()] = [
+            $this->codecs[$implementation->value] = [
                 'encoder' => in_array($implementation->encoderName(), $encoders, true),
                 'decoder' => in_array($implementation->decoderName(), $decoders, true),
             ];

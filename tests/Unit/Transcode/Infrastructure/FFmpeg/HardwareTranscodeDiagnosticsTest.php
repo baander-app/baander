@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Transcode\Infrastructure\FFmpeg;
 
+use App\Tests\Support\StubAacImplementationProbe;
 use App\Transcode\Domain\ValueObject\EncoderProfile;
 use App\Transcode\Infrastructure\FFmpeg\WorkerEncoderCapabilitiesSnapshotStore;
 use App\Transcode\Infrastructure\FFmpeg\HardwareTranscodeDiagnostics;
@@ -58,7 +59,7 @@ final class HardwareTranscodeDiagnosticsTest extends TestCase
         $store = new WorkerEncoderCapabilitiesSnapshotStore(sys_get_temp_dir() . '/absent-baander-' . bin2hex(random_bytes(8)));
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Worker encoder capabilities are unavailable');
-        new HardwareTranscodeDiagnostics($store, new \App\Tests\Support\StubAacImplementationProbe(['libbaac', 'aac'], ['libbaac', 'aac']))->inspect();
+        new HardwareTranscodeDiagnostics($store, new StubAacImplementationProbe(['libbaac', 'aac'], ['libbaac', 'aac']), '/usr/bin/ffmpeg')->inspect();
     }
 
     private function inspectPublishedProfile(EncoderProfile $profile, float $multiplier): \App\Transcode\Application\DTO\HardwareTranscodeDiagnosticsReport
@@ -68,7 +69,7 @@ final class HardwareTranscodeDiagnosticsTest extends TestCase
         $store = new WorkerEncoderCapabilitiesSnapshotStore($path);
         try {
             $store->publish($profile, $multiplier, 'worker-baander');
-            return new HardwareTranscodeDiagnostics($store, new \App\Tests\Support\StubAacImplementationProbe(['libbaac', 'aac'], ['libbaac', 'aac']))->inspect();
+            return new HardwareTranscodeDiagnostics($store, new StubAacImplementationProbe(['libbaac', 'aac'], ['libbaac', 'aac']), '/usr/bin/ffmpeg')->inspect();
         } finally {
             unlink($path);
             rmdir($directory);

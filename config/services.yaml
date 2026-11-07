@@ -1175,6 +1175,10 @@ services:
         arguments:
             $ffmpegPath: '%env(FFMPEG_PATH)%'
 
+    App\Transcode\Infrastructure\FFmpeg\HardwareTranscodeDiagnostics:
+        arguments:
+            $ffmpegPath: '%env(FFMPEG_PATH)%'
+
     App\Transcode\Infrastructure\FFmpeg\CopySegmentArguments:
         arguments:
             $ffmpegPath: '%env(FFMPEG_PATH)%'

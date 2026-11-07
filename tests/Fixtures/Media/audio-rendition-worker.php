@@ -44,7 +44,7 @@ $client = new class(NativeExecutionClient::fromEnvironment($profile->sharedCopyS
 ProcessExecutor::configureNativeExecution($client);
 // The disposable schema has no settings table; the fixture runs the setting's default.
 $settings = new class implements \App\Shared\Application\Port\SystemSettingsPortInterface {
-    public function get(string $key): bool|int|string
+    public function get(string $key): string
     {
         return \App\Transcode\Domain\ValueObject\AacImplementation::Baac->value;
     }

@@ -341,7 +341,7 @@ final class AudioRenditionExecutorTest extends TestCase
         self::assertFileDoesNotExist($this->final());
     }
 
-    /** @return list<array{0: list<string>, 1: array<string, mixed>}> */
+    /** @return list<list<string>> the argument vectors of the spawned commands, in order */
     private function runEncode(string $sourceCodec, AudioRenditionFormat $format, string $implementation): array
     {
         $source = $this->claim->runtime->input->sourcePath;
