@@ -16,6 +16,11 @@ final readonly class PresetConfiguration
     public const array REQUIRED_SIZE_KEYS = ['webWorkers', 'databaseSlots', 'ordinaryConsumers', 'sharedBuffersMiB', 'workMemMiB'];
     /** Media settings per capability: remux requires copy slots; unset transcode slots take the image's defaults. */
     public const array MEDIA_SIZE_KEYS = ['remux' => ['copySlots'], 'transcode' => ['videoSlots', 'audioSlots']];
+    /**
+     * Process size bounds as [minimum, maximum]. The image's deployment profile enforces the same
+     * bounds; checking them here refuses a bad size before a running deployment is stopped.
+     */
+    public const array PROCESS_BOUNDS = ['webWorkers' => [1, 16], 'databaseSlots' => [1, 16], 'ordinaryConsumers' => [1, 4], 'copySlots' => [1, 8]];
     /** PostgreSQL memory bounds in MiB, as [minimum, maximum]. */
     public const array POSTGRES_BOUNDS = ['sharedBuffersMiB' => [32, 16384], 'workMemMiB' => [1, 1024]];
     public const array HARDWARE_KEYS = ['accelerator', 'device', 'group'];
@@ -176,7 +181,7 @@ final readonly class PresetConfiguration
                 throw new \InvalidArgumentException('Deployment size ' . $key . ' must be a non-negative integer.');
             }
         }
-        foreach (self::POSTGRES_BOUNDS as $key => [$minimum, $maximum]) {
+        foreach (array_intersect_key(self::PROCESS_BOUNDS + self::POSTGRES_BOUNDS, $size) as $key => [$minimum, $maximum]) {
             if ($size[$key] < $minimum || $size[$key] > $maximum) {
                 throw new \InvalidArgumentException(sprintf('Deployment size requires %s between %d and %d.', $key, $minimum, $maximum));
             }

@@ -32,6 +32,8 @@ final readonly class DeploymentRuntimeEnvironment implements JsonSerializable
         'MAIL_FROM_ADDRESS', 'MAIL_FROM_NAME',
         'VAPID_PRIVATE_KEY', 'VAPID_PUBLIC_KEY', 'STREAM_URL_HMAC_SECRET',
         'APP_URL', 'DEFAULT_URI',
+        // The managed preset turns OpenTelemetry export off unless the operator sets a collector.
+        'OTEL_ENABLED', 'OTEL_EXPORTER_OTLP_ENDPOINT',
     ];
 
     /** @var array<string,string> */

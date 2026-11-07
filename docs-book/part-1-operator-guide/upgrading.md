@@ -36,6 +36,12 @@ in its configuration; a later `start` retires the old pair and stops the saved
 services before starting the selected release. `stop` retains named data volumes.
 See [Deployment capability and size](configuration.md#deployment-capability-and-size).
 
+A preset started with the earlier household tooling cannot be replaced this way.
+Its state directory, configuration format and volume ownership labels belong to that
+tooling, and `scripts/deploy-preset.php` refuses them. Stop it with the checkout
+that started it, then start the new preset under a fresh name and state directory;
+move data only through [backup and recovery](backup-and-recovery.md).
+
 Use the `dc` function and private environment file defined in
 [Getting Started](getting-started.md#1-prepare-configuration-and-the-browser-address).
 The development Make lifecycle commands target isolated development instances;

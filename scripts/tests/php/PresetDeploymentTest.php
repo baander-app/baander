@@ -21,6 +21,7 @@ use Baander\Tooling\Process\{CommandExecutor, CompletionPolicy, EngineExecutor, 
 use App\Shared\Application\DTO\DeploymentProfile;
 use App\Shared\Application\DTO\HardwareEncoder;
 use App\Shared\Application\DTO\MediaSlotBounds;
+use App\Shared\Infrastructure\Worker\DeploymentRuntimeEnvironment;
 use App\Shared\Infrastructure\Worker\OutOfMemoryKillOrder;
 use PHPUnit\Framework\TestCase;
 
@@ -410,6 +411,37 @@ final class PresetDeploymentTest extends TestCase
         $worker = PresetRenderer::workerEnvironment($configured, $this->profile());
         foreach ([$web, $worker] as $environment) {
             self::assertSame(['true', 'http://collector.baander.app:4318'], [$environment['OTEL_ENABLED'], $environment['OTEL_EXPORTER_OTLP_ENDPOINT']]);
+        }
+    }
+
+    public function testWorkerEnvironmentIsAdmittedByTheWorkerRuntime(): void
+    {
+        $data = self::configuration();
+        $data['environment'] += ['OTEL_ENABLED' => 'true', 'OTEL_EXPORTER_OTLP_ENDPOINT' => 'http://collector.baander.app:4318'];
+        foreach ([self::configuration(), $data] as $configuration) {
+            $worker = PresetRenderer::workerEnvironment(PresetConfiguration::fromArray($configuration), $this->profile());
+            ksort($worker);
+            self::assertSame($worker, new DeploymentRuntimeEnvironment($worker)->variables);
+        }
+    }
+
+    public function testProcessSizeBoundsMatchTheApplicationProfile(): void
+    {
+        self::assertSame([
+            'webWorkers' => [1, DeploymentProfile::MAXIMUM_WEB_WORKERS],
+            'databaseSlots' => [1, DeploymentProfile::MAXIMUM_DOCTRINE_POOL_SLOTS],
+            'ordinaryConsumers' => [1, DeploymentProfile::MAXIMUM_ORDINARY_CONSUMERS],
+            'copySlots' => [1, DeploymentProfile::MAXIMUM_COPY_SLOTS],
+        ], PresetConfiguration::PROCESS_BOUNDS);
+        foreach (['webWorkers' => 17, 'databaseSlots' => 0, 'ordinaryConsumers' => 5, 'copySlots' => 9] as $key => $value) {
+            $data = self::configuration();
+            $data['size'][$key] = $value;
+            try {
+                PresetConfiguration::fromArray($data);
+                self::fail('Accepted ' . $key . ' ' . $value . '.');
+            } catch (\InvalidArgumentException $error) {
+                self::assertStringContainsString($key, $error->getMessage());
+            }
         }
     }
 
