@@ -15,6 +15,7 @@ use App\Transcode\Application\DTO\AudioRenditionRuntimeSnapshot;
 use App\Transcode\Application\DTO\MediaWorkerIdentity;
 use App\Transcode\Application\Port\AudioRenditionFormat;
 use App\Transcode\Application\Port\AudioRenditionRuntimePort;
+use App\Transcode\Domain\ValueObject\AacImplementation;
 use App\Transcode\Infrastructure\Transcode\AudioRenditionExecutor;
 use App\Transcode\Infrastructure\FFmpeg\ProcessExecutor;
 use App\Shared\Infrastructure\Worker\NativeExecutionClientInterface;
@@ -429,7 +430,7 @@ final class AudioRenditionExecutorTest extends TestCase
         $runtime = $this->createMock(AudioRenditionRuntimePort::class);
         $runtime->method('start')->willReturn(true);
         $runtime->method('renew')->willReturn(true);
-        $runtime->expects(self::once())->method('fail')->with($this->claim, 'AAC implementation "bAAC" is not available in this FFmpeg build')->willReturn(true);
+        $runtime->expects(self::once())->method('fail')->with($this->claim, 'AAC implementation "bAAC" is not available in this FFmpeg build', AacImplementation::Baac)->willReturn(true);
         $runtime->expects(self::never())->method('complete');
         $probe = new StubAacImplementationProbe(['libfdk_aac', 'aac'], ['libfdk_aac', 'aac']);
         (new AudioRenditionExecutor(new MediaExecutionPolicy(new DeploymentProfile('full')), $runtime, new NullLogger(), $this->settings(), $probe, '/usr/bin/ffmpeg'))->run($this->claim, static fn (): bool => false);

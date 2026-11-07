@@ -875,7 +875,7 @@
       "mapping": "src/Transcode/Infrastructure/Doctrine/Entity/AudioRenditionRuntimeEntity.php",
       "classification": "capture",
       "operations": ["INSERT", "UPDATE", "DELETE"],
-      "relevant_columns": ["rendition_key", "track_key", "source_signature", "source_path", "format", "bitrate", "output_directory", "state", "generation", "partial_path", "final_path", "error", "mode", "stream_index", "output_container", "source_hash"],
+      "relevant_columns": ["rendition_key", "track_key", "source_signature", "source_path", "format", "bitrate", "output_directory", "state", "generation", "partial_path", "final_path", "error", "mode", "stream_index", "output_container", "source_hash", "failed_aac_implementation"],
       "excluded_columns": ["worker_namespace", "worker_boot_id", "worker_id", "worker_launch_generation", "worker_lease_epoch", "claim_token", "lease_expires_at", "updated_at"],
       "families": ["admin-media"],
       "scope_routes": ["admin"],

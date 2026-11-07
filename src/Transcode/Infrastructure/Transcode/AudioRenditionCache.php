@@ -6,6 +6,7 @@ namespace App\Transcode\Infrastructure\Transcode;
 
 use App\Transcode\Application\DTO\MediaOperation;
 use App\Transcode\Application\Service\MediaExecutionPolicy;
+use App\Shared\Application\Port\SystemSettingsPortInterface;
 use App\Shared\Infrastructure\Swoole\Async;
 use App\Transcode\Application\DTO\AudioRenditionInput;
 use App\Transcode\Application\DTO\AudioRenditionRuntimeSnapshot;
@@ -15,6 +16,8 @@ use App\Transcode\Application\Port\AudioRendition;
 use App\Transcode\Application\Port\AudioRenditionFormat;
 use App\Transcode\Application\Port\AudioRenditionPortInterface;
 use App\Transcode\Application\Port\AudioRenditionRuntimePort;
+use App\Transcode\Application\Settings\TranscodeSettingDefinitions;
+use App\Transcode\Domain\ValueObject\AacImplementation;
 use App\Transcode\Infrastructure\Storage\SegmentFileResolver;
 use Generator;
 use Psr\Log\LoggerInterface;
@@ -30,6 +33,7 @@ final class AudioRenditionCache implements AudioRenditionPortInterface
         private readonly SegmentFileResolver $paths,
         private readonly AudioRenditionRuntimePort $runtime,
         private readonly LoggerInterface $logger,
+        private readonly SystemSettingsPortInterface $settings,
         private readonly float $pollIntervalSeconds = 0.05,
         private readonly float $startTimeoutSeconds = 60.0,
     ) {}
@@ -140,7 +144,7 @@ final class AudioRenditionCache implements AudioRenditionPortInterface
         $deadline = microtime(true) + $this->startTimeoutSeconds;
         do {
             $current = $this->runtime->find($admitted->key) ?? $admitted;
-            if ($current->state === 'failed') {
+            if ($current->state === 'failed' && !$this->retryUnderCurrentAacImplementation($current)) {
                 $this->fail($current->error ?? 'the encoder failed');
             }
             if ($current->state === 'complete') {
@@ -170,6 +174,22 @@ final class AudioRenditionCache implements AudioRenditionPortInterface
             }
             Async::sleep($this->pollIntervalSeconds);
         } while (true);
+    }
+
+    /**
+     * A rendition that failed under another AAC implementation than the one now selected is
+     * encoded again, so switching the setting recovers it; the reset is a compare-and-swap on
+     * the observed generation, and losing it to a concurrent request leaves the retry to that one.
+     */
+    private function retryUnderCurrentAacImplementation(AudioRenditionRuntimeSnapshot $failed): bool
+    {
+        $current = AacImplementation::from((string) $this->settings->get(TranscodeSettingDefinitions::AAC_IMPLEMENTATION));
+        if ($failed->failedAacImplementation === null || $failed->failedAacImplementation === $current) {
+            return false;
+        }
+        $this->runtime->resetFailed($failed->key, $failed->generation, $current);
+
+        return true;
     }
 
     /** @return Generator<int, string> */

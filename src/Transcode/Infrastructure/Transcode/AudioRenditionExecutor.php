@@ -43,6 +43,7 @@ final class AudioRenditionExecutor
         $lock = null;
         $final = $claim->runtime->generationDirectory() . '/' . $input->sourceSignature;
         $partial = $final . SegmentFileResolver::PARTIAL_SUFFIX;
+        $aacUsed = null;
         try {
             $this->executionPolicy->assertAllowed($input->mode === 'copy' ? MediaOperation::AudioStreamCopy : MediaOperation::AudioEncode);
             clearstatcache(true, $input->sourcePath);
@@ -76,7 +77,7 @@ final class AudioRenditionExecutor
             if (!$this->runtime->start($claim, $partial, $final)) {
                 return;
             }
-            if (!$this->encode($claim, $partial, $stopRequested)) {
+            if (!$this->encode($claim, $partial, $stopRequested, $aacUsed)) {
                 $this->runtime->defer($claim);
                 return;
             }
@@ -92,10 +93,10 @@ final class AudioRenditionExecutor
             if ($error->uncertain) {
                 throw $error;
             }
-            $this->runtime->fail($claim, $error->getMessage());
+            $this->runtime->fail($claim, $error->getMessage(), $aacUsed);
             $this->logger->error('Audio rendition native execution rejected: {reason}', ['reason' => $error->getMessage()]);
         } catch (Throwable $error) {
-            $this->runtime->fail($claim, $error->getMessage());
+            $this->runtime->fail($claim, $error->getMessage(), $aacUsed);
             $this->logger->error('Audio rendition worker failed: {reason}', ['reason' => $error->getMessage(), 'rendition' => $claim->runtime->key]);
         } finally {
             // A stale worker can clean only its own generation's incomplete file.
@@ -109,8 +110,11 @@ final class AudioRenditionExecutor
         }
     }
 
-    /** @param callable(): bool $stopRequested */
-    private function encode(AudioRenditionClaim $claim, string $partial, callable $stopRequested): bool
+    /**
+     * @param callable(): bool $stopRequested
+     * @param-out AacImplementation|null $aacUsed the implementation the encode runs AAC through, so a failure can record it
+     */
+    private function encode(AudioRenditionClaim $claim, string $partial, callable $stopRequested, ?AacImplementation &$aacUsed): bool
     {
         $input = $claim->runtime->input;
         if ($input->mode === 'copy' && !$this->verifyCopySource($claim, $stopRequested)) {
@@ -131,6 +135,7 @@ final class AudioRenditionExecutor
                 $decoder = ['-c:a:0', $implementation->decoderName()];
             }
             if ($input->format === AudioRenditionFormat::Aac || $sourceCodec === 'aac') {
+                $aacUsed = $implementation;
                 $this->aacProbe->assertAvailable($implementation);
             }
         }

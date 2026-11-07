@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Transcode\Application\DTO;
 
+use App\Transcode\Domain\ValueObject\AacImplementation;
+
 #[\Symfony\Component\DependencyInjection\Attribute\Exclude]
 final readonly class AudioRenditionRuntimeSnapshot
 {
@@ -16,6 +18,8 @@ final readonly class AudioRenditionRuntimeSnapshot
         public ?string $finalPath,
         public ?string $error,
         public bool $ownershipLive = false,
+        /** The AAC implementation a failed encode used; null when it used none or has not failed. */
+        public ?AacImplementation $failedAacImplementation = null,
     ) {}
 
     public function generationDirectory(): string

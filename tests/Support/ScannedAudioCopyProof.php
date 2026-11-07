@@ -51,7 +51,7 @@ trait ScannedAudioCopyProof
         $profile = new DeploymentProfile('household');
         $policy = new MediaExecutionPolicy($profile);
         $runtime = new AudioRenditionRuntime($connection);
-        $cache = new AudioRenditionCache($policy, new SegmentFileResolver($root . '/copies'), $runtime, new NullLogger(), pollIntervalSeconds: .005, startTimeoutSeconds: 5);
+        $cache = new AudioRenditionCache($policy, new SegmentFileResolver($root . '/copies'), $runtime, new NullLogger(), new FixedAacImplementationSetting(), pollIntervalSeconds: .005, startTimeoutSeconds: 5);
         $delivery = new DeliveryDecisionService($access, $scopes, $videos, $streams, new DeliveryCompatibility($policy), $policy, $cache, $settings,
             $this->createStub(CompletedVideoArtifactPort::class), $this->createStub(CopyPresentationPortInterface::class));
         $decision = $delivery->track($owner, $track, new DeliveryDestination(['mp4'], audioCodecs: ['aac']));

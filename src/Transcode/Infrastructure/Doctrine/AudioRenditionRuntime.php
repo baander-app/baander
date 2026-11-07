@@ -10,6 +10,7 @@ use App\Transcode\Application\DTO\AudioRenditionRuntimeSnapshot;
 use App\Transcode\Application\DTO\MediaWorkerIdentity;
 use App\Transcode\Application\Port\AudioRenditionFormat;
 use App\Transcode\Application\Port\AudioRenditionRuntimePort;
+use App\Transcode\Domain\ValueObject\AacImplementation;
 use Doctrine\DBAL\Connection;
 
 final class AudioRenditionRuntime implements AudioRenditionRuntimePort
@@ -53,7 +54,7 @@ SQL, [$input->key(), $input->trackKey, $input->sourceSignature, $input->sourcePa
                 return null;
             }
             $token = bin2hex(random_bytes(32));
-            $this->connection->executeStatement('UPDATE audio_rendition_runtime SET worker_namespace = :worker_namespace, worker_boot_id = :worker_boot_id, worker_id = :worker_id, worker_launch_generation = :worker_launch_generation, worker_lease_epoch = :worker_lease_epoch, claim_token = :claim_token, lease_expires_at = clock_timestamp() + :ttl * interval \'1 second\', generation = generation + 1, state = \'pending\', partial_path = NULL, final_path = NULL, error = NULL, updated_at = clock_timestamp() WHERE rendition_key = :key', $this->owner($worker, $token) + ['ttl' => $leaseSeconds, 'key' => $key]);
+            $this->connection->executeStatement('UPDATE audio_rendition_runtime SET worker_namespace = :worker_namespace, worker_boot_id = :worker_boot_id, worker_id = :worker_id, worker_launch_generation = :worker_launch_generation, worker_lease_epoch = :worker_lease_epoch, claim_token = :claim_token, lease_expires_at = clock_timestamp() + :ttl * interval \'1 second\', generation = generation + 1, state = \'pending\', partial_path = NULL, final_path = NULL, error = NULL, failed_aac_implementation = NULL, updated_at = clock_timestamp() WHERE rendition_key = :key', $this->owner($worker, $token) + ['ttl' => $leaseSeconds, 'key' => $key]);
             return new AudioRenditionClaim($this->find($key) ?? throw new \LogicException('Claimed rendition disappeared.'), $worker, $token);
         });
     }
@@ -106,23 +107,39 @@ SQL, [$input->key(), $input->trackKey, $input->sourceSignature, $input->sourcePa
 
     public function resetCompleted(string $key, int $generation): bool
     {
-        return $this->connection->transactional(function () use ($key, $generation): bool {
-            $row = $this->locked('audio_rendition_runtime', 'rendition_key', $key);
-            if ($row === null || $row['state'] !== 'complete' || (int) $row['generation'] !== $generation) {
-                return false;
-            }
-            return $this->connection->executeStatement("UPDATE audio_rendition_runtime SET state = 'pending', partial_path = NULL, final_path = NULL, error = NULL, " . $this->clearOwnerSql() . ', updated_at = clock_timestamp() WHERE rendition_key = ?', [$key]) === 1;
-        });
+        return $this->reopen($key, $generation, static fn (array $row): bool => $row['state'] === 'complete');
     }
 
-    public function fail(AudioRenditionClaim $claim, string $error): bool
+    public function fail(AudioRenditionClaim $claim, string $error, ?AacImplementation $aacImplementation = null): bool
     {
-        return $this->mutate($claim, "state = 'failed', error = :error", ['error' => $error]);
+        return $this->mutate($claim, "state = 'failed', error = :error, failed_aac_implementation = :aac", ['error' => $error, 'aac' => $aacImplementation?->value]);
+    }
+
+    public function resetFailed(string $key, int $generation, AacImplementation $current): bool
+    {
+        return $this->reopen($key, $generation, static fn (array $row): bool => $row['state'] === 'failed'
+            && $row['failed_aac_implementation'] !== null
+            && $row['failed_aac_implementation'] !== $current->value);
     }
 
     public function defer(AudioRenditionClaim $claim): bool
     {
         return $this->mutate($claim, "state = 'pending', partial_path = NULL, final_path = NULL, " . $this->clearOwnerSql());
+    }
+
+    /**
+     * Return the locked row of the observed generation to pending without an owner.
+     * @param \Closure(array<string, mixed>): bool $observed
+     */
+    private function reopen(string $key, int $generation, \Closure $observed): bool
+    {
+        return $this->connection->transactional(function () use ($key, $generation, $observed): bool {
+            $row = $this->locked('audio_rendition_runtime', 'rendition_key', $key);
+            if ($row === null || (int) $row['generation'] !== $generation || !$observed($row)) {
+                return false;
+            }
+            return $this->connection->executeStatement("UPDATE audio_rendition_runtime SET state = 'pending', partial_path = NULL, final_path = NULL, error = NULL, failed_aac_implementation = NULL, " . $this->clearOwnerSql() . ', updated_at = clock_timestamp() WHERE rendition_key = ?', [$key]) === 1;
+        });
     }
 
     /** @param array<string, mixed> $parameters */
@@ -151,6 +168,6 @@ SQL, [$input->key(), $input->trackKey, $input->sourceSignature, $input->sourcePa
     /** @param array<string, mixed> $row */
     private function snapshot(array $row): AudioRenditionRuntimeSnapshot
     {
-        return new AudioRenditionRuntimeSnapshot($row['rendition_key'], new AudioRenditionInput($row['track_key'], $row['source_signature'], $row['source_path'], AudioRenditionFormat::from($row['format']), $row['bitrate'] === null ? null : (int) $row['bitrate'], $row['output_directory'], mode: $row['mode'], streamIndex: $row['stream_index'] === null ? null : (int) $row['stream_index'], outputContainer: $row['output_container'], sourceHash: $row['source_hash']), $row['state'], (int) $row['generation'], $row['partial_path'], $row['final_path'], $row['error'], array_key_exists('ownership_live', $row) ? (bool) $row['ownership_live'] : $this->live($row));
+        return new AudioRenditionRuntimeSnapshot($row['rendition_key'], new AudioRenditionInput($row['track_key'], $row['source_signature'], $row['source_path'], AudioRenditionFormat::from($row['format']), $row['bitrate'] === null ? null : (int) $row['bitrate'], $row['output_directory'], mode: $row['mode'], streamIndex: $row['stream_index'] === null ? null : (int) $row['stream_index'], outputContainer: $row['output_container'], sourceHash: $row['source_hash']), $row['state'], (int) $row['generation'], $row['partial_path'], $row['final_path'], $row['error'], array_key_exists('ownership_live', $row) ? (bool) $row['ownership_live'] : $this->live($row), $row['failed_aac_implementation'] === null ? null : AacImplementation::from($row['failed_aac_implementation']));
     }
 }
