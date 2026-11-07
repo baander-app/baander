@@ -53,7 +53,8 @@ final class Pooler
 
     /**
      * The pools of the default deployment, the 16 GB transcode starting point, which development
-     * instances and the source installation run when no deployment profile is set.
+     * instances and the source installation run when no deployment profile is set. The slot counts
+     * are the application's defaults for software encoding and must follow them.
      *
      * @return array{application:int,control:int,direct:int}
      */

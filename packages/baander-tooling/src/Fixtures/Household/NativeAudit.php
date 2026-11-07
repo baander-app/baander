@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Baander\Tooling\Fixtures\Household;
 
+use Baander\Tooling\Deployment\ImageProfile;
 use Baander\Tooling\Configuration\ApplicationLayout;
 
 final class NativeAudit
@@ -82,7 +83,7 @@ final class NativeAudit
      */
     public static function read(string $path, bool $verifiedBefore, bool $verifiedAfter, string $capability): array
     {
-        if (!in_array($capability, ['remux', 'transcode'], true)) {
+        if (!in_array($capability, ImageProfile::CAPABILITIES, true)) {
             throw new \InvalidArgumentException('Unknown native audit deployment capability.');
         }
         $result = ['complete' => false, 'capability' => $capability, 'launches' => 0, 'forbiddenLaunches' => 0, 'unclassifiedLaunches' => 0, 'byOperation' => [], 'errors' => []];

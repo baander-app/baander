@@ -161,10 +161,16 @@ final readonly class DeploymentProfile
         };
     }
 
+    /** Whether the deployment runs stream copy only, from a shared pool of copy slots. */
+    public function isRemux(): bool
+    {
+        return $this->capability === 'remux';
+    }
+
     /** The video and audio slot maximums of a transcode deployment; remux runs copy slots instead. */
     public function mediaSlotBounds(): ?MediaSlotBounds
     {
-        return $this->capability === 'remux' ? null : new MediaSlotBounds($this->webWorkers, $this->doctrinePoolSlots, $this->ordinaryConsumerLimit);
+        return $this->isRemux() ? null : new MediaSlotBounds($this->webWorkers, $this->doctrinePoolSlots, $this->ordinaryConsumerLimit);
     }
 
     /** Identifies the profile's complete settings; the worker boot row records it for web health. */
@@ -204,7 +210,7 @@ final readonly class DeploymentProfile
         if (!in_array($kind, ['video', 'audio'], true)) {
             throw new \InvalidArgumentException('Unknown media job kind.');
         }
-        [$prefix, $slots] = $this->capability === 'remux'
+        [$prefix, $slots] = $this->isRemux()
             ? ['media-copy-', $this->sharedCopySlots]
             : ['media-' . $kind . '-', $kind === 'video' ? $this->videoEncoderSlots : $this->audioEncoderSlots];
 
@@ -223,7 +229,7 @@ final readonly class DeploymentProfile
         $caps = ['supervisor' => 0, 'media-control' => self::CONTROL_COMMANDS]
             + array_fill_keys($this->mediaClientIds('video'), self::MEDIA_JOB_COMMANDS + self::MEDIA_HELPER_COMMANDS);
 
-        return $this->capability === 'remux' ? $caps : $caps + array_fill_keys($this->mediaClientIds('audio'), self::MEDIA_JOB_COMMANDS);
+        return $this->isRemux() ? $caps : $caps + array_fill_keys($this->mediaClientIds('audio'), self::MEDIA_JOB_COMMANDS);
     }
 
     public function nativeCommandLimit(): int

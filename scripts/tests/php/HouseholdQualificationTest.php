@@ -33,7 +33,7 @@ final class HouseholdQualificationTest extends TestCase
     public function testColdStartContractAllowsItsSamplingGapWithoutRequiringThirtyMinutePlayback(): void
     {
         $this->withPreparedQualification(function (Qualification $qualification, array $state): void {
-            $contract = new \ReflectionMethod(Qualification::class, 'contract')->invoke($qualification, $state, 'cold-startup', 10.0);
+            $contract = new \ReflectionMethod(Qualification::class, 'contract')->invoke($qualification, $state, 'cold-startup', 10.0, 0);
             $declaration = $contract->toArray();
             self::assertGreaterThan($declaration['maxSampleGapSeconds'], $declaration['durationSeconds']);
             self::assertLessThan(1800, $declaration['durationSeconds']);

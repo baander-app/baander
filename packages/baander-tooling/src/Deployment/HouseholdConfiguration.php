@@ -12,7 +12,6 @@ final readonly class HouseholdConfiguration
     public const array VOLUME_ROLES = ['media', 'storage', 'conversions', 'transcode_state', 'postgres', 'redis', 'secrets', 'pooler_credentials'];
     /** Redis's own dataset bound, enforced by Redis itself rather than by a container limit. */
     public const array RESOURCE_DEFAULTS = ['redisMaxmemoryMiB' => 192];
-    public const array CAPABILITIES = ['transcode', 'remux'];
     /** Size settings every deployment states; the image validates the process settings' bounds. */
     public const array REQUIRED_SIZE_KEYS = ['webWorkers', 'databaseSlots', 'ordinaryConsumers', 'sharedBuffersMiB', 'workMemMiB'];
     /** Media settings per capability: remux requires copy slots; unset transcode slots take the image's defaults. */
@@ -53,7 +52,7 @@ final readonly class HouseholdConfiguration
             throw new \InvalidArgumentException('Deployment name requires 3–41 lowercase letters, digits or hyphens.');
         }
         $capability = self::string($data, 'capability');
-        if (!in_array($capability, self::CAPABILITIES, true)) {
+        if (!in_array($capability, ImageProfile::CAPABILITIES, true)) {
             throw new \InvalidArgumentException('Select the transcode or remux deployment capability.');
         }
         $size = self::size(self::map($data, 'size'), $capability);

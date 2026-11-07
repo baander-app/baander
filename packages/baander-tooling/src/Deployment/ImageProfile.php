@@ -98,7 +98,7 @@ PHP;
         }
         $profile = self::fromArray($document);
         foreach ($settings as $name => $value) {
-            if ($value !== null && ($profile->deployment[$name] ?? null) !== $value) {
+            if ($name !== 'hardware' && $value !== null && ($profile->deployment[$name] ?? null) !== $value) {
                 throw new \RuntimeException('The image returned a different deployment profile.');
             }
         }

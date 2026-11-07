@@ -407,7 +407,7 @@ CODE;
         $observer = null;
         $contract = null;
         try {
-            $declaration = $this->contract($state, 'cold-startup', 0);
+            $declaration = $this->contract($state, 'cold-startup', 0, 0);
             $observer = $this->observer($state, $directory);
             $observer->start($this->configuration['maintenanceDeadlineSeconds'] + 600);
             $marker = $observer->update([], 'measured');
@@ -470,7 +470,7 @@ CODE;
             return $this->replaceDeployment($repeat);
         }
         $players ??= 2;
-        if (!in_array($scenario, RunContract::PLAYBACK_SCENARIOS, true) || $repeat < 1 || $repeat > 3 || !in_array($players, [1, 2], true)) {
+        if (!in_array($scenario, RunContract::PLAYER_SCENARIOS, true) || $repeat < 1 || $repeat > 3 || !in_array($players, [1, 2], true)) {
             throw new \InvalidArgumentException('Select original-overlap, fresh-copy-overlap, mixed-overlap, recovery, insufficient-memory or deployment-replacement, repeat 1, 2 or 3, and 1 or 2 players.');
         }
         $state = $this->state();
@@ -498,7 +498,7 @@ CODE;
         $browser = null;
         $browserConfiguration = null;
         $contract = null;
-        $ready = $players === 1 ? 'The real player' : 'Both real players';
+        $playerLabel = $players === 1 ? 'The real player' : 'Both real players';
         $receipt = ['version' => 1, 'scenario' => $scenario, 'repeat' => $repeat, 'players' => $players, 'failure' => null, 'hostMemory' => $hostMemory, 'cleanup' => []];
         try {
             if ($scenario === 'fresh-copy-overlap' && $this->existingCopyJobs($state) !== []) {
@@ -528,12 +528,12 @@ CODE;
                 stderrLogPath: $directory . '/browser.stderr',
             );
 
-            $this->runtime->await(function () use ($browser, $browserConfiguration, $ready): bool {
+            $this->runtime->await(function () use ($browser, $browserConfiguration, $playerLabel): bool {
                 if (!$this->runtime->alive($browser)) {
-                    throw new \RuntimeException('Browser exited before ' . lcfirst($ready) . ' became ready.');
+                    throw new \RuntimeException('Browser exited before ' . lcfirst($playerLabel) . ' became ready.');
                 }
                 return is_file($browserConfiguration['readyPath']);
-            }, 300, .1, $ready . ' did not become ready.');
+            }, 300, .1, $playerLabel . ' did not become ready.');
             $receipt['browserReady'] = AtomicFile::readJson($browserConfiguration['readyPath']);
             $application = new Application($this->docker, $this->deploymentState(), $state['provision']['libraries']);
             $readyMarker = $observer->update($this->roles(), 'measured');
@@ -1035,7 +1035,7 @@ CODE;
     public static function renamePlan(array $dataset, string $scenario, int $repeat, ?string $currentPath = null): array
     {
         $songs = array_values(array_filter($dataset['files'], static fn(array $file): bool => $file['kind'] === 'song'));
-        if (count($songs) !== 2000 || !in_array($scenario, RunContract::PLAYBACK_SCENARIOS, true) || $repeat < 1 || $repeat > 3) {
+        if (count($songs) !== 2000 || !in_array($scenario, RunContract::PLAYER_SCENARIOS, true) || $repeat < 1 || $repeat > 3) {
             throw new \InvalidArgumentException('A file change requires the complete dataset and a declared playback scenario.');
         }
         $song = $songs[1999];
@@ -1265,7 +1265,7 @@ CODE;
     }
 
     /** @param array<string,mixed> $state */
-    private function contract(array $state, string $scenario, float $started, int $players = 0): RunContract
+    private function contract(array $state, string $scenario, float $started, int $players): RunContract
     {
         $deployment = $this->deploymentState();
         // Deployment services and worker units run without a container memory limit; only the harness's own observer keeps one.

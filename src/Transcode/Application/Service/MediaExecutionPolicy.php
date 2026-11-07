@@ -17,7 +17,7 @@ final readonly class MediaExecutionPolicy implements MediaExecutionPolicyInterfa
 
     public function permits(MediaOperation $operation): bool
     {
-        $remux = $this->profile->capability === 'remux';
+        $remux = $this->profile->isRemux();
 
         return match ($operation) {
             // Encoding runs only under the transcode capability, in the kind's slots.
@@ -34,7 +34,7 @@ final readonly class MediaExecutionPolicy implements MediaExecutionPolicyInterfa
     public function assertAllowed(MediaOperation $operation): void
     {
         if (!$this->permits($operation)) {
-            throw new MediaEncodingProhibitedException($this->profile->capability === 'remux' ? null : match ($operation) {
+            throw new MediaEncodingProhibitedException($this->profile->isRemux() ? null : match ($operation) {
                 MediaOperation::VideoEncode, MediaOperation::VideoStreamCopy => 'video',
                 default => 'audio',
             });

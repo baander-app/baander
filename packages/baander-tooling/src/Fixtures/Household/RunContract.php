@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace Baander\Tooling\Fixtures\Household;
 
+use Baander\Tooling\Deployment\ImageProfile;
+
 final readonly class RunContract
 {
     /** Measured runs; a deployment replacement is a lifecycle check with its own receipt. */
     public const array SCENARIOS = ['cold-startup', 'original-overlap', 'fresh-copy-overlap', 'mixed-overlap', 'recovery', 'insufficient-memory'];
     /** Scenarios that run real players while normal background work runs. */
-    public const array PLAYBACK_SCENARIOS = ['original-overlap', 'fresh-copy-overlap', 'mixed-overlap', 'recovery', 'insufficient-memory'];
+    public const array PLAYER_SCENARIOS = ['original-overlap', 'fresh-copy-overlap', 'mixed-overlap', 'recovery', 'insufficient-memory'];
 
     /** @param array<string,mixed> $document */
     private function __construct(private array $document) {}
@@ -22,11 +24,11 @@ final readonly class RunContract
         }
         self::require($document['version'] === 2, 'Unknown run contract version.');
         self::require(in_array($document['scenario'], self::SCENARIOS, true), 'Invalid scenario.');
-        self::require(in_array($document['capability'], ['transcode', 'remux'], true), 'Invalid deployment capability.');
+        self::require(in_array($document['capability'], ImageProfile::CAPABILITIES, true), 'Invalid deployment capability.');
         $size = $document['size'];
         self::require(is_array($size) && $size !== [] && !array_is_list($size)
             && !array_any($size, static fn(mixed $value): bool => !is_int($value) || $value < 0), 'Run requires the deployment size.');
-        $players = in_array($document['scenario'], self::PLAYBACK_SCENARIOS, true) ? [1, 2] : [0];
+        $players = in_array($document['scenario'], self::PLAYER_SCENARIOS, true) ? [1, 2] : [0];
         self::require(in_array($document['players'], $players, true), 'Playback scenarios run one or two players; other runs run none.');
         self::require(is_string($document['imageId']) && preg_match('/^sha256:[a-f0-9]{64}$/D', $document['imageId']) === 1, 'Run image must be immutable.');
         foreach (['startedMonotonic', 'sampleIntervalSeconds', 'maxSampleGapSeconds', 'durationSeconds', 'maintenanceDeadlineSeconds'] as $key) {
@@ -34,7 +36,7 @@ final readonly class RunContract
         }
         self::require($document['sampleIntervalSeconds'] > 0 && $document['maxSampleGapSeconds'] >= $document['sampleIntervalSeconds'], 'Sampling gap must cover the sampling interval.');
         self::require($document['durationSeconds'] > 0 && $document['maxSampleGapSeconds'] < $document['durationSeconds'] && $document['maintenanceDeadlineSeconds'] >= $document['durationSeconds'], 'Maintenance deadline must include the load interval.');
-        self::require(!in_array($document['scenario'], self::PLAYBACK_SCENARIOS, true) || $document['durationSeconds'] >= 1800, 'Playback scenarios require at least 1800 seconds.');
+        self::require(!in_array($document['scenario'], self::PLAYER_SCENARIOS, true) || $document['durationSeconds'] >= 1800, 'Playback scenarios require at least 1800 seconds.');
         $roles = $document['requiredRoles'];
         self::require(is_array($roles) && array_is_list($roles) && $roles !== [] && count(array_unique($roles, SORT_REGULAR)) === count($roles), 'Run requires distinct service roles.');
         foreach ($roles as $role) {
