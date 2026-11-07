@@ -168,7 +168,7 @@ Open items for this plan:
 
 - At the default 8 software video slots, the reference host keeps about two 1080p `libx264` encodes in real time, not eight, so operators who convert video in software must lower the slots. The default was the user's choice and is unchanged.
 - The 14 backend failures that also occurred on master (`SignedDeliveryFirewallTest`, `OpenApiSpecTest`, `CoveredIndexPersistenceTest`, `DatabaseNamingConventionTest`, `CaptureCoverageTest`) were fixed on 2026-11-05 (see Forge-neutral CI).
-- Not run: the static FFmpeg image's full build, the controls drill at 8 + 12 (the default drills keep the 3 + 1 fixture), and NVENC, QSV and AMF on real hardware. The NVENC device-request shape that containment verification compares was not checked against a Docker NVIDIA runtime.
+- Not run: the controls drill at 8 + 12 (the default drills keep the 3 + 1 fixture), and NVENC, QSV and AMF on real hardware. The static FFmpeg image now builds; see bAAC in the server transcoder. The NVENC device-request shape that containment verification compares was not checked against a Docker NVIDIA runtime.
 - Existing PostgreSQL volumes need `REINDEX` and `ALTER DATABASE … REFRESH COLLATION VERSION` on the Debian 13 database image; `baander-database:latest` and the persistent instance were not touched.
 - Transcode execution ownership renewal runs on the application pool, where a client can wait up to PgBouncer's default 120 s; the ownership lease is 15 s. The load proofs saturated that pool without a missed renewal, but a burst of long application transactions could delay renewals past the lease.
 - The control pool fails a media authority query that waits more than one second. In the 8 + 12 software pass it peaked at 8 of 8 server connections with no wait; larger slot counts are unproven.
@@ -210,6 +210,33 @@ intermittent resume issue; the rerun does not establish its cause.
 Follow-up: the separate retry path can retain a pending control after a network
 failure followed by a rejected retry. Initial rejected requests are cleared; the
 retry-after-network-failure case remains outside this recovery check.
+
+## bAAC in the server transcoder
+
+The user confirmed the
+[bAAC FFmpeg and transcoder plan](docs/plans/2026-11-07-0918-feat-baac-ffmpeg-transcoder-plan.md),
+delivered on branch `feat/baac-ffmpeg-transcoder` (local, not pushed).
+The project's static FFmpeg 8.1 build carries bAAC from `packages/baander-aac` as the `libbaac` encoder and decoder beside fdk-aac and FFmpeg's built-in AAC codec, and the application image runs that build at `/usr/bin` in place of Debian's package.
+The system setting `transcode.aac_implementation` (`baac` by default, `fdk_aac`, `ffmpeg`; admin and `app:settings:set`) selects the AAC encoder and the decoder of AAC sources for audio renditions and DASH sessions. A session fixes it at creation, cache and presentation identities ignore it, a missing implementation is refused before the encoder starts, and a rendition that failed under one implementation is encoded again once another is selected.
+The [transcoding guide](docs-book/part-1-operator-guide/transcoding.md#aac-implementation) documents the setting.
+
+Checkpoint, 2026-11-07:
+
+- The static image built locally (451 MB). Its smoke encodes stereo and 5.1 with bAAC and decodes the result with the built-in decoder and with bAAC at 39.6 to 41.5 dB SNR, keeps the 5.1 channel order and conceals a damaged ADTS frame. The capability gate finds all 40 listed accelerators, hardware encoders, AAC encoders and decoders, filters and demuxers, and every shared object resolves.
+- The CI image built against it runs `ffmpeg version 8.1` with `--enable-libbaac`, has no Debian FFmpeg package and passes the same gate.
+- Backend suites on that image with bAAC as the default: unit and static-analysis rules 8,436 tests, functional 1,497 tests, integration 1,770 tests. Its failures were the migration-history pins in `InitialSchemaMigrationTest` (updated, 25e57d843, and passing), a PGroonga lookup error in `LibraryDirectoryPublicationTest` that passed on rerun, and the playback transfer failure listed below. PHPStan, Deptrac (0 violations), `lint:container` and the OpenAPI check pass. The tooling suite ran 1,523 tests with 9 skipped; its one failure, the Python boundary on the smoke script, was fixed (b2962c80f) and `PythonBoundaryTest` passes. The tooling analysis, format, architecture and source-policy checks pass, and the settings frontend tests pass 451 tests.
+- The suites found two FFmpeg 8.1 build gaps against Debian's package, both fixed (8898c5d39): no DASH demuxer (libxml2 was missing), which failed every copy presentation at its output probe, and no `scale_cuda`/`yadif_cuda` (no clang CUDA compilation) for the NVENC path. The gate now lists both, so the build fails if they go missing again.
+- Probe drift, ffprobe 7.1 against 8.1 on generated MP4, Matroska, WebM, MOV, MPEG-TS, FLAC and MP3 sources: packet timestamps match everywhere. Matroska and WebM sources whose audio has priming now report a container start of 0 instead of a small negative value, so `VideoProbeResult` derives a video end for them and their DASH audio takes the padded path instead of the shortest-stream cut. Only new or re-probed videos see this; their presentations re-encode once.
+- The adaptive browser check passed in Chromium 156 under bAAC and under FFmpeg's built-in codec; the producer commands used `libbaac` and `aac` respectively. The documentation site built (210 manual pages).
+- `ce-simplify-code` (7f571d2d6) and `ce-code-review` ran. The review's five findings were applied: Forgejo CI reads the FFmpeg image from its own registry (80755fd59), the smoke and gate require every implementation (8898c5d39), a failed codec listing raises instead of being cached (e50014407), failed renditions retry after a switch (17a52426f), and the refusal branches have tests (042a46070).
+
+Open items for this plan:
+
+- Push the branch and dispatch `ffmpeg.yaml`, then pin the published image's digest in the `ffmpeg` role of `packages/baander-tooling/resources/tooling-defaults.json`; the role names `:latest` until then, and the published `:latest` predates bAAC. The `ffmpeg-baander-static` GHCR package must grant read access to the repositories whose CI builds the application image.
+- GPU host qualification: run `debug:hw-transcode` and a worker start with the configured hardware encoder on the user's host before relying on the new binary for hardware work. NVENC, QSV and VAAPI were not run on hardware; the gate only proves the components are compiled in.
+- Not run: a clean `ffmpeg.yaml` run in CI (the first full local build's wall time was not recorded), and the stream-copy pacing re-check that `docs/solutions/performance-issues/pace-a-stream-copy-with-a-read-rate-burst-counted-from-the-seek-boundary.md` asks for at the next FFmpeg major. The testing guide's statement that `-shortest` buffers up to ten seconds is unverified on FFmpeg 8.
+- Found and not fixed (outside this plan): the NVENC HDR path emits `tonemap_cuda`, a filter neither Debian's FFmpeg nor this build has; `PlaybackTransferPersistenceTest::testReconnectUsesExplicitOldEndpointStopProofWithoutInheritingItsAuthority` fails with the branch's code on both FFmpeg builds, and the branch changes no Session code; `packages/baander-aac`'s `test_usac_enc` byte-identical fixture fails on this host's compiler; `MediaWorkerRunnerTest::testSerialAudioJobsReuseOneSlotWithIncreasingLaunchGenerations` failed once under CPU load and passes alone.
+- Review advisories left for a decision: a rendition whose source codec ffprobe cannot report decodes with FFmpeg's default decoder instead of the selected one; the libbaac decoder labels 7- and 8-channel output with an unspecified layout unless the container gives one; it neither trims nor drains decoder delay, which matters only for MPEG Surround sources; the unused `FFmpegAdapter` per-segment encoders read the live setting rather than a session's.
 
 ## Learning and plan maintenance
 
