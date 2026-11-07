@@ -37,8 +37,15 @@ final class CreateTranscodeSessionPolicyTest extends TestCase
         $storage->expects(self::never())->method('resolveJobDirectory');
         $presentations = $this->createMock(EncodePresentationPort::class);
         $presentations->expects(self::never())->method('select');
-        $handler = new CreateTranscodeSessionHandler(new MediaExecutionPolicy(new DeploymentProfile('household')), $jobs, $sessions, $storage, $ownership, $transaction, $this->createStub(SleeperInterface::class), $presentations);
+        $handler = new CreateTranscodeSessionHandler(new MediaExecutionPolicy(new DeploymentProfile('household')), $jobs, $sessions, $storage, $ownership, $transaction, $this->createStub(SleeperInterface::class), $presentations, $this->settings());
         $this->expectException(MediaEncodingProhibitedException::class);
         $handler(new CreateTranscodeSessionCommand(Uuid::generate(), Uuid::generate(), QualityTier::p720(), AudioProfile::streamingStereo()));
+    }
+
+    private function settings(): \App\Shared\Application\Port\SystemSettingsPortInterface
+    {
+        $settings = $this->createStub(\App\Shared\Application\Port\SystemSettingsPortInterface::class);
+        $settings->method('get')->willReturn('baac');
+        return $settings;
     }
 }

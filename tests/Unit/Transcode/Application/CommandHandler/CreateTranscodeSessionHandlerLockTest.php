@@ -70,7 +70,7 @@ final class CreateTranscodeSessionHandlerLockTest extends TestCase
             self::assertFalse($this->insideTransaction, 'Waiting cannot hold the producer transaction.');
             $this->sleeps[] = $seconds;
         });
-        $this->handler = new CreateTranscodeSessionHandler(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile('full')), $this->jobs, $this->sessions, $storage, $this->ownership, $transaction, $sleeper, $presentations);
+        $this->handler = new CreateTranscodeSessionHandler(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile('full')), $this->jobs, $this->sessions, $storage, $this->ownership, $transaction, $sleeper, $presentations, $this->settings());
     }
 
     private function snapshot(string $outcome): TranscodeRuntimeSnapshot
@@ -173,5 +173,12 @@ final class CreateTranscodeSessionHandlerLockTest extends TestCase
         $this->ownership->method('admit')->willReturn($this->snapshot('pending'));
         $this->ownership->expects(self::once())->method('expireAdmission')->willReturn(false);
         self::assertSame($this->session, ($this->handler)($this->command));
+    }
+
+    private function settings(): \App\Shared\Application\Port\SystemSettingsPortInterface
+    {
+        $settings = $this->createStub(\App\Shared\Application\Port\SystemSettingsPortInterface::class);
+        $settings->method('get')->willReturn('baac');
+        return $settings;
     }
 }

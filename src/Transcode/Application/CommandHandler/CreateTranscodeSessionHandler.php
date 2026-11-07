@@ -6,6 +6,7 @@ namespace App\Transcode\Application\CommandHandler;
 
 use App\Transcode\Application\DTO\MediaOperation;
 use App\Transcode\Application\Service\MediaExecutionPolicy;
+use App\Shared\Application\Port\SystemSettingsPortInterface;
 use App\Shared\Application\Port\SleeperInterface;
 use App\Shared\Application\Port\TransactionPortInterface;
 use App\Transcode\Application\Command\CreateTranscodeSessionCommand;
@@ -16,6 +17,8 @@ use App\Transcode\Application\Port\TranscodeExecutionOwnershipPort;
 use App\Transcode\Application\Port\TranscodeJobPortInterface;
 use App\Transcode\Application\Port\TranscodeSessionPortInterface;
 use App\Transcode\Application\Port\TranscodeStoragePortInterface;
+use App\Transcode\Application\Settings\TranscodeSettingDefinitions;
+use App\Transcode\Domain\ValueObject\AacImplementation;
 use App\Transcode\Domain\Model\TranscodeSession;
 use App\Transcode\Domain\ValueObject\TranscodeStatus;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
@@ -33,6 +36,7 @@ final readonly class CreateTranscodeSessionHandler
         private TransactionPortInterface $transaction,
         private SleeperInterface $sleeper,
         private EncodePresentationPort $presentations,
+        private SystemSettingsPortInterface $settings,
     ) {}
 
     #[AsMessageHandler]
@@ -62,7 +66,11 @@ final readonly class CreateTranscodeSessionHandler
             $job->attachSession();
             $this->jobPort->save($job);
             $session = $this->sessionPort->createSession($command->getUserId(), $job->getId(), $command->getVideoId(), $command->getAudioProfile(), $command->getPriority(), $command->getAudioLanguages());
-            $this->ownership->admit($job->getId(), $session->getId(), $command->requestId, new DesiredTranscodeState($command->getAudioProfile(), audioLanguages: array_values($command->getAudioLanguages()), presentationSelection: $selection));
+            // The AAC implementation is fixed for the session's lifetime here, so a
+            // seek respawn never changes encoder and a later switch of the setting
+            // only affects sessions created after it.
+            $implementation = AacImplementation::from((string) $this->settings->get(TranscodeSettingDefinitions::AAC_IMPLEMENTATION));
+            $this->ownership->admit($job->getId(), $session->getId(), $command->requestId, new DesiredTranscodeState($command->getAudioProfile(), audioLanguages: array_values($command->getAudioLanguages()), presentationSelection: $selection, aacImplementation: $implementation));
             return $session;
         });
 

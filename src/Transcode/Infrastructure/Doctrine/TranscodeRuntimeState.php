@@ -12,6 +12,7 @@ use App\Transcode\Application\DTO\MediaWorkerIdentity;
 use App\Transcode\Application\DTO\TranscodeExecutionClaim;
 use App\Transcode\Application\DTO\TranscodeRuntimeSnapshot;
 use App\Transcode\Application\Port\TranscodeExecutionOwnershipPort;
+use App\Transcode\Domain\ValueObject\AacImplementation;
 use App\Transcode\Domain\ValueObject\AudioProfile;
 use App\Transcode\Domain\ValueObject\PresentationSelection;
 use App\Transcode\Domain\ValueObject\LoudnessStandard;
@@ -85,7 +86,7 @@ SQL, ['job' => $jobId->toString(), 'session' => $sessionId->toString(), 'request
                 return new TranscodeControlResult($this->snapshot($row), false);
             }
             $previous = $this->snapshot($row)->desired;
-            $desired = new DesiredTranscodeState($audioProfile ?? $previous->audioProfile, $status ?? $previous->status, $position ?? $previous->position, $segmentIndex ?? $previous->segmentIndex, $previous->audioLanguages, $previous->presentationSelection);
+            $desired = new DesiredTranscodeState($audioProfile ?? $previous->audioProfile, $status ?? $previous->status, $position ?? $previous->position, $segmentIndex ?? $previous->segmentIndex, $previous->audioLanguages, $previous->presentationSelection, $previous->aacImplementation);
             if ($this->encodeDesired($desired) === $this->encodeDesired($previous)) {
                 return new TranscodeControlResult($this->snapshot($row), true);
             }
@@ -256,7 +257,7 @@ SQL, ['job' => $jobId->toString(), 'session' => $sessionId->toString(), 'request
 
     private function encodeDesired(DesiredTranscodeState $desired): string
     {
-        return json_encode(['status' => $desired->status, 'position' => $desired->position, 'segmentIndex' => $desired->segmentIndex, 'audioProfile' => $desired->audioProfile->jsonSerialize(), 'audioLanguages' => $desired->audioLanguages, 'presentationSelection' => $desired->presentationSelection?->jsonSerialize()], JSON_THROW_ON_ERROR);
+        return json_encode(['status' => $desired->status, 'position' => $desired->position, 'segmentIndex' => $desired->segmentIndex, 'audioProfile' => $desired->audioProfile->jsonSerialize(), 'audioLanguages' => $desired->audioLanguages, 'presentationSelection' => $desired->presentationSelection?->jsonSerialize(), 'aacImplementation' => $desired->aacImplementation?->value], JSON_THROW_ON_ERROR);
     }
 
     /** @param array<string, mixed> $row */
@@ -265,6 +266,6 @@ SQL, ['job' => $jobId->toString(), 'session' => $sessionId->toString(), 'request
         $desired = json_decode($row['desired'], true, 512, JSON_THROW_ON_ERROR);
         $profile = $desired['audioProfile'];
         $audioProfile = new AudioProfile($profile['name'], $profile['codec'], $profile['bitrate'], $profile['channelLayout'], $profile['channelCount'], $profile['sampleRate'], LoudnessStandard::from($profile['loudnessStandard']), $profile['downmixSurround'], $profile['applyDrc'], (float) $profile['drcRatio'], $profile['drcThreshold']);
-        return new TranscodeRuntimeSnapshot(Uuid::fromString($row['job_id']), Uuid::fromString($row['session_id']), $row['request_id'], new DesiredTranscodeState($audioProfile, $desired['status'], (float) $desired['position'], (int) $desired['segmentIndex'], $desired['audioLanguages'], isset($desired['presentationSelection']) ? PresentationSelection::fromArray($desired['presentationSelection']) : null), (int) $row['desired_revision'], (int) $row['observed_revision'], (int) $row['generation'], $row['outcome'], $row['output_directory'], $row['error'], array_key_exists('ownership_live', $row) ? (bool) $row['ownership_live'] : $this->live($row));
+        return new TranscodeRuntimeSnapshot(Uuid::fromString($row['job_id']), Uuid::fromString($row['session_id']), $row['request_id'], new DesiredTranscodeState($audioProfile, $desired['status'], (float) $desired['position'], (int) $desired['segmentIndex'], $desired['audioLanguages'], isset($desired['presentationSelection']) ? PresentationSelection::fromArray($desired['presentationSelection']) : null, isset($desired['aacImplementation']) ? AacImplementation::from($desired['aacImplementation']) : null), (int) $row['desired_revision'], (int) $row['observed_revision'], (int) $row['generation'], $row['outcome'], $row['output_directory'], $row['error'], array_key_exists('ownership_live', $row) ? (bool) $row['ownership_live'] : $this->live($row));
     }
 }

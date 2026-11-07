@@ -234,7 +234,7 @@ final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
                         $filters = $copy ? '' : $this->encoder()->buildVideoFilters($probe, $tier);
                         $audioFilters = $copy ? '' : $this->encoder()->buildAudioFiltersForProfile($probe, $active->runtime->desired->audioProfile);
                         $this->assertCurrent($active, $local, $stopRequested);
-                        $this->streamManager->startStream($job, $source, $tier, $filters, $start, $output, $active->runtime->desired->audioProfile, $audioFilters, $active->runtime->generation, $hasAudio, $probe->framerate, $probe->sourceTimestampOrigin, audioStreamOrdinal: $probe->selectedAudioStreamOrdinal() ?? 0, presentationSelection: $copy ? $selection : null, sourceBoundary: $sourceBoundary, sourceDuration: $probe->videoEnd ?? 0.0);
+                        $this->streamManager->startStream($job, $source, $tier, $filters, $start, $output, $active->runtime->desired->audioProfile, $audioFilters, $active->runtime->generation, $hasAudio, $probe->framerate, $probe->sourceTimestampOrigin, audioStreamOrdinal: $probe->selectedAudioStreamOrdinal() ?? 0, presentationSelection: $copy ? $selection : null, sourceBoundary: $sourceBoundary, sourceDuration: $probe->videoEnd ?? 0.0, aacImplementation: $active->runtime->desired->aacImplementation, sourceAudioCodec: $probe->selectedAudioStream()?->codec);
                         $this->assertCurrent($active, $local, $stopRequested);
                         $generation = $active->runtime->generation;
                         $paused = $throttled = $ready = $finished = false;

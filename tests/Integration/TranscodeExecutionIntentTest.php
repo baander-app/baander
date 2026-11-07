@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Integration;
 
 use App\Transcode\Application\DTO\DesiredTranscodeState;
+use App\Transcode\Domain\ValueObject\AacImplementation;
 use App\Transcode\Domain\ValueObject\AudioProfile;
 use App\Transcode\Infrastructure\Doctrine\TranscodeRuntimeState;
 use App\Shared\Domain\Model\Uuid;
@@ -55,6 +56,37 @@ final class TranscodeExecutionIntentTest extends TestCase
         self::assertNotNull($claim);
         self::assertSame($selection->canonicalKey(), $claim->runtime->desired->presentationSelection?->canonicalKey());
         self::assertSame(12.5, $claim->runtime->desired->position);
+    }
+
+    public function testTheAacImplementationIsFixedAtAdmissionAndSurvivesControls(): void
+    {
+        $this->first->transactional(function (): void {
+            $this->insertSession();
+            $this->runtime->admit($this->jobId, $this->sessionId, 'start', new DesiredTranscodeState(AudioProfile::streamingStereo(), aacImplementation: AacImplementation::Baac));
+        });
+        self::assertSame(AacImplementation::Baac, $this->runtime->find($this->jobId)?->desired->aacImplementation);
+        $paused = $this->runtime->control($this->jobId, $this->sessionId, 'pause', status: 'paused', seek: false)->runtime;
+        self::assertSame(AacImplementation::Baac, $paused->desired->aacImplementation);
+        $sought = $this->runtime->control($this->jobId, $this->sessionId, 'seek', position: 30.0)->runtime;
+        self::assertSame(AacImplementation::Baac, $sought->desired->aacImplementation);
+        self::assertSame($paused->generation + 1, $sought->generation);
+        $same = $this->runtime->control($this->jobId, $this->sessionId, 'same-profile', audioProfile: AudioProfile::streamingStereo());
+        self::assertSame($sought->generation, $same->runtime->generation, 'the implementation is not part of the profile comparison');
+        $claim = $this->runtimeFor($this->second)->claim($this->jobId, $this->worker());
+        self::assertSame(AacImplementation::Baac, $claim?->runtime->desired->aacImplementation);
+    }
+
+    public function testADesiredStateWithoutTheImplementationKeyDecodesToNull(): void
+    {
+        $this->first->transactional(function (): void {
+            $this->insertSession();
+            $this->runtime->admit($this->jobId, $this->sessionId, 'start', new DesiredTranscodeState(AudioProfile::streamingStereo(), presentationSelection: new \App\Transcode\Domain\ValueObject\PresentationSelection('copy', 'source-hash', 2, 4, 'mp4')));
+        });
+        self::assertNull($this->runtime->find($this->jobId)?->desired->aacImplementation, 'a copy session stores no implementation');
+        $this->first->executeStatement("UPDATE transcode_runtime_state SET desired = desired - 'aacImplementation'");
+        self::assertNull($this->runtime->find($this->jobId)?->desired->aacImplementation);
+        $controlled = $this->runtime->control($this->jobId, $this->sessionId, 'pause-legacy', status: 'paused', seek: false)->runtime;
+        self::assertNull($controlled->desired->aacImplementation);
     }
 
     public function testFailureAfterIntentInsertionRollsBackTheSessionAndIntent(): void

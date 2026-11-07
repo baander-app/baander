@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Transcode\Application\DTO;
 
+use App\Transcode\Domain\ValueObject\AacImplementation;
 use App\Transcode\Domain\ValueObject\AudioProfile;
 use App\Transcode\Domain\ValueObject\PresentationSelection;
 
@@ -18,6 +19,7 @@ final readonly class DesiredTranscodeState
         public int $segmentIndex = 0,
         public array $audioLanguages = [],
         public ?PresentationSelection $presentationSelection = null,
+        public ?AacImplementation $aacImplementation = null,
     ) {
         if (!in_array($status, ['running', 'paused', 'cancelled'], true)
             || !is_finite($position) || $position < 0 || $segmentIndex < 0
