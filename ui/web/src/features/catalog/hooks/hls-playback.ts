@@ -66,8 +66,14 @@ export function attachHlsPlayback({ video, url, position, onError, onReady, getS
       autoStartLoad: false,
       startPosition: position,
       // Movie playlists grow during encoding; their published edge is not a live
-      // playback target. Source seeks remain owned by the movie player.
+      // playback target. Source seeks remain owned by the movie player. hls.js merges
+      // user configuration over its defaults with a plain spread, so an own key set to
+      // undefined replaces the default latency controller class and no controller is
+      // created; lowLatencyMode is disabled as well because it defaults on. The
+      // constructor-configuration test pins both, so an hls.js upgrade that changes
+      // either semantic fails the suite.
       latencyController: undefined,
+      lowLatencyMode: false,
     })
     player = instance
     instance.on(HlsPlayer.Events.ERROR, (_event, data) => {
