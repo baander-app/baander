@@ -1,6 +1,6 @@
 # Baander roadmap
 
-Updated: 2026-11-07. This roadmap selects future work and records unresolved
+Updated: 2026-11-09. This roadmap selects future work and records unresolved
 acceptance. Current operating contracts belong in the linked guides; completed
 milestones and their verification evidence remain in Git history.
 
@@ -604,6 +604,43 @@ and encoder-tuning tiers are delivered in `packages/baander-aac`
 Figures and limits are in the
 [reference comparison](packages/baander-aac/docs/reference-comparison.md) and the
 [codec README](packages/baander-aac/docs/README.md).
+
+### Development controller image identities
+
+Two image-identity defects are fixed and verified on the branch
+`fix/database-image-double-export`; both trace to the pooler change
+(`d13b4ba77`, 2026-11-03) combined with the daemon's containerd image store,
+which gives every `docker build` export a fresh attestation index digest.
+Preparations failed from 2026-11-07: the worktree preview stayed in
+`preparation_failed` and the persistent instance's first start failed the same
+way. The persistent instance reached readiness at `https://baander.test` on
+2026-11-09 (web and workers ready, revision
+`4ef7de4a3d0581f4e970e433ec6c3768b5edeaa8`, gateway answering HTTP 200).
+
+- The postgres and pooler roles built the shared database tag twice; the second
+  export re-pointed the tag and orphaned the identity recorded first. One
+  export now serves both roles (`788bc012d`).
+- The shared gateway reused its recorded nginx digest after the daemon lost it,
+  because a later preparation pulled the floating `nginx:stable-alpine` tag
+  newer. The gateway re-pins to the release image when the recorded identity no
+  longer resolves (`bd7c8f926`).
+
+Each fix has a regression test that failed before and passes after. The
+affected tooling suites pass: 102 tests/679 assertions (build, activation,
+retained state, database, release-input integrity, libraries) and 52
+tests/436 assertions (host gateway, activation, topology, retained state,
+image pins).
+
+Open:
+
+- The fixes are on the unmerged branch `fix/database-image-double-export`;
+  master does not contain them until it merges.
+- A retained redis identity carries the same floating-tag risk: a preparation
+  that pulls `redis:7-alpine` newer orphans the digest an earlier release
+  recorded. The same daemon-side existence check belongs where retained
+  identities are consumed.
+- The full tooling suite has not re-run on the fixed branch; the affected-class
+  runs above are the current evidence.
 
 ## Roadmap maintenance
 
