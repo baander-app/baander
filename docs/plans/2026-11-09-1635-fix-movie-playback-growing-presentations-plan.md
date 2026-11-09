@@ -57,11 +57,17 @@ ladder, and from the worktree source at master's revision.
   1.3x real time, so the published window's leading edge races ahead of the playhead.
 - `ui/web/src/features/catalog/hooks/hls-playback.ts` constructs hls.js 1.7.4 with
   `latencyController: undefined` and a comment stating the published edge is not a live
-  target. In hls.js 1.7.4 `latencyController` is a controller-class override;
-  `undefined` selects the default controller, so the intended disable is a no-op and
-  `lowLatencyMode` remains enabled by default. On a playlist that grows during encoding the
-  default live-sync machinery drags the playhead toward the edge; the viewer sees a forward
-  cut each time a new segment publishes.
+  target. In hls.js 1.7.4 that undefined does disable the latency controller — an own key
+  set to `undefined` overrides the default controller class through the config spread, and
+  `createController` skips a falsy class — but the contract is implicit and unpinned: a
+  hls.js upgrade that filters undefined keys or changes override semantics silently
+  re-enables live-edge chasing, and `lowLatencyMode` stays enabled by default. The forward
+  cuts come from a self-sustaining restart loop rather than the latency controller: every
+  attachment replacement flushes the media element's buffer (`video.load()`), the player
+  then reaches the freshly publishing edge, and the `useBaanderPlayer` `seeking` handler
+  converts the resulting native seek into a server seek — which restarts the ladder
+  encoders into a new execution generation and replaces the attachment again. Each cycle
+  is a visible cut, and the loop runs at the segment cadence.
 - After each jump the client reports the jumped position, and
   `TranscodeStreamingService::getPlaybackState` returns `desired->position`. A fresh test
   session created an hour later was told the movie's position was 170.5 s, the drifted edge,
@@ -207,14 +213,15 @@ are resolved in KTD1–KTD7.
 
 ### Key Technical Decisions
 
-- KTD1. **Disable live-edge machinery explicitly in the HLS attachment.** Replace the no-op
-  `latencyController: undefined` with an explicit disable: `lowLatencyMode: false`, plus a
-  verified way to neutralize the latency controller (a no-op controller class, or `null` if
-  the installed hls.js supports disabling through it — read from the dist source in the
-  unit). Keep the explicit `startPosition`. Pin the constructed configuration with a test
-  that captures what is passed to the hls.js constructor, so a hls.js upgrade that re-enables
-  chasing fails the suite. Governs R1. (chosen over raising `liveSyncDurationCount` alone: a
-  larger trail distance only narrows the chase window instead of removing it.)
+- KTD1. **Pin the live-edge disable explicitly in the HLS attachment.** Keep the
+  `latencyController: undefined` override — verified against the installed hls.js dist as a
+  real disable, not a no-op — and make it explicit and regression-proof: set
+  `lowLatencyMode: false`, state the spread-override mechanism in the comment, and pin the
+  constructed configuration with a test that captures what is passed to the hls.js
+  constructor, so a hls.js upgrade that re-enables chasing fails the suite. Keep the
+  explicit `startPosition`. Governs R1. (chosen over raising `liveSyncDurationCount`: the
+  disable is already effective; it needs pinning, not replacing. The cut loop itself is
+  broken by KTD3.)
 
 - KTD2. **Report the session cursor, not producer progress.** A session's sign response
   carries that session's cursor: the client's requested start at creation, and its last
@@ -315,12 +322,13 @@ second band and the copy-pacing burst stay as they are.
 `ui/web/src/features/catalog/hooks/__tests__/hls-playback.test.ts` capturing the constructor
 configuration.
 
-**Approach:** Read the installed hls.js dist to confirm how a controller override disables
-the latency controller; set `lowLatencyMode: false` plus the verified disable; keep
+**Approach:** Keep the verified `latencyController: undefined` override, add
+`lowLatencyMode: false`, document the spread-override mechanism in the comment, and keep
 `startPosition` and the existing error and subtitle paths untouched.
 
-**Test scenarios:** The captured configuration contains the explicit disable and never
-`latencyController: undefined`; playback attach, error and dispose behavior is unchanged.
+**Test scenarios:** The captured configuration contains `latencyController: undefined` and
+`lowLatencyMode: false`, and never a defined latency controller; playback attach, error and
+dispose behavior is unchanged.
 
 **Tests:** The new capture test; the existing player hook and protocol suites.
 
