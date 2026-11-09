@@ -54,16 +54,22 @@ class Builder
         $release['worker_image'] = $this->build($docker, $source, 'worker', $revision);
         $release['operator_image'] = $this->build($docker, $source, 'dev-operator', $revision);
         // The database image also runs the pooler. Data keeps its retained PostgreSQL image;
-        // the pooler always runs from this release's build.
+        // the pooler always runs from this release's build. Both roles share one export:
+        // every docker build export receives a fresh attestation index digest, so a second
+        // build of the shared tag would orphan the identity recorded for the first role.
+        $databaseImageId = null;
         foreach (['postgres_image' => 'postgres', 'pooler_image' => 'postgres', 'nginx_image' => 'nginx', 'redis_image' => 'developmentRedis'] as $key => $role) {
             $selection = $this->configuration->images->role($role);
             $retained = in_array($key, ['postgres_image', 'redis_image'], true) ? ($instance[$key] ?? $instance['release']['images'][$key]['resolvedId'] ?? null) : null;
             if ($retained !== null) {
                 $release[$key] = $retained;
             } elseif ($role === 'postgres' && $this->configuration->provenance['images.postgres.reference'] === 'defaults') {
-                $tag = 'baander-development-postgres:' . $revision . '-' . basename($source);
-                $docker->run(['build', '--file', $source . '/docker/postgres/Dockerfile', '--tag', $tag, $source . '/docker'], timeout: null, logPath: $builds . '/' . basename($source) . '-postgres.log');
-                $release[$key] = $this->imageId($docker, $tag);
+                if ($databaseImageId === null) {
+                    $tag = 'baander-development-postgres:' . $revision . '-' . basename($source);
+                    $docker->run(['build', '--file', $source . '/docker/postgres/Dockerfile', '--tag', $tag, $source . '/docker'], timeout: null, logPath: $builds . '/' . basename($source) . '-postgres.log');
+                    $databaseImageId = $this->imageId($docker, $tag);
+                }
+                $release[$key] = $databaseImageId;
             } else {
                 $docker->run(['pull', $selection->reference], timeout: 300, logPath: $builds . '/' . basename($source) . '-' . $key . '.log');
                 $release[$key] = $this->imageId($docker, $selection->reference);

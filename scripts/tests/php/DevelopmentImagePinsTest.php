@@ -85,6 +85,22 @@ final class DevelopmentImagePinsTest extends TestCase
         self::assertNotContains([$this->docker, '--host', 'unix:///var/run/docker.sock', 'pull', 'baander-database:latest'], $this->runner->calls);
     }
 
+    public function testDefaultPostgresIsBuiltOnceForDatabaseAndPoolerRoles(): void
+    {
+        $release = $this->builder->prepare($this->instance);
+        $builds = array_values(array_filter(
+            $this->runner->calls,
+            static fn(array $args): bool => in_array('build', $args, true) && in_array($release['source'] . '/docker/postgres/Dockerfile', $args, true),
+        ));
+        // One export must serve both database roles: every docker build export receives a
+        // fresh attestation index digest, so a second build of the shared tag would orphan
+        // the identity recorded for the first role before it can be pinned.
+        self::assertCount(1, $builds);
+        self::assertSame($release['images']['postgres_image']['resolvedId'], $release['images']['pooler_image']['resolvedId']);
+        self::assertFalse($release['image_selections']['postgres_image']['retained']);
+        self::assertFalse($release['image_selections']['pooler_image']['retained']);
+    }
+
     public function testExplicitPostgresPreferencePullsTheSelectedSource(): void
     {
         $builder = new Builder(new StateStore($this->root . '/state'), $this->runner, ToolingConfiguration::resolve([
