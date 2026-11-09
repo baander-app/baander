@@ -70,9 +70,14 @@ final class Gateway
             $image = $release['images']['nginx_image']['resolvedId'];
             if (file_exists($saved)) {
                 $record = AtomicFile::readJson($saved);
-                $image = $record['nginx_image'];
                 if (!Connections::sameTarget($record['docker'], $instance['docker'])) {
                     throw new WorkflowError('The shared gateway belongs to another Docker target.');
+                }
+                // The recorded image can be orphaned when its floating tag is pulled newer
+                // by another release; keep it only while the daemon still resolves it.
+                $recorded = $record['nginx_image'];
+                if ($docker->run(['image', 'inspect', '--format', '{{.Id}}', $recorded], check: false)->exitCode === 0) {
+                    $image = $recorded;
                 }
             }
             $network = self::ownedNetwork($docker, 'baander-development-gateway-' . $this->store->scope(), 'gateway-' . $this->store->scope());

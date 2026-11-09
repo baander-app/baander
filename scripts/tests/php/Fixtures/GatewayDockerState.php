@@ -67,6 +67,15 @@ final class GatewayDockerState
             } else {
                 echo json_encode([$resource], JSON_THROW_ON_ERROR);
             }
+        } elseif (($arguments[0] ?? '') === 'image' && ($arguments[1] ?? '') === 'inspect') {
+            $identity = end($arguments);
+            $missing = $root . '/missing-images.json';
+            $list = is_file($missing) ? (json_decode((string) file_get_contents($missing), true) ?: []) : [];
+            if (in_array($identity, $list, true)) {
+                fwrite(STDERR, 'Error: No such image: ' . $identity);
+                exit(1);
+            }
+            echo $identity;
         } elseif (!in_array($arguments[0] ?? '', ['start', 'compose'], true)) {
             fwrite(STDERR, 'Unexpected activation gateway fixture command');
             exit(79);

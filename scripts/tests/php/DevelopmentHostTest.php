@@ -248,6 +248,33 @@ final class DevelopmentHostTest extends TestCase
         self::assertSame('nginx@sha256:original', $gateway->record()['nginx_image']);
     }
 
+    public function testGatewayRepinsItsImageWhenTheRecordedIdentityIsGone(): void
+    {
+        $executable = $this->root . '/host-gateway-docker';
+        file_put_contents($executable, '#!' . PHP_BINARY . "\n<?php\n\$_SERVER['argv'] = [\$_SERVER['argv'][0], "
+            . var_export($this->store->root, true) . ", ...array_slice(\$_SERVER['argv'], 1)];\nrequire "
+            . var_export(__DIR__ . '/Fixtures/host-gateway-docker.php', true) . ";\n");
+        chmod($executable, 0700);
+        $runner = new EngineExecutor(ExecutionContext::bounded(120, Environment::clean()));
+        $gateway = new Gateway($this->store, $runner);
+        $instance = [
+            'id' => 'persistent',
+            'hostname' => 'baander.test',
+            'project' => 'owned',
+            'docker' => new Target($executable, 'unix:///tmp/host-fixture-docker.sock', 'daemon', 'selected', null)->toArray(),
+        ];
+        $gateway->configure($instance, ['images' => ['nginx_image' => ['resolvedId' => 'nginx@sha256:original']]]);
+        // A floating nginx tag pulled newer by another release orphans the recorded digest
+        // and the daemon removes the unreferenced identity.
+        file_put_contents($this->store->root . '/missing-images.json', json_encode(['nginx@sha256:original'], JSON_THROW_ON_ERROR));
+        $gateway->configure($instance, ['images' => ['nginx_image' => ['resolvedId' => 'nginx@sha256:replacement']]]);
+
+        $record = $gateway->record();
+        self::assertSame('nginx@sha256:replacement', $record['nginx_image']);
+        $compose = json_decode((string) file_get_contents($gateway->directory . '/compose.json'), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame('nginx@sha256:replacement', $compose['services']['gateway']['image']);
+    }
+
     public function testGatewayRejectsForeignNetworkAndInvalidRoute(): void
     {
         $gateway = new Gateway($this->store, $this->runner());
