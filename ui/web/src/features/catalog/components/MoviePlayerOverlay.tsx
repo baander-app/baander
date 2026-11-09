@@ -42,8 +42,18 @@ const TimeReadout = styled.span`
 `
 
 const TitleBar = styled.div`
+  display: flex;
   flex-shrink: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-md);
   padding: 0 1rem;
+`
+
+const VolumeSliderWrap = styled.div`
+  display: flex;
+  width: 5rem;
+  align-items: center;
 `
 
 const SourceSeek = styled(Slider)`
@@ -153,24 +163,26 @@ export function MoviePlayerOverlay({ title, videoId, sourceDuration = 0, onClose
         </Button>
         <Button variant="ghost" size="sm" disabled={!connected || !selected} onClick={() => { submit({ action: 'stop' }) }}>Stop</Button>
         <PlaybackDestinationSelector />
-        <Slider
-          key={volumeScope}
-          aria-label="Movie volume"
-          aria-valuetext={`${Math.round(displayedVolume * 100)}%`}
-          min={0}
-          max={1}
-          step={0.01}
-          value={[displayedVolume]}
-          disabled={!connected || !selected || !volumeSupported}
-          onValueChange={([value]) => setVolumeDraft({ scope: volumeScope, value })}
-          onValueCommit={([volume]) => {
-            setVolumeDraft(null)
-            if (!cancelledVolume.current) submit({ action: 'volume', volume })
-          }}
-          onPointerDown={() => { cancelledVolume.current = false }}
-          onPointerCancel={() => { cancelledVolume.current = true; setVolumeDraft(null) }}
-          onKeyDown={() => { cancelledVolume.current = false }}
-        />
+        <VolumeSliderWrap>
+          <Slider
+            key={volumeScope}
+            aria-label="Movie volume"
+            aria-valuetext={`${Math.round(displayedVolume * 100)}%`}
+            min={0}
+            max={1}
+            step={0.01}
+            value={[displayedVolume]}
+            disabled={!connected || !selected || !volumeSupported}
+            onValueChange={([value]) => setVolumeDraft({ scope: volumeScope, value })}
+            onValueCommit={([volume]) => {
+              setVolumeDraft(null)
+              if (!cancelledVolume.current) submit({ action: 'volume', volume })
+            }}
+            onPointerDown={() => { cancelledVolume.current = false }}
+            onPointerCancel={() => { cancelledVolume.current = true; setVolumeDraft(null) }}
+            onKeyDown={() => { cancelledVolume.current = false }}
+          />
+        </VolumeSliderWrap>
         {error ? <p role="alert">{error}</p> : null}
         <SourceSeek
           key={videoId}
