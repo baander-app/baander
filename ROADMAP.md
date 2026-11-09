@@ -633,14 +633,13 @@ image pins).
 
 Open:
 
-- The fixes are on the unmerged branch `fix/database-image-double-export`;
-  master does not contain them until it merges.
 - A retained redis identity carries the same floating-tag risk: a preparation
   that pulls `redis:7-alpine` newer orphans the digest an earlier release
   recorded. The same daemon-side existence check belongs where retained
   identities are consumed.
-- The full tooling suite has not re-run on the fixed branch; the affected-class
-  runs above are the current evidence.
+- The full tooling suite completed green on 2026-11-09 (1525 tests, 13,063
+  assertions, 9 environment skips, 50 minutes) with the gateway fix landing
+  mid-run; a clean full re-run on the merged master remains pending.
 
 ## Roadmap maintenance
 
