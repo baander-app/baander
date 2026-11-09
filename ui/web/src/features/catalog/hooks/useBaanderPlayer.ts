@@ -799,12 +799,11 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, coor
         || loadedIdentity !== `${snapshot.jobId}:${snapshot.generation}:${snapshot.renditionSet}`) return
       if (restoredPosition !== null && Math.abs(video.currentTime - restoredPosition) <= 0.05) return
       if (restoredSourceEnd !== null && Math.abs(video.currentTime - restoredSourceEnd) <= 0.05) return
-      restoredPosition = null
-      // A paused encoder may not provide the data needed to finish this native seek.
-      // Commit its intent before decoding completes so the new execution can start.
-      if (seekChain || Math.abs(mediaStart + video.currentTime - snapshot.position) > 0.05) {
-        enqueueSeek(mediaStart + video.currentTime)
-      }
+      // Player-internal seeks (buffer-gap corrections, attachment restores) must not
+      // become server seeks: a server seek restarts the encoders into a new generation
+      // and replaces the attachment, which flushes the buffer and invites the next
+      // correction. The moved cursor reaches the server through progress reports.
+      performance.mark('baander:native-seek', { detail: { currentTime: video.currentTime, snapshotPosition: snapshot.position } })
     })
     const seek = (time: number) => {
       performance.mark('baander:seek-entry', { detail: { time, active: active(), terminal, snapshot: Boolean(snapshot),
