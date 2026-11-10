@@ -193,10 +193,12 @@ describe('useBaanderPlayer sessions and source end', () => {
   })
 
   // A media element whose clock and seek state the test owns, as jsdom plays nothing.
+  const completed = vi.fn()
   const mount = async (element: { seekable?: number, staysSeeking?: boolean } = {}) => {
     // One ref object for the hook's lifetime: a new one on every render would remount the player.
     const containerRef = { current: container }
-    const rendered = renderHook(() => useBaanderPlayer({ videoId: 'video-1', containerRef, coordinated: true }))
+    completed.mockClear()
+    const rendered = renderHook(() => useBaanderPlayer({ videoId: 'video-1', containerRef, coordinated: true, onCompleted: completed }))
     mounted.push(rendered)
     const video = container.querySelector('video')!
     const state = { time: 0, seeking: false, paused: true, ended: false, sought: [] as number[], log: [] as Array<number | 'play'> }
@@ -686,6 +688,110 @@ describe('useBaanderPlayer sessions and source end', () => {
     state.ended = false
     await act(async () => { await video.play() })
 
+    await waitFor(() => { expect(seeks()).toEqual([0]) })
+    await waitFor(() => { expect(attachments()).toBe(2) }, { timeout: 3000 })
+    await waitFor(() => { expect(state.paused).toBe(false) })
+    expect(controls.filter(control => control.action === 'pause')).toHaveLength(1)
+    expect(controls.filter(control => control.action === 'resume').length).toBeLessThanOrEqual(1)
+  })
+
+  // The movie plays to its end: the element pauses there and reports that it ended.
+  const playToEnd = async (video: HTMLVideoElement, state: { time: number, ended: boolean, paused: boolean }) => {
+    state.time = 223.59
+    state.ended = true
+    state.paused = true
+    await act(async () => {
+      video.dispatchEvent(new Event('pause'))
+      video.dispatchEvent(new Event('ended'))
+    })
+  }
+
+  it('reports a natural end once, and again only after the movie was played to its end again', async () => {
+    const { rendered, video, state, execution } = await mount()
+    await act(async () => { await execution.execute('play', undefined, signal()) })
+    expect(completed).not.toHaveBeenCalled()
+
+    await playToEnd(video, state)
+    await waitFor(() => { expect(rendered.result.current.state).toBe('ended') })
+    await act(async () => {
+      video.dispatchEvent(new Event('ended'))
+      video.dispatchEvent(new Event('timeupdate'))
+      video.dispatchEvent(new Event('pause'))
+    })
+    expect(completed).toHaveBeenCalledTimes(1)
+
+    // Replayed from the start, the same movie ends a second time.
+    state.ended = false
+    await act(async () => { await video.play() })
+    await waitFor(() => { expect(attachments()).toBe(2) }, { timeout: 3000 })
+    await waitFor(() => { expect(state.paused).toBe(false) })
+    // The replay's seek settles with the signings that follow its new attachment.
+    const signed = signs.length
+    await waitFor(() => { expect(signs.length).toBeGreaterThanOrEqual(signed + 2) }, { timeout: 4000 })
+    expect(completed).toHaveBeenCalledTimes(1)
+    await playToEnd(video, state)
+    await waitFor(() => { expect(completed).toHaveBeenCalledTimes(2) })
+  })
+
+  it('does not report an end when its session was cancelled', async () => {
+    const { rendered } = await mount()
+    server = { ...server, status: 'cancelled', ready: false }
+
+    await waitFor(() => { expect(rendered.result.current.state).toBe('ended') }, { timeout: 3000 })
+
+    expect(completed).not.toHaveBeenCalled()
+  })
+
+  it('reports the end of a delivery without a transcode session', async () => {
+    vi.mocked(negotiateMediaDelivery).mockReset().mockResolvedValue({ kind: 'original', url: 'https://media.baander.app/signed/original.mp4?exp=99999999999', jobId: null } as never)
+    const containerRef = { current: container }
+    mounted.push(renderHook(() => useBaanderPlayer({ videoId: 'video-1', containerRef, coordinated: true, onCompleted: completed })))
+    completed.mockClear()
+    await waitFor(() => { expect(vi.mocked(attachNativePlayback)).toHaveBeenCalledTimes(1) }, { timeout: 3000 })
+    const video = container.querySelector('video')!
+    Object.defineProperty(video, 'readyState', { configurable: true, value: 4 })
+    await act(async () => { video.dispatchEvent(new Event('canplay')) })
+    Object.defineProperty(video, 'ended', { configurable: true, value: true })
+
+    await act(async () => { video.dispatchEvent(new Event('ended')) })
+    await act(async () => { video.dispatchEvent(new Event('ended')) })
+
+    expect(completed).toHaveBeenCalledTimes(1)
+  })
+
+  it.each([
+    { pause: 'reached the session', status: 'paused' },
+    { pause: 'failed to reach the session', status: 'running' },
+  ])('leaves a finished player alone when it is asked to pause and its ending pause $pause', async ({ status }) => {
+    const { video, state, execution } = await mount()
+    await act(async () => { await execution.execute('play', undefined, signal()) })
+    if (status === 'running') {
+      // The ending pause is answered, but the session keeps running.
+      const post = vi.mocked(AXIOS_INSTANCE.post).getMockImplementation()!
+      vi.mocked(AXIOS_INSTANCE.post).mockImplementation(async (path: string, payload?: unknown) => {
+        if (path === '/api/stream/sign' || (payload as PositionBody).action !== 'pause') return post(path, payload)
+        controls.push({ ...(payload as PositionBody), session: path.split('/')[4] })
+        return { data: { data: {} } }
+      })
+    }
+    await playToEnd(video, state)
+    await waitFor(() => { expect(controls.filter(control => control.action === 'pause')).toHaveLength(1) })
+    await waitFor(() => { expect(server.status).toBe(status) })
+    const sent = controls.length
+
+    // The playback session's pause comes back to the player that already stands at its end.
+    let observation: Awaited<ReturnType<typeof execution.execute>> | undefined
+    await act(async () => { observation = await execution.execute('pause', undefined, signal()) })
+
+    expect(observation).toMatchObject({ observedState: 'paused', position: 223.59 })
+    expect(controls).toHaveLength(sent)
+    expect(controls.filter(control => control.action === 'pause').map(control => control.position)).toEqual([223.59])
+    expect(execution.observe().position).toBe(223.59)
+    expect(seeks()).toEqual([])
+
+    // Played again, it restarts from zero as it did before: one seek to zero, no further pause.
+    state.ended = false
+    await act(async () => { await video.play() })
     await waitFor(() => { expect(seeks()).toEqual([0]) })
     await waitFor(() => { expect(attachments()).toBe(2) }, { timeout: 3000 })
     await waitFor(() => { expect(state.paused).toBe(false) })

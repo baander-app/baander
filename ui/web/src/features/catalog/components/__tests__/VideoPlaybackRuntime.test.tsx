@@ -5,8 +5,14 @@ import type { PlaybackExecutionAdapter, PlaybackObservation } from '@/features/s
 import { useVideoPresentation } from '../../stores/video-presentation-store'
 import { VideoPlaybackRuntime } from '../VideoPlaybackRuntime'
 
-const { execution, adapters } = vi.hoisted(() => ({
+const { execution, adapters, playerOptions, session, request } = vi.hoisted(() => ({
   adapters: [] as PlaybackExecutionAdapter[],
+  playerOptions: [] as Array<{ onCompleted?: () => void }>,
+  request: vi.fn(),
+  session: {
+    snapshot: { activeIncarnationId: 'local', transfer: null, media: { kind: 'video', publicId: 'video-1' }, desiredState: 'playing' } as Record<string, unknown> | undefined,
+    endpoint: { incarnationId: 'local' } as { incarnationId: string } | null,
+  },
   execution: {
     localRecovery: { eligible: false, fence: () => null, rearmAfterRegistration: () => {} },
     ready: vi.fn(),
@@ -17,9 +23,14 @@ const { execution, adapters } = vi.hoisted(() => ({
   },
 }))
 vi.mock('../../hooks/useBaanderPlayer', () => ({
-  useBaanderPlayer: () => ({ execution, duration: 0, currentTime: 0, pendingSeekPosition: null, state: null, error: null }),
+  useBaanderPlayer: (options: { onCompleted?: () => void }) => {
+    playerOptions.push(options)
+    return { execution, duration: 0, currentTime: 0, pendingSeekPosition: null, state: null, error: null }
+  },
 }))
+vi.mock('@/features/session/hooks/use-playback-session', () => ({ usePlaybackSession: () => session }))
 vi.mock('@/features/session/services/playback-execution', () => ({
+  requestPlayback: request,
   registerPlaybackAdapter: (adapter: PlaybackExecutionAdapter) => {
     adapters.push(adapter)
     return () => { adapters.splice(adapters.indexOf(adapter), 1) }
@@ -39,6 +50,10 @@ function command(type: PlaybackCommandResource['type'], position: number, desire
 describe('VideoPlaybackRuntime', () => {
   beforeEach(() => {
     useVideoPresentation.getState().select('')
+    playerOptions.length = 0
+    request.mockReset().mockResolvedValue(undefined)
+    session.snapshot = { activeIncarnationId: 'local', transfer: null, media: { kind: 'video', publicId: 'video-1' }, desiredState: 'playing' }
+    session.endpoint = { incarnationId: 'local' }
     execution.ready.mockReset().mockRejectedValue(new Error('A prepare must not wait for the previous restore.'))
     execution.prepare.mockReset().mockResolvedValue(undefined)
     execution.quiesce.mockReset().mockResolvedValue(paused)
@@ -90,5 +105,61 @@ describe('VideoPlaybackRuntime', () => {
 
     expect(execution.quiesce).toHaveBeenCalledTimes(1)
     expect(execution.quiesce.mock.invocationCallOrder[0]).toBeLessThan(execution.prepare.mock.invocationCallOrder[0])
+  })
+
+  // The player reports that its video played to the end.
+  const complete = async () => {
+    await run('start', 0, 'playing')
+    await act(async () => { playerOptions.at(-1)!.onCompleted!() })
+  }
+
+  it('asks the session to pause once when its video ends as the active runner of a playing session', async () => {
+    await complete()
+
+    expect(request.mock.calls).toEqual([[{ action: 'pause' }]])
+  })
+
+  // Mounts the runtime anew on the session as arranged, with the video selected, and ends the video.
+  const completeOn = async (arrange: () => void) => {
+    await run('start', 0, 'playing')
+    arrange()
+    cleanup()
+    render(<VideoPlaybackRuntime />)
+    useVideoPresentation.getState().select('video-1')
+    await act(async () => { await Promise.resolve() })
+    await act(async () => { playerOptions.at(-1)!.onCompleted!() })
+  }
+
+  it('asks once per reported end', async () => {
+    await completeOn(() => {})
+    expect(request).toHaveBeenCalledTimes(1)
+
+    await act(async () => { playerOptions.at(-1)!.onCompleted!() })
+    expect(request).toHaveBeenCalledTimes(2)
+  })
+
+  it.each([
+    ['another endpoint is the active runner', () => { session.snapshot!.activeIncarnationId = 'remote' }],
+    ['no runner is active', () => { session.snapshot!.activeIncarnationId = null }],
+    ['this browser has no endpoint', () => { session.endpoint = null }],
+    ['the session is already paused', () => { session.snapshot!.desiredState = 'paused' }],
+    ['the session plays another video', () => { session.snapshot!.media = { kind: 'video', publicId: 'video-2' } }],
+    ['the session plays music', () => { session.snapshot!.media = { kind: 'song', publicId: 'video-1' } }],
+    ['a transfer is in flight', () => { session.snapshot!.transfer = { state: 'preparing' } }],
+    ['there is no session snapshot', () => { session.snapshot = undefined }],
+  ])('sends nothing at the end when %s', async (_reason, arrange) => {
+    await completeOn(arrange)
+
+    expect(request).not.toHaveBeenCalled()
+  })
+
+  it('shows a refused pause like any other playback request and leaves the completion alone', async () => {
+    request.mockRejectedValue(new Error('A previous playback result is unconfirmed.'))
+
+    await complete()
+    await act(async () => { await Promise.resolve() })
+
+    expect(useVideoPresentation.getState().error).toBe('A previous playback result is unconfirmed.')
+    expect(execution.execute.mock.calls.map(call => call[0])).toEqual(['play'])
   })
 })

@@ -16,6 +16,8 @@ interface UseBaanderPlayerOptions {
   onTimeUpdate?: (currentTime: number, duration: number) => void
   onStateChange?: (state: string) => void
   onError?: (error: MediaError | null) => void
+  /** The video played to its end. Called once per end, and again only after it was played again. */
+  onCompleted?: () => void
 }
 
 type VideoExecutionAction = 'play' | 'pause' | 'seek' | 'volume' | 'stop'
@@ -122,7 +124,7 @@ function supportsLocalVideoRecovery(): boolean {
     && 'disablePictureInPicture' in video && 'remote' in video
 }
 
-export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, coordinated = false, onTimeUpdate, onStateChange, onError }: UseBaanderPlayerOptions) {
+export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, coordinated = false, onTimeUpdate, onStateChange, onError, onCompleted }: UseBaanderPlayerOptions) {
   const recoveryFenced = useRef(false)
   const [recoverySupported] = useState(supportsLocalVideoRecovery)
   const executionRef = useRef<VideoExecution | null>(null)
@@ -131,8 +133,8 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, coor
   const playRef = useRef<(() => void) | null>(null)
   const pauseRef = useRef<(() => void) | null>(null)
   const seekRef = useRef<((time: number) => void) | null>(null)
-  const callbacks = useRef({ onTimeUpdate, onStateChange, onError })
-  useEffect(() => { callbacks.current = { onTimeUpdate, onStateChange, onError } }, [onTimeUpdate, onStateChange, onError])
+  const callbacks = useRef({ onTimeUpdate, onStateChange, onError, onCompleted })
+  useEffect(() => { callbacks.current = { onTimeUpdate, onStateChange, onError, onCompleted } }, [onTimeUpdate, onStateChange, onError, onCompleted])
   const [state, setState] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [duration, setDuration] = useState(0)
@@ -212,6 +214,7 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, coor
     let terminalError: Error | null = null
     let observedDeliveryInterruption = false
     let completion: { sessionId: string, jobId: string, generation: number } | null = null
+    let endReported = false
     const completed = () => completion !== null && snapshot !== null && completion.sessionId === snapshot.sessionId
       && completion.jobId === snapshot.jobId && completion.generation === snapshot.generation
       && (snapshot.status === 'running' || snapshot.status === 'paused')
@@ -871,6 +874,7 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, coor
       callbacks.current.onTimeUpdate?.(sourceDuration, sourceDuration)
       changeState('ended')
       if (canControlStatus() && desiredStatus() === 'running') control('pause', sourceDuration)
+      callbacks.current.onCompleted?.()
       return true
     }
     // Play on a movie that stands at its source end starts it again from zero. A player that
@@ -912,6 +916,7 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, coor
     })
     video.addEventListener('play', () => {
       if (video.paused) return
+      endReported = false
       if (recoveryFenced.current || (coordinated && !executionPermitted)) { video.pause(); return }
       if (replay()) return
       if (retiringPlayback?.attachment === attachmentRevision) {
@@ -996,7 +1001,15 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, coor
     video.addEventListener('ended', () => {
       if (finish()) return
       if (active() && !terminal && attachmentReady && video.ended && !seekChain
-        && sourceSeekPosition === null && !pendingLoad && (snapshot?.status === 'running' || snapshot?.status === 'paused')) changeState('ended')
+        && sourceSeekPosition === null && !pendingLoad && (snapshot?.status === 'running' || snapshot?.status === 'paused')) {
+        changeState('ended')
+        // Without a transcode session the element's own end is the completion, reported once
+        // until the element plays again.
+        if (snapshot.sessionId === null && !endReported) {
+          endReported = true
+          callbacks.current.onCompleted?.()
+        }
+      }
     })
     video.addEventListener('error', () => {
       if (attachmentReady) failAttachment(nativeFailure())
@@ -1086,7 +1099,10 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, coor
         signal.addEventListener('abort', cancel, { once: true })
         try {
           if (action === 'play') requestPlay()
-          else if (action === 'pause') requestPause()
+          // A player that finished its video stands paused at the end and has paused its session
+          // there. A pause asked of it has nothing left to do: it sends no second pause, and it
+          // leaves the player free to be played again from the start.
+          else if (action === 'pause') { if (!completed()) requestPause() }
           else if (action === 'seek') {
             if (value === undefined || !Number.isFinite(value)) throw new Error('Video seek position is invalid.')
             seek(value)

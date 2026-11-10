@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { PlaybackCommandResource } from '@/shared/api-client/gen/endpoints'
-import { registerPlaybackAdapter, type PlaybackExecutionAdapter, type PlaybackObservation } from '@/features/session/services/playback-execution'
+import { registerPlaybackAdapter, requestPlayback, type PlaybackExecutionAdapter, type PlaybackObservation } from '@/features/session/services/playback-execution'
+import { usePlaybackSession } from '@/features/session/hooks/use-playback-session'
 import { useBaanderPlayer } from '../hooks/useBaanderPlayer'
 import { useVideoPresentation } from '../stores/video-presentation-store'
 
@@ -10,7 +11,21 @@ export function VideoPlaybackRuntime() {
   const containerRef = useRef(host)
   const parkingRef = useRef<HTMLDivElement>(null)
   const mountedVideo = useRef('')
-  const player = useBaanderPlayer({ videoId, containerRef, coordinated: true })
+  const { snapshot, endpoint } = usePlaybackSession()
+  const session = useRef({ snapshot, endpoint })
+  useEffect(() => { session.current = { snapshot, endpoint } }, [snapshot, endpoint])
+  // A video that plays to its end stops by itself. The playback session knows a runner stopped
+  // playing only from a command that runner acknowledged, so the runner asks for the pause it has
+  // already carried out. Without it the session stays "playing" on a paused runner, and once the
+  // tab has gone no other destination may take the session over.
+  const pauseSessionAtEnd = useCallback(() => {
+    const { snapshot: current, endpoint: local } = session.current
+    if (!local || !current || current.activeIncarnationId !== local.incarnationId || current.transfer
+      || current.media?.kind !== 'video' || current.media.publicId !== mountedVideo.current
+      || current.desiredState !== 'playing') return
+    requestPlayback({ action: 'pause' }).catch(useVideoPresentation.getState().reportError)
+  }, [])
+  const player = useBaanderPlayer({ videoId, containerRef, coordinated: true, onCompleted: pauseSessionAtEnd })
   const { execution } = player
 
   useEffect(() => {
