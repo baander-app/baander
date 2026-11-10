@@ -69,9 +69,13 @@ ladder, and from the worktree source at master's revision.
   encoders into a new execution generation and replaces the attachment again. Each cycle
   is a visible cut, and the loop runs at the segment cadence.
 - After each jump the client reports the jumped position, and
-  `TranscodeStreamingService::getPlaybackState` returns `desired->position`. A fresh test
-  session created an hour later was told the movie's position was 170.5 s, the drifted edge,
-  and positioned its player there on first attach.
+  `TranscodeStreamingService::getPlaybackState` returns `desired->position`. A test attach
+  an hour later was told the movie's position was 170.5 s, the drifted edge, and positioned
+  its player there. That attach was not a fresh session: jobs are keyed by the client's
+  request id, and a start that repeats the id gets its existing session back, with the
+  cursor the client itself had reported. On the instance every session's cursor equals its
+  execution's `desired->position` (ten of ten rows, 2026-11-10), because the only writers
+  of that position are admission, which sets zero, and the client's own controls.
 - `useBaanderPlayer`'s `seeking` handler enqueues a server seek whenever a native seek lands
   more than 50 ms off the session position. Every server seek restarts all ladder encoders
   into a new execution generation. One playback burned generations `0 → 18` in two minutes;
@@ -84,7 +88,10 @@ ladder, and from the worktree source at master's revision.
   without constraining the volume slider; the shared `Slider` component defaults to
   `width: 100%`. Measured live: a 440 px disabled volume bar overlapping a 1248 px seek bar.
 - `app:transcode:job:cleanup` removed only 1 of the 8 jobs because the stale sessions still
-  reference the rest; no session-expiry path reclaims them.
+  reference the rest; no session-expiry path reclaims them. The eight held jobs are not
+  dead: twenty hours after the client left, each still has a worker renewing its lease
+  every 15 s with the encode parked at the lead throttle, so each also holds a transcode
+  slot (instance state, 2026-11-10).
 - The two-command browser gate passed while all of the above existed; its producer does not
   outrun playback far enough to expose edge-chasing.
 
@@ -223,13 +230,16 @@ are resolved in KTD1–KTD7.
   disable is already effective; it needs pinning, not replacing. The cut loop itself is
   broken by KTD3.)
 
-- KTD2. **Report the session cursor, not producer progress.** A session's sign response
-  carries that session's cursor: the client's requested start at creation, and its last
-  reported position afterwards. `CreateTranscodeSessionHandler` anchors a fresh session's
-  desired position to the requested start instead of inheriting the reused job's drifted
-  `desired->position`, and `TranscodeStreamingService::getPlaybackState` reports the
-  session-tracked cursor. Governs R2. (chosen over clamping `desired->position` at read time:
-  the drift enters through session creation, so it is corrected there.)
+- KTD2. **The server already reports the session cursor; no server change.** Corrected
+  2026-11-10 after reading the write paths and the instance's rows. Admission creates a
+  fresh session's desired position at zero and never inherits another session's, since
+  jobs are scoped to one client request id. The session cursor mirrors the execution's
+  desired position on every control. The sign request carries no start position, so
+  "requested start" is zero. The drift was fed entirely by the client's reported edge
+  seeks, which KTD3 removes; a repeated start resuming its own live session at its last
+  reported position is the intended resume. A first implementation of the original
+  decision changed no behaviour and was discarded. Governs R2 together with KTD3 and, for
+  sessions whose client has gone, KTD6.
 
 - KTD3. **Classify seeks before they reach the server.** Only user or app-committed intents
   enqueue server seeks. The `seeking` event handler stops auto-enqueuing on native seeks:
@@ -247,11 +257,18 @@ are resolved in KTD1–KTD7.
   explicit bounded width in `MoviePlayerOverlay`, matching how `NowPlayingBar` constrains its
   controls, so the seek slider is the only full-width slider. Governs R6.
 
-- KTD6. **Expire stale sessions so cleanup can reclaim their jobs.** A transcode session with
-  no client reports past a bounded age and no runnable job becomes expired; expired sessions
-  release their jobs for `app:transcode:job:cleanup`, which then removes the jobs and their
-  output. The bound is long enough that a paused player never expires mid-session. Governs
-  R5.
+- KTD6. **Expire stale sessions so cleanup can reclaim their jobs.** A transcode session
+  that no playback report and no stream signing has touched for 24 hours, the longest
+  lifetime of a signed stream URL, is stale unless its presentation is finished. Signing
+  now touches the session, so a paused player, which sends no reports but renews its URL,
+  never expires. Expiry runs at the start of job cleanup: it cancels the execution so the
+  worker stops and frees its slot, ends the session and releases the job without
+  cancelling it, which makes the job orphaned. Cleanup skips a job whose worker still
+  holds a live lease and removes it on the next run. The original condition "no runnable
+  job" was dropped (corrected 2026-11-10): an abandoned session's job stays runnable
+  indefinitely, as the instance shows, so that condition could never be met. Sessions over
+  a finished presentation stay, so the same client resumes without a new encode. Cleanup
+  reports both counts. Governs R5.
 
 - KTD7. **Gate edge-chasing with an outrunning producer.** Extend the existing browser
   playback checkpoint with a producer running at least 1.5x real time and an assertion that
@@ -344,9 +361,8 @@ dispose behavior is unchanged.
 `src/Transcode/Infrastructure/Transcode/TranscodeStreamingService.php`, their tests, and the
 signing controller tests that assert the response shape.
 
-**Approach:** Anchor a fresh session's desired position to the requested start; report the
-session-tracked cursor in `getPlaybackState`; keep the runtime desired state as the control
-fence for the worker.
+**Approach:** None; see the corrected KTD2. No file changes. The scenarios below already
+hold on master and are covered by the existing admission and playback-control suites.
 
 **Test scenarios:** A fresh session over a reused job with drifted desired state reports the
 requested start; a refreshed session reports its last reported position; the worker fence and
@@ -421,8 +437,10 @@ is bounded; controls keep their labels and disabled states.
 
 **Requirements:** R5; KTD6. **Dependencies:** U2.
 
-**Files:** The transcode session lifecycle services and `CleanupOrphanedJobsHandler`, with
-their tests.
+**Files:** A new `StaleTranscodeSessionExpiry` application service,
+`CleanupOrphanedJobsHandler`, `TranscodeJobService`, `AuthorizedPlayback` (signing touches
+the session), the cleanup endpoint and console command with the API specification and
+operator page, and their tests.
 
 **Approach:** Add the bounded expiry described in KTD6 after reading the existing lease
 lifetimes; let the cleanup command treat jobs held only by expired sessions as orphaned.
