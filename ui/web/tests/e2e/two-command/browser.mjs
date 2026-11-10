@@ -169,6 +169,7 @@ const progressOutages = []
 const statusOutages = []
 const seekOutages = []
 const movieCompletions = []
+const cursorAuthority = []
 let movieEndpointProof = null
 const signingRequests = new WeakMap()
 const attachedCapabilities = new Map()
@@ -273,7 +274,7 @@ async function savePlaybackTimeline() {
   try {
     const mediaEvents = await page.evaluate(() => window.__twoCommandMediaEvents ?? [])
     await writeFile(`${evidence}/playback-timeline.json`, JSON.stringify({
-      playbackSnapshots, playbackControls, clientControls, subtitleObservations, networkInterruptions, manifestEvidence, mediaRequestOrder, capabilityRenewals, progressOutages, statusOutages, seekOutages, movieCompletions, mediaEvents: [...previousMediaEvents, ...mediaEvents],
+      playbackSnapshots, playbackControls, clientControls, subtitleObservations, networkInterruptions, manifestEvidence, mediaRequestOrder, capabilityRenewals, progressOutages, statusOutages, seekOutages, movieCompletions, cursorAuthority, mediaEvents: [...previousMediaEvents, ...mediaEvents],
     }, null, 2))
   } finally {
     savingTimeline = false
@@ -1580,6 +1581,147 @@ async function proveMovieCompletion() {
     page.off('requestfailed', failed)
     await savePlaybackTimeline()
   }
+  return proof
+}
+
+function renditionExecutions(renditionSet) {
+  return renditionSet.split(',').map(item => {
+    const separator = item.lastIndexOf('.')
+    return [item.slice(0, separator), item.slice(separator + 1)]
+  })
+}
+
+// A movie's playlists grow while its encoders run ahead of playback, so the published
+// edge moves away from the playhead. That edge is a delivery window, never a playback
+// target: the playhead may wait at it, but only a committed seek may move the clock
+// faster than the wall clock or restart the encoders into a new generation. The given
+// committed seek restarted the encoders; this window observes the playback that follows.
+async function proveCursorAuthority(seek) {
+  const windowMs = 24000
+  // Slower production never leaves the playhead behind, and the proof would pass idly.
+  const requiredProducerRate = 1.5
+  // The media clock and the wall clock are sampled in one page task, so the bound absorbs
+  // only clock granularity and the player's stall nudges, which total at most 0.6 s. It
+  // stays far below one six-second segment, the smallest step toward the published edge.
+  const toleranceSeconds = 1
+  // The player corrects buffer gaps and stalls by assigning the media clock itself. Whether
+  // it does so in a given run depends on timing, so the window makes one such assignment.
+  const correctionSeconds = 0.5
+  const owner = ownedPlayback()
+  const executions = new Map(renditionExecutions(snapshot.renditionSet))
+  const proof = { startedAt: Date.now(), windowSeconds: windowMs / 1000, requiredProducerRate, toleranceSeconds,
+    seek: { at: seek.submission.at, position: seek.submission.position, requestId: seek.submission.requestId,
+      acceptedGeneration: seek.acknowledgement.acceptedGeneration },
+    jobId: owner.jobId, sessionId: owner.sessionId, generation: owner.generation, startTime: snapshot.startTime,
+    renditionSet: snapshot.renditionSet, samples: [], corrections: [], publications: [], marks: [] }
+  cursorAuthority.push(proof)
+  const round = value => Math.round(value * 1000) / 1000
+  const seekMarks = () => page.evaluate(since => performance.getEntriesByType('mark')
+    .filter(entry => /^baander:(?:native-seek|seek-)/.test(entry.name) && performance.timeOrigin + entry.startTime >= since)
+    .map(entry => ({ name: entry.name, at: Math.round(performance.timeOrigin + entry.startTime), ...entry.detail })), seek.submission.at)
+  const assertExecution = () => {
+    const uncommitted = playbackControls.filter(control => control.action === 'seek'
+      && control.at >= seek.submission.at && control.requestId !== seek.submission.requestId)
+    assert.equal(uncommitted.length, 0,
+      `Only a committed seek may reach the server; the player sent ${uncommitted.length} without one, the first to ${uncommitted[0]?.position}`)
+    assert.equal(snapshot.jobId, owner.jobId, 'Playback against a growing presentation must retain the owned job')
+    assert.equal(snapshot.sessionId, owner.sessionId, 'Playback against a growing presentation must retain the owned session')
+    const observed = [...playbackSnapshots.filter(item => item.accepted && item.at >= proof.startedAt
+      && item.jobId === owner.jobId && typeof item.renditionSet === 'string'), snapshot]
+    for (const item of observed) {
+      assert.equal(item.generation, owner.generation, 'No execution generation may advance without a committed seek')
+      for (const [job, generation] of renditionExecutions(item.renditionSet)) {
+        const known = executions.get(job)
+        assert(known === undefined || known === generation,
+          `A rendition restarted from generation ${known} into ${generation} without a committed seek`)
+        executions.set(job, generation)
+      }
+    }
+  }
+  // The clock may never gain on the wall clock since any earlier observation, starting
+  // with the committed seek itself: its position at the moment it was sent.
+  let wallOffsetFloor = seek.submission.position - seek.submission.at / 1000
+  let corrected = 0
+  let first = null
+  let last = null
+  let furthest = -Infinity
+  try {
+    while (Date.now() < proof.startedAt + windowMs) {
+      assertExecution()
+      const attachment = attachmentNumber
+      const state = await mediaState()
+      if (attachment === attachmentNumber) {
+        assert.equal(state.error, null, 'Playback against a growing presentation must stay free of media errors')
+        assert.equal(state.playbackRate, 1, 'The window must play at normal speed for the wall clock to bound it')
+        const clock = snapshot.startTime + state.time
+        const wallOffset = clock - state.at / 1000 - corrected
+        const ahead = wallOffset - wallOffsetFloor
+        last = { at: state.at, attachment, clock: round(clock), aheadOfWall: round(ahead), paused: state.paused,
+          seeking: state.seeking, ready: state.ready, decodedFrames: state.decodedFrames }
+        proof.samples.push(last)
+        assert(ahead <= toleranceSeconds,
+          `The player clock at ${clock.toFixed(2)} s ran ${ahead.toFixed(2)} s ahead of wall-clock playback plus committed seeks`)
+        wallOffsetFloor = Math.min(wallOffsetFloor, wallOffset)
+        if (!state.paused && !state.seeking && state.ready >= 3) {
+          first ??= last
+          furthest = Math.max(furthest, clock)
+        }
+        const pending = proof.corrections.at(-1)
+        if (pending && !pending.recorded) {
+          pending.recorded = (await seekMarks()).find(mark => mark.name === 'baander:native-seek'
+            && mark.at >= pending.at - 50 && Math.abs(mark.currentTime - pending.to) <= 0.05) ?? null
+        }
+        if (Date.now() >= proof.startedAt + windowMs / 2 && proof.corrections.length < 3
+          && (!pending || (!pending.recorded && Date.now() >= pending.at + 2000))) {
+          const correction = await video.evaluate((element, offset) => {
+            const from = element.currentTime
+            const buffered = Array.from({ length: element.buffered.length }, (_, index) => [element.buffered.start(index), element.buffered.end(index)])
+            if (element.paused || element.seeking || element.readyState < 3
+              || !buffered.some(([start, end]) => from >= start && from + offset + 1 <= end)) return null
+            element.currentTime = from + offset
+            return { at: Date.now(), from, to: element.currentTime }
+          }, correctionSeconds)
+          if (correction) {
+            corrected += correction.to - correction.from
+            proof.corrections.push({ ...correction, attachment: attachmentNumber, recorded: null })
+          }
+        }
+      }
+      await new Promise(resolve => setTimeout(resolve, 200))
+    }
+    assertExecution()
+    proof.marks = await seekMarks()
+    const sent = proof.marks.filter(mark => mark.name === 'baander:seek-send' && mark.at >= proof.startedAt)
+    assert.equal(sent.length, 0, 'The player must not send a seek during a window without a committed seek')
+    const correction = proof.corrections.find(item => item.recorded)
+    assert(correction, 'The window must apply one player-internal correction that the player records as a native seek')
+    assert(first && last.decodedFrames > first.decodedFrames && furthest - first.clock >= windowMs / 2000,
+      `Playback must advance through at least half the window (from ${first?.clock} to ${furthest})`)
+    proof.playedSeconds = round(furthest - first.clock)
+    proof.publications = manifestEvidence.filter(item => item.at >= seek.submission.at && item.path.includes('/tracks/video/')
+      && executions.get(/^\/api\/transcode\/([^/]+)\//.exec(item.path)?.[1]) === item.generation).map(item => {
+      const publishedSeconds = item.body.split('\n').filter(line => line.startsWith('#EXTINF:'))
+        .reduce((total, line) => total + Number(line.slice(8).split(',')[0]), 0)
+      const elapsedSeconds = (item.at - seek.submission.at) / 1000
+      return { at: item.at, attachment: item.attachment, path: item.path, generation: item.generation,
+        publishedSeconds: round(publishedSeconds), elapsedSeconds: round(elapsedSeconds), rate: round(publishedSeconds / elapsedSeconds) }
+    })
+    // Publication trails encoding, so no observation overstates the rate since the restart.
+    const fastest = proof.publications.reduce((best, item) => !best || item.rate > best.rate ? item : best, null)
+    proof.producerRate = fastest?.rate ?? null
+    assert(fastest && fastest.rate >= requiredProducerRate,
+      `The producer must outrun playback at least ${requiredProducerRate} times to qualify this window; it published at most ${fastest?.publishedSeconds ?? 0} s in ${fastest?.elapsedSeconds ?? 0} s`)
+    const publishedSeconds = Math.max(...proof.publications.map(item => item.publishedSeconds))
+    proof.leadSeconds = round(proof.startTime + publishedSeconds - last.clock)
+    assert(proof.leadSeconds > 0, 'The published edge must lead the playhead at the end of the window')
+    proof.finishedAt = Date.now()
+  } catch (error) {
+    proof.failure = error.message
+    proof.marks = await seekMarks().catch(() => proof.marks)
+    throw error
+  } finally {
+    await savePlaybackTimeline()
+  }
 }
 
 async function proveSeekOutages(owner, expectedPosition) {
@@ -2244,15 +2386,18 @@ async function checkpoint({ phase, baseUrl, credentials }) {
           && snapshot.renditionSet.split(',').includes(`${match[1]}.${item.generation}`)
       }), `Recovered playback must receive ${track} from the current signed rendition set`)
     }
-    await proveMovieCompletion()
+    const completion = await proveMovieCompletion()
+    await proveCursorAuthority(completion.replaySeek)
   } else if (phase === 'complete') {
     assert.deepEqual(phases, ['authenticated', 'attached', ...(phases.includes('client-controls') ? ['client-controls'] : []), 'sought-paused', 'web-restarted', 'worker-contained', 'worker-recovered'])
+    assert(cursorAuthority.length === 1 && cursorAuthority[0].finishedAt,
+      'The drill must retain one completed proof that the playhead keeps its own clock under an outrunning producer')
   } else {
     throw new Error(`Unexpected browser checkpoint: ${phase}`)
   }
   phases.push(phase)
   // No credentials or signed URLs are written to the evidence artifact.
-  await writeFile(`${evidence}/result.json`, JSON.stringify({ browser: browserInfo, phases, generation: snapshot?.generation, mediaResponses, nativeResponseEvidence, clientControls, subtitleObservations, networkInterruptions, manifestEvidence, mediaRequestOrder, capabilityRenewals, progressOutages, statusOutages, seekOutages, movieCompletions }, null, 2))
+  await writeFile(`${evidence}/result.json`, JSON.stringify({ browser: browserInfo, phases, generation: snapshot?.generation, mediaResponses, nativeResponseEvidence, clientControls, subtitleObservations, networkInterruptions, manifestEvidence, mediaRequestOrder, capabilityRenewals, progressOutages, statusOutages, seekOutages, movieCompletions, cursorAuthority }, null, 2))
   return { phase, passed: true }
 }
 
@@ -2272,7 +2417,7 @@ const server = createServer(async (request, response) => {
     const alertsAtFailure = await page.getByRole('alert').allTextContents().catch(() => null)
     const statusAtFailure = await page.getByRole('status').allTextContents().catch(() => null)
     await writeFile(`${evidence}/failure.json`, JSON.stringify({
-      browser: browserInfo, error: error.message, state, playback, playbackSnapshots, clientControls, subtitleObservations, networkInterruptions, mediaEvents: [...previousMediaEvents, ...mediaEvents], mediaResponses, apiResponses, nativeResponseEvidence, manifestEvidence, mediaRequestOrder, capabilityRenewals, progressOutages, statusOutages, seekOutages, movieCompletions, marks: marksAtFailure,
+      browser: browserInfo, error: error.message, state, playback, playbackSnapshots, clientControls, subtitleObservations, networkInterruptions, mediaEvents: [...previousMediaEvents, ...mediaEvents], mediaResponses, apiResponses, nativeResponseEvidence, manifestEvidence, mediaRequestOrder, capabilityRenewals, progressOutages, statusOutages, seekOutages, movieCompletions, cursorAuthority, marks: marksAtFailure,
       alerts: alertsAtFailure, statuses: statusAtFailure, pageErrors,
     }, null, 2))
     await page.screenshot({ path: `${evidence}/failure.png` }).catch(() => {})

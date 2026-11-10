@@ -12,7 +12,7 @@ try {
     Requirements::check();
     $environment = getenv();
     $configuration = \Baander\Tooling\Configuration\ToolingConfiguration::forRepository(dirname(__DIR__), $environment);
-    $executor = new \Baander\Tooling\Process\EngineExecutor(\Baander\Tooling\Process\ExecutionContext::bounded($configuration->budgets->seconds('fixture'), $environment));
+    $executor = new \Baander\Tooling\Process\EngineExecutor(\Baander\Tooling\Process\ExecutionContext::bounded($configuration->budgets->seconds('workerCapacity'), $environment));
     chdir(dirname(__DIR__));
     Support::check((getenv('BAANDER_TEST_IMAGE') ?: '') !== '', 'BAANDER_TEST_IMAGE: Set the production worker target built from this checkout.');
     if (!in_array(getenv('BAANDER_TEST_BROWSER_ENGINE') ?: 'chromium', ['chromium', 'firefox'], true)) {

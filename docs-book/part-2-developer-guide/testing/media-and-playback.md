@@ -306,6 +306,40 @@ It qualifies completion after a user seek, not uninterrupted full-source playbac
 or byte-exact decoding. The eight phases and phase deadlines remain unchanged;
 the outer deadline is 900 seconds.
 
+The replay that ends the completion check starts a 24-second edge-chasing window.
+The source-zero seek has just restarted every encoder, so the published edge runs
+away from a playhead that has only begun to move. A player that treats that edge
+as a target cuts forward here, and a player that forwards its own internal seeks
+to the server restarts the encoders again on every correction. The window samples
+the media clock and the wall clock in one page task. Between any two samples,
+counted from the moment the committed seek was sent, the clock may gain at most
+one second on the wall clock. The player's stall nudges total at most 0.6 seconds
+and the smallest step toward the published edge is one six-second segment, so the
+bound separates the two.
+
+An outrunning producer does not by itself make the player correct anything. The
+fixture's generated media gave it nothing to repair: in a run with the old
+forwarding restored, twelve seconds of playback sent no seek although the producer
+had published 41.67 seconds within 2.6 seconds of its restart. So halfway through,
+the window makes the correction itself. It assigns the media clock half a second
+ahead inside buffered media, as the player's own gap and stall corrections do, and
+allows that half second in the bound. The player must record the assignment as a
+`baander:native-seek` mark. For the whole window the job, the session and the
+generation of every rendition in the signed set must stay unchanged, and no seek
+may reach the server. With the forwarding restored, the same assignment sent a
+seek within a millisecond and the check failed on it.
+
+The window counts only if production outran playback. Some video playlist of the
+restarted generation must hold at least 1.5 times as many published seconds as
+wall seconds have passed since the seek was sent, and the published edge must
+still lead the playhead when the window ends. Publication trails encoding, so
+this never overstates the encoder's rate. A host too slow to reach 1.5 fails the
+check; it does not pass it idly. The `worker-recovered` checkpoint request budget
+is 180 seconds to hold the window. `cursorAuthority` in `result.json`,
+`failure.json` and `playback-timeline.json` retains the samples, the correction,
+the playlist observations with their rates, the player's seek marks and the final
+lead.
+
 The production fixture also submits a captured old-generation native seek after
 an explicit paused seek, while the worker is live and while it is absent. It must
 leave desired position, execution generation and control revision unchanged. This

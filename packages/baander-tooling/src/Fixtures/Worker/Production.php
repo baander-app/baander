@@ -44,7 +44,10 @@ final class Production
     public static function main(array $arguments, string $root): int
     {
         Runtime::require($arguments === [], 'Production worker qualification takes no arguments');
-        $runtime = new Runtime($root, budget: 'fixture');
+        // The two-command drill adds the browser checkpoint's playback proofs to this qualification,
+        // so it runs under the capacity budget its operator scenario already uses.
+        $twoCommand = (getenv('BAANDER_TEST_TWO_COMMAND') ?: '0') === '1';
+        $runtime = new Runtime($root, budget: $twoCommand ? 'workerCapacity' : 'fixture');
         $resources = new Resources($runtime, 'worker-production');
         try {
             $docker = $resources->docker;

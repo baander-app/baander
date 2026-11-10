@@ -180,7 +180,7 @@ final class BrowserCheckpoint
 import { readFile } from "node:fs/promises";
 let body = ""; for await (const chunk of process.stdin) body += chunk;
 const phase = JSON.parse(body).phase;
-const phaseTimeout = phase === "client-controls" ? 360000 : phase === "attached" ? 120000 : 90000;
+const phaseTimeout = {"client-controls": 360000, "attached": 120000, "worker-recovered": 180000}[phase] ?? 90000;
 const port = await readFile("/work/browser-port", "utf8");
 const response = await fetch(`http://127.0.0.1:${port}`, {method:"POST", body, signal:AbortSignal.timeout(phaseTimeout)});
 console.log(await response.text());
