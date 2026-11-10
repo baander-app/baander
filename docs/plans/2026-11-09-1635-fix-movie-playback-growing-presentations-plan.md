@@ -24,11 +24,17 @@ instance's own state and the worktree source; nothing in this plan is speculativ
 
 **Means:** Correct the player's HLS attachment, the position the server reports to attaching
 clients, transfer-failure settlement, the overlay control layout, stale-session lifecycle, and
-the browser gate that passed while the defects existed (KTD1–KTD7).
+the browser gate that passed while the defects existed (KTD1–KTD7, first phase; KTD8–KTD15,
+follow-up).
 
-**Execution profile:** One branch named after this plan with seven dependency-ordered units.
+**Execution profile:** One branch named after this plan with seventeen dependency-ordered
+units (U1–U7 delivered, U8–U17 the follow-up).
 Playback is verified on a preview instance against the same source movie before merge; the
 persistent instance receives the fixes only after master merges and the updater advances it.
+
+**Follow-up phase (added 2026-11-10):** U1–U7 are delivered on the branch. Their verification
+left open defects, each since diagnosed from a run or a PostgreSQL test. R8–R15, KTD8–KTD15
+and U8–U17 close them on the same branch before merge.
 
 **Authority and stop conditions:** Follow `AGENTS.md`, the Product Contract and then the
 Planning Contract. Stop affected work if a change would weaken media access checks, session
@@ -133,6 +139,38 @@ ladder, and from the worktree source at master's revision.
 - R7. The browser playback gate runs a producer that outruns playback and fails any run
   whose player clock advances without playback or a committed seek.
 
+**Follow-up (added 2026-11-10)**
+
+- R8. Within one execution generation the signed rendition set changes only when a sibling
+  rendition joins or is about to fall behind the cursor. The session's primary rendition
+  keeps today's rule and alone decides readiness. A growing sibling is offered only once
+  its published end leads the cursor by a join lead, and a sibling the player has attached
+  is withdrawn only when its lead shrinks to one segment, before the player reaches its
+  edge. A progress report that commits while a signing reads the jobs does not change the
+  set.
+- R9. A browser runner that has gone and was confirmed idle does not hold the session. A
+  command the gone runner was never shown settles when it expires, and a registration, a
+  control and a transfer release a gone idle runner the same way a snapshot does. A runner
+  that was shown a command able to start playback and did not answer stays unknown, and no
+  other destination starts; what ends that fence is an open question for the user.
+- R10. A viewer can always close the movie overlay. Closing during an uncertain transfer
+  silences the local video; the session stays fenced until the transfer settles.
+- R11. A client whose transcode sessions have ended receives a definite answer from signing,
+  not a retryable one. When they ended by expiry it continues at its position on a new
+  session without a reload; when their jobs failed or were cancelled it shows the error and
+  starts nothing.
+- R12. A development instance whose retained postgres or redis image no longer resolves in
+  the daemon prepares with the release's image instead of failing. A postgres image of
+  another major version than the retained data is outside this requirement: postgres
+  refuses to start and the data is unchanged.
+- R13. The browser gate passes in Chromium and Firefox with client controls, and its steps
+  do not depend on where the paused cursor happens to stand or on when the page reconnects.
+- R14. Loading a different movie starts it at zero unless the load names a position; it
+  never starts at the previous media's cursor. There is no per-movie resume position.
+- R15. Play on a movie whose cursor stands at the source end starts it from zero on any
+  player, not only on the one that reached the end; a new target position supersedes a
+  restore that has not settled.
+
 ### Actors
 
 - A1. The viewer plays, seeks and pauses a movie on a local or remote destination.
@@ -169,6 +207,36 @@ ladder, and from the worktree source at master's revision.
 - AE7. **One seek bar.** Covers R6. The overlay renders a single full-width slider; the
   volume control is bounded and visually distinct in the same row.
 
+- AE8. **Stable rendition set.** Covers R8. From a cold start in one generation with three
+  jobs, the player attaches at most once per rendition; no rendition leaves and rejoins; a
+  sibling whose encoder runs slower than playback is not offered while the cursor advances,
+  and one that joined during a pause is withdrawn once, before the player reaches its edge.
+- AE9. **Stop, close, play elsewhere.** Covers R9. A tab stops a movie and is closed, so its
+  socket closes; Play in
+  another tab inside the closed tab's 30-second registration window is refused at most until
+  the command expires and the registration lapses, and then plays.
+- AE10. **Reload and play.** Covers R9, R13. A paused browser tab without local recovery
+  reloads; its registration answer already shows the runner released, and an immediate Play
+  is accepted.
+- AE11. **Shown play stays fenced.** Covers R9. A runner that was shown a play command and
+  never answered keeps the session unknown with a stop outstanding, through every later
+  stop expiry and after its registration lapses.
+- AE12. **Close during an uncertain transfer.** Covers R10. The overlay closes and its video
+  is silent; other tabs still see the fence.
+- AE13. **Return after a day.** Covers R11. A tab whose sessions expired signs, is told the
+  sessions ended, and plays on from its position on a new session, whether or not job
+  cleanup has run since and whether the movie is encoded or copied. A tab whose job failed
+  or was cancelled by an operator shows the error and starts no new work.
+- AE15. **Next movie starts at zero.** Covers R14. After a movie played to 17 s, loading
+  another movie starts it at 0; loading the first movie again also starts at 0, and only
+  the movie that is still loaded keeps its cursor.
+- AE16. **Replay after reload.** Covers R15. A movie finishes, the page reloads, the viewer
+  presses Play: one seek to zero reaches the server, playback starts within a few seconds
+  and no transfer fails. A paused session at the end does not restart by itself.
+- AE14. **Lost retained image.** Covers R12. With the retained postgres or redis identity
+  removed from the daemon, `make preview-up` prepares and starts on the retained data when
+  the release's postgres major version matches it.
+
 ### Success Criteria
 
 The reported movie plays start to finish on a preview instance with no uncommanded clock
@@ -182,9 +250,13 @@ media-control gates keep passing.
   classification, transfer settlement, overlay control layout, session expiry, and the
   browser gate extension.
 - Excluded: adaptive-quality redesign, lead-throttle redesign, remote-destination semantics
-  beyond transfer settlement, the copy-pacing band, the OpenTelemetry `host.docker.internal`
-  resolution (a separate small fix), and the retained-redis tooling item already recorded in
-  `ROADMAP.md`.
+  beyond transfer settlement, the copy-pacing band, and the OpenTelemetry
+  `host.docker.internal` resolution (a separate small fix).
+- Included by the follow-up phase (2026-11-10): the membership rule of the signed rendition
+  set (not the ladder or the selection of tiers), the release and settlement of a gone
+  browser runner, the signing answer for ended sessions, and the retained postgres and redis
+  image identities of the development tooling, which the first phase had excluded; the
+  cursor of a newly loaded movie and replay from the source end.
 
 ### Dependencies and Assumptions
 
@@ -198,7 +270,18 @@ media-control gates keep passing.
 ### Outstanding Questions
 
 The configuration, position, seek-classification, transfer, layout, expiry and gate designs
-are resolved in KTD1–KTD7.
+are resolved in KTD1–KTD7, and the follow-up's designs in KTD8–KTD15.
+
+Open for the user (added 2026-11-10, not built by this plan):
+
+- **What ends the fence of a runner that was shown a start and then went away.** A tab that
+  reloads or closes while a load, play or seek is still starting leaves the session unknown
+  with a stop re-issued every 20 seconds, as before this plan; KTD9 keeps that fence
+  because the server cannot tell a closed tab from one that is cut off and still playing.
+  Candidates: an explicit viewer override ("play here anyway"); a same-tab registration
+  taken as proof that the previous document is gone, which needs the tab identity to be
+  held exclusively by one document in every supported engine; a bounded wait. Each weakens
+  the ownership fence by a different amount.
 
 ### Sources and Research
 
@@ -283,6 +366,109 @@ are resolved in KTD1–KTD7.
   checkpoint's existing evidence receipts. Governs R7. (chosen over a dedicated new gate: the
   two-command checkpoint already owns growing-presentation playback proofs.)
 
+- KTD8. **A rendition joins with a lead and stays while it covers the cursor.** The set was
+  rebuilt on every signing from "the rendition's published timeline covers the cursor", with
+  no margin. A rendition encoding near real time sits within one 6-second segment of the
+  cursor, so it left and rejoined repeatedly, and every change replaced the player's
+  attachment: 35 attachments and 100 seconds of starvation in one cold play on a loaded
+  preview. The session's primary rendition keeps the coverage rule and alone decides readiness, so
+  a start or a seek, paused or playing, is ready as before. A growing sibling now joins
+  only when its published end leads the cursor by 18 seconds (three segments, below the
+  lead throttle's 36-second resume lead so a throttled healthy encoder always qualifies),
+  capped by the remaining duration; a finished presentation joins at once. A sibling in
+  the client's attached set, in the same generation, stays while its published end leads
+  the cursor by more than one segment (6 seconds) or its presentation is finished; it is
+  withdrawn once at that margin, before the player reaches its edge. Staying while it merely
+  covered the cursor kept a starving level attached: in the recorded cold play 1080p stayed
+  in the set for two minutes while the clock ran at 0.65 times real time. The two
+  thresholds are two segments apart because a real-time encoder's lead swings by one
+  segment with every publication. The refresh request carries the attached set as a hint;
+  it can only lower the join threshold to the stay margin, and only for jobs the caller's
+  sessions already own. A sibling slower than playback therefore does not join while the
+  cursor advances, which is intended: offering it paced the player to its encoder. The
+  encoders of a paused session stop at coverage, so siblings join only after playback
+  resumes. The jobs'
+  runtime rows are read in one statement, so a progress report committing between reads no
+  longer makes the siblings look incompatible. The client rule stays: an identity change
+  replaces the attachment. Governs R8. (chosen over a client that ignores a shrinking set:
+  that leaves a starving level attached and breaks the checkpoint's proof that the attached
+  set equals the signed one; and over a stateless margin alone, which moved the chatter to
+  the margin in replays of the recorded runs.)
+
+- KTD9. **Disclosure decides whether an unanswered command can have had an effect.** A
+  command leaves the server only when a snapshot is built for its incarnation, so
+  `playback_commands` records `disclosed_at` there. When a control expires on a browser
+  runner, the session's observed state and the runner's own last report are both stopped
+  or paused, and the command was never disclosed or is itself a stop or pause, the command
+  is cancelled with its own outcome (never effective) and the session returns to the
+  confirmed state without a new stop. A disclosed play, load or seek keeps the existing
+  path: the session turns unknown with a stop outstanding. Its expiry also marks the runner
+  unknown, exactly as a stop that supersedes a disclosed pending control does, so neither
+  the stop the expiry issues nor any later stop can settle a play that may have run; the
+  unknown path holds until the runner answers. A transfer whose target was never shown its start fails
+  at expiry instead of staying uncertain. "Command expired and registration lapsed" alone is
+  rejected as proof: a tab shown the play and then cut off keeps playing, and the server
+  drops a dead socket only after 300 seconds. Governs R9.
+
+- KTD10. **One release check, run wherever the proof can first hold.** The release of a
+  confirmed paused or stopped browser runner ran only on the relay's one-second snapshot
+  tick. A reloaded tab without local recovery (every engine but Linux Chromium) registered,
+  was still shown the old incarnation as active, and an immediate Play was refused; that is
+  the Firefox failure of the gate, not a second pause command as first recorded. The check
+  becomes one method called from the snapshot, from the endpoint registration in the same
+  transaction that retires the old incarnation, and from a control and a transfer after
+  their revision and open-transfer guards. The stopped proof is unchanged. The paused proof
+  ignores commands settled as never effective, both in its later-command clause and in its
+  revision adjacency, and tells them from superseded commands by their outcome; its
+  existing later-command and revision cases keep refusing. Governs R9.
+
+- KTD11. **The overlay closes; the fence stays.** Closing the overlay during an uncertain
+  transfer silences the local video and resolves without a session control. The session
+  stays uncertain for every tab until the target answers or the transfer settles by KTD9.
+  Governs R10.
+
+- KTD12. **Ended sessions are a definite answer.** A refresh signing answers 410 when none
+  of the named sessions is still held, distinct from the 503 of a start that found no
+  capacity. A session in a cancelled or failed state counts as ended even while its job and
+  runtime row remain, which is the state between expiry and the next job cleanup; before,
+  that state answered 200 with status cancelled and the player showed "ended". The answer
+  carries the reason. When the sessions ended by expiry or their jobs are gone, the player
+  drops its snapshot and its negotiated delivery, negotiates delivery again, signs and
+  continues at its position; a copy delivery otherwise names the ended job again. When the
+  jobs failed or were cancelled, the player shows the error and starts nothing, so a failed
+  encode is not restarted by every open tab and an operator's cancel is not undone. The
+  player restarts at most once per ended session set; a second 410 before playback has
+  advanced is an error. Governs R11.
+
+- KTD13. **A retained identity is kept only while the daemon resolves it.** The builder
+  checks the retained postgres and redis identities in the daemon before reusing them and
+  otherwise takes the release's image and records it as not retained; the release contract's
+  effective identity follows the builder's decision. This is the rule the gateway already
+  applies to its nginx identity. The check must also cover the path that restarts a stopped,
+  ready instance from its saved release without calling the builder. A postgres image of
+  another major version refuses to start on the retained data without changing it.
+  Governs R12.
+
+- KTD14. **A load of different media resets the cursor.** The session has one cursor and
+  no per-media resume position. `ListeningSession::control` kept the cursor when a `load`
+  replaced the media without naming a position, and the movie page, unlike every song
+  load, names none; the new movie was prepared at the old movie's cursor. The domain rule
+  becomes: a load that changes the media and names no position starts at zero. A load of
+  the same media keeps its cursor; the movie page sends no load for the movie that is
+  still loaded, which is the only resume there is. Present on the merge base. Governs R14.
+
+- KTD15. **Replay is a rule of starting at the source end, not memory of having ended.**
+  Replay lived in the player hook's in-memory completion state, so only the player that
+  reached the end could replay. A fresh player (new tab, reload, after Stop) was prepared
+  at the source end with desired state playing, its restore seek never settled, the
+  prepare expired after 20 seconds, and every later prepare waited on the same wedged
+  restore. A start or prepare whose cursor stands at the source end with desired state
+  playing now begins at zero, the rule `replay()` already applies; and a prepare with a
+  different target supersedes a pending restore instead of waiting for it. A paused
+  session at the end stays at the end. Why the native seek at the source end never
+  completes is not pinned; the paused restore at the end is tested for the same hang in
+  U15. Governs R15.
+
 ### High-Level Technical Design
 
 The client owns the clock; the server owns the fence.
@@ -323,8 +509,10 @@ generation; the throttle bounds the producer; failed transfers settle; stale ses
 
 Shared transcode application services, the web player, the session coordinator and the
 browser qualification fixtures change. The persistent instance's updater delivers the fixes
-after master merges. No schema change is expected; if session expiry needs a column, the
-migration follows the repository's PostgreSQL rules.
+after master merges. The first phase needed no schema change. The follow-up adds one
+migration (`playback_commands.disclosed_at`, following the repository's PostgreSQL rules)
+and changes the Session context, the signing API specification and generated client, the
+development tooling's image-identity handling, and `CONCEPTS.md`.
 
 ### Research Constraints to Preserve
 
@@ -481,3 +669,209 @@ passes; the existing gates keep passing.
 
 **Verification:** The browser gates on the CI image, plus one instrumented preview run
 against the reported source movie recorded as the delivery evidence.
+
+### U8. Keep the signed rendition set stable
+
+**Goal:** A rendition joins once with a lead and does not leave and rejoin.
+
+**Requirements:** R8; KTD8. **Dependencies:** none.
+
+**Files:** `TranscodeStreamingService`, `TranscodeStreamingPortInterface`,
+`QualityFilteringStreamingDecorator`, `TranscodeExecutionOwnershipPort` and its
+implementation (one read of the group's runtime rows), `StreamSigningController` with the
+API specification and generated client, `useBaanderPlayer.ts` (the refresh sends the
+attached set), the operator guide's transcoding page (the join lead),
+`tests/Fixtures/Transcode/AdaptiveBrowserFixture.php` and the other test doubles of
+`TranscodeExecutionOwnershipPort`, and their tests.
+
+**Approach:** Apply KTD8 in `getPlaybackState`; use the same single read in `renditions()`.
+The adaptive fixtures do not use the join rule; they stub the port's per-job runtime read
+and must answer the new group read.
+
+**Test scenarios:** A growing sibling joins only with the lead; with the primary one
+segment ahead of the cursor and no sibling qualified, the state is ready with the primary
+alone, also for a paused seek; an attached sibling stays while it leads by more than one
+segment and is withdrawn at that margin; a sibling that joined during a pause and then
+encodes slower than playback is withdrawn once, before its lead reaches zero; a withdrawn
+sibling rejoins only with the lead; a real-time sibling changes the set at most once over
+60 signings; a finished sibling joins
+without a lead and the lead is capped by the remaining duration; a progress report committed
+between runtime reads keeps the set; a malformed or foreign attached set is refused or
+ignored; a generation change still replaces the attachment.
+
+**Tests:** `AdaptiveDeliveryTest`, `GenerationDeliveryTest`, `StreamSigningSecurityTest`,
+`useBaanderPlayer.test.ts`.
+
+**Verification:** Focused backend and frontend tests; the preview measurement of U17.
+
+### U9. Release and settle a gone browser runner
+
+**Goal:** No sequence of stop, pause, close, reload, play or transfer leaves a session held
+by a browser runner that has gone and was never shown a command able to start playback
+since its last idle report.
+
+**Requirements:** R9, R10; KTD9–KTD11. **Dependencies:** none.
+
+**Files:** A migration adding `playback_commands.disclosed_at`; `PlaybackStoreInterface` and
+`PlaybackStore` (disclosure in `snapshot()`, whether a superseded control was disclosed,
+whether a transfer attempt's start was disclosed); `PlaybackCoordinator` (control expiry,
+the shared release check and its four callers, transfer expiry); `ListeningSession`;
+`PlaybackTransfer`; the web coordinator and command runner (close during an uncertain
+transfer; the refusal alert clears once the session has no unconfirmed playback);
+`src/Session/README.md` (the disclosed command); and their tests.
+
+**Approach:** KTD9–KTD11. Read the history of the coordinator test that pins the refused
+close before replacing it.
+
+**Test scenarios:** An undisclosed play to a stopped browser settles without a stop; a
+disclosed play still turns the session unknown, and after it expires two further stop
+expiries and a lapsed registration leave the session unknown with a stop outstanding, and
+registration, control and transfer do not release the runner; an unanswered stop on a
+confirmed idle runner settles; a paused runner is released after an undisclosed play
+settles, while the paused proof's existing later-command and revision cases keep refusing; a non-browser runner keeps the unknown path; a stop superseding a disclosed
+control marks the runner unknown; registration of the same tab releases its acknowledged
+paused or stopped runner in the registration answer; registration of another tab keeps a
+live runner; a control and a transfer release a gone idle runner after the revision check
+and a stale revision is refused first; a transfer right after the lapse starts its target
+without a source; an uncertain transfer settles when its target was never shown the start
+and stays fenced once it was; the overlay closes during an uncertain transfer.
+
+**Tests:** `ListeningSessionTest`, `PlaybackTransferTest`, a new control-expiry unit test,
+`ConfirmedPausedRunnerRecoveryTest`, `ConfirmedStoppedRunnerRecoveryTest`,
+`ConfirmedPausedRunnerPersistenceTest`, `PlaybackTransferPersistenceTest`, the web coordinator, command-runner and overlay suites.
+
+**Verification:** Session unit and PostgreSQL integration suites; the Firefox gate of U17.
+
+### U10. Answer a signing for ended sessions definitely
+
+**Goal:** A client that outlived its sessions continues on a new one.
+
+**Requirements:** R11; KTD12. **Dependencies:** U8 (same files).
+
+**Files:** `StreamSigningController` with the API specification and generated client,
+`AuthorizedPlayback` (the session lookup excludes ended sessions), `useBaanderPlayer.ts`,
+and their tests.
+
+**Test scenarios:** A refresh naming only ended sessions answers 410 with its reason; a
+refresh naming a session ended by `StaleTranscodeSessionExpiry`, before job cleanup, answers
+410 as expired; a failed or cancelled job answers 410 as failed or cancelled; a start
+without capacity still answers 503 with `Retry-After`; after an expiry 410 the player
+renegotiates delivery, signs and continues at its position, for an encoded and for a copy
+delivery; after a failed or cancelled 410 it shows the error and sends no start; a second
+410 before playback has advanced fails instead of repeating; it does not loop when the new
+start is unavailable.
+
+**Tests:** `StreamSigningSecurityTest`, `AuthorizedPlaybackTest`, `useBaanderPlayer.test.ts`.
+
+**Verification:** Focused backend and frontend tests.
+
+### U11. Keep a retained image identity only while the daemon resolves it
+
+**Goal:** A preview or persistent instance prepares after its retained postgres or redis
+image was removed from the daemon.
+
+**Requirements:** R12; KTD13. **Dependencies:** none.
+
+**Files:** `Build/Builder.php`, `ReleaseContract.php`, `Updater.php` where it re-applies the
+instance's identity, and the tooling tests under `scripts/tests/php`.
+
+**Approach:** KTD13. Establish first why the release pins of `preview-fd790a887b6899cb`
+left the daemon; if a tooling path removes pins that a retained identity still needs, fix
+that path as well. Cover the restart of a stopped, ready instance from its saved release,
+which does not call the builder.
+
+**Test scenarios:** A resolvable retained identity is reused and recorded as retained; a
+missing one is replaced by the release's image, recorded as not retained, and becomes the
+instance's identity at activation; redis and postgres both.
+
+**Tests:** `DevelopmentActivationTest`, `DevelopmentUpdatesTest`, `DevelopmentImagePinsTest`
+or their fixtures.
+
+**Verification:** The affected tooling suites; `make preview-up` in the primary checkout
+reaches readiness on its retained data.
+
+### U12. Type the cleanup result
+
+**Goal:** The cleanup's counts are one typed value, not an array read in two places.
+
+**Requirements:** none (left from review). **Dependencies:** none.
+
+**Files:** A result object in the Transcode application layer, `CleanupOrphanedJobsHandler`,
+`TranscodeJobController`, `TranscodeJobCleanupCommand`, and their tests.
+
+**Verification:** Focused backend tests; the API specification is unchanged.
+
+### U13. Make the gate's steps independent of timing and cursor position
+
+**Goal:** The two-command checkpoint fails only for product defects.
+
+**Requirements:** R13. **Dependencies:** U9.
+
+**Files:** `ui/web/tests/e2e/two-command/browser.mjs`.
+
+**Approach:** In `resumeReleasedPlayback`, decide between reopening and resuming only once
+Play is enabled, so the reopen click cannot land on the overlay's own button after a late
+reconnect. In `final-seek-paused`, choose a seek target at a fixed distance from the paused
+cursor, so the pointer cannot land inside the slider thumb. The immediate Play after the
+reload stays as it is: it is the proof of KTD10.
+
+**Verification:** The gate in both engines (U17).
+
+### U14. Start a newly loaded movie at zero
+
+**Goal:** A movie never opens at another movie's cursor.
+
+**Requirements:** R14; KTD14. **Dependencies:** U9 (same domain file).
+
+**Files:** `ListeningSession.php` and its tests.
+
+**Test scenarios:** A load of different media without a position resets the cursor; a load
+of the same media without a position keeps it; a load naming a position uses it.
+
+**Tests:** `ListeningSessionTest`.
+
+**Verification:** Focused backend and frontend tests; the preview run of U17.
+
+### U15. Replay from the source end on any player
+
+**Goal:** Play after a finished movie works after a reload, in a new tab and after Stop.
+
+**Requirements:** R15; KTD15. **Dependencies:** U8, U10 (same files).
+
+**Files:** `useBaanderPlayer.ts`, `VideoPlaybackRuntime.tsx`, and their tests.
+
+**Test scenarios:** A start asked to play at the source end begins at zero and sends one
+seek to zero; a paused start at the source end stays at the end and settles; a new seek
+supersedes a restore that has not settled; a prepare with a different position does not
+wait for the previous restore; the checkpoint's replay after completion keeps its exact
+seek sequence.
+
+**Tests:** `useBaanderPlayer.test.ts`, a new `VideoPlaybackRuntime` test.
+
+**Verification:** Focused frontend tests; the gate and the preview run of U17.
+
+### U16. Correct the record
+
+**Goal:** The roadmap and this plan state what the follow-up found.
+
+**Files:** `ROADMAP.md`, `CONCEPTS.md`.
+
+**Approach:** Add the join lead and the disclosed command to `CONCEPTS.md` (the lead owns
+the file, so U8 and U9 can run side by side). Replace the "Firefox reload" open item's description (no second pause command
+exists; the release ran late) and record the follow-up units, their checkpoints and what
+stays open.
+
+### U17. Verify the follow-up
+
+**Goal:** Every gate named by this plan has run at the final code.
+
+**Requirements:** R8–R15 and the first phase's success criteria. **Dependencies:** U8–U16.
+
+**Approach:** `ce-simplify-code` over the follow-up changes; the Transcode and Session unit
+suites, the PostgreSQL integration files and the static gates in the CI image; the web
+typecheck and suites; a worker image built from the final code; the two-command gate with
+client controls in Chromium and Firefox; the adaptive and media-control gates and the
+movie-endpoint step; one cold-start preview run of the reported movie that counts
+attachments and stalled time against AE8, then loads a second movie (AE15) and replays after a reload (AE16); `ce-code-review` over the follow-up range with its justified
+findings applied.
+
