@@ -62,19 +62,25 @@ final class TranscodeStreamingService implements TranscodeStreamingPortInterface
             return null;
         }
         $primary = $jobs[0];
-        $group = $this->contexts($jobs);
-        $runtime = $group['admitted'][$primary->getId()->toString()] ?? null;
+        $key = $primary->getId()->toString();
+        $group = $this->contexts($jobs, siblingsBesideCoveringPrimary: true);
+        $canonical = $group['contexts'][$key] ?? null;
+        if ($canonical !== null && $this->coversCursor($canonical) && count($group['contexts']) < count($jobs)) {
+            // The cursor moved into the primary's coverage between the two reads: the siblings count after all.
+            $group = $this->contexts($jobs);
+            $canonical = $group['contexts'][$key] ?? null;
+        }
+        $runtime = $group['admitted'][$key] ?? null;
         if ($runtime === null) {
             return null;
         }
-        $canonical = $group['contexts'][$primary->getId()->toString()];
         $pairs = [];
         // The session's primary rendition alone decides readiness, by covering the cursor.
         if ($canonical !== null && $this->coversCursor($canonical)) {
             $pairs[] = ['jobId' => $primary->getPublicId()->toString(), 'generation' => $canonical['runtime']->generation];
             $attached = array_column($attachedRenditions, 'generation', 'jobId');
             foreach (array_slice($jobs, 1) as $job) {
-                $context = $group['contexts'][$job->getId()->toString()];
+                $context = $group['contexts'][$job->getId()->toString()] ?? null;
                 if ($context === null || !$this->compatible($canonical, $context) || !$this->canMerge($canonical, $context)) {
                     continue;
                 }
@@ -333,20 +339,27 @@ final class TranscodeStreamingService implements TranscodeStreamingPortInterface
      * one statement before their indexes and in one statement after them, so a control that moves
      * every sibling's cursor together can never be seen for some renditions and not for others.
      *
+     * A signing polls once a second while a start or a seek warms up. Siblings are offered only
+     * beside a primary that covers the cursor, so until the first job does, the indexes of the
+     * others are not read when the caller asks for that; their contexts are then absent.
+     *
      * @param list<TranscodeJob> $jobs
      * @param array<string, int> $generations Pinned generation by job id; the current one when absent.
      * @return array{admitted: array<string, TranscodeRuntimeSnapshot>, contexts: array<string, Context|null>}
      */
-    private function contexts(array $jobs, array $generations = []): array
+    private function contexts(array $jobs, array $generations = [], bool $siblingsBesideCoveringPrimary = false): array
     {
         $ids = array_map(static fn (TranscodeJob $job): Uuid => $job->getId(), $jobs);
         $admitted = $this->ownership->findGroup($ids);
         $published = [];
-        foreach ($jobs as $job) {
+        foreach ($jobs as $index => $job) {
             $key = $job->getId()->toString();
             $runtime = $admitted[$key] ?? null;
             $generation = $generations[$key] ?? ($runtime === null ? 0 : $runtime->generation);
             $published[$key] = $runtime === null || $generation < 1 ? null : $this->published($job, $generation, $runtime);
+            if ($index === 0 && $siblingsBesideCoveringPrimary && ($published[$key] === null || !$this->coversCursor($published[$key]))) {
+                break;
+            }
         }
         $latest = $this->ownership->findGroup($ids);
         $contexts = [];

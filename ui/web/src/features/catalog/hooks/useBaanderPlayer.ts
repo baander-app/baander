@@ -965,6 +965,14 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, coor
           && (!video.seeking || settledWhileSeeking)
       }, signal)
     }
+    // Waits until a cursor can be named. A session takes one before any restore has settled, once
+    // its duration is known; that arrives with the first prepared snapshot.
+    const readyToSeek = async (signal: AbortSignal) => {
+      await waitFor(() => snapshot !== null, signal)
+      // Without a transcode session the element is its own clock and has to be loaded first.
+      if (snapshot?.sessionId === null) await ready(signal)
+      else await waitFor(() => sourceDuration > 0, signal)
+    }
     const locallyControlled = () => recoverySupported && coordinated && video.disableRemotePlayback
       && video.disablePictureInPicture && !video.controls && video.getAttribute('x-webkit-airplay') === 'deny'
       && video.remote?.state === 'disconnected'
@@ -990,10 +998,7 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, coor
       observe,
       prepare: async (position, playing, signal) => {
         signal.throwIfAborted()
-        await waitFor(() => snapshot !== null, signal)
-        // Without a transcode session the element is its own clock and has to be loaded first.
-        if (snapshot?.sessionId === null) await ready(signal)
-        else await waitFor(() => sourceDuration > 0, signal)
+        await readyToSeek(signal)
         // Playing from the source end is a replay; a paused cursor stays at the end.
         const target = playing && atSourceEnd(position) ? 0 : sourceDuration > 0 ? Math.max(0, Math.min(sourceDuration, position)) : position
         if (Math.abs(cursor() - target) > 0.05) await execution.execute('seek', target, signal)
@@ -1012,12 +1017,7 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, coor
         // A seek names a new target, so it does not wait for a restore of the old one to settle;
         // it needs the session's duration, which arrives with the first prepared snapshot.
         if (action !== 'seek') await ready(signal)
-        else {
-          await waitFor(() => snapshot !== null, signal)
-          // Without a transcode session the element is its own clock and has to be loaded first.
-          if (snapshot?.sessionId === null) await ready(signal)
-          else await waitFor(() => sourceDuration > 0, signal)
-        }
+        else await readyToSeek(signal)
         const cancel = () => {
           executionEpoch++
           executionPermitted = false

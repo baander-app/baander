@@ -347,11 +347,15 @@ final readonly class PlaybackStore implements PlaybackStoreInterface
         if ($incarnationId !== null && $this->connection()->getTransactionNestingLevel() <= 1) {
             // This is the only place a pending command leaves the server. Recording it in the transaction
             // that builds the snapshot means a command without the mark was never shown to its runner.
-            $this->connection()->executeStatement(<<<'SQL'
-                UPDATE playback_commands SET disclosed_at=CURRENT_TIMESTAMP
-                WHERE session_id=:session AND incarnation_id=:incarnation AND acknowledged_at IS NULL AND disclosed_at IS NULL
-                SQL, ['session' => $session['id'], 'incarnation' => $incarnationId]);
+            // The mark is written by the statement that reads the commands: PostgreSQL runs a
+            // data-modifying WITH to completion whether or not the main query refers to it, and the
+            // main query reads the rows as they stood when the statement began.
             $commands = $this->connection()->fetchAllAssociative(<<<'SQL'
+                WITH shown AS (
+                    UPDATE playback_commands SET disclosed_at=CURRENT_TIMESTAMP
+                    WHERE session_id=:session AND incarnation_id=:incarnation AND acknowledged_at IS NULL AND disclosed_at IS NULL
+                    RETURNING id
+                )
                 SELECT id,attempt_id AS "attemptId",revision,incarnation_id AS "incarnationId",epoch,type,payload,expires_at AS "expiresAt"
                 FROM playback_commands WHERE session_id=:session AND incarnation_id=:incarnation AND acknowledged_at IS NULL
                 ORDER BY created_at,id

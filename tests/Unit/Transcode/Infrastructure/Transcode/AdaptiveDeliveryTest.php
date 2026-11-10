@@ -16,6 +16,7 @@ use App\Transcode\Application\DTO\MediaTrack;
 use App\Transcode\Application\DTO\TranscodeRuntimeSnapshot;
 use App\Transcode\Application\Port\TranscodeExecutionOwnershipPort;
 use App\Transcode\Application\Port\TranscodePublicViewInterface;
+use App\Transcode\Application\Port\TranscodeStoragePortInterface;
 use App\Transcode\Domain\Model\TranscodeJob;
 use App\Transcode\Domain\Model\TranscodeSession;
 use App\Transcode\Domain\Repository\TranscodeJobRepositoryInterface;
@@ -62,6 +63,8 @@ final class AdaptiveDeliveryTest extends TestCase
     /** @var list<string> */
     private array $runtimeReads = [];
     private int $groupReads = 0;
+    /** @var list<string> Quality tiers whose published index was resolved, in order. */
+    private array $indexReads = [];
     /** @var \Closure(int): void Runs before each group read, with its ordinal; lets a test commit a control between reads. */
     private \Closure $beforeGroupRead;
     private string $requestId;
@@ -141,7 +144,14 @@ final class AdaptiveDeliveryTest extends TestCase
             return $runtimes;
         });
         $auth = new HmacStreamAuthAdapter('adaptive-secret');
-        $this->streaming = new TranscodeStreamingService($jobs, new TranscodeFileStorage(new SegmentFileResolver($this->root)), new ManifestGenerator(), new DashManifestGenerator(), new QualityLadderRenderer(), $auth, $ownership, new PublishedPresentationReader());
+        $files = new TranscodeFileStorage(new SegmentFileResolver($this->root));
+        $storage = $this->createStub(TranscodeStoragePortInterface::class);
+        // Every rendition whose published index is resolved first asks for its generation's storage.
+        $storage->method('forGeneration')->willReturnCallback(function (Uuid $video, QualityTier|string $tier, int $generation, Uuid $job) use ($files): TranscodeStoragePortInterface {
+            $this->indexReads[] = $tier instanceof QualityTier ? $tier->name : $tier;
+            return $files->forGeneration($video, $tier, $generation, $job);
+        });
+        $this->streaming = new TranscodeStreamingService($jobs, $storage, new ManifestGenerator(), new DashManifestGenerator(), new QualityLadderRenderer(), $auth, $ownership, new PublishedPresentationReader());
         $videos = $this->createStub(TranscodePublicViewInterface::class);
         $videos->method('videoId')->willReturn($this->video);
         $this->signing = new StreamSigningController($auth, $playback, $videos, $this->streaming);
@@ -402,6 +412,48 @@ final class AdaptiveDeliveryTest extends TestCase
             self::assertSame(['360p'], $this->tiers($signed));
             self::assertSame(1, substr_count($this->master($signed['url']), '#EXT-X-STREAM-INF:'));
         }
+    }
+
+    public function testPrimaryThatDoesNotCoverTheCursorYetReadsNoSiblingIndex(): void
+    {
+        // A seek is warming up: the siblings are published far ahead, the primary has not reached the cursor.
+        $this->grow(0, 1);
+        $this->grow(1, 20);
+        $this->cursor(7.0);
+        $this->indexReads = [];
+        $this->groupReads = 0;
+        $this->runtimeReads = [];
+        $warming = $this->sign(true);
+        self::assertFalse($warming['ready']);
+        self::assertSame('', $warming['renditionSet']);
+        self::assertSame(7, $warming['position']);
+        self::assertSame(['360p'], $this->indexReads);
+        self::assertSame(2, $this->groupReads, 'The runtimes of all jobs are still read together, before and after the index.');
+        self::assertCount(6, $this->runtimeReads);
+
+        // Once the primary covers the cursor, the siblings are resolved and offered.
+        $this->grow(0, 2);
+        $this->indexReads = [];
+        self::assertSame(['360p', '720p', '1080p'], $this->tiers($this->sign(true)));
+        self::assertSame(['360p', '720p', '1080p'], $this->indexReads);
+    }
+
+    public function testCursorMovingIntoThePrimarysCoverageBetweenTheReadsStillOffersTheSiblings(): void
+    {
+        $this->grow(1, 20);
+        $this->cursor(100.0);
+        $this->groupReads = 0;
+        // The first read sees a cursor the primary does not cover; the control that moves it commits before the second.
+        $this->beforeGroupRead = function (int $read): void {
+            if ($read === 2) {
+                $this->cursor(1.0);
+            }
+        };
+        $signed = $this->sign(true);
+        self::assertTrue($signed['ready']);
+        self::assertSame(1, $signed['position']);
+        self::assertSame(['360p', '720p', '1080p'], $this->tiers($signed));
+        self::assertSame(4, $this->groupReads);
     }
 
     public function testAttachedSiblingStaysAboveOneSegmentAndIsWithdrawnAtThatMargin(): void
