@@ -430,7 +430,11 @@ Open for the user (added 2026-11-10, not built by this plan):
   a never-effective command records the session revision at which it settled
   (`settled_revision`, added after code review), and the proof requires the session to
   stand at the last such revision, or one past the acknowledgement when there is none.
-  Governs R9.
+  Two late additions from the final preview run: a `started` answer counts as paused
+  proof when the start asked for paused, and the video player pauses through the session
+  at a natural end. An observation of `paused` while the session wants playing is never
+  proof: an element reads paused during loads too, and a tab cut off from the network
+  can play on from its buffer. Governs R9.
 
 - KTD11. **The overlay closes; the fence stays.** Closing the overlay during an uncertain
   transfer silences the local video and resolves without a session control. The session
