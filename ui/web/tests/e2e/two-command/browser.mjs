@@ -526,6 +526,61 @@ function dialogueCueAt(position) {
   return null
 }
 
+// The final paused seek is a pointer press on the source timeline. A press inside the thumb
+// starts a drag without changing the value, so it commits no seek, and where the thumb
+// rests depends on how long the earlier phases played. The target therefore lies ten
+// seconds behind the paused thumb, far outside the thumb. It lies four seconds further
+// back where it would otherwise meet the operator's seek position, so the browser's and
+// the operator's cursors stay distinguishable, and it never passes five seconds beyond
+// that position, which keeps it on the 15-40 s dialogue cue the next phase's subtitle
+// proof requires.
+function finalSeekTarget(pausedThumb, operatorPosition) {
+  return [10, 14].map(distance => Math.min(Math.round(pausedThumb) - distance, operatorPosition + 5))
+    .find(target => Math.abs(target - operatorPosition) >= 2)
+}
+
+// A page registers its playback endpoint over a newly opened WebSocket, and the server
+// answers with the session snapshot that carries the registration. This resolves with that
+// first answer: its revision, the runner it names as active, and how long after the
+// registration it arrived. The frames are only observed, so the page receives them
+// unchanged; the capability in the answer is not kept. The listeners are removed once the
+// answer is seen or the time is up, and without an answer in time it resolves with null.
+function observeRegistrationAnswer(milliseconds = 45000) {
+  return new Promise(resolve => {
+    const observed = new Map()
+    const finish = answer => {
+      clearTimeout(timer)
+      page.off('websocket', observe)
+      for (const [socket, listeners] of observed) {
+        socket.off('framesent', listeners.sent)
+        socket.off('framereceived', listeners.received)
+      }
+      observed.clear()
+      resolve(answer)
+    }
+    const observe = socket => {
+      let registeredAt = null
+      const sent = ({ payload }) => {
+        if (registeredAt === null && typeof payload === 'string' && payload.includes('"session.endpoint"')) registeredAt = Date.now()
+      }
+      const received = ({ payload }) => {
+        if (typeof payload !== 'string' || !payload.includes('"session.snapshot"')) return
+        let message
+        try { message = JSON.parse(payload) } catch { return }
+        if (message?.type !== 'session.snapshot' || !message.data?.endpoint) return
+        const at = Date.now()
+        finish({ at, sinceRegistrationMs: registeredAt === null ? null : at - registeredAt,
+          revision: message.data.revision, activeIncarnationId: message.data.activeIncarnationId })
+      }
+      observed.set(socket, { sent, received })
+      socket.on('framesent', sent)
+      socket.on('framereceived', received)
+    }
+    const timer = setTimeout(() => finish(null), milliseconds)
+    page.on('websocket', observe)
+  })
+}
+
 async function restingCursorNow() {
   const state = await mediaState()
   assert(snapshot?.ready, 'The browser must hold a ready owned session before the operator phases')
@@ -538,8 +593,22 @@ async function restingCursorNow() {
 // resumes playback locally from the recovered cursor. The signed playback snapshot only
 // arrives once a local player attaches again, so the paused position is read from the
 // overlay's timeline.
-async function resumeReleasedPlayback(owner, position, label, started) {
-  if (await seekSlider().count() === 0) await page.getByRole('button', { name: 'Play', exact: true }).click()
+//
+// While the page is still recovering it shows no Play button, or only the overlay's
+// disabled one. Which Play button is on screen is read once one is enabled: beside the seek
+// slider it is the overlay's, which resumes playback; without the slider it is the page's,
+// which reopens the overlay. A reopen click chosen earlier would wait through the recovery
+// and land on the overlay's Play, queueing a second play behind the resume click.
+async function resumeReleasedPlayback(owner, position, label, started, beforeResume = async () => {}) {
+  const enabledPlay = page.getByRole('button', { name: 'Play', exact: true, disabled: false })
+  let overlayOpen
+  await until(async () => {
+    await enabledPlay.waitFor({ timeout: 45000 })
+    overlayOpen = await seekSlider().count() > 0
+    // The reading stands only while that one enabled Play button is still on screen.
+    return await enabledPlay.count() === 1
+  }, `one enabled Play button after ${label}`)
+  if (!overlayOpen) await enabledPlay.click()
   let reopenedPosition
   try {
     await until(async () => {
@@ -552,6 +621,7 @@ async function resumeReleasedPlayback(owner, position, label, started) {
   }
   assert.equal(await page.locator('video').count(), 0, `Playback must not mount a video after ${label} before it resumes locally`)
   clientControls.push({ action: `${label}-released-paused`, at: Date.now(), elapsedMs: Date.now() - started, position, reopenedPosition, playback: null })
+  await beforeResume()
   const resumeStarted = Date.now()
   await page.getByRole('button', { name: 'Play', exact: true }).click()
   video = await page.locator('video').elementHandle()
@@ -2343,12 +2413,34 @@ async function checkpoint({ phase, baseUrl, credentials }) {
     previousMediaEvents.push(...await page.evaluate(() => window.__twoCommandMediaEvents ?? []))
     const previousVideo = video
     snapshot = undefined
+    // The reload leaves a runner whose pause the session confirmed, and the reloaded page
+    // registers a new endpoint for the same tab. The answer to that registration must
+    // already show the session without an active runner, in every engine: an immediate
+    // Play is otherwise refused until a later snapshot releases the runner. The answer is
+    // kept as evidence whether or not the phase gets as far as checking it.
+    const registration = observeRegistrationAnswer().then(answer => {
+      const at = answer?.at ?? Date.now()
+      clientControls.push({ action: 'remount-registration', at, elapsedMs: at - remountStarted, answered: answer !== null,
+        sinceRegistrationMs: answer?.sinceRegistrationMs ?? null, revision: answer?.revision ?? null,
+        activeIncarnationId: answer ? answer.activeIncarnationId : undefined, playback: null })
+      return answer
+    })
     await page.reload()
     await previousVideo.dispose()
-    await resumeReleasedPlayback(owner, pausedPosition, 'remount', remountStarted)
+    // The overlay's Play is enabled only after the page has handled the registration answer,
+    // so reading that answer here does not delay the resume click that follows.
+    await resumeReleasedPlayback(owner, pausedPosition, 'remount', remountStarted, async () => {
+      const answer = await registration
+      assert(answer, 'The reloaded page must receive an answer to its endpoint registration')
+      assert.equal(answer.activeIncarnationId, null, 'The registration answer after a reload must already show the confirmed paused runner released')
+    })
     await pausePlayback(owner, 'final-pause')
-    // Leave a different paused cursor so the following operator seek changes position.
-    await seekSourceAndDecode(owner, credentials.expectedSeekPosition + 5, 'final-seek-paused', true)
+    // Leave a paused cursor that differs from the operator's seek position of the next phase.
+    const pausedThumb = await sliderValue()
+    const finalTarget = finalSeekTarget(pausedThumb, credentials.expectedSeekPosition)
+    assert(finalTarget >= 0 && pausedThumb - finalTarget >= 9.5 && dialogueCueAt(finalTarget) !== null,
+      `The final seek target ${finalTarget} must lie on a dialogue cue, clear of the paused thumb at ${pausedThumb}`)
+    await seekSourceAndDecode(owner, finalTarget, 'final-seek-paused', true)
     restingCursor = await restingCursorNow()
   } else if (phase === 'sought-paused') {
     // Video admission belongs to a client session: the operator's pause and seek act on
