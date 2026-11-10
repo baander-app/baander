@@ -252,6 +252,11 @@ are resolved in KTD1–KTD7.
   settles the movie's snapshot — the stuck transfer state is cleared with the same fence that
   recorded it — and the coordinator's early returns on unusable state report an error through
   the existing performance-mark and error paths instead of returning silently. Governs R4.
+  Added 2026-11-10 after the preview run: a browser runner that acknowledged an explicit
+  Stop and then went away kept its place and refused every other tab for good. A snapshot
+  releases it once its registration has expired or been retired, its own last report was
+  "stopped" and no command or transfer is outstanding; a runner still registered keeps its
+  place.
 
 - KTD5. **Constrain secondary controls in the movie overlay.** The volume slider gets an
   explicit bounded width in `MoviePlayerOverlay`, matching how `NowPlayingBar` constrains its
@@ -261,7 +266,9 @@ are resolved in KTD1–KTD7.
   that no playback report and no stream signing has touched for 24 hours, the longest
   lifetime of a signed stream URL, is stale unless its presentation is finished. Signing
   now touches the session, so a paused player, which sends no reports but renews its URL,
-  never expires. Expiry runs at the start of job cleanup: it cancels the execution so the
+  never expires. Signing writes only a session whose last write is over an hour old
+  (added 2026-11-10 after code review), so it takes no row lock beside a playing client's
+  playback control; the quality-ladder read is not a sign of life. Expiry runs at the start of job cleanup: it cancels the execution so the
   worker stops and frees its slot, ends the session and releases the job without
   cancelling it, which makes the job orphaned. Cleanup skips a job whose worker still
   holds a live lease and removes it on the next run. The original condition "no runnable

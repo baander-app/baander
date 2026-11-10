@@ -640,6 +640,125 @@ Open:
 - The full tooling suite completed green on 2026-11-09 (1525 tests, 13,063
   assertions, 9 environment skips, 50 minutes) with the gateway fix landing
   mid-run; a clean full re-run on the merged master remains pending.
+- A retained postgres identity fails the way the redis item above describes.
+  The primary checkout's preview (`preview-fd790a887b6899cb`) stays in
+  `preparation_failed` because its retained `postgres_image` identity no
+  longer exists in the daemon ("No such image"). `ReleaseContract` and
+  `Updater::activate` reuse a retained postgres or redis identity without
+  checking that it still resolves. Found 2026-11-10; a preview from a fresh
+  worktree has no retained identity and starts.
+
+### Movie playback on growing presentations
+
+Delivered on the branch `movie-playback-growing-presentations` from the
+[plan](docs/plans/2026-11-09-1635-fix-movie-playback-growing-presentations-plan.md);
+not merged. On the persistent instance a 1080p movie cut forward every few
+seconds while its encode ladder ran ahead of playback, wedged after a failed
+transfer and left eight sessions holding jobs, slots and 361 MB of output.
+
+- **Clock (U1, U3):** the hls.js live-edge disable is pinned by a test of the
+  constructed configuration (`7723c16b9`), and a player-internal seek is
+  recorded as a `baander:native-seek` mark and no longer sent to the server,
+  where it restarted every encoder (`99ad11a3e`).
+- **Session cursor (U2):** no code. The server already reported the session
+  cursor; the drift came from the client's own edge seeks. The plan's decision
+  is corrected (`76b4b1e6b`).
+- **Transfers (U4):** a rejected transfer command settles the transfer as
+  failed under its own fence, and the coordinator's refusals raise an error
+  and a mark instead of returning silently (`dee8bdea4`).
+- **Stopped runner:** a browser that acknowledged an explicit Stop kept its
+  place after it had gone, so every other tab was refused with "Previous
+  playback is unconfirmed" for good; reproduced on a preview in Chromium. A
+  snapshot now releases it once its registration has expired or been retired
+  (`056ba961d`). The cause was `7cf695486`, which also left
+  `PlaybackTransferPersistenceTest`'s reconnect test failing on `master`; the
+  test now asserts the real sequence.
+- **Overlay (U5):** the volume slider is bounded at 5 rem, so the seek slider
+  is the only full-width slider (`f2cd12d83`).
+- **Stale sessions (U6):** a session that no playback report and no stream
+  signing has touched for 24 hours expires at the start of job cleanup, unless
+  its presentation is finished. Expiry cancels the execution so the worker
+  frees its slot, and cleanup removes the job once the worker has let go
+  (`adf06fedb`). The plan's condition "no runnable job" could never be met and
+  was dropped: all eight stale jobs on the instance still had a worker
+  renewing its lease 20 hours later. The cleanup endpoint and
+  `app:transcode:job:cleanup --json` now return `{expired, cleaned}`. After
+  review, a signing renews a session only when its last write is over an hour
+  old, and one failing expiry no longer blocks the rest (`b26455a68`).
+- **Gate (U7):** the two-command checkpoint ends with a 24-second window on
+  the replay after movie completion: the media clock may gain at most one
+  second on the wall clock, no generation may change and no seek may reach
+  the server, and the producer must publish at least 1.5 times real time
+  (`0a76ee3a2`). The drill's outer bound moves from 600 to the documented 900
+  seconds.
+
+Verification, 2026-11-10, in `baander-ci-prewarm:local` at `056ba961d`:
+
+- The Transcode and Session unit suites pass 1,516 tests with 32,409
+  assertions. The integration files pass: `TranscodeSessionOwnershipPersistenceTest`
+  15 tests, the three playback-session persistence files 42 tests, and the
+  sibling-control rollback and admin parity files 15 tests (the last run at
+  `adf06fedb`).
+- PHPStan, Deptrac, `lint:container` and the OpenAPI check pass. The web
+  typecheck passes, and the web session and catalog suites pass 426 tests.
+- The gate passes in Chromium 156 at `adf06fedb` (all eight phases, 10:56,
+  producer rate 18.4, largest clock gain 0.001 s). With the forwarding that
+  `99ad11a3e` removed restored in the image, it fails in `worker-recovered`:
+  "Only a committed seek may reach the server; the player sent 1 without
+  one". Receipts are under `var/test-runs/u7-gate-*`.
+- The gate does not reach its new window in Firefox 157. With client controls
+  the drill fails at the `client-controls` reload, on this branch at
+  `056ba961d` (two runs) and on the merge base `f71e2c7b7` alike: Play is
+  refused with "Previous playback is unconfirmed" and no video mounts. See
+  the open item below.
+- The reported movie (1920x1080 H.264/Opus, 223.59 s) played to its end on a
+  fresh preview at `0a76ee3a2`, sampled every 250 ms: the clock never gained
+  more than 0.02 s on the wall clock between samples and never moved back,
+  the player recorded no native seek and sent no seek, all three jobs stayed
+  in one generation, and one set of three sessions and three jobs served the
+  whole play. The overlay showed a volume slider of 80 px and a seek slider of
+  1,408 px at a 1,440 px viewport.
+- `ce-code-review` over `f71e2c7b7..0a76ee3a2` with nine reviewers returned
+  two confirmed P2 findings, both on the session touch and both fixed in
+  `b26455a68`. The cross-model pass is disabled by the checkout configuration.
+
+Open:
+
+- **Startup stalls:** in the preview run the player replaced its source 13
+  times in the first 53 seconds and lost about 23 seconds to the reloads; the
+  play took 247 seconds. Nothing was replaced afterwards. Each replacement
+  follows a change of the signed rendition set; why the set changed that
+  often while the ladder started is not diagnosed.
+- **Play inside the registration window:** pressing Play in another tab
+  within the 30 seconds before a closed, stopped tab's registration expires
+  sends the command to the dead runner. Traced in code, not run: the command
+  expires, the session turns unknown with a stop outstanding, and the refusal
+  stays. A transfer in the instant after expiry and before the next snapshot
+  takes the same path.
+- **Client asleep for over a day:** a tab that returns after its session
+  expired receives 503 from signing, which the player retries as a transient
+  outage. Reopening the movie starts a new session; the open tab does not
+  recover by itself.
+- **Firefox reload:** before the reload the session receives a second `pause`
+  command about 50 ms after the first is acknowledged, and the page reloads
+  before that one is acknowledged. The unacknowledged command blocks the
+  release of the paused runner, and Firefox has no local recovery to fall
+  back on. What sends the second pause is not identified. The drill now keeps
+  each session request's action in `failure.json`; receipts are under
+  `var/test-runs/u7-gate-head2-firefox-run2`. Without client controls one run
+  at `adf06fedb` failed earlier, in `web-restarted` ("Timed out waiting for
+  native pause to commit"), with no base comparison. The roadmap recorded
+  both engines passing at `7cf695486` on 2026-11-06.
+- **Not run:** the adaptive and media-control gates, the movie-endpoint step,
+  the gate on the CI image or a hosted runner (the 1.5 rate is unproven on a
+  slower host), and the persistent instance's cleanup run, which needs the
+  branch on `master`.
+- **Left from the review:** closing the overlay is refused while its video is the
+  source of an uncertain transfer, and whether reconcile clears that state
+  for an unreachable destination was not traced. The cleanup result is an
+  untyped array read in two places.
+- **Finished presentations:** these keep their sessions and are reclaimed by
+  the cache sweep's 24-hour TTL, not by job cleanup.
 
 ## Roadmap maintenance
 
