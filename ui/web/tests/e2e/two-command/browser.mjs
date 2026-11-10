@@ -311,7 +311,16 @@ page.on('request', request => {
 page.on('response', async response => {
   const url = new URL(response.url())
   if (url.pathname.startsWith('/api/')) {
-    appendBounded(apiResponses, { at: Date.now(), path: url.pathname, status: response.status() })
+    // A refused resume is explained by the session requests before it, so those keep what
+    // they asked or reported. No identifier or capability is kept.
+    let sessionRequest = {}
+    if (url.pathname.startsWith('/api/session/') && response.request().method() === 'POST') {
+      try {
+        const body = response.request().postDataJSON()
+        sessionRequest = { action: body?.action, outcome: body?.outcome, observedState: body?.observedState }
+      } catch { /* A body that is not JSON carries nothing to keep. */ }
+    }
+    appendBounded(apiResponses, { at: Date.now(), path: url.pathname, status: response.status(), ...sessionRequest })
   }
   if (url.pathname === '/api/stream/sign' && response.ok()) {
     const receivedAt = Date.now()
