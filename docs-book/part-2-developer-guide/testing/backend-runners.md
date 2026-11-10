@@ -80,7 +80,10 @@ locally qualified image can be selected with the same variable. Check its PHP
 extensions and locked Swoole version; host PHP is not a substitute unless those
 requirements pass. The unit and messaging runners stream the current checkout and
 installed Composer dependencies into an isolated container. Image selection does
-not select an older copy of the application source.
+not select an older copy of the application source. A code change therefore needs
+no image rebuild. Rebuild the image with the command above when its own content
+changes (PHP extensions, the locked Swoole version, system packages, FFmpeg) or
+when `docker images` no longer lists the tag.
 
 The shared backend coordinator runs all four suites when no selection is given:
 
@@ -205,7 +208,7 @@ The functional runner creates an isolated PostgreSQL/Redis network, extracts the
 checkout into a fresh directory, and runs Doctrine migrations twice before
 executing the requested PHPUnit paths or options. With no arguments it selects `tests/Functional`.
 A fresh database executes `Version20261017000000` and all forward migrations in
-`migrations/` (currently through `Version20261107120000`); the second run checks that recorded migrations
+`migrations/` (currently through `Version20261110120000`); the second run checks that recorded migrations
 leave no pending work. The paired-deployment migration must also reject unresolved
 or inconsistent singleton history and preserve confirmed retirement records.
 Integration tests and runtime fixtures use
@@ -275,6 +278,37 @@ Run these in the application PHP runtime with the current Composer dependencies.
 Existing baselines record debt; do not regenerate or expand them to hide a failing
 check. Address runtime defects before annotation cleanup. The full application
 publisher requires both analyses to succeed, in addition to its test gates.
+
+`make phpstan` and the static steps of `make ci` run through
+`scripts/check-backend-container.php`. The script copies a snapshot of the
+worktree, uncommitted changes included, and the installed `vendor`,
+`scripts/vendor` and `relay/vendor` directories into a fresh application root in a
+disposable container without network access. It then runs the given command there
+as `www-data` with `APP_ENV=test`. The installed dependencies must match
+`composer.lock`. `--image` or `BAANDER_TEST_IMAGE` selects the image; without
+either, the script first builds a CI image from the snapshot. The same script runs
+the other static gates for the current tree, which are Deptrac, the container lint
+and the OpenAPI drift check:
+
+```bash
+export BAANDER_TEST_IMAGE=baander-ci:local
+make phpstan
+php scripts/check-backend-container.php --image "$BAANDER_TEST_IMAGE" -- vendor/bin/deptrac analyse --no-cache --no-progress
+php scripts/check-backend-container.php --image "$BAANDER_TEST_IMAGE" -- php bin/console lint:container --env=test --no-debug
+php scripts/check-backend-container.php --image "$BAANDER_TEST_IMAGE" -- php bin/console app:export-openapi-spec --env=test --no-debug --check
+```
+
+CI runs PHPStan, Deptrac and the OpenAPI check with a plain `docker run` on the
+image it has just built, so each analyses the source copied in at build time. To
+point such a container at the current tree instead, bind-mount the changed paths
+read-only over the application root, `/var/www/html`, and mount `packages` whenever
+you mount `vendor`. `vendor/baander/tooling`, `vendor/baander/phpstan-rules`,
+`vendor/swoole-bundle/swoole-bundle` and `vendor/tsduck/php` are symlinks into
+`packages/`. Without that mount they resolve to the image's older package sources,
+and class loading against the current `src/` fails with incompatible-declaration
+errors. On an SELinux host, a bind mount from a directory that host setup has not
+labelled, such as a scratch file outside the worktree, needs the `:z` option;
+otherwise the container reports "Permission denied".
 
 ## Application publication gates
 

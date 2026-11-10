@@ -185,13 +185,43 @@ class Workers
         $this->mutate($instance, fn(WorkerLifecycle $lifecycle, array &$record) => $lifecycle->ready($record, $timeout));
     }
 
-    /** @param array<string,mixed> $instance */
+    /**
+     * A boot whose operator image left the daemon is retired without the operator once none of
+     * its containers exists; every other boot retires through its operator.
+     *
+     * @param array<string,mixed> $instance
+     */
     public function retire(array &$instance): void
     {
         if (empty($instance['workers'])) {
             return;
         }
-        $this->mutate($instance, fn(WorkerLifecycle $lifecycle, array &$record) => $lifecycle->retire($record));
+        $this->mutate($instance, static fn(WorkerLifecycle $lifecycle, array &$record) => $lifecycle->operatorLost($record)
+            ? $lifecycle->retireWithoutOperator($record)
+            : $lifecycle->retire($record));
+    }
+
+    /**
+     * Fails before anything is changed when the recorded boot's operator image left the daemon
+     * while containers of the boot still exist.
+     *
+     * @param array<string,mixed> $instance
+     */
+    public function assertRetirable(array $instance): void
+    {
+        $this->guard(fn() => $this->lifecycle($instance)->assertRetirable(WorkerStateStore::hydrate($instance)));
+    }
+
+    /**
+     * Whether the recorded boot has to retire, or already retired, without its operator. Such a
+     * boot can still be registered in the database, which only the operator retires.
+     *
+     * @param array<string,mixed> $instance
+     */
+    public function operatorLost(array $instance): bool
+    {
+        return !empty($instance['workers']['operator_lost'])
+            || $this->guard(fn(): bool => $this->lifecycle($instance)->operatorLost(WorkerStateStore::hydrate($instance)));
     }
 
     /** @param array<string,mixed> $instance

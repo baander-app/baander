@@ -10,6 +10,7 @@ import { MovieMetadata } from '../components/MovieMetadata'
 import { requestPlayback } from '@/features/session/services/playback-execution'
 import { usePlaybackSession } from '@/features/session/hooks/use-playback-session'
 import { useVideoPresentation } from '../stores/video-presentation-store'
+import { useVideoPresentationError } from '../hooks/use-video-presentation-error'
 import { MoviePlayerOverlay } from '../components/MoviePlayerOverlay'
 import { textRole } from '@/shared/theme'
 
@@ -46,7 +47,7 @@ export function MovieDetailPage() {
   const { data, isLoading, isError, refetch } = useGetMovieShow(publicId!)
   const [isPlaying, setIsPlaying] = useState(false)
   const { snapshot } = usePlaybackSession()
-  const error = useVideoPresentation(state => state.error)
+  const error = useVideoPresentationError(snapshot)
 
   if (isError) {
     return (

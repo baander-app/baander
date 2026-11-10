@@ -10,7 +10,7 @@ import type { PlaybackCommandResource } from '@/shared/api-client/gen/endpoints'
 import { PlaybackLocalRecovery, type LocalRecoveryState, type RecoveryEndpoint } from './playback-local-recovery'
 import type { PlaybackRecoveryCheckpoint, PlaybackRecoveryRecord } from './playback-recovery-store'
 import { PlaybackCommandRunner, type PlaybackAcknowledgement } from './playback-command-runner'
-import { hasUnconfirmedPlayback } from './playback-status'
+import { hasUnconfirmedPlayback, UNCONFIRMED_PLAYBACK_REFUSAL } from './playback-status'
 import { MediaCompatibilityError } from '@/features/player/services/media-delivery'
 
 type RequestResult = NonNullable<PlaybackSnapshotResource['requestResult']>
@@ -174,7 +174,17 @@ export class PlaybackSessionCoordinator {
     delete published.transferResult
     delete published.recoveryResult
     this.client.setQueryData(PLAYBACK_SESSION_KEY, published)
+    // The refusal describes the session, not a failed request: once the session has no unconfirmed
+    // playback left, the alert would tell the viewer to recover a browser that holds nothing.
+    const connection = this.client.getQueryData<PlaybackConnection>(PLAYBACK_CONNECTION_KEY)
+    if (connection?.error === UNCONFIRMED_PLAYBACK_REFUSAL && !hasUnconfirmedPlayback(snapshot)) this.publish(connection.connected, null)
     this.runner.fence(snapshot.revision)
+    // A transfer that failed or expired sends its target nothing further. A target that is neither
+    // the runner nor named by a transfer any more holds a preparation nobody will start or stop.
+    const local = this.endpoint?.incarnationId
+    if (local && snapshot.activeIncarnationId !== local && snapshot.transfer?.targetIncarnationId !== local) {
+      this.runner.dropPreparation().catch(error => this.fail(error))
+    }
     this.refreshRequests()
     this.refreshTransfers()
     return snapshot
@@ -482,8 +492,23 @@ export class PlaybackSessionCoordinator {
     if (!this.current() || !this.ready || !this.snapshot || !this.endpoint) throw new Error('Playback connection is unavailable.')
     try {
       if (intent.action === 'stop-local-video') {
+        // A local video close only stops a session this endpoint actively plays. Another
+        // runner, another video or a live handoff owns stopping, so the close resolves
+        // without a control and records why. A transfer whose destination never proved it
+        // stopped keeps the session fenced for every tab, and the server refuses every
+        // control until it settles; silencing this tab's own video can start nothing, so
+        // the view still closes.
         if (this.endpoint.incarnationId !== intent.incarnationId || this.snapshot.activeIncarnationId !== intent.incarnationId
-          || this.snapshot.transfer || this.snapshot.media?.kind !== 'video' || this.snapshot.media.publicId !== intent.videoId) return
+          || this.snapshot.media?.kind !== 'video' || this.snapshot.media.publicId !== intent.videoId) {
+          performance.mark('baander:intent-refused', { detail: { action: intent.action, reason: 'not the active local video' } })
+          return
+        }
+        if (this.snapshot.transfer) {
+          const uncertain = this.snapshot.transfer.state === 'uncertain'
+          performance.mark('baander:intent-refused', { detail: { action: intent.action, reason: uncertain ? 'destination uncertain' : 'transfer in progress' } })
+          if (uncertain) await this.runner.silence().catch(error => this.fail(error))
+          return
+        }
         intent = { action: 'stop' }
       }
       if (this.pendingRequests.size > 0 && intent.action !== 'stop') throw new Error('A previous playback result is unconfirmed. Retry its result before sending another control.')
@@ -493,7 +518,7 @@ export class PlaybackSessionCoordinator {
         await this.ensureLocalEndpoint()
       }
       if ((intent.action === 'load' || intent.action === 'play') && hasUnconfirmedPlayback(this.snapshot)) {
-        throw new Error('Previous playback is unconfirmed. Stop playback in its original browser or recover that browser before resuming here.')
+        throw new Error(UNCONFIRMED_PLAYBACK_REFUSAL)
       }
       if (intent.action === 'queue' && 'operation' in intent) {
         intent = this.editQueue(intent.operation)
@@ -545,9 +570,20 @@ export class PlaybackSessionCoordinator {
     })
   }
 
+  /** The server explains playback refusals in the response body; prefer its reason over the transport status text. */
+  private refusal(error: unknown, fallback: string): Error {
+    if (error instanceof Error) {
+      const reason = (error as { response?: { data?: { error?: { message?: unknown } } } }).response?.data?.error?.message
+      if (typeof reason === 'string' && reason !== '') return new Error(reason)
+      return error
+    }
+    return new Error(fallback)
+  }
+
   private rejectUnconfirmed(request: PendingRequest, error: unknown): void {
-    request.reject(error instanceof Error ? error : new Error('The playback result could not be confirmed.'))
-    this.fail(error)
+    const refusal = this.refusal(error, 'The playback result could not be confirmed.')
+    request.reject(refusal)
+    this.fail(refusal)
   }
 
   private completeRequest(request: PendingRequest, result: RequestResult | null | undefined): void {
@@ -568,7 +604,9 @@ export class PlaybackSessionCoordinator {
     } else {
       const error = result.outcome === 'rejected' && result.rejectionReason
         ? new MediaCompatibilityError(result.rejectionReason)
-        : new Error(result.outcome === 'superseded' ? 'The playback request was superseded.' : 'The destination rejected the playback request.')
+        : new Error(result.outcome === 'superseded' ? 'The playback request was superseded.'
+          : result.outcome === 'never_effective' ? 'The destination did not answer the playback request. Nothing changed there; try again.'
+            : 'The destination rejected the playback request.')
       request.reject(error)
       this.fail(error)
     }
@@ -655,7 +693,7 @@ export class PlaybackSessionCoordinator {
     const result = this.intentTail.then(async () => {
       if (local) {
         if (hasUnconfirmedPlayback(this.snapshot) && this.snapshot?.activeIncarnationId !== this.endpoint?.incarnationId) {
-          throw new Error('Previous playback is unconfirmed. Stop playback in its original browser or recover that browser before resuming here.')
+          throw new Error(UNCONFIRMED_PLAYBACK_REFUSAL)
         }
         incarnationId = (await this.ensureLocalEndpoint()).incarnationId
       }
@@ -704,10 +742,11 @@ export class PlaybackSessionCoordinator {
         transfer.lastRevision = Math.max(transfer.lastRevision, response.revision)
         this.completeTransfer(transfer, response.transferResult)
       }).catch(error => {
-        transfer.reject(error instanceof Error ? error : new Error('The playback transfer result could not be confirmed.'))
+        const refusal = this.refusal(error, 'The playback transfer result could not be confirmed.')
+        transfer.reject(refusal)
         const status = (error as { response?: { status?: number } })?.response?.status
         if (status && status >= 400 && status < 500) this.transfers.delete(transfer)
-        this.fail(error)
+        this.fail(refusal)
       }).finally(() => {
         transfer.reading = false
         this.refreshTransfers()

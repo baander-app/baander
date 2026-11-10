@@ -7,6 +7,7 @@ import { requestPlayback, type PlaybackIntent } from '@/features/session/service
 import { usePlaybackSession } from '@/features/session/hooks/use-playback-session'
 import { PlaybackDestinationSelector } from '@/features/session/components/PlaybackDestinationSelector'
 import { useVideoPresentation } from '../stores/video-presentation-store'
+import { useVideoPresentationError } from '../hooks/use-video-presentation-error'
 import { textRole } from '@/shared/theme'
 import { ContentText } from '@/shared/typography'
 
@@ -42,8 +43,18 @@ const TimeReadout = styled.span`
 `
 
 const TitleBar = styled.div`
+  display: flex;
   flex-shrink: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-md);
   padding: 0 1rem;
+`
+
+const VolumeSliderWrap = styled.div`
+  display: flex;
+  width: 5rem;
+  align-items: center;
 `
 
 const SourceSeek = styled(Slider)`
@@ -78,7 +89,7 @@ export function MoviePlayerOverlay({ title, videoId, sourceDuration = 0, onClose
   const localTime = useVideoPresentation(state => state.currentTime)
   const localDuration = useVideoPresentation(state => state.duration)
   const pendingSeekPosition = useVideoPresentation(state => state.pendingSeekPosition)
-  const error = useVideoPresentation(state => state.error)
+  const error = useVideoPresentationError(snapshot)
   const localVideoId = useVideoPresentation(state => state.videoId)
   const local = !!endpoint && snapshot?.activeIncarnationId === endpoint.incarnationId
   const selected = snapshot?.media?.kind === 'video' && snapshot.media.publicId === videoId
@@ -153,24 +164,26 @@ export function MoviePlayerOverlay({ title, videoId, sourceDuration = 0, onClose
         </Button>
         <Button variant="ghost" size="sm" disabled={!connected || !selected} onClick={() => { submit({ action: 'stop' }) }}>Stop</Button>
         <PlaybackDestinationSelector />
-        <Slider
-          key={volumeScope}
-          aria-label="Movie volume"
-          aria-valuetext={`${Math.round(displayedVolume * 100)}%`}
-          min={0}
-          max={1}
-          step={0.01}
-          value={[displayedVolume]}
-          disabled={!connected || !selected || !volumeSupported}
-          onValueChange={([value]) => setVolumeDraft({ scope: volumeScope, value })}
-          onValueCommit={([volume]) => {
-            setVolumeDraft(null)
-            if (!cancelledVolume.current) submit({ action: 'volume', volume })
-          }}
-          onPointerDown={() => { cancelledVolume.current = false }}
-          onPointerCancel={() => { cancelledVolume.current = true; setVolumeDraft(null) }}
-          onKeyDown={() => { cancelledVolume.current = false }}
-        />
+        <VolumeSliderWrap>
+          <Slider
+            key={volumeScope}
+            aria-label="Movie volume"
+            aria-valuetext={`${Math.round(displayedVolume * 100)}%`}
+            min={0}
+            max={1}
+            step={0.01}
+            value={[displayedVolume]}
+            disabled={!connected || !selected || !volumeSupported}
+            onValueChange={([value]) => setVolumeDraft({ scope: volumeScope, value })}
+            onValueCommit={([volume]) => {
+              setVolumeDraft(null)
+              if (!cancelledVolume.current) submit({ action: 'volume', volume })
+            }}
+            onPointerDown={() => { cancelledVolume.current = false }}
+            onPointerCancel={() => { cancelledVolume.current = true; setVolumeDraft(null) }}
+            onKeyDown={() => { cancelledVolume.current = false }}
+          />
+        </VolumeSliderWrap>
         {error ? <p role="alert">{error}</p> : null}
         <SourceSeek
           key={videoId}

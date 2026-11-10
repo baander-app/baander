@@ -24,6 +24,10 @@ video playback require no casting companion or companion pairing.
 - **PlaybackTransfer** — A handoff with an attempt identity, source and target
   incarnations, retained cursor and desired state. It moves through `preparing`,
   `quiescing` and `starting`, then commits or enters failure or uncertainty.
+- **Disclosed command** — A command that was included in a snapshot built for its
+  own incarnation. That snapshot is the only way a command leaves the server, and
+  `playback_commands.disclosed_at` records the first time it happened, in the same
+  transaction. A command without the mark cannot have been executed.
 
 ## Ports
 
@@ -60,7 +64,8 @@ command ledger.
    actions are `load`, `play`, `pause`, `seek`, `stop`, `volume` and `queue`.
    Loading supplies the media selection; queue edits preserve the current media,
    position and playback state. Volume is a fraction from zero to one and requires
-   destination support.
+   destination support. A load that changes the media and names no position starts
+   at zero: the session has one cursor and no resume position per media.
 3. Session commits the control and its command intent in one transaction. An
    identical repeated request returns the original command result. The control
    response exposes that result as `requestResult`, including a pending or settled
@@ -72,7 +77,12 @@ command ledger.
    its final cursor, then starts the target. A matching acknowledgement commits the
    active destination. Rejection before quiescence leaves the source unchanged;
    uncertain startup leaves it recoverably paused while reconciliation requests
-   a target stop.
+   a target stop. A transfer that runs out of time is uncertain only when its start
+   was disclosed to the target. Otherwise it fails: a target that was never shown a
+   start cannot be playing.
+   A failed transfer sends its target nothing further. The browser drops a player
+   it only prepared once it is neither the runner nor the target of a transfer, so
+   the preparation does not keep its stream alive.
 5. The destination executes commands and acknowledges their command, attempt,
    revision, incarnation and epoch. Observations report actual playback state,
    position and supported volume. They renew presence but do not commit transfers.
@@ -109,13 +119,6 @@ memory. Browsers without the required storage, locks or qualified stop behavior
 retain ordinary playback with automatic recovery unavailable. External receiver
 routes require their own stop confirmation.
 
-A snapshot can also release an unavailable browser after a confirmed pause. This
-requires a matching acknowledgement for its incarnation and epoch, the immediately
-preceding command revision, consistent paused state, and no later or pending commands
-or unfinished transfer. Retirement and release share the session transaction and
-retain the media, queue and cursor. An expired presence lease alone is insufficient;
-this recovery does not apply to external receivers.
-
 For its active, available endpoint, the browser reuses presence confirmed within
 the current heartbeat interval. The freshness window starts when registration or
 observation begins, so a delayed response cannot extend it. Otherwise the browser
@@ -126,5 +129,64 @@ playback separately from unavailable device history.
 
 Closing a video view carries the browser incarnation and video identity into the
 command queue. It stops playback only if that browser still owns the same video
-and no transfer is pending. Closing a remote view leaves its playback unchanged;
-the explicit Stop control still targets the selected destination.
+and no transfer is pending. During an uncertain transfer the browser silences its
+own video and the view closes without a control; the session stays fenced for
+every tab until the transfer settles. Closing a remote view leaves its playback
+unchanged; the explicit Stop control still targets the selected destination.
+
+## Unanswered commands and gone runners
+
+A control that expires unanswered leaves the session unknown, with a stop owed to
+the runner, whenever the runner may have acted on it. It settles without a stop
+only when the control cannot have changed anything. That requires a browser
+runner that the session and the runner's own last report both hold stopped or
+paused, and a control that was never disclosed or is itself a stop or a pause.
+The command then closes with the outcome `never_effective` and the session wants
+the confirmed state again. Each such command records the session revision its
+settlement left, in `playback_commands.settled_revision`.
+
+Two more kinds of unanswered control close as `never_effective`, and neither
+changes what the session wants. A control that a stop replaces closes that way
+when it was never disclosed to its browser runner, or when it is a stop or a
+pause on a runner confirmed stopped or paused. A volume change or queue edit that
+expires closes that way when it was never disclosed; one the runner was shown may
+have been applied and closes as superseded.
+
+A disclosed `play`, `load` or `seek` that expires may have run. The session turns
+unknown and the runner's own report is marked unknown too, so neither the stop
+that follows nor any later stop can settle; only the runner's answer ends it. A
+stop that supersedes a disclosed pending `play`, `load` or `seek` marks the runner
+the same way; a superseded pause, stop, volume change or queue edit cannot have
+started anything and leaves a confirmed runner confirmed.
+An expired presence lease is no part of either proof: a tab that was shown a play
+and then cut off keeps playing.
+
+A browser runner that is unavailable can be released after a confirmed pause or
+a confirmed stop. The paused release requires the runner's acknowledgement of a
+pause, a quiesce or a stop, or of a start whose command wanted the paused state,
+for its incarnation and epoch, at the immediately preceding command revision, with
+consistent paused state and no later or pending commands or unfinished transfer.
+A start that wanted playback is no such acknowledgement. Commands that closed
+as `never_effective` do not count as later commands, and after them the session
+must stand at the revision the last one recorded instead of the one the
+acknowledgement left; a superseded command still counts. The stopped release
+requires the runner's own stop report, consistent stopped state, and no pending
+command or unfinished transfer. Retirement and release share the session
+transaction and retain the media, queue and cursor. An expired presence lease
+alone is insufficient; this recovery does not apply to external receivers.
+
+A runner's observation that it is paused is no such acknowledgement. While the
+session wants playback the runner may resume without another command, so a
+paused report made in that state is not its last word, and a runner that goes
+away after it stays held. This includes the state a stop leaves when it expires
+unanswered on such a runner: the session then reads paused, without an
+acknowledgement behind it. A browser that stops playing for good, as at the end
+of its media, has to ask for the pause or stop through the session and
+acknowledge it.
+
+The release check runs wherever its proof can first hold: on a snapshot, on an
+endpoint registration in the transaction that retires the tab's previous
+incarnation, and on a control or a transfer after its revision and transfer
+guards. A reloaded tab therefore sees its own paused or stopped runner released in
+the answer to its registration, and a transfer that follows a lapse starts its
+target without a source.

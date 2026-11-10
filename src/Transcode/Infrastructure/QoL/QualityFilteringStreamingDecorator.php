@@ -31,9 +31,9 @@ final readonly class QualityFilteringStreamingDecorator implements TranscodeStre
     {
     }
 
-    public function getPlaybackState(Uuid $videoId, array $allowedJobPublicIds): ?array
+    public function getPlaybackState(Uuid $videoId, array $allowedJobPublicIds, array $attachedRenditions = []): ?array
     {
-        return $this->inner->getPlaybackState($videoId, $allowedJobPublicIds);
+        return $this->inner->getPlaybackState($videoId, $allowedJobPublicIds, $attachedRenditions);
     }
 
     public function getMasterManifest(Uuid $videoId, array $renditions, int $expiresAt): string

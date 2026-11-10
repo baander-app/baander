@@ -205,6 +205,36 @@ for running and paused sessions alike. Resuming a still-encoding rendition does
 not bypass this check. A pause event caused by a media error does not persist a
 new user pause.
 
+The session's lowest tier alone decides readiness. Each other tier belongs to the
+signed rendition set only while it can keep up with playback. A tier that is still
+encoding joins once its published media leads the playback cursor by the join
+lead of 18 seconds, which is three segments, or reaches the end of the source. A
+finished tier joins at once. A tier the player has attached stays while it leads
+the cursor by more than one segment, and is withdrawn when that lead has shrunk
+to 6 seconds, before the player reaches the end of what the tier published.
+
+The player loads a new manifest whenever the set changes, which interrupts
+playback for a second or two. The two leads are two segments apart because the
+lead of an encoder running at playback speed swings by one segment with every
+publication; a single threshold would make such a tier leave and rejoin with each
+segment. A tier whose encoder runs slower than playback does not join while the
+cursor advances, so the movie plays in the lower tiers. When the higher tiers of
+a movie do not appear, check the worker's encode speed for that tier before the
+player.
+
+A refresh that names only sessions that have ended receives `410 Gone` with the
+reason. Sessions end as `expired` when
+[job cleanup](../commands/app-transcode-job-cleanup.md) expired them as stale or
+removed their jobs. The player then starts new sessions and continues at its
+position, paused if it was paused. It does so again whenever sessions it has held
+expire. Only when new sessions are reported ended before they answered a refresh
+or accepted a seek does the player show an error, so sessions that are gone at
+once cannot make it start in a loop. Sessions end as `failed` when an encode failed
+and as `cancelled` when they were cancelled on purpose. The player shows the
+error for both and starts nothing, so one failing encode is not restarted by
+every open tab and a cancellation is not undone. A start that finds no capacity
+still receives `503` with `Retry-After`.
+
 ### Worker learning state
 
 Each video child restores the worker's quality-governor learning, starts resource

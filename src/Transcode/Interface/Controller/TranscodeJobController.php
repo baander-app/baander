@@ -10,6 +10,7 @@ use App\Shared\Domain\Model\Uuid;
 use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Transcode\Application\Command\CleanupOrphanedJobsCommand;
+use App\Transcode\Application\DTO\TranscodeCleanupResult;
 use App\Transcode\Application\Port\TranscodeJobPortInterface;
 use App\Transcode\Application\Port\PlaybackAccessInterface;
 use App\Transcode\Application\Port\TranscodePublicViewInterface;
@@ -88,9 +89,9 @@ final class TranscodeJobController
 
     #[OA\Post(
         path: '/api/transcode/jobs/cleanup',
-        summary: 'Clean up orphaned transcode jobs (no active sessions)',
+        summary: 'Expire stale transcode sessions and clean up orphaned transcode jobs (no active sessions)',
         responses: [
-            new OA\Response(response: '200', description: 'Cleanup result', content: new OA\JsonContent(properties: [new OA\Property(property: 'cleaned', type: 'integer')])),
+            new OA\Response(response: '200', description: 'Cleanup result', content: new OA\JsonContent(properties: [new OA\Property(property: 'expired', type: 'integer'), new OA\Property(property: 'cleaned', type: 'integer')])),
         ],
     )]
     #[Route('/cleanup', name: 'cleanup', methods: ['POST'])]
@@ -98,10 +99,12 @@ final class TranscodeJobController
     #[CliCounterpart('app:transcode:job:cleanup')]
     public function cleanup(): JsonResponse
     {
-        $stamp = $this->commandBus->dispatch(new CleanupOrphanedJobsCommand())->last(HandledStamp::class);
-        $count = $stamp?->getResult() ?? 0;
+        $result = $this->commandBus->dispatch(new CleanupOrphanedJobsCommand())->last(HandledStamp::class)?->getResult();
+        if (!$result instanceof TranscodeCleanupResult) {
+            throw new \LogicException('The transcode job cleanup did not return its result.');
+        }
 
-        return $this->successResponse(['cleaned' => $count]);
+        return $this->successResponse($result->toArray());
     }
 
     #[OA\Get(

@@ -45,6 +45,8 @@ if (array_slice($args, 2, 2) === ['buildx', 'inspect']) {
     echo file_get_contents($builder); exit;
 }
 if (in_array('compose', $args, true)) { exit(71); }
+if (in_array('inspect', $args, true) && end($args) === 'lost-image') { fwrite(STDERR, "Error response from daemon: No such image: lost-image\n"); exit(1); }
+if (in_array('inspect', $args, true) && end($args) === 'unreadable-image') { fwrite(STDERR, "Cannot connect to the Docker daemon\n"); exit(1); }
 if (in_array('inspect', $args, true)) { echo 'sha256:' . str_repeat('a', 64); exit; }
 echo json_encode($args);
 CLI);
@@ -370,6 +372,15 @@ CLI);
         self::assertSame('sha256:' . str_repeat('a', 64), $image->id);
         self::assertSame('selected-daemon', $image->daemonId);
         self::assertSame('1.55.0', $image->toArray()['playwrightVersion']);
+    }
+
+    public function testOnlyTheDaemonsOwnAnswerCountsAsAnAbsentImage(): void
+    {
+        $client = new Client($this->executor, $this->resolve(), $this->environment);
+        self::assertTrue($client->holdsImage('held-image'));
+        self::assertFalse($client->holdsImage('lost-image'));
+        // A lookup that failed for another reason says nothing about the image.
+        self::assertTrue($client->holdsImage('unreadable-image'));
     }
 
     public function testTlsWithoutClientCertificateDoesNotAcquireAmbientCredentials(): void

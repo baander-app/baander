@@ -23,6 +23,25 @@ Write every report, summary or handoff to the user through `ce-noslop` (top-leve
 agent only; not code, config, verbatim quotes or text the user asked to post as
 written). Run `prose-fix` on documentation prose you write or change.
 
+- A defect found in or beside code a plan touches goes into the plan's units once
+  verified; "deferred" is only for separate work, with the reason stated.
+- Tracked documents (solutions, roadmap, plans, docs-book) state their evidence
+  inline. `var/` is untracked and cleared often: never cite its receipts, and copy
+  receipts out of an agent worktree before removing it.
+- Commits and pull requests carry the repository's git identity only: no AI
+  co-author trailers or attribution. Run explicit git instructions as given,
+  without pre-checking remotes.
+
+## Standing decisions
+
+- Read a feature's source and history before proposing its removal; "no callers"
+  is not evidence. Movie and concert code and the OAuth auth-code and device-code
+  flow are groundwork for planned features: keep them correct, never remove them.
+- `ui/rn` and Essentia are out of scope with no end date: no plans, fixes, CI jobs
+  or gates for them, and ask before touching `ui/rn`.
+- Capacity is bounded by transcode slots, not container CPU or memory limits; do
+  not plan derived container ceilings.
+
 ## Delegation
 
 Use subagents for substantial, separable work without waiting to be asked; keep
@@ -51,7 +70,9 @@ For PostgreSQL schema, migration, query and connection work, follow
 [Don't Do This](https://wiki.postgresql.org/wiki/Don%27t_Do_This) and the
 [postgres-remediation skill](.agents/skills/postgres-remediation/SKILL.md): audit,
 remedy and verify the affected code, explain applicable exceptions, and do not expand
-into unrelated schema rewrites. The registry keeps its SQLite/rqlite architecture.
+into unrelated schema rewrites. Name indexes, unique constraints and foreign keys per
+the [database naming page](docs-book/part-2-developer-guide/development/database-naming.md).
+The registry keeps its SQLite/rqlite architecture.
 
 ## Temporary pre-release policy
 
@@ -79,6 +100,9 @@ under `.agents/`.
   handling explicit.
 - Prefix Baander-defined HTTP headers with `X-Baander-`; keep generic protocol,
   proxy and security header names.
+- Write PHP 8.5 idiom: the pipe operator, first-class callables, small named
+  helpers over nested calls. Run `.php-cs-fixer.tooling.php` on files touched
+  under `packages/baander-tooling` and `scripts`.
 - Code stands on its own: source, tests, comments and docblocks never cite planning
   artifacts (requirement, acceptance-example or decision ids such as `R5`, `AE4`,
   `KTD2`, roadmap item numbers, plan file paths). State the behaviour in plain

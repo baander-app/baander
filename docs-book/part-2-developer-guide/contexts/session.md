@@ -93,7 +93,7 @@ Device mutation routes address a device by its 21-character `PublicId` (`{public
 | `DeviceDoctrineRepository` | Doctrine repository | Implements `DeviceRepositoryInterface` |
 | `DeviceAdapter` | Adapter | Implements `DevicePortInterface` |
 | `PlaybackStore` | Doctrine store | Implements `PlaybackStoreInterface` with row locking for destinations, incarnations, transfers, and the command ledger |
-| `PlaybackSessionSchemaListener` | Doctrine schema listener | Declares the playback coordination tables (`playback_session_states`, `playback_destinations`, `playback_endpoint_incarnations`, `playback_commands`, `playback_requests`, `playback_local_recoveries`) |
+| `PlaybackSessionSchemaListener` | Doctrine schema listener | Adds the two composite foreign keys from `listening_sessions` to `playback_destinations` and `playback_destination_incarnations`. Migrations create the four playback coordination tables (`playback_destinations`, `playback_destination_incarnations`, `playback_transfers`, `playback_commands`); they have no entities, `PlaybackStore` reads and writes them with SQL, and the Doctrine `schema_filter` keeps them out of ORM schema diffs |
 | `PlaybackCommandRelay` | Swoole relay | Implements `PlaybackConnectionsInterface`; polls bound WebSocket connections and delivers changed snapshots and pending commands |
 | `ListeningSessionInteractionAdapter` | Messaging adapter | Implements Shared's `ListeningSessionInteractionInterface` to bridge WebSocket frames and connection binding to `PlaybackCoordinator` and `PlaybackCommandRelay` |
 

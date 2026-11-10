@@ -136,6 +136,10 @@ final class ListeningSession
         $this->state->queue = $nextQueue;
         $this->state->currentTrackIndex = $nextIndex;
         if ($media !== null) {
+            if ($action === 'load' && $position === null && $media->toArray() !== $this->state->media?->toArray()) {
+                // The session has one cursor and no resume position per media, so other media starts at zero.
+                $position = 0.0;
+            }
             $this->state->media = $media;
         }
         if ($position !== null) {
@@ -215,11 +219,38 @@ final class ListeningSession
         $this->state->observedState = ObservedPlaybackState::Unknown;
     }
 
+    /** A control its confirmed idle runner cannot have acted on changes nothing there, so the session
+     *  wants the confirmed state again and keeps its runner. */
+    public function settleUnansweredControl(): void
+    {
+        $this->state->desiredState = match ($this->state->observedState) {
+            ObservedPlaybackState::Stopped => PlaybackState::Stopped,
+            ObservedPlaybackState::Paused => PlaybackState::Paused,
+            default => throw new \DomainException('Only a confirmed idle runner can leave a control unanswered.'),
+        };
+        $this->advanceRevision();
+    }
+
     public function releaseConfirmedPausedRunner(): void
     {
         if ($this->state->desiredState !== PlaybackState::Paused || $this->state->observedState !== ObservedPlaybackState::Paused) {
             throw new \DomainException('Only confirmed paused execution can release its runner.');
         }
+        $this->releaseRunner();
+    }
+
+    /** A runner that confirmed its stop and has since gone leaves the session stopped at its cursor,
+     *  without an executor, so another destination can start playback. */
+    public function releaseConfirmedStoppedRunner(): void
+    {
+        if ($this->state->desiredState !== PlaybackState::Stopped || $this->state->observedState !== ObservedPlaybackState::Stopped) {
+            throw new \DomainException('Only confirmed stopped execution can release its runner.');
+        }
+        $this->releaseRunner();
+    }
+
+    private function releaseRunner(): void
+    {
         $this->state->activeIncarnationId = null;
         $this->state->selectedDestinationId = null;
         $this->advanceRevision();

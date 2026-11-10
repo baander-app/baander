@@ -21,11 +21,9 @@ Open items:
   and no scheduled nightly has run on each.
 - The two-command drill passes locally in Chromium and Firefox, but no hosted run has
   executed its proofs since the owned-copy path landed. The gate's "Selected video
-  endpoint through movie completion and replay" step fails locally at its exact-end
-  seek: the seek to the 42-second source end is accepted and the worker pauses at 42,
-  but the session's seek control stays unacknowledged until a stop supersedes it 20
-  seconds later ("The playback request was superseded."). Receipts are in
-  `var/test-runs/20261106-movie-endpoint-chromium`.
+  endpoint through movie completion and replay" step failed locally at its exact-end
+  seek from 2026-11-06; it passes on the branch `movie-playback-growing-presentations`
+  (see "Movie playback on growing presentations") and on `master` once that merges.
 - Forgejo acceptance is deferred (user decision, 2026-11-05). Every job of the oldest
   queued run that ran inside the Forgejo registry's `baander-runner:latest` (built
   2026-10-15) failed within a minute, and Forgejo 15's API serves no job logs or
@@ -633,13 +631,210 @@ image pins).
 
 Open:
 
-- A retained redis identity carries the same floating-tag risk: a preparation
-  that pulls `redis:7-alpine` newer orphans the digest an earlier release
-  recorded. The same daemon-side existence check belongs where retained
-  identities are consumed.
 - The full tooling suite completed green on 2026-11-09 (1525 tests, 13,063
   assertions, 9 environment skips, 50 minutes) with the gateway fix landing
   mid-run; a clean full re-run on the merged master remains pending.
+- **Retained identities, delivered on the branch `movie-playback-growing-presentations`
+  (not merged):** a retained postgres or redis identity is kept only while the daemon
+  holds it; otherwise the role is built or pulled as for a new instance. A stopped
+  instance restarts from its saved release only while all its images resolve. Only the
+  daemon's own "No such image" answer counts as absent.
+- **Correction to the account above:** the 2026-11-07 failures were two defects. The
+  persistent instance failed on the double export. The worktree preview
+  `preview-fd790a887b6899cb` failed while pinning a postgres identity the daemon no
+  longer held: between 2026-11-02 and 2026-11-07 every image without a container was
+  removed from the daemon from outside, with the footprint of `docker system prune -a`.
+  The tooling has no path that removes release pins.
+- **Rules added for a pruned release, to be accepted or rejected by the user:** the
+  preflight runs from the prepared release when the previous release's images are gone;
+  a worker boot whose operator image is gone is recorded retired without the operator
+  when none of its containers exists, and refused before anything starts while
+  containers of it survive or the database still registers it.
+- **Verified live, 2026-11-10:** with the fix, `make preview-up` on
+  `preview-fd790a887b6899cb` prepared its release (postgres, pooler, redis and nginx
+  recorded as not retained), started postgres healthy on the retained volume and
+  stopped at the preflight's next guard, "An applied migration changed; reconcile the
+  saved release before continuing." `make preview-down` then stopped it, which it
+  could not do before because the worker's operator image was gone.
+- **Still blocked:** that preview's database applied five migrations that `de7942d73`
+  later rewrote, and the preflight refuses a changed applied migration. An instance
+  that was running when its release was pruned also stops at a named refusal, because
+  only the lost operator image could retire its worker registration. Both need a data
+  reset, which needs the owner's approval.
+
+### Movie playback on growing presentations
+
+Delivered on the branch `movie-playback-growing-presentations` from the
+[plan](docs/plans/2026-11-09-1635-fix-movie-playback-growing-presentations-plan.md);
+not merged. On the persistent instance a 1080p movie cut forward every few
+seconds while its encode ladder ran ahead of playback, wedged after a failed
+transfer and left eight sessions holding jobs, slots and 361 MB of output.
+
+- **Clock (U1, U3):** the hls.js live-edge disable is pinned by a test of the
+  constructed configuration (`7723c16b9`), and a player-internal seek is
+  recorded as a `baander:native-seek` mark and no longer sent to the server,
+  where it restarted every encoder (`99ad11a3e`).
+- **Session cursor (U2):** no code. The server already reported the session
+  cursor; the drift came from the client's own edge seeks. The plan's decision
+  is corrected (`76b4b1e6b`).
+- **Transfers (U4):** a rejected transfer command settles the transfer as
+  failed under its own fence, and the coordinator's refusals raise an error
+  and a mark instead of returning silently (`dee8bdea4`).
+- **Stopped runner:** a browser that acknowledged an explicit Stop kept its
+  place after it had gone, so every other tab was refused with "Previous
+  playback is unconfirmed" for good; reproduced on a preview in Chromium. A
+  snapshot now releases it once its registration has expired or been retired
+  (`056ba961d`). The cause was `7cf695486`, which also left
+  `PlaybackTransferPersistenceTest`'s reconnect test failing on `master`; the
+  test now asserts the real sequence.
+- **Overlay (U5):** the volume slider is bounded at 5 rem, so the seek slider
+  is the only full-width slider (`f2cd12d83`).
+- **Stale sessions (U6):** a session that no playback report and no stream
+  signing has touched for 24 hours expires at the start of job cleanup, unless
+  its presentation is finished. Expiry cancels the execution so the worker
+  frees its slot, and cleanup removes the job once the worker has let go
+  (`adf06fedb`). The plan's condition "no runnable job" could never be met and
+  was dropped: all eight stale jobs on the instance still had a worker
+  renewing its lease 20 hours later. The cleanup endpoint and
+  `app:transcode:job:cleanup --json` now return `{expired, cleaned}`. After
+  review, a signing renews a session only when its last write is over an hour
+  old, and one failing expiry no longer blocks the rest (`b26455a68`).
+- **Gate (U7):** the two-command checkpoint ends with a 24-second window on
+  the replay after movie completion: the media clock may gain at most one
+  second on the wall clock, no generation may change and no seek may reach
+  the server, and the producer must publish at least 1.5 times real time
+  (`0a76ee3a2`). The drill's outer bound moves from 600 to the documented 900
+  seconds.
+
+Follow-up, 2026-11-10. The first phase's verification left defects open; each was
+diagnosed from a run or a PostgreSQL test and fixed on the same branch (units U8–U17
+of the plan).
+
+- **Rendition set (U8):** the signed set was rebuilt on every signing from "the
+  sibling covers the cursor", so a sibling encoding near real time left and rejoined
+  as the cursor moved, and every change replaced the player's attachment: 35
+  attachments and 100 seconds of starvation in one cold play on a loaded preview. A
+  growing sibling now joins with an 18-second lead and an attached one stays until its
+  lead shrinks to one segment; the primary alone decides readiness; the group's
+  runtime rows are read together (`602c10412`, `c422a05ff`, `d74134856`).
+- **Gone runners (U9):** `playback_commands` records when a command was first shown
+  to its endpoint. A control the runner was never shown settles as never effective;
+  a shown play, load or seek keeps the unknown path. The release of a confirmed
+  paused or stopped browser runner runs from the snapshot, the registration, a
+  control and a transfer. A transfer whose target was never shown its start fails at
+  expiry, and the overlay closes during an uncertain transfer (`ddac83bbe`,
+  `f47131281`). A tab that took over a paused session is released on its `started`
+  answer when the start asked for paused (`4d14e32f5`).
+- **Finished movie, closed tab:** the final preview run found that letting a movie
+  finish, closing the tab and opening the movie elsewhere refused Play. At a natural
+  end the player had paused only its transcode session; the playback session saw a
+  `paused` observation while it still wanted playing, which is no proof of silence for
+  a tab that has gone. The player now pauses through the session at its end, as music
+  playback does, and the acknowledged pause lets the release work (`79a7cf3c4`).
+- **Ended sessions (U10):** a refresh signing that names only ended sessions answers
+  410 with its reason. After an expiry the player continues at its position on a new
+  session, paused if it was paused; after a failed or cancelled job it shows the
+  error (`602c10412`, `d74134856`).
+- **Cursor and replay (U14, U15):** a different movie starts at zero instead of the
+  previous movie's cursor. Play at the source end starts from zero on any player. A
+  restore into a presentation's last second lands one second early first, because
+  hls.js ends the media source only after the element has settled and the tail
+  decodes only after the source has ended (`ddac83bbe`, `602c10412`, `7cc63771c`).
+- **Gate (U13):** the checkpoint asserts that the registration answer after a reload
+  already shows the runner released, and two of its steps no longer depend on
+  reconnect timing or on where the paused cursor stands (`c27da2847`).
+- **Tooling and cleanup result (U11, U12):** see "Development controller image
+  identities" (`cb103bed1`, `4706716e2`); the cleanup counts are a typed result
+  (`602c10412`).
+- **Correction:** the Firefox failure recorded here earlier as "a second `pause`
+  command" was wrong. The second request re-reads the result of the same request. The
+  cause was the release running only on the relay's one-second tick, so the gate
+  passed about one run in six.
+
+Verification, 2026-11-10, in `baander-ci-prewarm:local` at the final code `79a7cf3c4`,
+each gate run alone on a quiet host.
+
+- The Transcode and Session unit suites pass 1,609 tests with 33,344 assertions. Twelve
+  PostgreSQL integration files for the session and transcode contexts pass 354 tests
+  with 11,480 assertions.
+- PHPStan, Deptrac, `lint:container` and the OpenAPI check pass. The web typecheck
+  passes, and the session and catalog suites pass 493 tests.
+- The tooling files touched pass on host PHP 8.5.12: 26 files with 416 tests after the
+  fallbacks, then `DevelopmentWorkersTest` 63 tests, `WorkerLifecycleTest` 16,
+  `DevelopmentActivationTest` 23 and `DevelopmentUpdatesTest` 12 after the review
+  follow-ups; `phpstan-tooling` and `deptrac-tooling` report nothing.
+- The two-command gate with client controls passes all eight phases in Firefox 157 and
+  Chromium 156. The registration answer after the reload arrived 37 ms and 39 ms after
+  registration with no active runner; the producer ran at 17.0 and 19.1 times real
+  time. With the seek forwarding that `99ad11a3e` removed restored in the image, the
+  gate fails in `worker-recovered`: "Only a committed seek may reach the server; the
+  player sent 1 without one".
+- The movie-endpoint step passes: after the exact-end seek the element stands at 24 of
+  24 with `ended` true, `readyState` 4 and not seeking; the natural end sends exactly
+  one ending pause, and replay sends one seek to zero. It had failed since 2026-11-06.
+- The media-control gate passes. Run beside image builds earlier in the day it failed
+  with exit 137; it is a CPU pressure drill.
+- The adaptive gate passes in Chromium 156.
+- The reported movie (1920x1080 H.264/Opus, 223.59 s) played from a cold start to its
+  end on a fresh preview at `7cc63771c`, before the two last session fixes, in Chromium
+  with host load 2.3 at the start. The
+  player attached twice (360p, then 360p with 720p at 65 s, when 720p led by 19.8 s),
+  against 35 attachments before; no rendition left and rejoined, against 17 times
+  before. It spent 2.0 s not ready after the first frame, against 100 s, and took
+  225.7 s of wall time, against 331.6 s. The media clock never gained more than
+  0.017 s on the wall clock between samples and never moved back; no native seek was
+  recorded and no seek was sent; one generation, three jobs and three sessions served
+  the play. The encoders ran at 4.51, 1.30 and 0.65 times real time for 360p, 720p and
+  1080p, so 1080p was never offered on this host. A second movie then started at
+  zero, and Play after a reload of the finished movie played from zero in 1.6 s; that
+  replay was served as a cached delivery without a transcode session. The seek slider
+  measured 1,408 px and the volume slider 80 px at a 1,440 px viewport.
+- Reviews: `ce-doc-review` of the follow-up plan with four reviewers, findings applied;
+  `ce-simplify-code`, three findings applied; `ce-code-review` over the follow-up with
+  eleven reviewers returned two confirmed P2 findings on the paused-runner release
+  proof, both fixed in `f47131281`, and one P1 claim that validation rejected. The first
+  phase's review returned two confirmed P2 findings, fixed in `b26455a68`. The
+  cross-model pass is disabled by the checkout configuration.
+
+Open, for the user to decide:
+
+- **What ends the fence of a runner that was shown a start and then went away.** A tab
+  that reloads or closes while a load, play or seek is starting leaves the session
+  unknown, as before. Candidates: an explicit "play here anyway", a same-tab
+  registration taken as proof, a bounded wait.
+- **Whether a shown queue edit or volume change may be ignored by the release proof.**
+  It cannot start playback, but today it still counts as a later command.
+- **The two tooling rules** named under "Development controller image identities".
+
+Open, known limits:
+
+- **Stop, close, play elsewhere:** the first Play inside the closed tab's 30-second
+  registration waits 20 seconds and fails with "The destination did not answer the
+  playback request. Nothing changed there; try again."; a second press after the
+  lapse plays. A tab that lost its network without closing counts as shown and stays
+  fenced until it returns.
+- **Join lead:** a sibling that encodes slower than playback is not offered, so on a
+  host where 1080p encodes at about real time it never appears; each join still
+  replaces the attachment once.
+- **Ended-session reason:** it is inferred from job, execution and session state. A
+  cancel that leaves an in-progress job still referenced by another session reads as
+  expired, and the player restarts it.
+- **End-of-stream landing:** the restore holds 250 ms on the landing and keeps a
+  one-second backstop, because the hook cannot see hls.js end the stream.
+- **Registration proof in Chromium:** local recovery releases the runner before
+  registration, so only the Firefox run binds the proof to the server change.
+- **Command disclosure by another incarnation:** a WebSocket transfer or registration
+  payload carrying another of the same user's incarnation ids is returned that
+  incarnation's commands and marks them shown. It can only block a settlement.
+- **Player hook size:** `useBaanderPlayer.ts` passed 1,100 lines; its session restart
+  resets about twenty closure variables by hand.
+- **Finished presentations:** these keep their sessions and are reclaimed by the
+  cache sweep's 24-hour TTL, not by job cleanup.
+- **Not run:** the gate on a hosted runner (the 1.5 rate is unproven on a slower
+  host), the full tooling suite, and the persistent instance's cleanup run, which
+  needs the branch on `master`.
+- **Planned next:** Doctrine entities for the four SQL-owned playback tables, on
+  their own plan and branch.
 
 ## Roadmap maintenance
 

@@ -237,10 +237,8 @@ blocking step on both forges.
 ```bash
 BAANDER_TEST_IMAGE=baander-ci-prewarm:local bash scripts/test-security-runtime-container.sh
 BAANDER_TEST_IMAGE=baander-ci-prewarm:local bash scripts/test-unit-container.sh
-BAANDER_TEST_IMAGE=baander-ci-prewarm:local BAANDER_FUNCTIONAL_TIMEOUT_ACTIVE=1 \
-  bash scripts/test-functional-container.sh tests/Functional
-BAANDER_TEST_IMAGE=baander-ci-prewarm:local BAANDER_FUNCTIONAL_TIMEOUT_ACTIVE=1 \
-  bash scripts/test-functional-container.sh tests/Integration
+BAANDER_TEST_IMAGE=baander-ci-prewarm:local bash scripts/test-functional-container.sh tests/Functional
+BAANDER_TEST_IMAGE=baander-ci-prewarm:local bash scripts/test-functional-container.sh tests/Integration
 ```
 
 

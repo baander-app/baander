@@ -648,6 +648,75 @@ CODE;
             && $files($a->files) === $files($b->files) && ($a->transportArguments[0] ?? null) === ($b->transportArguments[0] ?? null);
     }
 
+    /**
+     * Whether retiring this boot needs its operator image while the daemon no longer holds it.
+     * A retired boot, or one that never reached admission, retires without the operator.
+     *
+     * @param array<string,mixed>|null $record
+     */
+    public function operatorLost(?array $record): bool
+    {
+        if (empty($record) || ($record['phase'] ?? null) === 'retired'
+            || (in_array($record['phase'] ?? null, ['preparing', 'prepared'], true) && isset($record['preparation']))) {
+            return false;
+        }
+        return !$this->docker($record['target'])->holdsImage($record['operator_image']);
+    }
+
+    /**
+     * The containers of a boot whose operator image the daemon no longer holds. Only that image
+     * stops them and retires their registration, so the boot cannot be retired while any exists.
+     *
+     * @param array<string,mixed>|null $record
+     * @return list<string>
+     */
+    public function orphanedContainers(?array $record): array
+    {
+        if (!$this->operatorLost($record)) {
+            return [];
+        }
+        $manifest = AtomicFile::readJson($record['directory'] . '/manifest.json');
+        if (($manifest['namespace'] ?? null) !== $record['namespace'] || ($manifest['bootId'] ?? null) !== $record['boot_id']) {
+            throw new \RuntimeException('Worker cleanup identity differs from the saved manifest.');
+        }
+        return preg_split('/\s+/', $this->bootContainers($this->docker($record['target']), $manifest), flags: PREG_SPLIT_NO_EMPTY) ?: [];
+    }
+
+    /**
+     * Fails before anything is changed when the boot's operator image left the daemon while
+     * containers of the boot still exist.
+     *
+     * @param array<string,mixed>|null $record
+     */
+    public function assertRetirable(?array $record): void
+    {
+        $containers = $this->orphanedContainers($record);
+        if ($containers !== []) {
+            throw new \RuntimeException(
+                'The worker operator image ' . $record['operator_image'] . ' is no longer in the Docker daemon, and only it can retire worker boot '
+                . $record['boot_id'] . ', whose containers still exist: ' . implode(', ', $containers) . '. Nothing was changed.',
+            );
+        }
+    }
+
+    /**
+     * Retires a boot whose operator image left the daemon, once no container of the boot exists.
+     * The boot's registration in the database is not touched; the caller answers for it.
+     *
+     * @param array<string,mixed> $record
+     */
+    public function retireWithoutOperator(array &$record): void
+    {
+        if (!$this->operatorLost($record)) {
+            throw new \LogicException('The worker boot still has its operator image; retire it through the operator.');
+        }
+        $this->assertRetirable($record);
+        $this->cleanupIpc($record);
+        $record['operator_lost'] = true;
+        $this->phase($record, 'retired');
+        $this->cleanupControllerTag($record);
+    }
+
     /** @param array<string,mixed> $record */
     public function retire(array &$record): void
     {

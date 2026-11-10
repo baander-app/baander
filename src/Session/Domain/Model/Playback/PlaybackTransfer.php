@@ -33,9 +33,13 @@ final class PlaybackTransfer
     public function acknowledge(string $outcome, ?float $position = null): void
     {
         if ($outcome === 'rejected') {
+            // An explicit refusal settles the transfer: a destination that refuses to
+            // prepare or start is not playing, and a source that refuses to quiesce
+            // keeps playing as the authoritative runner. Only a destination refusing
+            // to stop while it may already be playing stays uncertain.
             $this->phase = match ($this->phase) {
-                'preparing' => 'failed',
-                'quiescing', 'starting', 'uncertain' => 'uncertain',
+                'preparing', 'quiescing', 'starting' => 'failed',
+                'uncertain' => 'uncertain',
                 default => throw new DomainException('Transfer is already terminal.'),
             };
             return;
@@ -55,11 +59,15 @@ final class PlaybackTransfer
         }
     }
 
-    public function expire(): void
+    /**
+     * A target that was never shown its start cannot be playing, so the transfer fails. Once the start
+     * was shown, only the target's own stop confirmation settles it.
+     */
+    public function expire(bool $targetShownStart): void
     {
         $this->phase = match ($this->phase) {
             'preparing' => 'failed',
-            'quiescing', 'starting', 'uncertain' => 'uncertain',
+            'quiescing', 'starting', 'uncertain' => $targetShownStart ? 'uncertain' : 'failed',
             default => $this->phase,
         };
     }

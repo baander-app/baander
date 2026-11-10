@@ -6,6 +6,7 @@ namespace App\Transcode\Interface\Console;
 
 use App\Shared\Interface\Console\AdminCommandSupport;
 use App\Transcode\Application\Command\CleanupOrphanedJobsCommand;
+use App\Transcode\Application\DTO\TranscodeCleanupResult;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -16,7 +17,7 @@ use Throwable;
 /** The CLI counterpart of POST /api/transcode/jobs/cleanup. */
 #[AsCommand(
     name: 'app:transcode:job:cleanup',
-    description: 'Remove transcode jobs that no session uses, with their output.',
+    description: 'Expire stale transcode sessions and remove transcode jobs that no session uses, with their output.',
 )]
 final class TranscodeJobCleanupCommand extends Command
 {
@@ -36,17 +37,19 @@ final class TranscodeJobCleanupCommand extends Command
         $io = new SymfonyStyle($input, $output);
 
         try {
-            $cleaned = $this->support->dispatch(new CleanupOrphanedJobsCommand());
+            $result = $this->support->dispatch(new CleanupOrphanedJobsCommand());
         } catch (Throwable $failure) {
             return AdminCommandSupport::fail($io, $failure);
         }
 
-        $cleaned = is_int($cleaned) ? $cleaned : 0;
+        if (!$result instanceof TranscodeCleanupResult) {
+            throw new \LogicException('The transcode job cleanup did not return its result.');
+        }
         if (AdminCommandSupport::wantsJson($input)) {
-            return AdminCommandSupport::json($io, ['cleaned' => $cleaned]);
+            return AdminCommandSupport::json($io, $result->toArray());
         }
 
-        $io->success(sprintf('Removed %d orphaned transcode jobs.', $cleaned));
+        $io->success(sprintf('Expired %d stale transcode sessions and removed %d orphaned transcode jobs.', $result->expired, $result->cleaned));
 
         return Command::SUCCESS;
     }

@@ -6,6 +6,7 @@ namespace App\Transcode\Infrastructure\Transcode;
 
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
+use App\Transcode\Application\Port\TranscodeExecutionOwnershipPort;
 use App\Transcode\Application\Port\TranscodeJobPortInterface;
 use App\Transcode\Application\Port\TranscodeStoragePortInterface;
 use App\Transcode\Domain\Event\TranscodeJobCreated;
@@ -21,6 +22,7 @@ final class TranscodeJobService implements TranscodeJobPortInterface
         private readonly TranscodeJobRepositoryInterface $jobRepository,
         private readonly TranscodeStoragePortInterface $storage,
         private readonly EventDispatcherInterface $eventDispatcher,
+        private readonly TranscodeExecutionOwnershipPort $ownership,
     ) {
     }
 
@@ -117,6 +119,11 @@ final class TranscodeJobService implements TranscodeJobPortInterface
         $count = 0;
 
         foreach ($orphans as $job) {
+            // A worker that still owns the execution may be writing this output;
+            // a later run removes the job once the worker has let go.
+            if ($this->ownership->find($job->getId())?->ownershipLive === true) {
+                continue;
+            }
             try {
                 if (!$this->storage->deleteIfUnretained($job->getOutputDirectory())) {
                     continue;

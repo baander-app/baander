@@ -7481,6 +7481,8 @@ export type PostStreamSigningSignBody = {
      * @maxItems 3
      */
   jobIds?: string[];
+  /** Rendition set the player has attached, as returned in renditionSet; refresh only. A rendition named here stays in the signed set on a smaller published lead than one that still has to join */
+  attachedSet?: string;
 };
 
 export type PostStreamSigningSign200 = {
@@ -7505,6 +7507,20 @@ export type PostStreamSigningSign200 = {
   renditionSet?: string;
 };
 
+export type PostStreamSigningSign410Reason = typeof PostStreamSigningSign410Reason[keyof typeof PostStreamSigningSign410Reason];
+
+
+export const PostStreamSigningSign410Reason = {
+  expired: 'expired',
+  failed: 'failed',
+  cancelled: 'cancelled',
+} as const;
+
+export type PostStreamSigningSign410 = {
+  error: string;
+  reason: PostStreamSigningSign410Reason;
+};
+
 export type GetTranscodeJobIndex200DataItem = {
   publicId?: string;
   status?: string;
@@ -7526,6 +7542,7 @@ export type GetTranscodeJobShow200 = {
 };
 
 export type PostTranscodeJobCleanup200 = {
+  expired?: number;
   cleaned?: number;
 };
 
@@ -34493,7 +34510,7 @@ return customInstance<PostStreamSigningSign200>(getPostStreamSigningSignUrl(),
 
 export const getPostStreamSigningSignMutationKey = () => ['postStreamSigningSign'] as const;
 
-export const getPostStreamSigningSignMutationOptions = <TError = ErrorType<void | ApiError>,
+export const getPostStreamSigningSignMutationOptions = <TError = ErrorType<void | PostStreamSigningSign410 | ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postStreamSigningSign>>, TError,PostStreamSigningSignMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
 ): UseMutationOptions<Awaited<ReturnType<typeof postStreamSigningSign>>, TError,PostStreamSigningSignMutationVariables, TContext> => {
 
@@ -34522,13 +34539,13 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type PostStreamSigningSignMutationResult = NonNullable<Awaited<ReturnType<typeof postStreamSigningSign>>>
     export type PostStreamSigningSignMutationBody = BodyType<PostStreamSigningSignBody>
-    export type PostStreamSigningSignMutationError = ErrorType<void | ApiError>
+    export type PostStreamSigningSignMutationError = ErrorType<void | PostStreamSigningSign410 | ApiError>
     export type PostStreamSigningSignMutationVariables = {data: BodyType<PostStreamSigningSignBody>}
 
     /**
  * @summary Generate a signed URL for a stream resource
  */
-export const usePostStreamSigningSign = <TError = ErrorType<void | ApiError>,
+export const usePostStreamSigningSign = <TError = ErrorType<void | PostStreamSigningSign410 | ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postStreamSigningSign>>, TError,PostStreamSigningSignMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof postStreamSigningSign>>,
@@ -34750,7 +34767,7 @@ export const getPostTranscodeJobCleanupUrl = () => {
 }
 
 /**
- * @summary Clean up orphaned transcode jobs (no active sessions)
+ * @summary Expire stale transcode sessions and clean up orphaned transcode jobs (no active sessions)
  */
 export const postTranscodeJobCleanup = async ( options?: Parameters<typeof customInstance>[1]): Promise<PostTranscodeJobCleanup200> => {
 
@@ -34802,7 +34819,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
     /**
- * @summary Clean up orphaned transcode jobs (no active sessions)
+ * @summary Expire stale transcode sessions and clean up orphaned transcode jobs (no active sessions)
  */
 export const usePostTranscodeJobCleanup = <TError = ErrorType<unknown>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postTranscodeJobCleanup>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}

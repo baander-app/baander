@@ -120,12 +120,14 @@ final class LocalPlaybackRecoveryTest extends TestCase
         $session = ListeningSession::create($owner, [], 0, 0);
         $session->control('pause', null, null, null, null, null);
         $session->commitDestination($source, new Uuid(), PlaybackState::Paused, 0);
+        // A recovery leaves a source it could not prove stopped unknown, with this stop owed.
+        $session->retainUncertainRunner();
         $store = $this->createMock(PlaybackStoreInterface::class);
         $store->method('lockSession')->willReturn($session);
         $store->method('currentTransfer')->willReturn(null);
         $store->method('pendingControl')->willReturn(['type' => 'stop', 'expires_at' => '2000-01-01T00:00:00+00:00',
             'attempt_id' => new Uuid()->toString(), 'request_id' => new Uuid()->toString(),
-            'incarnation_id' => $source->toString(), 'request_digest' => 'digest']);
+            'incarnation_id' => $source->toString(), 'request_digest' => 'digest', 'disclosed_at' => null]);
         $store->method('endpoint')->willReturn(['epoch' => 1]);
         $store->expects(self::once())->method('insertCommand')->with(self::callback(
             static fn(array $command): bool

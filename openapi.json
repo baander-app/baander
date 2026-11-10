@@ -19739,6 +19739,11 @@
                                         "maxItems": 3,
                                         "minItems": 1,
                                         "uniqueItems": true
+                                    },
+                                    "attachedSet": {
+                                        "description": "Rendition set the player has attached, as returned in renditionSet; refresh only. A rendition named here stays in the signed set on a smaller published lead than one that still has to join",
+                                        "type": "string",
+                                        "example": "0123456789abABCD_-xyz.3"
                                     }
                                 },
                                 "type": "object"
@@ -19814,6 +19819,33 @@
                     },
                     "400": {
                         "description": "Invalid request"
+                    },
+                    "410": {
+                        "description": "A refresh named only sessions that have ended. Sessions that expired may be started again; failed or cancelled ones may not",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "required": [
+                                        "error",
+                                        "reason"
+                                    ],
+                                    "properties": {
+                                        "error": {
+                                            "type": "string"
+                                        },
+                                        "reason": {
+                                            "type": "string",
+                                            "enum": [
+                                                "expired",
+                                                "failed",
+                                                "cancelled"
+                                            ]
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
                     },
                     "503": {
                         "description": "Transcode startup is temporarily unavailable",
@@ -19939,7 +19971,7 @@
                 "tags": [
                     "Transcode"
                 ],
-                "summary": "Clean up orphaned transcode jobs (no active sessions)",
+                "summary": "Expire stale transcode sessions and clean up orphaned transcode jobs (no active sessions)",
                 "operationId": "post_transcode_job_cleanup",
                 "responses": {
                     "200": {
@@ -19948,6 +19980,9 @@
                             "application/json": {
                                 "schema": {
                                     "properties": {
+                                        "expired": {
+                                            "type": "integer"
+                                        },
                                         "cleaned": {
                                             "type": "integer"
                                         }
