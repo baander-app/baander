@@ -142,7 +142,15 @@ only when the control cannot have changed anything. That requires a browser
 runner that the session and the runner's own last report both hold stopped or
 paused, and a control that was never disclosed or is itself a stop or a pause.
 The command then closes with the outcome `never_effective` and the session wants
-the confirmed state again.
+the confirmed state again. Each such command records the session revision its
+settlement left, in `playback_commands.settled_revision`.
+
+Two more kinds of unanswered control close as `never_effective`, and neither
+changes what the session wants. A control that a stop replaces closes that way
+when it was never disclosed to its browser runner, or when it is a stop or a
+pause on a runner confirmed stopped or paused. A volume change or queue edit that
+expires closes that way when it was never disclosed; one the runner was shown may
+have been applied and closes as superseded.
 
 A disclosed `play`, `load` or `seek` that expires may have run. The session turns
 unknown and the runner's own report is marked unknown too, so neither the stop
@@ -157,12 +165,13 @@ A browser runner that is unavailable can be released after a confirmed pause or
 a confirmed stop. The paused release requires a matching acknowledgement for its
 incarnation and epoch, the immediately preceding command revision, consistent
 paused state, and no later or pending commands or unfinished transfer. Commands
-that closed as `never_effective` count neither as later commands nor as a gap in
-the revisions; a superseded command still counts. The stopped release requires the
-runner's own stop report, consistent stopped state, and no pending command or
-unfinished transfer. Retirement and release share the session transaction and
-retain the media, queue and cursor. An expired presence lease alone is
-insufficient; this recovery does not apply to external receivers.
+that closed as `never_effective` do not count as later commands, and after them
+the session must stand at the revision the last one recorded instead of the one
+the acknowledgement left; a superseded command still counts. The stopped release
+requires the runner's own stop report, consistent stopped state, and no pending
+command or unfinished transfer. Retirement and release share the session
+transaction and retain the media, queue and cursor. An expired presence lease
+alone is insufficient; this recovery does not apply to external receivers.
 
 The release check runs wherever its proof can first hold: on a snapshot, on an
 endpoint registration in the transaction that retires the tab's previous

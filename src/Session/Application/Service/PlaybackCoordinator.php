@@ -167,23 +167,15 @@ final readonly class PlaybackCoordinator implements PlaybackCoordinationInterfac
                     if (!in_array($action, ['play', 'pause', 'seek', 'load', 'stop', 'volume', 'queue'], true)) {
                         throw new InvalidArgumentException('Invalid playback action.');
                     }
-                    if ($this->store->hasPendingControl($session->getId()->toString())) {
+                    $pending = $this->store->pendingControl($session->getId()->toString());
+                    if ($pending !== null) {
                         if ($action !== 'stop') {
                             throw new ConflictException('A runner control is awaiting acknowledgement.');
                         }
-                        $started = array_filter(
-                            $this->store->supersedeControls($session->getId()->toString()),
-                            static fn(array $shown): bool => in_array($shown['type'], self::STARTING_CONTROLS, true),
-                        );
-                        if ($started !== []) {
-                            // The runner may have started on a control it was shown. Until it answers, its
-                            // state is unknown, so this stop cannot later pass as one that changed nothing.
-                            // A superseded pause, stop, volume or queue edit cannot have started anything.
-                            $session->retainUncertainRunner();
-                            foreach (array_unique(array_column($started, 'incarnation_id')) as $incarnation) {
-                                $this->store->markRunnerUnknown($incarnation);
-                            }
-                        }
+                        do {
+                            $this->supersedeControl($session, $pending);
+                            $pending = $this->store->pendingControl($session->getId()->toString());
+                        } while ($pending !== null);
                     } else {
                         // The request already passed the revision check, so the release cannot refuse it.
                         // The control is then retained without a runner, as for a session nobody plays.
@@ -365,15 +357,22 @@ final readonly class PlaybackCoordinator implements PlaybackCoordinationInterfac
             return;
         }
         if (in_array($command['type'], ['volume', 'queue'], true)) {
-            $this->store->cancelCommands($command['attempt_id']);
+            // Neither can start or stop playback, so the session keeps what it wants and owes no stop.
+            // One that never left the server is settled as such; one the runner was shown stays a
+            // command the runner may have applied.
             $session->advanceRevision();
+            if ($this->neverEffective($session, $command, restoresConfirmedState: false)) {
+                $this->store->settleNeverEffective($command['attempt_id'], $session->revision());
+            } else {
+                $this->store->cancelCommands($command['attempt_id']);
+            }
             return;
         }
-        if ($this->neverEffective($session, $command)) {
+        if ($this->neverEffective($session, $command, restoresConfirmedState: true)) {
             // The runner was confirmed idle and cannot have been started by this command, so nothing
             // is uncertain: the session wants the confirmed state again and no stop is owed.
-            $this->store->settleNeverEffective($command['attempt_id']);
             $session->settleUnansweredControl();
+            $this->store->settleNeverEffective($command['attempt_id'], $session->revision());
             return;
         }
         $this->store->cancelCommands($command['attempt_id']);
@@ -401,21 +400,48 @@ final readonly class PlaybackCoordinator implements PlaybackCoordinationInterfac
     }
 
     /**
-     * An expired control changed nothing when its browser runner was confirmed idle, by the session and
-     * by the runner's own last report, and the control either never left the server or can only silence.
-     * A registration that lapsed is no part of this proof: a runner that was shown a play and then cut
-     * off keeps playing.
+     * A stop replaces a control its runner has not answered. A control that cannot have changed the
+     * runner settles as never effective and leaves no trace on what is known about the runner. One
+     * the runner was shown and that can start playback may have run: the runner turns unknown, so the
+     * stop that follows cannot later pass as one that changed nothing.
      *
      * @param array<string,mixed> $command
      */
-    private function neverEffective(ListeningSession $session, array $command): bool
+    private function supersedeControl(ListeningSession $session, array $command): void
     {
-        if (!in_array($session->observedState(), [ObservedPlaybackState::Stopped, ObservedPlaybackState::Paused], true)
-            || ($command['disclosed_at'] !== null && !in_array($command['type'], ['stop', 'pause'], true))) {
+        if ($this->neverEffective($session, $command, restoresConfirmedState: false)) {
+            $this->store->settleNeverEffective($command['attempt_id'], $session->revision());
+            return;
+        }
+        $this->store->cancelCommands($command['attempt_id']);
+        if ($command['disclosed_at'] !== null && in_array($command['type'], self::STARTING_CONTROLS, true)) {
+            $session->retainUncertainRunner();
+            $this->store->markRunnerUnknown($command['incarnation_id']);
+        }
+    }
+
+    /**
+     * An unanswered control changed nothing on a browser runner in two cases. It never left the
+     * server; or it is a stop or a pause, which can only silence, and the runner was confirmed idle
+     * by the session and by its own last report. When settling the control returns the session to
+     * its confirmed state, the runner must be confirmed idle in the first case too. A replaced
+     * control and an expired volume or queue edit return the session to nothing, so for them never
+     * having left the server is enough. A registration that lapsed is no part of this proof: a
+     * runner that was shown a play and then cut off keeps playing.
+     *
+     * @param array<string,mixed> $command
+     */
+    private function neverEffective(ListeningSession $session, array $command, bool $restoresConfirmedState): bool
+    {
+        $neverShown = $command['disclosed_at'] === null;
+        $idle = in_array($session->observedState(), [ObservedPlaybackState::Stopped, ObservedPlaybackState::Paused], true);
+        $provenByAbsence = $neverShown && !$restoresConfirmedState;
+        if (!$provenByAbsence && (!$idle || (!$neverShown && !in_array($command['type'], ['stop', 'pause'], true)))) {
             return false;
         }
         $runner = $this->store->endpoint($session->getUserId()->toString(), $command['incarnation_id']);
-        return $runner['kind'] === 'browser' && in_array($runner['observed_state'], ['stopped', 'paused'], true);
+        return $runner['kind'] === 'browser'
+            && ($provenByAbsence || in_array($runner['observed_state'], ['stopped', 'paused'], true));
     }
 
     /**

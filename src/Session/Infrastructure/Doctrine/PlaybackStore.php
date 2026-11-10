@@ -62,9 +62,9 @@ final readonly class PlaybackStore implements PlaybackStoreInterface
         // The caller holds the account/session lock. All commands and observations use that lock.
         // This proof covers managed browser execution only; independent external routes need their own proof.
         // The acknowledgement must be the last thing that moved the session. A command settled as never
-        // effective since then cannot have changed the runner, so it is neither a later command nor a gap
-        // in the revisions: issuing it and settling it advanced the revision once each. A superseded
-        // command still counts, because its runner may have been shown it.
+        // effective since then cannot have changed the runner, so it is no later command, and the
+        // session may stand at the revision the last such settlement recorded instead of the one the
+        // acknowledgement left. A superseded command still counts: its runner was shown it.
         if ($session->activeIncarnationId() === null || $session->desiredState() !== PlaybackState::Paused
             || $session->observedState() !== ObservedPlaybackState::Paused) {
             return false;
@@ -82,11 +82,11 @@ final readonly class PlaybackStore implements PlaybackStoreInterface
                         AND ((proof.type='pause' AND proof.outcome='paused')
                             OR (proof.type='quiesce' AND proof.outcome='quiesced')
                             OR (proof.type='stop' AND proof.outcome='stopped'))
-                        AND proof.revision=:revision-1-2*(
-                            SELECT count(*) FROM playback_commands settled
+                        AND :revision=coalesce((
+                            SELECT max(settled.settled_revision) FROM playback_commands settled
                             WHERE settled.session_id=proof.session_id AND settled.outcome='never_effective'
-                                AND settled.revision>proof.revision
-                        )
+                                AND (settled.revision>=proof.revision OR settled.created_at>proof.created_at)
+                        ),proof.revision+1)
                         AND NOT EXISTS (
                             SELECT 1 FROM playback_commands later
                             WHERE later.session_id=proof.session_id AND later.id<>proof.id
@@ -305,9 +305,9 @@ final readonly class PlaybackStore implements PlaybackStoreInterface
         $this->connection()->executeStatement("UPDATE playback_commands SET outcome='superseded',acknowledged_at=CURRENT_TIMESTAMP WHERE attempt_id=:attempt AND acknowledged_at IS NULL", ['attempt' => $attemptId]);
     }
 
-    public function settleNeverEffective(string $attemptId): void
+    public function settleNeverEffective(string $attemptId, int $sessionRevision): void
     {
-        $this->connection()->executeStatement("UPDATE playback_commands SET outcome='never_effective',acknowledged_at=CURRENT_TIMESTAMP WHERE attempt_id=:attempt AND acknowledged_at IS NULL", ['attempt' => $attemptId]);
+        $this->connection()->executeStatement("UPDATE playback_commands SET outcome='never_effective',settled_revision=:revision,acknowledged_at=CURRENT_TIMESTAMP WHERE attempt_id=:attempt AND acknowledged_at IS NULL", ['attempt' => $attemptId, 'revision' => $sessionRevision]);
     }
 
     public function attemptDisclosed(string $attemptId, string $type): bool
@@ -388,18 +388,6 @@ final readonly class PlaybackStore implements PlaybackStoreInterface
     {
         $command = $this->connection()->fetchAssociative("SELECT * FROM playback_commands WHERE session_id=:session AND acknowledged_at IS NULL AND type IN ('play','pause','seek','load','stop','volume','queue') ORDER BY created_at,id LIMIT 1", ['session' => $sessionId]);
         return $command === false ? null : $this->decode($command);
-    }
-
-    public function supersedeControls(string $sessionId): array
-    {
-        return $this->connection()->fetchAllAssociative(<<<'SQL'
-            WITH superseded AS (
-                UPDATE playback_commands SET outcome='superseded',acknowledged_at=CURRENT_TIMESTAMP
-                WHERE session_id=:session AND acknowledged_at IS NULL AND type IN ('play','pause','seek','load','stop','volume','queue')
-                RETURNING incarnation_id,type,disclosed_at
-            )
-            SELECT incarnation_id,type FROM superseded WHERE disclosed_at IS NOT NULL AND incarnation_id IS NOT NULL
-            SQL, ['session' => $sessionId]);
     }
 
     public function rememberRequest(string $sessionId, string $requestId, string $digest): bool

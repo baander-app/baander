@@ -36,7 +36,7 @@ final class UnansweredControlExpiryTest extends TestCase
         $revision = $session->revision();
         $command = $this->expired('play', disclosed: false);
         $store = $this->store($session, $command, $confirmed->value);
-        $store->expects(self::once())->method('settleNeverEffective')->with($command['attempt_id']);
+        $store->expects(self::once())->method('settleNeverEffective')->with($command['attempt_id'], $revision + 1);
         $store->expects(self::never())->method('cancelCommands');
         $store->expects(self::never())->method('insertCommand');
         $store->expects(self::never())->method('markRunnerUnknown');
@@ -95,7 +95,7 @@ final class UnansweredControlExpiryTest extends TestCase
         $session = $this->session(PlaybackState::Paused, $type);
         $command = $this->expired($type, $disclosed);
         $store = $this->store($session, $command, 'paused');
-        $store->expects(self::once())->method('settleNeverEffective')->with($command['attempt_id']);
+        $store->expects(self::once())->method('settleNeverEffective')->with($command['attempt_id'], $session->revision() + 1);
         $store->expects(self::never())->method('insertCommand');
         $store->expects(self::never())->method('markRunnerUnknown');
 
@@ -143,6 +143,36 @@ final class UnansweredControlExpiryTest extends TestCase
         yield 'a browser whose last report is unknown' => [['kind' => 'browser', 'observed_state' => 'unknown']];
     }
 
+    #[DataProvider('volumeAndQueueExpiries')]
+    public function testAnExpiredVolumeOrQueueEditSettlesOnlyWhenItsBrowserRunnerWasNeverShownIt(string $type, bool $disclosed, string $kind, bool $settles): void
+    {
+        $session = $this->session(PlaybackState::Paused, 'pause');
+        $revision = $session->revision();
+        $command = $this->expired($type, $disclosed);
+        $store = $this->store($session, $command, 'paused', $kind);
+        $store->expects($settles ? self::once() : self::never())->method('settleNeverEffective')->with($command['attempt_id'], $revision + 1);
+        $store->expects($settles ? self::never() : self::once())->method('cancelCommands')->with($command['attempt_id']);
+        // Neither can start or stop playback: the session keeps its state and owes no stop either way.
+        $store->expects(self::never())->method('insertCommand');
+        $store->expects(self::never())->method('markRunnerUnknown');
+
+        $this->snapshot($store);
+
+        self::assertSame(PlaybackState::Paused, $session->desiredState());
+        self::assertSame('paused', $session->observedState()->value);
+        self::assertSame($revision + 1, $session->revision());
+    }
+
+    /** @return iterable<string,array{string,bool,string,bool}> */
+    public static function volumeAndQueueExpiries(): iterable
+    {
+        foreach (['volume', 'queue'] as $type) {
+            yield $type . ' never shown to a browser' => [$type, false, 'browser', true];
+            yield $type . ' shown to a browser' => [$type, true, 'browser', false];
+            yield $type . ' never shown to another receiver' => [$type, false, 'cast', false];
+        }
+    }
+
     public function testAnExpiredStopOnARunnerTheSessionHoldsUnknownIsIssuedAgain(): void
     {
         $session = $this->session(PlaybackState::Stopped, 'stop');
@@ -166,12 +196,10 @@ final class UnansweredControlExpiryTest extends TestCase
     {
         $session = $this->session(PlaybackState::Stopped, 'play');
         $revision = $session->revision();
-        $store = $this->store($session, null, 'stopped');
-        $store->method('hasPendingControl')->willReturn(true);
-        $store->expects(self::once())->method('supersedeControls')->willReturn([
-            ['incarnation_id' => $this->runner->toString(), 'type' => 'volume'],
-            ['incarnation_id' => $this->runner->toString(), 'type' => $type],
-        ]);
+        $pending = $this->pending($type, disclosed: true);
+        $store = $this->store($session, null, 'stopped', pending: [$pending]);
+        $store->expects(self::once())->method('cancelCommands')->with($pending['attempt_id']);
+        $store->expects(self::never())->method('settleNeverEffective');
         $store->expects(self::once())->method('markRunnerUnknown')->with($this->runner->toString());
         $store->expects(self::never())->method('retireConfirmedStoppedBrowser');
         $store->expects(self::once())->method('insertCommand')->with(self::callback(
@@ -184,19 +212,19 @@ final class UnansweredControlExpiryTest extends TestCase
         self::assertSame('unknown', $session->observedState()->value);
     }
 
-    #[DataProvider('controlsThatCannotStartPlayback')]
-    public function testAStopSupersedingADisclosedControlThatCannotStartPlaybackKeepsTheConfirmedState(string $type): void
+    #[DataProvider('silencingTypes')]
+    public function testAStopSupersedingADisclosedSilencingControlOnAConfirmedIdleRunnerSettlesIt(string $type): void
     {
         $session = $this->session(PlaybackState::Paused, 'pause');
         $revision = $session->revision();
-        $store = $this->store($session, null, 'paused');
-        $store->method('hasPendingControl')->willReturn(true);
-        $store->expects(self::once())->method('supersedeControls')->willReturn([
-            ['incarnation_id' => $this->runner->toString(), 'type' => $type],
-        ]);
+        $pending = $this->pending($type, disclosed: true);
+        $store = $this->store($session, null, 'paused', pending: [$pending]);
+        // The settlement records the revision the session stood at, before the stop that replaces it.
+        $store->expects(self::once())->method('settleNeverEffective')->with($pending['attempt_id'], $revision);
+        $store->expects(self::never())->method('cancelCommands');
         $store->expects(self::never())->method('markRunnerUnknown');
         $store->expects(self::once())->method('insertCommand')->with(self::callback(
-            static fn(array $issued): bool => $issued['type'] === 'stop',
+            static fn(array $issued): bool => $issued['type'] === 'stop' && $issued['revision'] === $revision + 1,
         ));
 
         $this->stop($store, $revision);
@@ -206,27 +234,101 @@ final class UnansweredControlExpiryTest extends TestCase
     }
 
     /** @return iterable<string,array{string}> */
-    public static function controlsThatCannotStartPlayback(): iterable
+    public static function silencingTypes(): iterable
     {
         yield 'pause' => ['pause'];
         yield 'stop' => ['stop'];
-        yield 'volume' => ['volume'];
-        yield 'queue' => ['queue'];
     }
 
-    public function testAStopSupersedingAControlItsRunnerWasNeverShownKeepsTheConfirmedState(): void
+    /** @param array{type:string,reported:string,kind:string,confirmed:bool} $case */
+    #[DataProvider('shownControlsThatStaySuperseded')]
+    public function testAStopSupersedingAShownControlKeepsItSupersededWithoutAnIdleProofOrForAVolumeOrQueueEdit(array $case): void
     {
-        $session = $this->session(PlaybackState::Stopped, 'play');
+        $session = $this->session(PlaybackState::Paused, 'pause');
+        if (!$case['confirmed']) {
+            $session->retainUncertainRunner();
+        }
         $revision = $session->revision();
-        $store = $this->store($session, null, 'stopped');
-        $store->method('hasPendingControl')->willReturn(true);
-        $store->expects(self::once())->method('supersedeControls')->willReturn([]);
+        $pending = $this->pending($case['type'], disclosed: true);
+        $store = $this->store($session, null, $case['reported'], $case['kind'], pending: [$pending]);
+        $store->expects(self::once())->method('cancelCommands')->with($pending['attempt_id']);
+        $store->expects(self::never())->method('settleNeverEffective');
+        // None of these can have started playback, so what is known about the runner stands.
+        $store->expects(self::never())->method('markRunnerUnknown');
+        $store->expects(self::once())->method('insertCommand');
+
+        $this->stop($store, $revision);
+
+        self::assertSame($case['confirmed'] ? 'paused' : 'unknown', $session->observedState()->value);
+    }
+
+    /** @return iterable<string,array{array{type:string,reported:string,kind:string,confirmed:bool}}> */
+    public static function shownControlsThatStaySuperseded(): iterable
+    {
+        yield 'a volume change' => [['type' => 'volume', 'reported' => 'paused', 'kind' => 'browser', 'confirmed' => true]];
+        yield 'a queue edit' => [['type' => 'queue', 'reported' => 'paused', 'kind' => 'browser', 'confirmed' => true]];
+        yield 'a pause on a runner that last reported playing' => [['type' => 'pause', 'reported' => 'playing', 'kind' => 'browser', 'confirmed' => true]];
+        yield 'a stop on a runner the session holds unknown' => [['type' => 'stop', 'reported' => 'paused', 'kind' => 'browser', 'confirmed' => false]];
+        yield 'a pause on a receiver that is not a browser' => [['type' => 'pause', 'reported' => 'paused', 'kind' => 'cast', 'confirmed' => true]];
+    }
+
+    #[DataProvider('everyControl')]
+    public function testAStopSupersedingAControlItsRunnerWasNeverShownSettlesItAndKeepsWhatIsKnown(string $type, bool $confirmed): void
+    {
+        $session = $this->session(PlaybackState::Paused, 'pause');
+        if (!$confirmed) {
+            $session->retainUncertainRunner();
+        }
+        $revision = $session->revision();
+        $pending = $this->pending($type, disclosed: false);
+        $store = $this->store($session, null, $confirmed ? 'paused' : 'unknown', pending: [$pending]);
+        $store->expects(self::once())->method('settleNeverEffective')->with($pending['attempt_id'], $revision);
+        $store->expects(self::never())->method('cancelCommands');
         $store->expects(self::never())->method('markRunnerUnknown');
         $store->expects(self::once())->method('insertCommand');
 
         $this->stop($store, $revision);
 
         self::assertSame(PlaybackState::Stopped, $session->desiredState());
+        self::assertSame($confirmed ? 'paused' : 'unknown', $session->observedState()->value);
+    }
+
+    /** @return iterable<string,array{string,bool}> */
+    public static function everyControl(): iterable
+    {
+        foreach (['play', 'load', 'seek', 'pause', 'stop', 'volume', 'queue'] as $type) {
+            yield $type . ' on a confirmed runner' => [$type, true];
+        }
+        yield 'play on a runner the session holds unknown' => ['play', false];
+    }
+
+    public function testAControlAReceiverThatIsNotABrowserWasNeverShownStaysSuperseded(): void
+    {
+        $session = $this->session(PlaybackState::Paused, 'pause');
+        $revision = $session->revision();
+        $pending = $this->pending('play', disclosed: false);
+        $store = $this->store($session, null, 'paused', 'cast', pending: [$pending]);
+        $store->expects(self::once())->method('cancelCommands')->with($pending['attempt_id']);
+        $store->expects(self::never())->method('settleNeverEffective');
+
+        $this->stop($store, $revision);
+
+        self::assertSame('paused', $session->observedState()->value);
+    }
+
+    public function testAStopSupersedesEveryPendingControl(): void
+    {
+        $session = $this->session(PlaybackState::Stopped, 'play');
+        $revision = $session->revision();
+        $first = $this->pending('play', disclosed: false);
+        $second = $this->pending('volume', disclosed: true);
+        $store = $this->store($session, null, 'stopped', pending: [$first, $second]);
+        $store->expects(self::once())->method('settleNeverEffective')->with($first['attempt_id'], $revision);
+        $store->expects(self::once())->method('cancelCommands')->with($second['attempt_id']);
+        $store->expects(self::once())->method('insertCommand');
+
+        $this->stop($store, $revision);
+
         self::assertSame('stopped', $session->observedState()->value);
     }
 
@@ -246,13 +348,29 @@ final class UnansweredControlExpiryTest extends TestCase
             'disclosed_at' => $disclosed ? '2000-01-01T00:00:00+00:00' : null];
     }
 
-    /** @param array<string,mixed>|null $pending */
-    private function store(ListeningSession $session, ?array $pending, string $reported, string $kind = 'browser'): MockObject&PlaybackStoreInterface
+    /** @return array<string,mixed> A control that has not expired. */
+    private function pending(string $type, bool $disclosed): array
+    {
+        return ['expires_at' => '2999-01-01T00:00:00+00:00'] + $this->expired($type, $disclosed);
+    }
+
+    /**
+     * @param array<string,mixed>|null $expired The pending control every read returns.
+     * @param list<array<string,mixed>> $pending Pending controls that leave the list as they are closed.
+     */
+    private function store(ListeningSession $session, ?array $expired, string $reported, string $kind = 'browser', array $pending = []): MockObject&PlaybackStoreInterface
     {
         $store = $this->createMock(PlaybackStoreInterface::class);
         $store->method('lockSession')->willReturn($session);
         $store->method('currentTransfer')->willReturn(null);
-        $store->method('pendingControl')->willReturn($pending);
+        $close = static function (string $attempt) use (&$pending): void {
+            $pending = array_values(array_filter($pending, static fn(array $command): bool => $command['attempt_id'] !== $attempt));
+        };
+        $store->method('pendingControl')->willReturnCallback(static function () use ($expired, &$pending): ?array {
+            return $expired ?? $pending[0] ?? null;
+        });
+        $store->method('cancelCommands')->willReturnCallback($close);
+        $store->method('settleNeverEffective')->willReturnCallback($close);
         $store->method('endpoint')->willReturn([
             'id' => $this->runner->toString(), 'destination_id' => $this->destination->toString(), 'epoch' => 1,
             'kind' => $kind, 'observed_state' => $reported, 'capabilities' => ['song', 'video'], 'available' => false, 'retired_at' => null,

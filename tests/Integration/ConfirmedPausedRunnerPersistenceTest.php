@@ -183,26 +183,31 @@ final class ConfirmedPausedRunnerPersistenceTest extends TestCase
     public function testCommandsSettledAsNeverEffectiveDoNotCountAgainstThePauseAcknowledgement(): void
     {
         $connection = $this->manager->getConnection();
-        // The fixture's pause is acknowledged at revision 2 and leaves the session at revision 3. Issuing a
-        // control and settling it as never effective advances the revision once each.
+        // The fixture's pause is acknowledged at revision 2 and leaves the session at revision 3. Each
+        // later command is listed as its own revision, its outcome and, for one settled as never
+        // effective, the session revision that settlement left.
+        /** @var array<string,array{commands:list<array{int,string,int|null}>,revision:int,released:bool}> $cases */
         $cases = [
-            'one settled command' => ['commands' => [[4, 'never_effective']], 'revision' => 5, 'released' => true],
-            'two settled commands' => ['commands' => [[4, 'never_effective'], [6, 'never_effective']], 'revision' => 7, 'released' => true],
-            'a superseded command' => ['commands' => [[4, 'superseded']], 'revision' => 5, 'released' => false],
-            'a settled and a superseded command' => ['commands' => [[4, 'never_effective'], [6, 'superseded']], 'revision' => 7, 'released' => false],
-            'a revision no settled command accounts for' => ['commands' => [[4, 'never_effective']], 'revision' => 6, 'released' => false],
-            'a settled command without its revisions' => ['commands' => [[3, 'never_effective']], 'revision' => 3, 'released' => false],
+            'one settled command' => ['commands' => [[4, 'never_effective', 5]], 'revision' => 5, 'released' => true],
+            'a settled command another one replaced, then that one settled' => ['commands' => [[4, 'never_effective', 4], [5, 'never_effective', 6]], 'revision' => 6, 'released' => true],
+            'two settled commands' => ['commands' => [[4, 'never_effective', 5], [6, 'never_effective', 7]], 'revision' => 7, 'released' => true],
+            'a superseded command' => ['commands' => [[4, 'superseded', null]], 'revision' => 5, 'released' => false],
+            'a settled and a superseded command' => ['commands' => [[4, 'never_effective', 5], [6, 'superseded', null]], 'revision' => 7, 'released' => false],
+            'a superseded command that a settled one replaced' => ['commands' => [[4, 'superseded', null], [5, 'never_effective', 6]], 'revision' => 6, 'released' => false],
+            'a session that moved after the last settlement' => ['commands' => [[4, 'never_effective', 5]], 'revision' => 6, 'released' => false],
+            'a session behind the last settlement' => ['commands' => [[4, 'never_effective', 6]], 'revision' => 5, 'released' => false],
+            'a session that moved without any settlement' => ['commands' => [], 'revision' => 4, 'released' => false],
         ];
         foreach ($cases as $case => ['commands' => $commands, 'revision' => $revision, 'released' => $released]) {
             $fixture = $this->pausedBrowser();
-            foreach ($commands as [$commandRevision, $outcome]) {
+            foreach ($commands as [$commandRevision, $outcome, $settledRevision]) {
                 $connection->executeStatement(<<<'SQL'
-                    INSERT INTO playback_commands(id,session_id,user_id,attempt_id,request_id,request_digest,incarnation_id,epoch,revision,type,payload,outcome,acknowledged_at,expires_at,created_at)
+                    INSERT INTO playback_commands(id,session_id,user_id,attempt_id,request_id,request_digest,incarnation_id,epoch,revision,type,payload,outcome,settled_revision,disclosed_at,acknowledged_at,expires_at,created_at)
                     SELECT :id,session_id,user_id,:attempt,:request,request_digest,incarnation_id,epoch,:revision,'play',payload,
-                        :outcome,acknowledged_at,expires_at,created_at+INTERVAL '1 second'
+                        :outcome,:settled,CASE WHEN :outcome='superseded' THEN acknowledged_at END,acknowledged_at,expires_at,created_at+INTERVAL '1 second'
                     FROM playback_commands WHERE id=:proof
                     SQL, ['id' => new Uuid()->toString(), 'attempt' => new Uuid()->toString(), 'request' => new Uuid()->toString(),
-                    'revision' => $commandRevision, 'outcome' => $outcome, 'proof' => $fixture['command']]);
+                    'revision' => $commandRevision, 'outcome' => $outcome, 'settled' => $settledRevision, 'proof' => $fixture['command']]);
             }
             $connection->executeStatement('UPDATE listening_sessions SET revision=:revision WHERE id=:session', ['revision' => $revision, 'session' => $fixture['session']]);
 
@@ -213,5 +218,25 @@ final class ConfirmedPausedRunnerPersistenceTest extends TestCase
             self::assertSame($released, $this->observer->fetchOne('SELECT retired_at FROM playback_destination_incarnations WHERE id=?', [$fixture['incarnation']]) !== null, $case);
             self::assertSame(31.25, $result['position'], $case);
         }
+    }
+
+    public function testACommandIsSettledAsNeverEffectiveOnlyWithTheRevisionItLeft(): void
+    {
+        $fixture = $this->pausedBrowser();
+        $connection = $this->manager->getConnection();
+        $changes = [
+            "UPDATE playback_commands SET outcome='never_effective' WHERE id=:command",
+            "UPDATE playback_commands SET settled_revision=revision WHERE id=:command",
+            "UPDATE playback_commands SET outcome='never_effective',settled_revision=revision-1 WHERE id=:command",
+        ];
+        foreach ($changes as $change) {
+            try {
+                $connection->executeStatement($change, ['command' => $fixture['command']]);
+                self::fail($change);
+            } catch (\Doctrine\DBAL\Exception\DriverException $error) {
+                self::assertStringContainsString('chk_playback_commands_settled_revision', $error->getMessage(), $change);
+            }
+        }
+        self::assertSame(1, $connection->executeStatement("UPDATE playback_commands SET outcome='never_effective',settled_revision=revision WHERE id=:command", ['command' => $fixture['command']]));
     }
 }

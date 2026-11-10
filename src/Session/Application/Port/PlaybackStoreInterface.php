@@ -13,7 +13,8 @@ interface PlaybackStoreInterface
     public function saveSession(ListeningSession $session): void;
     /**
      * Retire only unavailable managed browser execution with a durable, fenced quiescence acknowledgement.
-     * Commands settled as never effective since that acknowledgement do not count against it.
+     * Commands settled as never effective since that acknowledgement do not count against it, and the
+     * session must stand at the revision the acknowledgement or the last such settlement left.
      */
     public function retireConfirmedPausedBrowser(ListeningSession $session): bool;
     /** Retire only unavailable managed browser execution that last reported itself stopped, with no command or transfer outstanding. */
@@ -41,15 +42,16 @@ interface PlaybackStoreInterface
     /** @return array{id:string,request_id:string,state:string,rejection_reason:?string}|null */
     public function requestedTransfer(string $sessionId, string $requestId): ?array;
     public function cancelCommands(string $attemptId): void;
-    /** Close the attempt's unanswered commands as never effective: their runner cannot have acted on them. */
-    public function settleNeverEffective(string $attemptId): void;
+    /**
+     * Close the attempt's unanswered commands as never effective: they cannot have changed their runner.
+     * The session revision the settlement leaves is recorded with them.
+     */
+    public function settleNeverEffective(string $attemptId, int $sessionRevision): void;
     /** Whether a command of this type in the attempt was ever included in a snapshot built for its endpoint. */
     public function attemptDisclosed(string $attemptId, string $type): bool;
     public function hasPendingControl(string $sessionId): bool;
     /** @return array<string,mixed>|null */
     public function pendingControl(string $sessionId): ?array;
-    /** @return list<array{incarnation_id:string,type:string}> The superseded controls their runner had been shown. */
-    public function supersedeControls(string $sessionId): array;
     public function rememberRequest(string $sessionId, string $requestId, string $digest): bool;
     /**
      * Pending commands leave the server only here, for the given incarnation, and are recorded as disclosed.
