@@ -81,9 +81,9 @@ make dev-host-setup OPTIONS="--share-path $(pwd)"
 
 ## 4. Start your worktree preview
 
-The application image copies FFmpeg from the project's static FFmpeg image. If your
-Docker daemon cannot pull that private package from the container registry, build a
-local copy once and point `BAANDER_FFMPEG_IMAGE` at it:
+The application image copies FFmpeg from the project's static FFmpeg image, a public
+package on GHCR pinned by digest. If your Docker daemon cannot pull it from the
+container registry, build a local copy once and point `BAANDER_FFMPEG_IMAGE` at it:
 
 ```bash
 docker buildx build -f docker/ffmpeg/Dockerfile -t ffmpeg-baander-static:local --load .

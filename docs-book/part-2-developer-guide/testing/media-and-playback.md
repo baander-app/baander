@@ -241,8 +241,12 @@ BAANDER_TEST_TWO_COMMAND_CHECKPOINT="$PWD/scripts/test-two-command-browser-check
   bash scripts/test-two-command-deployment-container.sh
 ```
 
-The hook uses the configured `browser` image role, Docker host networking and the
-checkout's `playwright-core` dependency. A custom `BAANDER_BROWSER_IMAGE` requires
+The hook uses the configured `browser` image role and the checkout's
+`playwright-core` dependency. In this drill the browser container joins the
+drill's Docker network and forwards its own loopback port 9501 to the `web` alias,
+so it reaches the application at its loopback origin and follows a replaced web
+container. Called without a network, the hook uses Docker host networking. A
+custom `BAANDER_BROWSER_IMAGE` requires
 `BAANDER_BROWSER_PLAYWRIGHT_VERSION`; preflight checks that declaration against the
 installed package before browser creation. The default reference and compatible
 version live in the tooling catalog. Set
@@ -355,6 +359,50 @@ contained process identities with no survivors and verifies cleanup. Ordinary
 [autoscaling](workers-and-messaging.md#ordinary-worker-autoscaling-qualification) and saturated
 [media controls](#shared-media-control-qualification) have dedicated gates below;
 regional qualification remains separate.
+
+### Iterating on the drill locally
+
+The drill runs the worker image as built. Server code under `src/`, the fixture
+programs under `tests/Fixtures` and the web bundle in `public/` all come from the
+image, so a change to any of them needs a new image. Build the bundle first,
+because the image build copies it from the checkout:
+
+```bash
+(cd ui/web && corepack yarn build && node scripts/verify-build.mjs)
+php scripts/build-application.php --buildx --target worker --tag baander-worker:test
+```
+
+The checkpoint hook copies the browser probe,
+`ui/web/tests/e2e/two-command/browser.mjs`, and `playwright-core` from the checkout
+into the browser container on every run, and the host-side orchestration under
+`scripts/` and `packages/baander-tooling` runs from the checkout as well. A change
+to the probe or to that orchestration needs only another run:
+
+```bash
+BAANDER_TEST_IMAGE=baander-worker:test BAANDER_TEST_DOCKER_SOCKET_PATH=/var/run/docker.sock \
+BAANDER_TEST_BROWSER_ENGINE=chromium BAANDER_TEST_BROWSER_CLIENT_CONTROLS=1 \
+BAANDER_TEST_ARTIFACTS="$PWD/var/test-runs/two-command-chromium" \
+BAANDER_TEST_TWO_COMMAND_CHECKPOINT="$PWD/scripts/test-two-command-browser-checkpoint.sh" \
+  bash scripts/test-two-command-deployment-container.sh
+```
+
+`BAANDER_TEST_POSTGRES_IMAGE` overrides the database image, which defaults to
+`baander-database:latest`. On a development host the worker image build took 10 to
+20 minutes and the full drill about ten, with client controls reached after about
+seven. The [endpoint check](#selected-video-endpoint-playback) took about five.
+
+Browser evidence lands in `browser/` under the artifacts directory: `result.json`
+after a pass, `failure.json` and `failure.png` after a failure. Beyond what
+`result.json` holds, `failure.json` records the error, the player's `baander:*`
+performance marks, the visible alert and status texts, page errors, console errors
+and warnings, and the recorded API responses. Read the marks first: they give the
+order in which the player committed, queued and sent each seek.
+
+Run the image build and each drill one at a time on an otherwise idle host. The
+drills run real encoders against deadlines, and the
+[media-control drill](#shared-media-control-qualification) applies CPU pressure on
+purpose. On 2026-11-10 it ended with exit status 137 while image builds ran beside
+it, and passed when run alone.
 
 
 ### Shared media control qualification

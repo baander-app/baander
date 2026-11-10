@@ -132,10 +132,20 @@ make preview-status
 make preview-url
 ```
 
-The application image copies FFmpeg from the project's static FFmpeg image, a
-private package in the container registry. A host that builds the application
-image needs either a registry login that can pull it or
-`BAANDER_FFMPEG_IMAGE` pointing at a locally built copy, such as the output of
+A new linked worktree (`git worktree add`) lacks two host-side prerequisites,
+because neither is tracked. Run `composer --working-dir=scripts install --no-dev`
+in it first; without that, every lifecycle command stops with "Install workflow
+tooling first". On an SELinux host, also pass the new directory to `--share-path`
+as shown under host setup; otherwise preflight reports "Preview checkout is
+unavailable to the selected Docker daemon". The new preview inherits the
+persistent instance's media mount declarations, as described under media mounts,
+but starts with an empty catalog. Scan a library from the administration page, or
+with `make exec cmd="php bin/console app:library:scan <slug>"`.
+
+The application image copies FFmpeg from the project's static FFmpeg image, which
+the `ffmpeg` image role pins by digest to the public package on GHCR. A host that
+cannot pull it sets `BAANDER_FFMPEG_IMAGE` to a locally built copy, such as the
+output of
 `docker buildx build -f docker/ffmpeg/Dockerfile -t ffmpeg-baander-static:local --load .`.
 
 Use the URL returned by `make preview-url` for browser work. For Playwright:

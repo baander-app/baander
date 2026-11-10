@@ -78,7 +78,7 @@ resolves its runner label.
 | Caches and coverage baselines | Forgejo generic packages through `scripts/ci-package-store.php` | `actions/cache` |
 | Artifacts | `.github/actions/forgejo-upload-artifact` | `actions/upload-artifact` v7.0.2 |
 | Host disk cleanup | None | Before the CI quality gate, the application build and the static FFmpeg build |
-| Anonymous-pull check | None | After pushing the Nginx, FFmpeg and application images |
+| Anonymous-pull check | None | After pushing the Nginx and application images |
 
 Registry login passes `secrets.REGISTRY_TOKEN || github.token` as the password, with
 `github.actor` as the user. Job timeouts are the same on both forges.
@@ -256,6 +256,14 @@ a smoke encodes and decodes with bAAC, and `scripts/ffmpeg-capability-gate.sh`
 checks that the binary lists every accelerator, hardware encoder and AAC
 implementation the application can select, and that its shared objects resolve. The
 same gate runs when the application image is built.
+
+A cold FFmpeg build takes about an hour and a half on GitHub, and every push to
+`master` that changes one of the workflow's paths starts one. When such a change
+needs no new image, push that commit alone with `[skip ci]` in its message. GitHub
+starts no workflow for that push, CI included, and Forgejo's default configuration
+does the same. Push the commits that follow, such as a digest update in
+`tooling-defaults.json`, separately. The path filter covers every commit in a
+push, so a follow-up pushed together with the FFmpeg change would start the build.
 
 The runner and PostgreSQL images are CI tooling and may be public, and so may the
 FFmpeg image. The application image keeps notice, provenance and embedded-dependency
