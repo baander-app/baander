@@ -415,6 +415,8 @@ describe('browser playback coordination', () => {
   it.each(['owned video', 'different video', 'transfer pending'] as const)('limits a local video close to its %s scope', async scenario => {
     const h = harness()
     cleanup.push(h.stop)
+    const mark = vi.spyOn(performance, 'mark')
+    cleanup.push(() => mark.mockRestore())
     const current = snapshot({ endpoint, activeIncarnationId: endpoint.incarnationId,
       media: { kind: 'video', publicId: scenario === 'different video' ? 'another-movie' : 'movie' },
       ...(scenario === 'transfer pending' ? { transfer: { attemptId: 'transfer', state: 'preparing' as const,
@@ -429,6 +431,51 @@ describe('browser playback coordination', () => {
     await requestPlayback({ action: 'stop-local-video', incarnationId: endpoint.incarnationId, videoId: 'movie' })
     const controls = vi.mocked(AXIOS_INSTANCE.post).mock.calls.filter(([path]) => path === '/api/session/control')
     expect(controls.map(([, body]) => (body as { action: string }).action)).toEqual(scenario === 'owned video' ? ['stop'] : [])
+    expect(mark.mock.calls.some(([name]) => name === 'baander:intent-refused')).toBe(scenario !== 'owned video')
+  })
+
+  it('refuses a local video close while the transfer destination has not proven it stopped', async () => {
+    const h = harness()
+    cleanup.push(h.stop)
+    const mark = vi.spyOn(performance, 'mark')
+    cleanup.push(() => mark.mockRestore())
+    const current = snapshot({ endpoint, activeIncarnationId: endpoint.incarnationId, media: { kind: 'video', publicId: 'movie' },
+      transfer: { attemptId: 'transfer', state: 'uncertain' as const, sourceIncarnationId: endpoint.incarnationId,
+        targetIncarnationId: 'remote', position: 12, desiredState: 'paused' as const } })
+    h.receive(current)
+    vi.mocked(AXIOS_INSTANCE.post).mockImplementation(async () => ({ data: { data: current } }))
+
+    const close = requestPlayback({ action: 'stop-local-video', incarnationId: endpoint.incarnationId, videoId: 'movie' })
+      .then(() => null, error => error as Error)
+
+    expect(await close).toBeInstanceOf(Error)
+    expect((await close)?.message).toContain('Confirm it stopped')
+    expect(vi.mocked(AXIOS_INSTANCE.post).mock.calls.some(([path]) => path === '/api/session/control')).toBe(false)
+    expect(mark.mock.calls.some(([name]) => name === 'baander:intent-error')).toBe(true)
+    expect(h.client.getQueryData(PLAYBACK_CONNECTION_KEY)).toHaveProperty('error', expect.stringContaining('uncertain'))
+  })
+
+  it('surfaces the server refusal reason when a transfer blocks a control', async () => {
+    const h = harness()
+    cleanup.push(h.stop)
+    const current = snapshot({ endpoint, activeIncarnationId: endpoint.incarnationId, media: { kind: 'video', publicId: 'movie' },
+      transfer: { attemptId: 'transfer', state: 'uncertain' as const, sourceIncarnationId: endpoint.incarnationId,
+        targetIncarnationId: 'remote', position: 12, desiredState: 'paused' as const } })
+    h.receive(current)
+    vi.mocked(AXIOS_INSTANCE.post).mockImplementation(async path => {
+      if (path === '/api/session/control') {
+        throw Object.assign(new Error('Request failed with status code 409'), {
+          response: { status: 409, data: { error: { message: 'Playback controls wait for transfer reconciliation.' } } },
+        })
+      }
+      return { data: { data: current } }
+    })
+
+    const play = requestPlayback({ action: 'play' }).then(() => null, error => error as Error)
+
+    expect(await play).toBeInstanceOf(Error)
+    expect((await play)?.message).toBe('Playback controls wait for transfer reconciliation.')
+    expect(h.client.getQueryData(PLAYBACK_CONNECTION_KEY)).toHaveProperty('error', 'Playback controls wait for transfer reconciliation.')
   })
 
   it.each(['load', 'play'] as const)('renews the owned endpoint before local %s after its lease expires', async action => {

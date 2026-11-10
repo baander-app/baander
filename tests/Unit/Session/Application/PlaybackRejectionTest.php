@@ -9,6 +9,7 @@ use App\Session\Application\Port\PlaybackOperation;
 use App\Session\Application\Port\PlaybackStoreInterface;
 use App\Session\Application\Service\PlaybackCoordinator;
 use App\Session\Domain\Model\ListeningSession\ListeningSession;
+use App\Session\Domain\Model\Playback\PlaybackState;
 use App\Shared\Application\Exception\ConflictException;
 use App\Shared\Application\Exception\InvalidInputException;
 use App\Shared\Application\Port\TransactionPortInterface;
@@ -36,6 +37,47 @@ final class PlaybackRejectionTest extends TestCase
         self::assertSame(['requestId' => $request, 'attemptId' => $attempt, 'state' => 'failed',
             'rejectionReason' => 'video_codec_unsupported'], $result['transferResult']);
         self::assertNotSame($result['transfer']['attemptId'], $result['transferResult']['attemptId']);
+    }
+
+    public function testRejectedTransferCommandSettlesTheTransferUnderItsOwnFence(): void
+    {
+        $owner = new Uuid();
+        $session = ListeningSession::create($owner, [], 0, 0);
+        $source = new Uuid();
+        $destination = new Uuid();
+        $session->commitDestination($source, $destination, PlaybackState::Playing, 12.5);
+        $attempt = new Uuid()->toString();
+        $command = new Uuid()->toString();
+        $transfer = ['id' => $attempt, 'session_id' => $session->getId()->toString(), 'user_id' => $owner->toString(),
+            'request_id' => new Uuid()->toString(), 'request_digest' => hash('sha256', 'digest'),
+            'source_incarnation_id' => $source->toString(), 'target_incarnation_id' => new Uuid()->toString(),
+            'desired_state' => 'playing', 'state' => 'quiescing', 'position' => 12.5, 'revision' => 0,
+            'expires_at' => (new \DateTimeImmutable('+5 seconds'))->format('Y-m-d H:i:s.uP')];
+        $store = $this->createMock(PlaybackStoreInterface::class);
+        $store->method('lockSession')->willReturn($session);
+        $store->method('currentTransfer')->willReturn($transfer);
+        $store->method('endpoint')->willReturnCallback(static fn(string $userId, string $incarnationId, ?string $capability = null): array =>
+            $incarnationId === $source->toString() ? ['id' => $source->toString(), 'destination_id' => $destination->toString()] : []);
+        $store->method('command')->willReturn(['id' => $command, 'incarnation_id' => $source->toString(), 'attempt_id' => $attempt,
+            'epoch' => 1, 'revision' => 0, 'type' => 'quiesce', 'outcome' => null, 'acknowledged_at' => null]);
+        $store->method('saveSession');
+        $store->method('snapshot')->willReturn([]);
+        $store->expects(self::once())->method('acknowledgeCommand');
+        $store->expects(self::never())->method('insertCommand');
+        $settled = null;
+        $store->method('saveTransfer')->willReturnCallback(static function (array $row) use (&$settled): void { $settled = $row; });
+
+        $this->coordinator($store)->execute($owner, PlaybackOperation::Acknowledge, [
+            'commandId' => $command, 'attemptId' => $attempt, 'incarnationId' => $source->toString(),
+            'epoch' => 1, 'revision' => 0, 'outcome' => 'rejected', 'rejectionReason' => 'video_codec_unsupported',
+        ], 'capability');
+
+        self::assertNotNull($settled);
+        self::assertSame('failed', $settled['state']);
+        self::assertSame(1, $settled['revision']);
+        self::assertSame(1, $session->revision());
+        self::assertSame('playing', $session->desiredState()->value);
+        self::assertSame($destination->toString(), $session->selectedDestinationId()?->toString());
     }
 
     public function testDuplicateAcknowledgementCannotChangeItsReason(): void

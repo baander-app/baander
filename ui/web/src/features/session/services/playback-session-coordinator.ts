@@ -482,8 +482,20 @@ export class PlaybackSessionCoordinator {
     if (!this.current() || !this.ready || !this.snapshot || !this.endpoint) throw new Error('Playback connection is unavailable.')
     try {
       if (intent.action === 'stop-local-video') {
+        // A local video close only stops a session this endpoint actively plays. Another
+        // runner, another video or a live handoff owns stopping, so the close resolves
+        // without a control and records why. A transfer whose destination never proved it
+        // stopped refuses the close instead: playback may still be running out of band.
         if (this.endpoint.incarnationId !== intent.incarnationId || this.snapshot.activeIncarnationId !== intent.incarnationId
-          || this.snapshot.transfer || this.snapshot.media?.kind !== 'video' || this.snapshot.media.publicId !== intent.videoId) return
+          || this.snapshot.media?.kind !== 'video' || this.snapshot.media.publicId !== intent.videoId) {
+          performance.mark('baander:intent-refused', { detail: { action: intent.action, reason: 'not the active local video' } })
+          return
+        }
+        if (this.snapshot.transfer) {
+          if (this.snapshot.transfer.state === 'uncertain') throw new Error('Playback at the destination is uncertain. Confirm it stopped before resuming here.')
+          performance.mark('baander:intent-refused', { detail: { action: intent.action, reason: 'transfer in progress' } })
+          return
+        }
         intent = { action: 'stop' }
       }
       if (this.pendingRequests.size > 0 && intent.action !== 'stop') throw new Error('A previous playback result is unconfirmed. Retry its result before sending another control.')
@@ -545,9 +557,20 @@ export class PlaybackSessionCoordinator {
     })
   }
 
+  /** The server explains playback refusals in the response body; prefer its reason over the transport status text. */
+  private refusal(error: unknown, fallback: string): Error {
+    if (error instanceof Error) {
+      const reason = (error as { response?: { data?: { error?: { message?: unknown } } } }).response?.data?.error?.message
+      if (typeof reason === 'string' && reason !== '') return new Error(reason)
+      return error
+    }
+    return new Error(fallback)
+  }
+
   private rejectUnconfirmed(request: PendingRequest, error: unknown): void {
-    request.reject(error instanceof Error ? error : new Error('The playback result could not be confirmed.'))
-    this.fail(error)
+    const refusal = this.refusal(error, 'The playback result could not be confirmed.')
+    request.reject(refusal)
+    this.fail(refusal)
   }
 
   private completeRequest(request: PendingRequest, result: RequestResult | null | undefined): void {
@@ -704,10 +727,11 @@ export class PlaybackSessionCoordinator {
         transfer.lastRevision = Math.max(transfer.lastRevision, response.revision)
         this.completeTransfer(transfer, response.transferResult)
       }).catch(error => {
-        transfer.reject(error instanceof Error ? error : new Error('The playback transfer result could not be confirmed.'))
+        const refusal = this.refusal(error, 'The playback transfer result could not be confirmed.')
+        transfer.reject(refusal)
         const status = (error as { response?: { status?: number } })?.response?.status
         if (status && status >= 400 && status < 500) this.transfers.delete(transfer)
-        this.fail(error)
+        this.fail(refusal)
       }).finally(() => {
         transfer.reading = false
         this.refreshTransfers()

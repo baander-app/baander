@@ -42,6 +42,37 @@ final class PlaybackTransferTest extends TestCase
         self::assertSame('failed', $transfer->state());
         self::assertNull($transfer->command());
     }
+
+    public function testRejectedQuiescenceSettlesTheFailedTransferAndKeepsTheSourceAuthoritative(): void
+    {
+        $transfer = PlaybackTransfer::begin('attempt', 'source', 'target', 'playing', 12.5);
+        $transfer->acknowledge('prepared');
+        $transfer->acknowledge('rejected');
+        self::assertSame('failed', $transfer->state());
+        self::assertNull($transfer->command());
+    }
+
+    public function testRejectedStartSettlesTheFailedTransferWithoutStopProof(): void
+    {
+        $transfer = PlaybackTransfer::begin('attempt', 'source', 'target', 'playing', 12.5);
+        $transfer->acknowledge('prepared');
+        $transfer->acknowledge('quiesced', 14.25);
+        $transfer->acknowledge('rejected');
+        self::assertSame('failed', $transfer->state());
+        self::assertNull($transfer->command());
+        self::assertSame(14.25, $transfer->position());
+    }
+
+    public function testRejectedStopKeepsTheUncertainDestinationFenced(): void
+    {
+        $transfer = PlaybackTransfer::begin('attempt', 'source', 'target', 'playing', 12.5);
+        $transfer->acknowledge('prepared');
+        $transfer->acknowledge('quiesced', 14.25);
+        $transfer->expire();
+        $transfer->acknowledge('rejected');
+        self::assertSame('uncertain', $transfer->state());
+        self::assertSame('stop', $transfer->command());
+    }
     public function testInvalidQuiescenceCannotAdvanceTransfer(): void
     {
         $transfer = PlaybackTransfer::begin('attempt', 'source', 'target', 'playing', 12.5);
