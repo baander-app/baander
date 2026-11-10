@@ -159,7 +159,7 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, coor
     let loadedIdentity: string | null = null
     let loadedSet: string | null = null
     // Sessions that expired are replaced; the cursor and status to continue with wait here for the
-    // new session. Until the new session has answered a second signing or accepted a control it is
+    // new session. Until the new session has answered a second signing or accepted a seek it is
     // unproven, and its loss is an error, so sessions that are gone at once cannot loop.
     let restart: { position: number, paused: boolean } | null = null
     let restartUnproven = false
@@ -209,8 +209,9 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, coor
       && (snapshot.status === 'running' || snapshot.status === 'paused')
     const playbackPosition = () => restoredSourceEnd !== null && Math.abs(video.currentTime - restoredSourceEnd) <= 0.1
       ? sourceDuration : mediaStart + video.currentTime
-    // Where playback is headed: a seek in flight, then a restore in flight, then the native clock.
-    const cursor = () => sourceSeekPosition ?? (pendingLoad ? mediaStart + pendingLoad.position : playbackPosition())
+    // Where playback is headed: a seek in flight, then the cursor kept while a failed attachment
+    // is replaced, then a restore in flight, then the native clock.
+    const cursor = () => sourceSeekPosition ?? recoveryPosition ?? (pendingLoad ? mediaStart + pendingLoad.position : playbackPosition())
     const atSourceEnd = (position: number) => sourceDuration > 0 && position >= sourceDuration - SOURCE_END_TOLERANCE
     const clearSourceSeek = () => {
       sourceSeekPosition = null
@@ -317,7 +318,7 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, coor
         if (delivery.kind === 'original' || delivery.kind === 'cached') {
           data = {
             url: delivery.url, renditionSet: delivery.url, jobId: `delivery:${videoId}`, jobIds: [], sessionId: null,
-            generation: 0, revision: 0, ready: true, position: snapshot ? playbackPosition() : 0,
+            generation: 0, revision: 0, ready: true, position: restart?.position ?? (snapshot ? playbackPosition() : 0),
             status: playbackStarted ? 'running' : 'paused', startTime: 0, duration: sourceDuration || video.duration || 0,
           }
         } else {
@@ -371,9 +372,11 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, coor
         const ownerChanged = previous !== null && (previous.jobId !== data.jobId || previous.sessionId !== data.sessionId)
         if (ownerChanged) subtitlePreference = undefined
         appliedRequest = revision
-        const resumed = data.sessionId ? restart : null
-        if (resumed) restart = null
-        const transferredCursor = resumed ? resumed.position : previous?.sessionId === null && data.sessionId ? playbackPosition() : null
+        const resumed = restart
+        restart = null
+        // A delivery without a session has none that could end again: nothing is left to prove.
+        if (resumed && !data.sessionId) restartUnproven = false
+        const transferredCursor = !data.sessionId ? null : resumed ? resumed.position : previous?.sessionId === null ? playbackPosition() : null
         snapshot = data
         if (transferredCursor !== null && transferredCursor > 0) {
           sourceSeekPosition = transferredCursor
@@ -384,7 +387,7 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, coor
           if (resumed?.paused) control('pause', transferredCursor)
           return
         }
-        if (resumed?.paused) control('pause', 0)
+        if (resumed?.paused && data.sessionId) control('pause', 0)
         if (!completed()) completion = null
         if (data.duration !== null && Number.isFinite(data.duration) && data.duration > 0) {
           sourceDuration = data.duration
@@ -459,7 +462,8 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, coor
           attachmentRestored = false
           pendingLoad = { identity, position: Math.max(0, position - mediaStart) }
           loadedIdentity = identity
-          loadedSet = data.renditionSet
+          // Without a session the set is the delivery's URL, which is no rendition set to sign.
+          loadedSet = data.sessionId ? data.renditionSet : null
           sourceEndSeek = null
           settledWhileSeeking = false
           retiringPlayback = null
@@ -541,6 +545,7 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, coor
       if (paused) playbackStarted = false
       restartUnproven = true
       restart = { position, paused }
+      controlError = null
       statusReconciliation = null
       cancelSeekReconciliation()
       canonicalSeekRecovery = null
@@ -647,10 +652,11 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, coor
               return
             }
           }
-          // The session accepted a control: it is held, so a later expiry is a new one.
-          if (snapshot?.sessionId === sessionId) restartUnproven = false
           if (chain && !owned()) { seekHandled = true; return }
           const { data } = response
+          // The endpoint also answers 200 for a session that has ended. Only a seek the session
+          // accepted into a generation shows that it is held, so a later expiry is a new one.
+          if (snapshot?.sessionId === sessionId && data.data?.acceptedGeneration !== undefined) restartUnproven = false
           if (chain && uncertainSeek && data.data?.acceptedGeneration === undefined && seekChain === chain) {
             const waiting = readSeekState(chain, 'rebase')
             const canonical = await waiting.state
@@ -681,6 +687,8 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, coor
         if (action === 'progress' && snapshot?.generation === current.generation) progressPosition = position
         if (!chain) await refresh()
       }).catch(async error => {
+        // A control that fails after its session was replaced says nothing about the new one.
+        if (snapshot?.sessionId !== sessionId) return
         controlError = error
         if ((action === 'progress' || statusRevision !== null) && isTransientControlFailure(error)) {
           if (statusRevision === null) return

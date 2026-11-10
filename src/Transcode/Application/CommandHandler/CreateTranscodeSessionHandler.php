@@ -20,6 +20,7 @@ use App\Transcode\Application\Port\TranscodeStoragePortInterface;
 use App\Transcode\Application\Settings\TranscodeSettingDefinitions;
 use App\Transcode\Domain\Model\TranscodeSession;
 use App\Transcode\Domain\ValueObject\AacImplementation;
+use App\Transcode\Domain\ValueObject\SessionState;
 use App\Transcode\Domain\ValueObject\TranscodeStatus;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 
@@ -56,7 +57,10 @@ final readonly class CreateTranscodeSessionHandler
             }
             if ($runtime !== null && $runtime->requestId === $command->requestId && in_array($runtime->outcome, ['pending', 'accepted', 'ready', 'complete'], true)) {
                 $existing = $this->sessionPort->findByUuid($runtime->sessionId);
-                if ($existing !== null && $existing->getUserId()->equals($command->getUserId())) {
+                // A session that was cancelled or has failed is not handed back: its client holds
+                // nothing through it, so the start admits a new session over that execution.
+                if ($existing !== null && $existing->getUserId()->equals($command->getUserId())
+                    && !in_array($existing->getSessionState(), [SessionState::Cancelled, SessionState::Failed], true)) {
                     return $existing;
                 }
             }

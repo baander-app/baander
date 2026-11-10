@@ -63,24 +63,34 @@ final class TranscodeStreamingService implements TranscodeStreamingPortInterface
         }
         $primary = $jobs[0];
         $key = $primary->getId()->toString();
-        $group = $this->contexts($jobs, siblingsBesideCoveringPrimary: true);
-        $canonical = $group['contexts'][$key] ?? null;
-        if ($canonical !== null && $this->coversCursor($canonical) && count($group['contexts']) < count($jobs)) {
-            // The cursor moved into the primary's coverage between the two reads: the siblings count after all.
-            $group = $this->contexts($jobs);
-            $canonical = $group['contexts'][$key] ?? null;
-        }
-        $runtime = $group['admitted'][$key] ?? null;
+        $siblings = array_slice($jobs, 1);
+        $admitted = $this->ownership->findGroup($this->ids($jobs));
+        $runtime = $admitted[$key] ?? null;
         if ($runtime === null) {
             return null;
         }
+        // Siblings are offered only beside a primary that covers the cursor. A signing polls once
+        // a second while a start or a seek warms up; until the primary covers, it reads no sibling index.
+        $published = $this->published([$primary], $admitted);
+        $withSiblings = $published[$key] !== null && $this->coversCursor($published[$key]);
+        $contexts = $this->fenced($jobs, $published + ($withSiblings ? $this->published($siblings, $admitted) : []));
+        if (!$withSiblings && $siblings !== [] && $contexts[$key] !== null && $this->coversCursor($contexts[$key])) {
+            // The cursor moved into the primary's coverage between the two reads: the siblings count after all.
+            $admitted = $this->ownership->findGroup($this->ids($jobs));
+            $runtime = $admitted[$key] ?? null;
+            if ($runtime === null) {
+                return null;
+            }
+            $contexts = $this->fenced($jobs, $this->published($jobs, $admitted));
+        }
+        $canonical = $contexts[$key] ?? null;
         $pairs = [];
         // The session's primary rendition alone decides readiness, by covering the cursor.
         if ($canonical !== null && $this->coversCursor($canonical)) {
             $pairs[] = ['jobId' => $primary->getPublicId()->toString(), 'generation' => $canonical['runtime']->generation];
             $attached = array_column($attachedRenditions, 'generation', 'jobId');
-            foreach (array_slice($jobs, 1) as $job) {
-                $context = $group['contexts'][$job->getId()->toString()] ?? null;
+            foreach ($siblings as $job) {
+                $context = $contexts[$job->getId()->toString()] ?? null;
                 if ($context === null || !$this->compatible($canonical, $context) || !$this->canMerge($canonical, $context)) {
                     continue;
                 }
@@ -330,48 +340,61 @@ final class TranscodeStreamingService implements TranscodeStreamingPortInterface
     private function context(TranscodeJob $job, int $generation): ?array
     {
         $runtime = $generation < 1 ? null : $this->ownership->find($job->getId());
-        $published = $runtime === null ? null : $this->published($job, $generation, $runtime);
-        return $published === null ? null : $this->fenced($published, $generation, $this->ownership->find($job->getId()));
+        $published = $runtime === null ? null : $this->publication($job, $generation, $runtime);
+        return $published === null ? null : $this->fence($published, $this->ownership->find($job->getId()));
     }
 
     /**
-     * Resolves several renditions against one committed runtime state. The jobs' runtimes are read in
-     * one statement before their indexes and in one statement after them, so a control that moves
-     * every sibling's cursor together can never be seen for some renditions and not for others.
-     *
-     * A signing polls once a second while a start or a seek warms up. Siblings are offered only
-     * beside a primary that covers the cursor, so until the first job does, the indexes of the
-     * others are not read when the caller asks for that; their contexts are then absent.
+     * @param list<TranscodeJob> $jobs
+     * @return list<Uuid>
+     */
+    private function ids(array $jobs): array
+    {
+        return array_map(static fn (TranscodeJob $job): Uuid => $job->getId(), $jobs);
+    }
+
+    /**
+     * Reads the published index of each job at its admitted generation. Several renditions are
+     * resolved against one committed runtime state: the jobs' runtimes are read in one statement
+     * before their indexes and in one statement after them ({@see fenced()}), so a control that
+     * moves every sibling's cursor together can never be seen for some renditions and not for others.
      *
      * @param list<TranscodeJob> $jobs
-     * @param array<string, int> $generations Pinned generation by job id; the current one when absent.
-     * @return array{admitted: array<string, TranscodeRuntimeSnapshot>, contexts: array<string, Context|null>}
+     * @param array<string, TranscodeRuntimeSnapshot> $admitted The runtimes of one group read, by job id.
+     * @param array<string, int> $generations Pinned generation by job id; the admitted one when absent.
+     * @return array<string, Context|null> By job id.
      */
-    private function contexts(array $jobs, array $generations = [], bool $siblingsBesideCoveringPrimary = false): array
+    private function published(array $jobs, array $admitted, array $generations = []): array
     {
-        $ids = array_map(static fn (TranscodeJob $job): Uuid => $job->getId(), $jobs);
-        $admitted = $this->ownership->findGroup($ids);
         $published = [];
-        foreach ($jobs as $index => $job) {
+        foreach ($jobs as $job) {
             $key = $job->getId()->toString();
             $runtime = $admitted[$key] ?? null;
             $generation = $generations[$key] ?? ($runtime === null ? 0 : $runtime->generation);
-            $published[$key] = $runtime === null || $generation < 1 ? null : $this->published($job, $generation, $runtime);
-            if ($index === 0 && $siblingsBesideCoveringPrimary && ($published[$key] === null || !$this->coversCursor($published[$key]))) {
-                break;
-            }
+            $published[$key] = $runtime === null || $generation < 1 ? null : $this->publication($job, $generation, $runtime);
         }
-        $latest = $this->ownership->findGroup($ids);
+        return $published;
+    }
+
+    /**
+     * Fences the resolved indexes with one read of the runtimes of all the group's jobs.
+     *
+     * @param list<TranscodeJob> $jobs
+     * @param array<string, Context|null> $published
+     * @return array<string, Context|null> By job id, for the jobs that were resolved.
+     */
+    private function fenced(array $jobs, array $published): array
+    {
+        $latest = $this->ownership->findGroup($this->ids($jobs));
         $contexts = [];
         foreach ($published as $key => $context) {
-            $contexts[$key] = $context === null ? null
-                : $this->fenced($context, $generations[$key] ?? $admitted[$key]->generation, $latest[$key] ?? null);
+            $contexts[$key] = $context === null ? null : $this->fence($context, $latest[$key] ?? null);
         }
-        return ['admitted' => $admitted, 'contexts' => $contexts];
+        return $contexts;
     }
 
     /** @return Context|null */
-    private function published(TranscodeJob $job, int $generation, TranscodeRuntimeSnapshot $runtime): ?array
+    private function publication(TranscodeJob $job, int $generation, TranscodeRuntimeSnapshot $runtime): ?array
     {
         try {
             $storage = $this->storage->forGeneration($job->getVideoId(), $job->getQualityTierName(), $generation, $job->getId());
@@ -409,14 +432,15 @@ final class TranscodeStreamingService implements TranscodeStreamingPortInterface
 
     /**
      * Accepts an index only when the runtime read after it still owns the same generation and audio.
+     * The index was read for the generation of the runtime it carries.
      *
      * @param Context $context
      * @return Context|null
      */
-    private function fenced(array $context, int $generation, ?TranscodeRuntimeSnapshot $latest): ?array
+    private function fence(array $context, ?TranscodeRuntimeSnapshot $latest): ?array
     {
         // Position telemetry advances revisions without replacing the encoded media.
-        if ($latest === null || !$this->readable($latest, $generation, $context['directory'])
+        if ($latest === null || !$this->readable($latest, $context['runtime']->generation, $context['directory'])
             || $latest->desired->audioProfile->jsonSerialize() !== $context['runtime']->desired->audioProfile->jsonSerialize()) {
             return null;
         }
@@ -462,7 +486,7 @@ final class TranscodeStreamingService implements TranscodeStreamingPortInterface
         foreach ($jobs as $job) {
             $generations[$job->getId()->toString()] = $pinned[$job->getPublicId()->toString()];
         }
-        $contexts = $this->contexts($jobs, $generations)['contexts'];
+        $contexts = $this->fenced($jobs, $this->published($jobs, $this->ownership->findGroup($this->ids($jobs)), $generations));
         $entries = []; $first = null;
         foreach ($jobs as $job) {
             $context = $contexts[$job->getId()->toString()];

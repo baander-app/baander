@@ -338,6 +338,115 @@ final class TranscodeSessionOwnershipPersistenceTest extends TestCase
         self::assertSame(\App\Transcode\Application\DTO\PlaybackEndReason::Expired, $playback->endReason($video, 'held-client', [$job->getPublicId()]));
     }
 
+    public function testStartAfterExpiryHoldsANewSessionWhetherOrNotTheWorkerHasLetGo(): void
+    {
+        $owner = $this->createUser();
+        $video = $this->createVideo();
+        $jobs = new \App\Transcode\Infrastructure\Doctrine\Repository\TranscodeJobRepository($this->manager);
+        $sessions = new TranscodeSessionRepository($this->manager);
+        $connection = $this->manager->getConnection();
+        $transaction = new class($connection) implements \App\Shared\Application\Port\TransactionPortInterface {
+            public function __construct(private readonly \Doctrine\DBAL\Connection $connection) {}
+            public function run(callable $operation): mixed { return $this->connection->transactional(static fn (): mixed => $operation()); }
+        };
+        $runtime = new \App\Transcode\Infrastructure\Doctrine\TranscodeRuntimeState($connection, $transaction);
+        $storage = $this->createStub(\App\Transcode\Application\Port\TranscodeStoragePortInterface::class);
+        $storage->method('forGeneration')->willReturnSelf();
+        $storage->method('resolveJobDirectory')->willReturn('/fixture/restart/generation-1');
+        $jobService = new \App\Transcode\Infrastructure\Transcode\TranscodeJobService($jobs, $storage, new \Symfony\Component\EventDispatcher\EventDispatcher(), $runtime);
+        $sessionService = new \App\Transcode\Infrastructure\Transcode\TranscodeSessionService($sessions);
+        $expiry = new \App\Transcode\Application\Service\StaleTranscodeSessionExpiry($sessionService, $runtime, $jobService, $transaction, new \Symfony\Component\Clock\NativeClock(), new \Psr\Log\NullLogger());
+        $request = Uuid::generate()->toString();
+        $worker = new \App\Transcode\Application\DTO\MediaWorkerIdentity('baander.app:workers', str_repeat('b', 32), 'media', 1);
+        /** @var list<\App\Transcode\Application\DTO\TranscodeExecutionClaim> $claims Every execution the worker accepted, in order */
+        $claims = [];
+        // The worker: while a start waits for its execution to be accepted, it claims and accepts it.
+        $sleeper = $this->createStub(\App\Shared\Application\Port\SleeperInterface::class);
+        $sleeper->method('sleep')->willReturnCallback(function () use ($connection, $runtime, $worker, $request, &$claims): void {
+            $job = $connection->fetchOne('SELECT id FROM transcode_jobs WHERE request_id = ?', [$request]);
+            $claim = is_string($job) ? $runtime->claim(Uuid::fromString($job), $worker) : null;
+            if ($claim !== null) {
+                self::assertTrue($runtime->observe($claim, 'accepted'));
+                $claims[] = $claim;
+            }
+        });
+        $presentations = $this->createStub(\App\Transcode\Application\Port\EncodePresentationPort::class);
+        $presentations->method('select')->willReturn(new \App\Transcode\Domain\ValueObject\PresentationSelection('encode', 'source', 0, 1, 'mp4', 'configuration'));
+        $settings = $this->createStub(\App\Shared\Application\Port\SystemSettingsPortInterface::class);
+        $settings->method('get')->willReturn('fdk_aac');
+        $handler = new \App\Transcode\Application\CommandHandler\CreateTranscodeSessionHandler(
+            new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile('full')),
+            $jobService, $sessionService, $storage, $runtime, $transaction, $sleeper, $presentations, $settings,
+        );
+        $security = $this->createStub(\Symfony\Bundle\SecurityBundle\Security::class);
+        $security->method('getUser')->willReturn(new \App\Auth\Infrastructure\Security\SecurityUser($owner->toString(), 'viewer@baander.app', ''));
+        $security->method('isGranted')->willReturn(true);
+        $bus = new \Symfony\Component\Messenger\MessageBus([new \Symfony\Component\Messenger\Middleware\HandleMessageMiddleware(new \Symfony\Component\Messenger\Handler\HandlersLocator([
+            \App\Transcode\Application\Command\CreateTranscodeSessionCommand::class => [$handler],
+        ]))]);
+        $playback = new \App\Transcode\Infrastructure\Auth\AuthorizedPlayback($security, $connection, $bus, new \Symfony\Component\Clock\NativeClock());
+        $expire = function (PublicId $session) use ($connection, $expiry): void {
+            $connection->executeStatement("UPDATE transcode_sessions SET updated_at = clock_timestamp() - interval '2 days' WHERE public_id = ?", [$session->toString()]);
+            $this->manager->clear();
+            self::assertSame(1, $expiry->expire());
+            $this->manager->clear();
+        };
+
+        $first = $playback->start($video, $request);
+        self::assertCount(1, $first, 'A video of unknown height is admitted at the lowest tier only.');
+        $jobPublicId = PublicId::fromString((string) array_key_first($first));
+        $jobId = Uuid::fromString((string) $connection->fetchOne('SELECT id FROM transcode_jobs WHERE public_id = ?', [$jobPublicId->toString()]));
+        self::assertCount(1, $claims);
+
+        // Expiry cancels the execution at once; the worker has not read that yet and still holds its lease.
+        $expire($first[$jobPublicId->toString()]);
+        $cancelled = $runtime->find($jobId);
+        self::assertNotNull($cancelled);
+        self::assertSame('cancelled', $cancelled->outcome);
+        self::assertTrue($cancelled->ownershipLive);
+        self::assertSame([], $playback->findSessions($video, $request, [$jobPublicId]));
+
+        // The same client starts again before the worker has let go and before job cleanup.
+        $second = $playback->start($video, $request);
+        self::assertSame([$jobPublicId->toString()], array_keys($second), 'The start holds a session on the same job.');
+        self::assertFalse($second[$jobPublicId->toString()]->equals($first[$jobPublicId->toString()]));
+        self::assertEquals($second, $playback->findSessions($video, $request, [$jobPublicId]));
+        $readmitted = $runtime->find($jobId);
+        self::assertNotNull($readmitted);
+        self::assertSame('accepted', $readmitted->outcome);
+        self::assertTrue($readmitted->ownershipLive);
+        self::assertGreaterThan($cancelled->generation, $readmitted->generation);
+        self::assertCount(2, $claims);
+        self::assertNull($runtime->refresh($claims[0]), 'The worker of the expired execution finds it replaced and stops.');
+
+        // The new session expires as well; this time the worker reads the cancellation and lets go first.
+        $expire($second[$jobPublicId->toString()]);
+        $latest = $runtime->refresh($claims[1]);
+        self::assertNotNull($latest);
+        self::assertTrue($runtime->release($latest));
+        self::assertFalse($runtime->find($jobId)?->ownershipLive);
+        $third = $playback->start($video, $request);
+        self::assertSame([$jobPublicId->toString()], array_keys($third));
+        self::assertFalse($third[$jobPublicId->toString()]->equals($second[$jobPublicId->toString()]));
+        self::assertEquals($third, $playback->findSessions($video, $request, [$jobPublicId]));
+        self::assertSame('accepted', $runtime->find($jobId)?->outcome);
+        self::assertCount(3, $claims);
+
+        // A session ended without its execution being cancelled is not handed back either: the
+        // start takes the running execution over for a new session.
+        $sessionService->cancelSession(Uuid::fromString((string) $connection->fetchOne('SELECT id FROM transcode_sessions WHERE public_id = ?', [$third[$jobPublicId->toString()]->toString()])));
+        $this->manager->clear();
+        self::assertSame('accepted', $runtime->find($jobId)?->outcome);
+        self::assertSame([], $playback->findSessions($video, $request, [$jobPublicId]));
+        $fourth = $playback->start($video, $request);
+        self::assertSame([$jobPublicId->toString()], array_keys($fourth));
+        self::assertFalse($fourth[$jobPublicId->toString()]->equals($third[$jobPublicId->toString()]));
+        self::assertEquals($fourth, $playback->findSessions($video, $request, [$jobPublicId]));
+        self::assertNull($runtime->refresh($claims[2]));
+        self::assertCount(4, $claims);
+        self::assertSame(1, (int) $connection->fetchOne('SELECT count(*) FROM transcode_jobs WHERE request_id = ?', [$request]), 'Every start reused the one job.');
+    }
+
     /** @return array<string, mixed> */
     private function playbackRows(Uuid $jobId): array
     {

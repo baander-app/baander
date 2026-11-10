@@ -228,7 +228,7 @@ reason. Sessions end as `expired` when
 removed their jobs. The player then starts new sessions and continues at its
 position, paused if it was paused. It does so again whenever sessions it has held
 expire. Only when new sessions are reported ended before they answered a refresh
-or accepted a control does the player show an error, so sessions that are gone at
+or accepted a seek does the player show an error, so sessions that are gone at
 once cannot make it start in a loop. Sessions end as `failed` when an encode failed
 and as `cancelled` when they were cancelled on purpose. The player shows the
 error for both and starts nothing, so one failing encode is not restarted by

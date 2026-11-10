@@ -58,7 +58,10 @@ final class TranscodeRuntimeState implements TranscodeExecutionOwnershipPort
         if ($row !== null && $row['session_id'] === $sessionId->toString()) {
             return $this->snapshot($row);
         }
-        if ($row !== null && !in_array($row['outcome'], ['complete', 'failed', 'cancelled', 'refused'], true)) {
+        // A running execution stays with the session that holds it. One whose session was cancelled
+        // or has failed is held by nobody, so the new session takes the job over in a new generation.
+        if ($row !== null && !in_array($row['outcome'], ['complete', 'failed', 'cancelled', 'refused'], true)
+            && $this->connection->fetchOne("SELECT 1 FROM transcode_sessions WHERE id = ? AND state NOT IN ('cancelled', 'failed')", [$row['session_id']])) {
             return $this->snapshot($row);
         }
         $generation = $row === null ? 1 : (int) $row['generation'] + 1;

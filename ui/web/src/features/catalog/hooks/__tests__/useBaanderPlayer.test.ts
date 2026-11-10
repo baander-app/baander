@@ -3,6 +3,7 @@ import { act, renderHook, waitFor } from '@testing-library/react'
 import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
 import { negotiateMediaDelivery } from '@/features/player/services/media-delivery'
 import { attachHlsPlayback } from '../hls-playback'
+import { attachNativePlayback } from '../native-playback'
 import { useBaanderPlayer } from '../useBaanderPlayer'
 
 vi.mock('@/shared/api-client/axios-instance', () => ({ AXIOS_INSTANCE: { post: vi.fn(), get: vi.fn() } }))
@@ -13,6 +14,12 @@ vi.mock('@/features/player/services/media-delivery', () => ({
   detectDestinationCapabilities: vi.fn(async () => []),
   negotiateMediaDelivery: vi.fn(async () => ({ kind: 'encoded', jobId: 'job-1' })),
   MediaCompatibilityError: class MediaCompatibilityError extends Error {},
+}))
+vi.mock('../native-playback', () => ({
+  attachNativePlayback: vi.fn((options: { onReady: () => void }) => {
+    options.onReady()
+    return () => {}
+  }),
 }))
 vi.mock('../hls-playback', () => ({
   attachHlsPlayback: vi.fn((options: { onReady: () => void }) => {
@@ -152,6 +159,7 @@ describe('useBaanderPlayer sessions and source end', () => {
     HTMLMediaElement.prototype.play = vi.fn(async () => {})
     HTMLMediaElement.prototype.pause = vi.fn()
     vi.mocked(attachHlsPlayback).mockClear()
+    vi.mocked(attachNativePlayback).mockClear()
     vi.mocked(negotiateMediaDelivery).mockReset().mockResolvedValue({ kind: 'encoded', jobId: 'job-1' } as never)
     vi.mocked(AXIOS_INSTANCE.post).mockReset().mockImplementation(async (path: string, payload?: unknown) => {
       if (path === '/api/stream/sign') {
@@ -406,6 +414,108 @@ describe('useBaanderPlayer sessions and source end', () => {
     expect(state.paused).toBe(true)
   }, 15000)
 
+  it('fails when the new session answers its controls with 200 but its next signing says it is gone', async () => {
+    const { rendered, video, state, execution } = await mount()
+    await act(async () => { await execution.execute('play', undefined, signal()) })
+    state.time = 42
+    await act(async () => { video.pause() })
+    await waitFor(() => { expect(server.status).toBe('paused') })
+    const second: Snapshot = { ...first, jobId: 'job-2', jobIds: ['job-2'], sessionId: 'session-2', renditionSet: 'job-2.1' }
+    // An ended session still answers a control with 200; it accepts nothing into a generation.
+    const post = vi.mocked(AXIOS_INSTANCE.post).getMockImplementation()!
+    const answered: string[] = []
+    vi.mocked(AXIOS_INSTANCE.post).mockImplementation(async (path: string, payload?: unknown) => {
+      if (!path.includes('/session-2/')) return post(path, payload)
+      answered.push((payload as PositionBody).action)
+      return { data: { data: {} } }
+    })
+    sign = body => {
+      if (body.refresh === true) throw gone('expired')
+      server = second
+      return server
+    }
+
+    await waitFor(() => { expect(rendered.result.current.error).toBe('Playback could not continue on a new session.') }, { timeout: 6000 })
+
+    expect(answered).toContain('seek')
+    expect(signs.filter(body => body.refresh !== true)).toHaveLength(2)
+  }, 10000)
+
+  it('continues at the cursor kept for recovery when its sessions expired after a media failure', async () => {
+    // The signed delivery has run out, so a network failure of the media is recovered, not fatal.
+    server = { ...first, url: 'https://media.baander.app/signed/master.m3u8?set=job-1.1&exp=1' }
+    const { rendered, state } = await mount()
+    state.time = 42
+    const attachment = vi.mocked(attachHlsPlayback).mock.calls[0][0] as unknown as { onError: (failure?: 'network') => void }
+    await act(async () => { attachment.onError('network') })
+    expect(rendered.result.current.state).toBe('preparing')
+    // The released element has lost its clock; only the kept cursor still knows the position.
+    state.time = 0
+    expireSessions()
+
+    await waitFor(() => { expect(onNewSession().filter(control => control.startsWith('seek'))).toEqual(['seek 42']) }, { timeout: 4000 })
+
+    expect(rendered.result.current.error).toBeNull()
+  })
+
+  it('names no delivery URL as its attached set when a copy replaces an original delivery', async () => {
+    const original = 'https://media.baander.app/signed/original.mp4?exp=1'
+    vi.mocked(negotiateMediaDelivery).mockReset()
+      .mockResolvedValueOnce({ kind: 'original', url: original, jobId: null } as never)
+      .mockResolvedValue({ kind: 'copy', url: original, jobId: 'job-1' } as never)
+    const containerRef = { current: container }
+    mounted.push(renderHook(() => useBaanderPlayer({ videoId: 'video-1', containerRef, coordinated: true })))
+
+    // The original delivery's capability has run out, so the next poll negotiates again.
+    await waitFor(() => { expect(vi.mocked(attachNativePlayback)).toHaveBeenCalledTimes(1) }, { timeout: 3000 })
+    await waitFor(() => { expect(signs.length).toBeGreaterThan(0) }, { timeout: 4000 })
+
+    expect(signs[0]).toMatchObject({ refresh: true, jobIds: ['job-1'] })
+    expect(signs.every(body => body.attachedSet === undefined || body.attachedSet === 'job-1.1')).toBe(true)
+    expect(signs[0]).not.toHaveProperty('attachedSet')
+  })
+
+  it('ignores a late failure of a replaced session when the new session is prepared', async () => {
+    const { rendered, video, execution } = await mount()
+    await act(async () => { await execution.execute('play', undefined, signal()) })
+    // The old session's pause is still on its way when the sessions expire.
+    const post = vi.mocked(AXIOS_INSTANCE.post).getMockImplementation()!
+    let failLate: (error: unknown) => void = () => {}
+    vi.mocked(AXIOS_INSTANCE.post).mockImplementation(async (path: string, payload?: unknown) => {
+      if (!path.includes('/session-1/')) return post(path, payload)
+      return new Promise((_resolve, reject) => { failLate = reject })
+    })
+    await act(async () => { video.pause() })
+    expireSessions()
+    await waitFor(() => { expect(signs.filter(body => body.refresh !== true)).toHaveLength(2) }, { timeout: 4000 })
+
+    await act(async () => { failLate(Object.assign(new Error('Not found'), { isAxiosError: true, response: { status: 404, data: {} } })) })
+    await waitFor(() => { expect(onNewSession()).toEqual(['pause 0']) }, { timeout: 3000 })
+    await act(async () => { await execution.prepare(0, false, signal()) })
+
+    expect(rendered.result.current.error).toBeNull()
+    expect(rendered.result.current.state).not.toBe('error')
+  })
+
+  it('continues on a delivery without a session at its position and keeps no restart for later sessions', async () => {
+    const original = 'https://media.baander.app/signed/original.mp4?exp=99999999999'
+    vi.mocked(negotiateMediaDelivery).mockReset()
+      .mockResolvedValueOnce({ kind: 'encoded', url: null, jobId: 'job-1' } as never)
+      .mockResolvedValue({ kind: 'original', url: original, jobId: null } as never)
+    const { rendered, state } = await mount()
+    state.time = 42
+    sign = body => {
+      if (body.refresh === true) throw gone('expired')
+      return server
+    }
+
+    await waitFor(() => { expect(vi.mocked(attachNativePlayback)).toHaveBeenCalledTimes(1) }, { timeout: 4000 })
+
+    expect((vi.mocked(attachNativePlayback).mock.calls[0][0] as unknown as { position: number }).position).toBe(42)
+    expect(signs.filter(body => body.refresh !== true)).toHaveLength(1)
+    expect(rendered.result.current.error).toBeNull()
+  })
+
   it.each([
     { reason: 'failed', message: 'The video could not be converted for playback.' },
     { reason: 'cancelled', message: 'Playback of this video was cancelled.' },
@@ -478,20 +588,30 @@ describe('useBaanderPlayer sessions and source end', () => {
     server = { ...first, generation: 3, startTime: 204, position: 223.59, status: 'paused', renditionSet: 'job-1.3' }
     // The published media ends just short of the source duration, so the native seek never completes.
     const { rendered, execution, state } = await mount({ seekable: 19.59, staysSeeking: true })
+    // The test owns the clock the seek's grace is measured with, so it waits for no real second.
+    const now = Date.now.bind(Date)
+    let elapsed = 0
+    const clock = vi.spyOn(Date, 'now').mockImplementation(() => now() + elapsed)
+    try {
+      const prepared = execution.prepare(223.59, false, signal())
+      await waitFor(() => { expect(state.seeking).toBe(true) }, { timeout: 3000 })
+      elapsed = 5000
+      await act(async () => { await prepared })
 
-    await act(async () => { await execution.prepare(223.59, false, signal()) })
+      expect(state.seeking).toBe(true)
+      expect(seeks()).toEqual([])
+      expect(execution.observe().position).toBe(223.59)
+      await waitFor(() => { expect(rendered.result.current.state).toBe('ended') }, { timeout: 3000 })
 
-    expect(state.seeking).toBe(true)
-    expect(seeks()).toEqual([])
-    expect(execution.observe().position).toBe(223.59)
-    await waitFor(() => { expect(rendered.result.current.state).toBe('ended') })
-
-    state.seeking = false
-    await act(async () => {
-      execution.execute('play', undefined, signal()).catch(() => {})
-      await waitFor(() => { expect(seeks()).toEqual([0]) })
-    })
-    expect(controls.filter(control => control.action === 'resume')).toHaveLength(1)
+      state.seeking = false
+      await act(async () => {
+        execution.execute('play', undefined, signal()).catch(() => {})
+        await waitFor(() => { expect(seeks()).toEqual([0]) }, { timeout: 3000 })
+      })
+      expect(controls.filter(control => control.action === 'resume')).toHaveLength(1)
+    } finally {
+      clock.mockRestore()
+    }
   })
 
   it('lets a new seek supersede a restore that has not settled', async () => {
