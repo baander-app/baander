@@ -75,7 +75,15 @@ interface SeekReconciliation {
 
 // How close to the source duration a cursor counts as standing at its end.
 const SOURCE_END_TOLERANCE = 0.1
-// How long a restore at the source end waits for its native seek before it settles without it.
+// The tail of a presentation, in seconds before its end. The last frames of a stream decode only
+// once its media source has ended, so a restore into the tail first lands at the tail's start.
+const SOURCE_END_APPROACH = 1
+// How long the restore stays on that landing. hls.js looks for a playing fragment on a 100 ms
+// tick; it needs to have seen one before it ends the media source.
+const SOURCE_END_DWELL_MS = 250
+// How long a step of a restore into the tail may stay pending before the restore goes on without
+// it. The dwell is a matter of timing, which a hidden tab's throttled timers can stretch, and a
+// presentation shorter than its tail has no landing that decodes.
 const SOURCE_END_SEEK_GRACE_MS = 1000
 
 function isTransientControlFailure(error: unknown): boolean {
@@ -191,7 +199,7 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, coor
     let sourceSeekPosition: number | null = null
     let sourceDuration = 0
     let restoredSourceEnd: number | null = null
-    let sourceEndSeek: { attachment: number, since: number } | null = null
+    let sourceEndSeek: { attachment: number, since: number, landedAt: number | null, endSoughtAt: number | null } | null = null
     let settledWhileSeeking = false
     let disposeAttachment: (() => void) | null = null
     let attachmentRevision = 0
@@ -470,12 +478,16 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, coor
           attachmentReady = false
           disposeAttachment?.()
           const attachment = ++attachmentRevision
+          // A restore into the tail lands before its target first. Playback waits for the restore
+          // to settle: the landing is a step on the way, not a place to play from.
+          if (tailLanding(pendingLoad.position) !== null) retiringPlayback = { attachment, suppressPause: false }
           video.removeAttribute('src')
           video.load()
           disposeAttachment = (delivery.kind === 'original' ? attachNativePlayback : attachHlsPlayback)({
             video,
             url: new URL(data.url, window.__BAANDER_API_URL__ || window.location.origin).href,
-            position: pendingLoad.position,
+            // A restore into the tail starts loading at its landing.
+            position: tailLanding(pendingLoad.position) ?? pendingLoad.position,
             getSubtitlePreference: () => subtitlePreference,
             onSubtitlePreferenceChange: preference => {
               if (active() && !terminal && attachment === attachmentRevision
@@ -713,6 +725,37 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, coor
       })
     }
 
+    // A new attachment cannot seek straight into the tail of a session's presentation, its end
+    // included. hls.js ends its media source only after it has seen a fragment playing, which
+    // takes an element that has settled on decoded media; and until the media source has ended,
+    // the last frames of the stream do not decode, so a seek into them stays pending for good.
+    // Such a restore therefore first lands where the tail starts, stays there long enough for
+    // hls.js to notice, and then goes to its target.
+    const tailLanding = (nativeTarget: number): number | null => {
+      const nativeEnd = sourceDuration - mediaStart
+      if (!snapshot?.sessionId || sourceDuration <= 0 || nativeEnd - nativeTarget >= SOURCE_END_APPROACH) return null
+      return Math.max(0, nativeEnd - SOURCE_END_APPROACH)
+    }
+    // Answers whether the target in the tail may be sought now.
+    const approachTail = (landing: number): boolean => {
+      if (sourceEndSeek?.attachment !== attachmentRevision) sourceEndSeek = { attachment: attachmentRevision, since: Date.now(), landedAt: null, endSoughtAt: null }
+      const approach = sourceEndSeek
+      if (approach.landedAt !== null) return Date.now() - approach.landedAt >= SOURCE_END_DWELL_MS
+      // A landing that never decodes gives way to the seek to the target and its own grace.
+      if (landing === 0 || Date.now() - approach.since >= SOURCE_END_SEEK_GRACE_MS) {
+        approach.landedAt = 0
+        return true
+      }
+      const landed = Math.abs(video.currentTime - landing) <= 0.05
+      if (landed && !video.seeking && video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+        approach.landedAt = Date.now()
+        window.setTimeout(restorePendingLoad, SOURCE_END_DWELL_MS)
+      } else if (!landed && !video.seeking) {
+        restoredPosition = landing
+        video.currentTime = landing
+      }
+      return false
+    }
     const restorePendingLoad = () => {
       if (!active() || terminal || !attachmentReady) return
       if (sourceSeekPosition !== null && seekChain) return
@@ -728,13 +771,20 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, coor
         // Ordinary seeks must wait for their actual target to become seekable.
         if (sourceEnd && Number.isFinite(video.duration) && video.duration > 0 && lastEnd !== null
           && nativeTarget > lastEnd && nativeTarget - lastEnd <= 0.1) nativeTarget = lastEnd
-        // A native seek to the source end can stay pending for good: the published media may end
-        // a few milliseconds short of the source duration, and nothing follows it. The element then
-        // stands at the end without ever reporting the seek done, so the restore settles without it.
-        const pendingAtSourceEnd = sourceEnd && video.seeking && sourceEndSeek?.attachment === attachmentRevision
-          && Math.abs(video.currentTime - nativeTarget) <= 0.05
-          && Date.now() - sourceEndSeek.since >= SOURCE_END_SEEK_GRACE_MS
-        if (video.seeking && canonicalSeekRecovery !== seekIntentRevision && !pendingAtSourceEnd) {
+        const landing = tailLanding(nativeTarget)
+        if (landing !== null && !approachTail(landing)) {
+          applyPlayback()
+          return
+        }
+        // Should the seek into the tail stay pending all the same, the element stands at its
+        // target without reporting the seek done, and the restore settles without it.
+        const pendingAtSourceEnd = landing !== null && video.seeking && sourceEndSeek?.attachment === attachmentRevision
+          && sourceEndSeek.endSoughtAt !== null && Math.abs(video.currentTime - nativeTarget) <= 0.05
+          && Date.now() - sourceEndSeek.endSoughtAt >= SOURCE_END_SEEK_GRACE_MS
+        // A landing that was given up may still be seeking; the seek to the target replaces it.
+        const landingGivenUp = landing !== null && sourceEndSeek?.attachment === attachmentRevision
+          && sourceEndSeek.landedAt === 0 && sourceEndSeek.endSoughtAt === null
+        if (video.seeking && canonicalSeekRecovery !== seekIntentRevision && !pendingAtSourceEnd && !landingGivenUp) {
           applyPlayback()
           return
         }
@@ -758,7 +808,7 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, coor
         if (!atTarget || (video.seeking && canonicalSeekRecovery === seekIntentRevision)) {
           restoredPosition = nativeTarget
           video.currentTime = nativeTarget
-          if (sourceEnd && sourceEndSeek?.attachment !== attachmentRevision) sourceEndSeek = { attachment: attachmentRevision, since: Date.now() }
+          if (landing !== null && sourceEndSeek?.attachment === attachmentRevision) sourceEndSeek.endSoughtAt ??= Date.now()
         }
         applyPlayback()
         if ((video.seeking && !pendingAtSourceEnd) || Math.abs(video.currentTime - nativeTarget) > 0.05) return
@@ -891,7 +941,8 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, coor
       if (!snapshot?.ready || loadedIdentity !== `${snapshot.jobId}:${snapshot.generation}:${snapshot.renditionSet}`) return
       if (pendingLoad) {
         if (Math.abs(video.currentTime - pendingLoad.position) <= 0.05
-          || (restoredSourceEnd !== null && Math.abs(video.currentTime - restoredSourceEnd) <= 0.05)) restorePendingLoad()
+          || (restoredSourceEnd !== null && Math.abs(video.currentTime - restoredSourceEnd) <= 0.05)
+          || (restoredPosition !== null && Math.abs(video.currentTime - restoredPosition) <= 0.05)) restorePendingLoad()
         return
       }
       restoredPosition = null

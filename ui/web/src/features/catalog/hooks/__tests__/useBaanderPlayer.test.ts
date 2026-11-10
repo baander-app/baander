@@ -199,16 +199,19 @@ describe('useBaanderPlayer sessions and source end', () => {
     const rendered = renderHook(() => useBaanderPlayer({ videoId: 'video-1', containerRef, coordinated: true }))
     mounted.push(rendered)
     const video = container.querySelector('video')!
-    const state = { time: 0, seeking: false, paused: true, ended: false }
+    const state = { time: 0, seeking: false, paused: true, ended: false, sought: [] as number[], log: [] as Array<number | 'play'> }
     Object.defineProperty(video, 'readyState', { configurable: true, value: 4 })
     Object.defineProperty(video, 'currentTime', { configurable: true, get: () => state.time, set: (value: number) => {
       state.time = value
+      state.sought.push(value)
+      state.log.push(+value.toFixed(3))
       state.seeking = element.staysSeeking === true && value > 0
     } })
     Object.defineProperty(video, 'seeking', { configurable: true, get: () => state.seeking })
     Object.defineProperty(video, 'paused', { configurable: true, get: () => state.paused })
     Object.defineProperty(video, 'ended', { configurable: true, get: () => state.ended })
     video.play = vi.fn(async () => {
+      state.log.push('play')
       if (!state.paused) return
       state.paused = false
       video.dispatchEvent(new Event('play'))
@@ -222,6 +225,7 @@ describe('useBaanderPlayer sessions and source end', () => {
     video.load = vi.fn(() => {
       state.paused = true
       state.seeking = false
+      state.time = 0
     })
     if (element.seekable !== undefined) {
       Object.defineProperty(video, 'seekable', { configurable: true, value: { length: 1, start: () => 0, end: () => element.seekable } })
@@ -588,14 +592,17 @@ describe('useBaanderPlayer sessions and source end', () => {
     server = { ...first, generation: 3, startTime: 204, position: 223.59, status: 'paused', renditionSet: 'job-1.3' }
     // The published media ends just short of the source duration, so the native seek never completes.
     const { rendered, execution, state } = await mount({ seekable: 19.59, staysSeeking: true })
-    // The test owns the clock the seek's grace is measured with, so it waits for no real second.
+    // The test owns the clock the restore's graces are measured with, so it waits for no real second.
     const now = Date.now.bind(Date)
     let elapsed = 0
     const clock = vi.spyOn(Date, 'now').mockImplementation(() => now() + elapsed)
     try {
       const prepared = execution.prepare(223.59, false, signal())
-      await waitFor(() => { expect(state.seeking).toBe(true) }, { timeout: 3000 })
+      // Neither the landing before the end nor the end itself ever reports its seek done.
+      await waitFor(() => { expect(state.sought.at(-1)).toBeCloseTo(18.59) }, { timeout: 3000 })
       elapsed = 5000
+      await waitFor(() => { expect(state.sought.at(-1)).toBeCloseTo(19.59) }, { timeout: 3000 })
+      elapsed = 10000
       await act(async () => { await prepared })
 
       expect(state.seeking).toBe(true)
@@ -612,6 +619,42 @@ describe('useBaanderPlayer sessions and source end', () => {
     } finally {
       clock.mockRestore()
     }
+  })
+
+  it('restores a paused cursor at the source end by landing before the end and then seeking to it', async () => {
+    server = { ...first, generation: 3, startTime: 204, position: 223.59, status: 'paused', renditionSet: 'job-1.3' }
+    const { rendered, execution, state } = await mount({ seekable: 19.59 })
+    const before = Date.now()
+
+    await act(async () => { await execution.prepare(223.59, false, signal()) })
+
+    // hls.js starts loading at the landing; the end is sought only after the element stayed there.
+    expect((vi.mocked(attachHlsPlayback).mock.calls[0][0] as unknown as { position: number }).position).toBeCloseTo(18.59)
+    expect(state.sought.map(time => +time.toFixed(2))).toEqual([18.59, 19.59])
+    expect(Date.now() - before).toBeGreaterThanOrEqual(250)
+    expect(state.seeking).toBe(false)
+    expect(execution.observe().position).toBe(223.59)
+    expect(seeks()).toEqual([])
+    await waitFor(() => { expect(rendered.result.current.state).toBe('ended') }, { timeout: 3000 })
+  })
+
+  it('restores a playing cursor in the last second through the landing, without playing from it', async () => {
+    server = { ...first, startTime: 12, duration: 42, position: 30 }
+    const { rendered, state, execution } = await mount({ seekable: 30 })
+    await act(async () => { await execution.execute('play', undefined, signal()) })
+    expect(rendered.result.current.state).toBe('playing')
+    // Playback has almost reached the end when a sibling joins and the attachment is replaced.
+    state.time = 29.883
+    state.log.length = 0
+    server = { ...server, renditionSet: 'job-1.1,job-2.1', url: 'https://media.baander.app/signed/master.m3u8?set=job-1.1,job-2.1' }
+
+    await waitFor(() => { expect(attachments()).toBe(2) }, { timeout: 3000 })
+    await waitFor(() => { expect(state.log.at(-1)).toBe('play') }, { timeout: 3000 })
+
+    expect((vi.mocked(attachHlsPlayback).mock.calls[1][0] as unknown as { position: number }).position).toBeCloseTo(29)
+    expect(state.log).toEqual([29, 29.883, 'play'])
+    expect(seeks()).toEqual([])
+    expect(rendered.result.current.error).toBeNull()
   })
 
   it('lets a new seek supersede a restore that has not settled', async () => {
