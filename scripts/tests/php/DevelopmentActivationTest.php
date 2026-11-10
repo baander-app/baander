@@ -193,6 +193,245 @@ final class DevelopmentActivationTest extends TestCase
         }
     }
 
+    public function testReplacedStorageImagesBecomeTheInstanceIdentitiesAtActivation(): void
+    {
+        // The recorded images left the daemon, so the prepared release carries its own
+        // images as the effective storage identities.
+        $this->store->save('persistent', array_replace($this->instance, ['postgres_image' => 'recorded-postgres', 'redis_image' => 'recorded-redis']));
+        self::assertSame('candidate-postgres', $this->new['effective']['postgres_image']);
+        self::assertSame('candidate-redis', $this->new['effective']['redis_image']);
+        $written = [];
+        $runtime = $this->createStub(Runtime::class);
+        $runtime->method('write')->willReturnCallback(static function (array $instance, array $release) use (&$written): array {
+            $written[] = $release;
+            return $instance;
+        });
+        $runtime->method('ready')->willReturn(['web_ready' => true]);
+        $runtime->method('running')->willReturn(true);
+        $this->updater->runtime = $runtime;
+        $this->updater->update('persistent');
+
+        $saved = $this->store->load('persistent');
+        self::assertSame(['ready', 'new'], [$saved['phase'], $saved['running_revision']]);
+        self::assertSame(['old', 'new'], array_column($written, 'revision'));
+        foreach (['postgres_image' => 'candidate-postgres', 'redis_image' => 'candidate-redis'] as $key => $image) {
+            self::assertSame($image, $saved[$key]);
+            self::assertSame($image, $saved['release']['images'][$key]['resolvedId']);
+            // The preflight starts the previous release's data services, which can only
+            // run on the replacing images.
+            self::assertSame($image, $written[0]['images'][$key]['resolvedId']);
+        }
+    }
+
+    public function testPreflightRunsFromThePreparedReleaseWhenThePreviousImagesLeftTheDaemon(): void
+    {
+        // Only the previous release names this application image.
+        self::assertSame('fixture-app_image', $this->old['images']['app_image']['resolvedId']);
+        file_put_contents($this->root . '/missing-images.json', json_encode(['fixture-app_image'], JSON_THROW_ON_ERROR));
+        $written = [];
+        $runtime = $this->createStub(Runtime::class);
+        $runtime->method('write')->willReturnCallback(static function (array $instance, array $release) use (&$written): array {
+            $written[] = $release['revision'];
+            return $instance;
+        });
+        $runtime->method('ready')->willReturn(['web_ready' => true]);
+        $runtime->method('running')->willReturn(true);
+        $this->updater->runtime = $runtime;
+        $this->updater->update('persistent');
+
+        // A release that cannot run serves no preflight; the prepared one takes its place.
+        self::assertSame(['new', 'new'], $written);
+        $saved = $this->store->load('persistent');
+        self::assertSame(['ready', 'new'], [$saved['phase'], $saved['running_revision']]);
+    }
+
+    public function testCheckpointFailureDoesNotRestartAPreviousReleaseWhoseImagesLeftTheDaemon(): void
+    {
+        file_put_contents($this->root . '/missing-images.json', json_encode(['fixture-app_image'], JSON_THROW_ON_ERROR));
+        $database = $this->createMock(Database::class);
+        $database->method('inspect')->willReturn(['fresh' => false, 'pending' => ['next']]);
+        $database->method('checkpoint')->willThrowException(new WorkflowError('checkpoint unavailable'));
+        $database->expects(self::never())->method('migrate');
+        $this->updater->database = $database;
+        $written = [];
+        $runtime = $this->createMock(Runtime::class);
+        $runtime->method('write')->willReturnCallback(static function (array $instance, array $release) use (&$written): array {
+            $written[] = $release['revision'];
+            return $instance;
+        });
+        $runtime->expects(self::never())->method('up');
+        $this->updater->runtime = $runtime;
+        try {
+            $this->updater->update('persistent');
+            self::fail('Expected checkpoint failure');
+        } catch (WorkflowError $error) {
+            self::assertSame('checkpoint unavailable', $error->getMessage());
+        }
+        $saved = $this->store->load('persistent');
+        self::assertSame('blocked', $saved['phase']);
+        self::assertStringContainsString('before any database change', $saved['failure']);
+        self::assertStringContainsString('its images are no longer in the Docker daemon', $saved['failure']);
+        self::assertEquals($this->old, $saved['release']);
+        self::assertSame('new', $saved['prepared_release']['revision']);
+        self::assertSame(['new'], $written);
+    }
+
+    /** @return array<string,mixed> A ready worker boot whose operator image left the daemon. */
+    private function instanceWithLostOperator(): array
+    {
+        return array_replace($this->instance, ['workers' => ['boot_id' => 'saved-boot', 'operator_image' => 'sha256:lost-operator', 'phase' => 'ready']]);
+    }
+
+    public function testWorkersThatCannotBeRetiredAreRefusedBeforeAnythingStarts(): void
+    {
+        $this->store->save('persistent', $this->instanceWithLostOperator());
+        $workers = $this->createMock(Workers::class);
+        $workers->method('running')->willReturn(true);
+        $workers->method('assertRetirable')->willThrowException(new WorkflowError('The worker operator image sha256:lost-operator is no longer in the Docker daemon.'));
+        $workers->expects(self::never())->method('retire');
+        $this->updater->workers = $workers;
+        $runtime = $this->createMock(Runtime::class);
+        $runtime->method('running')->willReturn(true);
+        $runtime->expects(self::never())->method('write');
+        $runtime->expects(self::never())->method('dependencies');
+        $this->updater->runtime = $runtime;
+        $database = $this->createMock(Database::class);
+        $database->expects(self::never())->method(self::anything());
+        $this->updater->database = $database;
+        try {
+            $this->updater->update('persistent');
+            self::fail('Unretirable workers reached activation.');
+        } catch (WorkflowError $error) {
+            self::assertStringContainsString('sha256:lost-operator is no longer in the Docker daemon', $error->getMessage());
+        }
+        $saved = $this->store->load('persistent');
+        self::assertEquals(['ready', 'old', $this->old], [$saved['phase'], $saved['running_revision'], $saved['release']]);
+        self::assertStringContainsString('preflight failed', $saved['failure']);
+    }
+
+    /** @return iterable<string,array{int}> */
+    public static function workerRegistrations(): iterable
+    {
+        yield 'still registered' => [1];
+        yield 'none' => [0];
+    }
+
+    #[DataProvider('workerRegistrations')]
+    public function testLostOperatorActivatesOnlyWhenTheDatabaseRegistersNoWorkerBoot(int $remaining): void
+    {
+        $this->store->save('persistent', $this->instanceWithLostOperator());
+        $workers = $this->createMock(Workers::class);
+        $workers->method('running')->willReturn(true);
+        $workers->method('operatorLost')->willReturn(true);
+        $workers->expects($remaining === 0 ? self::once() : self::never())->method('retire');
+        $this->updater->workers = $workers;
+        $database = $this->createMock(Database::class);
+        $database->method('inspect')->willReturn(['fresh' => false, 'pending' => ['next']]);
+        $database->expects(self::once())->method('sql')->willReturn(['remaining' => $remaining]);
+        $database->method('checkpoint')->willReturn(['target_revision' => 'new', 'verified' => false]);
+        $database->method('rehearse')->willReturn(['target_revision' => 'new', 'verified' => true]);
+        $database->expects($remaining === 0 ? self::once() : self::never())->method('migrate');
+        $this->updater->database = $database;
+        if ($remaining === 0) {
+            $this->updater->update('persistent');
+            self::assertSame(['ready', 'new'], array_values(array_intersect_key($this->store->load('persistent'), ['phase' => true, 'running_revision' => true])));
+            return;
+        }
+        try {
+            $this->updater->update('persistent');
+            self::fail('A registered boot without its operator reached quiescence.');
+        } catch (WorkflowError $error) {
+            self::assertStringContainsString('still registers worker boot saved-boot', $error->getMessage());
+            self::assertStringContainsString('sha256:lost-operator', $error->getMessage());
+        }
+        $saved = $this->store->load('persistent');
+        self::assertEquals(['ready', 'old', $this->old], [$saved['phase'], $saved['running_revision'], $saved['release']]);
+        self::assertStringContainsString('preflight failed', $saved['failure']);
+    }
+
+    public function testDownRefusesUnretirableWorkersBeforeChangingTheInstance(): void
+    {
+        $this->store->save('persistent', $this->instanceWithLostOperator());
+        $path = $this->store->directory('persistent') . '/state.json';
+        $original = file_get_contents($path);
+        $workers = $this->createMock(Workers::class);
+        $workers->method('assertRetirable')->willThrowException(new WorkflowError('The worker operator image sha256:lost-operator is no longer in the Docker daemon.'));
+        $workers->expects(self::never())->method('retire');
+        $this->updater->workers = $workers;
+        try {
+            $this->updater->down('persistent');
+            self::fail('Unretirable workers were quiesced.');
+        } catch (WorkflowError $error) {
+            self::assertStringContainsString('sha256:lost-operator', $error->getMessage());
+        }
+        self::assertSame($original, file_get_contents($path));
+    }
+
+    /** @return iterable<string,array{string}> */
+    public static function recordedStorageImages(): iterable
+    {
+        yield 'postgres' => ['postgres_image'];
+        yield 'redis' => ['redis_image'];
+    }
+
+    #[DataProvider('recordedStorageImages')]
+    public function testStoppedInstanceWithALostStorageImageRestartsOnAPreparedRelease(string $lost): void
+    {
+        $recorded = ['postgres_image' => 'recorded-postgres', 'redis_image' => 'recorded-redis'];
+        $this->store->save('persistent', array_replace($this->instance, $recorded));
+        file_put_contents($this->root . '/missing-images.json', json_encode([$recorded[$lost]], JSON_THROW_ON_ERROR));
+        // The builder keeps the identity the daemon still resolves and replaces the lost one.
+        $kept = $lost === 'postgres_image' ? 'redis_image' : 'postgres_image';
+        $prepared = array_replace($this->old, ['effective' => array_replace($this->old['effective'], [$lost => 'rebuilt'])]);
+        $prepared['images'][$lost]['resolvedId'] = 'rebuilt';
+        $builder = $this->createMock(Builder::class);
+        $builder->expects(self::once())->method('prepare')->willReturn($prepared);
+        $updater = $this->stoppedAtRunningRevision($builder);
+        $updater->update('persistent', automatic: true);
+
+        $saved = $this->store->load('persistent');
+        self::assertSame(['ready', 'old'], [$saved['phase'], $saved['running_revision']]);
+        self::assertSame('rebuilt', $saved[$lost]);
+        self::assertSame('rebuilt', $saved['release']['images'][$lost]['resolvedId']);
+        self::assertSame($recorded[$kept], $saved[$kept]);
+        self::assertSame($recorded[$kept], $saved['release']['images'][$kept]['resolvedId']);
+    }
+
+    public function testStoppedInstanceWithResolvableImagesRestartsItsSavedRelease(): void
+    {
+        $recorded = ['postgres_image' => 'recorded-postgres', 'redis_image' => 'recorded-redis'];
+        $this->store->save('persistent', array_replace($this->instance, $recorded));
+        $builder = $this->createMock(Builder::class);
+        $builder->expects(self::never())->method('prepare');
+        $updater = $this->stoppedAtRunningRevision($builder);
+        $updater->update('persistent', automatic: true);
+
+        $saved = $this->store->load('persistent');
+        self::assertSame(['ready', 'old'], [$saved['phase'], $saved['running_revision']]);
+        self::assertEquals($this->old, $saved['release']);
+        self::assertSame($recorded, array_intersect_key($saved, $recorded));
+    }
+
+    /** An updater whose instance is stopped while the remote still stands at its running revision. */
+    private function stoppedAtRunningRevision(Builder $builder): Updater
+    {
+        $updater = new class ($this->store, new EngineExecutor(ExecutionContext::bounded(120, Environment::clean()))) extends Updater {
+            public function head(array $instance): string
+            {
+                return 'old';
+            }
+        };
+        foreach (['gateway', 'database', 'workers'] as $collaborator) {
+            $updater->{$collaborator} = $this->updater->{$collaborator};
+        }
+        $updater->builder = $builder;
+        $updater->runtime = $this->createStub(Runtime::class);
+        $updater->runtime->method('write')->willReturnCallback(static fn(array $instance): array => $instance);
+        $updater->runtime->method('ready')->willReturn(['web_ready' => true]);
+        $updater->runtime->method('running')->willReturn(false);
+        return $updater;
+    }
+
     public function testCheckpointAndRehearsalFailureRestartOldWithoutMigration(): void
     {
         foreach (['checkpoint', 'rehearse'] as $boundary) {

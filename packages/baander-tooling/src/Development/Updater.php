@@ -12,6 +12,10 @@ use Baander\Tooling\Build\SourceUnavailable;
 class Updater
 {
     private const array INTERRUPTED_PHASES = ['database_mutating', 'quiescing', 'checkpointing', 'activating', 'blocked'];
+    /** Worker boots that are not retired and active leases; either denies a new boot. */
+    private const string WORKER_OWNERSHIP_SQL = "BEGIN READ ONLY; SELECT json_build_object('remaining', "
+        . "(SELECT count(*) FROM worker_deployment_boots WHERE retired_at IS NULL) + "
+        . "(SELECT count(*) FROM worker_deployment_leases WHERE state='active')); COMMIT;";
     public ?Builder $builder = null;
     public Runtime $runtime;
     public Gateway $gateway;
@@ -149,8 +153,11 @@ class Updater
                     }
                 } else {
                     $this->save($instance, ['readiness' => null]);
-                    if ($detected === $instance['running_revision'] && !$retry) {
-                        $retainedRelease = $instance['release'] ?? null;
+                    // No container holds the images of a stopped instance, so the daemon can have
+                    // lost them. Its saved release starts again only while they all still resolve;
+                    // otherwise a release is prepared anew, which also replaces a lost data image.
+                    if ($detected === $instance['running_revision'] && !$retry && $this->resolves($instance, $instance['release'] ?? null)) {
+                        $retainedRelease = $instance['release'];
                     }
                 }
             }
@@ -206,6 +213,12 @@ class Updater
                         'failed_revision' => $retainedRelease !== null ? null : $release['revision'],
                         'failure' => 'Release preflight failed; existing data and runtime were not changed.',
                     ]);
+                } elseif (($current['phase'] ?? null) === 'checkpointing' && !empty($current['release']) && !$this->resolves($current, $current['release'])) {
+                    // A previous release whose images left the daemon cannot be restarted.
+                    $this->save($current, [
+                        'phase' => 'blocked',
+                        'failure' => 'Checkpoint or rehearsal failed before any database change. The previous release was not restarted because its images are no longer in the Docker daemon; recover to activate the prepared release.',
+                    ]);
                 } elseif (($current['phase'] ?? null) === 'checkpointing' && !empty($current['release'])) {
                     try {
                         $current = array_replace($current, $this->runtime->write($current, $current['release']));
@@ -239,6 +252,19 @@ class Updater
         } finally {
             $lock->release();
         }
+    }
+
+    /** Whether the daemon still holds every image of a saved release.
+     * @param array<string,mixed> $instance
+     * @param array<string,mixed>|null $release
+     */
+    private function resolves(array $instance, ?array $release): bool
+    {
+        if ($release === null) {
+            return false;
+        }
+        $docker = $this->connections->client($instance['docker']);
+        return array_all(array_unique(array_column($release['images'] ?? [], 'resolvedId')), $docker->holdsImage(...));
     }
 
     /** @return array<string,mixed> */
@@ -293,9 +319,7 @@ class Updater
             $original = array_replace($instance, ['workers' => $record, 'network' => $record['network']]);
             $this->workers->retire($original);
         }
-        $observation = $this->database->sql($instance, "BEGIN READ ONLY; SELECT json_build_object('remaining', "
-            . "(SELECT count(*) FROM worker_deployment_boots WHERE retired_at IS NULL) + "
-            . "(SELECT count(*) FROM worker_deployment_leases WHERE state='active')); COMMIT;");
+        $observation = $this->database->sql($instance, self::WORKER_OWNERSHIP_SQL);
         if (($observation['remaining'] ?? null) !== 0) {
             throw new WorkflowError('Unaccounted worker ownership prevents adoption; retain the original controller records.');
         }
@@ -319,6 +343,11 @@ class Updater
         foreach (['postgres_image', 'redis_image'] as $key) {
             if (!empty($instance[$key])) {
                 $release['images'][$key]['resolvedId'] = $instance[$key];
+                // The previous release only starts the data services for the preflight; they
+                // run on the same identity, which differs from its own once that one is gone.
+                if ($previous) {
+                    $previous['images'][$key]['resolvedId'] = $instance[$key];
+                }
             } elseif (!empty($previous['images'][$key]['resolvedId'])) {
                 $release['images'][$key]['resolvedId'] = $previous['images'][$key]['resolvedId'];
             }
@@ -329,10 +358,16 @@ class Updater
             $catalog = $this->database->inspect($instance, $release);
             $this->freezeAdoption($instance);
         } elseif ($previous) {
-            $instance = array_replace($instance, $this->runtime->write($instance, $previous));
+            // Workers that could not be retired later are refused before anything is started.
+            $this->workers->assertRetirable($instance);
+            // The preflight runs from the previous release so the running service is untouched.
+            // A previous release whose images left the daemon cannot run at all, so the
+            // prepared release serves the preflight in its place.
+            $instance = array_replace($instance, $this->runtime->write($instance, $this->resolves($instance, $previous) ? $previous : $release));
             $this->runtime->dependencies($instance);
             $this->gateway->start();
             $catalog = $this->database->inspect($instance, $release);
+            $this->assertNoOrphanedWorkerRegistration($instance, $catalog);
             $this->freeze($instance);
         } else {
             $instance = array_replace($instance, $this->runtime->write($instance, $release));
@@ -371,6 +406,29 @@ class Updater
             $instance = array_replace($instance, $this->database->migrate($instance, $release, $checkpoint));
         }
         $this->startRelease($instance, $release);
+    }
+
+    /**
+     * A worker boot whose operator image left the daemon retires without the operator, which
+     * leaves its registration in the database as it is. Only the operator retires that
+     * registration, and while it stands it denies the next boot, so the activation is refused
+     * before the instance is quiesced or its database migrated.
+     *
+     * @param array<string,mixed> $instance
+     * @param array<string,mixed> $catalog
+     */
+    private function assertNoOrphanedWorkerRegistration(array $instance, array $catalog): void
+    {
+        if (!empty($catalog['fresh']) || !$this->workers->operatorLost($instance)) {
+            return;
+        }
+        if (($this->database->sql($instance, self::WORKER_OWNERSHIP_SQL)['remaining'] ?? null) !== 0) {
+            throw new WorkflowError(
+                'The database still registers worker boot ' . $instance['workers']['boot_id'] . ', and the operator image that retires it ('
+                . $instance['workers']['operator_image'] . ') is no longer in the Docker daemon. No container of the boot exists and the data is unchanged;'
+                . ' new workers cannot start until that registration is retired.',
+            );
+        }
     }
 
     /** @param array<string,mixed> $instance
@@ -428,6 +486,7 @@ class Updater
                 return;
             }
             ReleaseContract::validateGeneratedInputs($instance);
+            $this->workers->assertRetirable($instance);
             $blocked = in_array($instance['phase'] ?? null, self::INTERRUPTED_PHASES, true);
             $this->freeze($instance, route: is_file($this->store->root . '/gateway/state.json'));
             $this->runtime->down($instance);

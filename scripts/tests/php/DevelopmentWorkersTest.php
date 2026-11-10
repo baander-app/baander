@@ -33,14 +33,24 @@ final class DevelopmentWorkersTest extends DevDataTestCase
         $this->release['images']['worker_image']['resolvedId'] = 'sha256:' . str_repeat('a', 64);
     }
 
-    /** @param \Closure(non-empty-list<string>,?string,?array<string,string>):(string|\Baander\Tooling\Process\ProcessResult) $callback */
-    private function runner(\Closure $callback): WorkerCommandExecutor
+    /**
+     * The daemon holds every image except a fixture boot's controller tag and the images a test
+     * names as lost.
+     *
+     * @param \Closure(non-empty-list<string>,?string,?array<string,string>):(string|\Baander\Tooling\Process\ProcessResult) $callback
+     * @param list<string> $lost
+     */
+    private function runner(\Closure $callback, array $lost = []): WorkerCommandExecutor
     {
-        return new WorkerCommandExecutor(static function (array $arguments, ?string $input, ?array $environment) use ($callback): string|\Baander\Tooling\Process\ProcessResult {
+        return new WorkerCommandExecutor(static function (array $arguments, ?string $input, ?array $environment) use ($callback, $lost): string|\Baander\Tooling\Process\ProcessResult {
             $command = array_search('image', $arguments, true);
+            $image = $arguments[array_key_last($arguments)];
             if ($command !== false && ($arguments[$command + 1] ?? null) === 'inspect'
-                && str_starts_with($arguments[array_key_last($arguments)], 'baander-worker-controller:')) {
-                return new \Baander\Tooling\Process\ProcessResult(1, null, false, false, '', 'Error response from daemon: No such image: ' . $arguments[array_key_last($arguments)], 0);
+                && (str_starts_with($image, 'baander-worker-controller:') || in_array($image, $lost, true))) {
+                return new \Baander\Tooling\Process\ProcessResult(1, null, false, false, '', 'Error response from daemon: No such image: ' . $image, 0);
+            }
+            if ($command !== false && ($arguments[$command + 1] ?? null) === 'inspect' && in_array('{{.Id}}', $arguments, true)) {
+                return $image;
             }
             if ($command !== false && ($arguments[$command + 1] ?? null) === 'ls') {
                 return '';
@@ -167,8 +177,74 @@ final class DevelopmentWorkersTest extends DevDataTestCase
         $workers->retire($instance);
         self::assertSame(['status'], $actions);
         self::assertSame('retired', $instance['workers']['phase']);
-        self::assertCount(5, $runner->calls);
-        self::assertContains('label=app.baander.worker.boot-id=saved-boot', $runner->calls[1]['arguments']);
+        self::assertArrayNotHasKey('operator_lost', $instance['workers']);
+        // The daemon is first asked whether it still holds the operator image.
+        self::assertCount(7, $runner->calls);
+        self::assertSame(['image', 'inspect', '--format', '{{.Id}}', 'sha256:saved'], array_slice($runner->calls[1]['arguments'], -5));
+        self::assertContains('label=app.baander.worker.boot-id=saved-boot', $runner->calls[3]['arguments']);
+    }
+
+    public function testBootWhoseOperatorImageLeftTheDaemonRetiresWithoutTheOperatorOnceNoContainerExists(): void
+    {
+        $instance = $this->workerInstance();
+        $instance['workers']['phase'] = 'ready';
+        $runner = $this->runner(static fn(array $arguments): string => in_array('info', $arguments, true) ? '{"ID":"daemon"}' : '', ['sha256:saved']);
+        $workers = $this->lifecycle(static fn(): array => throw new WorkflowError('The lost operator was invoked.'), $runner);
+        self::assertTrue($workers->operatorLost($instance));
+        $workers->assertRetirable($instance);
+        $workers->retire($instance);
+        self::assertSame('retired', $instance['workers']['phase']);
+        self::assertTrue($instance['workers']['controller_tag_cleaned']);
+        // The record keeps that the boot's registration was never retired by its operator.
+        self::assertTrue($this->store->load('persistent')['workers']['operator_lost']);
+        self::assertTrue($workers->operatorLost($this->store->load('persistent')));
+        self::assertTrue(array_any($runner->calls, static fn(array $call): bool => in_array('label=app.baander.worker.boot-id=saved-boot', $call['arguments'], true)));
+        self::assertFalse(array_any($runner->calls, static fn(array $call): bool => (bool) array_intersect(['create', 'run', 'start', 'rm', 'stop', 'kill'], $call['arguments'])));
+    }
+
+    public function testBootWhoseOperatorImageLeftTheDaemonIsRefusedWhileItsContainersExist(): void
+    {
+        $instance = $this->workerInstance();
+        $instance['workers']['phase'] = 'ready';
+        $this->store->save('persistent', $instance);
+        $saved = $this->store->load('persistent');
+        $runner = $this->runner(static fn(array $arguments): string => match (true) {
+            in_array('info', $arguments, true) => '{"ID":"daemon"}',
+            in_array('ps', $arguments, true) => "control-container\nexecution-container\n",
+            default => '',
+        }, ['sha256:saved']);
+        $workers = $this->lifecycle(static fn(): array => throw new WorkflowError('The lost operator was invoked.'), $runner);
+        foreach ([$workers->assertRetirable(...), $workers->retire(...)] as $operation) {
+            try {
+                $operation($instance);
+                self::fail('A boot with surviving containers was retired without its operator.');
+            } catch (WorkflowError $error) {
+                self::assertStringContainsString('sha256:saved is no longer in the Docker daemon', $error->getMessage());
+                self::assertStringContainsString('saved-boot', $error->getMessage());
+                self::assertStringContainsString('control-container, execution-container', $error->getMessage());
+            }
+        }
+        self::assertSame('ready', $instance['workers']['phase']);
+        self::assertSame($saved, $this->store->load('persistent'));
+        self::assertFalse(array_any($runner->calls, static fn(array $call): bool => (bool) array_intersect(['create', 'run', 'start', 'rm', 'stop', 'kill', 'volume'], $call['arguments'])));
+    }
+
+    public function testResolvableOperatorImageKeepsRetirementWithTheOperator(): void
+    {
+        $instance = $this->workerInstance();
+        $instance['workers']['phase'] = 'ready';
+        $actions = [];
+        $runner = $this->runner(static fn(array $arguments): string => in_array('info', $arguments, true) ? '{"ID":"daemon"}' : '');
+        $workers = $this->lifecycle(static function (array $instance, string $action) use (&$actions): array {
+            $actions[] = $action;
+            return ['state' => 'retired'];
+        }, $runner);
+        self::assertFalse($workers->operatorLost($instance));
+        $workers->assertRetirable($instance);
+        $workers->retire($instance);
+        self::assertSame(['status', 'recover'], $actions);
+        self::assertSame('retired', $instance['workers']['phase']);
+        self::assertArrayNotHasKey('operator_lost', $instance['workers']);
     }
 
     /** @return iterable<string,array{bool}> */
@@ -693,8 +769,11 @@ final class DevelopmentWorkersTest extends DevDataTestCase
         } catch (\RuntimeException $error) {
             self::assertStringContainsString('inputs are missing or unreadable', $error->getMessage());
         }
-        self::assertCount(1, $runner->calls);
+        // Only the daemon's identity and its hold on the operator image were read.
+        self::assertCount(3, $runner->calls);
         self::assertContains('info', $runner->calls[0]['arguments']);
+        self::assertContains('inspect', $runner->calls[1]['arguments']);
+        self::assertContains('info', $runner->calls[2]['arguments']);
         self::assertSame('unproven legacy ownership', file_get_contents($directory . '/ipc-resources.json'));
     }
 

@@ -61,6 +61,12 @@ class Builder
         foreach (['postgres_image' => 'postgres', 'pooler_image' => 'postgres', 'nginx_image' => 'nginx', 'redis_image' => 'developmentRedis'] as $key => $role) {
             $selection = $this->configuration->images->role($role);
             $retained = in_array($key, ['postgres_image', 'redis_image'], true) ? ($instance[$key] ?? $instance['release']['images'][$key]['resolvedId'] ?? null) : null;
+            // A retained image can leave the daemon while its instance is stopped, because no
+            // container holds it then; keep it only while the daemon still resolves it and
+            // otherwise continue the data on this release's image.
+            if ($retained !== null && !$docker->holdsImage($retained)) {
+                $retained = null;
+            }
             if ($retained !== null) {
                 $release[$key] = $retained;
             } elseif ($role === 'postgres' && $this->configuration->provenance['images.postgres.reference'] === 'defaults') {
