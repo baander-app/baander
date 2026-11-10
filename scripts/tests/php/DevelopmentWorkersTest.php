@@ -229,6 +229,90 @@ final class DevelopmentWorkersTest extends DevDataTestCase
         self::assertFalse(array_any($runner->calls, static fn(array $call): bool => (bool) array_intersect(['create', 'run', 'start', 'rm', 'stop', 'kill', 'volume'], $call['arguments'])));
     }
 
+    /** @return iterable<string,array{array<string,mixed>}> */
+    public static function foreignManifests(): iterable
+    {
+        yield 'namespace' => [['namespace' => 'another-project', 'bootId' => 'saved-boot']];
+        yield 'boot' => [['namespace' => 'fixture-project', 'bootId' => 'another-boot']];
+        yield 'neither recorded' => [[]];
+    }
+
+    /** @param array<string,mixed> $identity */
+    #[DataProvider('foreignManifests')]
+    public function testLostOperatorNeverRetiresABootWhoseManifestNamesAnotherBoot(array $identity): void
+    {
+        $instance = $this->workerInstance();
+        $instance['workers']['phase'] = 'ready';
+        AtomicFile::writeJson($instance['workers']['directory'] . '/manifest.json', $identity + ['mediaMounts' => [], 'imageId' => 'worker-image']);
+        $this->store->save('persistent', $instance);
+        $saved = $this->store->load('persistent');
+        $runner = $this->runner(static fn(array $arguments): string => in_array('info', $arguments, true) ? '{"ID":"daemon"}' : '', ['sha256:saved']);
+        $workers = $this->lifecycle(static fn(): array => throw new WorkflowError('The lost operator was invoked.'), $runner);
+        foreach ([$workers->assertRetirable(...), $workers->retire(...)] as $operation) {
+            try {
+                $operation($instance);
+                self::fail('A manifest of another boot authorized retirement without the operator.');
+            } catch (WorkflowError $error) {
+                self::assertSame('Worker cleanup identity differs from the saved manifest.', $error->getMessage());
+            }
+        }
+        self::assertSame('ready', $instance['workers']['phase']);
+        self::assertSame($saved, $this->store->load('persistent'));
+        // The daemon was never asked for the containers of a boot the record does not own.
+        self::assertFalse(array_any($runner->calls, static fn(array $call): bool => (bool) array_intersect(['ps', 'volume', 'rm'], $call['arguments'])));
+    }
+
+    public function testLostOperatorNeverRetiresABootWhoseManifestIsMissing(): void
+    {
+        $instance = $this->workerInstance();
+        $instance['workers']['phase'] = 'ready';
+        unlink($instance['workers']['directory'] . '/manifest.json');
+        $this->store->save('persistent', $instance);
+        $saved = $this->store->load('persistent');
+        $runner = $this->runner(static fn(array $arguments): string => in_array('info', $arguments, true) ? '{"ID":"daemon"}' : '', ['sha256:saved']);
+        $workers = $this->lifecycle(static fn(): array => throw new WorkflowError('The lost operator was invoked.'), $runner);
+        foreach ([$workers->assertRetirable(...), $workers->retire(...)] as $operation) {
+            try {
+                $operation($instance);
+                self::fail('A boot without its manifest was taken to have no containers.');
+            } catch (WorkflowError $error) {
+                self::assertStringContainsString('Cannot read saved state; preserve it for recovery', $error->getMessage());
+                self::assertStringContainsString('manifest.json', $error->getMessage());
+            }
+        }
+        self::assertSame('ready', $instance['workers']['phase']);
+        self::assertSame($saved, $this->store->load('persistent'));
+        self::assertFalse(array_any($runner->calls, static fn(array $call): bool => (bool) array_intersect(['ps', 'volume', 'rm'], $call['arguments'])));
+    }
+
+    /** @return iterable<string,array{array<string,mixed>,bool}> */
+    public static function operatorDemands(): iterable
+    {
+        yield 'retired' => [['phase' => 'retired'], false];
+        yield 'preparing, never admitted' => [['phase' => 'preparing', 'preparation' => ['version' => 1]], false];
+        yield 'prepared, never admitted' => [['phase' => 'prepared', 'preparation' => ['version' => 1]], false];
+        yield 'preparing without preparation evidence' => [['phase' => 'preparing'], true];
+        yield 'started' => [['phase' => 'started'], true];
+    }
+
+    /** @param array<string,mixed> $record */
+    #[DataProvider('operatorDemands')]
+    public function testOnlyABootThatRetiresThroughItsOperatorCanHaveLostIt(array $record, bool $needsOperator): void
+    {
+        $instance = $this->workerInstance();
+        $instance['workers'] = array_replace($instance['workers'], $record);
+        $runner = $this->runner(static fn(array $arguments): string => in_array('info', $arguments, true) ? '{"ID":"daemon"}' : '', ['sha256:saved']);
+        $workers = $this->lifecycle(static fn(): array => throw new WorkflowError('The lost operator was invoked.'), $runner);
+        self::assertSame($needsOperator, $workers->operatorLost($instance));
+        if ($needsOperator) {
+            self::assertSame(['image', 'inspect', '--format', '{{.Id}}', 'sha256:saved'], array_slice($runner->calls[1]['arguments'], -5));
+            return;
+        }
+        // A boot that retires without its operator never has the daemon asked for the image.
+        $workers->assertRetirable($instance);
+        self::assertSame([], $runner->calls);
+    }
+
     public function testResolvableOperatorImageKeepsRetirementWithTheOperator(): void
     {
         $instance = $this->workerInstance();

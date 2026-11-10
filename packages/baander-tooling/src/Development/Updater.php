@@ -424,9 +424,11 @@ class Updater
         }
         if (($this->database->sql($instance, self::WORKER_OWNERSHIP_SQL)['remaining'] ?? null) !== 0) {
             throw new WorkflowError(
-                'The database still registers worker boot ' . $instance['workers']['boot_id'] . ', and the operator image that retires it ('
-                . $instance['workers']['operator_image'] . ') is no longer in the Docker daemon. No container of the boot exists and the data is unchanged;'
-                . ' new workers cannot start until that registration is retired.',
+                'The database still registers worker boot ' . $instance['workers']['boot_id'] . ', which was never retired. Only its operator image ('
+                . $instance['workers']['operator_image'] . ') can retire that registration, and the Docker daemon no longer holds that image.'
+                . ' No container of the boot exists and the data is unchanged. New workers cannot start while the registration stands, so before this'
+                . ' instance can activate, either retire the registration by hand in its database or reset the instance\'s data. No lifecycle'
+                . ' command does either, and a data reset needs the owner\'s approval.',
             );
         }
     }

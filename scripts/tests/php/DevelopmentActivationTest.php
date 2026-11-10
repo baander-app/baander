@@ -342,7 +342,10 @@ final class DevelopmentActivationTest extends TestCase
             self::fail('A registered boot without its operator reached quiescence.');
         } catch (WorkflowError $error) {
             self::assertStringContainsString('still registers worker boot saved-boot', $error->getMessage());
-            self::assertStringContainsString('sha256:lost-operator', $error->getMessage());
+            self::assertStringContainsString('Only its operator image (sha256:lost-operator) can retire that registration', $error->getMessage());
+            // The refusal names what the owner can do, and that no command does it for them.
+            self::assertStringContainsString('retire the registration by hand in its database or reset the instance\'s data', $error->getMessage());
+            self::assertStringContainsString('No lifecycle command does either', $error->getMessage());
         }
         $saved = $this->store->load('persistent');
         self::assertEquals(['ready', 'old', $this->old], [$saved['phase'], $saved['running_revision'], $saved['release']]);
