@@ -71,6 +71,6 @@ final class TranscodeJobCleanupCommandTest extends TestCase
         $transaction->method('run')->willReturnCallback(static fn (callable $operation): mixed => $operation());
 
         return new StaleTranscodeSessionExpiry($sessions, $this->createStub(TranscodeExecutionOwnershipPort::class),
-            $this->createStub(TranscodeJobPortInterface::class), $transaction, new MockClock($now));
+            $this->createStub(TranscodeJobPortInterface::class), $transaction, new MockClock($now), new \Psr\Log\NullLogger());
     }
 }

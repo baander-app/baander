@@ -15,6 +15,7 @@ use Doctrine\DBAL\DriverManager;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Bundle\SecurityBundle\Security;
+use Symfony\Component\Clock\MockClock;
 use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Stamp\HandledStamp;
@@ -62,7 +63,7 @@ final class AuthorizedPlaybackTest extends TestCase
                 $connection->insert('transcode_runtime_state', ['job_id' => $jobId->toString(), 'session_id' => $session->getId()->toString(), 'request_id' => $requestId]);
                 return new Envelope($command, [new HandledStamp($session, 'test-handler')]);
             });
-        $playback = new AuthorizedPlayback($security, $connection, $bus);
+        $playback = new AuthorizedPlayback($security, $connection, $bus, new MockClock());
         if (!$allowed) {
             $this->expectException(AccessDeniedException::class);
         }
@@ -91,6 +92,45 @@ final class AuthorizedPlaybackTest extends TestCase
         yield 'unknown source height uses minimum tier' => ['member', true, true, null, [360]];
     }
 
+    public function testSigningRenewsOnlyAnAgedSignOfLifeOfTheActorsOwnSessions(): void
+    {
+        $connection = DriverManager::getConnection(['driver' => 'pdo_sqlite', 'memory' => true]);
+        $connection->executeStatement('CREATE TABLE transcode_sessions (id TEXT PRIMARY KEY, public_id TEXT, user_id TEXT, updated_at TEXT)');
+        $actor = new Uuid();
+        $security = $this->createStub(Security::class);
+        $security->method('getUser')->willReturn(new SecurityUser($actor->toString(), 'viewer@baander.app', ''));
+        // A paused player signs every second; its last write was two hours ago.
+        $paused = new PublicId();
+        // A playing session's report renewed it a moment ago.
+        $playing = new PublicId();
+        $foreign = new PublicId();
+        $connection->insert('transcode_sessions', ['id' => 'paused', 'public_id' => $paused->toString(), 'user_id' => $actor->toString(), 'updated_at' => '2026-11-10 10:00:00.000000+00:00']);
+        $connection->insert('transcode_sessions', ['id' => 'playing', 'public_id' => $playing->toString(), 'user_id' => $actor->toString(), 'updated_at' => '2026-11-10 11:59:58.000000+00:00']);
+        $connection->insert('transcode_sessions', ['id' => 'foreign', 'public_id' => $foreign->toString(), 'user_id' => new Uuid()->toString(), 'updated_at' => '2026-11-10 10:00:00.000000+00:00']);
+        $clock = new MockClock(new \DateTimeImmutable('2026-11-10 12:00:00', new \DateTimeZone('UTC')));
+        $playback = new AuthorizedPlayback($security, $connection, $this->createStub(MessageBusInterface::class), $clock);
+        $signs = static fn (string $id): string => (string) $connection->fetchOne('SELECT updated_at FROM transcode_sessions WHERE id = :id', ['id' => $id]);
+        try {
+            $playback->touchSessions([$paused, $playing, $foreign]);
+
+            self::assertSame('2026-11-10 12:00:00.000000+00:00', $signs('paused'));
+            self::assertSame('2026-11-10 11:59:58.000000+00:00', $signs('playing'), 'A session renewed within the interval is not written.');
+            self::assertSame('2026-11-10 10:00:00.000000+00:00', $signs('foreign'), 'Another user\'s session is never renewed.');
+
+            // The next signings inside the interval write nothing.
+            $clock->modify('2026-11-10 12:59:59');
+            $playback->touchSessions([$paused]);
+            self::assertSame('2026-11-10 12:00:00.000000+00:00', $signs('paused'));
+            $clock->modify('2026-11-10 13:00:01');
+            $playback->touchSessions([$paused]);
+            self::assertSame('2026-11-10 13:00:01.000000+00:00', $signs('paused'));
+
+            $playback->touchSessions([]);
+        } finally {
+            $connection->close();
+        }
+    }
+
     public function testControlsExposeOnlyTheActorsCurrentRuntimeSession(): void
     {
         $connection = DriverManager::getConnection(['driver' => 'pdo_sqlite', 'memory' => true]);
@@ -116,16 +156,13 @@ final class AuthorizedPlaybackTest extends TestCase
         $connection->insert('transcode_jobs', ['id' => 'copy-job', 'public_id' => $copyJob->toString(), 'owner_user_id' => $actor->toString(), 'video_id' => $video->toString(), 'height' => 720, 'status' => 'in_progress', 'request_id' => $requestId, 'presentation_selection' => '{"mode":"copy"}']);
         $connection->insert('transcode_sessions', ['id' => 'copy-session', 'public_id' => $copySession->toString(), 'user_id' => $actor->toString(), 'video_id' => $video->toString(), 'job_id' => 'copy-job']);
         $connection->insert('transcode_runtime_state', ['job_id' => 'copy-job', 'session_id' => 'copy-session', 'request_id' => $requestId]);
-        $playback = new AuthorizedPlayback($security, $connection, $this->createStub(MessageBusInterface::class));
+        $playback = new AuthorizedPlayback($security, $connection, $this->createStub(MessageBusInterface::class), new MockClock());
         try {
             self::assertSame([$job->toString()], array_keys($this->currentSessions($playback, $video, $requestId, $job)));
             self::assertSame($session->toString(), $this->currentSessions($playback, $video, $requestId, $job)[$job->toString()]->toString());
-            // Signing is the session's sign of life while a paused player sends no reports.
-            self::assertNotNull($connection->fetchOne("SELECT updated_at FROM transcode_sessions WHERE id = 'session'"));
-            self::assertNull($connection->fetchOne("SELECT updated_at FROM transcode_sessions WHERE id = 'copy-session'"));
-            self::assertNull($connection->fetchOne("SELECT updated_at FROM transcode_sessions WHERE id = 'other-session'"));
             self::assertEquals([$copyJob->toString() => $copySession], $playback->findSessions($video, $requestId, [$copyJob]));
-            self::assertNotNull($connection->fetchOne("SELECT updated_at FROM transcode_sessions WHERE id = 'copy-session'"));
+            // The lookup also serves the quality ladder, which is no sign of life: it writes nothing.
+            self::assertSame(0, (int) $connection->fetchOne('SELECT count(*) FROM transcode_sessions WHERE updated_at IS NOT NULL'));
             self::assertSame([], $playback->findSessions($video, $otherRequestId, [$copyJob]));
             self::assertSame([], $playback->findSessions($video, $requestId, [new PublicId()]));
             self::assertSame([], $playback->findSessions($video, $requestId, []));
@@ -155,7 +192,7 @@ final class AuthorizedPlaybackTest extends TestCase
         $jobId = new Uuid();
         $videoId = new Uuid();
         $connection->insert('transcode_jobs', ['id' => $jobId->toString(), 'video_id' => $videoId->toString()]);
-        $playback = new AuthorizedPlayback($this->createStub(Security::class), $connection, $this->createStub(MessageBusInterface::class));
+        $playback = new AuthorizedPlayback($this->createStub(Security::class), $connection, $this->createStub(MessageBusInterface::class), new MockClock());
 
         try {
             self::assertTrue($playback->findTranscodeJobVideoId($jobId)?->equals($videoId));

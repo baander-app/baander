@@ -12,6 +12,8 @@ use App\Transcode\Application\Port\TranscodeSessionPortInterface;
 use App\Transcode\Domain\ValueObject\SessionState;
 use DateTimeImmutable;
 use Psr\Clock\ClockInterface;
+use Psr\Log\LoggerInterface;
+use Throwable;
 
 /**
  * Ends transcode sessions whose client can no longer be playing them.
@@ -43,6 +45,7 @@ final readonly class StaleTranscodeSessionExpiry
         private TranscodeJobPortInterface $jobPort,
         private TransactionPortInterface $transaction,
         private ClockInterface $clock,
+        private LoggerInterface $logger,
     ) {}
 
     /** @return int The number of sessions that expired */
@@ -54,8 +57,17 @@ final readonly class StaleTranscodeSessionExpiry
             if ($candidate->getUpdatedAt() > $cutoff) {
                 continue;
             }
-            if ($this->transaction->run(fn (): bool => $this->expireSession($candidate->getId(), $candidate->getVideoId(), $cutoff))) {
-                ++$expired;
+            try {
+                if ($this->transaction->run(fn (): bool => $this->expireSession($candidate->getId(), $candidate->getVideoId(), $cutoff))) {
+                    ++$expired;
+                }
+            } catch (Throwable $failure) {
+                // One session that cannot expire must not keep the others, or the
+                // job cleanup that follows, from running; the next run tries it again.
+                $this->logger->error('A stale transcode session could not be expired.', [
+                    'session' => $candidate->getId()->toString(),
+                    'exception' => $failure,
+                ]);
             }
         }
 

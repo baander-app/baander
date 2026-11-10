@@ -112,7 +112,7 @@ final class AdaptiveDeliveryTest extends TestCase
             }
             return new Envelope($message, [new HandledStamp($this->sessions[$job->getId()->toString()], 'fixture')]);
         });
-        $playback = new AuthorizedPlayback($security, $this->connection, $bus);
+        $playback = new AuthorizedPlayback($security, $this->connection, $bus, new \Symfony\Component\Clock\MockClock());
         $jobs = $this->createMock(TranscodeJobRepositoryInterface::class);
         $jobs->expects(self::never())->method('findActiveByVideo');
         $jobs->method('findByPublicId')->willReturnCallback(fn (PublicId $id) => $this->jobs[$id->toString()] ?? null);

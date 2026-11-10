@@ -15,6 +15,15 @@ interface PlaybackPortInterface extends PlaybackAccessInterface
      */
     public function findSessions(Uuid $videoId, string $requestId, array $jobIds): array;
 
+    /**
+     * Records that the client still holds these sessions. A stream signing calls
+     * it: a paused player sends no playback reports, and stale-session expiry
+     * must not end a session whose client still renews its stream URL.
+     *
+     * @param list<PublicId> $sessionIds
+     */
+    public function touchSessions(array $sessionIds): void;
+
     /** @return array<string, PublicId> The admitted jobs mapped to their session public IDs. */
     public function start(Uuid $videoId, string $requestId): array;
 }

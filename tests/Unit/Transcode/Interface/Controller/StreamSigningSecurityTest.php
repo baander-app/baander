@@ -75,9 +75,11 @@ final class StreamSigningSecurityTest extends TestCase
         $id = $video->getId();
         $path = '/api/transcode/'.$video->getPublicId().'/master.m3u8';
         $playback = $this->createMock(PlaybackPortInterface::class);
+        $session = new PublicId();
         $playback->expects($this->once())->method('start')->with($this->equalTo($id), self::REQUEST_ID)
-            ->willReturn(['0123456789abABCD_-xyz' => new PublicId()]);
+            ->willReturn(['0123456789abABCD_-xyz' => $session]);
         $playback->expects(self::never())->method('findSessions');
+        $playback->expects(self::once())->method('touchSessions')->with([$session]);
         $auth = $this->createMock(StreamAuthPortInterface::class);
         $auth->expects($this->once())->method('signUrl')->with($path.'?set=0123456789abABCD_-xyz.3', 86400)
             ->willReturn(['url' => $path.'?sig=s&exp=1', 'sig' => 's', 'exp' => 1]);
@@ -90,7 +92,9 @@ final class StreamSigningSecurityTest extends TestCase
         $playback = $this->createMock(PlaybackPortInterface::class);
         $playback->expects($this->never())->method('start');
         $playback->expects($this->once())->method('assertAccess')->with($video->getId());
-        $playback->expects(self::once())->method('findSessions')->with(self::anything(), self::REQUEST_ID, [PublicId::fromString('0123456789abABCD_-xyz')])->willReturn(['0123456789abABCD_-xyz' => new PublicId()]);
+        $playback->expects(self::once())->method('findSessions')->with(self::anything(), self::REQUEST_ID, [PublicId::fromString('0123456789abABCD_-xyz')])->willReturn(['0123456789abABCD_-xyz' => $session = new PublicId()]);
+        // A paused player sends no playback reports; its signing is the session's sign of life.
+        $playback->expects(self::once())->method('touchSessions')->with([$session]);
         $auth = $this->createStub(StreamAuthPortInterface::class);
         $auth->method('signUrl')->willReturn(['url' => '/signed', 'sig' => 's', 'exp' => 1]);
         $controller = new StreamSigningController($auth, $playback, $this->videos($video), $this->streaming());
@@ -110,6 +114,7 @@ final class StreamSigningSecurityTest extends TestCase
         $streaming->expects(self::never())->method('getPlaybackState');
         $playback = $this->createMock(PlaybackPortInterface::class);
         $playback->expects(self::once())->method('findSessions')->with(self::anything(), self::REQUEST_ID, [PublicId::fromString('0123456789abABCD_-xyz')])->willReturn([]);
+        $playback->expects(self::never())->method('touchSessions');
         $controller = new StreamSigningController($this->createStub(StreamAuthPortInterface::class), $playback, $this->videos($video), $streaming);
         $response = $controller->sign(Request::create('/', 'POST', content: json_encode(['requestId' => self::REQUEST_ID, 'path' => '/api/transcode/'.$video->getPublicId().'/master.m3u8', 'refresh' => true, 'jobIds' => ['0123456789abABCD_-xyz']], JSON_THROW_ON_ERROR)));
         self::assertSame(503, $response->getStatusCode());

@@ -24,6 +24,7 @@ use App\Transcode\Domain\ValueObject\SessionState;
 use DateTimeImmutable;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\LoggerInterface;
 use Symfony\Component\Clock\MockClock;
 
 final class StaleTranscodeSessionExpiryTest extends TestCase
@@ -43,6 +44,10 @@ final class StaleTranscodeSessionExpiryTest extends TestCase
     private int $savedSessions = 0;
     private int $savedJobs = 0;
     private StaleTranscodeSessionExpiry $expiry;
+    /** @var list<array{string, array<string, mixed>}> */
+    private array $errors = [];
+    /** @var list<string> Sessions whose save fails */
+    private array $failing = [];
 
     protected function setUp(): void
     {
@@ -52,7 +57,12 @@ final class StaleTranscodeSessionExpiryTest extends TestCase
         $sessions = $this->createStub(TranscodeSessionPortInterface::class);
         $sessions->method('findActive')->willReturnCallback(fn (): array => $this->listed);
         $sessions->method('findByUuid')->willReturnCallback(fn (Uuid $id): ?TranscodeSession => $this->current[$id->toString()] ?? null);
-        $sessions->method('save')->willReturnCallback(function (): void { ++$this->savedSessions; });
+        $sessions->method('save')->willReturnCallback(function (TranscodeSession $session): void {
+            if (in_array($session->getId()->toString(), $this->failing, true)) {
+                throw new \RuntimeException('The session could not be saved.');
+            }
+            ++$this->savedSessions;
+        });
         $jobs = $this->createStub(TranscodeJobPortInterface::class);
         $jobs->method('findByUuid')->willReturnCallback(fn (): TranscodeJob => $this->job);
         $jobs->method('save')->willReturnCallback(function (): void { ++$this->savedJobs; });
@@ -67,9 +77,13 @@ final class StaleTranscodeSessionExpiryTest extends TestCase
             $this->controls[] = ['session' => $sessionId->toString(), 'status' => $status, 'seek' => $seek];
             return new TranscodeControlResult($this->runtime ?? throw new \LogicException('No runtime.'), true);
         });
+        $logger = $this->createStub(LoggerInterface::class);
+        $logger->method('error')->willReturnCallback(function (string|\Stringable $message, array $context = []): void {
+            $this->errors[] = [(string) $message, $context];
+        });
         $transaction = $this->createStub(TransactionPortInterface::class);
         $transaction->method('run')->willReturnCallback(static fn (callable $operation): mixed => $operation());
-        $this->expiry = new StaleTranscodeSessionExpiry($sessions, $ownership, $jobs, $transaction, new MockClock(new DateTimeImmutable(self::NOW)));
+        $this->expiry = new StaleTranscodeSessionExpiry($sessions, $ownership, $jobs, $transaction, new MockClock(new DateTimeImmutable(self::NOW)), $logger);
     }
 
     public function testAbandonedSessionCancelsItsHeldExecutionAndReleasesItsJob(): void
@@ -158,6 +172,45 @@ final class StaleTranscodeSessionExpiryTest extends TestCase
         self::assertSame([], $this->controls, 'Only an execution this session owns and a worker still acts on is cancelled.');
         self::assertSame(SessionState::Cancelled, $session->getSessionState());
         self::assertSame(0, $this->job->getReferenceCount());
+    }
+
+    public function testSessionThatCannotExpireDoesNotKeepTheOthersFromExpiring(): void
+    {
+        $broken = $this->session(SessionState::Active, '-3 days');
+        $abandoned = $this->session(SessionState::Active, '-2 days');
+        $this->failing[] = $broken->getId()->toString();
+
+        self::assertSame(1, $this->expiry->expire());
+
+        self::assertSame(SessionState::Cancelled, $abandoned->getSessionState());
+        self::assertCount(1, $this->errors);
+        self::assertSame($broken->getId()->toString(), $this->errors[0][1]['session']);
+    }
+
+    /** @return iterable<string, array{?SessionState}> */
+    public static function sessionsGoneUnderTheLock(): iterable
+    {
+        yield 'a session another request already cancelled' => [SessionState::Cancelled];
+        yield 'a session that completed' => [SessionState::Completed];
+        yield 'a session that no longer exists' => [null];
+    }
+
+    #[DataProvider('sessionsGoneUnderTheLock')]
+    public function testSessionThatEndedBeforeTheLockIsLeftAlone(?SessionState $state): void
+    {
+        $listed = $this->session(SessionState::Active, '-2 days');
+        if ($state === null) {
+            unset($this->current[$listed->getId()->toString()]);
+        } else {
+            $this->current[$listed->getId()->toString()] = $this->reconstitute($listed, $state, '-2 days');
+        }
+        $this->runtime = $this->runtimeFor($listed, 'ready', live: true);
+
+        self::assertSame(0, $this->expiry->expire());
+
+        self::assertSame([], $this->controls);
+        self::assertSame(1, $this->job->getReferenceCount());
+        self::assertSame([0, 0], [$this->savedSessions, $this->savedJobs]);
     }
 
     private function session(SessionState $state, string $touched): TranscodeSession

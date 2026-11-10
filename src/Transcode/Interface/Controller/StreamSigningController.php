@@ -104,6 +104,7 @@ final class StreamSigningController
         if ($sessions === []) {
             return new JsonResponse(['error' => 'Owned media execution is unavailable'], 503, ['Retry-After' => '2']);
         }
+        $this->playback->touchSessions(array_values($sessions));
         $state = $this->streaming->getPlaybackState($videoId, array_keys($sessions));
         if ($state === null || !isset($sessions[$state['jobId']])) {
             return new JsonResponse(['error' => 'Media execution is unavailable'], 503, ['Retry-After' => '2']);

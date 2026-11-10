@@ -15,6 +15,8 @@ use App\Transcode\Domain\ValueObject\QualityTier;
 use App\Transcode\Domain\ValueObject\SessionPriority;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\ArrayParameterType;
+use Doctrine\DBAL\Types\Types;
+use Psr\Clock\ClockInterface;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Stamp\HandledStamp;
@@ -22,10 +24,19 @@ use Symfony\Component\Security\Core\Exception\AccessDeniedException;
 
 final readonly class AuthorizedPlayback implements PlaybackPortInterface
 {
+    /**
+     * How long a signing leaves a session's sign of life alone. Far below the
+     * idle bound of stale-session expiry, so a paused player that signs every
+     * second writes once an hour, and a playing one, whose reports already
+     * renew the session every second, never writes here.
+     */
+    private const int SIGN_OF_LIFE_INTERVAL_SECONDS = 3600;
+
     public function __construct(
         private Security $security,
         private Connection $connection,
         private MessageBusInterface $commandBus,
+        private ClockInterface $clock,
     ) {
     }
 
@@ -76,7 +87,7 @@ final readonly class AuthorizedPlayback implements PlaybackPortInterface
         }
         $selection = $internalIds ? ' AND j.id IN (:jobs)' : ' AND j.public_id IN (:jobs)';
         $rows = $this->connection->fetchAllAssociative(
-            'SELECT j.public_id AS job_id, s.public_id AS session_id, s.id AS session_uuid FROM transcode_sessions s'
+            'SELECT j.public_id AS job_id, s.public_id AS session_id FROM transcode_sessions s'
             .' JOIN transcode_jobs j ON j.id = s.job_id'
             .' JOIN transcode_runtime_state r ON r.session_id = s.id AND r.job_id = j.id'
             .' WHERE s.user_id = :user AND j.owner_user_id = :user AND s.video_id = :video AND j.video_id = :video'
@@ -90,17 +101,33 @@ final readonly class AuthorizedPlayback implements PlaybackPortInterface
         foreach ($rows as $row) {
             $sessions[$row['job_id']] = PublicId::fromString($row['session_id']);
         }
-        if ($rows !== []) {
-            // Signing is a sign of life: a paused player sends no playback reports,
-            // and stale-session expiry must not end a session whose client still
-            // renews its stream URL.
-            $this->connection->executeStatement(
-                'UPDATE transcode_sessions SET updated_at = CURRENT_TIMESTAMP WHERE id IN (:sessions)',
-                ['sessions' => array_column($rows, 'session_uuid')],
-                ['sessions' => ArrayParameterType::STRING],
-            );
-        }
         return $sessions;
+    }
+
+    public function touchSessions(array $sessionIds): void
+    {
+        $user = $this->security->getUser();
+        if ($user === null || !method_exists($user, 'getId')) {
+            throw new AccessDeniedException('Authentication required.');
+        }
+        if ($sessionIds === []) {
+            return;
+        }
+        $now = $this->clock->now();
+        // Only a session whose sign of life has aged is written. A session a
+        // playback report just renewed does not match and is not locked, so
+        // signing takes no row lock beside a running playback control.
+        $this->connection->executeStatement(
+            'UPDATE transcode_sessions SET updated_at = :now'
+            .' WHERE public_id IN (:sessions) AND user_id = :user AND updated_at < :aged',
+            [
+                'now' => $now,
+                'aged' => $now->modify(sprintf('-%d seconds', self::SIGN_OF_LIFE_INTERVAL_SECONDS)),
+                'sessions' => array_map(static fn (PublicId $id): string => $id->toString(), $sessionIds),
+                'user' => $user->getId(),
+            ],
+            ['now' => Types::DATETIMETZ_IMMUTABLE, 'aged' => Types::DATETIMETZ_IMMUTABLE, 'sessions' => ArrayParameterType::STRING],
+        );
     }
 
     public function start(Uuid $videoId, string $requestId): array
