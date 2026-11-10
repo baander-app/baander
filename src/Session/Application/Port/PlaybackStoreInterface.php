@@ -12,7 +12,8 @@ interface PlaybackStoreInterface
     public function lockSession(string $userId): ListeningSession;
     public function saveSession(ListeningSession $session): void;
     /**
-     * Retire only unavailable managed browser execution with a durable, fenced quiescence acknowledgement.
+     * Retire only unavailable managed browser execution with a durable, fenced acknowledgement that it is
+     * silent: of a pause, a quiesce, a stop, or a start that wanted the paused state.
      * Commands settled as never effective since that acknowledgement do not count against it, and the
      * session must stand at the revision the acknowledgement or the last such settlement left.
      */

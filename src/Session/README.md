@@ -162,16 +162,27 @@ An expired presence lease is no part of either proof: a tab that was shown a pla
 and then cut off keeps playing.
 
 A browser runner that is unavailable can be released after a confirmed pause or
-a confirmed stop. The paused release requires a matching acknowledgement for its
-incarnation and epoch, the immediately preceding command revision, consistent
-paused state, and no later or pending commands or unfinished transfer. Commands
-that closed as `never_effective` do not count as later commands, and after them
-the session must stand at the revision the last one recorded instead of the one
-the acknowledgement left; a superseded command still counts. The stopped release
+a confirmed stop. The paused release requires the runner's acknowledgement of a
+pause, a quiesce or a stop, or of a start whose command wanted the paused state,
+for its incarnation and epoch, at the immediately preceding command revision, with
+consistent paused state and no later or pending commands or unfinished transfer.
+A start that wanted playback is no such acknowledgement. Commands that closed
+as `never_effective` do not count as later commands, and after them the session
+must stand at the revision the last one recorded instead of the one the
+acknowledgement left; a superseded command still counts. The stopped release
 requires the runner's own stop report, consistent stopped state, and no pending
 command or unfinished transfer. Retirement and release share the session
 transaction and retain the media, queue and cursor. An expired presence lease
 alone is insufficient; this recovery does not apply to external receivers.
+
+A runner's observation that it is paused is no such acknowledgement. While the
+session wants playback the runner may resume without another command, so a
+paused report made in that state is not its last word, and a runner that goes
+away after it stays held. This includes the state a stop leaves when it expires
+unanswered on such a runner: the session then reads paused, without an
+acknowledgement behind it. A browser that stops playing for good, as at the end
+of its media, has to ask for the pause or stop through the session and
+acknowledge it.
 
 The release check runs wherever its proof can first hold: on a snapshot, on an
 endpoint registration in the transaction that retires the tab's previous

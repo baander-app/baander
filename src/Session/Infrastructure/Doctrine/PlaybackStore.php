@@ -65,6 +65,9 @@ final readonly class PlaybackStore implements PlaybackStoreInterface
         // effective since then cannot have changed the runner, so it is no later command, and the
         // session may stand at the revision the last such settlement recorded instead of the one the
         // acknowledgement left. A superseded command still counts: its runner was shown it.
+        // The acknowledgement is the runner's own answer that it is silent: to a pause, a quiesce or
+        // a stop, or to a start whose command wanted the paused state, which the runner answers only
+        // once it stands loaded and paused. A start that wanted playback proves nothing of the kind.
         if ($session->activeIncarnationId() === null || $session->desiredState() !== PlaybackState::Paused
             || $session->observedState() !== ObservedPlaybackState::Paused) {
             return false;
@@ -81,7 +84,8 @@ final readonly class PlaybackStore implements PlaybackStoreInterface
                         AND proof.acknowledged_at IS NOT NULL
                         AND ((proof.type='pause' AND proof.outcome='paused')
                             OR (proof.type='quiesce' AND proof.outcome='quiesced')
-                            OR (proof.type='stop' AND proof.outcome='stopped'))
+                            OR (proof.type='stop' AND proof.outcome='stopped')
+                            OR (proof.type='start' AND proof.outcome='started' AND proof.payload->>'desiredState'='paused'))
                         AND :revision=coalesce((
                             SELECT max(settled.settled_revision) FROM playback_commands settled
                             WHERE settled.session_id=proof.session_id AND settled.outcome='never_effective'
