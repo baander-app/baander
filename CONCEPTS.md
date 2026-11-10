@@ -198,6 +198,11 @@ Admission and signing carry this identity as `requestId`; individual playback co
 A playback handoff whose target may have started but has not confirmed its state.
 The source retains its media and cursor while paused until reconciliation establishes whether it can resume without overlapping the target.
 
+### Disclosed command
+
+A playback command that was included in a snapshot built for the endpoint incarnation it addresses. That snapshot is the only way a command leaves the server, and the command records the first time it happened.
+A command that expires undisclosed cannot have had an effect. On a browser runner whose last report was stopped or paused it settles as never effective, and the session keeps its confirmed state. A disclosed command able to start playback that goes unanswered leaves the session unknown until its runner answers.
+
 ### Browser execution lock
 
 An exclusive Web Lock held while one browser tab owns eligible local playback execution. Its name includes the server, account and nonsecret tab identity. A free lock proves the old holder released it; media fencing is a separate recovery condition.
@@ -285,6 +290,11 @@ A copy is bound by disk rather than an encoder, so its producer reads the source
 ### Lead throttle
 
 The bound the session subscriber keeps on how far a producer's published media runs ahead of the playhead: the producer's process is stopped once its lead reaches the pause mark and continued once the lead has shrunk to the resume mark. It applies to every producer, encode or copy, and a seek restarts the producer rather than repositioning it.
+
+### Join lead
+
+The lead a growing sibling rendition's published media must hold over the playback cursor before a signing adds it to the rendition set: three segments, capped by the remaining duration. A sibling the player has attached stays until its lead shrinks to one segment and is then withdrawn once, so a rendition encoding near real time does not leave and rejoin as the cursor moves.
+The session's primary rendition is offered as soon as it covers the cursor and alone decides readiness. The join lead is below the lead throttle's resume mark, so a throttled healthy encoder always qualifies; a sibling that encodes slower than playback does not join while the cursor advances.
 
 ### Sparse source
 

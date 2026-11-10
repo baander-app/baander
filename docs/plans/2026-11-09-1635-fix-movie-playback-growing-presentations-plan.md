@@ -405,7 +405,13 @@ Open for the user (added 2026-11-10, not built by this plan):
   path: the session turns unknown with a stop outstanding. Its expiry also marks the runner
   unknown, exactly as a stop that supersedes a disclosed pending control does, so neither
   the stop the expiry issues nor any later stop can settle a play that may have run; the
-  unknown path holds until the runner answers. A transfer whose target was never shown its start fails
+  unknown path holds until the runner answers. After code review (2026-11-10) one
+  predicate decides every unanswered control on a browser runner: a control that was never
+  disclosed settles as never effective whether it expires or a stop replaces it, a queue
+  edit or volume change included; so does a disclosed stop or pause on a runner the session
+  and its own report both hold idle. A disclosed queue edit or volume change still counts as
+  a later command; whether a shown command that cannot start playback may be ignored is
+  left to the user. A transfer whose target was never shown its start fails
   at expiry instead of staying uncertain. "Command expired and registration lapsed" alone is
   rejected as proof: a tab shown the play and then cut off keeps playing, and the server
   drops a dead socket only after 300 seconds. Governs R9.
@@ -420,7 +426,11 @@ Open for the user (added 2026-11-10, not built by this plan):
   their revision and open-transfer guards. The stopped proof is unchanged. The paused proof
   ignores commands settled as never effective, both in its later-command clause and in its
   revision adjacency, and tells them from superseded commands by their outcome; its
-  existing later-command and revision cases keep refusing. Governs R9.
+  existing later-command and revision cases keep refusing. The adjacency is not computed:
+  a never-effective command records the session revision at which it settled
+  (`settled_revision`, added after code review), and the proof requires the session to
+  stand at the last such revision, or one past the acknowledgement when there is none.
+  Governs R9.
 
 - KTD11. **The overlay closes; the fence stays.** Closing the overlay during an uncertain
   transfer silences the local video and resolves without a session control. The session
@@ -437,8 +447,11 @@ Open for the user (added 2026-11-10, not built by this plan):
   continues at its position; a copy delivery otherwise names the ended job again. When the
   jobs failed or were cancelled, the player shows the error and starts nothing, so a failed
   encode is not restarted by every open tab and an operator's cancel is not undone. The
-  player restarts at most once per ended session set; a second 410 before playback has
-  advanced is an error. Governs R11.
+  player restarts at most once per ended session set; a second 410 before the new session
+  has shown it is held is an error. Held means a signing after the session's first one, or
+  a seek answer that carries an accepted generation; a paused player restarts paused and
+  proves its session by the later signing, so a tab left paused across several expiries
+  restarts each time. Governs R11.
 
 - KTD13. **A retained identity is kept only while the daemon resolves it.** The builder
   checks the retained postgres and redis identities in the daemon before reusing them and
@@ -447,7 +460,14 @@ Open for the user (added 2026-11-10, not built by this plan):
   applies to its nginx identity. The check must also cover the path that restarts a stopped,
   ready instance from its saved release without calling the builder. A postgres image of
   another major version refuses to start on the retained data without changing it.
-  Governs R12.
+  Implementation found the cause of the live case: every image without a container had
+  been removed from the daemon from outside, with the footprint of `docker system prune
+  -a`; the tooling has no path that removes release pins. Two rules were added for that
+  case and are the user's to accept: when the previous release's images are gone the
+  preflight runs from the prepared release, and a worker boot whose operator image is
+  gone is recorded retired without the operator when none of its containers exists, and
+  refused before anything starts while containers of it survive or the database still
+  registers it. Governs R12.
 
 - KTD14. **A load of different media resets the cursor.** The session has one cursor and
   no per-media resume position. `ListeningSession::control` kept the cursor when a `load`
