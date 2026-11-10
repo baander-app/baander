@@ -210,7 +210,7 @@ foreach (['low' => QualityTier::p360(), 'high' => QualityTier::p720()] as $label
     $arguments = $encoder->buildStreamArgs($source, $tier, $encoder->buildVideoFilters($probe, $tier), $output,
         startSegment: $sourceStartTime > 0 ? 1 : null, audioStreamIndex: $selectedAudioOrdinal, audioProfile: $audioProfile, audioFilters: $encoder->buildAudioFiltersForProfile($probe, $audioProfile), hasAudio: true,
         sourceFrameRate: $probe->framerate, sourceTimestampOrigin: $probe->sourceTimestampOrigin,
-        sourceDuration: $probe->videoEnd ?? 0.0, aacImplementation: $aacImplementation, sourceAudioCodec: $probe->selectedAudioStream()?->codec);
+        sourceDuration: $probe->videoEnd ?? 0.0, aacImplementation: $aacImplementation, sourceAudioCodec: $probe->selectedAudioStream()->codec);
     if ($hasSubtitles) {
         $track = $probe->subtitleStreams[0] ?? throw new RuntimeException('The delayed movie must contain its embedded subtitle.');
         $subtitleDirectory = $output . '/subtitles/' . $track->trackKey();
