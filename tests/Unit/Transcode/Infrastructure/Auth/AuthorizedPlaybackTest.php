@@ -8,6 +8,7 @@ use App\Auth\Infrastructure\Security\SecurityUser;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Domain\Model\PublicId;
 use App\Transcode\Application\Command\CreateTranscodeSessionCommand;
+use App\Transcode\Application\DTO\PlaybackEndReason;
 use App\Transcode\Domain\Model\TranscodeSession;
 use App\Transcode\Domain\ValueObject\AudioProfile;
 use App\Transcode\Infrastructure\Auth\AuthorizedPlayback;
@@ -34,7 +35,7 @@ final class AuthorizedPlaybackTest extends TestCase
         $connection->executeStatement('CREATE TABLE movie_video (video_id TEXT, movie_id TEXT)');
         $connection->executeStatement('CREATE TABLE user_library_access (user_id TEXT, library_id TEXT)');
         $connection->executeStatement('CREATE TABLE transcode_jobs (id TEXT PRIMARY KEY, public_id TEXT, owner_user_id TEXT, video_id TEXT, height INTEGER, status TEXT, request_id TEXT)');
-        $connection->executeStatement('CREATE TABLE transcode_sessions (id TEXT PRIMARY KEY, public_id TEXT, user_id TEXT, video_id TEXT, job_id TEXT, updated_at TEXT)');
+        $connection->executeStatement("CREATE TABLE transcode_sessions (id TEXT PRIMARY KEY, public_id TEXT, user_id TEXT, video_id TEXT, job_id TEXT, updated_at TEXT, state TEXT NOT NULL DEFAULT 'active')");
         $connection->executeStatement('CREATE TABLE transcode_runtime_state (job_id TEXT PRIMARY KEY, session_id TEXT, request_id TEXT)');
         $userId = new Uuid();
         $videoId = new Uuid();
@@ -135,7 +136,7 @@ final class AuthorizedPlaybackTest extends TestCase
     {
         $connection = DriverManager::getConnection(['driver' => 'pdo_sqlite', 'memory' => true]);
         $connection->executeStatement('CREATE TABLE transcode_jobs (id TEXT PRIMARY KEY, public_id TEXT, owner_user_id TEXT, video_id TEXT, height INTEGER, status TEXT, request_id TEXT, presentation_selection TEXT)');
-        $connection->executeStatement('CREATE TABLE transcode_sessions (id TEXT PRIMARY KEY, public_id TEXT, user_id TEXT, video_id TEXT, job_id TEXT, updated_at TEXT)');
+        $connection->executeStatement("CREATE TABLE transcode_sessions (id TEXT PRIMARY KEY, public_id TEXT, user_id TEXT, video_id TEXT, job_id TEXT, updated_at TEXT, state TEXT NOT NULL DEFAULT 'active')");
         $connection->executeStatement('CREATE TABLE transcode_runtime_state (job_id TEXT PRIMARY KEY, session_id TEXT, request_id TEXT)');
         $actor = new Uuid();
         $video = new Uuid();
@@ -174,6 +175,64 @@ final class AuthorizedPlaybackTest extends TestCase
         } finally {
             $connection->close();
         }
+    }
+
+    /**
+     * @param array<int, array{job: ?string, session: string, outcome: string}> $jobs Job status (null when the job is gone), session state and execution outcome by tier height
+     */
+    #[DataProvider('endedSessions')]
+    public function testEndedSessionsAreNotHeldAndSayWhyTheyEnded(array $jobs, ?PlaybackEndReason $reason): void
+    {
+        $connection = DriverManager::getConnection(['driver' => 'pdo_sqlite', 'memory' => true]);
+        $connection->executeStatement('CREATE TABLE transcode_jobs (id TEXT PRIMARY KEY, public_id TEXT, owner_user_id TEXT, video_id TEXT, height INTEGER, status TEXT, request_id TEXT)');
+        $connection->executeStatement('CREATE TABLE transcode_sessions (id TEXT PRIMARY KEY, public_id TEXT, user_id TEXT, video_id TEXT, job_id TEXT, updated_at TEXT, state TEXT NOT NULL)');
+        $connection->executeStatement('CREATE TABLE transcode_runtime_state (job_id TEXT PRIMARY KEY, session_id TEXT, request_id TEXT, outcome TEXT)');
+        $actor = new Uuid();
+        $video = new Uuid();
+        $requestId = new Uuid()->toString();
+        $security = $this->createStub(Security::class);
+        $security->method('getUser')->willReturn(new SecurityUser($actor->toString(), 'viewer@baander.app', ''));
+        $named = [];
+        $held = [];
+        foreach ($jobs as $height => $row) {
+            $job = new PublicId();
+            $named[] = $job;
+            if ($row['job'] === null) {
+                continue;
+            }
+            $connection->insert('transcode_jobs', ['id' => 'job-'.$height, 'public_id' => $job->toString(), 'owner_user_id' => $actor->toString(), 'video_id' => $video->toString(), 'height' => $height, 'status' => $row['job'], 'request_id' => $requestId]);
+            $connection->insert('transcode_sessions', ['id' => 'session-'.$height, 'public_id' => new PublicId()->toString(), 'user_id' => $actor->toString(), 'video_id' => $video->toString(), 'job_id' => 'job-'.$height, 'state' => $row['session']]);
+            $connection->insert('transcode_runtime_state', ['job_id' => 'job-'.$height, 'session_id' => 'session-'.$height, 'request_id' => $requestId, 'outcome' => $row['outcome']]);
+            if (in_array($row['job'], ['pending', 'in_progress', 'completed'], true) && !in_array($row['session'], ['cancelled', 'failed'], true)) {
+                $held[] = $job->toString();
+            }
+        }
+        // Another client's failed job for the same video never explains this client's sessions.
+        $connection->insert('transcode_jobs', ['id' => 'other', 'public_id' => new PublicId()->toString(), 'owner_user_id' => $actor->toString(), 'video_id' => $video->toString(), 'height' => 360, 'status' => 'failed', 'request_id' => new Uuid()->toString()]);
+        $playback = new AuthorizedPlayback($security, $connection, $this->createStub(MessageBusInterface::class), new MockClock());
+        try {
+            self::assertSame($held, array_keys($playback->findSessions($video, $requestId, $named)));
+            if ($reason !== null) {
+                self::assertSame($reason, $playback->endReason($video, $requestId, $named));
+            }
+        } finally {
+            $connection->close();
+        }
+    }
+
+    /** @return iterable<string, array{array<int, array{job: ?string, session: string, outcome: string}>, ?PlaybackEndReason}> */
+    public static function endedSessions(): iterable
+    {
+        $row = static fn (?string $job, string $session, string $outcome): array => ['job' => $job, 'session' => $session, 'outcome' => $outcome];
+        yield 'held sessions' => [[360 => $row('in_progress', 'active', 'ready'), 720 => $row('completed', 'paused', 'complete')], null];
+        yield 'expired, before job cleanup' => [[360 => $row('in_progress', 'cancelled', 'cancelled'), 720 => $row('pending', 'cancelled', 'cancelled')], PlaybackEndReason::Expired];
+        yield 'jobs removed by cleanup' => [[360 => $row(null, 'cancelled', 'cancelled'), 720 => $row(null, 'cancelled', 'cancelled')], PlaybackEndReason::Expired];
+        yield 'one rendition expired, another still held' => [[360 => $row('in_progress', 'cancelled', 'cancelled'), 720 => $row('in_progress', 'active', 'ready')], null];
+        yield 'failed job' => [[360 => $row('failed', 'active', 'failed'), 720 => $row('in_progress', 'cancelled', 'cancelled')], PlaybackEndReason::Failed];
+        yield 'refused execution' => [[360 => $row('pending', 'cancelled', 'refused')], PlaybackEndReason::Failed];
+        yield 'session failed after an interruption' => [[360 => $row('in_progress', 'failed', 'accepted')], PlaybackEndReason::Failed];
+        yield 'cancelled job' => [[360 => $row('cancelled', 'cancelled', 'cancelled'), 720 => $row('cancelled', 'cancelled', 'cancelled')], PlaybackEndReason::Cancelled];
+        yield 'cancelled session of a finished presentation' => [[360 => $row('completed', 'cancelled', 'cancelled')], PlaybackEndReason::Cancelled];
     }
 
     /**

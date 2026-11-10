@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
+import { negotiateMediaDelivery } from '@/features/player/services/media-delivery'
+import { attachHlsPlayback } from '../hls-playback'
 import { useBaanderPlayer } from '../useBaanderPlayer'
 
 vi.mock('@/shared/api-client/axios-instance', () => ({ AXIOS_INSTANCE: { post: vi.fn(), get: vi.fn() } }))
@@ -35,7 +37,7 @@ interface SignSnapshot {
 
 const signSnapshot: SignSnapshot = {
   jobId: 'job-1', generation: 1, revision: 1, renditionSet: 'tier-720p', sessionId: 'session-1',
-  ready: true, url: 'https://media.example/signed/master.m3u8', startTime: 0, duration: 223,
+  ready: true, url: 'https://media.baander.app/signed/master.m3u8', startTime: 0, duration: 223,
   position: 0, status: 'running',
 }
 
@@ -111,5 +113,420 @@ describe('useBaanderPlayer seek handling', () => {
 
     expect(positionPosts.some(post => post.payload.action === 'seek' && post.payload.position === 100)).toBe(true)
     rendered.result.current.destroy()
+  })
+})
+
+interface Snapshot extends SignSnapshot { jobIds: string[] }
+type SignBody = { refresh?: boolean; jobIds?: string[]; attachedSet?: string }
+type PositionBody = { action: string; position: number }
+
+function gone(reason: string) {
+  return Object.assign(new Error('Gone'), { isAxiosError: true, response: { status: 410, data: { error: 'The playback sessions have ended.', reason } } })
+}
+
+function unavailable() {
+  return Object.assign(new Error('Unavailable'), { isAxiosError: true, response: { status: 503, data: {} } })
+}
+
+describe('useBaanderPlayer sessions and source end', () => {
+  let container: HTMLDivElement
+  let server: Snapshot
+  let signs: SignBody[]
+  let controls: Array<PositionBody & { session: string }>
+  let sign: (body: SignBody) => Snapshot
+  const mounted: Array<{ unmount: () => void }> = []
+  const play = HTMLMediaElement.prototype.play
+  const pause = HTMLMediaElement.prototype.pause
+
+  const first: Snapshot = {
+    jobId: 'job-1', jobIds: ['job-1'], generation: 1, revision: 1, renditionSet: 'job-1.1', sessionId: 'session-1',
+    ready: true, url: 'https://media.baander.app/signed/master.m3u8?set=job-1.1', startTime: 0, duration: 223.59,
+    position: 0, status: 'running',
+  }
+
+  beforeEach(() => {
+    server = { ...first }
+    signs = []
+    controls = []
+    sign = () => server
+    HTMLMediaElement.prototype.play = vi.fn(async () => {})
+    HTMLMediaElement.prototype.pause = vi.fn()
+    vi.mocked(attachHlsPlayback).mockClear()
+    vi.mocked(negotiateMediaDelivery).mockReset().mockResolvedValue({ kind: 'encoded', jobId: 'job-1' } as never)
+    vi.mocked(AXIOS_INSTANCE.post).mockReset().mockImplementation(async (path: string, payload?: unknown) => {
+      if (path === '/api/stream/sign') {
+        signs.push(payload as SignBody)
+        return { data: sign(payload as SignBody) }
+      }
+      const body = payload as PositionBody
+      controls.push({ ...body, session: path.split('/')[4] })
+      if (body.action === 'seek') {
+        // A seek restarts the encoders six seconds before the target, in a new generation.
+        const startTime = Math.max(0, Math.floor(body.position / 6) * 6 - 18)
+        server = { ...server, generation: server.generation + 1, revision: server.revision + 1, startTime, position: body.position,
+          renditionSet: `${server.jobId}.${server.generation + 1}`, url: `https://media.baander.app/signed/master.m3u8?set=${server.jobId}.${server.generation + 1}` }
+        return { data: { data: { acceptedGeneration: server.generation } } }
+      }
+      if (body.action === 'pause' || body.action === 'resume') {
+        server = { ...server, revision: server.revision + 1, status: body.action === 'pause' ? 'paused' : 'running', position: body.position }
+      }
+      return { data: { data: {} } }
+    })
+    container = document.createElement('div')
+    document.body.appendChild(container)
+  })
+
+  afterEach(() => {
+    // A player left running would keep signing into the next test.
+    for (const hook of mounted.splice(0)) hook.unmount()
+    HTMLMediaElement.prototype.play = play
+    HTMLMediaElement.prototype.pause = pause
+    document.body.removeChild(container)
+  })
+
+  // A media element whose clock and seek state the test owns, as jsdom plays nothing.
+  const mount = async (element: { seekable?: number, staysSeeking?: boolean } = {}) => {
+    // One ref object for the hook's lifetime: a new one on every render would remount the player.
+    const containerRef = { current: container }
+    const rendered = renderHook(() => useBaanderPlayer({ videoId: 'video-1', containerRef, coordinated: true }))
+    mounted.push(rendered)
+    const video = container.querySelector('video')!
+    const state = { time: 0, seeking: false, paused: true, ended: false }
+    Object.defineProperty(video, 'readyState', { configurable: true, value: 4 })
+    Object.defineProperty(video, 'currentTime', { configurable: true, get: () => state.time, set: (value: number) => {
+      state.time = value
+      state.seeking = element.staysSeeking === true && value > 0
+    } })
+    Object.defineProperty(video, 'seeking', { configurable: true, get: () => state.seeking })
+    Object.defineProperty(video, 'paused', { configurable: true, get: () => state.paused })
+    Object.defineProperty(video, 'ended', { configurable: true, get: () => state.ended })
+    video.play = vi.fn(async () => {
+      if (!state.paused) return
+      state.paused = false
+      video.dispatchEvent(new Event('play'))
+    })
+    video.pause = vi.fn(() => {
+      if (state.paused) return
+      state.paused = true
+      video.dispatchEvent(new Event('pause'))
+    })
+    // Loading a new source resets the element, as a browser does.
+    video.load = vi.fn(() => {
+      state.paused = true
+      state.seeking = false
+    })
+    if (element.seekable !== undefined) {
+      Object.defineProperty(video, 'seekable', { configurable: true, value: { length: 1, start: () => 0, end: () => element.seekable } })
+      Object.defineProperty(video, 'duration', { configurable: true, value: element.seekable })
+    }
+    await waitFor(() => { expect(signs.length).toBeGreaterThan(0) })
+    await act(async () => { video.dispatchEvent(new Event('canplay')) })
+    return { rendered, video, state, execution: rendered.result.current.execution }
+  }
+  const seeks = () => controls.filter(control => control.action === 'seek').map(control => control.position)
+  const attachments = () => vi.mocked(attachHlsPlayback).mock.calls.length
+  const signal = () => AbortSignal.timeout(4000)
+
+  it('sends the attached rendition set with a refresh, never with a start', async () => {
+    await mount()
+    expect(signs[0]).not.toHaveProperty('refresh')
+    expect(signs[0]).not.toHaveProperty('attachedSet')
+
+    await waitFor(() => { expect(signs.some(body => body.refresh === true)).toBe(true) }, { timeout: 3000 })
+
+    expect(signs.filter(body => body.refresh === true).every(body => body.attachedSet === 'job-1.1')).toBe(true)
+  })
+
+  it('keeps its attachment while the signed set stays and replaces it for a new generation', async () => {
+    await mount()
+    await waitFor(() => { expect(signs.filter(body => body.refresh === true).length).toBeGreaterThan(0) }, { timeout: 3000 })
+    expect(attachments()).toBe(1)
+
+    server = { ...server, generation: 2, revision: 2, renditionSet: 'job-1.2', url: 'https://media.baander.app/signed/master.m3u8?set=job-1.2' }
+
+    await waitFor(() => { expect(attachments()).toBe(2) }, { timeout: 3000 })
+    await waitFor(() => { expect(signs.at(-1)?.attachedSet).toBe('job-1.2') }, { timeout: 3000 })
+  })
+
+  it.each([
+    { delivery: 'encoded', start: (body: SignBody) => body.refresh !== true },
+    { delivery: 'copy', start: (body: SignBody) => body.jobIds?.[0] === 'job-2' },
+  ])('continues at its position on a new session after its $delivery sessions expired', async ({ delivery, start }) => {
+    vi.mocked(negotiateMediaDelivery).mockResolvedValueOnce({ kind: delivery, jobId: 'job-1' } as never).mockResolvedValue({ kind: delivery, jobId: 'job-2' } as never)
+    const { rendered, state } = await mount()
+    state.time = 42
+    const second: Snapshot = { ...first, jobId: 'job-2', jobIds: ['job-2'], sessionId: 'session-2', renditionSet: 'job-2.1', url: 'https://media.baander.app/signed/master.m3u8?set=job-2.1' }
+    sign = body => {
+      if (start(body)) {
+        if (server.jobId !== 'job-2') server = second
+        return server
+      }
+      if (body.jobIds?.[0] === 'job-1') throw gone('expired')
+      return server
+    }
+
+    await waitFor(() => { expect(controls.some(control => control.session === 'session-2' && control.action === 'seek')).toBe(true) }, { timeout: 4000 })
+
+    // The ended delivery is dropped with the ended sessions: a copy delivery names its job.
+    expect(vi.mocked(negotiateMediaDelivery)).toHaveBeenCalledTimes(2)
+    expect(controls.filter(control => control.session === 'session-2' && control.action === 'seek').map(control => control.position)).toEqual([42])
+    expect(signs.filter(start)).toHaveLength(delivery === 'encoded' ? 2 : signs.filter(start).length)
+    expect(rendered.result.current.error).toBeNull()
+    await waitFor(() => { expect(attachments()).toBe(2) }, { timeout: 3000 })
+  })
+
+  // Sessions that expire while the test's player holds them, and one new session set to continue on.
+  const expireSessions = () => {
+    const second: Snapshot = { ...first, jobId: 'job-2', jobIds: ['job-2'], sessionId: 'session-2', renditionSet: 'job-2.1', url: 'https://media.baander.app/signed/master.m3u8?set=job-2.1' }
+    sign = body => {
+      if (body.refresh !== true) {
+        if (server.jobId !== 'job-2') server = second
+        return server
+      }
+      if (body.jobIds?.[0] === 'job-1') throw gone('expired')
+      return server
+    }
+  }
+  const onNewSession = () => controls.filter(control => control.session === 'session-2').map(control => `${control.action} ${control.position}`)
+
+  it('continues paused at its position when its sessions expired while it was paused', async () => {
+    const { rendered, video, state, execution } = await mount()
+    await act(async () => { await execution.execute('play', undefined, signal()) })
+    // Paused on the element, as with its own controls: the player still counts as started.
+    state.time = 42
+    await act(async () => { video.pause() })
+    await waitFor(() => { expect(server.status).toBe('paused') })
+    const plays = vi.mocked(video.play).mock.calls.length
+    expireSessions()
+
+    await waitFor(() => { expect(onNewSession()).toEqual(['seek 42', 'pause 42']) }, { timeout: 4000 })
+    await waitFor(() => { expect(attachments()).toBe(2) }, { timeout: 3000 })
+    await waitFor(() => { expect(server.status).toBe('paused') })
+    // Several signings later the element has still not started by itself.
+    await new Promise(resolve => setTimeout(resolve, 1500))
+
+    expect(vi.mocked(video.play).mock.calls.length).toBe(plays)
+    expect(state.paused).toBe(true)
+    expect(server).toMatchObject({ sessionId: 'session-2', status: 'paused', position: 42 })
+    expect(onNewSession()).toEqual(['seek 42', 'pause 42'])
+    expect(rendered.result.current.error).toBeNull()
+  })
+
+  it('pauses the new session without a seek when it expired while paused at the start', async () => {
+    const { rendered, state, execution } = await mount()
+    await act(async () => { await execution.execute('pause', undefined, signal()) })
+    await waitFor(() => { expect(server.status).toBe('paused') })
+    expireSessions()
+
+    await waitFor(() => { expect(onNewSession()).toEqual(['pause 0']) }, { timeout: 4000 })
+    await waitFor(() => { expect(attachments()).toBe(2) }, { timeout: 3000 })
+
+    expect(state.paused).toBe(true)
+    expect(server).toMatchObject({ sessionId: 'session-2', status: 'paused' })
+    expect(rendered.result.current.error).toBeNull()
+  })
+
+  it('continues playing at its position when its sessions expired while it was playing', async () => {
+    const { rendered, video, state, execution } = await mount()
+    await act(async () => { await execution.execute('play', undefined, signal()) })
+    state.time = 42
+    const plays = vi.mocked(video.play).mock.calls.length
+    expireSessions()
+
+    await waitFor(() => { expect(attachments()).toBe(2) }, { timeout: 4000 })
+    await waitFor(() => { expect(state.paused).toBe(false) }, { timeout: 3000 })
+
+    expect(vi.mocked(video.play).mock.calls.length).toBeGreaterThan(plays)
+    expect(onNewSession().filter(control => !control.startsWith('progress'))).toEqual(['seek 42'])
+    expect(server).toMatchObject({ sessionId: 'session-2', status: 'running' })
+    expect(rendered.result.current.error).toBeNull()
+  })
+
+  it('fails when a paused restart loses its new session before that session answered a refresh or a control', async () => {
+    const { rendered, video, state, execution } = await mount()
+    await act(async () => { await execution.execute('play', undefined, signal()) })
+    state.time = 42
+    await act(async () => { video.pause() })
+    await waitFor(() => { expect(server.status).toBe('paused') })
+    const second: Snapshot = { ...first, jobId: 'job-2', jobIds: ['job-2'], sessionId: 'session-2', renditionSet: 'job-2.1' }
+    // The new sessions are gone at once: they refuse the restart's controls and every refresh.
+    const post = vi.mocked(AXIOS_INSTANCE.post).getMockImplementation()!
+    vi.mocked(AXIOS_INSTANCE.post).mockImplementation(async (path: string, payload?: unknown) => {
+      if (path.includes('/session-2/')) throw Object.assign(new Error('Not found'), { isAxiosError: true, response: { status: 404, data: {} } })
+      return post(path, payload)
+    })
+    sign = body => {
+      if (body.refresh === true) throw gone('expired')
+      server = second
+      return server
+    }
+
+    await waitFor(() => { expect(rendered.result.current.error).toBe('Playback could not continue on a new session.') }, { timeout: 6000 })
+
+    expect(rendered.result.current.state).toBe('error')
+    expect(onNewSession()).toEqual([])
+    expect(signs.filter(body => body.refresh !== true)).toHaveLength(2)
+  }, 10000)
+
+  it('restarts a paused player again when its held new session expires later', async () => {
+    const { rendered, video, state, execution } = await mount()
+    await act(async () => { await execution.execute('play', undefined, signal()) })
+    state.time = 42
+    await act(async () => { video.pause() })
+    await waitFor(() => { expect(server.status).toBe('paused') })
+    const plays = vi.mocked(video.play).mock.calls.length
+    const ended = new Set<string>()
+    let started = 1
+    sign = body => {
+      if (body.refresh !== true) {
+        started += 1
+        server = { ...first, jobId: `job-${started}`, jobIds: [`job-${started}`], sessionId: `session-${started}`, renditionSet: `job-${started}.1`,
+          url: `https://media.baander.app/signed/master.m3u8?set=job-${started}.1` }
+        return server
+      }
+      if (ended.has(body.jobIds?.[0] ?? '')) throw gone('expired')
+      return server
+    }
+    const on = (session: string) => controls.filter(control => control.session === session).map(control => `${control.action} ${control.position}`)
+
+    // The first night: the paused tab's sessions expire and it continues paused on new ones.
+    ended.add('job-1')
+    await waitFor(() => { expect(on('session-2')).toEqual(['seek 42', 'pause 42']) }, { timeout: 4000 })
+    await waitFor(() => { expect(signs.some(body => body.refresh === true && body.jobIds?.[0] === 'job-2')).toBe(true) }, { timeout: 3000 })
+    await waitFor(() => { expect(server).toMatchObject({ sessionId: 'session-2', status: 'paused' }) })
+
+    // The second night: the sessions it held since then expire as well.
+    ended.add('job-2')
+    await waitFor(() => { expect(on('session-3')).toEqual(['seek 42', 'pause 42']) }, { timeout: 5000 })
+    await waitFor(() => { expect(server).toMatchObject({ sessionId: 'session-3', status: 'paused', position: 42 }) })
+
+    expect(rendered.result.current.error).toBeNull()
+    expect(signs.filter(body => body.refresh !== true)).toHaveLength(3)
+    expect(vi.mocked(video.play).mock.calls.length).toBe(plays)
+    expect(state.paused).toBe(true)
+  }, 15000)
+
+  it.each([
+    { reason: 'failed', message: 'The video could not be converted for playback.' },
+    { reason: 'cancelled', message: 'Playback of this video was cancelled.' },
+  ])('shows the error and starts nothing when its sessions were $reason', async ({ reason, message }) => {
+    const { rendered } = await mount()
+    sign = body => {
+      if (body.refresh === true) throw gone(reason)
+      return server
+    }
+
+    await waitFor(() => { expect(rendered.result.current.error).toBe(message) }, { timeout: 3000 })
+
+    expect(rendered.result.current.state).toBe('error')
+    expect(signs.filter(body => body.refresh !== true)).toHaveLength(1)
+    expect(vi.mocked(negotiateMediaDelivery)).toHaveBeenCalledTimes(1)
+  })
+
+  it('fails when the new session is gone before it answered a refresh, instead of starting again', async () => {
+    const { rendered } = await mount()
+    const second: Snapshot = { ...first, jobId: 'job-2', jobIds: ['job-2'], sessionId: 'session-2', renditionSet: 'job-2.1' }
+    sign = body => {
+      if (body.refresh === true) throw gone('expired')
+      server = second
+      return server
+    }
+
+    await waitFor(() => { expect(rendered.result.current.state).toBe('error') }, { timeout: 5000 })
+
+    expect(rendered.result.current.error).toBe('Playback could not continue on a new session.')
+    expect(signs.filter(body => body.refresh !== true)).toHaveLength(2)
+  })
+
+  it('does not loop when the new start is unavailable', async () => {
+    const { rendered } = await mount()
+    let starts = 0
+    sign = body => {
+      if (body.refresh === true) throw gone('expired')
+      if (++starts > 0) throw unavailable()
+      return server
+    }
+
+    await waitFor(() => { expect(rendered.result.current.state).toBe('error') }, { timeout: 4000 })
+    const sent = signs.length
+    await new Promise(resolve => setTimeout(resolve, 1200))
+
+    expect(starts).toBe(1)
+    expect(signs).toHaveLength(sent)
+  })
+
+  it('begins at zero with one seek when it is prepared to play at the source end', async () => {
+    // The tab's transcode session still stands where the finished movie left it.
+    server = { ...first, generation: 3, startTime: 204, position: 223.59, renditionSet: 'job-1.3' }
+    const { execution } = await mount()
+
+    await act(async () => { await execution.prepare(223.59, true, signal()) })
+
+    expect(seeks()).toEqual([0])
+    expect(execution.observe().position).toBe(0)
+  })
+
+  it('sends no seek when a fresh session is prepared to play at the source end', async () => {
+    const { execution } = await mount()
+
+    await act(async () => { await execution.prepare(223.59, true, signal()) })
+
+    expect(seeks()).toEqual([])
+  })
+
+  it('settles a paused start at the source end without restarting it, and replays on Play', async () => {
+    server = { ...first, generation: 3, startTime: 204, position: 223.59, status: 'paused', renditionSet: 'job-1.3' }
+    // The published media ends just short of the source duration, so the native seek never completes.
+    const { rendered, execution, state } = await mount({ seekable: 19.59, staysSeeking: true })
+
+    await act(async () => { await execution.prepare(223.59, false, signal()) })
+
+    expect(state.seeking).toBe(true)
+    expect(seeks()).toEqual([])
+    expect(execution.observe().position).toBe(223.59)
+    await waitFor(() => { expect(rendered.result.current.state).toBe('ended') })
+
+    state.seeking = false
+    await act(async () => {
+      execution.execute('play', undefined, signal()).catch(() => {})
+      await waitFor(() => { expect(seeks()).toEqual([0]) })
+    })
+    expect(controls.filter(control => control.action === 'resume')).toHaveLength(1)
+  })
+
+  it('lets a new seek supersede a restore that has not settled', async () => {
+    // jsdom offers no seekable range, so the restore to 100 seconds stays pending.
+    server = { ...first, generation: 2, startTime: 78, position: 100, renditionSet: 'job-1.2' }
+    const { execution } = await mount()
+
+    await act(async () => { await execution.prepare(0, true, signal()) })
+
+    expect(seeks()).toEqual([0])
+  })
+
+  it('replays after completion with one seek to zero, one pause and at most one resume', async () => {
+    const { rendered, video, state, execution } = await mount()
+    await act(async () => { await execution.execute('play', undefined, signal()) })
+    expect(rendered.result.current.state).toBe('playing')
+    // The movie plays to its end: the element pauses there and reports that it ended.
+    state.time = 223.59
+    state.ended = true
+    state.paused = true
+    await act(async () => {
+      video.dispatchEvent(new Event('pause'))
+      video.dispatchEvent(new Event('ended'))
+    })
+    await waitFor(() => { expect(controls.filter(control => control.action === 'pause')).toHaveLength(1) })
+    await waitFor(() => { expect(rendered.result.current.state).toBe('ended') })
+    expect(seeks()).toEqual([])
+
+    state.ended = false
+    await act(async () => { await video.play() })
+
+    await waitFor(() => { expect(seeks()).toEqual([0]) })
+    await waitFor(() => { expect(attachments()).toBe(2) }, { timeout: 3000 })
+    await waitFor(() => { expect(state.paused).toBe(false) })
+    expect(controls.filter(control => control.action === 'pause')).toHaveLength(1)
+    expect(controls.filter(control => control.action === 'resume').length).toBeLessThanOrEqual(1)
   })
 })

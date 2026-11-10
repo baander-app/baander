@@ -6,6 +6,7 @@ namespace App\Transcode\Interface\Console;
 
 use App\Shared\Interface\Console\AdminCommandSupport;
 use App\Transcode\Application\Command\CleanupOrphanedJobsCommand;
+use App\Transcode\Application\DTO\TranscodeCleanupResult;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -41,14 +42,14 @@ final class TranscodeJobCleanupCommand extends Command
             return AdminCommandSupport::fail($io, $failure);
         }
 
-        $result = is_array($result) ? $result : [];
-        $expired = (int) ($result['expired'] ?? 0);
-        $cleaned = (int) ($result['cleaned'] ?? 0);
+        if (!$result instanceof TranscodeCleanupResult) {
+            throw new \LogicException('The transcode job cleanup did not return its result.');
+        }
         if (AdminCommandSupport::wantsJson($input)) {
-            return AdminCommandSupport::json($io, ['expired' => $expired, 'cleaned' => $cleaned]);
+            return AdminCommandSupport::json($io, $result->toArray());
         }
 
-        $io->success(sprintf('Expired %d stale transcode sessions and removed %d orphaned transcode jobs.', $expired, $cleaned));
+        $io->success(sprintf('Expired %d stale transcode sessions and removed %d orphaned transcode jobs.', $result->expired, $result->cleaned));
 
         return Command::SUCCESS;
     }

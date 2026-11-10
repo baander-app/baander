@@ -10,6 +10,7 @@ use App\Shared\Domain\Model\Uuid;
 use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Transcode\Application\Command\CleanupOrphanedJobsCommand;
+use App\Transcode\Application\DTO\TranscodeCleanupResult;
 use App\Transcode\Application\Port\TranscodeJobPortInterface;
 use App\Transcode\Application\Port\PlaybackAccessInterface;
 use App\Transcode\Application\Port\TranscodePublicViewInterface;
@@ -98,10 +99,12 @@ final class TranscodeJobController
     #[CliCounterpart('app:transcode:job:cleanup')]
     public function cleanup(): JsonResponse
     {
-        $stamp = $this->commandBus->dispatch(new CleanupOrphanedJobsCommand())->last(HandledStamp::class);
-        $result = $stamp?->getResult();
+        $result = $this->commandBus->dispatch(new CleanupOrphanedJobsCommand())->last(HandledStamp::class)?->getResult();
+        if (!$result instanceof TranscodeCleanupResult) {
+            throw new \LogicException('The transcode job cleanup did not return its result.');
+        }
 
-        return $this->successResponse(['expired' => (int) ($result['expired'] ?? 0), 'cleaned' => (int) ($result['cleaned'] ?? 0)]);
+        return $this->successResponse($result->toArray());
     }
 
     #[OA\Get(

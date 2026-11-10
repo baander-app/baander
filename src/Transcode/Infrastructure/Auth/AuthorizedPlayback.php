@@ -7,6 +7,7 @@ namespace App\Transcode\Infrastructure\Auth;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Domain\Model\PublicId;
 use App\Transcode\Application\Command\CreateTranscodeSessionCommand;
+use App\Transcode\Application\DTO\PlaybackEndReason;
 use App\Transcode\Application\Exception\TranscodeStartupUnavailableException;
 use App\Transcode\Application\Port\PlaybackPortInterface;
 use App\Transcode\Domain\Model\TranscodeSession;
@@ -93,7 +94,9 @@ final readonly class AuthorizedPlayback implements PlaybackPortInterface
             .' WHERE s.user_id = :user AND j.owner_user_id = :user AND s.video_id = :video AND j.video_id = :video'
             .' AND j.request_id = :request AND r.request_id = :request'
             .$selection
-            ." AND j.status IN ('pending', 'in_progress', 'completed') ORDER BY j.height, j.public_id",
+            // An ended session is not held, also between its expiry and the removal of its job.
+            ." AND j.status IN ('pending', 'in_progress', 'completed') AND s.state NOT IN ('cancelled', 'failed')"
+            .' ORDER BY j.height, j.public_id',
             ['user' => $user->getId(), 'video' => $videoId->toString(), 'request' => $requestId, 'jobs' => $jobIds],
             ['jobs' => ArrayParameterType::STRING],
         );
@@ -102,6 +105,35 @@ final readonly class AuthorizedPlayback implements PlaybackPortInterface
             $sessions[$row['job_id']] = PublicId::fromString($row['session_id']);
         }
         return $sessions;
+    }
+
+    public function endReason(Uuid $videoId, string $requestId, array $jobIds): PlaybackEndReason
+    {
+        $user = $this->security->getUser();
+        if ($user === null || !method_exists($user, 'getId')) {
+            throw new AccessDeniedException('Authentication required.');
+        }
+        $rows = $jobIds === [] ? [] : $this->connection->fetchAllAssociative(
+            'SELECT j.status AS job_status, r.outcome, s.state FROM transcode_jobs j'
+            .' LEFT JOIN transcode_runtime_state r ON r.job_id = j.id AND r.request_id = :request'
+            .' LEFT JOIN transcode_sessions s ON s.id = r.session_id AND s.user_id = :user'
+            .' WHERE j.public_id IN (:jobs) AND j.owner_user_id = :user AND j.video_id = :video AND j.request_id = :request',
+            ['user' => $user->getId(), 'video' => $videoId->toString(), 'request' => $requestId,
+                'jobs' => array_map(static fn (PublicId $id): string => $id->toString(), $jobIds)],
+            ['jobs' => ArrayParameterType::STRING],
+        );
+        $failed = static fn (array $row): bool => $row['job_status'] === 'failed' || $row['state'] === 'failed'
+            || in_array($row['outcome'], ['failed', 'refused'], true);
+        // Expiry releases a job without cancelling it and never ends the session of a finished
+        // presentation, so a cancelled job, or a cancelled session on a finished one, was cancelled on purpose.
+        $cancelled = static fn (array $row): bool => $row['job_status'] === 'cancelled'
+            || ($row['job_status'] === 'completed' && $row['state'] === 'cancelled');
+        return match (true) {
+            array_any($rows, $failed) => PlaybackEndReason::Failed,
+            array_any($rows, $cancelled) => PlaybackEndReason::Cancelled,
+            // Jobs that are gone, or released and waiting for cleanup.
+            default => PlaybackEndReason::Expired,
+        };
     }
 
     public function touchSessions(array $sessionIds): void

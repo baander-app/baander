@@ -118,11 +118,13 @@ final class VideoCopyPresentationTest extends TestCase
             self::assertSame(0, $metadata['startTime']);
             $repository = $this->createStub(TranscodeJobRepositoryInterface::class);
             $repository->method('findByPublicId')->willReturnCallback(static function () use (&$job): TranscodeJob { return $job; });
-            $ownership->method('find')->willReturnCallback(static function () use (&$claim, &$job): TranscodeRuntimeSnapshot {
+            $find = static function () use (&$claim, &$job): TranscodeRuntimeSnapshot {
                 return new TranscodeRuntimeSnapshot($job->getId(), $claim->runtime->sessionId, $claim->runtime->requestId,
                     $claim->runtime->desired, $claim->runtime->desiredRevision, $claim->runtime->desiredRevision,
                     $claim->runtime->generation, 'complete', $job->getOutputDirectory(), null);
-            });
+            };
+            $ownership->method('find')->willReturnCallback($find);
+            $ownership->method('findGroup')->willReturnCallback(static fn (): array => [$job->getId()->toString() => $find()]);
             $streaming = new TranscodeStreamingService($repository, $storage, new ManifestGenerator(), new DashManifestGenerator(),
                 new QualityLadderRenderer(), new HmacStreamAuthAdapter('copy-presentation-proof'), $ownership, new PublishedPresentationReader());
             $manifest = $streaming->getMasterManifest($video->getId(), [['jobId' => $job->getPublicId()->toString(), 'generation' => 1]], time() + 60);

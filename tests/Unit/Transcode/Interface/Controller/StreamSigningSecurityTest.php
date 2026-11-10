@@ -6,6 +6,7 @@ namespace App\Tests\Unit\Transcode\Interface\Controller;
 
 use App\Catalog\Domain\Model\Video;
 use App\Shared\Domain\Model\PublicId;
+use App\Transcode\Application\DTO\PlaybackEndReason;
 use App\Transcode\Application\Port\TranscodePublicViewInterface;
 use App\Transcode\Application\Port\PlaybackPortInterface;
 use App\Transcode\Application\Port\StreamAuthPortInterface;
@@ -53,6 +54,11 @@ final class StreamSigningSecurityTest extends TestCase
             yield [json_encode(['requestId' => self::REQUEST_ID, 'path' => $path, 'expiresInSeconds' => $duration], JSON_THROW_ON_ERROR)];
         }
         yield [json_encode(['requestId' => self::REQUEST_ID, 'path' => $path.'?unexpected=1'], JSON_THROW_ON_ERROR)];
+        // An attached rendition set belongs to a refresh and must be a canonical set.
+        yield [json_encode(['requestId' => self::REQUEST_ID, 'path' => $path, 'attachedSet' => '0123456789abABCD_-xyz.3'], JSON_THROW_ON_ERROR)];
+        foreach (['', 'job', '0123456789abABCD_-xyz', '0123456789abABCD_-xyz.0', '0123456789abABCD_-xyz.3,0123456789abABCD_-xyz.3', 'zzzzzzzzzzzzzzzzzzzzz.1,0123456789abABCD_-xyz.3', 3, ['0123456789abABCD_-xyz.3']] as $attached) {
+            yield [json_encode(['requestId' => self::REQUEST_ID, 'path' => $path, 'refresh' => true, 'jobIds' => ['0123456789abABCD_-xyz'], 'attachedSet' => $attached], JSON_THROW_ON_ERROR)];
+        }
     }
 
     public function testSigningCannotBypassLibraryAccess(): void
@@ -107,19 +113,66 @@ final class StreamSigningSecurityTest extends TestCase
         self::assertSame('paused', $body['status']);
     }
 
-    public function testMissingOwnedAttachmentDoesNotReadOrReturnAnyRuntimeState(): void
+    public function testAttachedSetCountsOnlyForJobsTheSessionsHold(): void
+    {
+        $video = Video::create('/video.mp4', 'hash');
+        $owned = '0123456789abABCD_-xyz';
+        $foreign = 'ABCDEFGHIJKLMNOPQRSTU';
+        $playback = $this->createStub(PlaybackPortInterface::class);
+        $playback->method('findSessions')->willReturn([$owned => new PublicId()]);
+        $streaming = $this->createMock(TranscodeStreamingPortInterface::class);
+        $streaming->expects(self::once())->method('getPlaybackState')
+            ->with($video->getId(), [$owned], [['jobId' => $owned, 'generation' => 3]])
+            ->willReturn(['generation' => 3, 'jobId' => $owned, 'revision' => 5, 'ready' => false, 'status' => 'running', 'position' => 0.0, 'startTime' => null, 'duration' => null, 'renditionSet' => '']);
+        $controller = new StreamSigningController($this->createStub(StreamAuthPortInterface::class), $playback, $this->videos($video), $streaming);
+        $response = $controller->sign(Request::create('/', 'POST', content: json_encode(['requestId' => self::REQUEST_ID, 'path' => '/api/transcode/'.$video->getPublicId().'/master.m3u8',
+            'refresh' => true, 'jobIds' => [$owned], 'attachedSet' => $owned.'.3,'.$foreign.'.9'], JSON_THROW_ON_ERROR)));
+        self::assertSame(200, $response->getStatusCode());
+    }
+
+    /** @return iterable<string, array{PlaybackEndReason}> */
+    public static function endReasons(): iterable
+    {
+        foreach (PlaybackEndReason::cases() as $reason) {
+            yield $reason->value => [$reason];
+        }
+    }
+
+    #[DataProvider('endReasons')]
+    public function testRefreshNamingOnlyEndedSessionsIsGoneWithItsReasonAndReadsNoRuntimeState(PlaybackEndReason $reason): void
+    {
+        $video = Video::create('/video.mp4', 'hash');
+        $streaming = $this->createMock(TranscodeStreamingPortInterface::class);
+        $streaming->expects(self::never())->method('getPlaybackState');
+        $jobs = [PublicId::fromString('0123456789abABCD_-xyz')];
+        $playback = $this->createMock(PlaybackPortInterface::class);
+        $playback->expects(self::once())->method('findSessions')->with($video->getId(), self::REQUEST_ID, $jobs)->willReturn([]);
+        $playback->expects(self::once())->method('endReason')->with($video->getId(), self::REQUEST_ID, $jobs)->willReturn($reason);
+        $playback->expects(self::never())->method('touchSessions');
+        $playback->expects(self::never())->method('start');
+        $controller = new StreamSigningController($this->createStub(StreamAuthPortInterface::class), $playback, $this->videos($video), $streaming);
+        $response = $controller->sign(Request::create('/', 'POST', content: json_encode(['requestId' => self::REQUEST_ID, 'path' => '/api/transcode/'.$video->getPublicId().'/master.m3u8', 'refresh' => true, 'jobIds' => ['0123456789abABCD_-xyz']], JSON_THROW_ON_ERROR)));
+        // A definite answer: nothing invites the client to retry the same sessions.
+        self::assertSame(410, $response->getStatusCode());
+        self::assertFalse($response->headers->has('Retry-After'));
+        self::assertStringContainsString('no-store', (string) $response->headers->get('Cache-Control'));
+        $body = json_decode($response->getContent(), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame($reason->value, $body['reason']);
+        foreach (['position', 'status', 'sessionId', 'jobId'] as $field) { self::assertArrayNotHasKey($field, $body); }
+    }
+
+    public function testStartWithoutCapacityStaysRetryable(): void
     {
         $video = Video::create('/video.mp4', 'hash');
         $streaming = $this->createMock(TranscodeStreamingPortInterface::class);
         $streaming->expects(self::never())->method('getPlaybackState');
         $playback = $this->createMock(PlaybackPortInterface::class);
-        $playback->expects(self::once())->method('findSessions')->with(self::anything(), self::REQUEST_ID, [PublicId::fromString('0123456789abABCD_-xyz')])->willReturn([]);
-        $playback->expects(self::never())->method('touchSessions');
+        $playback->expects(self::once())->method('start')->willReturn([]);
+        $playback->expects(self::never())->method('endReason');
         $controller = new StreamSigningController($this->createStub(StreamAuthPortInterface::class), $playback, $this->videos($video), $streaming);
-        $response = $controller->sign(Request::create('/', 'POST', content: json_encode(['requestId' => self::REQUEST_ID, 'path' => '/api/transcode/'.$video->getPublicId().'/master.m3u8', 'refresh' => true, 'jobIds' => ['0123456789abABCD_-xyz']], JSON_THROW_ON_ERROR)));
+        $response = $controller->sign(Request::create('/', 'POST', content: json_encode(['requestId' => self::REQUEST_ID, 'path' => '/api/transcode/'.$video->getPublicId().'/master.m3u8'], JSON_THROW_ON_ERROR)));
         self::assertSame(503, $response->getStatusCode());
-        $body = json_decode($response->getContent(), true, flags: JSON_THROW_ON_ERROR);
-        foreach (['position', 'status', 'sessionId', 'jobId'] as $field) { self::assertArrayNotHasKey($field, $body); }
+        self::assertSame('2', $response->headers->get('Retry-After'));
     }
 
     private function streaming(): TranscodeStreamingPortInterface

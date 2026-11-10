@@ -24,9 +24,11 @@ use App\Transcode\Domain\ValueObject\QualityTier;
 use App\Transcode\Infrastructure\Auth\AuthorizedPlayback;
 use App\Transcode\Infrastructure\Auth\HmacStreamAuthAdapter;
 use App\Transcode\Infrastructure\DASH\DashManifestGenerator;
+use App\Transcode\Infrastructure\FFmpeg\SegmentEncoder;
 use App\Transcode\Infrastructure\HLS\ManifestGenerator;
 use App\Transcode\Infrastructure\HLS\QualityLadderRenderer;
 use App\Transcode\Infrastructure\Storage\SegmentFileResolver;
+use App\Transcode\Infrastructure\Swoole\TranscodeSessionSubscriber;
 use App\Transcode\Infrastructure\Storage\TranscodeFileStorage;
 use App\Transcode\Infrastructure\Transcode\TranscodeStreamingService;
 use App\Transcode\Interface\Controller\StreamManifestController;
@@ -35,6 +37,7 @@ use App\Transcode\Interface\Security\SignedStreamRequest;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
 use Symfony\Component\Messenger\Stamp\HandledStamp;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\Request;
@@ -58,6 +61,9 @@ final class AdaptiveDeliveryTest extends TestCase
     private array $runtimes = [];
     /** @var list<string> */
     private array $runtimeReads = [];
+    private int $groupReads = 0;
+    /** @var \Closure(int): void Runs before each group read, with its ordinal; lets a test commit a control between reads. */
+    private \Closure $beforeGroupRead;
     private string $requestId;
     /** @var array<string, TranscodeSession> */
     private array $sessions = [];
@@ -65,6 +71,7 @@ final class AdaptiveDeliveryTest extends TestCase
     protected function setUp(): void
     {
         $this->root = sys_get_temp_dir().'/baander-adaptive-'.bin2hex(random_bytes(5));
+        $this->beforeGroupRead = static function (): void {};
         $this->requestId = Uuid::generate()->toString();
         $this->video = Uuid::generate(); $this->videoPublic = new PublicId();
         $this->actor = Uuid::generate(); $this->other = Uuid::generate();
@@ -75,7 +82,7 @@ final class AdaptiveDeliveryTest extends TestCase
             'CREATE TABLE movie_video (movie_id TEXT, video_id TEXT)',
             'CREATE TABLE user_library_access (user_id TEXT, library_id TEXT)',
             'CREATE TABLE transcode_jobs (id TEXT PRIMARY KEY, public_id TEXT, owner_user_id TEXT, video_id TEXT, height INTEGER, status TEXT, request_id TEXT, presentation_selection TEXT)',
-            'CREATE TABLE transcode_sessions (id TEXT PRIMARY KEY, public_id TEXT, user_id TEXT, video_id TEXT, job_id TEXT, updated_at TEXT)',
+            "CREATE TABLE transcode_sessions (id TEXT PRIMARY KEY, public_id TEXT, user_id TEXT, video_id TEXT, job_id TEXT, updated_at TEXT, state TEXT NOT NULL DEFAULT 'active')",
             'CREATE TABLE transcode_runtime_state (job_id TEXT PRIMARY KEY, session_id TEXT, request_id TEXT)',
         ] as $sql) { $this->connection->executeStatement($sql); }
         $this->connection->insert('videos', ['id' => $this->video->toString(), 'height' => 1080]);
@@ -120,6 +127,18 @@ final class AdaptiveDeliveryTest extends TestCase
         $ownership->method('find')->willReturnCallback(function (Uuid $id) {
             $this->runtimeReads[] = $id->toString();
             return $this->runtimes[$id->toString()] ?? null;
+        });
+        $ownership->method('findGroup')->willReturnCallback(function (array $ids): array {
+            ++$this->groupReads;
+            ($this->beforeGroupRead)($this->groupReads);
+            $runtimes = [];
+            foreach ($ids as $id) {
+                $this->runtimeReads[] = $id->toString();
+                if (isset($this->runtimes[$id->toString()])) {
+                    $runtimes[$id->toString()] = $this->runtimes[$id->toString()];
+                }
+            }
+            return $runtimes;
         });
         $auth = new HmacStreamAuthAdapter('adaptive-secret');
         $this->streaming = new TranscodeStreamingService($jobs, new TranscodeFileStorage(new SegmentFileResolver($this->root)), new ManifestGenerator(), new DashManifestGenerator(), new QualityLadderRenderer(), $auth, $ownership, new PublishedPresentationReader());
@@ -329,7 +348,7 @@ final class AdaptiveDeliveryTest extends TestCase
     {
         $jobs = array_values($this->jobs);
         $sibling = $this->runtimes[$jobs[1]->getId()->toString()];
-        PublishedPresentationFixture::write($sibling->outputDirectory, 1, audio: true, complete: false);
+        PublishedPresentationFixture::write($sibling->outputDirectory, 3, audio: true, complete: false);
         $signed = $this->sign(true, 'manifest.mpd');
         $manifest = $this->dash($signed['url']);
         self::assertStringContainsString('type="dynamic"', $manifest);
@@ -350,9 +369,218 @@ final class AdaptiveDeliveryTest extends TestCase
         $metadata['nativeAvailabilityStartTime'] = null;
         file_put_contents($path, json_encode($metadata, JSON_THROW_ON_ERROR));
         $sibling = $this->runtimes[$jobs[1]->getId()->toString()];
-        PublishedPresentationFixture::write($sibling->outputDirectory, 1, audio: true, complete: false);
+        // The sibling leads the cursor far enough to join; only the missing clock keeps it out.
+        PublishedPresentationFixture::write($sibling->outputDirectory, 4, audio: true, complete: false);
         $signed = $this->sign(true);
         self::assertSame(2, substr_count($this->master($signed['url']), '#EXT-X-STREAM-INF:'));
+    }
+
+    public function testGrowingSiblingJoinsOnlyWithTheJoinLead(): void
+    {
+        self::assertLessThan(TranscodeSessionSubscriber::RESUME_LEAD_SECONDS, $this->joinLead(),
+            'An encoder throttled at its resume lead must still qualify.');
+        $this->grow(1, 2);
+        self::assertSame(['360p', '1080p'], $this->tiers($this->sign(true)));
+        $this->grow(1, 3);
+        $signed = $this->sign(true);
+        self::assertSame(['360p', '720p', '1080p'], $this->tiers($signed));
+        self::assertSame(3, substr_count($this->master($signed['url']), '#EXT-X-STREAM-INF:'));
+        $this->cursor(0.5);
+        self::assertSame(['360p', '1080p'], $this->tiers($this->sign(true)));
+    }
+
+    public function testPrimaryAloneDecidesReadinessAlsoForAPausedSeek(): void
+    {
+        foreach ([0, 1, 2] as $index) {
+            $this->grow($index, 1);
+        }
+        foreach (['running', 'paused'] as $status) {
+            $this->cursor(2.0, $status);
+            $signed = $this->sign(true);
+            self::assertTrue($signed['ready'], $status);
+            self::assertSame($status, $signed['status']);
+            self::assertSame(['360p'], $this->tiers($signed));
+            self::assertSame(1, substr_count($this->master($signed['url']), '#EXT-X-STREAM-INF:'));
+        }
+    }
+
+    public function testAttachedSiblingStaysAboveOneSegmentAndIsWithdrawnAtThatMargin(): void
+    {
+        $this->finishOthers();
+        $this->grow(1, 3);
+        $attached = $this->sign(true)['renditionSet'];
+        self::assertSame(['360p', '720p', '1080p'], $this->tiers(['renditionSet' => $attached]));
+        // Eleven seconds in, the sibling leads by seven: enough to stay, not enough to join.
+        $this->cursor(11.0);
+        self::assertSame(['360p', '720p', '1080p'], $this->tiers($this->sign(true, attachedSet: $attached)));
+        self::assertSame(['360p', '1080p'], $this->tiers($this->sign(true)));
+        // At one segment of lead it is withdrawn, before the player reaches its edge.
+        $this->cursor(12.0);
+        $withdrawn = $this->sign(true, attachedSet: $attached);
+        self::assertSame(['360p', '1080p'], $this->tiers($withdrawn));
+        self::assertTrue($withdrawn['ready']);
+    }
+
+    public function testAttachedSetNamingAnotherGenerationDoesNotKeepASibling(): void
+    {
+        $this->finishOthers();
+        $this->grow(1, 3);
+        $attached = $this->sign(true)['renditionSet'];
+        $this->cursor(11.0);
+        $job = array_values($this->jobs)[1];
+        $stale = str_replace($job->getPublicId().'.4', $job->getPublicId().'.3', $attached);
+        self::assertNotSame($attached, $stale);
+        self::assertSame(['360p', '1080p'], $this->tiers($this->sign(true, attachedSet: $stale)));
+    }
+
+    public function testSiblingSlowerThanPlaybackIsWithdrawnOnceAndRejoinsOnlyWithTheJoinLead(): void
+    {
+        // The sibling joined while the cursor stood still, then encodes at half the playback speed.
+        $this->finishOthers();
+        $segments = 3;
+        $this->grow(1, $segments);
+        $attached = $this->sign(true)['renditionSet'];
+        $changes = [];
+        for ($second = 1; $second <= 40; ++$second) {
+            if ($second % 12 === 0) {
+                $this->grow(1, ++$segments);
+            }
+            $this->cursor((float) $second);
+            $signed = $this->sign(true, attachedSet: $attached);
+            self::assertTrue($signed['ready']);
+            if ($signed['renditionSet'] !== $attached) {
+                $changes[] = ['second' => $second, 'lead' => $segments * 6.0 - $second, 'tiers' => $this->tiers($signed)];
+                $attached = $signed['renditionSet'];
+            }
+        }
+        self::assertCount(1, $changes, json_encode($changes, JSON_THROW_ON_ERROR));
+        self::assertSame(['360p', '1080p'], $changes[0]['tiers']);
+        self::assertGreaterThan(0.0, $changes[0]['lead'], 'The sibling leaves before the player can reach its edge.');
+        // Seventeen seconds of lead are not enough to come back; the join lead is.
+        $this->grow(1, 10);
+        $this->cursor(43.0);
+        self::assertSame(['360p', '1080p'], $this->tiers($this->sign(true, attachedSet: $attached)));
+        $this->cursor(42.0);
+        self::assertSame(['360p', '720p', '1080p'], $this->tiers($this->sign(true, attachedSet: $attached)));
+    }
+
+    /** @return iterable<string, array{int, int, int}> */
+    public static function realTimeSiblings(): iterable
+    {
+        yield 'one segment ahead, published as the cursor reaches its end' => [1, 0, 2];
+        yield 'published only after the cursor has passed its end' => [1, 1, 2];
+        yield 'four segments ahead' => [4, 0, 3];
+    }
+
+    #[DataProvider('realTimeSiblings')]
+    public function testRealTimeSiblingChangesTheSetAtMostOnceOverSixtySignings(int $segments, int $publishedAtSecond, int $members): void
+    {
+        // Published end and cursor advance together; the lead swings by one segment per publication.
+        $this->finishOthers();
+        $this->grow(1, $segments);
+        $attached = $this->sign(true)['renditionSet'];
+        $changes = 0;
+        for ($second = 1; $second <= 60; ++$second) {
+            if ($second % 6 === $publishedAtSecond) {
+                $this->grow(1, ++$segments);
+            }
+            $this->cursor((float) $second);
+            $signed = $this->sign(true, attachedSet: $attached);
+            self::assertTrue($signed['ready']);
+            if ($signed['renditionSet'] !== $attached) {
+                ++$changes;
+                $attached = $signed['renditionSet'];
+            }
+        }
+        self::assertLessThanOrEqual(1, $changes);
+        self::assertCount($members, $this->tiers(['renditionSet' => $attached]));
+    }
+
+    public function testFinishedSiblingJoinsWithoutALeadAndTheLeadIsCappedByTheRemainingDuration(): void
+    {
+        // Every fixture rendition is finished with two segments: none leads by the join lead.
+        self::assertSame(['360p', '720p', '1080p'], $this->tiers($this->sign(true)));
+        $this->grow(1, 2);
+        self::assertSame(['360p', '1080p'], $this->tiers($this->sign(true)));
+        // Twelve published seconds are the whole of a twelve-second source.
+        foreach ([0, 1, 2] as $index) {
+            $path = $this->runtime($index)->outputDirectory.'/generation.json';
+            $metadata = json_decode((string) file_get_contents($path), true, flags: JSON_THROW_ON_ERROR);
+            $metadata['duration'] = 12;
+            file_put_contents($path, json_encode($metadata, JSON_THROW_ON_ERROR));
+        }
+        self::assertSame(['360p', '720p', '1080p'], $this->tiers($this->sign(true)));
+    }
+
+    public function testProgressCommittedBetweenRuntimeReadsKeepsTheSet(): void
+    {
+        $this->grow(1, 4);
+        $before = $this->sign(true);
+        $this->groupReads = 0;
+        $this->runtimeReads = [];
+        // The report moves every sibling's cursor in one transaction, after the signing's first read.
+        $this->beforeGroupRead = function (int $read): void {
+            if ($read === 2) {
+                $this->cursor(1.5);
+            }
+        };
+        $after = $this->sign(true, attachedSet: $before['renditionSet']);
+        self::assertSame(2, $this->groupReads, 'A signing reads the runtimes of its jobs in two statements.');
+        self::assertCount(6, $this->runtimeReads, 'No job runtime is read on its own between them.');
+        self::assertSame(1.5, $after['position']);
+        self::assertSame($before['renditionSet'], $after['renditionSet']);
+        self::assertSame(3, substr_count($this->master($after['url']), '#EXT-X-STREAM-INF:'));
+    }
+
+    private function joinLead(): float
+    {
+        return TranscodeStreamingService::JOIN_LEAD_SEGMENTS * SegmentEncoder::getSegmentDuration();
+    }
+
+    /** Gives the primary and the highest rendition two finished minutes, so only the middle one decides a set. */
+    private function finishOthers(): void
+    {
+        foreach ([0, 2] as $index) {
+            PublishedPresentationFixture::write($this->runtime($index)->outputDirectory, 20, audio: true);
+        }
+    }
+
+    private function runtime(int $index): TranscodeRuntimeSnapshot
+    {
+        return $this->runtimes[array_values($this->jobs)[$index]->getId()->toString()];
+    }
+
+    /** Publishes a growing presentation of six-second segments for one of the actor's renditions. */
+    private function grow(int $index, int $segments): void
+    {
+        PublishedPresentationFixture::write($this->runtime($index)->outputDirectory, $segments, audio: true, complete: false);
+    }
+
+    /** Moves the cursor of all the actor's renditions, as one playback control does. */
+    private function cursor(float $position, string $status = 'running'): void
+    {
+        foreach ([0, 1, 2] as $index) {
+            $runtime = $this->runtime($index);
+            $this->runtimes[$runtime->jobId->toString()] = new TranscodeRuntimeSnapshot($runtime->jobId, $runtime->sessionId, $runtime->requestId,
+                new DesiredTranscodeState(AudioProfile::streamingStereo(), $status, $position), $runtime->desiredRevision + 1, $runtime->observedRevision,
+                $runtime->generation, $runtime->outcome, $runtime->outputDirectory, null, true);
+        }
+    }
+
+    /**
+     * @param array{renditionSet: string} $signed
+     * @return list<string> Quality tiers of the signed set, lowest first.
+     */
+    private function tiers(array $signed): array
+    {
+        $members = array_map(static fn (string $entry): string => explode('.', $entry)[0], array_filter(explode(',', $signed['renditionSet'])));
+        $tiers = [];
+        foreach (array_slice(array_values($this->jobs), 0, 3) as $job) {
+            if (in_array($job->getPublicId()->toString(), $members, true)) {
+                $tiers[] = $job->getQualityTierName();
+            }
+        }
+        return $tiers;
     }
 
     private function dash(string $url): string
@@ -363,9 +591,10 @@ final class AdaptiveDeliveryTest extends TestCase
     }
 
     /** @return array<string, mixed> */
-    private function sign(bool $refresh, string $name = 'master.m3u8', int $expiresInSeconds = 86400): array
+    private function sign(bool $refresh, string $name = 'master.m3u8', int $expiresInSeconds = 86400, ?string $attachedSet = null): array
     {
-        $payload = ['requestId' => $this->requestId, 'path' => '/api/transcode/'.$this->videoPublic.'/'.$name, 'refresh' => $refresh, 'expiresInSeconds' => $expiresInSeconds];
+        $payload = ['requestId' => $this->requestId, 'path' => '/api/transcode/'.$this->videoPublic.'/'.$name, 'refresh' => $refresh, 'expiresInSeconds' => $expiresInSeconds]
+            + ($attachedSet === null ? [] : ['attachedSet' => $attachedSet]);
         if ($refresh) {
             $payload['jobIds'] = $this->connection->fetchFirstColumn('SELECT public_id FROM transcode_jobs WHERE owner_user_id = ?', [$this->actor->toString()]);
         }

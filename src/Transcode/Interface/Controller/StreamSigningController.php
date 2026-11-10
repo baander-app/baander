@@ -8,6 +8,7 @@ use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 
 use App\Shared\Interface\Controller\ApiResponsesTrait;
+use App\Transcode\Application\DTO\TranscodeRenditionSet;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use App\Transcode\Application\Port\PlaybackPortInterface;
 use App\Transcode\Application\Port\TranscodePublicViewInterface;
@@ -48,12 +49,17 @@ final class StreamSigningController
                     new OA\Property(property: 'refresh', type: 'boolean', description: 'Read current playback state without creating another admission'),
                     new OA\Property(property: 'requestId', type: 'string', format: 'uuid', description: 'Stable playback client session identifier, retained across reloads and reconnects'),
                     new OA\Property(property: 'jobIds', type: 'array', minItems: 1, maxItems: 3, uniqueItems: true, items: new OA\Items(type: 'string'), description: 'Exact admitted jobs; required for refresh and omitted for new admission'),
+                    new OA\Property(property: 'attachedSet', type: 'string', example: '0123456789abABCD_-xyz.3', description: 'Rendition set the player has attached, as returned in renditionSet; refresh only. A rendition named here stays in the signed set on a smaller published lead than one that still has to join'),
                 ],
             ),
         ),
         responses: [
             new OA\Response(response: '200', description: 'Signed URL generated', content: new OA\JsonContent(properties: [new OA\Property(property: 'jobIds', type: 'array', items: new OA\Items(type: 'string')), new OA\Property(property: 'requestId', type: 'string', format: 'uuid'), new OA\Property(property: 'url', type: 'string', nullable: true), new OA\Property(property: 'sig', type: 'string'), new OA\Property(property: 'exp', type: 'integer'), new OA\Property(property: 'generation', type: 'integer'), new OA\Property(property: 'jobId', type: 'string'), new OA\Property(property: 'sessionId', type: 'string', nullable: true), new OA\Property(property: 'revision', type: 'integer'), new OA\Property(property: 'ready', type: 'boolean'), new OA\Property(property: 'position', type: 'number'), new OA\Property(property: 'status', type: 'string'), new OA\Property(property: 'startTime', type: 'number', nullable: true), new OA\Property(property: 'duration', type: 'number', nullable: true), new OA\Property(property: 'renditionSet', type: 'string')])),
             new OA\Response(response: '400', description: 'Invalid request'),
+            new OA\Response(response: '410', description: 'A refresh named only sessions that have ended. Sessions that expired may be started again; failed or cancelled ones may not', content: new OA\JsonContent(required: ['error', 'reason'], properties: [
+                new OA\Property(property: 'error', type: 'string'),
+                new OA\Property(property: 'reason', type: 'string', enum: ['expired', 'failed', 'cancelled']),
+            ])),
             new OA\Response(response: '503', description: 'Transcode startup is temporarily unavailable', headers: [
                 new OA\Header(header: 'Retry-After', schema: new OA\Schema(type: 'integer', example: 2)),
             ], content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
@@ -72,11 +78,20 @@ final class StreamSigningController
         $jobIdentifiers = array_key_exists('jobIds', $data) ? $data['jobIds'] : [];
         $refresh = array_key_exists('refresh', $data) ? $data['refresh'] : false;
         $expiresInSeconds = array_key_exists('expiresInSeconds', $data) ? $data['expiresInSeconds'] : 86400;
+        $attachedSet = $data['attachedSet'] ?? null;
         if (!is_string($path) || !preg_match('~^/api/transcode/([0-9a-zA-Z_-]{21})/(?:master\.m3u8|manifest\.mpd)$~D', $path, $matches)
             || !is_string($requestId) || !is_bool($refresh) || !is_int($expiresInSeconds) || $expiresInSeconds < 1 || $expiresInSeconds > 86400
             || !is_array($jobIdentifiers) || !array_is_list($jobIdentifiers) || count($jobIdentifiers) > 3
             || ($refresh && $jobIdentifiers === []) || (!$refresh && $jobIdentifiers !== [])) {
             return $this->errorResponse('Expected a video manifest path, a client session UUID, a lifetime from 1 to 86400 seconds, and exact job IDs when refreshing.', 400);
+        }
+        if ($attachedSet !== null && (!is_string($attachedSet) || !$refresh)) {
+            return $this->errorResponse('An attached rendition set is a string and belongs to a refresh.', 400);
+        }
+        try {
+            $attached = $attachedSet === null ? [] : TranscodeRenditionSet::parse($attachedSet);
+        } catch (\InvalidArgumentException) {
+            return $this->errorResponse('Invalid attached rendition set.', 400);
         }
         try {
             $requestId = Uuid::fromString($requestId)->toString();
@@ -98,6 +113,13 @@ final class StreamSigningController
         if ($refresh) {
             $this->playback->assertAccess($videoId);
             $sessions = $this->playback->findSessions($videoId, $requestId, $jobIds);
+            if ($sessions === []) {
+                // Not a retryable outage: the client holds none of these sessions any more.
+                return new JsonResponse([
+                    'error' => 'The playback sessions have ended.',
+                    'reason' => $this->playback->endReason($videoId, $requestId, $jobIds)->value,
+                ], 410, ['Cache-Control' => 'no-store']);
+            }
         } else {
             $sessions = $this->playback->start($videoId, $requestId);
         }
@@ -105,7 +127,9 @@ final class StreamSigningController
             return new JsonResponse(['error' => 'Owned media execution is unavailable'], 503, ['Retry-After' => '2']);
         }
         $this->playback->touchSessions(array_values($sessions));
-        $state = $this->streaming->getPlaybackState($videoId, array_keys($sessions));
+        // The attached set is the client's word; it counts only for jobs its own sessions hold.
+        $attached = array_values(array_filter($attached, static fn (array $pair): bool => isset($sessions[$pair['jobId']])));
+        $state = $this->streaming->getPlaybackState($videoId, array_keys($sessions), $attached);
         if ($state === null || !isset($sessions[$state['jobId']])) {
             return new JsonResponse(['error' => 'Media execution is unavailable'], 503, ['Retry-After' => '2']);
         }

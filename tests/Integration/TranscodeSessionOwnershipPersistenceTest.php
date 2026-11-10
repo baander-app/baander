@@ -199,7 +199,14 @@ final class TranscodeSessionOwnershipPersistenceTest extends TestCase
                 self::assertSame($operation === 'cancel' ? 0 : 1, $job->getReferenceCount());
                 self::assertSame($operation === 'cancel' ? 'cancelled' : 'in_progress', $job->getStatus()->value);
             }
+            // One statement reads the runtimes of the named jobs, and of no other.
+            $group = $runtime->findGroup([...array_column($controlled, 0), Uuid::generate()]);
+            self::assertEqualsCanonicalizing(array_map(static fn (array $pair): string => $pair[0]->toString(), $controlled), array_keys($group));
+            foreach ($controlled as [$jobId]) {
+                self::assertEquals($runtime->find($jobId), $group[$jobId->toString()]);
+            }
         }
+        self::assertSame([], $runtime->findGroup([]));
     }
 
     public function testAbandonedSessionExpiresAndItsJobIsReclaimedWhileAFreshSessionStays(): void
@@ -250,7 +257,7 @@ final class TranscodeSessionOwnershipPersistenceTest extends TestCase
         $this->manager->clear();
         $storage->expects(self::once())->method('deleteIfUnretained')->with('/fixture/abandoned')->willReturn(true);
 
-        self::assertSame(['expired' => 1, 'cleaned' => 1], $handler(new \App\Transcode\Application\Command\CleanupOrphanedJobsCommand()));
+        self::assertSame(['expired' => 1, 'cleaned' => 1], $handler(new \App\Transcode\Application\Command\CleanupOrphanedJobsCommand())->toArray());
 
         $this->manager->clear();
         // The job went with its output; its session and execution rows cascade with it.
@@ -300,7 +307,7 @@ final class TranscodeSessionOwnershipPersistenceTest extends TestCase
         $this->manager->clear();
         $storage->expects(self::once())->method('deleteIfUnretained')->with('/fixture/held')->willReturn(true);
 
-        self::assertSame(['expired' => 1, 'cleaned' => 0], $handler(new \App\Transcode\Application\Command\CleanupOrphanedJobsCommand()));
+        self::assertSame(['expired' => 1, 'cleaned' => 0], $handler(new \App\Transcode\Application\Command\CleanupOrphanedJobsCommand())->toArray());
 
         $this->manager->clear();
         $cancelled = $runtime->find($job->getId());
@@ -313,15 +320,22 @@ final class TranscodeSessionOwnershipPersistenceTest extends TestCase
         self::assertNotNull($released);
         self::assertSame(0, $released->getReferenceCount());
         self::assertSame('in_progress', $released->getStatus()->value);
+        // Until cleanup removes the job, its client is told that the session expired, not that it still holds it.
+        $security = $this->createStub(\Symfony\Bundle\SecurityBundle\Security::class);
+        $security->method('getUser')->willReturn(new \App\Auth\Infrastructure\Security\SecurityUser($owner->toString(), 'viewer@baander.app', ''));
+        $playback = new \App\Transcode\Infrastructure\Auth\AuthorizedPlayback($security, $connection, $this->createStub(\Symfony\Component\Messenger\MessageBusInterface::class), new \Symfony\Component\Clock\NativeClock());
+        self::assertSame([], $playback->findSessions($video, 'held-client', [$job->getPublicId()]));
+        self::assertSame(\App\Transcode\Application\DTO\PlaybackEndReason::Expired, $playback->endReason($video, 'held-client', [$job->getPublicId()]));
 
         // The worker reads the cancellation and gives up the execution; the next run reclaims the job.
         $latest = $runtime->refresh($claim);
         self::assertNotNull($latest);
         self::assertTrue($runtime->release($latest));
         $this->manager->clear();
-        self::assertSame(['expired' => 0, 'cleaned' => 1], $handler(new \App\Transcode\Application\Command\CleanupOrphanedJobsCommand()));
+        self::assertSame(['expired' => 0, 'cleaned' => 1], $handler(new \App\Transcode\Application\Command\CleanupOrphanedJobsCommand())->toArray());
         $this->manager->clear();
         self::assertNull($jobs->findByUuid($job->getId()));
+        self::assertSame(\App\Transcode\Application\DTO\PlaybackEndReason::Expired, $playback->endReason($video, 'held-client', [$job->getPublicId()]));
     }
 
     /** @return array<string, mixed> */

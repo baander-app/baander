@@ -48,9 +48,9 @@ export function VideoPlaybackRuntime() {
         signal.throwIfAborted()
         await new Promise<void>(resolve => window.setTimeout(resolve, 20))
       }
-      await execution.ready(signal)
-      const position = execution.observe().position
-      if (Math.abs(position - payload.position) > 0.05) await execution.execute('seek', payload.position, signal)
+      // The player decides how to reach the cursor: a newer target supersedes a restore it is still
+      // waiting for, and playing from the source end starts again at zero.
+      await execution.prepare(payload.position, payload.desiredState === 'playing', signal)
       stoppedObservation = null
     }
     const stop = async (signal: AbortSignal) => {

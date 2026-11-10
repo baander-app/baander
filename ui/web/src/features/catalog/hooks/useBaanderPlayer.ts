@@ -27,6 +27,8 @@ interface VideoExecution {
     rearmAfterRegistration(): void
   }
   ready(signal: AbortSignal): Promise<void>
+  /** Brings the player to a cursor before it is told to play or pause there. */
+  prepare(position: number, playing: boolean, signal: AbortSignal): Promise<void>
   execute(action: VideoExecutionAction, value: number | undefined, signal: AbortSignal): Promise<PlaybackObservation>
   quiesce(signal: AbortSignal): Promise<PlaybackObservation>
   observe(): PlaybackObservation
@@ -70,6 +72,11 @@ interface SeekReconciliation {
   intentRevision: number
   resolve: (snapshot: PlaybackSnapshot | null) => void
 }
+
+// How close to the source duration a cursor counts as standing at its end.
+const SOURCE_END_TOLERANCE = 0.1
+// How long a restore at the source end waits for its native seek before it settles without it.
+const SOURCE_END_SEEK_GRACE_MS = 1000
 
 function isTransientControlFailure(error: unknown): boolean {
   if (!isAxiosError(error) || isCancel(error)) return false
@@ -150,6 +157,12 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, coor
     let appliedRequest = 0
     let snapshot: PlaybackSnapshot | null = null
     let loadedIdentity: string | null = null
+    let loadedSet: string | null = null
+    // Sessions that expired are replaced; the cursor and status to continue with wait here for the
+    // new session. Until the new session has answered a second signing or accepted a control it is
+    // unproven, and its loss is an error, so sessions that are gone at once cannot loop.
+    let restart: { position: number, paused: boolean } | null = null
+    let restartUnproven = false
     let subtitlePreference: SubtitlePreference | undefined
     let pendingLoad: { identity: string, position: number } | null = null
     let reloadCursor: number | null = null
@@ -178,6 +191,8 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, coor
     let sourceSeekPosition: number | null = null
     let sourceDuration = 0
     let restoredSourceEnd: number | null = null
+    let sourceEndSeek: { attachment: number, since: number } | null = null
+    let settledWhileSeeking = false
     let disposeAttachment: (() => void) | null = null
     let attachmentRevision = 0
     let retiringPlayback: { attachment: number, suppressPause: boolean } | null = null
@@ -194,6 +209,9 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, coor
       && (snapshot.status === 'running' || snapshot.status === 'paused')
     const playbackPosition = () => restoredSourceEnd !== null && Math.abs(video.currentTime - restoredSourceEnd) <= 0.1
       ? sourceDuration : mediaStart + video.currentTime
+    // Where playback is headed: a seek in flight, then a restore in flight, then the native clock.
+    const cursor = () => sourceSeekPosition ?? (pendingLoad ? mediaStart + pendingLoad.position : playbackPosition())
+    const atSourceEnd = (position: number) => sourceDuration > 0 && position >= sourceDuration - SOURCE_END_TOLERANCE
     const clearSourceSeek = () => {
       sourceSeekPosition = null
       setPendingSeekPosition(null)
@@ -209,6 +227,8 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, coor
       reloadCursor = null
       restoredPosition = null
       restoredSourceEnd = null
+      sourceEndSeek = null
+      settledWhileSeeking = false
       attachmentReady = false
       attachmentRestored = false
       retiringPlayback = null
@@ -306,6 +326,8 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, coor
             requestId,
             ...(delivery.kind === 'encoded' && (initial || snapshot === null || snapshot.sessionId === null) ? {} : {
               refresh: true, jobIds: snapshot && snapshot.sessionId !== null ? snapshot.jobIds : [delivery.jobId!],
+              // An attached rendition stays in the signed set on a smaller lead than one that has to join.
+              ...(disposeAttachment !== null && loadedSet ? { attachedSet: loadedSet } : {}),
             }),
           }, { signal: abort.signal, timeout: 5000 })
           data = result.data
@@ -314,6 +336,8 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, coor
         const previous = snapshot
         // A later response cannot move an attached job backwards in durable state.
         if (previous?.jobId === data.jobId && (data.generation < previous.generation || data.revision < previous.revision)) return
+        // A session that answers a signing after its first one is held: a later expiry is a new one.
+        if (previous?.sessionId && previous.sessionId === data.sessionId) restartUnproven = false
         const identity = `${data.jobId}:${data.generation}:${data.renditionSet}`
         const seekRead = seekReconciliation
         if (seekRead && (data.sessionId !== seekRead.chain.sessionId || data.jobId !== seekRead.chain.jobId
@@ -347,14 +371,20 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, coor
         const ownerChanged = previous !== null && (previous.jobId !== data.jobId || previous.sessionId !== data.sessionId)
         if (ownerChanged) subtitlePreference = undefined
         appliedRequest = revision
-        const transferredCursor = previous?.sessionId === null && data.sessionId ? playbackPosition() : null
+        const resumed = data.sessionId ? restart : null
+        if (resumed) restart = null
+        const transferredCursor = resumed ? resumed.position : previous?.sessionId === null && data.sessionId ? playbackPosition() : null
         snapshot = data
         if (transferredCursor !== null && transferredCursor > 0) {
           sourceSeekPosition = transferredCursor
           setPendingSeekPosition(transferredCursor)
           enqueueSeek(transferredCursor)
+          // A start cannot carry a status: the new session runs until it is told to pause. The
+          // pause follows the seek, so the session ends paused at the kept cursor.
+          if (resumed?.paused) control('pause', transferredCursor)
           return
         }
+        if (resumed?.paused) control('pause', 0)
         if (!completed()) completion = null
         if (data.duration !== null && Number.isFinite(data.duration) && data.duration > 0) {
           sourceDuration = data.duration
@@ -429,6 +459,9 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, coor
           attachmentRestored = false
           pendingLoad = { identity, position: Math.max(0, position - mediaStart) }
           loadedIdentity = identity
+          loadedSet = data.renditionSet
+          sourceEndSeek = null
+          settledWhileSeeking = false
           retiringPlayback = null
           attachmentReady = false
           disposeAttachment?.()
@@ -471,6 +504,10 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, coor
           setError(error.message)
         }
         const status = isAxiosError(error) ? error.response?.status : undefined
+        if (status === 410 && snapshot?.sessionId) {
+          endSessions((error as { response?: { data?: { reason?: unknown } } }).response?.data?.reason)
+          return
+        }
         const transient = isAxiosError(error) && !isCancel(error)
           && (error.response === undefined || (status !== undefined && status >= 500 && status <= 599))
         // Once signing accepted ownership, transport failures preserve its
@@ -482,6 +519,51 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, coor
         }
         fail()
       }
+    }
+
+    // The server no longer holds any of the signed sessions. Sessions that expired are replaced by
+    // new ones at the same cursor, unless the ended ones were themselves an unproven replacement;
+    // a failed or cancelled encode is not started again.
+    const endSessions = (reason: unknown) => {
+      const message = reason === 'failed' ? 'The video could not be converted for playback.'
+        : reason === 'cancelled' ? 'Playback of this video was cancelled.'
+          : reason !== 'expired' || restartUnproven ? 'Playback could not continue on a new session.' : null
+      if (message !== null) {
+        terminalError = new Error(message)
+        setError(message)
+        fail()
+        return
+      }
+      const position = cursor()
+      // A paused player continues paused. Its element must not start on the new session's
+      // running status before the pause has reached it, so it waits for a new request to play.
+      const paused = desiredStatus() === 'paused'
+      if (paused) playbackStarted = false
+      restartUnproven = true
+      restart = { position, paused }
+      statusReconciliation = null
+      cancelSeekReconciliation()
+      canonicalSeekRecovery = null
+      seekChain = null
+      recoveryPosition = null
+      localStatus = null
+      localStatusOwner = null
+      deferredStatusRevision = null
+      completion = null
+      progressPosition = null
+      sourceSeekPosition = null
+      setPendingSeekPosition(position)
+      releaseAttachment()
+      loadedIdentity = null
+      loadedSet = null
+      attachedCapability = null
+      observedDeliveryInterruption = false
+      snapshot = null
+      // The negotiated delivery names the ended jobs; a new one is negotiated with the new start.
+      delivery = null
+      appliedRequest = requestRevision + 1
+      changeState('preparing')
+      refresh(true).catch(() => fail())
     }
 
     const readSeekState = (chain: PlaybackSeekChain, mode: SeekReconciliation['mode']) => {
@@ -565,6 +647,8 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, coor
               return
             }
           }
+          // The session accepted a control: it is held, so a later expiry is a new one.
+          if (snapshot?.sessionId === sessionId) restartUnproven = false
           if (chain && !owned()) { seekHandled = true; return }
           const { data } = response
           if (chain && uncertainSeek && data.data?.acceptedGeneration === undefined && seekChain === chain) {
@@ -627,10 +711,6 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, coor
       const load = pendingLoad
       if (load && snapshot?.ready && `${snapshot.jobId}:${snapshot.generation}:${snapshot.renditionSet}` === load.identity) {
         if (video.readyState < HTMLMediaElement.HAVE_METADATA) return
-        if (video.seeking && canonicalSeekRecovery !== seekIntentRevision) {
-          applyPlayback()
-          return
-        }
         // Seeking an already starting native HLS stream can flush its initial
         // buffer before the next fragment is available. Allow small native preroll.
         let nativeTarget = load.position
@@ -640,6 +720,16 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, coor
         // Ordinary seeks must wait for their actual target to become seekable.
         if (sourceEnd && Number.isFinite(video.duration) && video.duration > 0 && lastEnd !== null
           && nativeTarget > lastEnd && nativeTarget - lastEnd <= 0.1) nativeTarget = lastEnd
+        // A native seek to the source end can stay pending for good: the published media may end
+        // a few milliseconds short of the source duration, and nothing follows it. The element then
+        // stands at the end without ever reporting the seek done, so the restore settles without it.
+        const pendingAtSourceEnd = sourceEnd && video.seeking && sourceEndSeek?.attachment === attachmentRevision
+          && Math.abs(video.currentTime - nativeTarget) <= 0.05
+          && Date.now() - sourceEndSeek.since >= SOURCE_END_SEEK_GRACE_MS
+        if (video.seeking && canonicalSeekRecovery !== seekIntentRevision && !pendingAtSourceEnd) {
+          applyPlayback()
+          return
+        }
         const alreadyAtStart = nativeTarget === 0 && video.currentTime <= 0.05
         const atTarget = alreadyAtStart || Math.abs(video.currentTime - nativeTarget) <= 0.05
         const seekable = Array.from({ length: video.seekable.length }, (_, index) =>
@@ -660,9 +750,11 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, coor
         if (!atTarget || (video.seeking && canonicalSeekRecovery === seekIntentRevision)) {
           restoredPosition = nativeTarget
           video.currentTime = nativeTarget
+          if (sourceEnd && sourceEndSeek?.attachment !== attachmentRevision) sourceEndSeek = { attachment: attachmentRevision, since: Date.now() }
         }
         applyPlayback()
-        if (video.seeking || Math.abs(video.currentTime - nativeTarget) > 0.05) return
+        if ((video.seeking && !pendingAtSourceEnd) || Math.abs(video.currentTime - nativeTarget) > 0.05) return
+        settledWhileSeeking = video.seeking
         if (retiringPlayback?.attachment === attachmentRevision) {
           retiringPlayback = null
           applyPlayback()
@@ -723,8 +815,11 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, coor
       if (canControlStatus() && desiredStatus() === 'running') control('pause', sourceDuration)
       return true
     }
-    const replay = () => {
-      if (!completed() || !active() || terminal) return false
+    // Play on a movie that stands at its source end starts it again from zero. A player that
+    // reached the end itself remembers its completion; any other one, such as a fresh player
+    // prepared at the end, is told so by the caller.
+    const replay = (standsAtSourceEnd = false) => {
+      if ((!completed() && !standsAtSourceEnd) || !active() || terminal) return false
       completion = null
       playbackStarted = true
       retiringPlayback = { attachment: attachmentRevision, suppressPause: !video.paused }
@@ -792,6 +887,7 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, coor
         return
       }
       restoredPosition = null
+      settledWhileSeeking = false
     })
     video.addEventListener('seeking', () => {
       if (completed() && !video.paused && video.currentTime <= 0.05 && replay()) return
@@ -822,7 +918,8 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, coor
     const requestPlay = () => {
       if (!active() || terminal || recoveryFenced.current) return
       executionPermitted = true
-      if (replay()) return
+      // Without a transcode session the element restarts an ended source by itself.
+      if (replay(Boolean(snapshot?.sessionId) && !seekChain && atSourceEnd(cursor()))) return
       playbackStarted = true
       if (canControlStatus() && desiredStatus() === 'paused') control('resume')
       if (attachmentReady) playVideo()
@@ -864,7 +961,8 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, coor
     const ready = async (signal: AbortSignal) => {
       await waitFor(() => {
         restorePendingLoad()
-        return attachmentReady && attachmentRestored && !pendingLoad && !seekChain && sourceSeekPosition === null && !video.seeking
+        return attachmentReady && attachmentRestored && !pendingLoad && !seekChain && sourceSeekPosition === null
+          && (!video.seeking || settledWhileSeeking)
       }, signal)
     }
     const locallyControlled = () => recoverySupported && coordinated && video.disableRemotePlayback
@@ -890,6 +988,17 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, coor
       },
       ready,
       observe,
+      prepare: async (position, playing, signal) => {
+        signal.throwIfAborted()
+        await waitFor(() => snapshot !== null, signal)
+        // Without a transcode session the element is its own clock and has to be loaded first.
+        if (snapshot?.sessionId === null) await ready(signal)
+        else await waitFor(() => sourceDuration > 0, signal)
+        // Playing from the source end is a replay; a paused cursor stays at the end.
+        const target = playing && atSourceEnd(position) ? 0 : sourceDuration > 0 ? Math.max(0, Math.min(sourceDuration, position)) : position
+        if (Math.abs(cursor() - target) > 0.05) await execution.execute('seek', target, signal)
+        else await ready(signal)
+      },
       execute: async (action, value, signal) => {
         signal.throwIfAborted()
         const epoch = executionEpoch
@@ -900,7 +1009,15 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, coor
           cleanup()
           return { ...observation, observedState: 'stopped' }
         }
-        await ready(signal)
+        // A seek names a new target, so it does not wait for a restore of the old one to settle;
+        // it needs the session's duration, which arrives with the first prepared snapshot.
+        if (action !== 'seek') await ready(signal)
+        else {
+          await waitFor(() => snapshot !== null, signal)
+          // Without a transcode session the element is its own clock and has to be loaded first.
+          if (snapshot?.sessionId === null) await ready(signal)
+          else await waitFor(() => sourceDuration > 0, signal)
+        }
         const cancel = () => {
           executionEpoch++
           executionPermitted = false
@@ -951,6 +1068,7 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, coor
       if (recoveryFenced.current) return
       if (snapshot?.sessionId === null && recoveryPosition === null && (!attachedCapability || Date.now() < attachedCapability.renewAt)) return
       control('progress')
+      restorePendingLoad()
       refresh().catch(() => fail())
     }, 1000)
     const cleanup = () => {
@@ -998,6 +1116,7 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, coor
       },
     },
     ready: signal => executionRef.current?.ready(signal) ?? Promise.reject(new Error('Video runtime is unavailable.')),
+    prepare: (position, playing, signal) => executionRef.current?.prepare(position, playing, signal) ?? Promise.reject(new Error('Video runtime is unavailable.')),
     execute: (action, value, signal) => executionRef.current?.execute(action, value, signal) ?? Promise.reject(new Error('Video runtime is unavailable.')),
     quiesce: signal => executionRef.current?.quiesce(signal) ?? Promise.resolve({ observedState: 'stopped', position: 0 }),
     observe: () => executionRef.current?.observe() ?? { observedState: 'stopped', position: 0 },

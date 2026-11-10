@@ -20,6 +20,7 @@ use App\Transcode\Domain\ValueObject\AudioStreamInfo;
 use App\Transcode\Domain\ValueObject\SubtitleTrackInfo;
 use App\Transcode\Domain\ValueObject\VideoProbeResult;
 use App\Transcode\Infrastructure\DASH\DashManifestGenerator;
+use App\Transcode\Infrastructure\FFmpeg\SegmentEncoder;
 use App\Transcode\Infrastructure\HLS\ManifestGenerator;
 use App\Transcode\Infrastructure\HLS\QualityLadderRenderer;
 use App\Transcode\Infrastructure\Packaging\PublishedPresentation;
@@ -32,6 +33,17 @@ use App\Transcode\Infrastructure\Packaging\PublishedTrack;
  */
 final class TranscodeStreamingService implements TranscodeStreamingPortInterface
 {
+    /**
+     * Published segments a growing sibling must lead the cursor by before it is offered. Three
+     * segments stay below the lead at which a throttled encoder resumes, so a healthy encoder
+     * always qualifies, and two segments above the stay lead, because the lead of an encoder
+     * running at real time swings by one segment with every publication.
+     */
+    public const int JOIN_LEAD_SEGMENTS = 3;
+    /** Lead, in published segments, at which an attached sibling is withdrawn. */
+    public const int STAY_LEAD_SEGMENTS = 1;
+    private const float SOURCE_END_TOLERANCE_SECONDS = 0.1;
+
     public function __construct(
         private readonly TranscodeJobRepositoryInterface $jobRepository,
         private readonly TranscodeStoragePortInterface $storage,
@@ -43,31 +55,34 @@ final class TranscodeStreamingService implements TranscodeStreamingPortInterface
         private readonly PublishedPresentationReader $presentationReader,
     ) {}
 
-    public function getPlaybackState(Uuid $videoId, array $allowedJobPublicIds): ?array
+    public function getPlaybackState(Uuid $videoId, array $allowedJobPublicIds, array $attachedRenditions = []): ?array
     {
         $jobs = $this->allowedJobs($videoId, $allowedJobPublicIds);
         if ($jobs === []) {
             return null;
         }
         $primary = $jobs[0];
-        $runtime = $this->ownership->find($primary->getId());
+        $group = $this->contexts($jobs);
+        $runtime = $group['admitted'][$primary->getId()->toString()] ?? null;
         if ($runtime === null) {
             return null;
         }
-        $canonical = $this->context($primary, $runtime->generation);
+        $canonical = $group['contexts'][$primary->getId()->toString()];
         $pairs = [];
+        // The session's primary rendition alone decides readiness, by covering the cursor.
         if ($canonical !== null && $this->coversCursor($canonical)) {
-            foreach ($jobs as $job) {
-                $current = $this->ownership->find($job->getId());
-                $context = $current === null ? null : $this->context($job, $current->generation);
-                if ($context !== null && $this->compatible($canonical, $context) && $this->coversCursor($context) && $this->canMerge($canonical, $context)) {
-                    $pairs[] = ['jobId' => $job->getPublicId()->toString(), 'generation' => $context['runtime']->generation];
+            $pairs[] = ['jobId' => $primary->getPublicId()->toString(), 'generation' => $canonical['runtime']->generation];
+            $attached = array_column($attachedRenditions, 'generation', 'jobId');
+            foreach (array_slice($jobs, 1) as $job) {
+                $context = $group['contexts'][$job->getId()->toString()];
+                if ($context === null || !$this->compatible($canonical, $context) || !$this->canMerge($canonical, $context)) {
+                    continue;
+                }
+                $generation = $context['runtime']->generation;
+                if ($this->offersSibling($context, ($attached[$job->getPublicId()->toString()] ?? null) === $generation)) {
+                    $pairs[] = ['jobId' => $job->getPublicId()->toString(), 'generation' => $generation];
                 }
             }
-        }
-        // The selected session remains primary while other renditions warm up.
-        if (!in_array($primary->getPublicId()->toString(), array_column($pairs, 'jobId'), true)) {
-            $pairs = [];
         }
         $runtime = $canonical['runtime'] ?? $runtime;
         return [
@@ -309,11 +324,43 @@ final class TranscodeStreamingService implements TranscodeStreamingPortInterface
     private function context(TranscodeJob $job, int $generation): ?array
     {
         $runtime = $generation < 1 ? null : $this->ownership->find($job->getId());
-        if ($runtime === null) {
-            return null;
+        $published = $runtime === null ? null : $this->published($job, $generation, $runtime);
+        return $published === null ? null : $this->fenced($published, $generation, $this->ownership->find($job->getId()));
+    }
+
+    /**
+     * Resolves several renditions against one committed runtime state. The jobs' runtimes are read in
+     * one statement before their indexes and in one statement after them, so a control that moves
+     * every sibling's cursor together can never be seen for some renditions and not for others.
+     *
+     * @param list<TranscodeJob> $jobs
+     * @param array<string, int> $generations Pinned generation by job id; the current one when absent.
+     * @return array{admitted: array<string, TranscodeRuntimeSnapshot>, contexts: array<string, Context|null>}
+     */
+    private function contexts(array $jobs, array $generations = []): array
+    {
+        $ids = array_map(static fn (TranscodeJob $job): Uuid => $job->getId(), $jobs);
+        $admitted = $this->ownership->findGroup($ids);
+        $published = [];
+        foreach ($jobs as $job) {
+            $key = $job->getId()->toString();
+            $runtime = $admitted[$key] ?? null;
+            $generation = $generations[$key] ?? ($runtime === null ? 0 : $runtime->generation);
+            $published[$key] = $runtime === null || $generation < 1 ? null : $this->published($job, $generation, $runtime);
         }
+        $latest = $this->ownership->findGroup($ids);
+        $contexts = [];
+        foreach ($published as $key => $context) {
+            $contexts[$key] = $context === null ? null
+                : $this->fenced($context, $generations[$key] ?? $admitted[$key]->generation, $latest[$key] ?? null);
+        }
+        return ['admitted' => $admitted, 'contexts' => $contexts];
+    }
+
+    /** @return Context|null */
+    private function published(TranscodeJob $job, int $generation, TranscodeRuntimeSnapshot $runtime): ?array
+    {
         try {
-            $tier = $job->getPresentationSelection()?->mode === 'copy' ? null : QualityTier::fromString($job->getQualityTierName());
             $storage = $this->storage->forGeneration($job->getVideoId(), $job->getQualityTierName(), $generation, $job->getId());
             $directory = $storage->resolveJobDirectory($job->getVideoId(), $job->getQualityTierName());
             if (!$this->readable($runtime, $generation, $directory)) {
@@ -337,13 +384,7 @@ final class TranscodeStreamingService implements TranscodeStreamingPortInterface
                 || (($metadata['audioCodec'] !== null) !== ($presentation->track(MediaTrack::Audio) !== null))) {
                 return null;
             }
-            $latest = $this->ownership->find($job->getId());
-            // Position telemetry advances revisions without replacing the encoded media.
-            if ($latest === null || !$this->readable($latest, $generation, $directory)
-                || $latest->desired->audioProfile->jsonSerialize() !== $runtime->desired->audioProfile->jsonSerialize()) {
-                return null;
-            }
-            return ['runtime' => $latest, 'storage' => $storage, 'directory' => $directory, 'presentation' => $presentation,
+            return ['runtime' => $runtime, 'storage' => $storage, 'directory' => $directory, 'presentation' => $presentation,
                 'metadata' => ['audioCodec' => $metadata['audioCodec'], 'audioProfile' => $metadata['audioProfile'],
                     'duration' => (float) $metadata['duration'], 'startTime' => (float) $metadata['startTime'],
                     'hlsTargetDuration' => (float) ($metadata['hlsTargetDuration'] ?? 7.0),
@@ -351,6 +392,22 @@ final class TranscodeStreamingService implements TranscodeStreamingPortInterface
         } catch (\InvalidArgumentException|\JsonException) {
             return null;
         }
+    }
+
+    /**
+     * Accepts an index only when the runtime read after it still owns the same generation and audio.
+     *
+     * @param Context $context
+     * @return Context|null
+     */
+    private function fenced(array $context, int $generation, ?TranscodeRuntimeSnapshot $latest): ?array
+    {
+        // Position telemetry advances revisions without replacing the encoded media.
+        if ($latest === null || !$this->readable($latest, $generation, $context['directory'])
+            || $latest->desired->audioProfile->jsonSerialize() !== $context['runtime']->desired->audioProfile->jsonSerialize()) {
+            return null;
+        }
+        return ['runtime' => $latest] + $context;
     }
 
     /** @param list<string> $allowedJobPublicIds
@@ -387,10 +444,15 @@ final class TranscodeStreamingService implements TranscodeStreamingPortInterface
         if (count($jobs) !== count($pairs)) {
             return null;
         }
-        $generations = array_column($pairs, 'generation', 'jobId');
+        $pinned = array_column($pairs, 'generation', 'jobId');
+        $generations = [];
+        foreach ($jobs as $job) {
+            $generations[$job->getId()->toString()] = $pinned[$job->getPublicId()->toString()];
+        }
+        $contexts = $this->contexts($jobs, $generations)['contexts'];
         $entries = []; $first = null;
         foreach ($jobs as $job) {
-            $context = $this->context($job, $generations[$job->getPublicId()->toString()]);
+            $context = $contexts[$job->getId()->toString()];
             if ($context === null || ($first !== null && (!$this->compatible($first, $context) || !$this->canMerge($first, $context)))) {
                 return null;
             }
@@ -398,6 +460,38 @@ final class TranscodeStreamingService implements TranscodeStreamingPortInterface
             $entries[] = ['job' => $job, 'context' => $context];
         }
         return $entries;
+    }
+
+    /**
+     * Decides whether a sibling of the primary rendition belongs to the signed set.
+     *
+     * A growing sibling is offered once its published end leads the cursor by the join lead, so a
+     * player that switches to it does not run into its edge. One the player already has attached
+     * stays until that lead has shrunk to the stay lead, and is then withdrawn before the player
+     * reaches its edge. A finished presentation, and one published up to the source end, needs no lead.
+     *
+     * @param Context $context
+     */
+    private function offersSibling(array $context, bool $attached): bool
+    {
+        if (!$this->coversCursor($context)) {
+            return false;
+        }
+        if ($context['presentation']->complete) {
+            return true;
+        }
+        $position = $context['runtime']->desired->position - $context['metadata']['startTime'];
+        $end = INF;
+        foreach ([MediaTrack::Video, ...($context['metadata']['audioCodec'] !== null ? [MediaTrack::Audio] : [])] as $kind) {
+            $end = min($end, $context['presentation']->track($kind)?->end() ?? 0.0);
+        }
+        $lead = $end - $position;
+        $remaining = $context['metadata']['duration'] - $context['runtime']->desired->position;
+        if ($lead >= $remaining - self::SOURCE_END_TOLERANCE_SECONDS) {
+            return true;
+        }
+        $segment = SegmentEncoder::getSegmentDuration();
+        return $attached ? $lead > self::STAY_LEAD_SEGMENTS * $segment : $lead >= self::JOIN_LEAD_SEGMENTS * $segment;
     }
 
     /** @param Context $context */
