@@ -94,6 +94,31 @@ final readonly class PlaybackStore implements PlaybackStoreInterface
                 'ackRevision' => $session->revision() - 1]) !== false;
     }
 
+    public function retireConfirmedStoppedBrowser(ListeningSession $session): bool
+    {
+        // The caller holds the account/session lock, and this covers managed browser execution only,
+        // as for a confirmed paused browser. No acknowledged command is required as proof: a session
+        // that never played has none, and while a stop is wanted and no command or transfer is
+        // outstanding, nothing can have restarted the runner after its own stop report.
+        if ($session->activeIncarnationId() === null || $session->desiredState() !== PlaybackState::Stopped
+            || $session->observedState() !== ObservedPlaybackState::Stopped) {
+            return false;
+        }
+        return $this->connection()->fetchOne(<<<'SQL'
+            UPDATE playback_destination_incarnations i SET retired_at=coalesce(i.retired_at,CURRENT_TIMESTAMP)
+            FROM playback_destinations d
+            WHERE i.id=:incarnation AND i.user_id=:owner AND d.id=i.destination_id AND d.kind='browser'
+                AND (i.expires_at<=CURRENT_TIMESTAMP OR i.retired_at IS NOT NULL)
+                AND i.observed_state='stopped'
+                AND NOT EXISTS (SELECT 1 FROM playback_commands pending
+                    WHERE pending.session_id=:session AND pending.acknowledged_at IS NULL)
+                AND NOT EXISTS (SELECT 1 FROM playback_transfers transfer
+                    WHERE transfer.session_id=:session AND transfer.state NOT IN ('committed','failed'))
+            RETURNING i.id
+            SQL, ['incarnation' => $session->activeIncarnationId()->toString(),
+                'owner' => $session->getUserId()->toString(), 'session' => $session->getId()->toString()]) !== false;
+    }
+
     public function register(string $userId, array $input): array
     {
         $deviceId = Uuid::fromString($input['deviceId'])->toString();

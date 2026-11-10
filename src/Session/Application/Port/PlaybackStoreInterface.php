@@ -13,6 +13,8 @@ interface PlaybackStoreInterface
     public function saveSession(ListeningSession $session): void;
     /** Retire only unavailable managed browser execution with a durable, fenced quiescence acknowledgement. */
     public function retireConfirmedPausedBrowser(ListeningSession $session): bool;
+    /** Retire only unavailable managed browser execution that last reported itself stopped, with no command or transfer outstanding. */
+    public function retireConfirmedStoppedBrowser(ListeningSession $session): bool;
     /**
      * @param array<string,mixed> $input
      * @return array<string,mixed>

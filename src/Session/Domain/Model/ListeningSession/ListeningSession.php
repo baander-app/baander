@@ -220,6 +220,21 @@ final class ListeningSession
         if ($this->state->desiredState !== PlaybackState::Paused || $this->state->observedState !== ObservedPlaybackState::Paused) {
             throw new \DomainException('Only confirmed paused execution can release its runner.');
         }
+        $this->releaseRunner();
+    }
+
+    /** A runner that confirmed its stop and has since gone leaves the session stopped at its cursor,
+     *  without an executor, so another destination can start playback. */
+    public function releaseConfirmedStoppedRunner(): void
+    {
+        if ($this->state->desiredState !== PlaybackState::Stopped || $this->state->observedState !== ObservedPlaybackState::Stopped) {
+            throw new \DomainException('Only confirmed stopped execution can release its runner.');
+        }
+        $this->releaseRunner();
+    }
+
+    private function releaseRunner(): void
+    {
         $this->state->activeIncarnationId = null;
         $this->state->selectedDestinationId = null;
         $this->advanceRevision();

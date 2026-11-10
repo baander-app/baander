@@ -724,17 +724,26 @@ final class PlaybackTransferPersistenceTest extends TestCase
         $old = $service->execute($owner, PlaybackOperation::Endpoint, $registration)['endpoint'];
         $snapshot = $this->activate($service, $owner, $old);
         $stopped = $service->execute($owner, PlaybackOperation::Observe, ['incarnationId' => $old['incarnationId'], 'expectedRevision' => $snapshot['revision'], 'observedState' => 'stopped', 'position' => 71.625], $old['capability']);
-        self::assertNull($stopped['activeIncarnationId']);
-        self::assertSame('paused', $stopped['desiredState']);
+        // The session never played, so the stop is the state it wants and the registered runner keeps its place.
+        self::assertSame($old['incarnationId'], $stopped['activeIncarnationId']);
+        self::assertSame('stopped', $stopped['desiredState']);
+        self::assertSame('stopped', $stopped['observedState']);
         self::assertSame(71.625, $stopped['position']);
-        self::assertSame($snapshot['revision'] + 1, $stopped['revision']);
+        self::assertSame($snapshot['revision'], $stopped['revision']);
         $new = $service->execute($owner, PlaybackOperation::Endpoint, $registration)['endpoint'];
         self::assertNotSame($old['incarnationId'], $new['incarnationId']);
         self::assertNotSame($old['capability'], $new['capability']);
         self::assertSame($old['epoch'] + 1, $new['epoch']);
+        // Registering the same endpoint again retired the old incarnation; its stop report releases the session.
         $snapshot = $service->execute($owner, PlaybackOperation::Snapshot, []);
         self::assertCount(1, $snapshot['destinations']);
         self::assertSame($new['incarnationId'], $snapshot['destinations'][0]['incarnationId']);
+        self::assertNull($snapshot['activeIncarnationId']);
+        self::assertNull($snapshot['selectedDestinationId']);
+        self::assertSame('stopped', $snapshot['desiredState']);
+        self::assertSame('stopped', $snapshot['observedState']);
+        self::assertSame(71.625, $snapshot['position']);
+        self::assertSame($stopped['revision'] + 1, $snapshot['revision']);
         $snapshot = $service->execute($owner, PlaybackOperation::Transfer, ['requestId' => new Uuid()->toString(), 'expectedRevision' => $snapshot['revision'], 'targetIncarnationId' => $new['incarnationId']]);
         self::assertNull($snapshot['transfer']['sourceIncarnationId']);
         self::assertSame(71.625, $snapshot['position']);
@@ -743,6 +752,78 @@ final class PlaybackTransferPersistenceTest extends TestCase
         self::assertSame('start', $start['type']);
         self::assertSame(71.625, $start['payload']['position']);
         self::assertSame([], $this->pending($service, $owner, $old)['commands']);
+    }
+
+    public function testADeliberatelyStoppedRunnerIsReleasedOnlyAfterItsRegistrationLapses(): void
+    {
+        $owner = $this->createUser();
+        $service = $this->coordinator();
+        $runner = $this->endpoint($service, $owner);
+        $stopped = $this->playThenStop($service, $owner, $runner);
+        self::assertSame($runner['incarnationId'], $stopped['activeIncarnationId']);
+        self::assertSame('stopped', $stopped['desiredState']);
+        self::assertSame('stopped', $stopped['observedState']);
+
+        $other = $this->endpoint($service, $owner);
+        $live = $this->pending($service, $owner, $other);
+        self::assertSame($runner['incarnationId'], $live['activeIncarnationId']);
+        self::assertSame($stopped['revision'], $live['revision']);
+        self::assertNull($this->observer->fetchOne('SELECT retired_at FROM playback_destination_incarnations WHERE id=?', [$runner['incarnationId']]));
+
+        $this->manager->getConnection()->executeStatement("UPDATE playback_destination_incarnations SET expires_at=CURRENT_TIMESTAMP-INTERVAL '1 second' WHERE id=:id", ['id' => $runner['incarnationId']]);
+        $released = $this->pending($service, $owner, $other);
+        self::assertNull($released['activeIncarnationId']);
+        self::assertNull($released['activeDestinationId']);
+        self::assertNull($released['selectedDestinationId']);
+        self::assertSame('stopped', $released['desiredState']);
+        self::assertSame('stopped', $released['observedState']);
+        self::assertSame(42.5, $released['position']);
+        self::assertSame($stopped['revision'] + 1, $released['revision']);
+        self::assertNotNull($this->observer->fetchOne('SELECT retired_at FROM playback_destination_incarnations WHERE id=?', [$runner['incarnationId']]));
+        self::assertSame($released['revision'], $this->pending($service, $owner, $other)['revision']);
+
+        $transfer = $service->execute($owner, PlaybackOperation::Transfer, ['requestId' => new Uuid()->toString(), 'expectedRevision' => $released['revision'], 'targetIncarnationId' => $other['incarnationId']]);
+        self::assertNull($transfer['transfer']['sourceIncarnationId']);
+        self::assertSame(42.5, $transfer['position']);
+        self::assertSame([], $this->pending($service, $owner, $runner)['commands']);
+    }
+
+    public function testALapsedStoppedRunnerKeepsItsPlaceWithoutItsOwnStopReportOrWithWorkOutstanding(): void
+    {
+        $service = $this->coordinator();
+        $connection = $this->manager->getConnection();
+        $changes = [
+            "UPDATE playback_destination_incarnations SET observed_state='playing' WHERE id=:incarnation",
+            "UPDATE playback_destination_incarnations SET observed_state='unknown' WHERE id=:incarnation",
+            "UPDATE playback_destinations SET kind='cast' WHERE id=(SELECT destination_id FROM playback_destination_incarnations WHERE id=:incarnation)",
+            "UPDATE playback_commands SET acknowledged_at=NULL,outcome=NULL,expires_at=CURRENT_TIMESTAMP+INTERVAL '1 hour' WHERE incarnation_id=:incarnation AND type='stop'",
+            "UPDATE listening_sessions SET observed_state='unknown' WHERE active_incarnation_id=:incarnation",
+            "UPDATE listening_sessions SET desired_state='playing',playback_state='playing' WHERE active_incarnation_id=:incarnation",
+        ];
+        foreach ($changes as $change) {
+            $owner = $this->createUser();
+            $runner = $this->endpoint($service, $owner);
+            $stopped = $this->playThenStop($service, $owner, $runner);
+            $connection->executeStatement("UPDATE playback_destination_incarnations SET expires_at=CURRENT_TIMESTAMP-INTERVAL '1 second' WHERE id=:id", ['id' => $runner['incarnationId']]);
+            $connection->executeStatement($change, ['incarnation' => $runner['incarnationId']]);
+            $snapshot = $service->execute($owner, PlaybackOperation::Snapshot, []);
+            self::assertSame($runner['incarnationId'], $snapshot['activeIncarnationId'], $change);
+            self::assertSame($stopped['revision'], $snapshot['revision'], $change);
+            self::assertNull($this->observer->fetchOne('SELECT retired_at FROM playback_destination_incarnations WHERE id=?', [$runner['incarnationId']]), $change);
+        }
+    }
+
+    /**
+     * @param array<string,mixed> $runner
+     * @return array<string,mixed>
+     */
+    private function playThenStop(PlaybackCoordinator $service, Uuid $owner, array $runner): array
+    {
+        $snapshot = $this->activate($service, $owner, $runner);
+        $service->execute($owner, PlaybackOperation::Control, ['requestId' => new Uuid()->toString(), 'expectedRevision' => $snapshot['revision'], 'action' => 'play']);
+        $snapshot = $this->ack($service, $owner, $runner, $this->pending($service, $owner, $runner)['commands'][0], 'playing', 42.5);
+        $service->execute($owner, PlaybackOperation::Control, ['requestId' => new Uuid()->toString(), 'expectedRevision' => $snapshot['revision'], 'action' => 'stop']);
+        return $this->ack($service, $owner, $runner, $this->pending($service, $owner, $runner)['commands'][0], 'stopped', 0.0);
     }
 
     public function testRejectedTransferReasonSurvivesLaterTransfersAndExactReplay(): void

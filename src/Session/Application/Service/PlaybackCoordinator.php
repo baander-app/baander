@@ -144,7 +144,8 @@ final readonly class PlaybackCoordinator implements PlaybackCoordinationInterfac
                             // A runner that stops without being told to has lost its playback, as after
                             // an outage that outlived its registration. Its own stop report is the proof
                             // its silence needs: the session continues without an executor, so the same
-                            // browser can start again. A deliberate stop keeps its runner and selection.
+                            // browser can start again. A deliberate stop keeps its runner and selection
+                            // for as long as that runner stays registered.
                             $session->releaseStoppedRunner($position);
                         } else {
                             $session->observePlayback(ObservedPlaybackState::from($state), $position);
@@ -225,11 +226,21 @@ final readonly class PlaybackCoordinator implements PlaybackCoordinationInterfac
                     $this->persistTransfer($session, $transfer, $this->model($transfer));
                     break;
                 case PlaybackOperation::Snapshot:
-                    if ($transfer === null && $session->activeIncarnationId() !== null
-                        && $session->desiredState() === PlaybackState::Paused
+                    if ($transfer !== null || $session->activeIncarnationId() === null) {
+                        break;
+                    }
+                    if ($session->desiredState() === PlaybackState::Paused
                         && $session->observedState() === ObservedPlaybackState::Paused
                         && $this->store->retireConfirmedPausedBrowser($session)) {
                         $session->releaseConfirmedPausedRunner();
+                    } elseif ($session->desiredState() === PlaybackState::Stopped
+                        && $session->observedState() === ObservedPlaybackState::Stopped
+                        && $this->store->retireConfirmedStoppedBrowser($session)) {
+                        // A deliberately stopped runner keeps its place only while it stays registered.
+                        // Once it has gone, no destination carries it and every client would be refused
+                        // playback for good, so the session continues stopped at its cursor without an
+                        // executor.
+                        $session->releaseConfirmedStoppedRunner();
                     }
                     break;
                 default:
