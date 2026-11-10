@@ -1,6 +1,6 @@
 # app:transcode:job:cleanup
 
-Remove the transcode jobs that no session uses any more, together with their transcoded output. The command does what `POST /api/transcode/jobs/cleanup` does in the admin API.
+End the transcode sessions whose client has gone, then remove the transcode jobs that no session uses any more, together with their transcoded output. The command does what `POST /api/transcode/jobs/cleanup` does in the admin API.
 
 ## Quick start
 
@@ -22,13 +22,17 @@ make exec cmd="php bin/console app:transcode:job:cleanup --json"
 
 ## Details
 
-A transcode job holds the segments of one video at one quality tier. Sessions share jobs, so a job stays after its last session ends. The command finds each job without a session, deletes its output directory and then the job itself, and prints how many jobs it removed, such as `Removed 3 orphaned transcode jobs.`
+A transcode job holds the segments of one video at one quality tier. A job stays after its last session ends. The command finds each job without a session, deletes its output directory and then the job itself, and prints what it did, such as `Expired 2 stale transcode sessions and removed 3 orphaned transcode jobs.`
 
-The command runs the same use case as the API and as the scheduled `CleanupOrphanedJobsCommand`. Deleting an output directory is best effort: a directory that cannot be deleted does not stop the job from being removed. A later session for the same video and tier transcodes it again.
+A client that closes without cancelling leaves its session behind, and the session keeps its job: the worker holds the encode at the lead throttle and keeps its transcode slot. The command first expires each stale session. A session is stale when no playback report and no stream signing has touched it for 24 hours, the longest lifetime of a signed stream URL, and its presentation is not finished. A paused player renews its stream URL, so it does not expire. Expiry cancels the encode, ends the session and releases the job.
 
-The command asks for no confirmation: it removes only output that no session uses and that a new session can rebuild.
+A job whose worker has not yet stopped the cancelled encode stays for the next run, so a job released by expiry is usually removed one run later. The worker stops within seconds.
 
-With `--json` the command prints only `{"cleaned": 3}`, the API's `data` object with the number of jobs removed.
+The command runs the same use case as the API and as the scheduled `CleanupOrphanedJobsCommand`. A job whose output directory is still retained or cannot be deleted stays for a later run. After a job is removed, a later session for the same video and tier transcodes it again.
+
+The command asks for no confirmation: it ends only sessions no client can still be playing, and removes only output that no session uses and that a new session can rebuild.
+
+With `--json` the command prints only `{"expired": 2, "cleaned": 3}`, the API's `data` object with the number of sessions expired and jobs removed.
 
 ## Exit codes
 

@@ -133,7 +133,7 @@ final class TranscodeSessionOwnershipPersistenceTest extends TestCase
             new \App\Transcode\Infrastructure\Transcode\TranscodeSessionService($sessions),
             $runtime,
             $transaction,
-            new \App\Transcode\Infrastructure\Transcode\TranscodeJobService($jobs, $this->createStub(\App\Transcode\Application\Port\TranscodeStoragePortInterface::class), new \Symfony\Component\EventDispatcher\EventDispatcher()),
+            new \App\Transcode\Infrastructure\Transcode\TranscodeJobService($jobs, $this->createStub(\App\Transcode\Application\Port\TranscodeStoragePortInterface::class), new \Symfony\Component\EventDispatcher\EventDispatcher(), $runtime),
         );
         $controlled = [];
         $protected = [];
@@ -200,6 +200,115 @@ final class TranscodeSessionOwnershipPersistenceTest extends TestCase
                 self::assertSame($operation === 'cancel' ? 'cancelled' : 'in_progress', $job->getStatus()->value);
             }
         }
+    }
+
+    public function testAbandonedSessionExpiresAndItsJobIsReclaimedWhileAFreshSessionStays(): void
+    {
+        $owner = $this->createUser();
+        $video = $this->createVideo();
+        $jobs = new \App\Transcode\Infrastructure\Doctrine\Repository\TranscodeJobRepository($this->manager);
+        $sessions = new TranscodeSessionRepository($this->manager);
+        $connection = $this->manager->getConnection();
+        $transaction = new class($connection) implements \App\Shared\Application\Port\TransactionPortInterface {
+            public function __construct(private readonly \Doctrine\DBAL\Connection $connection) {}
+            public function run(callable $operation): mixed { return $this->connection->transactional(static fn (): mixed => $operation()); }
+        };
+        $runtime = new \App\Transcode\Infrastructure\Doctrine\TranscodeRuntimeState($connection, $transaction);
+        $storage = $this->createMock(\App\Transcode\Application\Port\TranscodeStoragePortInterface::class);
+        $jobService = new \App\Transcode\Infrastructure\Transcode\TranscodeJobService($jobs, $storage, new \Symfony\Component\EventDispatcher\EventDispatcher(), $runtime);
+        $expiry = new \App\Transcode\Application\Service\StaleTranscodeSessionExpiry(
+            new \App\Transcode\Infrastructure\Transcode\TranscodeSessionService($sessions), $runtime, $jobService, $transaction, new \Symfony\Component\Clock\NativeClock(),
+        );
+        $handler = new \App\Transcode\Application\CommandHandler\CleanupOrphanedJobsHandler($jobService, $expiry);
+        $ids = [];
+        foreach (['abandoned' => \App\Transcode\Domain\ValueObject\QualityTier::p360(), 'fresh' => \App\Transcode\Domain\ValueObject\QualityTier::p720()] as $name => $tier) {
+            $job = \App\Transcode\Domain\Model\TranscodeJob::create($video, $tier, '/fixture/' . $name, $owner, requestId: $name . '-client');
+            $job->attachSession();
+            $job->markInProgress();
+            $jobs->save($job);
+            $session = TranscodeSession::create($owner, $job->getId(), $video, AudioProfile::streamingStereo());
+            $session->markPreparing();
+            $session->markActive();
+            $sessions->save($session);
+            $connection->transactional(static fn () => $runtime->admit($job->getId(), $session->getId(), $name . '-client', new \App\Transcode\Application\DTO\DesiredTranscodeState(AudioProfile::streamingStereo(), position: 118.86)));
+            $ids[$name] = [$job->getId(), $session->getId()];
+        }
+        // The abandoned client last reported or signed just over a day ago.
+        $connection->executeStatement("UPDATE transcode_sessions SET updated_at = clock_timestamp() - interval '24 hours 1 minute' WHERE id = ?", [$ids['abandoned'][1]->toString()]);
+        $connection->executeStatement("UPDATE transcode_sessions SET updated_at = clock_timestamp() - interval '23 hours' WHERE id = ?", [$ids['fresh'][1]->toString()]);
+        $this->manager->clear();
+        $storage->expects(self::once())->method('deleteIfUnretained')->with('/fixture/abandoned')->willReturn(true);
+
+        self::assertSame(['expired' => 1, 'cleaned' => 1], $handler(new \App\Transcode\Application\Command\CleanupOrphanedJobsCommand()));
+
+        $this->manager->clear();
+        // The job went with its output; its session and execution rows cascade with it.
+        self::assertNull($jobs->findByUuid($ids['abandoned'][0]));
+        self::assertNull($sessions->findByUuid($ids['abandoned'][1]));
+        self::assertNull($runtime->find($ids['abandoned'][0]));
+        $kept = $runtime->find($ids['fresh'][0]);
+        self::assertNotNull($kept);
+        self::assertSame('running', $kept->desired->status);
+        self::assertSame('pending', $kept->outcome);
+        self::assertSame(SessionState::Active, $sessions->findByUuid($ids['fresh'][1])?->getSessionState());
+        self::assertSame(1, $jobs->findByUuid($ids['fresh'][0])?->getReferenceCount());
+    }
+
+    public function testExpiryCancelsTheExecutionAWorkerHoldsAndCleanupWaitsForTheWorkerToLetGo(): void
+    {
+        $owner = $this->createUser();
+        $video = $this->createVideo();
+        $jobs = new \App\Transcode\Infrastructure\Doctrine\Repository\TranscodeJobRepository($this->manager);
+        $sessions = new TranscodeSessionRepository($this->manager);
+        $connection = $this->manager->getConnection();
+        $transaction = new class($connection) implements \App\Shared\Application\Port\TransactionPortInterface {
+            public function __construct(private readonly \Doctrine\DBAL\Connection $connection) {}
+            public function run(callable $operation): mixed { return $this->connection->transactional(static fn (): mixed => $operation()); }
+        };
+        $runtime = new \App\Transcode\Infrastructure\Doctrine\TranscodeRuntimeState($connection, $transaction);
+        $storage = $this->createMock(\App\Transcode\Application\Port\TranscodeStoragePortInterface::class);
+        $jobService = new \App\Transcode\Infrastructure\Transcode\TranscodeJobService($jobs, $storage, new \Symfony\Component\EventDispatcher\EventDispatcher(), $runtime);
+        $handler = new \App\Transcode\Application\CommandHandler\CleanupOrphanedJobsHandler($jobService, new \App\Transcode\Application\Service\StaleTranscodeSessionExpiry(
+            new \App\Transcode\Infrastructure\Transcode\TranscodeSessionService($sessions), $runtime, $jobService, $transaction, new \Symfony\Component\Clock\NativeClock(),
+        ));
+        $job = \App\Transcode\Domain\Model\TranscodeJob::create($video, \App\Transcode\Domain\ValueObject\QualityTier::p1080(), '/fixture/held', $owner, requestId: 'held-client');
+        $job->attachSession();
+        $job->markInProgress();
+        $jobs->save($job);
+        $session = TranscodeSession::create($owner, $job->getId(), $video, AudioProfile::streamingStereo());
+        $session->markPreparing();
+        $session->markActive();
+        $sessions->save($session);
+        $connection->transactional(static fn () => $runtime->admit($job->getId(), $session->getId(), 'held-client', new \App\Transcode\Application\DTO\DesiredTranscodeState(AudioProfile::streamingStereo())));
+        // A worker holds the execution with a live lease, as it does at the lead throttle.
+        $claim = $runtime->claim($job->getId(), new \App\Transcode\Application\DTO\MediaWorkerIdentity('baander.app:workers', str_repeat('a', 32), 'media', 1));
+        self::assertNotNull($claim);
+        $connection->executeStatement("UPDATE transcode_sessions SET updated_at = clock_timestamp() - interval '2 days' WHERE id = ?", [$session->getId()->toString()]);
+        $this->manager->clear();
+        $storage->expects(self::once())->method('deleteIfUnretained')->with('/fixture/held')->willReturn(true);
+
+        self::assertSame(['expired' => 1, 'cleaned' => 0], $handler(new \App\Transcode\Application\Command\CleanupOrphanedJobsCommand()));
+
+        $this->manager->clear();
+        $cancelled = $runtime->find($job->getId());
+        self::assertNotNull($cancelled);
+        self::assertSame('cancelled', $cancelled->desired->status);
+        self::assertSame('cancelled', $cancelled->outcome);
+        self::assertTrue($cancelled->ownershipLive);
+        self::assertSame(SessionState::Cancelled, $sessions->findByUuid($session->getId())?->getSessionState());
+        $released = $jobs->findByUuid($job->getId());
+        self::assertNotNull($released);
+        self::assertSame(0, $released->getReferenceCount());
+        self::assertSame('in_progress', $released->getStatus()->value);
+
+        // The worker reads the cancellation and gives up the execution; the next run reclaims the job.
+        $latest = $runtime->refresh($claim);
+        self::assertNotNull($latest);
+        self::assertTrue($runtime->release($latest));
+        $this->manager->clear();
+        self::assertSame(['expired' => 0, 'cleaned' => 1], $handler(new \App\Transcode\Application\Command\CleanupOrphanedJobsCommand()));
+        $this->manager->clear();
+        self::assertNull($jobs->findByUuid($job->getId()));
     }
 
     /** @return array<string, mixed> */

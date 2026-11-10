@@ -88,9 +88,9 @@ final class TranscodeJobController
 
     #[OA\Post(
         path: '/api/transcode/jobs/cleanup',
-        summary: 'Clean up orphaned transcode jobs (no active sessions)',
+        summary: 'Expire stale transcode sessions and clean up orphaned transcode jobs (no active sessions)',
         responses: [
-            new OA\Response(response: '200', description: 'Cleanup result', content: new OA\JsonContent(properties: [new OA\Property(property: 'cleaned', type: 'integer')])),
+            new OA\Response(response: '200', description: 'Cleanup result', content: new OA\JsonContent(properties: [new OA\Property(property: 'expired', type: 'integer'), new OA\Property(property: 'cleaned', type: 'integer')])),
         ],
     )]
     #[Route('/cleanup', name: 'cleanup', methods: ['POST'])]
@@ -99,9 +99,9 @@ final class TranscodeJobController
     public function cleanup(): JsonResponse
     {
         $stamp = $this->commandBus->dispatch(new CleanupOrphanedJobsCommand())->last(HandledStamp::class);
-        $count = $stamp?->getResult() ?? 0;
+        $result = $stamp?->getResult();
 
-        return $this->successResponse(['cleaned' => $count]);
+        return $this->successResponse(['expired' => (int) ($result['expired'] ?? 0), 'cleaned' => (int) ($result['cleaned'] ?? 0)]);
     }
 
     #[OA\Get(

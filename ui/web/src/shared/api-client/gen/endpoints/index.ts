@@ -7526,6 +7526,7 @@ export type GetTranscodeJobShow200 = {
 };
 
 export type PostTranscodeJobCleanup200 = {
+  expired?: number;
   cleaned?: number;
 };
 
@@ -34750,7 +34751,7 @@ export const getPostTranscodeJobCleanupUrl = () => {
 }
 
 /**
- * @summary Clean up orphaned transcode jobs (no active sessions)
+ * @summary Expire stale transcode sessions and clean up orphaned transcode jobs (no active sessions)
  */
 export const postTranscodeJobCleanup = async ( options?: Parameters<typeof customInstance>[1]): Promise<PostTranscodeJobCleanup200> => {
 
@@ -34802,7 +34803,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
     /**
- * @summary Clean up orphaned transcode jobs (no active sessions)
+ * @summary Expire stale transcode sessions and clean up orphaned transcode jobs (no active sessions)
  */
 export const usePostTranscodeJobCleanup = <TError = ErrorType<unknown>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postTranscodeJobCleanup>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}

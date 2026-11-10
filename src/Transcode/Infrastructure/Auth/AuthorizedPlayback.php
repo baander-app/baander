@@ -76,7 +76,7 @@ final readonly class AuthorizedPlayback implements PlaybackPortInterface
         }
         $selection = $internalIds ? ' AND j.id IN (:jobs)' : ' AND j.public_id IN (:jobs)';
         $rows = $this->connection->fetchAllAssociative(
-            'SELECT j.public_id AS job_id, s.public_id AS session_id FROM transcode_sessions s'
+            'SELECT j.public_id AS job_id, s.public_id AS session_id, s.id AS session_uuid FROM transcode_sessions s'
             .' JOIN transcode_jobs j ON j.id = s.job_id'
             .' JOIN transcode_runtime_state r ON r.session_id = s.id AND r.job_id = j.id'
             .' WHERE s.user_id = :user AND j.owner_user_id = :user AND s.video_id = :video AND j.video_id = :video'
@@ -89,6 +89,16 @@ final readonly class AuthorizedPlayback implements PlaybackPortInterface
         $sessions = [];
         foreach ($rows as $row) {
             $sessions[$row['job_id']] = PublicId::fromString($row['session_id']);
+        }
+        if ($rows !== []) {
+            // Signing is a sign of life: a paused player sends no playback reports,
+            // and stale-session expiry must not end a session whose client still
+            // renews its stream URL.
+            $this->connection->executeStatement(
+                'UPDATE transcode_sessions SET updated_at = CURRENT_TIMESTAMP WHERE id IN (:sessions)',
+                ['sessions' => array_column($rows, 'session_uuid')],
+                ['sessions' => ArrayParameterType::STRING],
+            );
         }
         return $sessions;
     }

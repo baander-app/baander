@@ -33,7 +33,7 @@ final class AuthorizedPlaybackTest extends TestCase
         $connection->executeStatement('CREATE TABLE movie_video (video_id TEXT, movie_id TEXT)');
         $connection->executeStatement('CREATE TABLE user_library_access (user_id TEXT, library_id TEXT)');
         $connection->executeStatement('CREATE TABLE transcode_jobs (id TEXT PRIMARY KEY, public_id TEXT, owner_user_id TEXT, video_id TEXT, height INTEGER, status TEXT, request_id TEXT)');
-        $connection->executeStatement('CREATE TABLE transcode_sessions (id TEXT PRIMARY KEY, public_id TEXT, user_id TEXT, video_id TEXT, job_id TEXT)');
+        $connection->executeStatement('CREATE TABLE transcode_sessions (id TEXT PRIMARY KEY, public_id TEXT, user_id TEXT, video_id TEXT, job_id TEXT, updated_at TEXT)');
         $connection->executeStatement('CREATE TABLE transcode_runtime_state (job_id TEXT PRIMARY KEY, session_id TEXT, request_id TEXT)');
         $userId = new Uuid();
         $videoId = new Uuid();
@@ -95,7 +95,7 @@ final class AuthorizedPlaybackTest extends TestCase
     {
         $connection = DriverManager::getConnection(['driver' => 'pdo_sqlite', 'memory' => true]);
         $connection->executeStatement('CREATE TABLE transcode_jobs (id TEXT PRIMARY KEY, public_id TEXT, owner_user_id TEXT, video_id TEXT, height INTEGER, status TEXT, request_id TEXT, presentation_selection TEXT)');
-        $connection->executeStatement('CREATE TABLE transcode_sessions (id TEXT PRIMARY KEY, public_id TEXT, user_id TEXT, video_id TEXT, job_id TEXT)');
+        $connection->executeStatement('CREATE TABLE transcode_sessions (id TEXT PRIMARY KEY, public_id TEXT, user_id TEXT, video_id TEXT, job_id TEXT, updated_at TEXT)');
         $connection->executeStatement('CREATE TABLE transcode_runtime_state (job_id TEXT PRIMARY KEY, session_id TEXT, request_id TEXT)');
         $actor = new Uuid();
         $video = new Uuid();
@@ -120,7 +120,12 @@ final class AuthorizedPlaybackTest extends TestCase
         try {
             self::assertSame([$job->toString()], array_keys($this->currentSessions($playback, $video, $requestId, $job)));
             self::assertSame($session->toString(), $this->currentSessions($playback, $video, $requestId, $job)[$job->toString()]->toString());
+            // Signing is the session's sign of life while a paused player sends no reports.
+            self::assertNotNull($connection->fetchOne("SELECT updated_at FROM transcode_sessions WHERE id = 'session'"));
+            self::assertNull($connection->fetchOne("SELECT updated_at FROM transcode_sessions WHERE id = 'copy-session'"));
+            self::assertNull($connection->fetchOne("SELECT updated_at FROM transcode_sessions WHERE id = 'other-session'"));
             self::assertEquals([$copyJob->toString() => $copySession], $playback->findSessions($video, $requestId, [$copyJob]));
+            self::assertNotNull($connection->fetchOne("SELECT updated_at FROM transcode_sessions WHERE id = 'copy-session'"));
             self::assertSame([], $playback->findSessions($video, $otherRequestId, [$copyJob]));
             self::assertSame([], $playback->findSessions($video, $requestId, [new PublicId()]));
             self::assertSame([], $playback->findSessions($video, $requestId, []));

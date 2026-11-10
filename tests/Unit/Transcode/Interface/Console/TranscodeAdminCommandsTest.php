@@ -131,13 +131,19 @@ final class TranscodeAdminCommandsTest extends TestCase
         $jobs = $this->createMock(TranscodeJobPortInterface::class);
         $jobs->expects(self::once())->method('cleanupOrphanedJobs')->willReturn(3);
         $support = new AdminCommandSupport(new MessageBus([new HandleMessageMiddleware(new HandlersLocator([
-            CleanupOrphanedJobsCommand::class => [new CleanupOrphanedJobsHandler($jobs)],
+            CleanupOrphanedJobsCommand::class => [new CleanupOrphanedJobsHandler($jobs, new \App\Transcode\Application\Service\StaleTranscodeSessionExpiry(
+                $this->createStub(\App\Transcode\Application\Port\TranscodeSessionPortInterface::class),
+                $this->createStub(\App\Transcode\Application\Port\TranscodeExecutionOwnershipPort::class),
+                $jobs,
+                $this->createStub(\App\Shared\Application\Port\TransactionPortInterface::class),
+                new \Symfony\Component\Clock\MockClock(),
+            ))],
         ]))]));
 
         $tester = new CommandTester(new TranscodeJobCleanupCommand($support));
 
         self::assertSame(Command::SUCCESS, $tester->execute([]));
-        self::assertStringContainsString('Removed 3 orphaned transcode jobs.', $tester->getDisplay());
+        self::assertStringContainsString('Expired 0 stale transcode sessions and removed 3 orphaned transcode jobs.', $tester->getDisplay());
     }
 
     private function session(Uuid $owner): TranscodeSession

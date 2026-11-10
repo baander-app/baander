@@ -19939,7 +19939,7 @@
                 "tags": [
                     "Transcode"
                 ],
-                "summary": "Clean up orphaned transcode jobs (no active sessions)",
+                "summary": "Expire stale transcode sessions and clean up orphaned transcode jobs (no active sessions)",
                 "operationId": "post_transcode_job_cleanup",
                 "responses": {
                     "200": {
@@ -19948,6 +19948,9 @@
                             "application/json": {
                                 "schema": {
                                     "properties": {
+                                        "expired": {
+                                            "type": "integer"
+                                        },
                                         "cleaned": {
                                             "type": "integer"
                                         }

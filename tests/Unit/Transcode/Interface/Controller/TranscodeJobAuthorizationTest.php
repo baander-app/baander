@@ -129,9 +129,9 @@ final class TranscodeJobAuthorizationTest extends TestCase
     {
         $bus = $this->createMock(MessageBusInterface::class);
         $bus->expects($this->once())->method('dispatch')->with($this->isInstanceOf(CleanupOrphanedJobsCommand::class))
-            ->willReturn(new Envelope(new CleanupOrphanedJobsCommand(), [new HandledStamp(3, 'cleanup')]));
+            ->willReturn(new Envelope(new CleanupOrphanedJobsCommand(), [new HandledStamp(['expired' => 2, 'cleaned' => 3], 'cleanup')]));
         $controller = new TranscodeJobController($bus, $this->createStub(TranscodeJobPortInterface::class), new \App\Tests\Unit\Transcode\PublicViewStub(), $this->createStub(\App\Transcode\Application\Port\PlaybackAccessInterface::class));
 
-        self::assertSame(['data' => ['cleaned' => 3]], json_decode($controller->cleanup()->getContent(), true, flags: JSON_THROW_ON_ERROR));
+        self::assertSame(['data' => ['expired' => 2, 'cleaned' => 3]], json_decode($controller->cleanup()->getContent(), true, flags: JSON_THROW_ON_ERROR));
     }
 }

@@ -224,6 +224,15 @@ A listener chooses a preset or a custom target. The target controls playback gai
 
 A user's playback lifecycle for a video transcode job, carrying its preparation, playback controls, position and completion state.
 
+### Stale transcode session
+
+A transcode session that no playback report and no stream signing has touched for
+the longest lifetime of a signed stream URL, 24 hours, and whose presentation is not
+finished. No client can still be playing it. Stale session expiry, part of job
+cleanup, cancels the execution its worker still holds, ends the session and
+releases its job, so the job becomes orphaned and cleanup removes it with its
+output. A paused player renews its stream URL and is never stale.
+
 ### Transcode execution generation
 
 The identity of one admitted media execution attempt inside a job-specific output
