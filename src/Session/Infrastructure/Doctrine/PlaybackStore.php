@@ -61,6 +61,10 @@ final readonly class PlaybackStore implements PlaybackStoreInterface
     {
         // The caller holds the account/session lock. All commands and observations use that lock.
         // This proof covers managed browser execution only; independent external routes need their own proof.
+        // The acknowledgement must be the last thing that moved the session. A command settled as never
+        // effective since then cannot have changed the runner, so it is neither a later command nor a gap
+        // in the revisions: issuing it and settling it advanced the revision once each. A superseded
+        // command still counts, because its runner may have been shown it.
         if ($session->activeIncarnationId() === null || $session->desiredState() !== PlaybackState::Paused
             || $session->observedState() !== ObservedPlaybackState::Paused) {
             return false;
@@ -74,13 +78,19 @@ final readonly class PlaybackStore implements PlaybackStoreInterface
                 AND EXISTS (
                     SELECT 1 FROM playback_commands proof
                     WHERE proof.session_id=:session AND proof.incarnation_id=i.id AND proof.epoch=i.epoch
-                        AND proof.revision=:ackRevision AND proof.acknowledged_at IS NOT NULL
+                        AND proof.acknowledged_at IS NOT NULL
                         AND ((proof.type='pause' AND proof.outcome='paused')
                             OR (proof.type='quiesce' AND proof.outcome='quiesced')
                             OR (proof.type='stop' AND proof.outcome='stopped'))
+                        AND proof.revision=:revision-1-2*(
+                            SELECT count(*) FROM playback_commands settled
+                            WHERE settled.session_id=proof.session_id AND settled.outcome='never_effective'
+                                AND settled.revision>proof.revision
+                        )
                         AND NOT EXISTS (
                             SELECT 1 FROM playback_commands later
                             WHERE later.session_id=proof.session_id AND later.id<>proof.id
+                                AND later.outcome IS DISTINCT FROM 'never_effective'
                                 AND (later.revision>=proof.revision OR later.created_at>proof.created_at)
                         )
                 )
@@ -91,7 +101,7 @@ final readonly class PlaybackStore implements PlaybackStoreInterface
             RETURNING i.id
             SQL, ['incarnation' => $session->activeIncarnationId()->toString(),
                 'owner' => $session->getUserId()->toString(), 'session' => $session->getId()->toString(),
-                'ackRevision' => $session->revision() - 1]) !== false;
+                'revision' => $session->revision()]) !== false;
     }
 
     public function retireConfirmedStoppedBrowser(ListeningSession $session): bool
@@ -179,7 +189,7 @@ final readonly class PlaybackStore implements PlaybackStoreInterface
     public function endpoint(string $userId, string $incarnationId, ?string $capability = null): array
     {
         $row = $this->connection()->fetchAssociative(<<<'SQL'
-            SELECT i.*,d.public_id,d.capabilities,(i.expires_at>CURRENT_TIMESTAMP AND i.retired_at IS NULL) available
+            SELECT i.*,d.public_id,d.kind,d.capabilities,(i.expires_at>CURRENT_TIMESTAMP AND i.retired_at IS NULL) available
             FROM playback_destination_incarnations i JOIN playback_destinations d ON d.id=i.destination_id
             WHERE i.id=:id AND i.user_id=:owner
             SQL, ['id' => Uuid::fromString($incarnationId)->toString(), 'owner' => $userId]);
@@ -295,6 +305,21 @@ final readonly class PlaybackStore implements PlaybackStoreInterface
         $this->connection()->executeStatement("UPDATE playback_commands SET outcome='superseded',acknowledged_at=CURRENT_TIMESTAMP WHERE attempt_id=:attempt AND acknowledged_at IS NULL", ['attempt' => $attemptId]);
     }
 
+    public function settleNeverEffective(string $attemptId): void
+    {
+        $this->connection()->executeStatement("UPDATE playback_commands SET outcome='never_effective',acknowledged_at=CURRENT_TIMESTAMP WHERE attempt_id=:attempt AND acknowledged_at IS NULL", ['attempt' => $attemptId]);
+    }
+
+    public function attemptDisclosed(string $attemptId, string $type): bool
+    {
+        return (bool) $this->connection()->fetchOne('SELECT EXISTS(SELECT 1 FROM playback_commands WHERE attempt_id=:attempt AND type=:type AND disclosed_at IS NOT NULL)', ['attempt' => $attemptId, 'type' => $type]);
+    }
+
+    public function markRunnerUnknown(string $incarnationId): void
+    {
+        $this->connection()->executeStatement("UPDATE playback_destination_incarnations SET observed_state='unknown' WHERE id=:id", ['id' => $incarnationId]);
+    }
+
     public function observe(string $incarnationId, string $state, float $position, ?float $volume = null): void
     {
         $this->connection()->executeStatement("UPDATE playback_destination_incarnations SET observed_state=:state,position=:position,observed_volume=coalesce(CAST(:volume AS double precision),observed_volume),expires_at=CURRENT_TIMESTAMP+INTERVAL '30 seconds' WHERE id=:id", ['state' => $state, 'position' => $position, 'volume' => $volume, 'id' => $incarnationId]);
@@ -318,11 +343,20 @@ final readonly class PlaybackStore implements PlaybackStoreInterface
             ) i ON true
             WHERE d.user_id=:owner ORDER BY d.created_at,i.epoch
             SQL, ['owner' => $session['user_id']]);
-        $commands = $incarnationId === null || $this->connection()->getTransactionNestingLevel() > 1 ? [] : $this->connection()->fetchAllAssociative(<<<'SQL'
-            SELECT id,attempt_id AS "attemptId",revision,incarnation_id AS "incarnationId",epoch,type,payload,expires_at AS "expiresAt"
-            FROM playback_commands WHERE session_id=:session AND incarnation_id=:incarnation AND acknowledged_at IS NULL
-            ORDER BY created_at,id
-            SQL, ['session' => $session['id'], 'incarnation' => $incarnationId]);
+        $commands = [];
+        if ($incarnationId !== null && $this->connection()->getTransactionNestingLevel() <= 1) {
+            // This is the only place a pending command leaves the server. Recording it in the transaction
+            // that builds the snapshot means a command without the mark was never shown to its runner.
+            $this->connection()->executeStatement(<<<'SQL'
+                UPDATE playback_commands SET disclosed_at=CURRENT_TIMESTAMP
+                WHERE session_id=:session AND incarnation_id=:incarnation AND acknowledged_at IS NULL AND disclosed_at IS NULL
+                SQL, ['session' => $session['id'], 'incarnation' => $incarnationId]);
+            $commands = $this->connection()->fetchAllAssociative(<<<'SQL'
+                SELECT id,attempt_id AS "attemptId",revision,incarnation_id AS "incarnationId",epoch,type,payload,expires_at AS "expiresAt"
+                FROM playback_commands WHERE session_id=:session AND incarnation_id=:incarnation AND acknowledged_at IS NULL
+                ORDER BY created_at,id
+                SQL, ['session' => $session['id'], 'incarnation' => $incarnationId]);
+        }
         $selected = $session['selected_destination_id'] === null ? null : $this->connection()->fetchOne('SELECT public_id FROM playback_destinations WHERE id=:id', ['id' => $session['selected_destination_id']]);
         $active = $session['active_incarnation_id'] === null ? null : $this->connection()->fetchOne('SELECT d.public_id FROM playback_destination_incarnations i JOIN playback_destinations d ON d.id=i.destination_id WHERE i.id=:id', ['id' => $session['active_incarnation_id']]);
         $transfer = $this->currentTransfer($session['id']);
@@ -352,9 +386,16 @@ final readonly class PlaybackStore implements PlaybackStoreInterface
         return $command === false ? null : $this->decode($command);
     }
 
-    public function supersedeControls(string $sessionId): void
+    public function supersedeControls(string $sessionId): array
     {
-        $this->connection()->executeStatement("UPDATE playback_commands SET outcome='superseded',acknowledged_at=CURRENT_TIMESTAMP WHERE session_id=:session AND acknowledged_at IS NULL AND type IN ('play','pause','seek','load','stop','volume','queue')", ['session' => $sessionId]);
+        return $this->connection()->fetchAllAssociative(<<<'SQL'
+            WITH superseded AS (
+                UPDATE playback_commands SET outcome='superseded',acknowledged_at=CURRENT_TIMESTAMP
+                WHERE session_id=:session AND acknowledged_at IS NULL AND type IN ('play','pause','seek','load','stop','volume','queue')
+                RETURNING incarnation_id,type,disclosed_at
+            )
+            SELECT incarnation_id,type FROM superseded WHERE disclosed_at IS NOT NULL AND incarnation_id IS NOT NULL
+            SQL, ['session' => $sessionId]);
     }
 
     public function rememberRequest(string $sessionId, string $requestId, string $digest): bool

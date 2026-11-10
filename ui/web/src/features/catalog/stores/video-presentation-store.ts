@@ -11,8 +11,10 @@ interface VideoPresentation {
   state: string | null
   error: string | null
   select: (videoId: string) => void
-  publish: (values: Partial<Omit<VideoPresentation, 'select' | 'publish' | 'reportError'>>) => void
+  publish: (values: Partial<Omit<VideoPresentation, 'select' | 'publish' | 'reportError' | 'dismissError'>>) => void
   reportError: (error: unknown) => void
+  /** Clears the shown error only while it is still this message; any other error stays. */
+  dismissError: (message: string) => void
 }
 
 export const useVideoPresentation = create<VideoPresentation>()(withStoreDebug('catalog.video-presentation', withNoopGuard(set => ({
@@ -20,4 +22,5 @@ export const useVideoPresentation = create<VideoPresentation>()(withStoreDebug('
   select: videoId => set({ videoId, error: null }),
   publish: values => set(values),
   reportError: error => set({ error: error instanceof Error ? error.message : 'Video playback failed.' }),
+  dismissError: message => set(state => state.error === message ? { error: null } : state),
 }))))

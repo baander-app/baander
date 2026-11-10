@@ -59,11 +59,15 @@ final class PlaybackTransfer
         }
     }
 
-    public function expire(): void
+    /**
+     * A target that was never shown its start cannot be playing, so the transfer fails. Once the start
+     * was shown, only the target's own stop confirmation settles it.
+     */
+    public function expire(bool $targetShownStart): void
     {
         $this->phase = match ($this->phase) {
             'preparing' => 'failed',
-            'quiescing', 'starting', 'uncertain' => 'uncertain',
+            'quiescing', 'starting', 'uncertain' => $targetShownStart ? 'uncertain' : 'failed',
             default => $this->phase,
         };
     }

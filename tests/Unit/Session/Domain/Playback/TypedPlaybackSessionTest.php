@@ -49,8 +49,8 @@ final class TypedPlaybackSessionTest extends TestCase
     {
         $queue = [new PublicId()->toString()];
         $media = new PlaybackMedia('song', PublicId::fromString($queue[0]));
-        $session = ListeningSession::create(new Uuid(), $queue, 0, 42.5);
-        $session->control('load', $media, null, null, null, PlaybackState::Playing);
+        $session = ListeningSession::create(new Uuid(), $queue, 0, 0);
+        $session->control('load', $media, null, null, 42.5, PlaybackState::Playing);
         $session->control('stop', null, null, null, null, null);
         self::assertSame(PlaybackState::Stopped, $session->desiredState());
         self::assertSame($media, $session->media());

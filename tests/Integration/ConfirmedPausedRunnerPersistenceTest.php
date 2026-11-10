@@ -179,4 +179,39 @@ final class ConfirmedPausedRunnerPersistenceTest extends TestCase
             }
         }
     }
+
+    public function testCommandsSettledAsNeverEffectiveDoNotCountAgainstThePauseAcknowledgement(): void
+    {
+        $connection = $this->manager->getConnection();
+        // The fixture's pause is acknowledged at revision 2 and leaves the session at revision 3. Issuing a
+        // control and settling it as never effective advances the revision once each.
+        $cases = [
+            'one settled command' => ['commands' => [[4, 'never_effective']], 'revision' => 5, 'released' => true],
+            'two settled commands' => ['commands' => [[4, 'never_effective'], [6, 'never_effective']], 'revision' => 7, 'released' => true],
+            'a superseded command' => ['commands' => [[4, 'superseded']], 'revision' => 5, 'released' => false],
+            'a settled and a superseded command' => ['commands' => [[4, 'never_effective'], [6, 'superseded']], 'revision' => 7, 'released' => false],
+            'a revision no settled command accounts for' => ['commands' => [[4, 'never_effective']], 'revision' => 6, 'released' => false],
+            'a settled command without its revisions' => ['commands' => [[3, 'never_effective']], 'revision' => 3, 'released' => false],
+        ];
+        foreach ($cases as $case => ['commands' => $commands, 'revision' => $revision, 'released' => $released]) {
+            $fixture = $this->pausedBrowser();
+            foreach ($commands as [$commandRevision, $outcome]) {
+                $connection->executeStatement(<<<'SQL'
+                    INSERT INTO playback_commands(id,session_id,user_id,attempt_id,request_id,request_digest,incarnation_id,epoch,revision,type,payload,outcome,acknowledged_at,expires_at,created_at)
+                    SELECT :id,session_id,user_id,:attempt,:request,request_digest,incarnation_id,epoch,:revision,'play',payload,
+                        :outcome,acknowledged_at,expires_at,created_at+INTERVAL '1 second'
+                    FROM playback_commands WHERE id=:proof
+                    SQL, ['id' => new Uuid()->toString(), 'attempt' => new Uuid()->toString(), 'request' => new Uuid()->toString(),
+                    'revision' => $commandRevision, 'outcome' => $outcome, 'proof' => $fixture['command']]);
+            }
+            $connection->executeStatement('UPDATE listening_sessions SET revision=:revision WHERE id=:session', ['revision' => $revision, 'session' => $fixture['session']]);
+
+            $result = PlaybackPersistenceFixture::coordinator($this->manager)->execute($fixture['owner'], PlaybackOperation::Snapshot, []);
+
+            self::assertSame($released ? null : $fixture['incarnation'], $result['activeIncarnationId'], $case);
+            self::assertSame($released ? $revision + 1 : $revision, $result['revision'], $case);
+            self::assertSame($released, $this->observer->fetchOne('SELECT retired_at FROM playback_destination_incarnations WHERE id=?', [$fixture['incarnation']]) !== null, $case);
+            self::assertSame(31.25, $result['position'], $case);
+        }
+    }
 }

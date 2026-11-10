@@ -434,25 +434,93 @@ describe('browser playback coordination', () => {
     expect(mark.mock.calls.some(([name]) => name === 'baander:intent-refused')).toBe(scenario !== 'owned video')
   })
 
-  it('refuses a local video close while the transfer destination has not proven it stopped', async () => {
+  it('closes a local video during an uncertain transfer by silencing it without a session control', async () => {
+    const quiesce = vi.fn(async () => ({ observedState: 'paused' as const, position: 12 }))
+    const execute = vi.fn(async () => ({ observedState: 'playing' as const, position: 12 }))
+    cleanup.push(registerPlaybackAdapter({ kind: 'video', supportsVolume: true, prepare: vi.fn(), execute, quiesce,
+      observe: vi.fn(() => ({ observedState: 'playing' as const, position: 12 })) }))
     const h = harness()
     cleanup.push(h.stop)
     const mark = vi.spyOn(performance, 'mark')
     cleanup.push(() => mark.mockRestore())
-    const current = snapshot({ endpoint, activeIncarnationId: endpoint.incarnationId, media: { kind: 'video', publicId: 'movie' },
+    const media = { kind: 'video' as const, publicId: 'movie' }
+    const play = { id: 'play', attemptId: 'attempt', revision: 1, incarnationId: endpoint.incarnationId, epoch: 1,
+      type: 'play' as const, payload: { media, queue: [], currentTrackIndex: 0, position: 12, desiredState: 'playing' as const },
+      expiresAt: new Date(Date.now() + 60_000).toISOString() }
+    h.receive(snapshot({ endpoint, activeIncarnationId: endpoint.incarnationId, media, commands: [play] }))
+    await vi.waitFor(() => expect(execute).toHaveBeenCalledOnce())
+    const current = snapshot({ revision: 2, activeIncarnationId: endpoint.incarnationId, media,
       transfer: { attemptId: 'transfer', state: 'uncertain' as const, sourceIncarnationId: endpoint.incarnationId,
         targetIncarnationId: 'remote', position: 12, desiredState: 'paused' as const } })
     h.receive(current)
+    vi.mocked(AXIOS_INSTANCE.post).mockClear().mockImplementation(async () => ({ data: { data: current } }))
+
+    await requestPlayback({ action: 'stop-local-video', incarnationId: endpoint.incarnationId, videoId: 'movie' })
+
+    expect(quiesce).toHaveBeenCalledOnce()
+    expect(execute).toHaveBeenCalledOnce()
+    expect(vi.mocked(AXIOS_INSTANCE.post).mock.calls.some(([path]) => path === '/api/session/control' || path === '/api/session/ack')).toBe(false)
+    expect(mark.mock.calls.some(([name, options]) => name === 'baander:intent-refused'
+      && (options as { detail?: { reason?: string } } | undefined)?.detail?.reason === 'destination uncertain')).toBe(true)
+    expect(mark.mock.calls.some(([name]) => name === 'baander:intent-error')).toBe(false)
+    expect(h.client.getQueryData(PLAYBACK_SESSION_KEY)).toHaveProperty('transfer.state', 'uncertain')
+  })
+
+  it('still closes a local video during an uncertain transfer when silencing it fails, and reports why', async () => {
+    const quiesce = vi.fn(async () => { throw new Error('The video element is gone.') })
+    const execute = vi.fn(async () => ({ observedState: 'playing' as const, position: 12 }))
+    cleanup.push(registerPlaybackAdapter({ kind: 'video', supportsVolume: true, prepare: vi.fn(), execute, quiesce,
+      observe: vi.fn(() => ({ observedState: 'playing' as const, position: 12 })) }))
+    const h = harness()
+    cleanup.push(h.stop)
+    const media = { kind: 'video' as const, publicId: 'movie' }
+    const play = { id: 'play', attemptId: 'attempt', revision: 1, incarnationId: endpoint.incarnationId, epoch: 1,
+      type: 'play' as const, payload: { media, queue: [], currentTrackIndex: 0, position: 12, desiredState: 'playing' as const },
+      expiresAt: new Date(Date.now() + 60_000).toISOString() }
+    h.receive(snapshot({ endpoint, activeIncarnationId: endpoint.incarnationId, media, commands: [play] }))
+    await vi.waitFor(() => expect(execute).toHaveBeenCalledOnce())
+    h.receive(snapshot({ revision: 2, activeIncarnationId: endpoint.incarnationId, media,
+      transfer: { attemptId: 'transfer', state: 'uncertain' as const, sourceIncarnationId: endpoint.incarnationId,
+        targetIncarnationId: 'remote', position: 12, desiredState: 'paused' as const } }))
+
+    await requestPlayback({ action: 'stop-local-video', incarnationId: endpoint.incarnationId, videoId: 'movie' })
+
+    expect(quiesce).toHaveBeenCalledOnce()
+    expect(h.client.getQueryData(PLAYBACK_CONNECTION_KEY)).toHaveProperty('error', 'The video element is gone.')
+  })
+
+  it.each(['failed', 'still starting', 'committed'] as const)('handles its own preparation once the transfer has %s', async outcome => {
+    const prepare = vi.fn(async () => {})
+    const quiesce = vi.fn(async () => ({ observedState: 'paused' as const, position: 12 }))
+    const execute = vi.fn(async (issued: { type: string }) => ({ observedState: issued.type === 'stop' ? 'stopped' as const : 'paused' as const, position: 12 }))
+    cleanup.push(registerPlaybackAdapter({ kind: 'video', supportsVolume: true, prepare, execute, quiesce,
+      observe: vi.fn(() => ({ observedState: 'paused' as const, position: 12 })) }))
+    const h = harness()
+    cleanup.push(h.stop)
+    const media = { kind: 'video' as const, publicId: 'movie' }
+    const transfer = { attemptId: 'transfer', state: 'preparing' as const, sourceIncarnationId: 'source',
+      targetIncarnationId: endpoint.incarnationId, position: 12, desiredState: 'playing' as const }
+    const command = { id: 'prepare', attemptId: 'transfer', revision: 1, incarnationId: endpoint.incarnationId, epoch: 1,
+      type: 'prepare' as const, payload: { media, queue: [], currentTrackIndex: 0, position: 12, desiredState: 'playing' as const },
+      expiresAt: new Date(Date.now() + 60_000).toISOString() }
+    let current = snapshot({ activeIncarnationId: 'source', media, transfer })
     vi.mocked(AXIOS_INSTANCE.post).mockImplementation(async () => ({ data: { data: current } }))
+    h.receive({ ...current, endpoint, commands: [command] })
+    await vi.waitFor(() => expect(vi.mocked(AXIOS_INSTANCE.post).mock.calls.some(([path]) => path === '/api/session/ack')).toBe(true))
+    expect(prepare).toHaveBeenCalledOnce()
+    expect(quiesce).not.toHaveBeenCalled()
 
-    const close = requestPlayback({ action: 'stop-local-video', incarnationId: endpoint.incarnationId, videoId: 'movie' })
-      .then(() => null, error => error as Error)
+    current = outcome === 'failed' ? snapshot({ revision: 2, activeIncarnationId: 'source', media })
+      : outcome === 'committed' ? snapshot({ revision: 2, activeIncarnationId: endpoint.incarnationId, media })
+        : snapshot({ revision: 2, activeIncarnationId: 'source', media, transfer: { ...transfer, state: 'starting' } })
+    h.receive(current)
+    await Promise.resolve()
+    await Promise.resolve()
 
-    expect(await close).toBeInstanceOf(Error)
-    expect((await close)?.message).toContain('Confirm it stopped')
-    expect(vi.mocked(AXIOS_INSTANCE.post).mock.calls.some(([path]) => path === '/api/session/control')).toBe(false)
-    expect(mark.mock.calls.some(([name]) => name === 'baander:intent-error')).toBe(true)
-    expect(h.client.getQueryData(PLAYBACK_CONNECTION_KEY)).toHaveProperty('error', expect.stringContaining('uncertain'))
+    // A failed or expired transfer sends its target nothing more: the tab lets its prepared player go.
+    expect(quiesce).toHaveBeenCalledTimes(outcome === 'failed' ? 1 : 0)
+    expect(execute.mock.calls.filter(([issued]) => issued.type === 'stop')).toHaveLength(outcome === 'failed' ? 1 : 0)
+    expect(vi.mocked(AXIOS_INSTANCE.post).mock.calls.filter(([path]) => path === '/api/session/ack')).toHaveLength(1)
   })
 
   it('surfaces the server refusal reason when a transfer blocks a control', async () => {
@@ -604,6 +672,36 @@ describe('browser playback coordination', () => {
     expect(h.client.getQueryData(PLAYBACK_CONNECTION_KEY)).toHaveProperty('error', expect.stringContaining('unconfirmed'))
   })
 
+  it('clears the unconfirmed-playback refusal once the session has no unconfirmed playback, and nothing else', async () => {
+    const h = harness()
+    cleanup.push(h.stop)
+    const legacy = { destinationId: 'legacy', incarnationId: 'legacy-tab', name: 'Chrome on Linux', kind: 'browser' as const,
+      epoch: 1, available: false, capabilities: ['song' as const], observedState: 'stopped' as const, position: 77, observedVolume: null }
+    const held = snapshot({ desiredState: 'stopped', observedState: 'stopped', activeIncarnationId: 'legacy-tab', destinations: [legacy] })
+    h.receive({ ...held, endpoint })
+    await expect(requestPlayback({ action: 'play' })).rejects.toThrow('Previous playback is unconfirmed.')
+    expect(h.client.getQueryData(PLAYBACK_CONNECTION_KEY)).toHaveProperty('error', expect.stringContaining('unconfirmed'))
+
+    // The runner is still held: the refusal still describes the session.
+    h.receive({ ...held, revision: 2 })
+    expect(h.client.getQueryData(PLAYBACK_CONNECTION_KEY)).toHaveProperty('error', expect.stringContaining('unconfirmed'))
+
+    // The server released the runner.
+    h.receive({ ...held, revision: 3, activeIncarnationId: null })
+    expect(h.client.getQueryData(PLAYBACK_CONNECTION_KEY)).toMatchObject({ error: null, connected: true })
+
+    // Another error is not the session's to clear.
+    h.receive({ ...held, revision: 4 })
+    await expect(requestPlayback({ action: 'play' })).rejects.toThrow('Previous playback is unconfirmed.')
+    await expect(requestPlayback({ action: 'pause' })).resolves.toBeUndefined()
+    vi.mocked(AXIOS_INSTANCE.post).mockRejectedValueOnce(Object.assign(new Error('Request failed with status code 409'), {
+      response: { status: 409, data: { error: { message: 'A runner control is awaiting acknowledgement.' } } },
+    }))
+    await expect(requestPlayback({ action: 'pause' })).rejects.toThrow('A runner control is awaiting acknowledgement.')
+    h.receive({ ...held, revision: 5, activeIncarnationId: null })
+    expect(h.client.getQueryData(PLAYBACK_CONNECTION_KEY)).toHaveProperty('error', 'A runner control is awaiting acknowledgement.')
+  })
+
   it('keeps stop available when the active runner is absent from the destination list', async () => {
     const h = harness()
     cleanup.push(h.stop)
@@ -705,6 +803,15 @@ describe('browser playback coordination', () => {
     await vi.waitFor(() => expect(h.requests).toHaveLength(1))
     h.settle(0, outcome)
     expect(await result).toBeInstanceOf(Error)
+  })
+
+  it('tells the viewer that a request its destination never answered changed nothing there', async () => {
+    const h = controlledServer()
+    const result = requestPlayback({ action: 'play' }).then(() => 'unexpected success', error => error as Error)
+    await vi.waitFor(() => expect(h.requests).toHaveLength(1))
+    h.settle(0, 'never_effective')
+    expect(await result).toBeInstanceOf(Error)
+    expect((await result as Error).message).toBe('The destination did not answer the playback request. Nothing changed there; try again.')
   })
 
   it.each(['committed', 'uncertain'] as const)('settles a transfer only from its acknowledged %s snapshot', async outcome => {

@@ -11,7 +11,10 @@ interface PlaybackStoreInterface
 {
     public function lockSession(string $userId): ListeningSession;
     public function saveSession(ListeningSession $session): void;
-    /** Retire only unavailable managed browser execution with a durable, fenced quiescence acknowledgement. */
+    /**
+     * Retire only unavailable managed browser execution with a durable, fenced quiescence acknowledgement.
+     * Commands settled as never effective since that acknowledgement do not count against it.
+     */
     public function retireConfirmedPausedBrowser(ListeningSession $session): bool;
     /** Retire only unavailable managed browser execution that last reported itself stopped, with no command or transfer outstanding. */
     public function retireConfirmedStoppedBrowser(ListeningSession $session): bool;
@@ -20,8 +23,10 @@ interface PlaybackStoreInterface
      * @return array<string,mixed>
      */
     public function register(string $userId, array $input): array;
-    /** @return array<string,mixed> */
+    /** @return array<string,mixed> The incarnation with its destination's kind, capabilities and availability. */
     public function endpoint(string $userId, string $incarnationId, ?string $capability = null): array;
+    /** Record that the runner may have acted on a command it was shown and has not answered. Presence is not renewed. */
+    public function markRunnerUnknown(string $incarnationId): void;
     /** @return array<string,mixed>|null */
     public function currentTransfer(string $sessionId): ?array;
     /** @param array<string,mixed> $transfer */
@@ -36,12 +41,21 @@ interface PlaybackStoreInterface
     /** @return array{id:string,request_id:string,state:string,rejection_reason:?string}|null */
     public function requestedTransfer(string $sessionId, string $requestId): ?array;
     public function cancelCommands(string $attemptId): void;
+    /** Close the attempt's unanswered commands as never effective: their runner cannot have acted on them. */
+    public function settleNeverEffective(string $attemptId): void;
+    /** Whether a command of this type in the attempt was ever included in a snapshot built for its endpoint. */
+    public function attemptDisclosed(string $attemptId, string $type): bool;
     public function hasPendingControl(string $sessionId): bool;
     /** @return array<string,mixed>|null */
     public function pendingControl(string $sessionId): ?array;
-    public function supersedeControls(string $sessionId): void;
+    /** @return list<array{incarnation_id:string,type:string}> The superseded controls their runner had been shown. */
+    public function supersedeControls(string $sessionId): array;
     public function rememberRequest(string $sessionId, string $requestId, string $digest): bool;
-    /** @return array<string,mixed> */
+    /**
+     * Pending commands leave the server only here, for the given incarnation, and are recorded as disclosed.
+     *
+     * @return array<string,mixed>
+     */
     public function snapshot(ListeningSession $session, ?string $incarnationId): array;
     public function observe(string $incarnationId, string $state, float $position, ?float $volume = null): void;
     public function observeVolume(string $incarnationId, float $volume): void;

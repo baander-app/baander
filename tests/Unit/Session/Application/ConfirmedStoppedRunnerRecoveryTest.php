@@ -11,10 +11,12 @@ use App\Session\Application\Service\PlaybackCoordinator;
 use App\Session\Domain\Model\ListeningSession\ListeningSession;
 use App\Session\Domain\Model\Playback\PlaybackMedia;
 use App\Session\Domain\Model\Playback\PlaybackState;
+use App\Shared\Application\Exception\ConflictException;
 use App\Shared\Application\Port\TransactionPortInterface;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use DateTimeImmutable;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
@@ -101,6 +103,128 @@ final class ConfirmedStoppedRunnerRecoveryTest extends TestCase
         self::assertSame('playing', $session->observedState()->value);
     }
 
+    public function testEndpointRegistrationReleasesAConfirmedStoppedRunnerInTheSameOperation(): void
+    {
+        $session = $this->stoppedSession();
+        $revision = $session->revision();
+        $store = $this->store($session);
+        $registration = ['destinationId' => new PublicId()->toString(), 'incarnationId' => new Uuid()->toString(), 'epoch' => 2, 'capability' => 'capability'];
+        $order = [];
+        $store->expects(self::once())->method('register')->willReturnCallback(static function () use (&$order, $registration): array {
+            $order[] = 'register';
+            return $registration;
+        });
+        $store->expects(self::once())->method('retireConfirmedStoppedBrowser')->with($session)->willReturnCallback(static function () use (&$order): bool {
+            $order[] = 'retire';
+            return true;
+        });
+        $store->expects(self::once())->method('saveSession')->with($session)->willReturnCallback(static function () use (&$order): void {
+            $order[] = 'save';
+        });
+
+        $result = $this->coordinator($store)->execute($this->owner, PlaybackOperation::Endpoint, [
+            'deviceId' => new Uuid()->toString(), 'endpointId' => new Uuid()->toString(),
+        ]);
+
+        self::assertSame(['register', 'retire', 'save'], $order);
+        self::assertSame($registration, $result['endpoint']);
+        self::assertNull($session->activeIncarnationId());
+        self::assertSame($revision + 1, $session->revision());
+        self::assertNull($session->selectedDestinationId());
+        self::assertSame(PlaybackState::Stopped, $session->desiredState());
+        self::assertSame(27.5, $session->getPosition());
+    }
+
+    public function testControlReleasesAGoneStoppedRunnerAfterTheRevisionCheckAndRetainsTheRequest(): void
+    {
+        $session = $this->stoppedSession();
+        $revision = $session->revision();
+        $store = $this->store($session);
+        $store->expects(self::once())->method('retireConfirmedStoppedBrowser')->with($session)->willReturn(true);
+        $store->expects(self::never())->method('endpoint');
+        $store->expects(self::once())->method('insertCommand')->with(self::callback(
+            static fn(array $command): bool => $command['type'] === 'play' && $command['incarnation_id'] === null && $command['revision'] === $revision + 2,
+        ));
+
+        $this->coordinator($store)->execute($this->owner, PlaybackOperation::Control, [
+            'requestId' => new Uuid()->toString(), 'expectedRevision' => $revision, 'action' => 'play',
+        ]);
+
+        self::assertNull($session->activeIncarnationId());
+        self::assertSame(PlaybackState::Playing, $session->desiredState());
+        self::assertSame(27.5, $session->getPosition());
+    }
+
+    public function testTransferReleasesAGoneStoppedRunnerAndStartsItsTargetWithoutASource(): void
+    {
+        $session = $this->stoppedSession();
+        $revision = $session->revision();
+        $target = new Uuid();
+        $store = $this->store($session);
+        $store->expects(self::once())->method('retireConfirmedStoppedBrowser')->with($session)->willReturn(true);
+        $store->method('endpoint')->willReturn([
+            'id' => $target->toString(), 'destination_id' => new Uuid()->toString(), 'epoch' => 1, 'kind' => 'browser',
+            'capabilities' => ['song', 'video'], 'available' => true, 'retired_at' => null, 'observed_state' => 'unknown',
+        ]);
+        $store->expects(self::once())->method('saveTransfer')->with(self::callback(
+            static fn(array $transfer): bool => $transfer['source_incarnation_id'] === null
+                && $transfer['target_incarnation_id'] === $target->toString() && $transfer['state'] === 'preparing',
+        ));
+        $store->expects(self::once())->method('insertCommand')->with(self::callback(
+            static fn(array $command): bool => $command['type'] === 'prepare' && $command['incarnation_id'] === $target->toString(),
+        ));
+
+        $this->coordinator($store)->execute($this->owner, PlaybackOperation::Transfer, [
+            'requestId' => new Uuid()->toString(), 'expectedRevision' => $revision, 'targetIncarnationId' => $target->toString(),
+        ]);
+
+        self::assertNull($session->activeIncarnationId());
+        self::assertSame(27.5, $session->getPosition());
+    }
+
+    /** @param array<string,mixed> $input */
+    #[DataProvider('guardedRequests')]
+    public function testAStaleRevisionIsRefusedBeforeAnyRelease(PlaybackOperation $operation, array $input): void
+    {
+        $session = $this->stoppedSession();
+        $store = $this->store($session);
+        $store->expects(self::never())->method('retireConfirmedStoppedBrowser');
+        $store->expects(self::never())->method('saveSession');
+
+        try {
+            $this->coordinator($store)->execute($this->owner, $operation, ['requestId' => new Uuid()->toString(), 'expectedRevision' => $session->revision() + 1] + $input);
+            self::fail('A request against another revision was accepted.');
+        } catch (ConflictException $error) {
+            self::assertSame('Playback revision conflict.', $error->getMessage());
+        }
+
+        self::assertSame($this->runner, $session->activeIncarnationId());
+    }
+
+    /** @return iterable<string,array{PlaybackOperation,array<string,mixed>}> */
+    public static function guardedRequests(): iterable
+    {
+        yield 'control' => [PlaybackOperation::Control, ['action' => 'play']];
+        yield 'transfer' => [PlaybackOperation::Transfer, ['targetIncarnationId' => new Uuid()->toString()]];
+    }
+
+    public function testARequestDuringATransferReleasesNothing(): void
+    {
+        $session = $this->stoppedSession();
+        $store = $this->store($session, [
+            'id' => new Uuid()->toString(), 'state' => 'preparing',
+            'expires_at' => new DateTimeImmutable('+20 seconds')->format(DATE_ATOM),
+        ]);
+        $store->expects(self::never())->method('retireConfirmedStoppedBrowser');
+        $store->method('register')->willReturn(['incarnationId' => new Uuid()->toString()]);
+
+        $this->coordinator($store)->execute($this->owner, PlaybackOperation::Endpoint, [
+            'deviceId' => new Uuid()->toString(), 'endpointId' => new Uuid()->toString(),
+        ]);
+
+        self::assertSame($this->runner, $session->activeIncarnationId());
+    }
+
     private function stoppedSession(bool $confirmed = true): ListeningSession
     {
         $session = ListeningSession::create($this->owner, [$this->track->toString()], 0, 27.5);
@@ -126,9 +250,13 @@ final class ConfirmedStoppedRunnerRecoveryTest extends TestCase
 
     private function snapshot(PlaybackStoreInterface $store): void
     {
+        $this->coordinator($store)->execute($this->owner, PlaybackOperation::Snapshot, []);
+    }
+
+    private function coordinator(PlaybackStoreInterface $store): PlaybackCoordinator
+    {
         $transactions = $this->createStub(TransactionPortInterface::class);
         $transactions->method('run')->willReturnCallback(static fn(callable $operation): mixed => $operation());
-        new PlaybackCoordinator($store, $transactions, $this->createStub(PlaybackMediaAccessInterface::class))
-            ->execute($this->owner, PlaybackOperation::Snapshot, []);
+        return new PlaybackCoordinator($store, $transactions, $this->createStub(PlaybackMediaAccessInterface::class));
     }
 }

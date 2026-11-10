@@ -7,6 +7,7 @@ import { requestPlayback, type PlaybackIntent } from '@/features/session/service
 import { usePlaybackSession } from '@/features/session/hooks/use-playback-session'
 import { PlaybackDestinationSelector } from '@/features/session/components/PlaybackDestinationSelector'
 import { useVideoPresentation } from '../stores/video-presentation-store'
+import { useVideoPresentationError } from '../hooks/use-video-presentation-error'
 import { textRole } from '@/shared/theme'
 import { ContentText } from '@/shared/typography'
 
@@ -88,7 +89,7 @@ export function MoviePlayerOverlay({ title, videoId, sourceDuration = 0, onClose
   const localTime = useVideoPresentation(state => state.currentTime)
   const localDuration = useVideoPresentation(state => state.duration)
   const pendingSeekPosition = useVideoPresentation(state => state.pendingSeekPosition)
-  const error = useVideoPresentation(state => state.error)
+  const error = useVideoPresentationError(snapshot)
   const localVideoId = useVideoPresentation(state => state.videoId)
   const local = !!endpoint && snapshot?.activeIncarnationId === endpoint.incarnationId
   const selected = snapshot?.media?.kind === 'video' && snapshot.media.publicId === videoId

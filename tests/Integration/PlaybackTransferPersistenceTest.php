@@ -466,8 +466,9 @@ final class PlaybackTransferPersistenceTest extends TestCase
         $service = $this->coordinator();
         $source = $this->endpoint($service, $owner);
         $target = $this->endpoint($service, $owner);
-        $snapshot = $this->activate($service, $owner, $source);
-        $this->manager->getConnection()->executeStatement("UPDATE playback_destination_incarnations SET expires_at=CURRENT_TIMESTAMP-INTERVAL '1 second' WHERE id=:id", ['id' => $source['incarnationId']]);
+        // A source that plays has no idle proof, so its lapsed presence releases nothing.
+        $snapshot = $this->playing($service, $owner, $source);
+        $this->expireRegistration($source['incarnationId']);
         $service->execute($owner, PlaybackOperation::Transfer, ['requestId' => new Uuid()->toString(), 'expectedRevision' => $snapshot['revision'], 'targetIncarnationId' => $target['incarnationId']]);
         $snapshot = $this->ack($service, $owner, $target, $this->pending($service, $owner, $target)['commands'][0], 'prepared');
         self::assertSame('quiescing', $snapshot['transfer']['state']);
@@ -730,11 +731,15 @@ final class PlaybackTransferPersistenceTest extends TestCase
         self::assertSame('stopped', $stopped['observedState']);
         self::assertSame(71.625, $stopped['position']);
         self::assertSame($snapshot['revision'], $stopped['revision']);
-        $new = $service->execute($owner, PlaybackOperation::Endpoint, $registration)['endpoint'];
+        $registered = $service->execute($owner, PlaybackOperation::Endpoint, $registration);
+        $new = $registered['endpoint'];
         self::assertNotSame($old['incarnationId'], $new['incarnationId']);
         self::assertNotSame($old['capability'], $new['capability']);
         self::assertSame($old['epoch'] + 1, $new['epoch']);
-        // Registering the same endpoint again retired the old incarnation; its stop report releases the session.
+        // Registering the same endpoint again retired the old incarnation; its stop report releases the
+        // session in the registration itself, and a later snapshot has nothing left to release.
+        self::assertNull($registered['activeIncarnationId']);
+        self::assertSame($stopped['revision'] + 1, $registered['revision']);
         $snapshot = $service->execute($owner, PlaybackOperation::Snapshot, []);
         self::assertCount(1, $snapshot['destinations']);
         self::assertSame($new['incarnationId'], $snapshot['destinations'][0]['incarnationId']);
@@ -819,11 +824,546 @@ final class PlaybackTransferPersistenceTest extends TestCase
      */
     private function playThenStop(PlaybackCoordinator $service, Uuid $owner, array $runner): array
     {
-        $snapshot = $this->activate($service, $owner, $runner);
-        $service->execute($owner, PlaybackOperation::Control, ['requestId' => new Uuid()->toString(), 'expectedRevision' => $snapshot['revision'], 'action' => 'play']);
-        $snapshot = $this->ack($service, $owner, $runner, $this->pending($service, $owner, $runner)['commands'][0], 'playing', 42.5);
+        $snapshot = $this->playing($service, $owner, $runner);
         $service->execute($owner, PlaybackOperation::Control, ['requestId' => new Uuid()->toString(), 'expectedRevision' => $snapshot['revision'], 'action' => 'stop']);
         return $this->ack($service, $owner, $runner, $this->pending($service, $owner, $runner)['commands'][0], 'stopped', 0.0);
+    }
+
+    /**
+     * @param array<string,mixed> $runner
+     * @return array<string,mixed>
+     */
+    private function playing(PlaybackCoordinator $service, Uuid $owner, array $runner): array
+    {
+        $snapshot = $this->activate($service, $owner, $runner);
+        $service->execute($owner, PlaybackOperation::Control, ['requestId' => new Uuid()->toString(), 'expectedRevision' => $snapshot['revision'], 'action' => 'play']);
+        return $this->ack($service, $owner, $runner, $this->pending($service, $owner, $runner)['commands'][0], 'playing', 42.5);
+    }
+
+    /**
+     * A tab that played, was told to pause, acknowledged it at 43 s and reported itself paused.
+     *
+     * @param list<string> $capabilities
+     * @return array{registration:array<string,mixed>,tab:array<string,mixed>,pause:array<string,mixed>,paused:array<string,mixed>}
+     */
+    private function pausedTab(PlaybackCoordinator $service, Uuid $owner, array $capabilities = ['song', 'video']): array
+    {
+        $device = new Uuid();
+        new DeviceDoctrineRepository($this->manager)->save(Device::create($owner, $device, 'Reloading tab'));
+        $registration = ['deviceId' => $device->toString(), 'endpointId' => new Uuid()->toString(), 'capabilities' => $capabilities];
+        $tab = $service->execute($owner, PlaybackOperation::Endpoint, $registration)['endpoint'];
+        $playing = $this->playing($service, $owner, $tab);
+        $pause = ['requestId' => new Uuid()->toString(), 'expectedRevision' => $playing['revision'], 'action' => 'pause', 'incarnationId' => $tab['incarnationId']];
+        $sent = $service->execute($owner, PlaybackOperation::Control, $pause, $tab['capability']);
+        $paused = $this->ack($service, $owner, $tab, $sent['commands'][0], 'paused', 43.0);
+        $service->execute($owner, PlaybackOperation::Observe, ['incarnationId' => $tab['incarnationId'], 'expectedRevision' => $paused['revision'], 'observedState' => 'paused', 'position' => 43.0], $tab['capability']);
+        return ['registration' => $registration, 'tab' => $tab, 'pause' => $pause, 'paused' => $paused];
+    }
+
+    private function expireRegistration(string $incarnationId): void
+    {
+        $this->manager->getConnection()->executeStatement("UPDATE playback_destination_incarnations SET expires_at=CURRENT_TIMESTAMP-INTERVAL '1 second' WHERE id=:id", ['id' => $incarnationId]);
+    }
+
+    private function expireCommands(Uuid $owner): void
+    {
+        $this->manager->getConnection()->executeStatement("UPDATE playback_commands SET expires_at=CURRENT_TIMESTAMP-INTERVAL '1 second' WHERE user_id=:owner AND acknowledged_at IS NULL", ['owner' => $owner->toString()]);
+    }
+
+    private function expireTransfer(Uuid $owner): void
+    {
+        $this->manager->getConnection()->executeStatement("UPDATE playback_transfers SET expires_at=CURRENT_TIMESTAMP-INTERVAL '1 second' WHERE user_id=:owner AND state NOT IN ('committed','failed')", ['owner' => $owner->toString()]);
+    }
+
+    /** @return list<array<string,mixed>> */
+    private function unanswered(Uuid $owner): array
+    {
+        return $this->observer->fetchAllAssociative('SELECT type,incarnation_id,revision,disclosed_at FROM playback_commands WHERE user_id=? AND acknowledged_at IS NULL ORDER BY created_at,id', [$owner->toString()]);
+    }
+
+    /**
+     * @param array<string,mixed> $input
+     * @param array<string,mixed>|null $endpoint
+     */
+    private function assertRefused(string $reason, PlaybackCoordinator $service, Uuid $owner, PlaybackOperation $operation, array $input, ?array $endpoint = null): void
+    {
+        try {
+            $service->execute($owner, $operation, ['requestId' => new Uuid()->toString()] + $input + ($endpoint === null ? [] : ['incarnationId' => $endpoint['incarnationId']]), $endpoint['capability'] ?? null);
+            self::fail($operation->value . ' was accepted.');
+        } catch (ConflictException $error) {
+            self::assertSame($reason, $error->getMessage());
+        }
+    }
+
+    public function testAPlayAClosedStoppedRunnerWasNeverShownSettlesAndTheRunnerIsReleasedOnceItsRegistrationLapses(): void
+    {
+        $owner = $this->createUser();
+        $service = $this->coordinator();
+        $runner = $this->endpoint($service, $owner);
+        $stopped = $this->playThenStop($service, $owner, $runner);
+        $other = $this->endpoint($service, $owner);
+
+        // The runner's tab has closed, so it never asks for its commands again; its registration still holds.
+        $request = ['requestId' => new Uuid()->toString(), 'expectedRevision' => $stopped['revision'], 'action' => 'play', 'incarnationId' => $other['incarnationId']];
+        $control = $service->execute($owner, PlaybackOperation::Control, $request, $other['capability']);
+        self::assertSame($runner['incarnationId'], $control['activeIncarnationId']);
+        self::assertSame('playing', $control['desiredState']);
+        self::assertNull($control['requestResult']['outcome']);
+        self::assertSame([], $control['commands']);
+
+        $this->expireCommands($owner);
+        $settled = $this->pending($service, $owner, $other);
+        self::assertSame($runner['incarnationId'], $settled['activeIncarnationId']);
+        self::assertSame('stopped', $settled['desiredState']);
+        self::assertSame('stopped', $settled['observedState']);
+        self::assertSame($control['revision'] + 1, $settled['revision']);
+        self::assertSame([], $this->unanswered($owner));
+        self::assertSame(
+            ['outcome' => 'never_effective', 'disclosed_at' => null],
+            $this->observer->fetchAssociative('SELECT outcome,disclosed_at FROM playback_commands WHERE id=?', [$request['requestId']]),
+        );
+        self::assertSame('never_effective', $service->execute($owner, PlaybackOperation::Control, $request, $other['capability'])['requestResult']['outcome']);
+        // A runner that is still registered keeps its place.
+        self::assertSame($settled['revision'], $this->pending($service, $owner, $other)['revision']);
+
+        $this->expireRegistration($runner['incarnationId']);
+        $released = $this->pending($service, $owner, $other);
+        self::assertNull($released['activeIncarnationId']);
+        self::assertNull($released['selectedDestinationId']);
+        self::assertSame('stopped', $released['desiredState']);
+        self::assertSame('stopped', $released['observedState']);
+        self::assertSame(42.5, $released['position']);
+        self::assertSame($settled['revision'] + 1, $released['revision']);
+
+        $play = $service->execute($owner, PlaybackOperation::Control, ['requestId' => new Uuid()->toString(), 'expectedRevision' => $released['revision'], 'action' => 'play', 'incarnationId' => $other['incarnationId']], $other['capability']);
+        self::assertSame('retained', $play['requestResult']['outcome']);
+        $transfer = $service->execute($owner, PlaybackOperation::Transfer, ['requestId' => new Uuid()->toString(), 'expectedRevision' => $play['revision'], 'targetIncarnationId' => $other['incarnationId']]);
+        self::assertNull($transfer['transfer']['sourceIncarnationId']);
+        self::assertSame(42.5, $transfer['position']);
+    }
+
+    public function testAPlayTheRunnerWasShownKeepsTheSessionUnknownThroughLaterStopExpiriesAndALapsedRegistration(): void
+    {
+        $owner = $this->createUser();
+        $service = $this->coordinator();
+        $device = new Uuid();
+        new DeviceDoctrineRepository($this->manager)->save(Device::create($owner, $device, 'Cut-off tab'));
+        $registration = ['deviceId' => $device->toString(), 'endpointId' => new Uuid()->toString()];
+        $runner = $service->execute($owner, PlaybackOperation::Endpoint, $registration)['endpoint'];
+        $stopped = $this->playThenStop($service, $owner, $runner);
+        $other = $this->endpoint($service, $owner);
+
+        $service->execute($owner, PlaybackOperation::Control, ['requestId' => new Uuid()->toString(), 'expectedRevision' => $stopped['revision'], 'action' => 'play', 'incarnationId' => $other['incarnationId']], $other['capability']);
+        // The runner is shown the play and never answers: it may be playing behind a lost connection.
+        self::assertSame('play', $this->pending($service, $owner, $runner)['commands'][0]['type']);
+
+        $this->expireCommands($owner);
+        $snapshot = $this->pending($service, $owner, $other);
+        self::assertSame($runner['incarnationId'], $snapshot['activeIncarnationId']);
+        self::assertSame('stopped', $snapshot['desiredState']);
+        self::assertSame('unknown', $snapshot['observedState']);
+        self::assertSame('unknown', $this->observer->fetchOne('SELECT observed_state FROM playback_destination_incarnations WHERE id=?', [$runner['incarnationId']]));
+
+        // The stops that follow are never shown to the runner. None of them may pass as harmless.
+        for ($expiry = 0; $expiry < 2; ++$expiry) {
+            $outstanding = $this->unanswered($owner);
+            self::assertCount(1, $outstanding);
+            self::assertSame('stop', $outstanding[0]['type']);
+            self::assertNull($outstanding[0]['disclosed_at']);
+            $this->expireCommands($owner);
+            $next = $this->pending($service, $owner, $other);
+            self::assertSame($runner['incarnationId'], $next['activeIncarnationId']);
+            self::assertSame('unknown', $next['observedState']);
+            self::assertGreaterThan($snapshot['revision'], $next['revision']);
+            $snapshot = $next;
+        }
+
+        $this->expireRegistration($runner['incarnationId']);
+        $lapsed = $this->pending($service, $owner, $other);
+        self::assertSame($runner['incarnationId'], $lapsed['activeIncarnationId']);
+        self::assertSame($snapshot['revision'], $lapsed['revision']);
+
+        $registered = $service->execute($owner, PlaybackOperation::Endpoint, $registration);
+        self::assertSame($runner['incarnationId'], $registered['activeIncarnationId']);
+        self::assertSame('unknown', $registered['observedState']);
+        $this->assertRefused('A runner control is awaiting acknowledgement.', $service, $owner, PlaybackOperation::Control, ['expectedRevision' => $registered['revision'], 'action' => 'play'], $registered['endpoint']);
+        $this->assertRefused('A runner control is awaiting acknowledgement.', $service, $owner, PlaybackOperation::Transfer, ['expectedRevision' => $registered['revision'], 'targetIncarnationId' => $other['incarnationId']]);
+
+        $outstanding = $this->unanswered($owner);
+        self::assertCount(1, $outstanding);
+        self::assertSame(['stop', $runner['incarnationId']], [$outstanding[0]['type'], $outstanding[0]['incarnation_id']]);
+        self::assertSame(0, (int) $this->observer->fetchOne("SELECT count(*) FROM playback_commands WHERE user_id=? AND outcome='never_effective'", [$owner->toString()]));
+        self::assertSame($runner['incarnationId'], $this->pending($service, $owner, $other)['activeIncarnationId']);
+    }
+
+    public function testAStopAConfirmedStoppedRunnerNeverAnswersSettlesAndDoesNotHoldItsRelease(): void
+    {
+        $owner = $this->createUser();
+        $service = $this->coordinator();
+        $runner = $this->endpoint($service, $owner);
+        $stopped = $this->playThenStop($service, $owner, $runner);
+        $other = $this->endpoint($service, $owner);
+
+        $request = ['requestId' => new Uuid()->toString(), 'expectedRevision' => $stopped['revision'], 'action' => 'stop', 'incarnationId' => $other['incarnationId']];
+        $service->execute($owner, PlaybackOperation::Control, $request, $other['capability']);
+        // Even a stop the runner was shown cannot start anything on a runner that had confirmed its stop.
+        self::assertSame('stop', $this->pending($service, $owner, $runner)['commands'][0]['type']);
+
+        $this->expireCommands($owner);
+        $this->expireRegistration($runner['incarnationId']);
+        $released = $this->pending($service, $owner, $other);
+        self::assertNull($released['activeIncarnationId']);
+        self::assertSame('stopped', $released['desiredState']);
+        self::assertSame('stopped', $released['observedState']);
+        self::assertSame([], $this->unanswered($owner));
+        self::assertSame('never_effective', $this->observer->fetchOne('SELECT outcome FROM playback_commands WHERE id=?', [$request['requestId']]));
+    }
+
+    public function testAStopSupersedingAPlayTheRunnerWasShownLeavesItUnknownUntilItAnswers(): void
+    {
+        $owner = $this->createUser();
+        $service = $this->coordinator();
+        $runner = $this->endpoint($service, $owner);
+        $stopped = $this->playThenStop($service, $owner, $runner);
+
+        $played = $service->execute($owner, PlaybackOperation::Control, ['requestId' => new Uuid()->toString(), 'expectedRevision' => $stopped['revision'], 'action' => 'play']);
+        self::assertSame('play', $this->pending($service, $owner, $runner)['commands'][0]['type']);
+        $stopping = $service->execute($owner, PlaybackOperation::Control, ['requestId' => new Uuid()->toString(), 'expectedRevision' => $played['revision'], 'action' => 'stop']);
+        self::assertSame('stopped', $stopping['desiredState']);
+        self::assertSame('unknown', $stopping['observedState']);
+        self::assertSame('unknown', $this->observer->fetchOne('SELECT observed_state FROM playback_destination_incarnations WHERE id=?', [$runner['incarnationId']]));
+
+        // The stop is never shown and expires: the play may have run, so nothing settles and nothing is released.
+        $this->expireCommands($owner);
+        $this->expireRegistration($runner['incarnationId']);
+        $unknown = $service->execute($owner, PlaybackOperation::Snapshot, []);
+        self::assertSame($runner['incarnationId'], $unknown['activeIncarnationId']);
+        self::assertSame('unknown', $unknown['observedState']);
+        self::assertCount(1, $this->unanswered($owner));
+
+        // The runner's own answer ends it.
+        $answered = $this->ack($service, $owner, $runner, $this->pending($service, $owner, $runner)['commands'][0], 'stopped');
+        self::assertSame('stopped', $answered['observedState']);
+        self::assertSame('stopped', $this->observer->fetchOne('SELECT observed_state FROM playback_destination_incarnations WHERE id=?', [$runner['incarnationId']]));
+    }
+
+    public function testAStopSupersedingAPauseTheRunnerWasShownKeepsItConfirmedAndStillSettles(): void
+    {
+        $owner = $this->createUser();
+        $service = $this->coordinator();
+        $runner = $this->endpoint($service, $owner);
+        $stopped = $this->playThenStop($service, $owner, $runner);
+        $other = $this->endpoint($service, $owner);
+
+        $paused = $service->execute($owner, PlaybackOperation::Control, ['requestId' => new Uuid()->toString(), 'expectedRevision' => $stopped['revision'], 'action' => 'pause']);
+        self::assertSame('pause', $this->pending($service, $owner, $runner)['commands'][0]['type']);
+        // A pause cannot start anything, so superseding it leaves the runner's confirmed stop standing.
+        $stop = ['requestId' => new Uuid()->toString(), 'expectedRevision' => $paused['revision'], 'action' => 'stop'];
+        $stopping = $service->execute($owner, PlaybackOperation::Control, $stop);
+        self::assertSame('stopped', $stopping['desiredState']);
+        self::assertSame('stopped', $stopping['observedState']);
+        self::assertSame('stopped', $this->observer->fetchOne('SELECT observed_state FROM playback_destination_incarnations WHERE id=?', [$runner['incarnationId']]));
+
+        // The runner has gone: the stop expires unanswered, settles, and the lapsed runner is released.
+        $this->expireCommands($owner);
+        $this->expireRegistration($runner['incarnationId']);
+        $released = $this->pending($service, $owner, $other);
+        self::assertNull($released['activeIncarnationId']);
+        self::assertSame('stopped', $released['desiredState']);
+        self::assertSame('stopped', $released['observedState']);
+        self::assertSame([], $this->unanswered($owner));
+        self::assertSame('never_effective', $this->observer->fetchOne('SELECT outcome FROM playback_commands WHERE id=?', [$stop['requestId']]));
+    }
+
+    public function testATransferRightAfterTheLapseStartsItsTargetWithoutASource(): void
+    {
+        $owner = $this->createUser();
+        $service = $this->coordinator();
+        $runner = $this->endpoint($service, $owner);
+        $stopped = $this->playThenStop($service, $owner, $runner);
+        $other = $this->endpoint($service, $owner);
+        // No snapshot runs between the lapse and the transfer.
+        $this->expireRegistration($runner['incarnationId']);
+
+        $transfer = $service->execute($owner, PlaybackOperation::Transfer, ['requestId' => new Uuid()->toString(), 'expectedRevision' => $stopped['revision'], 'targetIncarnationId' => $other['incarnationId']]);
+        self::assertNull($transfer['transfer']['sourceIncarnationId']);
+        self::assertNull($transfer['activeIncarnationId']);
+        self::assertNotNull($this->observer->fetchOne('SELECT retired_at FROM playback_destination_incarnations WHERE id=?', [$runner['incarnationId']]));
+        $starting = $this->ack($service, $owner, $other, $this->pending($service, $owner, $other)['commands'][0], 'prepared');
+        self::assertSame('starting', $starting['transfer']['state']);
+        $committed = $this->ack($service, $owner, $other, $this->pending($service, $owner, $other)['commands'][0], 'started');
+        self::assertNull($committed['transfer']);
+        self::assertSame($other['incarnationId'], $committed['activeIncarnationId']);
+        self::assertSame(42.5, $committed['position']);
+        self::assertSame([], $this->pending($service, $owner, $runner)['commands']);
+    }
+
+    public function testAStaleRevisionIsRefusedBeforeAGoneRunnerIsReleased(): void
+    {
+        $owner = $this->createUser();
+        $service = $this->coordinator();
+        $runner = $this->endpoint($service, $owner);
+        $stopped = $this->playThenStop($service, $owner, $runner);
+        $other = $this->endpoint($service, $owner);
+        $this->expireRegistration($runner['incarnationId']);
+
+        $this->assertRefused('Playback revision conflict.', $service, $owner, PlaybackOperation::Control, ['expectedRevision' => $stopped['revision'] - 1, 'action' => 'play']);
+        $this->assertRefused('Playback revision conflict.', $service, $owner, PlaybackOperation::Transfer, ['expectedRevision' => $stopped['revision'] - 1, 'targetIncarnationId' => $other['incarnationId']]);
+        self::assertSame($runner['incarnationId'], $this->observer->fetchOne('SELECT active_incarnation_id FROM listening_sessions WHERE user_id=?', [$owner->toString()]));
+        self::assertNull($this->observer->fetchOne('SELECT retired_at FROM playback_destination_incarnations WHERE id=?', [$runner['incarnationId']]));
+
+        // The same control at the current revision releases the runner and is retained without one.
+        $play = $service->execute($owner, PlaybackOperation::Control, ['requestId' => new Uuid()->toString(), 'expectedRevision' => $stopped['revision'], 'action' => 'play']);
+        self::assertNull($play['activeIncarnationId']);
+        self::assertSame('retained', $play['requestResult']['outcome']);
+        self::assertSame($stopped['revision'] + 2, $play['revision']);
+    }
+
+    public function testATransferFromAClosedStoppedSourceInsideItsRegistrationWindowFailsAtExpiryAndReleasesTheSource(): void
+    {
+        $owner = $this->createUser();
+        $service = $this->coordinator();
+        $runner = $this->endpoint($service, $owner);
+        $stopped = $this->playThenStop($service, $owner, $runner);
+        $other = $this->endpoint($service, $owner);
+
+        $request = ['requestId' => new Uuid()->toString(), 'expectedRevision' => $stopped['revision'], 'targetIncarnationId' => $other['incarnationId']];
+        $transfer = $service->execute($owner, PlaybackOperation::Transfer, $request);
+        self::assertSame($runner['incarnationId'], $transfer['transfer']['sourceIncarnationId']);
+        $quiescing = $this->ack($service, $owner, $other, $this->pending($service, $owner, $other)['commands'][0], 'prepared');
+        self::assertSame('quiescing', $quiescing['transfer']['state']);
+
+        // The closed source never quiesces. No start was ever issued, so nothing new can be playing.
+        $this->expireTransfer($owner);
+        $failed = $this->pending($service, $owner, $other);
+        self::assertNull($failed['transfer']);
+        self::assertSame([], $failed['commands']);
+        self::assertSame($runner['incarnationId'], $failed['activeIncarnationId']);
+        self::assertSame($runner['destinationId'], $failed['selectedDestinationId']);
+        self::assertSame('stopped', $failed['desiredState']);
+        self::assertSame('stopped', $failed['observedState']);
+        self::assertSame('failed', $service->execute($owner, PlaybackOperation::Transfer, $request)['transferResult']['state']);
+        self::assertSame([], $this->unanswered($owner));
+
+        $this->expireRegistration($runner['incarnationId']);
+        $released = $this->pending($service, $owner, $other);
+        self::assertNull($released['activeIncarnationId']);
+        self::assertSame('stopped', $released['observedState']);
+        self::assertSame(42.5, $released['position']);
+    }
+
+    public function testAnExpiredTransferSettlesWhenItsTargetWasNeverShownTheStart(): void
+    {
+        $owner = $this->createUser();
+        $service = $this->coordinator();
+        $source = $this->endpoint($service, $owner);
+        $target = $this->endpoint($service, $owner);
+        $playing = $this->playing($service, $owner, $source);
+        $service->execute($owner, PlaybackOperation::Transfer, ['requestId' => new Uuid()->toString(), 'expectedRevision' => $playing['revision'], 'targetIncarnationId' => $target['incarnationId']]);
+        $this->ack($service, $owner, $target, $this->pending($service, $owner, $target)['commands'][0], 'prepared');
+        $this->ack($service, $owner, $source, $this->pending($service, $owner, $source)['commands'][0], 'quiesced', 50.0);
+
+        // The target goes away before it asks for its start.
+        $this->expireRegistration($target['incarnationId']);
+        $this->expireTransfer($owner);
+        $failed = $this->pending($service, $owner, $source);
+        self::assertNull($failed['transfer']);
+        self::assertSame($source['incarnationId'], $failed['activeIncarnationId']);
+        self::assertSame($source['destinationId'], $failed['selectedDestinationId']);
+        self::assertSame('paused', $failed['desiredState']);
+        self::assertSame('paused', $failed['observedState']);
+        self::assertSame(50.0, $failed['position']);
+        self::assertSame([], $this->unanswered($owner));
+
+        // The source is the runner again and takes controls.
+        $service->execute($owner, PlaybackOperation::Control, ['requestId' => new Uuid()->toString(), 'expectedRevision' => $failed['revision'], 'action' => 'play']);
+        self::assertSame('play', $this->pending($service, $owner, $source)['commands'][0]['type']);
+    }
+
+    public function testAnExpiredTransferStaysUncertainOnceItsTargetWasShownTheStart(): void
+    {
+        $owner = $this->createUser();
+        $service = $this->coordinator();
+        $source = $this->endpoint($service, $owner);
+        $target = $this->endpoint($service, $owner);
+        $playing = $this->playing($service, $owner, $source);
+        $service->execute($owner, PlaybackOperation::Transfer, ['requestId' => new Uuid()->toString(), 'expectedRevision' => $playing['revision'], 'targetIncarnationId' => $target['incarnationId']]);
+        $this->ack($service, $owner, $target, $this->pending($service, $owner, $target)['commands'][0], 'prepared');
+        $this->ack($service, $owner, $source, $this->pending($service, $owner, $source)['commands'][0], 'quiesced', 50.0);
+        self::assertSame('start', $this->pending($service, $owner, $target)['commands'][0]['type']);
+
+        $this->expireRegistration($target['incarnationId']);
+        $snapshot = null;
+        for ($expiry = 0; $expiry < 3; ++$expiry) {
+            $this->expireTransfer($owner);
+            $snapshot = $this->pending($service, $owner, $source);
+            self::assertSame('uncertain', $snapshot['transfer']['state']);
+            self::assertSame($source['incarnationId'], $snapshot['activeIncarnationId']);
+            self::assertSame('unknown', $snapshot['observedState']);
+        }
+        $outstanding = $this->unanswered($owner);
+        self::assertCount(1, $outstanding);
+        self::assertSame(['stop', $target['incarnationId']], [$outstanding[0]['type'], $outstanding[0]['incarnation_id']]);
+        $this->assertRefused('Playback controls wait for transfer reconciliation.', $service, $owner, PlaybackOperation::Control, ['expectedRevision' => $snapshot['revision'], 'action' => 'stop'], $source);
+    }
+
+    public function testACommandIsRecordedAsShownOnlyWhenASnapshotIsBuiltForItsOwnEndpoint(): void
+    {
+        $owner = $this->createUser();
+        $service = $this->coordinator();
+        $runner = $this->endpoint($service, $owner);
+        $stopped = $this->playThenStop($service, $owner, $runner);
+        $other = $this->endpoint($service, $owner);
+        $request = ['requestId' => new Uuid()->toString(), 'expectedRevision' => $stopped['revision'], 'action' => 'play', 'incarnationId' => $other['incarnationId']];
+        $shown = fn(): mixed => $this->observer->fetchOne('SELECT disclosed_at FROM playback_commands WHERE id=?', [$request['requestId']]);
+
+        $service->execute($owner, PlaybackOperation::Control, $request, $other['capability']);
+        self::assertNull($shown());
+        $service->execute($owner, PlaybackOperation::Snapshot, []);
+        $this->pending($service, $owner, $other);
+        $service->execute($owner, PlaybackOperation::Control, $request, $other['capability']);
+        self::assertNull($shown());
+
+        // A snapshot built inside a transaction that has not committed delivers nothing and records nothing.
+        $connection = $this->manager->getConnection();
+        $connection->beginTransaction();
+        self::assertSame([], $this->pending($service, $owner, $runner)['commands']);
+        $connection->commit();
+        self::assertNull($shown());
+
+        self::assertSame($request['requestId'], $this->pending($service, $owner, $runner)['commands'][0]['id']);
+        $first = $shown();
+        self::assertNotNull($first);
+        $this->pending($service, $owner, $runner);
+        self::assertSame($first, $shown());
+    }
+
+    public function testReRegisteringTheSameTabReleasesItsAcknowledgedPausedRunnerInTheRegistrationSnapshot(): void
+    {
+        $owner = $this->createUser();
+        $service = $this->coordinator();
+        ['registration' => $registration, 'tab' => $tab, 'pause' => $pause, 'paused' => $paused] = $this->pausedTab($service, $owner);
+        // The client reads the pause's result again under the same request identity; that adds no command.
+        $replayed = $service->execute($owner, PlaybackOperation::Control, $pause, $tab['capability']);
+        self::assertSame('paused', $replayed['requestResult']['outcome']);
+        self::assertSame($paused['revision'], $replayed['revision']);
+        self::assertSame($tab['incarnationId'], $replayed['activeIncarnationId']);
+
+        $registered = $service->execute($owner, PlaybackOperation::Endpoint, $registration);
+        $reloaded = $registered['endpoint'];
+        self::assertNotSame($tab['incarnationId'], $reloaded['incarnationId']);
+        self::assertNull($registered['activeIncarnationId']);
+        self::assertNull($registered['activeDestinationId']);
+        self::assertNull($registered['selectedDestinationId']);
+        self::assertSame('paused', $registered['desiredState']);
+        self::assertSame('paused', $registered['observedState']);
+        self::assertSame(43.0, $registered['position']);
+        self::assertSame($paused['revision'] + 1, $registered['revision']);
+
+        // An immediate Play is accepted: it is retained without a runner and the tab then takes playback itself.
+        $play = $service->execute($owner, PlaybackOperation::Control, ['requestId' => new Uuid()->toString(), 'expectedRevision' => $registered['revision'], 'action' => 'play', 'incarnationId' => $reloaded['incarnationId']], $reloaded['capability']);
+        self::assertSame('retained', $play['requestResult']['outcome']);
+        $transfer = $service->execute($owner, PlaybackOperation::Transfer, ['requestId' => new Uuid()->toString(), 'expectedRevision' => $play['revision'], 'targetIncarnationId' => $reloaded['incarnationId']]);
+        self::assertNull($transfer['transfer']['sourceIncarnationId']);
+        self::assertSame(43.0, $transfer['position']);
+        self::assertSame([], $this->pending($service, $owner, $tab)['commands']);
+    }
+
+    public function testRegisteringAnotherTabKeepsALivePausedRunner(): void
+    {
+        $owner = $this->createUser();
+        $service = $this->coordinator();
+        ['tab' => $tab, 'paused' => $paused] = $this->pausedTab($service, $owner);
+        $device = new Uuid();
+        new DeviceDoctrineRepository($this->manager)->save(Device::create($owner, $device, 'Second tab'));
+
+        $registered = $service->execute($owner, PlaybackOperation::Endpoint, ['deviceId' => $device->toString(), 'endpointId' => new Uuid()->toString()]);
+
+        self::assertSame($tab['incarnationId'], $registered['activeIncarnationId']);
+        self::assertSame($paused['revision'], $registered['revision']);
+        self::assertNull($this->observer->fetchOne('SELECT retired_at FROM playback_destination_incarnations WHERE id=?', [$tab['incarnationId']]));
+    }
+
+    public function testReRegisteringTheSameTabKeepsARunnerWithoutPauseProof(): void
+    {
+        $service = $this->coordinator();
+        foreach (['playing', 'a later volume command', 'a pending command the runner was shown'] as $case) {
+            $owner = $this->createUser();
+            if ($case === 'playing') {
+                $device = new Uuid();
+                new DeviceDoctrineRepository($this->manager)->save(Device::create($owner, $device, 'Reloading tab'));
+                $registration = ['deviceId' => $device->toString(), 'endpointId' => new Uuid()->toString()];
+                $tab = $service->execute($owner, PlaybackOperation::Endpoint, $registration)['endpoint'];
+                $before = $this->playing($service, $owner, $tab);
+            } else {
+                ['registration' => $registration, 'tab' => $tab, 'paused' => $paused] = $this->pausedTab($service, $owner, ['song', 'video', 'volume']);
+                $control = ['requestId' => new Uuid()->toString(), 'expectedRevision' => $paused['revision'], 'incarnationId' => $tab['incarnationId']]
+                    + ($case === 'a later volume command' ? ['action' => 'volume', 'volume' => 0.5] : ['action' => 'play']);
+                $before = $service->execute($owner, PlaybackOperation::Control, $control, $tab['capability']);
+                self::assertCount(1, $before['commands'], $case);
+                if ($case === 'a later volume command') {
+                    $before = $this->ack($service, $owner, $tab, $before['commands'][0], 'applied', volume: 0.5);
+                }
+            }
+
+            $registered = $service->execute($owner, PlaybackOperation::Endpoint, $registration);
+
+            self::assertSame($tab['incarnationId'], $registered['activeIncarnationId'], $case);
+            self::assertSame($before['revision'], $registered['revision'], $case);
+            self::assertNotSame($tab['incarnationId'], $registered['endpoint']['incarnationId'], $case);
+        }
+    }
+
+    public function testAPausedRunnerIsReleasedAfterAPlayItWasNeverShownSettles(): void
+    {
+        $owner = $this->createUser();
+        $service = $this->coordinator();
+        ['tab' => $tab, 'paused' => $paused] = $this->pausedTab($service, $owner);
+        $other = $this->endpoint($service, $owner);
+
+        $request = ['requestId' => new Uuid()->toString(), 'expectedRevision' => $paused['revision'], 'action' => 'play', 'incarnationId' => $other['incarnationId']];
+        $service->execute($owner, PlaybackOperation::Control, $request, $other['capability']);
+        $this->expireCommands($owner);
+        $settled = $this->pending($service, $owner, $other);
+        self::assertSame($tab['incarnationId'], $settled['activeIncarnationId']);
+        self::assertSame('paused', $settled['desiredState']);
+        self::assertSame('paused', $settled['observedState']);
+        self::assertSame($paused['revision'] + 2, $settled['revision']);
+
+        $this->expireRegistration($tab['incarnationId']);
+        $released = $this->pending($service, $owner, $other);
+        self::assertNull($released['activeIncarnationId']);
+        self::assertSame('paused', $released['desiredState']);
+        self::assertSame('paused', $released['observedState']);
+        self::assertSame(43.0, $released['position']);
+        self::assertSame($settled['revision'] + 1, $released['revision']);
+    }
+
+    public function testAPausedRunnerKeepsItsPlaceAfterAPlayItWasShownOrASupersededCommand(): void
+    {
+        $service = $this->coordinator();
+        foreach (['shown', 'superseded'] as $case) {
+            $owner = $this->createUser();
+            ['tab' => $tab, 'paused' => $paused] = $this->pausedTab($service, $owner);
+            $other = $this->endpoint($service, $owner);
+            $request = ['requestId' => new Uuid()->toString(), 'expectedRevision' => $paused['revision'], 'action' => 'play', 'incarnationId' => $other['incarnationId']];
+            $service->execute($owner, PlaybackOperation::Control, $request, $other['capability']);
+            if ($case === 'shown') {
+                $this->pending($service, $owner, $tab);
+            }
+            $this->expireCommands($owner);
+            $this->pending($service, $owner, $other);
+            if ($case === 'superseded') {
+                // The same history, except that the command was closed as one its runner may have seen.
+                $this->manager->getConnection()->executeStatement("UPDATE playback_commands SET outcome='superseded' WHERE id=:id", ['id' => $request['requestId']]);
+            }
+            $this->expireRegistration($tab['incarnationId']);
+
+            $snapshot = $this->pending($service, $owner, $other);
+
+            self::assertSame($tab['incarnationId'], $snapshot['activeIncarnationId'], $case);
+            self::assertNull($this->observer->fetchOne('SELECT retired_at FROM playback_destination_incarnations WHERE id=?', [$tab['incarnationId']]), $case);
+        }
     }
 
     public function testRejectedTransferReasonSurvivesLaterTransfersAndExactReplay(): void

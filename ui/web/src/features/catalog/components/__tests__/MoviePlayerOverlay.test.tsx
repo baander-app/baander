@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, screen } from '@testing-library/react'
+import { cleanup, fireEvent, screen } from '@testing-library/react'
 import { render } from '../../../../../tests/test-utils'
 import { MoviePlayerOverlay } from '../MoviePlayerOverlay'
 
@@ -18,6 +18,8 @@ vi.mock('@/features/session/services/playback-execution', () => ({ requestPlayba
 
 afterEach(() => { cleanup() })
 beforeEach(() => {
+  request.mockReset()
+  playback.reportError.mockReset()
   session.snapshot.media.publicId = 'video'
   session.snapshot.activeIncarnationId = 'local'
   session.endpoint = { incarnationId: 'local' }
@@ -27,8 +29,8 @@ beforeEach(() => {
   session.snapshot.destinations[0].capabilities = ['volume']
 })
 
-function renderOverlay() {
-  render(<MoviePlayerOverlay title="Fixture movie" videoId="video" onClose={vi.fn()} />)
+function renderOverlay(onClose: () => void = vi.fn()) {
+  render(<MoviePlayerOverlay title="Fixture movie" videoId="video" onClose={onClose} />)
 }
 
 function sliderRoot(name: string) {
@@ -76,5 +78,44 @@ describe('movie overlay control layout', () => {
     const wrapper = volume.parentElement as HTMLElement
     expect(wrapper).not.toBe(controlsRow())
     expect(getComputedStyle(wrapper).width).toBe('80px')
+  })
+})
+
+describe('movie overlay close', () => {
+  it('asks the session to stop this tab\'s video and closes once that resolves', async () => {
+    // The request also resolves, without a control, while a transfer is uncertain: the
+    // coordinator silences the local video and the session keeps its fence.
+    request.mockResolvedValueOnce(undefined)
+    const onClose = vi.fn()
+    renderOverlay(onClose)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }))
+
+    await vi.waitFor(() => expect(onClose).toHaveBeenCalledOnce())
+    expect(request).toHaveBeenCalledExactlyOnceWith({ action: 'stop-local-video', incarnationId: 'local', videoId: 'video' })
+    expect(playback.reportError).not.toHaveBeenCalled()
+  })
+
+  it('stays open and reports the reason when the stop is refused', async () => {
+    const refusal = new Error('Playback revision conflict.')
+    request.mockRejectedValueOnce(refusal)
+    const onClose = vi.fn()
+    renderOverlay(onClose)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }))
+
+    await vi.waitFor(() => expect(playback.reportError).toHaveBeenCalledExactlyOnceWith(refusal))
+    expect(onClose).not.toHaveBeenCalled()
+  })
+
+  it('closes without a request while this tab has no playback endpoint', async () => {
+    session.endpoint = null
+    const onClose = vi.fn()
+    renderOverlay(onClose)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }))
+
+    await vi.waitFor(() => expect(onClose).toHaveBeenCalledOnce())
+    expect(request).not.toHaveBeenCalled()
   })
 })

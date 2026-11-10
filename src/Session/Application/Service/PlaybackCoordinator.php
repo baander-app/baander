@@ -24,6 +24,9 @@ use InvalidArgumentException;
 
 final readonly class PlaybackCoordinator implements PlaybackCoordinationInterface
 {
+    /** Controls that can start playback on the runner that executes them. */
+    private const array STARTING_CONTROLS = ['play', 'load', 'seek'];
+
     public function __construct(
         private PlaybackStoreInterface $store,
         private TransactionPortInterface $transactions,
@@ -65,14 +68,7 @@ final readonly class PlaybackCoordinator implements PlaybackCoordinationInterfac
             $before = serialize($session->getState());
             $transfer = $this->store->currentTransfer($session->getId()->toString());
             if ($transfer !== null && new DateTimeImmutable($transfer['expires_at']) <= new DateTimeImmutable()) {
-                $model = $this->model($transfer);
-                $model->expire();
-                $this->store->cancelCommands($transfer['id']);
-                $session->advanceRevision();
-                $this->persistTransfer($session, $transfer, $model);
-                if ($model->state() === 'uncertain') {
-                    $session->retainUncertainRunner();
-                }
+                $this->expireTransfer($session, $transfer);
                 $transfer = $this->store->currentTransfer($session->getId()->toString());
             }
             $this->expireControl($session);
@@ -81,6 +77,10 @@ final readonly class PlaybackCoordinator implements PlaybackCoordinationInterfac
                     $input['deviceId'] = $this->uuid($input, 'deviceId');
                     $input['endpointId'] = $this->uuid($input, 'endpointId');
                     $registration = $this->store->register($owner, $input);
+                    // Registering a tab again retires its previous incarnation. The answer to the
+                    // registration must already show a runner that this proves gone as released, or the
+                    // tab would refuse its own first Play until the next relayed snapshot.
+                    $this->releaseGoneRunner($session, $transfer);
                     break;
                 case PlaybackOperation::Transfer:
                     $requestId = $this->uuid($input, 'requestId');
@@ -94,6 +94,8 @@ final readonly class PlaybackCoordinator implements PlaybackCoordinationInterfac
                     if ($transfer !== null) {
                         throw new ConflictException('Another playback transfer is still being reconciled.');
                     }
+                    // A runner that is provably gone and idle is no source: the target starts directly.
+                    $this->releaseGoneRunner($session, $transfer);
                     $target = $this->store->endpoint($owner, $this->uuid($input, 'targetIncarnationId'));
                     if (!$target['available']) {
                         throw new ConflictException('The destination is unavailable.');
@@ -169,7 +171,23 @@ final readonly class PlaybackCoordinator implements PlaybackCoordinationInterfac
                         if ($action !== 'stop') {
                             throw new ConflictException('A runner control is awaiting acknowledgement.');
                         }
-                        $this->store->supersedeControls($session->getId()->toString());
+                        $started = array_filter(
+                            $this->store->supersedeControls($session->getId()->toString()),
+                            static fn(array $shown): bool => in_array($shown['type'], self::STARTING_CONTROLS, true),
+                        );
+                        if ($started !== []) {
+                            // The runner may have started on a control it was shown. Until it answers, its
+                            // state is unknown, so this stop cannot later pass as one that changed nothing.
+                            // A superseded pause, stop, volume or queue edit cannot have started anything.
+                            $session->retainUncertainRunner();
+                            foreach (array_unique(array_column($started, 'incarnation_id')) as $incarnation) {
+                                $this->store->markRunnerUnknown($incarnation);
+                            }
+                        }
+                    } else {
+                        // The request already passed the revision check, so the release cannot refuse it.
+                        // The control is then retained without a runner, as for a session nobody plays.
+                        $this->releaseGoneRunner($session, $transfer);
                     }
                     $previousQueue = $session->getQueue();
                     $session->control(
@@ -226,22 +244,7 @@ final readonly class PlaybackCoordinator implements PlaybackCoordinationInterfac
                     $this->persistTransfer($session, $transfer, $this->model($transfer));
                     break;
                 case PlaybackOperation::Snapshot:
-                    if ($transfer !== null || $session->activeIncarnationId() === null) {
-                        break;
-                    }
-                    if ($session->desiredState() === PlaybackState::Paused
-                        && $session->observedState() === ObservedPlaybackState::Paused
-                        && $this->store->retireConfirmedPausedBrowser($session)) {
-                        $session->releaseConfirmedPausedRunner();
-                    } elseif ($session->desiredState() === PlaybackState::Stopped
-                        && $session->observedState() === ObservedPlaybackState::Stopped
-                        && $this->store->retireConfirmedStoppedBrowser($session)) {
-                        // A deliberately stopped runner keeps its place only while it stays registered.
-                        // Once it has gone, no destination carries it and every client would be refused
-                        // playback for good, so the session continues stopped at its cursor without an
-                        // executor.
-                        $session->releaseConfirmedStoppedRunner();
-                    }
+                    $this->releaseGoneRunner($session, $transfer);
                     break;
                 default:
                     throw new InvalidArgumentException('Unknown playback operation.');
@@ -361,10 +364,24 @@ final readonly class PlaybackCoordinator implements PlaybackCoordinationInterfac
         if ($command === null || new DateTimeImmutable($command['expires_at']) > new DateTimeImmutable()) {
             return;
         }
-        $this->store->cancelCommands($command['attempt_id']);
         if (in_array($command['type'], ['volume', 'queue'], true)) {
+            $this->store->cancelCommands($command['attempt_id']);
             $session->advanceRevision();
             return;
+        }
+        if ($this->neverEffective($session, $command)) {
+            // The runner was confirmed idle and cannot have been started by this command, so nothing
+            // is uncertain: the session wants the confirmed state again and no stop is owed.
+            $this->store->settleNeverEffective($command['attempt_id']);
+            $session->settleUnansweredControl();
+            return;
+        }
+        $this->store->cancelCommands($command['attempt_id']);
+        if ($command['disclosed_at'] !== null && in_array($command['type'], self::STARTING_CONTROLS, true)) {
+            // The runner was shown a control that can start playback and did not answer. Its own last
+            // report no longer describes it, so neither the stop issued below nor any later stop can
+            // settle as harmless before the runner answers.
+            $this->store->markRunnerUnknown($command['incarnation_id']);
         }
         $preservePaused = $command['type'] === 'stop' && $session->desiredState() === PlaybackState::Paused;
         $session->retainUncertainRunner();
@@ -381,6 +398,76 @@ final readonly class PlaybackCoordinator implements PlaybackCoordinationInterfac
             'stop',
             $command['request_digest'],
         );
+    }
+
+    /**
+     * An expired control changed nothing when its browser runner was confirmed idle, by the session and
+     * by the runner's own last report, and the control either never left the server or can only silence.
+     * A registration that lapsed is no part of this proof: a runner that was shown a play and then cut
+     * off keeps playing.
+     *
+     * @param array<string,mixed> $command
+     */
+    private function neverEffective(ListeningSession $session, array $command): bool
+    {
+        if (!in_array($session->observedState(), [ObservedPlaybackState::Stopped, ObservedPlaybackState::Paused], true)
+            || ($command['disclosed_at'] !== null && !in_array($command['type'], ['stop', 'pause'], true))) {
+            return false;
+        }
+        $runner = $this->store->endpoint($session->getUserId()->toString(), $command['incarnation_id']);
+        return $runner['kind'] === 'browser' && in_array($runner['observed_state'], ['stopped', 'paused'], true);
+    }
+
+    /**
+     * A confirmed paused or stopped browser runner keeps its place only while it stays registered. Once
+     * it has gone, no destination carries it and every client would be refused playback for good, so
+     * the session continues at its cursor without an executor. The store holds the proof; a session
+     * whose state is unknown, or that has a transfer or a command outstanding, releases nothing.
+     *
+     * @param array<string,mixed>|null $transfer
+     */
+    private function releaseGoneRunner(ListeningSession $session, ?array $transfer): void
+    {
+        if ($transfer !== null || $session->activeIncarnationId() === null) {
+            return;
+        }
+        if ($session->desiredState() === PlaybackState::Paused
+            && $session->observedState() === ObservedPlaybackState::Paused
+            && $this->store->retireConfirmedPausedBrowser($session)) {
+            $session->releaseConfirmedPausedRunner();
+        } elseif ($session->desiredState() === PlaybackState::Stopped
+            && $session->observedState() === ObservedPlaybackState::Stopped
+            && $this->store->retireConfirmedStoppedBrowser($session)) {
+            $session->releaseConfirmedStoppedRunner();
+        }
+    }
+
+    /**
+     * A transfer that ran out of time fails when its target was never shown a start: nothing new can be
+     * playing. Once the target was shown its start it may be playing, and the transfer stays uncertain
+     * until the target confirms a stop.
+     *
+     * @param array<string,mixed> $transfer
+     */
+    private function expireTransfer(ListeningSession $session, array $transfer): void
+    {
+        $model = $this->model($transfer);
+        $quiescing = $model->state() === 'quiescing';
+        $model->expire($this->store->attemptDisclosed($transfer['id'], 'start'));
+        $this->store->cancelCommands($transfer['id']);
+        $session->advanceRevision();
+        $this->persistTransfer($session, $transfer, $model);
+        if ($model->state() === 'uncertain') {
+            $session->retainUncertainRunner();
+            return;
+        }
+        $session->restoreSelection($session->activeIncarnationId() === null ? null : Uuid::fromString($this->store->endpoint($session->getUserId()->toString(), $session->activeIncarnationId()->toString())['destination_id']));
+        if ($quiescing
+            && !in_array($session->observedState(), [ObservedPlaybackState::Stopped, ObservedPlaybackState::Paused], true)
+            && $this->store->attemptDisclosed($transfer['id'], 'quiesce')) {
+            // The source was shown the quiesce and did not answer: it may have paused or may still play.
+            $session->retainUncertainRunner();
+        }
     }
 
     /**
