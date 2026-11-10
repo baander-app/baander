@@ -84,4 +84,4 @@ The gate used to click and hope. It proved "Play works after a reload" only when
 
 - `docs/solutions/best-practices/browser-font-checks-that-pass-without-proving-anything.md`: another browser check that passed without testing what it claimed.
 - `docs/solutions/best-practices/pace-held-frame-fixtures-by-generated-frames.md`: a fixture whose pass depended on host speed.
-- Receipts: `var/test-runs/u7-gate-head2-firefox-run2/browser/failure.json` (failing), `var/test-runs/outstanding-firefox-1/browser/diag.json` (instrumented timeline), `var/test-runs/final-gate-firefox` and `var/test-runs/final-gate-chromium` (passing with the registration entry).
+- The instrumented timeline that settled it, for comparison when this recurs (Firefox, before the fix): control `pause` with `expectedRevision` 20 answers revision 21 with a command and outcome `null`; the acknowledgement answers revision 22; the same control, same `requestId` and `expectedRevision` 20, answers revision 22 with no command and outcome `paused`; reload; the registration answer at revision 22 still names the old incarnation; the release snapshot at revision 23 follows 710 ms later.

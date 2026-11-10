@@ -79,4 +79,4 @@ The dwell is timing, not a signal. The hook cannot see hls.js's end-of-stream, s
 ## Related
 
 - `docs/solutions/best-practices/pace-held-frame-fixtures-by-generated-frames.md`: another case where a finished playlist changed what the player could do.
-- Receipts: `var/test-runs/final-movie-endpoint/browser/failure.json` (failing, element stuck at 24 of 24) and `var/test-runs/endseek-2/browser/movie-endpoint.json` (passing: element at 24 of 24, `ended` true, `readyState` 4, buffered `[18, 24]`).
+- Measured states, for comparison when this recurs. Failing: element at 24 of 24, `seeking` true, `readyState` 1, buffered `[[0, 5.93], [23.936, 23.999999]]`, `MediaSource` open. Passing: element at 24 of 24, `ended` true, `readyState` 4, not seeking, buffered `[18, 24]`.
