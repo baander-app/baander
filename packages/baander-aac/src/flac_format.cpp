@@ -456,7 +456,7 @@ bool flac_sample_rate_is_codable(int rate) {
   return rate > 0 && sample_rate_code(rate, &value) > 0;
 }
 
-int flac_frame_header_parse(const uint8_t* d, size_t size, FlacFrameHeader* h) {
+int flac_frame_header_parse(const uint8_t* d, size_t size, FlacFrameHeader* h, bool check_crc) {
   /* The first four bytes hold every fixed field. */
   if (size >= 1 && d[0] != 0xFF) {
     return -1;
@@ -525,7 +525,7 @@ int flac_frame_header_parse(const uint8_t* d, size_t size, FlacFrameHeader* h) {
     h->sample_rate = ((d[pos] << 8) | d[pos + 1]) * (rate_code == 14 ? 10 : 1);
   }
   pos += rate_bytes;
-  if (flac_crc8(d, pos) != d[pos]) {
+  if (check_crc && flac_crc8(d, pos) != d[pos]) {
     return -1;
   }
   h->header_bytes = (int)pos + 1;

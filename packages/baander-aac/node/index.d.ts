@@ -503,11 +503,249 @@ export declare function measureLoudness(
   channels: number,
 ): AacLoudnessMeasurement;
 
+/** What a FLAC stream's STREAMINFO block states. */
+export interface FlacStreamInfo {
+  /** Samples per channel of the smallest block; 0 when the stream carried no STREAMINFO. */
+  minBlockSize: number;
+  /** Samples per channel of the largest block; 0 when the stream carried no STREAMINFO. */
+  maxBlockSize: number;
+  /** 0: unknown. */
+  minFrameBytes: number;
+  /** 0: unknown. */
+  maxFrameBytes: number;
+  sampleRate: number;
+  /** 1 to 8. */
+  channels: number;
+  /** 4 to 32. */
+  bitsPerSample: number;
+  /** Per channel; 0: unknown. */
+  totalSamples: number;
+  /** The MD5 of the unencoded samples, 16 bytes; all zero: unknown. */
+  md5: Buffer;
+}
+
+/** One FLAC frame as the encoder wrote it or the decoder read it. */
+export interface FlacFrameInfo {
+  /** Of the frame's first sample, per channel, from the start of the stream. */
+  samplePosition: number;
+  /** Samples per channel in the frame. */
+  blockSize: number;
+  /** The frame from its sync code to its CRC-16. */
+  bytes: number;
+}
+
+/** One entry of a FLAC stream's seek table. */
+export interface FlacSeekPoint {
+  /** Of the first sample of the target frame. */
+  samplePosition: number;
+  /** Of the target frame, from the first byte of the first frame. */
+  byteOffset: number;
+  /** Samples per channel in the target frame. */
+  blockSize: number;
+}
+
+/** A picture of a FLAC stream: the content of one PICTURE block. */
+export interface FlacPicture {
+  /** 0 to 20 by RFC 9639 Table 13: 3 is the front cover, 4 the back. Default 3 when writing. */
+  type?: number;
+  /** 'image/jpeg', 'image/png', ...; '-->' when `data` is a URI. */
+  mimeType: string;
+  description?: string;
+  /** Pixels; 0 or absent: unknown. The library does not look into the picture. */
+  width?: number;
+  height?: number;
+  /** Bits per pixel. */
+  depth?: number;
+  /** Of an indexed picture; 0 otherwise. */
+  colors?: number;
+  /** The picture file as it is, at most 16777183 bytes less the media type and description. */
+  data: Buffer | Uint8Array | ArrayBuffer;
+}
+
+/** A picture as the decoder returns it: every field present, the data a Buffer. */
+export interface FlacDecodedPicture {
+  type: number;
+  mimeType: string;
+  description: string;
+  width: number;
+  height: number;
+  depth: number;
+  colors: number;
+  data: Buffer;
+}
+
+export interface FlacEncoderOptions {
+  /** Any rate a FLAC frame header can state. Default 44100. */
+  sampleRate?: number;
+  /** 1 to 8, in the order RFC 9639 assigns to each count. Default 2. */
+  channels?: number;
+  /** 8, 12, 16, 20, 24 or 32. Default 16. */
+  bitsPerSample?: number;
+  /** 0 (fastest) to 8 (smallest). Default 5. */
+  level?: number;
+  /**
+   * Samples per channel the stream will hold, when known up front. It
+   * sizes the seek table.
+   */
+  totalSamples?: number;
+  /**
+   * Reserves a seek table in the header, a point for every ten seconds
+   * of `totalSamples`, which `finalHeader()` fills. For callers that
+   * will write the final header over the first one.
+   */
+  seekTable?: boolean;
+  /** Bytes of a PADDING block that closes the metadata. Default 0. */
+  padding?: number;
+  /**
+   * Tags (Vorbis comments), each 'NAME=value', written in this order. A
+   * name is printable ASCII without '='; names may repeat.
+   */
+  tags?: string[];
+  /** The writing program's name in the tag block. Default: the library's. */
+  vendor?: string;
+  /**
+   * Pictures, written in this order behind the tags. Of the types 1 and
+   * 2 (the file icons) a stream holds one each at most.
+   */
+  pictures?: FlacPicture[];
+}
+
+/**
+ * Lossless mode: encodes interleaved integer PCM to a native FLAC stream
+ * (RFC 9639) in the streamable subset. Nothing is ever coded with loss;
+ * a configuration FLAC cannot hold throws.
+ *
+ * The results of `encode()` and `finish()` joined are a complete stream:
+ * the first one begins with the stream's header (`headerBytes` long). A
+ * caller that can seek in its output then writes `finalHeader()` over
+ * that header, which adds the sample total, the MD5 of the input and the
+ * seek points. Without that step the stream is decodable, with a total
+ * and an MD5 of zero.
+ */
+export declare class FlacEncoder {
+  constructor(options?: FlacEncoderOptions);
+  /**
+   * Codes interleaved samples at the stream's bit depth (a 16-bit sample
+   * is a value in -32768..32767) and returns every frame they complete.
+   * Throws, having coded nothing, when a sample lies outside the depth.
+   */
+  encode(pcm: Int32Array): Buffer;
+  /**
+   * Ends the stream: returns the samples still held as its last, shorter
+   * frame. The next `encode()` starts a new stream.
+   */
+  finish(): Buffer;
+  /**
+   * After `finish()`: the header again, of the same length, with the
+   * sample total, the MD5, the frame size range and the seek points.
+   */
+  finalHeader(): Buffer;
+  /** The length of the stream's header: the fLaC marker and the metadata blocks. */
+  readonly headerBytes: number;
+  /** The last frame written; null before the first. */
+  readonly lastFrame: FlacFrameInfo | null;
+  /** The totals and the MD5 are zero until `finish()`. */
+  readonly streamInfo: FlacStreamInfo;
+  readonly sampleRate: number;
+  readonly channels: number;
+  readonly bitsPerSample: number;
+  readonly level: number;
+  /** Samples per channel in every frame but the last of a stream. */
+  readonly blockSize: number;
+}
+
+export interface FlacDecoderOptions {
+  /**
+   * Compares the MD5 of the decoded samples with the one in STREAMINFO;
+   * `md5` states the result after `finish()`. Default false. The frame
+   * checksums are verified in either case.
+   */
+  md5?: boolean;
+  /**
+   * A STREAMINFO block supplied out of band (its 34 bytes, as an MP4
+   * dfLa box or a Matroska CodecPrivate carries it), for a stream that
+   * starts at a frame.
+   */
+  streamInfo?: Buffer | Uint8Array | ArrayBuffer;
+  /**
+   * Keeps the stream's tags and pictures: true for up to 32 MiB of
+   * them, or `{ maxBytes }` for another limit. A tag or picture block
+   * past the limit is skipped and counted in `skippedMetadata`. Default
+   * false: tags and pictures are skipped unread, however large.
+   */
+  metadata?: boolean | { maxBytes?: number };
+}
+
+/**
+ * Lossless mode: decodes a native FLAC stream, fed in chunks of any
+ * size, to interleaved integer PCM at the stream's bit depth. A damaged
+ * frame is never concealed: it is counted in `errors`, decoding goes on
+ * at the next valid frame, and `lastFrame.samplePosition` shows how many
+ * samples were lost.
+ */
+export declare class FlacDecoder {
+  constructor(options?: FlacDecoderOptions);
+  /**
+   * Takes the bytes and returns the samples of every frame they
+   * complete, interleaved. Throws for a stream whose sample rate,
+   * channel count or bit depth changes on the way.
+   */
+  decode(data: Buffer | Uint8Array | ArrayBuffer): Int32Array;
+  /**
+   * Ends the stream: no more bytes follow. Returns the samples of frames
+   * that were waiting for that word; `md5` and `errors` then state the
+   * result. The decoder takes no input until `reset()`.
+   */
+  finish(): Int32Array;
+  /** Starts over for a new stream. */
+  reset(): void;
+  /**
+   * For a seek: drops the buffered bytes. The bytes given next may begin
+   * anywhere in the stream; the stream's properties and its seek table
+   * are kept, and `md5` becomes 'unknown'.
+   */
+  seekReset(): void;
+  /** Null until the stream's properties are known. */
+  readonly streamInfo: FlacStreamInfo | null;
+  /** The last frame decoded; null before the first. */
+  readonly lastFrame: FlacFrameInfo | null;
+  /** 0 until the stream's properties are known. */
+  readonly sampleRate: number;
+  readonly channels: number;
+  readonly bitsPerSample: number;
+  /** Damaged stretches of the stream so far, each one frame or several in a row. */
+  readonly errors: number;
+  /** After `finish()` with the `md5` option: whether the decoded samples are the encoded ones. */
+  readonly md5: 'unknown' | 'match' | 'mismatch';
+  /** The stream's seek table, placeholders left out. */
+  readonly seekPoints: FlacSeekPoint[];
+  /**
+   * The byte offset of the first frame, which the seek points count
+   * from; null until the metadata has been read and for a stream that
+   * began at a frame.
+   */
+  readonly firstFrameOffset: number | null;
+  /**
+   * With the `metadata` option: the stream's tags in its order, each
+   * 'NAME=value', once the header has been read (`firstFrameOffset` is
+   * a number then).
+   */
+  readonly tags: string[];
+  /** With the `metadata` option: the vendor string of the tag block; '' without one. */
+  readonly vendor: string;
+  /** With the `metadata` option: the stream's pictures in its order. */
+  readonly pictures: FlacDecodedPicture[];
+  /** Tag and picture blocks skipped because of the `metadata` limit. */
+  readonly skippedMetadata: number;
+}
+
 export declare const version: string;
 
 declare const binding: {
   AacDecoder: typeof AacDecoder;
   AacEncoder: typeof AacEncoder;
+  FlacDecoder: typeof FlacDecoder;
+  FlacEncoder: typeof FlacEncoder;
   measureLoudness: typeof measureLoudness;
   version: string;
 };

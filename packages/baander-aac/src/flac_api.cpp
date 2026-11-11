@@ -43,6 +43,35 @@ int baac_flac_decoder_set_md5_check(BaacFlacDecoder* dec, int enabled) {
   return flac_decoder_set_md5_check(dec, enabled != 0);
 }
 
+int baac_flac_decoder_set_metadata(BaacFlacDecoder* dec, int collect, size_t max_bytes) {
+  if (!dec) {
+    return AAC_ERR_INVALID_ARG;
+  }
+  return flac_decoder_set_metadata(dec, collect != 0, max_bytes);
+}
+
+int baac_flac_decoder_comments(BaacFlacDecoder* dec, const BaacFlacComment** comments,
+                               BaacFlacComment* vendor) {
+  if (!dec || !comments) {
+    return AAC_ERR_INVALID_ARG;
+  }
+  return flac_decoder_comments(dec, comments, vendor);
+}
+
+int baac_flac_decoder_pictures(BaacFlacDecoder* dec, const BaacFlacPicture** pictures) {
+  if (!dec || !pictures) {
+    return AAC_ERR_INVALID_ARG;
+  }
+  return flac_decoder_pictures(dec, pictures);
+}
+
+int baac_flac_decoder_skipped_metadata(BaacFlacDecoder* dec) {
+  if (!dec) {
+    return AAC_ERR_INVALID_ARG;
+  }
+  return flac_decoder_skipped_metadata(dec);
+}
+
 int baac_flac_decoder_feed(BaacFlacDecoder* dec, const uint8_t* data, int size) {
   if (!dec || size < 0 || (!data && size > 0)) {
     return AAC_ERR_INVALID_ARG;
@@ -143,6 +172,11 @@ void baac_flac_encoder_options_init(BaacFlacEncoderOptions* options) {
   options->padding_bytes = 0;
   options->total_samples_hint = 0;
   options->seek_table = 0;
+  options->comments = nullptr;
+  options->comment_count = 0;
+  options->vendor = nullptr;
+  options->pictures = nullptr;
+  options->picture_count = 0;
 }
 
 BaacFlacEncoder* baac_flac_encoder_create(int sample_rate, int channels, int bits_per_sample,
@@ -172,7 +206,11 @@ int baac_flac_encoder_set_options(BaacFlacEncoder* enc, const BaacFlacEncoderOpt
   if (!enc || !options) {
     return AAC_ERR_INVALID_ARG;
   }
-  return flac_encoder_set_options(enc, options);
+  try {
+    return flac_encoder_set_options(enc, options);
+  } catch (const std::bad_alloc&) {
+    return AAC_ERR_MEMORY;
+  }
 }
 
 int baac_flac_encoder_block_size(BaacFlacEncoder* enc) {

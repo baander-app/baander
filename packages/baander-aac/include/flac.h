@@ -44,6 +44,19 @@ extern "C" {
  * longer table is read up to here and the rest skipped. */
 #define BAAC_FLAC_MAX_SEEK_POINTS 32768
 
+/* A metadata block is at most this long: its length is a 24-bit number.
+ * A stream's tags have to fit one block, and so has each picture with
+ * its text: a picture of more than BAAC_FLAC_MAX_PICTURE_BYTES cannot be
+ * stored in a FLAC stream at all, and one with a media type or a
+ * description has that many bytes less. */
+#define BAAC_FLAC_MAX_METADATA_BLOCK_BYTES 16777215
+#define BAAC_FLAC_MAX_PICTURE_BYTES (BAAC_FLAC_MAX_METADATA_BLOCK_BYTES - 32)
+#define BAAC_FLAC_MAX_PICTURE_TYPE 20
+
+/* The bytes of tags and pictures the decoder holds for a caller that
+ * asks for them and names no limit of its own. */
+#define BAAC_FLAC_DEFAULT_METADATA_BYTES (32 * 1024 * 1024)
+
 /* The properties a STREAMINFO block states about a stream. */
 typedef struct BaacFlacStreamInfo_ {
   int min_block_size;     /* samples per channel; 0 when the stream carried no STREAMINFO */
@@ -72,6 +85,29 @@ typedef struct BaacFlacSeekPoint_ {
   int block_size;           /* samples per channel in the target frame */
 } BaacFlacSeekPoint;
 
+/* One tag: a field of a stream's VORBIS_COMMENT block, "NAME=value" in
+ * UTF-8.  `length` counts its bytes.  What the decoder hands out is
+ * followed by a zero byte, so that a tag without one inside reads as a
+ * C string; the encoder takes `length` bytes and looks for no end. */
+typedef struct BaacFlacComment_ {
+  const char* text;
+  uint32_t length;
+} BaacFlacComment;
+
+/* One picture: the content of a PICTURE block (RFC 9639 section 8.8).
+ * The strings end with a zero byte. */
+typedef struct BaacFlacPicture_ {
+  uint32_t type;           /* 0..20 by RFC 9639 Table 13: 3 is the front cover, 4 the back */
+  const char* mime_type;   /* "image/jpeg", "image/png", ...; "-->" when `data` is a URI */
+  const char* description; /* UTF-8; the encoder takes NULL as none */
+  uint32_t width;          /* pixels; 0: unknown */
+  uint32_t height;         /* pixels; 0: unknown */
+  uint32_t depth;          /* bits per pixel; 0: unknown */
+  uint32_t colors;         /* of an indexed picture; 0 otherwise */
+  const uint8_t* data;     /* the picture file as it is */
+  uint32_t data_bytes;
+} BaacFlacPicture;
+
 /* What the decoder found when it compared the MD5 of the decoded samples
  * with the one in STREAMINFO. */
 typedef enum BaacFlacMd5Verdict_ {
@@ -94,6 +130,15 @@ typedef struct BaacFlacDecoder_ BaacFlacDecoder;
  * container that keeps STREAMINFO out of band).  It decodes fixed and
  * variable block sizes, every subframe type, 1 to 8 channels and 4 to 32
  * bits per sample, inside and outside the streamable subset.
+ *
+ * Two things that are not FLAC but are found around FLAC streams in
+ * files are passed over: an ID3v2 tag in front of the marker, skipped by
+ * the length it states (the reference decoder accepts such files too),
+ * and an ID3v1 tag behind the last frame, which is 128 bytes that begin
+ * with "TAG" and end the input (the reference decoder reports those as
+ * lost sync; here every sample is decoded and verified before them, and
+ * nothing is reported).  Any other bytes where a frame was expected are
+ * damage.
  *
  * It verifies the CRC-8 of every frame header and the CRC-16 of every
  * frame.  A damaged frame is reported once as AAC_ERR_DECODE and never
@@ -126,6 +171,40 @@ int baac_flac_decoder_reset(BaacFlacDecoder* dec);
  * AAC_ERR_STATE; AAC_ERR_INVALID_ARG for another size or for values the
  * format forbids. */
 int baac_flac_decoder_set_streaminfo(BaacFlacDecoder* dec, const uint8_t* streaminfo, int size);
+
+/* Tags and pictures.  By default the decoder skips them unread, however
+ * large.  With `collect` 1 it keeps the stream's VORBIS_COMMENT block
+ * and its PICTURE blocks, up to `max_bytes` in all (0:
+ * BAAC_FLAC_DEFAULT_METADATA_BYTES): the content of each block counts,
+ * and a little for each block and each tag besides, so that a stream of
+ * a million empty fields is held to the limit too.  A block that would
+ * go past the limit is skipped whole and counted by
+ * baac_flac_decoder_skipped_metadata; the audio decodes all the same.
+ * A block is held in memory of its own length, which is reserved once
+ * 64 KiB of it have arrived and not on the word of its header alone,
+ * and nothing is sized from a length or a count inside a block: one
+ * whose inner lengths or counts do not fit it is dropped and reported
+ * as one AAC_ERR_DECODE.  Before the first byte is
+ * fed, then AAC_ERR_STATE. */
+int baac_flac_decoder_set_metadata(BaacFlacDecoder* dec, int collect, size_t max_bytes);
+
+/* The tags of the stream, in the order the stream has them: returns
+ * their number and points `*comments` at them.  `*vendor` (may be NULL)
+ * receives the vendor string of the block, which names the program that
+ * wrote the stream.  Zero, and a vendor without text, when the stream
+ * has no tags, when they were not collected, and until the metadata has
+ * been read (baac_flac_decoder_first_frame_offset says when).  Valid
+ * until the next reset or destroy. */
+int baac_flac_decoder_comments(BaacFlacDecoder* dec, const BaacFlacComment** comments,
+                               BaacFlacComment* vendor);
+
+/* The pictures of the stream in its order: returns their number and
+ * points `*pictures` at them, on the same terms as the tags. */
+int baac_flac_decoder_pictures(BaacFlacDecoder* dec, const BaacFlacPicture** pictures);
+
+/* How many tag and picture blocks were skipped because they would have
+ * gone past the limit of baac_flac_decoder_set_metadata. */
+int baac_flac_decoder_skipped_metadata(BaacFlacDecoder* dec);
 
 /* MD5 verification of the decoded samples against STREAMINFO: 1 on, 0
  * off (default).  Before the first frame is decoded, then
@@ -257,6 +336,23 @@ typedef struct BaacFlacEncoderOptions_ {
    * callers that will rewrite the header: a reserved table that is never
    * filled holds placeholders only. */
   int seek_table;
+  /* Tags: `comment_count` fields of "NAME=value" for a VORBIS_COMMENT
+   * block, written in this order behind the seek table.  A name is one
+   * or more printable ASCII characters other than '=' (0x20 to 0x7E),
+   * a value any UTF-8, and repeated names are fine.  `vendor` names the
+   * writing program in that block; NULL is the library's own name.
+   * Without comments and without a vendor no block is written. */
+  const BaacFlacComment* comments;
+  int comment_count;
+  const char* vendor;
+  /* Pictures: `picture_count` PICTURE blocks behind the tags, in this
+   * order.  A type up to BAAC_FLAC_MAX_PICTURE_TYPE, of the types 1 and
+   * 2 (the file icons) one each at most, a media type of printable
+   * ASCII, a description in UTF-8, and a block within
+   * BAAC_FLAC_MAX_METADATA_BLOCK_BYTES.  The library stores the bytes
+   * and the figures as given; it does not look into the picture. */
+  const BaacFlacPicture* pictures;
+  int picture_count;
 } BaacFlacEncoderOptions;
 
 /* Fills every field with its default, so that a caller sets only what it
@@ -273,7 +369,15 @@ BaacFlacEncoder* baac_flac_encoder_create(int sample_rate, int channels, int bit
                                           int level, int* error);
 void baac_flac_encoder_destroy(BaacFlacEncoder* enc);
 
-/* Before the header of a stream is written, or after its finish for the
+/* Tags and pictures are checked here, before a byte of the stream is
+ * written, and copied: the caller's memory is not used after the call.
+ * AAC_ERR_INVALID_ARG names a comment without '=' or with a character a
+ * name may not have, text that is not UTF-8, a picture type or media
+ * type the format does not allow, a second picture of type 1 or 2, and
+ * a block longer than the format's limit.  The header then grows by the
+ * blocks, which baac_flac_encoder_header_bytes reports.
+ *
+ * Before the header of a stream is written, or after its finish for the
  * next stream; AAC_ERR_STATE while a stream runs.  AAC_ERR_INVALID_ARG
  * for padding outside 0 to 16777215 bytes and for a total beyond 36
  * bits. */

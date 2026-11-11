@@ -8,10 +8,14 @@
 # driver when it has not; the library is instrumented in the same
 # build, so the whole tree is sanitized.
 
-set(FUZZ_HARNESSES fuzz_decoder fuzz_asc fuzz_encoder fuzz_unidrc fuzz_mps)
+set(FUZZ_HARNESSES fuzz_decoder fuzz_asc fuzz_encoder fuzz_unidrc fuzz_mps
+    fuzz_flac_decoder fuzz_flac_encoder)
 
+# The seed generator builds FLAC frames by hand with the internal bit
+# writer and header routines.
 add_executable(fuzz_seeds fuzz_seeds.cpp)
 target_link_libraries(fuzz_seeds PRIVATE baander-aac)
+target_include_directories(fuzz_seeds PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../src)
 
 foreach(harness ${FUZZ_HARNESSES})
     if(BAAC_FUZZ_HAVE_LIBFUZZER)
@@ -32,3 +36,8 @@ foreach(harness ${FUZZ_HARNESSES})
         target_link_libraries(${harness} PRIVATE m)
     endif()
 endforeach()
+
+# The FLAC decoder harness switches off the frame checksums through the
+# decoder's internal interface, so that mutated bytes reach the code
+# behind them.
+target_include_directories(fuzz_flac_decoder PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../src)

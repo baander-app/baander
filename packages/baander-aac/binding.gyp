@@ -4,6 +4,7 @@
       "target_name": "baander_aac",
       "sources": [
         "node/src/addon.cc",
+        "node/src/flac_addon.cc",
         "src/tables.cpp",
         "src/aac_cpu.cpp",
         "src/dsp.cpp",
@@ -80,7 +81,8 @@
         "src/flac_api.cpp",
         "src/flac_enc.cpp",
         "src/flac_lpc.cpp",
-        "src/flac_dsp.cpp"
+        "src/flac_dsp.cpp",
+        "src/flac_meta.cpp"
       ],
       "include_dirs": [
         "<!@(node -p \"require('node-addon-api').include\")",

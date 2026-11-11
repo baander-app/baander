@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 
-import { AacDecoder, AacEncoder, measureLoudness, version } from '../index.js';
+import { AacDecoder, AacEncoder, FlacDecoder, FlacEncoder, measureLoudness, version } from '../index.js';
 
 function tones(samples, sampleRate, channels) {
   const pcm = new Float32Array(samples * channels);
@@ -32,6 +32,12 @@ function snrDb(ref, out, offset) {
 
 test('reports a version', () => {
   assert.equal(typeof version, 'string');
+});
+
+test('reports the version of the package', () => {
+  const pkg = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8'));
+  assert.equal(pkg.version, '0.2.0');
+  assert.equal(version, pkg.version);
 });
 
 test('encodes and decodes a stereo signal in uneven chunks', () => {
@@ -545,4 +551,285 @@ test('encodes xHE-AAC with loudness metadata and meters the input', () => {
   assert.throws(() => new AacEncoder({ profile: 'xhe', channels: 6 }));
   assert.throws(() => new AacEncoder({ channels: 8, bitrate: 512000, measureLoudness: true }));
   assert.ok(new AacEncoder({ channels: 6, bitrate: 320000, measureLoudness: true }), 'the meter takes 5.1');
+});
+
+/* ── lossless mode ─────────────────────────────────────────────── */
+
+/* Tones at a bit depth, interleaved, with a little noise. */
+function intTones(samples, channels, bits, level = 0.5) {
+  const pcm = new Int32Array(samples * channels);
+  const peak = level * (2 ** (bits - 1) - 1);
+  let seed = 12345;
+  for (let i = 0; i < samples; i++) {
+    for (let c = 0; c < channels; c++) {
+      seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+      const noise = (seed / 2 ** 32 - 0.5) * 0.02;
+      const v = 0.7 * Math.sin(i * (0.031 + 0.007 * c)) + 0.25 * Math.sin(i * (0.29 + 0.01 * c)) + noise;
+      pcm[i * channels + c] = Math.round(Math.max(-1, Math.min(1, v)) * peak);
+    }
+  }
+  return pcm;
+}
+
+/* Encodes in chunks of the given sample counts (cycled) and returns the
+ * stream with the final header written over the first. */
+function flacEncode(encoder, pcm, channels, chunks) {
+  const parts = [];
+  let pos = 0;
+  for (let i = 0; pos < pcm.length; i++) {
+    const count = Math.min(chunks[i % chunks.length] * channels, pcm.length - pos);
+    parts.push(encoder.encode(pcm.subarray(pos, pos + count)));
+    pos += count;
+  }
+  parts.push(encoder.finish());
+  const stream = Buffer.concat(parts);
+  const header = encoder.finalHeader();
+  assert.equal(header.length, encoder.headerBytes);
+  header.copy(stream, 0);
+  return stream;
+}
+
+/* Decodes in chunks of the given byte counts (cycled). */
+function flacDecode(decoder, stream, chunks) {
+  const parts = [];
+  let pos = 0;
+  for (let i = 0; pos < stream.length; i++) {
+    const count = Math.min(chunks[i % chunks.length], stream.length - pos);
+    parts.push(decoder.decode(stream.subarray(pos, pos + count)));
+    pos += count;
+  }
+  parts.push(decoder.finish());
+  const out = new Int32Array(parts.reduce((n, p) => n + p.length, 0));
+  let at = 0;
+  for (const p of parts) {
+    out.set(p, at);
+    at += p.length;
+  }
+  return out;
+}
+
+test('FLAC: a stereo 16-bit signal in uneven chunks comes back bit for bit', () => {
+  const sampleRate = 44100;
+  const channels = 2;
+  const samples = 50000;
+  const pcm = intTones(samples, channels, 16);
+  const encoder = new FlacEncoder({ sampleRate, channels, bitsPerSample: 16, totalSamples: samples, seekTable: true });
+  assert.equal(encoder.blockSize, 4096);
+  assert.equal(encoder.level, 5);
+  assert.equal(encoder.lastFrame, null);
+  const stream = flacEncode(encoder, pcm, channels, [1, 4095, 4097, 777, 12000]);
+  assert.equal(stream.subarray(0, 4).toString('latin1'), 'fLaC');
+  assert.equal(encoder.streamInfo.totalSamples, samples);
+  assert.equal(encoder.lastFrame.samplePosition + encoder.lastFrame.blockSize, samples);
+
+  const decoder = new FlacDecoder({ md5: true });
+  assert.equal(decoder.streamInfo, null);
+  assert.equal(decoder.sampleRate, 0);
+  const out = flacDecode(decoder, stream, [1, 2, 3, 4000, 17, 30000]);
+  assert.deepEqual(out, pcm);
+  assert.equal(decoder.md5, 'match');
+  assert.equal(decoder.errors, 0);
+  assert.equal(decoder.sampleRate, sampleRate);
+  assert.equal(decoder.channels, channels);
+  assert.equal(decoder.bitsPerSample, 16);
+  assert.equal(decoder.streamInfo.totalSamples, samples);
+  assert.deepEqual(decoder.streamInfo.md5, encoder.streamInfo.md5);
+  assert.equal(decoder.firstFrameOffset, encoder.headerBytes);
+  assert.ok(decoder.seekPoints.length >= 1);
+  assert.equal(decoder.seekPoints[0].samplePosition, 0);
+  assert.equal(decoder.lastFrame.samplePosition + decoder.lastFrame.blockSize, samples);
+  assert.throws(() => decoder.decode(stream), /finished/);
+
+  // without the final header the stream decodes all the same, with no MD5 to compare
+  const again = new FlacEncoder({ sampleRate, channels });
+  const piped = Buffer.concat([again.encode(pcm), again.finish()]);
+  const plain = new FlacDecoder({ md5: true });
+  assert.deepEqual(flacDecode(plain, piped, [5000]), pcm);
+  assert.equal(plain.md5, 'unknown');
+  assert.equal(plain.streamInfo.totalSamples, 0);
+
+  // the encoder starts a second stream after the first
+  const second = Buffer.concat([again.encode(pcm.subarray(0, 2000)), again.finish()]);
+  plain.reset();
+  assert.deepEqual(flacDecode(plain, second, [333]), pcm.subarray(0, 2000));
+});
+
+test('FLAC: 24-bit 5.1 and every level round-trip', () => {
+  const pcm = intTones(9000, 6, 24);
+  for (const level of [0, 3, 5, 8]) {
+    const encoder = new FlacEncoder({ sampleRate: 48000, channels: 6, bitsPerSample: 24, level });
+    const stream = flacEncode(encoder, pcm, 6, [2500]);
+    const decoder = new FlacDecoder({ md5: true });
+    assert.deepEqual(flacDecode(decoder, stream, [4096]), pcm, `level ${level}`);
+    assert.equal(decoder.md5, 'match');
+    assert.equal(decoder.channels, 6);
+    assert.equal(decoder.bitsPerSample, 24);
+  }
+});
+
+test('FLAC: 32-bit samples at the extremes of the range round-trip', () => {
+  const samples = 10000;
+  const pcm = new Int32Array(samples * 2);
+  for (let i = 0; i < samples; i++) {
+    // full-scale extremes against each other, so that the side channel needs 33 bits
+    pcm[i * 2] = i % 3 === 0 ? -2147483648 : 2147483647;
+    pcm[i * 2 + 1] = i % 2 === 0 ? 2147483647 : -2147483648;
+  }
+  const smooth = intTones(samples, 2, 32, 0.9);
+  for (const input of [pcm, smooth]) {
+    for (const level of [0, 5, 8]) {
+      const encoder = new FlacEncoder({ sampleRate: 96000, channels: 2, bitsPerSample: 32, level });
+      const stream = flacEncode(encoder, input, 2, [4096, 1]);
+      const decoder = new FlacDecoder({ md5: true });
+      assert.deepEqual(flacDecode(decoder, stream, [10000]), input, `level ${level}`);
+      assert.equal(decoder.md5, 'match');
+    }
+  }
+});
+
+test('FLAC: a damaged frame is reported and decoding continues', () => {
+  const samples = 4096 * 6;
+  const pcm = intTones(samples, 2, 16);
+  const encoder = new FlacEncoder({ sampleRate: 44100, channels: 2 });
+  const stream = flacEncode(encoder, pcm, 2, [4096]);
+  const damaged = Buffer.from(stream);
+  damaged[Math.floor(stream.length / 2)] ^= 0x10;
+  const decoder = new FlacDecoder({ md5: true });
+  const out = flacDecode(decoder, damaged, [3000]);
+  assert.equal(decoder.errors, 1);
+  assert.equal(out.length, (samples - 4096) * 2);
+  assert.equal(decoder.md5, 'mismatch');
+  // the frames before and after the damaged one are the input's
+  assert.deepEqual(out.subarray(0, 4096 * 2), pcm.subarray(0, 4096 * 2));
+  assert.deepEqual(out.subarray(out.length - 4096 * 2), pcm.subarray(pcm.length - 4096 * 2));
+  assert.equal(decoder.lastFrame.samplePosition, samples - 4096);
+
+  // a stream that is cut short is one more damaged stretch
+  const cut = new FlacDecoder();
+  flacDecode(cut, stream.subarray(0, stream.length - 100), [5000]);
+  assert.equal(cut.errors, 1);
+});
+
+test('FLAC: decodes frames with STREAMINFO out of band', () => {
+  const pcm = intTones(10000, 2, 16);
+  const encoder = new FlacEncoder({ sampleRate: 44100, channels: 2 });
+  const stream = flacEncode(encoder, pcm, 2, [10000]);
+  const streamInfo = stream.subarray(8, 8 + 34);
+  const decoder = new FlacDecoder({ streamInfo, md5: true });
+  assert.equal(decoder.streamInfo.totalSamples, 10000);
+  assert.deepEqual(flacDecode(decoder, stream.subarray(encoder.headerBytes), [4096]), pcm);
+  assert.equal(decoder.md5, 'match');
+  assert.throws(() => new FlacDecoder({ streamInfo: Buffer.alloc(33) }), /STREAMINFO/);
+  assert.throws(() => new FlacDecoder({ streamInfo: 'no' }), /streamInfo must be a Buffer/);
+});
+
+test('FLAC: refuses options of the wrong kind and what FLAC cannot hold', () => {
+  assert.throws(() => new FlacEncoder({ sampleRate: '44100' }), /sampleRate must be a number/);
+  assert.throws(() => new FlacEncoder({ channels: true }), /channels must be a number/);
+  assert.throws(() => new FlacEncoder({ bitsPerSample: {} }), /bitsPerSample must be a number/);
+  assert.throws(() => new FlacEncoder({ level: '5' }), /level must be a number/);
+  assert.throws(() => new FlacEncoder({ padding: null }), /padding must be a number/);
+  assert.throws(() => new FlacEncoder({ totalSamples: -1 }), /totalSamples must be a whole number/);
+  assert.throws(() => new FlacEncoder({ totalSamples: 1.5 }), /totalSamples must be a whole number/);
+  assert.throws(() => new FlacEncoder({ seekTable: 1 }), /seekTable must be a boolean/);
+  assert.throws(() => new FlacDecoder({ md5: 'yes' }), /md5 must be a boolean/);
+  assert.throws(() => new FlacEncoder({ channels: 9 }), /unsupported configuration/);
+  assert.throws(() => new FlacEncoder({ channels: 0 }), /unsupported configuration/);
+  assert.throws(() => new FlacEncoder({ bitsPerSample: 17 }), /unsupported configuration/);
+  assert.throws(() => new FlacEncoder({ level: 9 }), /unsupported configuration/);
+  assert.throws(() => new FlacEncoder({ sampleRate: 700001 }), /unsupported configuration/);
+  assert.throws(() => new FlacEncoder({ sampleRate: 0 }), /unsupported configuration/);
+
+  const encoder = new FlacEncoder({ sampleRate: 48000, channels: 2, bitsPerSample: 16 });
+  assert.throws(() => encoder.encode(new Float32Array(8)), /expected an Int32Array/);
+  assert.throws(() => encoder.encode(new Int32Array(3)), /multiple of the channel count/);
+  assert.throws(() => encoder.finalHeader(), /not finished/);
+  // a sample outside the depth refuses the whole call: nothing of it is coded
+  const bad = new Int32Array(20000);
+  bad[19999] = 32768;
+  assert.throws(() => encoder.encode(bad), /outside the bit depth/);
+  const good = intTones(5000, 2, 16);
+  const stream = Buffer.concat([encoder.encode(good), encoder.finish()]);
+  const decoder = new FlacDecoder();
+  assert.deepEqual(flacDecode(decoder, stream, [4096]), good);
+  assert.throws(() => new FlacDecoder().decode('text'), /expected a Buffer/);
+});
+
+test('FLAC: tags and pictures are written and read back', () => {
+  const pcm = intTones(10000, 2, 16);
+  const tags = ['ARTIST=Ravel', 'GENRE=Classical', 'GENRE=Orchestral', 'TITLE=Boléro – 🎻', 'COMMENT='];
+  const cover = Buffer.from(Array.from({ length: 5000 }, (_, i) => (i * 37) & 255));
+  const icon = new Uint8Array([1, 2, 3, 4, 5]);
+  const encoder = new FlacEncoder({
+    sampleRate: 44100,
+    channels: 2,
+    tags,
+    vendor: 'smoke test ♫',
+    pictures: [
+      { mimeType: 'image/jpeg', description: 'Front – é', width: 600, height: 400, depth: 24, data: cover },
+      { type: 1, mimeType: 'image/png', width: 32, height: 32, depth: 8, colors: 16, data: icon },
+    ],
+  });
+  const stream = flacEncode(encoder, pcm, 2, [3000]);
+
+  const decoder = new FlacDecoder({ md5: true, metadata: true });
+  assert.deepEqual(decoder.tags, []);
+  assert.deepEqual(flacDecode(decoder, stream, [1000]), pcm);
+  assert.equal(decoder.md5, 'match');
+  assert.deepEqual(decoder.tags, tags);
+  assert.equal(decoder.vendor, 'smoke test ♫');
+  assert.equal(decoder.skippedMetadata, 0);
+  const pictures = decoder.pictures;
+  assert.equal(pictures.length, 2);
+  assert.deepEqual(
+    { ...pictures[0], data: null },
+    { type: 3, mimeType: 'image/jpeg', description: 'Front – é', width: 600, height: 400, depth: 24, colors: 0, data: null },
+  );
+  assert.ok(pictures[0].data.equals(cover));
+  assert.deepEqual(
+    { ...pictures[1], data: null },
+    { type: 1, mimeType: 'image/png', description: '', width: 32, height: 32, depth: 8, colors: 16, data: null },
+  );
+  assert.ok(pictures[1].data.equals(Buffer.from(icon)));
+
+  // the frames are those of a stream without tags
+  const plainEncoder = new FlacEncoder({ sampleRate: 44100, channels: 2 });
+  const plain = flacEncode(plainEncoder, pcm, 2, [3000]);
+  assert.ok(stream.subarray(encoder.headerBytes).equals(plain.subarray(plainEncoder.headerBytes)));
+
+  // a decoder that was not asked keeps nothing; one with a small limit skips the cover
+  const quiet = new FlacDecoder();
+  assert.deepEqual(flacDecode(quiet, stream, [4096]), pcm);
+  assert.deepEqual(quiet.tags, []);
+  assert.equal(quiet.vendor, '');
+  assert.deepEqual(quiet.pictures, []);
+  const limited = new FlacDecoder({ metadata: { maxBytes: 1000 } });
+  assert.deepEqual(flacDecode(limited, stream, [4096]), pcm);
+  assert.deepEqual(limited.tags, tags);
+  assert.equal(limited.skippedMetadata, 1);
+  assert.equal(limited.pictures.length, 1);
+  assert.equal(limited.pictures[0].type, 1);
+
+  // what the format does not take, and options of the wrong kind
+  assert.throws(() => new FlacEncoder({ tags: ['NOEQUALS'] }), /the format does not take/);
+  assert.throws(() => new FlacEncoder({ tags: ['NÄME=x'] }), /the format does not take/);
+  assert.throws(() => new FlacEncoder({ tags: ['=x'] }), /the format does not take/);
+  assert.throws(() => new FlacEncoder({ tags: 'ARTIST=x' }), /tags must be an array/);
+  assert.throws(() => new FlacEncoder({ tags: [1] }), /tags must be an array/);
+  assert.throws(() => new FlacEncoder({ vendor: 5 }), /vendor must be a string/);
+  assert.throws(() => new FlacEncoder({ pictures: {} }), /pictures must be an array/);
+  assert.throws(() => new FlacEncoder({ pictures: [{ data: cover }] }), /mimeType must be a string/);
+  assert.throws(() => new FlacEncoder({ pictures: [{ mimeType: 'image/png' }] }), /data must be a Buffer/);
+  assert.throws(
+    () => new FlacEncoder({ pictures: [{ mimeType: 'image/png', data: cover, width: '600' }] }),
+    /width must be a whole number/,
+  );
+  assert.throws(
+    () => new FlacEncoder({ pictures: [{ mimeType: 'image/png', data: cover, type: 21 }] }),
+    /the format does not take/,
+  );
+  const icons = [1, 1].map((type) => ({ type, mimeType: 'image/png', data: icon }));
+  assert.throws(() => new FlacEncoder({ pictures: icons }), /the format does not take/);
+  assert.throws(() => new FlacDecoder({ metadata: 'yes' }), /metadata must be a boolean or an object/);
+  assert.throws(() => new FlacDecoder({ metadata: { maxBytes: -1 } }), /maxBytes must be a whole number/);
 });

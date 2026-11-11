@@ -4,6 +4,7 @@
  *   baac dec <in.aac> <out.f32le> [rate] [channels] [--no-loudness]
  *   baac loudness <in.wav | in.f32le rate channels>
  *   baac bench [--seconds N] [--dump DIR] [--only NAME] [--streams DIR]
+ *   baac flac enc | dec | test | info ...   (the lossless mode: baac_flac.cpp)
  *
  * Raw PCM is interleaved 32-bit float; the AAC side is an ADTS stream
  * (a LOAS stream for the xhe profile, which ADTS cannot carry).
@@ -31,7 +32,8 @@
  * factors; --dump writes each stream and its decode to DIR for
  * comparisons between builds; --streams decodes every .aac and .loas
  * stream in DIR (the committed test streams) and prints the realtime
- * factor of each and of each profile. */
+ * factor of each and of each profile.  Its last rows are the lossless
+ * mode at levels 0, 5 and 8 on the same signal at 16 bits. */
 #include <algorithm>
 #include <chrono>
 #include <filesystem>
@@ -44,6 +46,12 @@
 #include <vector>
 
 #include "aac.h"
+
+/* The lossless mode (baac_flac.cpp). */
+int baac_flac_main(int argc, char** argv);
+const char* baac_flac_usage(void);
+int baac_flac_bench(const std::vector<float>& pcm, int sample_rate, int seconds,
+                    const std::string& only, const std::string& dump);
 
 static std::vector<uint8_t> read_all(const char* path) {
   std::vector<uint8_t> data;
@@ -86,7 +94,9 @@ static int usage() {
           "                      --drc  --drc-range LU  (MPEG-D DRC gain sets, 6 to 16 LU)\n"
           "       baac dec <in.aac> <out.f32le> [rate] [channels: 0 = as in the stream] [--no-loudness]\n"
           "       baac loudness <in.wav> | <in.f32le> <rate> <channels>\n"
-          "       baac bench [--seconds N] [--dump DIR] [--only NAME] [--streams DIR]\n");
+          "       baac bench [--seconds N] [--dump DIR] [--only NAME] [--streams DIR]\n"
+          "       %s",
+          baac_flac_usage());
   return 2;
 }
 
@@ -990,6 +1000,7 @@ static int bench(int argc, char** argv) {
       write_file(base + ".f32", out.data(), out.size() * sizeof(float));
     }
   }
+  failures += baac_flac_bench(pcm, sr, seconds, only, dump);
   if (!streams.empty() && bench_streams(streams) != 0) {
     failures++;
   }
@@ -1011,6 +1022,9 @@ int main(int argc, char** argv) {
   }
   if (strcmp(argv[1], "bench") == 0) {
     return bench(argc, argv);
+  }
+  if (strcmp(argv[1], "flac") == 0) {
+    return baac_flac_main(argc - 2, argv + 2);
   }
   return usage();
 }

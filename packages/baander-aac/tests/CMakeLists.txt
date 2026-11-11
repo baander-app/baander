@@ -48,6 +48,7 @@ set(TEST_SOURCES
     test_flac_encoder.cpp
     test_flac_interop.cpp
     test_flac_dsp.cpp
+    test_flac_meta.cpp
 )
 
 foreach(test_src ${TEST_SOURCES})
@@ -76,11 +77,28 @@ if(TARGET fuzz_decoder)
         BAAC_FUZZ_ASC="$<TARGET_FILE:fuzz_asc>"
         BAAC_FUZZ_ENCODER="$<TARGET_FILE:fuzz_encoder>"
         BAAC_FUZZ_UNIDRC="$<TARGET_FILE:fuzz_unidrc>"
-        BAAC_FUZZ_MPS="$<TARGET_FILE:fuzz_mps>")
+        BAAC_FUZZ_MPS="$<TARGET_FILE:fuzz_mps>"
+        BAAC_FUZZ_FLAC_DECODER="$<TARGET_FILE:fuzz_flac_decoder>"
+        BAAC_FUZZ_FLAC_ENCODER="$<TARGET_FILE:fuzz_flac_encoder>")
     if(BAAC_FUZZ_HAVE_LIBFUZZER)
         target_compile_definitions(test_fuzz_smoke PRIVATE BAAC_FUZZ_LIBFUZZER)
     endif()
     add_test(NAME test_fuzz_smoke COMMAND test_fuzz_smoke)
+endif()
+
+# The lossless commands of the baac tool, run as the built binary.  The
+# suite starts processes and measures their memory the POSIX way.
+if(TARGET baac AND NOT WIN32)
+    add_executable(test_flac_cli test_flac_cli.cpp)
+    target_link_libraries(test_flac_cli PRIVATE baander-aac)
+    target_include_directories(test_flac_cli PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
+    target_compile_definitions(test_flac_cli PRIVATE
+        BAAC_TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/data"
+        BAAC_TOOL="$<TARGET_FILE:baac>")
+    if(UNIX)
+        target_link_libraries(test_flac_cli PRIVATE m)
+    endif()
+    add_test(NAME test_flac_cli COMMAND test_flac_cli)
 endif()
 
 # The MPEG Surround syntax test compiles the test encoder tool in as its
@@ -91,7 +109,7 @@ target_include_directories(test_mps PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
 # header routines against known answers, and write the FLAC streams they
 # decode by hand with the internal bit writer.
 foreach(test_name test_flac_format test_flac_decoder test_flac_conformance test_flac_encoder
-        test_flac_interop test_flac_dsp test_allocation)
+        test_flac_interop test_flac_dsp test_flac_meta test_allocation)
     target_include_directories(${test_name} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
 endforeach()
 

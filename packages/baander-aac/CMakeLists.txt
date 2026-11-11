@@ -9,7 +9,7 @@ if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_CURRENT_BINARY_DIR)
     )
 endif()
 
-project(baander-aac VERSION 0.1.0 LANGUAGES C CXX)
+project(baander-aac VERSION 0.2.0 LANGUAGES C CXX)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -43,7 +43,7 @@ set(BAAC_AAC_SOURCES
     src/unidrc_parse.cpp src/unidrc_gain.cpp src/unidrc.cpp
     src/usac_arith_tables.cpp src/usac_arith.cpp src/usac_stereo.cpp src/usac_fd.cpp
     src/loudness.cpp src/usac_enc_config.cpp src/mps212_tables.cpp
-    src/flac_format.cpp src/flac_api.cpp src/flac_dsp.cpp)
+    src/flac_format.cpp src/flac_api.cpp src/flac_dsp.cpp src/flac_meta.cpp)
 set(BAAC_AAC_DECODER_SOURCES src/decoder.cpp src/conceal.cpp src/decoder_output.cpp src/limiter.cpp src/sbr_dec.cpp src/sbr_esbr.cpp src/ps_dec.cpp
     src/er_vcb11.cpp src/er_rvlc.cpp src/er_hcr.cpp
     src/usac_frame.cpp src/mps212.cpp
@@ -248,7 +248,7 @@ install(FILES ${CMAKE_CURRENT_BINARY_DIR}/libbaac.pc
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig)
 
 if(BAAC_AAC_BUILD_TOOLS AND BAAC_AAC_BUILD_ENCODER AND BAAC_AAC_BUILD_DECODER)
-    add_executable(baac tools/baac.cpp)
+    add_executable(baac tools/baac.cpp tools/baac_flac.cpp)
     target_link_libraries(baac PRIVATE baander-aac)
     install(TARGETS baac RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
     # MPEG Surround test encoder: 5.1 PCM to a LOAS stream with an AAC-LC

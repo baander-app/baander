@@ -397,6 +397,7 @@ struct BaacFlacDecoder_ {
     kBlockHeader, /* a metadata block header follows */
     kStreamInfo,  /* the 34 bytes of a STREAMINFO block follow */
     kSeekTable,   /* seek points follow, `block_left` bytes of them */
+    kCollect,     /* a tag or picture block the caller wants: `block_left` bytes of it follow */
     kFrames,      /* frames follow */
     kUnsupported, /* a frame changed the stream's properties */
     kFinished,
@@ -415,10 +416,11 @@ struct BaacFlacDecoder_ {
   uint64_t skip = 0;     /* metadata bytes still to drop as they arrive */
   uint32_t block_left = 0;
   bool last_block = false;
-  bool pending_error = false; /* damaged metadata, reported by the next decode call */
-  bool ended = false;         /* the caller has no more input: what is incomplete stays so */
-  bool synced = false;        /* a frame is expected right at the head; otherwise the
-                               * decoder is searching and skips what is none */
+  bool pending_error = false;    /* damaged metadata, reported by the next decode call */
+  bool ended = false;            /* the caller has no more input: what is incomplete stays so */
+  bool synced = false;           /* a frame is expected right at the head; otherwise the
+                                  * decoder is searching and skips what is none */
+  bool ignore_checksums = false; /* fuzzing: frames are taken whatever their CRCs say */
 
   /* The stream. */
   bool have_info = false; /* `info` is a STREAMINFO, from the stream or the caller */
@@ -431,6 +433,24 @@ struct BaacFlacDecoder_ {
   int64_t first_frame_offset = -1;
   bool have_seek_table = false;
   std::vector<BaacFlacSeekPoint> seek_points;
+
+  /* Tags and pictures, kept only for a caller that asked: the content
+   * of each block as it came, and what the caller is shown, which
+   * points into those blocks.  `meta_held` counts what the kept blocks
+   * cost, their bytes and their bookkeeping, and never passes
+   * `meta_cap`. */
+  bool collect = false;
+  size_t meta_cap = 0;
+  size_t meta_held = 0;
+  int meta_skipped = 0;
+  int collect_type = 0;         /* of the block coming in */
+  size_t collect_bytes = 0;     /* its length */
+  std::vector<uint8_t> current; /* what has arrived of it */
+  std::vector<std::vector<uint8_t>> meta_blocks;
+  bool have_comments = false;
+  BaacFlacComment vendor = {};
+  std::vector<BaacFlacComment> comments;
+  std::vector<BaacFlacPicture> pictures;
 
   /* One row of `block_capacity` samples per channel, and one row of
    * 64-bit samples for a 33-bit side channel. */
@@ -555,10 +575,91 @@ uint64_t load_be(const uint8_t* p, int bytes) {
   return v;
 }
 
+/* What a kept block costs against the caller's limit besides its
+ * content: the bookkeeping of the block, and of each tag in it.  A
+ * stream of a million empty pictures, or a tag block of a million empty
+ * fields, is thus held to the limit like a large picture is. */
+const size_t kBlockOverhead = 128;
+
+/* A tag or picture block has arrived whole: it is kept when it is
+ * sound and within the limit, skipped and counted when its fields would
+ * take the decoder past the limit, and dropped as damage when one of
+ * its lengths or its count does not fit it.  The fields are counted
+ * before anything is sized for them. */
+void keep_block(Decoder* d) {
+  const size_t size = d->current.size();
+  const size_t room = d->meta_cap - d->meta_held;
+  size_t cost = size + kBlockOverhead;
+  d->current.push_back(0); /* the spare byte that closes the last string */
+  uint8_t* block = d->current.data();
+  bool sound = true;
+  bool fits = cost <= room;
+  if (d->collect_type == FLAC_BLOCK_VORBIS_COMMENT) {
+    const int count = flac_meta_count_comments(block, size);
+    sound = count >= 0;
+    cost += sound ? (size_t)count * sizeof(BaacFlacComment) : 0;
+    fits = cost <= room;
+    if (sound && fits) {
+      d->comments.resize((size_t)count);
+      flac_meta_read_comments(block, &d->vendor, d->comments.data());
+      d->have_comments = true;
+    }
+  } else if (fits) {
+    BaacFlacPicture picture;
+    sound = flac_meta_read_picture(block, size, &picture);
+    if (sound) {
+      d->pictures.push_back(picture);
+    }
+  }
+  if (!sound || !fits) {
+    if (!sound) {
+      d->pending_error = true;
+    } else {
+      d->meta_skipped++;
+    }
+    d->current = std::vector<uint8_t>();
+    return;
+  }
+  /* Moving the block keeps its bytes where they are, and with them
+   * what points at them. */
+  d->meta_held += cost;
+  d->meta_blocks.push_back(std::move(d->current));
+  d->current = std::vector<uint8_t>();
+}
+
+/* Whether ten bytes are the header of an ID3v2 tag, and how many bytes
+ * of the tag follow them: its four size bytes carry seven bits each,
+ * and a flag announces a footer of ten bytes more. */
+bool id3v2_header(const uint8_t* p, uint64_t* following) {
+  if (memcmp(p, "ID3", 3) != 0 || p[3] == 0xFF || p[4] == 0xFF ||
+      ((p[6] | p[7] | p[8] | p[9]) & 0x80)) {
+    return false;
+  }
+  *following = ((uint64_t)p[6] << 21 | (uint64_t)p[7] << 14 | (uint64_t)p[8] << 7 | p[9]) +
+               ((p[5] & 0x10) ? 10 : 0);
+  return true;
+}
+
+/* What has to arrive of a tag or picture block before the decoder
+ * reserves the whole length its header states. */
+const size_t kCollectTrust = 65536;
+
+const size_t kId3v2HeaderBytes = 10;
+const size_t kId3v1Bytes = 128;
+
+/* Whether the bytes left at the head are an ID3v1 tag, which some
+ * programs put behind the last frame: 128 bytes that begin with "TAG"
+ * and end the input. */
+bool id3v1_trailer(const Decoder* d) {
+  return d->synced && pending(d) == kId3v1Bytes && memcmp(fifo_data(d), "TAG", 3) == 0;
+}
+
 /* Reads the marker and the metadata blocks as far as the FIFO allows.
- * STREAMINFO and the seek table are parsed; every other block is
- * dropped by its length, straight from the FIFO and then from the
- * caller's input, without being buffered. */
+ * STREAMINFO and the seek table are parsed, tags and pictures are kept
+ * for a caller that asked for them; every other block is dropped by its
+ * length, straight from the FIFO and then from the caller's input,
+ * without being buffered.  An ID3v2 tag in front of the marker, which
+ * some programs put there, is dropped the same way. */
 void process_metadata(Decoder* d) {
   for (;;) {
     if (d->skip) {
@@ -575,6 +676,17 @@ void process_metadata(Decoder* d) {
       case Decoder::kStart: {
         if (avail == 0) {
           return;
+        }
+        if (memcmp(p, "ID3", std::min<size_t>(avail, 3)) == 0) {
+          if (avail < kId3v2HeaderBytes) {
+            return;
+          }
+          uint64_t following = 0;
+          if (id3v2_header(p, &following)) {
+            drop(d, kId3v2HeaderBytes);
+            d->skip = following;
+            break;
+          }
         }
         /* Anything that does not begin with the marker is a stream
          * joined at a frame, or somewhere before one. */
@@ -612,6 +724,19 @@ void process_metadata(Decoder* d) {
         } else if (type == FLAC_BLOCK_SEEKTABLE && !d->have_seek_table) {
           d->have_seek_table = true;
           d->stage = Decoder::kSeekTable;
+        } else if (d->collect && ((type == FLAC_BLOCK_VORBIS_COMMENT && !d->have_comments) ||
+                                  type == FLAC_BLOCK_PICTURE)) {
+          if (d->block_left > d->meta_cap - d->meta_held) {
+            /* More than the caller wants held: skipped, and counted. */
+            d->meta_skipped++;
+            d->skip = d->block_left;
+            after_block(d);
+          } else {
+            d->collect_type = type;
+            d->collect_bytes = d->block_left;
+            d->current.clear();
+            d->stage = Decoder::kCollect;
+          }
         } else {
           /* A STREAMINFO of another length cannot be read. */
           if (type == FLAC_BLOCK_STREAMINFO && !d->have_info) {
@@ -633,6 +758,29 @@ void process_metadata(Decoder* d) {
           d->pending_error = true;
         }
         drop(d, BAAC_FLAC_STREAMINFO_BYTES);
+        after_block(d);
+        break;
+      }
+      case Decoder::kCollect: {
+        /* A block that claims a length has to deliver before it is
+         * believed: the buffer doubles with the bytes that arrive until
+         * 64 KiB of them are there, and only then takes the length the
+         * header states, which the caller's limit has allowed. */
+        const size_t n = std::min<size_t>(d->block_left, avail);
+        const size_t wanted = d->current.size() + n + 1;
+        if (d->current.capacity() < wanted) {
+          const size_t whole = d->collect_bytes + 1;
+          d->current.reserve(wanted > kCollectTrust
+                                 ? whole
+                                 : std::min(whole, std::max(wanted, d->current.capacity() * 2)));
+        }
+        d->current.insert(d->current.end(), p, p + n);
+        drop(d, n);
+        d->block_left -= (uint32_t)n;
+        if (d->block_left) {
+          return;
+        }
+        keep_block(d);
         after_block(d);
         break;
       }
@@ -715,7 +863,8 @@ FrameResult decode_frame(Decoder* d, const uint8_t* p, size_t avail, const FlacF
     return kFrameNeedMore;
   }
   pg.valid = false;
-  if (flac_crc16(p, crc_pos) != (uint16_t)((p[crc_pos] << 8) | p[crc_pos + 1])) {
+  if (!d->ignore_checksums &&
+      flac_crc16(p, crc_pos) != (uint16_t)((p[crc_pos] << 8) | p[crc_pos + 1])) {
     return kFrameInvalid;
   }
   *frame_bytes = crc_pos + 2;
@@ -850,6 +999,14 @@ void flac_decoder_reset(BaacFlacDecoder* d) {
   d->first_frame_offset = -1;
   d->have_seek_table = false;
   d->seek_points.clear();
+  d->meta_held = 0;
+  d->meta_skipped = 0;
+  d->current.clear();
+  d->meta_blocks.clear();
+  d->have_comments = false;
+  d->vendor = BaacFlacComment();
+  d->comments.clear();
+  d->pictures.clear();
   d->have_frame = false;
   d->last = BaacFlacFrameInfo();
   d->next_position = 0;
@@ -877,6 +1034,37 @@ int flac_decoder_set_md5_check(BaacFlacDecoder* d, bool enabled) {
   d->md5_enabled = enabled;
   return AAC_OK;
 }
+
+void flac_decoder_ignore_checksums(BaacFlacDecoder* d, bool ignore) {
+  d->ignore_checksums = ignore;
+}
+
+int flac_decoder_set_metadata(BaacFlacDecoder* d, bool collect, size_t max_bytes) {
+  if (d->stage != Decoder::kStart || d->offset || pending(d)) {
+    return AAC_ERR_STATE;
+  }
+  d->collect = collect;
+  d->meta_cap = max_bytes ? max_bytes : (size_t)BAAC_FLAC_DEFAULT_METADATA_BYTES;
+  return AAC_OK;
+}
+
+int flac_decoder_comments(const BaacFlacDecoder* d, const BaacFlacComment** comments,
+                          BaacFlacComment* vendor) {
+  static const char kNone[1] = {0};
+  *comments = d->comments.empty() ? nullptr : d->comments.data();
+  if (vendor) {
+    vendor->text = d->have_comments ? d->vendor.text : kNone;
+    vendor->length = d->have_comments ? d->vendor.length : 0;
+  }
+  return (int)d->comments.size();
+}
+
+int flac_decoder_pictures(const BaacFlacDecoder* d, const BaacFlacPicture** pictures) {
+  *pictures = d->pictures.empty() ? nullptr : d->pictures.data();
+  return (int)d->pictures.size();
+}
+
+int flac_decoder_skipped_metadata(const BaacFlacDecoder* d) { return d->meta_skipped; }
 
 int flac_decoder_feed(BaacFlacDecoder* d, const uint8_t* data, int size) {
   if (d->stage == Decoder::kFinished || d->ended) {
@@ -939,8 +1127,19 @@ int flac_decoder_decode_next(BaacFlacDecoder* d, int32_t* pcm, int pcm_size) {
       return 0;
     }
     const uint8_t* p = fifo_data(d);
+    if (d->synced && p[0] == 'T' && avail <= kId3v1Bytes) {
+      /* What may be an ID3v1 tag behind the last frame: it is one when
+       * the input ends with it, and is passed over then. */
+      if (id3v1_trailer(d) && d->ended) {
+        drop(d, kId3v1Bytes);
+        return 0;
+      }
+      if (!d->ended && memcmp(p, "TAG", std::min<size_t>(avail, 3)) == 0) {
+        return 0;
+      }
+    }
     FlacFrameHeader h;
-    const int header_bytes = flac_frame_header_parse(p, avail, &h);
+    const int header_bytes = flac_frame_header_parse(p, avail, &h, !d->ignore_checksums);
     if (header_bytes == 0 && !d->ended) {
       return 0;
     }
@@ -1123,6 +1322,9 @@ int flac_decoder_finish(BaacFlacDecoder* d, BaacFlacMd5Verdict* verdict) {
     return AAC_ERR_STATE;
   }
   process_metadata(d);
+  if (d->stage == Decoder::kFrames && id3v1_trailer(d)) {
+    drop(d, kId3v1Bytes);
+  }
   int result = AAC_OK;
   /* What is left is damage when it was to be a frame or part of the
    * header: an unfinished metadata block, a frame cut short, or bytes

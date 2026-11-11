@@ -18,6 +18,7 @@
 #include <algorithm>
 #include <cassert>
 #include <cstring>
+#include <memory>
 #include <new>
 #include <vector>
 
@@ -386,6 +387,10 @@ struct BaacFlacEncoder_ {
   int bits = 0;
   Level level = kLevels[BAAC_FLAC_LEVEL_DEFAULT];
   BaacFlacEncoderOptions options = {};
+  /* The tag and picture blocks of the options as they go into a header,
+   * and where the header of the last of them begins. */
+  std::shared_ptr<const std::vector<uint8_t>> meta;
+  size_t meta_last = 0;
 
   /* The stream being written. */
   uint64_t frame_number = 0;
@@ -400,9 +405,11 @@ struct BaacFlacEncoder_ {
   std::vector<BaacFlacSeekPoint> seek_points; /* those found so far */
   int header_size = 0;                        /* of the stream's header, first and final */
   int padding = 0;                            /* bytes of its padding block */
-  int seek_reserved = 0;                      /* points the header has room for */
-  uint64_t seek_spacing = 0;                  /* samples from one target to the next */
-  uint64_t seek_target = 0;                   /* the next sample position to point at */
+  std::shared_ptr<const std::vector<uint8_t>> stream_meta; /* its tags and pictures */
+  size_t stream_meta_last = 0;
+  int seek_reserved = 0;     /* points the header has room for */
+  uint64_t seek_spacing = 0; /* samples from one target to the next */
+  uint64_t seek_target = 0;  /* the next sample position to point at */
 
   /* The block being filled: one row of `block_size` samples per channel. */
   std::vector<int32_t> input;
@@ -1112,6 +1119,7 @@ int header_bytes(const Encoder* e) {
   const int points = seek_point_count(e, &spacing);
   return FLAC_MARKER_BYTES + FLAC_BLOCK_HEADER_BYTES + BAAC_FLAC_STREAMINFO_BYTES +
          (points ? FLAC_BLOCK_HEADER_BYTES + points * FLAC_SEEK_POINT_BYTES : 0) +
+         (e->meta ? (int)e->meta->size() : 0) +
          (e->options.padding_bytes ? FLAC_BLOCK_HEADER_BYTES + e->options.padding_bytes : 0);
 }
 
@@ -1131,22 +1139,25 @@ uint8_t* put_be(uint8_t* p, uint64_t v, int bytes) {
 }
 
 /* The marker and the metadata blocks: STREAMINFO, the seek table when
- * one is reserved, padding when asked for.  The first header of a
- * stream and the final one differ in STREAMINFO and in the seek points
- * that are filled in, never in length. */
+ * one is reserved, the tags and the pictures, padding when asked for.
+ * The first header of a stream and the final one differ in STREAMINFO
+ * and in the seek points that are filled in, never in length. */
 void write_header(const Encoder* e, uint8_t* out, bool final) {
   const int points = e->seek_reserved;
   const int padding = e->padding;
+  const size_t meta = e->stream_meta ? e->stream_meta->size() : 0;
   uint8_t* p = out;
   memcpy(p, "fLaC", FLAC_MARKER_BYTES);
   p += FLAC_MARKER_BYTES;
-  p = put_block_header(p, FLAC_BLOCK_STREAMINFO, !points && !padding, BAAC_FLAC_STREAMINFO_BYTES);
+  p = put_block_header(p, FLAC_BLOCK_STREAMINFO, !points && !meta && !padding,
+                       BAAC_FLAC_STREAMINFO_BYTES);
   BaacFlacStreamInfo info;
   stream_info(e, &info, final);
   flac_streaminfo_write(&info, p);
   p += BAAC_FLAC_STREAMINFO_BYTES;
   if (points) {
-    p = put_block_header(p, FLAC_BLOCK_SEEKTABLE, !padding, (size_t)points * FLAC_SEEK_POINT_BYTES);
+    p = put_block_header(p, FLAC_BLOCK_SEEKTABLE, !meta && !padding,
+                         (size_t)points * FLAC_SEEK_POINT_BYTES);
     for (int i = 0; i < points; i++) {
       if (final && i < (int)e->seek_points.size()) {
         const BaacFlacSeekPoint& point = e->seek_points[(size_t)i];
@@ -1160,6 +1171,15 @@ void write_header(const Encoder* e, uint8_t* out, bool final) {
         p = put_be(p, 0, 2);
       }
     }
+  }
+  if (meta) {
+    /* The blocks as the options left them; the last of them closes the
+     * metadata when no padding follows. */
+    memcpy(p, e->stream_meta->data(), meta);
+    if (!padding) {
+      p[e->stream_meta_last] |= 0x80;
+    }
+    p += meta;
   }
   if (padding) {
     p = put_block_header(p, FLAC_BLOCK_PADDING, true, (size_t)padding);
@@ -1235,7 +1255,27 @@ int flac_encoder_set_options(BaacFlacEncoder* e, const BaacFlacEncoderOptions* o
       (options->total_samples_hint >> 36)) {
     return AAC_ERR_INVALID_ARG;
   }
+  /* The tags and pictures are checked and written into blocks of the
+   * encoder's own; the caller's memory is not kept. */
+  size_t meta_bytes = 0;
+  const int error = flac_meta_size(options, &meta_bytes);
+  if (error != AAC_OK) {
+    return error;
+  }
+  std::shared_ptr<std::vector<uint8_t>> meta;
+  size_t meta_last = 0;
+  if (meta_bytes) {
+    meta = std::make_shared<std::vector<uint8_t>>(meta_bytes);
+    flac_meta_write(options, meta->data(), &meta_last);
+  }
+  e->meta = meta;
+  e->meta_last = meta_last;
   e->options = *options;
+  e->options.comments = nullptr;
+  e->options.comment_count = 0;
+  e->options.vendor = nullptr;
+  e->options.pictures = nullptr;
+  e->options.picture_count = 0;
   return AAC_OK;
 }
 
@@ -1263,6 +1303,8 @@ int flac_encoder_write_header(BaacFlacEncoder* e, uint8_t* out, int out_size) {
   e->fill = 0;
   e->header_size = bytes;
   e->padding = e->options.padding_bytes;
+  e->stream_meta = e->meta;
+  e->stream_meta_last = e->meta_last;
   e->seek_reserved = seek_point_count(e, &e->seek_spacing);
   e->seek_points.clear();
   e->seek_points.reserve((size_t)e->seek_reserved);

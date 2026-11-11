@@ -176,8 +176,10 @@ struct FlacFrameHeader {
 /* Parses a frame header at `data`.  Returns its length, 0 when `size`
  * bytes do not hold the whole header yet, or -1 when the bytes are not
  * a frame header: no sync code, a reserved or forbidden field value, an
- * invalid coded number, or a CRC-8 mismatch. */
-int flac_frame_header_parse(const uint8_t* data, size_t size, FlacFrameHeader* h);
+ * invalid coded number, or a CRC-8 mismatch.  Without `check_crc` the
+ * CRC-8 is read past and not compared. */
+int flac_frame_header_parse(const uint8_t* data, size_t size, FlacFrameHeader* h,
+                            bool check_crc = true);
 
 /* Writes a frame header with its CRC-8 into `out`
  * (FLAC_MAX_FRAME_HEADER_BYTES) and returns its length, or -1 when a
@@ -202,6 +204,16 @@ void flac_decoder_destroy(BaacFlacDecoder* d);
 void flac_decoder_reset(BaacFlacDecoder* d);
 int flac_decoder_set_streaminfo(BaacFlacDecoder* d, const uint8_t* data);
 int flac_decoder_set_md5_check(BaacFlacDecoder* d, bool enabled);
+/* For fuzzing only, and not reachable through the public API: a frame
+ * is taken whatever its CRC-8 and CRC-16 say, so that mutated input
+ * reaches the code behind the checksums (RFC 9639 section 11 advises
+ * this for fuzz testing). */
+void flac_decoder_ignore_checksums(BaacFlacDecoder* d, bool ignore);
+int flac_decoder_set_metadata(BaacFlacDecoder* d, bool collect, size_t max_bytes);
+int flac_decoder_comments(const BaacFlacDecoder* d, const BaacFlacComment** comments,
+                          BaacFlacComment* vendor);
+int flac_decoder_pictures(const BaacFlacDecoder* d, const BaacFlacPicture** pictures);
+int flac_decoder_skipped_metadata(const BaacFlacDecoder* d);
 int flac_decoder_feed(BaacFlacDecoder* d, const uint8_t* data, int size);
 int flac_decoder_decode_next(BaacFlacDecoder* d, int32_t* pcm, int pcm_size);
 int flac_decoder_pending_bytes(const BaacFlacDecoder* d);
@@ -274,6 +286,33 @@ double flac_lpc_energy(const double* w, int n);
  * windowed prediction error is `error`: per sample half the logarithm of
  * the residual's variance plus `offset`, and never less than one bit. */
 double flac_lpc_estimate_bits(double error, double window_energy, int samples, double offset);
+
+/* ── tags and pictures (flac_meta.cpp) ──────────────────────────── */
+
+/* Whether the bytes are well-formed UTF-8: no shorter forms, no
+ * surrogates, nothing past U+10FFFF. */
+bool flac_utf8_valid(const char* text, size_t size);
+
+/* The encoder's side.  flac_meta_size checks the tags and pictures of
+ * the options and gives the bytes their blocks take with their headers
+ * (0 when there are none), or AAC_ERR_INVALID_ARG for what the format
+ * does not take.  flac_meta_write then writes those blocks, each with
+ * its header and without the last-block flag, and says where the header
+ * of the last one begins. */
+int flac_meta_size(const BaacFlacEncoderOptions* options, size_t* bytes);
+void flac_meta_write(const BaacFlacEncoderOptions* options, uint8_t* out, size_t* last_header);
+
+/* The decoder's side, on the content of a block that is there whole.
+ * flac_meta_count_comments finds a VORBIS_COMMENT block sound and
+ * returns its number of fields, or -1 when a length or the count does
+ * not fit the block.  flac_meta_read_comments then fills the vendor and
+ * that many fields with pointers into the block, and closes each string
+ * with a zero byte in place: the block needs one spare byte behind its
+ * `size` bytes for the last one.  flac_meta_read_picture does both for
+ * a PICTURE block and returns false for one that is not sound. */
+int flac_meta_count_comments(const uint8_t* block, size_t size);
+void flac_meta_read_comments(uint8_t* block, BaacFlacComment* vendor, BaacFlacComment* comments);
+bool flac_meta_read_picture(uint8_t* block, size_t size, BaacFlacPicture* picture);
 
 /* ── kernels (flac_dsp.cpp and src/simd/flac_*.cpp) ─────────────── */
 
