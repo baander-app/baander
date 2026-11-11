@@ -12,13 +12,16 @@ use App\Session\Infrastructure\Doctrine\PlaybackStore;
 use App\Session\Infrastructure\Doctrine\Repository\DeviceDoctrineRepository;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Application\Exception\ConflictException;
+use App\Tests\Fixtures\Session\PlaybackCostFixture;
 use App\Tests\Fixtures\Session\PlaybackPersistenceFixture;
+use App\Tests\Fixtures\Session\PlaybackStatementLog;
 use App\Tests\Support\FinalSchemaBootstrap;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManager;
 use PHPUnit\Framework\TestCase;
 
-require_once dirname(__DIR__) . '/Fixtures/Session/playback-concurrent-transfer.php';
+require_once dirname(__DIR__) . '/Fixtures/Session/playback-snapshot-cost.php';
 
 /**
  * What the playback store does that the coordinator's tests do not assert: how it resolves a
@@ -453,6 +456,249 @@ final class PlaybackStoreContractTest extends TestCase
         self::assertSame(4.5, $loaded->getPosition());
         self::assertSame(PlaybackState::Paused, $loaded->desiredState());
         self::assertSame($session->getId()->toString(), $loaded->getId()->toString());
+    }
+
+    public function testTheFirstLockOfAnAccountCreatesItsSessionAndLaterLocksInsertNothing(): void
+    {
+        $owner = $this->owner();
+        $log = new PlaybackStatementLog();
+        $connection = PlaybackCostFixture::countingConnection($this->schema, $log);
+        $store = new PlaybackStore(PlaybackPersistenceFixture::manager($connection));
+        $inserts = static fn(array $statements): int => count(array_filter($statements, static fn(string $statement): bool => str_contains($statement, 'INSERT INTO listening_sessions')));
+
+        $created = null;
+        $first = $log->during(function () use ($store, $owner, &$created): void {
+            $created = $store->lockSession($owner);
+        });
+        self::assertSame(1, $inserts($first));
+        self::assertSame(0, $created->revision());
+        self::assertSame(PlaybackState::Stopped, $created->desiredState());
+        self::assertSame('unknown', $created->observedState()->value);
+        self::assertSame([], $created->getQueue());
+        self::assertNull($created->media());
+        self::assertNull($created->activeIncarnationId());
+        self::assertSame($owner, $created->getUserId()->toString());
+
+        $again = null;
+        $second = $log->during(function () use ($store, $owner, &$again): void {
+            $again = $store->lockSession($owner);
+        });
+        $connection->close();
+        self::assertSame(0, $inserts($second));
+        self::assertLessThan(count($first), count($second));
+        self::assertSame($created->getId()->toString(), $again->getId()->toString());
+        self::assertSame($created->getPublicId()->toString(), $again->getPublicId()->toString());
+        self::assertEquals($created->getCreatedAt(), $again->getCreatedAt());
+        self::assertSame(1, (int) $this->observer->fetchOne('SELECT count(*) FROM listening_sessions WHERE user_id=?', [$owner]));
+    }
+
+    public function testTheSessionLockIsARowLockHeldUntilTheTransactionEnds(): void
+    {
+        $owner = $this->owner();
+        $this->store->lockSession($owner);
+
+        $this->connection->beginTransaction();
+        $this->store->lockSession($owner);
+        self::assertFalse($this->observer->fetchOne('SELECT count(*)=1 FROM (SELECT 1 FROM listening_sessions WHERE user_id=? FOR UPDATE SKIP LOCKED) free', [$owner]));
+        $this->connection->commit();
+
+        self::assertTrue($this->observer->fetchOne('SELECT count(*)=1 FROM (SELECT 1 FROM listening_sessions WHERE user_id=? FOR UPDATE SKIP LOCKED) free', [$owner]));
+    }
+
+    public function testASnapshotCarriesEachDestinationOnceWithItsLatestIncarnation(): void
+    {
+        $owner = $this->owner();
+        $device = $this->device($owner);
+        $endpoint = new Uuid()->toString();
+        $registrations = array_map(fn(): array => $this->store->register($owner, ['deviceId' => $device, 'endpointId' => $endpoint]), range(1, 3));
+        $empty = $this->store->register($owner, ['deviceId' => $device, 'endpointId' => new Uuid()->toString(), 'name' => 'Never connected']);
+        $this->connection->executeStatement('DELETE FROM playback_destination_incarnations WHERE id=?', [$empty['incarnationId']]);
+        $this->connection->executeStatement("UPDATE playback_destinations SET created_at=created_at+INTERVAL '1 second' WHERE public_id=?", [$empty['destinationId']]);
+        $this->store->observe($registrations[2]['incarnationId'], 'paused', 8.5, 0.25);
+
+        $destinations = $this->store->snapshot($this->store->lockSession($owner), null)['destinations'];
+
+        self::assertSame([$registrations[0]['destinationId'], $empty['destinationId']], array_column($destinations, 'destinationId'));
+        self::assertSame(
+            ['destinationId' => $registrations[0]['destinationId'], 'name' => 'Playback store browser', 'kind' => 'browser', 'capabilities' => ['song', 'video'],
+                'incarnationId' => $registrations[2]['incarnationId'], 'epoch' => 3, 'observedState' => 'paused', 'position' => 8.5, 'observedVolume' => 0.25, 'available' => true],
+            $destinations[0],
+        );
+        self::assertSame(
+            ['destinationId' => $empty['destinationId'], 'name' => 'Never connected', 'kind' => 'browser', 'capabilities' => ['song', 'video'],
+                'incarnationId' => null, 'epoch' => null, 'observedState' => null, 'position' => null, 'observedVolume' => null, 'available' => false],
+            $destinations[1],
+        );
+    }
+
+    public function testAnEndpointsAvailabilityFollowsItsRegistrationOnEveryRead(): void
+    {
+        $account = $this->account();
+        $available = fn(): bool => $this->store->endpoint($account['owner'], $account['incarnation'])['available'];
+        self::assertTrue($available());
+
+        $this->connection->executeStatement("UPDATE playback_destination_incarnations SET expires_at=CURRENT_TIMESTAMP-INTERVAL '1 second' WHERE id=?", [$account['incarnation']]);
+        self::assertFalse($available());
+        $this->connection->executeStatement("UPDATE playback_destination_incarnations SET expires_at=CURRENT_TIMESTAMP+INTERVAL '1 hour' WHERE id=?", [$account['incarnation']]);
+        self::assertTrue($available());
+        $this->connection->executeStatement('UPDATE playback_destination_incarnations SET retired_at=CURRENT_TIMESTAMP WHERE id=?', [$account['incarnation']]);
+        self::assertFalse($available());
+    }
+
+    public function testAnEndpointIsReadOnlyForItsOwnerAndWithItsCapability(): void
+    {
+        $account = $this->account();
+        $capability = $this->register($account['owner'], $account['device']);
+        $stranger = $this->owner();
+
+        self::assertSame($capability['incarnationId'], $this->store->endpoint($account['owner'], $capability['incarnationId'], $capability['capability'])['id']);
+        foreach ([[$stranger, $capability['incarnationId'], null], [$account['owner'], $capability['incarnationId'], 'another capability'], [$account['owner'], new Uuid()->toString(), null]] as [$owner, $incarnation, $presented]) {
+            try {
+                $this->store->endpoint($owner, $incarnation, $presented);
+                self::fail('An endpoint was read without authority over it.');
+            } catch (ConflictException $error) {
+                self::assertSame('Endpoint authority is invalid.', $error->getMessage());
+            }
+        }
+    }
+
+    public function testARequestedTransferCarriesTheReasonItWasFirstRefusedFor(): void
+    {
+        $account = $this->account();
+        $transfer = $this->transfer($account);
+        $this->store->saveTransfer($transfer);
+        self::assertSame(
+            ['id' => $transfer['id'], 'request_id' => $transfer['request_id'], 'state' => 'preparing', 'rejection_reason' => null],
+            $this->store->requestedTransfer($account['session'], $transfer['request_id']),
+        );
+        self::assertNull($this->store->requestedTransfer($account['session'], new Uuid()->toString()));
+
+        $later = $this->command($account, ['type' => 'prepare', 'attempt_id' => $transfer['id'], 'request_id' => $transfer['request_id']]);
+        $earlier = $this->command($account, ['type' => 'start', 'attempt_id' => $transfer['id'], 'request_id' => $transfer['request_id']]);
+        $answered = $this->command($account, ['type' => 'quiesce', 'attempt_id' => $transfer['id'], 'request_id' => $transfer['request_id']]);
+        $elsewhere = $this->command($account, ['type' => 'prepare']);
+        foreach ([[$later, 'rejected', 'video_codec_unsupported'], [$earlier, 'rejected', 'audio_codec_unsupported'], [$answered, 'quiesced', null], [$elsewhere, 'rejected', 'container_unsupported']] as [$command, $outcome, $reason]) {
+            $this->store->insertCommand($command);
+            $this->store->acknowledgeCommand($command['id'], $outcome, $reason);
+        }
+        // Creation order decides, not the order of the identifiers.
+        $this->connection->executeStatement("UPDATE playback_commands SET created_at=created_at+INTERVAL '1 minute' WHERE id=?", [$later['id']]);
+        $this->connection->executeStatement("UPDATE playback_commands SET created_at=created_at-INTERVAL '1 minute' WHERE id=?", [$elsewhere['id']]);
+
+        self::assertSame(
+            ['id' => $transfer['id'], 'request_id' => $transfer['request_id'], 'state' => 'preparing', 'rejection_reason' => 'audio_codec_unsupported'],
+            $this->store->requestedTransfer($account['session'], $transfer['request_id']),
+        );
+    }
+
+    public function testARequestedCommandIsTheFirstCommandOfItsRequest(): void
+    {
+        $account = $this->account();
+        $first = $this->command($account, ['type' => 'play']);
+        $chased = ['id' => new Uuid()->toString(), 'type' => 'stop', 'revision' => 8] + $first;
+        $this->store->insertCommand($first);
+        $this->store->insertCommand($chased);
+        $this->connection->executeStatement("UPDATE playback_commands SET created_at=created_at+INTERVAL '1 minute' WHERE id=?", [$chased['id']]);
+        $this->store->acknowledgeCommand($first['id'], 'rejected', 'browser_rejected_source');
+
+        self::assertSame(
+            ['id' => $first['id'], 'request_id' => $first['request_id'], 'outcome' => 'rejected', 'rejection_reason' => 'browser_rejected_source'],
+            $this->store->requestedCommand($account['session'], $first['request_id']),
+        );
+        self::assertNull($this->store->requestedCommand($account['session'], new Uuid()->toString()));
+    }
+
+    public function testARequestIsRememberedByItsDigestWhetherItBecameATransferOrACommand(): void
+    {
+        $account = $this->account();
+        $transfer = $this->transfer($account, ['request_digest' => 'transfer digest']);
+        $this->store->saveTransfer($transfer);
+        $command = $this->command($account, ['type' => 'play', 'request_digest' => 'command digest']);
+        $this->store->insertCommand($command);
+
+        self::assertFalse($this->store->rememberRequest($account['session'], new Uuid()->toString(), 'transfer digest'));
+        foreach ([[$transfer['request_id'], 'transfer digest'], [$command['request_id'], 'command digest']] as [$request, $digest]) {
+            self::assertTrue($this->store->rememberRequest($account['session'], $request, $digest));
+            try {
+                $this->store->rememberRequest($account['session'], $request, 'another digest');
+                self::fail('A request identity was accepted for another payload.');
+            } catch (ConflictException $error) {
+                self::assertSame('The playback request identity has already been used for another payload.', $error->getMessage());
+            }
+        }
+        // Another account's session does not know the request.
+        $other = $this->account();
+        self::assertFalse($this->store->rememberRequest($other['session'], $transfer['request_id'], 'transfer digest'));
+    }
+
+    public function testQuiescenceAndDisclosureAreAnsweredFromTheAttemptsCommands(): void
+    {
+        $account = $this->account();
+        $attempt = new Uuid()->toString();
+        $quiesce = $this->command($account, ['type' => 'quiesce', 'attempt_id' => $attempt]);
+        $this->store->insertCommand($quiesce);
+        self::assertFalse($this->store->sourceQuiesced($attempt, $account['incarnation']));
+        self::assertFalse($this->store->attemptDisclosed($attempt, 'quiesce'));
+
+        $this->store->snapshot($this->store->lockSession($account['owner']), $account['incarnation']);
+        self::assertTrue($this->store->attemptDisclosed($attempt, 'quiesce'));
+        self::assertFalse($this->store->attemptDisclosed($attempt, 'start'));
+        self::assertFalse($this->store->attemptDisclosed(new Uuid()->toString(), 'quiesce'));
+
+        $this->store->acknowledgeCommand($quiesce['id'], 'quiesced');
+        self::assertTrue($this->store->sourceQuiesced($attempt, $account['incarnation']));
+        self::assertFalse($this->store->sourceQuiesced($attempt, new Uuid()->toString()));
+        self::assertFalse($this->store->sourceQuiesced(new Uuid()->toString(), $account['incarnation']));
+    }
+
+    public function testThePendingControlIsTheOldestUnansweredControlAndNoTransferCommand(): void
+    {
+        $account = $this->account();
+        self::assertNull($this->store->pendingControl($account['session']));
+        self::assertFalse($this->store->hasPendingControl($account['session']));
+        $prepare = $this->command($account, ['type' => 'prepare']);
+        $newer = $this->command($account, ['type' => 'volume', 'payload' => ['volume' => 0.5]]);
+        $older = $this->command($account, ['type' => 'seek']);
+        foreach ([$prepare, $newer, $older] as $command) {
+            $this->store->insertCommand($command);
+        }
+        $this->connection->executeStatement("UPDATE playback_commands SET created_at=created_at-INTERVAL '1 minute' WHERE id=?", [$older['id']]);
+        $this->connection->executeStatement("UPDATE playback_commands SET created_at=created_at-INTERVAL '2 minutes' WHERE id=?", [$prepare['id']]);
+
+        self::assertSame($older['id'], $this->store->pendingControl($account['session'])['id'] ?? null);
+        $this->store->acknowledgeCommand($older['id'], 'applied');
+        self::assertSame($newer['id'], $this->store->pendingControl($account['session'])['id'] ?? null);
+        $this->store->acknowledgeCommand($newer['id'], 'applied');
+        self::assertNull($this->store->pendingControl($account['session']));
+        self::assertFalse($this->store->hasPendingControl($account['session']));
+    }
+
+    public function testReadsLeaveNoEntityBehindInTheUnitOfWork(): void
+    {
+        $account = $this->account(recoverable: true);
+        $command = $this->command($account, ['type' => 'play']);
+        $this->store->insertCommand($command);
+        $transfer = $this->transfer($account);
+        $this->store->saveTransfer($transfer);
+        $this->manager->clear();
+
+        $this->connection->beginTransaction();
+        $session = $this->store->lockSession($account['owner']);
+        $this->store->endpoint($account['owner'], $account['incarnation']);
+        $this->store->localRecovery($account['owner'], $account['incarnation'], $account['tab'], $account['recoveryCredential']);
+        $this->store->command($account['owner'], $command['id']);
+        $this->store->pendingControl($account['session']);
+        $this->store->currentTransfer($account['session']);
+        $this->store->requestedCommand($account['session'], $command['request_id']);
+        $this->store->requestedTransfer($account['session'], $transfer['request_id']);
+        $this->store->rememberRequest($account['session'], $command['request_id'], $command['request_digest']);
+        $this->store->sourceQuiesced($command['attempt_id'], $account['incarnation']);
+        $this->store->attemptDisclosed($command['attempt_id'], 'play');
+        $this->store->snapshot($session, $account['incarnation']);
+        $this->connection->commit();
+
+        self::assertSame(0, $this->manager->getUnitOfWork()->size());
+        self::assertSame([], $this->manager->getUnitOfWork()->getIdentityMap());
     }
 
     private function owner(): string
