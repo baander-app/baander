@@ -6,11 +6,14 @@ import { getPlaybackAdapter } from '@/features/session/services/playback-executi
 import type { PlaybackCommandResource } from '@/shared/api-client/gen/endpoints'
 
 const { execution } = vi.hoisted(() => ({ execution: {
-  ready: vi.fn(), execute: vi.fn(), quiesce: vi.fn(),
+  ready: vi.fn(), prepare: vi.fn(), execute: vi.fn(), quiesce: vi.fn(),
   observe: vi.fn(() => ({ observedState: 'paused' as const, position: 0 })),
 } }))
 vi.mock('@/features/catalog/hooks/useBaanderPlayer', () => ({
   useBaanderPlayer: () => ({ execution, currentTime: 0, duration: 180, pendingSeekPosition: null, state: 'paused' }),
+}))
+vi.mock('@/features/session/hooks/use-playback-session', () => ({
+  usePlaybackSession: () => ({ snapshot: undefined, endpoint: null }),
 }))
 const payload: PlaybackCommandResource['payload'] = {
   media: { kind: 'video', publicId: 'video' }, queue: [], currentTrackIndex: 0, position: 0, desiredState: 'playing',
@@ -20,6 +23,7 @@ const signal = () => new AbortController().signal
 beforeEach(() => {
   vi.clearAllMocks()
   execution.ready.mockResolvedValue(undefined)
+  execution.prepare.mockResolvedValue(undefined)
   execution.quiesce.mockResolvedValue({ observedState: 'paused', position: 0 })
   execution.execute.mockResolvedValue({ observedState: 'playing', position: 0 })
   useVideoPresentation.getState().select('')
@@ -38,12 +42,12 @@ describe('persistent video execution', () => {
 
   it('prepares without play and waits for the actual source readiness', async () => {
     let ready!: () => void
-    execution.ready.mockImplementation(() => new Promise<void>(resolve => { ready = resolve }))
+    execution.prepare.mockImplementation(() => new Promise<void>(resolve => { ready = resolve }))
     render(<VideoPlaybackRuntime />)
     const prepared = vi.fn()
     let preparation!: Promise<void>
     act(() => { preparation = getPlaybackAdapter('video')!.prepare(payload, signal()).then(prepared) })
-    await waitFor(() => expect(execution.ready).toHaveBeenCalledOnce())
+    await waitFor(() => expect(execution.prepare).toHaveBeenCalledOnce())
     expect(prepared).not.toHaveBeenCalled()
     expect(execution.execute).not.toHaveBeenCalled()
     await act(async () => { ready(); await preparation })
@@ -94,11 +98,11 @@ describe('persistent video execution', () => {
     await expect(adapter.quiesce(signal())).resolves.toMatchObject({ observedState: 'stopped', position: 42 })
     await adapter.execute({ ...command, type: 'stop' }, signal())
     expect(execution.execute).toHaveBeenCalledTimes(1)
-    execution.ready.mockClear()
+    execution.prepare.mockClear()
     let replay!: Promise<unknown>
     act(() => { replay = adapter.execute({ ...command, type: 'play', payload }, signal()) })
     await act(async () => { await replay })
-    expect(execution.ready).toHaveBeenCalledOnce()
+    expect(execution.prepare).toHaveBeenCalledOnce()
     expect(execution.execute).toHaveBeenLastCalledWith('play', undefined, expect.any(AbortSignal))
     expect(useVideoPresentation.getState().videoId).toBe('video')
   })
