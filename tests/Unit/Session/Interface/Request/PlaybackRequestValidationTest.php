@@ -21,7 +21,8 @@ final class PlaybackRequestValidationTest extends TestCase
     {
         $validator = Validation::createValidatorBuilder()->enableAttributeMapping()->getValidator();
         $uuid = new Uuid()->toString();
-        $requests = [new RegisterPlaybackEndpointRequest($uuid, $uuid), new TransferPlaybackRequest($uuid, 0, $uuid),
+        $requests = [new RegisterPlaybackEndpointRequest($uuid, $uuid), new RegisterPlaybackEndpointRequest($uuid, $uuid, pageId: $uuid),
+            new TransferPlaybackRequest($uuid, 0, $uuid),
             new AcknowledgePlaybackRequest($uuid, $uuid, 1, $uuid, 1, 'prepared'), new ObservePlaybackRequest($uuid, 1, 'paused', 12.5),
             new ReconcilePlaybackRequest(1), new ControlPlaybackRequest($uuid, 0, 'volume', volume: 0.5), new ControlPlaybackRequest($uuid, 0, 'load', 12.5, ['kind' => 'video', 'publicId' => new PublicId()->toString()])];
         foreach ($requests as $request) {
@@ -38,6 +39,17 @@ final class PlaybackRequestValidationTest extends TestCase
         self::assertSame('video_codec_unsupported', $accepted->toArray()['rejectionReason']);
         self::assertNotCount(0, $validator->validate(new AcknowledgePlaybackRequest($id, $id, 1, $id, 1, 'rejected', rejectionReason: 'raw error message')));
         self::assertNotCount(0, $validator->validate(new AcknowledgePlaybackRequest($id, $id, 1, $id, 1, 'prepared', rejectionReason: 'unknown')));
+    }
+
+    public function testARegistrationCarriesItsPageIdentityOnlyAsAUuid(): void
+    {
+        $validator = Validation::createValidatorBuilder()->enableAttributeMapping()->getValidator();
+        $uuid = new Uuid()->toString();
+        $page = new Uuid()->toString();
+
+        self::assertSame($page, new RegisterPlaybackEndpointRequest($uuid, $uuid, pageId: $page)->toArray()['pageId']);
+        self::assertNull(new RegisterPlaybackEndpointRequest($uuid, $uuid)->toArray()['pageId']);
+        self::assertCount(1, $validator->validate(new RegisterPlaybackEndpointRequest($uuid, $uuid, pageId: 'this page')));
     }
 
     public function testMalformedMediaAndEndpointAuthorityAreRejectedBeforeTheUseCase(): void

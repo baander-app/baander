@@ -135,6 +135,38 @@ final class ConfirmedStoppedRunnerRecoveryTest extends TestCase
         self::assertSame(27.5, $session->getPosition());
     }
 
+    public function testARegistrationFromAnotherPageLeavesARunnerTheStoppedProofReleasesStopped(): void
+    {
+        $session = $this->stoppedSession();
+        $revision = $session->revision();
+        $store = $this->store($session);
+        $destination = new PublicId()->toString();
+        $order = [];
+        $store->method('register')->willReturn(['destinationId' => $destination, 'incarnationId' => new Uuid()->toString(), 'epoch' => 2, 'capability' => 'capability']);
+        $store->method('endpoint')->willReturn(['id' => $this->runner->toString(), 'public_id' => $destination, 'page_id' => new Uuid()->toString(),
+            'destination_id' => $this->destination->toString(), 'retired_at' => '2026-11-11 12:00:00.000000+00:00', 'observed_state' => 'stopped']);
+        $store->expects(self::once())->method('retireConfirmedStoppedBrowser')->with($session)->willReturnCallback(static function () use (&$order): bool {
+            $order[] = 'proof';
+            return true;
+        });
+        $store->expects(self::once())->method('supersedeIncarnationCommands')->with($this->runner->toString())->willReturnCallback(static function () use (&$order): void {
+            $order[] = 'release';
+        });
+        $store->expects(self::once())->method('retireIncarnation')->with($this->runner->toString(), true);
+        $store->expects(self::once())->method('saveSession')->with($session);
+
+        $this->coordinator($store)->execute($this->owner, PlaybackOperation::Endpoint, [
+            'deviceId' => new Uuid()->toString(), 'endpointId' => new Uuid()->toString(), 'pageId' => new Uuid()->toString(),
+        ]);
+
+        self::assertSame(['proof', 'release'], $order);
+        self::assertNull($session->activeIncarnationId());
+        self::assertSame($revision + 1, $session->revision());
+        self::assertSame(PlaybackState::Stopped, $session->desiredState());
+        self::assertSame('stopped', $session->observedState()->value);
+        self::assertSame(27.5, $session->getPosition());
+    }
+
     public function testControlReleasesAGoneStoppedRunnerAfterTheRevisionCheckAndRetainsTheRequest(): void
     {
         $session = $this->stoppedSession();

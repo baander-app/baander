@@ -14,18 +14,21 @@ interface PlaybackStoreInterface
     /**
      * Retire only unavailable managed browser execution with a durable, fenced acknowledgement that it is
      * silent: of a pause, a quiesce, a stop, or a start that wanted the paused state.
-     * Commands settled as never effective since that acknowledgement do not count against it, and the
-     * session must stand at the revision the acknowledgement or the last such settlement left.
+     * Commands settled as never effective since that acknowledgement do not count against it, and
+     * neither do queue edits and volume changes, which cannot start or move playback. The session must
+     * stand at the revision the acknowledgement, the last such settlement or the last such edit left.
      */
     public function retireConfirmedPausedBrowser(ListeningSession $session): bool;
     /** Retire only unavailable managed browser execution that last reported itself stopped, with no command or transfer outstanding. */
     public function retireConfirmedStoppedBrowser(ListeningSession $session): bool;
     /**
+     * The registration's optional page identity is stored with the new incarnation and returned with its row.
+     *
      * @param array<string,mixed> $input
      * @return array<string,mixed>
      */
     public function register(string $userId, array $input): array;
-    /** @return array<string,mixed> The incarnation with its destination's kind, capabilities and availability. */
+    /** @return array<string,mixed> The incarnation with its destination's public identity, kind, capabilities and availability. */
     public function endpoint(string $userId, string $incarnationId, ?string $capability = null): array;
     /** Record that the runner may have acted on a command it was shown and has not answered. Presence is not renewed. */
     public function markRunnerUnknown(string $incarnationId): void;
@@ -61,11 +64,25 @@ interface PlaybackStoreInterface
      */
     public function snapshot(ListeningSession $session, ?string $incarnationId): array;
     public function observe(string $incarnationId, string $state, float $position, ?float $volume = null): void;
+    /** Record the cursor an endpoint reports and renew its presence. What it last reported about playback stands. */
+    public function reportCursor(string $incarnationId, float $position): void;
     public function observeVolume(string $incarnationId, float $volume): void;
     /** @return array<string,mixed> */
     public function localRecovery(string $owner, string $incarnationId, string $tabId, string $credential): array;
     /** @param array<string,mixed> $result */
     public function completeLocalRecovery(string $incarnationId, array $result): void;
+    /**
+     * End an incarnation's registration, once, without renewing its presence. It is recorded as stopped
+     * only where its silence is proved, and at a cursor only where it reported one; otherwise what it
+     * last reported stands.
+     */
+    public function retireIncarnation(string $incarnationId, bool $stopped, ?float $position = null): void;
     public function supersedeIncarnationCommands(string $incarnationId): void;
+    /**
+     * Give an incarnation's place to its successor: its unanswered commands are addressed to the
+     * successor and its epoch, keeping the mark that they were shown, and an open transfer names the
+     * successor in each role the earlier incarnation held. Answered commands stay where they are.
+     */
+    public function succeedIncarnation(string $earlierId, string $successorId, int $successorEpoch): void;
     public function sourceQuiesced(string $attemptId, string $sourceId): bool;
 }

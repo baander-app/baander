@@ -66,6 +66,10 @@ final class PlaybackDestinationIncarnationEntity
     #[ORM\Column(type: 'json', nullable: true, options: ['jsonb' => true])]
     private ?array $recoveryResult = null;
 
+    /** The document that registered this incarnation, when it named itself. Absent means unknown, never "the same". */
+    #[ORM\Column(type: 'uuid', nullable: true)]
+    private ?Uuid $pageId;
+
     /**
      * An incarnation eligible for local recovery carries its tab, credential hash and expiry;
      * any other incarnation carries none of them. The table's check constraint enforces both.
@@ -81,6 +85,7 @@ final class PlaybackDestinationIncarnationEntity
         ?Uuid $tabId = null,
         ?string $recoveryCredentialHash = null,
         ?\DateTimeImmutable $recoveryExpiresAt = null,
+        ?Uuid $pageId = null,
     ) {
         $this->id = $id;
         $this->destinationId = $destinationId;
@@ -92,5 +97,6 @@ final class PlaybackDestinationIncarnationEntity
         $this->tabId = $tabId;
         $this->recoveryCredentialHash = $recoveryCredentialHash;
         $this->recoveryExpiresAt = $recoveryExpiresAt;
+        $this->pageId = $pageId;
     }
 }

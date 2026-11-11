@@ -899,6 +899,8 @@ export interface RegisterPlaybackEndpointRequest {
   /** @nullable */
   tabId?: string | null;
   localRecoveryEligible?: boolean;
+  /** @nullable */
+  pageId?: string | null;
 }
 
 export interface TransferPlaybackRequest {

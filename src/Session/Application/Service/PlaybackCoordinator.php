@@ -76,11 +76,34 @@ final readonly class PlaybackCoordinator implements PlaybackCoordinationInterfac
                 case PlaybackOperation::Endpoint:
                     $input['deviceId'] = $this->uuid($input, 'deviceId');
                     $input['endpointId'] = $this->uuid($input, 'endpointId');
+                    $input['pageId'] = $this->pageIdentity($input);
                     $registration = $this->store->register($owner, $input);
+                    $earlierPages = $input['pageId'] === null ? [] : $this->earlierPagesOfTab($session, $transfer, $registration);
+                    // The same page registering again is one live document that never stopped answering
+                    // for its players, as after its socket was replaced. Its new incarnation takes the
+                    // earlier one's place and its unanswered commands; nothing is released and the
+                    // revision stands, because an answer is accepted only at its command's own revision.
+                    foreach ($earlierPages as $earlier) {
+                        if ($earlier['page_id'] === $input['pageId']) {
+                            if ($session->activeIncarnationId()?->toString() === $earlier['id']) {
+                                $session->succeedRunner(Uuid::fromString($registration['incarnationId']));
+                            }
+                            $this->store->succeedIncarnation($earlier['id'], $registration['incarnationId'], (int) $registration['epoch']);
+                        }
+                    }
                     // Registering a tab again retires its previous incarnation. The answer to the
                     // registration must already show a runner that this proves gone as released, or the
                     // tab would refuse its own first Play until the next relayed snapshot.
                     $this->releaseGoneRunner($session, $transfer);
+                    // A tab holds one live document at a time, so a registration from another page
+                    // proves the earlier page gone, whatever the session last knew about it. The
+                    // proofs above ran first: what they release keeps the state it confirmed.
+                    foreach ($earlierPages as $earlier) {
+                        if ($earlier['page_id'] !== $input['pageId']) {
+                            $this->releaseIncarnation($session, $earlier['id'], null);
+                            $this->store->retireIncarnation($earlier['id'], stopped: true);
+                        }
+                    }
                     break;
                 case PlaybackOperation::Transfer:
                     $requestId = $this->uuid($input, 'requestId');
@@ -110,8 +133,7 @@ final readonly class PlaybackCoordinator implements PlaybackCoordinationInterfac
 
                     $sourceId = $session->activeIncarnationId()?->toString();
                     if ($sourceId !== null) {
-                        $source = $this->store->endpoint($owner, $sourceId);
-                        if ($source['retired_at'] !== null && $source['observed_state'] === 'stopped') {
+                        if ($this->goneAndStopped($this->store->endpoint($owner, $sourceId))) {
                             $sourceId = null;
                         }
                     }
@@ -290,64 +312,121 @@ final readonly class PlaybackCoordinator implements PlaybackCoordinationInterfac
         if ($record['recovery_result'] !== null) {
             return $this->store->snapshot($session, null) + ['recoveryResult' => $record['recovery_result']];
         }
-        $checkpoint = $input['checkpoint'] ?? null;
-        if (!is_array($checkpoint) || !array_key_exists('media', $checkpoint)
-            || !isset($checkpoint['revision'], $checkpoint['currentTrackIndex'])
-            || !is_int($checkpoint['revision']) || $checkpoint['revision'] < 0
-            || !is_int($checkpoint['currentTrackIndex']) || $checkpoint['currentTrackIndex'] < 0) {
-            throw new InvalidArgumentException('Invalid local recovery checkpoint.');
-        }
-        $position = $this->position($checkpoint);
-        $media = $checkpoint['media'] === null ? null : $this->media($checkpoint['media']);
-        $transfer = $this->store->currentTransfer($session->getId()->toString());
-        $source = $transfer !== null && $transfer['source_incarnation_id'] === $incarnation;
-        $target = $transfer !== null && $transfer['target_incarnation_id'] === $incarnation;
-        $active = $session->activeIncarnationId()?->toString() === $incarnation;
-        $preserveTarget = $source && in_array($transfer['state'], ['starting', 'uncertain'], true);
-        $mutate = !$preserveTarget && ($source || $target || ($transfer === null && $active));
-        $this->store->supersedeIncarnationCommands($incarnation);
-        if ($mutate) {
-            $targetPreparing = $target && $transfer['state'] === 'preparing';
-            if ($transfer !== null) {
-                $this->store->cancelCommands($transfer['id']);
-                $transfer['state'] = 'failed';
-            }
-            if (!$targetPreparing) {
-                $sourceId = $target ? $transfer['source_incarnation_id'] : null;
-                $sourceStopped = $sourceId === null || $this->store->sourceQuiesced($transfer['id'], $sourceId);
-                if ($sourceId !== null && !$sourceStopped) {
-                    $sourceEndpoint = $this->store->endpoint($session->getUserId()->toString(), $sourceId);
-                    $sourceStopped = ($sourceEndpoint['recovery_result'] ?? null) !== null
-                        && $sourceEndpoint['retired_at'] !== null && $sourceEndpoint['observed_state'] === 'stopped';
-                }
-                $session->recoverLocalRunner(
-                    $media,
-                    $checkpoint['currentTrackIndex'],
-                    $checkpoint['revision'],
-                    $position,
-                    !$target || $sourceId === null,
-                    $sourceStopped,
-                );
-                if ($target && $sourceId !== null) {
-                    $session->restoreSelection(Uuid::fromString($this->store->endpoint($session->getUserId()->toString(), $sourceId)['destination_id']));
-                    if (!$sourceStopped) {
-                        $obligation = (new Uuid())->toString();
-                        $this->enqueue($session, $obligation, $obligation, $sourceId, 'stop', hash('sha256', $obligation));
-                    }
-                }
-            } else {
-                $session->restoreSelection($active ? null : ($session->activeIncarnationId() === null ? null : Uuid::fromString($this->store->endpoint($session->getUserId()->toString(), $session->activeIncarnationId()->toString())['destination_id'])));
-                $session->advanceRevision();
-            }
-            if ($transfer !== null) {
-                $transfer['revision'] = $session->revision();
-                $this->store->saveTransfer($transfer);
-            }
+        $checkpoint = $this->checkpoint($input['checkpoint'] ?? null);
+        if ($this->releaseIncarnation($session, $incarnation, $checkpoint)) {
             $this->store->saveSession($session);
         }
         $result = ['incarnationId' => $incarnation, 'outcome' => 'recovered', 'revision' => $session->revision()];
         $this->store->completeLocalRecovery($incarnation, $result);
         return $this->store->snapshot($session, null) + ['recoveryResult' => $result];
+    }
+
+    /**
+     * Settles the session for one incarnation that will not answer again, wherever the session still
+     * names it. Its unanswered commands are closed. As the runner, or as the source of a transfer whose
+     * target was not yet asked to start, it leaves the session paused without a runner. As the target
+     * of a transfer it fails the transfer, and the source keeps the session unless it is gone as well.
+     * As the source of a transfer whose target was asked to start it changes nothing: the transfer goes
+     * on. The cursor is the given checkpoint's where it describes the session as it stands, and the
+     * one last recorded otherwise.
+     *
+     * @param array{media:?PlaybackMedia,currentTrackIndex:int,revision:int,position:float}|null $checkpoint
+     * @return bool Whether the session changed. The caller saves it.
+     */
+    private function releaseIncarnation(ListeningSession $session, string $incarnation, ?array $checkpoint): bool
+    {
+        $owner = $session->getUserId()->toString();
+        $transfer = $this->store->currentTransfer($session->getId()->toString());
+        $source = $transfer !== null && $transfer['source_incarnation_id'] === $incarnation;
+        $target = $transfer !== null && $transfer['target_incarnation_id'] === $incarnation;
+        $active = $session->activeIncarnationId()?->toString() === $incarnation;
+        $preserveTarget = $source && in_array($transfer['state'], ['starting', 'uncertain'], true);
+        $this->store->supersedeIncarnationCommands($incarnation);
+        if ($preserveTarget || !($source || $target || ($transfer === null && $active))) {
+            return false;
+        }
+        $targetPreparing = $target && $transfer['state'] === 'preparing';
+        if ($transfer !== null) {
+            $this->store->cancelCommands($transfer['id']);
+            $transfer['state'] = 'failed';
+        }
+        if ($targetPreparing) {
+            // Nothing was handed over yet, so whoever ran playback still does.
+            $this->fallBackToRunner($session);
+            $session->advanceRevision();
+        } else {
+            $sourceId = $target ? $transfer['source_incarnation_id'] : null;
+            $sourceEndpoint = $sourceId === null ? null : $this->store->endpoint($owner, $sourceId);
+            // A source that is itself recorded gone and stopped does not get the session back.
+            $keepSource = $sourceEndpoint !== null && !$this->goneAndStopped($sourceEndpoint);
+            $sourceStopped = !$keepSource || $this->store->sourceQuiesced($transfer['id'], $sourceId);
+            if ($checkpoint === null) {
+                $session->releaseGoneIncarnation(!$keepSource, $sourceStopped);
+            } else {
+                $session->recoverLocalRunner($checkpoint['media'], $checkpoint['currentTrackIndex'], $checkpoint['revision'], $checkpoint['position'], !$keepSource, $sourceStopped);
+            }
+            if ($keepSource) {
+                $session->restoreSelection(Uuid::fromString($sourceEndpoint['destination_id']));
+                if (!$sourceStopped) {
+                    $obligation = (new Uuid())->toString();
+                    $this->enqueue($session, $obligation, $obligation, $sourceId, 'stop', hash('sha256', $obligation));
+                }
+            }
+        }
+        if ($transfer !== null) {
+            $transfer['revision'] = $session->revision();
+            $this->store->saveTransfer($transfer);
+        }
+        return true;
+    }
+
+    /**
+     * A failed transfer leaves the session with the runner it had. A runner whose incarnation is
+     * retired and whose own last report is a stop is gone and silent, so the session is released
+     * from it instead of being handed back to it.
+     */
+    private function fallBackToRunner(ListeningSession $session): void
+    {
+        $runnerId = $session->activeIncarnationId()?->toString();
+        $runner = $runnerId === null ? null : $this->store->endpoint($session->getUserId()->toString(), $runnerId);
+        if ($runner !== null && $this->goneAndStopped($runner)) {
+            $session->releaseSilentRunner();
+            return;
+        }
+        $session->restoreSelection($runner === null ? null : Uuid::fromString($runner['destination_id']));
+    }
+
+    /**
+     * Whether an incarnation's registration was ended and its own last report is a stop. Nothing shown
+     * to it since that report can have started it: a start it was shown and did not answer marks it unknown.
+     *
+     * @param array<string,mixed> $endpoint
+     */
+    private function goneAndStopped(array $endpoint): bool
+    {
+        return ($endpoint['retired_at'] ?? null) !== null && ($endpoint['observed_state'] ?? null) === 'stopped';
+    }
+
+    /**
+     * The earlier incarnations of the tab that just registered which the session still names, as the
+     * target or the source of its open transfer or as its runner, in that order, and which registered
+     * with a page identity. One that registered without names no page, and that is never proof.
+     *
+     * @param array<string,mixed>|null $transfer
+     * @param array<string,mixed> $registration
+     * @return list<array<string,mixed>>
+     */
+    private function earlierPagesOfTab(ListeningSession $session, ?array $transfer, array $registration): array
+    {
+        $named = [$transfer['target_incarnation_id'] ?? null, $transfer['source_incarnation_id'] ?? null, $session->activeIncarnationId()?->toString()]
+            |> array_filter(...)
+            |> array_unique(...);
+        $owner = $session->getUserId()->toString();
+        $endpoints = array_map(fn(string $incarnationId): array => $this->store->endpoint($owner, $incarnationId), $named);
+        return array_values(array_filter(
+            $endpoints,
+            static fn(array $endpoint): bool => $endpoint['public_id'] === $registration['destinationId'] && $endpoint['page_id'] !== null,
+        ));
     }
 
     private function expireControl(ListeningSession $session): void
@@ -487,7 +566,7 @@ final readonly class PlaybackCoordinator implements PlaybackCoordinationInterfac
             $session->retainUncertainRunner();
             return;
         }
-        $session->restoreSelection($session->activeIncarnationId() === null ? null : Uuid::fromString($this->store->endpoint($session->getUserId()->toString(), $session->activeIncarnationId()->toString())['destination_id']));
+        $this->fallBackToRunner($session);
         if ($quiescing
             && !in_array($session->observedState(), [ObservedPlaybackState::Stopped, ObservedPlaybackState::Paused], true)
             && $this->store->attemptDisclosed($transfer['id'], 'quiesce')) {
@@ -544,7 +623,7 @@ final readonly class PlaybackCoordinator implements PlaybackCoordinationInterfac
                 $session->retainUncertainRunner();
             }
             if ($model->state() === 'failed') {
-                $session->restoreSelection($session->activeIncarnationId() === null ? null : Uuid::fromString($this->store->endpoint($session->getUserId()->toString(), $session->activeIncarnationId()->toString())['destination_id']));
+                $this->fallBackToRunner($session);
             }
             $this->store->acknowledgeCommand($command['id'], $outcome, $rejectionReason);
             $this->persistTransfer($session, $transfer, $model);
@@ -561,6 +640,17 @@ final readonly class PlaybackCoordinator implements PlaybackCoordinationInterfac
                 $this->store->observeVolume($endpoint['id'], $this->volume($input));
             }
             $this->store->acknowledgeCommand($command['id'], $outcome, $rejectionReason);
+            $session->advanceRevision();
+            return;
+        }
+        if ($command['type'] === 'queue') {
+            // A queue edit cannot start, stop or move playback, so its answer says nothing about
+            // playback, applied or rejected: what the session and the runner last knew stands. The
+            // answer records the cursor and renews the runner's presence.
+            $cursor = isset($input['position']) ? $this->position($input) : $session->getPosition();
+            $this->store->acknowledgeCommand($command['id'], $outcome, $rejectionReason);
+            $session->observePlayback($session->observedState(), $cursor);
+            $this->store->reportCursor($endpoint['id'], $cursor);
             $session->advanceRevision();
             return;
         }
@@ -638,6 +728,41 @@ final readonly class PlaybackCoordinator implements PlaybackCoordinationInterfac
         }
         ksort($input);
         return hash('sha256', json_encode(['operation' => $operation->value, 'input' => $input], JSON_THROW_ON_ERROR));
+    }
+
+    /**
+     * The page identity a registration names, or null when it names none.
+     *
+     * @param array<string,mixed> $input
+     */
+    private function pageIdentity(array $input): ?string
+    {
+        $pageId = $input['pageId'] ?? null;
+        if ($pageId === null) {
+            return null;
+        }
+        try {
+            return strtolower($this->uuid($input, 'pageId'));
+        } catch (InvalidArgumentException) {
+            throw new InvalidArgumentException('pageId must be a UUID.');
+        }
+    }
+
+    /**
+     * The cursor an endpoint held when it went away, with the session revision, media and queue position it belongs to.
+     *
+     * @return array{media:?PlaybackMedia,currentTrackIndex:int,revision:int,position:float}
+     */
+    private function checkpoint(mixed $checkpoint): array
+    {
+        if (!is_array($checkpoint) || !array_key_exists('media', $checkpoint)
+            || !isset($checkpoint['revision'], $checkpoint['currentTrackIndex'])
+            || !is_int($checkpoint['revision']) || $checkpoint['revision'] < 0
+            || !is_int($checkpoint['currentTrackIndex']) || $checkpoint['currentTrackIndex'] < 0) {
+            throw new InvalidArgumentException('Invalid local recovery checkpoint.');
+        }
+        return ['media' => $checkpoint['media'] === null ? null : $this->media($checkpoint['media']),
+            'currentTrackIndex' => $checkpoint['currentTrackIndex'], 'revision' => $checkpoint['revision'], 'position' => $this->position($checkpoint)];
     }
 
     /** @param array<string,mixed> $input */

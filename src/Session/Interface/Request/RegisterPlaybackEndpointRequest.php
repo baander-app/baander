@@ -25,6 +25,8 @@ final readonly class RegisterPlaybackEndpointRequest
         #[Assert\Uuid]
         public ?string $tabId = null,
         public bool $localRecoveryEligible = false,
+        #[Assert\Uuid]
+        public ?string $pageId = null,
     ) {}
 
     /** @return array<string,mixed> */

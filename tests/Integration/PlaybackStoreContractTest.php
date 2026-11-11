@@ -31,7 +31,7 @@ final class PlaybackStoreContractTest extends TestCase
 {
     private const array INCARNATION_COLUMNS = [
         'id', 'destination_id', 'user_id', 'epoch', 'capability_hash', 'expires_at', 'retired_at', 'observed_volume', 'observed_state', 'position',
-        'tab_id', 'local_recovery_eligible', 'recovery_credential_hash', 'recovery_expires_at', 'recovery_revoked_at', 'recovery_result',
+        'tab_id', 'local_recovery_eligible', 'recovery_credential_hash', 'recovery_expires_at', 'recovery_revoked_at', 'recovery_result', 'page_id',
     ];
     private const array COMMAND_COLUMNS = [
         'id', 'session_id', 'user_id', 'attempt_id', 'request_id', 'request_digest', 'incarnation_id', 'epoch', 'revision', 'type', 'payload',
@@ -222,6 +222,86 @@ final class PlaybackStoreContractTest extends TestCase
         // The expiry is the instant the registration answered, thirty days ahead.
         self::assertSame(new \DateTimeImmutable($recoverable['recoveryExpiresAt'])->getTimestamp(), new \DateTimeImmutable($stored['recovery_expires_at'])->getTimestamp());
         self::assertEqualsWithDelta(time() + 30 * 86400, new \DateTimeImmutable($stored['recovery_expires_at'])->getTimestamp(), 60);
+    }
+
+    public function testARegistrationStoresThePageIdentityItNamesAndASnapshotNeverShowsIt(): void
+    {
+        $owner = $this->owner();
+        $device = $this->device($owner);
+        $tab = ['deviceId' => $device, 'endpointId' => new Uuid()->toString()];
+        $page = new Uuid()->toString();
+
+        $named = $this->store->register($owner, ['pageId' => $page] + $tab);
+        $unnamed = $this->store->register($owner, $tab);
+
+        self::assertSame(['destinationId', 'incarnationId', 'epoch', 'capability'], array_keys($named));
+        self::assertSame($page, $this->observer->fetchOne('SELECT page_id FROM playback_destination_incarnations WHERE id=?', [$named['incarnationId']]));
+        self::assertNull($this->observer->fetchOne('SELECT page_id FROM playback_destination_incarnations WHERE id=?', [$unnamed['incarnationId']]));
+        self::assertSame($page, $this->store->endpoint($owner, $named['incarnationId'])['page_id']);
+        self::assertNull($this->store->endpoint($owner, $unnamed['incarnationId'])['page_id']);
+        $snapshot = $this->store->snapshot($this->store->lockSession($owner), $named['incarnationId']);
+        self::assertStringNotContainsString($page, json_encode($snapshot, JSON_THROW_ON_ERROR));
+    }
+
+    public function testRetiringAnIncarnationEndsItsRegistrationOnceAndRecordsOnlyWhatItIsTold(): void
+    {
+        $account = $this->account();
+        $this->store->observe($account['incarnation'], 'playing', 2.0, 0.5);
+        $row = fn(): array => $this->connection->fetchAssociative(
+            'SELECT observed_state,position,observed_volume,retired_at=CURRENT_TIMESTAMP AS stamped,expires_at,capability_hash FROM playback_destination_incarnations WHERE id=?',
+            [$account['incarnation']],
+        );
+        ['capability_hash' => $capability, 'expires_at' => $expires] = $row();
+
+        // Retired without proof of silence: what the incarnation last reported stands.
+        $this->connection->beginTransaction();
+        $this->store->retireIncarnation($account['incarnation'], stopped: false);
+        self::assertSame(['observed_state' => 'playing', 'position' => 2.0, 'observed_volume' => 0.5, 'stamped' => true, 'expires_at' => $expires, 'capability_hash' => $capability], $row());
+        $this->connection->commit();
+        $retired = $this->observer->fetchOne('SELECT retired_at FROM playback_destination_incarnations WHERE id=?', [$account['incarnation']]);
+        self::assertFalse($this->store->endpoint($account['owner'], $account['incarnation'])['available']);
+
+        // Recorded as stopped, then as stopped at a reported cursor; the first retirement stands.
+        $this->store->retireIncarnation($account['incarnation'], stopped: true);
+        self::assertSame(['stopped', 2.0], [$row()['observed_state'], $row()['position']]);
+        $this->store->retireIncarnation($account['incarnation'], stopped: true, position: 9.5);
+        self::assertSame(['stopped', 9.5], [$row()['observed_state'], $row()['position']]);
+        self::assertSame($retired, $this->observer->fetchOne('SELECT retired_at FROM playback_destination_incarnations WHERE id=?', [$account['incarnation']]));
+        // Neither the presence it last reported nor its capability changes.
+        self::assertSame([$expires, $capability], [$row()['expires_at'], $row()['capability_hash']]);
+    }
+
+    public function testASuccessorTakesOverTheUnansweredCommandsAndTheOpenTransferOfTheIncarnationItSucceeds(): void
+    {
+        $account = $this->account();
+        $earlier = $account['incarnation'];
+        $successor = $this->store->register($account['owner'], ['deviceId' => $account['device'], 'endpointId' => new Uuid()->toString()]);
+        $answered = $this->command($account, ['type' => 'pause', 'revision' => 5]);
+        $shown = $this->command($account, ['type' => 'play', 'revision' => 6]);
+        $elsewhere = $this->command($account, ['type' => 'volume', 'revision' => 6, 'incarnation_id' => $successor['incarnationId'], 'epoch' => $successor['epoch']]);
+        foreach ([$answered, $shown, $elsewhere] as $command) {
+            $this->store->insertCommand($command);
+        }
+        $this->store->acknowledgeCommand($answered['id'], 'paused');
+        $this->store->snapshot($this->store->lockSession($account['owner']), $earlier);
+        $settled = $this->transfer($account, ['state' => 'failed', 'source_incarnation_id' => $earlier]);
+        $open = $this->transfer($account, ['state' => 'quiescing', 'source_incarnation_id' => $earlier]);
+        $this->store->saveTransfer($settled);
+        $this->store->saveTransfer($open);
+        $command = fn(string $id): array => $this->observer->fetchAssociative('SELECT incarnation_id,epoch,revision,disclosed_at IS NOT NULL AS shown,outcome,expires_at FROM playback_commands WHERE id=?', [$id]);
+        $transfer = fn(string $id): array => $this->observer->fetchAssociative('SELECT source_incarnation_id,target_incarnation_id,state,expires_at FROM playback_transfers WHERE id=?', [$id]);
+        $before = ['answered' => $command($answered['id']), 'shown' => $command($shown['id']), 'elsewhere' => $command($elsewhere['id']), 'settled' => $transfer($settled['id']), 'open' => $transfer($open['id'])];
+        self::assertTrue($before['shown']['shown']);
+
+        $this->store->succeedIncarnation($earlier, $successor['incarnationId'], $successor['epoch']);
+
+        // Only the unanswered command moves; it keeps its revision, its expiry and the mark that it was shown.
+        self::assertSame(['incarnation_id' => $successor['incarnationId'], 'epoch' => $successor['epoch']] + $before['shown'], $command($shown['id']));
+        self::assertSame($before['answered'], $command($answered['id']));
+        self::assertSame($before['elsewhere'], $command($elsewhere['id']));
+        // Only the open transfer is re-pointed, in each role the earlier incarnation held.
+        self::assertSame(['source_incarnation_id' => $successor['incarnationId'], 'target_incarnation_id' => $successor['incarnationId']] + $before['open'], $transfer($open['id']));
+        self::assertSame($before['settled'], $transfer($settled['id']));
     }
 
     public function testStoredInstantsAreTheTransactionsDatabaseClock(): void
@@ -811,6 +891,9 @@ final class PlaybackStoreContractTest extends TestCase
         $this->connection->executeStatement("UPDATE playback_destination_incarnations SET expires_at=CURRENT_TIMESTAMP-INTERVAL '1 hour' WHERE id=?", [$account['incarnation']]);
         $this->store->markRunnerUnknown($account['incarnation']);
         self::assertSame(['observed_state' => 'unknown', 'position' => 6.0, 'observed_volume' => 1.0, 'renewed' => false, 'retired_at' => null], $row());
+        // A reported cursor renews the registration and leaves the last report about playback as it stands.
+        $this->store->reportCursor($account['incarnation'], 7.5);
+        self::assertSame(['observed_state' => 'unknown', 'position' => 7.5, 'observed_volume' => 1.0, 'renewed' => true, 'retired_at' => null], $row());
         $this->connection->commit();
     }
 
@@ -938,9 +1021,9 @@ final class PlaybackStoreContractTest extends TestCase
 
         $this->connection->beginTransaction();
         $session = $this->store->lockSession($owner);
-        $endpoint = $this->store->register($owner, ['deviceId' => $device, 'endpointId' => new Uuid()->toString(), 'tabId' => new Uuid()->toString(), 'localRecoveryEligible' => true]);
+        $endpoint = $this->store->register($owner, ['deviceId' => $device, 'endpointId' => new Uuid()->toString(), 'tabId' => new Uuid()->toString(), 'localRecoveryEligible' => true, 'pageId' => new Uuid()->toString()]);
         $clean('a registration');
-        $this->store->register($owner, ['deviceId' => $device, 'endpointId' => new Uuid()->toString()]);
+        $later = $this->store->register($owner, ['deviceId' => $device, 'endpointId' => new Uuid()->toString()]);
         $account = ['owner' => $owner, 'session' => $session->getId()->toString(), 'incarnation' => $endpoint['incarnationId']];
         $command = $this->command($account, ['type' => 'play']);
         $this->store->insertCommand($command);
@@ -959,8 +1042,11 @@ final class PlaybackStoreContractTest extends TestCase
         $this->store->supersedeIncarnationCommands($endpoint['incarnationId']);
         $this->store->observe($endpoint['incarnationId'], 'paused', 1.0, 0.5);
         $this->store->observeVolume($endpoint['incarnationId'], 0.75);
+        $this->store->reportCursor($endpoint['incarnationId'], 2.0);
         $this->store->markRunnerUnknown($endpoint['incarnationId']);
         $this->store->completeLocalRecovery($endpoint['incarnationId'], ['outcome' => 'recovered']);
+        $this->store->retireIncarnation($endpoint['incarnationId'], stopped: true, position: 3.0);
+        $this->store->succeedIncarnation($endpoint['incarnationId'], $later['incarnationId'], $later['epoch']);
         $this->store->snapshot($session, $endpoint['incarnationId']);
         $clean('every other write');
         $this->connection->commit();

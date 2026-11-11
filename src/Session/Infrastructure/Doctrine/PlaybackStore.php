@@ -101,10 +101,14 @@ final readonly class PlaybackStore implements PlaybackStoreInterface
         // This proof covers managed browser execution only; independent external routes need their own proof.
         // It stays one SQL statement: the proof is a single predicate over the session's whole command
         // ledger, which DQL cannot write and PHP could only evaluate by reading the ledger.
-        // The acknowledgement must be the last thing that moved the session. A command settled as never
-        // effective since then cannot have changed the runner, so it is no later command, and the
-        // session may stand at the revision the last such settlement recorded instead of the one the
-        // acknowledgement left. A superseded command still counts: its runner was shown it.
+        // The acknowledgement must be the last thing that could have moved playback. A command settled
+        // as never effective since then cannot have changed the runner, so it is no later command, and
+        // the session may stand at the revision the last such settlement recorded instead of the one
+        // the acknowledgement left. A queue edit or a volume change is no later command either: neither
+        // can start or move playback, whether the runner applied it or not. Each leaves the session
+        // exactly one revision past its own once it is answered or expires, so the session must stand
+        // there or at the last settlement, whichever is later. Any other movement keeps the runner, and
+        // so does every other superseded command: its runner was shown it.
         // The acknowledgement is the runner's own answer that it is silent: to a pause, a quiesce or
         // a stop, or to a start whose command wanted the paused state, which the runner answers only
         // once it stands loaded and paused. A start that wanted playback proves nothing of the kind.
@@ -126,15 +130,24 @@ final readonly class PlaybackStore implements PlaybackStoreInterface
                             OR (proof.type='quiesce' AND proof.outcome='quiesced')
                             OR (proof.type='stop' AND proof.outcome='stopped')
                             OR (proof.type='start' AND proof.outcome='started' AND proof.payload->>'desiredState'='paused'))
-                        AND :revision=coalesce((
-                            SELECT max(settled.settled_revision) FROM playback_commands settled
-                            WHERE settled.session_id=proof.session_id AND settled.outcome='never_effective'
-                                AND (settled.revision>=proof.revision OR settled.created_at>proof.created_at)
-                        ),proof.revision+1)
+                        AND :revision=greatest(
+                            coalesce((
+                                SELECT max(settled.settled_revision) FROM playback_commands settled
+                                WHERE settled.session_id=proof.session_id AND settled.outcome='never_effective'
+                                    AND (settled.revision>=proof.revision OR settled.created_at>proof.created_at)
+                            ),proof.revision+1),
+                            (
+                                SELECT max(passed.revision)+1 FROM playback_commands passed
+                                WHERE passed.session_id=proof.session_id AND passed.id<>proof.id
+                                    AND passed.type IN ('queue','volume')
+                                    AND (passed.revision>=proof.revision OR passed.created_at>proof.created_at)
+                            )
+                        )
                         AND NOT EXISTS (
                             SELECT 1 FROM playback_commands later
                             WHERE later.session_id=proof.session_id AND later.id<>proof.id
                                 AND later.outcome IS DISTINCT FROM 'never_effective'
+                                AND later.type NOT IN ('queue','volume')
                                 AND (later.revision>=proof.revision OR later.created_at>proof.created_at)
                         )
                 )
@@ -196,6 +209,7 @@ final readonly class PlaybackStore implements PlaybackStoreInterface
             throw new \InvalidArgumentException('Local recovery eligibility must be a boolean.');
         }
         $tabId = isset($input['tabId']) ? Uuid::fromString($input['tabId'])->toString() : null;
+        $pageId = isset($input['pageId']) ? Uuid::fromString($input['pageId']) : null;
         if ($eligible && $tabId === null) {
             throw new \InvalidArgumentException('Local recovery requires a tab identity.');
         }
@@ -260,6 +274,7 @@ final readonly class PlaybackStore implements PlaybackStoreInterface
             $recovery['tab'] ?? null,
             $recovery === null ? null : hash('sha256', $recovery['credential']),
             $recovery['expires'] ?? null,
+            $pageId,
         ));
         $result = ['destinationId' => $destination['publicId'], 'incarnationId' => $incarnation->toString(), 'epoch' => $epoch, 'capability' => $capability];
         if ($recovery !== null) {
@@ -318,12 +333,40 @@ final readonly class PlaybackStore implements PlaybackStoreInterface
         );
     }
 
+    public function retireIncarnation(string $incarnationId, bool $stopped, ?float $position = null): void
+    {
+        $changes = ['i.retiredAt = COALESCE(i.retiredAt, CURRENT_TIMESTAMP())'];
+        $parameters = ['id' => $incarnationId];
+        if ($stopped) {
+            $changes[] = "i.observedState = 'stopped'";
+        }
+        if ($position !== null) {
+            $changes[] = 'i.position = :position';
+            $parameters['position'] = $position;
+        }
+        $this->change('UPDATE ' . PlaybackDestinationIncarnationEntity::class . ' i SET ' . implode(', ', $changes) . ' WHERE i.id = :id', $parameters);
+    }
+
     public function supersedeIncarnationCommands(string $incarnationId): void
     {
         $this->change(
             'UPDATE ' . PlaybackCommandEntity::class . " c SET c.outcome = 'superseded', c.acknowledgedAt = CURRENT_TIMESTAMP() WHERE c.incarnationId = :id AND c.acknowledgedAt IS NULL",
             ['id' => $incarnationId],
         );
+    }
+
+    public function succeedIncarnation(string $earlierId, string $successorId, int $successorEpoch): void
+    {
+        $this->change(
+            'UPDATE ' . PlaybackCommandEntity::class . ' c SET c.incarnationId = :successor, c.epoch = :epoch WHERE c.incarnationId = :earlier AND c.acknowledgedAt IS NULL',
+            ['successor' => $successorId, 'epoch' => $successorEpoch, 'earlier' => $earlierId],
+        );
+        foreach (['sourceIncarnationId', 'targetIncarnationId'] as $role) {
+            $this->change(
+                'UPDATE ' . PlaybackTransferEntity::class . " t SET t.{$role} = :successor WHERE t.{$role} = :earlier AND t.state NOT IN ('committed', 'failed')",
+                ['successor' => $successorId, 'earlier' => $earlierId],
+            );
+        }
     }
 
     public function sourceQuiesced(string $attemptId, string $sourceId): bool
@@ -513,6 +556,14 @@ final readonly class PlaybackStore implements PlaybackStoreInterface
             . ' i.observedVolume = COALESCE(:volume, i.observedVolume), i.expiresAt = ' . self::expiresAfter(self::PRESENCE_LIFETIME) . ' WHERE i.id = :id',
             ['state' => $state, 'position' => $position, 'volume' => $volume, 'id' => $incarnationId],
             ['volume' => Types::FLOAT],
+        );
+    }
+
+    public function reportCursor(string $incarnationId, float $position): void
+    {
+        $this->change(
+            'UPDATE ' . PlaybackDestinationIncarnationEntity::class . ' i SET i.position = :position, i.expiresAt = ' . self::expiresAfter(self::PRESENCE_LIFETIME) . ' WHERE i.id = :id',
+            ['position' => $position, 'id' => $incarnationId],
         );
     }
 

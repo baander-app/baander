@@ -24274,6 +24274,11 @@
                     "localRecoveryEligible": {
                         "type": "boolean",
                         "default": false
+                    },
+                    "pageId": {
+                        "type": "string",
+                        "nullable": true,
+                        "default": null
                     }
                 },
                 "type": "object"
