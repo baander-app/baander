@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace App\Transcode\Interface\Controller;
 
 use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
+use App\Shared\Application\Exception\HandlerFailure;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Transcode\Application\Command\CleanupOrphanedJobsCommand;
 use App\Transcode\Application\DTO\TranscodeCleanupResult;
+use App\Transcode\Application\Exception\TranscodeCleanupIncompleteException;
 use App\Transcode\Application\Port\TranscodeJobPortInterface;
 use App\Transcode\Application\Port\PlaybackAccessInterface;
 use App\Transcode\Application\Port\TranscodePublicViewInterface;
@@ -20,6 +22,8 @@ use App\Transcode\Interface\Resource\TranscodeMetricsResource;
 use OpenApi\Attributes as OA;
 use Nelmio\ApiDocBundle\Attribute\Model;
 use Symfony\Component\HttpFoundation\JsonResponse;
+use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\Messenger\Exception\HandlerFailedException;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Stamp\HandledStamp;
 use Symfony\Component\Routing\Attribute\Route;
@@ -91,7 +95,8 @@ final class TranscodeJobController
         path: '/api/transcode/jobs/cleanup',
         summary: 'Expire stale transcode sessions and clean up orphaned transcode jobs (no active sessions)',
         responses: [
-            new OA\Response(response: '200', description: 'Cleanup result', content: new OA\JsonContent(properties: [new OA\Property(property: 'expired', type: 'integer'), new OA\Property(property: 'cleaned', type: 'integer')])),
+            new OA\Response(response: '200', description: 'Cleanup result', content: new OA\JsonContent(properties: [new OA\Property(property: 'data', properties: [new OA\Property(property: 'expired', type: 'integer'), new OA\Property(property: 'cleaned', type: 'integer')], type: 'object')])),
+            new OA\Response(response: '503', description: 'The run removed every job it could and left at least one behind; `details` holds the `expired`, `cleaned` and `failed` counts, and the server log names each job that failed', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
     #[Route('/cleanup', name: 'cleanup', methods: ['POST'])]
@@ -99,7 +104,22 @@ final class TranscodeJobController
     #[CliCounterpart('app:transcode:job:cleanup')]
     public function cleanup(): JsonResponse
     {
-        $result = $this->commandBus->dispatch(new CleanupOrphanedJobsCommand())->last(HandledStamp::class)?->getResult();
+        try {
+            $result = $this->commandBus->dispatch(new CleanupOrphanedJobsCommand())->last(HandledStamp::class)?->getResult();
+        } catch (HandlerFailedException $failure) {
+            $incomplete = HandlerFailure::cause($failure);
+            if (!$incomplete instanceof TranscodeCleanupIncompleteException) {
+                throw $failure;
+            }
+
+            // The run did its work and left jobs behind: an error, as on the console, with the
+            // counts a finished run would have returned and the number of jobs still to remove.
+            return $this->errorResponse($incomplete->getMessage(), Response::HTTP_SERVICE_UNAVAILABLE, [
+                'expired' => $incomplete->expired,
+                'cleaned' => $incomplete->removed,
+                'failed' => $incomplete->failed,
+            ]);
+        }
         if (!$result instanceof TranscodeCleanupResult) {
             throw new \LogicException('The transcode job cleanup did not return its result.');
         }

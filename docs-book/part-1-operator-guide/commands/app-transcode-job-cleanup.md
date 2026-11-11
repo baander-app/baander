@@ -40,3 +40,5 @@ With `--json` the command prints only `{"expired": 2, "cleaned": 3}`, the API's 
 |------|---------|
 | 0 | Cleanup finished, possibly with nothing to remove |
 | 1 | The jobs could not be read, or at least one could not be removed; the message gives the removed and failed counts and the log names each job |
+
+The API endpoint reports the same outcome: a run that could not remove every job answers 503 with the same message and the `expired`, `cleaned` and `failed` counts in the error's details.

@@ -19980,14 +19980,29 @@
                             "application/json": {
                                 "schema": {
                                     "properties": {
-                                        "expired": {
-                                            "type": "integer"
-                                        },
-                                        "cleaned": {
-                                            "type": "integer"
+                                        "data": {
+                                            "properties": {
+                                                "expired": {
+                                                    "type": "integer"
+                                                },
+                                                "cleaned": {
+                                                    "type": "integer"
+                                                }
+                                            },
+                                            "type": "object"
                                         }
                                     },
                                     "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "The run removed every job it could and left at least one behind; `details` holds the `expired`, `cleaned` and `failed` counts, and the server log names each job that failed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
                                 }
                             }
                         }

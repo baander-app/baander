@@ -109,6 +109,9 @@ final class TranscodeJobCleanupCommandTest extends TestCase
         self::assertStringContainsString('removed 6 orphaned jobs and could not remove 2', (string) $error);
         self::assertCount(1, $logger->contexts);
         self::assertSame(['expired' => 4, 'cleaned' => 6, 'failed' => 2], array_diff_key($logger->contexts[0], ['exception' => true]));
+        // The failure the run ends with carries the expiry's count too, for an entry point that reports all three.
+        self::assertInstanceOf(\App\Transcode\Application\Exception\TranscodeCleanupIncompleteException::class, $logger->contexts[0]['exception']);
+        self::assertSame([4, 6, 2], [$logger->contexts[0]['exception']->expired, $logger->contexts[0]['exception']->removed, $logger->contexts[0]['exception']->failed]);
     }
 
     /** An expiry over $count abandoned sessions, each without an execution of its own. */
