@@ -4,7 +4,7 @@ import { useId, useState } from 'react'
 import { Button } from '@/shared/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/shared/components/ui/dropdown-menu'
 import { usePlaybackSession } from '../hooks/use-playback-session'
-import { hasUnconfirmedPlayback, overridableHold } from '../services/playback-status'
+import { canOverrideHold, hasUnconfirmedPlayback } from '../services/playback-status'
 import { textRole } from '@/shared/theme'
 
 const DestinationMenu = styled(DropdownMenuContent)`
@@ -54,7 +54,7 @@ export function PlaybackDestinationSelector({ compact = false }: { compact?: boo
   const available = snapshot?.destinations.filter(destination => destination.available) ?? []
   const uncertain = snapshot?.transfer?.state === 'uncertain'
   const unconfirmed = hasUnconfirmedPlayback(snapshot)
-  const hold = overridableHold(snapshot)
+  const overridable = canOverrideHold(snapshot)
   const recoveryMessage = localRecovery?.status === 'recovered' && (snapshot?.activeIncarnationId || snapshot?.transfer)
     ? null : localRecovery?.message
   const recovering = localRecovery?.status === 'recovering'
@@ -113,17 +113,17 @@ export function PlaybackDestinationSelector({ compact = false }: { compact?: boo
           <>
             <Status role="status">
               The destination has not confirmed it stopped. Playback here remains paused until it is safe to resume.
-              {hold ? ` It is unavailable. ${overrideConsequence}` : null}
+              {overridable ? ` It is unavailable. ${overrideConsequence}` : null}
             </Status>
             <DropdownMenuItem disabled={!connected || busy} onSelect={() => { perform(reconcile) }}>Check destination stopped</DropdownMenuItem>
           </>
         ) : unconfirmed ? (
           <Status role="status">
             {active ? active.name : 'The previous destination'} is unavailable and has not confirmed that it stopped.
-            {hold ? ` ${overrideConsequence}` : null}
+            {overridable ? ` ${overrideConsequence}` : null}
           </Status>
         ) : null}
-        {hold ? (
+        {overridable ? (
           <DropdownMenuItem disabled={!connected || busy || recovering} onSelect={event => { event.preventDefault(); playHereAnyway() }}>
             Play here anyway
           </DropdownMenuItem>

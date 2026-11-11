@@ -1173,7 +1173,7 @@ describe('browser playback coordination', () => {
     ]])
     const reported = vi.mocked(AXIOS_INSTANCE.post).mock.invocationCallOrder[vi.mocked(AXIOS_INSTANCE.post).mock.calls.findIndex(([path]) => path === '/api/session/close')]
     expect(reported).toBeLessThan(h.transport.send.mock.invocationCallOrder[1])
-    // The close report replaces the snapshot, observation and acknowledgement the page used to send for it.
+    // The close report is all the page sends for its earlier incarnation: no snapshot read, observation or acknowledgement.
     expect(AXIOS_INSTANCE.get).not.toHaveBeenCalled()
     expect(posts('/api/session/observe')).toEqual([])
     expect(posts('/api/session/ack')).toEqual([])

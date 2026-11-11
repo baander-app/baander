@@ -66,44 +66,15 @@ final readonly class PlaybackCoordinator implements PlaybackCoordinationInterfac
                 return $this->recoverLocal($session, $input);
             }
             $before = serialize($session->getState());
-            $transfer = $this->store->currentTransfer($session->getId()->toString());
+            $transfer = $this->openTransfer($session);
             if ($transfer !== null && new DateTimeImmutable($transfer['expires_at']) <= new DateTimeImmutable()) {
                 $this->expireTransfer($session, $transfer);
-                $transfer = $this->store->currentTransfer($session->getId()->toString());
+                $transfer = $this->openTransfer($session);
             }
             $this->expireControl($session);
             switch ($operation) {
                 case PlaybackOperation::Endpoint:
-                    $input['deviceId'] = $this->uuid($input, 'deviceId');
-                    $input['endpointId'] = $this->uuid($input, 'endpointId');
-                    $input['pageId'] = $this->pageIdentity($input);
-                    $registration = $this->store->register($owner, $input);
-                    $earlierPages = $input['pageId'] === null ? [] : $this->earlierPagesOfTab($session, $transfer, $registration);
-                    // The same page registering again is one live document that never stopped answering
-                    // for its players, as after its socket was replaced. Its new incarnation takes the
-                    // earlier one's place and its unanswered commands; nothing is released and the
-                    // revision stands, because an answer is accepted only at its command's own revision.
-                    foreach ($earlierPages as $earlier) {
-                        if ($earlier['page_id'] === $input['pageId']) {
-                            if ($session->activeIncarnationId()?->toString() === $earlier['id']) {
-                                $session->succeedRunner(Uuid::fromString($registration['incarnationId']));
-                            }
-                            $this->store->succeedIncarnation($earlier['id'], $registration['incarnationId'], (int) $registration['epoch']);
-                        }
-                    }
-                    // Registering a tab again retires its previous incarnation. The answer to the
-                    // registration must already show a runner that this proves gone as released, or the
-                    // tab would refuse its own first Play until the next relayed snapshot.
-                    $this->releaseGoneRunner($session, $transfer);
-                    // A tab holds one live document at a time, so a registration from another page
-                    // proves the earlier page gone, whatever the session last knew about it. The
-                    // proofs above ran first: what they release keeps the state it confirmed.
-                    foreach ($earlierPages as $earlier) {
-                        if ($earlier['page_id'] !== $input['pageId']) {
-                            $this->releaseIncarnation($session, $earlier['id'], null);
-                            $this->store->retireIncarnation($earlier['id'], stopped: true);
-                        }
-                    }
+                    $registration = $this->registerEndpoint($session, $owner, $input, $transfer);
                     break;
                 case PlaybackOperation::Transfer:
                     $requestId = $this->uuid($input, 'requestId');
@@ -258,31 +229,10 @@ final readonly class PlaybackCoordinator implements PlaybackCoordinationInterfac
                     $this->persistTransfer($session, $transfer, $this->model($transfer));
                     break;
                 case PlaybackOperation::Close:
-                    // The endpoint says, with its own capability, that it is going away and that its
-                    // players have stopped. Its registration ends here, so nobody waits for a lapse,
-                    // and its report is the proof of silence the release needs. The proofs run first:
-                    // what they release keeps the state it confirmed. A report for an incarnation the
-                    // session no longer names changes only that incarnation's row.
-                    $checkpoint = $this->checkpoint($input['checkpoint'] ?? null, 'Invalid close report checkpoint.');
-                    $this->store->retireIncarnation($endpoint['id'], stopped: true, position: $checkpoint['position']);
-                    $this->releaseGoneRunner($session, $transfer);
-                    $this->releaseIncarnation($session, $endpoint['id'], $checkpoint);
+                    $this->closeEndpoint($session, $input, $endpoint, $transfer);
                     break;
                 case PlaybackOperation::Override:
-                    $requestId = $this->uuid($input, 'requestId');
-                    if ($this->replayRequest($session, $requestId, $operation, $input)) {
-                        break;
-                    }
-                    $this->expectRevision($session, $input);
-                    if (!$endpoint['available']) {
-                        throw new ConflictException('Connect this browser before playing here.');
-                    }
-                    $overridden = $this->override($session, $transfer);
-                    // The override is one row of the command ledger, stored already settled: it gives
-                    // the request its replay and its result, is addressed to the incarnation whose hold
-                    // ended, and is no acknowledgement that could later pass as proof of anything.
-                    $this->enqueue($session, $requestId, $requestId, $overridden, 'stop', $this->requestDigest($operation, $input), $requestId);
-                    $this->store->acknowledgeCommand($requestId, 'overridden');
+                    $this->acceptOverride($session, $input, $endpoint, $transfer);
                     break;
                 case PlaybackOperation::Snapshot:
                     $this->releaseGoneRunner($session, $transfer);
@@ -341,12 +291,96 @@ final readonly class PlaybackCoordinator implements PlaybackCoordinationInterfac
             return $this->store->snapshot($session, null) + ['recoveryResult' => $record['recovery_result']];
         }
         $checkpoint = $this->checkpoint($input['checkpoint'] ?? null, 'Invalid local recovery checkpoint.');
-        if ($this->releaseIncarnation($session, $incarnation, $checkpoint)) {
+        if ($this->releaseIncarnation($session, $incarnation, $checkpoint, $this->openTransfer($session))) {
             $this->store->saveSession($session);
         }
         $result = ['incarnationId' => $incarnation, 'outcome' => 'recovered', 'revision' => $session->revision()];
         $this->store->completeLocalRecovery($incarnation, $result);
         return $this->store->snapshot($session, null) + ['recoveryResult' => $result];
+    }
+
+    /**
+     * Registers an endpoint of a page and settles the session for the earlier incarnations of its tab.
+     *
+     * @param array<string,mixed> $input
+     * @param array<string,mixed>|null $transfer
+     * @return array<string,mixed> The registration.
+     */
+    private function registerEndpoint(ListeningSession $session, string $owner, array $input, ?array $transfer): array
+    {
+        $input['deviceId'] = $this->uuid($input, 'deviceId');
+        $input['endpointId'] = $this->uuid($input, 'endpointId');
+        $pageId = $this->pageIdentity($input);
+        $input['pageId'] = $pageId;
+        $registration = $this->store->register($owner, $input);
+        $earlierPages = $pageId === null ? [] : $this->earlierPagesOfTab($session, $transfer, $registration);
+        $samePage = array_filter($earlierPages, static fn(array $earlier): bool => $earlier['page_id'] === $pageId);
+        $otherPages = array_filter($earlierPages, static fn(array $earlier): bool => $earlier['page_id'] !== $pageId);
+        // The same page registering again is one live document that never stopped answering
+        // for its players, as after its socket was replaced. Its new incarnation takes the
+        // earlier one's place and its unanswered commands; nothing is released and the
+        // revision stands, because an answer is accepted only at its command's own revision.
+        foreach ($samePage as $earlier) {
+            if ($session->activeIncarnationId()?->toString() === $earlier['id']) {
+                $session->succeedRunner(Uuid::fromString($registration['incarnationId']));
+            }
+            $this->store->succeedIncarnation($earlier['id'], $registration['incarnationId'], (int) $registration['epoch']);
+        }
+        // Registering a tab again retires its previous incarnation. The answer to the
+        // registration must already show a runner that this proves gone as released, or the
+        // tab would refuse its own first Play until the next relayed snapshot.
+        $this->releaseGoneRunner($session, $transfer);
+        // A tab holds one live document at a time, so a registration from another page
+        // proves the earlier page gone, whatever the session last knew about it. The
+        // proofs above run first: what they release keeps the state it confirmed.
+        foreach ($otherPages as $earlier) {
+            $this->releaseAndRetire($session, $earlier['id'], $this->openTransfer($session), stopped: true);
+        }
+        return $registration;
+    }
+
+    /**
+     * The endpoint says, with its own capability, that it is going away and that its players have
+     * stopped. Its registration ends here, so nobody waits for a lapse, and its report is the proof
+     * of silence the release needs. The proofs run first: what they release keeps the state it
+     * confirmed. A report for an incarnation the session no longer names changes only that
+     * incarnation's row.
+     *
+     * @param array<string,mixed> $input
+     * @param array<string,mixed> $endpoint
+     * @param array<string,mixed>|null $transfer
+     */
+    private function closeEndpoint(ListeningSession $session, array $input, array $endpoint, ?array $transfer): void
+    {
+        $checkpoint = $this->checkpoint($input['checkpoint'] ?? null, 'Invalid close report checkpoint.');
+        $this->store->retireIncarnation($endpoint['id'], stopped: true, position: $checkpoint['position']);
+        $this->releaseGoneRunner($session, $transfer);
+        $this->releaseIncarnation($session, $endpoint['id'], $checkpoint, $transfer);
+    }
+
+    /**
+     * Takes a playback override from a registered tab. The override is one row of the command
+     * ledger, stored already settled: it gives the request its replay and its result, is addressed
+     * to the incarnation whose hold ended, and is no acknowledgement that could later pass as proof
+     * of anything.
+     *
+     * @param array<string,mixed> $input
+     * @param array<string,mixed> $endpoint
+     * @param array<string,mixed>|null $transfer
+     */
+    private function acceptOverride(ListeningSession $session, array $input, array $endpoint, ?array $transfer): void
+    {
+        $requestId = $this->uuid($input, 'requestId');
+        if ($this->replayRequest($session, $requestId, PlaybackOperation::Override, $input)) {
+            return;
+        }
+        $this->expectRevision($session, $input);
+        if (!$endpoint['available']) {
+            throw new ConflictException('Connect this browser before playing here.');
+        }
+        $overridden = $this->override($session, $transfer);
+        $this->enqueue($session, $requestId, $requestId, $overridden, 'stop', $this->requestDigest(PlaybackOperation::Override, $input), $requestId);
+        $this->store->acknowledgeCommand($requestId, 'overridden');
     }
 
     /**
@@ -359,12 +393,12 @@ final readonly class PlaybackCoordinator implements PlaybackCoordinationInterfac
      * one last recorded otherwise.
      *
      * @param array{media:?PlaybackMedia,currentTrackIndex:int,revision:int,position:float}|null $checkpoint
+     * @param array<string,mixed>|null $transfer The session's open transfer as it stands now.
      * @return bool Whether the session changed. The caller saves it.
      */
-    private function releaseIncarnation(ListeningSession $session, string $incarnation, ?array $checkpoint): bool
+    private function releaseIncarnation(ListeningSession $session, string $incarnation, ?array $checkpoint, ?array $transfer): bool
     {
         $owner = $session->getUserId()->toString();
-        $transfer = $this->store->currentTransfer($session->getId()->toString());
         $source = $transfer !== null && $transfer['source_incarnation_id'] === $incarnation;
         $target = $transfer !== null && $transfer['target_incarnation_id'] === $incarnation;
         $active = $session->activeIncarnationId()?->toString() === $incarnation;
@@ -606,19 +640,35 @@ final readonly class PlaybackCoordinator implements PlaybackCoordinationInterfac
         if ($destination['available']) {
             throw new ConflictException('The destination is still connected. Stop playback there.');
         }
-        $this->releaseIncarnation($session, $destinationId, null);
-        $this->store->retireIncarnation($destinationId, stopped: false);
-        // The failed transfer fell back to its source. A source that is no longer registered either
-        // would hold the session just as its target did, so the same request ends its hold too.
+        $this->releaseAndRetire($session, $destinationId, $transfer, stopped: false);
+        // The failed transfer falls back to its source. A source that is no longer registered either
+        // holds the session just as its target did, so the same request ends its hold too.
         $sourceId = $transfer['source_incarnation_id'] ?? null;
         if ($sourceId !== null && $session->activeIncarnationId()?->toString() === $sourceId) {
             $source = $this->store->endpoint($owner, $sourceId);
             if ($source['kind'] === 'browser' && !$source['available']) {
-                $this->releaseIncarnation($session, $sourceId, null);
-                $this->store->retireIncarnation($sourceId, stopped: false);
+                $this->releaseAndRetire($session, $sourceId, $this->openTransfer($session), stopped: false);
             }
         }
         return $destinationId;
+    }
+
+    /**
+     * Releases the session from an incarnation that will not answer again and ends its registration.
+     * One retired as stopped is recorded silent; otherwise it keeps what it last reported.
+     *
+     * @param array<string,mixed>|null $transfer The session's open transfer as it stands now.
+     */
+    private function releaseAndRetire(ListeningSession $session, string $incarnation, ?array $transfer, bool $stopped): void
+    {
+        $this->releaseIncarnation($session, $incarnation, null, $transfer);
+        $this->store->retireIncarnation($incarnation, stopped: $stopped);
+    }
+
+    /** @return array<string,mixed>|null */
+    private function openTransfer(ListeningSession $session): ?array
+    {
+        return $this->store->currentTransfer($session->getId()->toString());
     }
 
     /**

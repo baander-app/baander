@@ -1,5 +1,5 @@
 import type { QueryClient } from '@tanstack/react-query'
-import type { PlaybackEndpointResource, PlaybackSnapshotResource } from '@/shared/api-client/gen/endpoints'
+import type { OverridePlaybackRequest, PlaybackEndpointResource, PlaybackSnapshotResource } from '@/shared/api-client/gen/endpoints'
 import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
 import { authenticatedTransport, type SharedLiveTransport } from '@/shared/live/transport'
 import { captureOwnership, isCurrentOwnership, subscribeOwnership } from '@/shared/live/ownership'
@@ -12,8 +12,8 @@ import type { PlaybackRecoveryCheckpoint, PlaybackRecoveryRecord } from './playb
 import { PlaybackCommandRunner, type PlaybackAcknowledgement } from './playback-command-runner'
 import { hasUnconfirmedPlayback, UNCONFIRMED_PLAYBACK_REFUSAL } from './playback-status'
 import { playbackPageId } from './playback-page-identity'
+import { CLOSE_REPORT_PATH, PlaybackCloseReporter } from './playback-close-reporter'
 import { MediaCompatibilityError } from '@/features/player/services/media-delivery'
-import { onAccessTokenChange, prepareKeepalivePost, sendKeepalivePost, type PreparedKeepaliveRequest } from '@/shared/api-client/keepalive-request'
 
 type RequestResult = NonNullable<PlaybackSnapshotResource['requestResult']>
 type TransferResult = NonNullable<PlaybackSnapshotResource['transferResult']>
@@ -48,16 +48,29 @@ const REQUEST_TIMEOUT_MS = 15_000
 /** How long the server keeps a command deliverable. A page that cannot be registered for that long cannot be commanded. */
 const COMMAND_LIFETIME_MS = 20_000
 const REGISTRATION_RETRY_MS = 1_000
-const CLOSE_REPORT_PATH = '/api/session/close'
 const OVERRIDE_PATH = '/api/session/override'
 /** How long a refused request still says what the listener wants once the hold on the session is overridden. */
 const REFUSED_REQUEST_LIFETIME_MS = 120_000
 
-/** The body of an override request, typed here because the generated client does not carry the route. */
-interface OverrideRequest {
-  requestId: string
-  expectedRevision: number
-  incarnationId: string
+/** A request this tab was refused for unconfirmed playback, which an override may start again. */
+class RefusedRequest {
+  private readonly intent: PlaybackIntent
+  private readonly at: number
+
+  constructor(intent: PlaybackIntent, at: number) {
+    this.intent = intent
+    this.at = at
+  }
+
+  /**
+   * The refused intent while it is still what the listener wants at `now`. The wall clock keeps
+   * counting while the machine sleeps: a refusal older than the limit, or one the clock puts in
+   * the future, starts nothing.
+   */
+  freshIntent(now: number): PlaybackIntent | null {
+    const age = now - this.at
+    return age >= 0 && age <= REFUSED_REQUEST_LIFETIME_MS ? this.intent : null
+  }
 }
 
 export const PLAYBACK_SESSION_KEY = ['session', 'current'] as const
@@ -106,10 +119,15 @@ export class PlaybackSessionCoordinator {
   private readonly incarnations = new Set<string>()
   /** Set from the moment a page that never disconnected sends its registration until the answer is bound. */
   private rebinding = false
-  private preparedClose: { endpoint: PlaybackEndpointResource; request: PreparedKeepaliveRequest } | null = null
   /** The last request this tab was refused for unconfirmed playback, when starting it again is what an override is for. */
-  private refused: { intent: PlaybackIntent; at: number } | null = null
-  private closePreparation = 0
+  private refused: RefusedRequest | null = null
+  private readonly closeReport = new PlaybackCloseReporter({
+    current: () => this.current(),
+    endpoint: () => this.endpoint,
+    snapshot: () => this.snapshot,
+    cursor: snapshot => this.cursor(snapshot),
+    checkpoint: (snapshot, position) => this.checkpointAt(snapshot, position),
+  })
 
   private readonly client: QueryClient
   private readonly transport: SharedLiveTransport
@@ -134,12 +152,12 @@ export class PlaybackSessionCoordinator {
       onError: error => this.fail(error),
     }))
     this.cleanup.push(this.transport.retain())
-    this.cleanup.push(onAccessTokenChange(() => this.prepareCloseReport()))
+    this.cleanup.push(this.closeReport.start())
     if (this.transport.isConnected()) this.register()
     // Only an unloading page reports its close. A tab that is merely hidden keeps playing, and
     // nothing tells the two apart but this event.
     const hide = () => {
-      this.reportClosing()
+      this.closeReport.send()
       this.suspended = true
       this.disconnect()
       this.localRecovery?.dispose()
@@ -314,8 +332,7 @@ export class PlaybackSessionCoordinator {
     this.socketRegistered = false
     this.rebinding = false
     this.refused = null
-    this.preparedClose = null
-    this.closePreparation++
+    this.closeReport.discard()
     const cursor = this.runner.observe()?.position
     const fenced = this.runner.fenceLocalExecution()
     this.localRecovery?.noteFence(fenced)
@@ -332,7 +349,7 @@ export class PlaybackSessionCoordinator {
     const closing = Promise.all([previous, stopping]).then(([, observation]) => {
       if (endpoint && snapshot) {
         const position = observation?.position ?? cursor ?? snapshot.position
-        this.closed = { endpoint, checkpoint: this.checkpoint({ ...snapshot, position }) }
+        this.closed = { endpoint, checkpoint: this.checkpointAt(snapshot, position) }
       }
       return this.closed
     })
@@ -446,8 +463,6 @@ export class PlaybackSessionCoordinator {
     const capabilities: string[] = adapters.map(adapter => adapter.kind)
     if (adapters.length > 0 && adapters.every(adapter => adapter.supportsVolume)) capabilities.push('volume')
     this.localQualified = !!this.localRecovery?.isEligible() && adapters.length > 0 && adapters.every(adapter => adapter.localRecovery?.eligible)
-    // The server keeps this page's place under a new incarnation without advancing the revision,
-    // so until the answer is bound a snapshot cannot be judged by the incarnation it names.
     this.rebinding = bound
     this.transport.send({ type: 'session.endpoint', deviceId: getDeviceId(), endpointId: this.localRecovery?.tabId ?? this.endpointId, name: getDeviceName(), capabilities,
       pageId: playbackPageId,
@@ -476,32 +491,13 @@ export class PlaybackSessionCoordinator {
     }
   }
 
-  /** Signs the close report this page would send if it went away now; a proof cannot be signed while unloading. */
-  private prepareCloseReport(): void {
-    const endpoint = this.endpoint
-    if (!endpoint?.capability || !this.current()) return
-    const preparation = ++this.closePreparation
-    prepareKeepalivePost(CLOSE_REPORT_PATH, { 'X-Baander-Playback-Endpoint': endpoint.capability }).then(request => {
-      if (preparation !== this.closePreparation || endpoint !== this.endpoint) return
-      this.preparedClose = request ? { endpoint, request } : null
-    }).catch(error => {
-      console.warn('[PlaybackSession] A close report could not be prepared:', error instanceof Error ? error.message : error)
-    })
+  /** Where this page's player stands, or the snapshot's cursor while it holds none. */
+  private cursor(snapshot: PlaybackSnapshotResource): number {
+    return this.runner.observe()?.position ?? snapshot.position
   }
 
-  /** Sends the prepared close report of a page that is going away, with the cursor its player stands at. */
-  private reportClosing(): void {
-    const endpoint = this.endpoint
-    const snapshot = this.snapshot
-    const prepared = this.preparedClose
-    if (!endpoint || !snapshot || !prepared || prepared.endpoint !== endpoint || !this.current()) return
-    this.preparedClose = null
-    const position = this.runner.observe()?.position ?? snapshot.position
-    sendKeepalivePost(prepared.request, { incarnationId: endpoint.incarnationId, checkpoint: this.checkpoint({ ...snapshot, position }) })
-  }
-
-  private checkpoint(snapshot: Pick<PlaybackSnapshotResource, 'revision' | 'media' | 'currentTrackIndex' | 'position'>): PlaybackRecoveryCheckpoint {
-    return { revision: snapshot.revision, media: snapshot.media, currentTrackIndex: snapshot.currentTrackIndex, position: snapshot.position }
+  private checkpointAt(snapshot: Pick<PlaybackSnapshotResource, 'revision' | 'media' | 'currentTrackIndex'>, position: number): PlaybackRecoveryCheckpoint {
+    return { revision: snapshot.revision, media: snapshot.media, currentTrackIndex: snapshot.currentTrackIndex, position }
   }
 
   private async recoverLocal(record: PlaybackRecoveryRecord): Promise<void> {
@@ -515,7 +511,7 @@ export class PlaybackSessionCoordinator {
     const generation = this.connection
     const endpoint = snapshot.endpoint as RecoveryEndpoint
     if (!endpoint?.capability) return
-    if (this.localRecovery) await this.localRecovery.registered(endpoint, this.checkpoint(snapshot), this.localQualified)
+    if (this.localRecovery) await this.localRecovery.registered(endpoint, this.checkpointAt(snapshot, snapshot.position), this.localQualified)
     if (!this.current() || this.suspended || generation !== this.connection) return
     // A page that registered again through a replaced socket was never fenced. Rearming its
     // adapters would cancel what they are executing, so only a fenced page is rearmed.
@@ -535,7 +531,7 @@ export class PlaybackSessionCoordinator {
     this.ready = true
     this.presenceConfirmedAt = this.registrationStartedAt
     this.publish(true, null)
-    this.prepareCloseReport()
+    this.closeReport.prepare()
     this.refreshRequests(true)
     this.refreshTransfers(true)
     this.dispatchCommands(snapshot)
@@ -660,7 +656,7 @@ export class PlaybackSessionCoordinator {
     const silentRunner = held === null && snapshot.activeIncarnationId === endpoint.incarnationId && !this.playing()
     const observation = held ?? { observedState: silentRunner ? 'stopped' as const : 'unknown' as const, position: snapshot.position }
     if (this.localQualified && this.localRecovery) {
-      try { await this.localRecovery.checkpoint(this.checkpoint({ ...snapshot, position: observation.position })) }
+      try { await this.localRecovery.checkpoint(this.checkpointAt(snapshot, observation.position)) }
       catch (error) {
         if (generation !== this.connection || !this.current()) return
         this.executionBlocked = true; this.localRecovery.noteFence(this.runner.fenceLocalExecution()); throw error
@@ -674,7 +670,7 @@ export class PlaybackSessionCoordinator {
       if (generation === this.connection && endpoint === this.endpoint && this.ready && this.current()) {
         this.presenceConfirmedAt = startedAt
         // The proof inside a prepared close report ages; each presence report replaces it.
-        this.prepareCloseReport()
+        this.closeReport.prepare()
       }
     } catch (error) {
       this.presenceConfirmedAt = null
@@ -738,7 +734,7 @@ export class PlaybackSessionCoordinator {
         // a queue restore wants paused, and a movie opens its view from its own Play button.
         const wantsPlaying = intent.action === 'play'
           || (intent.action === 'load' && intent.media.kind === 'song' && intent.desiredState === 'playing')
-        this.refused = wantsPlaying ? { intent, at: Date.now() } : null
+        this.refused = wantsPlaying ? new RefusedRequest(intent, Date.now()) : null
         throw new Error(UNCONFIRMED_PLAYBACK_REFUSAL)
       }
       if (intent.action === 'queue' && 'operation' in intent) {
@@ -996,7 +992,7 @@ export class PlaybackSessionCoordinator {
       const endpoint = await this.ensureLocalEndpoint()
       if (!this.snapshot) throw new Error('Playback connection is unavailable.')
       const refused = this.refused
-      const payload: OverrideRequest = { requestId: crypto.randomUUID(), expectedRevision: this.snapshot.revision, incarnationId: endpoint.incarnationId }
+      const payload: OverridePlaybackRequest = { requestId: crypto.randomUUID(), expectedRevision: this.snapshot.revision, incarnationId: endpoint.incarnationId }
       let answer: ControlSnapshot
       try { answer = await this.post(OVERRIDE_PATH, payload, endpoint) }
       catch (error) { throw this.refusal(error, 'The override could not be confirmed.') }
@@ -1005,11 +1001,10 @@ export class PlaybackSessionCoordinator {
       }
       this.refused = null
       this.publish(this.ready, null)
-      // The wall clock keeps counting while the machine sleeps. A refusal older than the limit,
-      // or one the clock puts in the future, only takes over and starts nothing.
-      const age = refused ? Date.now() - refused.at : NaN
-      if (refused && age >= 0 && age <= REFUSED_REQUEST_LIFETIME_MS && !answer.activeIncarnationId && !answer.transfer) {
-        await this.executeIntent(refused.intent)
+      // Without a fresh refusal, the override only takes over and starts nothing.
+      const intent = refused?.freshIntent(Date.now())
+      if (intent && !answer.activeIncarnationId && !answer.transfer) {
+        await this.executeIntent(intent)
       }
     } catch (error) { this.fail(error); throw error }
   }

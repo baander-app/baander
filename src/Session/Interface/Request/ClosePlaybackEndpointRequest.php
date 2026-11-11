@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Session\Interface\Request;
 
+use App\Session\Interface\Validator\PlaybackCheckpoint;
 use Symfony\Component\Validator\Constraints as Assert;
 
 final readonly class ClosePlaybackEndpointRequest
@@ -13,15 +14,7 @@ final readonly class ClosePlaybackEndpointRequest
         #[Assert\NotBlank]
         #[Assert\Uuid]
         public string $incarnationId,
-        #[Assert\Collection(fields: [
-            'revision' => [new Assert\Type('integer'), new Assert\PositiveOrZero()],
-            'media' => [new Assert\AtLeastOneOf(constraints: [new Assert\IsNull(), new Assert\Collection(fields: [
-                'kind' => [new Assert\Choice(choices: ['song', 'video'])],
-                'publicId' => [new Assert\Regex(pattern: '/^[0-9a-zA-Z_-]{21}$/D')],
-            ])])],
-            'currentTrackIndex' => [new Assert\Type('integer'), new Assert\PositiveOrZero()],
-            'position' => [new Assert\Type('numeric'), new Assert\PositiveOrZero()],
-        ])]
+        #[PlaybackCheckpoint]
         public array $checkpoint,
     ) {}
 

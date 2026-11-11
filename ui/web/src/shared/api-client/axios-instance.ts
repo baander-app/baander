@@ -36,13 +36,16 @@ export function getAuthSession(keyPair = getDpopKeyPair()): number {
   return session;
 }
 
+/** The headers every API request carries, whether or not it goes through this client. */
+export const API_DEFAULT_HEADERS = {
+  Accept: 'application/json',
+  'X-Requested-With': 'XMLHttpRequest',
+} as const;
+
 export const AXIOS_INSTANCE = Axios.create({
   baseURL: window.__BAANDER_API_URL__,
   withCredentials: false,
-  headers: {
-    Accept: 'application/json',
-    'X-Requested-With': 'XMLHttpRequest',
-  },
+  headers: API_DEFAULT_HEADERS,
 });
 
 /** The origin the API is served from: the configured API URL, or the page's own origin. */

@@ -1,7 +1,7 @@
 import { useAuthStore } from '@/features/auth/stores/auth-store'
 import { createDpopProof } from '@/shared/crypto/dpop-proof'
 import { getDpopKeyPair, getDpopNonce } from '@/shared/crypto/dpop-store'
-import { AXIOS_INSTANCE, buildHtu } from './axios-instance'
+import { API_DEFAULT_HEADERS, AXIOS_INSTANCE, buildHtu } from './axios-instance'
 
 /**
  * An authenticated `POST` whose URL and headers were built ahead of time, so that it can be sent
@@ -29,8 +29,7 @@ export async function prepareKeepalivePost(path: string, headers: Record<string,
   return {
     url,
     headers: {
-      Accept: 'application/json',
-      'X-Requested-With': 'XMLHttpRequest',
+      ...API_DEFAULT_HEADERS,
       'Content-Type': 'application/json',
       ...headers,
       Authorization: `DPoP ${accessToken}`,
