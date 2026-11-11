@@ -24,6 +24,8 @@ final class HttpExchange
     private readonly CurlMultiHandle $multi;
     private readonly CurlHandle $handle;
     private ?\Throwable $failure = null;
+    private readonly float $startedAt;
+    private ?float $lastByteAt = null;
 
     /**
      * @param list<string> $headers
@@ -58,6 +60,7 @@ final class HttpExchange
             },
             CURLOPT_WRITEFUNCTION => function (CurlHandle $handle, string $data): int {
                 $this->body .= $data;
+                $this->lastByteAt = microtime(true);
                 if ($this->stopAfterBytes !== null && strlen($this->body) >= $this->stopAfterBytes) {
                     // Accepting fewer bytes than received makes curl drop the connection.
                     $this->stopped = true;
@@ -76,6 +79,24 @@ final class HttpExchange
         }
         $this->multi = curl_multi_init();
         curl_multi_add_handle($this->multi, $this->handle);
+        $this->startedAt = microtime(true);
+    }
+
+    /**
+     * How far the body has come, for a failure message: a body that still grew just before
+     * the deadline was slow, and one whose last byte is old had stalled.
+     */
+    public function progress(?int $expectedBytes = null): string
+    {
+        $now = microtime(true);
+
+        return sprintf(
+            '%d%s body bytes received in %.1f seconds%s',
+            strlen($this->body),
+            $expectedBytes === null ? '' : sprintf(' of about %d', $expectedBytes),
+            $now - $this->startedAt,
+            $this->lastByteAt === null ? '' : sprintf(', the last %.1f seconds ago', $now - $this->lastByteAt),
+        );
     }
 
     /**
@@ -169,10 +190,11 @@ final class HttpExchange
         }
     }
 
-    public function complete(float $seconds = 30.0): self
+    /** @param int|null $expectedBytes the body size the caller expects, named in the timeout message */
+    public function complete(float $seconds = 30.0, ?int $expectedBytes = null): self
     {
         if (!$this->until(static fn(self $exchange): bool => $exchange->done, $seconds)) {
-            throw new RuntimeException('The request did not finish in time.');
+            throw new RuntimeException('The request did not finish in time: ' . $this->progress($expectedBytes) . '.');
         }
 
         return $this;
@@ -200,7 +222,7 @@ final class HttpExchange
         $result = is_array($info) ? $info['result'] : CURLE_OK;
         $this->result = $result;
         if ($result !== CURLE_OK && !($this->stopped && $result === CURLE_WRITE_ERROR)) {
-            throw new RuntimeException('Request failed: ' . curl_strerror($result));
+            throw new RuntimeException('Request failed: ' . curl_strerror($result) . ' (' . $this->progress() . ').');
         }
         curl_multi_remove_handle($this->multi, $this->handle);
         $this->done = true;

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Transcode\Interface\Controller;
 
 use App\Transcode\Application\Command\CleanupOrphanedJobsCommand;
+use App\Transcode\Application\Exception\TranscodeCleanupIncompleteException;
 use App\Transcode\Application\Port\TranscodeJobPortInterface;
 use App\Transcode\Application\Port\PlaybackAccessInterface;
 use App\Transcode\Application\Port\TranscodePublicViewInterface;
@@ -19,6 +20,7 @@ use App\Transcode\Interface\Controller\TranscodeJobController;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Symfony\Component\Messenger\Envelope;
+use Symfony\Component\Messenger\Exception\HandlerFailedException;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Stamp\HandledStamp;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
@@ -143,5 +145,52 @@ final class TranscodeJobAuthorizationTest extends TestCase
 
         $this->expectException(\LogicException::class);
         $controller->cleanup();
+    }
+
+    public function testACleanupThatLeftJobsBehindAnswersWithItsCountsAsAnError(): void
+    {
+        $bus = $this->createStub(MessageBusInterface::class);
+        $bus->method('dispatch')->willThrowException(new HandlerFailedException(
+            new Envelope(new CleanupOrphanedJobsCommand()),
+            [new TranscodeCleanupIncompleteException(removed: 6, failed: 2, expired: 4)],
+        ));
+        $controller = new TranscodeJobController($bus, $this->createStub(TranscodeJobPortInterface::class), new \App\Tests\Unit\Transcode\PublicViewStub(), $this->createStub(PlaybackAccessInterface::class));
+
+        // The controller holds no answer of its own for this outcome: the exception subscriber every
+        // endpoint shares unwraps the handler's failure and answers it.
+        $events = new \Symfony\Component\EventDispatcher\EventDispatcher();
+        $events->addListener(\Symfony\Component\HttpKernel\KernelEvents::EXCEPTION, new \App\Shared\Infrastructure\EventListener\ExceptionSubscriber(
+            new \Psr\Log\NullLogger(),
+            $this->createStub(\Symfony\Contracts\Translation\TranslatorInterface::class),
+        ));
+        $controllers = $this->createStub(\Symfony\Component\HttpKernel\Controller\ControllerResolverInterface::class);
+        $controllers->method('getController')->willReturn($controller->cleanup(...));
+        $arguments = $this->createStub(\Symfony\Component\HttpKernel\Controller\ArgumentResolverInterface::class);
+        $arguments->method('getArguments')->willReturn([]);
+
+        $response = (new \Symfony\Component\HttpKernel\HttpKernel($events, $controllers, new \Symfony\Component\HttpFoundation\RequestStack(), $arguments))
+            ->handle(\Symfony\Component\HttpFoundation\Request::create('/api/transcode/jobs/cleanup', 'POST'));
+
+        self::assertSame(503, $response->getStatusCode());
+        self::assertSame(['error' => [
+            'message' => 'The transcode job cleanup removed 6 orphaned jobs and could not remove 2; the log names each job that failed.',
+            'code' => 503,
+            'details' => ['expired' => 4, 'cleaned' => 6, 'failed' => 2],
+        ]], json_decode((string) $response->getContent(), true, flags: JSON_THROW_ON_ERROR));
+    }
+
+    public function testAnyOtherCleanupFailureIsLeftToTheErrorHandler(): void
+    {
+        $failure = new HandlerFailedException(new Envelope(new CleanupOrphanedJobsCommand()), [new \RuntimeException('The orphaned jobs could not be read.')]);
+        $bus = $this->createStub(MessageBusInterface::class);
+        $bus->method('dispatch')->willThrowException($failure);
+        $controller = new TranscodeJobController($bus, $this->createStub(TranscodeJobPortInterface::class), new \App\Tests\Unit\Transcode\PublicViewStub(), $this->createStub(PlaybackAccessInterface::class));
+
+        try {
+            $controller->cleanup();
+            self::fail('A cleanup that failed outright has no answer of its own.');
+        } catch (HandlerFailedException $thrown) {
+            self::assertSame($failure, $thrown);
+        }
     }
 }

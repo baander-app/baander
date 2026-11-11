@@ -366,13 +366,18 @@ int main() {
   test_flac_encoder("FLAC 16 stereo", 2, 16);
   test_flac_encoder("FLAC 24 5.1", 6, 24);
   test_flac_encoder("FLAC 32 stereo", 2, 32);
-  /* The counting operators are in use at all: creating a decoder
-   * allocates.  The probe goes through the library because a compiler
-   * may assume that an operator new called in this file leaves the
-   * counter alone (GCC's -fassume-sane-operators-new-delete), which a
-   * call into another translation unit does not allow it. */
+  /* The counting operators are in use at all.  The operator is called by
+   * name: for a new-expression a compiler may remove an allocation it can
+   * pair with its release, or assume that the operator leaves every global
+   * as it was (GCC's -fassume-sane-operators-new-delete), and then the
+   * comparison below is decided without the counter being read. */
+  const long before = g_allocations;
+  ::operator delete(::operator new(sizeof(int)));
+  CHECK(g_allocations == before + 1, "the allocation counter sees operator new");
+  /* The steady-state checks above count the library's allocations, so the
+   * counter has to see those too: creating a decoder allocates. */
   g_allocations = 0;
   aac_decoder_destroy(aac_decoder_create(48000, 2));
-  CHECK(g_allocations > 0, "the allocation counter sees operator new");
+  CHECK(g_allocations > 0, "the allocation counter sees the library's allocations");
   return test_summary("test_allocation");
 }

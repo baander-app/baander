@@ -2,8 +2,13 @@
  * every frame, the bandwidth override sets the decoded lowpass, the VBR
  * modes order their bitrates and follow a peak bitrate, a 5.1 HE-AAC
  * frame carries each element's SBR data right after that element and
- * FFmpeg decodes it channel for channel, and HE-AAC v2 drains a short
- * last block and a single-sample input correctly. */
+ * FFmpeg decodes it channel for channel, HE-AAC v2 drains a short
+ * last block and a single-sample input correctly, and the committed
+ * AAC-LC, HE-AAC and HE-AAC v2 streams.
+ *
+ * With arguments the program writes the committed streams instead:
+ *   test_encoder_tuning --write-streams <dir>
+ */
 #include "bitstream.h"
 #include "encoder.h"
 #include "test_util.h"
@@ -566,9 +571,121 @@ void test_ps_single_sample() {
   }
 }
 
+/* ── the committed streams ─────────────────────────────────────── */
+
+/* One stream per encoder the xHE-AAC suites do not reach: AAC-LC with
+ * the afterburner, its default, which is what a transcode writes; the
+ * SBR encoder over it; and parametric stereo over both. */
+struct Committed {
+  const char* name;
+  AacObjectType aot;
+  int bitrate;
+  double min_low_db; /* of the decode's low band against the source's */
+};
+const Committed kCommitted[3] = {{"lc_enc_cpe_128k.aac", AAC_AOT_LC, 128000, 20.0},
+                                 {"he_enc_cpe_48k.aac", AAC_AOT_SBR, 48000, 16.0},
+                                 {"hev2_enc_cpe_32k.aac", AAC_AOT_PS, 32000, 13.0}};
+constexpr uint32_t kCommittedSignal = 0xe5ee8187u; /* signal_checksum of committed_signal() */
+
+/* The committed streams' signal: the HE-AAC suite's tones, noise and
+ * clicks at half level, as in the xHE-AAC suites. */
+std::vector<float> committed_signal() {
+  std::vector<float> pcm = gen_he_signal(2);
+  for (float& v : pcm) {
+    v *= 0.5f;
+  }
+  return pcm;
+}
+
+std::vector<uint8_t> committed_encode(const Committed& s, const std::vector<float>& pcm) {
+  int error = 0;
+  const std::vector<uint8_t> stream =
+      encode_stream(pcm, 48000, 2, s.bitrate, AAC_RC_CBR, 0, &error, s.aot);
+  CHECK(error == 0 && !stream.empty(), "%s: encode error %d", s.name, error);
+  return stream;
+}
+
+/* The mono downmix below 3 kHz, where every one of the three profiles
+ * codes the waveform. */
+std::vector<float> low_band(const std::vector<float>& stereo) {
+  std::vector<float> mono(stereo.size() / 2);
+  for (size_t i = 0; i < mono.size(); i++) {
+    mono[i] = 0.5f * (stereo[2 * i] + stereo[2 * i + 1]);
+  }
+  return lowpass_channel(mono, 1, 0, 3000.0f, 48000);
+}
+
+/* SNR of a stream's decoded low band against the source's, at the best
+ * delay; -100 when a frame fails or the output is not stereo. */
+double low_band_db(const std::vector<float>& low_src, const std::vector<uint8_t>& stream) {
+  int errors = 0;
+  AacDecoderHandle dec = aac_decoder_create(48000, 0);
+  const std::vector<float> out = decode_stream(stream, 48000, 0, &errors, dec);
+  const int channels = dec ? aac_decoder_channels(dec) : 0;
+  aac_decoder_destroy(dec);
+  if (errors != 0 || channels != 2 || out.empty()) {
+    return -100.0;
+  }
+  return best_aligned_snr_db(low_src, low_band(out), 1024, 7000, nullptr);
+}
+
+int write_streams(const char* dir) {
+  const std::vector<float> pcm = committed_signal();
+  for (const Committed& s : kCommitted) {
+    const std::vector<uint8_t> stream = committed_encode(s, pcm);
+    const std::string path = std::string(dir) + "/" + s.name;
+    if (g_failures || !write_file(path, stream.data(), stream.size())) {
+      fprintf(stderr, "%s: not written\n", path.c_str());
+      return 1;
+    }
+    printf("%s: %zu frames, %zu bytes\n", path.c_str(), split_adts(stream).size(), stream.size());
+  }
+  return 0;
+}
+
+/* The streams under tests/data decode without error and match the
+ * generator's signal in the low band; a fresh encode of that signal is
+ * byte identical, so a change of the encoder's output shows up here and
+ * the streams are regenerated with --write-streams on purpose.  The
+ * streams were written by the reference build (test_util.h) from the
+ * signal whose checksum is given with them; other builds compare the
+ * decodes instead. */
+void test_committed() {
+  const std::vector<float> pcm = committed_signal();
+  const std::vector<float> low_src = low_band(pcm);
+  for (const Committed& s : kCommitted) {
+    const std::vector<uint8_t> stream = read_file(data_path(s.name));
+    CHECK(!stream.empty(), "%s present", s.name);
+    if (stream.empty()) {
+      continue;
+    }
+    const double low = low_band_db(low_src, stream);
+    CHECK(low > s.min_low_db, "%s: low band %.1f dB against the source", s.name, low);
+    const std::vector<uint8_t> fresh = committed_encode(s, pcm);
+#if BAAC_REFERENCE_BUILD
+    if (!check_committed_signal(s.name, pcm, kCommittedSignal)) {
+      continue;
+    }
+    CHECK(fresh == stream, "%s: a fresh encode is byte identical (%zu vs %zu bytes)", s.name,
+          fresh.size(), stream.size());
+#else
+    const double again = low_band_db(low_src, fresh);
+    CHECK(fabs(again - low) < 1.5,
+          "%s: a fresh encode of this build decodes like the committed stream (%.1f against "
+          "%.1f dB; the byte identity check needs the reference build)",
+          s.name, again, low);
+#endif
+    printf("  %s: low band %.1f dB\n", s.name, low);
+  }
+}
+
 }  // namespace
 
-int main() {
+int main(int argc, char** argv) {
+  if (argc >= 3 && strcmp(argv[1], "--write-streams") == 0) {
+    return write_streams(argv[2]);
+  }
+  test_committed();
   test_peak_bitrate();
   test_bandwidth();
   test_vbr_modes();

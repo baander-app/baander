@@ -182,6 +182,39 @@ writes take the shared form first (`liveClaimKindForImport()`), then read the
 claim in a separate statement so its READ COMMITTED snapshot postdates the lock.
 Verified by the two-session import/delete tests in the same file.
 
+The four playback coordination tables are the worked example of rows that the unit
+of work inserts and guarded statements change.
+[PlaybackStore](../../../../src/Session/Infrastructure/Doctrine/PlaybackStore.php)
+maps them with `readOnly` entities that hold every reference as a scalar `Uuid`;
+[PlaybackSessionSchemaListener](../../../../src/Session/Infrastructure/Doctrine/PlaybackSessionSchemaListener.php)
+declares their composite keys onto `(id, user_id)`, which an association cannot
+target. `readOnly` stops the unit of work computing changes for a managed row; it
+restricts neither an insert nor a DQL `UPDATE`.
+
+- An insert is persisted, flushed and detached in the method that creates it. The
+  unit of work does not order inserts across scalar-referenced entities, so a parent
+  row is flushed before its child, and a DQL read does not see an unflushed row.
+  Inside the caller's transaction each flush runs `SAVEPOINT`, `INSERT`,
+  `RELEASE SAVEPOINT`: three statements where an SQL insert sends one.
+- An update is one DQL `UPDATE` with its predicate, stamped with
+  `CURRENT_TIMESTAMP()` in the statement. An insert takes the same clock from a DQL
+  read, which returns one value throughout a transaction.
+- A read hydrates arrays, so nothing managed goes stale behind raw SQL or another
+  transaction. A DQL lock mode needs an active transaction; outside one Doctrine
+  refuses it.
+- DQL has no `ON CONFLICT`. Under the account lock an upsert becomes an update
+  followed by an insert when no row matched.
+- The DQL parser rejects arithmetic after a function in a select list
+  (`COALESCE(MAX(i.epoch), 0) + 1`); select the function and add in PHP.
+- A flush that fails closes the entity manager, where a failed DBAL statement did
+  not. A fixture that hands a store one concrete manager must resolve the current
+  manager on every call, as the pooled proxy does.
+
+Five statements stay SQL, each named with its reason in
+[the Session README](../../../../src/Session/README.md). Verified on PostgreSQL 18
+by `PlaybackStoreContractTest`, `PlaybackSchemaMappingTest` and
+`PlaybackSnapshotCostTest`.
+
 For example, [AccessTokenRepository](../../../../src/Auth/Infrastructure/Repository/OAuth/AccessTokenRepository.php)
 honors `save(..., false)` and clears after bulk revocation. Preserve the flush
 parameter. A flush inside an outer transaction is not a commit; do not publish

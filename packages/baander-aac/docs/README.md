@@ -810,10 +810,10 @@ mode has a kernel table of its own (`src/flac_dsp.cpp`, with SSE2, AVX2
 and NEON kernels in `src/simd/flac_*.cpp`), chosen at run time and
 capped by `BAAC_AAC_CPU` like the AAC table. Its integer kernels are
 exact, and its two floating-point kernels accumulate in one stated order
-and are compiled without the package's Release math options, without
-contraction and without fused multiply-add. A stream therefore comes out
-the same byte for byte at every level, which `tests/test_flac_dsp.cpp`
-checks kernel by kernel and on whole streams.
+and are compiled in exact arithmetic, without contraction and without
+fused multiply-add. A stream therefore comes out the same byte for byte
+at every level, which `tests/test_flac_dsp.cpp` checks kernel by kernel
+and on whole streams.
 
 The output does not depend on the C library either. The analysis needs
 a cosine for its windows and a base 2 logarithm for its size estimates,

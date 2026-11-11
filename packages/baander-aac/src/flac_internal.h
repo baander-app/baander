@@ -342,8 +342,8 @@ bool flac_meta_read_picture(uint8_t* block, size_t size, BaacFlacPicture* pictur
  * - the integer kernels wrap like unsigned arithmetic or are given
  *   inputs that cannot overflow, so any order of evaluation agrees;
  * - the two floating-point kernels are elementwise or accumulate in one
- *   stated order, are compiled without the package's Release math
- *   options and without contraction, and use no fused multiply-add. */
+ *   stated order, are compiled in exact arithmetic and without
+ *   contraction, and use no fused multiply-add. */
 struct FlacBitReader;
 struct FlacBitWriter;
 

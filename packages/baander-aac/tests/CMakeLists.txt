@@ -145,10 +145,12 @@ add_test(NAME test_flac_encoder_plain_libm COMMAND test_flac_encoder)
 set_tests_properties(test_flac_encoder_plain_libm PROPERTIES
     ENVIRONMENT "GLIBC_TUNABLES=glibc.cpu.hwcaps=-FMA,-AVX2,-AVX")
 
-# The transforms and filterbanks go through the DSP dispatch table; the
-# same suites run again with the table capped at the scalar and the SSE2
-# kernels (BAAC_AAC_CPU), so that every level this machine can run is
-# exercised end to end, not only in the kernel comparison of test_dsp.
+# The transforms, the filterbanks and the encoder's quantization noise go
+# through the DSP dispatch table; the same suites run again with the table
+# capped at the scalar and the SSE2 kernels (BAAC_AAC_CPU), so that every
+# level this machine can run is exercised end to end, not only in the
+# kernel comparison of test_dsp (test_roundtrip drives the AAC-LC and
+# HE-AAC encoders, whose scalefactor search sums the noise).
 # The lossless mode has a kernel table of its own under the same cap, and
 # its suites run again the same way.
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64|i686|i386")

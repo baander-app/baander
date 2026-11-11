@@ -79,24 +79,28 @@ if(BAAC_AAC_BUILD_ENCODER)
     list(APPEND ALL_SOURCES ${BAAC_AAC_ENCODER_SOURCES})
 endif()
 
-# Release builds take the fast-math rewrites except the unsafe-math
-# group as a whole: under -funsafe-math-optimizations x86 compilers turn
-# 1/sqrt(x) into the RSQRTSS/RSQRTPS estimate plus a Newton step, and
-# the estimate differs between processor vendors, so one binary would
-# encode differently on Intel and AMD machines.  Reassociation,
-# reciprocal multiplication and the finite-math assumptions stay; with
-# exact division and square root the output is a function of the input.
-# BAAC_RELEASE_MATH tells the tests that compare committed streams byte
-# for byte that this arithmetic is in force.
+# Release builds compute in exact arithmetic: every sum, product and
+# quotient is rounded in the order the source writes it, so the encoder's
+# output is a function of its input and of the C library's functions, the
+# same from every compiler.  The rewrites that change a result stay off:
+# under -fassociative-math each compiler regroups and vectorises a sum
+# its own way, and a sum rounded differently turns a rate or masking
+# decision; -freciprocal-math, -fno-signed-zeros and -ffinite-math-only
+# give the same licence for quotients, zeros and comparisons; under
+# -funsafe-math-optimizations x86 compilers take 1/sqrt(x) from the
+# RSQRTSS/RSQRTPS estimate, which differs between processor vendors.
+# Contraction is off for the same reason on targets with a fused
+# multiply-add; a kernel that wants one asks for it with the intrinsic.
+# -fno-math-errno and -fno-trapping-math change no result.  The options
+# reach the tests as well, whose signal generators must give every build
+# the same samples.  BAAC_RELEASE_MATH tells the tests that compare
+# committed streams byte for byte that this build is optimised this way.
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     add_compile_options(
+        -ffp-contract=off
         $<$<CONFIG:Release>:-O3>
         $<$<CONFIG:Release>:-fno-math-errno>
-        $<$<CONFIG:Release>:-fassociative-math>
-        $<$<CONFIG:Release>:-freciprocal-math>
-        $<$<CONFIG:Release>:-fno-signed-zeros>
-        $<$<CONFIG:Release>:-fno-trapping-math>
-        $<$<CONFIG:Release>:-ffinite-math-only>)
+        $<$<CONFIG:Release>:-fno-trapping-math>)
     add_compile_definitions($<$<CONFIG:Release>:BAAC_RELEASE_MATH=1>)
 endif()
 
@@ -181,12 +185,13 @@ endif()
 # scalar table in step with NEON).
 set_source_files_properties(src/dsp.cpp PROPERTIES COMPILE_FLAGS "-ffp-contract=off")
 # The analysis of the FLAC encoder decides which bytes are written, so
-# its floating-point sums must come out the same in every build of one
-# machine: the files that hold such sums (the predictor analysis, the
-# scalar kernels, and the encoder, which adds up autocorrelations and
-# size estimates of its own) are compiled without the Release math
-# options above and without contraction.  (On another compiler than GCC
-# or Clang the options above are not in force either.)
+# its floating-point sums must come out the same in every build: the
+# files that hold such sums (the predictor analysis, the scalar kernels,
+# and the encoder, which adds up autocorrelations and size estimates of
+# its own) name the exact arithmetic of the options above in their own
+# flags as well, so that it does not rest on that block alone.  (On
+# another compiler than GCC or Clang the options above are not in force
+# either.)
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     set(BAAC_FLAC_STRICT_MATH
         "-fno-associative-math -fno-reciprocal-math -fsigned-zeros -ftrapping-math -fno-finite-math-only -ffp-contract=off")

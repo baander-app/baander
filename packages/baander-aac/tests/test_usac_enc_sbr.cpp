@@ -21,19 +21,6 @@
 #include "usac.h"
 #include "usac_enc.h"
 
-/* The committed streams are the release build's bytes; a sanitizer
- * build keeps the same flags but not the same vectorised arithmetic. */
-#if defined(__SANITIZE_ADDRESS__) || defined(__SANITIZE_UNDEFINED__)
-#define BAAC_SANITIZED 1
-#elif defined(__has_feature)
-#if __has_feature(address_sanitizer) || __has_feature(undefined_behavior_sanitizer)
-#define BAAC_SANITIZED 1
-#endif
-#endif
-#ifndef BAAC_SANITIZED
-#define BAAC_SANITIZED 0
-#endif
-
 namespace {
 
 constexpr int kRate = 48000;
@@ -646,10 +633,11 @@ struct Committed {
   int channels;
   int bitrate;
   int mps;
+  uint32_t signal; /* signal_checksum of committed_signal(channels) */
 };
-const Committed kCommitted[3] = {{"usac_enc_sbr_sce_32k.loas", 1, 32000, 0},
-                                 {"usac_enc_sbr_cpe_64k.loas", 2, 64000, 0},
-                                 {"usac_enc_mps_cpe_32k.loas", 2, 32000, 1}};
+const Committed kCommitted[3] = {{"usac_enc_sbr_sce_32k.loas", 1, 32000, 0, 0xee1d5a1au},
+                                 {"usac_enc_sbr_cpe_64k.loas", 2, 64000, 0, 0xe5ee8187u},
+                                 {"usac_enc_mps_cpe_32k.loas", 2, 32000, 1, 0xe5ee8187u}};
 
 /* The committed streams' signal: the HE-AAC suite's tones, noise and
  * clicks at half level, so that the reference decoders' 16-bit output
@@ -680,9 +668,8 @@ int write_streams(const char* dir) {
  * generator's signal; a fresh encode of that signal is byte identical,
  * so a change of the encoder's output shows up here and the streams are
  * regenerated with --write-streams on purpose.  The streams were written
- * by the release build, whose arithmetic only another build with its
- * optimisation and Release math flags and without sanitizers reproduces;
- * other builds compare the decodes instead. */
+ * by the reference build (test_util.h) from the signal whose checksum
+ * is given with them; other builds compare the decodes instead. */
 void test_committed() {
   for (const Committed& s : kCommitted) {
     const std::vector<uint8_t> stream = read_file(data_path(s.name));
@@ -698,7 +685,10 @@ void test_committed() {
           "%s: %d frames, %d errors, %.1f dB", s.name, d.frames, d.errors, snr);
     const AacUsacEncoderOptions o = options(-1, s.mps ? 1 : -1);
     const Encoded e = encode(pcm, s.channels, s.bitrate, &o);
-#if defined(__OPTIMIZE__) && BAAC_RELEASE_MATH && !BAAC_SANITIZED
+#if BAAC_REFERENCE_BUILD
+    if (!check_committed_signal(s.name, pcm, s.signal)) {
+      continue;
+    }
     CHECK(e.stream == stream, "%s: a fresh encode is byte identical (%zu vs %zu bytes)", s.name,
           e.stream.size(), stream.size());
 #else
@@ -709,7 +699,7 @@ void test_committed() {
     const double fresh = aligned_snr_db(pcm, again.pcm, s.channels, AAC_ENCODER_SBR_DELAY);
     CHECK(again.errors == 0 && fabs(fresh - snr) < 1.5,
           "%s: a fresh encode of this build decodes like the committed stream (%.1f against "
-          "%.1f dB; the byte identity check needs the release build's flags)",
+          "%.1f dB; the byte identity check needs the reference build)",
           s.name, fresh, snr);
 #endif
   }

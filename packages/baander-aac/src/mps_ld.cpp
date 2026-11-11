@@ -6,6 +6,7 @@
 #include <mutex>
 
 #include "mps_internal.h"
+#include "qmf_sums.h"
 
 /* The low-delay mode of MPEG Surround: the filterbank with the
  * low-delay prototype, the decorrelator of the low-delay mode and the
@@ -26,22 +27,24 @@ constexpr int kOut = 2;
 constexpr int kMatrixFloats = (int)(sizeof(AacMpsBandMatrices) / sizeof(float));
 constexpr float kAbsThr = 1e-9f * 32768.0f * 32768.0f;
 
-float g_ana_cos[kBands][2 * kBands], g_ana_sin[kBands][2 * kBands];
-float g_syn_cos[2 * kBands][kBands], g_syn_sin[2 * kBands][kBands];
+/* The modulation tables as the sums of qmf_sums.h read them: the
+ * analysis tables by term, the synthesis tables by band. */
+float g_ana_cos[2 * kBands][kBands], g_ana_sin[2 * kBands][kBands];
+float g_syn_cos[kBands][2 * kBands], g_syn_sin[kBands][2 * kBands];
 
 void build_tables() {
   for (int k = 0; k < kBands; k++) {
     for (int n = 0; n < 2 * kBands; n++) {
       const double a = M_PI / 128.0 * (k + 0.5) * (2.0 * n + 1.0);
-      g_ana_cos[k][n] = (float)cos(a);
-      g_ana_sin[k][n] = (float)sin(a);
+      g_ana_cos[n][k] = (float)cos(a);
+      g_ana_sin[n][k] = (float)sin(a);
     }
   }
   for (int n = 0; n < 2 * kBands; n++) {
     for (int k = 0; k < kBands; k++) {
       const double a = M_PI / 128.0 * (k + 0.5) * (2.0 * n - 127.0);
-      g_syn_cos[n][k] = (float)(cos(a) / 64.0);
-      g_syn_sin[n][k] = (float)(sin(a) / 64.0);
+      g_syn_cos[k][n] = (float)(cos(a) / 64.0);
+      g_syn_sin[k][n] = (float)(sin(a) / 64.0);
     }
   }
 }
@@ -260,25 +263,8 @@ void aac_mps_ld_analyze(AacMpsLdAnalysis* a, const float* in, float (*W)[2]) {
     x[n] = in[kBands - 1 - n];
   }
   float u[2 * kBands];
-  for (int n = 0; n < 2 * kBands; n++) {
-    float sum = 0.0f;
-    for (int j = 0; j < 5; j++) {
-      const int idx = n + 2 * kBands * j;
-      sum += x[idx] * aac_mps_ld_window[idx];
-    }
-    u[n] = sum;
-  }
-  for (int k = 0; k < kBands; k++) {
-    float re = 0.0f, im = 0.0f;
-    const float* c = g_ana_cos[k];
-    const float* s = g_ana_sin[k];
-    for (int n = 0; n < 2 * kBands; n++) {
-      re += u[n] * c[n];
-      im += u[n] * s[n];
-    }
-    W[k][0] = re;
-    W[k][1] = im;
-  }
+  aac_qmf_fold(u, x, aac_mps_ld_window, 2 * kBands);
+  aac_qmf_modulate(W, u, &g_ana_cos[0][0], &g_ana_sin[0][0], kBands, 2 * kBands);
 }
 
 void aac_mps_ld_synthesis_init(AacMpsLdSynthesis* s) {
@@ -298,25 +284,8 @@ void aac_mps_ld_synthesize(AacMpsLdSynthesis* s, const float (*X)[2], float* out
     s->off -= block;
   }
   float* v = s->v + s->off;
-  for (int n = 0; n < block; n++) {
-    const float* c = g_syn_cos[n];
-    const float* sn = g_syn_sin[n];
-    float acc = 0.0f;
-    for (int k = 0; k < kBands; k++) {
-      acc += X[k][0] * c[k] - X[k][1] * sn[k];
-    }
-    v[n] = acc;
-  }
-  for (int k = 0; k < kBands; k++) {
-    float acc = 0.0f;
-    for (int j = 0; j < 5; j++) {
-      const int g0 = 2 * block * j + k;
-      const int g1 = 2 * block * j + 3 * kBands + k;
-      acc += v[g0] * aac_mps_ld_window[2 * j * kBands + k] +
-             v[g1] * aac_mps_ld_window[(2 * j + 1) * kBands + k];
-    }
-    out[k] = acc;
-  }
+  aac_qmf_demodulate(v, X, &g_syn_cos[0][0], &g_syn_sin[0][0], kBands, block);
+  aac_qmf_overlap(out, v, aac_mps_ld_window, kBands);
 }
 
 /* ── the signal path ────────────────────────────────────────────── */

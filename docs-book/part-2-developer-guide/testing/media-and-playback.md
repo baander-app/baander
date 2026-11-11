@@ -404,6 +404,22 @@ drills run real encoders against deadlines, and the
 purpose. On 2026-11-10 it ended with exit status 137 while image builds ran beside
 it, and passed when run alone.
 
+The `attach` phase of the two-command drill has the step most exposed to load. The
+worker encodes the fixture's 30-minute track to MP3 on one thread while web streams
+the growing file, and the fixture waits 110 seconds for that stream to end. On an
+idle development host the encode took about 48 seconds, so the step fails once the
+encoder runs slower than about 0.44 of that speed. On 2026-11-11 the stream missed
+the 55-second wait the fixture had then, on a host that was also running builds and
+benchmarks, and the drill passed when run alone.
+
+Each phase receipt, `<phase>.json` in the artifacts directory, records under `host`
+the load averages from `/proc/loadavg` and the first line of `/proc/pressure/cpu`,
+where the kernel provides it, at the start and at the end of the phase. The `attach`
+receipt adds `audioSeconds`, the time from the audio request to the end of its
+stream. A failed phase writes the same host load to `<phase>.stderr`, and the audio
+wait's timeout message states the bytes received, the bytes expected and the
+seconds elapsed, which shows whether the encoder was slow or the stream had stalled.
+
 
 ### Shared media control qualification
 

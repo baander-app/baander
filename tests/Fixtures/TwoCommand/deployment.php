@@ -35,6 +35,8 @@ const STATE = ROOT . '/state.json';
 const EMAIL = 'two-command-admin@baander.app';
 const VIDEO = '/media/source/video.mkv';
 const AUDIO = '/media/source/track.flac';
+// Long enough that its encode is still running while a phase observes the audio slot it holds.
+const AUDIO_SECONDS = 1800;
 const COST_VIDEO = '/media/source/cost-1080p.mkv';
 const COST_VIDEO_SECONDS = 120;
 const COST_TRACK_SECONDS = 600;
@@ -550,10 +552,34 @@ function occupyAudio(StreamClient $client, string $track, int $slots): array
     }
     return $streams;
 }
+/**
+ * The host's load averages and its CPU pressure, where the kernel exposes it. The phases run
+ * real encoders against deadlines, so a receipt or a failure also says how busy the host was.
+ *
+ * @return array{loadavg: ?string, cpuPressure: ?string}
+ */
+function hostLoad(): array
+{
+    $read = static function (string $path): ?string {
+        $text = is_readable($path) ? @file_get_contents($path) : false;
+
+        return is_string($text) ? $text : null;
+    };
+    $load = $read('/proc/loadavg');
+    $pressure = $read('/proc/pressure/cpu');
+
+    return [
+        'loadavg' => $load === null ? null : implode(' ', array_slice(explode(' ', trim($load)), 0, 3)),
+        // The first line counts the time some task waited for a CPU; its total is in microseconds.
+        'cpuPressure' => $pressure === null ? null : substr(explode("\n", $pressure)[0], strlen('some ')),
+    ];
+}
 $mode = $argv[1] ?? '';
 $started = microtime(true);
-set_exception_handler(static function (Throwable $error) use ($mode): never {
+$hostAtStart = hostLoad();
+set_exception_handler(static function (Throwable $error) use ($mode, $hostAtStart): never {
     fwrite(STDERR, 'two-command ' . $mode . ': ' . $error->getMessage() . ' at ' . $error->getFile() . ':' . $error->getLine() . "\n");
+    fwrite(STDERR, 'two-command ' . $mode . ' host load: ' . json_encode(['start' => $hostAtStart, 'end' => hostLoad()]) . "\n");
     exit(1);
 });
 $kernel = new App\Kernel('prod', false);
@@ -609,7 +635,7 @@ if ($mode === 'prepare') {
             '-metadata:s:s:2', 'language=', '-metadata:s:s:2', 'title=Unlabelled', '-disposition:s:2', '0',
             '-c:v', 'libx264', '-preset', 'ultrafast', '-threads', '2', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-c:s', 'srt', '-t', '180', VIDEO], 150);
     }
-    command(['ffmpeg', '-nostdin', '-v', 'error', '-y', '-f', 'lavfi', '-i', 'sine=frequency=440:duration=1800', '-ac', '2', '-ar', '44100', '-threads', '1', '-c:a', 'flac', AUDIO], 60);
+    command(['ffmpeg', '-nostdin', '-v', 'error', '-y', '-f', 'lavfi', '-i', 'sine=frequency=440:duration=' . AUDIO_SECONDS, '-ac', '2', '-ar', '44100', '-threads', '1', '-c:a', 'flac', AUDIO], 60);
     $library = new LibraryEntity('Two command music', 'two-command-music', '/media/source', 'music', 'local');
     $movies = new LibraryEntity('Two command movies', 'two-command-movies', '/media/source', 'movie', 'local');
     $album = new AlbumEntity(new PublicId(), $library, 'Two command album', 'two-command-album');
@@ -830,13 +856,19 @@ if ($mode === 'prepare') {
     $dash = verifyDash($auth, $state);
     $expiry = verifySignedDeliveryExpiry($auth, $state);
     $state['initialOutput'] = retainVideoOutput($db, $state, $decoded, 'initial'); save($state);
-    $audio = $auth->open('id=' . $state['track'] . '&format=mp3&bitrate=192000');
-    ensure($audio->until(static fn (HttpExchange $value): bool => strlen($value->body) >= 8192, 30), 'Worker did not produce progressive audio.');
+    // The worker encodes the whole track on one thread and the web follows the growing file. On an
+    // idle development host that takes about 48 seconds. The wait allows 110, so the step fails
+    // only when the encoder runs slower than about 0.44 of that speed. The request's own bound
+    // is 120 seconds, the longest a fixture request may take, and lies just behind the wait.
+    $audioStarted = microtime(true);
+    $audio = $auth->open('id=' . $state['track'] . '&format=mp3&bitrate=192000', timeoutSeconds: 120);
+    ensure($audio->until(static fn (HttpExchange $value): bool => strlen($value->body) >= 8192, 30), 'Worker did not produce progressive audio: ' . $audio->progress() . '.');
     $audioRow = $db->fetchAssociative("SELECT state, worker_boot_id FROM audio_rendition_runtime WHERE bitrate=192000");
     ensure($audioRow !== false && $audioRow['state'] === 'running' && !$audio->done, 'Audio bytes were not received while the worker encoder was running.');
     $firstBytes = strlen($audio->body);
-    ensure($audio->until(static fn (HttpExchange $value): bool => strlen($value->body) > $firstBytes + 8192, 30), 'Worker audio did not grow.');
-    $audio->complete(55);
+    ensure($audio->until(static fn (HttpExchange $value): bool => strlen($value->body) > $firstBytes + 8192, 30), 'Worker audio did not grow: ' . $audio->progress() . '.');
+    $audio->complete(110, intdiv(192000, 8) * AUDIO_SECONDS);
+    $audioSeconds = round(microtime(true) - $audioStarted, 1);
     file_put_contents(ROOT . '/decoded.mp3', $audio->body);
     command(['ffmpeg', '-nostdin', '-v', 'error', '-threads', '1', '-i', ROOT . '/decoded.mp3', '-f', 'null', '-']);
     $image = twoCommandExchange($auth, '/api/images/' . $state['image'] . '/file?preset=thumb')->complete();
@@ -848,7 +880,7 @@ if ($mode === 'prepare') {
     ensure($recommendation->status() === 202 && (jsonBody($recommendation)['data']['execution'] ?? null) === 'async', 'Recommendation admission lost its typed asynchronous response.');
     $recommendationId = jsonBody($recommendation)['data']['public_id'];
     await(static function () use ($db, $recommendationId): bool { return $db->fetchOne('SELECT status FROM recommendation_jobs WHERE public_id=?', [$recommendationId]) === 'completed'; }, 'worker recommendation completion', 45);
-    $result = ['attachments' => count($requests), 'uniqueSessions' => count(array_unique($sessions)), 'video' => videoEvidence($decoded), 'dash' => $dash, 'signedDeliveryExpiry' => $expiry, 'audioBytes' => strlen($audio->body), 'audioWorkerBoot' => $audioRow['worker_boot_id'], 'imageStatus' => $converted->status(), 'recommendationStatus' => $recommendation->status()];
+    $result = ['attachments' => count($requests), 'uniqueSessions' => count(array_unique($sessions)), 'video' => videoEvidence($decoded), 'dash' => $dash, 'signedDeliveryExpiry' => $expiry, 'audioBytes' => strlen($audio->body), 'audioSeconds' => $audioSeconds, 'audioWorkerBoot' => $audioRow['worker_boot_id'], 'imageStatus' => $converted->status(), 'recommendationStatus' => $recommendation->status()];
 } elseif ($mode === 'dash') {
     $result = verifyDash($client(), state());
 } elseif (in_array($mode, ['seek-paused', 'resume', 'pause-absent', 'cancel'], true)) {
@@ -911,7 +943,7 @@ if ($mode === 'prepare') {
     throw new RuntimeException('Unknown drill phase.');
 }
 // Production logging also uses stdout; keep the phase receipt on its own channel.
-$receipt = json_encode(['phase' => $mode, 'seconds' => round(microtime(true) - $started, 3), 'evidence' => $result], JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT) . "\n";
+$receipt = json_encode(['phase' => $mode, 'seconds' => round(microtime(true) - $started, 3), 'host' => ['start' => $hostAtStart, 'end' => hostLoad()], 'evidence' => $result], JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT) . "\n";
 $receiptPath = ROOT . '/result-' . $mode . '.json';
 ensure(file_put_contents($receiptPath, $receipt, LOCK_EX) === strlen($receipt), 'Cannot write phase receipt.');
 ensure(chmod($receiptPath, 0600), 'Cannot protect phase receipt.');

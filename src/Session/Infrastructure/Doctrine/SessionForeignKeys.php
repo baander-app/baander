@@ -7,12 +7,13 @@ namespace App\Session\Infrastructure\Doctrine;
 use App\Shared\Infrastructure\Doctrine\EventListener\ForeignKeyDeclaration;
 use App\Shared\Infrastructure\Doctrine\EventListener\ForeignKeyDeclarationProviderInterface;
 
-/** Owner constraints for device and listening-session tables mapped with scalar user IDs. */
+/** Owner constraints for device, listening-session and playback-destination tables mapped with scalar user IDs. */
 final class SessionForeignKeys implements ForeignKeyDeclarationProviderInterface
 {
     public function foreignKeys(): iterable
     {
         yield new ForeignKeyDeclaration('fk_devices_user_id', 'devices', 'user_id', 'users', 'id', 'CASCADE');
         yield new ForeignKeyDeclaration('fk_listening_sessions_user_id', 'listening_sessions', 'user_id', 'users', 'id', 'CASCADE');
+        yield new ForeignKeyDeclaration('fk_playback_destinations_user_id', 'playback_destinations', 'user_id', 'users', 'id', 'CASCADE');
     }
 }

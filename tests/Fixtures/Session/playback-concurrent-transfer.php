@@ -12,10 +12,13 @@ use App\Shared\Infrastructure\Doctrine\DedicatedConnectionFactory;
 use App\Shared\Infrastructure\Doctrine\DoctrineTransaction;
 use App\Shared\Infrastructure\Doctrine\Type\CustomTypesRegistrar;
 use Doctrine\DBAL\Connection;
+use Doctrine\ORM\Decorator\EntityManagerDecorator;
 use Doctrine\ORM\EntityManager;
+use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Mapping\UnderscoreNamingStrategy;
 use Doctrine\ORM\ORMSetup;
 use Doctrine\Persistence\AbstractManagerRegistry;
+use Doctrine\Persistence\ObjectManager;
 use SwooleBundle\SwooleBundle\Bridge\Swoole\Swoole;
 
 require_once dirname(__DIR__, 3) . '/vendor/autoload.php';
@@ -66,7 +69,26 @@ final class PlaybackPersistenceFixture
                 $this->manager = PlaybackPersistenceFixture::manager($this->manager->getConnection());
             }
         };
-        return new PlaybackCoordinator(new PlaybackStore($manager), new DoctrineTransaction($registry, new Swoole()), self::mediaAccess($manager));
+        // In the application the store holds a pooled proxy that always resolves the current
+        // entity manager. The fixture's store resolves the registry's manager on every call for the
+        // same reason: a failed flush closes a manager, the transaction port resets the registry, and
+        // a store holding the closed manager could serve nothing afterwards.
+        $current = new class ($registry) extends EntityManagerDecorator {
+            /** @var EntityManagerInterface */
+            protected ObjectManager $wrapped {
+                get {
+                    $manager = $this->registry->getManager();
+                    if (!$manager instanceof EntityManagerInterface) {
+                        throw new \LogicException('The fixture registry holds no entity manager.');
+                    }
+                    $this->wrapped = $manager;
+                    return $this->wrapped;
+                }
+            }
+
+            public function __construct(private readonly AbstractManagerRegistry $registry) {}
+        };
+        return new PlaybackCoordinator(new PlaybackStore($current), new DoctrineTransaction($registry, new Swoole()), self::mediaAccess($manager));
     }
     private static function mediaAccess(EntityManager $manager): \App\Media\Application\Port\PlaybackMediaAccessInterface
     {
@@ -96,24 +118,32 @@ final class PlaybackPersistenceFixture
 
 }
 
+// Run as a program, this is a second process with its own connection: it performs one coordinator
+// operation when its parent releases it, and answers with the snapshot or with the conflict.
 if (realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === __FILE__) {
     try {
-        [$script,$schema,$application,$owner,$target,$revision] = $_SERVER['argv'] ?? throw new \LogicException('Requires CLI arguments.');
+        [$script, $schema, $application, $owner, $operation, $input] = $_SERVER['argv'] ?? throw new \LogicException('Requires CLI arguments.');
         $manager = PlaybackPersistenceFixture::manager(PlaybackPersistenceFixture::connect($schema, $application));
         $coordinator = PlaybackPersistenceFixture::coordinator($manager);
         fwrite(STDOUT, "ready\n");
         fflush(STDOUT);
         if (fgets(STDIN) !== "go\n") {
-            throw new \RuntimeException('Missing transfer release.');
+            throw new \RuntimeException('Missing release.');
         }
         try {
-            $coordinator->execute(Uuid::fromString($owner), PlaybackOperation::Transfer, ['requestId' => new Uuid()->toString(), 'expectedRevision' => (int) $revision, 'targetIncarnationId' => $target]);
-            fwrite(STDOUT, "committed\n");
+            $result = $coordinator->execute(Uuid::fromString($owner), PlaybackOperation::from($operation), json_decode($input, true, flags: JSON_THROW_ON_ERROR));
+            $answer = 'committed ' . json_encode($result, JSON_THROW_ON_ERROR);
         } catch (\App\Shared\Application\Exception\ConflictException) {
-            fwrite(STDOUT, "conflict\n");
+            $answer = 'conflict';
         }
+        // A refused insert closes the entity manager it was flushed through, also when the caller
+        // was then answered with a conflict.
+        if (!$manager->isOpen()) {
+            throw new \LogicException('The operation closed its entity manager.');
+        }
+        fwrite(STDOUT, $answer . "\n");
     } catch (\Throwable $error) {
-        fwrite(STDERR, $error->getMessage() . "\n");
+        fwrite(STDERR, $error::class . ': ' . $error->getMessage() . "\n");
         exit(1);
     }
 }

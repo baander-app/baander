@@ -28,7 +28,7 @@ A client that closes without cancelling leaves its session behind, and the sessi
 
 A job whose worker has not yet stopped the cancelled encode stays for the next run, so a job released by expiry is usually removed one run later. The worker stops within seconds.
 
-The command runs the same use case as the API and as the scheduled `CleanupOrphanedJobsCommand`. A job whose output directory is still retained or cannot be deleted stays for a later run. After a job is removed, a later session for the same video and tier transcodes it again.
+The command runs the same use case as the API's cleanup endpoint; nothing schedules it, so run it from the console, the admin panel or your own scheduler. A job whose output directory is still retained stays for a later run. A job whose output or record cannot be deleted is logged with its id and also stays; the run removes every other job and then exits 1. After a job is removed, a later session for the same video and tier transcodes it again.
 
 The command asks for no confirmation: it ends only sessions no client can still be playing, and removes only output that no session uses and that a new session can rebuild.
 
@@ -39,4 +39,6 @@ With `--json` the command prints only `{"expired": 2, "cleaned": 3}`, the API's 
 | Code | Meaning |
 |------|---------|
 | 0 | Cleanup finished, possibly with nothing to remove |
-| 1 | The jobs could not be read or removed; the message says why |
+| 1 | The jobs could not be read, or at least one could not be removed; the message gives the removed and failed counts and the log names each job |
+
+The API endpoint reports the same outcome: a run that could not remove every job answers 503 with the same message and the `expired`, `cleaned` and `failed` counts in the error's details.

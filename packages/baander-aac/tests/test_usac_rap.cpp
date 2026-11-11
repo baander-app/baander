@@ -27,19 +27,6 @@
 #include "usac.h"
 #include "usac_enc.h"
 
-/* The committed stream is the release build's bytes; a sanitizer build
- * keeps the same flags but not the same vectorised arithmetic. */
-#if defined(__SANITIZE_ADDRESS__) || defined(__SANITIZE_UNDEFINED__)
-#define BAAC_SANITIZED 1
-#elif defined(__has_feature)
-#if __has_feature(address_sanitizer) || __has_feature(undefined_behavior_sanitizer)
-#define BAAC_SANITIZED 1
-#endif
-#endif
-#ifndef BAAC_SANITIZED
-#define BAAC_SANITIZED 0
-#endif
-
 namespace {
 
 constexpr int kRate = 48000;
@@ -830,6 +817,7 @@ void test_api() {
  * under 3000 bytes, independent frames requested before frames 5 and
  * 20: the pre-roll frames land at 0, 7, 19 and 22. */
 const char* kCommittedName = "usac_enc_rap_cpe_64k.loas";
+constexpr uint32_t kCommittedSignal = 0xe5ee8187u; /* signal_checksum of committed_signal() */
 const std::set<int> kCommittedRequests = {5, 20};
 const std::vector<int> kCommittedIpf = {0, 7, 19, 22};
 
@@ -928,9 +916,13 @@ void test_committed() {
   }
   CHECK(largest <= 3000, "%s: largest segment %zu bytes", kCommittedName, largest);
   const Encoded e = encode(pcm, 2, 64000, committed_options(), AAC_TRANSPORT_LOAS, kCommittedRequests);
-#if defined(__OPTIMIZE__) && BAAC_RELEASE_MATH && !BAAC_SANITIZED
-  CHECK(e.stream == stream, "%s: a fresh encode is byte identical (%zu vs %zu bytes)", kCommittedName,
-        e.stream.size(), stream.size());
+#if BAAC_REFERENCE_BUILD
+  /* The stream is the reference build's (test_util.h), encoded from the
+   * signal with this checksum. */
+  if (check_committed_signal(kCommittedName, pcm, kCommittedSignal)) {
+    CHECK(e.stream == stream, "%s: a fresh encode is byte identical (%zu vs %zu bytes)",
+          kCommittedName, e.stream.size(), stream.size());
+  }
 #else
   /* Two encodes that differ in a quantised line also differ in every
    * noise filled line after it, so the decodes are compared through the
@@ -940,7 +932,7 @@ void test_committed() {
   const double fresh = aligned_snr_db(pcm, again, 2, AAC_ENCODER_SBR_DELAY);
   CHECK(again_errors == 0 && fabs(fresh - snr) < 1.5,
         "%s: a fresh encode of this build decodes like the committed stream (%.1f against %.1f dB; "
-        "the byte identity check needs the release build's flags)",
+        "the byte identity check needs the reference build)",
         kCommittedName, fresh, snr);
 #endif
   printf("  %s: %.1f dB, largest segment %zu bytes\n", kCommittedName, snr, largest);

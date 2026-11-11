@@ -793,9 +793,9 @@ static void test_analysis_functions(bool print) {
     }
     count++;
   };
-  /* These arguments are computed here, in a file that is compiled with
-   * the package's Release math options: another compiler may round
-   * them another way, so they serve the bound and not the pin. */
+  /* These arguments are computed here, in a file that does not get the
+   * analysis's own flags: another build may round them another way, so
+   * they serve the bound and not the pin. */
   for (int taper = 1; taper <= 4096; taper++) {
     for (int edge = 0; edge < taper; edge += taper > 256 ? 13 : 1) {
       check_cos(pi * ((double)edge + 0.5) / (double)taper, false);

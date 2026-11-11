@@ -5,10 +5,10 @@
  * Nothing here touches a sample that reaches the stream: the analysis
  * proposes integer coefficients, and the encoder computes every residual
  * from them in integers.  But the proposal decides which bytes are
- * written, so this file is compiled without the package's Release math
- * options and without contraction: every sum is taken in the order it is
- * written here, and a kernel that replaces a loop of this file has to
- * keep that order to give the same stream.
+ * written, so this file is compiled in exact arithmetic and without
+ * contraction: every sum is taken in the order it is written here, and
+ * a kernel that replaces a loop of this file has to keep that order to
+ * give the same stream.
  *
  * For the same reason the two transcendental functions the analysis
  * needs, a cosine for the windows and a base 2 logarithm for the size

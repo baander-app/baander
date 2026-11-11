@@ -1,10 +1,10 @@
 /* The scalar kernels of the FLAC codec and the table that dispatches to
  * them or to the SSE2, AVX2 and NEON ones (src/simd/flac_*.cpp).
  *
- * This file is compiled without the package's Release math options and
- * without contraction, like the other files of the analysis: the two
- * floating-point kernels state the order of their arithmetic, and every
- * level has to reproduce it bit for bit. */
+ * This file is compiled in exact arithmetic and without contraction,
+ * like the other files of the analysis: the two floating-point kernels
+ * state the order of their arithmetic, and every level has to reproduce
+ * it bit for bit. */
 #include "aac_cpu.h"
 #include "flac_internal.h"
 
