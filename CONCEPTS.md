@@ -203,6 +203,21 @@ The source retains its media and cursor while paused until reconciliation establ
 A playback command that was included in a snapshot built for the endpoint incarnation it addresses. That snapshot is the only way a command leaves the server, and the command records the first time it happened.
 A command that expires undisclosed cannot have had an effect. On a browser runner whose last report was stopped or paused it settles as never effective, and the session keeps its confirmed state. A disclosed command able to start playback that goes unanswered leaves the session unknown until its runner answers.
 
+### Playback page identity
+
+A random value a browser document creates once, keeps in memory and sends with every registration of its playback endpoint. It is never stored, so a reload, a duplicated tab and a restored session each get a new one, while a document restored from the back/forward cache keeps its own.
+With the tab's identity it tells a new page from a live one: a registration from another page of the same tab proves the earlier page gone, and one from the same page is that page's own reconnect. A registration without it proves nothing.
+
+### Close report
+
+A playback endpoint's own statement, made with its capability as its page goes away or after it disconnected and silenced its players, that this incarnation has stopped. The server retires the incarnation and releases the session from it in the same request.
+A crash, a killed browser or a dead network sends none; the playback override is then the way back.
+
+### Playback override
+
+The listener's explicit decision, made in a browser that was refused playback, to end the hold of a destination that is no longer registered and has not confirmed that it is silent. The web client offers it as "Play here anyway".
+The server retires that destination's incarnation without recording it as stopped, and the session continues paused at its cursor. No timer performs an override. A destination that is still playing when it is overridden keeps playing until it next reaches the server.
+
 ### Browser execution lock
 
 An exclusive Web Lock held while one browser tab owns eligible local playback execution. Its name includes the server, account and nonsecret tab identity. A free lock proves the old holder released it; media fencing is a separate recovery condition.
