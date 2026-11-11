@@ -91,7 +91,8 @@ final class TranscodeJobController
         path: '/api/transcode/jobs/cleanup',
         summary: 'Expire stale transcode sessions and clean up orphaned transcode jobs (no active sessions)',
         responses: [
-            new OA\Response(response: '200', description: 'Cleanup result', content: new OA\JsonContent(properties: [new OA\Property(property: 'expired', type: 'integer'), new OA\Property(property: 'cleaned', type: 'integer')])),
+            new OA\Response(response: '200', description: 'Cleanup result', content: new OA\JsonContent(properties: [new OA\Property(property: 'data', properties: [new OA\Property(property: 'expired', type: 'integer'), new OA\Property(property: 'cleaned', type: 'integer')], type: 'object')])),
+            new OA\Response(response: '503', description: 'The run removed every job it could and left at least one behind; `details` holds the `expired`, `cleaned` and `failed` counts, and the server log names each job that failed', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
     #[Route('/cleanup', name: 'cleanup', methods: ['POST'])]
@@ -99,6 +100,8 @@ final class TranscodeJobController
     #[CliCounterpart('app:transcode:job:cleanup')]
     public function cleanup(): JsonResponse
     {
+        // A run that left jobs behind ends with an outcome the exception subscriber answers as 503,
+        // with the run's counts as the error details.
         $result = $this->commandBus->dispatch(new CleanupOrphanedJobsCommand())->last(HandledStamp::class)?->getResult();
         if (!$result instanceof TranscodeCleanupResult) {
             throw new \LogicException('The transcode job cleanup did not return its result.');

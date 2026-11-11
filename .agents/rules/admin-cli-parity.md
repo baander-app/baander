@@ -52,7 +52,10 @@ admin route, an admin page call, or a console command. Read it with the
   | `NotFoundException` | 404 | 1 |
   | `ConflictException` | 409 | 1 |
   | `InvalidInputException` | 422 | 2 |
+  | `ServiceUnavailableException` | 503 | 1 |
 
+  `ServiceUnavailableException` covers both a dependency that did not answer and a
+  run that did part of its work; the second kind reports what it did in `details`.
   Repeating an idempotent action, such as disabling a disabled user, succeeds without
   change. A message clients may see in another language implements
   `TranslatableInterface`; `getMessage()` stays English for the console and logs.

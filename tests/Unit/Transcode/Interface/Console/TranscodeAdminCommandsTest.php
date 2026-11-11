@@ -138,7 +138,7 @@ final class TranscodeAdminCommandsTest extends TestCase
                 $this->createStub(\App\Shared\Application\Port\TransactionPortInterface::class),
                 new \Symfony\Component\Clock\MockClock(),
                 new \Psr\Log\NullLogger(),
-            ))],
+            ), new \Psr\Log\NullLogger())],
         ]))]));
 
         $tester = new CommandTester(new TranscodeJobCleanupCommand($support));

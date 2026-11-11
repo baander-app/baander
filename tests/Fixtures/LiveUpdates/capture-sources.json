@@ -1286,25 +1286,25 @@
     },
     {
       "table": "playback_commands",
-      "mapping": "migrations/Version20261101190000.php",
+      "mapping": "src/Session/Infrastructure/Doctrine/Entity/PlaybackCommandEntity.php",
       "classification": "excluded",
       "reason": "Durable command intents, acknowledgements and replay bookkeeping; the session snapshot relay delivers pending commands to their incarnation and the browser snapshot query refetches nothing on a sessions hint."
     },
     {
       "table": "playback_destination_incarnations",
-      "mapping": "migrations/Version20261101190000.php",
+      "mapping": "src/Session/Infrastructure/Doctrine/Entity/PlaybackDestinationIncarnationEntity.php",
       "classification": "excluded",
       "reason": "Endpoint epochs, lease expiry, observed position and volume; lease renewals and observations must never capture, and the session snapshot relay publishes availability changes."
     },
     {
       "table": "playback_destinations",
-      "mapping": "migrations/Version20261101190000.php",
+      "mapping": "src/Session/Infrastructure/Doctrine/Entity/PlaybackDestinationEntity.php",
       "classification": "excluded",
       "reason": "Playback endpoint registry read only through the playback snapshot, which the session snapshot relay pushes to bound connections; no HTTP query family refetches it."
     },
     {
       "table": "playback_transfers",
-      "mapping": "migrations/Version20261101190000.php",
+      "mapping": "src/Session/Infrastructure/Doctrine/Entity/PlaybackTransferEntity.php",
       "classification": "excluded",
       "reason": "Transfer attempt fencing and replay identity; the session snapshot relay publishes the current transfer state and no HTTP query family refetches it."
     },

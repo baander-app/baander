@@ -32,6 +32,8 @@ final class PlaybackTransferPersistenceTest extends TestCase
     private string $schemaName;
     private EntityManager $manager;
     private Connection $observer;
+    /** @var list<\Closure(): array{answer: string, errors: string, exit: int}> Second processes a test started. */
+    private array $rivals = [];
 
     protected function setUp(): void
     {
@@ -55,6 +57,10 @@ final class PlaybackTransferPersistenceTest extends TestCase
         $connection = $this->manager->getConnection();
         while ($connection->isTransactionActive()) {
             $connection->rollBack();
+        }
+        // A test that failed before it collected its second process still ends it.
+        foreach ($this->rivals as $finish) {
+            $finish();
         }
         $this->manager->close();
         $this->observer->close();
@@ -564,6 +570,41 @@ final class PlaybackTransferPersistenceTest extends TestCase
         self::assertSame('preparing', $service->execute($owner, PlaybackOperation::Transfer, $request)['transfer']['state']);
     }
 
+    public function testARefusedDestinationOrIncarnationInsertRollsTheRegistrationBackAndLeavesTheCoordinatorUsable(): void
+    {
+        $owner = $this->createUser();
+        $device = new Uuid();
+        new DeviceDoctrineRepository($this->manager)->save(Device::create($owner, $device, 'Playback browser'));
+        $service = $this->coordinator();
+        $connection = $this->manager->getConnection();
+        $connection->executeStatement("CREATE FUNCTION pg_temp.reject_playback_registration() RETURNS trigger LANGUAGE plpgsql AS 'BEGIN RAISE EXCEPTION ''registration insert refused''; END;'");
+        $epochs = [];
+        foreach (['playback_destinations', 'playback_destination_incarnations'] as $table) {
+            $registration = ['deviceId' => $device->toString(), 'endpointId' => new Uuid()->toString()];
+            $before = $service->execute($owner, PlaybackOperation::Snapshot, []);
+            $connection->executeStatement("CREATE TRIGGER reject_playback_registration BEFORE INSERT ON {$table} FOR EACH ROW EXECUTE FUNCTION pg_temp.reject_playback_registration()");
+            try {
+                $service->execute($owner, PlaybackOperation::Endpoint, $registration);
+                self::fail("The refused insert into {$table} must escape.");
+            } catch (\Doctrine\DBAL\Exception $error) {
+                self::assertStringContainsString('registration insert refused', $error->getMessage(), $table);
+            }
+            $connection->executeStatement("DROP TRIGGER reject_playback_registration ON {$table}");
+            // The destination of a refused incarnation went with it.
+            self::assertSame(0, (int) $this->observer->fetchOne('SELECT count(*) FROM playback_destinations WHERE endpoint_id=?', [$registration['endpointId']]), $table);
+            self::assertFalse($connection->isTransactionActive(), $table);
+
+            // The same coordinator serves the next operations, the refused registration among them.
+            self::assertSame($before, $service->execute($owner, PlaybackOperation::Snapshot, []), $table);
+            $registered = $service->execute($owner, PlaybackOperation::Endpoint, $registration);
+            $epochs[] = $registered['endpoint']['epoch'];
+            self::assertContains($registered['endpoint']['destinationId'], array_column($registered['destinations'], 'destinationId'), $table);
+            self::assertSame(1, (int) $this->observer->fetchOne('SELECT count(*) FROM playback_destinations WHERE endpoint_id=?', [$registration['endpointId']]), $table);
+        }
+        self::assertSame([1, 1], $epochs);
+        self::assertSame(2, (int) $this->observer->fetchOne('SELECT count(*) FROM playback_destination_incarnations WHERE user_id=?', [$owner->toString()]));
+    }
+
     public function testNewCoordinatorReplaysTheSamePersistedCommandIdentity(): void
     {
         $owner = $this->createUser();
@@ -685,44 +726,118 @@ final class PlaybackTransferPersistenceTest extends TestCase
         $connection = $this->manager->getConnection();
         $connection->beginTransaction();
         new PlaybackStore($this->manager)->lockSession($owner->toString());
+        $rival = $this->contendingOperation($owner, PlaybackOperation::Transfer, ['requestId' => new Uuid()->toString(), 'expectedRevision' => 0, 'targetIncarnationId' => $target['incarnationId']]);
+        $service->execute($owner, PlaybackOperation::Transfer, ['requestId' => new Uuid()->toString(), 'expectedRevision' => 0, 'targetIncarnationId' => $target['incarnationId']]);
+        self::assertSame(0, (int) $this->observer->fetchOne('SELECT count(*) FROM playback_transfers'));
+        $connection->commit();
+        self::assertSame(['answer' => 'conflict', 'errors' => '', 'exit' => 0], $rival());
+        self::assertSame(1, (int) $this->observer->fetchOne('SELECT count(*) FROM playback_transfers'));
+        self::assertSame(1, (int) $this->observer->fetchOne('SELECT count(*) FROM playback_commands'));
+        self::assertSame(1, (int) $this->observer->fetchOne('SELECT revision FROM listening_sessions WHERE user_id=:owner', ['owner' => $owner->toString()]));
+    }
+
+    public function testTwoConnectionsRegisteringOneEndpointAtOnceShareItsDestination(): void
+    {
+        $service = $this->coordinator();
+        $connection = $this->manager->getConnection();
+        // Where the account already has its session row, the account lock and the row lock alone
+        // order the two registrations. On an account's first operation the session row is created
+        // under the same lock.
+        foreach (['an account with a session' => true, 'the first operation of an account' => false] as $case => $hasSession) {
+            $owner = $this->createUser();
+            $device = new Uuid();
+            new DeviceDoctrineRepository($this->manager)->save(Device::create($owner, $device, 'Same tab'));
+            $registration = ['deviceId' => $device->toString(), 'endpointId' => new Uuid()->toString()];
+            if ($hasSession) {
+                $service->execute($owner, PlaybackOperation::Snapshot, []);
+            }
+            $connection->beginTransaction();
+            new PlaybackStore($this->manager)->lockSession($owner->toString());
+            $rival = $this->contendingOperation($owner, PlaybackOperation::Endpoint, $registration);
+
+            $first = $service->execute($owner, PlaybackOperation::Endpoint, $registration)['endpoint'];
+            self::assertSame(0, (int) $this->observer->fetchOne('SELECT count(*) FROM playback_destinations WHERE user_id=?', [$owner->toString()]), $case);
+            $connection->commit();
+            $answered = $rival();
+
+            self::assertSame(['errors' => '', 'exit' => 0], ['errors' => $answered['errors'], 'exit' => $answered['exit']], $case);
+            self::assertStringStartsWith('committed ', $answered['answer'], $case);
+            $second = json_decode(substr($answered['answer'], 10), true, flags: JSON_THROW_ON_ERROR)['endpoint'];
+            self::assertSame([1, 2], [$first['epoch'], $second['epoch']], $case);
+            self::assertSame($first['destinationId'], $second['destinationId'], $case);
+            self::assertSame(
+                [$first['destinationId']],
+                $this->observer->fetchFirstColumn('SELECT public_id FROM playback_destinations WHERE user_id=?', [$owner->toString()]),
+                $case,
+            );
+            self::assertSame(
+                [[$first['incarnationId'], 1, true], [$second['incarnationId'], 2, false]],
+                array_map(
+                    static fn(array $incarnation): array => [$incarnation['id'], (int) $incarnation['epoch'], (bool) $incarnation['retired']],
+                    $this->observer->fetchAllAssociative('SELECT id, epoch, retired_at IS NOT NULL AS retired FROM playback_destination_incarnations WHERE user_id=? ORDER BY epoch', [$owner->toString()]),
+                ),
+                $case,
+            );
+            self::assertSame(1, (int) $this->observer->fetchOne('SELECT count(*) FROM listening_sessions WHERE user_id=?', [$owner->toString()]), $case);
+            self::assertTrue($this->manager->isOpen(), $case);
+        }
+    }
+
+    /**
+     * Starts the operation in a second process on its own connection and returns once that
+     * connection waits for a lock this test's open transaction holds. The returned closure waits
+     * for the process to finish and gives its answer, what it wrote as errors and its exit code.
+     *
+     * @param array<string,mixed> $input
+     * @return \Closure(): array{answer: string, errors: string, exit: int}
+     */
+    private function contendingOperation(Uuid $owner, PlaybackOperation $operation, array $input): \Closure
+    {
         $application = 'playback_race_' . bin2hex(random_bytes(6));
         $errors = tmpfile();
         self::assertIsResource($errors);
-        $process = proc_open([PHP_BINARY, dirname(__DIR__) . '/Fixtures/Session/playback-concurrent-transfer.php', $this->schemaName, $application, $owner->toString(), $target['incarnationId'], '0'], [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => $errors], $pipes);
+        $process = proc_open(
+            [PHP_BINARY, dirname(__DIR__) . '/Fixtures/Session/playback-concurrent-transfer.php', $this->schemaName, $application, $owner->toString(),
+                $operation->value, json_encode($input, JSON_THROW_ON_ERROR)],
+            [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => $errors],
+            $pipes,
+        );
         self::assertIsResource($process);
-        try {
-            stream_set_timeout($pipes[1], 10);
-            self::assertSame("ready\n", fgets($pipes[1]));
-            fwrite($pipes[0], "go\n");
-            fflush($pipes[0]);
-            $blocked = false;
-            $deadline = microtime(true) + 8;
-            do {
-                $blocked = (bool) $this->observer->fetchOne("SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE application_name=:application AND wait_event_type='Lock')", ['application' => $application]);
-                if (!$blocked) {
-                    usleep(10000);
-                }
-            } while (!$blocked && microtime(true) < $deadline);
-            self::assertTrue($blocked, 'The second database connection must actually contend on the session writer.');
-            $service->execute($owner, PlaybackOperation::Transfer, ['requestId' => new Uuid()->toString(), 'expectedRevision' => 0, 'targetIncarnationId' => $target['incarnationId']]);
-            self::assertSame(0, (int) $this->observer->fetchOne('SELECT count(*) FROM playback_transfers'));
-            $connection->commit();
-            self::assertSame("conflict\n", fgets($pipes[1]));
-            self::assertSame(1, (int) $this->observer->fetchOne('SELECT count(*) FROM playback_transfers'));
-            self::assertSame(1, (int) $this->observer->fetchOne('SELECT count(*) FROM playback_commands'));
-            self::assertSame(1, (int) $this->observer->fetchOne('SELECT revision FROM listening_sessions WHERE user_id=:owner', ['owner' => $owner->toString()]));
-        } finally {
+        $finished = null;
+        $finish = static function () use (&$finished, $process, $pipes, $errors): array {
+            if ($finished !== null) {
+                return $finished;
+            }
+            $answer = fgets($pipes[1]);
             foreach ($pipes as $pipe) {
                 if (is_resource($pipe)) {
                     fclose($pipe);
                 }
             }
-            if (proc_get_status($process)['running']) {
+            if (!is_string($answer) && proc_get_status($process)['running']) {
                 proc_terminate($process, 9);
             }
-            proc_close($process);
+            $exit = proc_close($process);
+            rewind($errors);
+            $written = (string) stream_get_contents($errors);
             fclose($errors);
-        }
+            return $finished = ['answer' => is_string($answer) ? rtrim($answer, "\n") : '', 'errors' => $written, 'exit' => $exit];
+        };
+        $this->rivals[] = $finish;
+        stream_set_timeout($pipes[1], 10);
+        self::assertSame("ready\n", fgets($pipes[1]));
+        fwrite($pipes[0], "go\n");
+        fflush($pipes[0]);
+        $blocked = false;
+        $deadline = microtime(true) + 8;
+        do {
+            $blocked = (bool) $this->observer->fetchOne("SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE application_name=:application AND wait_event_type='Lock')", ['application' => $application]);
+            if (!$blocked) {
+                usleep(10000);
+            }
+        } while (!$blocked && microtime(true) < $deadline);
+        self::assertTrue($blocked, 'The second database connection must actually contend on the session writer.');
+        return $finish;
     }
 
     public function testReconnectUsesExplicitOldEndpointStopProofWithoutInheritingItsAuthority(): void

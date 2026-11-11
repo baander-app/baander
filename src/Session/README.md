@@ -45,6 +45,50 @@ video playback require no casting companion or companion pairing.
 `PlaybackMediaAccessInterface` and commits state with command intent through
 Shared's `TransactionPortInterface`.
 
+## Persistence
+
+Every table of the context has a Doctrine entity under
+`Infrastructure/Doctrine/Entity/`: `ListeningSessionEntity`, `DeviceEntity` and the
+four playback coordination entities `PlaybackDestinationEntity`,
+`PlaybackDestinationIncarnationEntity`, `PlaybackTransferEntity` and
+`PlaybackCommandEntity`. The four are `readOnly` and hold every reference to another
+table as a scalar `Uuid`. Each of their foreign keys references `(id, user_id)`,
+which an ORM association cannot target, so `PlaybackSessionSchemaListener` declares
+the eight composite keys and `SessionForeignKeys` the owner keys to `users`.
+Migrations create the tables and their check constraints; schema comparison checks
+everything else against the mappings.
+
+`PlaybackStore` runs under the account's advisory lock and the session row lock.
+Its statements take three forms:
+
+- **Insert.** A new row is persisted, flushed and detached in the method that
+  creates it. A later read of the same operation therefore finds the row, and no
+  managed entity outlives the call.
+- **Update.** One DQL `UPDATE` whose predicate is the guard. No entity is loaded.
+- **Read.** DQL hydrated to plain rows keyed by column name, never to managed
+  entities. The coordinator reads an endpoint before it holds the lock, and the
+  relay serves every socket of a worker through one entity manager; a managed copy
+  would go stale behind both.
+
+The database clock stamps every stored instant except a recovery credential's
+expiry, which the PHP clock sets thirty days ahead. An update stamps in its
+statement. An insert takes the transaction's `CURRENT_TIMESTAMP`, read with a row
+the method needs anyway.
+
+Five statements stay SQL:
+
+| Statement | Reason |
+|-----------|--------|
+| The account advisory lock in `lockSession` | DQL has no advisory lock, and this lock serializes the first insert of a session row |
+| The insert of a missing session row, `ON CONFLICT (user_id) DO NOTHING` | It absorbs a row created outside the account lock, where a unit-of-work insert would fail and close the entity manager. It runs only when the locked read finds no row |
+| `retireConfirmedPausedBrowser` | The proof is one predicate over the session's whole command ledger, with `UPDATE … FROM … RETURNING`, a JSON operator and the database clock |
+| `retireConfirmedStoppedBrowser` | The same statement shape, so the two proofs stay in one form |
+| The recovery expiry check in `localRecovery` | It compares against `clock_timestamp()`, the clock as it stands after the transaction waited for its locks. DQL offers only the transaction's start time |
+
+`PlaybackSnapshotCostTest` holds the number of statements a relayed snapshot and a
+control may send, because the relay builds a snapshot once per second for every
+bound socket.
+
 ## Events
 
 | Event | Trigger | Payload |

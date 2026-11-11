@@ -211,6 +211,53 @@ PHP);
         self::assertSame(file_get_contents($this->directory . '/track-0-seg-00001.m4s'), $exchange->body);
     }
 
+    public function testCompletionTimeoutNamesTheBytesReceivedTheBytesExpectedAndTheTimeElapsed(): void
+    {
+        // The test is the peer, so neither response can finish however slowly this process runs:
+        // the first connection is never answered, and the second gets half of its announced body.
+        $listen = static function (): array {
+            $server = stream_socket_server('tcp://127.0.0.1:0', $number, $message);
+            self::assertIsResource($server, $message);
+
+            return [$server, 'http://' . stream_socket_get_name($server, false) . '/'];
+        };
+        [$unanswered, $unansweredUrl] = $listen();
+        [$halfSent, $halfSentUrl] = $listen();
+        $connection = null;
+        try {
+            $silent = new HttpExchange($unansweredUrl, []);
+            try {
+                $silent->complete(.1, 4096);
+                self::fail('A request that was never answered finished in time.');
+            } catch (RuntimeException $error) {
+                self::assertSame(1, preg_match('/^The request did not finish in time: 0 of about 4096 body bytes received in (\d+\.\d) seconds\.$/D', $error->getMessage(), $silentMatch), $error->getMessage());
+                self::assertGreaterThanOrEqual(.1, (float) $silentMatch[1]);
+            }
+
+            $partial = new HttpExchange($halfSentUrl, []);
+            self::assertFalse($partial->poll());
+            $connection = stream_socket_accept($halfSent, 10);
+            self::assertIsResource($connection);
+            fwrite($connection, "HTTP/1.1 200 OK\r\nContent-Length: 64\r\n\r\n" . str_repeat('a', 32));
+            self::assertTrue($partial->until(static fn(HttpExchange $value): bool => strlen($value->body) === 32, 10));
+            try {
+                $partial->complete(.1);
+                self::fail('A body whose second half was never sent finished in time.');
+            } catch (RuntimeException $error) {
+                self::assertSame(1, preg_match('/^The request did not finish in time: 32 body bytes received in (\d+\.\d) seconds, the last (\d+\.\d) seconds ago\.$/D', $error->getMessage(), $partialMatch), $error->getMessage());
+                self::assertGreaterThanOrEqual(.1, (float) $partialMatch[1]);
+                self::assertLessThanOrEqual((float) $partialMatch[1], (float) $partialMatch[2]);
+            }
+            self::assertFalse($partial->done);
+        } finally {
+            foreach ([$connection, $unanswered, $halfSent] as $socket) {
+                if (is_resource($socket)) {
+                    fclose($socket);
+                }
+            }
+        }
+    }
+
     public function testAcceptedTamperedSignatureStillFailsCertification(): void
     {
         file_put_contents($this->directory . '/mode', 'accepted-tampering');

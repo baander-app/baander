@@ -7541,9 +7541,13 @@ export type GetTranscodeJobShow200 = {
   data?: GetTranscodeJobShow200Data;
 };
 
-export type PostTranscodeJobCleanup200 = {
+export type PostTranscodeJobCleanup200Data = {
   expired?: number;
   cleaned?: number;
+};
+
+export type PostTranscodeJobCleanup200 = {
+  data?: PostTranscodeJobCleanup200Data;
 };
 
 export type GetTranscodeSessionIndex200DataItem = {
@@ -34786,7 +34790,7 @@ export const postTranscodeJobCleanup = async ( options?: Parameters<typeof custo
 
 export const getPostTranscodeJobCleanupMutationKey = () => ['postTranscodeJobCleanup'] as const;
 
-export const getPostTranscodeJobCleanupMutationOptions = <TError = ErrorType<unknown>,
+export const getPostTranscodeJobCleanupMutationOptions = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postTranscodeJobCleanup>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
 ): UseMutationOptions<Awaited<ReturnType<typeof postTranscodeJobCleanup>>, TError,void, TContext> => {
 
@@ -34815,13 +34819,13 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type PostTranscodeJobCleanupMutationResult = NonNullable<Awaited<ReturnType<typeof postTranscodeJobCleanup>>>
 
-    export type PostTranscodeJobCleanupMutationError = ErrorType<unknown>
+    export type PostTranscodeJobCleanupMutationError = ErrorType<ApiError>
 
 
     /**
  * @summary Expire stale transcode sessions and clean up orphaned transcode jobs (no active sessions)
  */
-export const usePostTranscodeJobCleanup = <TError = ErrorType<unknown>,
+export const usePostTranscodeJobCleanup = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postTranscodeJobCleanup>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof postTranscodeJobCleanup>>,
