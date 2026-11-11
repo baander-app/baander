@@ -169,7 +169,8 @@ describe('useBaanderPlayer authorization', () => {
     await act(async () => identify('81b42c41-c2bb-47f2-b0b6-f2eeed3d14fe'))
     expect(post.mock.calls[0][1]).toEqual({ path: '/api/transcode/video/master.m3u8', requestId: '81b42c41-c2bb-47f2-b0b6-f2eeed3d14fe' })
     await act(async () => { await vi.advanceTimersByTimeAsync(1000) })
-    expect(post.mock.calls.at(-1)?.[1]).toEqual({ path: '/api/transcode/video/master.m3u8', requestId: '81b42c41-c2bb-47f2-b0b6-f2eeed3d14fe', refresh: true, jobIds: ['low', 'high'] })
+    // The refresh of an attached player names the rendition set it plays.
+    expect(post.mock.calls.at(-1)?.[1]).toEqual({ path: '/api/transcode/video/master.m3u8', requestId: '81b42c41-c2bb-47f2-b0b6-f2eeed3d14fe', refresh: true, jobIds: ['low', 'high'], attachedSet: 'set' })
     unmount()
   })
 
@@ -361,8 +362,9 @@ describe('useBaanderPlayer authorization', () => {
     { position: 0, startTime: 0, status: 'running', nativeTime: 0.002, shouldSeek: false },
     { position: 162, startTime: 162, status: 'paused', nativeTime: 0.002, shouldSeek: false },
     { position: 0, startTime: 0, status: 'paused', nativeTime: 1, shouldSeek: true },
-    { position: 180, startTime: 162, status: 'paused', nativeTime: 0, shouldSeek: true },
-  ])('restores $status global position $position from native time $nativeTime without unnecessary seeking', async ({ position, startTime, status, nativeTime, shouldSeek }) => {
+    // A restore into the last second of the presentation first lands where that second starts.
+    { position: 180, startTime: 162, status: 'paused', nativeTime: 0, shouldSeek: true, landing: 17 },
+  ] as { position: number, startTime: number, status: string, nativeTime: number, shouldSeek: boolean, landing?: number }[])('restores $status global position $position from native time $nativeTime without unnecessary seeking', async ({ position, startTime, status, nativeTime, shouldSeek, landing }) => {
     post.mockResolvedValue({ data: { url: '/manifest', jobIds: ['job'], jobId: 'job', renditionSet: 'set', sessionId: 'owned-session', generation: 1, revision: 1, ready: true, startTime, duration: 180, position, status } })
     const containerRef = { current: document.createElement('div') }
     const { unmount } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef, autoPlay: true }))
@@ -375,7 +377,7 @@ describe('useBaanderPlayer authorization', () => {
     vi.mocked(video.pause).mockClear()
     vi.mocked(video.play).mockClear()
     await act(async () => video.dispatchEvent(new Event('loadedmetadata')))
-    if (shouldSeek) expect(setTime).toHaveBeenCalledExactlyOnceWith(position - startTime)
+    if (shouldSeek) expect(setTime).toHaveBeenCalledExactlyOnceWith(landing ?? position - startTime)
     else expect(setTime).not.toHaveBeenCalled()
     expect(video.seeking).toBe(shouldSeek)
     if (status === 'paused') expect(video.pause).toHaveBeenCalled()
@@ -443,6 +445,10 @@ describe('useBaanderPlayer authorization', () => {
     const { unmount } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef }))
     await act(async () => {})
     const video = containerRef.current.querySelector('video')!
+    // The player also restores on its one-second tick once the element has metadata, so the
+    // restoration stays pending only while the element has none.
+    let metadata = owner === 'native seek'
+    Object.defineProperty(video, 'readyState', { configurable: true, get: () => metadata ? HTMLMediaElement.HAVE_METADATA : HTMLMediaElement.HAVE_NOTHING })
     if (owner === 'native seek') {
       await act(async () => video.dispatchEvent(new Event('loadedmetadata')))
       video.currentTime = 30
@@ -450,8 +456,10 @@ describe('useBaanderPlayer authorization', () => {
     }
     await act(async () => vi.advanceTimersByTimeAsync(16000))
     expect(attachments).toHaveLength(1)
-    if (owner === 'restoration') await act(async () => video.dispatchEvent(new Event('loadedmetadata')))
-    else Object.defineProperty(video, 'seeking', { value: false })
+    if (owner === 'restoration') {
+      metadata = true
+      await act(async () => video.dispatchEvent(new Event('loadedmetadata')))
+    } else Object.defineProperty(video, 'seeking', { value: false })
     await act(async () => vi.advanceTimersByTimeAsync(1000))
     expect(attachments).toHaveLength(2)
     expect(attachments[1].position).toBe(owner === 'restoration' ? 18 : 30)
@@ -972,7 +980,10 @@ describe('useBaanderPlayer authorization', () => {
       await act(async () => vi.advanceTimersByTimeAsync(1000))
       await act(async () => video.dispatchEvent(new Event('loadedmetadata')))
     } else {
-      if (kind !== 'pending restoration') await act(async () => video.dispatchEvent(new Event('loadedmetadata')))
+      // The player also restores on its one-second tick once the element has metadata, so a
+      // restoration stays pending only while the element has none.
+      if (kind === 'pending restoration') Object.defineProperty(video, 'readyState', { configurable: true, value: HTMLMediaElement.HAVE_NOTHING })
+      else await act(async () => video.dispatchEvent(new Event('loadedmetadata')))
       snapshot = { data: kind === 'stale snapshot' ? { ...unavailable, generation: 9 }
         : kind === 'cancelled' ? { ...unavailable, status: 'cancelled' }
           : kind === 'malformed ready' ? { ...unavailable, ready: true }
@@ -1205,7 +1216,7 @@ describe('useBaanderPlayer authorization', () => {
     vi.useRealTimers()
   })
 
-  it('persists native seek and pause through the authorized current session', async () => {
+  it('persists a native seek\'s cursor with the next pause, not as a server seek, through the authorized current session', async () => {
     post.mockResolvedValue({ data: { url: '/manifest?generation=1', jobIds: ['job'], jobId: 'job', renditionSet: 'set', sessionId: 'owned-session', generation: 1, revision: 1, ready: true, startTime: 0, duration: 100, position: 0, status: 'running' } })
     const containerRef = { current: document.createElement('div') }
     const { unmount } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef, autoPlay: true }))
@@ -1217,7 +1228,9 @@ describe('useBaanderPlayer authorization', () => {
       video.dispatchEvent(new Event('seeking'))
       video.dispatchEvent(new Event('seeked'))
     })
-    expect(post).toHaveBeenCalledWith('/api/transcode/sessions/owned-session/position', { position: 42, action: 'seek', requestId: expect.any(String), generation: 1 }, { signal: expect.any(AbortSignal), timeout: 5000 })
+    // A seek the element made by itself would restart the encoders; the moved cursor reaches the
+    // session with the next report instead.
+    expect(post.mock.calls.filter(call => call[1].action === 'seek')).toEqual([])
     await act(async () => video.dispatchEvent(new Event('pause')))
     expect(post).toHaveBeenCalledWith('/api/transcode/sessions/owned-session/position', { position: 42, action: 'pause' }, { signal: expect.any(AbortSignal), timeout: 5000 })
     unmount()
@@ -1784,7 +1797,7 @@ describe('useBaanderPlayer authorization', () => {
       return Promise.resolve({ data: {} })
     })
     const containerRef = { current: document.createElement('div') }
-    const { unmount } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef, autoPlay: true }))
+    const { result, unmount } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef, autoPlay: true }))
     await act(async () => {})
     const video = containerRef.current.querySelector('video')!
     Object.defineProperty(video, 'paused', { configurable: true, value: false })
@@ -1794,11 +1807,8 @@ describe('useBaanderPlayer authorization', () => {
     video.currentTime = 20
     await act(async () => vi.advanceTimersByTimeAsync(3000))
     expect(post.mock.calls.filter((call) => call[1].action === 'progress')).toHaveLength(1)
-    video.currentTime = 42
-    await act(async () => {
-      video.dispatchEvent(new Event('seeking'))
-      video.dispatchEvent(new Event('seeked'))
-    })
+    // Only a seek the viewer asked for reaches the session.
+    await act(async () => result.current.seekTo(42))
     expect(post.mock.calls.filter((call) => call[1].action === 'seek')).toHaveLength(0)
     revision = 6
     await act(async () => finishProgress({ data: {} }))
@@ -1806,7 +1816,7 @@ describe('useBaanderPlayer authorization', () => {
     unmount()
   })
 
-  it('keeps a queued native seek bound to the generation that emitted it', async () => {
+  it('keeps a queued seek bound to the generation it was asked for in', async () => {
     vi.useFakeTimers()
     let generation = 1
     let finishProgress!: (value: { data: object }) => void
@@ -1816,18 +1826,15 @@ describe('useBaanderPlayer authorization', () => {
       return Promise.resolve({ data: {} })
     })
     const containerRef = { current: document.createElement('div') }
-    const { unmount } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef, autoPlay: true }))
+    const { result, unmount } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef, autoPlay: true }))
     await act(async () => {})
     const video = containerRef.current.querySelector('video')!
     Object.defineProperty(video, 'paused', { configurable: true, value: false })
     await act(async () => video.dispatchEvent(new Event('loadedmetadata')))
     video.currentTime = 10
     await act(async () => vi.advanceTimersByTimeAsync(1000))
-    video.currentTime = 42
-    await act(async () => {
-      video.dispatchEvent(new Event('seeking'))
-      video.dispatchEvent(new Event('seeked'))
-    })
+    // Only a seek the viewer asked for reaches the session.
+    await act(async () => result.current.seekTo(42))
     generation = 2
     await act(async () => vi.advanceTimersByTimeAsync(1000))
     expect(video.src).toContain('generation=2')
@@ -1836,7 +1843,7 @@ describe('useBaanderPlayer authorization', () => {
     unmount()
   })
 
-  it.each([7, undefined])('retains only the latest native target through its own accepted generation %s', async (acceptedGeneration) => {
+  it.each([7, undefined])('retains only the latest target through its own accepted generation %s', async (acceptedGeneration) => {
     vi.useFakeTimers()
     const snapshot = (generation: number) => ({ data: {
       url: `/manifest?generation=${generation}`, jobIds: ['job'], jobId: 'job', renditionSet: `job.${generation}`,
@@ -1858,18 +1865,16 @@ describe('useBaanderPlayer authorization', () => {
       return Promise.resolve({ data: { data: {} } })
     })
     const containerRef = { current: document.createElement('div') }
-    const { unmount } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef }))
+    const { result, unmount } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef }))
     await act(async () => {})
     const video = containerRef.current.querySelector('video')!
     await act(async () => video.dispatchEvent(new Event('loadedmetadata')))
     await act(async () => vi.advanceTimersByTimeAsync(1000))
     await act(async () => video.dispatchEvent(new Event('pause')))
-    video.currentTime = 33
-    await act(async () => video.dispatchEvent(new Event('seeking')))
-    video.currentTime = 43
-    await act(async () => video.dispatchEvent(new Event('seeking')))
-    video.currentTime = 53
-    await act(async () => video.dispatchEvent(new Event('seeking')))
+    // Only seeks the viewer asked for reach the session.
+    await act(async () => result.current.seekTo(45))
+    await act(async () => result.current.seekTo(55))
+    await act(async () => result.current.seekTo(65))
     await act(async () => finishPause({ data: {} }))
     await act(async () => finishOldRefresh(snapshot(7)))
     await act(async () => vi.advanceTimersByTimeAsync(1000))
@@ -1885,7 +1890,7 @@ describe('useBaanderPlayer authorization', () => {
     unmount()
   })
 
-  it('orders a pause between native targets and retains its intent until fresh reconciliation', async () => {
+  it('orders a pause between seek targets and retains its intent until fresh reconciliation', async () => {
     let generation = 4
     let position = 30
     let status = 'running'
@@ -1908,25 +1913,24 @@ describe('useBaanderPlayer authorization', () => {
       return Promise.resolve({ data: { data: {} } })
     })
     const containerRef = { current: document.createElement('div') }
-    const { unmount } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef, autoPlay: true }))
+    const { result, unmount } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef, autoPlay: true }))
     await act(async () => {})
     const video = containerRef.current.querySelector('video')!
     Object.defineProperty(video, 'paused', { configurable: true, writable: true, value: false })
     vi.mocked(video.play).mockImplementation(async () => { Object.defineProperty(video, 'paused', { value: false }) })
     vi.mocked(video.pause).mockImplementation(() => { Object.defineProperty(video, 'paused', { value: true }) })
     await act(async () => video.dispatchEvent(new Event('loadedmetadata')))
-    video.currentTime = 33
-    await act(async () => video.dispatchEvent(new Event('seeking')))
-    video.currentTime = 43
+    // Only seeks the viewer asked for reach the session.
+    await act(async () => result.current.seekTo(45))
     Object.defineProperty(video, 'paused', { value: true })
     await act(async () => video.dispatchEvent(new Event('pause')))
-    video.currentTime = 53
-    await act(async () => video.dispatchEvent(new Event('seeking')))
+    await act(async () => result.current.seekTo(65))
     await act(async () => finishFirst({ data: { data: { acceptedGeneration: 5 } } }))
     const commands = () => post.mock.calls.filter((call) => call[1].action).map((call) => call[1])
     expect(commands()).toEqual([
       { action: 'seek', requestId: expect.any(String), position: 45, generation: 4 },
-      { action: 'pause', position: 55 },
+      // The pause stands where the seek in flight is headed.
+      { action: 'pause', position: 45 },
       { action: 'seek', requestId: expect.any(String), position: 65, generation: 5 },
     ])
     expect(video.paused).toBe(true)
@@ -1937,7 +1941,7 @@ describe('useBaanderPlayer authorization', () => {
     unmount()
   })
 
-  it('retains accepted native seek authority while its fresh reconciliation is pending', async () => {
+  it('retains accepted seek authority while its fresh reconciliation is pending', async () => {
     let generation = 4
     let position = 30
     const snapshot = () => ({ data: {
@@ -1960,17 +1964,16 @@ describe('useBaanderPlayer authorization', () => {
       return Promise.resolve({ data: { data: { acceptedGeneration: generation } } })
     })
     const containerRef = { current: document.createElement('div') }
-    const { unmount } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef }))
+    const { result, unmount } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef }))
     await act(async () => {})
     const video = containerRef.current.querySelector('video')!
     await act(async () => video.dispatchEvent(new Event('loadedmetadata')))
-    video.currentTime = 33
-    await act(async () => video.dispatchEvent(new Event('seeking')))
+    // Only seeks the viewer asked for reach the session.
+    await act(async () => result.current.seekTo(45))
     expect(refreshes).toBe(2)
     expect(video.src).toContain('generation=4')
     const committedFirst = snapshot()
-    video.currentTime = 53
-    await act(async () => video.dispatchEvent(new Event('seeking')))
+    await act(async () => result.current.seekTo(65))
     await act(async () => finishRefresh(committedFirst))
     expect(post.mock.calls.filter((call) => call[1].action === 'seek').map((call) => call[1])).toEqual([
       { action: 'seek', requestId: expect.any(String), position: 45, generation: 4 },
@@ -2161,7 +2164,7 @@ describe('useBaanderPlayer authorization', () => {
       player.unmount()
     })
 
-    it('rolls an unfinished native seek back to the fresh canonical cursor after both attempts fail', async () => {
+    it('sends nothing for an unfinished native seek during an outage and leaves the element where it went', async () => {
       const attempts: Array<Record<string, unknown>> = []
       post.mockImplementation((path: string, payload: Record<string, unknown>) => {
         if (path === '/api/stream/sign') return Promise.resolve({ data: initial() })
@@ -2178,10 +2181,10 @@ describe('useBaanderPlayer authorization', () => {
         player.video.dispatchEvent(new Event('seeking'))
       } })
       await act(async () => player.video.dispatchEvent(new Event('seeking')))
-      expect(attempts).toHaveLength(2)
-      expect(attempts[1]).toEqual(attempts[0])
-      expect(player.video.currentTime).toBe(18)
-      expect(player.result.current.currentTime).toBe(30)
+      // A seek the element made by itself is no server seek, so there is no failed delivery to
+      // roll back: the element keeps its position, which the next progress report carries.
+      expect(attempts).toEqual([])
+      expect(player.video.currentTime).toBe(48)
       expect(player.result.current.pendingSeekPosition).toBeNull()
       expect(player.onError).not.toHaveBeenCalled()
       expect(attachments[0].dispose).not.toHaveBeenCalled()
@@ -2213,7 +2216,7 @@ describe('useBaanderPlayer authorization', () => {
       player.unmount()
     })
 
-    it('cancels an unfinished native seek only once while asynchronous rollback is still seeking', async () => {
+    it('does not move an unfinished native seek when restore events arrive during an outage', async () => {
       const attempts: Array<Record<string, unknown>> = []
       post.mockImplementation((path: string, payload: Record<string, unknown>) => {
         if (path === '/api/stream/sign') return Promise.resolve({ data: initial() })
@@ -2227,17 +2230,16 @@ describe('useBaanderPlayer authorization', () => {
       Object.defineProperty(player.video, 'seeking', { configurable: true, get: () => seeking })
       Object.defineProperty(player.video, 'currentTime', { configurable: true, get: () => time, set: assign })
       await act(async () => player.video.dispatchEvent(new Event('seeking')))
-      expect(assign).toHaveBeenCalledExactlyOnceWith(18)
       await act(async () => {
         for (const event of ['progress', 'canplay', 'loadeddata']) player.video.dispatchEvent(new Event(event))
       })
-      expect(assign).toHaveBeenCalledOnce()
       seeking = false
       await act(async () => player.video.dispatchEvent(new Event('seeked')))
-      expect(assign).toHaveBeenCalledOnce()
-      expect(player.result.current.currentTime).toBe(30)
+      // A seek the element made by itself is no server seek: nothing is sent, nothing rolls back.
+      expect(assign).not.toHaveBeenCalled()
+      expect(time).toBe(48)
       expect(player.onError).not.toHaveBeenCalled()
-      expect(attempts).toHaveLength(2)
+      expect(attempts).toEqual([])
       player.unmount()
     })
 
@@ -2499,7 +2501,7 @@ describe('useBaanderPlayer authorization', () => {
   it.each([0, 180])('keeps paused restoration authoritative when the native duration is %s and its seek clamps', async (initialDuration) => {
     post.mockResolvedValue({ data: { url: '/manifest', jobIds: ['job'], jobId: 'job', renditionSet: 'set', sessionId: 'owned-session', generation: 4, revision: 8, ready: true, position: 30, status: 'paused', startTime: 12, duration: 180 } })
     const containerRef = { current: document.createElement('div') }
-    const { unmount } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef, autoPlay: true }))
+    const { result, unmount } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef, autoPlay: true }))
     await act(async () => {})
     const video = containerRef.current.querySelector('video')!
     let nativeTime = 0
@@ -2521,11 +2523,14 @@ describe('useBaanderPlayer authorization', () => {
     expect(video.pause).toHaveBeenCalled()
     await act(async () => video.dispatchEvent(new Event('seeked')))
     expect(post.mock.calls.filter((call) => call[1].action)).toHaveLength(0)
+    // A seek the element makes by itself after the restore sends nothing; one the viewer asks for does.
     nativeTime = 20
     await act(async () => {
       video.dispatchEvent(new Event('seeking'))
       video.dispatchEvent(new Event('seeked'))
     })
+    expect(post.mock.calls.filter((call) => call[1].action)).toHaveLength(0)
+    await act(async () => result.current.seekTo(32))
     expect(post).toHaveBeenCalledWith('/api/transcode/sessions/owned-session/position', { position: 32, action: 'seek', requestId: expect.any(String), generation: 4 }, { signal: expect.any(AbortSignal), timeout: 5000 })
     unmount()
   })
@@ -2715,7 +2720,7 @@ describe('useBaanderPlayer authorization', () => {
     unmount()
   })
 
-  it('submits a paused native seek before decoding completes and does not duplicate its completion', async () => {
+  it('sends no seek for a paused native seek, before or after decoding completes, and submits a paused user seek once', async () => {
     const snapshot = { url: '/manifest', jobIds: ['job'], jobId: 'job', sessionId: 'owned-session',
       generation: 4, revision: 11, ready: true, position: 33, status: 'paused',
       startTime: 12, duration: 180, renditionSet: 'job.4' }
@@ -2723,25 +2728,31 @@ describe('useBaanderPlayer authorization', () => {
       ? Promise.resolve({ data: snapshot })
       : new Promise(() => {}))
     const containerRef = { current: document.createElement('div') }
-    const { unmount } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef, autoPlay: true }))
+    const { result, unmount } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef, autoPlay: true }))
     await act(async () => {})
     const video = containerRef.current.querySelector('video')!
     await act(async () => video.dispatchEvent(new Event('loadedmetadata')))
     await act(async () => video.dispatchEvent(new Event('seeking')))
     expect(post.mock.calls.filter((call) => call[1].action)).toHaveLength(0)
+    // A seek the element makes by itself would restart the encoders as a server seek; the session
+    // hears of its cursor through later reports instead, neither while it decodes nor once it is done.
     video.currentTime = 23
     Object.defineProperty(video, 'seeking', { configurable: true, writable: true, value: true })
     await act(async () => video.dispatchEvent(new Event('seeking')))
+    expect(post.mock.calls.filter((call) => call[1].action)).toHaveLength(0)
+    Object.defineProperty(video, 'seeking', { value: false })
+    await act(async () => video.dispatchEvent(new Event('seeked')))
+    expect(post.mock.calls.filter((call) => call[1].action)).toHaveLength(0)
+    // A seek the viewer asks for goes out at once, without waiting for the element.
+    await act(async () => result.current.seekTo(35))
     expect(post).toHaveBeenCalledWith('/api/transcode/sessions/owned-session/position', {
       position: 35, action: 'seek', requestId: expect.any(String), generation: 4,
     }, { signal: expect.any(AbortSignal), timeout: 5000 })
-    Object.defineProperty(video, 'seeking', { value: false })
-    await act(async () => video.dispatchEvent(new Event('seeked')))
     expect(post.mock.calls.filter((call) => call[1].action === 'seek')).toHaveLength(1)
     unmount()
   })
 
-  it('commits a native seek when sibling renditions arrive before seeked', async () => {
+  it('keeps a native seek out of the session when sibling renditions arrive before seeked', async () => {
     vi.useFakeTimers()
     const snapshot = (renditionSet: string) => ({ data: {
       url: `/manifest?set=${renditionSet}`, jobId: 'job', sessionId: 'owned-session',
@@ -2761,10 +2772,9 @@ describe('useBaanderPlayer authorization', () => {
     expect(video.src).not.toContain('sibling.3')
     Object.defineProperty(video, 'seeking', { value: false })
     await act(async () => video.dispatchEvent(new Event('seeked')))
-    expect(post.mock.calls.filter((call) => call[1].action === 'seek')).toHaveLength(1)
-    expect(post).toHaveBeenCalledWith('/api/transcode/sessions/owned-session/position', {
-      position: 35, action: 'seek', requestId: expect.any(String), generation: 4,
-    }, { signal: expect.any(AbortSignal), timeout: 5000 })
+    // A seek the element made by itself is no server seek: the session hears of its cursor through
+    // the next progress report.
+    expect(post.mock.calls.filter((call) => call[1].action === 'seek')).toEqual([])
     await act(async () => vi.advanceTimersByTimeAsync(1000))
     expect(video.src).toContain('sibling.3')
     unmount()
@@ -2844,13 +2854,19 @@ describe('useBaanderPlayer authorization', () => {
     const { unmount } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef, autoPlay: true }))
     await act(async () => {})
     const video = containerRef.current.querySelector('video')!
+    // A replaced source has no metadata until its element loads it again. The player also restores
+    // on its one-second tick once the element has metadata, so the element's state is modelled.
+    let metadata = true
+    Object.defineProperty(video, 'readyState', { configurable: true, get: () => metadata ? HTMLMediaElement.HAVE_METADATA : HTMLMediaElement.HAVE_NOTHING })
     await act(async () => video.dispatchEvent(new Event('loadedmetadata')))
     video.currentTime = 30
     await act(async () => vi.advanceTimersByTimeAsync(1000))
     expect(video.src).toContain('sibling.4')
+    metadata = false
     video.currentTime = 0
     await act(async () => vi.advanceTimersByTimeAsync(1000))
     expect(video.src).not.toContain('third.7')
+    metadata = true
     await act(async () => video.dispatchEvent(new Event('loadedmetadata')))
     expect(video.currentTime).toBe(30)
     await act(async () => vi.advanceTimersByTimeAsync(1000))
@@ -3168,8 +3184,14 @@ describe('useBaanderPlayer authorization', () => {
     Object.defineProperty(video, 'seeking', { configurable: true, get: () => seeking })
     Object.defineProperty(video, 'duration', { configurable: true, value: 17.92 })
     Object.defineProperty(video, 'seekable', { configurable: true, value: { length: 1, start: () => 0, end: () => 17.92 } })
+    Object.defineProperty(video, 'readyState', { configurable: true, value: HTMLMediaElement.HAVE_CURRENT_DATA })
     await act(async () => video.dispatchEvent(new Event('loadedmetadata')))
-    expect(nativeTime).toBe(17.92)
+    // A restore into the last second first lands where that second starts, and goes on to the
+    // end only once the element has stood on a decoded frame there.
+    expect(nativeTime).toBe(17)
+    seeking = false
+    await act(async () => video.dispatchEvent(new Event('seeked')))
+    await waitFor(() => expect(nativeTime).toBe(17.92))
     await act(async () => video.dispatchEvent(new Event('seeking')))
     seeking = false
     await act(async () => {
@@ -3199,6 +3221,7 @@ describe('useBaanderPlayer authorization', () => {
     { position: 180, nativeEnd: 17.92, nativeDuration: Infinity },
     { position: 179.95, nativeEnd: 17.92, nativeDuration: 17.92 },
   ])('waits for unavailable source position $position when the native end is $nativeEnd and duration is $nativeDuration', async ({ position, nativeEnd, nativeDuration }) => {
+    vi.useFakeTimers()
     post.mockResolvedValue({ data: { url: '/manifest', jobIds: ['job'], jobId: 'job', renditionSet: 'job.5', sessionId: 'owned-session',
       generation: 5, revision: 5, ready: true, position, status: 'paused', startTime: 162, duration: 180 } })
     const containerRef = { current: document.createElement('div') }
@@ -3213,7 +3236,12 @@ describe('useBaanderPlayer authorization', () => {
       video.dispatchEvent(new Event('loadedmetadata'))
       video.dispatchEvent(new Event('progress'))
     })
-    expect(setTime).not.toHaveBeenCalled()
+    // The target lies in the last second, so the restore lands where that second starts; the
+    // landing itself is seekable. Past the landing's grace the restore still waits for its target.
+    await act(async () => { await vi.advanceTimersByTimeAsync(2000) })
+    await act(async () => video.dispatchEvent(new Event('progress')))
+    expect(setTime).toHaveBeenCalled()
+    expect(setTime.mock.calls.every(([time]) => time === 17)).toBe(true)
     expect(post.mock.calls.filter(call => call[1].action)).toHaveLength(0)
     unmount()
   })
@@ -3327,11 +3355,14 @@ describe('useBaanderPlayer authorization', () => {
       player.unmount()
     })
 
-    it('treats paused native seeking after completion as a new explicit source target', async () => {
+    it('treats a paused seek after completion as a new explicit source target', async () => {
       const player = await setupCompletion()
       await player.finish()
+      // The element seeking by itself is no target; the viewer's seek is.
       player.video.currentTime = 5
       await act(async () => player.video.dispatchEvent(new Event('seeking')))
+      expect(player.controls().filter(control => control.action === 'seek')).toEqual([])
+      await act(async () => player.result.current.seekTo(167))
       expect(player.controls().filter(control => control.action === 'seek')).toEqual([
         { action: 'seek', position: 167, generation: 5, requestId: expect.any(String) },
       ])
