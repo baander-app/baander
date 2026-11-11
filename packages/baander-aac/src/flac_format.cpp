@@ -21,15 +21,24 @@ struct Crc8Table {
   }
 };
 
+/* Eight tables for the CRC-16, so that a frame is checked eight bytes
+ * at a step: v[0][i] is the checksum of the byte i, and v[k][i] that of
+ * the byte i followed by k zero bytes, which is v[k - 1][i] taken
+ * through one more byte. */
 struct Crc16Table {
-  uint16_t v[256];
+  uint16_t v[8][256];
   constexpr Crc16Table() : v() {
     for (int i = 0; i < 256; i++) {
       uint16_t crc = (uint16_t)(i << 8);
       for (int bit = 0; bit < 8; bit++) {
         crc = (uint16_t)((crc & 0x8000) ? (crc << 1) ^ 0x8005 : crc << 1);
       }
-      v[i] = crc;
+      v[0][i] = crc;
+    }
+    for (int k = 1; k < 8; k++) {
+      for (int i = 0; i < 256; i++) {
+        v[k][i] = (uint16_t)((v[k - 1][i] << 8) ^ v[0][v[k - 1][i] >> 8]);
+      }
     }
   }
 };
@@ -48,8 +57,18 @@ uint8_t flac_crc8(const uint8_t* data, size_t size) {
 }
 
 uint16_t flac_crc16_update(uint16_t crc, const uint8_t* data, size_t size) {
+  /* Eight bytes at a step: the checksum so far goes into the first two,
+   * and each byte contributes through the table of its distance from
+   * the end of the group. */
+  while (size >= 8) {
+    crc = (uint16_t)(kCrc16.v[7][data[0] ^ (crc >> 8)] ^ kCrc16.v[6][data[1] ^ (crc & 0xFF)] ^
+                     kCrc16.v[5][data[2]] ^ kCrc16.v[4][data[3]] ^ kCrc16.v[3][data[4]] ^
+                     kCrc16.v[2][data[5]] ^ kCrc16.v[1][data[6]] ^ kCrc16.v[0][data[7]]);
+    data += 8;
+    size -= 8;
+  }
   for (size_t i = 0; i < size; i++) {
-    crc = (uint16_t)((crc << 8) ^ kCrc16.v[(crc >> 8) ^ data[i]]);
+    crc = (uint16_t)((crc << 8) ^ kCrc16.v[0][(crc >> 8) ^ data[i]]);
   }
   return crc;
 }
@@ -57,21 +76,6 @@ uint16_t flac_crc16_update(uint16_t crc, const uint8_t* data, size_t size) {
 /* ── MD5 (RFC 1321) ─────────────────────────────────────────────── */
 
 namespace {
-
-/* T[i] = floor(2^32 * abs(sin(i + 1))), RFC 1321 section 3.4. */
-const uint32_t kMd5T[64] = {
-    0xd76aa478, 0xe8c7b756, 0x242070db, 0xc1bdceee, 0xf57c0faf, 0x4787c62a, 0xa8304613, 0xfd469501,
-    0x698098d8, 0x8b44f7af, 0xffff5bb1, 0x895cd7be, 0x6b901122, 0xfd987193, 0xa679438e, 0x49b40821,
-    0xf61e2562, 0xc040b340, 0x265e5a51, 0xe9b6c7aa, 0xd62f105d, 0x02441453, 0xd8a1e681, 0xe7d3fbc8,
-    0x21e1cde6, 0xc33707d6, 0xf4d50d87, 0x455a14ed, 0xa9e3e905, 0xfcefa3f8, 0x676f02d9, 0x8d2a4c8a,
-    0xfffa3942, 0x8771f681, 0x6d9d6122, 0xfde5380c, 0xa4beea44, 0x4bdecfa9, 0xf6bb4b60, 0xbebfbc70,
-    0x289b7ec6, 0xeaa127fa, 0xd4ef3085, 0x04881d05, 0xd9d4d039, 0xe6db99e5, 0x1fa27cf8, 0xc4ac5665,
-    0xf4292244, 0x432aff97, 0xab9423a7, 0xfc93a039, 0x655b59c3, 0x8f0ccc92, 0xffeff47d, 0x85845dd1,
-    0x6fa87e4f, 0xfe2ce6e0, 0xa3014314, 0x4e0811a1, 0xf7537e82, 0xbd3af235, 0x2ad7d2bb, 0xeb86d391,
-};
-
-/* Left rotations per round, four values repeated four times each. */
-const int kMd5Shift[4][4] = {{7, 12, 17, 22}, {5, 9, 14, 20}, {4, 11, 16, 23}, {6, 10, 15, 21}};
 
 inline uint32_t rotl32(uint32_t x, int n) { return (x << n) | (x >> (32 - n)); }
 
@@ -86,48 +90,103 @@ inline void store_le32(uint8_t* p, uint32_t v) {
   p[3] = (uint8_t)(v >> 24);
 }
 
-/* One 64-byte block through the four rounds of RFC 1321 section 3.4. */
+/* The auxiliary functions of the four rounds (RFC 1321 section 3.4). */
+inline uint32_t md5_f(uint32_t x, uint32_t y, uint32_t z) { return (x & y) | (~x & z); }
+inline uint32_t md5_g(uint32_t x, uint32_t y, uint32_t z) { return (x & z) | (y & ~z); }
+inline uint32_t md5_h(uint32_t x, uint32_t y, uint32_t z) { return x ^ y ^ z; }
+inline uint32_t md5_i(uint32_t x, uint32_t y, uint32_t z) { return y ^ (x | ~z); }
+
+/* One step: w = x + ((w + f(x, y, z) + X[k] + T) <<< s), where T is
+ * floor(2^32 * abs(sin(step))) for the steps 1 to 64. */
+#define MD5_STEP(f, w, x, y, z, k, s, t) w = x + rotl32(w + f(x, y, z) + m[k] + t, s)
+
+/* One 64-byte block through the four rounds of RFC 1321 section 3.4,
+ * sixteen steps each, with the round's function, the word order, the
+ * rotations and the constants written out. */
 void md5_block(uint32_t state[4], const uint8_t* block) {
-  uint32_t x[16];
+  uint32_t m[16];
   for (int i = 0; i < 16; i++) {
-    x[i] = load_le32(block + 4 * i);
+    m[i] = load_le32(block + 4 * i);
   }
   uint32_t a = state[0];
   uint32_t b = state[1];
   uint32_t c = state[2];
   uint32_t d = state[3];
-  for (int i = 0; i < 64; i++) {
-    uint32_t f;
-    int k;
-    switch (i >> 4) {
-      case 0:
-        f = (b & c) | (~b & d);
-        k = i;
-        break;
-      case 1:
-        f = (b & d) | (c & ~d);
-        k = (5 * i + 1) & 15;
-        break;
-      case 2:
-        f = b ^ c ^ d;
-        k = (3 * i + 5) & 15;
-        break;
-      default:
-        f = c ^ (b | ~d);
-        k = (7 * i) & 15;
-        break;
-    }
-    const uint32_t t = a + f + x[k] + kMd5T[i];
-    a = d;
-    d = c;
-    c = b;
-    b += rotl32(t, kMd5Shift[i >> 4][i & 3]);
-  }
+  /* Round 1: F, the message words in order. */
+  MD5_STEP(md5_f, a, b, c, d, 0, 7, 0xd76aa478);
+  MD5_STEP(md5_f, d, a, b, c, 1, 12, 0xe8c7b756);
+  MD5_STEP(md5_f, c, d, a, b, 2, 17, 0x242070db);
+  MD5_STEP(md5_f, b, c, d, a, 3, 22, 0xc1bdceee);
+  MD5_STEP(md5_f, a, b, c, d, 4, 7, 0xf57c0faf);
+  MD5_STEP(md5_f, d, a, b, c, 5, 12, 0x4787c62a);
+  MD5_STEP(md5_f, c, d, a, b, 6, 17, 0xa8304613);
+  MD5_STEP(md5_f, b, c, d, a, 7, 22, 0xfd469501);
+  MD5_STEP(md5_f, a, b, c, d, 8, 7, 0x698098d8);
+  MD5_STEP(md5_f, d, a, b, c, 9, 12, 0x8b44f7af);
+  MD5_STEP(md5_f, c, d, a, b, 10, 17, 0xffff5bb1);
+  MD5_STEP(md5_f, b, c, d, a, 11, 22, 0x895cd7be);
+  MD5_STEP(md5_f, a, b, c, d, 12, 7, 0x6b901122);
+  MD5_STEP(md5_f, d, a, b, c, 13, 12, 0xfd987193);
+  MD5_STEP(md5_f, c, d, a, b, 14, 17, 0xa679438e);
+  MD5_STEP(md5_f, b, c, d, a, 15, 22, 0x49b40821);
+  /* Round 2: G, every fifth word from the second. */
+  MD5_STEP(md5_g, a, b, c, d, 1, 5, 0xf61e2562);
+  MD5_STEP(md5_g, d, a, b, c, 6, 9, 0xc040b340);
+  MD5_STEP(md5_g, c, d, a, b, 11, 14, 0x265e5a51);
+  MD5_STEP(md5_g, b, c, d, a, 0, 20, 0xe9b6c7aa);
+  MD5_STEP(md5_g, a, b, c, d, 5, 5, 0xd62f105d);
+  MD5_STEP(md5_g, d, a, b, c, 10, 9, 0x02441453);
+  MD5_STEP(md5_g, c, d, a, b, 15, 14, 0xd8a1e681);
+  MD5_STEP(md5_g, b, c, d, a, 4, 20, 0xe7d3fbc8);
+  MD5_STEP(md5_g, a, b, c, d, 9, 5, 0x21e1cde6);
+  MD5_STEP(md5_g, d, a, b, c, 14, 9, 0xc33707d6);
+  MD5_STEP(md5_g, c, d, a, b, 3, 14, 0xf4d50d87);
+  MD5_STEP(md5_g, b, c, d, a, 8, 20, 0x455a14ed);
+  MD5_STEP(md5_g, a, b, c, d, 13, 5, 0xa9e3e905);
+  MD5_STEP(md5_g, d, a, b, c, 2, 9, 0xfcefa3f8);
+  MD5_STEP(md5_g, c, d, a, b, 7, 14, 0x676f02d9);
+  MD5_STEP(md5_g, b, c, d, a, 12, 20, 0x8d2a4c8a);
+  /* Round 3: H, every third word from the sixth. */
+  MD5_STEP(md5_h, a, b, c, d, 5, 4, 0xfffa3942);
+  MD5_STEP(md5_h, d, a, b, c, 8, 11, 0x8771f681);
+  MD5_STEP(md5_h, c, d, a, b, 11, 16, 0x6d9d6122);
+  MD5_STEP(md5_h, b, c, d, a, 14, 23, 0xfde5380c);
+  MD5_STEP(md5_h, a, b, c, d, 1, 4, 0xa4beea44);
+  MD5_STEP(md5_h, d, a, b, c, 4, 11, 0x4bdecfa9);
+  MD5_STEP(md5_h, c, d, a, b, 7, 16, 0xf6bb4b60);
+  MD5_STEP(md5_h, b, c, d, a, 10, 23, 0xbebfbc70);
+  MD5_STEP(md5_h, a, b, c, d, 13, 4, 0x289b7ec6);
+  MD5_STEP(md5_h, d, a, b, c, 0, 11, 0xeaa127fa);
+  MD5_STEP(md5_h, c, d, a, b, 3, 16, 0xd4ef3085);
+  MD5_STEP(md5_h, b, c, d, a, 6, 23, 0x04881d05);
+  MD5_STEP(md5_h, a, b, c, d, 9, 4, 0xd9d4d039);
+  MD5_STEP(md5_h, d, a, b, c, 12, 11, 0xe6db99e5);
+  MD5_STEP(md5_h, c, d, a, b, 15, 16, 0x1fa27cf8);
+  MD5_STEP(md5_h, b, c, d, a, 2, 23, 0xc4ac5665);
+  /* Round 4: I, every seventh word from the first. */
+  MD5_STEP(md5_i, a, b, c, d, 0, 6, 0xf4292244);
+  MD5_STEP(md5_i, d, a, b, c, 7, 10, 0x432aff97);
+  MD5_STEP(md5_i, c, d, a, b, 14, 15, 0xab9423a7);
+  MD5_STEP(md5_i, b, c, d, a, 5, 21, 0xfc93a039);
+  MD5_STEP(md5_i, a, b, c, d, 12, 6, 0x655b59c3);
+  MD5_STEP(md5_i, d, a, b, c, 3, 10, 0x8f0ccc92);
+  MD5_STEP(md5_i, c, d, a, b, 10, 15, 0xffeff47d);
+  MD5_STEP(md5_i, b, c, d, a, 1, 21, 0x85845dd1);
+  MD5_STEP(md5_i, a, b, c, d, 8, 6, 0x6fa87e4f);
+  MD5_STEP(md5_i, d, a, b, c, 15, 10, 0xfe2ce6e0);
+  MD5_STEP(md5_i, c, d, a, b, 6, 15, 0xa3014314);
+  MD5_STEP(md5_i, b, c, d, a, 13, 21, 0x4e0811a1);
+  MD5_STEP(md5_i, a, b, c, d, 4, 6, 0xf7537e82);
+  MD5_STEP(md5_i, d, a, b, c, 11, 10, 0xbd3af235);
+  MD5_STEP(md5_i, c, d, a, b, 2, 15, 0x2ad7d2bb);
+  MD5_STEP(md5_i, b, c, d, a, 9, 21, 0xeb86d391);
   state[0] += a;
   state[1] += b;
   state[2] += c;
   state[3] += d;
 }
+
+#undef MD5_STEP
 
 }  // namespace
 
@@ -342,17 +401,44 @@ const int kBitDepths[8] = {0, 8, 12, -1, 16, 20, 24, 32};
 
 }  // namespace
 
-bool flac_sample_rate_is_codable(int rate) {
-  if (rate <= 0) {
-    return false;
-  }
-  for (int code = 1; code < 12; code++) {
+namespace {
+
+/* How a frame header states a sample rate: the code of the four sample
+ * rate bits, and for the codes 12 to 14 the number stored behind the
+ * header's fixed part.  A table code when one fits (0 for a rate of 0,
+ * which reads "see STREAMINFO"), else kilohertz in 8 bits, hertz in 16
+ * bits or tens of hertz in 16 bits, whichever expresses the rate; -1
+ * when none does. */
+int sample_rate_code(int rate, uint32_t* value) {
+  *value = 0;
+  for (int code = 0; code < 12; code++) {
     if (kSampleRates[code] == rate) {
-      return true;
+      return code;
     }
   }
-  return (rate % 1000 == 0 && rate / 1000 <= 255) || rate <= 65535 ||
-         (rate % 10 == 0 && rate / 10 <= 65535);
+  if (rate <= 0) {
+    return -1;
+  }
+  if (rate % 1000 == 0 && rate / 1000 <= 255) {
+    *value = (uint32_t)rate / 1000;
+    return 12;
+  }
+  if (rate <= 65535) {
+    *value = (uint32_t)rate;
+    return 13;
+  }
+  if (rate % 10 == 0 && rate / 10 <= 65535) {
+    *value = (uint32_t)rate / 10;
+    return 14;
+  }
+  return -1;
+}
+
+}  // namespace
+
+bool flac_sample_rate_is_codable(int rate) {
+  uint32_t value;
+  return rate > 0 && sample_rate_code(rate, &value) > 0;
 }
 
 int flac_frame_header_parse(const uint8_t* d, size_t size, FlacFrameHeader* h) {
@@ -461,27 +547,8 @@ int flac_frame_header_write(const FlacFrameHeader* h, uint8_t* out) {
     block_code = h->block_size <= 256 ? 6 : 7;
   }
 
-  /* Sample rate: a table code, else kilohertz in 8 bits, hertz in 16
-   * bits or tens of hertz in 16 bits, whichever expresses it. */
-  int rate_code = -1;
   uint32_t rate_value = 0;
-  for (int code = 0; code < 12 && rate_code < 0; code++) {
-    if (kSampleRates[code] == h->sample_rate) {
-      rate_code = code;
-    }
-  }
-  if (rate_code < 0 && h->sample_rate > 0) {
-    if (h->sample_rate % 1000 == 0 && h->sample_rate / 1000 <= 255) {
-      rate_code = 12;
-      rate_value = (uint32_t)h->sample_rate / 1000;
-    } else if (h->sample_rate <= 65535) {
-      rate_code = 13;
-      rate_value = (uint32_t)h->sample_rate;
-    } else if (h->sample_rate % 10 == 0 && h->sample_rate / 10 <= 65535) {
-      rate_code = 14;
-      rate_value = (uint32_t)h->sample_rate / 10;
-    }
-  }
+  const int rate_code = sample_rate_code(h->sample_rate, &rate_value);
   int depth_code = -1;
   for (int code = 0; code < 8 && depth_code < 0; code++) {
     if (kBitDepths[code] == h->bits_per_sample) {

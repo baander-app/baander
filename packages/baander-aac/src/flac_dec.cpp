@@ -76,18 +76,22 @@ int ceil_log2(int n) {
  * fewer, the reader is left exhausted.  `out` may be null to pass over
  * the values. */
 template <typename T>
-int read_fixed_width(FlacBitReader* r, T* out, int count, int width) {
+int read_fixed_width(FlacBitReader* r, T* FLAC_RESTRICT out, int count, int width) {
   const size_t left = (size_t)(r->end - r->data) * 8 - flac_bitreader_position(r);
   const int whole = (int)std::min<size_t>((size_t)count, left / (size_t)width);
+  /* The reader works on a copy for the length of the loop, so that the
+   * stores to `out` cannot be taken for stores to its state. */
+  FlacBitReader local = *r;
   if (out) {
     for (int i = 0; i < whole; i++) {
-      out[i] = (T)flac_bitreader_read_signed(r, width);
+      out[i] = (T)flac_bitreader_read_signed(&local, width);
     }
   } else {
     for (int i = 0; i < whole; i++) {
-      flac_bitreader_read_signed(r, width);
+      flac_bitreader_read_signed(&local, width);
     }
   }
+  *r = local;
   if (whole < count) {
     flac_bitreader_fail(r);
   }
@@ -97,25 +101,39 @@ int read_fixed_width(FlacBitReader* r, T* out, int count, int width) {
 /* One Rice-coded partition: `count` values of a unary quotient and `k`
  * plain bits each, folded back to signed.  Returns the number of values
  * read: all of them, or fewer when the input ends inside one, which then
- * starts at `*stop_bit`; -1 for a value outside 32 bits. */
-int read_rice(FlacBitReader* r, int32_t* out, int count, int k, size_t* stop_bit) {
+ * starts at `*stop_bit`; -1 for a value outside 32 bits.
+ *
+ * The reader's cache, bit count and position live in locals inside the
+ * loop and are written back before the slow path, which goes through
+ * the reader, and at every return. */
+int read_rice(FlacBitReader* r, int32_t* FLAC_RESTRICT out, int count, int k, size_t* stop_bit) {
   const uint32_t max_quotient = 0xFFFFFFFFu >> k;
+  const uint8_t* const end = r->end;
+  uint64_t cache = r->cache;
+  int bits = r->bits;
+  const uint8_t* next = r->next;
+  int result = count;
   for (int i = 0; i < count; i++) {
     uint32_t quotient;
     uint32_t rest;
-    if (r->bits < 56) {
-      flac_bitreader_refill(r);
+    int zeros = cache ? flac_clz64(cache) : 64;
+    int used = zeros + 1 + k;
+    if (used > bits) {
+      /* The cache may only have run low: top it up and look again. */
+      flac_refill(cache, bits, next, end);
+      zeros = cache ? flac_clz64(cache) : 64;
+      used = zeros + 1 + k;
     }
-    const uint64_t cache = r->cache;
-    const int zeros = cache ? flac_clz64(cache) : 64;
-    const int used = zeros + 1 + k;
-    if (used <= r->bits) {
+    if (used <= bits) {
       /* The whole code word lies in the cache. */
       quotient = (uint32_t)zeros;
       rest = k ? (uint32_t)((cache << (zeros + 1)) >> (64 - k)) : 0;
-      r->cache = cache << used;
-      r->bits -= used;
+      cache <<= used;
+      bits -= used;
     } else {
+      r->cache = cache;
+      r->bits = bits;
+      r->next = next;
       const size_t start = flac_bitreader_position(r);
       quotient = flac_bitreader_read_unary(r);
       rest = flac_bitreader_read(r, k);
@@ -123,14 +141,21 @@ int read_rice(FlacBitReader* r, int32_t* out, int count, int k, size_t* stop_bit
         *stop_bit = start;
         return i;
       }
+      cache = r->cache;
+      bits = r->bits;
+      next = r->next;
     }
     if (quotient > max_quotient) {
-      return -1;
+      result = -1;
+      break;
     }
     const uint32_t folded = (quotient << k) | rest;
     out[i] = (int32_t)((folded >> 1) ^ (0u - (folded & 1)));
   }
-  return count;
+  r->cache = cache;
+  r->bits = bits;
+  r->next = next;
+  return result;
 }
 
 /* The coded residual of a subframe (RFC 9639 section 9.2.7) into
@@ -203,8 +228,10 @@ bool read_residual(FlacBitReader* r, int32_t* out, int block_size, int order, Pr
 /* ── prediction ─────────────────────────────────────────────────── */
 
 /* s[order .. n) holds the residual on entry and the samples on return;
- * s[0 .. order) are the warm-up samples. */
-void restore_fixed32(int32_t* s, int n, int order) {
+ * s[0 .. order) are the warm-up samples.  In these loops a row is reached
+ * through one pointer only, and the coefficients and a separate residual
+ * are other objects than the row. */
+void restore_fixed32(int32_t* FLAC_RESTRICT s, int n, int order) {
   switch (order) {
     case 1:
       for (int i = 1; i < n; i++) {
@@ -233,7 +260,8 @@ void restore_fixed32(int32_t* s, int n, int order) {
   }
 }
 
-void restore_lpc32(int32_t* s, int n, int order, const int32_t* coefs, int shift) {
+void restore_lpc32(int32_t* FLAC_RESTRICT s, int n, int order, const int32_t* FLAC_RESTRICT coefs,
+                   int shift) {
   for (int i = order; i < n; i++) {
     uint32_t sum = 0;
     for (int j = 0; j < order; j++) {
@@ -245,7 +273,8 @@ void restore_lpc32(int32_t* s, int n, int order, const int32_t* coefs, int shift
 
 /* The same with a 64-bit sum: 15 coefficient bits, 32 sample bits and 5
  * bits of summation cannot overflow it. */
-void restore_lpc32_wide_sum(int32_t* s, int n, int order, const int32_t* coefs, int shift) {
+void restore_lpc32_wide_sum(int32_t* FLAC_RESTRICT s, int n, int order,
+                            const int32_t* FLAC_RESTRICT coefs, int shift) {
   for (int i = order; i < n; i++) {
     int64_t sum = 0;
     for (int j = 0; j < order; j++) {
@@ -257,7 +286,7 @@ void restore_lpc32_wide_sum(int32_t* s, int n, int order, const int32_t* coefs, 
 
 /* 33-bit samples: the residual comes from `res`, the samples go to `s`,
  * whose first `order` entries are the warm-up samples. */
-void restore_fixed64(int64_t* s, const int32_t* res, int n, int order) {
+void restore_fixed64(int64_t* FLAC_RESTRICT s, const int32_t* FLAC_RESTRICT res, int n, int order) {
   static const int kWeights[5][4] = {
       {0, 0, 0, 0}, {1, 0, 0, 0}, {2, -1, 0, 0}, {3, -3, 1, 0}, {4, -6, 4, -1}};
   for (int i = order; i < n; i++) {
@@ -269,8 +298,8 @@ void restore_fixed64(int64_t* s, const int32_t* res, int n, int order) {
   }
 }
 
-void restore_lpc64(int64_t* s, const int32_t* res, int n, int order, const int32_t* coefs,
-                   int shift) {
+void restore_lpc64(int64_t* FLAC_RESTRICT s, const int32_t* FLAC_RESTRICT res, int n, int order,
+                   const int32_t* FLAC_RESTRICT coefs, int shift) {
   for (int i = order; i < n; i++) {
     uint64_t sum = 0;
     for (int j = 0; j < order; j++) {
@@ -365,6 +394,18 @@ bool decode_subframe(FlacBitReader* r, int bps, int block_size, int32_t* out, in
     if (!read_residual(r, out, block_size, order, pg)) {
       return false;
     }
+    /* The bits the coefficients really take, sign included: never more
+     * than the declared precision, and often fewer. */
+    int coef_bits = 1;
+    if (lpc) {
+      uint32_t magnitudes = 0;
+      for (int i = 0; i < order; i++) {
+        magnitudes |= (uint32_t)(coefs[i] < 0 ? ~coefs[i] : coefs[i]);
+      }
+      while (magnitudes >> (coef_bits - 1)) {
+        coef_bits++;
+      }
+    }
     if (restore && wide) {
       std::copy(warmup, warmup + order, wide);
       if (lpc) {
@@ -378,7 +419,7 @@ bool decode_subframe(FlacBitReader* r, int bps, int block_size, int32_t* out, in
       }
       if (!lpc) {
         restore_fixed32(out, block_size, order);
-      } else if (bps + precision + ceil_log2(order) <= 32) {
+      } else if (bps + coef_bits + ceil_log2(order) <= 32) {
         restore_lpc32(out, block_size, order, coefs, shift);
       } else {
         restore_lpc32_wide_sum(out, block_size, order, coefs, shift);
@@ -472,11 +513,32 @@ typedef BaacFlacDecoder_ Decoder;
 size_t pending(const Decoder* d) { return d->fifo.size() - d->head; }
 const uint8_t* fifo_data(const Decoder* d) { return d->fifo.data() + d->head; }
 
+/* Whatever was learned about the frame at the head no longer holds: the
+ * head moved, or the frame is to be read differently. */
+void forget_frame(Decoder* d) {
+  d->need = 0;
+  d->progress.valid = false;
+}
+
 void drop(Decoder* d, size_t n) {
   d->head += n;
   d->offset += n;
-  d->need = 0;
-  d->progress.valid = false;
+  forget_frame(d);
+}
+
+/* Empties the input side: the FIFO, what is known about the frame at its
+ * head, a metadata block in passage, and the flags that describe where
+ * in the stream the next byte belongs.  A reset and a seek both start
+ * from here. */
+void clear_input(Decoder* d) {
+  d->fifo.clear();
+  d->head = 0;
+  forget_frame(d);
+  d->skip = 0;
+  d->block_left = 0;
+  d->pending_error = false;
+  d->ended = false;
+  d->synced = false;
 }
 
 void fifo_append(Decoder* d, const uint8_t* data, size_t n) {
@@ -525,8 +587,7 @@ void apply_info(Decoder* d, const BaacFlacStreamInfo& info) {
   d->bits = info.bits_per_sample;
   d->nominal_block = info.min_block_size == info.max_block_size ? info.max_block_size : 0;
   /* A frame waiting at the head is read differently from here on. */
-  d->need = 0;
-  d->progress.valid = false;
+  forget_frame(d);
 }
 
 /* The block whose header was just read is behind us (but for `skip`
@@ -720,11 +781,13 @@ FrameResult decode_frame(Decoder* d, const uint8_t* p, size_t avail, const FlacF
  * (RFC 9639 section 4.2). */
 void undo_stereo(Decoder* d, const FlacFrameHeader& h, int bits) {
   const int n = h.block_size;
-  int32_t* c0 = d->work.data();
-  int32_t* c1 = c0 + d->block_capacity;
+  /* Two rows of the sample buffer and the 64-bit row: three stretches of
+   * memory that do not overlap. */
+  int32_t* FLAC_RESTRICT c0 = d->work.data();
+  int32_t* FLAC_RESTRICT c1 = d->work.data() + d->block_capacity;
   if (bits == 32) {
     /* The side channel is in the 64-bit row. */
-    const int64_t* side = d->wide.data();
+    const int64_t* FLAC_RESTRICT side = d->wide.data();
     if (h.assignment == FLAC_ASSIGN_LEFT_SIDE) {
       for (int i = 0; i < n; i++) {
         c1[i] = (int32_t)(uint32_t)((uint64_t)(int64_t)c0[i] - (uint64_t)side[i]);
@@ -767,21 +830,23 @@ void undo_stereo(Decoder* d, const FlacFrameHeader& h, int bits) {
   }
 }
 
-void interleave(const Decoder* d, int channels, int n, int32_t* pcm) {
+/* The rows are the decoder's own and `pcm` is the caller's: they do not
+ * overlap. */
+void interleave(const Decoder* d, int channels, int n, int32_t* FLAC_RESTRICT pcm) {
   const int32_t* rows = d->work.data();
   const size_t stride = (size_t)d->block_capacity;
   if (channels == 1) {
     memcpy(pcm, rows, (size_t)n * sizeof(int32_t));
   } else if (channels == 2) {
-    const int32_t* c0 = rows;
-    const int32_t* c1 = rows + stride;
+    const int32_t* FLAC_RESTRICT c0 = rows;
+    const int32_t* FLAC_RESTRICT c1 = rows + stride;
     for (int i = 0; i < n; i++) {
       pcm[2 * i] = c0[i];
       pcm[2 * i + 1] = c1[i];
     }
   } else {
     for (int ch = 0; ch < channels; ch++) {
-      const int32_t* c = rows + (size_t)ch * stride;
+      const int32_t* FLAC_RESTRICT c = rows + (size_t)ch * stride;
       for (int i = 0; i < n; i++) {
         pcm[(size_t)i * (size_t)channels + (size_t)ch] = c[i];
       }
@@ -824,18 +889,10 @@ BaacFlacDecoder* flac_decoder_create() {
 void flac_decoder_destroy(BaacFlacDecoder* d) { delete d; }
 
 void flac_decoder_reset(BaacFlacDecoder* d) {
+  clear_input(d);
   d->stage = Decoder::kStart;
-  d->fifo.clear();
-  d->head = 0;
-  d->need = 0;
-  d->progress.valid = false;
   d->offset = 0;
-  d->skip = 0;
-  d->block_left = 0;
   d->last_block = false;
-  d->pending_error = false;
-  d->ended = false;
-  d->synced = false;
   d->have_info = false;
   d->info = BaacFlacStreamInfo();
   d->have_config = false;
@@ -1091,16 +1148,8 @@ int flac_decoder_seek_reset(BaacFlacDecoder* d) {
   if (d->stage == Decoder::kFinished) {
     return AAC_ERR_STATE;
   }
+  clear_input(d);
   d->stage = Decoder::kFrames;
-  d->fifo.clear();
-  d->head = 0;
-  d->need = 0;
-  d->progress.valid = false;
-  d->skip = 0;
-  d->block_left = 0;
-  d->pending_error = false;
-  d->ended = false;
-  d->synced = false;
   d->md5_valid = false;
   return AAC_OK;
 }

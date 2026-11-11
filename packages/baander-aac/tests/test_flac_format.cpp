@@ -166,6 +166,18 @@ static void test_crc() {
         "CRC-8 against the bit-serial form");
   CHECK(flac_crc16(msg.data(), msg.size()) == crc_bitwise(msg.data(), msg.size(), 16, 0x8005),
         "CRC-16 against the bit-serial form");
+  /* Every length around the eight-byte step of the CRC-16, from every
+   * start within a step, and continued from a checksum that is not
+   * zero. */
+  for (size_t start = 0; start < 9; start++) {
+    for (size_t len = 0; len <= 41; len++) {
+      CHECK(flac_crc16(msg.data() + start, len) == crc_bitwise(msg.data() + start, len, 16, 0x8005),
+            "CRC-16 of %zu bytes from offset %zu", len, start);
+      CHECK(flac_crc16_update(flac_crc16(msg.data(), start), msg.data() + start, len) ==
+                flac_crc16(msg.data(), start + len),
+            "CRC-16 of %zu bytes continued after %zu", len, start);
+    }
+  }
   uint16_t crc = 0;
   for (size_t pos = 0; pos < msg.size(); pos += 100) {
     crc = flac_crc16_update(crc, msg.data() + pos, std::min<size_t>(100, msg.size() - pos));

@@ -280,6 +280,39 @@ static void test_subframe_types() {
     expect_clean("the 32-bit prediction sum at its limit", flac_decode(b.stream()), b.pcm);
   }
 
+  /* The same limit reached with coefficients narrower than the precision
+   * the subframe declares: 24 bits of sample, 4 bits of coefficient in a
+   * declared 15, and 4 of summation.  The sum's width follows from the
+   * coefficients that are there, and full-scale samples whose products
+   * all have one sign must still come out right. */
+  {
+    StreamBuilder b(48000, 1, 24);
+    const int block = 256;
+    for (int sign : {1, -1}) {
+      std::vector<int32_t> pcm((size_t)block);
+      std::vector<int> coefs;
+      for (int j = 0; j < 16; j++) {
+        coefs.push_back((j % 2 ? 1 : -1) * sign > 0 ? 7 : -8);
+      }
+      for (int i = 0; i < block; i++) {
+        pcm[(size_t)i] = i % 2 ? 8388607 : -8388608;
+      }
+      TestSubframe sf = TestSubframe::lpc(coefs, 15, 0);
+      sf.escape = -2;
+      b.add(sf, pcm);
+      sf.shift = 3;
+      b.add(sf, pcm);
+      /* One coefficient more, or one bit more, and the sum needs 64
+       * bits. */
+      coefs.push_back(sign > 0 ? 7 : -8);
+      b.add(TestSubframe::lpc(coefs, 15, 4), flac_gen_tones(block, 1, 24, 0.9, 6u));
+      coefs.pop_back();
+      coefs[0] = sign > 0 ? 15 : -16;
+      b.add(TestSubframe::lpc(coefs, 15, 4), flac_gen_tones(block, 1, 24, 0.9, 7u));
+    }
+    expect_clean("narrow coefficients under a wide precision", flac_decode(b.stream()), b.pcm);
+  }
+
   /* Rice parameters of 4 and 5 bits, every partition order a block of
    * 4096 allows, escaped partitions with and without bits, and a fixed
    * Rice parameter that does not fit the residual well. */

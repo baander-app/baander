@@ -21,6 +21,11 @@
 
 #include "flac.h"
 
+/* A pointer through which alone its object is reached in a function: the
+ * compiler may then keep values in registers across stores through other
+ * pointers.  Used only where the buffers cannot overlap. */
+#define FLAC_RESTRICT __restrict
+
 /* ── format constants ───────────────────────────────────────────── */
 
 #define FLAC_MARKER_BYTES 4       /* "fLaC" */
@@ -201,18 +206,25 @@ static inline void flac_bitreader_init(FlacBitReader* r, const uint8_t* data, si
   r->overread = false;
 }
 
-/* Tops the cache up to at least 56 bits while input remains. */
-static inline void flac_bitreader_refill(FlacBitReader* r) {
-  if (r->end - r->next >= 8) {
-    r->cache |= flac_load_be64(r->next) >> r->bits;
-    r->next += (63 - r->bits) >> 3;
-    r->bits |= 56;
+/* Tops a cache up to at least 56 bits while input remains.  The state
+ * is passed piece by piece so that a loop can keep it in locals, where a
+ * store to its output cannot make the compiler load it again. */
+static inline void flac_refill(uint64_t& cache, int& bits, const uint8_t*& next,
+                               const uint8_t* end) {
+  if (end - next >= 8) {
+    cache |= flac_load_be64(next) >> bits;
+    next += (63 - bits) >> 3;
+    bits |= 56;
     return;
   }
-  while (r->bits <= 55 && r->next < r->end) {
-    r->cache |= (uint64_t)*r->next++ << (56 - r->bits);
-    r->bits += 8;
+  while (bits <= 55 && next < end) {
+    cache |= (uint64_t)*next++ << (56 - bits);
+    bits += 8;
   }
+}
+
+static inline void flac_bitreader_refill(FlacBitReader* r) {
+  flac_refill(r->cache, r->bits, r->next, r->end);
 }
 
 /* Moves to `bit` bits behind the start of the input, a position inside
