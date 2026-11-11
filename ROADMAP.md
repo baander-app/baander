@@ -634,8 +634,7 @@ Open:
 - The full tooling suite completed green on 2026-11-09 (1525 tests, 13,063
   assertions, 9 environment skips, 50 minutes) with the gateway fix landing
   mid-run; a clean full re-run on the merged master remains pending.
-- **Retained identities, delivered on the branch `movie-playback-growing-presentations`
-  (not merged):** a retained postgres or redis identity is kept only while the daemon
+- **Retained identities, delivered with the movie playback merge (`5957de556`):** a retained postgres or redis identity is kept only while the daemon
   holds it; otherwise the role is built or pulled as for a new instance. A stopped
   instance restarts from its saved release only while all its images resolve. Only the
   daemon's own "No such image" answer counts as absent.
@@ -661,12 +660,24 @@ Open:
   that was running when its release was pruned also stops at a named refusal, because
   only the lost operator image could retire its worker registration. Both need a data
   reset, which needs the owner's approval.
+- **Reset, 2026-11-11, approved by the owner:** the preview's 14 volumes, its private
+  network and its saved state (21 GB, 17 GB of it checkpoints) were removed after
+  checking that no container used them. `make preview-status` answers "No configured
+  instance", so the next `make preview-up` initializes a new instance. The tooling has
+  no reset command; this was done with `docker volume rm`, `docker network rm` and by
+  removing the instance's directory under the controller's state root.
 
 ### Movie playback on growing presentations
 
-Delivered on the branch `movie-playback-growing-presentations` from the
-[plan](docs/plans/2026-11-09-1635-fix-movie-playback-growing-presentations-plan.md);
-not merged. On the persistent instance a 1080p movie cut forward every few
+Delivered from the
+[plan](docs/plans/2026-11-09-1635-fix-movie-playback-growing-presentations-plan.md)
+on the branch `movie-playback-growing-presentations`, merged to `master` as
+`5957de556` on 2026-11-10 and pushed to both remotes. The website was built from
+that revision and published to `baander.app` the same day: 237 manual pages; on
+the live site the home page, the Session context page, the media and playback
+testing page, the continuous integration page, `sitemap.xml` and
+`pagefind/pagefind.js` answered 200 with the expected content and an unknown path
+answered 404. The visual checks were not repeated. On the persistent instance a 1080p movie cut forward every few
 seconds while its encode ladder ran ahead of playback, wedged after a failed
 transfer and left eight sessions holding jobs, slots and 361 MB of output.
 
@@ -796,14 +807,18 @@ each gate run alone on a quiet host.
   phase's review returned two confirmed P2 findings, fixed in `b26455a68`. The
   cross-model pass is disabled by the checkout configuration.
 
+Decided by the user on 2026-11-11, not yet planned or built:
+
+- **What ends the fence of a runner that was shown a start and then went away.** A
+  registration from the same tab is taken as proof that the old page is gone and
+  ends the fence at once. For a tab that closed or lost its network, the refused
+  tab offers an explicit "Play here anyway". Nothing is released on a timer.
+- **Queue edits and volume changes:** the release proof ignores a queue edit or a
+  volume change shown after the confirmed pause or stop. Only a command that can
+  start or move playback keeps the runner fenced.
+
 Open, for the user to decide:
 
-- **What ends the fence of a runner that was shown a start and then went away.** A tab
-  that reloads or closes while a load, play or seek is starting leaves the session
-  unknown, as before. Candidates: an explicit "play here anyway", a same-tab
-  registration taken as proof, a bounded wait.
-- **Whether a shown queue edit or volume change may be ignored by the release proof.**
-  It cannot start playback, but today it still counts as a later command.
 - **The two tooling rules** named under "Development controller image identities".
 
 Open, known limits:
@@ -839,9 +854,9 @@ Open, known limits:
 
 ### Playback session entities
 
-Delivered on the branch `playback-session-entities` from the
-[plan](docs/plans/2026-11-10-2252-refactor-playback-session-entities-plan.md); not
-merged.
+Delivered from the
+[plan](docs/plans/2026-11-10-2252-refactor-playback-session-entities-plan.md) on the
+branch `playback-session-entities` and merged to `master` on 2026-11-11.
 The four playback coordination tables had no entities, the ORM `schema_filter` hid
 them from schema comparison, and `PlaybackStore` read and wrote them with 38
 hand-written statements.
@@ -921,9 +936,16 @@ Open:
   whose row the database deletes by cascade while the unit of work keeps the child
   managed. Removing the parent and flushing again fails, as the cleanup defect below
   showed. They are not audited. The playback entities have no associations.
-- **Not run:** `ce-simplify-code` and `ce-code-review` over this branch, the gate on a
-  hosted runner, and the adaptive and media-control gates, whose code this branch does
-  not touch.
+- **Not run:** the gate on a hosted runner, and the adaptive and media-control gates,
+  whose code this branch does not touch.
+- **Store preconditions:** `register()`, `saveTransfer()` and `insertCommand()` look
+  a row up and then insert it, which is safe only under the account lock that
+  `lockSession()` takes inside the transaction port. The coordinator is their only
+  caller. The store states this in docblocks and does not assert it: the contract
+  tests call the three outside a transaction, and an open transaction would not prove
+  the lock.
+- **A job another run removed:** when two cleanup runs overlap and the other one
+  deleted a whole job first, this run still counts that job as cleaned.
 
 Gates, 2026-11-11, on an image built from the branch, client controls on: the
 two-command gate passes all eight phases in Chromium 156 and in Firefox 157 (two of
@@ -931,6 +953,26 @@ three Firefox runs; see the drill fix below), and the movie-endpoint step passes
 Transcode and Session unit suites pass 1,615 tests, sixteen PostgreSQL integration
 files pass 402 tests, PHPStan, Deptrac, `lint:container` and the OpenAPI check are
 clean, and the web typecheck and 493 session and catalog tests pass.
+
+Code review, 2026-11-11, eight reviewers over the branch against `e839b7986`: no
+defect in the store, one confirmed P2 in the cleanup fix and one unproven risk that a
+test then proved, both fixed in `b364cd7f3`. The tests the review asked for are in
+`d8a39c6cc` (two connections registering one endpoint, a refused insert, a
+token-level check of the five SQL statements) and `02b8fa12a` (a worker delivery test
+that raced its own timeout). The cross-model pass is disabled by the checkout
+configuration.
+
+Final checkpoint, 2026-11-11, at `975e8ca51` (the image was built at `b364cd7f3`; the
+one later source change renames a bind type that maps to the same instant type):
+the two-command gate passes all eight phases in Firefox 157 and in Chromium 156 on
+the first run of each, client controls on, and the movie-endpoint step passes. The
+whole unit directory passes 8,551 tests in 803 files, eighteen PostgreSQL integration
+files pass 409 tests, PHPStan, Deptrac, `lint:container` and the OpenAPI check are
+clean, and the web typecheck and 493 session and catalog tests pass. The full unit
+run was the first on this line of work since the movie playback branch: it found
+`InstantBindConventionTest` failing on a bind that `b26455a68` introduced and that
+reached `master` with the movie playback merge, fixed in `975e8ca51`. Earlier
+checkpoints ran the Transcode and Session unit directories only.
 
 Fixed on the same branch, found on the persistent instance after the movie playback
 merge:
@@ -945,6 +987,14 @@ merge:
   run that could not remove every job exits 1, or answers 503 from the admin endpoint,
   with the expired, removed and failed counts. A test runs the real command over eight
   stale sessions, two with a live lease: eight expire, six jobs go, two stay.
+  After code review (`b364cd7f3`) the removal no longer looks the sessions up with a
+  query. It detaches the ones the unit of work holds, read from its identity map,
+  because a second cleanup run can delete a session row this run still manages; a
+  two-connection test failed against the query in both variants with "removed 2
+  orphaned jobs and could not remove 1". The incomplete outcome is a
+  `ServiceUnavailableException`, so the exception subscriber builds the 503 and the
+  controller no longer catches it. The learning is in
+  `docs/solutions/runtime-errors/doctrine-refuses-a-flush-after-the-database-cascaded-a-delete-under-managed-children.md`.
 - **Two-command audio step (`c4f169142`):** one Firefox run failed in `attach` because
   the drill waited 55 seconds for a single-thread MP3 encode of a 30-minute track that
   takes about 48 seconds here, while the host was under heavy concurrent load. The
