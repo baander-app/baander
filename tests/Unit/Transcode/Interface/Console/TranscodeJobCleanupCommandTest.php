@@ -31,7 +31,7 @@ final class TranscodeJobCleanupCommandTest extends TestCase
         $jobs = $this->createStub(TranscodeJobPortInterface::class);
         $jobs->method('cleanupOrphanedJobs')->willReturn(3);
         $support = new AdminCommandSupport(new MessageBus([new HandleMessageMiddleware(new HandlersLocator([
-            CleanupOrphanedJobsCommand::class => [new CleanupOrphanedJobsHandler($jobs, $this->staleSessions(2))],
+            CleanupOrphanedJobsCommand::class => [new CleanupOrphanedJobsHandler($jobs, $this->staleSessions(2), new \Psr\Log\NullLogger())],
         ]))]));
 
         $tester = new CommandTester(new TranscodeJobCleanupCommand($support));
@@ -45,13 +45,43 @@ final class TranscodeJobCleanupCommandTest extends TestCase
         $jobs = $this->createStub(TranscodeJobPortInterface::class);
         $jobs->method('cleanupOrphanedJobs')->willReturn(0);
         $support = new AdminCommandSupport(new MessageBus([new HandleMessageMiddleware(new HandlersLocator([
-            CleanupOrphanedJobsCommand::class => [new CleanupOrphanedJobsHandler($jobs, $this->staleSessions(8))],
+            CleanupOrphanedJobsCommand::class => [new CleanupOrphanedJobsHandler($jobs, $this->staleSessions(8), new \Psr\Log\NullLogger())],
         ]))]));
 
         $tester = new CommandTester(new TranscodeJobCleanupCommand($support));
 
         self::assertSame(Command::SUCCESS, $tester->execute([]));
         self::assertStringContainsString('Expired 8 stale transcode sessions and removed 0 orphaned transcode jobs.', $tester->getDisplay());
+    }
+
+    public function testAFailedCleanupStepIsAnErrorOnTheConsoleAndInTheLog(): void
+    {
+        $failure = new \RuntimeException('The job could not be removed.');
+        $jobs = $this->createStub(TranscodeJobPortInterface::class);
+        $jobs->method('cleanupOrphanedJobs')->willThrowException($failure);
+        $logger = new class extends \Psr\Log\AbstractLogger {
+            /** @var list<array{level: mixed, message: string, context: array<mixed>}> */
+            public array $records = [];
+
+            public function log($level, \Stringable|string $message, array $context = []): void
+            {
+                $this->records[] = ['level' => $level, 'message' => (string) $message, 'context' => $context];
+            }
+        };
+        $support = new AdminCommandSupport(new MessageBus([new HandleMessageMiddleware(new HandlersLocator([
+            CleanupOrphanedJobsCommand::class => [new CleanupOrphanedJobsHandler($jobs, $this->staleSessions(3), $logger)],
+        ]))]));
+
+        $tester = new CommandTester(new TranscodeJobCleanupCommand($support));
+
+        self::assertSame(Command::FAILURE, $tester->execute(['--json' => true], ['capture_stderr_separately' => true]));
+        self::assertSame('', $tester->getDisplay(), 'A failed run prints no result.');
+        self::assertStringContainsString('The job could not be removed.', $tester->getErrorOutput());
+        // The sessions expired before the failure stay expired; the log says how many and why the run failed.
+        self::assertCount(1, $logger->records);
+        self::assertSame(\Psr\Log\LogLevel::ERROR, $logger->records[0]['level']);
+        self::assertSame(3, $logger->records[0]['context']['expired']);
+        self::assertSame($failure, $logger->records[0]['context']['exception']);
     }
 
     /** An expiry over $count abandoned sessions, each without an execution of its own. */

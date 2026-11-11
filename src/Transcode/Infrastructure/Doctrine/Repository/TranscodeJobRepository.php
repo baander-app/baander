@@ -12,6 +12,7 @@ use App\Transcode\Domain\Repository\TranscodeJobRepositoryInterface;
 use App\Transcode\Domain\ValueObject\TranscodeStatus;
 use App\Transcode\Domain\ValueObject\PresentationSelection;
 use App\Transcode\Infrastructure\Doctrine\Entity\TranscodeJobEntity;
+use App\Transcode\Infrastructure\Doctrine\Entity\TranscodeSessionEntity;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Query;
 
@@ -155,10 +156,18 @@ final class TranscodeJobRepository implements TranscodeJobRepositoryInterface
             ->getRepository(TranscodeJobEntity::class)
             ->find($job->getId());
 
-        if ($entity !== null) {
-            $this->entityManager->remove($entity);
-            $this->entityManager->flush();
+        if ($entity === null) {
+            return;
         }
+        // The database deletes a job's sessions with the job. The unit of work has to remove them
+        // too: a session it still manages would keep pointing at the removed job, and the next
+        // flush would refuse that job as a new entity found through the session.
+        $sessions = $this->entityManager->getRepository(TranscodeSessionEntity::class)->findBy(['job' => $entity]);
+        foreach ($sessions as $session) {
+            $this->entityManager->remove($session);
+        }
+        $this->entityManager->remove($entity);
+        $this->entityManager->flush();
     }
 
     // --- Internal ---

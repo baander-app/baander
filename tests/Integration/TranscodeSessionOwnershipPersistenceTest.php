@@ -226,7 +226,7 @@ final class TranscodeSessionOwnershipPersistenceTest extends TestCase
         $expiry = new \App\Transcode\Application\Service\StaleTranscodeSessionExpiry(
             new \App\Transcode\Infrastructure\Transcode\TranscodeSessionService($sessions), $runtime, $jobService, $transaction, new \Symfony\Component\Clock\NativeClock(), new \Psr\Log\NullLogger(),
         );
-        $handler = new \App\Transcode\Application\CommandHandler\CleanupOrphanedJobsHandler($jobService, $expiry);
+        $handler = new \App\Transcode\Application\CommandHandler\CleanupOrphanedJobsHandler($jobService, $expiry, new \Psr\Log\NullLogger());
         $ids = [];
         foreach (['abandoned' => \App\Transcode\Domain\ValueObject\QualityTier::p360(), 'fresh' => \App\Transcode\Domain\ValueObject\QualityTier::p720(), 'paused' => \App\Transcode\Domain\ValueObject\QualityTier::p1080()] as $name => $tier) {
             $job = \App\Transcode\Domain\Model\TranscodeJob::create($video, $tier, '/fixture/' . $name, $owner, requestId: $name . '-client');
@@ -290,7 +290,7 @@ final class TranscodeSessionOwnershipPersistenceTest extends TestCase
         $jobService = new \App\Transcode\Infrastructure\Transcode\TranscodeJobService($jobs, $storage, new \Symfony\Component\EventDispatcher\EventDispatcher(), $runtime);
         $handler = new \App\Transcode\Application\CommandHandler\CleanupOrphanedJobsHandler($jobService, new \App\Transcode\Application\Service\StaleTranscodeSessionExpiry(
             new \App\Transcode\Infrastructure\Transcode\TranscodeSessionService($sessions), $runtime, $jobService, $transaction, new \Symfony\Component\Clock\NativeClock(), new \Psr\Log\NullLogger(),
-        ));
+        ), new \Psr\Log\NullLogger());
         $job = \App\Transcode\Domain\Model\TranscodeJob::create($video, \App\Transcode\Domain\ValueObject\QualityTier::p1080(), '/fixture/held', $owner, requestId: 'held-client');
         $job->attachSession();
         $job->markInProgress();
@@ -445,6 +445,111 @@ final class TranscodeSessionOwnershipPersistenceTest extends TestCase
         self::assertNull($runtime->refresh($claims[2]));
         self::assertCount(4, $claims);
         self::assertSame(1, (int) $connection->fetchOne('SELECT count(*) FROM transcode_jobs WHERE request_id = ?', [$request]), 'Every start reused the one job.');
+    }
+
+    public function testOneCleanupRunExpiresStaleSessionsAndRemovesEveryJobTheirWorkersLetGo(): void
+    {
+        $owner = $this->createUser();
+        $video = $this->createVideo();
+        $jobs = new \App\Transcode\Infrastructure\Doctrine\Repository\TranscodeJobRepository($this->manager);
+        $sessions = new TranscodeSessionRepository($this->manager);
+        $connection = $this->manager->getConnection();
+        // The transaction port the application runs: it flushes the entity manager inside each transaction.
+        $registry = $this->createStub(\Doctrine\Persistence\ManagerRegistry::class);
+        $registry->method('getManager')->willReturn($this->manager);
+        $transaction = new \App\Shared\Infrastructure\Doctrine\DoctrineTransaction($registry, new \SwooleBundle\SwooleBundle\Bridge\Swoole\Swoole());
+        $runtime = new \App\Transcode\Infrastructure\Doctrine\TranscodeRuntimeState($connection, $transaction);
+        $storage = $this->createStub(\App\Transcode\Application\Port\TranscodeStoragePortInterface::class);
+        $storage->method('deleteIfUnretained')->willReturn(true);
+        $jobService = new \App\Transcode\Infrastructure\Transcode\TranscodeJobService($jobs, $storage, new \Symfony\Component\EventDispatcher\EventDispatcher(), $runtime);
+        $logger = new class extends \Psr\Log\AbstractLogger {
+            /** @var list<string> */
+            public array $records = [];
+
+            public function log($level, \Stringable|string $message, array $context = []): void
+            {
+                $this->records[] = $level . ': ' . $message;
+            }
+        };
+        $handler = new \App\Transcode\Application\CommandHandler\CleanupOrphanedJobsHandler($jobService, new \App\Transcode\Application\Service\StaleTranscodeSessionExpiry(
+            new \App\Transcode\Infrastructure\Transcode\TranscodeSessionService($sessions), $runtime, $jobService, $transaction, new \Symfony\Component\Clock\NativeClock(), $logger,
+        ), $logger);
+        $command = new \App\Transcode\Interface\Console\TranscodeJobCleanupCommand(new \App\Shared\Interface\Console\AdminCommandSupport(
+            new \Symfony\Component\Messenger\MessageBus([new \Symfony\Component\Messenger\Middleware\HandleMessageMiddleware(new \Symfony\Component\Messenger\Handler\HandlersLocator([
+                \App\Transcode\Application\Command\CleanupOrphanedJobsCommand::class => [$handler],
+            ]))]),
+        ));
+        $worker = new \App\Transcode\Application\DTO\MediaWorkerIdentity('baander.app:workers', str_repeat('c', 32), 'media', 1);
+        // One user left one video open in three players two days ago. Each player holds the tiers of
+        // its own play; some were paused. Two executions still have a worker renewing its lease, as
+        // at the lead throttle; the workers of the others have let go.
+        $plays = [
+            'first-player' => ['360p' => ['active', 'held'], '720p' => ['active', 'released'], '1080p' => ['paused', 'released']],
+            'second-player' => ['360p' => ['paused', 'held'], '720p' => ['active', 'never claimed'], '1080p' => ['active', 'released']],
+            'third-player' => ['360p' => ['paused', 'released'], '720p' => ['active', 'never claimed']],
+        ];
+        $held = [];
+        $let = [];
+        foreach ($plays as $player => $tiers) {
+            foreach ($tiers as $tier => [$state, $lease]) {
+                $job = \App\Transcode\Domain\Model\TranscodeJob::create($video, \App\Transcode\Domain\ValueObject\QualityTier::fromString($tier), '/fixture/' . $player . '/' . $tier, $owner, requestId: $player);
+                $job->attachSession();
+                $job->markInProgress();
+                $jobs->save($job);
+                $session = TranscodeSession::create($owner, $job->getId(), $video, AudioProfile::streamingStereo());
+                $session->markPreparing();
+                $session->markActive();
+                if ($state === 'paused') {
+                    $session->markPaused();
+                }
+                $sessions->save($session);
+                $connection->transactional(static fn () => $runtime->admit($job->getId(), $session->getId(), $player, new \App\Transcode\Application\DTO\DesiredTranscodeState(AudioProfile::streamingStereo(), $state === 'paused' ? 'paused' : 'running', 118.86)));
+                if ($lease !== 'never claimed') {
+                    $claim = $runtime->claim($job->getId(), $worker);
+                    self::assertNotNull($claim);
+                    self::assertTrue($runtime->observe($claim, 'ready', '/fixture/' . $player . '/' . $tier . '/generation-' . $claim->runtime->generation));
+                    if ($lease === 'released') {
+                        self::assertTrue($runtime->release($runtime->refresh($claim) ?? $claim));
+                    }
+                }
+                if ($lease === 'held') {
+                    $held[] = $job->getId();
+                } else {
+                    $let[] = $job->getId();
+                }
+            }
+        }
+        $connection->executeStatement("UPDATE transcode_sessions SET updated_at = clock_timestamp() - interval '2 days' WHERE user_id = ?", [$owner->toString()]);
+        // The command runs in a process of its own: nothing is managed when it starts.
+        $this->manager->clear();
+
+        $tester = new \Symfony\Component\Console\Tester\CommandTester($command);
+        $exit = $tester->execute(['--json' => true], ['capture_stderr_separately' => true]);
+
+        self::assertSame('', $tester->getErrorOutput());
+        self::assertSame([], $logger->records);
+        self::assertSame(\Symfony\Component\Console\Command\Command::SUCCESS, $exit);
+        self::assertSame(['expired' => 8, 'cleaned' => 6], json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR));
+        self::assertTrue($this->manager->isOpen());
+        $this->manager->clear();
+        foreach ($let as $jobId) {
+            self::assertNull($jobs->findByUuid($jobId));
+            self::assertNull($runtime->find($jobId));
+        }
+        self::assertSame(0, (int) $connection->fetchOne("SELECT count(*) FROM transcode_sessions WHERE user_id = ? AND state NOT IN ('cancelled')", [$owner->toString()]));
+        // A worker that still holds its lease may be writing: its job waits for it to let go.
+        foreach ($held as $jobId) {
+            $kept = $runtime->find($jobId);
+            self::assertNotNull($kept);
+            self::assertSame('cancelled', $kept->outcome);
+            self::assertTrue($kept->ownershipLive);
+            self::assertSame(0, $jobs->findByUuid($jobId)?->getReferenceCount());
+        }
+        self::assertSame(2, (int) $connection->fetchOne('SELECT count(*) FROM transcode_sessions WHERE user_id = ?', [$owner->toString()]));
+
+        // The next run, in the same process as a scheduler runs it, finds nothing to expire and still nothing to remove.
+        self::assertSame(\Symfony\Component\Console\Command\Command::SUCCESS, $tester->execute(['--json' => true]));
+        self::assertSame(['expired' => 0, 'cleaned' => 0], json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR));
     }
 
     /** @return array<string, mixed> */
