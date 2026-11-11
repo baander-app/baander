@@ -5,14 +5,15 @@
 
 /* The direct sums of the complex filterbanks (qmf.cpp, qmf_ld.cpp,
  * mps_ld.cpp).  Every output adds its terms in the order of its
- * definition, first term first, so the result is the one a plain loop over
- * the terms of one output gives, to the last bit.  The loops are nested
- * the other way round: the outer loop walks the terms and the inner one
- * the outputs, each of which keeps its own running sum.  Exact arithmetic
- * forbids regrouping the terms of one sum, which leaves a loop over the
- * terms to a single chain of additions; a loop over the outputs has no
- * such chain and vectorises.  The modulation tables are stored for this
- * order, term by term. */
+ * definition, first term first.  The outer loop walks the terms and the
+ * inner loop the outputs, each with its own running sum: the additions
+ * into one output keep their order, and the inner loop, in which no
+ * output depends on another, vectorises.
+ *
+ * A table such a loop reads is stored by term: the values of one term for
+ * all outputs lie next to each other, so the inner loop reads them in
+ * sequence.  The modulation tables of the filterbanks and the DCT-IV
+ * tables of usac_fac.cpp follow this layout. */
 
 /* u[n] = sum over j < 5 of x[n + terms j] window[n + terms j], n < terms:
  * the windowed history folded into one period of the modulation. */

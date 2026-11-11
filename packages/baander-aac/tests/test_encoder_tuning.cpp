@@ -3,12 +3,15 @@
  * modes order their bitrates and follow a peak bitrate, a 5.1 HE-AAC
  * frame carries each element's SBR data right after that element and
  * FFmpeg decodes it channel for channel, HE-AAC v2 drains a short
- * last block and a single-sample input correctly, and the committed
- * AAC-LC, HE-AAC and HE-AAC v2 streams.
+ * last block and a single-sample input correctly, NaN, infinite and huge
+ * input samples are coded as their documented replacements, and the
+ * committed AAC-LC, HE-AAC and HE-AAC v2 streams.
  *
  * With arguments the program writes the committed streams instead:
  *   test_encoder_tuning --write-streams <dir>
  */
+#include <cfloat>
+
 #include "bitstream.h"
 #include "encoder.h"
 #include "test_util.h"
@@ -571,6 +574,88 @@ void test_ps_single_sample() {
   }
 }
 
+/* ── input out of range ────────────────────────────────────────── */
+
+/* Decodes a stream of any transport through the FIFO, concealment off;
+ * returns whether every frame decoded and every sample is finite. */
+bool decodes_finite(const std::vector<uint8_t>& stream) {
+  AacDecoderHandle dec = aac_decoder_create(48000, 0);
+  if (!dec) {
+    return false;
+  }
+  aac_decoder_set_concealment(dec, AAC_CONCEAL_OFF);
+  std::vector<float> out((size_t)AAC_DECODER_MAX_OUTPUT * 8);
+  bool ok = true;
+  int frames = 0;
+  size_t pos = 0;
+  for (;;) {
+    pos += (size_t)aac_decoder_feed(dec, stream.data() + pos, (int)(stream.size() - pos));
+    const int got = aac_decoder_decode_next(dec, out.data(), (int)out.size());
+    if (got == 0 && pos == stream.size()) {
+      break;
+    }
+    ok = ok && got >= 0;
+    for (int i = 0; i < got * aac_decoder_channels(dec); i++) {
+      ok = ok && std::isfinite(out[(size_t)i]);
+    }
+    frames += got > 0;
+  }
+  aac_decoder_destroy(dec);
+  return ok && frames > 0;
+}
+
+/* A NaN is coded as silence and a sample beyond 65536 in magnitude as
+ * 65536 of its sign: a stream with NaN, infinities or huge values is
+ * byte for byte the stream of the signal with those replacements, in
+ * every profile, and decodes to finite samples.  Single samples and a
+ * run longer than a block are replaced. */
+void test_out_of_range_input() {
+  struct Profile {
+    const char* name;
+    AacObjectType aot;
+    int bitrate;
+    AacRateControl rc;
+  };
+  const Profile profiles[] = {{"AAC-LC", AAC_AOT_LC, 128000, AAC_RC_CBR},
+                              {"AAC-LC TVBR", AAC_AOT_LC, 128000, AAC_RC_TVBR},
+                              {"HE-AAC", AAC_AOT_SBR, 48000, AAC_RC_CBR},
+                              {"HE-AAC v2", AAC_AOT_PS, 32000, AAC_RC_CBR},
+                              {"xHE-AAC", AAC_AOT_USAC, 64000, AAC_RC_CBR},
+                              {"AAC-ELD", AAC_AOT_ER_ELD, 128000, AAC_RC_CBR}};
+  std::vector<float> signal = gen_he_signal(2);
+  signal.resize(2 * 36000);
+  std::vector<float> nans = signal, silenced = signal;
+  std::vector<float> infinite = signal, huge = signal, limited = signal;
+  for (size_t k : {1001u, 12346u, 20001u, 33333u}) {
+    const float sign = k & 1 ? 1.0f : -1.0f;
+    nans[k] = NAN;
+    silenced[k] = 0.0f;
+    infinite[k] = sign * INFINITY;
+    huge[k] = sign * (k < 20000 ? 1e30f : FLT_MAX);
+    limited[k] = sign * 65536.0f;
+  }
+  for (size_t k = 2 * 30000; k < 2 * 32048; k++) { /* a whole block and more */
+    nans[k] = NAN;
+    silenced[k] = 0.0f;
+    infinite[k] = -INFINITY;
+    huge[k] = -1e20f;
+    limited[k] = -65536.0f;
+  }
+  const auto none = [](AacEncoderHandle) {};
+  for (const Profile& p : profiles) {
+    const auto encode = [&](const std::vector<float>& pcm) {
+      return encode_with(pcm, 48000, 2, p.bitrate, p.aot, p.rc, none).stream;
+    };
+    const std::vector<uint8_t> want_silence = encode(silenced);
+    const std::vector<uint8_t> want_limit = encode(limited);
+    CHECK(encode(nans) == want_silence, "%s: NaN codes as silence", p.name);
+    CHECK(encode(infinite) == want_limit, "%s: an infinity codes as 65536", p.name);
+    CHECK(encode(huge) == want_limit, "%s: a huge sample codes as 65536", p.name);
+    CHECK(decodes_finite(want_silence) && decodes_finite(want_limit),
+          "%s: the streams decode to finite samples", p.name);
+  }
+}
+
 /* ── the committed streams ─────────────────────────────────────── */
 
 /* One stream per encoder the xHE-AAC suites do not reach: AAC-LC with
@@ -682,8 +767,8 @@ void test_committed() {
 }  // namespace
 
 int main(int argc, char** argv) {
-  if (argc >= 3 && strcmp(argv[1], "--write-streams") == 0) {
-    return write_streams(argv[2]);
+  if (const char* dir = write_streams_dir(argc, argv)) {
+    return write_streams(dir);
   }
   test_committed();
   test_peak_bitrate();
@@ -693,5 +778,6 @@ int main(int argc, char** argv) {
   test_he51_ffmpeg();
   test_ps_short_last_block();
   test_ps_single_sample();
+  test_out_of_range_input();
   return test_summary("test_encoder_tuning");
 }

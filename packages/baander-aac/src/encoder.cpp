@@ -1421,8 +1421,17 @@ int prepare_bands(AacEncoderState* s, ReleaseEntry* release) {
       }
     }
   }
+  /* Bands of equal energy (channels that carry the same signal) go in
+   * channel and band order, so that the order does not depend on the
+   * sort. */
   std::sort(release, release + n_release, [](const ReleaseEntry& a, const ReleaseEntry& b) {
-    return a.sfb != b.sfb ? a.sfb > b.sfb : a.energy < b.energy;
+    if (a.sfb != b.sfb) {
+      return a.sfb > b.sfb;
+    }
+    if (a.energy != b.energy) {
+      return a.energy < b.energy;
+    }
+    return a.ch != b.ch ? a.ch < b.ch : a.idx < b.idx;
   });
   return n_release;
 }
@@ -1902,6 +1911,10 @@ void apply_usac_tools(AacEncoderState* s) {
 void aac_enc_band_book_bits(const AacIcsInfo* ics, const int* quant, int g, int w0, int b,
                             int max_mag, int* cost) {
   band_book_bits(ics, quant, g, w0, b, max_mag, cost);
+}
+
+float aac_enc_band_noise(const AacDSP* dsp, const AacEncChannel* c, int g, int w0, int b, int sf) {
+  return band_noise_at(dsp, c, g, w0, b, sf);
 }
 
 AacEncoderState* aac_encoder_state_create(int sr, int ch, int br, AacObjectType aot,

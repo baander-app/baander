@@ -367,12 +367,11 @@ namespace {
 
 /* Ratio of the energy a second-order predictor explains to the residual
  * of a band over slots [t0, t1), with two slots of history.  Every sum
- * over the slots keeps two partial sums, one of the first, third,
- * fifth ... term and one of the others, and adds them at the end: a
- * written-out order that every compiler follows, with two independent
- * lanes that it can compute side by side.  The band's values are copied
- * to separate arrays of real and imaginary parts, so the two lanes read
- * neighbouring values. */
+ * over the slots is the sum of two partial sums, one of the first, third,
+ * fifth ... term and one of the others.  The order is written out, so
+ * every compiler computes the same sums, and the two partial sums do not
+ * depend on each other.  The band's values are copied to separate arrays
+ * of real and imaginary parts, so the two read neighbouring values. */
 float tonality(const AacSbrEncChannel* ch, int band, int t0, int t1) {
   const int n = t1 - t0;
   if (n < 2) {

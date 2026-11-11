@@ -569,8 +569,8 @@ static int write_streams(const char* dir) {
 }
 
 int main(int argc, char** argv) {
-  if (argc >= 3 && strcmp(argv[1], "--write-streams") == 0) {
-    return write_streams(argv[2]);
+  if (const char* dir = write_streams_dir(argc, argv)) {
+    return write_streams(dir);
   }
   test_api();
   for (int ch : {1, 2}) {

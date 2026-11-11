@@ -161,10 +161,7 @@ static float syn_filter_step(const float* a, const float* h) {
  * samples do not depend on how a compiler would group the sum. */
 static void test_syn_filter_order() {
   unsigned seed = 7u;
-  auto next = [&seed]() {
-    seed = seed * 1664525u + 1013904223u;
-    return (float)(seed >> 8) / 8388608.0f - 1.0f;
-  };
+  const auto next = [&seed]() { return lcg_float(&seed); };
   /* coefficients whose magnitudes sum below 1 keep the filter stable */
   float a[LPD_M + 1] = {1.0f};
   for (int j = 1; j <= LPD_M; j++) {
@@ -553,8 +550,7 @@ static void test_fac() {
     std::vector<float> x((size_t)n), y((size_t)n), want((size_t)n);
     unsigned seed = 11u;
     for (int i = 0; i < n; i++) {
-      seed = seed * 1664525u + 1013904223u;
-      x[(size_t)i] = (float)(seed >> 8) / 8388608.0f - 1.0f;
+      x[(size_t)i] = lcg_float(&seed);
     }
     const double pi = 3.14159265358979323846;
     for (int k = 0; k < n; k++) {

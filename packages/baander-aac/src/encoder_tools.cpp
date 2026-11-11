@@ -69,9 +69,9 @@ float tns_dequantize(int idx, int bits) {
 }
 
 /* The sum of x[i] y[i] over [0, n) in double.  Product i goes into
- * partial sum i mod 4 and the four are added pairwise at the end: a
- * written-out order that every compiler follows, with four independent
- * additions in flight instead of one chain. */
+ * partial sum s(i mod 4), and the result is (s0 + s1) + (s2 + s3).  The
+ * order is written out, so every compiler computes the same sum, and the
+ * four partial sums do not depend on one another. */
 double dot_in_four(const float* x, const float* y, int n) {
   double s0 = 0.0, s1 = 0.0, s2 = 0.0, s3 = 0.0;
   int i = 0;

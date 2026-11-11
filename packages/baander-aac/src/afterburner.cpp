@@ -64,12 +64,12 @@ constexpr float kIgnoredLog2 = -1.0e9f;
 /* Codebook with the smallest alphabet per maximum magnitude, by index. */
 const int kCodebookMaxVal[12] = {0, 1, 1, 2, 2, 4, 4, 7, 7, 12, 12, AAC_ESC_MAX_MAG};
 
-float sf_gain(int sf) { return exp2f(0.25f * (float)(sf - 100)); }
 float sf_scale34(int sf) { return exp2f(-0.1875f * (float)(sf - 100)); }
 
 /* Per-band bookkeeping of one channel. */
 struct ChannelWork {
   AacEncChannel* c;
+  const AacDSP* dsp; /* the codec's DSP table */
   int nswb, ngroups, nbands;
   int w0[AAC_MAX_WINDOW_GROUPS]; /* first window of each group */
   int lines[AAC_MAX_BANDS];      /* lines over the group's windows */
@@ -174,16 +174,12 @@ int quantize_band(const ChannelWork* w, int idx, int sf, int* q) {
   return max_mag;
 }
 
-float band_noise(const ChannelWork* w, int idx, int sf, const int* q) {
-  const float gain = sf_gain(sf);
-  const AacEncChannel* c = w->c;
-  float noise = 0.0f;
-  for_lines(w, idx, [&](int i) {
-    const int v = q[i] < 0 ? -q[i] : q[i];
-    const float d = fabsf(c->coef[i]) - aac_pow43[v] * gain;
-    noise += d * d;
-  });
-  return noise;
+/* The noise of band idx quantized at sf, measured as the rate loop
+ * measures it.  A coded band's stored quantization is quantize_band's at
+ * its scalefactor, so this is also the noise of the values it holds. */
+float band_noise(const ChannelWork* w, int idx, int sf) {
+  const int g = group_of(w, idx);
+  return aac_enc_band_noise(w->dsp, w->c, g, w->w0[g], band_of(w, idx), sf);
 }
 
 int band_max_mag(const ChannelWork* w, int idx, const int* q) {
@@ -592,7 +588,7 @@ const TrialEntry* trial_at(Frame* f, int ch, int idx, int sf) {
     ChannelWork* w = &f->ch[ch];
     e->sf = sf;
     e->max_mag = quantize_band(w, idx, sf, f->quant_scratch);
-    e->noise = e->max_mag > 0 ? band_noise(w, idx, sf, f->quant_scratch) : w->c->energy[idx];
+    e->noise = e->max_mag > 0 ? band_noise(w, idx, sf) : w->c->energy[idx];
     count_band_bits(w, idx, f->quant_scratch, e->max_mag, e->book_bits);
     e->bits = e->max_mag > 0 ? best_bits(e->book_bits) : 0;
   }
@@ -737,7 +733,15 @@ int collect_donors(Frame* f, const Move* made, Move* donors) {
       donors[ndonor++] = d;
     }
   }
-  std::sort(donors, donors + ndonor, [](const Move& a, const Move& b) { return a.score > b.score; });
+  /* Equal scores (bands whose noise grows by less than the 1e-9 floor,
+   * channels that carry the same signal) go in channel and band order,
+   * so that the order does not depend on the sort. */
+  std::sort(donors, donors + ndonor, [](const Move& a, const Move& b) {
+    if (a.score != b.score) {
+      return a.score > b.score;
+    }
+    return a.ch != b.ch ? a.ch < b.ch : a.idx < b.idx;
+  });
   return ndonor;
 }
 
@@ -748,6 +752,7 @@ void init_channel(Frame* f, int ch) {
   AacEncChannel* c = &f->s->ch[ch];
   const AacIcsInfo* ics = &c->ics;
   w->c = c;
+  w->dsp = f->s->dsp;
   w->nswb = ics->num_swb;
   w->ngroups = ics->num_window_groups;
   w->nbands = w->ngroups * w->nswb;
@@ -781,7 +786,7 @@ void init_channel(Frame* f, int ch) {
     if (w->eligible[idx]) {
       scalefactor_limits(w, idx, &w->sf_min[idx], &w->sf_zero[idx]);
     }
-    w->noise[idx] = w->coded[idx] ? band_noise(w, idx, w->sf[idx], c->quant) : c->energy[idx];
+    w->noise[idx] = w->coded[idx] ? band_noise(w, idx, w->sf[idx]) : c->energy[idx];
     w->ratio_log2[idx] = w->eligible[idx] ? ratio_log2_of(w, idx, w->noise[idx]) : kIgnoredLog2;
     if (c->tool[idx]) {
       for (int cb = 0; cb <= AAC_NUM_CODEBOOKS; cb++) {

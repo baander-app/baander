@@ -154,14 +154,13 @@ void lpd_stabilise_a(float* a) {
   }
 }
 
-/* Each output subtracts its sixteen terms in a fixed order: the twelve
- * oldest go into four independent partial sums, which are added
- * pairwise, and the four newest follow one by one, oldest first.  One
- * output then waits on the one before it for a single multiplication and
- * subtraction instead of sixteen dependent subtractions, and the order is
- * written out, so every compiler computes the same samples.  The two
- * newest outputs stay in variables, so that wait includes no store and
- * load. */
+/* Output i subtracts its sixteen terms a[j] x[i - j] in a fixed order.
+ * The twelve oldest, j = 16 down to 5, go oldest first into four partial
+ * sums, term j into sum (16 - j) mod 4; x[i] - ((s0 + s1) + (s2 + s3))
+ * then loses the terms j = 4, 3, 2 and 1, in that order.  The order is
+ * written out, so every compiler computes the same samples, and an output
+ * depends on the one before it through one multiplication and one
+ * subtraction.  The two newest outputs are kept in x1 and x2. */
 void lpd_syn_filter(const float* a, float* x, int n) {
   static_assert(LPD_M == 16, "the evaluation order below is written for sixteen coefficients");
   float x1 = x[-1];

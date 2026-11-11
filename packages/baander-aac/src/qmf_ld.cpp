@@ -9,9 +9,8 @@
 /* Low-delay complex filterbank: the direct-sum structure of qmf.cpp with
  * the four windows of qmf_ld_window.inc, one per bank (analysis and
  * synthesis, 64 and 32 bands), designed together so that every pairing
- * reconstructs its input (tools/cldfb_design.py).  The sums are those of
- * qmf_sums.h; the analysis tables are stored by term and the synthesis
- * tables by band. */
+ * reconstructs its input (tools/cldfb_design.py).  The sums and the
+ * layout of their tables are those of qmf_sums.h. */
 
 namespace {
 
