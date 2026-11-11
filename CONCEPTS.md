@@ -571,6 +571,13 @@ It reports whether the results match or the comparison is unavailable and leaves
 
 The public name of Bånder's AAC encoder and decoder library.
 
+### Lossless mode
+
+The bAAC mode that codes integer PCM as a FLAC stream and returns the identical samples on decode.
+*Avoid: lossless AAC; the mode writes FLAC, which is not an AAC profile.*
+
+Its streams keep a fixed block size inside FLAC's streamable subset, so that other FLAC decoders read them.
+
 ### AAC implementation setting
 
 The system setting that selects which codec implementation FFmpeg uses for AAC encoding and decoding across the server's transcodes: bAAC by default, Fraunhofer's fdk-aac, or FFmpeg's built-in codec.
