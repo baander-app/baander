@@ -873,17 +873,24 @@ Measured:
 
 | Scenario | Statements, before | Statements, now | Median before | Median now | Ratio | Bound |
 |---|---|---|---|---|---|---|
-| Snapshot, unbound socket, runner playing | 9 | 8 | 2.42 ms | 2.74 ms | 1.13 | 1.15 |
-| Snapshot, bound socket, runner resting paused | 12 | 11 | 4.02 ms | 4.41 ms | 1.10 | 1.15 |
-| Snapshot that first shows a command | 12 | 12 | not timed | not timed | | |
-| Control that issues one command | 19 | 23 | 6.89 ms | 8.76 ms | 1.27 | 1.5 |
+| Snapshot, unbound socket, runner playing | 9 | 6 | 2.29 ms | 2.31 ms | 0.96 | 1.15 |
+| Snapshot, bound socket, runner resting paused | 12 | 9 | 4.07 ms | 3.91 ms | 0.96 | 1.15 |
+| Snapshot that first shows a command | 12 | 10 | not timed | not timed | | |
+| Control that issues one command | 19 | 21 | 6.45 ms | 8.25 ms | 1.26 | 1.5 |
 
 The medians are from the pass with `synchronous_commit` off for the session, which
 is the pass the bounds are judged on. With commits waiting for the flush every
 snapshot stays at about 17 ms before and after, because the flush outweighs the
-statements. Serving 50 accounts in turn through one entity manager costs 4.34 ms
-per snapshot against 4.41 ms for one account, with the same number of statements
+statements. Serving 50 accounts in turn through one entity manager costs 3.87 ms
+per snapshot against 3.91 ms for one account, with the same number of statements
 and an empty unit of work after each round. No fallback to SQL was applied.
+
+These figures are from the second measurement, six alternating pairs against the SQL
+store after a simplification pass (`7c93212ca`) resolved the snapshot's selected
+destination and active incarnation from rows it had already read; the ratio is the
+median of the six paired ratios, and the medians shown are from the pair run on a
+quiet host. The first measurement, before that change, gave 8, 11, 12 and 23
+statements and ratios of 1.13, 1.10 and 1.27.
 
 Checkpoint, 2026-11-11: the Session unit suite passes with 143 tests, unchanged;
 ten PostgreSQL integration files pass with 157 tests, the six playback files among
@@ -908,9 +915,8 @@ Open:
 - **Query cache:** the measurement's entity manager uses an in-memory query cache;
   production configures `cache.system`. The cost of a DQL statement there is
   unmeasured.
-- **Narrow margin:** the unbound snapshot is at 1.13 against 1.15. It sends one
-  statement fewer and takes about 0.3 ms longer, so the cost is per DQL statement,
-  and returning one statement to SQL would recover little.
+- **Control cost:** a control that issues a command costs two more statements than
+  the SQL store and 1.26 times its time, inside the bound of 1.5.
 - **Associations with a database cascade:** 29 entity files map a to-one association
   whose row the database deletes by cascade while the unit of work keeps the child
   managed. Removing the parent and flushing again fails, as the cleanup defect below
