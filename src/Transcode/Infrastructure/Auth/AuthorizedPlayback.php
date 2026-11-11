@@ -158,7 +158,7 @@ final readonly class AuthorizedPlayback implements PlaybackPortInterface
                 'sessions' => array_map(static fn (PublicId $id): string => $id->toString(), $sessionIds),
                 'user' => $user->getId(),
             ],
-            ['now' => Types::DATETIMETZ_IMMUTABLE, 'aged' => Types::DATETIMETZ_IMMUTABLE, 'sessions' => ArrayParameterType::STRING],
+            ['now' => Types::DATETIME_IMMUTABLE, 'aged' => Types::DATETIME_IMMUTABLE, 'sessions' => ArrayParameterType::STRING],
         );
     }
 
