@@ -1075,6 +1075,20 @@ export interface RecoverLocalPlaybackRequest {
   checkpoint: RecoverLocalPlaybackRequestCheckpoint;
 }
 
+export type ClosePlaybackEndpointRequestCheckpoint = {[key: string]: {[key: string]: string} | number | null};
+
+export interface ClosePlaybackEndpointRequest {
+  incarnationId: string;
+  checkpoint: ClosePlaybackEndpointRequestCheckpoint;
+}
+
+export interface OverridePlaybackRequest {
+  requestId: string;
+  /** @minimum 0 */
+  expectedRevision: number;
+  incarnationId: string;
+}
+
 /**
  * Setting key to new value
  */
@@ -6771,6 +6785,14 @@ export type PostPlaybackReconcile200 = {
 
 export type PostPlaybackRecoverLocal200 = {
   data?: PlaybackSnapshotResource;
+};
+
+export type PostPlaybackClose200 = {
+  data: PlaybackSnapshotResource;
+};
+
+export type PostPlaybackOverride200 = {
+  data: PlaybackSnapshotResource;
 };
 
 export type GetPlaybackSnapshotParams = {
@@ -30265,6 +30287,182 @@ export const usePostPlaybackRecoverLocal = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getPostPlaybackRecoverLocalMutationOptions(options), queryClient);
+    }
+
+export const getPostPlaybackCloseUrl = () => {
+
+
+
+
+  return `/api/session/close`
+}
+
+/**
+ * @summary Report that an endpoint is going away and its players have stopped
+ */
+export const postPlaybackClose = async (closePlaybackEndpointRequest: ClosePlaybackEndpointRequest, options?: Parameters<typeof customInstance>[1]): Promise<PostPlaybackClose200> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customInstance<PostPlaybackClose200>(getPostPlaybackCloseUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(closePlaybackEndpointRequest)
+  }
+);}
+
+
+
+
+
+export const getPostPlaybackCloseMutationKey = () => ['postPlaybackClose'] as const;
+
+export const getPostPlaybackCloseMutationOptions = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPlaybackClose>>, TError,PostPlaybackCloseMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof postPlaybackClose>>, TError,PostPlaybackCloseMutationVariables, TContext> => {
+
+const mutationKey = getPostPlaybackCloseMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postPlaybackClose>>, PostPlaybackCloseMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  postPlaybackClose(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostPlaybackCloseMutationResult = NonNullable<Awaited<ReturnType<typeof postPlaybackClose>>>
+    export type PostPlaybackCloseMutationBody = BodyType<ClosePlaybackEndpointRequest>
+    export type PostPlaybackCloseMutationError = ErrorType<ApiError>
+    export type PostPlaybackCloseMutationVariables = {data: BodyType<ClosePlaybackEndpointRequest>}
+
+    /**
+ * @summary Report that an endpoint is going away and its players have stopped
+ */
+export const usePostPlaybackClose = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPlaybackClose>>, TError,PostPlaybackCloseMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof postPlaybackClose>>,
+        TError,
+        PostPlaybackCloseMutationVariables,
+        TContext
+      > => {
+      return useMutation(getPostPlaybackCloseMutationOptions(options), queryClient);
+    }
+
+export const getPostPlaybackOverrideUrl = () => {
+
+
+
+
+  return `/api/session/override`
+}
+
+/**
+ * @summary End the hold of a destination that is no longer registered
+ */
+export const postPlaybackOverride = async (overridePlaybackRequest: OverridePlaybackRequest, options?: Parameters<typeof customInstance>[1]): Promise<PostPlaybackOverride200> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customInstance<PostPlaybackOverride200>(getPostPlaybackOverrideUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(overridePlaybackRequest)
+  }
+);}
+
+
+
+
+
+export const getPostPlaybackOverrideMutationKey = () => ['postPlaybackOverride'] as const;
+
+export const getPostPlaybackOverrideMutationOptions = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPlaybackOverride>>, TError,PostPlaybackOverrideMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof postPlaybackOverride>>, TError,PostPlaybackOverrideMutationVariables, TContext> => {
+
+const mutationKey = getPostPlaybackOverrideMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postPlaybackOverride>>, PostPlaybackOverrideMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  postPlaybackOverride(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostPlaybackOverrideMutationResult = NonNullable<Awaited<ReturnType<typeof postPlaybackOverride>>>
+    export type PostPlaybackOverrideMutationBody = BodyType<OverridePlaybackRequest>
+    export type PostPlaybackOverrideMutationError = ErrorType<ApiError>
+    export type PostPlaybackOverrideMutationVariables = {data: BodyType<OverridePlaybackRequest>}
+
+    /**
+ * @summary End the hold of a destination that is no longer registered
+ */
+export const usePostPlaybackOverride = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPlaybackOverride>>, TError,PostPlaybackOverrideMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof postPlaybackOverride>>,
+        TError,
+        PostPlaybackOverrideMutationVariables,
+        TContext
+      > => {
+      return useMutation(getPostPlaybackOverrideMutationOptions(options), queryClient);
     }
 
 export const getGetPlaybackSnapshotUrl = (params?: GetPlaybackSnapshotParams,) => {

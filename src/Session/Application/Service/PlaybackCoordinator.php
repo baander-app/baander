@@ -52,7 +52,7 @@ final readonly class PlaybackCoordinator implements PlaybackCoordinationInterfac
         $owner = $userId->toString();
         $incarnationId = isset($input['incarnationId']) ? $this->uuid($input, 'incarnationId') : null;
         $endpoint = null;
-        if (in_array($operation, [PlaybackOperation::Acknowledge, PlaybackOperation::Observe], true)
+        if (in_array($operation, [PlaybackOperation::Acknowledge, PlaybackOperation::Observe, PlaybackOperation::Close, PlaybackOperation::Override], true)
             || (in_array($operation, [PlaybackOperation::Snapshot, PlaybackOperation::Control], true) && $incarnationId !== null)) {
             if ($incarnationId === null || $endpointCapability === null || $endpointCapability === '') {
                 throw new ConflictException('An endpoint capability is required.');
@@ -257,6 +257,33 @@ final readonly class PlaybackCoordinator implements PlaybackCoordinationInterfac
                     $session->advanceRevision();
                     $this->persistTransfer($session, $transfer, $this->model($transfer));
                     break;
+                case PlaybackOperation::Close:
+                    // The endpoint says, with its own capability, that it is going away and that its
+                    // players have stopped. Its registration ends here, so nobody waits for a lapse,
+                    // and its report is the proof of silence the release needs. The proofs run first:
+                    // what they release keeps the state it confirmed. A report for an incarnation the
+                    // session no longer names changes only that incarnation's row.
+                    $checkpoint = $this->checkpoint($input['checkpoint'] ?? null, 'Invalid close report checkpoint.');
+                    $this->store->retireIncarnation($endpoint['id'], stopped: true, position: $checkpoint['position']);
+                    $this->releaseGoneRunner($session, $transfer);
+                    $this->releaseIncarnation($session, $endpoint['id'], $checkpoint);
+                    break;
+                case PlaybackOperation::Override:
+                    $requestId = $this->uuid($input, 'requestId');
+                    if ($this->replayRequest($session, $requestId, $operation, $input)) {
+                        break;
+                    }
+                    $this->expectRevision($session, $input);
+                    if (!$endpoint['available']) {
+                        throw new ConflictException('Connect this browser before playing here.');
+                    }
+                    $overridden = $this->override($session, $transfer);
+                    // The override is one row of the command ledger, stored already settled: it gives
+                    // the request its replay and its result, is addressed to the incarnation whose hold
+                    // ended, and is no acknowledgement that could later pass as proof of anything.
+                    $this->enqueue($session, $requestId, $requestId, $overridden, 'stop', $this->requestDigest($operation, $input), $requestId);
+                    $this->store->acknowledgeCommand($requestId, 'overridden');
+                    break;
                 case PlaybackOperation::Snapshot:
                     $this->releaseGoneRunner($session, $transfer);
                     break;
@@ -266,8 +293,9 @@ final readonly class PlaybackCoordinator implements PlaybackCoordinationInterfac
             if (serialize($session->getState()) !== $before) {
                 $this->store->saveSession($session);
             }
-            $snapshot = $this->store->snapshot($session, $incarnationId);
-            if ($operation === PlaybackOperation::Control) {
+            // An endpoint that reported its close is shown no commands: none is left for it.
+            $snapshot = $this->store->snapshot($session, $operation === PlaybackOperation::Close ? null : $incarnationId);
+            if (in_array($operation, [PlaybackOperation::Control, PlaybackOperation::Override], true)) {
                 $command = $this->store->requestedCommand($session->getId()->toString(), $this->uuid($input, 'requestId'));
                 if ($command !== null) {
                     $snapshot['requestResult'] = [
@@ -312,7 +340,7 @@ final readonly class PlaybackCoordinator implements PlaybackCoordinationInterfac
         if ($record['recovery_result'] !== null) {
             return $this->store->snapshot($session, null) + ['recoveryResult' => $record['recovery_result']];
         }
-        $checkpoint = $this->checkpoint($input['checkpoint'] ?? null);
+        $checkpoint = $this->checkpoint($input['checkpoint'] ?? null, 'Invalid local recovery checkpoint.');
         if ($this->releaseIncarnation($session, $incarnation, $checkpoint)) {
             $this->store->saveSession($session);
         }
@@ -548,6 +576,52 @@ final readonly class PlaybackCoordinator implements PlaybackCoordinationInterfac
     }
 
     /**
+     * Ends the hold of a browser destination that is no longer registered, on the listener's word
+     * alone: the session's runner when no transfer is open, or the target of an uncertain transfer.
+     * Nothing proves that destination silent, so the guard is the one fact the server has: while the
+     * destination still reports, the server can reach it and cannot tell a crashed tab from a playing
+     * one. A runner that a proof releases in this same request was held when the request arrived and
+     * counts as overridden. Each overridden incarnation is retired, so a late report cannot make it
+     * available again, and keeps what it last reported and its capability.
+     *
+     * @param array<string,mixed>|null $transfer
+     * @return string The incarnation the override is recorded against.
+     */
+    private function override(ListeningSession $session, ?array $transfer): string
+    {
+        $owner = $session->getUserId()->toString();
+        $held = $session->activeIncarnationId()?->toString();
+        $this->releaseGoneRunner($session, $transfer);
+        if ($held !== null && $session->activeIncarnationId() === null) {
+            return $held;
+        }
+        if ($transfer !== null && $transfer['state'] !== 'uncertain') {
+            throw new ConflictException('Playback controls wait for transfer reconciliation.');
+        }
+        $destinationId = $transfer['target_incarnation_id'] ?? $held;
+        $destination = $destinationId === null ? null : $this->store->endpoint($owner, $destinationId);
+        if ($destination === null || $destination['kind'] !== 'browser') {
+            throw new ConflictException('No playback is waiting to be overridden.');
+        }
+        if ($destination['available']) {
+            throw new ConflictException('The destination is still connected. Stop playback there.');
+        }
+        $this->releaseIncarnation($session, $destinationId, null);
+        $this->store->retireIncarnation($destinationId, stopped: false);
+        // The failed transfer fell back to its source. A source that is no longer registered either
+        // would hold the session just as its target did, so the same request ends its hold too.
+        $sourceId = $transfer['source_incarnation_id'] ?? null;
+        if ($sourceId !== null && $session->activeIncarnationId()?->toString() === $sourceId) {
+            $source = $this->store->endpoint($owner, $sourceId);
+            if ($source['kind'] === 'browser' && !$source['available']) {
+                $this->releaseIncarnation($session, $sourceId, null);
+                $this->store->retireIncarnation($sourceId, stopped: false);
+            }
+        }
+        return $destinationId;
+    }
+
+    /**
      * A transfer that ran out of time fails when its target was never shown a start: nothing new can be
      * playing. Once the target was shown its start it may be playing, and the transfer stays uncertain
      * until the target confirms a stop.
@@ -723,7 +797,8 @@ final readonly class PlaybackCoordinator implements PlaybackCoordinationInterfac
     private function requestDigest(PlaybackOperation $operation, array $input): string
     {
         unset($input['expectedRevision'],$input['type']);
-        if ($operation === PlaybackOperation::Control) {
+        // The asking endpoint is no part of what is asked: a request repeated after its tab registered again is the same request.
+        if (in_array($operation, [PlaybackOperation::Control, PlaybackOperation::Override], true)) {
             unset($input['incarnationId']);
         }
         ksort($input);
@@ -753,13 +828,13 @@ final readonly class PlaybackCoordinator implements PlaybackCoordinationInterfac
      *
      * @return array{media:?PlaybackMedia,currentTrackIndex:int,revision:int,position:float}
      */
-    private function checkpoint(mixed $checkpoint): array
+    private function checkpoint(mixed $checkpoint, string $refusal): array
     {
         if (!is_array($checkpoint) || !array_key_exists('media', $checkpoint)
             || !isset($checkpoint['revision'], $checkpoint['currentTrackIndex'])
             || !is_int($checkpoint['revision']) || $checkpoint['revision'] < 0
             || !is_int($checkpoint['currentTrackIndex']) || $checkpoint['currentTrackIndex'] < 0) {
-            throw new InvalidArgumentException('Invalid local recovery checkpoint.');
+            throw new InvalidArgumentException($refusal);
         }
         return ['media' => $checkpoint['media'] === null ? null : $this->media($checkpoint['media']),
             'currentTrackIndex' => $checkpoint['currentTrackIndex'], 'revision' => $checkpoint['revision'], 'position' => $this->position($checkpoint)];
