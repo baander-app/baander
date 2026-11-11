@@ -45,6 +45,8 @@ set(TEST_SOURCES
     test_flac_format.cpp
     test_flac_decoder.cpp
     test_flac_conformance.cpp
+    test_flac_encoder.cpp
+    test_flac_interop.cpp
 )
 
 foreach(test_src ${TEST_SOURCES})
@@ -87,7 +89,8 @@ target_include_directories(test_mps PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
 # The lossless-mode tests check the internal bit reader, checksums and
 # header routines against known answers, and write the FLAC streams they
 # decode by hand with the internal bit writer.
-foreach(test_name test_flac_format test_flac_decoder test_flac_conformance test_allocation)
+foreach(test_name test_flac_format test_flac_decoder test_flac_conformance test_flac_encoder
+        test_flac_interop test_allocation)
     target_include_directories(${test_name} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
 endforeach()
 

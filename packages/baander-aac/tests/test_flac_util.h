@@ -612,4 +612,203 @@ static FlacDecoded flac_decode(const std::vector<uint8_t>& stream, size_t chunk 
   return out;
 }
 
+/* ── encoding through the public API ───────────────────────────── */
+
+struct FlacEncoded {
+  std::vector<uint8_t> stream; /* the header and every frame */
+  int header_bytes = 0;
+  std::vector<BaacFlacFrameInfo> frames; /* the last frame of each call that wrote one */
+  int error = AAC_OK;                    /* of creation or of the first call that failed */
+  BaacFlacStreamInfo info = {};          /* after the finish */
+};
+
+/* Encodes interleaved samples as one stream, fed `chunk` samples per
+ * channel at a time.  With `rewrite` the final header replaces the
+ * first, as a caller with a seekable output does. */
+static FlacEncoded flac_encode(const std::vector<int32_t>& pcm, int sample_rate, int channels,
+                               int bits, int level, size_t chunk = SIZE_MAX, bool rewrite = true,
+                               const BaacFlacEncoderOptions* options = nullptr,
+                               BaacFlacEncoder* existing = nullptr) {
+  FlacEncoded out;
+  BaacFlacEncoder* enc =
+      existing ? existing
+               : baac_flac_encoder_create(sample_rate, channels, bits, level, &out.error);
+  if (!enc) {
+    return out;
+  }
+  if (options && (out.error = baac_flac_encoder_set_options(enc, options)) != AAC_OK) {
+    return out;
+  }
+  out.header_bytes = baac_flac_encoder_header_bytes(enc);
+  out.stream.resize((size_t)out.header_bytes);
+  const int header = baac_flac_encoder_write_header(enc, out.stream.data(), out.header_bytes);
+  if (header != out.header_bytes) {
+    out.error = header < 0 ? header : AAC_ERR_ENCODE;
+  }
+  const size_t total = pcm.size() / (size_t)channels;
+  std::vector<uint8_t> buf;
+  for (size_t pos = 0; pos < total && out.error == AAC_OK;) {
+    const int n = (int)std::min(chunk, total - pos);
+    buf.resize((size_t)baac_flac_encoder_max_output_bytes(enc, n));
+    const int got = baac_flac_encoder_encode(enc, pcm.data() + pos * (size_t)channels, n,
+                                             buf.data(), (int)buf.size());
+    if (got < 0) {
+      out.error = got;
+      break;
+    }
+    if (got > 0) {
+      BaacFlacFrameInfo frame;
+      baac_flac_encoder_last_frame_info(enc, &frame);
+      out.frames.push_back(frame);
+      out.stream.insert(out.stream.end(), buf.begin(), buf.begin() + got);
+    }
+    pos += (size_t)n;
+  }
+  if (out.error == AAC_OK) {
+    buf.resize((size_t)baac_flac_encoder_max_output_bytes(enc, 0));
+    const int got = baac_flac_encoder_finish(enc, buf.data(), (int)buf.size());
+    if (got < 0) {
+      out.error = got;
+    } else {
+      if (got > 0) {
+        BaacFlacFrameInfo frame;
+        baac_flac_encoder_last_frame_info(enc, &frame);
+        out.frames.push_back(frame);
+        out.stream.insert(out.stream.end(), buf.begin(), buf.begin() + got);
+      }
+      baac_flac_encoder_stream_info(enc, &out.info);
+      if (rewrite && baac_flac_encoder_final_header(enc, out.stream.data(), out.header_bytes) !=
+                         out.header_bytes) {
+        out.error = AAC_ERR_ENCODE;
+      }
+    }
+  }
+  if (!existing) {
+    baac_flac_encoder_destroy(enc);
+  }
+  return out;
+}
+
+/* ── the shape of a stream ─────────────────────────────────────── */
+
+/* How a subframe and a frame are coded, read from the stream without
+ * decoding the samples: what the tests need to see which tools an
+ * encoder used. */
+struct FlacSubframeShape {
+  int type = 0; /* 0 constant, 1 unencoded, 2 fixed predictor, 3 linear predictor */
+  int order = 0;
+  int bps = 0; /* bits per sample of the subframe, wasted bits removed */
+  int wasted = 0;
+  int precision = 0;
+  int shift = 0;
+  int parameter_bits = 0; /* 4 or 5; 0 without a residual */
+  int partition_order = 0;
+  int escaped = 0; /* partitions stored unencoded */
+  int max_parameter = 0;
+};
+
+struct FlacFrameShape {
+  size_t offset = 0; /* from the start of the stream */
+  size_t bytes = 0;
+  FlacFrameHeader header = {};
+  std::vector<FlacSubframeShape> subframes;
+};
+
+/* Walks a stream that begins with the marker and that carries the bit
+ * depth in every frame header.  Stops at the first thing it cannot
+ * read; `complete`, when given, says whether it reached the end. */
+static std::vector<FlacFrameShape> flac_inspect(const std::vector<uint8_t>& s,
+                                                bool* complete = nullptr) {
+  std::vector<FlacFrameShape> frames;
+  if (complete) {
+    *complete = false;
+  }
+  size_t pos = 4;
+  for (bool last = false; !last;) {
+    if (pos + 4 > s.size()) {
+      return frames;
+    }
+    last = (s[pos] & 0x80) != 0;
+    pos += 4 + (((size_t)s[pos + 1] << 16) | ((size_t)s[pos + 2] << 8) | s[pos + 3]);
+  }
+  while (pos < s.size()) {
+    FlacFrameShape f;
+    f.offset = pos;
+    if (flac_frame_header_parse(s.data() + pos, s.size() - pos, &f.header) <= 0) {
+      return frames;
+    }
+    const FlacFrameHeader& h = f.header;
+    FlacBitReader r;
+    flac_bitreader_init(&r, s.data() + pos + (size_t)h.header_bytes,
+                        s.size() - pos - (size_t)h.header_bytes);
+    const auto skip = [&r](uint64_t bits) {
+      for (; bits >= 32; bits -= 32) {
+        flac_bitreader_read(&r, 32);
+      }
+      flac_bitreader_read(&r, (int)bits);
+    };
+    for (int ch = 0; ch < h.channels; ch++) {
+      FlacSubframeShape sf;
+      const bool side =
+          (h.assignment == FLAC_ASSIGN_SIDE_RIGHT && ch == 0) ||
+          ((h.assignment == FLAC_ASSIGN_LEFT_SIDE || h.assignment == FLAC_ASSIGN_MID_SIDE) &&
+           ch == 1);
+      flac_bitreader_read(&r, 1);
+      const int code = (int)flac_bitreader_read(&r, 6);
+      if (flac_bitreader_read(&r, 1)) {
+        sf.wasted = (int)flac_bitreader_read_unary(&r) + 1;
+      }
+      sf.bps = h.bits_per_sample + (side ? 1 : 0) - sf.wasted;
+      if (code == 0) {
+        sf.type = 0;
+        skip((uint64_t)sf.bps);
+      } else if (code == 1) {
+        sf.type = 1;
+        skip((uint64_t)sf.bps * (uint64_t)h.block_size);
+      } else {
+        sf.type = code >= 32 ? 3 : 2;
+        sf.order = code >= 32 ? code - 31 : code - 8;
+        skip((uint64_t)sf.bps * (uint64_t)sf.order);
+        if (sf.type == 3) {
+          sf.precision = (int)flac_bitreader_read(&r, 4) + 1;
+          sf.shift = (int)flac_bitreader_read(&r, 5);
+          skip((uint64_t)sf.precision * (uint64_t)sf.order);
+        }
+        sf.parameter_bits = flac_bitreader_read(&r, 2) ? 5 : 4;
+        sf.partition_order = (int)flac_bitreader_read(&r, 4);
+        const int size = h.block_size >> sf.partition_order;
+        for (int p = 0; p < (1 << sf.partition_order) && !r.overread; p++) {
+          const int count = p ? size : size - sf.order;
+          const uint32_t parameter = flac_bitreader_read(&r, sf.parameter_bits);
+          if (parameter == (1u << sf.parameter_bits) - 1) {
+            sf.escaped++;
+            skip((uint64_t)flac_bitreader_read(&r, 5) * (uint64_t)count);
+          } else {
+            sf.max_parameter = std::max(sf.max_parameter, (int)parameter);
+            for (int i = 0; i < count && !r.overread; i++) {
+              flac_bitreader_read_unary(&r);
+              flac_bitreader_read(&r, (int)parameter);
+            }
+          }
+        }
+      }
+      f.subframes.push_back(sf);
+    }
+    if (r.overread) {
+      return frames;
+    }
+    flac_bitreader_align(&r);
+    f.bytes = (size_t)h.header_bytes + flac_bitreader_position(&r) / 8 + 2;
+    if (pos + f.bytes > s.size()) {
+      return frames;
+    }
+    frames.push_back(f);
+    pos += f.bytes;
+  }
+  if (complete) {
+    *complete = true;
+  }
+  return frames;
+}
+
 #endif /* BAANDER_AAC_TEST_FLAC_UTIL_H */

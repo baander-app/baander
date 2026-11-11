@@ -77,7 +77,9 @@
         "src/drc_gen.cpp",
         "src/flac_format.cpp",
         "src/flac_dec.cpp",
-        "src/flac_api.cpp"
+        "src/flac_api.cpp",
+        "src/flac_enc.cpp",
+        "src/flac_lpc.cpp"
       ],
       "include_dirs": [
         "<!@(node -p \"require('node-addon-api').include\")",

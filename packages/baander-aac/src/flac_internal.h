@@ -155,6 +155,66 @@ int flac_decoder_seek_reset(BaacFlacDecoder* d);
 int flac_decoder_end_input(BaacFlacDecoder* d);
 int flac_decoder_finish(BaacFlacDecoder* d, BaacFlacMd5Verdict* verdict);
 
+/* ── encoder (flac_enc.cpp) ─────────────────────────────────────── */
+
+/* The encoder behind the public functions of flac.h, which check their
+ * arguments first.  flac_encoder_check says whether a format can be
+ * encoded (AAC_OK or the error for it); flac_encoder_create may throw
+ * std::bad_alloc. */
+int flac_encoder_check(int sample_rate, int channels, int bits_per_sample, int level);
+BaacFlacEncoder* flac_encoder_create(int sample_rate, int channels, int bits_per_sample, int level);
+void flac_encoder_destroy(BaacFlacEncoder* e);
+int flac_encoder_set_options(BaacFlacEncoder* e, const BaacFlacEncoderOptions* options);
+int flac_encoder_block_size(const BaacFlacEncoder* e);
+int flac_encoder_header_bytes(const BaacFlacEncoder* e);
+int flac_encoder_write_header(BaacFlacEncoder* e, uint8_t* out, int out_size);
+int flac_encoder_max_output_bytes(const BaacFlacEncoder* e, int n_samples);
+int flac_encoder_encode(BaacFlacEncoder* e, const int32_t* pcm, int n_samples, uint8_t* out,
+                        int out_size);
+int flac_encoder_finish(BaacFlacEncoder* e, uint8_t* out, int out_size);
+int flac_encoder_last_frame_info(const BaacFlacEncoder* e, BaacFlacFrameInfo* info);
+int flac_encoder_final_header(const BaacFlacEncoder* e, uint8_t* out, int out_size);
+void flac_encoder_stream_info(const BaacFlacEncoder* e, BaacFlacStreamInfo* info);
+
+/* ── linear prediction analysis (flac_lpc.cpp) ──────────────────── */
+
+/* The floating-point side of the encoder.  It only proposes: every
+ * residual is computed from the quantised coefficients in integers. */
+
+#define FLAC_MAX_ANALYSIS_WINDOWS 9
+
+/* Parts the windows of a set cut the block into: 1, 2 or 3 for sets of
+ * 1, 3 and 9 windows. */
+int flac_lpc_window_parts(int windows);
+/* Fills w[0 .. n) with window `index` of a set of `windows`: 0 is the
+ * whole block, 1 and 2 its halves, 3 to 5 its thirds, 6 to 8 the block
+ * without one third.  `taper_fraction` of the smallest part rises and
+ * falls. */
+void flac_lpc_window(double* w, int n, int windows, int index, double taper_fraction);
+void flac_lpc_apply_window(const double* x, const double* w, int n, double* y);
+/* r[lag] = sum of y[i] * y[i - lag], for lag 0 to max_lag. */
+void flac_lpc_autocorrelation(const double* y, int n, int max_lag, double* r);
+/* The Levinson-Durbin recursion.  Returns the highest order reached
+ * (fewer than max_order when the prediction error runs out); the
+ * predictor of order m is coefs[(m - 1) * FLAC_MAX_LPC_ORDER + j] for
+ * j below m, the coefficient of the sample j + 1 back, and errors[m - 1]
+ * its prediction error. */
+int flac_lpc_levinson(const double* r, int max_order, double* coefs, double* errors);
+/* Quantises a predictor to `precision` bits with the largest shift that
+ * keeps its largest coefficient in range.  False when the coefficients
+ * cannot be written: too large for the precision, or all zero. */
+bool flac_lpc_quantize(const double* a, int order, int precision, int32_t* q, int* shift);
+/* The prediction error the quantised predictor q / 2^shift leaves on the
+ * windowed signal whose autocorrelation is r[0 .. order]: what the
+ * recursion's error becomes once the coefficients are rounded. */
+double flac_lpc_quantized_error(const double* r, const int32_t* q, int shift, int order);
+/* The sum of the squares of a window. */
+double flac_lpc_energy(const double* w, int n);
+/* An estimate of the bits `samples` residual samples take when the
+ * windowed prediction error is `error`: per sample half the logarithm of
+ * the residual's variance plus `offset`, and never less than one bit. */
+double flac_lpc_estimate_bits(double error, double window_energy, int samples, double offset);
+
 /* ── bit reader ─────────────────────────────────────────────────── */
 
 /* Number of leading zero bits of a nonzero value. */

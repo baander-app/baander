@@ -55,7 +55,8 @@ set(BAAC_AAC_DECODER_SOURCES src/decoder.cpp src/conceal.cpp src/decoder_output.
     src/flac_dec.cpp)
 set(BAAC_AAC_ENCODER_SOURCES src/psycho.cpp src/encoder_tools.cpp src/afterburner.cpp src/encoder.cpp src/sbr_enc.cpp src/ps_enc.cpp
     src/sbr_ld_enc.cpp src/usac_arith_enc.cpp src/usac_enc.cpp src/sbr_enc_usac.cpp
-    src/mps212_enc.cpp src/drc_gen.cpp)
+    src/mps212_enc.cpp src/drc_gen.cpp
+    src/flac_enc.cpp src/flac_lpc.cpp)
 
 set(BAAC_AAC_SIMD_SOURCES)
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64|i686|i386")
@@ -173,6 +174,15 @@ endif()
 # rule (on x86-64 without FMA this changes nothing; on ARM it keeps the
 # scalar table in step with NEON).
 set_source_files_properties(src/dsp.cpp PROPERTIES COMPILE_FLAGS "-ffp-contract=off")
+# The analysis of the FLAC encoder decides which bytes are written, so
+# its floating-point sums must come out the same in every build of one
+# machine: the file is compiled without the Release math options above
+# and without contraction.  (On another compiler than GCC or Clang the
+# options above are not in force either.)
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    set_source_files_properties(src/flac_lpc.cpp PROPERTIES COMPILE_FLAGS
+        "-fno-associative-math -fno-reciprocal-math -fsigned-zeros -ftrapping-math -fno-finite-math-only -ffp-contract=off")
+endif()
 
 set(CMAKE_C_VISIBILITY_PRESET hidden)
 set(CMAKE_CXX_VISIBILITY_PRESET hidden)

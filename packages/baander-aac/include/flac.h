@@ -222,6 +222,19 @@ int baac_flac_decoder_finish(BaacFlacDecoder* dec, BaacFlacMd5Verdict* verdict);
  * rate up to 65535 Hz and multiples of 10 Hz up to 655350 Hz.  Anything
  * else is refused; nothing is ever coded with loss.
  *
+ * The level sets how much the encoder searches, within the ceilings of
+ * the reference encoder's preset of the same number: blocks of 1152
+ * samples and fixed predictors at levels 0 to 2, blocks of 4096 and
+ * linear predictors up to order 6, 8 or 12 from level 3, 4 and 7, and
+ * one, three or nine analysis windows up to level 5, at 6 and 7, and at
+ * 8.  Linear predictors stay at order 12 or below at every sample rate,
+ * 5-bit Rice parameters are used above 16 bits only, and at 16 bits and
+ * below every prediction fits a 32-bit sum.  The encoder sizes its
+ * buffers when it is created and allocates nothing while a stream runs
+ * (the header of a stream with a seek table reserves its points).  One
+ * encoder runs on the calling thread; encoders are independent of each
+ * other.
+ *
  * A stream is written in this order: baac_flac_encoder_write_header,
  * baac_flac_encoder_encode any number of times, baac_flac_encoder_finish.
  * A caller whose output can seek then writes the bytes of
@@ -238,9 +251,11 @@ typedef struct BaacFlacEncoderOptions_ {
    * up front; 0 (default) for unknown.  It sizes the seek table. */
   uint64_t total_samples_hint;
   /* 1 reserves a seek table in the header, with a point for every ten
-   * seconds of `total_samples_hint`, to be filled by the final header;
-   * 0 (default) writes none.  For callers that will rewrite the header:
-   * a reserved table that is never filled holds placeholders only. */
+   * seconds of `total_samples_hint` (spaced wider when that would take
+   * more than BAAC_FLAC_MAX_SEEK_POINTS), to be filled by the final
+   * header; 0 (default) writes none, and so does a hint of 0.  For
+   * callers that will rewrite the header: a reserved table that is never
+   * filled holds placeholders only. */
   int seek_table;
 } BaacFlacEncoderOptions;
 
@@ -258,24 +273,36 @@ BaacFlacEncoder* baac_flac_encoder_create(int sample_rate, int channels, int bit
                                           int level, int* error);
 void baac_flac_encoder_destroy(BaacFlacEncoder* enc);
 
-/* Before the header of a stream is written, then AAC_ERR_STATE. */
+/* Before the header of a stream is written, or after its finish for the
+ * next stream; AAC_ERR_STATE while a stream runs.  AAC_ERR_INVALID_ARG
+ * for padding outside 0 to 16777215 bytes and for a total beyond 36
+ * bits. */
 int baac_flac_encoder_set_options(BaacFlacEncoder* enc, const BaacFlacEncoderOptions* options);
 
 /* Samples per channel in every frame but the last of a stream. */
 int baac_flac_encoder_block_size(BaacFlacEncoder* enc);
 
-/* Writes the fLaC marker and the metadata blocks and returns their
- * length, which baac_flac_encoder_header_bytes reports beforehand;
- * AAC_ERR_OVERFLOW when `out_size` is smaller. */
+/* Starts a stream: writes the fLaC marker and the metadata blocks and
+ * returns their length, which baac_flac_encoder_header_bytes reports
+ * beforehand; AAC_ERR_OVERFLOW when `out_size` is smaller, AAC_ERR_STATE
+ * while a stream runs.  A caller that stores frames without the header,
+ * in a container, writes it to a buffer of its own. */
 int baac_flac_encoder_header_bytes(BaacFlacEncoder* enc);
 int baac_flac_encoder_write_header(BaacFlacEncoder* enc, uint8_t* out, int out_size);
 
 /* Takes `n_samples` samples per channel from `pcm`, interleaved, and
  * writes every whole frame they complete; returns the bytes written,
  * which is 0 while a block is still filling.  A sample outside the bit
- * depth is refused with AAC_ERR_INVALID_ARG.  An output buffer smaller
- * than baac_flac_encoder_max_output_bytes(enc, n_samples) is refused
- * with AAC_ERR_OVERFLOW before any input is consumed. */
+ * depth is refused with AAC_ERR_INVALID_ARG, a call before the header
+ * with AAC_ERR_STATE, and an output buffer smaller than
+ * baac_flac_encoder_max_output_bytes(enc, n_samples) with
+ * AAC_ERR_OVERFLOW; a refused call consumes no input.
+ *
+ * baac_flac_encoder_max_output_bytes is the most a call with that many
+ * samples can write, counting what is buffered already: every channel
+ * of every frame unencoded, which no frame exceeds.  With 0 samples it
+ * is the bound of baac_flac_encoder_finish.  AAC_ERR_INVALID_ARG when
+ * the bound does not fit an int; feed fewer samples per call then. */
 int baac_flac_encoder_max_output_bytes(BaacFlacEncoder* enc, int n_samples);
 int baac_flac_encoder_encode(BaacFlacEncoder* enc, const int32_t* pcm, int n_samples, uint8_t* out,
                              int out_size);
@@ -287,7 +314,9 @@ int baac_flac_encoder_encode(BaacFlacEncoder* enc, const int32_t* pcm, int n_sam
  * fresh encoder's. */
 int baac_flac_encoder_finish(BaacFlacEncoder* enc, uint8_t* out, int out_size);
 
-/* The last frame written: its bytes, its samples and its position.
+/* The last frame written: its bytes, its samples and its position, as a
+ * container's muxer needs them (a call that completes several frames
+ * leaves the last of them here; feed a block per call to see each).
  * AAC_ERR_STATE before the first frame of a stream. */
 int baac_flac_encoder_last_frame_info(BaacFlacEncoder* enc, BaacFlacFrameInfo* info);
 
