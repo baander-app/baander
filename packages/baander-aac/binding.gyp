@@ -74,7 +74,10 @@
         "src/usac_enc.cpp",
         "src/sbr_enc_usac.cpp",
         "src/mps212_enc.cpp",
-        "src/drc_gen.cpp"
+        "src/drc_gen.cpp",
+        "src/flac_format.cpp",
+        "src/flac_dec.cpp",
+        "src/flac_api.cpp"
       ],
       "include_dirs": [
         "<!@(node -p \"require('node-addon-api').include\")",

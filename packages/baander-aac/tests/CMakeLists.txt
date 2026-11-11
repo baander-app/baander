@@ -42,6 +42,9 @@ set(TEST_SOURCES
     test_playback.cpp
     test_encoder_tuning.cpp
     test_drc_gen.cpp
+    test_flac_format.cpp
+    test_flac_decoder.cpp
+    test_flac_conformance.cpp
 )
 
 foreach(test_src ${TEST_SOURCES})
@@ -80,6 +83,13 @@ endif()
 # The MPEG Surround syntax test compiles the test encoder tool in as its
 # writer, which includes the internal headers by their bare names.
 target_include_directories(test_mps PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
+
+# The lossless-mode tests check the internal bit reader, checksums and
+# header routines against known answers, and write the FLAC streams they
+# decode by hand with the internal bit writer.
+foreach(test_name test_flac_format test_flac_decoder test_flac_conformance test_allocation)
+    target_include_directories(${test_name} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
+endforeach()
 
 # The transforms and filterbanks go through the DSP dispatch table; the
 # same suites run again with the table capped at the scalar and the SSE2

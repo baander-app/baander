@@ -1,0 +1,93 @@
+a2010f343487d3f7618affe54f789f5487602331c0a8d03f49e9a7c547cf0499  LICENSE.txt
+cf37fb5c7b3bff2404cb1dfb4b37e8057b5bcba622be14952675c1f523ac3c1d  README.txt
+7abd0c6062b33949cc646bc887b5267d698ec8aff9cd8d8c2f270d40b7b63615  faulty/01 - wrong max blocksize.flac
+1e7f0cb5e19b984d549beea65a9f074cc7693ff594e6ae4685bca43b48dc3143  faulty/02 - wrong maximum framesize.flac
+6d3258785ae23fe90958a7bd8eab8443d07d28f456b5d49b908772fa2f803a22  faulty/03 - wrong bit depth.flac
+5410a65f762a6c97a2f8c51fb0354bbde564f35d07ef95fee60e8a715d110efc  faulty/04 - wrong number of channels.flac
+92f98457511f2f9413445f2fb3e236ae92eab86c38e0082dfbe9dd96d01ba92c  faulty/05 - wrong total number of samples.flac
+53aed5e7fde7a652b82ba06a8382b2612b02ebbde7b0d2016276644d17cc76cd  faulty/06 - missing streaminfo metadata block.flac
+6d46725991ba5da477187fde7709ea201c399d00027257c365d7301226d851ea  faulty/07 - other metadata blocks preceding streaminfo metadata block.flac
+f6e3b6b72e86f259fcdafc50486b8bf9d4d85b193e18e6e4aa63a6e1ca9e7928  faulty/08 - blocksize 65536.flac
+4a1e703e9ac7dc67ac82dc74087ba1d62a0f13e89d11e020e01e26306a0102af  faulty/09 - blocksize 1.flac
+c79b0514a61634035a5653c5493797bbd1fcc78982116e4d429630e9e462d29b  faulty/10 - invalid vorbis comment metadata block.flac
+3732151ba8c4e66a785165aa75a444aad814c16807ddc97b793811376acacfd6  faulty/11 - incorrect metadata block length.flac
+3ff789bbc85d21cf651ac88657b81cee822352186d79d0675f4f7aca23ae34ad  faulty/README.txt
+02c7e60ae7788c2cb6898a0a46985d759f1e62482ddd965a374dfd09a2a8390f  subset/01 - blocksize 4096.flac
+f4e97914fb9a8cd95b9be90c9970f6d553d76ded55a7a443dbd0d5dfa7bd2819  subset/02 - blocksize 4608.flac
+164d0747e8c4855407990182b784fcd7475da228bf20a6cff67e947c683959b3  subset/03 - blocksize 16.flac
+0f9f7e2fc262e16e8cd92de3e8869d13197a5e9c3ef7239f8ee749cbd2689980  subset/04 - blocksize 192.flac
+8965c9616f769573d3bf8ef5b92ee5a2827e797c098a9436a5e3366feb9c9ae2  subset/05 - blocksize 254.flac
+ba705cc365abf5b8bd6b4d4392a2668ae395844f82d04e74be3e19b60cb03260  subset/06 - blocksize 512.flac
+ffc15a2ead7a6651e2cd36fa886edcffffc32e831077dce852fb7df6f131d2b3  subset/07 - blocksize 725.flac
+fa189c885be140510348f18899fe151a903f0199d502982ecc7863cb85810ba6  subset/08 - blocksize 1000.flac
+8786ea66bf5d0083fcf760b874216ac566d0b2688ba58e5711f46525841a0028  subset/09 - blocksize 1937.flac
+8ec67465e9041373a67f2440220825ba9d7706789584bffbbb3f109424df25ee  subset/10 - blocksize 2304.flac
+07596315fc9b297702984deab49041f4695e1482ec3e1d081888d1bf13198e53  subset/11 - partition order 8.flac
+d33731350269929542c6e0a788c1b9a27eb91dcb3a20f5f960b8569be012c6fa  subset/12 - qlp precision 15 bit.flac
+b60e113a6a3b97d7a3c48be90913ced8c85f1ee332c6c5dd5a79b46cdc38108a  subset/13 - qlp precision 2 bit.flac
+58fa05681bd646168ea2a19bc9a6f4ee9d6de295fd832c1f70da1bdbf32d74cb  subset/14 - wasted bits.flac
+80459f8ad5a9c7edf081a10f9269c55c29136749021e5a55483bc173aaaa82b0  subset/15 - only verbatim subframes.flac
+5562cff546a1b0d93cea31c0c375c5df65658311de1fc3d322d14b8a2c5ac930  subset/16 - partition order 8 containing escaped partitions.flac
+d6f082cbbbcb03015f861b8fa30cf16708a62b85520905a126da28db29645feb  subset/17 - all fixed orders.flac
+562dd053a92a83bf64baf90ae5f9b3d0af58121c5534b3c05353d77b2ff25aaa  subset/18 - precision search.flac
+72ee52c82ee46eea28d659392ce75557e66df1051563fde1936d3e5a8fd8d2c2  subset/19 - samplerate 35467Hz.flac
+9c87394f650fda9d08bc6b4a7c56a4fd56dcac3531913aa536e7d4d576580ee0  subset/20 - samplerate 39kHz.flac
+a808ffa5c3cb99c7bc8268141f2d01fb7ccb4c3ced617fd7909f578fb9363f88  subset/21 - samplerate 22050Hz.flac
+d9c385129c4253da4c0de34ed5b163b404523aa971773277b8b74ef92f7d4f44  subset/22 - 12 bit per sample.flac
+d72ad54e1d0ebe5d65b1b1addd13ee873d38c58cb3357774a1943ced2d984cf9  subset/23 - 8 bit per sample.flac
+c6664710c935e4d862ab04f146ddd7f6df9e2278b651c17a432934e61488eaf7  subset/24 - variable blocksize file created with flake revision 264.flac
+df5658969201d6867a1cc64d69e30a8ec833b53f7239345eda7eefff1a4a2ad8  subset/25 - variable blocksize file created with flake revision 264, modified to create smaller blocks.flac
+355ddbac0f596623f805c3d3ff8cf4ba25d3a13c9d61e63719a8d02ebb647c19  subset/26 - variable blocksize file created with CUETools.Flake 2.1.6.flac
+21b486a42dbf64c043d57dcd5a038163dc77f5eec398312d994643617ec3c5b6  subset/27 - old format variable blocksize file created with Flake 0.11.flac
+62322a5c7821081bae99cc1a3f398f177a17cf9312131a5fbcfcc2ee38539346  subset/28 - high resolution audio, default settings.flac
+7551605d8a90a7e74e788b31273493ce5e24059d839b1d44dbad89cf9fb132a5  subset/29 - high resolution audio, blocksize 16384.flac
+d2e6b73cc0888419d709a03c317f59dfb8d48fcdc29e73fb0c099d5de7d512be  subset/30 - high resolution audio, blocksize 13456.flac
+caf84fbf740a98e3371a58df03422722a7d6058289b11a291f0b39103ea20133  subset/31 - high resolution audio, using only 32nd order predictors.flac
+479474ac6a101725976aa9a4e94580040d650779da41db2981be03aa41ef7fdd  subset/32 - high resolution audio, partition order 8 containing escaped partitions.flac
+4833aafc6a7d652bac05de6d304d3e63cc419a731df995b146d91294062bbcd0  subset/33 - samplerate 192kHz.flac
+b32a7e21114034610fea4d43610980111dc9c40faa315a3111196102a7bac36e  subset/34 - samplerate 192kHz, using only 32nd order predictors.flac
+ffe10b26321fdc1a1be31cfd7034a4f98b1c0cb3e32e9c1cc129b7ff4a259177  subset/35 - samplerate 134560Hz.flac
+63fc6b1ae16fc0285f7053f49ce967087f6a041630ee105d3d67fd8d34e45b7c  subset/36 - samplerate 384kHz.flac
+8d8c0526b7823099974a348a6ae80eff9c7eeb4be4e3da270e8e2e9e45d74b3c  subset/37 - 20 bit per sample.flac
+44d14d0efa374049fd9f56aaee3a068a30045e62a571df574c7b824ae596a3cf  subset/38 - 3 channels (3.0).flac
+ac670ce52561023dca32f7bd20fbe94c1e1459f06188cd0f870801ea5fb23cee  subset/39 - 4 channels (4.0).flac
+bf616e933caab9b7a5da64f9527390f83f208134d327c72a16225c0779ba0da0  subset/40 - 5 channels (5.0).flac
+c12650fda54a384abf017d4b931491de043eaa7a815ae74c7a9b49d4087d6193  subset/41 - 6 channels (5.1).flac
+07a5d7fc8c4dd74c634b2f0e912a063496f67dd2ba9fbe14f7b5fa37fee8f638  subset/42 - 7 channels (6.1).flac
+9c39ff436f316b3a8e72200c8f38af2d9ef15418c25be555aa621d0c793a6254  subset/43 - 8 channels (7.1).flac
+1a0e8c17392ae03b2cb04e8c82fcc1f924580fdc978884101faa3e9cf7ed9197  subset/44 - 8-channel surround, 192kHz, 24 bit, using only 32nd order predictors.flac
+336a18eb7a78f7fc0ab34980348e2895bc3f82db440a2430d9f92e996f889f9a  subset/45 - no total number of samples set.flac
+9dc39732ce17815832790901b768bb50cd5ff0cd21b28a123c1cabc16ed776cc  subset/46 - no min-max framesize set.flac
+9a62c79f634849e74cb2183f9e3a9bd284f51e2591c553008d3e6449967eef85  subset/47 - only STREAMINFO.flac
+4417aca6b5f90971c50c28766d2f32b3acaa7f9f9667bd313336242dae8b2531  subset/48 - Extremely large SEEKTABLE.flac
+7bc44fa2754536279fde4f8fb31d824f43b8d0b3f93d27d055d209682914f20e  subset/49 - Extremely large PADDING.flac
+1f04f237d74836104993a8072d4223e84a5d3bd76fbc44555c221c7e69a23594  subset/50 - Extremely large PICTURE.flac
+033160e8124ed287b0b5d615c94ac4139477e47d6e4059b1c19b7141566f5ef9  subset/51 - Extremely large VORBISCOMMENT.flac
+0e45a4f8dbef15cbebdd8dfe690d8ae60e0c6abb596db1270a9161b62a7a3f1c  subset/52 - Extremely large APPLICATION.flac
+513fad18578f3225fae5de1bda8f700415be6fd8aa1e7af533b5eb796ed2d461  subset/53 - CUESHEET with very many indexes.flac
+b68dc6644784fac35aa07581be8603a360d1697e07a2265d7eb24001936fd247  subset/54 - 1000x repeating VORBISCOMMENT.flac
+a756b460df79b7cc492223f80cda570e4511f2024e5fa0c4d505ba51b86191f6  subset/55 - file 48-53 combined.flac
+5cebe7a3710cf8924bd2913854e9ca60b4cd53cfee5a3af0c3c73fddc1888963  subset/56 - JPG PICTURE.flac
+c6abff7f8bb63c2821bd21dd9052c543f10ba0be878e83cb419c248f14f72697  subset/57 - PNG PICTURE.flac
+7c2b1a963a665847167a7275f9924f65baeb85c21726c218f61bf3f803f301c8  subset/58 - GIF PICTURE.flac
+7395d02bf8d9533dc554cce02dee9de98c77f8731a45f62d0a243bd0d6f9a45c  subset/59 - AVIF PICTURE.flac
+20539fbbd6ae28cea2b2182a4c60c6c70cbb710a136199fc83200c4e5fa00b1c  subset/60 - mono audio.flac
+9b15791a8b8ca14a6b9a2374ecf7c34be25bc7b9e64fa600eb5f7608194b0b61  subset/61 - predictor overflow check, 16-bit.flac
+a6b3904e8bcce7a93ad529f9b07e64d06d6647ea7a775ba91490dbacc3c771b7  subset/62 - predictor overflow check, 20-bit.flac
+d5e072373f2d9e80ca2e49b7dd349ebd4340929143d7e5f2c154a97f04755c38  subset/63 - predictor overflow check, 24-bit.flac
+3ad0bf2e9b9c78cd04deb0a8e133f5d088db051e42cbf3ffb15e1b528f009ca6  subset/64 - rice partitions with escape code zero.flac
+46b8983cbd8884a61b77b4eb8f887dd79bd08a58aa0b7c72600f162651e92011  subset/README.txt
+39c5ab8d50f639c61ab50d7e815ad82bb534f39422fca22f16228e2c73b40594  subset/playlist.html
+e8ea8469ad5a3d10ba35ecb9d01e62dfda9c0562a3d8ca846cd4012bfdaa4a2a  subset/playlist.m3u
+9fa8f7c57186be8708f42620885a71d4c4871767ff55cfe063eb1cf3bad8d0a5  uncommon/01 - changing samplerate.flac
+fe70d5e324bea56e9569d4ff9d4b6fa9c33d3f763e7fec5b1f27904e648a0482  uncommon/02 - increasing number of channels.flac
+8e3c451d835cd9a0ef8914e027cf93c98985bd1bb4d7eea59deb15996b97be3b  uncommon/03 - decreasing number of channels.flac
+f614382d8bd33b881668f2384dff03478ec2f863cb7069c42120cf8586c145b7  uncommon/04 - changing bitdepth.flac
+de71cbd81f0be1743fc8264f159a521dfc1d92a5e2056c30a64d66001e055eec  uncommon/05 - 32bps audio.flac
+3e773546d57f7aa7d126a225f8db152a34196725b71ffb76bf2fe05bad6fbb9f  uncommon/06 - samplerate 768kHz.flac
+7defaacc8d1bcd3201081d7054de5df1665d17f79851c35b3c6360401d30aa71  uncommon/07 - 15 bit per sample.flac
+2c0825fc761db080dbfdc11ea2d2b02ee414c9ed83c6240ffbac62db22d08714  uncommon/08 - blocksize 65535.flac
+33ee6f02cc9d930dd421e02b716bc2d9d520c3facdf98030eb09c303227f8626  uncommon/09 - Rice partition order 15.flac
+d95f63e8101320f5ac7ffe249bc429a209eb0e10996a987301eaa63386a8faa1  uncommon/10 - file starting at frame header.flac
+40c58b833fb07f0de41259d83cde78211e3faaf9e5f844aed43fa52c18435d2f  uncommon/11 - file starting with unparsable data.flac
+9c5ffe917b9bfb72243e1531f16ace7c3ef28c475865cb5b45f105cd55f06c75  uncommon/README.txt

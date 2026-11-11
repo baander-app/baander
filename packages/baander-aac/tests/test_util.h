@@ -429,6 +429,73 @@ static bool run_command(const std::string& cmd) {
   return system((cmd + " > /dev/null 2>&1").c_str()) == 0;
 }
 
+/* A path or other word as one shell argument. */
+static std::string shell_quote(const std::string& word) {
+  std::string out = "'";
+  for (char c : word) {
+    if (c == '\'') {
+      out += "'\\''";
+    } else {
+      out += c;
+    }
+  }
+  return out + "'";
+}
+
+/* Standard output of a command without its trailing newlines; empty
+ * when the command cannot be run.  `status`, when given, receives what
+ * pclose returns. */
+static std::string run_capture(const std::string& cmd, int* status = nullptr) {
+  std::string out;
+  FILE* pipe = popen(cmd.c_str(), "r");
+  if (!pipe) {
+    if (status) {
+      *status = -1;
+    }
+    return out;
+  }
+  char buf[4096];
+  size_t n;
+  while ((n = fread(buf, 1, sizeof(buf), pipe)) > 0) {
+    out.append(buf, n);
+  }
+  const int result = pclose(pipe);
+  if (status) {
+    *status = result;
+  }
+  while (!out.empty() && (out.back() == '\n' || out.back() == '\r')) {
+    out.pop_back();
+  }
+  return out;
+}
+
+/* ── external oracles ──────────────────────────────────────────── */
+
+/* A check against a reference tool or a fetched data set cannot run
+ * without it.  By default such a check is skipped with a message; with
+ * BAAC_REQUIRE_ORACLES set (to anything but 0) a missing oracle is a
+ * failure, so that a run that is meant to prove something cannot pass
+ * by proving nothing. */
+static bool oracles_required() {
+  const char* v = getenv("BAAC_REQUIRE_ORACLES");
+  return v && *v && strcmp(v, "0") != 0;
+}
+
+/* Reports a missing oracle as a skip or a failure and returns whether
+ * it is there. */
+static bool oracle_present(bool present, const char* what) {
+  if (present) {
+    return true;
+  }
+  if (oracles_required()) {
+    printf("FAIL: %s is missing and BAAC_REQUIRE_ORACLES is set\n", what);
+    g_failures++;
+  } else {
+    printf("SKIP: %s is missing\n", what);
+  }
+  return false;
+}
+
 /* ── a minimal MP4 file ────────────────────────────────────────── */
 
 static void put32(std::vector<uint8_t>& v, uint32_t x) {
