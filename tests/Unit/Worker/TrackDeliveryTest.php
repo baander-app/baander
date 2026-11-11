@@ -211,6 +211,28 @@ PHP);
         self::assertSame(file_get_contents($this->directory . '/track-0-seg-00001.m4s'), $exchange->body);
     }
 
+    public function testCompletionTimeoutNamesTheBytesReceivedTheBytesExpectedAndTheTimeElapsed(): void
+    {
+        file_put_contents($this->directory . '/mode', 'slow-fragment');
+        $silent = new HttpExchange($this->resources()['audio']['segmentUrl'], []);
+        try {
+            $silent->complete(.1, 4096);
+            self::fail('A response that had not started finished in time.');
+        } catch (RuntimeException $error) {
+            self::assertMatchesRegularExpression('/^The request did not finish in time: 0 of about 4096 body bytes received in 0\.\d seconds\.$/D', $error->getMessage());
+        }
+
+        file_put_contents($this->directory . '/mode', 'slow-body');
+        $partial = new HttpExchange($this->resources()['video']['segmentUrl'], []);
+        self::assertTrue($partial->until(static fn(HttpExchange $value): bool => strlen($value->body) >= 32, 1));
+        try {
+            $partial->complete(.02);
+            self::fail('A body that was still arriving finished in time.');
+        } catch (RuntimeException $error) {
+            self::assertMatchesRegularExpression('/^The request did not finish in time: 32 body bytes received in \d\.\d seconds, the last 0\.\d seconds ago\.$/D', $error->getMessage());
+        }
+    }
+
     public function testAcceptedTamperedSignatureStillFailsCertification(): void
     {
         file_put_contents($this->directory . '/mode', 'accepted-tampering');
