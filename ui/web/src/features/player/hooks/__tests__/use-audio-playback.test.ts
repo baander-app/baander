@@ -15,6 +15,7 @@ import { PlayerProgress } from '@/features/layout/components/PlayerProgress'
 import { ProgressBar } from '../../components/ProgressBar'
 import { negotiateMediaDelivery } from '../../services/media-delivery'
 import { getPlaybackAdapter, registerPlaybackIntentHandler } from '@/features/session/services/playback-execution'
+import { PlaybackCommandRunner } from '@/features/session/services/playback-command-runner'
 
 const renderHook: typeof renderBaseHook = (callback, options) => {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, queryFn: async () => null } } })
@@ -731,6 +732,33 @@ describe('useAudioPlayback', () => {
     radio.src = 'https://radio.baander.app/live'
     adapter.localRecovery!.fence()
     expect(radio.src).toBe('')
+  })
+
+  it('is silent but not stopped once a disconnecting runner has fenced and stopped it', async () => {
+    seedQueue(0, 1)
+    renderHook(() => useAudioPlayback())
+    const [audio] = capturedAudioElements
+    audio.src = '/api/stream/track?id=t0'
+    audio.currentTime = 17
+    vi.mocked(audio.play).mockImplementation(async () => { audio.paused = false })
+    for (const element of capturedAudioElements) vi.mocked(element.pause).mockImplementation(() => { element.paused = true })
+    const adapter = getPlaybackAdapter('song')!
+    const runner = new PlaybackCommandRunner(async () => {})
+    runner.bind({ incarnationId: 'browser', epoch: 1, destinationId: 'device' })
+    await act(async () => {
+      await runner.accept({ ...loadCommand(), type: 'play', expiresAt: new Date(Date.now() + 20_000).toISOString() }, 1)
+    })
+    expect(adapter.observe()).toMatchObject({ observedState: 'playing', position: 17 })
+
+    runner.fenceLocalExecution()
+    expect(adapter.observe()).toMatchObject({ observedState: 'stopped', position: 17 })
+
+    // The fenced adapter refuses the runner's stop, and its quiesce has already silenced it. What
+    // it observes from then on is "paused": a page tells that its players are silent by none of
+    // them playing, not by all of them reporting a stop.
+    await expect(runner.disconnect()).resolves.toMatchObject({ observedState: 'paused', position: 17 })
+    expect(adapter.observe()).toMatchObject({ observedState: 'paused', position: 17 })
+    expect(capturedAudioElements.every(element => element.paused)).toBe(true)
   })
 
   it('registers its owned runtime and removes it on unmount', async () => {

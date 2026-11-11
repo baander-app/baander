@@ -53,6 +53,8 @@ export function VideoPlaybackRuntime() {
 
   useEffect(() => {
     let stoppedObservation: PlaybackObservation | null = null
+    // A volume set while no video is mounted has no element to hold it; the next mount takes it.
+    let volumeForNextMount: number | null = null
     const prepare = async (payload: PlaybackCommandResource['payload'], signal: AbortSignal) => {
       signal.throwIfAborted()
       if (payload.media?.kind !== 'video') throw new Error('A video selection is required.')
@@ -67,6 +69,19 @@ export function VideoPlaybackRuntime() {
       // waiting for, and playing from the source end starts again at zero.
       await execution.prepare(payload.position, payload.desiredState === 'playing', signal)
       stoppedObservation = null
+      if (volumeForNextMount !== null) {
+        await execution.execute('volume', volumeForNextMount, signal)
+        volumeForNextMount = null
+      }
+    }
+    // A stopped player has closed its video. A volume change is no reason to open it again: that
+    // would mount and prepare a movie nobody asked to see, and the player would stop reporting
+    // itself stopped.
+    const setStoppedVolume = (stopped: PlaybackObservation, volume: number | null | undefined) => {
+      if (volume == null || !Number.isFinite(volume) || volume < 0 || volume > 1) throw new Error('Video volume is invalid.')
+      volumeForNextMount = volume
+      stoppedObservation = { ...stopped, volume }
+      return stoppedObservation
     }
     const stop = async (signal: AbortSignal) => {
       signal.throwIfAborted()
@@ -98,6 +113,7 @@ export function VideoPlaybackRuntime() {
           if (payload.desiredState === 'stopped') return stop(signal)
           return execution.execute(payload.desiredState === 'playing' ? 'play' : 'pause', undefined, signal)
         }
+        if (type === 'volume' && stoppedObservation) return setStoppedVolume(stoppedObservation, payload.volume)
         if (stoppedObservation) await prepare(payload, signal)
         if (type === 'seek') return execution.execute('seek', payload.position, signal)
         if (type === 'volume') return execution.execute('volume', payload.volume ?? undefined, signal)

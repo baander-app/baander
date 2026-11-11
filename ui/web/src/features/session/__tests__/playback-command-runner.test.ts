@@ -251,6 +251,55 @@ describe('playback command execution', () => {
     expect(adapter.quiesce).not.toHaveBeenCalled()
   })
 
+  it('answers a command delivered again for the next incarnation from the effect it already has', async () => {
+    const { runner, adapter, ack } = setup()
+    await runner.accept(command('play'), 4)
+    expect(ack).toHaveBeenLastCalledWith(expect.objectContaining({ commandId: 'command', incarnationId: 'endpoint', epoch: 2, outcome: 'playing' }))
+
+    runner.bind({ incarnationId: 'next-endpoint', epoch: 3, destinationId: 'device' })
+    await runner.accept({ ...command('play'), incarnationId: 'next-endpoint', epoch: 3 }, 4)
+
+    expect(adapter.execute).toHaveBeenCalledTimes(1)
+    expect(ack).toHaveBeenCalledTimes(2)
+    expect(ack).toHaveBeenLastCalledWith({
+      commandId: 'command', attemptId: 'attempt', revision: 4, incarnationId: 'next-endpoint', epoch: 3, outcome: 'playing', position: 12,
+    })
+  })
+
+  it('does not answer for the earlier incarnation once the next one is bound', async () => {
+    const { runner, adapter, ack } = setup()
+    let resolve!: (value: typeof observation) => void
+    adapter.execute.mockImplementation(() => new Promise(done => { resolve = done }))
+    const first = runner.accept(command('play'), 4)
+    await vi.waitFor(() => expect(adapter.execute).toHaveBeenCalled())
+
+    runner.bind({ incarnationId: 'next-endpoint', epoch: 3, destinationId: 'device' })
+    const again = runner.accept({ ...command('play'), incarnationId: 'next-endpoint', epoch: 3 }, 4)
+    resolve(observation)
+    await Promise.all([first, again])
+
+    expect(adapter.execute).toHaveBeenCalledTimes(1)
+    expect(ack).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ incarnationId: 'next-endpoint', epoch: 3, outcome: 'playing' }))
+  })
+
+  it('reports the cursor of a silenced player whose stop is refused at a disconnect', async () => {
+    const { runner, adapter } = setup()
+    await runner.accept(command('play'), 4)
+    adapter.quiesce.mockResolvedValueOnce({ observedState: 'paused', position: 14 })
+    adapter.execute.mockRejectedValueOnce(new DOMException('Playback execution was cancelled.', 'AbortError'))
+
+    await expect(runner.disconnect()).resolves.toEqual({ observedState: 'paused', position: 14 })
+  })
+
+  it('reports a refused stop of a player that keeps playing at a disconnect', async () => {
+    const { runner, adapter } = setup()
+    await runner.accept(command('play'), 4)
+    adapter.quiesce.mockResolvedValueOnce({ observedState: 'playing', position: 14 })
+    adapter.execute.mockRejectedValueOnce(new Error('The element is gone.'))
+
+    await expect(runner.disconnect()).rejects.toThrow('The element is gone.')
+  })
+
   it('stops owned media on connection replacement and suppresses late success', async () => {
     const { runner, adapter, ack } = setup()
     let resolve!: (value: typeof observation) => void

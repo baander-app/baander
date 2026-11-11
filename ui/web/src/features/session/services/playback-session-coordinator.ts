@@ -11,7 +11,9 @@ import { PlaybackLocalRecovery, type LocalRecoveryState, type RecoveryEndpoint }
 import type { PlaybackRecoveryCheckpoint, PlaybackRecoveryRecord } from './playback-recovery-store'
 import { PlaybackCommandRunner, type PlaybackAcknowledgement } from './playback-command-runner'
 import { hasUnconfirmedPlayback, UNCONFIRMED_PLAYBACK_REFUSAL } from './playback-status'
+import { playbackPageId } from './playback-page-identity'
 import { MediaCompatibilityError } from '@/features/player/services/media-delivery'
+import { onAccessTokenChange, prepareKeepalivePost, sendKeepalivePost, type PreparedKeepaliveRequest } from '@/shared/api-client/keepalive-request'
 
 type RequestResult = NonNullable<PlaybackSnapshotResource['requestResult']>
 type TransferResult = NonNullable<PlaybackSnapshotResource['transferResult']>
@@ -34,10 +36,19 @@ interface PendingTransfer {
   lastRevision: number
 }
 
-type StopProof = { endpoint: PlaybackEndpointResource; position: number }
-let retirement: { owner: ReturnType<typeof captureOwnership>; recovery: Promise<StopProof | null> } | null = null
+/** An incarnation this page stopped playing for and has not yet reported closed. */
+interface ClosedIncarnation {
+  endpoint: PlaybackEndpointResource
+  checkpoint: PlaybackRecoveryCheckpoint
+}
+let retirement: { owner: ReturnType<typeof captureOwnership>; closing: Promise<ClosedIncarnation | null> } | null = null
 
 const PRESENCE_INTERVAL_MS = 10_000
+const REQUEST_TIMEOUT_MS = 15_000
+/** How long the server keeps a command deliverable. A page that cannot be registered for that long cannot be commanded. */
+const COMMAND_LIFETIME_MS = 20_000
+const REGISTRATION_RETRY_MS = 1_000
+const CLOSE_REPORT_PATH = '/api/session/close'
 
 export const PLAYBACK_SESSION_KEY = ['session', 'current'] as const
 export const PLAYBACK_CONNECTION_KEY = ['session', 'connection'] as const
@@ -71,10 +82,22 @@ export class PlaybackSessionCoordinator {
   private registrationStartedAt: number | null = null
   private ready = false
   private registrationPending = false
+  /** Whether the socket now open carries an answered registration: the server reaches the page only through such a socket. */
+  private socketRegistered = false
+  private registrationRetry: ReturnType<typeof setTimeout> | undefined
+  private registrationDeadline: ReturnType<typeof setTimeout> | undefined
   private cleanup: (() => void)[] = []
   private interval: ReturnType<typeof setInterval> | undefined
   private recovery: Promise<void> = Promise.resolve()
-  private stopProof: StopProof | null = null
+  private closed: ClosedIncarnation | null = null
+  /** Whether the page has disconnected, and stopped its players, since its last answered registration. */
+  private returning = false
+  /** Every incarnation this page has been assigned. A snapshot that names any of them names this page. */
+  private readonly incarnations = new Set<string>()
+  /** Set from the moment a page that never disconnected sends its registration until the answer is bound. */
+  private rebinding = false
+  private preparedClose: { endpoint: PlaybackEndpointResource; request: PreparedKeepaliveRequest } | null = null
+  private closePreparation = 0
 
   private readonly client: QueryClient
   private readonly transport: SharedLiveTransport
@@ -93,14 +116,18 @@ export class PlaybackSessionCoordinator {
       if (!this.current()) this.dispose()
     }))
     this.cleanup.push(this.transport.subscribe({
-      onOpen: () => { this.reconnect().catch(error => { this.registrationPending = false; this.fail(error) }) },
+      onOpen: () => { this.opened() },
       onClose: () => { this.disconnect() },
       onMessage: message => this.message(message),
       onError: error => this.fail(error),
     }))
     this.cleanup.push(this.transport.retain())
-    if (this.transport.isConnected()) this.reconnect().catch(error => { this.registrationPending = false; this.fail(error) })
+    this.cleanup.push(onAccessTokenChange(() => this.prepareCloseReport()))
+    if (this.transport.isConnected()) this.register()
+    // Only an unloading page reports its close. A tab that is merely hidden keeps playing, and
+    // nothing tells the two apart but this event.
     const hide = () => {
+      this.reportClosing()
       this.suspended = true
       this.disconnect()
       this.localRecovery?.dispose()
@@ -181,8 +208,7 @@ export class PlaybackSessionCoordinator {
     this.runner.fence(snapshot.revision)
     // A transfer that failed or expired sends its target nothing further. A target that is neither
     // the runner nor named by a transfer any more holds a preparation nobody will start or stop.
-    const local = this.endpoint?.incarnationId
-    if (local && snapshot.activeIncarnationId !== local && snapshot.transfer?.targetIncarnationId !== local) {
+    if (this.endpoint && !this.rebinding && !this.names(snapshot)) {
       this.runner.dropPreparation().catch(error => this.fail(error))
     }
     this.refreshRequests()
@@ -190,11 +216,17 @@ export class PlaybackSessionCoordinator {
     return snapshot
   }
 
+  /** Whether the session names this page: as its runner, or as a participant of its open transfer. */
+  private names(snapshot: PlaybackSnapshotResource): boolean {
+    return [snapshot.activeIncarnationId, snapshot.transfer?.sourceIncarnationId, snapshot.transfer?.targetIncarnationId]
+      .some(incarnation => incarnation != null && this.incarnations.has(incarnation))
+  }
+
   private async withRequest<T>(operation: (signal: AbortSignal) => Promise<T>): Promise<T> {
     if (!this.current()) throw new Error('Playback account changed.')
     const request = new AbortController()
     this.httpRequests.add(request)
-    const timeout = setTimeout(() => request.abort(new Error('Playback request timed out; its result is unconfirmed.')), 15_000)
+    const timeout = setTimeout(() => request.abort(new Error('Playback request timed out; its result is unconfirmed.')), REQUEST_TIMEOUT_MS)
     let onAbort = () => {}
     const aborted = new Promise<never>((_, reject) => {
       onAbort = () => reject(request.signal.reason instanceof Error ? request.signal.reason : new Error('Playback request aborted.'))
@@ -224,17 +256,25 @@ export class PlaybackSessionCoordinator {
     if (!this.current() || typeof message !== 'object' || message === null || !('type' in message)) return
     if (message.type === 'session.error') {
       this.registrationPending = false
+      this.rebinding = false
       this.fail(new Error('message' in message && typeof message.message === 'string' ? message.message : 'Playback request failed.'))
+      this.registerAgainWhileBound()
       return
     }
     if (message.type !== 'session.snapshot' || !('data' in message)) return
     try {
       const snapshot = this.apply(message.data)
-      if (this.snapshot && snapshot.revision < this.snapshot.revision) return
+      // A registration answer binds the page whatever its revision: a control this page sent
+      // meanwhile may already have shown it a later one.
       if (snapshot.endpoint?.capability && this.transport.isConnected()) {
-        this.acceptEndpoint(snapshot).catch(error => { this.registrationPending = false; this.fail(error) })
+        this.acceptEndpoint(snapshot).catch(error => {
+          this.registrationPending = false
+          this.fail(error)
+          this.registerAgainWhileBound()
+        })
         return
       }
+      if (this.snapshot && snapshot.revision < this.snapshot.revision) return
       this.dispatchCommands(snapshot)
     } catch (error) { this.fail(error) }
   }
@@ -250,6 +290,12 @@ export class PlaybackSessionCoordinator {
     this.clientRequestId = null
     this.presenceConfirmedAt = null
     this.registrationStartedAt = null
+    this.clearRegistrationTimers()
+    this.socketRegistered = false
+    this.rebinding = false
+    this.preparedClose = null
+    this.closePreparation++
+    const cursor = this.runner.observe()?.position
     const fenced = this.runner.fenceLocalExecution()
     this.localRecovery?.noteFence(fenced)
     this.abortRequests()
@@ -257,17 +303,76 @@ export class PlaybackSessionCoordinator {
     this.registrationPending = false
     this.connection++
     const endpoint = this.endpoint
+    const snapshot = this.snapshot
     this.endpoint = null
     this.publish(false, 'Playback connection lost. Remote playback may still be active.')
     const previous = this.recovery
-    const stopping = this.runner.disconnect()
-    const stopped = Promise.all([previous, stopping]).then(([, observation]) => {
-      const proof = endpoint && observation?.observedState === 'stopped' ? { endpoint, position: observation.position } : this.stopProof
-      this.stopProof = proof
-      return proof
-    }).catch(error => { this.fail(error); return null })
-    retirement = { owner: this.ownership, recovery: stopped }
-    this.recovery = stopped.then(() => {})
+    const stopping = this.runner.disconnect().catch(error => { this.fail(error); return null })
+    const closing = Promise.all([previous, stopping]).then(([, observation]) => {
+      if (endpoint && snapshot) {
+        const position = observation?.position ?? cursor ?? snapshot.position
+        this.closed = { endpoint, checkpoint: this.checkpoint({ ...snapshot, position }) }
+      }
+      return this.closed
+    })
+    retirement = { owner: this.ownership, closing }
+    this.recovery = closing.then(() => {})
+  }
+
+  private clearRegistrationTimers(): void {
+    clearTimeout(this.registrationRetry)
+    clearTimeout(this.registrationDeadline)
+    this.registrationRetry = undefined
+    this.registrationDeadline = undefined
+  }
+
+  /** Whether any player of this page is audible, whoever started it. */
+  private playing(): boolean {
+    return getPlaybackAdapters().some(adapter => adapter.observe().observedState === 'playing')
+  }
+
+  private opened(): void {
+    if (!this.current()) return
+    // The socket this one replaced will never answer a registration that was sent on it.
+    this.registrationPending = false
+    this.socketRegistered = false
+    this.clearRegistrationTimers()
+    // An endpoint that is still bound means the socket was replaced without a close, and the page
+    // keeps playing. The server reaches a page only through a socket that carries its
+    // registration, so a page that stays without one for a command's lifetime cannot be
+    // commanded any more: it then stops as it does after a close.
+    if (this.endpoint) this.registrationDeadline = setTimeout(() => this.registrationOverdue(), COMMAND_LIFETIME_MS)
+    this.register()
+  }
+
+  private register(): void {
+    this.reconnect().catch(error => {
+      this.fail(error)
+      this.registerAgainWhileBound()
+    })
+  }
+
+  /**
+   * A page that plays through a replaced socket has nobody to press Retry for it: a registration
+   * that failed, was refused or stayed unanswered is sent again for as long as the socket is open.
+   */
+  private registerAgainWhileBound(delay = REGISTRATION_RETRY_MS): void {
+    const due = () => this.current() && this.endpoint !== null && !this.socketRegistered && !this.suspended && this.transport.isConnected()
+    if (!due()) return
+    clearTimeout(this.registrationRetry)
+    this.registrationRetry = setTimeout(() => {
+      this.registrationRetry = undefined
+      if (!due()) return
+      this.registrationPending = false
+      this.register()
+    }, delay)
+  }
+
+  private registrationOverdue(): void {
+    this.registrationDeadline = undefined
+    if (!this.current() || this.socketRegistered || !this.endpoint) return
+    this.disconnect()
+    if (this.transport.isConnected()) this.register()
   }
 
   private async reconnect(): Promise<void> {
@@ -275,54 +380,103 @@ export class PlaybackSessionCoordinator {
     this.registrationPending = true
     this.registrationStartedAt = Date.now()
     const connection = ++this.connection
+    try {
+      await this.sendRegistration(connection)
+    } catch (error) {
+      // A later attempt or a disconnect took over: this failure describes nothing that is current.
+      if (connection !== this.connection) return
+      this.registrationPending = false
+      throw error
+    }
+  }
+
+  private async sendRegistration(connection: number): Promise<void> {
     const current = () => this.current() && connection === this.connection && this.transport.isConnected()
+    // An endpoint that is still bound means the socket was replaced without a close. The page
+    // never stopped and still answers for its own players, so it fences nothing, recovers nothing
+    // of its own and registers again as the same page; the server then keeps its place.
+    const bound = this.endpoint !== null
     await this.recovery
-    if (retirement && this.ownership.principal !== null && retirement.owner.principal === this.ownership.principal) this.stopProof = await retirement.recovery
+    if (!bound && retirement && this.ownership.principal !== null && retirement.owner.principal === this.ownership.principal) this.closed = await retirement.closing
     if (!current()) return
+    const closed = bound ? null : this.closed
+    if (closed) this.returning = true
+    // A player that survived the stop still speaks for itself: reporting its incarnation closed,
+    // or recovering its record, would tell the server that a playing page had stopped.
+    const silent = closed === null || !this.playing()
+    if (closed) {
+      this.closed = null
+      retirement = null
+      if (silent) await this.reportClosed(closed)
+      if (!current()) return
+    }
     if (this.localRecovery) {
-      const initializing = this.localRecovery.initialize(record => this.recoverLocal(record))
-      this.publish(false, null)
+      const initializing = this.localRecovery.initialize(record => this.recoverLocal(record), bound || !silent ? 'keep' : 'recover')
+      this.publishRecovery(bound)
       await initializing
       if (!current()) return
-      this.publish(false, null)
+      this.publishRecovery(bound)
     }
     this.clientRequestId = this.localRecovery?.tabId ?? this.endpointId
     for (const waiter of this.identityWaiters) waiter.resolve(this.clientRequestId)
-    if (this.stopProof && this.localRecovery?.wasRecovered(this.stopProof.endpoint.incarnationId)) { this.stopProof = null; retirement = null }
-    const proof = this.stopProof
-    if (proof) {
-      const response = await this.withRequest(signal => AXIOS_INSTANCE.get('/api/session/snapshot', {
-        signal,
-        params: { incarnationId: proof.endpoint.incarnationId },
-        headers: { 'X-Baander-Playback-Endpoint': proof.endpoint.capability },
-      }))
-      if (!current()) return
-      const old = this.apply(response.data?.data ?? response.data)
-      await this.post('/api/session/observe', {
-        incarnationId: proof.endpoint.incarnationId, expectedRevision: old.revision,
-        observedState: 'stopped', position: proof.position,
-      }, proof.endpoint)
-      if (!current()) return
-      for (const command of old.commands) {
-        if (command.type !== 'stop' || command.incarnationId !== proof.endpoint.incarnationId) continue
-        await this.post('/api/session/ack', {
-          commandId: command.id, attemptId: command.attemptId, revision: command.revision,
-          incarnationId: command.incarnationId, epoch: command.epoch, outcome: 'stopped', position: proof.position,
-        }, proof.endpoint)
-        if (!current()) return
-      }
-      this.stopProof = null
-      retirement = null
-    }
     await this.withRequest(signal => AXIOS_INSTANCE.post('/api/devices', { deviceId: getDeviceId(), name: getDeviceName() }, { signal }))
     if (!current()) return
     const adapters = (['song', 'video'] as const).map(kind => getPlaybackAdapter(kind)).filter(adapter => adapter !== undefined)
     const capabilities: string[] = adapters.map(adapter => adapter.kind)
     if (adapters.length > 0 && adapters.every(adapter => adapter.supportsVolume)) capabilities.push('volume')
     this.localQualified = !!this.localRecovery?.isEligible() && adapters.length > 0 && adapters.every(adapter => adapter.localRecovery?.eligible)
+    // The server keeps this page's place under a new incarnation without advancing the revision,
+    // so until the answer is bound a snapshot cannot be judged by the incarnation it names.
+    this.rebinding = bound
     this.transport.send({ type: 'session.endpoint', deviceId: getDeviceId(), endpointId: this.localRecovery?.tabId ?? this.endpointId, name: getDeviceName(), capabilities,
+      pageId: playbackPageId,
       ...(this.localRecovery ? { tabId: this.localRecovery.tabId, localRecoveryEligible: this.localQualified } : {}),
     })
+    if (bound) this.registerAgainWhileBound(REQUEST_TIMEOUT_MS)
+  }
+
+  /** Shows the recovery progress without calling a page that never disconnected disconnected. */
+  private publishRecovery(bound: boolean): void {
+    if (!bound) this.publish(false, null)
+    else this.publish(this.ready, this.client.getQueryData<PlaybackConnection>(PLAYBACK_CONNECTION_KEY)?.error ?? null)
+  }
+
+  /**
+   * Tells the server that an incarnation of this page has gone and its players are silent, so the
+   * session is released from it at once. The registration that follows does not depend on the
+   * answer: a page that registers again keeps its place, and a runner that holds no player then
+   * reports itself stopped.
+   */
+  private async reportClosed(closed: ClosedIncarnation): Promise<void> {
+    try {
+      await this.post(CLOSE_REPORT_PATH, { incarnationId: closed.endpoint.incarnationId, checkpoint: closed.checkpoint }, closed.endpoint)
+    } catch (error) {
+      console.warn('[PlaybackSession] The close report for the previous registration was not accepted:', this.refusal(error, 'The request failed.').message)
+    }
+  }
+
+  /** Signs the close report this page would send if it went away now; a proof cannot be signed while unloading. */
+  private prepareCloseReport(): void {
+    const endpoint = this.endpoint
+    if (!endpoint?.capability || !this.current()) return
+    const preparation = ++this.closePreparation
+    prepareKeepalivePost(CLOSE_REPORT_PATH, { 'X-Baander-Playback-Endpoint': endpoint.capability }).then(request => {
+      if (preparation !== this.closePreparation || endpoint !== this.endpoint) return
+      this.preparedClose = request ? { endpoint, request } : null
+    }).catch(error => {
+      console.warn('[PlaybackSession] A close report could not be prepared:', error instanceof Error ? error.message : error)
+    })
+  }
+
+  /** Sends the prepared close report of a page that is going away, with the cursor its player stands at. */
+  private reportClosing(): void {
+    const endpoint = this.endpoint
+    const snapshot = this.snapshot
+    const prepared = this.preparedClose
+    if (!endpoint || !snapshot || !prepared || prepared.endpoint !== endpoint || !this.current()) return
+    this.preparedClose = null
+    const position = this.runner.observe()?.position ?? snapshot.position
+    sendKeepalivePost(prepared.request, { incarnationId: endpoint.incarnationId, checkpoint: this.checkpoint({ ...snapshot, position }) })
   }
 
   private checkpoint(snapshot: Pick<PlaybackSnapshotResource, 'revision' | 'media' | 'currentTrackIndex' | 'position'>): PlaybackRecoveryCheckpoint {
@@ -342,18 +496,36 @@ export class PlaybackSessionCoordinator {
     if (!endpoint?.capability) return
     if (this.localRecovery) await this.localRecovery.registered(endpoint, this.checkpoint(snapshot), this.localQualified)
     if (!this.current() || this.suspended || generation !== this.connection) return
+    // A page that registered again through a replaced socket was never fenced. Rearming its
+    // adapters would cancel what they are executing, so only a fenced page is rearmed.
+    const fenced = this.endpoint === null || this.executionBlocked
+    const returning = this.returning
+    this.returning = false
     this.registrationPending = false
+    this.clearRegistrationTimers()
+    this.socketRegistered = true
+    this.rebinding = false
     this.endpoint = endpoint
+    this.incarnations.add(endpoint.incarnationId)
     this.runner.bind(endpoint)
     this.executionBlocked = false
-    for (const adapter of getPlaybackAdapters()) adapter.localRecovery?.rearmAfterRegistration()
+    if (fenced) for (const adapter of getPlaybackAdapters()) adapter.localRecovery?.rearmAfterRegistration()
     this.ready = true
     this.presenceConfirmedAt = this.registrationStartedAt
     this.publish(true, null)
+    this.prepareCloseReport()
     this.refreshRequests(true)
     this.refreshTransfers(true)
     this.dispatchCommands(snapshot)
+    // A command for the new incarnation may have been relayed while the answer was being bound.
+    if (this.snapshot && this.snapshot !== snapshot) this.dispatchCommands(this.snapshot)
     for (const ready of this.registrationReady) ready()
+    // The session may still name this page as its runner although the page stopped its players
+    // when it disconnected: its close report was lost, and the registration kept its place. It
+    // says so at once instead of leaving the session to show playback that is not there.
+    if (returning && this.snapshot?.activeIncarnationId === endpoint.incarnationId && this.runner.observe() === null) {
+      this.observe().catch(error => this.fail(error))
+    }
   }
 
   private async ensureLocalEndpoint(): Promise<PlaybackEndpointResource> {
@@ -379,6 +551,7 @@ export class PlaybackSessionCoordinator {
     try {
       await Promise.all([this.reconnect(), readiness])
     } catch (error) {
+      // The registration was sent and stayed unanswered: a later retry may send another.
       this.registrationPending = false
       throw error
     } finally {
@@ -420,6 +593,12 @@ export class PlaybackSessionCoordinator {
     if (this.ready && !this.executionBlocked) {
       this.refreshRequests(true)
       this.refreshTransfers(true)
+      // A page that kept playing through a replaced socket is ready and still has to register on it.
+      if (this.socketRegistered || this.registrationPending || !this.transport.isConnected()) return
+      clearTimeout(this.registrationRetry)
+      this.registrationRetry = undefined
+      try { await this.reconnect() }
+      catch (error) { this.fail(error); this.registerAgainWhileBound(); throw error }
       return
     }
     if (this.executionBlocked) this.disconnect()
@@ -428,13 +607,20 @@ export class PlaybackSessionCoordinator {
     try {
       if (this.transport.isConnected()) await this.reconnect()
       else this.transport.reconnect()
-    } catch (error) { this.registrationPending = false; this.fail(error); throw error }
+    } catch (error) { this.fail(error); throw error }
   }
 
   private async acknowledge(ack: PlaybackAcknowledgement): Promise<void> {
     const endpoint = this.endpoint
     if (!endpoint || !this.ready) return
-    await this.post('/api/session/ack', ack, endpoint)
+    try {
+      await this.post('/api/session/ack', ack, endpoint)
+    } catch (error) {
+      // The page registered again while this answer was on its way, so the answer named an
+      // incarnation that has been succeeded. The command comes again for the new one.
+      if (this.endpoint !== endpoint) return
+      throw error
+    }
     if (ack.outcome === 'rejected') this.fail(ack.rejectionReason
       ? new MediaCompatibilityError(ack.rejectionReason)
       : new Error('Playback could not start or apply the control. Try again on the destination; it may require a user gesture.'))
@@ -446,7 +632,11 @@ export class PlaybackSessionCoordinator {
     const endpoint = this.endpoint
     const snapshot = this.snapshot
     if (!this.current() || !this.ready || !endpoint || !snapshot) return
-    const observation = this.runner.observe() ?? { observedState: 'unknown' as const, position: snapshot.position }
+    // A runner that holds no player and hears none plays nothing: it disconnected, stopped, and
+    // was kept as the runner when it registered again. Saying so releases the session from it.
+    const held = this.runner.observe()
+    const silentRunner = held === null && snapshot.activeIncarnationId === endpoint.incarnationId && !this.playing()
+    const observation = held ?? { observedState: silentRunner ? 'stopped' as const : 'unknown' as const, position: snapshot.position }
     if (this.localQualified && this.localRecovery) {
       try { await this.localRecovery.checkpoint(this.checkpoint({ ...snapshot, position: observation.position })) }
       catch (error) {
@@ -459,7 +649,11 @@ export class PlaybackSessionCoordinator {
     const startedAt = Date.now()
     try {
       await this.post('/api/session/observe', { incarnationId: endpoint.incarnationId, expectedRevision: snapshot.revision, ...observation }, endpoint)
-      if (generation === this.connection && endpoint === this.endpoint && this.ready && this.current()) this.presenceConfirmedAt = startedAt
+      if (generation === this.connection && endpoint === this.endpoint && this.ready && this.current()) {
+        this.presenceConfirmedAt = startedAt
+        // The proof inside a prepared close report ages; each presence report replaces it.
+        this.prepareCloseReport()
+      }
     } catch (error) {
       this.presenceConfirmedAt = null
       throw error
