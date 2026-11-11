@@ -969,9 +969,38 @@ final class PlaybackStoreContractTest extends TestCase
         self::assertSame(2, (int) $this->observer->fetchOne('SELECT count(*) FROM playback_destinations WHERE user_id=?', [$owner]));
     }
 
+    /**
+     * Reads the store's source, so it also holds for branches no scenario runs. The store may reach
+     * the connection only through its connection() method and must call a method on the result at
+     * once: a connection kept in a variable, a property or a parameter fails here, and so does a
+     * second place that asks the entity manager for it, or a native query. Two things stay out of
+     * its sight: a statement another class issues on the store's behalf, and a call whose name is
+     * put together at run time.
+     */
     public function testOnlyTheFiveStatementsDqlCannotExpressReachTheConnection(): void
     {
         $source = (string) file_get_contents(new \ReflectionClass(PlaybackStore::class)->getFileName());
+        $tokens = array_values(array_filter(\PhpToken::tokenize($source), static fn(\PhpToken $token): bool => !$token->isIgnorable()));
+        $uses = [];
+        foreach ($tokens as $at => $token) {
+            if (!$token->is(T_STRING) || $token->text !== 'connection' || $tokens[$at - 1]->is(T_FUNCTION)) {
+                continue;
+            }
+            $written = implode('', array_map(static fn(\PhpToken $part): string => $part->text, array_slice($tokens, $at - 2, 8)));
+            $uses[] = preg_match('/^\$this->connection\(\)->(\w+)\($/', $written, $called) === 1 ? $called[1] : 'held: ' . $written;
+        }
+        self::assertSame(
+            ['executeQuery', 'executeStatement', 'fetchOne', 'fetchOne', 'fetchOne', 'getTransactionNestingLevel', 'isTransactionActive'],
+            $uses,
+            'Each use of the connection is a call on it where it is obtained.',
+        );
+        $names = array_count_values(array_map(
+            static fn(\PhpToken $token): string => $token->text,
+            array_filter($tokens, static fn(\PhpToken $token): bool => $token->is(T_STRING)),
+        ));
+        self::assertSame(1, $names['getConnection'] ?? 0, 'Only connection() asks the entity manager for the connection.');
+        self::assertSame(1, $names['Connection'] ?? 0, 'Only the return type of connection() names the connection type.');
+        self::assertSame([], array_keys(array_intersect_key($names, array_flip(['createNativeQuery', 'getNativeConnection', 'getWrappedConnection']))));
         preg_match_all('/connection\(\)\s*->\s*(executeStatement|executeQuery|fetch\w+)\(\s*(?:<<<\'SQL\'\s*)?[\'"]?\s*([A-Z ]+?[a-z_]+)/', $source, $calls, PREG_SET_ORDER);
 
         self::assertSame([

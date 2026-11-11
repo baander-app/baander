@@ -35,6 +35,10 @@ use App\Shared\Application\Exception\ConflictException;
  * by one DQL update whose predicate is the guard. The database clock stamps every instant except a
  * recovery credential's expiry: an update stamps in its statement, an insert with the transaction's
  * clock read beforehand. Five statements stay SQL, each for the reason given where it stands.
+ *
+ * An insert that the database refuses closes the entity manager it was flushed through. The
+ * transaction port that runs every coordinator operation rolls back and replaces a closed manager;
+ * a caller outside it would be left holding one.
  */
 final readonly class PlaybackStore implements PlaybackStoreInterface
 {
@@ -169,6 +173,12 @@ final readonly class PlaybackStore implements PlaybackStoreInterface
                 'owner' => $session->getUserId()->toString(), 'session' => $session->getId()->toString()]) !== false;
     }
 
+    /**
+     * The caller holds the account lock that lockSession() takes, in a transaction that is still
+     * open. The destination is looked for and then inserted, and the epoch is read and then used, in
+     * separate statements: only that lock keeps a second registration of the tab from running
+     * between them and failing on the unique key.
+     */
     public function register(string $userId, array $input): array
     {
         $deviceId = Uuid::fromString($input['deviceId'])->toString();
@@ -334,6 +344,10 @@ final readonly class PlaybackStore implements PlaybackStoreInterface
         return $row === null ? null : self::columns($row);
     }
 
+    /**
+     * The caller holds the account lock that lockSession() takes, in a transaction that is still
+     * open: a transfer the update does not find is inserted by a second statement.
+     */
     public function saveTransfer(array $transfer): void
     {
         $progressed = $this->change(
@@ -364,6 +378,10 @@ final readonly class PlaybackStore implements PlaybackStoreInterface
         ));
     }
 
+    /**
+     * The caller holds the account lock that lockSession() takes, in a transaction that is still
+     * open: the replay key is looked for and the command is then inserted by a second statement.
+     */
     public function insertCommand(array $command): void
     {
         $addressed = $command['incarnation_id'] !== null;

@@ -118,24 +118,32 @@ final class PlaybackPersistenceFixture
 
 }
 
+// Run as a program, this is a second process with its own connection: it performs one coordinator
+// operation when its parent releases it, and answers with the snapshot or with the conflict.
 if (realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === __FILE__) {
     try {
-        [$script,$schema,$application,$owner,$target,$revision] = $_SERVER['argv'] ?? throw new \LogicException('Requires CLI arguments.');
+        [$script, $schema, $application, $owner, $operation, $input] = $_SERVER['argv'] ?? throw new \LogicException('Requires CLI arguments.');
         $manager = PlaybackPersistenceFixture::manager(PlaybackPersistenceFixture::connect($schema, $application));
         $coordinator = PlaybackPersistenceFixture::coordinator($manager);
         fwrite(STDOUT, "ready\n");
         fflush(STDOUT);
         if (fgets(STDIN) !== "go\n") {
-            throw new \RuntimeException('Missing transfer release.');
+            throw new \RuntimeException('Missing release.');
         }
         try {
-            $coordinator->execute(Uuid::fromString($owner), PlaybackOperation::Transfer, ['requestId' => new Uuid()->toString(), 'expectedRevision' => (int) $revision, 'targetIncarnationId' => $target]);
-            fwrite(STDOUT, "committed\n");
+            $result = $coordinator->execute(Uuid::fromString($owner), PlaybackOperation::from($operation), json_decode($input, true, flags: JSON_THROW_ON_ERROR));
+            $answer = 'committed ' . json_encode($result, JSON_THROW_ON_ERROR);
         } catch (\App\Shared\Application\Exception\ConflictException) {
-            fwrite(STDOUT, "conflict\n");
+            $answer = 'conflict';
         }
+        // A refused insert closes the entity manager it was flushed through, also when the caller
+        // was then answered with a conflict.
+        if (!$manager->isOpen()) {
+            throw new \LogicException('The operation closed its entity manager.');
+        }
+        fwrite(STDOUT, $answer . "\n");
     } catch (\Throwable $error) {
-        fwrite(STDERR, $error->getMessage() . "\n");
+        fwrite(STDERR, $error::class . ': ' . $error->getMessage() . "\n");
         exit(1);
     }
 }
