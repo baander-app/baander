@@ -81,10 +81,12 @@ endif()
 # writer, which includes the internal headers by their bare names.
 target_include_directories(test_mps PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
 
-# The transforms and filterbanks go through the DSP dispatch table; the
-# same suites run again with the table capped at the scalar and the SSE2
-# kernels (BAAC_AAC_CPU), so that every level this machine can run is
-# exercised end to end, not only in the kernel comparison of test_dsp.
+# The transforms, the filterbanks and the encoder's quantization noise go
+# through the DSP dispatch table; the same suites run again with the table
+# capped at the scalar and the SSE2 kernels (BAAC_AAC_CPU), so that every
+# level this machine can run is exercised end to end, not only in the
+# kernel comparison of test_dsp (test_roundtrip drives the AAC-LC and
+# HE-AAC encoders, whose scalefactor search sums the noise).
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64|i686|i386")
     set(BAAC_DISPATCH_LEVELS scalar sse2)
 else()

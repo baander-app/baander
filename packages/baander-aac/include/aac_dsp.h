@@ -45,6 +45,21 @@ using AacDSP = struct AacDSP_ {
                            int half);
   void (*mdct_post_twiddle)(float* out, const float* re, const float* im, const float* c,
                             const float* s, int half);
+
+  /* ── Encoder kernels ────────────────────────────────────────── */
+  /* The noise of a scalefactor band quantized with step `scale`, over
+   * `windows` spans of `len` lines that lie `stride` floats apart in coef
+   * and in x34 (|coef|^(3/4)).  Each line takes
+   *   v = x34[i] * scale + round, clamped to [0, 8191] (8191 for a NaN),
+   *   q = (int) v,  d = |coef[i]| - pow43[q] * gain,
+   * and the result is the sum of d^2; pow43 has 8192 entries.  The sum
+   * has one order on every level, so that the encoder's choices do not
+   * depend on the processor: line i of a span adds into accumulator
+   * i % 8, span after span, and the accumulators a0..a7 combine as
+   * ((a0 + a4) + (a2 + a6)) + ((a1 + a5) + (a3 + a7)).  Every product and
+   * sum is rounded on its own (no fused multiply-add). */
+  float (*quant_noise)(const float* coef, const float* x34, int len, int windows, int stride,
+                       float scale, float round, float gain, const float* pow43);
 };
 
 /* Initialize DSP struct with scalar C defaults, then override per CPU flags */

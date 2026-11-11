@@ -13,6 +13,7 @@
 #include <emmintrin.h>
 
 #include <cmath>
+#include <cstddef>
 #include <cstring>
 
 /* ── Vector Operations ───────────────────────────────────────── */
@@ -199,6 +200,88 @@ static void aac_vector_fmul_accumulate_sse2(float* dst, const float* a, const fl
   }
 }
 
+/* ── Encoder kernels ─────────────────────────────────────────── */
+
+namespace {
+
+struct QuantNoiseArgs {
+  __m128 scale, round, gain;
+  const float* pow43;
+};
+
+/* d^2 of four lines (see the scalar kernel).  MINPS gives its second
+ * operand for a NaN, so a NaN quantizes to 8191 as in the scalar
+ * kernel's clamp. */
+inline __m128 quant_noise4(__m128 coef, __m128 x34, const QuantNoiseArgs& a) {
+  const __m128 v = _mm_add_ps(_mm_mul_ps(x34, a.scale), a.round);
+  const __m128 clamped = _mm_max_ps(_mm_min_ps(v, _mm_set1_ps(8191.0f)), _mm_setzero_ps());
+  const __m128i q = _mm_cvttps_epi32(clamped);
+  const int q0 = _mm_cvtsi128_si32(q);
+  const int q1 = _mm_cvtsi128_si32(_mm_shuffle_epi32(q, _MM_SHUFFLE(1, 1, 1, 1)));
+  const int q2 = _mm_cvtsi128_si32(_mm_shuffle_epi32(q, _MM_SHUFFLE(2, 2, 2, 2)));
+  const int q3 = _mm_cvtsi128_si32(_mm_shuffle_epi32(q, _MM_SHUFFLE(3, 3, 3, 3)));
+  const __m128 p = _mm_setr_ps(a.pow43[q0], a.pow43[q1], a.pow43[q2], a.pow43[q3]);
+  const __m128 d = _mm_sub_ps(_mm_andnot_ps(_mm_set1_ps(-0.0f), coef), _mm_mul_ps(p, a.gain));
+  return _mm_mul_ps(d, d);
+}
+
+/* d^2 of the last n < 4 lines of a span in lanes 0..n-1, +0 in the
+ * others, which leaves an accumulator unchanged (its lanes are never
+ * -0). */
+inline __m128 quant_noise_part(const float* coef, const float* x34, int n,
+                               const QuantNoiseArgs& a) {
+  alignas(16) float c[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+  alignas(16) float x[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+  for (int k = 0; k < n; k++) {
+    c[k] = coef[k];
+    x[k] = x34[k];
+  }
+  const __m128i lanes = _mm_setr_epi32(0, 1, 2, 3);
+  const __m128 live = _mm_castsi128_ps(_mm_cmplt_epi32(lanes, _mm_set1_epi32(n)));
+  return _mm_and_ps(quant_noise4(_mm_load_ps(c), _mm_load_ps(x), a), live);
+}
+
+/* ((a0 + a4) + (a2 + a6)) + ((a1 + a5) + (a3 + a7)) for lo = a0..a3 and
+ * hi = a4..a7. */
+inline float sum_lanes8(__m128 lo, __m128 hi) {
+  const __m128 s = _mm_add_ps(lo, hi);
+  const __m128 t = _mm_add_ps(s, _mm_movehl_ps(s, s));
+  return _mm_cvtss_f32(_mm_add_ss(t, _mm_shuffle_ps(t, t, _MM_SHUFFLE(1, 1, 1, 1))));
+}
+
+}  // namespace
+
+/* Lanes 0..3 of the scalar kernel's accumulators in lo, 4..7 in hi. */
+static float aac_quant_noise_sse2(const float* coef, const float* x34, int len, int windows,
+                                  int stride, float scale, float round, float gain,
+                                  const float* pow43) {
+  const QuantNoiseArgs a{_mm_set1_ps(scale), _mm_set1_ps(round), _mm_set1_ps(gain), pow43};
+  __m128 lo = _mm_setzero_ps();
+  __m128 hi = _mm_setzero_ps();
+  for (int w = 0; w < windows; w++) {
+    const float* cw = coef + (ptrdiff_t)w * stride;
+    const float* xw = x34 + (ptrdiff_t)w * stride;
+    int i = 0;
+    for (; i + 8 <= len; i += 8) {
+      lo = _mm_add_ps(lo, quant_noise4(_mm_loadu_ps(cw + i), _mm_loadu_ps(xw + i), a));
+      hi = _mm_add_ps(hi, quant_noise4(_mm_loadu_ps(cw + i + 4), _mm_loadu_ps(xw + i + 4), a));
+    }
+    if (i + 4 <= len) {
+      lo = _mm_add_ps(lo, quant_noise4(_mm_loadu_ps(cw + i), _mm_loadu_ps(xw + i), a));
+      i += 4;
+    }
+    if (i < len) {
+      const __m128 part = quant_noise_part(cw + i, xw + i, len - i, a);
+      if (i & 4) {
+        hi = _mm_add_ps(hi, part);
+      } else {
+        lo = _mm_add_ps(lo, part);
+      }
+    }
+  }
+  return sum_lanes8(lo, hi);
+}
+
 void aac_dsp_init_sse2(AacDSP* dsp) {
   dsp->vector_fmul = aac_vector_fmul_sse2;
   dsp->vector_fmul_scalar = aac_vector_fmul_scalar_sse2;
@@ -209,6 +292,7 @@ void aac_dsp_init_sse2(AacDSP* dsp) {
   dsp->fft_radix2_stage = aac_fft_radix2_stage_sse2;
   dsp->mdct_pre_twiddle = aac_mdct_pre_twiddle_sse2;
   dsp->mdct_post_twiddle = aac_mdct_post_twiddle_sse2;
+  dsp->quant_noise = aac_quant_noise_sse2;
 }
 
 #endif /* BAAC_AAC_SSE2 || __SSE2__ */

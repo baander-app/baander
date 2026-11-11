@@ -170,24 +170,13 @@ void clear_band(AacEncChannel* c, int g, int w0, int b) {
   c->quant_max[idx] = 0;
 }
 
-/* The noise of band b quantized at sf, without storing the quantized
- * values (the same sum as quantize_band followed by band_noise). */
-float band_noise_at(const AacEncChannel* c, int g, int w0, int b, int sf) {
-  const AacIcsInfo* ics = &c->ics;
-  const float scale = g_sf_scale34[sf];
-  const float gain = g_sf_gain[sf];
-  float noise = 0.0f;
-  for (int w = w0; w < w0 + ics->group_len[g]; w++) {
-    for (int i = w * 128 + ics->swb_offset[b]; i < w * 128 + ics->swb_offset[b + 1]; i++) {
-      int q = (int)(c->x34[i] * scale + kQuantRound);
-      if (q > AAC_ESC_MAX_MAG) {
-        q = AAC_ESC_MAX_MAG;
-      }
-      const float d = fabsf(c->coef[i]) - aac_pow43[q] * gain;
-      noise += d * d;
-    }
-  }
-  return noise;
+/* The noise of band b quantized at sf: the lines of quantize_band, without
+ * storing the quantized values. */
+float band_noise_at(const AacDSP* dsp, const AacEncChannel* c, int g, int w0, int b, int sf) {
+  const int* off = c->ics.swb_offset;
+  const int start = w0 * 128 + off[b];
+  return dsp->quant_noise(c->coef + start, c->x34 + start, off[b + 1] - off[b], c->ics.group_len[g],
+                          128, g_sf_scale34[sf], kQuantRound, g_sf_gain[sf], aac_pow43);
 }
 
 /* Smallest scalefactor whose quantized magnitudes stay within the escape
@@ -210,12 +199,13 @@ int min_scalefactor(const AacEncChannel* c, int g, int w0, int b) {
 
 /* Largest (coarsest) scalefactor whose quantization noise stays within
  * allowed, searched by bisection from sf_min. */
-int find_scalefactor(AacEncChannel* c, int g, int w0, int b, int sf_min, float allowed) {
+int find_scalefactor(const AacDSP* dsp, AacEncChannel* c, int g, int w0, int b, int sf_min,
+                     float allowed) {
   int lo = sf_min;
   int hi = kMaxSf;
   while (lo < hi) {
     const int mid = (lo + hi + 1) / 2;
-    if (band_noise_at(c, g, w0, b, mid) <= allowed) {
+    if (band_noise_at(dsp, c, g, w0, b, mid) <= allowed) {
       lo = mid;
     } else {
       hi = mid - 1;
@@ -230,15 +220,15 @@ int find_scalefactor(AacEncChannel* c, int g, int w0, int b, int sf_min, float a
  * search gallops from the estimate to bracket the boundary and bisects
  * the bracket; it usually needs two to four quantizations where plain
  * bisection over the scalefactor range needs eight. */
-int find_scalefactor_from_estimate(AacEncChannel* c, int g, int w0, int b, int sf_min,
-                                   float allowed) {
+int find_scalefactor_from_estimate(const AacDSP* dsp, AacEncChannel* c, int g, int w0, int b,
+                                   int sf_min, float allowed) {
   const float form = c->form[g * c->ics.num_swb + b];
   if (form <= 0.0f || allowed <= 0.0f) {
-    return find_scalefactor(c, g, w0, b, sf_min, allowed);
+    return find_scalefactor(dsp, c, g, w0, b, sf_min, allowed);
   }
   const int est = std::clamp(
       100 + (int)floorf((8.0f / 3.0f) * log2f(6.75f * allowed / form)), sf_min, kMaxSf);
-  auto fits = [&](int sf) { return band_noise_at(c, g, w0, b, sf) <= allowed; };
+  auto fits = [&](int sf) { return band_noise_at(dsp, c, g, w0, b, sf) <= allowed; };
   int lo, hi; /* lo fits (or is sf_min), hi does not (or is past the range) */
   if (fits(est)) {
     lo = est;
@@ -282,11 +272,12 @@ int find_scalefactor_from_estimate(AacEncChannel* c, int g, int w0, int b, int s
  * monotonic in the scalefactor (a coarser step can round the band's large
  * lines closer to their values while it drops small ones), so one of
  * them may fit the allowance again, for fewer bits. */
-int find_scalefactor_lc(AacEncChannel* c, int g, int w0, int b, int sf_min, float allowed) {
-  const int boundary = find_scalefactor_from_estimate(c, g, w0, b, sf_min, allowed);
+int find_scalefactor_lc(const AacDSP* dsp, AacEncChannel* c, int g, int w0, int b, int sf_min,
+                        float allowed) {
+  const int boundary = find_scalefactor_from_estimate(dsp, c, g, w0, b, sf_min, allowed);
   int sf = boundary;
   for (int up = 2; up <= kCoarserProbe && boundary + up <= kMaxSf; up++) {
-    if (band_noise_at(c, g, w0, b, boundary + up) <= allowed) {
+    if (band_noise_at(dsp, c, g, w0, b, boundary + up) <= allowed) {
       sf = boundary + up;
     }
   }
@@ -556,7 +547,7 @@ int section_group(AacEncChannel* c, int g, int w0, int max_sfb) {
  * band's noise stays within its allowance, smooths the scalefactors where
  * that saves bits, and quantizes.  Bands of a coding tool keep their book
  * and value. */
-void quantize_channel(AacEncChannel* c, bool estimate) {
+void quantize_channel(const AacDSP* dsp, AacEncChannel* c, bool estimate) {
   const AacIcsInfo* ics = &c->ics;
   const int nswb = ics->num_swb;
   int w0 = 0;
@@ -581,9 +572,8 @@ void quantize_channel(AacEncChannel* c, bool estimate) {
           c->sf_floor[idx] = min_scalefactor(c, g, w0, b);
         }
         const int sf_min = c->sf_floor[idx];
-        c->sf_found[idx] = estimate
-                               ? find_scalefactor_lc(c, g, w0, b, sf_min, c->allowed[idx])
-                               : find_scalefactor(c, g, w0, b, sf_min, c->allowed[idx]);
+        c->sf_found[idx] = estimate ? find_scalefactor_lc(dsp, c, g, w0, b, sf_min, c->allowed[idx])
+                                    : find_scalefactor(dsp, c, g, w0, b, sf_min, c->allowed[idx]);
         c->sf_allowed[idx] = c->allowed[idx];
       }
       c->sf[idx] = c->sf_found[idx];
@@ -606,7 +596,7 @@ void quantize_channel(AacEncChannel* c, bool estimate) {
       }
       const int sf = c->sf[idx];
       if (prev_sf >= 0 && prev_sf != sf && std::abs(prev_sf - sf) <= kMaxSfDelta) {
-        if (band_noise_at(c, g, w0, b, prev_sf) <= c->allowed[idx]) {
+        if (band_noise_at(dsp, c, g, w0, b, prev_sf) <= c->allowed[idx]) {
           const int bits_new = best_bits_at(c, g, w0, b, prev_sf, false) + 1;
           const int bits_old = best_bits_at(c, g, w0, b, sf, false) +
                                aac_scalefactor_bits[sf - prev_sf + AAC_SCALE_DIFF_ZERO];
@@ -1491,7 +1481,7 @@ int quantize_frame(AacEncoderState* s) {
     AacEncElement* el = &s->elem[e];
     int max_sfb = 0;
     for (int k = 0; k < el->num_ch; k++) {
-      quantize_channel(&s->ch[el->ch[k]], fast_rate_loop(s));
+      quantize_channel(s->dsp, &s->ch[el->ch[k]], fast_rate_loop(s));
       max_sfb = std::max(max_sfb, channel_max_sfb(&s->ch[el->ch[k]]));
     }
     el->max_sfb = max_sfb;
