@@ -49,6 +49,16 @@ const REQUEST_TIMEOUT_MS = 15_000
 const COMMAND_LIFETIME_MS = 20_000
 const REGISTRATION_RETRY_MS = 1_000
 const CLOSE_REPORT_PATH = '/api/session/close'
+const OVERRIDE_PATH = '/api/session/override'
+/** How long a refused request still says what the listener wants once the hold on the session is overridden. */
+const REFUSED_REQUEST_LIFETIME_MS = 120_000
+
+/** The body of an override request, typed here because the generated client does not carry the route. */
+interface OverrideRequest {
+  requestId: string
+  expectedRevision: number
+  incarnationId: string
+}
 
 export const PLAYBACK_SESSION_KEY = ['session', 'current'] as const
 export const PLAYBACK_CONNECTION_KEY = ['session', 'connection'] as const
@@ -97,6 +107,8 @@ export class PlaybackSessionCoordinator {
   /** Set from the moment a page that never disconnected sends its registration until the answer is bound. */
   private rebinding = false
   private preparedClose: { endpoint: PlaybackEndpointResource; request: PreparedKeepaliveRequest } | null = null
+  /** The last request this tab was refused for unconfirmed playback, when starting it again is what an override is for. */
+  private refused: { intent: PlaybackIntent; at: number } | null = null
   private closePreparation = 0
 
   private readonly client: QueryClient
@@ -204,12 +216,20 @@ export class PlaybackSessionCoordinator {
     // The refusal describes the session, not a failed request: once the session has no unconfirmed
     // playback left, the alert would tell the viewer to recover a browser that holds nothing.
     const connection = this.client.getQueryData<PlaybackConnection>(PLAYBACK_CONNECTION_KEY)
-    if (connection?.error === UNCONFIRMED_PLAYBACK_REFUSAL && !hasUnconfirmedPlayback(snapshot)) this.publish(connection.connected, null)
+    if (!hasUnconfirmedPlayback(snapshot)) {
+      // Whatever released the session, the refused request was an answer to a hold that is gone.
+      this.refused = null
+      if (connection?.error === UNCONFIRMED_PLAYBACK_REFUSAL) this.publish(connection.connected, null)
+    }
     this.runner.fence(snapshot.revision)
-    // A transfer that failed or expired sends its target nothing further. A target that is neither
-    // the runner nor named by a transfer any more holds a preparation nobody will start or stop.
+    // A session that no longer names this tab sends it nothing further. A transfer that failed or
+    // expired leaves its target a preparation nobody will start or stop, and a session that was
+    // taken over elsewhere leaves a tab that still plays: the tab lets go of the one and silences
+    // the other. While the page registers again as itself its place moves to a new incarnation
+    // without a new revision, so nothing is judged until the answer is bound.
     if (this.endpoint && !this.rebinding && !this.names(snapshot)) {
       this.runner.dropPreparation().catch(error => this.fail(error))
+      this.runner.silenceLostPlayback().catch(error => this.fail(error))
     }
     this.refreshRequests()
     this.refreshTransfers()
@@ -293,6 +313,7 @@ export class PlaybackSessionCoordinator {
     this.clearRegistrationTimers()
     this.socketRegistered = false
     this.rebinding = false
+    this.refused = null
     this.preparedClose = null
     this.closePreparation++
     const cursor = this.runner.observe()?.position
@@ -505,6 +526,7 @@ export class PlaybackSessionCoordinator {
     this.clearRegistrationTimers()
     this.socketRegistered = true
     this.rebinding = false
+    if (this.endpoint?.incarnationId !== endpoint.incarnationId) this.refused = null
     this.endpoint = endpoint
     this.incarnations.add(endpoint.incarnationId)
     this.runner.bind(endpoint)
@@ -712,6 +734,11 @@ export class PlaybackSessionCoordinator {
         await this.ensureLocalEndpoint()
       }
       if ((intent.action === 'load' || intent.action === 'play') && hasUnconfirmedPlayback(this.snapshot)) {
+        // Only a Play or a song selection that wanted to play is worth starting after an override:
+        // a queue restore wants paused, and a movie opens its view from its own Play button.
+        const wantsPlaying = intent.action === 'play'
+          || (intent.action === 'load' && intent.media.kind === 'song' && intent.desiredState === 'playing')
+        this.refused = wantsPlaying ? { intent, at: Date.now() } : null
         throw new Error(UNCONFIRMED_PLAYBACK_REFUSAL)
       }
       if (intent.action === 'queue' && 'operation' in intent) {
@@ -729,6 +756,8 @@ export class PlaybackSessionCoordinator {
       if ((intent.action === 'load' || intent.action === 'play') && !this.snapshot.activeIncarnationId && !this.snapshot.transfer) {
         await this.performTransfer(this.endpoint.incarnationId)
       }
+      // A request of this tab went through: an earlier refusal no longer says what the listener wants.
+      this.refused = null
       performance.mark('baander:intent-done', { detail: { action: intent.action, active: this.snapshot?.activeIncarnationId ?? null } })
     } catch (error) {
       performance.mark('baander:intent-error', { detail: { action: intent.action, message: error instanceof Error ? error.message : String(error) } })
@@ -887,6 +916,7 @@ export class PlaybackSessionCoordinator {
     const result = this.intentTail.then(async () => {
       if (local) {
         if (hasUnconfirmedPlayback(this.snapshot) && this.snapshot?.activeIncarnationId !== this.endpoint?.incarnationId) {
+          this.refused = null
           throw new Error(UNCONFIRMED_PLAYBACK_REFUSAL)
         }
         incarnationId = (await this.ensureLocalEndpoint()).incarnationId
@@ -948,6 +978,42 @@ export class PlaybackSessionCoordinator {
     }
   }
 
+  /**
+   * Ends the hold of a destination that is no longer registered and never confirmed that it
+   * stopped, because the listener chose to play here anyway. The server decides whether that
+   * destination is really gone. The tab then starts what it was last refused, when that was a
+   * Play or a song selection and recent enough to still be what the listener wants.
+   */
+  override(): Promise<void> {
+    const result = this.intentTail.then(() => this.performOverride())
+    this.intentTail = result.catch(() => {})
+    return result
+  }
+
+  private async performOverride(): Promise<void> {
+    try {
+      // The server takes an override only from a tab whose own registration holds.
+      const endpoint = await this.ensureLocalEndpoint()
+      if (!this.snapshot) throw new Error('Playback connection is unavailable.')
+      const refused = this.refused
+      const payload: OverrideRequest = { requestId: crypto.randomUUID(), expectedRevision: this.snapshot.revision, incarnationId: endpoint.incarnationId }
+      let answer: ControlSnapshot
+      try { answer = await this.post(OVERRIDE_PATH, payload, endpoint) }
+      catch (error) { throw this.refusal(error, 'The override could not be confirmed.') }
+      if (answer.requestResult?.requestId !== payload.requestId || answer.requestResult.outcome !== 'overridden') {
+        throw new Error('The server did not confirm the override.')
+      }
+      this.refused = null
+      this.publish(this.ready, null)
+      // The wall clock keeps counting while the machine sleeps. A refusal older than the limit,
+      // or one the clock puts in the future, only takes over and starts nothing.
+      const age = refused ? Date.now() - refused.at : NaN
+      if (refused && age >= 0 && age <= REFUSED_REQUEST_LIFETIME_MS && !answer.activeIncarnationId && !answer.transfer) {
+        await this.executeIntent(refused.intent)
+      }
+    } catch (error) { this.fail(error); throw error }
+  }
+
   async reconcile(): Promise<void> {
     if (!this.snapshot) return
     try { await this.post('/api/session/reconcile', { expectedRevision: this.snapshot.revision }) }
@@ -982,6 +1048,10 @@ export function getPlaybackClientRequestId(signal: AbortSignal): Promise<string>
 
 export function transferPlayback(incarnationId: string): Promise<void> {
   return activeCoordinator ? activeCoordinator.transfer(incarnationId) : Promise.reject(new Error('Playback connection is unavailable.'))
+}
+
+export function overridePlayback(): Promise<void> {
+  return activeCoordinator ? activeCoordinator.override() : Promise.reject(new Error('Playback connection is unavailable.'))
 }
 
 export function reconcilePlayback(): Promise<void> {

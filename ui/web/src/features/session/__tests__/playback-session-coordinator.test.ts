@@ -6,7 +6,7 @@ import { advanceAuthorization, synchronizeOwnership } from '@/shared/live/owners
 import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
 import { PlaybackLocalRecovery } from '../services/playback-local-recovery'
 import { registerPlaybackAdapter, requestPlayback, type PlaybackObservation } from '../services/playback-execution'
-import { PlaybackSessionCoordinator, getPlaybackClientRequestId, registerPlaybackCoordinator, PLAYBACK_CONNECTION_KEY, PLAYBACK_SESSION_KEY } from '../services/playback-session-coordinator'
+import { PlaybackSessionCoordinator, getPlaybackClientRequestId, overridePlayback, registerPlaybackCoordinator, transferPlayback, PLAYBACK_CONNECTION_KEY, PLAYBACK_SESSION_KEY } from '../services/playback-session-coordinator'
 
 vi.mock('@/shared/api-client/axios-instance', () => ({ AXIOS_INSTANCE: { post: vi.fn(), get: vi.fn() } }))
 vi.mock('@/shared/live/transport', () => ({ authenticatedTransport: {} }))
@@ -79,23 +79,26 @@ function player(kind: 'song' | 'video' = 'song') {
 }
 
 const song = { kind: 'song' as const, publicId: 'song' }
+const movie = { kind: 'video' as const, publicId: 'movie' }
 function issue(type: PlaybackCommandResource['type'], overrides: Partial<PlaybackCommandResource> = {}): PlaybackCommandResource {
   return { id: type, attemptId: 'attempt', revision: 1, incarnationId: endpoint.incarnationId, epoch: 1, type,
     payload: { media: song, queue: ['song'], currentTrackIndex: 0, position: 20, desiredState: 'playing' },
     expiresAt: new Date(Date.now() + 60_000).toISOString(), ...overrides }
 }
 
-/** A registered page that is the session's runner and plays a song. */
-async function playingPage(recovery?: PlaybackLocalRecovery) {
-  const local = player()
+/** A registered page that is the session's runner and plays a song, or a movie. */
+async function playingPage(recovery?: PlaybackLocalRecovery, kind: 'song' | 'video' = 'song') {
+  const local = player(kind)
   cleanup.push(registerPlaybackAdapter(local.adapter))
   const h = harness(recovery)
   cleanup.push(h.stop)
   await vi.waitFor(() => expect(h.transport.send).toHaveBeenCalledOnce())
+  const media = kind === 'song' ? song : movie
+  const queue = kind === 'song' ? ['song'] : []
   const session = snapshot({ activeIncarnationId: endpoint.incarnationId, activeDestinationId: endpoint.destinationId,
-    media: song, queue: ['song'], position: 20, desiredState: 'playing', observedState: 'playing' })
+    media, queue, position: 20, desiredState: 'playing', observedState: 'playing' })
   vi.mocked(AXIOS_INSTANCE.post).mockImplementation(async () => ({ data: { data: session } }))
-  h.receive({ ...session, endpoint, commands: [issue('start')] })
+  h.receive({ ...session, endpoint, commands: [issue('start', { payload: { media, queue, currentTrackIndex: 0, position: 20, desiredState: 'playing' } })] })
   await vi.waitFor(() => expect(posts('/api/session/observe')).toHaveLength(1))
   expect(local.state.observedState).toBe('playing')
   await vi.waitFor(() => expect(keepalive.prepare).toHaveBeenCalledTimes(2))
@@ -740,7 +743,7 @@ describe('browser playback coordination', () => {
     h.receive(retained)
 
     await expect(requestPlayback(action === 'load' ? { action, media: { kind: 'song', publicId: 'another-song' } } : { action }))
-      .rejects.toThrow('Stop playback in its original browser or recover that browser before resuming here.')
+      .rejects.toThrow('Previous playback is unconfirmed. Stop it in its original browser, or choose Play here anyway in the playback destination menu.')
 
     expect(vi.mocked(AXIOS_INSTANCE.post).mock.calls.some(([path]) => path === '/api/session/control')).toBe(false)
     expect(vi.mocked(AXIOS_INSTANCE.post).mock.calls.some(([path]) => path === '/api/session/observe')).toBe(false)
@@ -1574,5 +1577,386 @@ describe('browser playback coordination', () => {
     expect(h.adapter.localRecovery.fence).not.toHaveBeenCalled()
     expect(h.state.observedState).toBe('playing')
     expect(h.client.getQueryData(PLAYBACK_CONNECTION_KEY)).toHaveProperty('connected', true)
+  })
+
+  /** The session as another browser runs it. */
+  const elsewhere = (session: PlaybackSnapshotResource, revision: number): PlaybackSnapshotResource => ({
+    ...session, revision, activeIncarnationId: 'remote', activeDestinationId: 'remote-device',
+    destinations: [...session.destinations, { destinationId: 'remote-device', incarnationId: 'remote', name: 'Living room', kind: 'browser',
+      epoch: 1, available: true, capabilities: ['song', 'video'], observedState: 'playing', position: 20, observedVolume: null }],
+  })
+  const stops = (h: Awaited<ReturnType<typeof playingPage>>) => h.adapter.execute.mock.calls.filter(([command]) => command.type === 'stop')
+
+  it.each([
+    ['song', 'another runner'], ['video', 'another runner'], ['song', 'no runner'], ['video', 'no runner'],
+  ] as const)('silences a playing %s once when a snapshot names %s', async (kind, runner) => {
+    const h = await playingPage(undefined, kind)
+    const lost = (revision: number) => runner === 'another runner' ? elsewhere(h.session, revision)
+      : { ...h.session, revision, activeIncarnationId: null, activeDestinationId: null, desiredState: 'paused' as const, observedState: 'paused' as const }
+
+    h.receive(lost(2))
+    await vi.waitFor(() => expect(h.state.observedState).toBe('paused'))
+
+    expect(h.adapter.quiesce).toHaveBeenCalledOnce()
+    // Silenced where it stands: a stop would close a movie the viewer still has open.
+    expect(stops(h)).toEqual([])
+    expect(posts('/api/session/ack')).toHaveLength(1)
+
+    h.receive(lost(3))
+    await settled()
+    expect(h.adapter.quiesce).toHaveBeenCalledOnce()
+    expect(h.client.getQueryData(PLAYBACK_CONNECTION_KEY)).toMatchObject({ connected: true, error: null })
+  })
+
+  it.each(['song', 'video'] as const)('leaves a paused %s alone when a snapshot names no runner, and plays it again at its cursor', async kind => {
+    const h = await playingPage(undefined, kind)
+    const payload = { ...issue('start').payload, media: h.session.media, queue: h.session.queue, position: 44 }
+    h.receive({ ...h.session, revision: 2, desiredState: 'paused', commands: [issue('pause', { revision: 2, payload: { ...payload, desiredState: 'paused' } })] })
+    await vi.waitFor(() => expect(h.state.observedState).toBe('paused'))
+    await vi.waitFor(() => expect(posts('/api/session/ack')).toHaveLength(2))
+    h.adapter.execute.mockClear()
+
+    // The paused tab's presence lapsed and the session was released from it while it stayed open.
+    h.receive({ ...h.session, revision: 3, activeIncarnationId: null, activeDestinationId: null, desiredState: 'paused', observedState: 'paused', position: 44 })
+    await settled()
+    expect(h.adapter.quiesce).not.toHaveBeenCalled()
+    expect(h.adapter.execute).not.toHaveBeenCalled()
+    expect(h.state.observedState).toBe('paused')
+
+    h.receive({ ...h.session, revision: 4, activeIncarnationId: null, activeDestinationId: null, position: 44,
+      transfer: { attemptId: 'resume', state: 'starting', sourceIncarnationId: null, targetIncarnationId: endpoint.incarnationId, position: 44, desiredState: 'playing' },
+      commands: [issue('start', { id: 'resume', attemptId: 'resume', revision: 4, payload })] })
+    await vi.waitFor(() => expect(h.state).toEqual({ observedState: 'playing', position: 44 }))
+    expect(h.adapter.quiesce).not.toHaveBeenCalled()
+    expect(stops(h)).toEqual([])
+  })
+
+  it.each(['the target of a transfer that is starting', 'the source of a transfer', 'the runner'] as const)('leaves a playing player alone while the session names the tab as %s', async role => {
+    const h = await playingPage()
+    const transfer = { attemptId: 'transfer', position: 20, desiredState: 'playing' as const }
+    const named = (revision: number): PlaybackSnapshotResource => role === 'the runner' ? { ...h.session, revision }
+      : role === 'the source of a transfer'
+        ? { ...elsewhere(h.session, revision), transfer: { ...transfer, state: 'starting', sourceIncarnationId: endpoint.incarnationId, targetIncarnationId: 'remote' } }
+        // It answered its start and plays; the snapshot that commits the transfer has not arrived.
+        : { ...elsewhere(h.session, revision), transfer: { ...transfer, state: 'starting', sourceIncarnationId: 'remote', targetIncarnationId: endpoint.incarnationId } }
+
+    h.receive(named(2))
+    h.receive(named(3))
+    await settled()
+
+    expect(h.adapter.quiesce).not.toHaveBeenCalled()
+    expect(h.state.observedState).toBe('playing')
+  })
+
+  it('ignores a snapshot older than the one it holds when it decides whether it lost the session', async () => {
+    const h = await playingPage()
+    h.receive({ ...h.session, revision: 3 })
+
+    h.receive(elsewhere(h.session, 2))
+    await settled()
+
+    expect(h.adapter.quiesce).not.toHaveBeenCalled()
+    expect(h.state.observedState).toBe('playing')
+  })
+
+  it('silences nothing while it registers again as the same page, whichever incarnation a snapshot names meanwhile', async () => {
+    const h = await playingPage()
+    h.open()
+    await vi.waitFor(() => expect(h.transport.send).toHaveBeenCalledTimes(2))
+
+    // Relayed after the server kept the page's place and before its answer arrived here.
+    h.receive(succeeded(h.session))
+    await settled()
+    expect(h.adapter.quiesce).not.toHaveBeenCalled()
+
+    // The answer itself is applied while the page still holds its earlier incarnation.
+    h.receive({ ...succeeded(h.session), endpoint: successor })
+    await vi.waitFor(() => expect(h.client.getQueryData(PLAYBACK_CONNECTION_KEY)).toHaveProperty('endpoint.incarnationId', successor.incarnationId))
+
+    // An answer computed before the server kept the page's place carries the same revision and
+    // names the earlier incarnation; it arrives after the new one is bound.
+    h.receive(h.session)
+    h.receive({ ...h.session, commands: [] })
+    await settled()
+
+    expect(h.adapter.quiesce).not.toHaveBeenCalled()
+    expect(h.state.observedState).toBe('playing')
+  })
+
+  it('still silences a page that registered again as itself once the session names somebody else', async () => {
+    const h = await playingPage()
+    h.open()
+    await vi.waitFor(() => expect(h.transport.send).toHaveBeenCalledTimes(2))
+    h.receive({ ...succeeded(h.session), endpoint: successor })
+    await vi.waitFor(() => expect(h.client.getQueryData(PLAYBACK_CONNECTION_KEY)).toHaveProperty('endpoint.incarnationId', successor.incarnationId))
+
+    h.receive(elsewhere(succeeded(h.session), 2))
+
+    await vi.waitFor(() => expect(h.state.observedState).toBe('paused'))
+    expect(h.adapter.quiesce).toHaveBeenCalledOnce()
+  })
+
+  it('executes a preparation that follows the loss of the session after the player is silenced, and keeps it', async () => {
+    const h = await playingPage()
+    let silence!: () => void
+    h.adapter.quiesce.mockImplementationOnce(() => new Promise<PlaybackObservation>(resolve => {
+      silence = () => { h.state.observedState = 'paused'; resolve({ ...h.state }) }
+    }))
+    h.receive(elsewhere(h.session, 2))
+    await vi.waitFor(() => expect(silence).toBeDefined())
+
+    const transfer = { attemptId: 'back', state: 'preparing' as const, sourceIncarnationId: 'remote', targetIncarnationId: endpoint.incarnationId, position: 50, desiredState: 'playing' as const }
+    const prepare = issue('prepare', { id: 'prepare', attemptId: 'back', revision: 3, payload: { ...issue('start').payload, position: 50 } })
+    h.receive({ ...elsewhere(h.session, 3), transfer, commands: [prepare] })
+    await settled()
+    expect(h.adapter.prepare).not.toHaveBeenCalled()
+
+    silence()
+    await vi.waitFor(() => expect(h.adapter.prepare).toHaveBeenCalledOnce())
+    await vi.waitFor(() => expect(posts('/api/session/ack').at(-1)?.[1]).toMatchObject({ commandId: 'prepare', outcome: 'prepared' }))
+
+    h.receive({ ...elsewhere(h.session, 4), transfer: { ...transfer, state: 'quiescing' } })
+    await settled()
+    expect(h.adapter.quiesce).toHaveBeenCalledOnce()
+    expect(stops(h)).toEqual([])
+  })
+
+  describe('Play here anyway', () => {
+    const gone = { destinationId: 'gone-device', incarnationId: 'gone-tab', name: 'Firefox on Linux', kind: 'browser' as const,
+      epoch: 1, available: false, capabilities: ['song' as const, 'video' as const], observedState: 'unknown' as const, position: 77, observedVolume: null }
+    const refusal = (message: string) => Object.assign(new Error('Request failed with status code 409'), { response: { status: 409, data: { error: { message } } } })
+
+    /**
+     * A registered tab beside a session whose runner has gone without confirming that it stopped.
+     * The server here accepts an override, which leaves the session paused without a runner, and
+     * then lets the tab play through the ordinary control and transfer.
+     */
+    async function refusedTab(left: Partial<PlaybackSnapshotResource> = {}) {
+      const local = player()
+      cleanup.push(registerPlaybackAdapter(local.adapter))
+      const h = harness()
+      cleanup.push(h.stop, registerPlaybackCoordinator(h.runtime))
+      await vi.waitFor(() => expect(h.transport.send).toHaveBeenCalledOnce())
+      const own = snapshot().destinations
+      let state = snapshot({ revision: 5, media: { kind: 'song', publicId: 'held-song' }, queue: ['held-song'], position: 77,
+        desiredState: 'playing', observedState: 'unknown', activeIncarnationId: gone.incarnationId, activeDestinationId: gone.destinationId,
+        destinations: [...own, gone] })
+      const server = { override: (): void => {}, overrides: [] as Record<string, unknown>[] }
+      vi.mocked(AXIOS_INSTANCE.post).mockImplementation(async (path, body) => {
+        const request = body as Record<string, unknown>
+        if (path === '/api/session/override') {
+          server.override()
+          server.overrides.push(request)
+          state = { ...state, revision: state.revision + 1, activeIncarnationId: null, activeDestinationId: null,
+            desiredState: 'paused', observedState: 'paused', ...left }
+          return { data: { data: { ...state, requestResult: { requestId: request.requestId, commandId: 'override', outcome: 'overridden', rejectionReason: null } } } }
+        }
+        if (path === '/api/session/control') {
+          state = { ...state, revision: state.revision + 1 }
+          return { data: { data: { ...state, requestResult: { requestId: request.requestId, commandId: 'control', outcome: 'retained', rejectionReason: null } } } }
+        }
+        if (path === '/api/session/transfer') {
+          state = { ...state, revision: state.revision + 1, activeIncarnationId: endpoint.incarnationId, activeDestinationId: endpoint.destinationId }
+          return { data: { data: { ...state, transferResult: { requestId: request.requestId, attemptId: 'attempt', state: 'committed', rejectionReason: null } } } }
+        }
+        return { data: { data: state } }
+      })
+      h.receive({ ...state, endpoint })
+      await vi.waitFor(() => expect(h.client.getQueryData(PLAYBACK_CONNECTION_KEY)).toHaveProperty('connected', true))
+      return { ...h, ...local, server, current: () => state, hold: (next: PlaybackSnapshotResource) => { state = next; h.receive(next) } }
+    }
+    const controls = () => posts('/api/session/control').map(([, body]) => body as Record<string, unknown>)
+    const selection = { action: 'load' as const, media: { kind: 'song' as const, publicId: 'chosen-song' }, position: 0, desiredState: 'playing' as const }
+
+    it('posts one override for this tab at the current revision, after it renewed its presence', async () => {
+      const h = await refusedTab()
+
+      await overridePlayback()
+
+      const calls = vi.mocked(AXIOS_INSTANCE.post).mock.calls.map(([path]) => path)
+      expect(calls.filter(path => path === '/api/session/override')).toHaveLength(1)
+      expect(calls.indexOf('/api/session/observe')).toBeGreaterThanOrEqual(0)
+      expect(calls.indexOf('/api/session/observe')).toBeLessThan(calls.indexOf('/api/session/override'))
+      const [, body, config] = posts('/api/session/override')[0]
+      expect(body).toEqual({ requestId: expect.stringMatching(/^[0-9a-f-]{36}$/), expectedRevision: 5, incarnationId: endpoint.incarnationId })
+      expect(config).toMatchObject({ headers: { 'X-Baander-Playback-Endpoint': endpoint.capability } })
+      expect(h.client.getQueryData(PLAYBACK_SESSION_KEY)).toMatchObject({ activeIncarnationId: null, desiredState: 'paused', revision: 6 })
+
+      await overridePlayback().catch(() => {})
+      const identities = posts('/api/session/override').map(([, request]) => (request as { requestId: string }).requestId)
+      expect(new Set(identities).size).toBe(identities.length)
+    })
+
+    it('plays the song selection it was refused half a minute before the override was accepted', async () => {
+      const now = Date.now()
+      const clock = vi.spyOn(Date, 'now').mockReturnValue(now)
+      cleanup.push(() => clock.mockRestore())
+      const h = await refusedTab()
+      await expect(requestPlayback(selection)).rejects.toThrow('Previous playback is unconfirmed.')
+      expect(controls()).toEqual([])
+      h.server.override = () => { clock.mockReturnValue(now + 30_000) }
+
+      await overridePlayback()
+
+      expect(controls()).toEqual([expect.objectContaining({ action: 'load', media: selection.media, desiredState: 'playing', queue: ['held-song', 'chosen-song'], currentTrackIndex: 1 })])
+      expect(posts('/api/session/transfer')[0][1]).toMatchObject({ targetIncarnationId: endpoint.incarnationId })
+      expect(h.client.getQueryData(PLAYBACK_SESSION_KEY)).toHaveProperty('activeIncarnationId', endpoint.incarnationId)
+      expect(h.client.getQueryData(PLAYBACK_CONNECTION_KEY)).toHaveProperty('error', null)
+    })
+
+    it.each([
+      [119_000, 'plays'], [120_000, 'plays'], [120_001, 'only takes over'], [600_000, 'only takes over'], [-1, 'only takes over'],
+    ] as const)('with a play refused %i ms before the accepted override, it %s', async (age, outcome) => {
+      const now = Date.now()
+      const clock = vi.spyOn(Date, 'now').mockReturnValue(now)
+      cleanup.push(() => clock.mockRestore())
+      const h = await refusedTab()
+      await expect(requestPlayback({ action: 'play' })).rejects.toThrow('Previous playback is unconfirmed.')
+      h.server.override = () => { clock.mockReturnValue(now + age) }
+
+      await overridePlayback()
+
+      expect(controls().map(control => control.action)).toEqual(outcome === 'plays' ? ['play'] : [])
+      expect(posts('/api/session/transfer')).toHaveLength(outcome === 'plays' ? 1 : 0)
+      expect(h.client.getQueryData(PLAYBACK_CONNECTION_KEY)).toHaveProperty('error', null)
+
+      // An old refusal is not kept for a later override either, and the next Play starts by itself.
+      h.hold({ ...h.current(), revision: h.current().revision + 1, activeIncarnationId: gone.incarnationId, activeDestinationId: gone.destinationId })
+      await overridePlayback()
+      expect(controls().map(control => control.action)).toEqual(outcome === 'plays' ? ['play'] : [])
+      await requestPlayback({ action: 'play' })
+      expect(controls().map(control => control.action)).toEqual(outcome === 'plays' ? ['play', 'play'] : ['play'])
+    })
+
+    it.each(['a movie selection', 'a paused queue restore', 'a local transfer'] as const)('starts nothing after an override when %s was what it was refused, and clears the refusal', async refused => {
+      const h = await refusedTab()
+      await requestPlayback({ action: 'play' }).catch(() => {})
+      if (refused === 'a movie selection') {
+        await expect(requestPlayback({ action: 'load', media: { kind: 'video', publicId: 'movie' }, desiredState: 'playing' })).rejects.toThrow('Previous playback is unconfirmed.')
+      } else if (refused === 'a paused queue restore') {
+        await expect(requestPlayback({ ...selection, desiredState: 'paused' })).rejects.toThrow('Previous playback is unconfirmed.')
+      } else {
+        await expect(transferPlayback(endpoint.incarnationId)).rejects.toThrow('Previous playback is unconfirmed.')
+      }
+      expect(h.client.getQueryData(PLAYBACK_CONNECTION_KEY)).toHaveProperty('error', expect.stringContaining('Play here anyway'))
+
+      await overridePlayback()
+
+      expect(controls()).toEqual([])
+      expect(posts('/api/session/transfer')).toEqual([])
+      expect(h.client.getQueryData(PLAYBACK_CONNECTION_KEY)).toHaveProperty('error', null)
+    })
+
+    it('starts nothing when the override left the session with the source of a failed transfer', async () => {
+      const source = { ...gone, destinationId: 'source-device', incarnationId: 'source-tab', name: 'Living room', available: true, observedState: 'paused' as const }
+      const h = await refusedTab({ activeIncarnationId: source.incarnationId, activeDestinationId: source.destinationId })
+      await requestPlayback({ action: 'play' }).catch(() => {})
+
+      await overridePlayback()
+
+      expect(controls()).toEqual([])
+      expect(h.client.getQueryData(PLAYBACK_SESSION_KEY)).toHaveProperty('activeIncarnationId', source.incarnationId)
+    })
+
+    it('forgets the refused request when the session is released without an override', async () => {
+      const h = await refusedTab()
+      await requestPlayback({ action: 'play' }).catch(() => {})
+
+      // The gone runner's own proof released the session; later another runner goes missing.
+      h.hold({ ...h.current(), revision: 6, activeIncarnationId: null, activeDestinationId: null, desiredState: 'paused', observedState: 'paused' })
+      h.hold({ ...h.current(), revision: 7, activeIncarnationId: gone.incarnationId, activeDestinationId: gone.destinationId })
+      await overridePlayback()
+
+      expect(controls()).toEqual([])
+    })
+
+    it('forgets the refused request after a later request of the tab succeeded', async () => {
+      await refusedTab()
+      await requestPlayback({ action: 'play' }).catch(() => {})
+      await requestPlayback({ action: 'pause' })
+
+      await overridePlayback()
+
+      expect(controls().map(control => control.action)).toEqual(['pause'])
+    })
+
+    it('forgets the refused request when the tab loses its endpoint', async () => {
+      const h = await refusedTab()
+      await requestPlayback({ action: 'play' }).catch(() => {})
+      h.close()
+      h.open()
+      await vi.waitFor(() => expect(h.transport.send).toHaveBeenCalledTimes(2))
+      const registeredAgain = { ...h.current(), destinations: [...succeeded(snapshot()).destinations, gone] }
+      h.hold(registeredAgain)
+      h.receive({ ...registeredAgain, endpoint: successor })
+      await vi.waitFor(() => expect(h.client.getQueryData(PLAYBACK_CONNECTION_KEY)).toHaveProperty('connected', true))
+
+      await overridePlayback()
+
+      expect(posts('/api/session/override').at(-1)?.[1]).toMatchObject({ incarnationId: successor.incarnationId })
+      expect(controls()).toEqual([])
+    })
+
+    it('reports the refused request as refused, once, when an earlier result of the tab is still unconfirmed', async () => {
+      const h = await refusedTab()
+      await requestPlayback({ action: 'play' }).catch(() => {})
+      const server = vi.mocked(AXIOS_INSTANCE.post).getMockImplementation()!
+      vi.mocked(AXIOS_INSTANCE.post).mockImplementation(async (path, body, config) => {
+        if (path === '/api/session/control' && (body as { action: string }).action === 'pause') throw new Error('Connection interrupted')
+        return server(path, body, config)
+      })
+      await expect(requestPlayback({ action: 'pause' })).rejects.toThrow('Connection interrupted')
+
+      await expect(overridePlayback()).rejects.toThrow('A previous playback result is unconfirmed.')
+
+      expect(posts('/api/session/override')).toHaveLength(1)
+      expect(h.client.getQueryData(PLAYBACK_SESSION_KEY)).toHaveProperty('activeIncarnationId', null)
+      await settled()
+      expect(posts('/api/session/override')).toHaveLength(1)
+      expect(controls().filter(control => control.action === 'play')).toEqual([])
+    })
+
+    it.each([
+      'The destination is still connected. Stop playback there.',
+      'Playback revision conflict.',
+      'No playback is waiting to be overridden.',
+    ])('shows the reason the server refused the override with: %s', async message => {
+      const h = await refusedTab()
+      await requestPlayback({ action: 'play' }).catch(() => {})
+      h.server.override = () => { throw refusal(message) }
+
+      await expect(overridePlayback()).rejects.toThrow(message)
+
+      expect(h.client.getQueryData(PLAYBACK_CONNECTION_KEY)).toHaveProperty('error', message)
+      expect(controls()).toEqual([])
+      // The refused Play is still wanted: a second press that the server accepts starts it.
+      h.server.override = () => {}
+      await overridePlayback()
+      expect(controls().map(control => control.action)).toEqual(['play'])
+    })
+
+    it('shows that the route is missing when the server does not know the override', async () => {
+      const h = await refusedTab()
+      h.server.override = () => { throw Object.assign(new Error('Request failed with status code 404'), { response: { status: 404, data: { error: { message: 'Not Found', code: 404 } } } }) }
+
+      await expect(overridePlayback()).rejects.toThrow('Not Found')
+      expect(h.client.getQueryData(PLAYBACK_CONNECTION_KEY)).toHaveProperty('error', 'Not Found')
+    })
+
+    it('does not take an answer without its own overridden result for an accepted override', async () => {
+      const h = await refusedTab()
+      await requestPlayback({ action: 'play' }).catch(() => {})
+      vi.mocked(AXIOS_INSTANCE.post).mockImplementation(async path => ({ data: { data: path === '/api/session/override'
+        ? { ...h.current(), requestResult: { requestId: 'another-request', commandId: 'override', outcome: 'overridden', rejectionReason: null } } : h.current() } }))
+
+      await expect(overridePlayback()).rejects.toThrow('The server did not confirm the override.')
+      expect(controls()).toEqual([])
+    })
+
+    it('is unavailable without a registered endpoint', async () => {
+      const h = harness(); cleanup.push(h.stop, registerPlaybackCoordinator(h.runtime))
+      await expect(overridePlayback()).rejects.toThrow('Playback connection is unavailable.')
+      expect(posts('/api/session/override')).toEqual([])
+    })
   })
 })
