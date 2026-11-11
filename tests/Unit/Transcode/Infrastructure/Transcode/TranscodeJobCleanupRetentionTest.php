@@ -15,6 +15,8 @@ use App\Transcode\Domain\Model\TranscodeJob;
 use App\Transcode\Domain\Repository\TranscodeJobRepositoryInterface;
 use App\Transcode\Domain\ValueObject\AudioProfile;
 use App\Transcode\Domain\ValueObject\QualityTier;
+use App\Transcode\Infrastructure\Storage\SegmentFileResolver;
+use App\Transcode\Infrastructure\Storage\TranscodeFileStorage;
 use App\Transcode\Infrastructure\Transcode\TranscodeJobService;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -139,6 +141,87 @@ final class TranscodeJobCleanupRetentionTest extends TestCase
         self::assertCount(1, $logger->records);
         self::assertSame(LogLevel::ERROR, $logger->records[0]['level']);
         self::assertSame(['job' => $jobs[1]->getId()->toString(), 'step' => 'record removal', 'exception' => $failure], $logger->records[0]['context']);
+    }
+
+    public function testALeaseThatCannotBeReadKeepsItsJobAndNotTheOthers(): void
+    {
+        $jobs = [
+            TranscodeJob::create(Uuid::v7(), QualityTier::p360(), '/cache/video/first', Uuid::v7()),
+            TranscodeJob::create(Uuid::v7(), QualityTier::p720(), '/cache/video/unreadable', Uuid::v7()),
+            TranscodeJob::create(Uuid::v7(), QualityTier::p1080(), '/cache/video/third', Uuid::v7()),
+        ];
+        $failure = new \RuntimeException('The runtime state could not be read.');
+        $removed = [];
+        $repository = $this->createStub(TranscodeJobRepositoryInterface::class);
+        $repository->method('findOrphanedJobs')->willReturn($jobs);
+        $repository->method('delete')->willReturnCallback(static function (TranscodeJob $job) use (&$removed): void {
+            $removed[] = $job;
+        });
+        $ownership = $this->createStub(TranscodeExecutionOwnershipPort::class);
+        $ownership->method('find')->willReturnCallback(static fn (Uuid $jobId): ?TranscodeRuntimeSnapshot => $jobId->equals($jobs[1]->getId()) ? throw $failure : null);
+        // Without a lease verdict a worker may still be writing: the output is not offered for deletion.
+        $offered = [];
+        $storage = $this->createStub(TranscodeStoragePortInterface::class);
+        $storage->method('deleteIfUnretained')->willReturnCallback(static function (string $directory) use (&$offered): bool {
+            $offered[] = $directory;
+
+            return true;
+        });
+        $logger = $this->logger();
+        $service = new TranscodeJobService($repository, $storage, $this->createStub(EventDispatcherInterface::class), $ownership, $this->transaction(), $logger);
+
+        try {
+            $service->cleanupOrphanedJobs();
+            self::fail('A run that skipped a job after an error does not report success.');
+        } catch (TranscodeCleanupIncompleteException $incomplete) {
+            self::assertSame([2, 1], [$incomplete->removed, $incomplete->failed]);
+        }
+        self::assertSame(['/cache/video/first', '/cache/video/third'], $offered);
+        self::assertSame([$jobs[0], $jobs[2]], $removed);
+        self::assertCount(1, $logger->records);
+        self::assertSame(LogLevel::ERROR, $logger->records[0]['level']);
+        self::assertSame(['job' => $jobs[1]->getId()->toString(), 'step' => 'lease check', 'exception' => $failure], $logger->records[0]['context']);
+    }
+
+    public function testTheRunAfterAFailedRecordRemovalOffersTheMissingOutputAgainAndRemovesTheJob(): void
+    {
+        $root = sys_get_temp_dir() . '/baander-cleanup-retry-' . bin2hex(random_bytes(8));
+        $output = $root . '/video/720p/job-one';
+        mkdir($output . '/generation-1', 0700, true);
+        file_put_contents($output . '/generation-1/segment.m4s', 'media');
+        try {
+            $job = TranscodeJob::create(Uuid::v7(), QualityTier::p720(), $output, Uuid::v7());
+            // The first removal of the record fails; later ones succeed.
+            $removals = new \ArrayObject();
+            $repository = $this->createStub(TranscodeJobRepositoryInterface::class);
+            $repository->method('findOrphanedJobs')->willReturn([$job]);
+            $repository->method('delete')->willReturnCallback(static function (TranscodeJob $job) use ($removals): void {
+                $removals->append($job);
+                if (count($removals) === 1) {
+                    throw new \RuntimeException('The row is locked.');
+                }
+            });
+            $service = new TranscodeJobService($repository, new TranscodeFileStorage(new SegmentFileResolver($root)), $this->createStub(EventDispatcherInterface::class), $this->createStub(TranscodeExecutionOwnershipPort::class), $this->transaction(), new NullLogger());
+
+            try {
+                $service->cleanupOrphanedJobs();
+                self::fail('A run that could not remove the record does not report success.');
+            } catch (TranscodeCleanupIncompleteException $incomplete) {
+                self::assertSame([0, 1], [$incomplete->removed, $incomplete->failed]);
+            }
+            // The record outlived its output. Deleting output that is already gone succeeds,
+            // so the next run reaches the record again.
+            self::assertDirectoryDoesNotExist($output);
+
+            self::assertSame(1, $service->cleanupOrphanedJobs());
+            self::assertCount(2, $removals);
+        } finally {
+            $entries = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($root, \FilesystemIterator::SKIP_DOTS), \RecursiveIteratorIterator::CHILD_FIRST);
+            foreach ($entries as $entry) {
+                $entry->isDir() ? rmdir($entry->getPathname()) : unlink($entry->getPathname());
+            }
+            rmdir($root);
+        }
     }
 
     /** A transaction boundary that only runs its operation. */

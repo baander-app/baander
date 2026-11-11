@@ -625,7 +625,7 @@ final class TranscodeSessionOwnershipPersistenceTest extends TestCase
         self::assertTrue($this->manager->isOpen());
         self::assertNull($jobs->findByUuid($first));
         self::assertNull($jobs->findByUuid($last));
-        // The refused job is whole: its removal was rolled back with the session rows it had already deleted.
+        // The refused job is whole: it keeps its session row and its runtime state.
         self::assertSame(0, $jobs->findByUuid($refused)?->getReferenceCount());
         self::assertSame(['cancelled'], $connection->fetchFirstColumn('SELECT state FROM transcode_sessions WHERE job_id = ?', [$refused->toString()]));
         self::assertNotNull($runtime->find($refused));

@@ -159,12 +159,16 @@ final class TranscodeJobRepository implements TranscodeJobRepositoryInterface
         if ($entity === null) {
             return;
         }
-        // The database deletes a job's sessions with the job. The unit of work has to remove them
-        // too: a session it still manages would keep pointing at the removed job, and the next
-        // flush would refuse that job as a new entity found through the session.
-        $sessions = $this->entityManager->getRepository(TranscodeSessionEntity::class)->findBy(['job' => $entity]);
-        foreach ($sessions as $session) {
-            $this->entityManager->remove($session);
+        // The database deletes a job's sessions with the job. The unit of work has to let go of the
+        // ones it manages: a session left pointing at the removed job would make the next flush
+        // refuse that job as a new entity found through the session. It reads them from its own
+        // identity map, not from a query, because another process may already have deleted a row
+        // this unit of work still holds.
+        $unitOfWork = $this->entityManager->getUnitOfWork();
+        foreach ($unitOfWork->getIdentityMap()[TranscodeSessionEntity::class] ?? [] as $session) {
+            if ($session instanceof TranscodeSessionEntity && !$unitOfWork->isUninitializedObject($session) && $session->getJob() === $entity) {
+                $this->entityManager->detach($session);
+            }
         }
         $this->entityManager->remove($entity);
         $this->entityManager->flush();

@@ -156,7 +156,20 @@ final class TranscodeJobAuthorizationTest extends TestCase
         ));
         $controller = new TranscodeJobController($bus, $this->createStub(TranscodeJobPortInterface::class), new \App\Tests\Unit\Transcode\PublicViewStub(), $this->createStub(PlaybackAccessInterface::class));
 
-        $response = $controller->cleanup();
+        // The controller holds no answer of its own for this outcome: the exception subscriber every
+        // endpoint shares unwraps the handler's failure and answers it.
+        $events = new \Symfony\Component\EventDispatcher\EventDispatcher();
+        $events->addListener(\Symfony\Component\HttpKernel\KernelEvents::EXCEPTION, new \App\Shared\Infrastructure\EventListener\ExceptionSubscriber(
+            new \Psr\Log\NullLogger(),
+            $this->createStub(\Symfony\Contracts\Translation\TranslatorInterface::class),
+        ));
+        $controllers = $this->createStub(\Symfony\Component\HttpKernel\Controller\ControllerResolverInterface::class);
+        $controllers->method('getController')->willReturn($controller->cleanup(...));
+        $arguments = $this->createStub(\Symfony\Component\HttpKernel\Controller\ArgumentResolverInterface::class);
+        $arguments->method('getArguments')->willReturn([]);
+
+        $response = (new \Symfony\Component\HttpKernel\HttpKernel($events, $controllers, new \Symfony\Component\HttpFoundation\RequestStack(), $arguments))
+            ->handle(\Symfony\Component\HttpFoundation\Request::create('/api/transcode/jobs/cleanup', 'POST'));
 
         self::assertSame(503, $response->getStatusCode());
         self::assertSame(['error' => [
