@@ -28,6 +28,25 @@ inside an outer transaction does not commit independently. Related producer writ
 and outbox insertion must use the same connection and commit boundary; use the
 [PostgreSQL skill](../skills/postgres-remediation/SKILL.md) for affected persistence.
 
+## Tables and statements outside the ORM
+
+This section governs `PlaybackStore` and every table or store added after it. The
+tables still listed in `schema_filter` (eleven on 2026-11-11) and the existing
+stores that run DBAL statements are an unreviewed baseline: this rule neither
+approves them nor requires converting them, and they are no precedent for new code.
+
+- A table has a Doctrine entity unless schema comparison cannot represent it. A new
+  `schema_filter` entry carries its reason beside it.
+- A statement stays SQL only when DQL has no form for it and no DQL statement or
+  unit-of-work insert gives the same result without breaking a single-statement
+  fence, losing a clock reading or adding a statement to a per-second path. Name
+  each such statement with its reason where it stands.
+- Rows whose updates are guarded statements map to a `readOnly` entity. The unit of
+  work inserts such a row and never computes changes for it; each update is one
+  statement whose predicate is the guard; reads return plain rows, not managed
+  entities. `PlaybackStore` and the four playback coordination entities are the
+  worked example.
+
 ## Service resolution
 
 Clients depend on repository interfaces. Verify the resolved service, including

@@ -834,7 +834,84 @@ Open, known limits:
   host), the full tooling suite, and the persistent instance's cleanup run, which
   needs the branch on `master`.
 - **Planned next:** Doctrine entities for the four SQL-owned playback tables, on
-  their own plan and branch.
+  their own plan and branch. Delivered since; see
+  [Playback session entities](#playback-session-entities).
+
+### Playback session entities
+
+Delivered on the branch `playback-session-entities` from the
+[plan](docs/plans/2026-11-10-2252-refactor-playback-session-entities-plan.md); not
+merged, and the two-command browser gate in Chromium and Firefox is still to run.
+The four playback coordination tables had no entities, the ORM `schema_filter` hid
+them from schema comparison, and `PlaybackStore` read and wrote them with 38
+hand-written statements.
+
+- **Contract and baseline (U1, `772f5a085`):** `PlaybackStoreContractTest` pins what
+  the coordinator's suites do not: how a repeated write resolves, which clock
+  stamps a row, and the keys and scalar types of every returned row.
+  `PlaybackSnapshotCostTest` counts the statements of a relayed snapshot and of a
+  control that issues a command.
+- **Entities (U2, `deb220984`):** four `readOnly` entities match the migrated
+  catalog, the tables left `schema_filter`, and schema comparison is clean with no
+  migration changed. `PlaybackSessionSchemaListener` declares eight composite
+  foreign keys.
+- **Reads (U3, `0be4eaafd`):** every read is DQL that returns plain rows.
+- **Writes (U4, `715c37523`):** an insert goes through the unit of work, flushed and
+  detached in its method; an update is one DQL statement with its predicate. Five
+  statements stay SQL: the account advisory lock, the insert of a missing session
+  row, the two retire proofs and the recovery expiry check against
+  `clock_timestamp()`.
+- **Cost (U5, `eb9c4c7bf`):** measured against the SQL store with the same program
+  on the same host, 2,000 iterations after 200 warm-up, PostgreSQL 18.4, four runs
+  before and five after, load average between 2 and 7.
+- **Documentation and rule (U6):** the Session context page, the Session README,
+  the database naming page and the Doctrine reference describe the mapping, and
+  `.agents/rules/ddd-repositories.md` states when a table or a statement may stay
+  outside the ORM.
+
+Measured:
+
+| Scenario | Statements, before | Statements, now | Median before | Median now | Ratio | Bound |
+|---|---|---|---|---|---|---|
+| Snapshot, unbound socket, runner playing | 9 | 8 | 2.42 ms | 2.74 ms | 1.13 | 1.15 |
+| Snapshot, bound socket, runner resting paused | 12 | 11 | 4.02 ms | 4.41 ms | 1.10 | 1.15 |
+| Snapshot that first shows a command | 12 | 12 | not timed | not timed | | |
+| Control that issues one command | 19 | 23 | 6.89 ms | 8.76 ms | 1.27 | 1.5 |
+
+The medians are from the pass with `synchronous_commit` off for the session, which
+is the pass the bounds are judged on. With commits waiting for the flush every
+snapshot stays at about 17 ms before and after, because the flush outweighs the
+statements. Serving 50 accounts in turn through one entity manager costs 4.34 ms
+per snapshot against 4.41 ms for one account, with the same number of statements
+and an empty unit of work after each round. No fallback to SQL was applied.
+
+Checkpoint, 2026-11-11: the Session unit suite passes with 143 tests, unchanged;
+ten PostgreSQL integration files pass with 157 tests, the six playback files among
+them with no changed assertion; PHPStan, Deptrac, the container lint and the
+OpenAPI drift check are clean.
+
+Accepted differences:
+
+- A number in a stored JSON document keeps a zero fraction (`30.0` where the SQL
+  store wrote `30`).
+- A session without media stores SQL NULL where the SQL store wrote the JSON value
+  `null`. Both read back as no media.
+- A control that issues a command sends four more statements: one read that carries
+  the transaction clock and the replay-key check, a savepoint and its release
+  around the insert, and the mark that the control's own answer shows the command.
+
+Open:
+
+- **Unreviewed baseline:** the eleven tables still in `schema_filter` and the
+  existing stores that run DBAL statements have not been reviewed against the new
+  rule, which neither approves them nor requires converting them.
+- **Query cache:** the measurement's entity manager uses an in-memory query cache;
+  production configures `cache.system`. The cost of a DQL statement there is
+  unmeasured.
+- **Narrow margin:** the unbound snapshot is at 1.13 against 1.15. It sends one
+  statement fewer and takes about 0.3 ms longer, so the cost is per DQL statement,
+  and returning one statement to SQL would recover little.
+- **Not run:** the two-command browser gate on an image built from this branch.
 
 ## Roadmap maintenance
 
