@@ -220,7 +220,7 @@ int best_bits(const int* bits) {
 }
 
 float ratio_log2_of(const ChannelWork* w, int idx, float noise) {
-  return log2f(fmaxf(noise, 1e-30f) / fmaxf(w->c->allowed[idx], 1e-30f));
+  return log2f(std::max(noise, 1e-30f) / std::max(w->c->allowed[idx], 1e-30f));
 }
 
 /* Smallest scalefactor whose quantized magnitudes stay within the escape
@@ -228,7 +228,7 @@ float ratio_log2_of(const ChannelWork* w, int idx, float noise) {
  * beyond the coarsest scalefactor that keeps a nonzero line). */
 void scalefactor_limits(const ChannelWork* w, int idx, int* sf_min, int* sf_zero) {
   float max34 = 0.0f;
-  for_lines(w, idx, [&](int i) { max34 = fmaxf(max34, w->c->x34[i]); });
+  for_lines(w, idx, [&](int i) { max34 = std::max(max34, w->c->x34[i]); });
   if (max34 <= 0.0f) {
     *sf_min = 0;
     *sf_zero = 0;
@@ -673,7 +673,7 @@ float worst_ratio(const Frame* f) {
   float worst = kIgnoredLog2;
   for (int ch = 0; ch < f->nch; ch++) {
     for (int idx = 0; idx < f->ch[ch].nbands; idx++) {
-      worst = fmaxf(worst, f->ch[ch].ratio_log2[idx]);
+      worst = std::max(worst, f->ch[ch].ratio_log2[idx]);
     }
   }
   return worst;
@@ -733,7 +733,7 @@ int collect_donors(Frame* f, const Move* made, Move* donors) {
           d.ratio_log2 > kDonorCapLog2 || d.ratio_log2 > worst - kDonorMarginLog2) {
         continue;
       }
-      d.score = (float)(-d.local_bits) / fmaxf(d.noise - w->noise[idx], 1e-9f);
+      d.score = (float)(-d.local_bits) / std::max(d.noise - w->noise[idx], 1e-9f);
       donors[ndonor++] = d;
     }
   }

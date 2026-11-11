@@ -197,7 +197,7 @@ int min_scalefactor(const AacEncChannel* c, int g, int w0, int b) {
   float max34 = 0.0f;
   for (int w = w0; w < w0 + ics->group_len[g]; w++) {
     for (int i = w * 128 + ics->swb_offset[b]; i < w * 128 + ics->swb_offset[b + 1]; i++) {
-      max34 = fmaxf(max34, c->x34[i]);
+      max34 = std::max(max34, c->x34[i]);
     }
   }
   if (max34 <= 0.0f) {
@@ -778,10 +778,10 @@ void decide_ms(AacEncoderState* s, AacEncElement* el) {
           es += d * d;
         }
       }
-      const float thr_min = fminf(l->thr[idx], r->thr[idx]);
-      const float pn_lr = (l->thr[idx] / fmaxf(l->energy[idx], l->thr[idx])) *
-                          (r->thr[idx] / fmaxf(r->energy[idx], r->thr[idx]));
-      const float pn_ms = (thr_min / fmaxf(em, thr_min)) * (thr_min / fmaxf(es, thr_min));
+      const float thr_min = std::min(l->thr[idx], r->thr[idx]);
+      const float pn_lr = (l->thr[idx] / std::max(l->energy[idx], l->thr[idx])) *
+                          (r->thr[idx] / std::max(r->energy[idx], r->thr[idx]));
+      const float pn_ms = (thr_min / std::max(em, thr_min)) * (thr_min / std::max(es, thr_min));
       ms_used[idx] = pn_ms > pn_lr;
       if (!ms_used[idx]) {
         lr_bands++;
@@ -798,7 +798,7 @@ void decide_ms(AacEncoderState* s, AacEncElement* el) {
       l->energy[idx] = em;
       r->energy[idx] = es;
       l->thr[idx] = r->thr[idx] = thr_min;
-      l->spread[idx] = r->spread[idx] = 0.5f * fminf(l->spread[idx], r->spread[idx]);
+      l->spread[idx] = r->spread[idx] = 0.5f * std::min(l->spread[idx], r->spread[idx]);
     }
     w0 += ics->group_len[g];
   }
@@ -1464,11 +1464,11 @@ void set_allowances(AacEncoderState* s, float reduction, float improve, const Re
             allowed = root * root * root * root;
             const float floor = e * ch->min_snr[idx];
             if (allowed > floor && ch->avoid_hole[idx] && b < solid) {
-              allowed = fmaxf(thr, floor);
+              allowed = std::max(thr, floor);
             }
           }
           if (b >= solid) {
-            allowed = fmaxf(allowed, e * kExtensionNoise);
+            allowed = std::max(allowed, e * kExtensionNoise);
           }
           if (allowed >= e) {
             allowed = -1.0f;
@@ -1601,7 +1601,7 @@ int rate_control(AacEncoderState* s, int target_bits, float base_improve, bool s
   for (int c = 0; c < s->channels; c++) {
     const AacEncChannel* ch = &s->ch[c];
     for (int i = 0; i < ch->ics.num_window_groups * ch->ics.num_swb; i++) {
-      max_root = fmaxf(max_root, sqrtf(sqrtf(ch->energy[i])));
+      max_root = std::max(max_root, sqrtf(sqrtf(ch->energy[i])));
     }
   }
 

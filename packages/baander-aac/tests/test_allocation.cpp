@@ -197,9 +197,13 @@ int main() {
   for (const Profile& p : kProfiles) {
     test_profile(p);
   }
-  /* The counting operators are in use at all. */
+  /* The counting operators are in use at all.  The operator is called by
+   * name: for a new-expression a compiler may remove an allocation it can
+   * pair with its release, or assume that the operator leaves every global
+   * as it was, and then the comparison below is decided without the
+   * counter being read. */
   const long before = g_allocations;
-  delete new int(1);
+  ::operator delete(::operator new(sizeof(int)));
   CHECK(g_allocations == before + 1, "the allocation counter sees operator new");
   return test_summary("test_allocation");
 }

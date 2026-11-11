@@ -2,8 +2,10 @@
  * input to the accuracy of the prototype (the banks are near-perfect
  * reconstruction, about 55 dB), and the two analysis banks agree on the
  * low band so that an encoder working at the full rate sees the energies
- * the decoder will reproduce from the half-rate core. */
+ * the decoder will reproduce from the half-rate core.  The banks' direct
+ * sums add the terms of every output in the order of its definition. */
 #include "qmf.h"
+#include "qmf_sums.h"
 #include "test_util.h"
 
 static std::vector<float> test_signal(int n, int sr) {
@@ -208,7 +210,92 @@ static void test_fft_form_matches_direct_sums() {
   }
 }
 
+static bool same_bits(const float* a, const float* b, int n) {
+  return memcmp(a, b, (size_t)n * sizeof(float)) == 0;
+}
+
+/* The sums of qmf_sums.h against plain loops that take one output at a
+ * time and add its terms first to last.  A sum whose terms were regrouped
+ * rounds differently on this data, and an encoder built on it would write
+ * other bytes than the committed streams. */
+static void test_sums_keep_term_order() {
+  unsigned seed = 4711u;
+  auto rnd = [&]() {
+    seed = seed * 1664525u + 1013904223u;
+    return (float)(seed >> 8) / 8388608.0f - 1.0f;
+  };
+  std::vector<float> x(1280), window(1280), cos_t(128 * 64), sin_t(128 * 64), v(2560);
+  float X[64][2];
+  for (int round = 0; round < 8; round++) {
+    for (float& f : x) f = 20000.0f * rnd();
+    for (float& f : window) f = rnd();
+    for (float& f : cos_t) f = rnd();
+    for (float& f : sin_t) f = rnd();
+    for (float& f : v) f = 20000.0f * rnd();
+    for (float (&c)[2] : X) {
+      c[0] = 20000.0f * rnd();
+      c[1] = 20000.0f * rnd();
+    }
+    for (int bands : {16, 24, 32, 64}) {
+      const int terms = 2 * bands;
+      float u[128], want_u[128];
+      aac_qmf_fold(u, x.data(), window.data(), terms);
+      for (int n = 0; n < terms; n++) {
+        float sum = 0.0f;
+        for (int j = 0; j < 5; j++) {
+          sum += x[n + terms * j] * window[n + terms * j];
+        }
+        want_u[n] = sum;
+      }
+      CHECK(same_bits(u, want_u, terms), "fold of %d terms adds the taps in order", terms);
+
+      float W[64][2], want_W[64][2];
+      aac_qmf_modulate(W, u, cos_t.data(), sin_t.data(), bands, terms);
+      for (int k = 0; k < bands; k++) {
+        float re = 0.0f;
+        float im = 0.0f;
+        for (int n = 0; n < terms; n++) {
+          re += u[n] * cos_t[n * bands + k];
+          im += u[n] * sin_t[n * bands + k];
+        }
+        want_W[k][0] = re;
+        want_W[k][1] = im;
+      }
+      CHECK(same_bits(&W[0][0], &want_W[0][0], 2 * bands),
+            "modulation of %d bands adds the terms in order", bands);
+
+      float out[64], want_out[64];
+      aac_qmf_overlap(out, v.data(), window.data(), bands);
+      for (int k = 0; k < bands; k++) {
+        float acc = 0.0f;
+        for (int j = 0; j < 5; j++) {
+          acc += v[4 * bands * j + k] * window[2 * bands * j + k] +
+                 v[4 * bands * j + 3 * bands + k] * window[(2 * j + 1) * bands + k];
+        }
+        want_out[k] = acc;
+      }
+      CHECK(same_bits(out, want_out, bands), "overlap of %d bands adds the segments in order",
+            bands);
+    }
+    for (int bands : {32, 64}) {
+      const int outputs = 2 * bands;
+      float got[128], want[128];
+      aac_qmf_demodulate(got, X, cos_t.data(), sin_t.data(), bands, outputs);
+      for (int n = 0; n < outputs; n++) {
+        float acc = 0.0f;
+        for (int k = 0; k < bands; k++) {
+          acc += X[k][0] * cos_t[k * outputs + n] - X[k][1] * sin_t[k * outputs + n];
+        }
+        want[n] = acc;
+      }
+      CHECK(same_bits(got, want, outputs), "demodulation of %d bands adds the bands in order",
+            bands);
+    }
+  }
+}
+
 int main() {
+  test_sums_keep_term_order();
   test_reconstruction();
   test_analysis_scaling();
   test_fft_form_matches_direct_sums();

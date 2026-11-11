@@ -70,24 +70,28 @@ if(BAAC_AAC_BUILD_ENCODER)
     list(APPEND ALL_SOURCES ${BAAC_AAC_ENCODER_SOURCES})
 endif()
 
-# Release builds take the fast-math rewrites except the unsafe-math
-# group as a whole: under -funsafe-math-optimizations x86 compilers turn
-# 1/sqrt(x) into the RSQRTSS/RSQRTPS estimate plus a Newton step, and
-# the estimate differs between processor vendors, so one binary would
-# encode differently on Intel and AMD machines.  Reassociation,
-# reciprocal multiplication and the finite-math assumptions stay; with
-# exact division and square root the output is a function of the input.
-# BAAC_RELEASE_MATH tells the tests that compare committed streams byte
-# for byte that this arithmetic is in force.
+# Release builds compute in exact arithmetic: every sum, product and
+# quotient is rounded in the order the source writes it, so the encoder's
+# output is a function of its input and of the C library's functions, the
+# same from every compiler.  The rewrites that change a result stay off:
+# under -fassociative-math each compiler regroups and vectorises a sum
+# its own way, and a sum rounded differently turns a rate or masking
+# decision; -freciprocal-math, -fno-signed-zeros and -ffinite-math-only
+# give the same licence for quotients, zeros and comparisons; under
+# -funsafe-math-optimizations x86 compilers take 1/sqrt(x) from the
+# RSQRTSS/RSQRTPS estimate, which differs between processor vendors.
+# Contraction is off for the same reason on targets with a fused
+# multiply-add; a kernel that wants one asks for it with the intrinsic.
+# -fno-math-errno and -fno-trapping-math change no result.  The options
+# reach the tests as well, whose signal generators must give every build
+# the same samples.  BAAC_RELEASE_MATH tells the tests that compare
+# committed streams byte for byte that this build is optimised this way.
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     add_compile_options(
+        -ffp-contract=off
         $<$<CONFIG:Release>:-O3>
         $<$<CONFIG:Release>:-fno-math-errno>
-        $<$<CONFIG:Release>:-fassociative-math>
-        $<$<CONFIG:Release>:-freciprocal-math>
-        $<$<CONFIG:Release>:-fno-signed-zeros>
-        $<$<CONFIG:Release>:-fno-trapping-math>
-        $<$<CONFIG:Release>:-ffinite-math-only>)
+        $<$<CONFIG:Release>:-fno-trapping-math>)
     add_compile_definitions($<$<CONFIG:Release>:BAAC_RELEASE_MATH=1>)
 endif()
 
