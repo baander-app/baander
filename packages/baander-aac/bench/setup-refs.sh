@@ -3,6 +3,15 @@
 # compares against, at the versions the published results used, into
 # $1 (default ./work/ext), and write env.sh there for bench.py.
 #
+#   setup-refs.sh [dir] [--lossless-only]
+#
+# The references of the lossless stage come first: the pinned flac 1.4.3
+# and its metaflac (../tests/flac-reference.sh) are built and their
+# exports written to env.sh before anything else is fetched, so that a
+# missing dependency of an AAC reference or of a quality meter cannot
+# keep `./bench.py lossless` from running.  With --lossless-only the
+# script stops there.
+#
 # Needs: git, cmake, ninja, a C/C++ toolchain, autotools, the GStreamer
 # development packages (GstPEAQ), wine and 7z (Apple AAC), curl, and
 # Python 3 with numpy, scipy and soundfile.  On Ubuntu 24.04:
@@ -20,9 +29,27 @@
 # with iTunes installed, point QAAC at a qaac64.exe next to its DLLs
 # instead.  Not redistributable: fetch it yourself.
 set -euo pipefail
-ext=$(realpath -m "${1:-$(dirname "$0")/work/ext}")
+here=$(cd "$(dirname "$0")" && pwd)
+lossless_only=0
+dir=
+for arg in "$@"; do
+  case "$arg" in
+    --lossless-only) lossless_only=1 ;;
+    *) dir=$arg ;;
+  esac
+done
+ext=$(realpath -m "${dir:-$here/work/ext}")
 mkdir -p "$ext"
 cd "$ext"
+
+# The lossless references, and their exports at once.
+flac=$("$here/../tests/flac-reference.sh" "$ext")
+cat > env.sh <<ENV
+export FLAC=$flac METAFLAC=$(dirname "$(dirname "$flac")")/metaflac/metaflac
+export BAAC_FLAC_REFERENCE=$flac
+ENV
+echo "wrote the lossless exports to $ext/env.sh"
+[ "$lossless_only" = 1 ] && exit 0
 
 fetch() {  # repo dir commit
   [ -d "$2" ] || git clone -q "https://github.com/$1" "$2"
@@ -91,7 +118,7 @@ wineboot -i >/dev/null 2>&1 || true
 wine run/qaac64.exe --check
 cd "$ext"
 
-cat > env.sh <<ENV
+cat >> env.sh <<ENV
 export FDK_AAC_ENC=$ext/fdk-aac/build/aac-enc FDK_AAC_DEC=$ext/fdk-aac/build/aac-dec
 export FDK_XHE_ENC=$ext/fdk-aac/build/xhe-aac-enc
 export XAAC_ENC=$ext/libxaac/build/xaacenc XAAC_DEC=$ext/libxaac/build/xaacdec

@@ -12,28 +12,44 @@ be re-run after a tool or a configuration changes by deleting its cache):
            with every encoder and decoder, single-threaded, best of N
   compat   decode our streams with every decoder and other encoders'
            streams with ours, and compare the decodes
-  lossless ALAC and FLAC on the same corpus: size and speed
-  report   write the CSV files and the Markdown tables under results/
+  lossless bAAC's lossless mode against FLAC and ALAC on the same corpus
+           and on held-out recordings: size, speed and bit-exactness,
+           with the gates of the lossless mode (see LOSSLESS below)
+  check    print every lossless gate of the cached run as passed, failed
+           or undecided, and exit non-zero unless all of them passed
+  report   write the CSV files and the Markdown tables under results/;
+           only the sections and files whose stage has a cache change
+  selftest check the harness's own logic on made-up figures
 
 Tool paths come from environment variables (see TOOLS below); a missing
 tool skips the configurations that need it and says so.
 """
 import argparse
 import csv
+import datetime
 import json
+import math
 import os
+import platform
 import re
 import shlex
 import shutil
+import statistics
 import subprocess
 import sys
 import tempfile
+import time
+import wave
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import numpy as np
-import soundfile as sf
-from scipy import signal
+
+try:
+    import soundfile as sf
+    from scipy import signal
+except ImportError:  # the lossless, check and report stages do not need them
+    sf = signal = None
 
 HERE = Path(__file__).resolve().parent
 WORK = Path(os.environ.get("BENCH_WORK", HERE / "work"))
@@ -49,7 +65,7 @@ TOOLS = {
     "xaac_dec": os.environ.get("XAAC_DEC", ""),         # libxaac xaacdec
     "qaac": os.environ.get("QAAC", ""),                 # qaac64.exe, run with wine
     "refalac": os.environ.get("REFALAC", ""),           # refalac64.exe, run with wine
-    "flac": os.environ.get("FLAC", "flac"),
+    "flac": os.environ.get("FLAC", "flac"),             # the pinned flac 1.4.3 (setup-refs.sh)
     "peaq": os.environ.get("PEAQ", ""),                 # GstPEAQ's peaq
     "visqol": os.environ.get("VISQOL", ""),             # ViSQOL v3 binary
     "visqol_model": os.environ.get("VISQOL_MODEL", ""),  # libsvm model file
@@ -541,36 +557,775 @@ def stage_compat(args):
 
 
 # ---------------------------------------------------------------- lossless
+#
+# LOSSLESS.  The stage measures bAAC's lossless mode (the `baac flac`
+# commands) against the pinned flac 1.4.3, FFmpeg's FLAC and ALAC
+# encoders and, when it can run, Apple's refalac, and judges the gates
+# of the lossless mode.
+#
+# Size.  One pass over the corpus concatenation (about 130 s).  FLAC
+# rows also record frame bytes, the file without its metadata blocks,
+# because flac writes padding and a seek table by default; every size
+# gate between FLAC encoders compares frame bytes.
+#
+# Speed.  Every timed process is pinned to one core with taskset and
+# measured as user plus system CPU time (wait4).  A gate takes at least
+# five repeats; inside a repeat the reference and bAAC run back to back,
+# in alternating order, and yield one paired ratio, bAAC's time over the
+# reference's.  The threshold is 1 plus the reference's spread, (max -
+# min) / median of its times over the repeats.  A gate has passed when
+# every paired ratio is at or below the threshold, failed when every one
+# is above it, and is undecided when they straddle it.
+#
+# What is timed.  The gates are judged on the long run: one process over
+# the input repeated until the fastest command of the gate set takes at
+# least 2 CPU seconds.  That is the method the plan fixes, and it keeps
+# a start of a process (about 1 ms) out of the figure.  The plan does
+# not say whether an encoder reads WAV or raw PCM; flac reads raw PCM
+# about 3 % faster than WAV and bAAC reads both alike, so the encode
+# gates are judged on raw input, the case that favours bAAC least.  The
+# other three figures of each encode gate are measured and recorded
+# beside it, each labelled: long run from WAV, and one process per
+# corpus item (which adds each tool's start cost) from raw and from WAV.
+#
+# Decode.  The neutral streams are flac's own (-5 and -8).  Against
+# `flac -d` both sides verify the MD5; against FFmpeg neither does and
+# both check the frame CRCs (FFmpeg is asked to with -err_detect
+# crccheck).  Every decoder writes a WAV file to /dev/null.
+#
+# Exactness.  Every stream is decoded by its own decoder and by the
+# others that take it (bAAC's by flac and FFmpeg, theirs by bAAC) and
+# each decode is compared with the source bytes.
+#
+# Held-out inputs.  Real recordings from the FLAC decoder testbench,
+# decoded with `flac -d`, never used for tuning: five 96 kHz 24-bit
+# files, one 5.1 file and one 16-bit stereo file.  Each set's total
+# frame bytes gate; the per-file figures are recorded.
+#
+# Host.  The run records the processor, the compiler, the versions of
+# the references and the load average at its start and end.  A run on a
+# host that is not quiet is recorded as such and is not a gate result.
+
+LOSSLESS_LEVELS = list(range(9))
+MIN_CPU_SECONDS = 2.0
+# The repeated input is sized for this much over the minimum, so that a
+# run a little faster than the one that sized it still counts.
+LONG_MARGIN = 1.4
+QUIET_LOAD = 2.0
+CARRIED_REFALAC = dict(codec="alac-apple-ref", seconds=130.3173125, kbps=690.2499619918112,
+                       bit_exact=True, carried="2026-10-30")
+TESTBENCH = Path(os.environ.get("BAAC_FLAC_TESTBENCH", HERE / "work" / "flac-test-files"))
+HELD_OUT = [
+    ("hires", "96 kHz, 24-bit stereo", dict(sample_rate=96000, channels=2, bits=24),
+     ["28 - high resolution audio, default settings",
+      "29 - high resolution audio, blocksize 16384",
+      "30 - high resolution audio, blocksize 13456",
+      "31 - high resolution audio, using only 32nd order predictors",
+      "32 - high resolution audio, partition order 8 containing escaped partitions"]),
+    ("surround", "5.1, 44.1 kHz, 16-bit", dict(sample_rate=44100, channels=6, bits=16),
+     ["41 - 6 channels (5.1)"]),
+    ("stereo16", "44.1 kHz, 16-bit stereo", dict(sample_rate=44100, channels=2, bits=16),
+     ["01 - blocksize 4096"]),
+]
+
+
+def cpu_run(cmd, core, stdout=subprocess.DEVNULL):
+    """Run cmd pinned to `core`; return (CPU seconds, peak RSS in KiB)."""
+    p = subprocess.Popen(["taskset", "-c", str(core)] + cmd, stdout=stdout,
+                         stderr=subprocess.PIPE)
+    err = p.stderr.read()
+    _, status, usage = os.wait4(p.pid, 0)
+    p.returncode = os.waitstatus_to_exitcode(status)
+    if p.returncode != 0:
+        raise RuntimeError(f"{shlex.join(cmd)} failed ({p.returncode}): "
+                           f"{err.decode(errors='replace')[-600:]}")
+    return usage.ru_utime + usage.ru_stime, usage.ru_maxrss
+
+
+def cpu_of(cmds, core):
+    """CPU seconds and peak RSS of a sequence of commands, each its own process."""
+    total, rss = 0.0, 0
+    for cmd in cmds:
+        t, r = cpu_run(cmd, core)
+        total += t
+        rss = max(rss, r)
+    return total, rss
+
+
+def paired_times(ours, theirs, repeats, core):
+    """Each repeat runs both command sequences back to back, in alternating
+    order; returns [(our CPU seconds, their CPU seconds), ...]."""
+    pairs = []
+    for i in range(repeats):
+        if i % 2 == 0:
+            a = cpu_of(ours, core)[0]
+            b = cpu_of(theirs, core)[0]
+        else:
+            b = cpu_of(theirs, core)[0]
+            a = cpu_of(ours, core)[0]
+        pairs.append((a, b))
+    return pairs
+
+
+def speed_verdict(pairs):
+    """The statistic of a speed gate from its paired times.  A gate with
+    a run shorter than MIN_CPU_SECONDS is undecided whatever its ratios."""
+    ratios = [a / b for a, b in pairs]
+    refs = [b for _, b in pairs]
+    spread = (max(refs) - min(refs)) / statistics.median(refs)
+    threshold = 1.0 + spread
+    shortest = min(min(a, b) for a, b in pairs)
+    if shortest < MIN_CPU_SECONDS:
+        verdict = "undecided"
+    elif max(ratios) <= threshold:
+        verdict = "passed"
+    elif min(ratios) > threshold:
+        verdict = "failed"
+    else:
+        verdict = "undecided"
+    return dict(ratio_median=statistics.median(ratios), ratio_min=min(ratios),
+                ratio_max=max(ratios), reference_spread=spread, threshold=threshold,
+                ours_median=statistics.median(a for a, _ in pairs),
+                reference_median=statistics.median(refs),
+                min_cpu=shortest, verdict=verdict,
+                pairs=[[round(a, 4), round(b, 4)] for a, b in pairs])
+
+
+def size_verdict(ours, reference):
+    """A size gate takes no tolerance: one byte more has failed."""
+    return dict(ours=ours, reference=reference,
+                verdict="passed" if ours <= reference else "failed")
+
+
+def flac_frame_bytes(path):
+    """A FLAC file without its marker and metadata blocks."""
+    with open(path, "rb") as f:
+        if f.read(4) != b"fLaC":
+            raise RuntimeError(f"{path} is not a FLAC file")
+        while True:
+            head = f.read(4)
+            f.seek(int.from_bytes(head[1:], "big"), 1)
+            if head[0] & 0x80:
+                return os.path.getsize(path) - f.tell()
+
+
+def same_bytes(a, b):
+    """Whether two decodes are the same samples: byte for byte."""
+    return a == b
+
+
+def tool_version(cmd):
+    try:
+        out = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        return out.stdout.decode(errors="replace").splitlines()[0].strip()
+    except (OSError, IndexError):
+        return ""
+
+
+def pick_core():
+    """The core that was idlest over half a second, by /proc/stat."""
+    def sample():
+        idle = {}
+        for line in Path("/proc/stat").read_text().splitlines():
+            m = re.match(r"cpu(\d+) (.*)", line)
+            if m:
+                v = [int(x) for x in m.group(2).split()]
+                idle[int(m.group(1))] = (v[3] + v[4], sum(v))
+        return idle
+    try:
+        a = sample()
+        time.sleep(0.5)
+        b = sample()
+    except OSError:
+        return 0
+    allowed = os.sched_getaffinity(0)
+    busy = {c: 1.0 - (b[c][0] - a[c][0]) / max(1, b[c][1] - a[c][1]) for c in b if c in allowed}
+    return min(busy, key=lambda c: (round(busy[c], 2), -c)) if busy else 0
+
+
+def host_info(core):
+    cpu = ""
+    try:
+        for line in Path("/proc/cpuinfo").read_text().splitlines():
+            if line.startswith("model name"):
+                cpu = line.split(":", 1)[1].strip()
+                break
+    except OSError:
+        pass
+    compiler = build_type = ""
+    cache = Path(TOOLS["baac"]).parent / "CMakeCache.txt"
+    if cache.exists():
+        text = cache.read_text()
+        m = re.search(r"^CMAKE_CXX_COMPILER:\w+=(.*)$", text, re.M)
+        if m:
+            compiler = tool_version([m.group(1), "--version"])
+        m = re.search(r"^CMAKE_BUILD_TYPE:\w+=(.*)$", text, re.M)
+        build_type = m.group(1) if m else ""
+    governor = Path(f"/sys/devices/system/cpu/cpu{core}/cpufreq/scaling_governor")
+    return dict(cpu=cpu, cores=os.cpu_count(), kernel=platform.release(), core=core,
+                governor=governor.read_text().strip() if governor.exists() else "",
+                compiler=compiler, build_type=build_type)
+
+
+def git_state():
+    try:
+        rev = subprocess.run(["git", "-C", str(HERE), "rev-parse", "--short", "HEAD"],
+                             stdout=subprocess.PIPE, stderr=subprocess.DEVNULL).stdout.decode().strip()
+        dirty = subprocess.run(["git", "-C", str(HERE), "status", "--porcelain", "--", ".."],
+                               stdout=subprocess.PIPE, stderr=subprocess.DEVNULL).stdout.strip()
+        return rev + ("+changes" if dirty else "")
+    except OSError:
+        return ""
+
+
+def raw_args(fmt):
+    """flac's options for headerless input of a format."""
+    return ["--force-raw-format", "--endian=little", "--sign=signed",
+            f"--channels={fmt['channels']}", f"--bps={fmt['bits']}",
+            f"--sample-rate={fmt['sample_rate']}"]
+
+
+def enc_baac(level, src, out, fmt=None):
+    raw = ["--raw", str(fmt["sample_rate"]), str(fmt["channels"]), str(fmt["bits"])] if fmt else []
+    return [TOOLS["baac"], "flac", "enc", "--level", str(level)] + raw + [str(src), str(out)]
+
+
+def enc_flac(level, src, out, fmt=None):
+    return [TOOLS["flac"], "-s", "-f", f"-{level}", "-o", str(out)] + \
+        (raw_args(fmt) if fmt else []) + [str(src)]
+
+
+def dec_baac(stream, out, md5=True, raw=False):
+    return [TOOLS["baac"], "flac", "dec"] + ([] if md5 else ["--no-md5"]) + \
+        (["--raw"] if raw else []) + [str(stream), str(out)]
+
+
+def dec_flac(stream, out, raw=False):
+    extra = ["--force-raw-format", "--endian=little", "--sign=signed"] if raw else []
+    return [TOOLS["flac"], "-d", "-s", "-f"] + extra + ["-o", str(out), str(stream)]
+
+
+def dec_ffmpeg(stream, out, bits=16, raw=False):
+    """FFmpeg's decode with the frame CRC check on; it verifies no MD5."""
+    width = 16 if bits <= 16 else 24 if bits <= 24 else 32
+    return [TOOLS["ffmpeg"], "-v", "error", "-nostdin", "-y", "-threads", "1", "-err_detect",
+            "crccheck", "-i", str(stream), "-c:a", f"pcm_s{width}le", "-f",
+            f"s{width}le" if raw else "wav", str(out)]
+
+
+def decoded(cmd_for, core):
+    """The bytes a decode command writes to standard output."""
+    p = subprocess.run(["taskset", "-c", str(core)] + cmd_for("-"), stdout=subprocess.PIPE,
+                       stderr=subprocess.PIPE)
+    if p.returncode != 0:
+        return None
+    return p.stdout
+
+
+def write_wav(path, raw, fmt):
+    """A WAV file around raw PCM: the plain header for 16-bit stereo, the
+    extensible one for everything else, as bAAC and flac write them."""
+    width = (fmt["bits"] + 7) // 8
+    ch, rate = fmt["channels"], fmt["sample_rate"]
+    extensible = ch > 2 or fmt["bits"] > 16
+    masks = {1: 0x4, 2: 0x3, 3: 0x7, 4: 0x33, 5: 0x37, 6: 0x3F, 7: 0x70F, 8: 0x63F}
+    body = b"WAVEfmt "
+    if extensible:
+        body += (40).to_bytes(4, "little") + (0xFFFE).to_bytes(2, "little")
+    else:
+        body += (16).to_bytes(4, "little") + (1).to_bytes(2, "little")
+    body += ch.to_bytes(2, "little") + rate.to_bytes(4, "little")
+    body += (rate * ch * width).to_bytes(4, "little") + (ch * width).to_bytes(2, "little")
+    body += (width * 8).to_bytes(2, "little")
+    if extensible:
+        body += (22).to_bytes(2, "little") + fmt["bits"].to_bytes(2, "little")
+        body += masks[ch].to_bytes(4, "little")
+        body += bytes.fromhex("0100000000001000800000aa00389b71")
+    size = os.path.getsize(raw)
+    with open(path, "wb") as out, open(raw, "rb") as src:
+        out.write(b"RIFF" + (4 + len(body) - 4 + 8 + size + 4).to_bytes(4, "little") + body)
+        out.write(b"data" + size.to_bytes(4, "little"))
+        shutil.copyfileobj(src, out, 1 << 20)
+
+
+def repeat_file(src, dst, reps):
+    with open(dst, "wb") as out:
+        for _ in range(reps):
+            with open(src, "rb") as f:
+                shutil.copyfileobj(f, out, 1 << 20)
+
+
+def long_input(d, tag, once_raw, fmt, core, reps=None):
+    """The input repeated until bAAC's decode without MD5, the fastest
+    command of a gate set, takes MIN_CPU_SECONDS, or `reps` times when the
+    caller fixes the count: returns the repetition count and writes
+    <tag>.long.raw and <tag>.long.wav."""
+    probe = d / f"{tag}.probe.flac"
+    raw = d / f"{tag}.long.raw"
+    fixed = reps is not None
+    if not fixed:
+        cpu_run(enc_flac(5, once_raw, probe, fmt), core)
+        t = min(cpu_run(dec_baac(probe, "/dev/null", md5=False), core)[0] for _ in range(3))
+        reps = max(1, math.ceil(LONG_MARGIN * MIN_CPU_SECONDS / max(t, 1e-4)))
+    for _ in range(4):
+        repeat_file(once_raw, raw, reps)
+        if fixed:
+            break
+        cpu_run(enc_flac(5, raw, probe, fmt), core)
+        t = min(cpu_run(dec_baac(probe, "/dev/null", md5=False), core)[0] for _ in range(2))
+        if t >= 0.9 * LONG_MARGIN * MIN_CPU_SECONDS:
+            break
+        reps = math.ceil(reps * LONG_MARGIN * MIN_CPU_SECONDS / max(t, 1e-4))
+    write_wav(d / f"{tag}.long.wav", raw, fmt)
+    probe.unlink(missing_ok=True)
+    return reps
+
+
+def check_held_out_format(name, found, expected):
+    """A held-out file of another format than the set's stops the stage."""
+    if found != expected:
+        raise SystemExit(f"held-out file \"{name}\" is {found['sample_rate']} Hz, "
+                         f"{found['channels']} channels, {found['bits']} bits; the set expects "
+                         f"{expected['sample_rate']} Hz, {expected['channels']} channels, "
+                         f"{expected['bits']} bits")
+
+
+def flac_properties(path):
+    """Sample rate, channels and bit depth from a FLAC file's STREAMINFO."""
+    with open(path, "rb") as f:
+        head = f.read(4 + 4 + 34)
+    if head[:4] != b"fLaC" or (head[4] & 0x7F) != 0:
+        raise SystemExit(f"held-out file \"{path}\" has no STREAMINFO")
+    v = int.from_bytes(head[18:26], "big")
+    return dict(sample_rate=v >> 44, channels=((v >> 41) & 7) + 1, bits=((v >> 36) & 31) + 1), \
+        v & ((1 << 36) - 1)
+
+
+def alac_rows(have_refalac, measured):
+    """The ALAC reference rows: refalac measured when it runs here, else
+    the row carried from the run of 2026-10-30, which is compared on size
+    only and marked."""
+    rows = [r for r in measured if r["codec"] == "alac-ffmpeg"]
+    ref = [r for r in measured if r["codec"] == "alac-apple-ref"]
+    rows += ref if have_refalac and ref else [dict(CARRIED_REFALAC)]
+    return rows
+
+
+def measure_gate(name, ours, theirs, repeats, core, log=True):
+    r = speed_verdict(paired_times(ours, theirs, repeats, core))
+    if log:
+        print(f"  {name}: {r['ratio_median']:.4f} ({r['ratio_min']:.4f} to {r['ratio_max']:.4f}), "
+              f"threshold {r['threshold']:.4f}: {r['verdict']}", file=sys.stderr)
+    return r
+
 
 def stage_lossless(args):
-    pcm = prepare_corpus()
-    wav, secs = concat_corpus(pcm)
+    for tool in ("baac", "flac", "ffmpeg"):
+        if not have(tool):
+            raise SystemExit(f"the lossless stage needs {tool} ({TOOLS[tool]})")
+    flac_version = tool_version([TOOLS["flac"], "--version"])
+    if flac_version != "flac 1.4.3" and not args.any_flac:
+        raise SystemExit(f"FLAC is \"{flac_version}\", not the pinned flac 1.4.3: run "
+                         "./setup-refs.sh and source work/ext/env.sh (or pass --any-flac for a "
+                         "run that is not a gate result)")
     d = WORK / "lossless"
     d.mkdir(parents=True, exist_ok=True)
+    core = args.core if args.core is not None else pick_core()
+    repeats = max(args.repeat, 5)
+    only = re.compile(args.only or ".")
     ff = TOOLS["ffmpeg"]
-    encs = [
-        ("alac-ffmpeg", "m4a", lambda o: [ff, "-v", "error", "-y", "-threads", "1", "-i", str(wav),
-                                         "-c:a", "alac", o]),
-        ("flac-5", "flac", lambda o: [TOOLS["flac"], "-s", "-f", "-5", "-o", o, str(wav)]),
-        ("flac-8", "flac", lambda o: [TOOLS["flac"], "-s", "-f", "-8", "-o", o, str(wav)]),
-    ]
-    if have("refalac"):
-        encs.append(("alac-apple-ref", "m4a", lambda o: wine("refalac") + ["--silent", "-o", o, str(wav)]))
-    ref = sf.read(str(wav), dtype="int16")[0]
+    load_start = os.getloadavg()
+    started = datetime.datetime.now().astimezone().isoformat(timespec="seconds")
+    host = host_info(core)
+    print(f"lossless: core {core}, {repeats} repeats, load {load_start[0]:.2f}", file=sys.stderr)
+
+    # The corpus: the ten items back to back, once and repeated.
+    corpus = WORK / "corpus"
+    if not (corpus / f"{MUSIC[0]}.wav").exists():
+        subprocess.run([str(HERE / "corpus.sh"), str(corpus)], check=True)
+    fmt = dict(sample_rate=48000, channels=2, bits=16)
+    items = []
+    with open(d / "corpus.raw", "wb") as out:
+        for name in MUSIC:
+            with wave.open(str(corpus / f"{name}.wav"), "rb") as w:
+                if (w.getframerate(), w.getnchannels(), w.getsampwidth()) != (48000, 2, 2):
+                    raise SystemExit(f"corpus item {name} is not 48 kHz 16-bit stereo")
+                pcm = w.readframes(w.getnframes())
+            (d / f"item.{name}.raw").write_bytes(pcm)
+            write_wav(d / f"item.{name}.wav", d / f"item.{name}.raw", fmt)
+            items.append(name)
+            out.write(pcm)
+    write_wav(d / "corpus.wav", d / "corpus.raw", fmt)
+    source = (d / "corpus.raw").read_bytes()
+    seconds = len(source) / (48000 * 4)
+    reps = long_input(d, "corpus", d / "corpus.raw", fmt, core, args.reps)
+    print(f"corpus: {seconds:.1f} s, repeated {reps} times for timing", file=sys.stderr)
+
+    # ---- sizes and exactness: one pass over the corpus -----------------
+    def flac_row(codec, encoder, level, enc_cmd):
+        o = d / f"{codec}.flac"
+        cpu_run(enc_cmd(d / "corpus.wav", o), core)
+        exact = True
+        for dec in (lambda out: dec_baac(o, out, raw=True), lambda out: dec_flac(o, out, raw=True),
+                    lambda out: dec_ffmpeg(o, out, raw=True)):
+            exact = exact and same_bytes(decoded(dec, core), source)
+        size = os.path.getsize(o)
+        return dict(codec=codec, family="flac", encoder=encoder, level=level, seconds=seconds,
+                    bytes=size, kbps=size * 8 / seconds / 1000, frame_bytes=flac_frame_bytes(o),
+                    bit_exact=bool(exact))
+
     rows = []
-    for name, ext, mk in encs:
-        o = str(d / f"{name}.{ext}")
-        e = best_of(mk(o), args.repeat, d, f"enc-{name}")
-        dec = str(d / f"{name}.dec.wav")
-        dcmd = [ff, "-v", "error", "-y", "-threads", "1", "-i", o, "-c:a", "pcm_s16le", dec]
-        r = best_of(dcmd, args.repeat, d, f"dec-{name}")
-        exact = bool(np.array_equal(sf.read(dec, dtype="int16")[0], ref))
-        os.remove(dec)
-        rows.append(dict(codec=name, seconds=secs, kbps=os.path.getsize(o) * 8 / secs / 1000,
-                         enc_cpu=e["cpu"], enc_rss_kb=e["rss_kb"], dec_cpu=r["cpu"],
-                         dec_rss_kb=r["rss_kb"], bit_exact=exact))
-        print(rows[-1], file=sys.stderr)
-    (WORK / "lossless.json").write_text(json.dumps(rows, indent=1))
+    for level in LOSSLESS_LEVELS:
+        rows.append(flac_row(f"baac-{level}", "baac", level,
+                             lambda src, o, level=level: enc_baac(level, src, o)))
+    for level in LOSSLESS_LEVELS:
+        rows.append(flac_row(f"flac-{level}", "flac", level,
+                             lambda src, o, level=level: enc_flac(level, src, o)))
+    for level in (5, 8):
+        rows.append(flac_row(f"flac-ffmpeg-{level}", "ffmpeg", level,
+                             lambda src, o, level=level: [
+                                 ff, "-v", "error", "-nostdin", "-y", "-threads", "1", "-i",
+                                 str(src), "-c:a", "flac", "-compression_level", str(level),
+                                 str(o)]))
+    alac_enc = lambda src, o: [ff, "-v", "error", "-nostdin", "-y", "-threads", "1", "-i",
+                               str(src), "-c:a", "alac", str(o)]
+    alac_dec = lambda stream, out, raw=False: [
+        ff, "-v", "error", "-nostdin", "-y", "-threads", "1", "-i", str(stream), "-c:a",
+        "pcm_s16le", "-f", "s16le" if raw else "wav", str(out)]
+    cpu_run(alac_enc(d / "corpus.wav", d / "alac-ffmpeg.m4a"), core)
+    size = os.path.getsize(d / "alac-ffmpeg.m4a")
+    measured_alac = [dict(codec="alac-ffmpeg", family="alac", encoder="ffmpeg", seconds=seconds,
+                          bytes=size, kbps=size * 8 / seconds / 1000,
+                          bit_exact=bool(same_bytes(decoded(
+                              lambda out: alac_dec(d / "alac-ffmpeg.m4a", out, raw=True), core),
+                              source)))]
+    if have("refalac"):
+        o = d / "alac-apple-ref.m4a"
+        run(wine("refalac") + ["--silent", "-o", str(o), str(d / "corpus.wav")])
+        size = os.path.getsize(o)
+        measured_alac.append(dict(codec="alac-apple-ref", family="alac", encoder="refalac",
+                                  seconds=seconds, bytes=size, kbps=size * 8 / seconds / 1000,
+                                  bit_exact=bool(same_bytes(decoded(
+                                      lambda out: alac_dec(o, out, raw=True), core), source))))
+    alac = alac_rows(have("refalac"), measured_alac)
+    by = {r["codec"]: r for r in rows + alac}
+    for r in rows:
+        print(f"  {r['codec']}: {r['kbps']:.2f} kbit/s, {r['frame_bytes']} frame bytes, "
+              f"bit-exact {r['bit_exact']}", file=sys.stderr)
+
+    # ---- speed of every row, on the long input from WAV ----------------
+    long_wav, long_raw = d / "corpus.long.wav", d / "corpus.long.raw"
+    row_repeats = 3
+    if not args.gates_only:
+        for r in rows:
+            level, enc = r["level"], r["encoder"]
+            stream = d / f"{r['codec']}.long.flac"
+            if enc == "baac":
+                e, dcmd = enc_baac(level, long_wav, "/dev/null"), dec_baac(stream, "/dev/null")
+                make = enc_baac(level, long_wav, stream)
+            elif enc == "flac":
+                e, dcmd = enc_flac(level, long_wav, "/dev/null"), dec_flac(stream, "/dev/null")
+                make = enc_flac(level, long_wav, stream)
+            else:
+                e = [ff, "-v", "error", "-nostdin", "-y", "-threads", "1", "-i", str(long_wav),
+                     "-c:a", "flac", "-compression_level", str(level), "-f", "flac", "/dev/null"]
+                make = e[:-3] + [str(stream)]
+                dcmd = dec_ffmpeg(stream, "/dev/null")
+            cpu_run(make, core)
+            et = [cpu_run(e, core) for _ in range(row_repeats)]
+            dt = [cpu_run(dcmd, core) for _ in range(row_repeats)]
+            r.update(enc_cpu=statistics.median(t for t, _ in et) / reps,
+                     enc_rss_kb=max(m for _, m in et),
+                     dec_cpu=statistics.median(t for t, _ in dt) / reps,
+                     dec_rss_kb=max(m for _, m in dt))
+            if not (enc == "flac" and level in (5, 8)) and not (enc == "baac" and level == 5):
+                stream.unlink()
+            print(f"  {r['codec']}: enc {seconds / r['enc_cpu']:.0f}x, dec "
+                  f"{seconds / r['dec_cpu']:.0f}x", file=sys.stderr)
+    for level in (5, 8):  # the neutral streams of the decode gates
+        if not (d / f"flac-{level}.long.flac").exists():
+            cpu_run(enc_flac(level, long_wav, d / f"flac-{level}.long.flac"), core)
+    if not (d / "baac-5.long.flac").exists():
+        cpu_run(enc_baac(5, long_wav, d / "baac-5.long.flac"), core)
+
+    # ---- gates ---------------------------------------------------------
+    gates, figures = [], []
+
+    def gate(gid, group, text, result, judged_on=None):
+        g = dict(id=gid, group=group, description=text, **result)
+        if judged_on:
+            g["judged_on"] = judged_on
+        gates.append(g)
+        return g
+
+    for level in (5, 8):
+        gate(f"size-{level}", "flac", f"bAAC level {level} frame bytes against flac -{level}",
+             dict(kind="size", **size_verdict(by[f"baac-{level}"]["frame_bytes"],
+                                              by[f"flac-{level}"]["frame_bytes"])))
+    variants = {
+        "long-raw": lambda tool, level: [tool(level, long_raw, "/dev/null", fmt)],
+        "long-wav": lambda tool, level: [tool(level, long_wav, "/dev/null")],
+        "per-file-raw": lambda tool, level: [tool(level, d / f"item.{n}.raw", "/dev/null", fmt)
+                                             for _ in range(reps) for n in items],
+        "per-file-wav": lambda tool, level: [tool(level, d / f"item.{n}.wav", "/dev/null")
+                                             for _ in range(reps) for n in items],
+    }
+    for level in (5, 8):
+        gid = f"enc-{level}"
+        if not only.search(gid):
+            continue
+        for variant, mk in variants.items():
+            r = measure_gate(f"{gid} {variant}", mk(enc_baac, level), mk(enc_flac, level), repeats,
+                             core)
+            figures.append(dict(measure=gid, variant=variant, judged=variant == "long-raw", **r))
+            if variant == "long-raw":
+                gate(gid, "flac", f"encode at level {level} against flac -{level}",
+                     dict(kind="speed", **r), "one process over the repeated corpus, raw input")
+    # Decode of flac's own streams.
+    for level in (5, 8):
+        stream = d / f"flac-{level}.long.flac"
+        for name, n in ((f"item.{n}", n) for n in items):
+            if not (d / f"{name}.flac-{level}.flac").exists():
+                cpu_run(enc_flac(level, d / f"{name}.wav", d / f"{name}.flac-{level}.flac"), core)
+        per_file = [d / f"item.{n}.flac-{level}.flac" for _ in range(reps) for n in items]
+        for ref, ours_md5, their in (("flac", True, dec_flac), ("ffmpeg", False, dec_ffmpeg)):
+            gid = f"dec-{level}-{ref}"
+            if not only.search(gid):
+                continue
+            checks = "MD5 verified by both" if ref == "flac" else \
+                "frame CRCs checked by both, no MD5"
+            r = measure_gate(f"{gid} long", [dec_baac(stream, "/dev/null", md5=ours_md5)],
+                             [their(stream, "/dev/null")], repeats, core)
+            figures.append(dict(measure=gid, variant="long", judged=True, **r))
+            gate(gid, "decode", f"decode of flac -{level} streams against {ref} ({checks})",
+                 dict(kind="speed", **r), "one process over the repeated corpus")
+            r = measure_gate(f"{gid} per-file",
+                             [dec_baac(s, "/dev/null", md5=ours_md5) for s in per_file],
+                             [their(s, "/dev/null") for s in per_file], repeats, core)
+            figures.append(dict(measure=gid, variant="per-file", judged=False, **r))
+    # ALAC, at the default level.
+    ours5 = by["baac-5"]
+    for r in alac:
+        ref_bytes = r.get("bytes") or round(r["kbps"] * r["seconds"] * 125)
+        ours_bytes = ours5["bytes"] if r["seconds"] == seconds else \
+            round(ours5["kbps"] * r["seconds"] * 125)
+        note = f" (row carried from {r['carried']}, size only)" if r.get("carried") else ""
+        gate(f"alac-size-{'refalac' if r['codec'] == 'alac-apple-ref' else 'ffmpeg'}", "alac",
+             f"bAAC level 5 stream against {r['codec']}{note}",
+             dict(kind="size", **size_verdict(ours_bytes, ref_bytes)))
+    if only.search("alac-enc"):
+        r = measure_gate("alac-enc", [enc_baac(5, long_wav, d / "timing.flac")],
+                         [alac_enc(long_wav, d / "timing.m4a")], repeats, core)
+        figures.append(dict(measure="alac-enc", variant="long-wav", judged=True, **r))
+        gate("alac-enc", "alac", "encode at level 5 against FFmpeg ALAC", dict(kind="speed", **r),
+             "one process over the repeated corpus, WAV input, both writing a file")
+        by["alac-ffmpeg"].update(enc_cpu=r["reference_median"] / reps)
+    if only.search("alac-dec"):
+        if not (d / "timing.m4a").exists():
+            cpu_run(alac_enc(long_wav, d / "timing.m4a"), core)
+        r = measure_gate("alac-dec", [dec_baac(d / "baac-5.long.flac", "/dev/null")],
+                         [alac_dec(d / "timing.m4a", "/dev/null")], repeats, core)
+        figures.append(dict(measure="alac-dec", variant="long", judged=True, **r))
+        gate("alac-dec", "alac", "decode of its own level 5 stream against FFmpeg decoding ALAC",
+             dict(kind="speed", **r), "one process over the repeated corpus")
+        by["alac-ffmpeg"].update(dec_cpu=r["reference_median"] / reps)
+    for f in ("timing.flac", "timing.m4a"):
+        (d / f).unlink(missing_ok=True)
+
+    # ---- held-out recordings -------------------------------------------
+    held = []
+    for set_id, label, expected, names in HELD_OUT:
+        if not only.search(f"held-{set_id}"):
+            continue
+        ours_total = theirs_total = 0
+        set_raw = d / f"held.{set_id}.raw"
+        with open(set_raw, "wb") as out:
+            for name in names:
+                path = TESTBENCH / "subset" / f"{name}.flac"
+                if not path.exists():
+                    raise SystemExit(f"held-out file \"{path}\" is missing: run "
+                                     "../tests/flac-testbench.sh")
+                found, total = flac_properties(path)
+                check_held_out_format(name, found, expected)
+                pcm = decoded(lambda o: dec_flac(path, o, raw=True), core)
+                out.write(pcm)
+                raw = d / "held.one.raw"
+                raw.write_bytes(pcm)
+                cpu_run(enc_baac(5, raw, d / "held.baac.flac", expected), core)
+                cpu_run(enc_flac(5, raw, d / "held.flac.flac", expected), core)
+                exact = all(same_bytes(decoded(dec, core), pcm) for dec in (
+                    lambda o: dec_baac(d / "held.baac.flac", o, raw=True),
+                    lambda o: dec_flac(d / "held.baac.flac", o, raw=True),
+                    lambda o: dec_ffmpeg(d / "held.baac.flac", o, expected["bits"], raw=True),
+                    lambda o: dec_baac(d / "held.flac.flac", o, raw=True)))
+                a = flac_frame_bytes(d / "held.baac.flac")
+                b = flac_frame_bytes(d / "held.flac.flac")
+                ours_total += a
+                theirs_total += b
+                held.append(dict(set=set_id, file=name, seconds=total / expected["sample_rate"],
+                                 **expected, baac_frame_bytes=a, flac_frame_bytes=b,
+                                 bit_exact=bool(exact)))
+        gate(f"held-{set_id}-size", "held-out", f"held-out {label}: level 5 frame bytes against flac -5",
+             dict(kind="size", **size_verdict(ours_total, theirs_total)))
+        set_reps = long_input(d, f"held.{set_id}", set_raw, expected, core)
+        lraw = d / f"held.{set_id}.long.raw"
+        stream = d / f"held.{set_id}.long.flac"
+        cpu_run(enc_flac(5, lraw, stream, expected), core)
+        r = measure_gate(f"held-{set_id}-enc", [enc_baac(5, lraw, "/dev/null", expected)],
+                         [enc_flac(5, lraw, "/dev/null", expected)], repeats, core)
+        gate(f"held-{set_id}-enc", "held-out", f"held-out {label}: encode at level 5 against flac -5",
+             dict(kind="speed", **r), f"one process over the set repeated {set_reps} times, raw "
+             "input")
+        r = measure_gate(f"held-{set_id}-dec-flac", [dec_baac(stream, "/dev/null")],
+                         [dec_flac(stream, "/dev/null")], repeats, core)
+        gate(f"held-{set_id}-dec-flac", "held-out",
+             f"held-out {label}: decode of the flac -5 stream against flac (MD5 verified by both)",
+             dict(kind="speed", **r), f"one process over the set repeated {set_reps} times")
+        r = measure_gate(f"held-{set_id}-dec-ffmpeg", [dec_baac(stream, "/dev/null", md5=False)],
+                         [dec_ffmpeg(stream, "/dev/null", expected["bits"])], repeats, core)
+        gate(f"held-{set_id}-dec-ffmpeg", "held-out",
+             f"held-out {label}: decode of the flac -5 stream against FFmpeg (frame CRCs checked "
+             "by both, no MD5)", dict(kind="speed", **r),
+             f"one process over the set repeated {set_reps} times")
+        for f in (lraw, stream, d / f"held.{set_id}.long.wav", set_raw):
+            f.unlink(missing_ok=True)
+
+    load_end = os.getloadavg()
+    quiet = max(load_start[0], load_end[0]) <= args.quiet_load
+    complete = not (args.only or args.gates_only or args.any_flac or args.reps)
+    result = dict(
+        schema=2, date=started, complete=complete,
+        host=dict(host, load_start=[round(x, 2) for x in load_start],
+                  load_end=[round(x, 2) for x in load_end], quiet=quiet,
+                  quiet_load=args.quiet_load),
+        tools=dict(baac=git_state(), flac=flac_version, ffmpeg=tool_version([ff, "-version"]),
+                   refalac="measured" if have("refalac") else "carried from 2026-10-30"),
+        method=dict(pinned=f"taskset -c {core}", repeats=repeats, corpus_seconds=seconds,
+                    corpus_repetitions=reps, min_cpu_seconds=MIN_CPU_SECONDS,
+                    statistic="median of the paired ratios (bAAC CPU time over the reference's); "
+                              "threshold 1 + (max - min) / median of the reference's times",
+                    judged="long run (one process over the repeated input); encode from raw "
+                           "PCM, which flac reads about 3 % faster than WAV"),
+        rows=rows + alac, gates=gates, figures=figures, held_out=held)
+    (WORK / "lossless.json").write_text(json.dumps(result, indent=1) + "\n")
+    for f in d.glob("*.long.*"):
+        f.unlink()
+    print(f"load {load_end[0]:.2f} at the end; wrote {WORK / 'lossless.json'}", file=sys.stderr)
+    if args.check:
+        sys.exit(0 if check_lossless(result) else 1)
+
+
+def check_lossless(result, out=sys.stdout):
+    """Print every gate of a lossless run; True when all of them passed in
+    a complete run on a quiet host."""
+    ok = True
+    host = result.get("host", {})
+    print(f"lossless run of {result.get('date', '?')} on {host.get('cpu', '?')}, core "
+          f"{host.get('core', '?')}, load {host.get('load_start', ['?'])[0]} at the start and "
+          f"{host.get('load_end', ['?'])[0]} at the end", file=out)
+    for g in result.get("gates", []):
+        if g["kind"] == "size":
+            detail = f"{g['ours']} bytes against {g['reference']}"
+        else:
+            detail = (f"ratio {g['ratio_median']:.4f} ({g['ratio_min']:.4f} to "
+                      f"{g['ratio_max']:.4f}), threshold {g['threshold']:.4f}")
+            if g.get("min_cpu", MIN_CPU_SECONDS) < MIN_CPU_SECONDS:
+                detail += f", a run of only {g['min_cpu']:.2f} CPU s"
+                g = dict(g, verdict="undecided")
+        print(f"{g['verdict']:9} {g['group']} {g['id']}: {g['description']}: {detail}",
+              file=out)
+        ok = ok and g["verdict"] == "passed"
+    for r in result.get("rows", []):
+        if not r.get("bit_exact", False):
+            print(f"failed    {r['codec']} is not bit-exact", file=out)
+            ok = False
+    for h in result.get("held_out", []):
+        if not h.get("bit_exact", False):
+            print(f"failed    held-out file \"{h['file']}\" is not bit-exact", file=out)
+            ok = False
+    # An observation, not a gate: each level against the level below it.
+    sizes = {r["level"]: r["frame_bytes"] for r in result.get("rows", [])
+             if r.get("encoder") == "baac"}
+    larger = [f"{n} ({sizes[n]} against {sizes[n - 1]})" for n in sorted(sizes)
+              if n - 1 in sizes and sizes[n] > sizes[n - 1]]
+    print("observation: " + ("every bAAC level is no larger than the level below it" if not larger
+                             else "bAAC levels larger than the level below: " + ", ".join(larger)),
+          file=out)
+    if not result.get("complete", False):
+        print("not a gate result: the run was limited (--only, --gates-only or --any-flac)",
+              file=out)
+        ok = False
+    if not host.get("quiet", False):
+        print(f"not a gate result: the host was not quiet (load above "
+              f"{host.get('quiet_load', QUIET_LOAD)}); run it again when it is", file=out)
+        ok = False
+    print("every gate passed" if ok else "not every gate passed", file=out)
+    return ok
+
+
+def stage_check(args):
+    path = Path(args.results) if args.results else WORK / "lossless.json"
+    if not path.exists():
+        raise SystemExit(f"{path} is missing: run ./bench.py lossless first")
+    sys.exit(0 if check_lossless(json.loads(path.read_text())) else 1)
+
+
+def lossless_section(result):
+    """The Lossless section of tables.md from a run's results."""
+    md = ["## Lossless (generated)\n"]
+    host, method, tools = result["host"], result["method"], result["tools"]
+    md.append(f"Run of {result['date']} on {host['cpu']} (core {host['core']}, "
+              f"{host['compiler'] or 'unknown compiler'}), load {host['load_start'][0]} at the "
+              f"start and {host['load_end'][0]} at the end"
+              f"{'' if host['quiet'] else ': the host was not quiet, so this is not a gate result'}"
+              f". bAAC {tools['baac']}, {tools['flac']}, {tools['ffmpeg'].split(' Copyright')[0]}; "
+              f"refalac {tools['refalac']}. The corpus is {method['corpus_seconds']:.1f} s; timed "
+              f"runs repeat it {method['corpus_repetitions']} times in one process pinned with "
+              f"`{method['pinned']}`, {method['repeats']} repeats with the reference and bAAC "
+              "alternated.\n")
+    md.append("| Codec | kbit/s | Frame bytes | Enc × realtime | Dec × realtime | Bit-exact |")
+    md.append("|---|--:|--:|--:|--:|---|")
+    for r in result["rows"]:
+        enc = f"{r['seconds'] / r['enc_cpu']:.0f}" if r.get("enc_cpu") else "-"
+        dec = f"{r['seconds'] / r['dec_cpu']:.0f}" if r.get("dec_cpu") else "-"
+        name = r["codec"] + (f" (carried from {r['carried']})" if r.get("carried") else "")
+        md.append(f"| {name} | {r['kbps']:.2f} | {r.get('frame_bytes', '-')} | {enc} | {dec} | "
+                  f"{r['bit_exact']} |")
+    md.append("\n### Gates\n")
+    md.append("A speed ratio is bAAC's CPU time over the reference's, the median of the paired "
+              "repeats with their range; the threshold is 1 plus the reference's own spread. "
+              f"Judged on: {method['judged']}.\n")
+    md.append("| Gate | Group | bAAC | Reference | Ratio (range) | Threshold | Verdict |")
+    md.append("|---|---|--:|--:|--:|--:|---|")
+    for g in result["gates"]:
+        if g["kind"] == "size":
+            md.append(f"| {g['id']}: {g['description']} | {g['group']} | {g['ours']} | "
+                      f"{g['reference']} | | | {g['verdict']} |")
+        else:
+            md.append(f"| {g['id']}: {g['description']} | {g['group']} | "
+                      f"{g['ours_median']:.3f} s | {g['reference_median']:.3f} s | "
+                      f"{g['ratio_median']:.3f} ({g['ratio_min']:.3f} to {g['ratio_max']:.3f}) | "
+                      f"{g['threshold']:.3f} | {g['verdict']} |")
+    if result["figures"]:
+        md.append("\n### Every figure of the speed gates\n")
+        md.append("Long: one process over the repeated corpus. Per file: one process per corpus "
+                  "item, which adds each tool's start. The judged figure is marked.\n")
+        md.append("| Measure | Variant | bAAC s | Reference s | Ratio (range) | Threshold | Reads as |")
+        md.append("|---|---|--:|--:|--:|--:|---|")
+        for f in result["figures"]:
+            md.append(f"| {f['measure']} | {f['variant']}{' (judged)' if f['judged'] else ''} | "
+                      f"{f['ours_median']:.3f} | {f['reference_median']:.3f} | "
+                      f"{f['ratio_median']:.3f} ({f['ratio_min']:.3f} to {f['ratio_max']:.3f}) | "
+                      f"{f['threshold']:.3f} | {f['verdict']} |")
+    if result["held_out"]:
+        md.append("\n### Held-out recordings, level 5\n")
+        md.append("| Set | File | Seconds | bAAC frame bytes | flac -5 frame bytes | Bit-exact |")
+        md.append("|---|---|--:|--:|--:|---|")
+        for h in result["held_out"]:
+            md.append(f"| {h['set']} | {h['file']} | {h['seconds']:.1f} | {h['baac_frame_bytes']} | "
+                      f"{h['flac_frame_bytes']} | {h['bit_exact']} |")
+    return md
+
 
 
 # ---------------------------------------------------------------- report
@@ -592,9 +1347,36 @@ def fmt(v, nd=2):
     return "-" if v is None or (isinstance(v, float) and np.isnan(v)) else f"{v:.{nd}f}"
 
 
+SECTIONS = ["Quality", "Speed and memory", "Decoder agreement", "Lossless"]
+
+
+def split_sections(text):
+    """The generated sections of tables.md, by title, each without the
+    blank lines around it."""
+    out = {}
+    starts = [m.start() for m in re.finditer(r"(?m)^## ", text)] + [len(text)]
+    for a, b in zip(starts, starts[1:]):
+        chunk = text[a:b].strip("\n")
+        title = chunk.split("\n", 1)[0][3:].replace(" (generated)", "").strip()
+        out[title] = chunk
+    return out
+
+
+def merge_sections(old_text, new):
+    """tables.md with the sections in `new` replaced and every other
+    section as it was, byte for byte."""
+    sections = split_sections(old_text)
+    sections.update({title: "\n".join(lines).strip("\n") for title, lines in new.items()})
+    order = [t for t in SECTIONS if t in sections] + [t for t in sections if t not in SECTIONS]
+    return "\n\n".join(sections[t] for t in order) + "\n"
+
+
 def stage_report(args):
+    """Writes the results of every stage that has a cache; a stage without
+    one keeps its results files and its section of tables.md as they are."""
     RESULTS.mkdir(parents=True, exist_ok=True)
     rows = [json.loads(p.read_text()) for p in sorted((WORK / "quality").glob("*/*.json"))]
+    new = {}
     md = []
     if rows:
         keys = ["config", "family", "encoder", "mode", "nominal", "item", "seconds", "bytes",
@@ -715,11 +1497,12 @@ def stage_report(args):
                 r = next((x for x in by[c] if x["item"] == item), None)
                 cells.append("-" if r is None else f"{r['peaq_basic']:.2f} / {fmt(r.get('visqol'))}")
             md.append(f"| {item.replace('48_stereo', '')} | " + " | ".join(cells) + " |")
+        new["Quality"] = md
     sp = WORK / "speed.json"
     if sp.exists():
         srows = json.loads(sp.read_text())
         (RESULTS / "speed.json").write_text(json.dumps(srows, indent=1))
-        md.append("\n## Speed and memory (generated)\n")
+        md = new["Speed and memory"] = ["## Speed and memory (generated)\n"]
         md.append("CPU seconds (user + system, best of the runs) over the "
                   f"{srows[-1]['seconds']:.0f} s corpus concatenation; × realtime = audio "
                   "seconds per CPU second; RSS = peak resident set of the process.\n")
@@ -736,7 +1519,7 @@ def stage_report(args):
     if cp.exists():
         crows = json.loads(cp.read_text())
         (RESULTS / "compat.json").write_text(json.dumps(crows, indent=1))
-        md.append("\n## Decoder agreement (generated)\n")
+        md = new["Decoder agreement"] = ["## Decoder agreement (generated)\n"]
         md.append("Each decode aligned to the source; SNR of every decoder's output against "
                   "our decoder's (higher = closer; about 130 dB is float rounding). Min over the "
                   "ten items.\n")
@@ -754,32 +1537,157 @@ def stage_report(args):
                       f"{fmt(float(np.median(v)), 1) if v else '-'} |")
     lp = WORK / "lossless.json"
     if lp.exists():
-        lrows = json.loads(lp.read_text())
-        (RESULTS / "lossless.json").write_text(json.dumps(lrows, indent=1))
-        md.append("\n## Lossless (generated)\n")
-        md.append("| Codec | kbit/s | Enc × realtime | Dec × realtime | Dec RSS MiB | Bit-exact |")
-        md.append("|---|--:|--:|--:|--:|---|")
-        for r in lrows:
-            md.append(f"| {r['codec']} | {r['kbps']:.0f} | {r['seconds'] / r['enc_cpu']:.0f} | "
-                      f"{r['seconds'] / r['dec_cpu']:.0f} | {r['dec_rss_kb'] / 1024:.1f} | {r['bit_exact']} |")
-    (RESULTS / "tables.md").write_text("\n".join(md) + "\n")
-    print(f"wrote {RESULTS}", file=sys.stderr)
+        result = json.loads(lp.read_text())
+        (RESULTS / "lossless.json").write_text(json.dumps(result, indent=1) + "\n")
+        new["Lossless"] = lossless_section(result)
+    tables = RESULTS / "tables.md"
+    tables.write_text(merge_sections(tables.read_text() if tables.exists() else "", new))
+    print(f"wrote {', '.join(new) or 'nothing'} under {RESULTS}", file=sys.stderr)
+
+
+def stage_selftest(args):
+    """The harness's own logic on made-up figures: no codec runs."""
+    failures = []
+
+    def expect(cond, what):
+        print(("ok    " if cond else "FAIL  ") + what)
+        if not cond:
+            failures.append(what)
+
+    # The statistic.  A reference spread of 1 % makes the threshold 1.01.
+    refs = [3.000, 3.030, 3.015, 3.000, 3.006]
+    below = speed_verdict([(r * x, r) for r, x in zip(refs, (0.97, 0.98, 0.99, 1.00, 0.985))])
+    straddle = speed_verdict([(r * x, r) for r, x in zip(refs, (0.99, 1.03, 1.00, 1.02, 0.995))])
+    above = speed_verdict([(r * x, r) for r, x in zip(refs, (1.02, 1.05, 1.03, 1.04, 1.025))])
+    expect(abs(below["threshold"] - 1.00998) < 1e-4, "a reference spread of 1 % gives a threshold of 1.01")
+    expect(below["verdict"] == "passed", "paired ratios of 0.97 to 1.00 pass")
+    expect(straddle["verdict"] == "undecided", "paired ratios of 0.99 to 1.03 are undecided")
+    expect(above["verdict"] == "failed", "paired ratios of 1.02 to 1.05 fail")
+    short = speed_verdict([(r * x / 2, r / 2) for r, x in zip(refs, (0.97, 0.98, 0.99, 1.00, 0.985))])
+    expect(short["verdict"] == "undecided", "the same ratios from runs under 2 CPU seconds are undecided")
+    expect(size_verdict(1000, 1000)["verdict"] == "passed", "a size equal to the reference passes")
+    expect(size_verdict(1001, 1000)["verdict"] == "failed", "one byte more than the reference fails")
+
+    # The check mode on a whole made-up run.
+    def made_up(speed, size=(1000, 1000), quiet=True, exact=True):
+        host = dict(cpu="test", core=0, load_start=[0.1], load_end=[0.1], quiet=quiet,
+                    quiet_load=QUIET_LOAD)
+        return dict(date="test", complete=True, host=host, held_out=[],
+                    rows=[dict(codec="baac-5", encoder="baac", level=5, frame_bytes=10,
+                               bit_exact=exact)],
+                    gates=[dict(id="size-5", group="flac", description="size", kind="size",
+                                **size_verdict(*size)),
+                           dict(id="enc-5", group="flac", description="speed", kind="speed",
+                                **speed)])
+    sink = open(os.devnull, "w")
+    expect(check_lossless(made_up(below), sink), "the check passes a run whose gates all passed")
+    expect(not check_lossless(made_up(straddle), sink), "the check does not pass an undecided gate")
+    expect(not check_lossless(made_up(above), sink), "the check does not pass a failed gate")
+    expect(not check_lossless(made_up(below, size=(1001, 1000)), sink),
+           "the check does not pass a row one byte larger than its reference")
+    expect(not check_lossless(made_up(below, quiet=False), sink),
+           "the check does not pass a run on a host that was not quiet")
+    expect(not check_lossless(made_up(below, exact=False), sink),
+           "the check does not pass a row that is not bit-exact")
+
+    # Exactness: one sample altered is not the same decode.
+    pcm = bytes(range(256)) * 16
+    altered = bytearray(pcm)
+    altered[1000] ^= 1
+    expect(same_bytes(pcm, bytes(pcm)) and not same_bytes(pcm, bytes(altered)),
+           "a decode altered by one sample is not bit-exact")
+
+    # The carried refalac row.
+    measured = [dict(codec="alac-ffmpeg", kbps=697.0, seconds=130.3, bit_exact=True)]
+    carried = alac_rows(False, measured)
+    expect(len(carried) == 2 and carried[1].get("carried") == "2026-10-30" and
+           "enc_cpu" not in carried[1],
+           "without refalac its row is the carried one, marked and without speed")
+    own = alac_rows(True, measured + [dict(codec="alac-apple-ref", kbps=690.0, seconds=130.3,
+                                           bit_exact=True)])
+    expect(len(own) == 2 and "carried" not in own[1], "with refalac its measured row is used")
+
+    # A held-out file of another format.
+    try:
+        check_held_out_format("28 - high resolution audio",
+                              dict(sample_rate=48000, channels=2, bits=24),
+                              dict(sample_rate=96000, channels=2, bits=24))
+        expect(False, "a held-out file of another format stops the stage")
+    except SystemExit as e:
+        expect("28 - high resolution audio" in str(e) and "48000" in str(e),
+               "a held-out file of another format stops the stage with a message naming it")
+
+    # The report: only the sections that have a cache change.
+    committed = (HERE / "results" / "tables.md").read_text()
+    expect(merge_sections(committed, {}) == committed,
+           "tables.md comes back byte for byte when no section is replaced")
+    global WORK, RESULTS
+    keep = WORK, RESULTS
+    with tempfile.TemporaryDirectory() as tmp:
+        WORK, RESULTS = Path(tmp) / "work", Path(tmp) / "results"
+        WORK.mkdir()
+        shutil.copytree(HERE / "results", RESULTS)
+        before = {p.name: p.read_bytes() for p in RESULTS.iterdir()}
+        run_of = made_up(below)
+        run_of.update(tools=dict(baac="x", flac="flac 1.4.3", ffmpeg="ffmpeg", refalac="carried"),
+                      method=dict(corpus_seconds=130.3, corpus_repetitions=25, pinned="taskset -c 0",
+                                  repeats=5, judged="long run"), figures=[])
+        run_of["host"].update(compiler="c++")
+        run_of["rows"][0].update(seconds=130.3, kbps=600.0, enc_cpu=0.2, dec_cpu=0.1)
+        for g in run_of["gates"]:
+            g.setdefault("ours_median", 1.0)
+        (WORK / "lossless.json").write_text(json.dumps(run_of))
+        stage_report(args)
+        after = {p.name: p.read_bytes() for p in RESULTS.iterdir()}
+        old, new = split_sections(before["tables.md"].decode()), split_sections(after["tables.md"].decode())
+        expect(all(old[t] == new[t] for t in ("Quality", "Speed and memory", "Decoder agreement")),
+               "with only the lossless cache, the other sections of tables.md are unchanged")
+        expect(old.get("Lossless") != new["Lossless"] and "baac-5" in new["Lossless"] and
+               list(new) == [t for t in SECTIONS if t in new],
+               "and the Lossless section is the new one, in its place")
+        expect(all(before[n] == after[n] for n in before if n not in ("tables.md", "lossless.json")),
+               "and the other results files are byte-identical")
+    WORK, RESULTS = keep
+    print(f"selftest: {len(failures)} failure(s)")
+    sys.exit(1 if failures else 0)
 
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("stage", choices=["quality", "speed", "compat", "lossless", "report", "list"])
-    ap.add_argument("--only", help="regular expression over configuration ids")
+    ap.add_argument("stage", choices=["quality", "speed", "compat", "lossless", "check", "report",
+                                      "selftest", "list"])
+    ap.add_argument("--only", help="regular expression over configuration ids (lossless: over "
+                                   "gate ids; a limited run is not a gate result)")
     ap.add_argument("--jobs", type=int, default=os.cpu_count() or 1)
-    ap.add_argument("--repeat", type=int, default=3)
+    ap.add_argument("--repeat", type=int, default=None,
+                    help="timing repeats (lossless: at least 5, the default; other stages 3)")
+    ap.add_argument("--check", action="store_true",
+                    help="lossless: print the gates after the run and exit by them")
+    ap.add_argument("--core", type=int, default=None,
+                    help="lossless: the core to pin to (default: the idlest)")
+    ap.add_argument("--reps", type=int, default=None,
+                    help="lossless: corpus repetitions of a timed run (default: enough for "
+                         "2 CPU seconds)")
+    ap.add_argument("--gates-only", action="store_true",
+                    help="lossless: skip the speed of the rows that carry no gate")
+    ap.add_argument("--any-flac", action="store_true",
+                    help="lossless: take a flac that is not the pinned 1.4.3")
+    ap.add_argument("--quiet-load", type=float, default=QUIET_LOAD,
+                    help="lossless: the 1-minute load average above which the host is not quiet")
+    ap.add_argument("--results", help="check: a lossless.json other than the work cache")
     args = ap.parse_args()
     if args.stage == "list":
         for c in cfg_list():
             print(c["id"], "needs", ",".join(c["needs"]), "" if all(map(have, c["needs"])) else "(missing)")
         return
+    if args.stage in ("quality", "speed", "compat") and sf is None:
+        raise SystemExit(f"the {args.stage} stage needs the Python modules scipy and soundfile")
+    if args.repeat is None:
+        args.repeat = 5 if args.stage == "lossless" else 3
     {"quality": stage_quality, "speed": stage_speed, "compat": stage_compat,
-     "lossless": stage_lossless, "report": stage_report}[args.stage](args)
+     "lossless": stage_lossless, "check": stage_check, "report": stage_report,
+     "selftest": stage_selftest}[args.stage](args)
 
 
 if __name__ == "__main__":
