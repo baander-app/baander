@@ -12,6 +12,10 @@
 #include <string>
 #include <vector>
 
+#if !defined(_WIN32)
+#include <sys/wait.h>
+#endif
+
 #include "aac.h"
 
 static int g_failures = 0;
@@ -440,6 +444,33 @@ static std::string shell_quote(const std::string& word) {
     }
   }
   return out + "'";
+}
+
+/* A command run through the shell with what it wrote. */
+struct CommandRun {
+  int status = -1;          /* the exit status; -1 when the command did not exit */
+  std::vector<uint8_t> out; /* standard output */
+  std::string err;          /* standard error */
+  std::string text() const { return std::string(out.begin(), out.end()); }
+};
+
+/* Runs `cmd` with its standard output and standard error captured in
+ * files of the directory `dir`, which the caller owns. */
+static CommandRun run_command(const std::string& cmd, const std::string& dir) {
+  CommandRun r;
+  const std::string out_path = dir + "/stdout";
+  const std::string err_path = dir + "/stderr";
+  const int status =
+      system((cmd + " > " + shell_quote(out_path) + " 2> " + shell_quote(err_path)).c_str());
+#if defined(_WIN32)
+  r.status = status;
+#else
+  r.status = WIFEXITED(status) ? WEXITSTATUS(status) : -1;
+#endif
+  r.out = read_file(out_path);
+  const std::vector<uint8_t> err = read_file(err_path);
+  r.err.assign(err.begin(), err.end());
+  return r;
 }
 
 /* Standard output of a command without its trailing newlines; empty

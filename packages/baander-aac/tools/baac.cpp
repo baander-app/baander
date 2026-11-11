@@ -35,7 +35,6 @@
  * factor of each and of each profile.  Its last rows are the lossless
  * mode at levels 0, 5 and 8 on the same signal at 16 bits. */
 #include <algorithm>
-#include <chrono>
 #include <filesystem>
 #include <map>
 #include <cmath>
@@ -46,6 +45,7 @@
 #include <vector>
 
 #include "aac.h"
+#include "baac_common.h"
 #include "baac_flac.h"
 
 static std::vector<uint8_t> read_all(const char* path) {
@@ -142,11 +142,6 @@ static void print_loudness(FILE* f, const AacLoudnessInfo& info) {
     fprintf(f, "max short-term        needs 3 s of input\n");
   }
 }
-
-static uint32_t le32(const uint8_t* p) {
-  return (uint32_t)p[0] | (uint32_t)p[1] << 8 | (uint32_t)p[2] << 16 | (uint32_t)p[3] << 24;
-}
-static uint32_t le16(const uint8_t* p) { return (uint32_t)p[0] | (uint32_t)p[1] << 8; }
 
 /* Reads a RIFF/WAVE file with integer PCM of 8 to 32 bits or 32-bit
  * float samples (plain or WAVE_FORMAT_EXTENSIBLE) into interleaved
@@ -684,11 +679,6 @@ static std::vector<float> bench_signal(int n, int sr) {
     pcm[(size_t)i * 2 + 1] = 0.7f * right + noise - click;
   }
   return pcm;
-}
-
-static double now_seconds() {
-  using clock = std::chrono::steady_clock;
-  return std::chrono::duration<double>(clock::now().time_since_epoch()).count();
 }
 
 static void write_file(const std::string& path, const void* data, size_t bytes) {

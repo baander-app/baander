@@ -104,12 +104,19 @@ bool bytes_detached(const Napi::Value& v) {
  * the library reads.  (Copying each picture when its `data` is read
  * would be as safe and cost a second copy of up to 16 MiB each.) */
 struct TagStore {
+  /* One picture as it was read: the figures the library will see, the
+   * strings and the JavaScript value its pointers will be set to. */
+  struct PictureSource {
+    BaacFlacPicture view;
+    std::string mime_type;
+    std::string description;
+    Napi::Value data;
+  };
+
   std::vector<std::string> tags;
   std::string vendor;
   bool have_vendor = false;
-  std::vector<std::string> mime_types;
-  std::vector<std::string> descriptions;
-  std::vector<Napi::Value> data;
+  std::vector<PictureSource> sources;
   std::vector<BaacFlacComment> comments;
   std::vector<BaacFlacPicture> pictures;
 
@@ -178,10 +185,7 @@ struct TagStore {
             !picture_number(env, p, "colors", &picture.colors)) {
           return false;
         }
-        mime_types.push_back(mime);
-        descriptions.push_back(description);
-        data.push_back(bytes);
-        pictures.push_back(picture);
+        sources.push_back({picture, mime, description, bytes});
       }
     }
     return !env.IsExceptionPending();
@@ -195,10 +199,11 @@ struct TagStore {
     for (const std::string& tag : tags) {
       comments.push_back({tag.data(), static_cast<uint32_t>(tag.size())});
     }
-    for (size_t i = 0; i < pictures.size(); i++) {
+    pictures.clear();
+    for (const PictureSource& source : sources) {
       const uint8_t* bytes = nullptr;
       size_t size = 0;
-      if (bytes_detached(data[i]) || !bytes_of(data[i], &bytes, &size)) {
+      if (bytes_detached(source.data) || !bytes_of(source.data, &bytes, &size)) {
         throw_error(env, "FlacEncoder: pictures[].data was detached while the options were read");
         return false;
       }
@@ -208,10 +213,12 @@ struct TagStore {
                     "holds");
         return false;
       }
-      pictures[i].mime_type = mime_types[i].c_str();
-      pictures[i].description = descriptions[i].c_str();
-      pictures[i].data = bytes;
-      pictures[i].data_bytes = static_cast<uint32_t>(size);
+      BaacFlacPicture picture = source.view;
+      picture.mime_type = source.mime_type.c_str();
+      picture.description = source.description.c_str();
+      picture.data = bytes;
+      picture.data_bytes = static_cast<uint32_t>(size);
+      pictures.push_back(picture);
     }
     options->comments = comments.data();
     options->comment_count = static_cast<int>(comments.size());
@@ -331,6 +338,16 @@ class FlacEncoder : public Napi::ObjectWrap<FlacEncoder> {
     return true;
   }
 
+  /* Room for `size` bytes of frames, kept from call to call: the bound
+   * of a call is far above what it writes, and a fresh buffer of that
+   * size would be cleared every time. */
+  uint8_t* scratch(size_t size) {
+    if (scratch_.size() < size) {
+      scratch_.resize(size);
+    }
+    return scratch_.data();
+  }
+
   /* Codes the samples and returns every frame they complete.  The first
    * result of a stream begins with the stream's header. */
   Napi::Value Encode(const Napi::CallbackInfo& info) {
@@ -353,11 +370,14 @@ class FlacEncoder : public Napi::ObjectWrap<FlacEncoder> {
      * call has written nothing. */
     const int32_t* samples = pcm.Data();
     if (bits_ < 32) {
-      const int32_t limit = static_cast<int32_t>(1) << (bits_ - 1);
+      const int bits = bits_;
+      const uint32_t half = 1u << (bits - 1);
+      uint32_t outside = 0;
       for (size_t i = 0; i < values; i++) {
-        if (samples[i] < -limit || samples[i] >= limit) {
-          return throw_error(env, "FlacEncoder.encode: a sample lies outside the bit depth");
-        }
+        outside |= (static_cast<uint32_t>(samples[i]) + half) >> bits;
+      }
+      if (outside) {
+        return throw_error(env, "FlacEncoder.encode: a sample lies outside the bit depth");
       }
     }
     std::vector<uint8_t> out;
@@ -372,14 +392,13 @@ class FlacEncoder : public Napi::ObjectWrap<FlacEncoder> {
       if (bound < 0) {
         return throw_error(env, std::string("FlacEncoder.encode: ") + error_name(bound));
       }
-      const size_t at = out.size();
-      out.resize(at + static_cast<size_t>(bound));
-      const int n = baac_flac_encoder_encode(handle_, samples + pos * channels_, count,
-                                             out.data() + at, bound);
+      uint8_t* const frames_out = scratch(static_cast<size_t>(bound));
+      const int n =
+          baac_flac_encoder_encode(handle_, samples + pos * channels_, count, frames_out, bound);
       if (n < 0) {
         return throw_error(env, std::string("FlacEncoder.encode: ") + error_name(n));
       }
-      out.resize(at + static_cast<size_t>(n));
+      out.insert(out.end(), frames_out, frames_out + n);
     }
     return Napi::Buffer<uint8_t>::Copy(env, out.data(), out.size());
   }
@@ -396,13 +415,12 @@ class FlacEncoder : public Napi::ObjectWrap<FlacEncoder> {
       return throw_error(env, "FlacEncoder.finish: the stream cannot begin");
     }
     const int bound = baac_flac_encoder_max_output_bytes(handle_, 0);
-    const size_t at = out.size();
-    out.resize(at + static_cast<size_t>(bound > 0 ? bound : 0));
-    const int n = baac_flac_encoder_finish(handle_, out.data() + at, bound);
+    uint8_t* const frames_out = scratch(static_cast<size_t>(bound > 0 ? bound : 0));
+    const int n = baac_flac_encoder_finish(handle_, frames_out, bound);
     if (n < 0) {
       return throw_error(env, std::string("FlacEncoder.finish: ") + error_name(n));
     }
-    out.resize(at + static_cast<size_t>(n));
+    out.insert(out.end(), frames_out, frames_out + n);
     started_ = false;
     return Napi::Buffer<uint8_t>::Copy(env, out.data(), out.size());
   }
@@ -470,6 +488,7 @@ class FlacEncoder : public Napi::ObjectWrap<FlacEncoder> {
   int bits_ = 16;
   int level_ = BAAC_FLAC_LEVEL_DEFAULT;
   bool started_ = false; /* the header of the running stream is out */
+  std::vector<uint8_t> scratch_;
 };
 
 /* ── decoder ───────────────────────────────────────────────────── */
@@ -593,6 +612,14 @@ class FlacDecoder : public Napi::ObjectWrap<FlacDecoder> {
     return static_cast<size_t>(kFrameValues);
   }
 
+  /* Throws the error that was held back until the samples before it
+   * had been handed out. */
+  Napi::Value throw_deferred(const Napi::Env& env, const char* where) {
+    const int code = deferred_error_;
+    deferred_error_ = 0;
+    return throw_error(env, std::string(where) + ": " + error_name(code));
+  }
+
   /* Feeds `size` bytes at `data` (the caller's chunk, or the rest of an
    * earlier one that is kept in `queue_`) and decodes frames straight
    * into `out_` until the input is spent or another frame might pass
@@ -604,9 +631,7 @@ class FlacDecoder : public Napi::ObjectWrap<FlacDecoder> {
   Napi::Value pump(const Napi::Env& env, const char* where, const uint8_t* data, size_t size,
                    bool queued) {
     if (deferred_error_ != 0) {
-      const int code = deferred_error_;
-      deferred_error_ = 0;
-      return throw_error(env, std::string(where) + ": " + error_name(code));
+      return throw_deferred(env, where);
     }
     size_t used = 0;
     size_t left = size;
@@ -690,9 +715,7 @@ class FlacDecoder : public Napi::ObjectWrap<FlacDecoder> {
       finished_ = true;
     }
     if (used == 0 && deferred_error_ != 0) {
-      const int code = deferred_error_;
-      deferred_error_ = 0;
-      return throw_error(env, std::string(where) + ": " + error_name(code));
+      return throw_deferred(env, where);
     }
     Napi::Int32Array result = Napi::Int32Array::New(env, used);
     if (used) {
@@ -709,19 +732,16 @@ class FlacDecoder : public Napi::ObjectWrap<FlacDecoder> {
     if (!handle_) {
       return throw_error(env, "FlacDecoder: not initialized");
     }
-    if (finished_) {
+    /* A call without input goes on with what is held back, also after
+     * finish() has been called; new bytes are refused from then on. */
+    const bool with_input = info.Length() >= 1 && !info[0].IsUndefined();
+    if (finished_ || (with_input && finishing_)) {
       return throw_error(env,
                          "FlacDecoder.decode: the stream is finished; reset() starts "
                          "another");
     }
-    const bool with_input = info.Length() >= 1 && !info[0].IsUndefined();
     if (!with_input) {
       return pump(env, "FlacDecoder.decode", queue_.data(), queue_.size(), true);
-    }
-    if (finishing_) {
-      return throw_error(env,
-                         "FlacDecoder.decode: the stream is finished; reset() starts "
-                         "another");
     }
     if (pending()) {
       return throw_error(env,

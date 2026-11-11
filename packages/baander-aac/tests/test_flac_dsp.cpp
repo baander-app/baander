@@ -3,7 +3,15 @@
  * on random data, bit for bit, at lengths that leave a vector tail; the
  * residual and the restore kernels against each other where the 32-bit
  * and the 64-bit forms both apply; and whole streams, which have to come
- * out the same byte for byte whatever level the process is capped at. */
+ * out the same byte for byte whatever level the process is capped at.
+ *
+ *   BAAC_REQUIRE_KERNELS  levels that have to run here, separated by
+ *                         commas ("neon", "sse2,avx2"): the suite fails
+ *                         when the processor does not report one of
+ *                         them, or when the level installed no kernel
+ *                         of its own, so that a build which left the
+ *                         level's kernels out cannot pass by comparing
+ *                         the scalar ones with themselves */
 #include "aac_cpu.h"
 #include "test_flac_util.h"
 
@@ -561,6 +569,41 @@ static void test_stream_identity(const char* self, const std::vector<const char*
 #endif
 }
 
+/* The kernels a level's table holds that are not the scalar ones. */
+static int own_kernels(const FlacDSP& dsp, const FlacDSP& scalar) {
+  int own = 0;
+  own += dsp.window != scalar.window;
+  own += dsp.autocorrelation != scalar.autocorrelation;
+  own += dsp.fixed_sums != scalar.fixed_sums;
+  own += dsp.lpc_residual_16 != scalar.lpc_residual_16;
+  own += dsp.lpc_residual_32 != scalar.lpc_residual_32;
+  own += dsp.lpc_residual_64 != scalar.lpc_residual_64;
+  own += dsp.rice_fold != scalar.rice_fold;
+  own += dsp.rice_sums != scalar.rice_sums;
+  own += dsp.rice_encode != scalar.rice_encode;
+  own += dsp.rice_decode != scalar.rice_decode;
+  own += dsp.lpc_restore_32 != scalar.lpc_restore_32;
+  own += dsp.lpc_restore_wide != scalar.lpc_restore_wide;
+  for (size_t i = 0; i < sizeof(dsp.stereo_out) / sizeof(dsp.stereo_out[0]); i++) {
+    own += dsp.stereo_out[i] != scalar.stereo_out[i];
+  }
+  return own;
+}
+
+/* Whether `name` is one of the comma-separated names in `list`. */
+static bool listed(const char* list, const char* name) {
+  const size_t length = strlen(name);
+  for (const char* p = list; *p;) {
+    const char* end = strchr(p, ',');
+    const size_t n = end ? (size_t)(end - p) : strlen(p);
+    if (n == length && memcmp(p, name, n) == 0) {
+      return true;
+    }
+    p += n + (end ? 1 : 0);
+  }
+  return false;
+}
+
 int main(int argc, char** argv) {
   if (argc > 1 && strcmp(argv[1], "--stream-digests") == 0) {
     return print_stream_digests() ? 1 : 0;
@@ -577,9 +620,25 @@ int main(int argc, char** argv) {
       {"avx2", AAC_CPU_FLAG_SSE2 | AAC_CPU_FLAG_AVX | AAC_CPU_FLAG_AVX2},
       {"neon", AAC_CPU_FLAG_NEON},
   };
+  const char* required = getenv("BAAC_REQUIRE_KERNELS");
+  for (const char* p = required ? required : ""; *p;) {
+    const char* end = strchr(p, ',');
+    const std::string name(p, end ? (size_t)(end - p) : strlen(p));
+    bool known = false;
+    for (const Level& level : levels) {
+      known = known || name == level.name;
+    }
+    CHECK(known, "BAAC_REQUIRE_KERNELS names the level \"%s\", which this suite does not have",
+          name.c_str());
+    p += name.size() + (end ? 1 : 0);
+  }
   std::vector<const char*> caps;
   for (const Level& level : levels) {
+    const bool must_run =
+        required && level.flags != AAC_CPU_FLAG_NONE && listed(required, level.name);
     if ((level.flags & detected) != level.flags) {
+      CHECK(!must_run, "the %s kernels are required here and this processor does not report them",
+            level.name);
       continue;
     }
     /* The AVX2 level takes a kernel of its own when the processor has
@@ -590,9 +649,12 @@ int main(int argc, char** argv) {
     aac_set_cpu_flags_override(level.flags | extra);
     FlacDSP dsp;
     flac_dsp_init(&dsp);
-    printf("testing %s kernels%s%s\n", level.name,
-           dsp.rice_decode != scalar.rice_decode ? ", with a Rice reader of the level's own" : "",
-           dsp.rice_encode != scalar.rice_encode ? ", with a Rice writer of the level's own" : "");
+    const int own = own_kernels(dsp, scalar);
+    printf("testing %s kernels, %d of the level's own%s%s\n", level.name, own,
+           dsp.rice_decode != scalar.rice_decode ? ", with a Rice reader among them" : "",
+           dsp.rice_encode != scalar.rice_encode ? ", with a Rice writer among them" : "");
+    CHECK(!must_run || own > 0,
+          "the %s kernels are required here and the build installed none of them", level.name);
     test_analysis(level.name, &scalar, &dsp);
     test_fixed_sums(level.name, &scalar, &dsp);
     test_prediction(level.name, &scalar, &dsp);
@@ -602,6 +664,27 @@ int main(int argc, char** argv) {
     test_rice_decode(level.name, &scalar, &dsp);
     test_stereo_out(level.name, &scalar, &dsp);
     caps.push_back(level.name);
+    if (extra) {
+      /* The same level as a processor without BMI2 and LZCNT gets it:
+       * the kernels that wait for those two stay the shared ones, and
+       * every kernel is compared again. */
+      aac_set_cpu_flags_override(level.flags);
+      FlacDSP plain;
+      flac_dsp_init(&plain);
+      const std::string name = std::string(level.name) + " without BMI2 and LZCNT";
+      printf("testing %s kernels, %d of the level's own\n", name.c_str(),
+             own_kernels(plain, scalar));
+      CHECK(plain.rice_encode == scalar.rice_encode && plain.rice_decode == scalar.rice_decode,
+            "%s: the Rice writer and reader are the shared ones", name.c_str());
+      test_analysis(name.c_str(), &scalar, &plain);
+      test_fixed_sums(name.c_str(), &scalar, &plain);
+      test_prediction(name.c_str(), &scalar, &plain);
+      test_residual_edges(name.c_str(), &plain);
+      test_rice(name.c_str(), &scalar, &plain);
+      test_rice_encode(name.c_str(), &scalar, &plain);
+      test_rice_decode(name.c_str(), &scalar, &plain);
+      test_stereo_out(name.c_str(), &scalar, &plain);
+    }
   }
   CHECK(!caps.empty(), "at least the scalar level runs");
   test_stream_identity(argv[0], caps);

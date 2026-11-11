@@ -54,8 +54,8 @@ set(TEST_SOURCES
 # The library builds its computed tables when the first encoder or
 # decoder is created.  The unit tests also read tables and call table
 # routines directly, so each of them gets the tables at program start
-# (tables_at_load.cpp), as before the library built them lazily.
-# test_tables_lazy, below, is the one suite without that file.
+# (tables_at_load.cpp).  test_tables_lazy, below, is the one suite
+# without that file.
 foreach(test_src ${TEST_SOURCES})
     get_filename_component(test_name ${test_src} NAME_WE)
     add_executable(${test_name} ${test_src} tables_at_load.cpp)

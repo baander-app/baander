@@ -4,8 +4,7 @@
  * The library builds them when the first encoder or decoder is created.
  * A unit test or an internal tool may read a table, or call a routine
  * that reads one, without creating either; for those programs the
- * tables are there from the start, as they were when the library built
- * them at load. */
+ * tables are there from the start. */
 #include "aac_tables.h"
 
 namespace {

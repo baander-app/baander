@@ -9,7 +9,6 @@
  *                         is taken from the same build
  *   BAAC_REQUIRE_ORACLES  set: a missing flac, metaflac, ffmpeg or
  *                         ffprobe fails the suite instead of skipping */
-#include <sys/wait.h>
 
 #include <new>
 
@@ -196,15 +195,9 @@ static bool same_pictures(const std::vector<Picture>& a, const std::vector<Pictu
 static std::vector<int> block_list(const std::vector<uint8_t>& s, int* last_flags) {
   std::vector<int> types;
   *last_flags = 0;
-  size_t pos = 4;
-  while (pos + 4 <= s.size()) {
-    types.push_back(s[pos] & 0x7F);
-    const bool last = (s[pos] & 0x80) != 0;
-    *last_flags += last ? 1 : 0;
-    pos += 4 + ((size_t)s[pos + 1] << 16 | (size_t)s[pos + 2] << 8 | s[pos + 3]);
-    if (last) {
-      break;
-    }
+  for (const FlacBlockShape& b : flac_blocks(s)) {
+    types.push_back(b.type);
+    *last_flags += b.last ? 1 : 0;
   }
   return types;
 }
@@ -691,12 +684,8 @@ static void test_limit() {
    * size and no second copy.  A limit one byte below them: the last
    * one is skipped. */
   size_t blocks = 0;
-  for (size_t pos = 4; pos + 4 <= (size_t)e.header_bytes;) {
-    const size_t length =
-        (size_t)e.stream[pos + 1] << 16 | (size_t)e.stream[pos + 2] << 8 | e.stream[pos + 3];
-    const int type = e.stream[pos] & 0x7F;
-    blocks += type == FLAC_BLOCK_VORBIS_COMMENT || type == FLAC_BLOCK_PICTURE ? length : 0;
-    pos += 4 + length;
+  for (const FlacBlockShape& b : flac_blocks(e.stream, (size_t)e.header_bytes)) {
+    blocks += b.type == FLAC_BLOCK_VORBIS_COMMENT || b.type == FLAC_BLOCK_PICTURE ? b.length : 0;
   }
   const Read roomy = read_stream(e.stream, true, blocks + 4096, 65536);
   CHECK(roomy.skipped == 0 && same_pictures(roomy.tags.pictures, tags.pictures),
@@ -730,10 +719,12 @@ static void test_limit() {
   /* A block that claims 5 MiB is not given 5 MiB before 64 KiB of it
    * have come. */
   std::vector<uint8_t> begun(e.stream.begin(), e.stream.begin() + 4 + 4 + 34);
-  size_t picture_at = begun.size();
-  while ((e.stream[picture_at] & 0x7F) != FLAC_BLOCK_PICTURE) {
-    picture_at += 4 + ((size_t)e.stream[picture_at + 1] << 16 |
-                       (size_t)e.stream[picture_at + 2] << 8 | e.stream[picture_at + 3]);
+  size_t picture_at = 0;
+  for (const FlacBlockShape& b : flac_blocks(e.stream)) {
+    if (b.type == FLAC_BLOCK_PICTURE) {
+      picture_at = b.offset;
+      break;
+    }
   }
   begun.insert(begun.end(), e.stream.begin() + (long)picture_at,
                e.stream.begin() + (long)picture_at + 60000);
@@ -871,6 +862,107 @@ static void test_memory_failure() {
         wrong, tried);
 }
 
+/* The three calls that set an encoder up, each with allocations failing
+ * at every place in turn: the call reports AAC_ERR_MEMORY and lets no
+ * exception out, and the stream that follows once memory is back is the
+ * one an undisturbed encoder writes, byte for byte. */
+static void test_encoder_memory_failure() {
+  const std::vector<int32_t> pcm = flac_gen_tones(4096 + 300, 2, 16, 0.5, 23u);
+  Tags tags = sample_tags();
+  tags.pictures[0].data = bytes_of(3000, 7u);
+  TagOptions to(tags);
+  to.options.total_samples_hint = pcm.size() / 2;
+  to.options.seek_table = 1;
+  to.options.padding_bytes = 100;
+  const FlacEncoded reference = flac_encode(pcm, 44100, 2, 16, 5, 5000, true, &to.options);
+  CHECK(reference.error == AAC_OK, "the undisturbed encoder writes the stream");
+
+  const auto failing = [](long fail_in) {
+    g_fail_in = fail_in;
+    g_fail_count = 3;
+    g_failed = 0;
+  };
+  const auto restored = []() {
+    const bool fired = g_failed > 0;
+    g_fail_in = -1;
+    g_fail_count = 0;
+    return fired;
+  };
+  /* What an encoder that is set up writes, against the reference. */
+  const auto same_stream = [&](BaacFlacEncoder* enc) {
+    return flac_encode(pcm, 44100, 2, 16, 5, 5000, true, nullptr, enc).stream == reference.stream;
+  };
+
+  const char* const calls[] = {"create", "set_options", "write_header"};
+  for (int call = 0; call < 3; call++) {
+    long tried = 0;
+    int reported = 0;
+    int wrong = 0;
+    int escaped = 0;
+    for (long fail_in = 0; fail_in < 2000; fail_in++) {
+      int error = AAC_OK;
+      int result = AAC_OK;
+      BaacFlacEncoder* enc = nullptr;
+      std::vector<uint8_t> header;
+      bool fired = false;
+      try {
+        if (call == 0) {
+          failing(fail_in);
+          enc = baac_flac_encoder_create(44100, 2, 16, 5, &error);
+          fired = restored();
+          result = enc ? AAC_OK : error;
+        } else {
+          enc = baac_flac_encoder_create(44100, 2, 16, 5, &error);
+          if (call == 2) {
+            baac_flac_encoder_set_options(enc, &to.options);
+            header.resize((size_t)baac_flac_encoder_header_bytes(enc));
+          }
+          failing(fail_in);
+          result = call == 1
+                       ? baac_flac_encoder_set_options(enc, &to.options)
+                       : baac_flac_encoder_write_header(enc, header.data(), (int)header.size());
+          fired = restored();
+        }
+      } catch (...) {
+        fired = restored();
+        escaped++;
+      }
+      if (!fired) {
+        baac_flac_encoder_destroy(enc);
+        break;
+      }
+      tried++;
+      const bool succeeded = call == 2 ? result == (int)header.size() : result == AAC_OK;
+      if (!succeeded) {
+        reported += result == AAC_ERR_MEMORY ? 1 : 0;
+        wrong += result == AAC_ERR_MEMORY ? 0 : 1;
+        /* The same again with memory back, and the stream from there. */
+        if (call == 0) {
+          enc = baac_flac_encoder_create(44100, 2, 16, 5, &error);
+        }
+        const bool ready =
+            enc && (call == 2 || baac_flac_encoder_set_options(enc, &to.options) == AAC_OK);
+        wrong += ready && same_stream(enc) ? 0 : 1;
+      } else if (call != 2) {
+        /* The failure was absorbed: the encoder has to be whole. */
+        const bool ready = call == 1 || baac_flac_encoder_set_options(enc, &to.options) == AAC_OK;
+        wrong += ready && same_stream(enc) ? 0 : 1;
+      }
+      baac_flac_encoder_destroy(enc);
+    }
+    printf("%s: allocations failed at %ld places, %d calls reported AAC_ERR_MEMORY\n", calls[call],
+           tried, reported);
+    CHECK(escaped == 0, "%s lets no exception out when an allocation fails (%d did)", calls[call],
+          escaped);
+    CHECK(wrong == 0,
+          "%s reports a failed allocation as AAC_ERR_MEMORY, and the stream written once "
+          "memory is back is the undisturbed one (%d of %ld runs differ)",
+          calls[call], wrong, tried);
+    CHECK(call == 2 || (tried >= 1 && reported >= 1),
+          "%s has allocations to fail (%ld places, %d reported)", calls[call], tried, reported);
+  }
+}
+
 /* A seek or a reset in the middle of a picture block gives back what
  * had been taken in of it. */
 static void test_dropped_input() {
@@ -951,23 +1043,9 @@ static std::vector<uint8_t> id3v2(size_t body, bool footer) {
   return tag;
 }
 
-struct Run {
-  int status = -1;
-  std::string out;
-  std::string err;
-};
+typedef CommandRun Run;
 
-static Run run(const std::string& cmd) {
-  Run r;
-  const std::string out_path = g_tmp + "/stdout";
-  const std::string err_path = g_tmp + "/stderr";
-  r.status = system((cmd + " > " + shell_quote(out_path) + " 2> " + shell_quote(err_path)).c_str());
-  const std::vector<uint8_t> out = read_file(out_path);
-  const std::vector<uint8_t> err = read_file(err_path);
-  r.out.assign(out.begin(), out.end());
-  r.err.assign(err.begin(), err.end());
-  return r;
-}
+static Run run(const std::string& cmd) { return run_command(cmd, g_tmp); }
 
 static void test_id3() {
   const std::vector<int32_t> pcm = flac_gen_tones(4096 * 2 + 55, 2, 16, 0.5, 12u);
@@ -1069,8 +1147,7 @@ static void test_id3() {
   const Run v2 = run(shell_quote(g_flac) + " -t -s " + shell_quote(g_tmp + "/id3v2.flac"));
   CHECK(v2.status == 0, "flac -t accepts the stream behind an ID3v2 tag: %s", v2.err.c_str());
   const Run trailer = run(shell_quote(g_flac) + " -t -s " + shell_quote(g_tmp + "/id3v1.flac"));
-  printf("flac -t on a stream with an ID3v1 tag behind it: exit %d, %s\n",
-         WEXITSTATUS(trailer.status),
+  printf("flac -t on a stream with an ID3v1 tag behind it: exit %d, %s\n", trailer.status,
          trailer.err.find("LOST_SYNC") != std::string::npos ? "reports lost sync" : "no complaint");
 }
 
@@ -1144,18 +1221,19 @@ static void test_oracles() {
 
   /* metaflac: the tags in order, the picture's figures and its bytes. */
   r = run(metaflac + " --export-tags-to=- " + file);
-  CHECK(r.status == 0 && lines_of(r.out) == tags.comments,
-        "metaflac lists the tags bAAC wrote, in order:\n%s", r.out.c_str());
+  CHECK(r.status == 0 && lines_of(r.text()) == tags.comments,
+        "metaflac lists the tags bAAC wrote, in order:\n%s", r.text().c_str());
   r = run(metaflac + " --list --block-type=VORBIS_COMMENT " + file);
-  CHECK(contains(r.out, "vendor string: bAAC") && contains(r.out, "comments: 5") &&
-            contains(r.out, "comment[2]: GENRE=Orchestral"),
-        "metaflac --list shows the vendor and the fields:\n%s", r.out.c_str());
+  CHECK(contains(r.text(), "vendor string: bAAC") && contains(r.text(), "comments: 5") &&
+            contains(r.text(), "comment[2]: GENRE=Orchestral"),
+        "metaflac --list shows the vendor and the fields:\n%s", r.text().c_str());
   r = run(metaflac + " --list --block-type=PICTURE " + file);
-  CHECK(contains(r.out, "type: 3 (Cover (front))") && contains(r.out, "MIME type: image/jpeg") &&
-            contains(r.out, "description: Front") && contains(r.out, "width: 64") &&
-            contains(r.out, "height: 48") && contains(r.out, "depth: 24") &&
-            contains(r.out, "data length: " + std::to_string(cover.size())),
-        "metaflac --list shows the picture as written:\n%s", r.out.c_str());
+  CHECK(contains(r.text(), "type: 3 (Cover (front))") &&
+            contains(r.text(), "MIME type: image/jpeg") &&
+            contains(r.text(), "description: Front") && contains(r.text(), "width: 64") &&
+            contains(r.text(), "height: 48") && contains(r.text(), "depth: 24") &&
+            contains(r.text(), "data length: " + std::to_string(cover.size())),
+        "metaflac --list shows the picture as written:\n%s", r.text().c_str());
   const std::string exported = g_tmp + "/exported.jpg";
   r = run(metaflac + " --export-picture-to=" + shell_quote(exported) + " " + file);
   CHECK(r.status == 0 && read_file(exported) == cover, "metaflac exports the picture's bytes");
@@ -1171,16 +1249,16 @@ static void test_oracles() {
   /* FFmpeg: the tags (it joins the values of a repeated name), the
    * cover as an attached picture, and the audio. */
   r = run("ffprobe -v error -show_entries format_tags -of default=nw=1 " + file);
-  CHECK(contains(r.out, "TAG:ARTIST=Ravel") && contains(r.out, "TAG:TITLE=Boléro") &&
-            contains(r.out, "Classical") && contains(r.out, "Orchestral"),
-        "ffprobe lists the tags bAAC wrote:\n%s%s", r.out.c_str(), r.err.c_str());
+  CHECK(contains(r.text(), "TAG:ARTIST=Ravel") && contains(r.text(), "TAG:TITLE=Boléro") &&
+            contains(r.text(), "Classical") && contains(r.text(), "Orchestral"),
+        "ffprobe lists the tags bAAC wrote:\n%s%s", r.text().c_str(), r.err.c_str());
   r =
       run("ffprobe -v error -select_streams v -show_entries "
           "stream=codec_name,width,height:stream_disposition=attached_pic -of default=nw=1 " +
           file);
-  CHECK(contains(r.out, "codec_name=mjpeg") && contains(r.out, "width=64") &&
-            contains(r.out, "height=48") && contains(r.out, "attached_pic=1"),
-        "ffprobe finds the cover as an attached picture:\n%s%s", r.out.c_str(), r.err.c_str());
+  CHECK(contains(r.text(), "codec_name=mjpeg") && contains(r.text(), "width=64") &&
+            contains(r.text(), "height=48") && contains(r.text(), "attached_pic=1"),
+        "ffprobe finds the cover as an attached picture:\n%s%s", r.text().c_str(), r.err.c_str());
   r = run("ffmpeg -v error -nostdin -i " + file + " -map 0:a -f s16le -c:a pcm_s16le - | cmp - " +
           shell_quote(g_tmp + "/in.raw"));
   CHECK(r.status == 0 && r.err.empty(), "FFmpeg decodes the tagged stream to the input: %s",
@@ -1204,10 +1282,10 @@ static void test_oracles() {
   /* metaflac says what flac wrote (it leaves out the tag without a
    * value), and bAAC has to read the same. */
   r = run(metaflac + " --export-tags-to=- " + shell_quote(theirs));
-  const std::vector<std::string> written = lines_of(r.out);
+  const std::vector<std::string> written = lines_of(r.text());
   CHECK(written.size() >= 4 && written[0] == "ARTIST=Ravel" && written[2] == "GENRE=Orchestral" &&
             written[3] == "TITLE=Boléro",
-        "flac wrote the tags it was given:\n%s", r.out.c_str());
+        "flac wrote the tags it was given:\n%s", r.text().c_str());
   CHECK(read.tags.comments == written, "bAAC reads flac's tags in order (%zu of %zu)",
         read.tags.comments.size(), written.size());
   CHECK(contains(read.tags.vendor, "libFLAC 1.4.3"), "bAAC reads flac's vendor: %s",
@@ -1255,6 +1333,7 @@ int main() {
   test_hostile_blocks();
   test_limit();
   test_memory_failure();
+  test_encoder_memory_failure();
   test_dropped_input();
   test_field_count();
   test_id3();

@@ -26,24 +26,9 @@ static std::string g_tmp;  /* a directory for this run */
 
 /* ── running the tool ──────────────────────────────────────────── */
 
-struct Run {
-  int status = -1; /* the exit status; -1 when the command did not exit */
-  std::vector<uint8_t> out;
-  std::string err;
-};
+typedef CommandRun Run;
 
-static Run run(const std::string& cmd) {
-  Run r;
-  const std::string out_path = g_tmp + "/stdout";
-  const std::string err_path = g_tmp + "/stderr";
-  const int status =
-      system((cmd + " > " + shell_quote(out_path) + " 2> " + shell_quote(err_path)).c_str());
-  r.status = WIFEXITED(status) ? WEXITSTATUS(status) : -1;
-  r.out = read_file(out_path);
-  const std::vector<uint8_t> err = read_file(err_path);
-  r.err.assign(err.begin(), err.end());
-  return r;
-}
+static Run run(const std::string& cmd) { return run_command(cmd, g_tmp); }
 
 static std::string path(const char* name) { return g_tmp + "/" + name; }
 static std::string quoted(const char* name) { return shell_quote(path(name)); }
@@ -282,14 +267,8 @@ static void test_raw_and_pipes() {
 /* The metadata blocks of a stream: their types in order. */
 static std::vector<int> block_types(const std::vector<uint8_t>& s) {
   std::vector<int> types;
-  size_t pos = 4;
-  while (pos + 4 <= s.size()) {
-    types.push_back(s[pos] & 0x7F);
-    const bool last = (s[pos] & 0x80) != 0;
-    pos += 4 + ((size_t)s[pos + 1] << 16 | (size_t)s[pos + 2] << 8 | s[pos + 3]);
-    if (last) {
-      break;
-    }
+  for (const FlacBlockShape& b : flac_blocks(s)) {
+    types.push_back(b.type);
   }
   return types;
 }
@@ -601,6 +580,64 @@ static void test_tags_and_pictures() {
   Run r = run(g_tool + " flac enc" + options + " --picture " + quoted("cover.jpg") + " --picture " +
               quoted("icon.png") + " " + quoted("in.wav") + " " + quoted("tagged.flac"));
   CHECK(r.status == 0, "enc with tags and pictures exits %d: %s", r.status, r.err.c_str());
+  {
+    /* The tool writes only the beginning of the final header over the
+     * first one.  The file has to be what the library gives when the
+     * whole final header stands in front of the frames: the seek table
+     * filled, and the tags and both pictures as they were. */
+    std::vector<BaacFlacComment> comments;
+    for (const std::string& tag : tags) {
+      comments.push_back({tag.data(), (uint32_t)tag.size()});
+    }
+    BaacFlacPicture pictures[2] = {};
+    pictures[0].type = 3;
+    pictures[0].mime_type = "image/jpeg";
+    pictures[0].width = 640;
+    pictures[0].height = 480;
+    pictures[0].depth = 24;
+    pictures[0].data = jpeg.data();
+    pictures[0].data_bytes = (uint32_t)jpeg.size();
+    pictures[1].type = 3;
+    pictures[1].mime_type = "image/png";
+    pictures[1].width = 32;
+    pictures[1].height = 16;
+    pictures[1].depth = 24;
+    pictures[1].colors = 13;
+    pictures[1].data = png.data();
+    pictures[1].data_bytes = (uint32_t)png.size();
+    BaacFlacEncoderOptions wanted;
+    baac_flac_encoder_options_init(&wanted);
+    wanted.total_samples_hint = (uint64_t)frames;
+    wanted.seek_table = 1;
+    wanted.comments = comments.data();
+    wanted.comment_count = (int)comments.size();
+    wanted.pictures = pictures;
+    wanted.picture_count = 2;
+    BaacFlacEncoder* enc = baac_flac_encoder_create(44100, 2, 16, BAAC_FLAC_LEVEL_DEFAULT, nullptr);
+    std::vector<uint8_t> expected;
+    bool built = enc && baac_flac_encoder_set_options(enc, &wanted) == AAC_OK;
+    if (built) {
+      const int header = baac_flac_encoder_header_bytes(enc);
+      expected.resize((size_t)header);
+      std::vector<uint8_t> coded((size_t)baac_flac_encoder_max_output_bytes(enc, frames));
+      built = baac_flac_encoder_write_header(enc, expected.data(), header) == header;
+      int n =
+          built ? baac_flac_encoder_encode(enc, pcm.data(), frames, coded.data(), (int)coded.size())
+                : -1;
+      built = n >= 0;
+      expected.insert(expected.end(), coded.begin(), coded.begin() + std::max(n, 0));
+      n = built ? baac_flac_encoder_finish(enc, coded.data(), (int)coded.size()) : -1;
+      built = n >= 0;
+      expected.insert(expected.end(), coded.begin(), coded.begin() + std::max(n, 0));
+      built = built && baac_flac_encoder_final_header(enc, expected.data(), header) == header;
+    }
+    baac_flac_encoder_destroy(enc);
+    const std::vector<uint8_t> written = read_file(path("tagged.flac"));
+    CHECK(built && written == expected,
+          "the file with a seek table, tags and pictures is the library's stream with its "
+          "final header, byte for byte (%zu and %zu bytes)",
+          written.size(), expected.size());
+  }
   r = run(g_tool + " flac info " + quoted("tagged.flac"));
   std::string text = text_of(r.out);
   CHECK(r.status == 0 && info_tags(text) == tags, "info lists the tags in order:\n%s",

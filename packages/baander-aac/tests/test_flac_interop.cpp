@@ -26,22 +26,9 @@ static int g_checked = 0;       /* streams the oracles looked at */
 
 /* ── running the oracles ───────────────────────────────────────── */
 
-struct Run {
-  int status = -1;
-  std::vector<uint8_t> out; /* standard output */
-  std::string err;          /* standard error */
-};
+typedef CommandRun Run;
 
-static Run run(const std::string& cmd) {
-  Run r;
-  const std::string out_path = g_tmp + "/stdout";
-  const std::string err_path = g_tmp + "/stderr";
-  r.status = system((cmd + " > " + shell_quote(out_path) + " 2> " + shell_quote(err_path)).c_str());
-  r.out = read_file(out_path);
-  const std::vector<uint8_t> err = read_file(err_path);
-  r.err.assign(err.begin(), err.end());
-  return r;
-}
+static Run run(const std::string& cmd) { return run_command(cmd, g_tmp); }
 
 /* The samples as raw little-endian PCM of `width` bytes, each shifted
  * left by `shift` bits. */

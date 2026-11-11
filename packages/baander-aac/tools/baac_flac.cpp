@@ -33,7 +33,6 @@
 #include "baac_flac.h"
 
 #include <algorithm>
-#include <chrono>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -42,6 +41,7 @@
 #include <string>
 #include <vector>
 
+#include "baac_common.h"
 #include "flac.h"
 
 namespace {
@@ -134,10 +134,6 @@ bool skip_bytes(File* in, uint64_t count) {
   return true;
 }
 
-uint32_t le16(const uint8_t* p) { return (uint32_t)p[0] | (uint32_t)p[1] << 8; }
-uint32_t le32(const uint8_t* p) {
-  return (uint32_t)p[0] | (uint32_t)p[1] << 8 | (uint32_t)p[2] << 16 | (uint32_t)p[3] << 24;
-}
 void put_le16(uint8_t* p, uint32_t v) {
   p[0] = (uint8_t)v;
   p[1] = (uint8_t)(v >> 8);
@@ -495,11 +491,32 @@ bool read_picture(const char* path, PictureFile* pic) {
   if (!open_file(&in, path, false)) {
     return false;
   }
-  /* In steps that grow with the file, up to one byte past what a block
-   * holds: a small cover takes a small buffer. */
+  const auto too_large = [path]() {
+    fprintf(stderr,
+            "baac: %s is larger than a FLAC picture block holds (%d bytes with its media type)\n",
+            path, BAAC_FLAC_MAX_PICTURE_BYTES);
+    return false;
+  };
+  /* A file says how long it is, and gets a buffer of that length and
+   * one byte, read at once: the byte shows a file that has grown since,
+   * which is then read on like input of unknown length.  That is read
+   * in steps that grow with it, up to one byte past what a block holds,
+   * so that a small cover takes a small buffer. */
   const size_t limit = (size_t)BAAC_FLAC_MAX_PICTURE_BYTES + 1;
+  size_t step = 65536;
+  if (in.owned && fseek(in.f, 0, SEEK_END) == 0) {
+    const long length = ftell(in.f);
+    if (length < 0 || fseek(in.f, 0, SEEK_SET) != 0) {
+      fprintf(stderr, "baac: cannot open %s\n", path);
+      return false;
+    }
+    if ((unsigned long)length > (unsigned long)BAAC_FLAC_MAX_PICTURE_BYTES) {
+      return too_large();
+    }
+    step = (size_t)length + 1;
+  }
   size_t got = 0;
-  for (size_t step = 65536; got < limit; step *= 2) {
+  for (; got < limit; step *= 2) {
     const size_t want = std::min(step, limit - got);
     pic->data.resize(got + want);
     const size_t n = read_fully(&in, pic->data.data() + got, want);
@@ -509,13 +526,12 @@ bool read_picture(const char* path, PictureFile* pic) {
     }
   }
   if (got > BAAC_FLAC_MAX_PICTURE_BYTES) {
-    fprintf(stderr,
-            "baac: %s is larger than a FLAC picture block holds (%d bytes with its media type)\n",
-            path, BAAC_FLAC_MAX_PICTURE_BYTES);
-    return false;
+    return too_large();
   }
   pic->data.resize(got);
-  pic->data.shrink_to_fit();
+  if (pic->data.capacity() > got + 1) {
+    pic->data.shrink_to_fit();
+  }
   if (!png_figures(pic) && !jpeg_figures(pic)) {
     fprintf(stderr, "baac: %s is neither a JPEG nor a PNG file\n", path);
     return false;
@@ -603,6 +619,27 @@ struct EncodeArgs {
 /* Whether a rewrite of the first bytes will reach the file: a named
  * output that can seek. */
 bool can_rewrite(const File& out) { return out.owned && fseek(out.f, 0, SEEK_CUR) == 0; }
+
+/* The length of the part of a stream's header that its final form can
+ * change: the marker, STREAMINFO (block type 0) and the seek table
+ * (type 3), which lead the metadata.  The tags, the pictures and the
+ * padding behind them are the same bytes in both forms, and a cover is
+ * not written twice for the sake of a few numbers. */
+size_t header_prefix(const std::vector<uint8_t>& header) {
+  size_t pos = 4;
+  while (pos + 4 <= header.size()) {
+    const int type = header[pos] & 0x7F;
+    if (type != 0 && type != 3) {
+      break;
+    }
+    const bool last = (header[pos] & 0x80) != 0;
+    pos += 4 + ((size_t)header[pos + 1] << 16 | (size_t)header[pos + 2] << 8 | header[pos + 3]);
+    if (last) {
+      break;
+    }
+  }
+  return std::min(pos, header.size());
+}
 
 int encode_stream(const EncodeArgs& args, File* in, File* out, bool* created) {
   PcmLayout layout;
@@ -740,10 +777,12 @@ int encode_stream(const EncodeArgs& args, File* in, File* out, bool* created) {
   }
   if (rewrite) {
     /* The header again, now with the total, the MD5 and the seek
-     * points; it has the length of the first one. */
+     * points; it has the length of the first one, and only its
+     * beginning differs from it. */
     n = baac_flac_encoder_final_header(enc, header.data(), (int)header.size());
+    const size_t changed = n == (int)header.size() ? header_prefix(header) : 0;
     if (n != (int)header.size() || fflush(out->f) != 0 || fseek(out->f, 0, SEEK_SET) != 0 ||
-        fwrite(header.data(), 1, header.size(), out->f) != header.size()) {
+        fwrite(header.data(), 1, changed, out->f) != changed) {
       fprintf(stderr, "baac: cannot rewrite the header of %s\n", out->name.c_str());
       return 1;
     }
@@ -1224,11 +1263,6 @@ int info(int argc, char** argv) {
     }
   }
   return status;
-}
-
-double now_seconds() {
-  using clock = std::chrono::steady_clock;
-  return std::chrono::duration<double>(clock::now().time_since_epoch()).count();
 }
 
 }  // namespace

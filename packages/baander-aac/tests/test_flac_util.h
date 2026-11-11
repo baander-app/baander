@@ -714,6 +714,38 @@ struct FlacFrameShape {
   std::vector<FlacSubframeShape> subframes;
 };
 
+/* One metadata block of a stream, as its 4-byte header states it. */
+struct FlacBlockShape {
+  int type = 0;
+  bool last = false;
+  size_t length = 0; /* of the content behind the header */
+  size_t offset = 0; /* of the header in the stream */
+};
+
+/* The metadata blocks of a stream that begins with the marker, in
+ * order, up to and including the one flagged as the last; it stops
+ * earlier where the first `limit` bytes of the stream hold no further
+ * header. */
+static std::vector<FlacBlockShape> flac_blocks(const std::vector<uint8_t>& s,
+                                               size_t limit = SIZE_MAX) {
+  std::vector<FlacBlockShape> blocks;
+  const size_t end = std::min(limit, s.size());
+  size_t pos = 4;
+  while (pos + 4 <= end) {
+    FlacBlockShape b;
+    b.type = s[pos] & 0x7F;
+    b.last = (s[pos] & 0x80) != 0;
+    b.length = ((size_t)s[pos + 1] << 16) | ((size_t)s[pos + 2] << 8) | s[pos + 3];
+    b.offset = pos;
+    blocks.push_back(b);
+    if (b.last) {
+      break;
+    }
+    pos += 4 + b.length;
+  }
+  return blocks;
+}
+
 /* Walks a stream that begins with the marker and that carries the bit
  * depth in every frame header.  Stops at the first thing it cannot
  * read; `complete`, when given, says whether it reached the end. */
@@ -723,14 +755,11 @@ static std::vector<FlacFrameShape> flac_inspect(const std::vector<uint8_t>& s,
   if (complete) {
     *complete = false;
   }
-  size_t pos = 4;
-  for (bool last = false; !last;) {
-    if (pos + 4 > s.size()) {
-      return frames;
-    }
-    last = (s[pos] & 0x80) != 0;
-    pos += 4 + (((size_t)s[pos + 1] << 16) | ((size_t)s[pos + 2] << 8) | s[pos + 3]);
+  const std::vector<FlacBlockShape> blocks = flac_blocks(s);
+  if (blocks.empty() || !blocks.back().last) {
+    return frames;
   }
+  size_t pos = blocks.back().offset + 4 + blocks.back().length;
   while (pos < s.size()) {
     FlacFrameShape f;
     f.offset = pos;
