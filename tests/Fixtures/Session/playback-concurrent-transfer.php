@@ -12,10 +12,13 @@ use App\Shared\Infrastructure\Doctrine\DedicatedConnectionFactory;
 use App\Shared\Infrastructure\Doctrine\DoctrineTransaction;
 use App\Shared\Infrastructure\Doctrine\Type\CustomTypesRegistrar;
 use Doctrine\DBAL\Connection;
+use Doctrine\ORM\Decorator\EntityManagerDecorator;
 use Doctrine\ORM\EntityManager;
+use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Mapping\UnderscoreNamingStrategy;
 use Doctrine\ORM\ORMSetup;
 use Doctrine\Persistence\AbstractManagerRegistry;
+use Doctrine\Persistence\ObjectManager;
 use SwooleBundle\SwooleBundle\Bridge\Swoole\Swoole;
 
 require_once dirname(__DIR__, 3) . '/vendor/autoload.php';
@@ -66,7 +69,26 @@ final class PlaybackPersistenceFixture
                 $this->manager = PlaybackPersistenceFixture::manager($this->manager->getConnection());
             }
         };
-        return new PlaybackCoordinator(new PlaybackStore($manager), new DoctrineTransaction($registry, new Swoole()), self::mediaAccess($manager));
+        // In the application the store holds a pooled proxy that always resolves the current
+        // entity manager. The fixture's store resolves the registry's manager on every call for the
+        // same reason: a failed flush closes a manager, the transaction port resets the registry, and
+        // a store holding the closed manager could serve nothing afterwards.
+        $current = new class ($registry) extends EntityManagerDecorator {
+            /** @var EntityManagerInterface */
+            protected ObjectManager $wrapped {
+                get {
+                    $manager = $this->registry->getManager();
+                    if (!$manager instanceof EntityManagerInterface) {
+                        throw new \LogicException('The fixture registry holds no entity manager.');
+                    }
+                    $this->wrapped = $manager;
+                    return $this->wrapped;
+                }
+            }
+
+            public function __construct(private readonly AbstractManagerRegistry $registry) {}
+        };
+        return new PlaybackCoordinator(new PlaybackStore($current), new DoctrineTransaction($registry, new Swoole()), self::mediaAccess($manager));
     }
     private static function mediaAccess(EntityManager $manager): \App\Media\Application\Port\PlaybackMediaAccessInterface
     {

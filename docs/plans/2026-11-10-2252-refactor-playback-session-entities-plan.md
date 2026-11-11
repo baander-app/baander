@@ -68,8 +68,8 @@ The store's statements were written this way for a reason that still holds for s
 
 **Cost**
 
-- R8. A relayed snapshot, the snapshot `PlaybackCommandRelay` builds once per second for each bound socket, executes no more statements than before in each measured scenario, its median time is at most 1.15 times the baseline measured on the same host, and its time does not grow with the number of sockets one entity manager serves in a relay tick.
-- R12. A control that issues one command to a runner executes no more statements than the count U5 records for it, and its median time is at most 1.5 times the baseline measured on the same host.
+- R8. A relayed snapshot, the snapshot `PlaybackCommandRelay` builds once per second for each bound socket, executes no more statements than before in each measured scenario, its median time is at most 1.15 times the baseline measured on the same host, and its time does not grow with the number of sockets one entity manager serves in a relay tick. The baseline, measured on 2026-11-11 against the SQL store (PostgreSQL 18.4, 2,000 iterations after 200 warm-up, two runs): 9 statements for an unbound socket with a playing runner and 12 for a bound socket with a resting paused runner, with or without a first disclosure. A snapshot's time is dominated by its commit: with commits waiting for the flush the medians are 16.9 to 17.8 ms whatever the store does, so the time bound is judged on a second pass with `synchronous_commit` off for the session, where the medians are 2.4 ms (unbound) and 4.0 ms (bound) and two runs differ by under 5 %. Both passes are recorded.
+- R12. A control that issues one command to a runner executes no more statements than the count U5 records for it, and its median time is at most 1.5 times the baseline measured on the same host. The baseline is 19 statements and a median of 6.8 to 6.9 ms on the pass with `synchronous_commit` off (17.7 ms with commits waiting for the flush); the bound is judged on that pass, as for R8.
 
 **Proof**
 
