@@ -103,66 +103,39 @@ int read_fixed_width(FlacBitReader* r, T* FLAC_RESTRICT out, int count, int widt
  * read: all of them, or fewer when the input ends inside one, which then
  * starts at `*stop_bit`; -1 for a value outside 32 bits.
  *
- * The reader's cache, bit count and position live in locals inside the
- * loop and are written back before the slow path, which goes through
- * the reader, and at every return. */
-int read_rice(FlacBitReader* r, int32_t* FLAC_RESTRICT out, int count, int k, size_t* stop_bit) {
+ * The kernel reads every code word that lies whole in the reader's
+ * cache; the rare one that does not, a very long one or one at the end
+ * of the input, goes through the reader. */
+int read_rice(const FlacDSP* dsp, FlacBitReader* r, int32_t* out, int count, int k,
+              size_t* stop_bit) {
   const uint32_t max_quotient = 0xFFFFFFFFu >> k;
-  const uint8_t* const end = r->end;
-  uint64_t cache = r->cache;
-  int bits = r->bits;
-  const uint8_t* next = r->next;
-  int result = count;
-  for (int i = 0; i < count; i++) {
-    uint32_t quotient;
-    uint32_t rest;
-    int zeros = cache ? flac_clz64(cache) : 64;
-    int used = zeros + 1 + k;
-    if (used > bits) {
-      /* The cache may only have run low: top it up and look again. */
-      flac_refill(cache, bits, next, end);
-      zeros = cache ? flac_clz64(cache) : 64;
-      used = zeros + 1 + k;
+  for (int i = 0;;) {
+    i += dsp->rice_decode(r, out + i, count - i, k);
+    if (i == count) {
+      return count;
     }
-    if (used <= bits) {
-      /* The whole code word lies in the cache. */
-      quotient = (uint32_t)zeros;
-      rest = k ? (uint32_t)((cache << (zeros + 1)) >> (64 - k)) : 0;
-      cache <<= used;
-      bits -= used;
-    } else {
-      r->cache = cache;
-      r->bits = bits;
-      r->next = next;
-      const size_t start = flac_bitreader_position(r);
-      quotient = flac_bitreader_read_unary(r);
-      rest = flac_bitreader_read(r, k);
-      if (r->overread) {
-        *stop_bit = start;
-        return i;
-      }
-      cache = r->cache;
-      bits = r->bits;
-      next = r->next;
+    /* A code word the kernel left: bit by bit through the reader. */
+    const size_t start = flac_bitreader_position(r);
+    const uint32_t quotient = flac_bitreader_read_unary(r);
+    const uint32_t rest = flac_bitreader_read(r, k);
+    if (r->overread) {
+      *stop_bit = start;
+      return i;
     }
     if (quotient > max_quotient) {
-      result = -1;
-      break;
+      return -1;
     }
     const uint32_t folded = (quotient << k) | rest;
-    out[i] = (int32_t)((folded >> 1) ^ (0u - (folded & 1)));
+    out[i++] = (int32_t)((folded >> 1) ^ (0u - (folded & 1)));
   }
-  r->cache = cache;
-  r->bits = bits;
-  r->next = next;
-  return result;
 }
 
 /* The coded residual of a subframe (RFC 9639 section 9.2.7) into
  * out[order .. block_size).  Returns false for a syntax error, and for
  * input that ends early, which the reader's overread flag tells apart;
  * `pg` then says where to go on. */
-bool read_residual(FlacBitReader* r, int32_t* out, int block_size, int order, Progress* pg) {
+bool read_residual(const FlacDSP* dsp, FlacBitReader* r, int32_t* out, int block_size, int order,
+                   Progress* pg) {
   const uint32_t method = flac_bitreader_read(r, 2);
   if (method > 1) {
     return false;
@@ -201,7 +174,7 @@ bool read_residual(FlacBitReader* r, int32_t* out, int block_size, int order, Pr
     }
     if (pg->parameter != escape) {
       size_t stop_bit = 0;
-      const int got = read_rice(r, p + done, count - done, (int)pg->parameter, &stop_bit);
+      const int got = read_rice(dsp, r, p + done, count - done, (int)pg->parameter, &stop_bit);
       if (got < 0) {
         return false;
       }
@@ -232,6 +205,7 @@ bool read_residual(FlacBitReader* r, int32_t* out, int block_size, int order, Pr
  * through one pointer only, and the coefficients and a separate residual
  * are other objects than the row. */
 void restore_fixed32(int32_t* FLAC_RESTRICT s, int n, int order) {
+  FLAC_PROFILE(FLAC_PROF_RESTORE);
   switch (order) {
     case 1:
       for (int i = 1; i < n; i++) {
@@ -260,33 +234,10 @@ void restore_fixed32(int32_t* FLAC_RESTRICT s, int n, int order) {
   }
 }
 
-void restore_lpc32(int32_t* FLAC_RESTRICT s, int n, int order, const int32_t* FLAC_RESTRICT coefs,
-                   int shift) {
-  for (int i = order; i < n; i++) {
-    uint32_t sum = 0;
-    for (int j = 0; j < order; j++) {
-      sum += (uint32_t)coefs[j] * (uint32_t)s[i - 1 - j];
-    }
-    s[i] = (int32_t)((uint32_t)s[i] + (uint32_t)((int32_t)sum >> shift));
-  }
-}
-
-/* The same with a 64-bit sum: 15 coefficient bits, 32 sample bits and 5
- * bits of summation cannot overflow it. */
-void restore_lpc32_wide_sum(int32_t* FLAC_RESTRICT s, int n, int order,
-                            const int32_t* FLAC_RESTRICT coefs, int shift) {
-  for (int i = order; i < n; i++) {
-    int64_t sum = 0;
-    for (int j = 0; j < order; j++) {
-      sum += (int64_t)coefs[j] * (int64_t)s[i - 1 - j];
-    }
-    s[i] = (int32_t)((uint32_t)s[i] + (uint32_t)(uint64_t)(sum >> shift));
-  }
-}
-
 /* 33-bit samples: the residual comes from `res`, the samples go to `s`,
  * whose first `order` entries are the warm-up samples. */
 void restore_fixed64(int64_t* FLAC_RESTRICT s, const int32_t* FLAC_RESTRICT res, int n, int order) {
+  FLAC_PROFILE(FLAC_PROF_RESTORE);
   static const int kWeights[5][4] = {
       {0, 0, 0, 0}, {1, 0, 0, 0}, {2, -1, 0, 0}, {3, -3, 1, 0}, {4, -6, 4, -1}};
   for (int i = order; i < n; i++) {
@@ -300,6 +251,7 @@ void restore_fixed64(int64_t* FLAC_RESTRICT s, const int32_t* FLAC_RESTRICT res,
 
 void restore_lpc64(int64_t* FLAC_RESTRICT s, const int32_t* FLAC_RESTRICT res, int n, int order,
                    const int32_t* FLAC_RESTRICT coefs, int shift) {
+  FLAC_PROFILE(FLAC_PROF_RESTORE);
   for (int i = order; i < n; i++) {
     uint64_t sum = 0;
     for (int j = 0; j < order; j++) {
@@ -322,8 +274,9 @@ void restore_lpc64(int64_t* FLAC_RESTRICT s, const int32_t* FLAC_RESTRICT res, i
  * zeros read past the end can look like a syntax error; `pg` then holds
  * the point to resume at, and the next call, on the same subframe with
  * more input, reads its header again and continues there. */
-bool decode_subframe(FlacBitReader* r, int bps, int block_size, int32_t* out, int64_t* wide,
-                     bool restore, Progress* pg) {
+bool decode_subframe(const FlacDSP* dsp, FlacBitReader* r, int bps, int block_size, int32_t* out,
+                     int64_t* wide, bool restore, Progress* pg) {
+  FLAC_PROFILE(FLAC_PROF_READ);
   if (flac_bitreader_read(r, 1)) {
     return false;
   }
@@ -391,7 +344,7 @@ bool decode_subframe(FlacBitReader* r, int bps, int block_size, int32_t* out, in
         coefs[i] = (int32_t)flac_bitreader_read_signed(r, precision);
       }
     }
-    if (!read_residual(r, out, block_size, order, pg)) {
+    if (!read_residual(dsp, r, out, block_size, order, pg)) {
       return false;
     }
     /* The bits the coefficients really take, sign included: never more
@@ -420,9 +373,11 @@ bool decode_subframe(FlacBitReader* r, int bps, int block_size, int32_t* out, in
       if (!lpc) {
         restore_fixed32(out, block_size, order);
       } else if (bps + coef_bits + ceil_log2(order) <= 32) {
-        restore_lpc32(out, block_size, order, coefs, shift);
+        FLAC_PROFILE(FLAC_PROF_RESTORE);
+        dsp->lpc_restore_32(out, block_size, order, coefs, shift);
       } else {
-        restore_lpc32_wide_sum(out, block_size, order, coefs, shift);
+        FLAC_PROFILE(FLAC_PROF_RESTORE);
+        dsp->lpc_restore_wide(out, block_size, order, coefs, shift);
       }
     }
   } else {
@@ -458,6 +413,7 @@ struct BaacFlacDecoder_ {
     kFinished,
   };
   Stage stage = kStart;
+  const FlacDSP* dsp = flac_dsp_global();
 
   /* Input.  `fifo` never grows beyond `fifo_limit`, which is reserved
    * up front, so appending does not allocate. */
@@ -752,7 +708,7 @@ FrameResult decode_frame(Decoder* d, const uint8_t* p, size_t avail, const FlacF
     int64_t* wide = bps > 32 ? d->wide.data() : nullptr;
     pg.channel = ch;
     pg.subframe_bit = flac_bitreader_position(&r);
-    const bool ok = decode_subframe(&r, bps, h.block_size, out, wide, restore, &pg);
+    const bool ok = decode_subframe(d->dsp, &r, bps, h.block_size, out, wide, restore, &pg);
     if (r.overread) {
       return kFrameNeedMore;
     }
@@ -780,6 +736,7 @@ FrameResult decode_frame(Decoder* d, const uint8_t* p, size_t avail, const FlacF
 /* Turns the channel rows of a decoded frame back into left and right
  * (RFC 9639 section 4.2). */
 void undo_stereo(Decoder* d, const FlacFrameHeader& h, int bits) {
+  FLAC_PROFILE(FLAC_PROF_OUTPUT);
   const int n = h.block_size;
   /* Two rows of the sample buffer and the 64-bit row: three stretches of
    * memory that do not overlap. */
@@ -833,6 +790,7 @@ void undo_stereo(Decoder* d, const FlacFrameHeader& h, int bits) {
 /* The rows are the decoder's own and `pcm` is the caller's: they do not
  * overlap. */
 void interleave(const Decoder* d, int channels, int n, int32_t* FLAC_RESTRICT pcm) {
+  FLAC_PROFILE(FLAC_PROF_OUTPUT);
   const int32_t* rows = d->work.data();
   const size_t stride = (size_t)d->block_capacity;
   if (channels == 1) {
@@ -1063,10 +1021,18 @@ int flac_decoder_decode_next(BaacFlacDecoder* d, int32_t* pcm, int pcm_size) {
       return AAC_ERR_OVERFLOW;
     }
 
-    if (h.assignment != FLAC_ASSIGN_INDEPENDENT) {
-      undo_stereo(d, h, bits);
+    if (h.channels == 2 && (bits <= 30 || h.assignment == FLAC_ASSIGN_INDEPENDENT)) {
+      /* The common case in one pass: the assignment undone while the
+       * two rows are interleaved. */
+      FLAC_PROFILE(FLAC_PROF_OUTPUT);
+      d->dsp->stereo_out[h.assignment](d->work.data(), d->work.data() + d->block_capacity,
+                                       h.block_size, pcm);
+    } else {
+      if (h.assignment != FLAC_ASSIGN_INDEPENDENT) {
+        undo_stereo(d, h, bits);
+      }
+      interleave(d, h.channels, h.block_size, pcm);
     }
-    interleave(d, h.channels, h.block_size, pcm);
 
     /* The position: a sample number as coded, a frame number times the
      * stream's block size.  A stream that numbers frames of varying

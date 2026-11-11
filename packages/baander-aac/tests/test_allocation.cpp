@@ -7,7 +7,10 @@
  * steady-state phase so that its growth, which is allowed, does not
  * count.  The FLAC decoder of the lossless mode is held to the same
  * rule, with its input fed in pieces throughout: its FIFO is sized once
- * from the stream's STREAMINFO, so feeding may not allocate either. */
+ * from the stream's STREAMINFO, so feeding may not allocate either.  So
+ * is the FLAC encoder at its highest level, where every search runs: its
+ * rows, its analysis windows and its seek points exist before the first
+ * block. */
 #include <cstdlib>
 #include <new>
 
@@ -181,8 +184,9 @@ static void test_profile(const Profile& p) {
     for (int f = 0; f < total_frames; f++) {
       const size_t end = f + 1 < total_frames ? frame_offsets[f + 1] : stream.size();
       g_allocations = 0;
-      const int got = aac_decoder_decode(dec, stream.data() + frame_offsets[f],
-                                         (int)(end - frame_offsets[f]), out.data(), (int)out.size());
+      const int got =
+          aac_decoder_decode(dec, stream.data() + frame_offsets[f], (int)(end - frame_offsets[f]),
+                             out.data(), (int)out.size());
       CHECK(got > 0, "%s: one-shot decode frame %d: %d", p.name, f, got);
       if (f >= kSettleFrames) {
         steady_allocations += g_allocations;
@@ -282,6 +286,76 @@ static void test_flac_decoder(const char* name, int channels, int bits) {
   baac_flac_decoder_destroy(dec);
 }
 
+/* The FLAC encoder at level 8 with a seek table, its input given in
+ * pieces that do not line up with its blocks.  At 32 bits a side channel
+ * takes the encoder's 64-bit rows. */
+static void test_flac_encoder(const char* name, int channels, int bits) {
+  const int rate = 48000;
+  const int block = 4096;
+  const int piece = 1000;
+  const int total_frames = kSettleFrames + kSteadyFrames;
+  const int total = block * total_frames + 123;
+  const std::vector<int32_t> pcm = flac_gen_tones(total, channels, bits, 0.4, 5u);
+
+  BaacFlacEncoder* enc = baac_flac_encoder_create(rate, channels, bits, 8, nullptr);
+  CHECK(enc != nullptr, "%s: encoder", name);
+  if (!enc) {
+    return;
+  }
+  BaacFlacEncoderOptions options;
+  baac_flac_encoder_options_init(&options);
+  options.seek_table = 1;
+  options.total_samples_hint = (uint64_t)total;
+  CHECK(baac_flac_encoder_set_options(enc, &options) == AAC_OK, "%s: options", name);
+  std::vector<uint8_t> header((size_t)baac_flac_encoder_header_bytes(enc));
+  /* The bound counts what the encoder holds already, which is less than
+   * a block. */
+  std::vector<uint8_t> out((size_t)baac_flac_encoder_max_output_bytes(enc, piece + block));
+  std::vector<uint8_t> stream;
+  stream.reserve(header.size() + (size_t)total * (size_t)channels * 4 + 65536);
+  CHECK(
+      baac_flac_encoder_write_header(enc, header.data(), (int)header.size()) == (int)header.size(),
+      "%s: header", name);
+  stream.insert(stream.end(), header.begin(), header.end());
+
+  long steady_allocations = 0;
+  int steady_calls = 0;
+  for (int pos = 0; pos < total; pos += piece) {
+    const int count = std::min(piece, total - pos);
+    g_allocations = 0;
+    const int got = baac_flac_encoder_encode(enc, pcm.data() + (size_t)pos * (size_t)channels,
+                                             count, out.data(), (int)out.size());
+    if (pos >= kSettleFrames * block) {
+      steady_allocations += g_allocations;
+      steady_calls++;
+    }
+    CHECK(got >= 0, "%s: encode at %d: %d", name, pos, got);
+    if (got < 0) {
+      break;
+    }
+    stream.insert(stream.end(), out.begin(), out.begin() + got);
+  }
+  g_allocations = 0;
+  const int last = baac_flac_encoder_finish(enc, out.data(), (int)out.size());
+  const int final_header = baac_flac_encoder_final_header(enc, header.data(), (int)header.size());
+  steady_allocations += g_allocations;
+  CHECK(last >= 0 && final_header == (int)header.size(), "%s: finish %d, final header %d", name,
+        last, final_header);
+  if (last > 0) {
+    stream.insert(stream.end(), out.begin(), out.begin() + last);
+  }
+  std::copy(header.begin(), header.end(), stream.begin());
+  baac_flac_encoder_destroy(enc);
+  printf("%-16s encode: %ld allocations over %d steady calls\n", name, steady_allocations,
+         steady_calls);
+  CHECK(steady_allocations == 0, "%s: the encoder allocates in steady state (%ld)", name,
+        steady_allocations);
+
+  const FlacDecoded d = flac_decode(stream, 8192);
+  CHECK(d.errors.empty() && d.finish == AAC_OK && d.verdict == BAAC_FLAC_MD5_MATCH && d.pcm == pcm,
+        "%s: the stream decodes to the input with its MD5 verified", name);
+}
+
 int main() {
   for (const Profile& p : kProfiles) {
     test_profile(p);
@@ -289,6 +363,9 @@ int main() {
   test_flac_decoder("FLAC 16 stereo", 2, 16);
   test_flac_decoder("FLAC 24 5.1", 6, 24);
   test_flac_decoder("FLAC 32 stereo", 2, 32);
+  test_flac_encoder("FLAC 16 stereo", 2, 16);
+  test_flac_encoder("FLAC 24 5.1", 6, 24);
+  test_flac_encoder("FLAC 32 stereo", 2, 32);
   /* The counting operators are in use at all: creating a decoder
    * allocates.  The probe goes through the library because a compiler
    * may assume that an operator new called in this file leaves the

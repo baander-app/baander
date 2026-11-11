@@ -47,6 +47,7 @@ set(TEST_SOURCES
     test_flac_conformance.cpp
     test_flac_encoder.cpp
     test_flac_interop.cpp
+    test_flac_dsp.cpp
 )
 
 foreach(test_src ${TEST_SOURCES})
@@ -90,7 +91,7 @@ target_include_directories(test_mps PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
 # header routines against known answers, and write the FLAC streams they
 # decode by hand with the internal bit writer.
 foreach(test_name test_flac_format test_flac_decoder test_flac_conformance test_flac_encoder
-        test_flac_interop test_allocation)
+        test_flac_interop test_flac_dsp test_allocation)
     target_include_directories(${test_name} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
 endforeach()
 
@@ -98,13 +99,16 @@ endforeach()
 # same suites run again with the table capped at the scalar and the SSE2
 # kernels (BAAC_AAC_CPU), so that every level this machine can run is
 # exercised end to end, not only in the kernel comparison of test_dsp.
+# The lossless mode has a kernel table of its own under the same cap, and
+# its suites run again the same way.
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64|i686|i386")
     set(BAAC_DISPATCH_LEVELS scalar sse2)
 else()
     set(BAAC_DISPATCH_LEVELS scalar)
 endif()
 foreach(level ${BAAC_DISPATCH_LEVELS})
-    foreach(test_name test_mdct test_qmf test_roundtrip)
+    foreach(test_name test_mdct test_qmf test_roundtrip test_flac_decoder test_flac_conformance
+            test_flac_encoder test_flac_interop)
         add_test(NAME ${test_name}_${level} COMMAND ${test_name})
         set_tests_properties(${test_name}_${level} PROPERTIES ENVIRONMENT "BAAC_AAC_CPU=${level}")
     endforeach()

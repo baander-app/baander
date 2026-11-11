@@ -79,7 +79,8 @@
         "src/flac_dec.cpp",
         "src/flac_api.cpp",
         "src/flac_enc.cpp",
-        "src/flac_lpc.cpp"
+        "src/flac_lpc.cpp",
+        "src/flac_dsp.cpp"
       ],
       "include_dirs": [
         "<!@(node -p \"require('node-addon-api').include\")",
@@ -108,12 +109,12 @@
       "conditions": [
         ["OS=='win'", {"defines": ["_USE_MATH_DEFINES", "NOMINMAX"]}],
         ["target_arch=='x64' or target_arch=='ia32'", {
-          "sources": ["src/simd/sse2.cpp"],
+          "sources": ["src/simd/sse2.cpp", "src/simd/flac_sse2.cpp"],
           "defines": ["BAAC_AAC_SSE2"],
           "cflags_cc": ["-msse2"]
         }],
         ["target_arch=='arm64'", {
-          "sources": ["src/simd/neon.cpp"],
+          "sources": ["src/simd/neon.cpp", "src/simd/flac_neon.cpp"],
           "defines": ["BAAC_AAC_NEON"]
         }]
       ]

@@ -26,6 +26,51 @@
  * pointers.  Used only where the buffers cannot overlap. */
 #define FLAC_RESTRICT __restrict
 
+/* ── stage timers ───────────────────────────────────────────────── */
+
+/* With BAAC_FLAC_PROFILE defined at compile time the codec accounts the
+ * time it spends per stage, each stage without the stages it calls, and
+ * flac_profile_report prints the table.  A development aid for finding
+ * where an encode or a decode spends its time: the timers are process-
+ * wide, not for more than one thread, and absent from a normal build,
+ * where FLAC_PROFILE expands to nothing. */
+#if defined(BAAC_FLAC_PROFILE)
+#include <cstdio>
+enum FlacProfileStage {
+  FLAC_PROF_OTHER, /* whatever no other stage claims */
+  FLAC_PROF_INPUT, /* range check and de-interleaving of the input */
+  FLAC_PROF_MD5,
+  FLAC_PROF_SCAN,   /* wasted bits and constant detection */
+  FLAC_PROF_STEREO, /* mid and side channels, and the adaptive estimate */
+  FLAC_PROF_FIXED,  /* fixed predictors: magnitudes and residual */
+  FLAC_PROF_WINDOW, /* conversion to floating point and windowing */
+  FLAC_PROF_AUTOCORRELATION,
+  FLAC_PROF_LEVINSON,
+  FLAC_PROF_QUANTISE, /* quantisation, error estimate and ranking */
+  FLAC_PROF_RESIDUAL, /* residual of a linear predictor */
+  FLAC_PROF_RICE,     /* Rice parameter and partition search */
+  FLAC_PROF_WRITE,    /* bit writing */
+  FLAC_PROF_CRC,
+  FLAC_PROF_READ,    /* decoder: subframe headers and residual */
+  FLAC_PROF_RESTORE, /* decoder: prediction */
+  FLAC_PROF_OUTPUT,  /* decoder: stereo and interleaving */
+  FLAC_PROF_COUNT
+};
+void flac_profile_enter(int stage);
+void flac_profile_leave();
+void flac_profile_reset();
+void flac_profile_report(FILE* out);
+struct FlacProfileScope {
+  explicit FlacProfileScope(int stage) { flac_profile_enter(stage); }
+  ~FlacProfileScope() { flac_profile_leave(); }
+};
+#define FLAC_PROFILE_NAME2(line) flac_profile_scope_##line
+#define FLAC_PROFILE_NAME(line) FLAC_PROFILE_NAME2(line)
+#define FLAC_PROFILE(stage) FlacProfileScope FLAC_PROFILE_NAME(__LINE__)(stage)
+#else
+#define FLAC_PROFILE(stage)
+#endif
+
 /* ── format constants ───────────────────────────────────────────── */
 
 #define FLAC_MARKER_BYTES 4       /* "fLaC" */
@@ -191,9 +236,13 @@ int flac_lpc_window_parts(int windows);
  * without one third.  `taper_fraction` of the smallest part rises and
  * falls. */
 void flac_lpc_window(double* w, int n, int windows, int index, double taper_fraction);
-void flac_lpc_apply_window(const double* x, const double* w, int n, double* y);
-/* r[lag] = sum of y[i] * y[i - lag], for lag 0 to max_lag. */
-void flac_lpc_autocorrelation(const double* y, int n, int max_lag, double* r);
+/* Where that window is not zero: one or two ranges, each a begin and an
+ * end in `ranges`; returns their number.  Two ranges lie a third of the
+ * block apart. */
+int flac_lpc_window_ranges(int n, int index, int* ranges);
+/* A raised cosine over n samples, which rises to its middle and falls
+ * from there. */
+void flac_lpc_hann(double* w, int n);
 /* The Levinson-Durbin recursion.  Returns the highest order reached
  * (fewer than max_order when the prediction error runs out); the
  * predictor of order m is coefs[(m - 1) * FLAC_MAX_LPC_ORDER + j] for
@@ -214,6 +263,85 @@ double flac_lpc_energy(const double* w, int n);
  * windowed prediction error is `error`: per sample half the logarithm of
  * the residual's variance plus `offset`, and never less than one bit. */
 double flac_lpc_estimate_bits(double error, double window_energy, int samples, double offset);
+
+/* ── kernels (flac_dsp.cpp and src/simd/flac_*.cpp) ─────────────── */
+
+/* The hot loops of the codec behind one table of function pointers,
+ * filled with the scalar kernels and then, as the processor allows, with
+ * the SSE2, AVX2 or NEON ones (aac_get_cpu_flags, which BAAC_AAC_CPU
+ * caps).  Every level computes the same values bit for bit, so that the
+ * encoder writes the same stream whichever kernels run:
+ *
+ * - the integer kernels wrap like unsigned arithmetic or are given
+ *   inputs that cannot overflow, so any order of evaluation agrees;
+ * - the two floating-point kernels are elementwise or accumulate in one
+ *   stated order, are compiled without the package's Release math
+ *   options and without contraction, and use no fused multiply-add. */
+struct FlacBitReader;
+
+struct FlacDSP {
+  /* y[i] = x[i] * w[i]. */
+  void (*window)(const double* x, const double* w, int n, double* y);
+  /* r[lag] = sum of y[i] * y[i - lag] for lag 0 to max_lag (at most
+   * FLAC_MAX_LPC_ORDER).  The order of the accumulation is part of the
+   * kernel: for each lag two partial sums, one over the even i and one
+   * over the odd i, each taken with i ascending, and r[lag] is the even
+   * sum plus the odd one. */
+  void (*autocorrelation)(const double* y, int n, int max_lag, double* r);
+
+  /* The magnitudes of the residuals of the fixed predictors of order 0
+   * to max_order summed over x[max_order .. n), for samples of at most
+   * 27 bits (so that no difference leaves 32 bits). */
+  void (*fixed_sums)(const int32_t* x, int n, int max_order, uint64_t* sums);
+  /* residual[i] = x[i] - ((sum over j of coefs[j] * x[i - 1 - j]) >>
+   * shift) for i from order to n.  The 32-bit form is for a caller that
+   * knows every sum and every residual to fit 32 bits; the 16-bit form
+   * for one that knows in addition that every sample and every
+   * coefficient fits 16.  The 64-bit form takes samples and coefficients
+   * of any 32-bit value and returns whether every residual lies above
+   * -2^31 and below 2^31. */
+  void (*lpc_residual_16)(const int32_t* x, int n, int order, const int32_t* coefs, int shift,
+                          int32_t* residual);
+  void (*lpc_residual_32)(const int32_t* x, int n, int order, const int32_t* coefs, int shift,
+                          int32_t* residual);
+  bool (*lpc_residual_64)(const int32_t* x, int n, int order, const int32_t* coefs, int shift,
+                          int32_t* residual);
+  /* Folds n residual values to unsigned (zigzag), and returns their sum;
+   * `*bits` receives all of them or-ed together. */
+  uint64_t (*rice_fold)(const int32_t* residual, int n, uint32_t* folded, uint32_t* bits);
+  /* For each of k_count parameters from k_low up, the sum of
+   * folded[i] >> k over n values, into sums[0], sums[stride], ...
+   * `bits` is what rice_fold gave for the values: all of them or-ed
+   * together, which bounds each one. */
+  void (*rice_sums)(const uint32_t* folded, int n, uint32_t bits, int k_low, int k_count,
+                    uint64_t* sums, size_t stride);
+
+  /* Rice code words of parameter k from the reader into out[0 ..
+   * count), for as long as each lies whole in the reader's cache, which
+   * is topped up on the way.  Returns how many were read: fewer than
+   * `count` when the next code word is longer than the cache can hold,
+   * runs past the input or has a value outside 32 bits, which is left
+   * unread for the caller to take bit by bit. */
+  int (*rice_decode)(FlacBitReader* r, int32_t* out, int count, int k);
+  /* The decoder's prediction: s[order .. n) holds the residual on entry
+   * and the samples on return, s[0 .. order) the warm-up samples.  The
+   * 32-bit form wraps; the wide form sums in 64 bits. */
+  void (*lpc_restore_32)(int32_t* s, int n, int order, const int32_t* coefs, int shift);
+  void (*lpc_restore_wide)(int32_t* s, int n, int order, const int32_t* coefs, int shift);
+  /* Two channel rows of up to 30-bit audio to interleaved left and
+   * right, by FlacChannelAssignment: the stereo assignment is undone on
+   * the way. */
+  void (*stereo_out[4])(const int32_t* c0, const int32_t* c1, int n, int32_t* pcm);
+};
+
+/* Fills a table with the scalar kernels, then with those of the levels
+ * the processor flags allow. */
+void flac_dsp_init(FlacDSP* dsp);
+/* The process-wide table, filled once on first use. */
+const FlacDSP* flac_dsp_global(void);
+void flac_dsp_init_sse2(FlacDSP* dsp);
+void flac_dsp_init_avx2(FlacDSP* dsp);
+void flac_dsp_init_neon(FlacDSP* dsp);
 
 /* ── bit reader ─────────────────────────────────────────────────── */
 
@@ -365,6 +493,53 @@ static inline uint32_t flac_bitreader_read_unary(FlacBitReader* r) {
       return count;
     }
   }
+}
+
+/* The loop of the rice_decode kernel, here so that every level compiles
+ * the same statements, each with the instructions it may use: counting
+ * leading zeros is one instruction on a processor that has it and a
+ * slower sequence on one that does not.  The reader's cache, bit count
+ * and position live in locals inside the loop, where a store to the
+ * output cannot make the compiler load them again. */
+#if defined(__GNUC__) || defined(__clang__)
+#define FLAC_ALWAYS_INLINE inline __attribute__((always_inline))
+#else
+#define FLAC_ALWAYS_INLINE inline
+#endif
+
+static FLAC_ALWAYS_INLINE int flac_rice_decode_words(FlacBitReader* r, int32_t* FLAC_RESTRICT out,
+                                                     int count, int k) {
+  const uint32_t max_quotient = 0xFFFFFFFFu >> k;
+  const uint8_t* const end = r->end;
+  uint64_t cache = r->cache;
+  int bits = r->bits;
+  const uint8_t* next = r->next;
+  int i = 0;
+  for (; i < count; i++) {
+    int zeros = cache ? flac_clz64(cache) : 64;
+    int used = zeros + 1 + k;
+    if (used > bits) {
+      /* The cache may only have run low: top it up and look again. */
+      flac_refill(cache, bits, next, end);
+      zeros = cache ? flac_clz64(cache) : 64;
+      used = zeros + 1 + k;
+      if (used > bits) {
+        break;
+      }
+    }
+    if ((uint32_t)zeros > max_quotient) {
+      break;
+    }
+    const uint32_t rest = k ? (uint32_t)((cache << (zeros + 1)) >> (64 - k)) : 0;
+    cache <<= used;
+    bits -= used;
+    const uint32_t folded = ((uint32_t)zeros << k) | rest;
+    out[i] = (int32_t)((folded >> 1) ^ (0u - (folded & 1)));
+  }
+  r->cache = cache;
+  r->bits = bits;
+  r->next = next;
+  return i;
 }
 
 /* Bits consumed since the reader was initialised. */

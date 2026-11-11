@@ -57,6 +57,7 @@ uint8_t flac_crc8(const uint8_t* data, size_t size) {
 }
 
 uint16_t flac_crc16_update(uint16_t crc, const uint8_t* data, size_t size) {
+  FLAC_PROFILE(FLAC_PROF_CRC);
   /* Eight bytes at a step: the checksum so far goes into the first two,
    * and each byte contributes through the table of its distance from
    * the end of the group. */
@@ -90,15 +91,28 @@ inline void store_le32(uint8_t* p, uint32_t v) {
   p[3] = (uint8_t)(v >> 24);
 }
 
-/* The auxiliary functions of the four rounds (RFC 1321 section 3.4). */
-inline uint32_t md5_f(uint32_t x, uint32_t y, uint32_t z) { return (x & y) | (~x & z); }
-inline uint32_t md5_g(uint32_t x, uint32_t y, uint32_t z) { return (x & z) | (y & ~z); }
-inline uint32_t md5_h(uint32_t x, uint32_t y, uint32_t z) { return x ^ y ^ z; }
-inline uint32_t md5_i(uint32_t x, uint32_t y, uint32_t z) { return y ^ (x | ~z); }
+/* The auxiliary functions of the four rounds (RFC 1321 section 3.4),
+ * each added to the sum a step has ready.  A step waits for x, which the
+ * step before it produced, and for nothing else: so each function is
+ * written to take x through as few operations as it can.  F is
+ * (x & y) | (~x & z) and G is (x & z) | (y & ~z); the two halves of G
+ * share no bit, so they can be added one after the other. */
+inline uint32_t md5_f(uint32_t sum, uint32_t x, uint32_t y, uint32_t z) {
+  return sum + (z ^ (x & (y ^ z)));
+}
+inline uint32_t md5_g(uint32_t sum, uint32_t x, uint32_t y, uint32_t z) {
+  return (sum + (y & ~z)) + (x & z);
+}
+inline uint32_t md5_h(uint32_t sum, uint32_t x, uint32_t y, uint32_t z) {
+  return sum + (x ^ (y ^ z));
+}
+inline uint32_t md5_i(uint32_t sum, uint32_t x, uint32_t y, uint32_t z) {
+  return sum + (y ^ (x | ~z));
+}
 
 /* One step: w = x + ((w + f(x, y, z) + X[k] + T) <<< s), where T is
  * floor(2^32 * abs(sin(step))) for the steps 1 to 64. */
-#define MD5_STEP(f, w, x, y, z, k, s, t) w = x + rotl32(w + f(x, y, z) + m[k] + t, s)
+#define MD5_STEP(f, w, x, y, z, k, s, t) w = x + rotl32(f(w + m[k] + t, x, y, z), s)
 
 /* One 64-byte block through the four rounds of RFC 1321 section 3.4,
  * sixteen steps each, with the round's function, the word order, the
@@ -238,6 +252,7 @@ void flac_md5_final(FlacMd5* m, uint8_t digest[16]) {
 }
 
 void flac_md5_update_pcm(FlacMd5* m, const int32_t* samples, size_t count, int bits_per_sample) {
+  FLAC_PROFILE(FLAC_PROF_MD5);
   const int width = (bits_per_sample + 7) / 8;
   uint8_t buf[4096];
   const size_t per_chunk = sizeof(buf) / (size_t)width;
@@ -582,3 +597,64 @@ int flac_frame_header_write(const FlacFrameHeader* h, uint8_t* out) {
   out[pos] = flac_crc8(out, (size_t)pos);
   return pos + 1;
 }
+
+/* ── stage timers ───────────────────────────────────────────────── */
+
+#if defined(BAAC_FLAC_PROFILE)
+#include <chrono>
+
+namespace {
+
+const char* const kProfileNames[FLAC_PROF_COUNT] = {
+    "other",    "input",    "MD5",      "scan",
+    "stereo",   "fixed",    "window",   "autocorrelation",
+    "Levinson", "quantise", "residual", "Rice search",
+    "write",    "CRC",      "read",     "restore",
+    "output"};
+
+struct Profile {
+  double seconds[FLAC_PROF_COUNT] = {0};
+  long calls[FLAC_PROF_COUNT] = {0};
+  int stack[32];
+  int depth = 0;
+  int current = FLAC_PROF_OTHER;
+  std::chrono::steady_clock::time_point last = std::chrono::steady_clock::now();
+};
+Profile g_profile;
+
+/* Books the time since the last switch to the stage that was running. */
+void profile_switch(int next) {
+  const std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
+  g_profile.seconds[g_profile.current] +=
+      std::chrono::duration<double>(now - g_profile.last).count();
+  g_profile.last = now;
+  g_profile.current = next;
+}
+
+}  // namespace
+
+void flac_profile_enter(int stage) {
+  g_profile.stack[g_profile.depth++] = g_profile.current;
+  g_profile.calls[stage]++;
+  profile_switch(stage);
+}
+
+void flac_profile_leave() { profile_switch(g_profile.stack[--g_profile.depth]); }
+
+void flac_profile_reset() { g_profile = Profile(); }
+
+void flac_profile_report(FILE* out) {
+  profile_switch(g_profile.current);
+  double total = 0.0;
+  for (int i = 0; i < FLAC_PROF_COUNT; i++) {
+    total += g_profile.seconds[i];
+  }
+  for (int i = 0; i < FLAC_PROF_COUNT; i++) {
+    if (g_profile.calls[i] || i == FLAC_PROF_OTHER) {
+      fprintf(out, "  %-16s %8.3f s %5.1f %%  %9ld calls\n", kProfileNames[i], g_profile.seconds[i],
+              total > 0.0 ? 100.0 * g_profile.seconds[i] / total : 0.0, g_profile.calls[i]);
+    }
+  }
+  fprintf(out, "  %-16s %8.3f s\n", "total", total);
+}
+#endif

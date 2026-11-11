@@ -43,7 +43,7 @@ set(BAAC_AAC_SOURCES
     src/unidrc_parse.cpp src/unidrc_gain.cpp src/unidrc.cpp
     src/usac_arith_tables.cpp src/usac_arith.cpp src/usac_stereo.cpp src/usac_fd.cpp
     src/loudness.cpp src/usac_enc_config.cpp src/mps212_tables.cpp
-    src/flac_format.cpp src/flac_api.cpp)
+    src/flac_format.cpp src/flac_api.cpp src/flac_dsp.cpp)
 set(BAAC_AAC_DECODER_SOURCES src/decoder.cpp src/conceal.cpp src/decoder_output.cpp src/limiter.cpp src/sbr_dec.cpp src/sbr_esbr.cpp src/ps_dec.cpp
     src/er_vcb11.cpp src/er_rvlc.cpp src/er_hcr.cpp
     src/usac_frame.cpp src/mps212.cpp
@@ -60,9 +60,10 @@ set(BAAC_AAC_ENCODER_SOURCES src/psycho.cpp src/encoder_tools.cpp src/afterburne
 
 set(BAAC_AAC_SIMD_SOURCES)
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64|i686|i386")
-    list(APPEND BAAC_AAC_SIMD_SOURCES src/simd/sse2.cpp src/simd/avx2.cpp)
+    list(APPEND BAAC_AAC_SIMD_SOURCES src/simd/sse2.cpp src/simd/avx2.cpp
+        src/simd/flac_sse2.cpp src/simd/flac_avx2.cpp)
 elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|arm")
-    list(APPEND BAAC_AAC_SIMD_SOURCES src/simd/neon.cpp)
+    list(APPEND BAAC_AAC_SIMD_SOURCES src/simd/neon.cpp src/simd/flac_neon.cpp)
 endif()
 
 set(ALL_SOURCES ${BAAC_AAC_SOURCES} ${BAAC_AAC_SIMD_SOURCES})
@@ -180,8 +181,24 @@ set_source_files_properties(src/dsp.cpp PROPERTIES COMPILE_FLAGS "-ffp-contract=
 # and without contraction.  (On another compiler than GCC or Clang the
 # options above are not in force either.)
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-    set_source_files_properties(src/flac_lpc.cpp PROPERTIES COMPILE_FLAGS
+    set(BAAC_FLAC_STRICT_MATH
         "-fno-associative-math -fno-reciprocal-math -fsigned-zeros -ftrapping-math -fno-finite-math-only -ffp-contract=off")
+    set_source_files_properties(src/flac_lpc.cpp src/flac_dsp.cpp PROPERTIES COMPILE_FLAGS
+        "${BAAC_FLAC_STRICT_MATH}")
+    # The FLAC kernels of each SIMD level follow the same rule, with the
+    # instruction set the level names and nothing beyond it.
+    if(HAS_SSE2 AND CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64|i686|i386")
+        set_source_files_properties(src/simd/flac_sse2.cpp PROPERTIES COMPILE_FLAGS
+            "-msse2 ${BAAC_FLAC_STRICT_MATH}")
+    endif()
+    if(HAS_AVX2 AND CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64|i686|i386")
+        set_source_files_properties(src/simd/flac_avx2.cpp PROPERTIES COMPILE_FLAGS
+            "-mavx2 ${BAAC_FLAC_STRICT_MATH}")
+    endif()
+    if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|arm")
+        set_source_files_properties(src/simd/flac_neon.cpp PROPERTIES COMPILE_FLAGS
+            "${BAAC_FLAC_STRICT_MATH}")
+    endif()
 endif()
 
 set(CMAKE_C_VISIBILITY_PRESET hidden)
@@ -208,9 +225,13 @@ add_library(baander-aac-simdeps STATIC
     EXCLUDE_FROM_ALL
     src/simd/sse2.cpp
     src/simd/avx2.cpp
-    src/simd/neon.cpp)
+    src/simd/neon.cpp
+    src/simd/flac_sse2.cpp
+    src/simd/flac_avx2.cpp
+    src/simd/flac_neon.cpp)
 target_include_directories(baander-aac-simdeps PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/include)
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
 include(GNUInstallDirs)
 install(TARGETS baander-aac

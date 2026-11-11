@@ -40,6 +40,41 @@ void add_tapered_range(double* w, int begin, int end, int taper) {
 
 int flac_lpc_window_parts(int windows) { return windows >= 9 ? 3 : windows >= 3 ? 2 : 1; }
 
+int flac_lpc_window_ranges(int n, int index, int* ranges) {
+  if (index == 0) {
+    ranges[0] = 0; /* the whole block */
+    ranges[1] = n;
+    return 1;
+  }
+  if (index <= 2) {
+    const int half = index - 1; /* one half */
+    ranges[0] = n * half / 2;
+    ranges[1] = n * (half + 1) / 2;
+    return 1;
+  }
+  if (index <= 5) {
+    const int third = index - 3; /* one third */
+    ranges[0] = n * third / 3;
+    ranges[1] = n * (third + 1) / 3;
+    return 1;
+  }
+  /* The block without one third: what lies before it and what lies
+   * behind it, each a range with ends of its own. */
+  const int third = index - 6;
+  int count = 0;
+  if (third > 0) {
+    ranges[0] = 0;
+    ranges[1] = n * third / 3;
+    count++;
+  }
+  if (third < 2) {
+    ranges[2 * count] = n * (third + 1) / 3;
+    ranges[2 * count + 1] = n;
+    count++;
+  }
+  return count;
+}
+
 void flac_lpc_window(double* w, int n, int windows, int index, double taper_fraction) {
   /* The tapers of every window of a set have one length: the fraction of
    * the smallest part the set cuts the block into, half of it per side. */
@@ -51,44 +86,22 @@ void flac_lpc_window(double* w, int n, int windows, int index, double taper_frac
   for (int i = 0; i < n; i++) {
     w[i] = 0.0;
   }
-  if (index == 0) {
-    add_tapered_range(w, 0, n, taper); /* the whole block */
-  } else if (index <= 2) {
-    const int half = index - 1; /* one half */
-    add_tapered_range(w, n * half / 2, n * (half + 1) / 2, taper);
-  } else if (index <= 5) {
-    const int third = index - 3; /* one third */
-    add_tapered_range(w, n * third / 3, n * (third + 1) / 3, taper);
-  } else {
-    /* The block without one third: what lies before it and what lies
-     * behind it, each tapered at its own ends. */
-    const int third = index - 6;
-    if (third > 0) {
-      add_tapered_range(w, 0, n * third / 3, taper);
-    }
-    if (third < 2) {
-      add_tapered_range(w, n * (third + 1) / 3, n, taper);
-    }
+  int ranges[4];
+  const int count = flac_lpc_window_ranges(n, index, ranges);
+  for (int i = 0; i < count; i++) {
+    add_tapered_range(w, ranges[2 * i], ranges[2 * i + 1], taper);
   }
 }
 
-void flac_lpc_apply_window(const double* x, const double* w, int n, double* y) {
+void flac_lpc_hann(double* w, int n) {
   for (int i = 0; i < n; i++) {
-    y[i] = x[i] * w[i];
+    w[i] = 0.0;
   }
-}
-
-void flac_lpc_autocorrelation(const double* y, int n, int max_lag, double* r) {
-  for (int lag = 0; lag <= max_lag; lag++) {
-    double sum = 0.0;
-    for (int i = lag; i < n; i++) {
-      sum += y[i] * y[i - lag];
-    }
-    r[lag] = sum;
-  }
+  add_tapered_range(w, 0, n, n / 2);
 }
 
 int flac_lpc_levinson(const double* r, int max_order, double* coefs, double* errors) {
+  FLAC_PROFILE(FLAC_PROF_LEVINSON);
   double a[FLAC_MAX_LPC_ORDER];
   double error = r[0];
   int order = 0;
@@ -126,6 +139,7 @@ int flac_lpc_levinson(const double* r, int max_order, double* coefs, double* err
 }
 
 bool flac_lpc_quantize(const double* a, int order, int precision, int32_t* q, int* shift) {
+  FLAC_PROFILE(FLAC_PROF_QUANTISE);
   double largest = 0.0;
   for (int j = 0; j < order; j++) {
     const double magnitude = fabs(a[j]);
@@ -197,10 +211,12 @@ double flac_lpc_estimate_bits(double error, double window_energy, int samples, d
 }
 
 double flac_lpc_quantized_error(const double* r, const int32_t* q, int shift, int order) {
+  FLAC_PROFILE(FLAC_PROF_QUANTISE);
   /* The error filter: one for the sample itself, minus each quantised
    * coefficient for the sample it weights.  Its output energy on the
    * windowed signal is the filter's quadratic form in the
-   * autocorrelation. */
+   * autocorrelation, which is symmetric: every pair of taps counts
+   * twice. */
   double b[FLAC_MAX_LPC_ORDER + 1];
   const double scale = 1.0 / (double)(1 << shift);
   b[0] = 1.0;
@@ -209,11 +225,11 @@ double flac_lpc_quantized_error(const double* r, const int32_t* q, int shift, in
   }
   double error = 0.0;
   for (int i = 0; i <= order; i++) {
-    double row = 0.0;
-    for (int j = 0; j <= order; j++) {
-      row += b[j] * r[i > j ? i - j : j - i];
+    double below = 0.0;
+    for (int j = 0; j < i; j++) {
+      below += b[j] * r[i - j];
     }
-    error += b[i] * row;
+    error += b[i] * (b[i] * r[0] + 2.0 * below);
   }
   return error;
 }
