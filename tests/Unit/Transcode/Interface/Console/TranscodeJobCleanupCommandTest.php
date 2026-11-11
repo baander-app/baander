@@ -84,6 +84,33 @@ final class TranscodeJobCleanupCommandTest extends TestCase
         self::assertSame($failure, $logger->records[0]['context']['exception']);
     }
 
+    public function testACleanupThatLeftJobsBehindFailsWithItsCountsOnTheConsoleAndInTheLog(): void
+    {
+        $jobs = $this->createStub(TranscodeJobPortInterface::class);
+        $jobs->method('cleanupOrphanedJobs')->willThrowException(new \App\Transcode\Application\Exception\TranscodeCleanupIncompleteException(6, 2));
+        $logger = new class extends \Psr\Log\AbstractLogger {
+            /** @var list<array<mixed>> */
+            public array $contexts = [];
+
+            public function log($level, \Stringable|string $message, array $context = []): void
+            {
+                $this->contexts[] = $context;
+            }
+        };
+        $support = new AdminCommandSupport(new MessageBus([new HandleMessageMiddleware(new HandlersLocator([
+            CleanupOrphanedJobsCommand::class => [new CleanupOrphanedJobsHandler($jobs, $this->staleSessions(4), $logger)],
+        ]))]));
+
+        $tester = new CommandTester(new TranscodeJobCleanupCommand($support));
+
+        self::assertSame(Command::FAILURE, $tester->execute([], ['capture_stderr_separately' => true]));
+        self::assertSame('', $tester->getDisplay(), 'A run that left jobs behind prints no success line.');
+        $error = preg_replace('/\s+/', ' ', $tester->getErrorOutput());
+        self::assertStringContainsString('removed 6 orphaned jobs and could not remove 2', (string) $error);
+        self::assertCount(1, $logger->contexts);
+        self::assertSame(['expired' => 4, 'cleaned' => 6, 'failed' => 2], array_diff_key($logger->contexts[0], ['exception' => true]));
+    }
+
     /** An expiry over $count abandoned sessions, each without an execution of its own. */
     private function staleSessions(int $count): StaleTranscodeSessionExpiry
     {

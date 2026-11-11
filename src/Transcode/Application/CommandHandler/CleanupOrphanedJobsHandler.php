@@ -6,6 +6,7 @@ namespace App\Transcode\Application\CommandHandler;
 
 use App\Transcode\Application\Command\CleanupOrphanedJobsCommand;
 use App\Transcode\Application\DTO\TranscodeCleanupResult;
+use App\Transcode\Application\Exception\TranscodeCleanupIncompleteException;
 use App\Transcode\Application\Port\TranscodeJobPortInterface;
 use App\Transcode\Application\Service\StaleTranscodeSessionExpiry;
 use Psr\Log\LoggerInterface;
@@ -37,6 +38,7 @@ final class CleanupOrphanedJobsHandler
             // say why, and the sessions expired above stay expired, so the log keeps both.
             $this->logger->error('The transcode job cleanup failed after stale sessions were expired.', [
                 'expired' => $expired,
+                ...($failure instanceof TranscodeCleanupIncompleteException ? ['cleaned' => $failure->removed, 'failed' => $failure->failed] : []),
                 'exception' => $failure,
             ]);
             throw $failure;
