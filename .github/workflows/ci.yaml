@@ -758,8 +758,8 @@ jobs:
                     retention-days: 14
 
     # ThreadSanitizer re-executes the tests with address randomization off; the
-    # Ubuntu 26.04 runner refuses that personality() call, so the sanitizer jobs
-    # stay on 24.04 until it allows it.
+    # Ubuntu 26.04 runner refuses that personality() call, so this job stays on
+    # 24.04 until it allows it.
     registry-thread-quality:
         runs-on: ${{ github.server_url == 'https://github.com' && 'ubuntu-24.04' || 'docker-cli' }}
         timeout-minutes: 30
@@ -796,7 +796,7 @@ jobs:
                 run: REGISTRY_SUBJECT_PYTHON=/usr/bin/python3 bash scripts/test-registry.sh thread
 
     registry-fuzz-quality:
-        runs-on: ${{ github.server_url == 'https://github.com' && 'ubuntu-24.04' || 'docker-cli' }}
+        runs-on: ${{ github.server_url == 'https://github.com' && 'ubuntu-latest' || 'docker-cli' }}
         timeout-minutes: 45
         container:
             image: ${{ github.server_url == 'https://github.com' && 'ghcr.io' || vars.REGISTRY_URL }}/${{ github.server_url == 'https://github.com' && 'baander-app' || vars.REGISTRY_OWNER }}/baander-runner:latest

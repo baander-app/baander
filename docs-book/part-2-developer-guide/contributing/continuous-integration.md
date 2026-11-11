@@ -81,7 +81,7 @@ caused it.
 
 | Concern | Forgejo | GitHub |
 | --- | --- | --- |
-| Runner label | `docker-cli` (self-hosted) | `ubuntu-latest` (hosted); `ubuntu-24.04` for the registry thread and fuzz jobs, whose ThreadSanitizer cannot disable address randomization on the 26.04 runner |
+| Runner label | `docker-cli` (self-hosted) | `ubuntu-latest` (hosted); `ubuntu-24.04` for the registry thread job, whose ThreadSanitizer cannot disable address randomization on the 26.04 runner |
 | Job container | `<REGISTRY_URL>/<REGISTRY_OWNER>/baander-runner:latest` | `ghcr.io/baander-app/baander-runner:latest` |
 | Registry and image owner | The `REGISTRY_URL` and `REGISTRY_OWNER` variables | `ghcr.io` and `baander-app` |
 | Registry login | The `REGISTRY_TOKEN` secret | The workflow token (`github.token`) |
