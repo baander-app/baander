@@ -136,6 +136,15 @@ foreach(test_name test_flac_format test_flac_decoder test_flac_conformance test_
     target_include_directories(${test_name} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
 endforeach()
 
+# The pinned streams of the FLAC encoder once more with the C library
+# told to use its routines for a processor without FMA and AVX2, which
+# return other last bits for some arguments.  The encoder's analysis
+# calls none of them, so the streams have to be the same; on a C library
+# that does not know the variable the run repeats the plain one.
+add_test(NAME test_flac_encoder_plain_libm COMMAND test_flac_encoder)
+set_tests_properties(test_flac_encoder_plain_libm PROPERTIES
+    ENVIRONMENT "GLIBC_TUNABLES=glibc.cpu.hwcaps=-FMA,-AVX2,-AVX")
+
 # The transforms and filterbanks go through the DSP dispatch table; the
 # same suites run again with the table capped at the scalar and the SSE2
 # kernels (BAAC_AAC_CPU), so that every level this machine can run is

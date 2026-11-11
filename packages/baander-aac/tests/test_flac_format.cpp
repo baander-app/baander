@@ -3,6 +3,9 @@
  * values worked out from their polynomials, the coded numbers,
  * STREAMINFO and frame headers against the example streams of RFC 9639
  * Appendix D, and the bit reader and writer. */
+#include <cfloat>
+#include <cmath>
+
 #include "flac_internal.h"
 #include "test_flac_util.h"
 
@@ -744,7 +747,168 @@ static void test_bits() {
   }
 }
 
-int main() {
+/* ── the analysis's own cosine and logarithm ───────────────────── */
+
+/* The encoder's analysis computes its cosine and its base 2 logarithm
+ * itself, so that every build writes the same streams.  Two things are
+ * held here: the error of each against a reference of higher precision,
+ * over the whole range of its arguments, and the results themselves,
+ * bit for bit, on a fixed set of arguments, which every compiler and
+ * processor has to reproduce. */
+static void test_analysis_functions(bool print) {
+  /* The reference is the long double function where that type has more
+   * bits than a double (64 on x86, 113 on most others); where it does
+   * not, the C library's own double function, with room for its error. */
+  const bool wide = LDBL_MANT_DIG >= 64;
+  const long double cos_bound = wide ? 0x1p-52L : 0x1p-51L;
+  const long double log_bound = wide ? 0x1p-51L : 0x1.8p-51L;
+  const double pi = 3.14159265358979323846;
+  uint32_t seed = 20261111u;
+  const auto next = [&seed]() {
+    seed = seed * 1664525u + 1013904223u;
+    return seed;
+  };
+  uint64_t hash = 1469598103934665603ull;
+  const auto mix = [&hash](double v) {
+    uint64_t bits;
+    memcpy(&bits, &v, sizeof(bits));
+    hash = (hash ^ bits) * 1099511628211ull;
+  };
+
+  /* The cosine: every argument a window of up to 4096 samples can ask
+   * for (a subset of the longer tapers), then arguments all over
+   * [0, pi], and the ends. */
+  long double worst = 0.0L;
+  double worst_at = 0.0;
+  long count = 0;
+  const auto check_cos = [&](double x, bool pinned) {
+    const double c = flac_cos(x);
+    const long double error = fabsl((long double)c - cosl((long double)x));
+    if (error > worst) {
+      worst = error;
+      worst_at = x;
+    }
+    if (pinned) {
+      mix(c);
+    }
+    count++;
+  };
+  /* These arguments are computed here, in a file that is compiled with
+   * the package's Release math options: another compiler may round
+   * them another way, so they serve the bound and not the pin. */
+  for (int taper = 1; taper <= 4096; taper++) {
+    for (int edge = 0; edge < taper; edge += taper > 256 ? 13 : 1) {
+      check_cos(pi * ((double)edge + 0.5) / (double)taper, false);
+    }
+  }
+  for (double x : {0.0, pi / 4.0, pi / 2.0, 3.0 * pi / 4.0, pi, 1e-300, 1e-9}) {
+    check_cos(x, false);
+  }
+  /* These are exact whatever the options: a whole number below
+   * pi * 2^50, scaled by a power of two. */
+  for (int i = 0; i < 2000000; i++) {
+    const uint64_t whole = (((uint64_t)next() << 32) | next()) % 3537118876014000ull;
+    check_cos(ldexp((double)whole, -50), true);
+  }
+  CHECK(worst <= cos_bound,
+        "flac_cos is within %.3Le of the cosine on [0, pi] (%ld arguments; worst %.3Le at %a)",
+        cos_bound, count, worst, worst_at);
+  CHECK(flac_cos(0.0) == 1.0 && flac_cos(pi) == -1.0, "flac_cos is 1 at 0 and -1 at pi");
+  /* And the windows themselves, which the library makes from its own
+   * arguments: the three sets at the two block sizes of the levels and
+   * at two lengths a last block may have. */
+  {
+    std::vector<double> window(4096);
+    for (int n : {4096, 1152, 1000, 16}) {
+      for (int windows : {1, 3, 9}) {
+        for (int index = 0; index < windows; index++) {
+          flac_lpc_window(window.data(), n, windows, index, 0.5);
+          for (int i = 0; i < n; i++) {
+            mix(window[(size_t)i]);
+          }
+        }
+      }
+      flac_lpc_hann(window.data(), n);
+      for (int i = 0; i < n; i++) {
+        mix(window[(size_t)i]);
+      }
+    }
+  }
+  const uint64_t cos_hash = hash;
+
+  /* The logarithm: mantissas all over [1, 2) at exponents over the
+   * whole range of a double, subnormal numbers among them, and at the
+   * exponents the estimates meet most; the powers of two with their
+   * neighbours; and the ends of the table's intervals. */
+  hash = 1469598103934665603ull;
+  worst = 0.0L;
+  worst_at = 0.0;
+  count = 0;
+  const auto check_log = [&](double x) {
+    if (!(x > 0.0) || std::isinf(x)) {
+      return;
+    }
+    const double l = flac_log2(x);
+    const long double truth = log2l((long double)x);
+    const long double scale = fabsl(truth) > 1.0L ? fabsl(truth) : 1.0L;
+    const long double error = fabsl((long double)l - truth) / scale;
+    if (error > worst) {
+      worst = error;
+      worst_at = x;
+    }
+    mix(l);
+    count++;
+  };
+  for (int i = 0; i < 3000000; i++) {
+    uint64_t bits = ((uint64_t)next() << 20) | (next() >> 12);
+    bits = (bits & 0x000FFFFFFFFFFFFFull) | 0x3FF0000000000000ull;
+    double mantissa;
+    memcpy(&mantissa, &bits, sizeof(mantissa));
+    const uint32_t r = next();
+    check_log(ldexp(mantissa, i % 3 == 0 ? (int)(r % 2098) - 1075 : (int)(r % 80) - 70));
+  }
+  for (int e = -1074; e <= 1023; e++) {
+    const double power = ldexp(1.0, e);
+    check_log(power);
+    check_log(nextafter(power, 0.0));
+    check_log(nextafter(power, HUGE_VAL));
+  }
+  for (int i = 0; i <= 128; i++) {
+    const double edge = 1.0 + (double)i / 128.0;
+    for (double x : {nextafter(edge, 0.0), edge, nextafter(edge, 4.0)}) {
+      check_log(x);
+      check_log(x * 0.5);
+      check_log(x * 0x1p-20);
+    }
+  }
+  CHECK(worst <= log_bound,
+        "flac_log2 is within %.3Le times max(1, |log2 x|) of the logarithm (%ld arguments; worst "
+        "%.3Le at %a)",
+        log_bound, count, worst, worst_at);
+  for (int e : {-1074, -1022, -52, -1, 0, 1, 10, 1023}) {
+    CHECK(flac_log2(ldexp(1.0, e)) == (double)e, "flac_log2(2^%d) is %d", e, e);
+  }
+  const uint64_t log_hash = hash;
+
+  if (print) {
+    printf("cos %016llx log2 %016llx\n", (unsigned long long)cos_hash,
+           (unsigned long long)log_hash);
+    return;
+  }
+  CHECK(cos_hash == 0x29b359da0f88160full,
+        "flac_cos and the windows made with it are the pinned values, bit for bit (hash %016llx)",
+        (unsigned long long)cos_hash);
+  CHECK(log_hash == 0xf40d72d11db6a4bbull,
+        "flac_log2 returns the pinned values, bit for bit (hash %016llx)",
+        (unsigned long long)log_hash);
+}
+
+int main(int argc, char** argv) {
+  if (argc > 1 && strcmp(argv[1], "--print-analysis-hashes") == 0) {
+    test_analysis_functions(true);
+    return 0;
+  }
+  test_analysis_functions(false);
   test_md5();
   test_crc();
   test_coded_numbers();

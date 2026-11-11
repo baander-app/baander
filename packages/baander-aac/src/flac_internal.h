@@ -258,6 +258,19 @@ void flac_encoder_stream_info(const BaacFlacEncoder* e, BaacFlacStreamInfo* info
 
 #define FLAC_MAX_ANALYSIS_WINDOWS 9
 
+/* The cosine of x for x in [0, pi], and the base 2 logarithm of a
+ * positive finite x: the analysis's own, so that every build on every
+ * machine computes the same windows and the same size estimates (the C
+ * library's differ in the last bit between libraries and processors).
+ * They are held to an absolute error, which is what the analysis needs:
+ * the cosine is within 2^-52 of the true value, and the logarithm
+ * within 2^-51 times the larger of 1 and its own magnitude.  Neither is
+ * correctly rounded; the logarithm of a power of two is exact.  The
+ * tests check the bounds against a reference of higher precision and
+ * pin the results themselves. */
+double flac_cos(double x);
+double flac_log2(double x);
+
 /* Fills w[0 .. n) with window `index` of a set of `windows`: 0 is the
  * whole block, 1 and 2 its halves, 3 to 5 its thirds, 6 to 8 the block
  * without one third.  `taper_fraction` of the smallest part rises and

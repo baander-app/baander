@@ -8,14 +8,118 @@
  * written, so this file is compiled without the package's Release math
  * options and without contraction: every sum is taken in the order it is
  * written here, and a kernel that replaces a loop of this file has to
- * keep that order to give the same stream. */
+ * keep that order to give the same stream.
+ *
+ * For the same reason the two transcendental functions the analysis
+ * needs, a cosine for the windows and a base 2 logarithm for the size
+ * estimates, are computed here and not taken from the C library: a
+ * library is free to return either neighbour of the true value, and
+ * libraries, and one library on different processors, do differ in the
+ * last bit.  The functions below use additions, multiplications and
+ * divisions of doubles in a fixed order, which every IEEE 754 machine
+ * performs alike.  What is left of <cmath> is exact: fabs, floor and
+ * frexp return the same value everywhere. */
 #include <cmath>
+#include <cstring>
 
 #include "flac_internal.h"
 
 namespace {
 
 const double kPi = 3.14159265358979323846;
+
+/* Pi and its half, each as the nearest double and what that leaves
+ * out, for differences that keep the missing bits. */
+const double kPiHigh = 0x1.921fb54442d18p+1;
+const double kPiLow = 0x1.1a62633145c07p-53;
+const double kHalfPiHigh = 0x1.921fb54442d18p+0;
+const double kHalfPiLow = 0x1.1a62633145c07p-54;
+const double kQuarterPi = 0x1.921fb54442d18p-1;
+
+/* The cosine of y for y in [0, pi/4]: the Taylor series to y^16, whose
+ * next term is below 2e-18 there.  The first two terms are taken apart
+ * so that the rounding of 1 - y^2/2 is put back. */
+double cos_kernel(double y) {
+  const double z = y * y;
+  const double tail =
+      z * z *
+      (1.0 / 24.0 + z * (-1.0 / 720.0 +
+                         z * (1.0 / 40320.0 +
+                              z * (-1.0 / 3628800.0 +
+                                   z * (1.0 / 479001600.0 + z * (-1.0 / 87178291200.0 +
+                                                                 z * (1.0 / 20922789888000.0)))))));
+  const double half = 0.5 * z;
+  const double w = 1.0 - half;
+  return w + (((1.0 - w) - half) + tail);
+}
+
+/* The sine of y for y in [0, pi/4]: the Taylor series to y^17, whose
+ * next term is below 1e-19 there. */
+double sin_kernel(double y) {
+  const double z = y * y;
+  const double tail =
+      -1.0 / 6.0 +
+      z * (1.0 / 120.0 +
+           z * (-1.0 / 5040.0 +
+                z * (1.0 / 362880.0 +
+                     z * (-1.0 / 39916800.0 +
+                          z * (1.0 / 6227020800.0 +
+                               z * (-1.0 / 1307674368000.0 + z * (1.0 / 355687428096000.0)))))));
+  return y + y * (z * tail);
+}
+
+/* 1 / ln 2, and the square root of 2. */
+constexpr double kInverseLn2 = 0x1.71547652b82fep+0;
+constexpr double kSqrt2 = 0x1.6a09e667f3bcdp+0;
+
+/* The base 2 logarithm of m in [1, 2) by a series: m is halved into
+ * (sqrt 1/2, sqrt 2] where it has to be, and ln m = 2 atanh(s) with
+ * s = (m - 1) / (m + 1), at most 0.1716 in magnitude, summed as
+ * 2 (s + s^3/3 + s^5/5 + ...) to s^23, whose next term is below 1e-20.
+ * It divides and has a long chain of products, which is too slow for
+ * the estimates; it fills the table below, when the library is
+ * compiled. */
+constexpr double log2_series(double m) {
+  double exponent = 0.0;
+  if (m > kSqrt2) {
+    m *= 0.5;
+    exponent = 1.0;
+  }
+  const double s = (m - 1.0) / (m + 1.0);
+  const double z = s * s;
+  double tail = 1.0 / 23.0;
+  for (int k = 21; k >= 3; k -= 2) {
+    tail = 1.0 / (double)k + z * tail;
+  }
+  const double twice = 2.0 * s;
+  return exponent + (twice * kInverseLn2 + (twice * (z * tail)) * kInverseLn2);
+}
+
+/* The mantissas [1, 2) in 128 intervals: for each its centre, which is
+ * exact in a double, the reciprocal of the centre and its logarithm. */
+constexpr int kLogIntervals = 128;
+struct LogTable {
+  double centre[kLogIntervals];
+  double reciprocal[kLogIntervals];
+  double log2_centre[kLogIntervals];
+  constexpr LogTable() : centre(), reciprocal(), log2_centre() {
+    for (int i = 0; i < kLogIntervals; i++) {
+      centre[i] = 1.0 + ((double)i + 0.5) / (double)kLogIntervals;
+      reciprocal[i] = 1.0 / centre[i];
+      log2_centre[i] = log2_series(centre[i]);
+    }
+  }
+};
+constexpr LogTable kLog;
+
+/* The coefficients of log2(1 + u) = (u - u^2/2 + u^3/3 - ...) / ln 2. */
+constexpr double kLog1 = kInverseLn2;
+constexpr double kLog2 = -kInverseLn2 / 2.0;
+constexpr double kLog3 = kInverseLn2 / 3.0;
+constexpr double kLog4 = -kInverseLn2 / 4.0;
+constexpr double kLog5 = kInverseLn2 / 5.0;
+constexpr double kLog6 = -kInverseLn2 / 6.0;
+constexpr double kLog7 = kInverseLn2 / 7.0;
 
 /* Adds a raised-cosine window over [begin, end) to `w`: a rise over the
  * first `taper` samples, a fall over the last, one in between.  The
@@ -30,7 +134,7 @@ void add_tapered_range(double* w, int begin, int end, int taper) {
     double v = 1.0;
     const int edge = i < length - 1 - i ? i : length - 1 - i;
     if (edge < taper) {
-      v = 0.5 - 0.5 * cos(kPi * ((double)edge + 0.5) / (double)taper);
+      v = 0.5 - 0.5 * flac_cos(kPi * ((double)edge + 0.5) / (double)taper);
     }
     w[begin + i] += v;
   }
@@ -41,6 +145,51 @@ void add_tapered_range(double* w, int begin, int end, int taper) {
 int window_parts(int windows) { return windows >= 9 ? 3 : windows >= 3 ? 2 : 1; }
 
 }  // namespace
+
+double flac_cos(double x) {
+  /* Onto [0, pi/2] by cos(x) = -cos(pi - x), then onto [0, pi/4] by
+   * cos(y) = sin(pi/2 - y).  Each difference is exact in its first
+   * step, the two doubles being within a factor of two of each other,
+   * and takes the bits the constant leaves out in the second. */
+  const bool negate = x > kHalfPiHigh;
+  const double y = negate ? (kPiHigh - x) + kPiLow : x;
+  const double c = y > kQuarterPi ? sin_kernel((kHalfPiHigh - y) + kHalfPiLow) : cos_kernel(y);
+  return negate ? -c : c;
+}
+
+double flac_log2(double x) {
+  /* x = m * 2^e with m in [1, 2), taken from the bits of the double; a
+   * subnormal number is scaled into the normal range first, which is
+   * exact. */
+  uint64_t bits;
+  memcpy(&bits, &x, sizeof(bits));
+  int exponent = (int)(bits >> 52) & 0x7FF;
+  if (exponent == 0) {
+    x *= 0x1p54;
+    memcpy(&bits, &x, sizeof(bits));
+    exponent = ((int)(bits >> 52) & 0x7FF) - 54;
+  }
+  exponent -= 1023;
+  const int interval = (int)(bits >> 45) & (kLogIntervals - 1);
+  bits = (bits & 0x000FFFFFFFFFFFFFull) | 0x3FF0000000000000ull;
+  double m;
+  memcpy(&m, &bits, sizeof(m));
+  if (m == 1.0) {
+    return (double)exponent; /* a power of two, exactly */
+  }
+  /* m = c (1 + u) for the centre c of its interval: m - c is exact, and
+   * u is below 1/256 in magnitude, so that the series of log2(1 + u) is
+   * done at u^7, whose successor is below 1e-20.  The products are
+   * paired, not chained, so that the sum does not wait on one long row
+   * of them; the order is fixed all the same. */
+  const double u = (m - kLog.centre[interval]) * kLog.reciprocal[interval];
+  const double u2 = u * u;
+  const double low = kLog1 + u * kLog2;
+  const double middle = kLog3 + u * kLog4;
+  const double high = (kLog5 + u * kLog6) + u2 * kLog7;
+  const double series = u * (low + u2 * (middle + u2 * high));
+  return (double)exponent + (kLog.log2_centre[interval] + series);
+}
 
 int flac_lpc_window_ranges(int n, int index, int* ranges) {
   if (index == 0) {
@@ -204,7 +353,7 @@ double flac_lpc_energy(const double* w, int n) {
 double flac_lpc_estimate_bits(double error, double window_energy, int samples, double offset) {
   double per_sample = 1.0;
   if (error > 0.0 && window_energy > 0.0) {
-    const double bits = 0.5 * log2(error / window_energy) + offset;
+    const double bits = 0.5 * flac_log2(error / window_energy) + offset;
     if (bits > per_sample) {
       per_sample = bits;
     }

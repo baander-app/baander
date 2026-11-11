@@ -813,8 +813,19 @@ exact, and its two floating-point kernels accumulate in one stated order
 and are compiled without the package's Release math options, without
 contraction and without fused multiply-add. A stream therefore comes out
 the same byte for byte at every level, which `tests/test_flac_dsp.cpp`
-checks kernel by kernel and on whole streams. Two limits of the kernel
-set are worth knowing:
+checks kernel by kernel and on whole streams.
+
+The output does not depend on the C library either. The analysis needs
+a cosine for its windows and a base 2 logarithm for its size estimates,
+and a library may return either neighbour of the true value: libraries
+differ in that last bit, and so does one library on processors with and
+without FMA. The analysis therefore computes both itself (`flac_cos` and
+`flac_log2` in `src/flac_lpc.cpp`). `tests/test_flac_format.cpp` holds
+the two functions to their error bounds and pins their results and the
+windows made with them, and `tests/test_flac_encoder.cpp` pins fifteen
+whole streams by digest.
+
+Two limits of the kernel set are worth knowing:
 
 - The AVX2 level writes Rice codes eight at a time and reads them with a
   single-instruction zero count. Both kernels are built by GCC and Clang
