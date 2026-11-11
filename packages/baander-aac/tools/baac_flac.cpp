@@ -30,6 +30,8 @@
  * states and, unless --no-md5 is given, the MD5 of the decoded samples.
  * Every command exits non-zero on any error or mismatch; enc then leaves
  * no output file, dec leaves what could be decoded. */
+#include "baac_flac.h"
+
 #include <algorithm>
 #include <chrono>
 #include <cmath>
@@ -42,12 +44,21 @@
 
 #include "flac.h"
 
-int baac_flac_main(int argc, char** argv);
-const char* baac_flac_usage(void);
-int baac_flac_bench(const std::vector<float>& pcm, int sample_rate, int seconds,
-                    const std::string& only, const std::string& dump);
-
 namespace {
+
+/* The samples of the largest frame there is: the largest block in the
+ * most channels. */
+const size_t kLargestFrame = (size_t)BAAC_FLAC_MAX_BLOCK_SIZE * BAAC_FLAC_MAX_CHANNELS;
+
+/* The codec's handles, destroyed when they go out of scope. */
+struct EncoderDestroy {
+  void operator()(BaacFlacEncoder* enc) const { baac_flac_encoder_destroy(enc); }
+};
+struct DecoderDestroy {
+  void operator()(BaacFlacDecoder* dec) const { baac_flac_decoder_destroy(dec); }
+};
+typedef std::unique_ptr<BaacFlacEncoder, EncoderDestroy> EncoderHandle;
+typedef std::unique_ptr<BaacFlacDecoder, DecoderDestroy> DecoderHandle;
 
 const size_t kIoBuffer = 1 << 18; /* of an output stream, and of what dec reads at a time */
 const int kChunkFrames = 16384;   /* samples per channel enc reads at a time */
@@ -484,8 +495,19 @@ bool read_picture(const char* path, PictureFile* pic) {
   if (!open_file(&in, path, false)) {
     return false;
   }
-  pic->data.resize((size_t)BAAC_FLAC_MAX_PICTURE_BYTES + 1);
-  const size_t got = read_fully(&in, pic->data.data(), pic->data.size());
+  /* In steps that grow with the file, up to one byte past what a block
+   * holds: a small cover takes a small buffer. */
+  const size_t limit = (size_t)BAAC_FLAC_MAX_PICTURE_BYTES + 1;
+  size_t got = 0;
+  for (size_t step = 65536; got < limit; step *= 2) {
+    const size_t want = std::min(step, limit - got);
+    pic->data.resize(got + want);
+    const size_t n = read_fully(&in, pic->data.data() + got, want);
+    got += n;
+    if (n < want) {
+      break;
+    }
+  }
   if (got > BAAC_FLAC_MAX_PICTURE_BYTES) {
     fprintf(stderr,
             "baac: %s is larger than a FLAC picture block holds (%d bytes with its media type)\n",
@@ -493,6 +515,7 @@ bool read_picture(const char* path, PictureFile* pic) {
     return false;
   }
   pic->data.resize(got);
+  pic->data.shrink_to_fit();
   if (!png_figures(pic) && !jpeg_figures(pic)) {
     fprintf(stderr, "baac: %s is neither a JPEG nor a PNG file\n", path);
     return false;
@@ -606,10 +629,7 @@ int encode_stream(const EncodeArgs& args, File* in, File* out, bool* created) {
             in->name.c_str(), layout.sample_rate, layout.channels, layout.bits, error_name(error));
     return 1;
   }
-  struct Destroy {
-    BaacFlacEncoder* enc;
-    ~Destroy() { baac_flac_encoder_destroy(enc); }
-  } destroy{enc};
+  const EncoderHandle owner(enc);
 
   /* Tags and pictures are settled before the output exists: what the
    * format does not take is refused with nothing written. */
@@ -810,10 +830,7 @@ int decode_stream(const DecodeArgs& args, File* in, File* out) {
     fprintf(stderr, "baac: out of memory\n");
     return 1;
   }
-  struct Destroy {
-    BaacFlacDecoder* dec;
-    ~Destroy() { baac_flac_decoder_destroy(dec); }
-  } destroy{dec};
+  const DecoderHandle owner(dec);
   baac_flac_decoder_set_md5_check(dec, args.md5 ? 1 : 0);
 
   /* The sample buffer starts at a block of the usual size and grows
@@ -892,8 +909,8 @@ int decode_stream(const DecodeArgs& args, File* in, File* out) {
         }
         continue;
       }
-      if (n == AAC_ERR_OVERFLOW && pcm_size < (size_t)BAAC_FLAC_MAX_BLOCK_SIZE * 8) {
-        pcm_size = (size_t)BAAC_FLAC_MAX_BLOCK_SIZE * BAAC_FLAC_MAX_CHANNELS;
+      if (n == AAC_ERR_OVERFLOW && pcm_size < kLargestFrame) {
+        pcm_size = kLargestFrame;
         pcm.reset(new int32_t[pcm_size]);
         continue;
       }
@@ -1076,16 +1093,13 @@ int info(int argc, char** argv) {
     fprintf(stderr, "baac: out of memory\n");
     return 1;
   }
-  struct Destroy {
-    BaacFlacDecoder* dec;
-    ~Destroy() { baac_flac_decoder_destroy(dec); }
-  } destroy{dec};
+  const DecoderHandle owner(dec);
   baac_flac_decoder_set_metadata(dec, 1, 0);
 
   /* The header is all that is read: the input is fed until the first
    * frame is there, and that frame only says that the header is over. */
   std::unique_ptr<uint8_t[]> input(new uint8_t[kIoBuffer]);
-  std::unique_ptr<int32_t[]> pcm(new int32_t[(size_t)BAAC_FLAC_MAX_BLOCK_SIZE * 8]);
+  std::unique_ptr<int32_t[]> pcm(new int32_t[kLargestFrame]);
   int damaged = 0;
   bool done = false;
   while (!done) {
@@ -1104,7 +1118,7 @@ int info(int argc, char** argv) {
         }
         pos += (size_t)took;
       }
-      const int n = baac_flac_decoder_decode_next(dec, pcm.get(), BAAC_FLAC_MAX_BLOCK_SIZE * 8);
+      const int n = baac_flac_decoder_decode_next(dec, pcm.get(), (int)kLargestFrame);
       if (n == AAC_ERR_DECODE) {
         damaged++;
       } else if (n != 0 || (took == 0 && pos < got)) {

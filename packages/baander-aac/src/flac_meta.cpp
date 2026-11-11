@@ -15,30 +15,6 @@ namespace {
  * caller names none. */
 const char kVendor[] = "bAAC";
 
-uint32_t read_le32(const uint8_t* p) {
-  return (uint32_t)p[0] | (uint32_t)p[1] << 8 | (uint32_t)p[2] << 16 | (uint32_t)p[3] << 24;
-}
-
-uint32_t read_be32(const uint8_t* p) {
-  return (uint32_t)p[0] << 24 | (uint32_t)p[1] << 16 | (uint32_t)p[2] << 8 | (uint32_t)p[3];
-}
-
-uint8_t* put_le32(uint8_t* p, uint32_t v) {
-  p[0] = (uint8_t)v;
-  p[1] = (uint8_t)(v >> 8);
-  p[2] = (uint8_t)(v >> 16);
-  p[3] = (uint8_t)(v >> 24);
-  return p + 4;
-}
-
-uint8_t* put_be32(uint8_t* p, uint32_t v) {
-  p[0] = (uint8_t)(v >> 24);
-  p[1] = (uint8_t)(v >> 16);
-  p[2] = (uint8_t)(v >> 8);
-  p[3] = (uint8_t)v;
-  return p + 4;
-}
-
 uint8_t* put_bytes(uint8_t* p, const void* data, size_t size) {
   if (size) {
     memcpy(p, data, size);
@@ -46,13 +22,8 @@ uint8_t* put_bytes(uint8_t* p, const void* data, size_t size) {
   return p + size;
 }
 
-uint8_t* put_header(uint8_t* p, int type, size_t size) {
-  p[0] = (uint8_t)type;
-  p[1] = (uint8_t)(size >> 16);
-  p[2] = (uint8_t)(size >> 8);
-  p[3] = (uint8_t)size;
-  return p + 4;
-}
+/* A printable ASCII character: 0x20 to 0x7E. */
+bool printable(char c) { return (unsigned char)c >= 0x20 && (unsigned char)c <= 0x7E; }
 
 /* A field of a tag block: a name of printable ASCII without '=', the
  * '=', and a value in UTF-8. */
@@ -62,8 +33,7 @@ bool comment_valid(const BaacFlacComment& c) {
   }
   uint32_t name = 0;
   while (name < c.length && c.text[name] != '=') {
-    const unsigned char ch = (unsigned char)c.text[name];
-    if (ch < 0x20 || ch > 0x7E) {
+    if (!printable(c.text[name])) {
       return false;
     }
     name++;
@@ -73,8 +43,7 @@ bool comment_valid(const BaacFlacComment& c) {
 
 bool printable_ascii(const char* s) {
   for (; *s; s++) {
-    const unsigned char ch = (unsigned char)*s;
-    if (ch < 0x20 || ch > 0x7E) {
+    if (!printable(*s)) {
       return false;
     }
   }
@@ -115,6 +84,11 @@ uint64_t comment_block_bytes(const BaacFlacEncoderOptions* o) {
       return 0;
     }
     bytes += 4 + (uint64_t)o->comments[i].length;
+    /* Past the limit the block is refused whatever follows: no count,
+     * however large, makes this loop read on. */
+    if (bytes > BAAC_FLAC_MAX_METADATA_BLOCK_BYTES) {
+      break;
+    }
   }
   return bytes;
 }
@@ -208,12 +182,12 @@ void flac_meta_write(const BaacFlacEncoderOptions* o, uint8_t* out, size_t* last
   if (has_comment_block(o)) {
     const char* vendor = vendor_of(o);
     const size_t vendor_bytes = strlen(vendor);
-    p = put_header(p, FLAC_BLOCK_VORBIS_COMMENT, (size_t)comment_block_bytes(o));
-    p = put_le32(p, (uint32_t)vendor_bytes);
+    p = flac_put_block_header(p, FLAC_BLOCK_VORBIS_COMMENT, false, (size_t)comment_block_bytes(o));
+    p = flac_put_le32(p, (uint32_t)vendor_bytes);
     p = put_bytes(p, vendor, vendor_bytes);
-    p = put_le32(p, (uint32_t)o->comment_count);
+    p = flac_put_le32(p, (uint32_t)o->comment_count);
     for (int i = 0; i < o->comment_count; i++) {
-      p = put_le32(p, o->comments[i].length);
+      p = flac_put_le32(p, o->comments[i].length);
       p = put_bytes(p, o->comments[i].text, o->comments[i].length);
     }
   }
@@ -222,17 +196,17 @@ void flac_meta_write(const BaacFlacEncoderOptions* o, uint8_t* out, size_t* last
     const size_t mime = strlen(pic.mime_type);
     const size_t description = pic.description ? strlen(pic.description) : 0;
     *last_header = (size_t)(p - out);
-    p = put_header(p, FLAC_BLOCK_PICTURE, (size_t)picture_block_bytes(pic));
-    p = put_be32(p, pic.type);
-    p = put_be32(p, (uint32_t)mime);
+    p = flac_put_block_header(p, FLAC_BLOCK_PICTURE, false, (size_t)picture_block_bytes(pic));
+    p = flac_put_be(p, pic.type, 4);
+    p = flac_put_be(p, (uint32_t)mime, 4);
     p = put_bytes(p, pic.mime_type, mime);
-    p = put_be32(p, (uint32_t)description);
+    p = flac_put_be(p, (uint32_t)description, 4);
     p = put_bytes(p, pic.description, description);
-    p = put_be32(p, pic.width);
-    p = put_be32(p, pic.height);
-    p = put_be32(p, pic.depth);
-    p = put_be32(p, pic.colors);
-    p = put_be32(p, pic.data_bytes);
+    p = flac_put_be(p, pic.width, 4);
+    p = flac_put_be(p, pic.height, 4);
+    p = flac_put_be(p, pic.depth, 4);
+    p = flac_put_be(p, pic.colors, 4);
+    p = flac_put_be(p, pic.data_bytes, 4);
     p = put_bytes(p, pic.data, pic.data_bytes);
   }
 }
@@ -244,12 +218,12 @@ int flac_meta_count_comments(const uint8_t* block, size_t size) {
   if (size < 8) {
     return -1;
   }
-  const uint32_t vendor = read_le32(block);
+  const uint32_t vendor = flac_load_le32(block);
   if (vendor > size - 8) {
     return -1;
   }
   size_t pos = 4 + (size_t)vendor;
-  const uint32_t count = read_le32(block + pos);
+  const uint32_t count = flac_load_le32(block + pos);
   pos += 4;
   /* Every field has a length of four bytes at least, so a count beyond
    * a quarter of what is left cannot be true. */
@@ -260,7 +234,7 @@ int flac_meta_count_comments(const uint8_t* block, size_t size) {
     if (size - pos < 4) {
       return -1;
     }
-    const uint32_t length = read_le32(block + pos);
+    const uint32_t length = flac_load_le32(block + pos);
     pos += 4;
     if (length > size - pos) {
       return -1;
@@ -274,14 +248,14 @@ void flac_meta_read_comments(uint8_t* block, BaacFlacComment* vendor, BaacFlacCo
   /* Each string gets its closing zero from the byte behind it, which
    * holds a length that has been read by then, or is the spare byte
    * behind the block. */
-  vendor->length = read_le32(block);
+  vendor->length = flac_load_le32(block);
   vendor->text = (const char*)block + 4;
   size_t pos = 4 + (size_t)vendor->length;
-  const uint32_t count = read_le32(block + pos);
+  const uint32_t count = flac_load_le32(block + pos);
   block[pos] = 0;
   pos += 4;
   for (uint32_t i = 0; i < count; i++) {
-    comments[i].length = read_le32(block + pos);
+    comments[i].length = flac_load_le32(block + pos);
     comments[i].text = (const char*)block + pos + 4;
     if (i > 0) {
       block[pos] = 0; /* closes the field before */
@@ -301,17 +275,16 @@ bool flac_meta_read_picture(uint8_t* block, size_t size, BaacFlacPicture* pictur
     return false;
   }
   size_t left = size - 32;
-  size_t pos = 0;
-  picture->type = read_be32(block);
-  const uint32_t mime = read_be32(block + 4);
-  pos = 8;
+  picture->type = (uint32_t)flac_load_be(block, 4);
+  const uint32_t mime = (uint32_t)flac_load_be(block + 4, 4);
+  size_t pos = 8;
   if (mime > left) {
     return false;
   }
   left -= mime;
   const size_t mime_at = pos;
   pos += mime;
-  const uint32_t description = read_be32(block + pos);
+  const uint32_t description = (uint32_t)flac_load_be(block + pos, 4);
   if (description > left) {
     return false;
   }
@@ -319,11 +292,11 @@ bool flac_meta_read_picture(uint8_t* block, size_t size, BaacFlacPicture* pictur
   const size_t description_length_at = pos;
   const size_t description_at = pos + 4;
   pos = description_at + description;
-  picture->width = read_be32(block + pos);
-  picture->height = read_be32(block + pos + 4);
-  picture->depth = read_be32(block + pos + 8);
-  picture->colors = read_be32(block + pos + 12);
-  const uint32_t data = read_be32(block + pos + 16);
+  picture->width = (uint32_t)flac_load_be(block + pos, 4);
+  picture->height = (uint32_t)flac_load_be(block + pos + 4, 4);
+  picture->depth = (uint32_t)flac_load_be(block + pos + 8, 4);
+  picture->colors = (uint32_t)flac_load_be(block + pos + 12, 4);
+  const uint32_t data = (uint32_t)flac_load_be(block + pos + 16, 4);
   const size_t figures_at = pos;
   pos += 20;
   /* The data is the rest of the block, no more and no less. */

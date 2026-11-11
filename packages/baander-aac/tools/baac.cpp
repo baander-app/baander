@@ -46,12 +46,7 @@
 #include <vector>
 
 #include "aac.h"
-
-/* The lossless mode (baac_flac.cpp). */
-int baac_flac_main(int argc, char** argv);
-const char* baac_flac_usage(void);
-int baac_flac_bench(const std::vector<float>& pcm, int sample_rate, int seconds,
-                    const std::string& only, const std::string& dump);
+#include "baac_flac.h"
 
 static std::vector<uint8_t> read_all(const char* path) {
   std::vector<uint8_t> data;

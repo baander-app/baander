@@ -1375,6 +1375,10 @@ void flac_encoder_seeds() {
 
 }  // namespace
 
+/* The corpus directory of each harness. */
+static const char* const kHarnesses[] = {"decoder", "asc",          "encoder",     "unidrc",
+                                         "mps",     "flac_decoder", "flac_encoder"};
+
 int main(int argc, char** argv) {
   if (argc != 3) {
     fprintf(stderr, "usage: fuzz_seeds <tests/data> <out>\n");
@@ -1383,8 +1387,7 @@ int main(int argc, char** argv) {
   const std::string data = argv[1];
   g_out = argv[2];
   mkdir(g_out.c_str(), 0755);
-  for (const char* h :
-       {"decoder", "asc", "encoder", "unidrc", "mps", "flac_decoder", "flac_encoder"}) {
+  for (const char* h : kHarnesses) {
     mkdir((g_out + "/" + h).c_str(), 0755);
   }
   DIR* d = opendir(data.c_str());
@@ -1430,8 +1433,7 @@ int main(int argc, char** argv) {
   /* Empty and minimal inputs, so that the mutator starts from the
    * option bytes alone as well, and the reproducers of past findings
    * (tests/data/fuzz/<harness>/), so that every run replays them. */
-  for (const char* h :
-       {"decoder", "asc", "encoder", "unidrc", "mps", "flac_decoder", "flac_encoder"}) {
+  for (const char* h : kHarnesses) {
     if (DIR* past = opendir((data + "/fuzz/" + h).c_str())) {
       std::vector<std::string> found;
       while (dirent* e = readdir(past)) {

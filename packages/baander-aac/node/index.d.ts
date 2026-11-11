@@ -672,8 +672,17 @@ export interface FlacDecoderOptions {
    * them, or `{ maxBytes }` for another limit. A tag or picture block
    * past the limit is skipped and counted in `skippedMetadata`. Default
    * false: tags and pictures are skipped unread, however large.
+   * A `maxBytes` of 0 is the 32 MiB as well; one that the build cannot
+   * address (above 4 GiB on a 32-bit build) throws.
    */
   metadata?: boolean | { maxBytes?: number };
+  /**
+   * The most samples (values of the Int32Array, all channels counted)
+   * one `decode()` or `finish()` call returns. Default 1048576 (4 MiB);
+   * at least 524280, which is one frame of the largest block in eight
+   * channels, and at most 268435456. See `decode()`.
+   */
+  maxOutput?: number;
 }
 
 /**
@@ -682,27 +691,55 @@ export interface FlacDecoderOptions {
  * frame is never concealed: it is counted in `errors`, decoding goes on
  * at the next valid frame, and `lastFrame.samplePosition` shows how many
  * samples were lost.
+ *
+ * What a call returns is bounded, whatever the stream says: a FLAC
+ * frame of 50 bytes can stand for two megabytes of samples, so the size
+ * of the input says nothing about the size of the output. One call
+ * returns at most `maxOutput` samples and holds the rest back:
+ *
+ *     let pcm = decoder.decode(chunk);
+ *     use(pcm);
+ *     while (decoder.pending) use(decoder.decode());
+ *
+ * Nothing is lost on the way, and the decoder holds no more than the
+ * unread rest of the one chunk and a buffer of `maxOutput` samples.
  */
 export declare class FlacDecoder {
   constructor(options?: FlacDecoderOptions);
   /**
-   * Takes the bytes and returns the samples of every frame they
-   * complete, interleaved. Throws for a stream whose sample rate,
-   * channel count or bit depth changes on the way.
+   * Takes the bytes and returns the samples of the frames they complete,
+   * interleaved, at most `maxOutput` of them. When `pending` is true
+   * afterwards, more are waiting: call `decode()` without an argument
+   * until it is false, and only then give the next bytes (a call with
+   * bytes while samples are pending throws, so that nothing can pile
+   * up). Throws for a stream whose sample rate, channel count or bit
+   * depth changes on the way, after the samples before the change have
+   * been returned.
    */
-  decode(data: Buffer | Uint8Array | ArrayBuffer): Int32Array;
+  decode(data?: Buffer | Uint8Array | ArrayBuffer): Int32Array;
   /**
    * Ends the stream: no more bytes follow. Returns the samples of frames
-   * that were waiting for that word; `md5` and `errors` then state the
-   * result. The decoder takes no input until `reset()`.
+   * that were waiting for that word, at most `maxOutput` of them; while
+   * `pending` is true, call `finish()` again for the rest. `md5` and
+   * `errors` state the result once `pending` is false. The decoder takes
+   * no input until `reset()`.
    */
   finish(): Int32Array;
+  /**
+   * Whether samples or bytes of the last chunk are still held back for
+   * the bound of a call: another `decode()` without an argument (or
+   * `finish()`, once that was called) returns more.
+   */
+  readonly pending: boolean;
+  /** The most samples one call returns. */
+  readonly maxOutput: number;
   /** Starts over for a new stream. */
   reset(): void;
   /**
-   * For a seek: drops the buffered bytes. The bytes given next may begin
-   * anywhere in the stream; the stream's properties and its seek table
-   * are kept, and `md5` becomes 'unknown'.
+   * For a seek: drops the buffered bytes and the samples not yet
+   * collected. The bytes given next may begin anywhere in the stream;
+   * the stream's properties and its seek table are kept, and `md5`
+   * becomes 'unknown'.
    */
   seekReset(): void;
   /** Null until the stream's properties are known. */

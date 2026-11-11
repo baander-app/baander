@@ -18,11 +18,26 @@
 /* ── allocation watch ──────────────────────────────────────────── */
 
 /* Every allocation carries its size in front, so that the bytes in use
- * and their highest mark are known. */
+ * and their highest mark are known.  `g_fail_in` makes allocations
+ * fail: `g_fail_count` of them in a row, beginning that many
+ * allocations from now (0 the next; negative, none). */
 static size_t g_live = 0;
 static size_t g_peak = 0;
+static long g_fail_in = -1;
+static int g_fail_count = 0;
+static int g_failed = 0;
 
 static void* counted_alloc(size_t size) {
+  if (g_fail_in == 0) {
+    if (g_fail_count > 0) {
+      g_fail_count--;
+      g_failed++;
+      return nullptr;
+    }
+    g_fail_in = -1;
+  } else if (g_fail_in > 0) {
+    g_fail_in--;
+  }
   size_t* p = (size_t*)malloc(size + 16);
   if (!p) {
     return nullptr;
@@ -743,6 +758,175 @@ static void test_limit() {
   baac_flac_decoder_destroy(dec);
 }
 
+/* ── memory that runs out, and input that is dropped ───────────── */
+
+/* Decodes a stream with tags kept, letting the allocation that comes
+ * `fail_in` allocations into the decode fail, and the two after it; a
+ * call that reports the failure is made again.  Returns false when no
+ * allocation was left to fail. */
+static bool decode_with_failure(const std::vector<uint8_t>& stream, long fail_in, Tags* tags,
+                                std::vector<int32_t>* pcm, int* memory_errors) {
+  BaacFlacDecoder* dec = baac_flac_decoder_create();
+  baac_flac_decoder_set_metadata(dec, 1, 0);
+  std::vector<int32_t> block((size_t)4096 * 2);
+  pcm->clear();
+  pcm->reserve(1 << 16);
+  tags->comments.reserve(64);
+  g_fail_in = fail_in;
+  g_fail_count = 3;
+  g_failed = 0;
+  size_t pos = 0;
+  int guard = 0;
+  while (pos < stream.size() && guard++ < 100000) {
+    const int took = baac_flac_decoder_feed(dec, stream.data() + pos,
+                                            (int)std::min<size_t>(stream.size() - pos, 97));
+    if (took == AAC_ERR_MEMORY) {
+      (*memory_errors)++;
+      continue;
+    }
+    pos += (size_t)std::max(took, 0);
+    for (;;) {
+      const int n = baac_flac_decoder_decode_next(dec, block.data(), (int)block.size());
+      if (n == AAC_ERR_MEMORY) {
+        (*memory_errors)++;
+        continue;
+      }
+      if (n <= 0) {
+        break;
+      }
+      pcm->insert(pcm->end(), block.begin(), block.begin() + (size_t)n * 2);
+    }
+  }
+  const bool fired = g_failed > 0;
+  g_fail_in = -1;
+  g_fail_count = 0;
+  const BaacFlacComment* comments = nullptr;
+  BaacFlacComment vendor = {};
+  const int count = baac_flac_decoder_comments(dec, &comments, &vendor);
+  tags->comments.clear();
+  tags->pictures.clear();
+  tags->vendor.assign(vendor.text, vendor.length);
+  for (int i = 0; i < count; i++) {
+    tags->comments.emplace_back(comments[i].text, comments[i].length);
+  }
+  const BaacFlacPicture* pictures = nullptr;
+  const int picture_count = baac_flac_decoder_pictures(dec, &pictures);
+  for (int i = 0; i < picture_count; i++) {
+    Picture p;
+    p.type = pictures[i].type;
+    p.mime = pictures[i].mime_type;
+    p.description = pictures[i].description;
+    p.width = pictures[i].width;
+    p.height = pictures[i].height;
+    p.depth = pictures[i].depth;
+    p.colors = pictures[i].colors;
+    p.data.assign(pictures[i].data, pictures[i].data + pictures[i].data_bytes);
+    tags->pictures.push_back(p);
+  }
+  baac_flac_decoder_destroy(dec);
+  return fired;
+}
+
+/* An allocation may fail anywhere while tags and pictures are taken in:
+ * the call says so, and the same call made again goes on as if nothing
+ * had happened, with every tag and picture kept once. */
+static void test_memory_failure() {
+  const std::vector<int32_t> pcm = flac_gen_tones(4096 + 300, 2, 16, 0.5, 21u);
+  Tags tags = sample_tags();
+  tags.pictures[0].data = bytes_of(3000, 5u);
+  tags.pictures.push_back(tags.pictures[1]);
+  tags.pictures.back().type = 5;
+  TagOptions to(tags);
+  const FlacEncoded e = flac_encode(pcm, 44100, 2, 16, 5, 5000, true, &to.options);
+  int failures_seen = 0;
+  int wrong = 0;
+  long tried = 0;
+  for (long fail_in = 0; fail_in < 2000; fail_in++) {
+    Tags got;
+    std::vector<int32_t> decoded;
+    int memory_errors = 0;
+    const bool fired = decode_with_failure(e.stream, fail_in, &got, &decoded, &memory_errors);
+    if (!fired) {
+      break;
+    }
+    tried++;
+    failures_seen += memory_errors;
+    if (got.comments != tags.comments || !same_pictures(got.pictures, tags.pictures) ||
+        decoded != pcm) {
+      wrong++;
+      if (wrong == 1) {
+        printf("allocation %ld failing: %zu tags of %zu, %zu pictures of %zu, %zu samples of %zu\n",
+               fail_in, got.comments.size(), tags.comments.size(), got.pictures.size(),
+               tags.pictures.size(), decoded.size(), pcm.size());
+      }
+    }
+  }
+  CHECK(tried >= 5 && failures_seen >= 5,
+        "allocations fail during the decode (%ld places tried, %d calls reported "
+        "AAC_ERR_MEMORY)",
+        tried, failures_seen);
+  CHECK(wrong == 0,
+        "after a failed allocation the call made again keeps every tag and picture "
+        "once (%d of %ld runs differ)",
+        wrong, tried);
+}
+
+/* A seek or a reset in the middle of a picture block gives back what
+ * had been taken in of it. */
+static void test_dropped_input() {
+  const std::vector<int32_t> pcm = flac_gen_tones(4096, 2, 16, 0.5, 22u);
+  Tags tags;
+  Picture large;
+  large.data = bytes_of(4u << 20, 6u);
+  tags.pictures = {large};
+  TagOptions to(tags);
+  const FlacEncoded e = flac_encode(pcm, 44100, 2, 16, 5, 5000, true, &to.options);
+  for (int reset = 0; reset < 2; reset++) {
+    BaacFlacDecoder* dec = baac_flac_decoder_create();
+    baac_flac_decoder_set_metadata(dec, 1, 0);
+    const size_t before = g_live;
+    size_t pos = 0;
+    while (pos < (3u << 20)) {
+      pos += (size_t)baac_flac_decoder_feed(dec, e.stream.data() + pos, 65536);
+    }
+    const size_t held = g_live - before;
+    CHECK(held > (2u << 20), "three megabytes into the picture the decoder holds %zu bytes", held);
+    if (reset) {
+      baac_flac_decoder_reset(dec);
+    } else {
+      baac_flac_decoder_seek_reset(dec);
+    }
+    CHECK(g_live - before < (1u << 20), "after a %s it holds %zu bytes", reset ? "reset" : "seek",
+          g_live - before);
+    baac_flac_decoder_destroy(dec);
+  }
+}
+
+/* A count of fields no caller could mean: the check stops as soon as
+ * the tags are past the block limit, and reads no field beyond. */
+static void test_field_count() {
+  const std::string field = "LYRICS=" + std::string(6u << 20, 'x');
+  /* Three fields pass the limit.  The fourth points nowhere: reading it
+   * would end the test. */
+  std::vector<BaacFlacComment> fields(3, BaacFlacComment{field.data(), (uint32_t)field.size()});
+  fields.push_back(BaacFlacComment{(const char*)(uintptr_t)8, 16});
+  BaacFlacEncoder* enc = baac_flac_encoder_create(44100, 2, 16, 5, nullptr);
+  BaacFlacEncoderOptions options;
+  baac_flac_encoder_options_init(&options);
+  options.comments = fields.data();
+  options.comment_count = INT32_MAX; /* far more than are there */
+  CHECK(baac_flac_encoder_set_options(enc, &options) == AAC_ERR_INVALID_ARG,
+        "tags past the block limit are refused at the field that passes it");
+  baac_flac_encoder_destroy(enc);
+
+  /* The counters of the decoder stop at their largest value. */
+  int counter = INT32_MAX - 1;
+  flac_count(&counter);
+  flac_count(&counter);
+  flac_count(&counter);
+  CHECK(counter == INT32_MAX, "a counter at its limit stays there (%d)", counter);
+}
+
 /* ── ID3 tags around a stream ──────────────────────────────────── */
 
 static std::vector<uint8_t> id3v2(size_t body, bool footer) {
@@ -1070,6 +1254,9 @@ int main() {
   test_refusals();
   test_hostile_blocks();
   test_limit();
+  test_memory_failure();
+  test_dropped_input();
+  test_field_count();
   test_id3();
   test_oracles();
   remove_temp_dir(g_tmp);

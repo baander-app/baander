@@ -12,9 +12,26 @@
 
 #include "aac.h"
 
+/* Throws `message`, unless an exception is on its way already: a getter
+ * of the caller's that threw while an option was read is then the error
+ * to report, and a second throw on top of it would end the process. */
 inline Napi::Value throw_error(const Napi::Env& env, const std::string& message) {
-  Napi::Error::New(env, message).ThrowAsJavaScriptException();
+  if (!env.IsExceptionPending()) {
+    Napi::Error::New(env, message).ThrowAsJavaScriptException();
+  }
   return env.Undefined();
+}
+
+/* Whether the option is there and not undefined, with its value: read
+ * once, since reading may run a getter of the caller's.  (An option
+ * that is null counts as given here; option_given of the AAC classes
+ * treats null as absent.) */
+inline bool option_defined(const Napi::Object& o, const char* key, Napi::Value* value) {
+  if (!o.Has(key)) {
+    return false;
+  }
+  *value = o.Get(key);
+  return !o.Env().IsExceptionPending() && !value->IsUndefined();
 }
 
 inline const char* error_name(int code) {
@@ -64,10 +81,10 @@ inline bool bytes_of(const Napi::Value& v, const uint8_t** data, size_t* size) {
  * option is absent.  Returns false after throwing. */
 inline bool option_number(const Napi::Env& env, const Napi::Object& o, const char* key,
                           const char* what, int* out) {
-  if (!o.Has(key) || o.Get(key).IsUndefined()) {
-    return true;
+  Napi::Value v;
+  if (!option_defined(o, key, &v)) {
+    return !env.IsExceptionPending();
   }
-  const Napi::Value v = o.Get(key);
   /* a value outside the 32-bit range is refused rather than wrapped, so
    * that 2^32 cannot turn into 0 (an option's "off") */
   const double d = v.IsNumber() ? v.As<Napi::Number>().DoubleValue() : 0.0;
@@ -80,10 +97,8 @@ inline bool option_number(const Napi::Env& env, const Napi::Object& o, const cha
 }
 
 inline bool option_bool(const Napi::Object& o, const char* key, bool fallback) {
-  if (!o.Has(key) || o.Get(key).IsUndefined()) {
-    return fallback;
-  }
-  return o.Get(key).ToBoolean().Value();
+  Napi::Value v;
+  return option_defined(o, key, &v) ? v.ToBoolean().Value() : fallback;
 }
 
 /* Adds the classes of the lossless mode to the module (flac_addon.cc). */

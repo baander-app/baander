@@ -589,16 +589,22 @@ function flacEncode(encoder, pcm, channels, chunks) {
   return stream;
 }
 
-/* Decodes in chunks of the given byte counts (cycled). */
+/* Decodes in chunks of the given byte counts (cycled), collecting what a
+ * call held back for its bound before the next chunk goes in. */
 function flacDecode(decoder, stream, chunks) {
   const parts = [];
   let pos = 0;
   for (let i = 0; pos < stream.length; i++) {
     const count = Math.min(chunks[i % chunks.length], stream.length - pos);
     parts.push(decoder.decode(stream.subarray(pos, pos + count)));
+    while (decoder.pending) {
+      parts.push(decoder.decode());
+    }
     pos += count;
   }
-  parts.push(decoder.finish());
+  do {
+    parts.push(decoder.finish());
+  } while (decoder.pending);
   const out = new Int32Array(parts.reduce((n, p) => n + p.length, 0));
   let at = 0;
   for (const p of parts) {
@@ -832,4 +838,189 @@ test('FLAC: tags and pictures are written and read back', () => {
   assert.throws(() => new FlacEncoder({ pictures: icons }), /the format does not take/);
   assert.throws(() => new FlacDecoder({ metadata: 'yes' }), /metadata must be a boolean or an object/);
   assert.throws(() => new FlacDecoder({ metadata: { maxBytes: -1 } }), /maxBytes must be a whole number/);
+});
+
+test('FLAC: a picture buffer detached or shrunk while the options are read is never read stale', () => {
+  const detach = (buffer) => structuredClone(buffer, { transfer: [buffer] });
+  // a getter of the picture itself detaches the picture's bytes
+  const first = new Uint8Array(new ArrayBuffer(200000)).fill(0x5a);
+  const picture = {
+    mimeType: 'image/png',
+    data: first,
+    get width() {
+      detach(first.buffer);
+      return 32;
+    },
+  };
+  assert.throws(() => new FlacEncoder({ pictures: [picture] }), /detached/);
+  // an option of the encoder read after the pictures does
+  const second = new Uint8Array(new ArrayBuffer(200000)).fill(0x5a);
+  const options = { pictures: [{ mimeType: 'image/png', data: second }] };
+  for (const key of ['sampleRate', 'channels', 'bitsPerSample', 'level', 'padding', 'totalSamples', 'seekTable', 'tags', 'vendor']) {
+    Object.defineProperty(options, key, {
+      enumerable: true,
+      get() {
+        if (second.buffer.byteLength) {
+          detach(second.buffer);
+        }
+        return undefined;
+      },
+    });
+  }
+  assert.throws(() => new FlacEncoder(options), /detached/);
+  // a later picture's getter detaches an earlier picture's bytes
+  const third = new Uint8Array(new ArrayBuffer(200000)).fill(0x5a);
+  const later = {
+    mimeType: 'image/png',
+    data: new Uint8Array(4),
+    get description() {
+      detach(third.buffer);
+      return 'x';
+    },
+  };
+  assert.throws(() => new FlacEncoder({ pictures: [{ mimeType: 'image/png', data: third }, later] }), /detached/);
+
+  // a buffer that shrinks while the options are read gives the picture its length at the end
+  const resizable = new ArrayBuffer(5000, { maxByteLength: 5000 });
+  const view = new Uint8Array(resizable).fill(7);
+  const shrinking = {
+    mimeType: 'image/png',
+    data: view,
+    get height() {
+      resizable.resize(10);
+      return 1;
+    },
+  };
+  const encoder = new FlacEncoder({ pictures: [shrinking] });
+  const stream = Buffer.concat([encoder.encode(intTones(100, 2, 16)), encoder.finish()]);
+  const decoder = new FlacDecoder({ metadata: true });
+  flacDecode(decoder, stream, [4096]);
+  assert.equal(decoder.pictures.length, 1);
+  assert.ok(decoder.pictures[0].data.equals(Buffer.alloc(10, 7)));
+});
+
+/* A stream at the format's worst expansion: frames of 65535 samples in
+ * eight channels at 32 bits, each channel a constant: 50 bytes that
+ * decode to two megabytes. */
+function largestBlockStream(frames) {
+  const crc = (bytes, bits, poly) => {
+    const top = 1 << (bits - 1);
+    const mask = 2 ** bits - 1;
+    let c = 0;
+    for (const b of bytes) {
+      c ^= b << (bits - 8);
+      for (let i = 0; i < 8; i++) {
+        c = c & top ? ((c << 1) ^ poly) & mask : (c << 1) & mask;
+      }
+    }
+    return c;
+  };
+  const parts = [Buffer.from('fLaC'), Buffer.from([0x80, 0, 0, 34])];
+  // STREAMINFO: blocks of 65535, 44100 Hz, 8 channels, 32 bits, no total, no MD5
+  const info = Buffer.alloc(34);
+  info.writeUInt16BE(65535, 0);
+  info.writeUInt16BE(65535, 2);
+  info.set([0x0a, 0xc4, 0x4f, 0xf0], 10);
+  parts.push(info);
+  for (let f = 0; f < frames; f++) {
+    // sync, a block size given in 16 bits and 44.1 kHz, 8 channels and 32 bits, the frame number
+    const header = [0xff, 0xf8, 0x79, 0x7e, f, 0xff, 0xfe];
+    header.push(crc(header, 8, 0x07));
+    const frame = [...header];
+    for (let c = 0; c < 8; c++) {
+      const value = (c * 1000003 + f) | 0;
+      frame.push(0x00, (value >>> 24) & 255, (value >>> 16) & 255, (value >>> 8) & 255, value & 255);
+    }
+    const sum = crc(frame, 16, 0x8005);
+    frame.push(sum >> 8, sum & 255);
+    parts.push(Buffer.from(frame));
+  }
+  return Buffer.concat(parts);
+}
+
+test('FLAC: a decode call returns no more than its bound, and the rest on the calls after', () => {
+  const frames = 24;
+  const frameValues = 65535 * 8;
+  const stream = largestBlockStream(frames);
+  assert.ok(stream.length < 1300); // for 24 * 2 MiB of samples
+
+  const check = (decoder, bound) => {
+    let total = 0;
+    let calls = 0;
+    const take = (out) => {
+      assert.ok(out.length <= bound, `${out.length} values from one call, the bound is ${bound}`);
+      for (let at = 0; at < out.length; at += frameValues) {
+        const frame = (total + at) / frameValues;
+        // the first sample of each channel, and the last of the frame
+        for (let c = 0; c < 8; c++) {
+          assert.equal(out[at + c], (c * 1000003 + frame) | 0);
+        }
+        assert.equal(out[at + frameValues - 1], (7 * 1000003 + frame) | 0);
+      }
+      total += out.length;
+      calls++;
+    };
+    take(decoder.decode(stream));
+    assert.equal(decoder.pending, true);
+    // more input is refused while output is waiting: nothing piles up
+    assert.throws(() => decoder.decode(stream), /pending/);
+    while (decoder.pending) {
+      take(decoder.decode());
+    }
+    do {
+      take(decoder.finish());
+    } while (decoder.pending);
+    assert.equal(total, frames * frameValues);
+    assert.equal(decoder.errors, 0);
+    assert.equal(decoder.pending, false);
+    return calls;
+  };
+  // the default: 1048576 values a call, two of these frames
+  const byDefault = new FlacDecoder();
+  assert.equal(byDefault.maxOutput, 1048576);
+  assert.ok(check(byDefault, 1048576) >= frames / 2);
+  // the smallest bound there is: one frame of the largest size
+  const smallest = new FlacDecoder({ maxOutput: frameValues });
+  assert.ok(check(smallest, frameValues) >= frames);
+  assert.throws(() => new FlacDecoder({ maxOutput: frameValues - 1 }), /maxOutput/);
+  assert.throws(() => new FlacDecoder({ maxOutput: '1000000' }), /maxOutput must be a whole number/);
+
+  // a finish that meets the bound goes on the same way
+  const atOnce = new FlacDecoder({ maxOutput: frameValues });
+  const first = atOnce.decode(stream.subarray(0, 42 + 50 * 3 + 7));
+  assert.equal(first.length, frameValues);
+  let rest = 0;
+  while (atOnce.pending) {
+    rest += atOnce.decode().length;
+  }
+  assert.equal(rest, 2 * frameValues);
+  assert.equal(atOnce.finish().length, 0); // the seven bytes of a fourth frame are a frame cut short
+  assert.equal(atOnce.errors, 1);
+  assert.throws(() => atOnce.decode(stream), /finished/);
+});
+
+test('an option whose getter throws surfaces that error', () => {
+  const thrower = (key) => ({
+    get [key]() {
+      throw new RangeError(`getter of ${key}`);
+    },
+  });
+  for (const key of ['sampleRate', 'level', 'totalSamples', 'seekTable', 'tags', 'vendor', 'pictures']) {
+    assert.throws(() => new FlacEncoder(thrower(key)), new RegExp(`getter of ${key}`));
+  }
+  assert.throws(
+    () => new FlacEncoder({ pictures: [Object.assign(thrower('data'), { mimeType: 'image/png' })] }),
+    /getter of data/,
+  );
+  assert.throws(
+    () => new FlacEncoder({ pictures: [Object.assign(thrower('width'), { mimeType: 'image/png', data: new Uint8Array(4) })] }),
+    /getter of width/,
+  );
+  for (const key of ['md5', 'metadata', 'maxOutput', 'streamInfo']) {
+    assert.throws(() => new FlacDecoder(thrower(key)), new RegExp(`getter of ${key}`));
+  }
+  assert.throws(() => new FlacDecoder({ metadata: thrower('maxBytes') }), /getter of maxBytes/);
+  // the AAC classes read their numeric options through the same helper
+  assert.throws(() => new AacDecoder(thrower('frameLength')), /getter of frameLength/);
+  assert.throws(() => new AacEncoder(thrower('frameLength')), /getter of frameLength/);
 });

@@ -1123,21 +1123,6 @@ int header_bytes(const Encoder* e) {
          (e->options.padding_bytes ? FLAC_BLOCK_HEADER_BYTES + e->options.padding_bytes : 0);
 }
 
-uint8_t* put_block_header(uint8_t* p, int type, bool last, size_t size) {
-  *p++ = (uint8_t)((last ? 0x80 : 0) | type);
-  *p++ = (uint8_t)(size >> 16);
-  *p++ = (uint8_t)(size >> 8);
-  *p++ = (uint8_t)size;
-  return p;
-}
-
-uint8_t* put_be(uint8_t* p, uint64_t v, int bytes) {
-  for (int i = bytes - 1; i >= 0; i--) {
-    *p++ = (uint8_t)(v >> (8 * i));
-  }
-  return p;
-}
-
 /* The marker and the metadata blocks: STREAMINFO, the seek table when
  * one is reserved, the tags and the pictures, padding when asked for.
  * The first header of a stream and the final one differ in STREAMINFO
@@ -1149,26 +1134,26 @@ void write_header(const Encoder* e, uint8_t* out, bool final) {
   uint8_t* p = out;
   memcpy(p, "fLaC", FLAC_MARKER_BYTES);
   p += FLAC_MARKER_BYTES;
-  p = put_block_header(p, FLAC_BLOCK_STREAMINFO, !points && !meta && !padding,
-                       BAAC_FLAC_STREAMINFO_BYTES);
+  p = flac_put_block_header(p, FLAC_BLOCK_STREAMINFO, !points && !meta && !padding,
+                            BAAC_FLAC_STREAMINFO_BYTES);
   BaacFlacStreamInfo info;
   stream_info(e, &info, final);
   flac_streaminfo_write(&info, p);
   p += BAAC_FLAC_STREAMINFO_BYTES;
   if (points) {
-    p = put_block_header(p, FLAC_BLOCK_SEEKTABLE, !meta && !padding,
-                         (size_t)points * FLAC_SEEK_POINT_BYTES);
+    p = flac_put_block_header(p, FLAC_BLOCK_SEEKTABLE, !meta && !padding,
+                              (size_t)points * FLAC_SEEK_POINT_BYTES);
     for (int i = 0; i < points; i++) {
       if (final && i < (int)e->seek_points.size()) {
         const BaacFlacSeekPoint& point = e->seek_points[(size_t)i];
-        p = put_be(p, point.sample_position, 8);
-        p = put_be(p, point.byte_offset, 8);
-        p = put_be(p, (uint64_t)point.block_size, 2);
+        p = flac_put_be(p, point.sample_position, 8);
+        p = flac_put_be(p, point.byte_offset, 8);
+        p = flac_put_be(p, (uint64_t)point.block_size, 2);
       } else {
         /* A placeholder: room for a point, ignored by decoders. */
-        p = put_be(p, UINT64_MAX, 8);
-        p = put_be(p, 0, 8);
-        p = put_be(p, 0, 2);
+        p = flac_put_be(p, UINT64_MAX, 8);
+        p = flac_put_be(p, 0, 8);
+        p = flac_put_be(p, 0, 2);
       }
     }
   }
@@ -1182,7 +1167,7 @@ void write_header(const Encoder* e, uint8_t* out, bool final) {
     p += meta;
   }
   if (padding) {
-    p = put_block_header(p, FLAC_BLOCK_PADDING, true, (size_t)padding);
+    p = flac_put_block_header(p, FLAC_BLOCK_PADDING, true, (size_t)padding);
     memset(p, 0, (size_t)padding);
   }
 }

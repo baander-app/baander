@@ -80,17 +80,6 @@ namespace {
 
 inline uint32_t rotl32(uint32_t x, int n) { return (x << n) | (x >> (32 - n)); }
 
-inline uint32_t load_le32(const uint8_t* p) {
-  return (uint32_t)p[0] | ((uint32_t)p[1] << 8) | ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24);
-}
-
-inline void store_le32(uint8_t* p, uint32_t v) {
-  p[0] = (uint8_t)v;
-  p[1] = (uint8_t)(v >> 8);
-  p[2] = (uint8_t)(v >> 16);
-  p[3] = (uint8_t)(v >> 24);
-}
-
 /* The auxiliary functions of the four rounds (RFC 1321 section 3.4),
  * each added to the sum a step has ready.  A step waits for x, which the
  * step before it produced, and for nothing else: so each function is
@@ -120,7 +109,7 @@ inline uint32_t md5_i(uint32_t sum, uint32_t x, uint32_t y, uint32_t z) {
 void md5_block(uint32_t state[4], const uint8_t* block) {
   uint32_t m[16];
   for (int i = 0; i < 16; i++) {
-    m[i] = load_le32(block + 4 * i);
+    m[i] = flac_load_le32(block + 4 * i);
   }
   uint32_t a = state[0];
   uint32_t b = state[1];
@@ -243,11 +232,11 @@ void flac_md5_final(FlacMd5* m, uint8_t digest[16]) {
   uint8_t pad[72] = {0x80};
   const size_t fill = (size_t)(m->bytes & 63);
   const size_t pad_bytes = fill < 56 ? 56 - fill : 120 - fill;
-  store_le32(pad + pad_bytes, (uint32_t)bit_length);
-  store_le32(pad + pad_bytes + 4, (uint32_t)(bit_length >> 32));
+  flac_put_le32(pad + pad_bytes, (uint32_t)bit_length);
+  flac_put_le32(pad + pad_bytes + 4, (uint32_t)(bit_length >> 32));
   flac_md5_update(m, pad, pad_bytes + 8);
   for (int i = 0; i < 4; i++) {
-    store_le32(digest + 4 * i, m->state[i]);
+    flac_put_le32(digest + 4 * i, m->state[i]);
   }
 }
 
@@ -282,7 +271,7 @@ void flac_md5_update_pcm(FlacMd5* m, const int32_t* samples, size_t count, int b
         break;
       default:
         for (size_t i = 0; i < n; i++) {
-          store_le32(p, (uint32_t)samples[i]);
+          flac_put_le32(p, (uint32_t)samples[i]);
           p += 4;
         }
         break;

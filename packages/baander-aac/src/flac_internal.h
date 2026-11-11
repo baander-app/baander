@@ -414,6 +414,51 @@ static inline int flac_clz64(uint64_t x) {
 #endif
 }
 
+/* Numbers in the two byte orders the format uses: big-endian nearly
+ * everywhere, little-endian in the tag block and in MD5.  The writers
+ * return the position behind what they wrote. */
+static inline uint64_t flac_load_be(const uint8_t* p, int bytes) {
+  uint64_t v = 0;
+  for (int i = 0; i < bytes; i++) {
+    v = (v << 8) | p[i];
+  }
+  return v;
+}
+
+static inline uint8_t* flac_put_be(uint8_t* p, uint64_t v, int bytes) {
+  for (int i = bytes - 1; i >= 0; i--) {
+    *p++ = (uint8_t)(v >> (8 * i));
+  }
+  return p;
+}
+
+static inline uint32_t flac_load_le32(const uint8_t* p) {
+  return (uint32_t)p[0] | ((uint32_t)p[1] << 8) | ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24);
+}
+
+static inline uint8_t* flac_put_le32(uint8_t* p, uint32_t v) {
+  p[0] = (uint8_t)v;
+  p[1] = (uint8_t)(v >> 8);
+  p[2] = (uint8_t)(v >> 16);
+  p[3] = (uint8_t)(v >> 24);
+  return p + 4;
+}
+
+/* The header of a metadata block: the flag of the last block, the type
+ * and the length of the content in 24 bits. */
+static inline uint8_t* flac_put_block_header(uint8_t* p, int type, bool last, size_t size) {
+  *p++ = (uint8_t)((last ? 0x80 : 0) | type);
+  return flac_put_be(p, size, 3);
+}
+
+/* One more in a counter that stops at the largest value it can hold: a
+ * stream long enough to count past it cannot make it wrap. */
+static inline void flac_count(int* counter) {
+  if (*counter < INT32_MAX) {
+    (*counter)++;
+  }
+}
+
 static inline uint64_t flac_load_be64(const uint8_t* p) {
   return ((uint64_t)p[0] << 56) | ((uint64_t)p[1] << 48) | ((uint64_t)p[2] << 40) |
          ((uint64_t)p[3] << 32) | ((uint64_t)p[4] << 24) | ((uint64_t)p[5] << 16) |

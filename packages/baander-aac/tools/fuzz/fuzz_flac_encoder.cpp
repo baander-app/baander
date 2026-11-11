@@ -59,7 +59,7 @@ void check_code(int ret, const char* what) {
 /* Encodes one stream and decodes it again. */
 void one_stream(BaacFlacEncoder* enc, const std::vector<int32_t>& pcm, int channels, int bits,
                 size_t chunk, bool rewrite, bool slow_feed, const Input& meta, bool meta_taken,
-                int padding, bool seek_table) {
+                bool seek_table) {
   const size_t frames = pcm.size() / (size_t)channels;
   const int header_bytes = baac_flac_encoder_header_bytes(enc);
   if (header_bytes < 4 + 4 + BAAC_FLAC_STREAMINFO_BYTES) {
@@ -165,7 +165,6 @@ void one_stream(BaacFlacEncoder* enc, const std::vector<int32_t>& pcm, int chann
   if (!(seek_table && rewrite) && seek_points != 0) {
     fuzz_fail("seek points in a stream that should have none", seek_points);
   }
-  (void)padding;
 
   /* Tags and pictures as given, or none when they were refused. */
   const BaacFlacComment* comments = nullptr;
@@ -329,11 +328,10 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
   const bool rewrite = (flags & 0x10) != 0;
   const bool slow_feed = (flags & 0x20) != 0 && frames < 3000;
   one_stream(enc, pcm, channels, bits, chunk, rewrite, slow_feed, meta, meta_taken,
-             options.padding_bytes, have_seek_table);
+             have_seek_table);
   if (flags & 0x40) {
     /* The encoder again: nothing of the first stream carries over. */
-    one_stream(enc, pcm, channels, bits, 4096, true, false, meta, meta_taken, options.padding_bytes,
-               have_seek_table);
+    one_stream(enc, pcm, channels, bits, 4096, true, false, meta, meta_taken, have_seek_table);
   }
   baac_flac_encoder_destroy(enc);
   return 0;
