@@ -841,7 +841,7 @@ Open, known limits:
 
 Delivered on the branch `playback-session-entities` from the
 [plan](docs/plans/2026-11-10-2252-refactor-playback-session-entities-plan.md); not
-merged, and the two-command browser gate in Chromium and Firefox is still to run.
+merged.
 The four playback coordination tables had no entities, the ORM `schema_filter` hid
 them from schema comparison, and `PlaybackStore` read and wrote them with 38
 hand-written statements.
@@ -864,7 +864,7 @@ hand-written statements.
 - **Cost (U5, `eb9c4c7bf`):** measured against the SQL store with the same program
   on the same host, 2,000 iterations after 200 warm-up, PostgreSQL 18.4, four runs
   before and five after, load average between 2 and 7.
-- **Documentation and rule (U6):** the Session context page, the Session README,
+- **Documentation and rule (U6, `e937e01de`):** the Session context page, the Session README,
   the database naming page and the Doctrine reference describe the mapping, and
   `.agents/rules/ddd-repositories.md` states when a table or a statement may stay
   outside the ORM.
@@ -911,7 +911,43 @@ Open:
 - **Narrow margin:** the unbound snapshot is at 1.13 against 1.15. It sends one
   statement fewer and takes about 0.3 ms longer, so the cost is per DQL statement,
   and returning one statement to SQL would recover little.
-- **Not run:** the two-command browser gate on an image built from this branch.
+- **Associations with a database cascade:** 29 entity files map a to-one association
+  whose row the database deletes by cascade while the unit of work keeps the child
+  managed. Removing the parent and flushing again fails, as the cleanup defect below
+  showed. They are not audited. The playback entities have no associations.
+- **Not run:** `ce-simplify-code` and `ce-code-review` over this branch, the gate on a
+  hosted runner, and the adaptive and media-control gates, whose code this branch does
+  not touch.
+
+Gates, 2026-11-11, on an image built from the branch, client controls on: the
+two-command gate passes all eight phases in Chromium 156 and in Firefox 157 (two of
+three Firefox runs; see the drill fix below), and the movie-endpoint step passes. The
+Transcode and Session unit suites pass 1,615 tests, sixteen PostgreSQL integration
+files pass 402 tests, PHPStan, Deptrac, `lint:container` and the OpenAPI check are
+clean, and the web typecheck and 493 session and catalog tests pass.
+
+Fixed on the same branch, found on the persistent instance after the movie playback
+merge:
+
+- **Cleanup after an expiry (`e7420b119`, `101cc31e4`, `3ef843e27`):** the first job
+  cleanup on the instance expired eight stale sessions and then failed with Doctrine's
+  "a new entity was found through the relationship `TranscodeSessionEntity#job`"; a
+  second run removed seven jobs. The expiry keeps the sessions managed, and each job
+  was removed with its own flush, so the second removal walked a session whose job
+  was gone. Deleting a job now removes its sessions in the same flush. Each job is
+  removed in its own transaction, a failure is logged with the job and the step, and a
+  run that could not remove every job exits 1, or answers 503 from the admin endpoint,
+  with the expired, removed and failed counts. A test runs the real command over eight
+  stale sessions, two with a live lease: eight expire, six jobs go, two stay.
+- **Two-command audio step (`c4f169142`):** one Firefox run failed in `attach` because
+  the drill waited 55 seconds for a single-thread MP3 encode of a 30-minute track that
+  takes about 48 seconds here, while the host was under heavy concurrent load. The
+  session store answered on its cadence throughout and the database log was clean. The
+  wait is 110 seconds, a timeout names bytes received and seconds elapsed, and every
+  phase receipt records load average and CPU pressure. A hosted runner slower than
+  about 0.87 of this host on one thread would have failed the old wait every time;
+  hosted results were not checked for that.
+
 
 ## Roadmap maintenance
 
