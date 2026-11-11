@@ -41,8 +41,10 @@ final readonly class PlaybackStore implements PlaybackStoreInterface
     /** True while the incarnation's registration holds: neither lapsed nor retired. */
     private const string AVAILABLE = 'CASE WHEN i.expiresAt > CURRENT_TIMESTAMP() AND i.retiredAt IS NULL THEN true ELSE false END';
     private const string CONTROL_TYPES = "'play', 'pause', 'seek', 'load', 'stop', 'volume', 'queue'";
-    private const string COMMAND_LIFETIME = "DATE_ADD(CURRENT_TIMESTAMP(), 20, 'second')";
-    private const string PRESENCE_LIFETIME = "DATE_ADD(CURRENT_TIMESTAMP(), 30, 'second')";
+    /** Seconds a command or a transfer step waits for its answer. */
+    private const int COMMAND_LIFETIME = 20;
+    /** Seconds a registration holds after the runner last reported. */
+    private const int PRESENCE_LIFETIME = 30;
 
     public function __construct(private EntityManagerInterface $entityManager) {}
 
@@ -206,10 +208,11 @@ final readonly class PlaybackStore implements PlaybackStoreInterface
             ['capabilities' => Types::JSON],
         );
         if ($renamed === 0) {
-            $destination = ['id' => new Uuid(), 'publicId' => new PublicId()->toString()];
+            $publicId = new PublicId();
+            $destination = ['id' => new Uuid(), 'publicId' => $publicId->toString()];
             $this->insert(new PlaybackDestinationEntity(
                 $destination['id'],
-                PublicId::fromString($destination['publicId']),
+                $publicId,
                 Uuid::fromString($userId),
                 Uuid::fromString($deviceId),
                 Uuid::fromString($endpointId),
@@ -232,24 +235,26 @@ final readonly class PlaybackStore implements PlaybackStoreInterface
         );
         $incarnation = new Uuid();
         $capability = bin2hex(random_bytes(32));
-        $credential = $eligible ? bin2hex(random_bytes(32)) : null;
         // The recovery credential outlives the transaction by thirty days and is the one instant set from this process's clock.
-        $expires = $eligible ? new \DateTimeImmutable('+30 days') : null;
+        $recovery = $eligible
+            ? ['credential' => bin2hex(random_bytes(32)), 'expires' => new \DateTimeImmutable('+30 days'), 'tab' => Uuid::fromString($tabId)]
+            : null;
         $this->insert(new PlaybackDestinationIncarnationEntity(
             $incarnation,
             $destination['id'],
             Uuid::fromString($userId),
             $epoch,
             hash('sha256', $capability),
-            $now->modify('+30 seconds'),
+            $now->modify('+' . self::PRESENCE_LIFETIME . ' seconds'),
             $eligible,
-            $eligible ? Uuid::fromString($tabId) : null,
-            $credential === null ? null : hash('sha256', $credential),
-            $expires,
+            $recovery['tab'] ?? null,
+            $recovery === null ? null : hash('sha256', $recovery['credential']),
+            $recovery['expires'] ?? null,
         ));
         $result = ['destinationId' => $destination['publicId'], 'incarnationId' => $incarnation->toString(), 'epoch' => $epoch, 'capability' => $capability];
-        if ($credential !== null && $expires !== null) {
-            $result += ['recoveryCredential' => $credential, 'recoveryExpiresAt' => $expires->format(\DateTimeInterface::ATOM), 'recoveryTabId' => $tabId];
+        if ($recovery !== null) {
+            $result += ['recoveryCredential' => $recovery['credential'], 'recoveryExpiresAt' => $recovery['expires']->format(\DateTimeInterface::ATOM),
+                'recoveryTabId' => $tabId];
         }
         return $result;
     }
@@ -333,7 +338,7 @@ final readonly class PlaybackStore implements PlaybackStoreInterface
     {
         $progressed = $this->change(
             'UPDATE ' . PlaybackTransferEntity::class . ' t SET t.state = :state, t.position = :position, t.revision = :revision,'
-            . ' t.expiresAt = ' . self::COMMAND_LIFETIME . ' WHERE t.id = :id',
+            . ' t.expiresAt = ' . self::expiresAfter(self::COMMAND_LIFETIME) . ' WHERE t.id = :id',
             ['id' => $transfer['id'], 'state' => $transfer['state'], 'position' => $transfer['position'], 'revision' => $transfer['revision']],
         );
         if ($progressed > 0) {
@@ -354,7 +359,7 @@ final readonly class PlaybackStore implements PlaybackStoreInterface
             $transfer['desired_state'],
             (float) $transfer['position'],
             (int) $transfer['revision'],
-            $now->modify('+20 seconds'),
+            $now->modify('+' . self::COMMAND_LIFETIME . ' seconds'),
             $now,
         ));
     }
@@ -395,7 +400,7 @@ final readonly class PlaybackStore implements PlaybackStoreInterface
             $command['payload'],
             $addressed ? null : 'retained',
             $addressed ? null : $now,
-            $now->modify('+20 seconds'),
+            $now->modify('+' . self::COMMAND_LIFETIME . ' seconds'),
             $now,
         ));
     }
@@ -487,7 +492,7 @@ final readonly class PlaybackStore implements PlaybackStoreInterface
     {
         $this->change(
             'UPDATE ' . PlaybackDestinationIncarnationEntity::class . ' i SET i.observedState = :state, i.position = :position,'
-            . ' i.observedVolume = COALESCE(:volume, i.observedVolume), i.expiresAt = ' . self::PRESENCE_LIFETIME . ' WHERE i.id = :id',
+            . ' i.observedVolume = COALESCE(:volume, i.observedVolume), i.expiresAt = ' . self::expiresAfter(self::PRESENCE_LIFETIME) . ' WHERE i.id = :id',
             ['state' => $state, 'position' => $position, 'volume' => $volume, 'id' => $incarnationId],
             ['volume' => Types::FLOAT],
         );
@@ -496,7 +501,7 @@ final readonly class PlaybackStore implements PlaybackStoreInterface
     public function observeVolume(string $incarnationId, float $volume): void
     {
         $this->change(
-            'UPDATE ' . PlaybackDestinationIncarnationEntity::class . ' i SET i.observedVolume = :volume, i.expiresAt = ' . self::PRESENCE_LIFETIME . ' WHERE i.id = :id',
+            'UPDATE ' . PlaybackDestinationIncarnationEntity::class . ' i SET i.observedVolume = :volume, i.expiresAt = ' . self::expiresAfter(self::PRESENCE_LIFETIME) . ' WHERE i.id = :id',
             ['volume' => $volume, 'id' => $incarnationId],
         );
     }
@@ -506,8 +511,9 @@ final readonly class PlaybackStore implements PlaybackStoreInterface
         $session = $this->sessionRow($aggregate);
         // Each destination with its latest incarnation, which is the one with the highest epoch: the
         // pair of destination and epoch is unique. A destination without an incarnation still appears.
+        // The row's own key travels along to resolve the session's two references below, and is not shown.
         $destinations = $this->rows(
-            'SELECT d.publicId AS destinationId, d.name AS name, d.kind AS kind, d.capabilities AS capabilities,'
+            'SELECT d.id AS destinationKey, d.publicId AS destinationId, d.name AS name, d.kind AS kind, d.capabilities AS capabilities,'
             . ' i.id AS incarnationId, i.epoch AS epoch, i.observedState AS observedState, i.position AS position, i.observedVolume AS observedVolume,'
             . ' ' . self::AVAILABLE . ' AS available'
             . ' FROM ' . PlaybackDestinationEntity::class . ' d LEFT JOIN ' . PlaybackDestinationIncarnationEntity::class . ' i'
@@ -536,11 +542,17 @@ final readonly class PlaybackStore implements PlaybackStoreInterface
                 );
             }
         }
-        $selected = $session['selected_destination_id'] === null ? null : $this->rows(
-            'SELECT d.publicId FROM ' . PlaybackDestinationEntity::class . ' d WHERE d.id = :id',
-            ['id' => $session['selected_destination_id']],
-        )[0]['publicId'] ?? false;
-        $active = $session['active_incarnation_id'] === null ? null : $this->rows(
+        // The selected destination is one of the owner's, all of which were just read.
+        $selected = $session['selected_destination_id'] === null ? null : array_find(
+            $destinations,
+            static fn(array $destination): bool => $destination['destinationKey']->toString() === $session['selected_destination_id'],
+        )['destinationId'] ?? false;
+        // So is the active incarnation's destination, unless a later registration of the same tab
+        // replaced the incarnation while it still holds the session. Only then is it looked up.
+        $active = $session['active_incarnation_id'] === null ? null : array_find(
+            $destinations,
+            static fn(array $destination): bool => $destination['incarnationId']?->toString() === $session['active_incarnation_id'],
+        )['destinationId'] ?? $this->rows(
             'SELECT d.publicId FROM ' . PlaybackDestinationIncarnationEntity::class . ' i JOIN ' . PlaybackDestinationEntity::class . ' d WITH d.id = i.destinationId WHERE i.id = :id',
             ['id' => $session['active_incarnation_id']],
         )[0]['publicId'] ?? false;
@@ -554,7 +566,10 @@ final readonly class PlaybackStore implements PlaybackStoreInterface
                 'sourceIncarnationId' => $transfer['source_incarnation_id'], 'targetIncarnationId' => $transfer['target_incarnation_id'],
                 'position' => (float) $transfer['position'], 'desiredState' => $transfer['desired_state']],
             'destinations' => array_map(
-                static fn(array $destination): array => [...$destination, 'incarnationId' => $destination['incarnationId']?->toString()],
+                static fn(array $destination): array => [
+                    ...array_diff_key($destination, ['destinationKey' => true]),
+                    'incarnationId' => $destination['incarnationId']?->toString(),
+                ],
                 $destinations,
             ),
             'commands' => array_map(static fn(array $command): array => [
@@ -584,10 +599,14 @@ final readonly class PlaybackStore implements PlaybackStoreInterface
     {
         // A transfer's commands carry its request identity and digest, and so do the stops issued for
         // an expired control, so whichever row is found first gives the same answer.
-        $known = ' WHERE r.sessionId = :session AND r.requestId = :request';
-        $previous = $this->rows('SELECT r.requestDigest FROM ' . PlaybackTransferEntity::class . ' r' . $known, ['session' => $sessionId, 'request' => $requestId], limit: 1)[0]['requestDigest']
-            ?? $this->rows('SELECT r.requestDigest FROM ' . PlaybackCommandEntity::class . ' r' . $known, ['session' => $sessionId, 'request' => $requestId], limit: 1)[0]['requestDigest']
-            ?? null;
+        $previous = null;
+        foreach ([PlaybackTransferEntity::class, PlaybackCommandEntity::class] as $remembered) {
+            $previous ??= $this->rows(
+                'SELECT r.requestDigest FROM ' . $remembered . ' r WHERE r.sessionId = :session AND r.requestId = :request',
+                ['session' => $sessionId, 'request' => $requestId],
+                limit: 1,
+            )[0]['requestDigest'] ?? null;
+        }
         if ($previous === null) {
             return false;
         }
@@ -639,6 +658,12 @@ final readonly class PlaybackStore implements PlaybackStoreInterface
         $this->entityManager->detach($row);
     }
 
+    /** The end of a lifetime an update starts, as its statement writes it. An insert counts the same seconds from the transaction's clock. */
+    private static function expiresAfter(int $seconds): string
+    {
+        return "DATE_ADD(CURRENT_TIMESTAMP(), {$seconds}, 'second')";
+    }
+
     /** The instant the current transaction began, which is what CURRENT_TIMESTAMP stamps in every statement of it. */
     private function transactionClock(string $sessionId): \DateTimeImmutable
     {
@@ -656,9 +681,11 @@ final readonly class PlaybackStore implements PlaybackStoreInterface
      */
     private static function columns(array $fields): array
     {
+        /** @var array<string,string> $names The mapped field names are a fixed, small set, so each is converted once per worker. */
+        static $names = [];
         $row = [];
         foreach ($fields as $field => $value) {
-            $row[strtolower((string) preg_replace('/(?<!^)[A-Z]/', '_$0', $field))] = match (true) {
+            $row[$names[$field] ??= strtolower((string) preg_replace('/(?<!^)[A-Z]/', '_$0', $field))] = match (true) {
                 $value instanceof Uuid => $value->toString(),
                 $value instanceof \DateTimeImmutable => $value->format(InstantType::WRITE_FORMAT),
                 default => $value,

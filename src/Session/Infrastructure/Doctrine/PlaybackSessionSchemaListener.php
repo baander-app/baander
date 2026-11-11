@@ -34,7 +34,7 @@ final class PlaybackSessionSchemaListener
     {
         $schema = $event->getSchema();
         foreach (self::FOREIGN_KEYS as [$table, $name, $column, $foreignTable, $onDelete]) {
-            // A focused SchemaTool fixture maps only some tables; the referenced table can be absent from it.
+            // A focused SchemaTool fixture maps only some tables; a table that would own a key can be absent from it.
             if (!$schema->hasTable($table)) {
                 continue;
             }

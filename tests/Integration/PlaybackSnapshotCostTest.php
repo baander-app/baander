@@ -23,15 +23,16 @@ require_once dirname(__DIR__) . '/Fixtures/Session/playback-snapshot-cost.php';
 final class PlaybackSnapshotCostTest extends TestCase
 {
     // The SQL store used 9, 12 and 12. The session row is now inserted only when the locked read
-    // finds none, which saves a statement on every snapshot, and the snapshot that first shows a
-    // command to its runner pays one more statement for the mark.
-    private const int UNBOUND_PLAYING_SNAPSHOT = 8;
-    private const int BOUND_RESTING_SNAPSHOT = 11;
-    private const int BOUND_FIRST_DISCLOSURE_SNAPSHOT = 12;
+    // finds none, and the selected and the active destination are found among the destinations the
+    // snapshot reads anyway, which saves three statements on every snapshot. The snapshot that first
+    // shows a command to its runner pays one more statement for the mark.
+    private const int UNBOUND_PLAYING_SNAPSHOT = 6;
+    private const int BOUND_RESTING_SNAPSHOT = 9;
+    private const int BOUND_FIRST_DISCLOSURE_SNAPSHOT = 10;
     // An addressed command is inserted through the unit of work: one read carries the
     // transaction clock and the replay-key check, a savepoint wraps the insert, and the
     // control's own answer marks the new command as shown. The SQL store used 19.
-    private const int CONTROL_ISSUING_ONE_COMMAND = 23;
+    private const int CONTROL_ISSUING_ONE_COMMAND = 21;
 
     private string $schema;
     private Connection $connection;

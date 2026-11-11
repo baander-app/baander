@@ -505,6 +505,31 @@ final class PlaybackStoreContractTest extends TestCase
         self::assertTrue($this->observer->fetchOne('SELECT count(*)=1 FROM (SELECT 1 FROM listening_sessions WHERE user_id=? FOR UPDATE SKIP LOCKED) free', [$owner]));
     }
 
+    public function testASnapshotNamesTheSelectedDestinationAndTheOneItsActiveIncarnationBelongsTo(): void
+    {
+        $owner = $this->owner();
+        $device = $this->device($owner);
+        $endpoint = new Uuid()->toString();
+        [$earlier, $latest] = array_map(fn(): array => $this->store->register($owner, ['deviceId' => $device, 'endpointId' => $endpoint]), range(1, 2));
+        $other = $this->register($owner, $device);
+        $this->store->lockSession($owner);
+        $point = function (?string $selected, ?string $active) use ($owner): array {
+            $this->connection->executeStatement(
+                'UPDATE listening_sessions SET selected_destination_id=(SELECT id FROM playback_destinations WHERE public_id=?), active_incarnation_id=? WHERE user_id=?',
+                [$selected, $active, $owner],
+            );
+            $snapshot = $this->store->snapshot($this->store->lockSession($owner), null);
+            return [$snapshot['selectedDestinationId'], $snapshot['activeDestinationId'], $snapshot['activeIncarnationId']];
+        };
+
+        self::assertSame($earlier['destinationId'], $latest['destinationId']);
+        self::assertSame([null, null, null], $point(null, null));
+        self::assertSame([$other['destinationId'], $latest['destinationId'], $latest['incarnationId']], $point($other['destinationId'], $latest['incarnationId']));
+        // A later registration of the tab replaced the incarnation that still holds the session.
+        self::assertSame([$other['destinationId'], $latest['destinationId'], $earlier['incarnationId']], $point($other['destinationId'], $earlier['incarnationId']));
+        self::assertSame([$latest['destinationId'], null, null], $point($latest['destinationId'], null));
+    }
+
     public function testASnapshotCarriesEachDestinationOnceWithItsLatestIncarnation(): void
     {
         $owner = $this->owner();

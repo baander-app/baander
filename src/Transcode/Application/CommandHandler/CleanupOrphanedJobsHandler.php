@@ -34,17 +34,15 @@ final class CleanupOrphanedJobsHandler
         try {
             $cleaned = $this->jobPort->cleanupOrphanedJobs();
         } catch (Throwable $failure) {
+            $context = ['expired' => $expired];
             if ($failure instanceof TranscodeCleanupIncompleteException) {
                 // Whoever started the run reports all of its counts, the expired sessions included.
                 $failure = $failure->afterExpiring($expired);
+                $context += ['cleaned' => $failure->removed, 'failed' => $failure->failed];
             }
             // The run still fails for its caller. A console exit code and an HTTP status do not
             // say why, and the sessions expired above stay expired, so the log keeps both.
-            $this->logger->error('The transcode job cleanup failed after stale sessions were expired.', [
-                'expired' => $expired,
-                ...($failure instanceof TranscodeCleanupIncompleteException ? ['cleaned' => $failure->removed, 'failed' => $failure->failed] : []),
-                'exception' => $failure,
-            ]);
+            $this->logger->error('The transcode job cleanup failed after stale sessions were expired.', [...$context, 'exception' => $failure]);
             throw $failure;
         }
 
