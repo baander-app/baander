@@ -644,7 +644,7 @@ Open:
   longer held: between 2026-11-02 and 2026-11-07 every image without a container was
   removed from the daemon from outside, with the footprint of `docker system prune -a`.
   The tooling has no path that removes release pins.
-- **Rules added for a pruned release, to be accepted or rejected by the user:** the
+- **Rules added for a pruned release, accepted by the user on 2026-11-11:** the
   preflight runs from the prepared release when the previous release's images are gone;
   a worker boot whose operator image is gone is recorded retired without the operator
   when none of its containers exists, and refused before anything starts while
@@ -817,9 +817,8 @@ Decided by the user on 2026-11-11, not yet planned or built:
   volume change shown after the confirmed pause or stop. Only a command that can
   start or move playback keeps the runner fenced.
 
-Open, for the user to decide:
-
-- **The two tooling rules** named under "Development controller image identities".
+The two tooling rules named under "Development controller image identities" were
+accepted by the user on 2026-11-11.
 
 Open, known limits:
 
