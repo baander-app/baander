@@ -283,7 +283,8 @@ jobs:
                 run: |
                     docker run --rm --network none --entrypoint php "$CI_IMAGE" \
                       vendor/bin/phpunit --configuration phpunit-tooling.xml.dist scripts/tests/php/RetainBuildEvidenceTest.php
-                    bash scripts/test-worker-operator-cleanup.sh
+                    docker run --rm --network none --entrypoint php "$CI_IMAGE" \
+                      vendor/bin/phpunit --configuration phpunit-tooling.xml.dist scripts/tests/php/WorkerCleanupTest.php
 
             -   name: PHP tooling regressions
                 run: |
