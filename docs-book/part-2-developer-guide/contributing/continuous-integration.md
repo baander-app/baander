@@ -23,7 +23,7 @@ store. The workflows select them at run time; nothing is edited per forge.
 | `postgres.yaml` | Build PostgreSQL Image | Pushes to `master` that touch `docker/postgres/**`, and dispatch | Publishes `baander-postgres` |
 | `nginx.yaml` | Build Nginx Image | Pushes to `master` that touch `docker/nginx/**`, and dispatch | Publishes `baander-nginx` |
 | `ffmpeg.yaml` | Build FFmpeg Image | Pushes to `master` that touch `packages/baander-aac/**`, `docker/ffmpeg/**` or the capability gate script, and dispatch | Publishes `ffmpeg-baander-static` |
-| `aac-native.yml` | AAC native addon | Pushes, tags and pull requests that touch `packages/baander-aac/**` | GitHub only; see below |
+| `aac-native.yml` | AAC native addon | Pushes, tags and pull requests that touch `packages/baander-aac/**` | GitHub only; builds the prebuilt binding and tests the codec, see below |
 
 A workflow with path filters lists its own file among them, so editing the
 workflow runs it. The README's badges show GitHub's status for CI, Frontend CI,
@@ -43,6 +43,32 @@ and Windows runners, so its jobs carry `if: github.server_url == 'https://github
 On Forgejo the same jobs resolve `runs-on` to `docker-cli` and skip there. Forgejo
 evaluates a job's `if:` only after a matching runner picks the job up, so a macOS or
 Windows label would leave the skipped job queued.
+
+That workflow also tests the codec the binding carries. Every runner builds the
+binding and runs its smoke test under Node and under Electron, which covers the AAC
+and the FLAC classes. The Linux runner then builds the package with CMake and runs
+every CTest suite with `BAAC_REQUIRE_ORACLES` set. The lossless suites compare
+against three oracles: the reference `flac` 1.4.3, FFmpeg and the FLAC decoder
+testbench. With the variable set, a suite fails when its oracle is missing; without
+it the suite skips that comparison, prints a line that begins with `SKIP:` and
+passes. The job also fails when the test log holds such a line. Two scripts under
+`packages/baander-aac/tests` provide the oracles: `flac-reference.sh` builds `flac`
+at its pinned commit, and `flac-testbench.sh` fetches the testbench at its pinned
+commit and checks it against the committed manifest. Each sits behind an
+`actions/cache` entry keyed on its pin, so a run builds or fetches only after a pin
+has moved, and the scripts leave a restored copy alone once they have checked it.
+The runner's `flac` package is not used.
+
+The two macOS runners build the lossless suites for their own architecture and run
+them. The lossless mode picks its kernels for the processor it runs on, so the arm64
+runner is the only place where the NEON kernels execute. `BAAC_REQUIRE_KERNELS`
+names the kernel levels a runner has to exercise (`neon` on arm64, `sse2,avx2` on
+Linux, `sse2` on the Intel Mac): `test_flac_dsp` fails when a named level did not
+run or installed no kernel of its own, and the step checks the suite's output for
+the line that says the level ran and how many of its kernels were compared with the
+scalar ones. Windows has no such step. The CTest suites
+are POSIX programs, and the Windows build of the codec is tested through the
+binding.
 
 ### Forge detection
 

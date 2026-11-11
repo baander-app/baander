@@ -27,6 +27,7 @@ tool skips the configurations that need it and says so.
 import argparse
 import csv
 import datetime
+import hashlib
 import json
 import math
 import os
@@ -579,14 +580,13 @@ def stage_compat(args):
 #
 # What is timed.  The gates are judged on the long run: one process over
 # the input repeated until the fastest command of the gate set takes at
-# least 2 CPU seconds.  That is the method the plan fixes, and it keeps
-# a start of a process (about 1 ms) out of the figure.  The plan does
-# not say whether an encoder reads WAV or raw PCM; flac reads raw PCM
-# about 3 % faster than WAV and bAAC reads both alike, so the encode
-# gates are judged on raw input, the case that favours bAAC least.  The
-# other three figures of each encode gate are measured and recorded
-# beside it, each labelled: long run from WAV, and one process per
-# corpus item (which adds each tool's start cost) from raw and from WAV.
+# least 2 CPU seconds, which keeps the start of a process (about 1 ms)
+# out of the figure.  The encode gates are judged on raw input: flac
+# reads raw PCM about 3 % faster than WAV and bAAC reads both alike, so
+# raw input is the case that favours bAAC least.  The other three
+# figures of each encode gate are measured and recorded beside it, each
+# labelled: long run from WAV, and one process per corpus item (which
+# adds each tool's start cost) from raw and from WAV.
 #
 # Decode.  The neutral streams are flac's own (-5 and -8).  Against
 # `flac -d` both sides verify the MD5; against FFmpeg neither does and
@@ -597,10 +597,23 @@ def stage_compat(args):
 # others that take it (bAAC's by flac and FFmpeg, theirs by bAAC) and
 # each decode is compared with the source bytes.
 #
-# Held-out inputs.  Real recordings from the FLAC decoder testbench,
-# decoded with `flac -d`, never used for tuning: five 96 kHz 24-bit
-# files, one 5.1 file and one 16-bit stereo file.  Each set's total
-# frame bytes gate; the per-file figures are recorded.
+# Corpus additions.  Seven recordings from the FLAC decoder testbench,
+# decoded with `flac -d`: five 96 kHz 24-bit files, one 5.1 file and one
+# 16-bit stereo file.  They were the first held-out set; they have been
+# run and have informed work on the encoder, so they now count as corpus
+# and may be tuned on.  Each set keeps its gates at level 5, and the
+# enlarged corpus (the ten items and these) has size totals and size
+# gates of its own at levels 5 and 8.
+#
+# Held-out recordings.  Three recordings that no encoder or decoder has
+# been run on before the recorded run: a 96 kHz 24-bit file, twenty
+# seconds of a 5.1 film master and a 16-bit stereo file
+# (fetch-heldout.sh).  The stage touches them only in a complete run
+# with --check that starts on a quiet host, writes a ledger entry
+# before it reads the first of them, and records in its result whether
+# that run was the first.  A later run with another build of baac is
+# not a gate result for these recordings.  Each set's total frame bytes
+# gate at level 5, with an encode gate and two decode gates.
 #
 # Host.  The run records the processor, the compiler, the versions of
 # the references and the load average at its start and end.  A run on a
@@ -615,17 +628,34 @@ QUIET_LOAD = 2.0
 CARRIED_REFALAC = dict(codec="alac-apple-ref", seconds=130.3173125, kbps=690.2499619918112,
                        bit_exact=True, carried="2026-10-30")
 TESTBENCH = Path(os.environ.get("BAAC_FLAC_TESTBENCH", HERE / "work" / "flac-test-files"))
+HELDOUT_DIR = Path(os.environ.get("BAAC_HELDOUT", HERE / "work" / "heldout"))
+# A set is (id, label, format, sources); a source is (file, skip, until),
+# the last two as `flac -d --skip` and `--until` take them, or None for
+# the whole file.
+#
+# The first held-out set, now corpus: files of the testbench's subset.
+CORPUS_ADDITIONS = [
+    ("hires", "96 kHz, 24-bit stereo", dict(sample_rate=96000, channels=2, bits=24),
+     [("28 - high resolution audio, default settings.flac", None, None),
+      ("29 - high resolution audio, blocksize 16384.flac", None, None),
+      ("30 - high resolution audio, blocksize 13456.flac", None, None),
+      ("31 - high resolution audio, using only 32nd order predictors.flac", None, None),
+      ("32 - high resolution audio, partition order 8 containing escaped partitions.flac",
+       None, None)]),
+    ("surround", "5.1, 44.1 kHz, 16-bit", dict(sample_rate=44100, channels=6, bits=16),
+     [("41 - 6 channels (5.1).flac", None, None)]),
+    ("stereo16", "44.1 kHz, 16-bit stereo", dict(sample_rate=44100, channels=2, bits=16),
+     [("01 - blocksize 4096.flac", None, None)]),
+]
+# The held-out set.  The span of the film master was fixed before the
+# file was ever decoded: twenty seconds from the fifth minute.
 HELD_OUT = [
     ("hires", "96 kHz, 24-bit stereo", dict(sample_rate=96000, channels=2, bits=24),
-     ["28 - high resolution audio, default settings",
-      "29 - high resolution audio, blocksize 16384",
-      "30 - high resolution audio, blocksize 13456",
-      "31 - high resolution audio, using only 32nd order predictors",
-      "32 - high resolution audio, partition order 8 containing escaped partitions"]),
-    ("surround", "5.1, 44.1 kHz, 16-bit", dict(sample_rate=44100, channels=6, bits=16),
-     ["41 - 6 channels (5.1)"]),
-    ("stereo16", "44.1 kHz, 16-bit stereo", dict(sample_rate=44100, channels=2, bits=16),
-     ["01 - blocksize 4096"]),
+     [("open-goldberg-variatio-4.flac", None, None)]),
+    ("surround", "5.1, 48 kHz, 16-bit", dict(sample_rate=48000, channels=6, bits=16),
+     [("sintel-master-51.flac", "5:00.00", "5:20.00")]),
+    ("stereo16", "48 kHz, 16-bit stereo", dict(sample_rate=48000, channels=2, bits=16),
+     [("sintel_trailer-audio.flac", None, None)]),
 ]
 
 
@@ -800,17 +830,24 @@ def dec_baac(stream, out, md5=True, raw=False):
         (["--raw"] if raw else []) + [str(stream), str(out)]
 
 
-def dec_flac(stream, out, raw=False):
+def dec_flac(stream, out, raw=False, skip=None, until=None):
     extra = ["--force-raw-format", "--endian=little", "--sign=signed"] if raw else []
+    extra += [f"--skip={skip}"] if skip else []
+    extra += [f"--until={until}"] if until else []
     return [TOOLS["flac"], "-d", "-s", "-f"] + extra + ["-o", str(out), str(stream)]
+
+
+def ffmpeg_cmd(*args):
+    """An FFmpeg command of the lossless stage: quiet, no terminal, one
+    thread, and the arguments given."""
+    return [TOOLS["ffmpeg"], "-v", "error", "-nostdin", "-y", "-threads", "1", *args]
 
 
 def dec_ffmpeg(stream, out, bits=16, raw=False):
     """FFmpeg's decode with the frame CRC check on; it verifies no MD5."""
     width = 16 if bits <= 16 else 24 if bits <= 24 else 32
-    return [TOOLS["ffmpeg"], "-v", "error", "-nostdin", "-y", "-threads", "1", "-err_detect",
-            "crccheck", "-i", str(stream), "-c:a", f"pcm_s{width}le", "-f",
-            f"s{width}le" if raw else "wav", str(out)]
+    return ffmpeg_cmd("-err_detect", "crccheck", "-i", str(stream), "-c:a", f"pcm_s{width}le",
+                      "-f", f"s{width}le" if raw else "wav", str(out))
 
 
 def decoded(cmd_for, core):
@@ -901,6 +938,32 @@ def flac_properties(path):
         v & ((1 << 36) - 1)
 
 
+def file_sha256(path):
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for block in iter(lambda: f.read(1 << 20), b""):
+            h.update(block)
+    return h.hexdigest()
+
+
+def held_out_entry(ledger_path, date, baac_sha256, git):
+    """Books a run on the held-out recordings in the ledger, before the
+    run reads the first of them, and returns what the result records:
+    whether it is the first run, and whether it measures the build of
+    baac the first run measured.  An interrupted run stays booked: the
+    recordings were read."""
+    runs = json.loads(ledger_path.read_text())["runs"] if ledger_path.exists() else []
+    record = dict(touched=True, run=len(runs) + 1, first_run=not runs,
+                  same_build_as_first=not runs or runs[0]["baac_sha256"] == baac_sha256,
+                  first_date=runs[0]["date"] if runs else date, baac_sha256=baac_sha256)
+    runs.append(dict(date=date, baac_sha256=baac_sha256, git=git))
+    ledger_path.parent.mkdir(parents=True, exist_ok=True)
+    ledger_path.write_text(json.dumps(dict(
+        note="Runs of the lossless stage on the held-out recordings. Deleting this file does "
+             "not make the recordings unseen.", runs=runs), indent=1) + "\n")
+    return record
+
+
 def alac_rows(have_refalac, measured):
     """The ALAC reference rows: refalac measured when it runs here, else
     the row carried from the run of 2026-10-30, which is compared on size
@@ -983,15 +1046,12 @@ def stage_lossless(args):
                              lambda src, o, level=level: enc_flac(level, src, o)))
     for level in (5, 8):
         rows.append(flac_row(f"flac-ffmpeg-{level}", "ffmpeg", level,
-                             lambda src, o, level=level: [
-                                 ff, "-v", "error", "-nostdin", "-y", "-threads", "1", "-i",
-                                 str(src), "-c:a", "flac", "-compression_level", str(level),
-                                 str(o)]))
-    alac_enc = lambda src, o: [ff, "-v", "error", "-nostdin", "-y", "-threads", "1", "-i",
-                               str(src), "-c:a", "alac", str(o)]
-    alac_dec = lambda stream, out, raw=False: [
-        ff, "-v", "error", "-nostdin", "-y", "-threads", "1", "-i", str(stream), "-c:a",
-        "pcm_s16le", "-f", "s16le" if raw else "wav", str(out)]
+                             lambda src, o, level=level: ffmpeg_cmd(
+                                 "-i", str(src), "-c:a", "flac", "-compression_level", str(level),
+                                 str(o))))
+    alac_enc = lambda src, o: ffmpeg_cmd("-i", str(src), "-c:a", "alac", str(o))
+    alac_dec = lambda stream, out, raw=False: ffmpeg_cmd(
+        "-i", str(stream), "-c:a", "pcm_s16le", "-f", "s16le" if raw else "wav", str(out))
     cpu_run(alac_enc(d / "corpus.wav", d / "alac-ffmpeg.m4a"), core)
     size = os.path.getsize(d / "alac-ffmpeg.m4a")
     measured_alac = [dict(codec="alac-ffmpeg", family="alac", encoder="ffmpeg", seconds=seconds,
@@ -1027,8 +1087,8 @@ def stage_lossless(args):
                 e, dcmd = enc_flac(level, long_wav, "/dev/null"), dec_flac(stream, "/dev/null")
                 make = enc_flac(level, long_wav, stream)
             else:
-                e = [ff, "-v", "error", "-nostdin", "-y", "-threads", "1", "-i", str(long_wav),
-                     "-c:a", "flac", "-compression_level", str(level), "-f", "flac", "/dev/null"]
+                e = ffmpeg_cmd("-i", str(long_wav), "-c:a", "flac", "-compression_level",
+                               str(level), "-f", "flac", "/dev/null")
                 make = e[:-3] + [str(stream)]
                 dcmd = dec_ffmpeg(stream, "/dev/null")
             cpu_run(make, core)
@@ -1132,67 +1192,132 @@ def stage_lossless(args):
     for f in ("timing.flac", "timing.m4a"):
         (d / f).unlink(missing_ok=True)
 
-    # ---- held-out recordings -------------------------------------------
-    held = []
-    for set_id, label, expected, names in HELD_OUT:
-        if not only.search(f"held-{set_id}"):
-            continue
-        ours_total = theirs_total = 0
-        set_raw = d / f"held.{set_id}.raw"
+    # ---- recordings beyond the ten items --------------------------------
+    def measure_set(prefix, group, what, directory, set_id, label, expected, sources, levels):
+        """One set of recordings: sizes file by file at `levels`, exactness
+        and the level 5 gates on the set as one input.  Returns the per-file
+        records and the set's frame bytes by level and encoder."""
+        records = []
+        totals = {level: dict(baac=0, flac=0) for level in levels}
+        set_raw = d / f"{prefix}.{set_id}.raw"
         with open(set_raw, "wb") as out:
-            for name in names:
-                path = TESTBENCH / "subset" / f"{name}.flac"
+            for name, skip, until in sources:
+                path = directory / name
                 if not path.exists():
-                    raise SystemExit(f"held-out file \"{path}\" is missing: run "
-                                     "../tests/flac-testbench.sh")
-                found, total = flac_properties(path)
+                    raise SystemExit(f"{what} file \"{path}\" is missing")
+                found, _ = flac_properties(path)
                 check_held_out_format(name, found, expected)
-                pcm = decoded(lambda o: dec_flac(path, o, raw=True), core)
+                pcm = decoded(lambda o: dec_flac(path, o, raw=True, skip=skip, until=until), core)
                 out.write(pcm)
-                raw = d / "held.one.raw"
+                raw = d / f"{prefix}.one.raw"
                 raw.write_bytes(pcm)
-                cpu_run(enc_baac(5, raw, d / "held.baac.flac", expected), core)
-                cpu_run(enc_flac(5, raw, d / "held.flac.flac", expected), core)
-                exact = all(same_bytes(decoded(dec, core), pcm) for dec in (
-                    lambda o: dec_baac(d / "held.baac.flac", o, raw=True),
-                    lambda o: dec_flac(d / "held.baac.flac", o, raw=True),
-                    lambda o: dec_ffmpeg(d / "held.baac.flac", o, expected["bits"], raw=True),
-                    lambda o: dec_baac(d / "held.flac.flac", o, raw=True)))
-                a = flac_frame_bytes(d / "held.baac.flac")
-                b = flac_frame_bytes(d / "held.flac.flac")
-                ours_total += a
-                theirs_total += b
-                held.append(dict(set=set_id, file=name, seconds=total / expected["sample_rate"],
-                                 **expected, baac_frame_bytes=a, flac_frame_bytes=b,
-                                 bit_exact=bool(exact)))
-        gate(f"held-{set_id}-size", "held-out", f"held-out {label}: level 5 frame bytes against flac -5",
-             dict(kind="size", **size_verdict(ours_total, theirs_total)))
-        set_reps = long_input(d, f"held.{set_id}", set_raw, expected, core)
-        lraw = d / f"held.{set_id}.long.raw"
-        stream = d / f"held.{set_id}.long.flac"
+                record = dict(set=set_id, file=Path(name).stem, **expected,
+                              seconds=len(pcm) / (expected["sample_rate"] * expected["channels"]
+                                                  * ((expected["bits"] + 7) // 8)))
+                if skip or until:
+                    record["span"] = [skip, until]
+                exact = True
+                for level in levels:
+                    ours, theirs = d / f"{prefix}.baac.flac", d / f"{prefix}.flac.flac"
+                    cpu_run(enc_baac(level, raw, ours, expected), core)
+                    cpu_run(enc_flac(level, raw, theirs, expected), core)
+                    exact = exact and all(same_bytes(decoded(dec, core), pcm) for dec in (
+                        lambda o: dec_baac(ours, o, raw=True),
+                        lambda o: dec_flac(ours, o, raw=True),
+                        lambda o: dec_ffmpeg(ours, o, expected["bits"], raw=True),
+                        lambda o: dec_baac(theirs, o, raw=True)))
+                    a, b = flac_frame_bytes(ours), flac_frame_bytes(theirs)
+                    totals[level]["baac"] += a
+                    totals[level]["flac"] += b
+                    suffix = "" if level == 5 else f"_{level}"
+                    record[f"baac_frame_bytes{suffix}"] = a
+                    record[f"flac_frame_bytes{suffix}"] = b
+                record["bit_exact"] = bool(exact)
+                records.append(record)
+        gate(f"{prefix}-{set_id}-size", group, f"{what} {label}: level 5 frame bytes against flac -5",
+             dict(kind="size", **size_verdict(totals[5]["baac"], totals[5]["flac"])))
+        set_reps = long_input(d, f"{prefix}.{set_id}", set_raw, expected, core)
+        lraw = d / f"{prefix}.{set_id}.long.raw"
+        stream = d / f"{prefix}.{set_id}.long.flac"
         cpu_run(enc_flac(5, lraw, stream, expected), core)
-        r = measure_gate(f"held-{set_id}-enc", [enc_baac(5, lraw, "/dev/null", expected)],
+        r = measure_gate(f"{prefix}-{set_id}-enc", [enc_baac(5, lraw, "/dev/null", expected)],
                          [enc_flac(5, lraw, "/dev/null", expected)], repeats, core)
-        gate(f"held-{set_id}-enc", "held-out", f"held-out {label}: encode at level 5 against flac -5",
+        gate(f"{prefix}-{set_id}-enc", group, f"{what} {label}: encode at level 5 against flac -5",
              dict(kind="speed", **r), f"one process over the set repeated {set_reps} times, raw "
              "input")
-        r = measure_gate(f"held-{set_id}-dec-flac", [dec_baac(stream, "/dev/null")],
+        r = measure_gate(f"{prefix}-{set_id}-dec-flac", [dec_baac(stream, "/dev/null")],
                          [dec_flac(stream, "/dev/null")], repeats, core)
-        gate(f"held-{set_id}-dec-flac", "held-out",
-             f"held-out {label}: decode of the flac -5 stream against flac (MD5 verified by both)",
+        gate(f"{prefix}-{set_id}-dec-flac", group,
+             f"{what} {label}: decode of the flac -5 stream against flac (MD5 verified by both)",
              dict(kind="speed", **r), f"one process over the set repeated {set_reps} times")
-        r = measure_gate(f"held-{set_id}-dec-ffmpeg", [dec_baac(stream, "/dev/null", md5=False)],
+        r = measure_gate(f"{prefix}-{set_id}-dec-ffmpeg", [dec_baac(stream, "/dev/null", md5=False)],
                          [dec_ffmpeg(stream, "/dev/null", expected["bits"])], repeats, core)
-        gate(f"held-{set_id}-dec-ffmpeg", "held-out",
-             f"held-out {label}: decode of the flac -5 stream against FFmpeg (frame CRCs checked "
+        gate(f"{prefix}-{set_id}-dec-ffmpeg", group,
+             f"{what} {label}: decode of the flac -5 stream against FFmpeg (frame CRCs checked "
              "by both, no MD5)", dict(kind="speed", **r),
              f"one process over the set repeated {set_reps} times")
-        for f in (lraw, stream, d / f"held.{set_id}.long.wav", set_raw):
+        for f in (lraw, stream, d / f"{prefix}.{set_id}.long.wav", set_raw,
+                  d / f"{prefix}.one.raw", d / f"{prefix}.baac.flac", d / f"{prefix}.flac.flac"):
             f.unlink(missing_ok=True)
+        return records, totals
+
+    limited = bool(args.only or args.gates_only or args.any_flac or args.reps)
+
+    # The corpus additions, and the totals of the enlarged corpus: the ten
+    # items back to back and these recordings.
+    added = []
+    corpus_totals = dict(original={str(level): dict(baac=by[f"baac-{level}"]["frame_bytes"],
+                                                    flac=by[f"flac-{level}"]["frame_bytes"])
+                                   for level in (5, 8)})
+    enlarged = {level: dict(corpus_totals["original"][str(level)]) for level in (5, 8)}
+    measured_all = True
+    for set_id, label, expected, sources in CORPUS_ADDITIONS:
+        if not only.search(f"added-{set_id}"):
+            measured_all = False
+            continue
+        if not (TESTBENCH / "subset").is_dir():
+            raise SystemExit(f"the FLAC decoder testbench is missing at {TESTBENCH}: run "
+                             "../tests/flac-testbench.sh")
+        records, totals = measure_set("added", "corpus", "corpus addition", TESTBENCH / "subset",
+                                      set_id, label, expected, sources, (5, 8))
+        added += records
+        for level in (5, 8):
+            for side in ("baac", "flac"):
+                enlarged[level][side] += totals[level][side]
+    if measured_all:
+        corpus_totals["enlarged"] = {str(level): enlarged[level] for level in (5, 8)}
+        for level in (5, 8):
+            gate(f"size-{level}-enlarged", "corpus",
+                 f"bAAC level {level} frame bytes against flac -{level} on the enlarged corpus",
+                 dict(kind="size", **size_verdict(enlarged[level]["baac"],
+                                                  enlarged[level]["flac"])))
+
+    # The held-out recordings.  Nothing before this point has read them,
+    # and nothing reads them unless this is a run that can count: complete,
+    # asked to judge its gates, and begun on a quiet host.
+    held = []
+    if limited or not args.check:
+        held_run = dict(touched=False, reason="the run was limited" if limited else
+                        "the stage was not run with --check")
+    elif load_start[0] > args.quiet_load:
+        held_run = dict(touched=False, reason=f"the host was not quiet at the start (load "
+                                              f"{load_start[0]:.2f})")
+    else:
+        if not HELDOUT_DIR.is_dir():
+            raise SystemExit(f"the held-out recordings are missing at {HELDOUT_DIR}: run "
+                             "./fetch-heldout.sh")
+        held_run = held_out_entry(HELDOUT_DIR / "runs.json", started,
+                                  file_sha256(TOOLS["baac"]), git_state())
+        for set_id, label, expected, sources in HELD_OUT:
+            records, _ = measure_set("held", "held-out", "held-out", HELDOUT_DIR, set_id, label,
+                                     expected, sources, (5,))
+            held += records
+    if not held_run["touched"]:
+        print(f"the held-out recordings were not read: {held_run['reason']}", file=sys.stderr)
 
     load_end = os.getloadavg()
     quiet = max(load_start[0], load_end[0]) <= args.quiet_load
-    complete = not (args.only or args.gates_only or args.any_flac or args.reps)
+    complete = not limited
     result = dict(
         schema=2, date=started, complete=complete,
         host=dict(host, load_start=[round(x, 2) for x in load_start],
@@ -1206,7 +1331,8 @@ def stage_lossless(args):
                               "threshold 1 + (max - min) / median of the reference's times",
                     judged="long run (one process over the repeated input); encode from raw "
                            "PCM, which flac reads about 3 % faster than WAV"),
-        rows=rows + alac, gates=gates, figures=figures, held_out=held)
+        rows=rows + alac, gates=gates, figures=figures, corpus_totals=corpus_totals,
+        corpus_additions=added, held_out=held, held_out_run=held_run)
     (WORK / "lossless.json").write_text(json.dumps(result, indent=1) + "\n")
     for f in d.glob("*.long.*"):
         f.unlink()
@@ -1239,10 +1365,11 @@ def check_lossless(result, out=sys.stdout):
         if not r.get("bit_exact", False):
             print(f"failed    {r['codec']} is not bit-exact", file=out)
             ok = False
-    for h in result.get("held_out", []):
-        if not h.get("bit_exact", False):
-            print(f"failed    held-out file \"{h['file']}\" is not bit-exact", file=out)
-            ok = False
+    for what, key in (("corpus addition", "corpus_additions"), ("held-out file", "held_out")):
+        for h in result.get(key, []):
+            if not h.get("bit_exact", False):
+                print(f"failed    {what} \"{h['file']}\" is not bit-exact", file=out)
+                ok = False
     # An observation, not a gate: each level against the level below it.
     sizes = {r["level"]: r["frame_bytes"] for r in result.get("rows", [])
              if r.get("encoder") == "baac"}
@@ -1252,12 +1379,28 @@ def check_lossless(result, out=sys.stdout):
                              else "bAAC levels larger than the level below: " + ", ".join(larger)),
           file=out)
     if not result.get("complete", False):
-        print("not a gate result: the run was limited (--only, --gates-only or --any-flac)",
+        print("not a gate result: the run was limited (--only, --gates-only, --reps or --any-flac)",
               file=out)
         ok = False
     if not host.get("quiet", False):
         print(f"not a gate result: the host was not quiet (load above "
               f"{host.get('quiet_load', QUIET_LOAD)}); run it again when it is", file=out)
+        ok = False
+    # The held-out recordings count once: in their first run, or in a
+    # later run of the build the first run measured.
+    run = result.get("held_out_run", {})
+    if not run.get("touched", False):
+        print("not a gate result: the held-out recordings were not read ("
+              f"{run.get('reason', 'the result does not say why')})", file=out)
+        ok = False
+    elif run.get("first_run", False):
+        print("held-out recordings: this was their first run", file=out)
+    elif run.get("same_build_as_first", False):
+        print(f"held-out recordings: run {run.get('run')}, of the build their first run "
+              f"measured on {run.get('first_date')}", file=out)
+    else:
+        print(f"not a gate result for the held-out recordings: run {run.get('run')}, and the "
+              f"first, on {run.get('first_date')}, measured another build of baac", file=out)
         ok = False
     print("every gate passed" if ok else "not every gate passed", file=out)
     return ok
@@ -1317,13 +1460,43 @@ def lossless_section(result):
                       f"{f['ours_median']:.3f} | {f['reference_median']:.3f} | "
                       f"{f['ratio_median']:.3f} ({f['ratio_min']:.3f} to {f['ratio_max']:.3f}) | "
                       f"{f['threshold']:.3f} | {f['verdict']} |")
-    if result["held_out"]:
-        md.append("\n### Held-out recordings, level 5\n")
-        md.append("| Set | File | Seconds | bAAC frame bytes | flac -5 frame bytes | Bit-exact |")
-        md.append("|---|---|--:|--:|--:|---|")
-        for h in result["held_out"]:
+    totals = result.get("corpus_totals", {})
+    if totals:
+        md.append("\n### Corpus totals, frame bytes\n")
+        md.append("The original corpus is the ten items back to back. The enlarged corpus adds "
+                  "the recordings of the first held-out set, which are listed below.\n")
+        md.append("| Corpus | Level | bAAC | flac |")
+        md.append("|---|--:|--:|--:|")
+        for name in ("original", "enlarged"):
+            for level, t in sorted(totals.get(name, {}).items()):
+                md.append(f"| {name} | {level} | {t['baac']} | {t['flac']} |")
+    if result.get("corpus_additions"):
+        md.append("\n### Corpus additions\n")
+        md.append("| Set | File | Seconds | bAAC level 5 | flac -5 | bAAC level 8 | flac -8 | "
+                  "Bit-exact |")
+        md.append("|---|---|--:|--:|--:|--:|--:|---|")
+        for h in result["corpus_additions"]:
             md.append(f"| {h['set']} | {h['file']} | {h['seconds']:.1f} | {h['baac_frame_bytes']} | "
-                      f"{h['flac_frame_bytes']} | {h['bit_exact']} |")
+                      f"{h['flac_frame_bytes']} | {h['baac_frame_bytes_8']} | "
+                      f"{h['flac_frame_bytes_8']} | {h['bit_exact']} |")
+    run = result.get("held_out_run", {})
+    md.append("\n### Held-out recordings, level 5\n")
+    if not run.get("touched", False):
+        md.append(f"Not read in this run: {run.get('reason', 'the result does not say why')}.")
+    else:
+        md.append("This was the first run on these recordings." if run.get("first_run") else
+                  f"Run {run.get('run')} on these recordings; the first was on "
+                  f"{run.get('first_date')}"
+                  + (" and measured this build of baac." if run.get("same_build_as_first") else
+                     " and measured another build of baac, so this run is not a gate result "
+                     "for them."))
+        md.append("\n| Set | File | Span | Seconds | bAAC frame bytes | flac -5 frame bytes | "
+                  "Bit-exact |")
+        md.append("|---|---|---|--:|--:|--:|---|")
+        for h in result.get("held_out", []):
+            span = " to ".join(h["span"]) if h.get("span") else "whole"
+            md.append(f"| {h['set']} | {h['file']} | {span} | {h['seconds']:.1f} | "
+                      f"{h['baac_frame_bytes']} | {h['flac_frame_bytes']} | {h['bit_exact']} |")
     return md
 
 
@@ -1569,10 +1742,12 @@ def stage_selftest(args):
     expect(size_verdict(1001, 1000)["verdict"] == "failed", "one byte more than the reference fails")
 
     # The check mode on a whole made-up run.
-    def made_up(speed, size=(1000, 1000), quiet=True, exact=True):
+    def made_up(speed, size=(1000, 1000), quiet=True, exact=True, held=None):
         host = dict(cpu="test", core=0, load_start=[0.1], load_end=[0.1], quiet=quiet,
                     quiet_load=QUIET_LOAD)
         return dict(date="test", complete=True, host=host, held_out=[],
+                    held_out_run=held or dict(touched=True, run=1, first_run=True,
+                                              same_build_as_first=True, first_date="test"),
                     rows=[dict(codec="baac-5", encoder="baac", level=5, frame_bytes=10,
                                bit_exact=exact)],
                     gates=[dict(id="size-5", group="flac", description="size", kind="size",
@@ -1589,6 +1764,27 @@ def stage_selftest(args):
            "the check does not pass a run on a host that was not quiet")
     expect(not check_lossless(made_up(below, exact=False), sink),
            "the check does not pass a row that is not bit-exact")
+    expect(not check_lossless(made_up(below, held=dict(touched=False, reason="test")), sink),
+           "the check does not pass a run that did not read the held-out recordings")
+
+    # The ledger of the held-out recordings: the first run, a second run
+    # of the same build, and a run of another build.
+    with tempfile.TemporaryDirectory() as tmp:
+        ledger = Path(tmp) / "heldout" / "runs.json"
+        first = held_out_entry(ledger, "day 1", "aaaa", "rev1")
+        again = held_out_entry(ledger, "day 2", "aaaa", "rev1")
+        other = held_out_entry(ledger, "day 3", "bbbb", "rev2")
+        expect(first["first_run"] and first["run"] == 1, "the ledger books a first run as the first")
+        expect(not again["first_run"] and again["same_build_as_first"] and again["run"] == 2
+               and again["first_date"] == "day 1",
+               "a second run of the same build is booked as a repeat")
+        expect(not other["first_run"] and not other["same_build_as_first"] and other["run"] == 3,
+               "a run of another build is booked as such")
+        expect(len(json.loads(ledger.read_text())["runs"]) == 3, "the ledger keeps every run")
+        expect(check_lossless(made_up(below, held=again), sink),
+               "the check passes a repeat on the build the first run measured")
+        expect(not check_lossless(made_up(below, held=other), sink),
+               "the check does not pass the held-out gates of another build's later run")
 
     # Exactness: one sample altered is not the same decode.
     pcm = bytes(range(256)) * 16

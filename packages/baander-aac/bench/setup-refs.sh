@@ -9,8 +9,12 @@
 # and its metaflac (../tests/flac-reference.sh) are built and their
 # exports written to env.sh before anything else is fetched, so that a
 # missing dependency of an AAC reference or of a quality meter cannot
-# keep `./bench.py lossless` from running.  With --lossless-only the
-# script stops there.
+# keep `./bench.py lossless` from running.  The recordings of that stage
+# follow: the FLAC decoder testbench (../tests/flac-testbench.sh), whose
+# files are part of the corpus, and the held-out recordings
+# (fetch-heldout.sh), which are downloaded and checksummed here and
+# read by nothing but the stage itself.  With --lossless-only the script
+# stops there.
 #
 # Needs: git, cmake, ninja, a C/C++ toolchain, autotools, the GStreamer
 # development packages (GstPEAQ), wine and 7z (Apple AAC), curl, and
@@ -49,6 +53,12 @@ export FLAC=$flac METAFLAC=$(dirname "$(dirname "$flac")")/metaflac/metaflac
 export BAAC_FLAC_REFERENCE=$flac
 ENV
 echo "wrote the lossless exports to $ext/env.sh"
+testbench=$("$here/../tests/flac-testbench.sh")
+heldout=$("$here/fetch-heldout.sh")
+cat >> env.sh <<ENV
+export BAAC_FLAC_TESTBENCH=$testbench
+export BAAC_HELDOUT=$heldout
+ENV
 [ "$lossless_only" = 1 ] && exit 0
 
 fetch() {  # repo dir commit

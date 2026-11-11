@@ -32,9 +32,10 @@ export VISQOL=/path/to/visqol  # optional, see below
 The lossless stage needs only the pinned `flac`, FFmpeg and Python with
 numpy: `./setup-refs.sh --lossless-only` builds `flac` 1.4.3 and writes
 its exports, and the full script writes them before it fetches anything
-else. `../tests/flac-testbench.sh` fetches the recordings of the held-out
-sets. The quality, speed and compat stages also need scipy and
-soundfile.
+else. The same call fetches the stage's recordings: the FLAC decoder
+testbench (`../tests/flac-testbench.sh`), seven files of which are part
+of the corpus, and the held-out recordings (`./fetch-heldout.sh`). The
+quality, speed and compat stages also need scipy and soundfile.
 
 `report` replaces a results file and its section of `results/tables.md`
 only when the stage has a cache under `work/`; the others stay as they
@@ -102,14 +103,84 @@ references and judges the gates of the lossless mode; the comment above
   both, no MD5).
 - **Exactness.** Every stream is decoded by its own decoder and by the
   others, and each decode compared with the source bytes.
-- **Held-out recordings.** Five 96 kHz 24-bit files, a 5.1 file and a
-  16-bit stereo file from the FLAC decoder testbench, at level 5. They
-  are measured for the record and never used to tune the encoder.
+- **Corpus additions.** Seven recordings of the FLAC decoder testbench
+  are measured beside the ten items: five 96 kHz 24-bit files (testbench
+  files 28 to 32), a 5.1 file (41) and a 16-bit stereo file (01). Each
+  set has a size gate on its total at level 5, an encode gate and two
+  decode gates, and the sizes are recorded file by file at levels 5 and
+  8. The enlarged corpus, the ten items and these seven, has totals and
+  size gates of its own at levels 5 and 8. The totals of the ten items
+  stay as they were and are labelled as the original corpus.
+- **Held-out recordings.** Three recordings that are never used to tune
+  the encoder, at level 5, with the same four gates for each: Variatio 4
+  of the Open Goldberg Variations (96 kHz, 24-bit stereo, 69 s), twenty
+  seconds of the 5.1 master of the film Sintel (48 kHz, 16-bit, from
+  5:00 to 5:20) and the audio of the film's trailer (48 kHz, 16-bit
+  stereo, 52 s). [Held-out recordings](#held-out-recordings) states
+  where they come from, how the stage keeps them unseen and what
+  happened to the set before them.
+- **What the figures describe.** One build on one machine: `baac` as
+  CMake builds it in Release, on the processor the run records. The
+  judged speed figure leaves the start of a process out, and the
+  per-item figures include it; one start of `baac` costs more than one
+  of `flac`, because the tool loads the C++ runtime dynamically. On x86
+  the AVX2 kernels run, among them a Rice writer that only GCC and Clang
+  build, so an MSVC build encodes more slowly than a run here shows. The
+  NEON kernels do not run on an x86 host, and no ARM speed is recorded.
 - **Host.** A run records the processor, the compiler, the versions of
   the references and the load average at its start and end. A run that
   was limited (`--only`, `--gates-only`, `--reps`) or made while the
   load was above `--quiet-load` (2.0) is recorded as such and is not a
   gate result: `check` exits non-zero for it.
+
+## Held-out recordings
+
+The held-out recordings exist to answer one question: whether the
+encoder is as good on material it was not tuned on as on the corpus. The
+answer holds only if nothing was decided by looking at them, so the
+harness makes the first look the recorded one.
+
+`fetch-heldout.sh` downloads three files into `work/heldout` and checks
+them against `heldout.sha256`; `setup-refs.sh` calls it. The script
+downloads and checksums and does nothing else.
+
+| File | Source | Licence |
+|---|---|---|
+| `open-goldberg-variatio-4.flac` | Kimiko Ishizaka, J.S. Bach: "Open" Goldberg Variations, BWV 988, Variatio 4; Internet Archive item `OpenGoldbergVariations` | Creative Commons Zero 1.0 |
+| `sintel-master-51.flac` | The 5.1 master of the open movie Sintel, (c) Blender Foundation, durian.blender.org; `media.xiph.org/sintel` | Creative Commons Attribution 3.0 |
+| `sintel_trailer-audio.flac` | The trailer audio of the same film; `media.xiph.org/sintel` | Creative Commons Attribution 3.0 |
+
+Only the lossless stage reads the files, and only in a run that can
+count: a complete run with `--check` that starts on a quiet host. A
+limited run, a run without `--check` and a run that starts under load
+leave them alone and say so. Before the stage decodes the first file it
+books the run in `work/heldout/runs.json`, with the date and the SHA-256
+of the `baac` binary it measures, and the result records whether the run
+was the first. A later run of the same binary is a repeat of the same
+measurement and counts. A later run of another binary does not: `check`
+reports its held-out gates and exits non-zero, because the encoder may
+have changed in answer to the first look. Deleting the ledger does not
+make the recordings unseen; a set that has been looked at is replaced,
+not reused. The span of the film master was fixed before the file was
+decoded.
+
+A held-out gate that fails in the recorded run is reported as failed.
+The encoder is not tuned in answer to it.
+
+### The first held-out set
+
+The seven testbench recordings that are now corpus additions were the
+first held-out set. They were run once before the encoder was final, in
+a limited run on a host under load, and two encode gates failed there:
+the 96 kHz 24-bit set at a ratio of 1.089 and the 16-bit stereo file at
+1.031. Four speed changes to the encoder followed (a Rice writer in the
+kernel table, a wider residual kernel for AVX2, a sample scan and input
+copy the compiler can vectorise, and a CRC-16 that takes sixteen bytes
+at a step). They were chosen and measured on the ten items and on the
+ten items scaled to 24 bits, and they left every encoded byte as it was.
+The failed gates had nonetheless prompted the work, so the set could no
+longer serve as held-out. It was folded into the corpus, where tuning on
+it is allowed, and the three recordings above replaced it.
 
 ## ViSQOL
 

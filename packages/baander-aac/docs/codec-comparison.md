@@ -6,7 +6,9 @@ measured again on 2026-10-31 at commit 129ce92, after the tuning in the
 scores are those of the first run. baander-aac against
 FFmpeg's native `aac` encoder, Fraunhofer FDK AAC, Ittiam's libxaac and
 Apple's Core Audio AAC encoder, with ALAC and FLAC as the lossless
-reference. The harness in
+reference. The [Lossless](#lossless) section is newer: it was rewritten
+when bAAC gained its lossless mode, on another machine, and states its
+own run. The harness in
 [bench/](../bench/README.md) reproduces every number. The raw rows and
 the generated tables are in `bench/results/` (`quality.csv`,
 `tables.md`).
@@ -39,9 +41,13 @@ the generated tables are in `bench/results/` (`quality.csv`,
 - **Apple's true VBR still leads at 128 to 160 kbit/s,** by 0.17 to 0.19
   PEAQ points over our VBR, down from 0.33 to 0.44. ViSQOL puts our VBR
   0.04 to 0.12 points ahead.
-- **Lossless:** ALAC needs 690 to 697 kbit/s on this corpus, FLAC 615 to
-  630. Both decode at about 200 to 400 times realtime. AAC-LC at 256
-  kbit/s is 2.7 times smaller than ALAC and scores -0.02 on PEAQ.
+- **Lossless:** bAAC's lossless mode writes FLAC. At level 5 its frames
+  take 10,232,449 bytes on this corpus against 10,248,681 for `flac -5`,
+  and at level 8 9,998,768 against 10,010,621. ALAC needs 690 to 697
+  kbit/s on the same corpus, FLAC 614 to 691 by level. The speed
+  comparison with `flac` is judged by gates, which
+  [Lossless](#lossless) states. AAC-LC at 256 kbit/s is 2.7 times
+  smaller than ALAC and scores -0.02 on PEAQ.
 
 ## What was measured
 
@@ -52,7 +58,7 @@ the generated tables are in `bench/results/` (`quality.csv`,
 | FDK AAC | AOSP mirror `mstorsjo/fdk-aac` c41c3c7 (2026-10-12), C++ tree: `aac-enc` (afterburner on, its default), `aac-dec`, `xhe-aac-enc` |
 | libxaac | `ittiam-systems/libxaac` v0.1.14 (2fbadd5): `xaacenc`, `xaacdec` |
 | Apple AAC | Core Audio AAC encoder and decoder from iTunes for Windows 12.13.9.1 (CoreAudioToolbox 7.10.9.0), through qaac 2.85 under Wine 9.0, quality setting 2 (highest) |
-| Lossless | FFmpeg ALAC, Apple's reference ALAC (`refalac` 2.85), FLAC 1.4.3 at levels 5 and 8 |
+| Lossless | bAAC levels 0 to 8, FLAC 1.4.3 at levels 0 to 8, FFmpeg's FLAC encoder at levels 5 and 8, FFmpeg ALAC, Apple's reference ALAC (`refalac` 2.85). The lossless stage records its own machine and versions; see [Lossless](#lossless) |
 | Machine | 4-core Intel Xeon at 2.1 GHz (cloud VM), Ubuntu 24.04; every timed run single-threaded |
 
 **Corpus.** Ten music excerpts from TCDAudio14 at 48 kHz, 16-bit
@@ -397,22 +403,168 @@ FDK's decoder does. On FDK's xHE-AAC streams that moved the level by
 
 ## Lossless
 
-Over the 130 s corpus, single-threaded:
+bAAC's lossless mode writes and reads native FLAC, so it is measured
+against the reference encoder, `flac` 1.4.3, level for level. FFmpeg's
+FLAC encoder and two ALAC encoders stand beside it for comparison.
+`bench.py lossless` produces every figure of this section, and
+[bench/README.md](../bench/README.md#lossless-stage) states the method
+in full.
 
-| Codec | kbit/s | Encode | Decode | Bit-exact |
-|-------|-------:|-------:|-------:|-----------|
-| ALAC, FFmpeg | 697 | 132× | 192× | yes |
-| ALAC, Apple reference (refalac) | 690 | 181×, under Wine | 214× | yes |
-| FLAC level 5 | 630 | 521× | 407× | yes |
-| FLAC level 8 | 615 | 195× | 395× | yes |
+### How it is judged
 
-Every lossless stream decodes with FFmpeg. On this corpus ALAC is 10 to
-13 % larger than FLAC and decodes at about half FLAC's speed. AAC-LC at 256
-kbit/s is 2.7 times smaller than ALAC and scores -0.02 PEAQ and 4.72
-ViSQOL with our encoder. baander-aac has no lossless mode, and none is
-proposed here. Both lossless codecs decode cheaply through FFmpeg,
-which Baander already uses, so a lossless tier is a passthrough decision
-for the server rather than codec work.
+The comparison with `flac` is a set of gates, not a table to be read by
+eye.
+
+- **Size.** bAAC's frame bytes at a level may not exceed those of
+  `flac` at the same level. Frame bytes are the file without its
+  metadata blocks, because `flac` writes padding and seek points by
+  default. Size takes no tolerance.
+- **Speed.** Every timed process is pinned to one core and measured in
+  CPU time. The reference and bAAC run back to back, in alternating
+  order, five times or more; each repeat gives one ratio, bAAC's time
+  over the reference's. The threshold is 1 plus the reference's own
+  spread over the repeats. A gate passes when every ratio lies at or
+  below the threshold and fails when every ratio lies above it.
+  Otherwise it is undecided, and an undecided gate is not a passed one.
+- **What a speed gate is judged on.** One process over the corpus
+  repeated until the fastest command takes 2 CPU seconds, encoders
+  reading raw PCM. `flac` reads raw PCM about 3 % faster than WAV and
+  bAAC reads both alike, so raw input favours bAAC least. Three more
+  figures are recorded beside the judged one for each level: the same
+  run from WAV, and one process per corpus item from raw PCM and from
+  WAV, which adds each tool's start to every item.
+- **Decode.** `flac`'s own `-5` and `-8` streams are decoded by bAAC,
+  by `flac -d` (MD5 verified by both) and by FFmpeg (frame CRCs checked
+  by both, no MD5).
+- **Exactness.** Every stream is decoded by its own decoder and by the
+  others, and each decode is compared with the source.
+- **ALAC.** bAAC at level 5 is compared with FFmpeg's ALAC encoder on
+  size and speed. Apple's `refalac` runs under Wine; on a machine where
+  it cannot run, its row is carried from the run of 2026-10-30, marked,
+  and compared on size only.
+
+A run counts as a gate result only when it is complete and the host was
+quiet: `bench.py` records the load average at its start and end and
+says so when it was not.
+
+### Size on the corpus
+
+The 130 s corpus, frame bytes and the bitrate of the whole file. Size
+does not depend on the machine or on its load.
+
+| Level | bAAC frame bytes | `flac` frame bytes | bAAC kbit/s | `flac` kbit/s |
+|---:|---:|---:|---:|---:|
+| 0 | 11,247,512 | 11,249,468 | 690.49 | 691.11 |
+| 1 | 11,171,070 | 11,199,433 | 685.79 | 688.04 |
+| 2 | 11,170,675 | 11,172,677 | 685.77 | 686.40 |
+| 3 | 10,450,934 | 10,463,401 | 641.59 | 642.86 |
+| 4 | 10,239,564 | 10,270,049 | 628.61 | 630.99 |
+| 5 | 10,232,449 | 10,248,681 | 628.17 | 629.68 |
+| 6 | 10,181,162 | 10,194,843 | 625.03 | 626.37 |
+| 7 | 10,007,032 | 10,018,540 | 614.34 | 615.55 |
+| 8 | 9,998,768 | 10,010,621 | 613.83 | 615.06 |
+
+bAAC is smaller than `flac` at every level, and each bAAC level is no
+larger than the one below it. The size gates are levels 5 and 8. The
+other encoders on the same corpus:
+
+| Encoder | Frame bytes | kbit/s |
+|---|---:|---:|
+| FFmpeg FLAC, level 5 | 10,508,471 | 645.61 |
+| FFmpeg FLAC, level 8 | 10,322,400 | 634.19 |
+| FFmpeg ALAC | - | 697.02 |
+| Apple reference ALAC (`refalac`), carried from 2026-10-30 | - | 690.25 |
+
+Every stream of both tables decodes bit for bit with its own decoder
+and with the others.
+
+### Speed
+
+The speed gates are read from the recorded run: the first complete run
+on a quiet host after the last change to the codec. That run has not
+been taken yet, so the cells below are empty; `bench/results/tables.md`
+will carry them, and this table is filled from it.
+
+| Gate | Ratio, median (range) | Threshold | Verdict |
+|---|---:|---:|---|
+| Encode at level 5 against `flac -5` | | | |
+| Encode at level 8 against `flac -8` | | | |
+| Decode of `flac -5` streams against `flac -d` | | | |
+| Decode of `flac -5` streams against FFmpeg | | | |
+| Decode of `flac -8` streams against `flac -d` | | | |
+| Decode of `flac -8` streams against FFmpeg | | | |
+| Encode at level 5 against FFmpeg ALAC | | | |
+| Decode of its own level 5 stream against FFmpeg decoding ALAC | | | |
+
+### Corpus additions and the enlarged corpus
+
+Seven recordings of the FLAC decoder testbench are measured beside the
+ten items: five 96 kHz 24-bit stereo files (testbench files 28 to 32), a
+5.1 file (41) and a 16-bit stereo file (01). Each set has a size gate, an
+encode gate and two decode gates at level 5. The sizes at level 5:
+
+| Set | File | bAAC frame bytes | `flac -5` frame bytes |
+|---|---|---:|---:|
+| 96 kHz, 24-bit | 28 | 3,466,569 | 3,468,596 |
+| 96 kHz, 24-bit | 29 | 3,258,760 | 3,260,512 |
+| 96 kHz, 24-bit | 30 | 3,239,483 | 3,241,266 |
+| 96 kHz, 24-bit | 31 | 3,233,550 | 3,235,312 |
+| 96 kHz, 24-bit | 32 | 3,250,378 | 3,252,094 |
+| 96 kHz, 24-bit | total | 16,448,740 | 16,457,780 |
+| 5.1, 16-bit | 41 | 164,138 | 167,275 |
+| 16-bit stereo | 01 | 541,106 | 541,445 |
+
+The enlarged corpus is the ten items and these seven recordings. Its
+totals at levels 5 and 8, and its size gates, are read from the recorded
+run. The figures of the size table above are those of the original
+corpus, the ten items alone.
+
+### Held-out recordings
+
+Three recordings are measured at level 5 by the same rules and are
+never used to tune the encoder: Variatio 4 of the Open Goldberg
+Variations (96 kHz, 24-bit stereo, 69 s), twenty seconds of the 5.1
+master of the film Sintel (48 kHz, 16-bit) and the audio of that film's
+trailer (48 kHz, 16-bit stereo, 52 s). The harness reads them only in a
+complete run that starts on a quiet host and records whether that run
+was their first; [bench/README.md](../bench/README.md#held-out-recordings)
+states the mechanism and the sources. Their sizes and gates are read
+from the recorded run, which is their first.
+
+The seven testbench recordings above were the first held-out set. They
+were run once before the encoder was final, on a host under load, and
+two encode gates failed: the 96 kHz 24-bit set at a ratio of 1.089 and
+the 16-bit stereo file at 1.031. Four speed changes to the encoder
+followed, chosen and measured on the ten items and on the ten items
+scaled to 24 bits, with every encoded byte unchanged. Because those
+failures had prompted the work, the set was folded into the corpus and
+replaced by the three recordings above. A held-out gate that fails in
+the recorded run is reported as failed, and the encoder is not tuned in
+answer to it.
+
+### What the figures describe
+
+The figures are those of one build on one machine: the `baac` tool and
+the library as CMake builds them in Release with GCC, on an x86-64
+processor with AVX2. Three things differ elsewhere.
+
+- A build with MSVC, which is how the Windows prebuild of the binding is
+  made, writes Rice codes with the loop every level shares and not with
+  the AVX2 kernel, which GCC and Clang build. Its streams are the same;
+  its encoding is slower than these figures say.
+- The NEON kernels were not run on this machine. The arm64 job of
+  `.github/workflows/aac-native.yml` runs them against the scalar
+  kernels; no speed was measured on ARM.
+- One start of `baac` costs more than one start of `flac`, because the
+  tool loads the C++ runtime dynamically, as every build of the package
+  does. An indicative measurement on this machine, taken while it was
+  under load and therefore not a gate result, gave about 1.4 ms of CPU
+  time for a start of `baac` and 0.8 ms for `flac`. The judged figure
+  is a long run and leaves the start out; the per-item figures include
+  it.
+
+AAC-LC at 256 kbit/s is 2.7 times smaller than ALAC and scores -0.02
+PEAQ and 4.72 ViSQOL with our encoder.
 
 ## Features
 
@@ -496,6 +648,7 @@ the rate loop, is done: see the AAC-LC section and the
 See [bench/README.md](../bench/README.md). `bench/setup-refs.sh`
 fetches and builds the reference codecs and GstPEAQ at the commits
 above. ViSQOL needs its own build. `bench/bench.py` runs the stages
-`quality`, `speed`, `compat`, `lossless` and `report`. A full run takes
+`quality`, `speed`, `compat`, `lossless` and `report`; `lossless --check`
+prints each gate with its verdict. A full run takes
 about 40 minutes for the encodes and PEAQ, and 50 minutes of ViSQOL on
 four cores.

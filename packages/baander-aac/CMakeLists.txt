@@ -28,7 +28,12 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Android")
     set(BAAC_AAC_PLATFORM "android")
 elseif(APPLE)
     set(BAAC_AAC_PLATFORM "macos")
-    set(CMAKE_OSX_ARCHITECTURES "x86_64;arm64")
+    # Both architectures unless the caller names its own
+    # (-DCMAKE_OSX_ARCHITECTURES=arm64), as a build that runs the suites
+    # on the machine it is built on does.
+    if(NOT CMAKE_OSX_ARCHITECTURES)
+        set(CMAKE_OSX_ARCHITECTURES "x86_64;arm64")
+    endif()
 elseif(WIN32)
     set(BAAC_AAC_PLATFORM "windows")
 else()

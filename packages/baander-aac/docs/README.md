@@ -2,9 +2,11 @@
 
 A self-contained AAC-LC and HE-AAC v1/v2 encoder and decoder in C++17
 with a C API, a command-line tool and a Node-API binding for the Electron
-app, over ADTS, LOAS/LATM and raw access units.
+app, over ADTS, LOAS/LATM and raw access units. Its
+[lossless mode](#lossless-mode) is an encoder and a decoder for native
+FLAC streams (RFC 9639) in the same library, tool and binding.
 
-**Version:** 0.1.0
+**Version:** 0.2.0
 **License:** Apache-2.0 for Baander-authored code; see [Provenance](#provenance).
 **Standard:** ISO/IEC 14496-3 (MPEG-4 Audio), AAC-LC, HE-AAC v1 and v2, 1024- and 960-sample frames; ADTS, LATM/LOAS (ISO/IEC 14496-3 1.7) and raw access units with an AudioSpecificConfig.
 
@@ -678,6 +680,366 @@ configuration grows by 34 bytes (and the loudness entries by up to
 33), which a LOAS stream pays at each immediate playout frame, where
 its StreamMuxConfig travels.
 
+## Lossless mode
+
+The lossless mode codes PCM as native FLAC (RFC 9639). It is bAAC's own
+encoder and decoder, written from the RFC, and shares nothing with the
+AAC code but the build, the CPU detection and the error codes. Its API
+is `include/flac.h`; every name begins with `baac_flac_`. PCM crosses
+that API as interleaved signed 32-bit integers at the stream's bit depth
+(a 16-bit sample is a value from -32768 to 32767), never as float, so
+that every sample comes back bit for bit. The library does not reorder
+channels: the order is the one RFC 9639 section 9.1.3 assigns to each
+channel count, which `flac.h` lists.
+
+### Decoder
+
+The decoder reads a native FLAC stream from a byte FIFO in any chunking.
+A stream is the `fLaC` marker with its metadata blocks and then frames,
+or frames alone: a stream joined in the middle, or the samples of a
+container that keeps STREAMINFO out of band, which
+`baac_flac_decoder_set_streaminfo` supplies. It decodes fixed and
+variable block sizes, every subframe type (constant, verbatim, fixed
+and linear prediction), every stereo assignment, 1 to 8 channels and 4
+to 32 bits per sample, inside and outside the streamable subset.
+
+Every frame is checked. The decoder verifies the CRC-8 of each frame
+header and the CRC-16 of each frame. A damaged frame is reported once
+as `AAC_ERR_DECODE` and never concealed; the decoder then finds the next
+valid frame by itself, and that frame's sample position says how many
+samples were lost. `baac_flac_decoder_lost_frames` counts the damaged
+stretches. A stream whose sample rate, channel count or bit depth
+changes between frames ends with `AAC_ERR_UNSUPPORTED` at the first
+frame that differs. MD5 verification of the decoded samples against
+STREAMINFO is a setting (`baac_flac_decoder_set_md5_check`, off by
+default in the library, on in the command-line tool), and
+`baac_flac_decoder_finish` returns its verdict: match, mismatch, or
+unknown when the stream states no MD5 or was not decoded from its first
+frame to its last.
+
+Two things that are not FLAC but are found around FLAC streams in files
+are passed over. An ID3v2 tag in front of the marker is skipped by the
+length it states. An ID3v1 tag behind the last frame, 128 bytes that
+begin with `TAG`, ends the input without a report. Any other bytes where
+a frame was expected are damage.
+
+For a seek the decoder hands out the stream's seek table
+(`baac_flac_decoder_seek_points`, with `baac_flac_decoder_first_frame_offset`
+as the origin of its byte offsets) and the caller moves in its own
+input: after `baac_flac_decoder_seek_reset` the bytes fed next may begin
+anywhere, and decoding resumes at the first valid frame found, whose
+position `baac_flac_decoder_last_frame_info` reports.
+
+Memory is bounded by the stream's own limits and not by what a header
+claims. Metadata the decoder does not use is skipped as it arrives, a
+frame that claims more samples than STREAMINFO permits is refused before
+anything is sized for it, and the FIFO holds 64 KiB or one frame of the
+largest size the decoder accepts, whichever is more. Once the first
+frames are decoded the decoder allocates nothing
+(`tests/test_flac_decoder.cpp` counts).
+
+### Encoder
+
+The encoder writes native FLAC in the streamable subset with one fixed
+block size per stream. It takes 1 to 8 channels, bit depths of 8, 12,
+16, 20, 24 and 32, and every sample rate a frame header can express.
+Anything else is refused; nothing is ever coded with loss, and a sample
+outside the bit depth fails the call that carries it.
+
+A level from 0 to 8 sets how much the encoder searches. Each level stays
+within the ceilings of the reference encoder's preset of the same
+number, so a stream of level 5 asks no more of a decoder than `flac -5`
+does. Level 5 is the default.
+
+| Level | Block | Prediction | Stereo | Finest partition order | Analysis windows |
+|---:|---:|---|---|---:|---:|
+| 0 | 1152 | fixed | independent channels | 3 | - |
+| 1 | 1152 | fixed | the two assignments an estimate prefers | 3 | - |
+| 2 | 1152 | fixed | all four assignments | 3 | - |
+| 3 | 4096 | linear, order 6 or below | independent channels | 4 | 1 |
+| 4 | 4096 | linear, order 8 or below | the two assignments an estimate prefers | 4 | 1 |
+| 5 | 4096 | linear, order 8 or below | all four assignments | 5 | 1 |
+| 6 | 4096 | linear, order 8 or below | all four assignments | 6 | 3 |
+| 7 | 4096 | linear, order 12 or below | all four assignments | 6 | 3 |
+| 8 | 4096 | linear, order 12 or below | all four assignments | 6 | 9, of which the best 2 are coded |
+
+For each channel the encoder codes the fixed predictor whose residual
+is smallest and, from level 3, the linear predictors its analysis
+proposes, and keeps the smallest subframe by exact size. The size of a
+residual is exact as well: for every Rice parameter that can be the best
+one of some partition the bits are counted, not estimated, over every
+partition order the level allows. A stereo pair is stored as left and
+right, left and side, side and right, or mid and side, whichever is
+smallest among the assignments the level codes. Linear predictors stay
+at order 12 or below at every sample rate, 5-bit Rice parameters are
+used above 16 bits only, and at 16 bits and below every prediction fits
+a 32-bit sum.
+
+A stream is written in this order: `baac_flac_encoder_write_header`,
+`baac_flac_encoder_encode` any number of times,
+`baac_flac_encoder_finish`. A caller whose output can seek then writes
+the bytes of `baac_flac_encoder_final_header` over the first header,
+which puts the sample total, the MD5 of the input, the frame size range
+and the seek points into the stream. Without that step the stream is
+complete and decodable, with a total and an MD5 of zero. The options
+(`BaacFlacEncoderOptions`) reserve a seek table with a point for every
+ten seconds when the caller states the total up front, add a PADDING
+block, and carry the tags and pictures. The encoder sizes its buffers
+when it is created and allocates nothing while a stream runs
+(`tests/test_allocation.cpp` counts).
+
+The encoder's output does not depend on the processor. The lossless
+mode has a kernel table of its own (`src/flac_dsp.cpp`, with SSE2, AVX2
+and NEON kernels in `src/simd/flac_*.cpp`), chosen at run time and
+capped by `BAAC_AAC_CPU` like the AAC table. Its integer kernels are
+exact, and its two floating-point kernels accumulate in one stated order
+and are compiled without the package's Release math options, without
+contraction and without fused multiply-add. A stream therefore comes out
+the same byte for byte at every level, which `tests/test_flac_dsp.cpp`
+checks kernel by kernel and on whole streams. Two limits of the kernel
+set are worth knowing:
+
+- The AVX2 level writes Rice codes eight at a time and reads them with a
+  single-instruction zero count. Both kernels are built by GCC and Clang
+  only and are installed when the processor reports BMI2 (and LZCNT for
+  the reader). A build with MSVC, which is how the Windows prebuild is
+  made, uses the loops every level shares; its output is the same and
+  its encoding is slower.
+- The NEON level has kernels for the window, the autocorrelation, the
+  32-bit residual and the Rice fold and sums. They are compiled for
+  arm64 only
+  and are not exercised on the x86 host the codec was developed on; the
+  arm64 runner of `.github/workflows/aac-native.yml` runs them against
+  the scalar kernels and fails when they did not run.
+
+### Tags and pictures
+
+The encoder writes a VORBIS_COMMENT block and PICTURE blocks from its
+options, in the order given, and checks them before a byte of the stream
+is written. A tag is `NAME=value`: the name is printable ASCII without
+`=`, the value any UTF-8, and names may repeat. A picture carries a type
+from 0 to 20 (RFC 9639 Table 13; 3 is the front cover), a media type, a
+description, its dimensions and the file's bytes, which the library
+stores as given without looking into them. A stream holds at most one
+picture each of the types 1 and 2, and a picture with its text has to
+fit one metadata block: 16777183 bytes less the media type and the
+description.
+
+The decoder skips tags and pictures unread by default, however large.
+With `baac_flac_decoder_set_metadata` it keeps the stream's tags and
+pictures up to a byte limit the caller sets (32 MiB when the caller
+names none) and hands them out through `baac_flac_decoder_comments` and
+`baac_flac_decoder_pictures`. A block that would pass the limit is
+skipped whole and counted by `baac_flac_decoder_skipped_metadata`; the
+audio decodes all the same. Nothing is sized from a length or a count
+inside a block: a block whose inner lengths do not fit it is dropped and
+reported as one `AAC_ERR_DECODE`. SEEKTABLE and PADDING are read or
+skipped as the format says; APPLICATION and CUESHEET blocks are skipped.
+
+### API
+
+All functions are declared in `include/flac.h` with C linkage and return
+the `AacError` codes of `aac.h`.
+
+```c
+/* decoder */
+BaacFlacDecoder* baac_flac_decoder_create(void);
+int baac_flac_decoder_set_streaminfo(BaacFlacDecoder* dec, const uint8_t* streaminfo, int size);
+int baac_flac_decoder_set_metadata(BaacFlacDecoder* dec, int collect, size_t max_bytes);
+int baac_flac_decoder_set_md5_check(BaacFlacDecoder* dec, int enabled);
+int baac_flac_decoder_feed(BaacFlacDecoder* dec, const uint8_t* data, int size);
+int baac_flac_decoder_decode_next(BaacFlacDecoder* dec, int32_t* pcm, int pcm_size);
+int baac_flac_decoder_end_input(BaacFlacDecoder* dec);
+int baac_flac_decoder_finish(BaacFlacDecoder* dec, BaacFlacMd5Verdict* verdict);
+int baac_flac_decoder_reset(BaacFlacDecoder* dec);
+int baac_flac_decoder_seek_reset(BaacFlacDecoder* dec);
+int baac_flac_decoder_stream_info(BaacFlacDecoder* dec, BaacFlacStreamInfo* info);
+int baac_flac_decoder_last_frame_info(BaacFlacDecoder* dec, BaacFlacFrameInfo* info);
+int baac_flac_decoder_lost_frames(BaacFlacDecoder* dec);
+int baac_flac_decoder_pending_bytes(BaacFlacDecoder* dec);
+int baac_flac_decoder_seek_points(BaacFlacDecoder* dec, const BaacFlacSeekPoint** points);
+int64_t baac_flac_decoder_first_frame_offset(BaacFlacDecoder* dec);
+int baac_flac_decoder_comments(BaacFlacDecoder* dec, const BaacFlacComment** comments,
+                               BaacFlacComment* vendor);
+int baac_flac_decoder_pictures(BaacFlacDecoder* dec, const BaacFlacPicture** pictures);
+int baac_flac_decoder_skipped_metadata(BaacFlacDecoder* dec);
+void baac_flac_decoder_destroy(BaacFlacDecoder* dec);
+
+/* encoder */
+BaacFlacEncoder* baac_flac_encoder_create(int sample_rate, int channels, int bits_per_sample,
+                                          int level, int* error);
+void baac_flac_encoder_options_init(BaacFlacEncoderOptions* options);
+int baac_flac_encoder_set_options(BaacFlacEncoder* enc, const BaacFlacEncoderOptions* options);
+int baac_flac_encoder_block_size(BaacFlacEncoder* enc);
+int baac_flac_encoder_header_bytes(BaacFlacEncoder* enc);
+int baac_flac_encoder_write_header(BaacFlacEncoder* enc, uint8_t* out, int out_size);
+int baac_flac_encoder_max_output_bytes(BaacFlacEncoder* enc, int n_samples);
+int baac_flac_encoder_encode(BaacFlacEncoder* enc, const int32_t* pcm, int n_samples,
+                             uint8_t* out, int out_size);
+int baac_flac_encoder_finish(BaacFlacEncoder* enc, uint8_t* out, int out_size);
+int baac_flac_encoder_final_header(BaacFlacEncoder* enc, uint8_t* out, int out_size);
+int baac_flac_encoder_last_frame_info(BaacFlacEncoder* enc, BaacFlacFrameInfo* info);
+int baac_flac_encoder_stream_info(BaacFlacEncoder* enc, BaacFlacStreamInfo* info);
+void baac_flac_encoder_destroy(BaacFlacEncoder* enc);
+```
+
+`baac_flac_decoder_feed` returns the bytes it took, fewer than offered
+when the FIFO is full, which means a frame is waiting for
+`baac_flac_decoder_decode_next`. That call returns the block size of the
+frame it decoded, 0 when no complete frame is pending, and
+`AAC_ERR_OVERFLOW` when the caller's buffer is too small, in which case
+the frame stays pending. `baac_flac_decoder_end_input` tells the decoder
+that no more bytes follow, so that a frame the input ends in is damage
+and not a wait for more. On the encoder side
+`baac_flac_encoder_max_output_bytes` is the most a call with that many
+samples can write, and a call with a smaller buffer is refused without
+consuming input. One encoder or decoder runs on the calling thread;
+handles are independent of each other. The header states the terms of
+every function in full.
+
+### Lossless commands
+
+```sh
+baac flac enc [--level 0..8] [--raw RATE CHANNELS BITS] [--tag NAME=VALUE]... [--picture FILE]... <in.wav | -> <out.flac | ->
+baac flac dec [--no-md5] [--raw] <in.flac | -> <out.wav | ->
+baac flac test [--no-md5] <in.flac | ->
+baac flac info [--export-picture FILE [--picture-number N]] <in.flac | ->
+```
+
+`enc` reads an integer WAV file (PCM, or the extensible format with its
+valid-bits field) or, with `--raw`, headerless PCM, and writes a native
+FLAC stream. `dec` does the reverse, and `test` decodes without writing.
+A dash is standard input or standard output. Raw PCM is interleaved
+little-endian signed integers, each sample in its bit depth rounded up
+to whole bytes.
+
+Input and output are streamed: the tool holds a few blocks, however long
+the file. When the output can seek, `enc` reserves a seek table and,
+after the last frame, rewrites the header with the sample total, the MD5
+of the input and the seek points. Into a pipe the stream is complete
+without them. `--tag` adds a tag and may be repeated, also with one
+name. `--picture` adds a JPEG or PNG file as a front cover, with the
+media type and the dimensions read from the file's own header. `info`
+prints what a stream's header says, its tags and its pictures without
+decoding the audio, and `--export-picture` writes one picture's bytes to
+a file.
+
+`dec` and `test` verify every frame checksum, the sample total the
+header states and, unless `--no-md5` is given, the MD5 of the decoded
+samples. Every command exits non-zero on any error or mismatch; `enc`
+then leaves no output file, and `dec` leaves what could be decoded.
+
+`baac bench` adds lossless rows to its table: the synthetic signal at 16
+bits through levels 0, 5 and 8.
+
+The codec's computed AAC tables are built when the first AAC encoder or
+decoder is created, not when the program starts, so the `flac` commands
+do not pay for them. The tool links the C++ runtime dynamically, as the
+package's other builds do, and loading that runtime is most of what one
+start of `baac` costs.
+
+### Lossless classes
+
+The binding exports `FlacEncoder` and `FlacDecoder` beside the AAC
+classes. Samples are `Int32Array`, interleaved, at the stream's bit
+depth.
+
+```js
+import { FlacDecoder, FlacEncoder } from '@baander/aac-native';
+
+const encoder = new FlacEncoder({ sampleRate: 44100, channels: 2, bitsPerSample: 16, level: 5 });
+const stream = Buffer.concat([encoder.encode(pcm), encoder.finish()]);
+
+const decoder = new FlacDecoder({ md5: true });
+use(decoder.decode(stream)); // Int32Array
+while (decoder.pending) use(decoder.decode());
+use(decoder.finish()); // decoder.md5 is 'match' afterwards
+```
+
+The results of `encode()` and `finish()` joined are a complete stream;
+the first begins with the header, `headerBytes` long, and
+`finalHeader()` returns the header to write over it once the stream is
+finished. The encoder options are `sampleRate`, `channels`,
+`bitsPerSample`, `level`, `totalSamples`, `seekTable`, `padding`,
+`tags`, `vendor` and `pictures`; the encoder reports `lastFrame`,
+`streamInfo` and `blockSize`.
+
+What a decoder call returns is bounded, whatever the stream says: a FLAC
+frame of 50 bytes can stand for two megabytes of samples. One call
+returns at most `maxOutput` samples (1048576 by default) and holds the
+rest back; while `pending` is true the caller collects with `decode()`
+without an argument before it gives more bytes. The decoder options add
+`md5`, `streamInfo` (STREAMINFO supplied out of band) and `metadata`
+(`true`, or `{ maxBytes }`, to keep tags and pictures). The decoder
+reports `streamInfo`, `lastFrame`, `errors`, `md5`, `seekPoints`,
+`firstFrameOffset`, `tags`, `vendor`, `pictures` and `skippedMetadata`,
+and has `reset()` and `seekReset()`. `node/index.d.ts` states every
+field.
+
+### Tests
+
+Eight CTest suites belong to the lossless mode, and `test_allocation`
+holds its encoder and decoder to the rule of the AAC ones. The decoder,
+conformance, encoder and interop suites run again with the kernel table
+capped at the scalar kernels and, on x86, at the SSE2 ones.
+
+- `test_flac_format`: MD5 against the test suite of RFC 1321, both frame
+  checksums against values worked out from their polynomials, the coded
+  numbers, STREAMINFO and frame headers against the example streams of
+  RFC 9639 Appendix D, and the bit reader and writer.
+- `test_flac_decoder`: streams written by hand, so that every subframe
+  type, residual form, stereo assignment, bit depth and block size is
+  decoded from a known description to known samples; damaged, truncated
+  and unusual streams; feeding in any chunking; resynchronisation;
+  seeking; and the bounds the decoder keeps on its memory.
+- `test_flac_conformance`: the decoder against streams it did not write.
+  The committed fixtures (`tests/data/flac`) are short synthetic signals
+  encoded by `flac` 1.4.3 and by FFmpeg, each with the MD5 of its source.
+  The FLAC decoder testbench (ietf-wg-cellar/flac-test-files, about
+  300 MB, fetched by `tests/flac-testbench.sh` and never committed) adds
+  real recordings and the format's corner cases.
+- `test_flac_encoder`: every stream has to come back bit for bit from
+  the library's own decoder, with the sample total and the MD5 its
+  header states, across bit depths, channel counts, sample rates and
+  levels, and has to stay within the ceilings of its level.
+- `test_flac_interop`: the encoder against decoders it shares no line
+  with. `flac -t` tests each stream, `flac -d` and FFmpeg decode it, and
+  the samples of both are compared with the input.
+- `test_flac_dsp`: every kernel of every level the machine can run
+  against the scalar kernel, bit for bit, and whole streams, which have
+  to come out the same whatever level the process is capped at.
+  `BAAC_REQUIRE_KERNELS` names levels that have to run.
+- `test_flac_meta`: tags and pictures through the C API, blocks whose
+  inner lengths lie, the caller's limit, ID3 tags around a stream, and
+  the same data through `metaflac`, `flac` and FFmpeg.
+- `test_flac_cli`: the `baac flac` commands as the built tool.
+- `test_allocation`: neither the lossless encoder nor the decoder
+  allocates once a stream runs.
+
+The reference encoder and FFmpeg are oracles: the suites run their
+binaries and compare output. `tests/flac-reference.sh` builds `flac` at
+the commit of its 1.4.3 tag and prints the binary's path for
+`BAAC_FLAC_REFERENCE`; `BAAC_FLAC_TESTBENCH` names the testbench
+directory. A suite whose oracle is missing skips that comparison with a
+message and passes. With `BAAC_REQUIRE_ORACLES` set, which CI does, it
+fails instead. `fuzz_flac_decoder` and `fuzz_flac_encoder` are described
+under [Fuzzing and benchmarks](#fuzzing-and-benchmarks), where the
+measurements against `flac`, FFmpeg and ALAC are linked as well.
+
+### Limits
+
+- Native FLAC only. Ogg FLAC is not read or written.
+- The encoder writes one fixed block size per stream and the streamable
+  subset. It does not write variable block sizes, bit depths other than
+  8, 12, 16, 20, 24 and 32, or CUESHEET and APPLICATION blocks.
+- The encoder codes on the calling thread. It has no multithreaded mode.
+- The decoder does not seek by itself: it gives the seek points and
+  resumes wherever the caller continues.
+- A stream whose properties change between frames is refused from the
+  frame that differs.
+- The library stores pictures as given. Only the command-line tool reads
+  a JPEG or PNG header, to fill in the media type and the dimensions.
+
 ## API
 
 All functions are declared in `include/aac.h` with C linkage.
@@ -1008,7 +1370,11 @@ baac enc <in.f32le> <out.aac> <rate> <channels> [bitrate] [cbr|abr|cvbr|tvbr] [q
 baac dec <in.aac> <out.f32le> [rate] [channels] [--no-loudness]
 baac loudness <in.wav> | <in.f32le> <rate> <channels>
 baac bench [--seconds N] [--dump DIR] [--only NAME] [--streams DIR]
+baac flac enc | dec | test | info ...
 ```
+
+The `flac` commands are the lossless mode; their arguments are under
+[Lossless commands](#lossless-commands).
 
 For every profile `--peak-bitrate N`, `--bandwidth HZ` and
 `--vbr-mode 1..5` set the tuning controls (with a VBR mode the bitrate
@@ -1069,7 +1435,9 @@ const decoder = new AacDecoder({ sampleRate: 44100, channels: 2 });
 const samples = decoder.decode(stream); // Float32Array, interleaved
 ```
 
-Both classes accept input in arbitrary chunk sizes and keep partial frames
+`FlacEncoder` and `FlacDecoder`, the classes of the lossless mode, are
+described under [Lossless classes](#lossless-classes). Both AAC classes
+accept input in arbitrary chunk sizes and keep partial frames
 between calls. The decoder options add `transport` (`detect`, `adts`,
 `loas`, `latm`, `latm-raw`, `raw`), `config` (AudioSpecificConfig bytes),
 `frameLength`, `concealment` (`off`, `noise`, `interpolate`) and
@@ -1177,8 +1545,10 @@ request that touches the package, the desktop app's Electron version or
 the workflow: it builds against the headers of the locked Electron, runs
 the smoke test under Node and under Electron (`ELECTRON_RUN_AS_NODE`,
 no display needed) with the binary in `prebuilds/`, runs the CTest
-suites with FFmpeg on Linux, and keeps each binary as a workflow
-artifact. Pushing a tag `aac-native-v<version>` (the version in
+suites on Linux with FFmpeg, the reference `flac` and the FLAC decoder
+testbench required, runs the lossless suites on the two macOS runners
+against the kernels of their processors, and keeps each binary as a
+workflow artifact. Pushing a tag `aac-native-v<version>` (the version in
 `package.json`; the workflow refuses a mismatch) attaches the four
 binaries and `SHA256SUMS` to the GitHub release of that tag, creating
 the release when needed; nothing is committed. The desktop app's
@@ -1188,8 +1558,10 @@ the asar archive, which `process.dlopen` cannot read.
 
 ## Testing
 
-`ctest` runs forty suites, and the transform, filterbank and
-roundtrip suites again at every DSP dispatch level this machine can run:
+`ctest` runs forty-nine suites, and the transform, filterbank and
+roundtrip suites again at every DSP dispatch level this machine can run.
+The suites of the lossless mode are described under
+[Lossless mode](#tests); the others cover:
 table consistency (prefix-free, complete
 Huffman codebooks; scalefactor bands for 1024 and 960 frames;
 Princen-Bradley windows), MDCT against the direct definition and TDAC,
@@ -1392,9 +1764,10 @@ speed, memory, decoder agreement) and lists where it falls short;
 does as its output streams show it, which of those behaviours improved
 ours, and the remaining gaps; `tools/aac-probe.cpp` is the probe.
 
-Five fuzz harnesses under `tools/fuzz/` drive the decoder, the
+Seven fuzz harnesses under `tools/fuzz/` drive the decoder, the
 AudioSpecificConfig and StreamMuxConfig parsers, the encoder, MPEG-D
-DRC and MPEG Surround with mutated input, and
+DRC, MPEG Surround and the FLAC decoder and encoder of the lossless mode
+with mutated input, and
 [tools/fuzz/README.md](../tools/fuzz/README.md) documents their inputs:
 
 - `fuzz_decoder` covers ADTS, LOAS, LATM and raw access units with a
@@ -1408,8 +1781,19 @@ DRC and MPEG Surround with mutated input, and
 - `fuzz_unidrc` covers the `uniDrcConfig()`, `loudnessInfoSet()` and
   `uniDrcGain()` parsers and the module's output.
 - `fuzz_mps` runs the surround streams through the public decoder.
+- `fuzz_flac_decoder` feeds the FLAC decoder through its FIFO in pieces
+  of every size: the marker and the metadata blocks, tags and pictures
+  kept under each limit or skipped, a STREAMINFO given out of band, ID3
+  tags around the stream, a seek reset and a second pass. A mutated
+  frame almost never keeps its checksums, so the harness also runs with
+  them ignored, through an internal switch, to reach the code behind
+  them.
+- `fuzz_flac_encoder` takes the level, channel count, bit depth, sample
+  rate, seek table, padding, tags and pictures from the first bytes and
+  the rest as PCM; our decoder has to return the samples bit for bit,
+  the tags and pictures as given, and the input's total and MD5.
 
-`fuzz_seeds` derives about 560 seeds from every stream under
+`fuzz_seeds` derives about 800 seeds from every stream under
 `tests/data` (whole, chunked, truncated, as access units with their
 config, the config alone, and the DRC payloads) and from hand-built
 inputs at the bounds a decoder has to enforce. The bounds covered are
@@ -1483,12 +1867,12 @@ channels through the hybrid QMF bank.
 ## Project structure
 
 ```
-include/      public aac.h and internal headers
-src/          tables, FFT/MDCT, QMF, bitstream, ASC, LATM, transport layer, decoder, concealment, error resilience tools (er_vcb11, er_rvlc, er_hcr), SBR and PS decoders, low-delay filterbanks, LD-SBR, limiter, dynamic range control, USAC decoder (usac_config, usac_frame, usac_arith, usac_fd, usac_stereo, usac_lpd with usac_lpc, usac_acelp, usac_tcx and usac_fac), USAC encoder (usac_enc, usac_enc_config, usac_arith_enc, the USAC form of the SBR encoder in sbr_enc_usac, the 2-1-2 encoder in mps212_enc and the MPEG-D DRC gain generator in drc_gen), enhanced SBR (sbr_esbr), MPS 212 (mps212), MPEG Surround (mps_config, mps_frame, mps_params, mps_tables, mps_tree, mps_dec, mps_glue, and the low-delay form of ELD v2 in mps_ld with mps_ld_tables), MPEG-D DRC (unidrc_parse, unidrc_gain, unidrc), psychoacoustics, encoder, afterburner, coding tools, SBR and PS encoders, SIMD
-tools/        baac command-line tool (with the benchmark), mps-enc test stream writer for MPEG Surround, fuzz/ harnesses with their seed generator and mutation driver
-tests/        CTest suites and the committed HE-AAC, ELD, USAC and MPEG Surround reference streams and decodes (tests/data)
-bench/        the codec comparison harness (corpus, reference tools, quality, speed, compatibility) and its results
-node/         Node-API binding (addon.cc, ESM entry, types, smoke test, the prebuild fetch script)
+include/      public aac.h, flac.h (the lossless mode) and internal headers
+src/          tables, FFT/MDCT, QMF, bitstream, ASC, LATM, transport layer, decoder, concealment, error resilience tools (er_vcb11, er_rvlc, er_hcr), SBR and PS decoders, low-delay filterbanks, LD-SBR, limiter, dynamic range control, USAC decoder (usac_config, usac_frame, usac_arith, usac_fd, usac_stereo, usac_lpd with usac_lpc, usac_acelp, usac_tcx and usac_fac), USAC encoder (usac_enc, usac_enc_config, usac_arith_enc, the USAC form of the SBR encoder in sbr_enc_usac, the 2-1-2 encoder in mps212_enc and the MPEG-D DRC gain generator in drc_gen), enhanced SBR (sbr_esbr), MPS 212 (mps212), MPEG Surround (mps_config, mps_frame, mps_params, mps_tables, mps_tree, mps_dec, mps_glue, and the low-delay form of ELD v2 in mps_ld with mps_ld_tables), MPEG-D DRC (unidrc_parse, unidrc_gain, unidrc), psychoacoustics, encoder, afterburner, coding tools, SBR and PS encoders, the lossless mode (flac_api, flac_format, flac_dec, flac_enc, flac_lpc, flac_meta, and the kernel table flac_dsp), SIMD (simd/, with the lossless kernels in flac_sse2, flac_avx2 and flac_neon)
+tools/        baac command-line tool (with the benchmark and, in baac_flac, the lossless commands), mps-enc test stream writer for MPEG Surround, fuzz/ harnesses with their seed generator and mutation driver
+tests/        CTest suites and the committed HE-AAC, ELD, USAC and MPEG Surround reference streams and decodes (tests/data), the FLAC fixtures (tests/data/flac), and the scripts that build the reference flac and fetch the FLAC decoder testbench
+bench/        the codec comparison harness (corpus, reference tools, quality, speed, compatibility, the lossless stage with its gates) and its results
+node/         Node-API binding (addon.cc and flac_addon.cc, ESM entry, types, smoke test, the prebuild fetch script)
 prebuilds/    prebuilt bindings per platform-arch, fetched from a release (not committed)
 docs/         this file, the reference comparison and the codec comparison
 ```
@@ -1551,3 +1935,19 @@ and decorrelator tables are ISO/IEC 23003-1 data transcribed from
 libxaac's ROM files under its Apache-2.0 licence, with the attribution
 header the USAC tables carry, and checked against it. The MPEG Surround
 test streams were written by the package's own test tool.
+
+The lossless mode is written from RFC 9639 (the FLAC format, with the
+worked examples of its Appendix D as the first test vectors) and RFC
+1321 (MD5). The reference implementation, libFLAC with its `flac` and
+`metaflac` tools at release 1.4.3, and FFmpeg's FLAC encoder and decoder
+are oracles through their binaries only: the suites and the benchmark
+run them and compare output, and no source of either was read, copied
+or adapted. The encoder's levels keep within the block size, the
+predictor order and the partition order of the reference encoder's
+preset of the same number, so that a level asks no more of a decoder
+than that preset does. The committed FLAC fixtures were encoded by `flac`
+1.4.3 and by FFmpeg from the suite's own synthetic signals. The FLAC
+decoder testbench (ietf-wg-cellar/flac-test-files, CC0 1.0) is fetched
+at a pinned commit and checked against a committed SHA-256 manifest; it
+is not part of the repository. The lossless mode is Apache-2.0 like the
+rest of the Baander-authored code.
