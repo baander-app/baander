@@ -185,7 +185,7 @@ It connects the listener's home receivers to playback controlled through Bånder
 ### Playback endpoint
 
 A live player instance that can execute and report playback for a destination, such as one browser tab, a companion process or a Cast receiver application.
-Its incarnation identifies that instance's current connection lifetime, separately from the saved browser device token or destination identity.
+Its incarnation identifies that instance's current connection lifetime, separately from the saved browser device token or destination identity. When the same browser page registers again, as after a replaced socket, its next incarnation succeeds the earlier one: it takes the earlier one's place as runner or transfer participant and its unanswered commands, and the session revision does not change.
 
 ### Playback client-session identity
 
@@ -201,26 +201,27 @@ The source retains its media and cursor while paused until reconciliation establ
 ### Disclosed command
 
 A playback command that was included in a snapshot built for the endpoint incarnation it addresses. That snapshot is the only way a command leaves the server, and the command records the first time it happened.
-A command that expires undisclosed cannot have had an effect. On a browser runner whose last report was stopped or paused it settles as never effective, and the session keeps its confirmed state. A disclosed command able to start playback that goes unanswered leaves the session unknown until its runner answers.
+A command that expires undisclosed cannot have had an effect. On a browser runner whose last report was stopped or paused it settles as never effective, and the session keeps its confirmed state. A disclosed command able to start playback that goes unanswered leaves the session unknown. No timer ends that state: the runner's answer, a local recovery, a close report from its page, a registration of its tab from another page or a playback override does.
 
 ### Playback page identity
 
-A random value a browser document creates once, keeps in memory and sends with every registration of its playback endpoint. It is never stored, so a reload, a duplicated tab and a restored session each get a new one, while a document restored from the back/forward cache keeps its own.
-With the tab's identity it tells a new page from a live one: a registration from another page of the same tab proves the earlier page gone, and one from the same page is that page's own reconnect. A registration without it proves nothing.
+A random value a browser document creates once, keeps in memory and sends as `pageId` with every registration of its playback endpoint. It is never stored, so a reload, a duplicated tab and a restored session each get a new one, while a document restored from the back/forward cache keeps its own. The server keeps it with the incarnation and never returns it.
+With the tab's identity it tells a new page from a live one. A registration from another page of the same tab proves the earlier page gone, and the session is released from that page's incarnation in the registration's own transaction. One from the same page is that page's own reconnect, and its new incarnation succeeds the earlier one. A registration without a page identity, or against an earlier incarnation that has none, proves nothing.
 
 ### Close report
 
-A playback endpoint's own statement, made with its capability as its page goes away or after it disconnected and silenced its players, that this incarnation has stopped. The server retires the incarnation and releases the session from it in the same request.
-A crash, a killed browser or a dead network sends none; the playback override is then the way back.
+A playback endpoint's own statement, made with its capability, that this incarnation has stopped. The web client sends it at `pagehide`, from a request prepared ahead, and after a disconnect that silenced its players, before it registers again. The server retires the incarnation, records it stopped at the reported cursor and releases the session from it in the same request; a report for an incarnation the session no longer names changes only that incarnation.
+A tab that is only hidden sends none. A crash, a killed browser or a dead network sends none either; the playback override is then the way back.
 
 ### Playback override
 
-The listener's explicit decision, made in a browser that was refused playback, to end the hold of a destination that is no longer registered and has not confirmed that it is silent. The web client offers it as "Play here anyway".
-The server retires that destination's incarnation without recording it as stopped, and the session continues paused at its cursor. No timer performs an override. A destination that is still playing when it is overridden keeps playing until it next reaches the server.
+The listener's explicit decision, made in a registered browser tab, to end the hold of a browser destination that is no longer registered and has not confirmed that it is silent: the session's runner, or the target of an uncertain transfer. The web client offers it as "Play here anyway" in the playback destination menu.
+The server retires that destination's incarnation without recording it as stopped, and the session continues paused at its cursor, without a runner unless a registered source of the failed transfer keeps it. No timer performs an override, and the server refuses it while the destination is still registered. A destination that is still playing when it is overridden keeps playing until a snapshot reaches it or its socket closes.
 
 ### Browser execution lock
 
 An exclusive Web Lock held while one browser tab owns eligible local playback execution. Its name includes the server, account and nonsecret tab identity. A free lock proves the old holder released it; media fencing is a separate recovery condition.
+A page claims a tab identity only while it holds that tab's lock, and gives the lock up only by ending or by entering the back/forward cache after fencing its players, so two live pages do not share a tab identity; without Web Locks, every page load uses a new one. The playback page identity tells the server whether a registration of the tab comes from the page it already knows or from a later one.
 
 ### Local recovery credential
 
