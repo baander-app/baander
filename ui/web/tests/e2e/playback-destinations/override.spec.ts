@@ -1,10 +1,10 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test } from '@playwright/test'
 import { FixtureClient, type FixtureManifest } from '../live-updates/capacity-fixtures'
 import {
-  attachExchanges, destinationControl, incarnationOf, nativeAudio, openSessionTab, playFixtureSong, sessionSnapshot, type SessionTab,
+  attachExchanges, destinationControl, fixtureSongRow, incarnationOf, nativeAudio, openSessionTab, playFixtureSong, sessionSnapshot,
+  type SessionTab,
 } from './session-tabs'
 
-const footer = (page: Page) => page.getByRole('region', { name: 'Playback', exact: true })
 const consequence = 'Play here anyway ends its hold; if it is still playing, it continues until it reconnects.'
 
 /** Waits until `tab` itself shows that the runner it knows is unavailable and has not confirmed a stop. */
@@ -62,7 +62,7 @@ test.describe('Play here anyway', () => {
       expect((await nativeAudio(lost.page)).paused, 'the lost browser must still be playing when the other one is refused').toBe(false)
 
       const controlsBefore = taking.exchanges.filter(exchange => exchange.path === '/api/session/control').length
-      await taking.page.getByText('Live song 00000', { exact: true }).dblclick()
+      await fixtureSongRow(taking.page).dblclick()
       await expect(taking.page.getByText('Previous playback is unconfirmed. Stop it in its original browser, or choose Play here anyway in the playback destination menu.').first()).toBeVisible()
       // The refusal is the tab's own: nothing was asked of the session.
       expect(taking.exchanges.filter(exchange => exchange.path === '/api/session/control')).toHaveLength(controlsBefore)
@@ -113,6 +113,7 @@ test.describe('Play here anyway', () => {
       tabs.push(offline)
       const taking = await openSessionTab(browser, baseURL, manifest.users[0], 'Taking browser')
       tabs.push(taking)
+      await taking.page.goto('/music/songs')
       await expect.poll(async () => (await sessionSnapshot(taking.page)).destinations.filter(destination => destination.available).length).toBe(2)
       const socketsClosed: number[] = []
       offline.page.on('websocket', socket => { socket.on('close', () => { socketsClosed.push(Date.now()) }) })
@@ -134,7 +135,9 @@ test.describe('Play here anyway', () => {
       receipt.lapsedAfterMs = Date.now() - wentOffline
       receipt.playingWhenRefused = !(await nativeAudio(offline.page)).paused
 
-      await footer(taking.page).getByRole('button', { name: 'Play', exact: true }).click()
+      // The tab shows the runner's playback, so its player offers Pause, not Play. The song is
+      // selected again instead, and the tab refuses it itself.
+      await fixtureSongRow(taking.page).dblclick()
       await expect(taking.page.getByText(/Previous playback is unconfirmed/).first()).toBeVisible()
       const overridden = Date.now()
       await playHereAnyway(taking, 'Offline browser')

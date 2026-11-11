@@ -669,6 +669,41 @@ describe('useBaanderPlayer sessions and source end', () => {
     expect(seeks()).toEqual([0])
   })
 
+  it('stays prepared when the media it seeks away from fails before the new generation is read', async () => {
+    server = { ...first, position: 30 }
+    const { rendered, execution, state } = await mount({ seekable: 60 })
+    await waitFor(() => { expect(state.time).toBe(30) })
+    // The session accepts the seek into a new generation and retires the attached one; the
+    // signing that names the new generation is still on its way, and it first finds the new
+    // generation still being prepared.
+    const post = vi.mocked(AXIOS_INSTANCE.post).getMockImplementation()!
+    let answerSigning: () => void = () => {}
+    let signingHeld = false
+    vi.mocked(AXIOS_INSTANCE.post).mockImplementation(async (path: string, payload?: unknown) => {
+      if (path === '/api/stream/sign' && server.generation > 1 && !signingHeld) {
+        signingHeld = true
+        await new Promise<void>(resolve => { answerSigning = resolve })
+        signs.push(payload as SignBody)
+        return { data: { ...server, ready: false, url: null, startTime: null } }
+      }
+      return post(path, payload)
+    })
+    const prepared = execution.prepare(40, true, signal())
+    await waitFor(() => { expect(signingHeld).toBe(true) })
+    expect(seeks()).toEqual([40])
+
+    // A resource of the retired generation is gone, and hls.js reports a fatal network error.
+    const retired = vi.mocked(attachHlsPlayback).mock.calls[0][0] as unknown as { onError: (failure?: 'network') => void }
+    await act(async () => { retired.onError('network') })
+    answerSigning()
+    await act(async () => { await prepared })
+
+    expect(rendered.result.current.error).toBeNull()
+    expect(rendered.result.current.state).not.toBe('error')
+    expect(attachments()).toBe(2)
+    expect(execution.observe().position).toBe(40)
+  })
+
   it('replays after completion with one seek to zero, one pause and at most one resume', async () => {
     const { rendered, video, state, execution } = await mount()
     await act(async () => { await execution.execute('play', undefined, signal()) })

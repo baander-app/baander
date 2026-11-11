@@ -1239,6 +1239,16 @@ afterwards. The helper `session-tabs.ts` opens a named context, signs it in,
 starts the song and records every session `POST` of the context with its
 answer; each test attaches that record as `session-exchanges`, with its receipt.
 
+Two contexts of one account would otherwise conflict over a preference. Every
+tab that shows the session's track selects that track in its context panel, and
+the selection writes the account's layout preference. The second context's write
+then conflicts with the first, and the conflict dialog is modal: it hides the
+destination control and the player from the rest of the test. The helper
+therefore answers each preference write of its context itself, with the version
+the write expected, so the server stores no preference version for a later
+write to conflict with. Preference reads still reach the server; preference
+synchronization has its own tests.
+
 `close-report.spec.ts` has three cases:
 
 - A playing tab leaves its page by navigating away, which dispatches `pagehide`.
@@ -1266,8 +1276,9 @@ answer; each test attaches that record as `session-exchanges`, with its receipt.
   `overridden` and close the menu, and the refused track must start without
   another press. The overridden tab's audio element must be paused within ten
   seconds and stay paused while the other tab plays on.
-- A playing tab is taken offline with `setOffline`, and the other tab overrides
-  it once its registration has lapsed. The only assertion about the offline tab
+- A playing tab is taken offline with `setOffline`. Once its registration has
+  lapsed, the other tab selects the song, is refused, and overrides the offline
+  tab; the refused song then plays. The only assertion about the offline tab
   is that its element is paused once it is back online, while the session still
   names the other tab. The receipt records whether the offline tab's socket
   closed, how long its element kept playing and which rule silenced it.

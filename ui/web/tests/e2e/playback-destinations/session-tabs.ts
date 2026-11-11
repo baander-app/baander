@@ -18,8 +18,8 @@ export interface SessionTab {
   context: BrowserContext
   page: Page
   exchanges: SessionExchange[]
-  /** Whether this context asked the session for `path`, as far as the driver saw. */
-  requested(path: string): boolean
+  /** Whether this context asked the session for `path`, as far as the driver saw; with `since`, only from that time on. */
+  requested(path: string, since?: number): boolean
 }
 
 const sessionPath = (url: string) => {
@@ -36,6 +36,17 @@ export async function openSessionTab(
   browser: Browser, baseURL: string | undefined, user: FixtureUser, name: string, prepare: (context: BrowserContext) => void = () => {},
 ): Promise<SessionTab> {
   const context = await browser.newContext({ baseURL, ignoreHTTPSErrors: true, viewport: { width: 1280, height: 800 } })
+  // Every tab that shows the session's track selects it in its context panel, and that writes the
+  // account's layout preference. Two contexts of one account writing it conflict, and the conflict
+  // dialog is modal: it hides the rest of the page, the destination control included. Preference
+  // synchronization is not what these specs prove, so a write stays in its context: it is answered
+  // with the version it expected, and the server keeps no version that another context could
+  // conflict with. Reads still reach the server.
+  await context.route('**/api/user/*-preferences/', async route => {
+    if (route.request().method() !== 'PUT') return route.fallback()
+    const { version } = route.request().postDataJSON() as { version: number }
+    return route.fulfill({ json: { data: { version } } })
+  })
   prepare(context)
   await context.addInitScript((deviceName: string) => {
     localStorage.setItem('baander-device-name', deviceName)
@@ -62,7 +73,10 @@ export async function openSessionTab(
   })
   const page = await context.newPage()
   await login(page, user)
-  return { name, context, page, exchanges, requested: path => exchanges.some(exchange => exchange.path === path) }
+  return {
+    name, context, page, exchanges,
+    requested: (path, since = 0) => exchanges.some(exchange => exchange.path === path && exchange.at >= since),
+  }
 }
 
 export interface RegistrationAnswer {
@@ -120,7 +134,7 @@ export async function incarnationOf(observer: Page, name: string): Promise<strin
  */
 export async function playFixtureSong(tab: SessionTab): Promise<string> {
   await tab.page.goto('/music/songs')
-  await tab.page.getByText('Live song 00000', { exact: true }).dblclick()
+  await fixtureSongRow(tab.page).dblclick()
   await expect.poll(async () => (await nativeAudio(tab.page)).paused, { timeout: 25_000 }).toBe(false)
   await expect.poll(async () => (await nativeAudio(tab.page)).time).toBeGreaterThan(1)
   await expect.poll(async () => {
@@ -129,6 +143,14 @@ export async function playFixtureSong(tab: SessionTab): Promise<string> {
       && snapshot.activeIncarnationId === snapshot.destinations.find(destination => destination.name === tab.name)?.incarnationId
   }, { message: `the session to confirm that ${tab.name} plays` }).toBe(true)
   return (await sessionSnapshot(tab.page)).activeIncarnationId!
+}
+
+/**
+ * The fixture song in the song list. A tab that shows the session's track also names it in its
+ * player, its context panel and its recently played items, outside the main region.
+ */
+export function fixtureSongRow(page: Page) {
+  return page.getByRole('main').getByText('Live song 00000', { exact: true })
 }
 
 /** The playback destination control. Its title says what the tab itself knows about the session. */

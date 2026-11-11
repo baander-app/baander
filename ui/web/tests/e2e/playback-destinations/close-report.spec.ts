@@ -70,8 +70,10 @@ test.describe('a page that goes away reports its close', () => {
       expect(after.position).toBeGreaterThan(1)
 
       await playAtOnce(staying, runner)
-      expect(leaving.requested('/api/session/override')).toBe(false)
-      expect(leaving.requested('/api/session/recover-local')).toBe(false)
+      // Before it played, the tab loaded the song list as a new page, and in an engine with local
+      // recovery that page recovered the one before it. Only what followed the departure counts.
+      expect(leaving.requested('/api/session/override', left)).toBe(false)
+      expect(leaving.requested('/api/session/recover-local', left)).toBe(false)
     } finally {
       await attachExchanges(testInfo, tabs, receipt)
       await Promise.all(tabs.map(tab => tab.context.close()))
