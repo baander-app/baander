@@ -12,6 +12,7 @@ on:
             - 'ui/shared/**'
             - 'ui/rn/**'
             - 'ui/electron/**'
+            - 'packages/baander-aac/**'
             - 'scripts/build-wasm.ts'
             - '.github/workflows/frontend.yaml'
     pull_request:
@@ -24,6 +25,7 @@ on:
             - 'ui/shared/**'
             - 'ui/rn/**'
             - 'ui/electron/**'
+            - 'packages/baander-aac/**'
             - 'scripts/build-wasm.ts'
             - '.github/workflows/frontend.yaml'
 
