@@ -1,5 +1,6 @@
 /* Tests of the USAC linear prediction domain core: the mode table, the
  * LSP to LPC conversion against an LPC analysis of the synthesis filter,
+ * the synthesis filter's evaluation order,
  * the algebraic vector quantiser (codevectors on the RE8 lattice and the
  * index syntax round trip), the ACELP pulse codes and the pitch lag
  * codes at the core rates the range formula serves and above, the FAC
@@ -134,6 +135,54 @@ static void test_lsp_lpc() {
   lpd_interp_lsp(lsp0, lsp1, 4, ai);
   CHECK(memcmp(ai[4], a1, sizeof(a1)) == 0, "interpolation: last set");
   CHECK(fabsf(ai[0][1] - (0.875f * a0[1] + 0.125f * a1[1])) < 0.05f, "interpolation: first subframe");
+}
+
+/* One output of the synthesis filter in its stated order: the twelve
+ * oldest terms in four partial sums of every fourth term, added
+ * pairwise, then the four newest subtracted, oldest first. */
+static float syn_filter_step(const float* a, const float* h) {
+  float p[4];
+  for (int k = 0; k < 4; k++) {
+    p[k] = a[LPD_M - k] * h[k - LPD_M];
+  }
+  for (int g = 1; g < 3; g++) {
+    for (int k = 0; k < 4; k++) {
+      p[k] += a[LPD_M - 4 * g - k] * h[4 * g + k - LPD_M];
+    }
+  }
+  float s = h[0] - ((p[0] + p[1]) + (p[2] + p[3]));
+  for (int j = 4; j >= 1; j--) {
+    s -= a[j] * h[-j];
+  }
+  return s;
+}
+
+/* The synthesis filter returns the bits of that order, so the decoded
+ * samples do not depend on how a compiler would group the sum. */
+static void test_syn_filter_order() {
+  unsigned seed = 7u;
+  auto next = [&seed]() {
+    seed = seed * 1664525u + 1013904223u;
+    return (float)(seed >> 8) / 8388608.0f - 1.0f;
+  };
+  /* coefficients whose magnitudes sum below 1 keep the filter stable */
+  float a[LPD_M + 1] = {1.0f};
+  for (int j = 1; j <= LPD_M; j++) {
+    a[j] = 0.06f * next();
+  }
+  const int n = 4096;
+  std::vector<float> in((size_t)(LPD_M + n));
+  for (float& v : in) {
+    v = next();
+  }
+  std::vector<float> out = in;
+  lpd_syn_filter(a, out.data() + LPD_M, n);
+  std::vector<float> ref = in;
+  for (int i = 0; i < n; i++) {
+    ref[(size_t)(LPD_M + i)] = syn_filter_step(a, ref.data() + LPD_M + i);
+  }
+  CHECK(memcmp(out.data(), ref.data(), out.size() * sizeof(float)) == 0,
+        "synthesis filter: the bits of the stated order");
 }
 
 /* ── algebraic vector quantiser ─────────────────────────────────── */
@@ -499,6 +548,26 @@ static void test_fac() {
     }
     CHECK(err < 1e-8 * ref, "DCT-IV of %d is an involution (error %.1e)", n, err / ref);
   }
+  /* every output adds its terms in order of j, to the last bit */
+  for (int n = 48; n <= 128; n += n < 64 ? 16 : 32) {
+    std::vector<float> x((size_t)n), y((size_t)n), want((size_t)n);
+    unsigned seed = 11u;
+    for (int i = 0; i < n; i++) {
+      seed = seed * 1664525u + 1013904223u;
+      x[(size_t)i] = (float)(seed >> 8) / 8388608.0f - 1.0f;
+    }
+    const double pi = 3.14159265358979323846;
+    for (int k = 0; k < n; k++) {
+      float s = 0.0f;
+      for (int j = 0; j < n; j++) {
+        s += x[(size_t)j] * (float)cos(pi / n * (j + 0.5) * (k + 0.5));
+      }
+      want[(size_t)k] = s;
+    }
+    lpd_dct4(x.data(), y.data(), n);
+    CHECK(memcmp(y.data(), want.data(), (size_t)n * sizeof(float)) == 0,
+          "DCT-IV of %d: the sums in order of j", n);
+  }
   /* the windows: sine slope power complementary, the FAC windows the
    * standard's products */
   float w[2 * LPD_MAX_LFAC], past_w[LPD_MAX_LFAC], zir_w[LPD_MAX_LFAC];
@@ -856,6 +925,7 @@ static void test_stream(const LpdStream& st) {
 int main() {
   test_modes();
   test_lsp_lpc();
+  test_syn_filter_order();
   test_avq();
   test_acelp_pulses();
   test_pitch();

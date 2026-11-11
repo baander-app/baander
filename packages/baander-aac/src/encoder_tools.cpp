@@ -68,22 +68,41 @@ float tns_dequantize(int idx, int bits) {
   return (float)sin(idx / (idx >= 0 ? iqfac : iqfac_m));
 }
 
+/* The sum of x[i] y[i] over [0, n) in double.  Product i goes into
+ * partial sum i mod 4 and the four are added pairwise at the end: a
+ * written-out order that every compiler follows, with four independent
+ * additions in flight instead of one chain. */
+double dot_in_four(const float* x, const float* y, int n) {
+  double s0 = 0.0, s1 = 0.0, s2 = 0.0, s3 = 0.0;
+  int i = 0;
+  for (; i + 4 <= n; i += 4) {
+    s0 += (double)x[i] * y[i];
+    s1 += (double)x[i + 1] * y[i + 1];
+    s2 += (double)x[i + 2] * y[i + 2];
+    s3 += (double)x[i + 3] * y[i + 3];
+  }
+  if (i < n) {
+    s0 += (double)x[i] * y[i];
+  }
+  if (i + 1 < n) {
+    s1 += (double)x[i + 1] * y[i + 1];
+  }
+  if (i + 2 < n) {
+    s2 += (double)x[i + 2] * y[i + 2];
+  }
+  return (s0 + s1) + (s2 + s3);
+}
+
 /* Energy-normalized autocorrelation of x[start .. stop) up to max_lag,
  * accumulated into r. */
 void accumulate_acf(const float* x, int start, int stop, int max_lag, double* r) {
-  double e = 0.0;
-  for (int i = start; i < stop; i++) {
-    e += (double)x[i] * x[i];
-  }
+  const int n = stop - start;
+  const double e = dot_in_four(x + start, x + start, n);
   if (e <= 0.0) {
     return;
   }
   for (int lag = 0; lag <= max_lag; lag++) {
-    double acc = 0.0;
-    for (int i = start; i < stop - lag; i++) {
-      acc += (double)x[i] * x[i + lag];
-    }
-    r[lag] += acc / e;
+    r[lag] += dot_in_four(x + start, x + start + lag, n - lag) / e;
   }
 }
 

@@ -15,10 +15,10 @@ constexpr double kPi = 3.14159265358979323846;
  * FD frame's FAC of frame_length / 8 or, for short windows, / 16. */
 constexpr int kDct4Lengths[4] = {48, 64, 96, 128};
 
-/* The cosine tables of those lengths.  The one instance is a
- * function-local static, which the language initialises exactly once
- * even when several decoders reach it at the same time on different
- * threads. */
+/* The cosine tables of those lengths, term by term: entry j n + k is
+ * term j of output k.  The one instance is a function-local static,
+ * which the language initialises exactly once even when several decoders
+ * reach it at the same time on different threads. */
 struct Dct4Tables {
   float cos_table[4][LPD_MAX_LFAC * LPD_MAX_LFAC];
 
@@ -28,7 +28,7 @@ struct Dct4Tables {
       float* c = cos_table[t];
       for (int k = 0; k < n; k++) {
         for (int j = 0; j < n; j++) {
-          c[k * n + j] = (float)cos(kPi / n * (j + 0.5) * (k + 0.5));
+          c[j * n + k] = (float)cos(kPi / n * (j + 0.5) * (k + 0.5));
         }
       }
     }
@@ -78,22 +78,34 @@ int lpd_read_fac(AacBitReader* r, int length, int* coef) {
   return r->overread ? AAC_ERR_DECODE : AAC_OK;
 }
 
+/* Output k adds its terms in order of j.  With a table the loops run
+ * the other way round, over the terms outside and the outputs inside, so
+ * each output keeps that order while the compiler computes several
+ * outputs at once instead of waiting on one chain of additions. */
 void lpd_dct4(const float* in, float* out, int n) {
   const float* c = dct4_tables().table(n);
-  for (int k = 0; k < n; k++) {
-    float s = 0.0f;
-    if (c) {
-      const float* row = c + k * n;
-      for (int j = 0; j < n; j++) {
-        s += in[j] * row[j];
-      }
-    } else {
+  if (!c) {
+    for (int k = 0; k < n; k++) {
+      float s = 0.0f;
       for (int j = 0; j < n; j++) {
         s += in[j] * (float)cos(kPi / n * (j + 0.5) * (k + 0.5));
       }
+      out[k] = s;
     }
-    out[k] = s;
+    return;
   }
+  float acc[LPD_MAX_LFAC];
+  for (int k = 0; k < n; k++) {
+    acc[k] = 0.0f;
+  }
+  for (int j = 0; j < n; j++) {
+    const float v = in[j];
+    const float* term = c + j * n;
+    for (int k = 0; k < n; k++) {
+      acc[k] += v * term[k];
+    }
+  }
+  memcpy(out, acc, (size_t)n * sizeof(float));
 }
 
 void lpd_fac_synth(const float* x, int length, const float* a, float* out, int out_len) {
