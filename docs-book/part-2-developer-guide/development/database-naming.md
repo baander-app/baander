@@ -16,7 +16,7 @@ PostgreSQL index and constraint names in Baander follow one scheme: a type prefi
 
 - List columns in index order, separated by underscores: `idx_notifications_user_id_created_at`.
 - A B-tree index takes no suffix. The suffixes for other indexes are defined in [Extension Indexes](#extension-indexes).
-- A partial index declared on an entity with `options: ['where' => ...]` is not migration-only and takes the column name: `idx_scheduled_jobs_recovery_after_id`.
+- A partial index declared on an entity with `options: ['where' => ...]` is not migration-only and takes the column name: `idx_scheduled_jobs_recovery_after_id`. A partial index that a migration created under a purpose name keeps that name when its table is mapped later: `uniq_playback_transfers_current` is declared on `PlaybackTransferEntity` unchanged, because renaming it would need a migration for no gain.
 - Renaming a unique constraint also renames the index that backs it, so both carry the `uniq_` name.
 - PostgreSQL truncates identifiers longer than 63 bytes. When a name would exceed that, shorten the column part consistently instead of letting PostgreSQL cut the name. Collapse each polymorphic `<x>_type`, `<x>_id` pair to `<x>`: the unique index on `recommendations (source_type, source_id, target_type, target_id, name, user_id)` is `uniq_recommendations_source_target_name_user_id`.
 
