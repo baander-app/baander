@@ -1,6 +1,7 @@
 ---
 title: Doctrine refuses a flush after the database cascaded a delete under managed children
 date: 2026-11-11
+last_updated: 2026-11-11
 category: runtime-errors
 module: Transcode job cleanup (TranscodeJobRepository, StaleTranscodeSessionExpiry)
 problem_type: runtime_error
@@ -78,6 +79,17 @@ The sequence that fails:
 4. The flush for the second job computes change sets for every managed entity. It walks a
    session's `job` association, finds an entity it does not manage, and refuses it as new.
 
+Three conditions have to meet in one entity-manager lifetime: children loaded and still
+managed, the parent leaving the unit of work, and a later flush that has something to
+write. Reading `UnitOfWork` in Doctrine ORM 3.7.6 narrows each of them:
+
+- A flush with nothing scheduled returns before the check that throws, so a port's closing
+  flush after a repository has already flushed is harmless.
+- A bulk DQL or SQL `DELETE` of the parent does not raise this error. The parent object
+  stays in the unit of work's state map, so the association walk still sees it as managed.
+  The error needs `remove` with a flush, a `detach`, or a partial clear.
+- An uninitialized lazy object is skipped, both as an entity and as an association value.
+
 `delete()` now lets go of the job's sessions that the unit of work itself holds, read from
 the identity map and not from the database:
 
@@ -127,8 +139,16 @@ the ORM as well would issue a DELETE per session for rows the cascade is about t
   entity left the unit of work while something managed still points at it. Look for a
   removal, a `detach` or a `clear` earlier in the same process before looking for a
   missing cascade.
-- The same shape is not audited elsewhere. `ROADMAP.md` records 29 entity files that map
-  a to-one association whose row the database deletes by cascade.
+- Detaching a child is only safe when nothing managed points at that child. A detached
+  entity counts as new, so detaching a song while one of its credit, genre-link or activity
+  entities is managed moves the same refusal one level down. `TranscodeSessionEntity` is
+  the target of no association, which is why detaching is enough here.
+- An audit on 2026-11-11 read all 51 to-one join columns with `onDelete` (39 `CASCADE`,
+  12 `SET NULL`, in 33 entity files) and every ORM removal of their parents. None meets the
+  three conditions today. The closest is `PruneMissingImagesHandler`, which removes images
+  in a loop with a flush each: it is safe only because the owning albums and artists are
+  uninitialized references at that point. `ROADMAP.md` lists the three places that are one
+  change away.
 
 ## Related
 

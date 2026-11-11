@@ -931,10 +931,23 @@ Open:
   unmeasured.
 - **Control cost:** a control that issues a command costs two more statements than
   the SQL store and 1.26 times its time, inside the bound of 1.5.
-- **Associations with a database cascade:** 29 entity files map a to-one association
-  whose row the database deletes by cascade while the unit of work keeps the child
-  managed. Removing the parent and flushing again fails, as the cleanup defect below
-  showed. They are not audited. The playback entities have no associations.
+- **Associations with a database cascade, audited 2026-11-11 by reading:** 51 to-one
+  join columns carry `onDelete` (39 `CASCADE`, 12 `SET NULL`) in 33 entity files; the
+  earlier count of 29 files left out four that carry only `SET NULL`. No schema
+  listener adds one on an association column, and no mapping uses `cascade` or
+  `orphanRemoval`. None is reachable today: the failure needs managed children, the
+  parent removed through the ORM, and a later flush with something to write, and for
+  every pair at least one is missing. Three places are one change away and have no
+  test that would catch it:
+  - `PruneMissingImagesHandler` removes images in a loop with a flush each, and is
+    safe only while the owning albums and artists are uninitialized references;
+  - `AlbumRepository::delete` detaches songs without skipping uninitialized ones, and
+    covers neither credits, genre links nor activities (`MovieRepository::delete` has
+    the same gaps);
+  - `UserRepository::delete` has eleven child classes, and an administrator deleting
+    their own account already holds managed token entities, so any write added after
+    the delete in that request would fail.
+  Not covered: `tests/`, and the long-lived runners were not traced line by line.
 - **Not run:** the gate on a hosted runner, and the adaptive and media-control gates,
   whose code this branch does not touch.
 - **Store preconditions:** `register()`, `saveTransfer()` and `insertCommand()` look
