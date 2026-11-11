@@ -240,18 +240,24 @@ export class PlaybackSessionCoordinator {
       if (connection?.error === UNCONFIRMED_PLAYBACK_REFUSAL) this.publish(connection.connected, null)
     }
     this.runner.fence(snapshot.revision)
-    // A session that no longer names this tab sends it nothing further. A transfer that failed or
-    // expired leaves its target a preparation nobody will start or stop, and a session that was
-    // taken over elsewhere leaves a tab that still plays: the tab lets go of the one and silences
-    // the other. While the page registers again as itself its place moves to a new incarnation
-    // without a new revision, so nothing is judged until the answer is bound.
-    if (this.endpoint && !this.rebinding && !this.names(snapshot)) {
-      this.runner.dropPreparation().catch(error => this.fail(error))
-      this.runner.silenceLostPlayback().catch(error => this.fail(error))
-    }
+    // While the page registers again as itself its place moves to a new incarnation without a new
+    // revision, so nothing is judged until the answer is bound; binding the answer judges it then.
+    if (this.endpoint && !this.rebinding) this.letGoUnlessNamed(snapshot)
     this.refreshRequests()
     this.refreshTransfers()
     return snapshot
+  }
+
+  /**
+   * A session that no longer names this tab sends it nothing further. A transfer that failed or
+   * expired leaves its target a preparation nobody will start or stop, and a session that was
+   * taken over elsewhere leaves a tab that still plays: the tab lets go of the one and silences
+   * the other.
+   */
+  private letGoUnlessNamed(snapshot: PlaybackSnapshotResource): void {
+    if (this.names(snapshot)) return
+    this.runner.dropPreparation().catch(error => this.fail(error))
+    this.runner.silenceLostPlayback().catch(error => this.fail(error))
   }
 
   /** Whether the session names this page: as its runner, or as a participant of its open transfer. */
@@ -526,6 +532,10 @@ export class PlaybackSessionCoordinator {
     this.endpoint = endpoint
     this.incarnations.add(endpoint.incarnationId)
     this.runner.bind(endpoint)
+    // The answer is the first session this incarnation is shown. A page that kept playing through
+    // a replaced socket, and was taken over while it could not be reached, learns here that the
+    // server kept no place for it, as any other snapshot would tell it.
+    if (this.snapshot) this.letGoUnlessNamed(this.snapshot)
     this.executionBlocked = false
     if (fenced) for (const adapter of getPlaybackAdapters()) adapter.localRecovery?.rearmAfterRegistration()
     this.ready = true

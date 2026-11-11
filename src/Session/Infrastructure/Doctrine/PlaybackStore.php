@@ -344,7 +344,12 @@ final readonly class PlaybackStore implements PlaybackStoreInterface
             $changes[] = 'i.position = :position';
             $parameters['position'] = $position;
         }
-        $this->change('UPDATE ' . PlaybackDestinationIncarnationEntity::class . ' i SET ' . implode(', ', $changes) . ' WHERE i.id = :id', $parameters);
+        // A row already retired as stopped is final, so a repeated close report cannot move its cursor.
+        $this->change(
+            'UPDATE ' . PlaybackDestinationIncarnationEntity::class . ' i SET ' . implode(', ', $changes)
+            . " WHERE i.id = :id AND (i.retiredAt IS NULL OR i.observedState <> 'stopped')",
+            $parameters,
+        );
     }
 
     public function supersedeIncarnationCommands(string $incarnationId): void
@@ -369,11 +374,13 @@ final readonly class PlaybackStore implements PlaybackStoreInterface
         }
     }
 
-    public function sourceQuiesced(string $attemptId, string $sourceId): bool
+    public function sourceQuiesced(string $attemptId): bool
     {
+        // An attempt asks only its source to quiesce. The answer stays with the incarnation that gave
+        // it, while a successor of the same page may hold the source's role since.
         return $this->rows(
-            'SELECT c.id FROM ' . PlaybackCommandEntity::class . " c WHERE c.attemptId = :attempt AND c.incarnationId = :source AND c.type = 'quiesce' AND c.outcome = 'quiesced'",
-            ['attempt' => $attemptId, 'source' => $sourceId],
+            'SELECT c.id FROM ' . PlaybackCommandEntity::class . " c WHERE c.attemptId = :attempt AND c.type = 'quiesce' AND c.outcome = 'quiesced'",
+            ['attempt' => $attemptId],
             limit: 1,
         ) !== [];
     }

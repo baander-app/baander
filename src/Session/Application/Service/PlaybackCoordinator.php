@@ -344,7 +344,12 @@ final readonly class PlaybackCoordinator implements PlaybackCoordinationInterfac
      * stopped. Its registration ends here, so nobody waits for a lapse, and its report is the proof
      * of silence the release needs. The proofs run first: what they release keeps the state it
      * confirmed. A report for an incarnation the session no longer names changes only that
-     * incarnation's row.
+     * incarnation's row, and a repeated report changes nothing.
+     *
+     * The page may have registered again as itself after it prepared the report, so that a successor
+     * holds its place at the same revision. While the session still stands at the revision the
+     * report describes, nothing has run since the page stopped, and the report speaks for that
+     * successor too. A successor that acted since has moved the session on and keeps its place.
      *
      * @param array<string,mixed> $input
      * @param array<string,mixed> $endpoint
@@ -356,6 +361,54 @@ final readonly class PlaybackCoordinator implements PlaybackCoordinationInterfac
         $this->store->retireIncarnation($endpoint['id'], stopped: true, position: $checkpoint['position']);
         $this->releaseGoneRunner($session, $transfer);
         $this->releaseIncarnation($session, $endpoint['id'], $checkpoint, $transfer);
+        // Every release that changes the session advances its revision, so an unchanged revision
+        // also means the open transfer is still as it was read.
+        if ($session->revision() !== $checkpoint['revision']) {
+            return;
+        }
+        foreach ($this->successorsOfPage($session, $transfer, $endpoint) as $successor) {
+            $this->store->retireIncarnation($successor, stopped: true, position: $checkpoint['position']);
+            $this->releaseIncarnation($session, $successor, $checkpoint, $transfer);
+        }
+    }
+
+    /**
+     * The incarnations the session names that registered later from the same tab and the same page
+     * as the given one. An incarnation without a page identity has no successor.
+     *
+     * @param array<string,mixed>|null $transfer
+     * @param array<string,mixed> $endpoint
+     * @return list<string>
+     */
+    private function successorsOfPage(ListeningSession $session, ?array $transfer, array $endpoint): array
+    {
+        if (($endpoint['page_id'] ?? null) === null) {
+            return [];
+        }
+        $owner = $session->getUserId()->toString();
+        $samePage = function (string $incarnationId) use ($owner, $endpoint): bool {
+            if ($incarnationId === $endpoint['id']) {
+                return false;
+            }
+            $named = $this->store->endpoint($owner, $incarnationId);
+            return $named['destination_id'] === $endpoint['destination_id'] && $named['page_id'] === $endpoint['page_id'];
+        };
+        return array_values(array_filter($this->namedIncarnations($session, $transfer), $samePage));
+    }
+
+    /**
+     * The incarnations the session names: the target and the source of its open transfer and its
+     * runner, in that order, each once.
+     *
+     * @param array<string,mixed>|null $transfer
+     * @return list<string>
+     */
+    private function namedIncarnations(ListeningSession $session, ?array $transfer): array
+    {
+        return [$transfer['target_incarnation_id'] ?? null, $transfer['source_incarnation_id'] ?? null, $session->activeIncarnationId()?->toString()]
+            |> array_filter(...)
+            |> array_unique(...)
+            |> array_values(...);
     }
 
     /**
@@ -421,7 +474,7 @@ final readonly class PlaybackCoordinator implements PlaybackCoordinationInterfac
             $sourceEndpoint = $sourceId === null ? null : $this->store->endpoint($owner, $sourceId);
             // A source that is itself recorded gone and stopped does not get the session back.
             $keepSource = $sourceEndpoint !== null && !$this->goneAndStopped($sourceEndpoint);
-            $sourceStopped = !$keepSource || $this->store->sourceQuiesced($transfer['id'], $sourceId);
+            $sourceStopped = !$keepSource || $this->store->sourceQuiesced($transfer['id']);
             if ($checkpoint === null) {
                 $session->releaseGoneIncarnation(!$keepSource, $sourceStopped);
             } else {
@@ -480,11 +533,8 @@ final readonly class PlaybackCoordinator implements PlaybackCoordinationInterfac
      */
     private function earlierPagesOfTab(ListeningSession $session, ?array $transfer, array $registration): array
     {
-        $named = [$transfer['target_incarnation_id'] ?? null, $transfer['source_incarnation_id'] ?? null, $session->activeIncarnationId()?->toString()]
-            |> array_filter(...)
-            |> array_unique(...);
         $owner = $session->getUserId()->toString();
-        $endpoints = array_map(fn(string $incarnationId): array => $this->store->endpoint($owner, $incarnationId), $named);
+        $endpoints = array_map(fn(string $incarnationId): array => $this->store->endpoint($owner, $incarnationId), $this->namedIncarnations($session, $transfer));
         return array_values(array_filter(
             $endpoints,
             static fn(array $endpoint): bool => $endpoint['public_id'] === $registration['destinationId'] && $endpoint['page_id'] !== null,

@@ -254,9 +254,77 @@ final class PlaybackCloseReportPersistenceTest extends TestCase
         self::assertSame('playing', $closed['observedState']);
         self::assertSame($pause['revision'], $closed['revision']);
         self::assertTrue($this->incarnation($successor['incarnationId'])['available']);
+        // The succession retired the earlier incarnation without recording it stopped, so its first report still records its cursor.
+        self::assertSame(['observed_state' => 'stopped', 'position' => 5.0, 'retired' => true, 'available' => false], $this->incarnation($earlier['incarnationId']));
         // The pause that followed the page to its new incarnation is still there to be answered.
         self::assertSame([['pause', $successor['incarnationId']]], $this->unanswered($owner));
         self::assertSame('paused', $this->answer($service, $owner, $successor, 'paused', 43.0)['observedState']);
+    }
+
+    public function testAReportFromAPageThatWasSucceededSinceSpeaksForItsSuccessorWhileTheSessionStandsWhereItLeftIt(): void
+    {
+        $service = $this->coordinator();
+        foreach (['the successor did nothing since', 'the successor answered a seek since'] as $case) {
+            $owner = $this->createUser();
+            $registration = $this->tabOnAPage($owner);
+            $earlier = $service->execute($owner, PlaybackOperation::Endpoint, $registration)['endpoint'];
+            $playing = $this->playing($service, $owner, $earlier);
+            // The socket was replaced and the same page registered again: its successor took the
+            // earlier incarnation's place at the same revision.
+            $succeeded = $service->execute($owner, PlaybackOperation::Endpoint, $registration);
+            $successor = $succeeded['endpoint'];
+            self::assertSame([$successor['incarnationId'], $playing['revision']], [$succeeded['activeIncarnationId'], $succeeded['revision']], $case);
+            $before = $playing;
+            if ($case === 'the successor answered a seek since') {
+                $this->controlFrom($service, $owner, $successor, $playing['revision'], 'seek', ['position' => 70.0]);
+                $before = $this->answer($service, $owner, $successor, 'applied', 70.0);
+                self::assertGreaterThan($playing['revision'], $before['revision'], $case);
+            }
+
+            // The page went away, and the report that reaches the server names the earlier incarnation.
+            $closed = $this->close($service, $owner, $earlier, $this->checkpoint($playing, 61.0));
+
+            if ($case === 'the successor did nothing since') {
+                self::assertNull($closed['activeIncarnationId'], $case);
+                self::assertSame('paused', $closed['desiredState'], $case);
+                self::assertSame('paused', $closed['observedState'], $case);
+                self::assertSame(61.0, $closed['position'], $case);
+                self::assertSame($playing['revision'] + 1, $closed['revision'], $case);
+                self::assertSame(['observed_state' => 'stopped', 'position' => 61.0, 'retired' => true, 'available' => false], $this->incarnation($successor['incarnationId']), $case);
+                // Another tab then plays without a refusal.
+                $next = $this->endpoint($service, $owner);
+                self::assertSame('retained', $this->controlFrom($service, $owner, $next, $closed['revision'], 'play')['requestResult']['outcome'], $case);
+            } else {
+                // The session moved on after the report's checkpoint, so the report speaks only for the earlier incarnation.
+                self::assertSame($successor['incarnationId'], $closed['activeIncarnationId'], $case);
+                self::assertSame('playing', $closed['observedState'], $case);
+                self::assertSame(70.0, $closed['position'], $case);
+                self::assertSame($before['revision'], $closed['revision'], $case);
+                self::assertTrue($this->incarnation($successor['incarnationId'])['available'], $case);
+            }
+            self::assertSame([], $this->unanswered($owner), $case);
+        }
+    }
+
+    public function testATargetThatReportsItsCloseAfterTheSourcePageWasSucceededLeavesTheSuccessorPausedAndOwedNothing(): void
+    {
+        $owner = $this->createUser();
+        $service = $this->coordinator();
+        ['source' => $source, 'sourceRegistration' => $registration, 'target' => $target, 'snapshot' => $starting] = $this->transferBetweenPages($service, $owner, true, 'starting');
+        // The source answered its quiesce; then its page registered again and its successor took the source's role.
+        $succeeded = $service->execute($owner, PlaybackOperation::Endpoint, $registration);
+        $successor = $succeeded['endpoint'];
+        self::assertSame($successor['incarnationId'], $succeeded['transfer']['sourceIncarnationId']);
+        self::assertNotSame($source['incarnationId'], $successor['incarnationId']);
+
+        $closed = $this->close($service, $owner, $target, $this->checkpoint($starting, 61.0));
+
+        self::assertNull($closed['transfer']);
+        self::assertSame($successor['incarnationId'], $closed['activeIncarnationId']);
+        self::assertSame('paused', $closed['desiredState']);
+        self::assertSame('paused', $closed['observedState']);
+        // The quiesce the page answered before its succession is the proof that it is silent: no stop is owed.
+        self::assertSame([], $this->unanswered($owner));
     }
 
     public function testARepeatedReportChangesNothingAndAPageThatReturnsFindsNothingToSucceed(): void
@@ -273,6 +341,13 @@ final class PlaybackCloseReportPersistenceTest extends TestCase
         $again = $this->close($service, $owner, $runner, $checkpoint);
 
         self::assertSame($first, $again);
+        self::assertSame($after, $this->committed($owner));
+
+        // A later report at another cursor, as from the page restored from the back/forward cache,
+        // changes nothing either: the incarnation is already retired as stopped.
+        $later = $this->close($service, $owner, $runner, $this->checkpoint($playing, 12.0));
+
+        self::assertSame($first, $later);
         self::assertSame($after, $this->committed($owner));
 
         // The same page registers again, as after a restore from the back/forward cache. The session
@@ -317,7 +392,8 @@ final class PlaybackCloseReportPersistenceTest extends TestCase
         self::assertSame('playing', $replayed['observedState']);
         self::assertSame($taken['revision'], $replayed['revision']);
 
-        // In the other order the recovery releases the session and the close report that follows changes only the incarnation's row.
+        // In the other order the recovery releases the session and retires the incarnation as stopped,
+        // so the close report that follows changes nothing, as a repeated report does.
         $owner = $this->createUser();
         $runner = $this->endpoint($service, $owner, ['localRecoveryEligible' => true, 'tabId' => new Uuid()->toString()]);
         $playing = $this->playing($service, $owner, $runner);
@@ -326,13 +402,14 @@ final class PlaybackCloseReportPersistenceTest extends TestCase
         $recovered = $service->execute($owner, PlaybackOperation::RecoverLocal, $recovery);
         self::assertNull($recovered['activeIncarnationId']);
         self::assertSame(99.0, $recovered['position']);
+        $after = $this->committed($owner);
         $closed = $this->close($service, $owner, $runner, $this->checkpoint($playing, 97.25));
         self::assertNull($closed['activeIncarnationId']);
         self::assertSame(99.0, $closed['position']);
         self::assertSame($recovered['revision'], $closed['revision']);
-        self::assertSame(['observed_state' => 'stopped', 'position' => 97.25, 'retired' => true, 'available' => false], $this->incarnation($runner['incarnationId']));
+        self::assertSame(['observed_state' => 'stopped', 'position' => 42.5, 'retired' => true, 'available' => false], $this->incarnation($runner['incarnationId']));
+        self::assertSame($after, $this->committed($owner));
         // The same proof once more answers with its recorded result and changes nothing.
-        $after = $this->committed($owner);
         $replayed = $service->execute($owner, PlaybackOperation::RecoverLocal, $recovery);
         self::assertSame('recovered', $replayed['recoveryResult']['outcome']);
         // The stored result comes back from a JSON column, whose key order is its own.

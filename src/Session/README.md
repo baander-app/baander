@@ -90,8 +90,9 @@ rows of the incarnations the session names; a row without one names no page.
 Three guarded updates serve the releases and the succession described below.
 `retireIncarnation` ends a registration without renewing its presence and keeps
 the first retirement time; it records `stopped` and a cursor only when the caller
-passes them. `succeedIncarnation` addresses an incarnation's unanswered commands
-to its successor and the successor's epoch, keeping their disclosure mark, and
+passes them, and changes nothing on a row that is already retired and `stopped`.
+`succeedIncarnation` addresses an incarnation's unanswered commands to its
+successor and the successor's epoch, keeping their disclosure mark, and
 names the successor in each role the earlier incarnation holds in an open
 transfer. `reportCursor` records a cursor and renews presence, and leaves the
 reported playback state alone.
@@ -358,7 +359,9 @@ the succession, the existing proofs, then the release.
   change, because an answer is accepted only at its command's own revision.
   Answered commands stay with the earlier incarnation, so its pause or stop proves
   nothing for the new one, and an answer that still names the earlier incarnation
-  is refused as stale.
+  is refused as stale. An answered quiesce is the exception: a transfer attempt
+  asks only its source to quiesce, so the answer counts for whichever incarnation
+  of that page now holds the source's role.
 - **No page identity**, on the registration or on the earlier incarnation, proves
   nothing. Only the existing proofs apply.
 
@@ -393,10 +396,19 @@ at the reported position without renewing its presence, the existing proofs run,
 and the release routine runs for whatever still names the incarnation. Its
 destination is unavailable at once, so the next tab does not wait for a lapse. The
 answer is the snapshot, without commands. A report for an incarnation the session
-does not name, whether it never was named, was succeeded or already reported,
-changes only that incarnation's row and gets the same answer. A close report and
-a local recovery for the same incarnation release the session once: whichever
-comes second changes nothing, and a local recovery still answers `recovered`.
+does not name, whether it never was named or was succeeded, changes only that
+incarnation's row and gets the same answer. A repeated report changes nothing,
+whatever cursor it carries. A close report and a local recovery for the same incarnation
+release the session once: whichever comes second changes nothing, and a local
+recovery still answers `recovered`.
+
+A page can register again as itself after it prepared its report, and the report
+can then reach the server after a successor has taken the page's place at the same
+revision. While the session still stands at the revision of the report's
+checkpoint, nothing has run since the page stopped, and the report speaks for the
+successor too: the successor is retired and recorded `stopped` at the reported
+position, and the session is released from it as from the reporting incarnation.
+A successor that acted since has advanced the revision and keeps its place.
 
 The web client sends the report on two occasions:
 

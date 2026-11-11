@@ -210,7 +210,7 @@ With the tab's identity it tells a new page from a live one. A registration from
 
 ### Close report
 
-A playback endpoint's own statement, made with its capability, that this incarnation has stopped. The web client sends it at `pagehide`, from a request prepared ahead, and after a disconnect that silenced its players, before it registers again. The server retires the incarnation, records it stopped at the reported cursor and releases the session from it in the same request; a report for an incarnation the session no longer names changes only that incarnation.
+A playback endpoint's own statement, made with its capability, that this incarnation has stopped. The web client sends it at `pagehide`, from a request prepared ahead, and after a disconnect that silenced its players, before it registers again. The server retires the incarnation, records it stopped at the reported cursor and releases the session from it in the same request; a report for an incarnation the session no longer names changes only that incarnation, and a repeated report changes nothing. While the session still stands at the revision the report describes, the report also speaks for the successor the same page has registered since.
 A tab that is only hidden sends none. A crash, a killed browser or a dead network sends none either; the playback override is then the way back.
 
 ### Playback override

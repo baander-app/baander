@@ -121,6 +121,9 @@ test.describe('Play here anyway', () => {
         const path = '/src/features/player/stores/player-store.ts'
         const { usePlayerStore } = await import(/* @vite-ignore */ path)
         const audio = usePlayerStore.getState().audioElement as HTMLAudioElement
+        // The lapse, the override and the return take about as long as the minute-long song. A
+        // looping element never ends or pauses by itself, so only the page can silence it.
+        audio.loop = true
         audio.addEventListener('pause', () => { document.documentElement.dataset.offlinePausedAt ??= String(Date.now()) })
         audio.addEventListener('ended', () => { document.documentElement.dataset.offlineEndedAt ??= String(Date.now()) })
       })
@@ -142,9 +145,10 @@ test.describe('Play here anyway', () => {
 
       const backOnline = Date.now()
       await offline.context.setOffline(false)
-      // The one thing asserted of the offline browser: once it is back it is silent, however it
-      // came to be. What silenced it, and how long it had played on, goes into the receipt.
-      await expect.poll(async () => (await nativeAudio(offline.page)).paused, { timeout: 90_000, intervals: [500] }).toBe(true)
+      // Once it is back it is silent within a presence interval and the registration deadline. What
+      // silenced it, and how long it had played on, goes into the receipt.
+      await expect.poll(async () => (await nativeAudio(offline.page)).paused, { timeout: 30_000, intervals: [500] }).toBe(true)
+      expect((await nativeAudio(offline.page)).ended).toBe(false)
       await expect.poll(async () => offline.page.evaluate(() => navigator.onLine)).toBe(true)
       expect((await sessionSnapshot(taking.page)).activeIncarnationId).toBe(own)
 
@@ -162,6 +166,7 @@ test.describe('Play here anyway', () => {
           : pausedAt >= backOnline ? 'a snapshot after it was back showed it that it lost the session'
             : 'unattributed'
       testInfo.annotations.push({ type: 'offline browser', description: JSON.stringify(receipt) })
+      expect(['the song ended by itself', 'unattributed'], 'what silenced the offline browser').not.toContain(receipt.silencedBy)
     } finally {
       await attachExchanges(testInfo, tabs, receipt)
       await Promise.all(tabs.map(tab => tab.context.close()))

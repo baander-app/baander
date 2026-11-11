@@ -74,7 +74,7 @@ interface PlaybackStoreInterface
     /**
      * End an incarnation's registration, once, without renewing its presence. It is recorded as stopped
      * only where its silence is proved, and at a cursor only where it reported one; otherwise what it
-     * last reported stands.
+     * last reported stands. An incarnation already retired as stopped stays as it is.
      */
     public function retireIncarnation(string $incarnationId, bool $stopped, ?float $position = null): void;
     public function supersedeIncarnationCommands(string $incarnationId): void;
@@ -84,5 +84,6 @@ interface PlaybackStoreInterface
      * successor in each role the earlier incarnation held. Answered commands stay where they are.
      */
     public function succeedIncarnation(string $earlierId, string $successorId, int $successorEpoch): void;
-    public function sourceQuiesced(string $attemptId, string $sourceId): bool;
+    /** Whether the source of a transfer attempt answered its quiesce, whichever incarnation of its page answered it. */
+    public function sourceQuiesced(string $attemptId): bool;
 }

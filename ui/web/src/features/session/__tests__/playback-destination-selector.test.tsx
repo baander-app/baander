@@ -116,22 +116,24 @@ describe('Play here anyway', () => {
     runner?: Presence | null
     transfer?: { state: 'preparing' | 'quiescing' | 'starting' | 'uncertain'; target: Presence } | null
     connection?: Partial<PlaybackConnection>
+    /** The held destination that is not a browser; every other one is. */
+    notBrowser?: 'runner' | 'target'
   }
   let unregister: (() => void) | undefined
   afterEach(() => { unregister?.(); unregister = undefined })
 
   /** The menu, opened, beside a session held as described; `override` stands for the coordinator's request. */
-  async function openMenu({ runner = 'unavailable', transfer = null, connection = {} }: Held = {}, override = vi.fn(async () => {})) {
+  async function openMenu({ runner = 'unavailable', transfer = null, connection = {}, notBrowser }: Held = {}, override = vi.fn(async () => {})) {
     unregister = registerPlaybackCoordinator({ override } as unknown as PlaybackSessionCoordinator)
     const client = new QueryClient()
     client.setQueryData(PLAYBACK_CONNECTION_KEY, { connected: true, error: null, endpoint: { destinationId: 'local', incarnationId: 'local-tab', epoch: 1 }, ...connection })
-    const destination = (id: string, name: string, presence: Presence | null | undefined) => presence && presence !== 'missing'
-      ? [{ destinationId: id, incarnationId: `${id}-tab`, name, available: presence === 'available', capabilities: ['song'] }] : []
+    const destination = (id: 'runner' | 'target', name: string, presence: Presence | null | undefined) => presence && presence !== 'missing'
+      ? [{ destinationId: id, incarnationId: `${id}-tab`, name, kind: notBrowser === id ? 'cast' : 'browser', available: presence === 'available', capabilities: ['song'] }] : []
     client.setQueryData(PLAYBACK_SESSION_KEY, {
       media: { kind: 'song', publicId: 'held-song' }, queue: ['held-song'], position: 77, observedState: 'unknown',
       activeIncarnationId: runner ? 'runner-tab' : null,
       destinations: [
-        { destinationId: 'local', incarnationId: 'local-tab', name: 'Local browser', available: true, capabilities: ['song'] },
+        { destinationId: 'local', incarnationId: 'local-tab', name: 'Local browser', kind: 'browser', available: true, capabilities: ['song'] },
         ...destination('runner', 'Firefox on Linux', runner),
         ...destination('target', 'Living room', transfer?.target),
       ],
@@ -161,6 +163,9 @@ describe('Play here anyway', () => {
     ['a transfer is preparing beside an unavailable runner', { runner: 'unavailable', transfer: { state: 'preparing', target: 'available' } }],
     ['a transfer is quiescing beside an unavailable runner', { runner: 'unavailable', transfer: { state: 'quiescing', target: 'unavailable' } }],
     ['a transfer is starting beside an unavailable runner', { runner: 'unavailable', transfer: { state: 'starting', target: 'unavailable' } }],
+    // The server ends the hold of a browser only.
+    ['the unavailable runner is not a browser', { runner: 'unavailable', notBrowser: 'runner' }],
+    ['the unavailable target of an uncertain transfer is not a browser', { runner: 'available', transfer: { state: 'uncertain', target: 'unavailable' }, notBrowser: 'target' }],
   ] as [string, Held][])('is not offered while %s', async (_case, held) => {
     const { item } = await openMenu(held)
     expect(item()).not.toBeInTheDocument()

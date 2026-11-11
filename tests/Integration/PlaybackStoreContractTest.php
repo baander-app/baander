@@ -261,12 +261,19 @@ final class PlaybackStoreContractTest extends TestCase
         $retired = $this->observer->fetchOne('SELECT retired_at FROM playback_destination_incarnations WHERE id=?', [$account['incarnation']]);
         self::assertFalse($this->store->endpoint($account['owner'], $account['incarnation'])['available']);
 
-        // Recorded as stopped, then as stopped at a reported cursor; the first retirement stands.
-        $this->store->retireIncarnation($account['incarnation'], stopped: true);
-        self::assertSame(['stopped', 2.0], [$row()['observed_state'], $row()['position']]);
+        // Recorded as stopped at a reported cursor; the first retirement stands.
         $this->store->retireIncarnation($account['incarnation'], stopped: true, position: 9.5);
         self::assertSame(['stopped', 9.5], [$row()['observed_state'], $row()['position']]);
         self::assertSame($retired, $this->observer->fetchOne('SELECT retired_at FROM playback_destination_incarnations WHERE id=?', [$account['incarnation']]));
+        // A row retired as stopped is final: a later retirement at another cursor changes nothing.
+        $this->store->retireIncarnation($account['incarnation'], stopped: true, position: 4.0);
+        self::assertSame(['stopped', 9.5], [$row()['observed_state'], $row()['position']]);
+        // Recorded as stopped without a reported cursor, an incarnation keeps the cursor it last reported.
+        $other = $this->account();
+        $this->store->observe($other['incarnation'], 'playing', 3.0);
+        $this->store->retireIncarnation($other['incarnation'], stopped: true);
+        self::assertSame(['observed_state' => 'stopped', 'position' => 3.0, 'retired' => true],
+            $this->connection->fetchAssociative('SELECT observed_state,position,retired_at IS NOT NULL AS retired FROM playback_destination_incarnations WHERE id=?', [$other['incarnation']]));
         // Neither the presence it last reported nor its capability changes.
         self::assertSame([$expires, $capability], [$row()['expires_at'], $row()['capability_hash']]);
     }
@@ -742,7 +749,7 @@ final class PlaybackStoreContractTest extends TestCase
         $attempt = new Uuid()->toString();
         $quiesce = $this->command($account, ['type' => 'quiesce', 'attempt_id' => $attempt]);
         $this->store->insertCommand($quiesce);
-        self::assertFalse($this->store->sourceQuiesced($attempt, $account['incarnation']));
+        self::assertFalse($this->store->sourceQuiesced($attempt));
         self::assertFalse($this->store->attemptDisclosed($attempt, 'quiesce'));
 
         $this->store->snapshot($this->store->lockSession($account['owner']), $account['incarnation']);
@@ -751,9 +758,8 @@ final class PlaybackStoreContractTest extends TestCase
         self::assertFalse($this->store->attemptDisclosed(new Uuid()->toString(), 'quiesce'));
 
         $this->store->acknowledgeCommand($quiesce['id'], 'quiesced');
-        self::assertTrue($this->store->sourceQuiesced($attempt, $account['incarnation']));
-        self::assertFalse($this->store->sourceQuiesced($attempt, new Uuid()->toString()));
-        self::assertFalse($this->store->sourceQuiesced(new Uuid()->toString(), $account['incarnation']));
+        self::assertTrue($this->store->sourceQuiesced($attempt));
+        self::assertFalse($this->store->sourceQuiesced(new Uuid()->toString()));
     }
 
     public function testThePendingControlIsTheOldestUnansweredControlAndNoTransferCommand(): void
@@ -797,7 +803,7 @@ final class PlaybackStoreContractTest extends TestCase
         $this->store->requestedCommand($account['session'], $command['request_id']);
         $this->store->requestedTransfer($account['session'], $transfer['request_id']);
         $this->store->rememberRequest($account['session'], $command['request_id'], $command['request_digest']);
-        $this->store->sourceQuiesced($command['attempt_id'], $account['incarnation']);
+        $this->store->sourceQuiesced($command['attempt_id']);
         $this->store->attemptDisclosed($command['attempt_id'], 'play');
         $this->store->snapshot($session, $account['incarnation']);
         $this->connection->commit();

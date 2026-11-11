@@ -204,6 +204,10 @@ final class PlaybackOverridePersistenceTest extends TestCase
         $this->assertOverrideRefused('An endpoint capability is required.', $service, $owner, $asker, $revision, ['capability' => null]);
         $this->assertOverrideRefused('Endpoint authority is invalid.', $service, $owner, $asker, $revision, ['capability' => str_repeat('0', 64)]);
         $this->assertOverrideRefused('Endpoint authority is invalid.', $service, $owner, $asker, $revision, $runner);
+        // Another account cannot ask with this account's tab, although its incarnation and capability are valid and its own.
+        $before = $this->committed($owner);
+        $this->assertOverrideRefused('Endpoint authority is invalid.', $service, $this->createUser(), $asker, $revision);
+        self::assertSame($before, $this->committed($owner));
 
         // A tab that is not registered any more cannot ask: neither one whose registration lapsed nor
         // one that its own later registration retired.

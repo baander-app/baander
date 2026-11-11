@@ -1696,6 +1696,34 @@ describe('browser playback coordination', () => {
     expect(h.adapter.quiesce).toHaveBeenCalledOnce()
   })
 
+  it.each(['another runner', 'no runner'] as const)('silences a playing page once when the answer to its registration as itself names %s', async runner => {
+    const h = await playingPage()
+    // The page lost its network while it played and was overridden meanwhile, so the server kept no
+    // place for it: its new incarnation is an ordinary destination of a session it does not run.
+    const lost = runner === 'another runner' ? elsewhere(h.session, 2)
+      : { ...h.session, revision: 2, activeIncarnationId: null, activeDestinationId: null, desiredState: 'paused' as const, observedState: 'paused' as const }
+    const answer = { ...lost, destinations: lost.destinations.map(destination => destination.incarnationId === endpoint.incarnationId
+      ? { ...destination, incarnationId: successor.incarnationId, epoch: successor.epoch } : destination) }
+    vi.mocked(AXIOS_INSTANCE.post).mockClear().mockImplementation(async () => ({ data: { data: answer } }))
+    h.open()
+    await vi.waitFor(() => expect(h.transport.send).toHaveBeenCalledTimes(2))
+
+    h.receive({ ...answer, endpoint: successor })
+    await vi.waitFor(() => expect(h.client.getQueryData(PLAYBACK_CONNECTION_KEY)).toHaveProperty('endpoint.incarnationId', successor.incarnationId))
+    await settled()
+
+    expect(h.state.observedState).toBe('paused')
+    expect(h.adapter.quiesce).toHaveBeenCalledOnce()
+    expect(stops(h)).toEqual([])
+    expect(h.client.getQueryData(PLAYBACK_CONNECTION_KEY)).toMatchObject({ connected: true, error: null })
+
+    // Silenced once: the next snapshot that does not name it leaves it as it is.
+    h.receive({ ...answer, revision: 3 })
+    await settled()
+    expect(h.adapter.quiesce).toHaveBeenCalledOnce()
+    expect(h.state.observedState).toBe('paused')
+  })
+
   it('executes a preparation that follows the loss of the session after the player is silenced, and keeps it', async () => {
     const h = await playingPage()
     let silence!: () => void
