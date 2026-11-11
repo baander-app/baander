@@ -115,6 +115,9 @@
           "defines": ["BAAC_AAC_SSE2"],
           "cflags_cc": ["-msse2"]
         }],
+        ["target_arch=='ia32'", {
+          "cflags_cc": ["-mfpmath=sse"]
+        }],
         ["target_arch=='arm64'", {
           "sources": ["src/simd/neon.cpp", "src/simd/flac_neon.cpp"],
           "defines": ["BAAC_AAC_NEON"]

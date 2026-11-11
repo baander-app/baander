@@ -271,6 +271,20 @@ class FlacEncoder : public Napi::ObjectWrap<FlacEncoder> {
   }
 
   explicit FlacEncoder(const Napi::CallbackInfo& info) : Napi::ObjectWrap<FlacEncoder>(info) {
+    /* The addon is built without C++ exceptions crossing into Node: a
+     * failed allocation while the options are copied is caught here and
+     * thrown as a JavaScript error. */
+    try {
+      construct(info);
+    } catch (const std::bad_alloc&) {
+      throw_error(info.Env(), "FlacEncoder: out of memory");
+    }
+  }
+
+  ~FlacEncoder() override { baac_flac_encoder_destroy(handle_); }
+
+ private:
+  void construct(const Napi::CallbackInfo& info) {
     const Napi::Env env = info.Env();
     BaacFlacEncoderOptions options;
     baac_flac_encoder_options_init(&options);
@@ -318,23 +332,50 @@ class FlacEncoder : public Napi::ObjectWrap<FlacEncoder> {
     }
   }
 
-  ~FlacEncoder() override { baac_flac_encoder_destroy(handle_); }
-
- private:
-  /* The header of a stream that has not begun, appended to `out`. */
-  bool begin(std::vector<uint8_t>* out) {
+  /* Starts the stream when none is running: the header into `out`,
+   * which is empty and has room for it, so that nothing here can fail
+   * for want of memory once the encoder has begun. */
+  bool begin(std::vector<uint8_t>* out, int header_bytes) {
     if (started_) {
       return true;
     }
-    const int size = baac_flac_encoder_header_bytes(handle_);
-    if (size < 0) {
-      return false;
-    }
-    out->resize(static_cast<size_t>(size));
-    if (baac_flac_encoder_write_header(handle_, out->data(), size) != size) {
+    out->resize(static_cast<size_t>(header_bytes));
+    if (baac_flac_encoder_write_header(handle_, out->data(), header_bytes) != header_bytes) {
       return false;
     }
     started_ = true;
+    finished_ = false;
+    return true;
+  }
+
+  /* What a call needs before it changes anything: room in `out` for
+   * the header of a stream that has not begun, and the scratch buffer
+   * at the size of the first step.  Throws std::bad_alloc; the encoder
+   * is then as it was, and the call can be made again.  Returns the
+   * header's length, 0 for a stream that runs, or a negative error. */
+  int prepare(std::vector<uint8_t>* out, int first_bound) {
+    int header_bytes = 0;
+    if (!started_) {
+      header_bytes = baac_flac_encoder_header_bytes(handle_);
+      if (header_bytes < 0) {
+        return header_bytes;
+      }
+      out->reserve(static_cast<size_t>(header_bytes));
+    }
+    scratch(static_cast<size_t>(first_bound > 0 ? first_bound : 0));
+    return header_bytes;
+  }
+
+  /* Refuses a call on an encoder that lost output: frames that were
+   * coded and could not be handed out are gone, and what would follow
+   * them is no stream. */
+  bool refuse_failed(const Napi::Env& env, const char* where) {
+    if (!failed_) {
+      return false;
+    }
+    throw_error(env, std::string(where) +
+                         ": an earlier call failed after coding began; the stream is "
+                         "incomplete and this encoder writes no more");
     return true;
   }
 
@@ -354,6 +395,9 @@ class FlacEncoder : public Napi::ObjectWrap<FlacEncoder> {
     const Napi::Env env = info.Env();
     if (!handle_) {
       return throw_error(env, "FlacEncoder: not initialized");
+    }
+    if (refuse_failed(env, "FlacEncoder.encode")) {
+      return env.Undefined();
     }
     if (info.Length() < 1 || !info[0].IsTypedArray() ||
         info[0].As<Napi::TypedArray>().TypedArrayType() != napi_int32_array) {
@@ -380,49 +424,106 @@ class FlacEncoder : public Napi::ObjectWrap<FlacEncoder> {
         return throw_error(env, "FlacEncoder.encode: a sample lies outside the bit depth");
       }
     }
-    std::vector<uint8_t> out;
-    if (!begin(&out)) {
-      return throw_error(env, "FlacEncoder.encode: the stream cannot begin");
-    }
     const size_t frames = values / static_cast<size_t>(channels_);
     const size_t step = 1 << 16;
-    for (size_t pos = 0; pos < frames; pos += step) {
-      const int count = static_cast<int>(frames - pos < step ? frames - pos : step);
-      const int bound = baac_flac_encoder_max_output_bytes(handle_, count);
-      if (bound < 0) {
-        return throw_error(env, std::string("FlacEncoder.encode: ") + error_name(bound));
+    const auto count_at = [&](size_t pos) {
+      return static_cast<int>(frames - pos < step ? frames - pos : step);
+    };
+    std::vector<uint8_t> out;
+    bool coding = false; /* the encoder's state has changed: a failure now loses output */
+    try {
+      const int first_bound = baac_flac_encoder_max_output_bytes(handle_, count_at(0));
+      if (first_bound < 0) {
+        return throw_error(env, std::string("FlacEncoder.encode: ") + error_name(first_bound));
       }
-      uint8_t* const frames_out = scratch(static_cast<size_t>(bound));
-      const int n =
-          baac_flac_encoder_encode(handle_, samples + pos * channels_, count, frames_out, bound);
-      if (n < 0) {
-        return throw_error(env, std::string("FlacEncoder.encode: ") + error_name(n));
+      const int header_bytes = prepare(&out, first_bound);
+      if (header_bytes < 0) {
+        return throw_error(env, "FlacEncoder.encode: the stream cannot begin");
       }
-      out.insert(out.end(), frames_out, frames_out + n);
+      coding = true;
+      if (!begin(&out, header_bytes)) {
+        failed_ = true;
+        return throw_error(env, "FlacEncoder.encode: the stream cannot begin");
+      }
+      for (size_t pos = 0; pos < frames; pos += step) {
+        const int count = count_at(pos);
+        const int bound = baac_flac_encoder_max_output_bytes(handle_, count);
+        /* A step the library refuses has consumed nothing.  What the
+         * call holds by then, the header or earlier frames, is lost
+         * with it. */
+        if (bound < 0) {
+          failed_ = !out.empty() || pos > 0;
+          return throw_error(env, std::string("FlacEncoder.encode: ") + error_name(bound));
+        }
+        uint8_t* const frames_out = scratch(static_cast<size_t>(bound));
+        const int n =
+            baac_flac_encoder_encode(handle_, samples + pos * channels_, count, frames_out, bound);
+        if (n < 0) {
+          failed_ = !out.empty() || pos > 0;
+          return throw_error(env, std::string("FlacEncoder.encode: ") + error_name(n));
+        }
+        out.insert(out.end(), frames_out, frames_out + n);
+      }
+    } catch (const std::bad_alloc&) {
+      failed_ = failed_ || coding;
+      return throw_error(env, "FlacEncoder.encode: out of memory");
     }
-    return Napi::Buffer<uint8_t>::Copy(env, out.data(), out.size());
+    return hand_out(env, out);
+  }
+
+  /* The bytes of a call as a Buffer.  When Node cannot make one, the
+   * frames in it are lost and the encoder writes no more. */
+  Napi::Value hand_out(const Napi::Env& env, const std::vector<uint8_t>& out) {
+    Napi::Value result = Napi::Buffer<uint8_t>::Copy(env, out.data(), out.size());
+    if (env.IsExceptionPending()) {
+      failed_ = true;
+    }
+    return result;
   }
 
   /* Ends the stream: the samples still held as its last, shorter frame.
-   * The next encode() starts a new stream. */
+   * The next encode() starts a new stream; a second finish() without
+   * one is refused, as the library refuses it. */
   Napi::Value Finish(const Napi::CallbackInfo& info) {
     const Napi::Env env = info.Env();
     if (!handle_) {
       return throw_error(env, "FlacEncoder: not initialized");
     }
+    if (refuse_failed(env, "FlacEncoder.finish")) {
+      return env.Undefined();
+    }
+    if (finished_) {
+      return throw_error(env,
+                         "FlacEncoder.finish: the stream is finished; encode() starts "
+                         "another");
+    }
     std::vector<uint8_t> out;
-    if (!begin(&out)) {
-      return throw_error(env, "FlacEncoder.finish: the stream cannot begin");
+    bool coding = false;
+    try {
+      const int bound = baac_flac_encoder_max_output_bytes(handle_, 0);
+      const int header_bytes = prepare(&out, bound);
+      if (header_bytes < 0) {
+        return throw_error(env, "FlacEncoder.finish: the stream cannot begin");
+      }
+      coding = true;
+      if (!begin(&out, header_bytes)) {
+        failed_ = true;
+        return throw_error(env, "FlacEncoder.finish: the stream cannot begin");
+      }
+      uint8_t* const frames_out = scratch(static_cast<size_t>(bound > 0 ? bound : 0));
+      const int n = baac_flac_encoder_finish(handle_, frames_out, bound);
+      if (n < 0) {
+        failed_ = !out.empty();
+        return throw_error(env, std::string("FlacEncoder.finish: ") + error_name(n));
+      }
+      started_ = false;
+      finished_ = true;
+      out.insert(out.end(), frames_out, frames_out + n);
+    } catch (const std::bad_alloc&) {
+      failed_ = failed_ || coding;
+      return throw_error(env, "FlacEncoder.finish: out of memory");
     }
-    const int bound = baac_flac_encoder_max_output_bytes(handle_, 0);
-    uint8_t* const frames_out = scratch(static_cast<size_t>(bound > 0 ? bound : 0));
-    const int n = baac_flac_encoder_finish(handle_, frames_out, bound);
-    if (n < 0) {
-      return throw_error(env, std::string("FlacEncoder.finish: ") + error_name(n));
-    }
-    out.insert(out.end(), frames_out, frames_out + n);
-    started_ = false;
-    return Napi::Buffer<uint8_t>::Copy(env, out.data(), out.size());
+    return hand_out(env, out);
   }
 
   /* After finish(): the header again, of the same length, with the
@@ -433,8 +534,16 @@ class FlacEncoder : public Napi::ObjectWrap<FlacEncoder> {
     if (!handle_) {
       return throw_error(env, "FlacEncoder: not initialized");
     }
+    if (refuse_failed(env, "FlacEncoder.finalHeader")) {
+      return env.Undefined();
+    }
     const int size = baac_flac_encoder_header_bytes(handle_);
-    std::vector<uint8_t> out(static_cast<size_t>(size > 0 ? size : 0));
+    std::vector<uint8_t> out;
+    try {
+      out.resize(static_cast<size_t>(size > 0 ? size : 0));
+    } catch (const std::bad_alloc&) {
+      return throw_error(env, "FlacEncoder.finalHeader: out of memory");
+    }
     const int n = baac_flac_encoder_final_header(handle_, out.data(), size);
     if (n < 0) {
       return throw_error(env,
@@ -487,7 +596,9 @@ class FlacEncoder : public Napi::ObjectWrap<FlacEncoder> {
   int channels_ = 2;
   int bits_ = 16;
   int level_ = BAAC_FLAC_LEVEL_DEFAULT;
-  bool started_ = false; /* the header of the running stream is out */
+  bool started_ = false;  /* the header of the running stream is out */
+  bool finished_ = false; /* finish() ended a stream and none has begun since */
+  bool failed_ = false;   /* output was lost: the stream is incomplete, and nothing follows */
   std::vector<uint8_t> scratch_;
 };
 
@@ -515,6 +626,8 @@ class FlacDecoder : public Napi::ObjectWrap<FlacDecoder> {
          InstanceAccessor("vendor", &FlacDecoder::Vendor, nullptr),
          InstanceAccessor("pictures", &FlacDecoder::Pictures, nullptr),
          InstanceAccessor("skippedMetadata", &FlacDecoder::SkippedMetadata, nullptr),
+         InstanceAccessor("id3v2Bytes", &FlacDecoder::Id3v2Bytes, nullptr),
+         InstanceAccessor("id3v1", &FlacDecoder::Id3v1, nullptr),
          InstanceAccessor("pending", &FlacDecoder::Pending, nullptr),
          InstanceAccessor("maxOutput", &FlacDecoder::MaxOutput, nullptr)});
   }
@@ -613,11 +726,28 @@ class FlacDecoder : public Napi::ObjectWrap<FlacDecoder> {
   }
 
   /* Throws the error that was held back until the samples before it
-   * had been handed out. */
+   * had been handed out.  Every such error but a failed allocation is
+   * final for the stream: the library answers each later call the same
+   * way.  The bytes that were waiting are dropped then, so that
+   * `pending` does not promise samples that cannot come, and decode()
+   * goes on answering with this error until reset() or seekReset(). */
   Napi::Value throw_deferred(const Napi::Env& env, const char* where) {
     const int code = deferred_error_;
     deferred_error_ = 0;
+    if (code != AAC_ERR_MEMORY) {
+      failed_ = code;
+      drop_queue();
+      more_ = false;
+    }
     return throw_error(env, std::string(where) + ": " + error_name(code));
+  }
+
+  /* The bytes of an earlier chunk that are not fed yet. */
+  const uint8_t* queued() const { return queue_.data() + queue_head_; }
+  size_t queued_bytes() const { return queue_.size() - queue_head_; }
+  void drop_queue() {
+    queue_.clear();
+    queue_head_ = 0;
   }
 
   /* Feeds `size` bytes at `data` (the caller's chunk, or the rest of an
@@ -699,20 +829,33 @@ class FlacDecoder : public Napi::ObjectWrap<FlacDecoder> {
           break;
         }
       }
-      /* The bytes not yet fed wait for the next call. */
-      if (queued) {
-        queue_.erase(queue_.begin(), queue_.end() - static_cast<std::ptrdiff_t>(left));
+      /* The bytes not yet fed wait for the next call.  Of a chunk
+       * that is queued already only the start moves: taking the fed
+       * bytes out each time would copy a large chunk once for every
+       * call that a small bound makes necessary. */
+      if (left == 0) {
+        drop_queue();
+      } else if (queued) {
+        queue_head_ = queue_.size() - left;
       } else {
         queue_.assign(data, data + left);
+        queue_head_ = 0;
       }
     } catch (const std::bad_alloc&) {
-      queue_.clear();
+      drop_queue();
       more_ = false;
       return throw_error(env, std::string(where) + ": out of memory");
     }
-    if (finishing_ && ended_ && !more_ && queue_.empty() && deferred_error_ == 0 && !finished_) {
-      baac_flac_decoder_finish(handle_, &verdict_);
-      finished_ = true;
+    if (finishing_ && ended_ && !more_ && queued_bytes() == 0 && deferred_error_ == 0 &&
+        !finished_) {
+      /* A stream that ends inside a frame is damage the library counts,
+       * which `errors` shows; any other answer is an error of its own. */
+      const int ret = baac_flac_decoder_finish(handle_, &verdict_);
+      if (ret != AAC_OK && ret != AAC_ERR_DECODE) {
+        deferred_error_ = ret;
+      } else {
+        finished_ = true;
+      }
     }
     if (used == 0 && deferred_error_ != 0) {
       return throw_deferred(env, where);
@@ -740,8 +883,12 @@ class FlacDecoder : public Napi::ObjectWrap<FlacDecoder> {
                          "FlacDecoder.decode: the stream is finished; reset() starts "
                          "another");
     }
+    if (failed_ != 0) {
+      return throw_error(env, std::string("FlacDecoder.decode: ") + error_name(failed_) +
+                                  "; the stream cannot be decoded further, reset() starts another");
+    }
     if (!with_input) {
-      return pump(env, "FlacDecoder.decode", queue_.data(), queue_.size(), true);
+      return pump(env, "FlacDecoder.decode", queued(), queued_bytes(), true);
     }
     if (pending()) {
       return throw_error(env,
@@ -769,17 +916,28 @@ class FlacDecoder : public Napi::ObjectWrap<FlacDecoder> {
     if (finished_) {
       return Napi::Int32Array::New(env, 0);
     }
+    if (failed_ != 0) {
+      /* The stream ended in an error that decode() has thrown: there is
+       * nothing more to hand out, and the stream is closed as it is. */
+      baac_flac_decoder_finish(handle_, &verdict_);
+      verdict_ = BAAC_FLAC_MD5_UNKNOWN;
+      finishing_ = true;
+      ended_ = true;
+      finished_ = true;
+      return Napi::Int32Array::New(env, 0);
+    }
     finishing_ = true;
-    return pump(env, "FlacDecoder.finish", queue_.data(), queue_.size(), true);
+    return pump(env, "FlacDecoder.finish", queued(), queued_bytes(), true);
   }
 
-  bool pending() const { return more_ || !queue_.empty() || deferred_error_ != 0; }
+  bool pending() const { return more_ || queued_bytes() != 0 || deferred_error_ != 0; }
 
   /* Forgets what a stream left behind in this object. */
   void clear() {
-    queue_.clear();
+    drop_queue();
     more_ = false;
     deferred_error_ = 0;
+    failed_ = 0;
     verdict_ = BAAC_FLAC_MD5_UNKNOWN;
   }
 
@@ -798,7 +956,11 @@ class FlacDecoder : public Napi::ObjectWrap<FlacDecoder> {
    * collected; the bytes given next may begin anywhere in the stream. */
   Napi::Value SeekReset(const Napi::CallbackInfo& info) {
     if (handle_ && baac_flac_decoder_seek_reset(handle_) == AAC_OK) {
+      /* The library takes input again, also after finish() was called
+       * and had not yet ended the stream; so does this object. */
       clear();
+      finishing_ = false;
+      ended_ = false;
     }
     return info.Env().Undefined();
   }
@@ -925,15 +1087,35 @@ class FlacDecoder : public Napi::ObjectWrap<FlacDecoder> {
     return Napi::Number::New(info.Env(), handle_ ? baac_flac_decoder_skipped_metadata(handle_) : 0);
   }
 
+  /* The bytes of ID3v2 tags passed over in front of the stream. */
+  Napi::Value Id3v2Bytes(const Napi::CallbackInfo& info) {
+    uint64_t bytes = 0;
+    if (handle_) {
+      baac_flac_decoder_id3(handle_, &bytes, nullptr);
+    }
+    return Napi::Number::New(info.Env(), static_cast<double>(bytes));
+  }
+
+  /* Whether an ID3v1 tag behind the last frame was passed over. */
+  Napi::Value Id3v1(const Napi::CallbackInfo& info) {
+    int trailer = 0;
+    if (handle_) {
+      baac_flac_decoder_id3(handle_, nullptr, &trailer);
+    }
+    return Napi::Boolean::New(info.Env(), trailer != 0);
+  }
+
   BaacFlacDecoder* handle_ = nullptr;
   size_t max_output_ = static_cast<size_t>(kDefaultOutput); /* values one call returns at most */
   std::vector<int32_t> out_;   /* where frames are decoded, kept from call to call */
-  std::vector<uint8_t> queue_; /* bytes of the last chunk that are not fed yet */
+  std::vector<uint8_t> queue_; /* the last chunk, when a call could not feed all of it */
+  size_t queue_head_ = 0;      /* the first byte of `queue_` that is not fed yet */
   bool more_ = false;          /* frames are waiting that the bound held back */
   bool finishing_ = false;     /* finish() was called */
   bool ended_ = false;         /* the decoder was told the input has ended */
   bool finished_ = false;      /* the stream is finished */
   int deferred_error_ = 0;     /* an error to throw once the samples before it are out */
+  int failed_ = 0;             /* the error that ended the stream, once it has been thrown */
   BaacFlacMd5Verdict verdict_ = BAAC_FLAC_MD5_UNKNOWN;
 };
 

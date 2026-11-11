@@ -337,7 +337,7 @@ void rice_sums_sse2(const uint32_t* folded, int n, uint32_t bits, int k_low, int
 
 }  // namespace
 
-void flac_dsp_init_sse2(FlacDSP* dsp) {
+void flac_dsp_init_sse2(FlacDSP* dsp, int) {
   dsp->window = window_sse2;
   dsp->autocorrelation = autocorrelation_sse2;
   dsp->fixed_sums = fixed_sums_sse2;

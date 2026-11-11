@@ -5,16 +5,15 @@
 #
 #   setup-refs.sh [dir] [--lossless-only]
 #
-# The references of the lossless stage come first: the pinned flac 1.4.3
-# and its metaflac (../tests/flac-reference.sh) are built and their
-# exports written to env.sh before anything else is fetched, so that a
-# missing dependency of an AAC reference or of a quality meter cannot
-# keep `./bench.py lossless` from running.  The recordings of that stage
-# follow: the FLAC decoder testbench (../tests/flac-testbench.sh), whose
-# files are part of the corpus, and the held-out recordings
-# (fetch-heldout.sh), which are downloaded and checksummed here and
-# read by nothing but the stage itself.  With --lossless-only the script
-# stops there.
+# The lossless stage comes first: the pinned flac 1.4.3 and its metaflac
+# (../tests/flac-reference.sh) are built, the stage's recordings are
+# fetched (the FLAC decoder testbench, ../tests/flac-testbench.sh, whose
+# files are part of the corpus, and the held-out recordings,
+# fetch-heldout.sh, which are downloaded and checksummed here and read
+# by nothing but the stage itself), and their exports are written to
+# env.sh before any AAC reference or quality meter is touched, so that
+# a missing dependency of one of those cannot keep `./bench.py lossless`
+# from running.  With --lossless-only the script stops there.
 #
 # Needs: git, cmake, ninja, a C/C++ toolchain, autotools, the GStreamer
 # development packages (GstPEAQ), wine and 7z (Apple AAC), curl, and
@@ -46,19 +45,34 @@ ext=$(realpath -m "${dir:-$here/work/ext}")
 mkdir -p "$ext"
 cd "$ext"
 
-# The lossless references, and their exports at once.
+# env.sh is written beside itself and moved into place, so that a fetch
+# or a build that fails leaves the file of the last good run as it was.
+publish() {  # the new file
+  mv "$1" "$ext/env.sh"
+}
+
+# The lossless references and recordings, and their exports at once.
 flac=$("$here/../tests/flac-reference.sh" "$ext")
-cat > env.sh <<ENV
-export FLAC=$flac METAFLAC=$(dirname "$(dirname "$flac")")/metaflac/metaflac
-export BAAC_FLAC_REFERENCE=$flac
-ENV
-echo "wrote the lossless exports to $ext/env.sh"
 testbench=$("$here/../tests/flac-testbench.sh")
 heldout=$("$here/fetch-heldout.sh")
-cat >> env.sh <<ENV
+lossless_exports() {
+  cat <<ENV
+export FLAC=$flac METAFLAC=$(dirname "$(dirname "$flac")")/metaflac/metaflac
+export BAAC_FLAC_REFERENCE=$flac
 export BAAC_FLAC_TESTBENCH=$testbench
 export BAAC_HELDOUT=$heldout
 ENV
+}
+{
+  lossless_exports
+  # What an earlier run wrote for the other references stays until this
+  # run has built them again.
+  if [ -f env.sh ]; then
+    grep -v -E '^export (FLAC|BAAC_FLAC_REFERENCE|BAAC_FLAC_TESTBENCH|BAAC_HELDOUT)=' env.sh || true
+  fi
+} > env.sh.new
+publish env.sh.new
+echo "wrote the lossless exports to $ext/env.sh"
 [ "$lossless_only" = 1 ] && exit 0
 
 fetch() {  # repo dir commit
@@ -128,7 +142,9 @@ wineboot -i >/dev/null 2>&1 || true
 wine run/qaac64.exe --check
 cd "$ext"
 
-cat >> env.sh <<ENV
+{
+  lossless_exports
+  cat <<ENV
 export FDK_AAC_ENC=$ext/fdk-aac/build/aac-enc FDK_AAC_DEC=$ext/fdk-aac/build/aac-dec
 export FDK_XHE_ENC=$ext/fdk-aac/build/xhe-aac-enc
 export XAAC_ENC=$ext/libxaac/build/xaacenc XAAC_DEC=$ext/libxaac/build/xaacdec
@@ -136,5 +152,9 @@ export QAAC=$ext/apple/run/qaac64.exe REFALAC=$ext/apple/run/refalac64.exe
 export WINEPREFIX=$ext/wineprefix WINEDEBUG=-all
 export PEAQ=$ext/prefix/bin/peaq GST_PLUGIN_PATH=$ext/prefix/lib/gstreamer-1.0
 ENV
-[ -x "$ext/visqol/bazel-bin/visqol" ] && echo "export VISQOL=$ext/visqol/bazel-bin/visqol" >> env.sh
+  if [ -x "$ext/visqol/bazel-bin/visqol" ]; then
+    echo "export VISQOL=$ext/visqol/bazel-bin/visqol"
+  fi
+} > env.sh.new
+publish env.sh.new
 echo "wrote $ext/env.sh; ViSQOL: see README.md"

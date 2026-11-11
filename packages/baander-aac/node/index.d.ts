@@ -627,12 +627,21 @@ export declare class FlacEncoder {
   /**
    * Codes interleaved samples at the stream's bit depth (a 16-bit sample
    * is a value in -32768..32767) and returns every frame they complete.
-   * Throws, having coded nothing, when a sample lies outside the depth.
+   * Throws, having coded nothing, when the array's length is not a
+   * multiple of the channel count and when a sample lies outside the
+   * depth.
+   *
+   * A call that runs out of memory before it has coded anything throws
+   * and can be made again. One that fails after coding began has lost
+   * frames: the stream is incomplete, and every later call on the
+   * encoder throws.
    */
   encode(pcm: Int32Array): Buffer;
   /**
    * Ends the stream: returns the samples still held as its last, shorter
-   * frame. The next `encode()` starts a new stream.
+   * frame. On an encoder that has coded nothing it returns the header of
+   * a stream without samples. The next `encode()` starts a new stream; a
+   * second `finish()` without one throws.
    */
   finish(): Buffer;
   /**
@@ -712,23 +721,32 @@ export declare class FlacDecoder {
    * afterwards, more are waiting: call `decode()` without an argument
    * until it is false, and only then give the next bytes (a call with
    * bytes while samples are pending throws, so that nothing can pile
-   * up). Throws for a stream whose sample rate, channel count or bit
-   * depth changes on the way, after the samples before the change have
-   * been returned.
+   * up).
+   *
+   * Throws for a stream that cannot be decoded further: one whose sample
+   * rate, channel count or bit depth changes on the way, or frames that
+   * leave those to a STREAMINFO the decoder was not given. The samples
+   * before that point are returned first, with `pending` true for the
+   * error that waits; the call after them throws. From then on nothing
+   * is pending, every `decode()` throws the same error, `finish()`
+   * closes the stream without samples, and `reset()` or `seekReset()`
+   * starts again.
    */
   decode(data?: Buffer | Uint8Array | ArrayBuffer): Int32Array;
   /**
    * Ends the stream: no more bytes follow. Returns the samples of frames
    * that were waiting for that word, at most `maxOutput` of them; while
    * `pending` is true, call `finish()` again for the rest. `md5` and
-   * `errors` state the result once `pending` is false. The decoder takes
-   * no input until `reset()`.
+   * `errors` state the result once `pending` is false; a stream that
+   * ends inside a frame does not throw and counts in `errors`. The
+   * decoder takes no input until `reset()`.
    */
   finish(): Int32Array;
   /**
    * Whether samples or bytes of the last chunk are still held back for
-   * the bound of a call: another `decode()` without an argument (or
-   * `finish()`, once that was called) returns more.
+   * the bound of a call, or an error waits behind samples already
+   * returned: another `decode()` without an argument (or `finish()`,
+   * once that was called) returns more or throws that error.
    */
   readonly pending: boolean;
   /** The most samples one call returns. */
@@ -739,7 +757,9 @@ export declare class FlacDecoder {
    * For a seek: drops the buffered bytes and the samples not yet
    * collected. The bytes given next may begin anywhere in the stream;
    * the stream's properties and its seek table are kept, and `md5`
-   * becomes 'unknown'.
+   * becomes 'unknown'. It also takes back a `finish()` that has not yet
+   * handed out its last samples: the decoder takes bytes again. Once
+   * the stream is finished, only `reset()` does.
    */
   seekReset(): void;
   /** Null until the stream's properties are known. */
@@ -774,6 +794,21 @@ export declare class FlacDecoder {
   readonly pictures: FlacDecodedPicture[];
   /** Tag and picture blocks skipped because of the `metadata` limit. */
   readonly skippedMetadata: number;
+  /**
+   * The bytes of ID3v2 tags in front of the stream, which the decoder
+   * passes over by the length each states; 0 when the input began with
+   * the stream. `firstFrameOffset` counts from the first byte given, so
+   * it includes them.
+   */
+  readonly id3v2Bytes: number;
+  /**
+   * Whether an ID3v1 tag, 128 bytes that begin with 'TAG' behind the
+   * last frame, was passed over; known after `finish()`. The reference
+   * decoder, `flac`, reports such a tag as lost sync; this one decodes
+   * and verifies every sample before it, counts no error for it and
+   * says so here.
+   */
+  readonly id3v1: boolean;
 }
 
 export declare const version: string;

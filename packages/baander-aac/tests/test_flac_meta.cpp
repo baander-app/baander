@@ -1073,6 +1073,25 @@ static void test_id3() {
       CHECK(r.first_frame == (int64_t)(front.size() + (size_t)e.header_bytes),
             "ID3v2 variant %d: the first frame is at byte %lld", variant, (long long)r.first_frame);
     }
+    /* What was passed over is said: the bytes of the tags in front, and
+     * no tag behind. */
+    BaacFlacDecoder* told = baac_flac_decoder_create();
+    uint64_t v2_bytes = 99;
+    int v1 = 99;
+    CHECK(baac_flac_decoder_id3(told, &v2_bytes, &v1) == AAC_OK && v2_bytes == 0 && v1 == 0,
+          "a decoder that has read nothing has passed over nothing");
+    baac_flac_decoder_feed(told, stream.data(), (int)std::min<size_t>(stream.size(), 60000));
+    CHECK(baac_flac_decoder_id3(told, &v2_bytes, &v1) == AAC_OK && v2_bytes == front.size() &&
+              v1 == 0,
+          "ID3v2 variant %d: the decoder says it passed over %llu bytes of %zu", variant,
+          (unsigned long long)v2_bytes, front.size());
+    CHECK(baac_flac_decoder_id3(told, nullptr, nullptr) == AAC_OK &&
+              baac_flac_decoder_id3(nullptr, &v2_bytes, &v1) == AAC_ERR_INVALID_ARG,
+          "the query takes null for what the caller does not ask, and refuses no decoder");
+    baac_flac_decoder_reset(told);
+    baac_flac_decoder_id3(told, &v2_bytes, &v1);
+    CHECK(v2_bytes == 0 && v1 == 0, "a reset forgets what was passed over");
+    baac_flac_decoder_destroy(told);
   }
   /* A stream that ends inside the tag is cut short. */
   std::vector<uint8_t> inside = id3v2(3000, false);
@@ -1110,10 +1129,40 @@ static void test_id3() {
     }
     CHECK(n == 0, "nothing is reported while the tag may still be one (%d)", n);
   }
+  int v1_dropped = 99;
+  baac_flac_decoder_id3(dec, nullptr, &v1_dropped);
+  CHECK(v1_dropped == 0, "before the input has ended the tag behind the last frame is not yet one");
   CHECK(baac_flac_decoder_finish(dec, nullptr) == AAC_OK && decoded == pcm.size() / 2 &&
             baac_flac_decoder_lost_frames(dec) == 0,
         "a finish without end_input passes the ID3v1 tag over too");
+  uint64_t in_front = 99;
+  baac_flac_decoder_id3(dec, &in_front, &v1_dropped);
+  CHECK(v1_dropped == 1 && in_front == 0, "and the decoder says that it passed an ID3v1 tag over");
   baac_flac_decoder_destroy(dec);
+  /* The same with the end of the input declared, and nothing of the
+   * kind for a stream without a tag or with other bytes behind it. */
+  for (int shape = 0; shape < 3; shape++) {
+    std::vector<uint8_t> s = e.stream;
+    if (shape == 0) {
+      flac_append(s, v1);
+    } else if (shape == 2) {
+      s.insert(s.end(), 128, 0x55);
+    }
+    BaacFlacDecoder* d = baac_flac_decoder_create();
+    for (size_t pos = 0; pos < s.size();) {
+      pos += (size_t)baac_flac_decoder_feed(d, s.data() + pos, (int)(s.size() - pos));
+      while (baac_flac_decoder_decode_next(d, buf.data(), (int)buf.size()) != 0) {
+      }
+    }
+    baac_flac_decoder_end_input(d);
+    while (baac_flac_decoder_decode_next(d, buf.data(), (int)buf.size()) != 0) {
+    }
+    baac_flac_decoder_id3(d, nullptr, &v1_dropped);
+    CHECK(v1_dropped == (shape == 0 ? 1 : 0),
+          "with the input ended, shape %d: an ID3v1 tag passed over is reported as %d", shape,
+          v1_dropped);
+    baac_flac_decoder_destroy(d);
+  }
 
   std::vector<uint8_t> longer = tail;
   longer.push_back(0);

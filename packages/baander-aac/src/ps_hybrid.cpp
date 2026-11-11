@@ -201,16 +201,21 @@ void aac_ps_hybrid_synthesis(float out[2][38][64],
   }
 }
 
-void aac_ps_hybrid_init(void) {
-  static bool ready = false;
-  if (ready) {
-    return;
-  }
+static bool build_filters() {
   make_filters_from_proto(g_f20_0_8, kG0Q8, 8);
   make_filters_from_proto(g_f34_0_12, kG0Q12, 12);
   make_filters_from_proto(g_f34_1_8, kG1Q8, 8);
   make_filters_from_proto(g_f34_2_4, kG2Q4, 4);
-  ready = true;
+  return true;
+}
+
+void aac_ps_hybrid_init(void) {
+  /* Built by the first caller; the language has every other caller
+   * wait until the static is initialised, so two PS encoders or
+   * decoders created at the same moment cannot both write the
+   * filters, or read them half written. */
+  static const bool built = build_filters();
+  (void)built;
 }
 
 /* Table 8.48: parameter band of each sub-subband, 20-band mode. */

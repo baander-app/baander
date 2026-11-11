@@ -748,7 +748,95 @@ static void test_levels() {
   }
 }
 
-int main() {
+/* What the encoder writes for a given input is the same bytes in every
+ * build and on every machine: the analysis is done in a stated order,
+ * and the kernels of every level agree bit for bit.  These are the
+ * SHA-256 digests of whole streams, the final header included, for
+ * inputs made with integers alone; a compiler, a C library or a
+ * processor on which one of them comes out differently writes other
+ * streams than the rest. */
+struct PinnedStream {
+  int sample_rate, channels, bits, frames;
+  uint32_t seed;
+  const char* digest[3]; /* levels 0, 5 and 8 */
+};
+
+static const PinnedStream kPinned[] = {
+    {44100,
+     2,
+     16,
+     20000,
+     1,
+     {"62e623de5614b170cd637d31387699ef9d3c3f88c92d60731e6ebf42a028d3f0",
+      "f8826ec09138e2545a4cb6759a4d6ccfcd90c5cfa93134a5314e8d00fdf5de02",
+      "b61d73372fd7caee7251f476e3cf807cab5df409826df03ba927eddc9609d45d"}},
+    {96000,
+     2,
+     24,
+     12000,
+     2,
+     {"2fa0c50aba068607244450fc721d99070d440469f6a60655ccbed5862f70574f",
+      "ac5e520aa11524a7f8f840e217cde775ecf59341db9b8b1acd27645961e33510",
+      "66fb30848692b13c9fb05e274b21cab3719165bdc5d6a001be714bdb43f1c48f"}},
+    {48000,
+     6,
+     16,
+     6000,
+     3,
+     {"46bace5228eefde37262de505b3af04bf33ed8471a039b1da6d8647bac1cda7c",
+      "df5dfe4db557654a1173b197041a852b8de017eba86a626339d46994c169b7f9",
+      "08925268e42deee249d85e2aec6a7e168e08955c0b429d566187c2f3b2896b44"}},
+    {48000,
+     1,
+     8,
+     9000,
+     4,
+     {"39ca8a7868a3dd78502cb8a84b77ebfb88e4b4947008be6ea352dfc2502f85f6",
+      "5a8b4d36894a8aa45d515d9d46ec37e1193d4c6017a9e4748e2c6f62d5cc9ee1",
+      "44d8b2d546e77839387d1c39a637832970a446e56b8cbfdf4f37986368e830cd"}},
+    {192000,
+     2,
+     32,
+     5000,
+     5,
+     {"3914bea6f67a0dee1e13bd96718c9f283b42caee8c40bdc485c64171a0e5d11d",
+      "e53e439b860ea92f9d82194f621ff918884066ad9f4511d106bc80a3856a11f5",
+      "9a12c11ab6f64cb597428c190594e5542256d0d508e32fe48cf9d4d6e7f74d95"}},
+};
+
+static void test_pinned_digests(bool print) {
+  static const int kLevels[3] = {0, 5, 8};
+  {
+    const uint8_t abc[3] = {'a', 'b', 'c'};
+    CHECK(flac_sha256_hex(abc, 3) ==
+              "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+          "the digest of the suite is SHA-256");
+  }
+  for (const PinnedStream& p : kPinned) {
+    const std::vector<int32_t> pcm = flac_gen_integer(p.frames, p.channels, p.bits, p.seed);
+    for (int l = 0; l < 3; l++) {
+      const FlacEncoded e = flac_encode(pcm, p.sample_rate, p.channels, p.bits, kLevels[l]);
+      const std::string digest = flac_sha256_hex(e.stream.data(), e.stream.size());
+      if (print) {
+        printf("%d Hz, %d channels, %d bits, level %d: %s\n", p.sample_rate, p.channels, p.bits,
+               kLevels[l], digest.c_str());
+        continue;
+      }
+      CHECK(e.error == AAC_OK && digest == p.digest[l],
+            "%d Hz, %d channels, %d bits, %d samples at level %d: the stream is the pinned one "
+            "(%zu bytes, %s)",
+            p.sample_rate, p.channels, p.bits, p.frames, kLevels[l], e.stream.size(),
+            digest.c_str());
+    }
+  }
+}
+
+int main(int argc, char** argv) {
+  if (argc > 1 && strcmp(argv[1], "--print-digests") == 0) {
+    test_pinned_digests(true);
+    return 0;
+  }
+  test_pinned_digests(false);
   test_roundtrip_matrix();
   test_extremes();
   test_signals();

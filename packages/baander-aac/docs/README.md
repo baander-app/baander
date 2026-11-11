@@ -720,8 +720,25 @@ frame to its last.
 Two things that are not FLAC but are found around FLAC streams in files
 are passed over. An ID3v2 tag in front of the marker is skipped by the
 length it states. An ID3v1 tag behind the last frame, 128 bytes that
-begin with `TAG`, ends the input without a report. Any other bytes where
-a frame was expected are damage.
+begin with `TAG`, ends the input and is no error. Neither tag is read,
+and `baac_flac_decoder_id3` says what was passed over: the bytes of the
+tags in front, and whether a tag behind the last frame was dropped. Any
+other bytes where a frame was expected are damage.
+
+Behind damage the decoder searches for the next frame: a sync code with
+a header whose CRC-8 holds is read to its end, without restoring
+samples, and is a frame when its CRC-16 holds. A stream can be built of
+such headers that are no frames, each claiming the largest frame there
+is, so the search keeps an account. What it has read for rejected
+candidates may exceed the size of one frame only by four bytes for each
+byte of input it has passed; while the account is overdrawn, sync codes
+are passed unread. The work of a call is therefore bounded by the input
+it holds, and a crafted stream costs time in proportion to its length.
+The price is that a frame which follows such a stretch closely can be
+passed over. A header that leaves the bit depth to a STREAMINFO the
+decoder was not given is treated the same way: the bytes behind it are
+read at every depth, and it counts as a frame, which the caller is told
+is unsupported, only when one of them ends in a CRC-16 that holds.
 
 For a seek the decoder hands out the stream's seek table
 (`baac_flac_decoder_seek_points`, with `baac_flac_decoder_first_frame_offset`
@@ -863,6 +880,7 @@ int baac_flac_decoder_comments(BaacFlacDecoder* dec, const BaacFlacComment** com
                                BaacFlacComment* vendor);
 int baac_flac_decoder_pictures(BaacFlacDecoder* dec, const BaacFlacPicture** pictures);
 int baac_flac_decoder_skipped_metadata(BaacFlacDecoder* dec);
+int baac_flac_decoder_id3(BaacFlacDecoder* dec, uint64_t* id3v2_bytes, int* id3v1_trailer);
 void baac_flac_decoder_destroy(BaacFlacDecoder* dec);
 
 /* encoder */
@@ -922,12 +940,16 @@ name. `--picture` adds a JPEG or PNG file as a front cover, with the
 media type and the dimensions read from the file's own header. `info`
 prints what a stream's header says, its tags and its pictures without
 decoding the audio, and `--export-picture` writes one picture's bytes to
-a file.
+a file. ID3 tags around a stream are passed over and reported: `test`
+names them with its result, `dec` on standard error, and `info` shows
+the one in front and, for a file, the one at its end.
 
 `dec` and `test` verify every frame checksum, the sample total the
 header states and, unless `--no-md5` is given, the MD5 of the decoded
-samples. Every command exits non-zero on any error or mismatch; `enc`
-then leaves no output file, and `dec` leaves what could be decoded.
+samples. Every command exits non-zero on any error or mismatch, a read
+that fails included; `enc` then leaves no output file (a pipe or a
+device it was told to write into is not removed), and `dec` leaves what
+could be decoded.
 
 `baac bench` adds lossless rows to its table: the synthetic signal at 16
 bits through levels 0, 5 and 8.
@@ -972,8 +994,8 @@ without an argument before it gives more bytes. The decoder options add
 `md5`, `streamInfo` (STREAMINFO supplied out of band) and `metadata`
 (`true`, or `{ maxBytes }`, to keep tags and pictures). The decoder
 reports `streamInfo`, `lastFrame`, `errors`, `md5`, `seekPoints`,
-`firstFrameOffset`, `tags`, `vendor`, `pictures` and `skippedMetadata`,
-and has `reset()` and `seekReset()`. `node/index.d.ts` states every
+`firstFrameOffset`, `tags`, `vendor`, `pictures`, `skippedMetadata`,
+`id3v2Bytes` and `id3v1`, and has `reset()` and `seekReset()`. `node/index.d.ts` states every
 field.
 
 ### Tests
@@ -991,7 +1013,9 @@ capped at the scalar kernels and, on x86, at the SSE2 ones.
   type, residual form, stereo assignment, bit depth and block size is
   decoded from a known description to known samples; damaged, truncated
   and unusual streams; feeding in any chunking; resynchronisation;
-  seeking; and the bounds the decoder keeps on its memory.
+  seeking; the bounds the decoder keeps on its memory; and the work of
+  the frame search on streams built to make it expensive, counted in
+  bytes read and not in time.
 - `test_flac_conformance`: the decoder against streams it did not write.
   The committed fixtures (`tests/data/flac`) are short synthetic signals
   encoded by `flac` 1.4.3 and by FFmpeg, each with the MD5 of its source.
@@ -1001,7 +1025,11 @@ capped at the scalar kernels and, on x86, at the SSE2 ones.
 - `test_flac_encoder`: every stream has to come back bit for bit from
   the library's own decoder, with the sample total and the MD5 its
   header states, across bit depths, channel counts, sample rates and
-  levels, and has to stay within the ceilings of its level.
+  levels, and has to stay within the ceilings of its level. Fifteen
+  streams, of five inputs made with integers alone at levels 0, 5 and
+  8, are pinned by their SHA-256 digests: every compiler, C library and
+  processor the suite runs on has to write the same bytes. The binding's
+  smoke test pins six of them again, which covers the Windows build.
 - `test_flac_interop`: the encoder against decoders it shares no line
   with. `flac -t` tests each stream, `flac -d` and FFmpeg decode it, and
   the samples of both are compared with the input.
@@ -1029,6 +1057,14 @@ measurements against `flac`, FFmpeg and ALAC are linked as well.
 ### Limits
 
 - Native FLAC only. Ogg FLAC is not read or written.
+- ID3 tags are no part of FLAC, and the decoder treats the two that are
+  found around FLAC files differently from the reference decoder in one
+  case. Both decoders accept an ID3v2 tag in front of the stream. An
+  ID3v1 tag behind the last frame makes `flac` report lost sync; bAAC
+  decodes and verifies every sample before it, counts no error, and
+  reports the tag (`baac_flac_decoder_id3`, `id3v1` in the binding, a
+  line from `baac flac test`). The tags themselves are not read: their
+  fields are not available through this library.
 - The encoder writes one fixed block size per stream and the streamable
   subset. It does not write variable block sizes, bit depths other than
   8, 12, 16, 20, 24 and 32, or CUESHEET and APPLICATION blocks.

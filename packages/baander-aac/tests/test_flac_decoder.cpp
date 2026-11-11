@@ -1045,6 +1045,120 @@ static void test_frame_start() {
 
 /* ── property changes ──────────────────────────────────────────── */
 
+/* The work of the frame search.  A stream can be made of sync codes
+ * with headers whose CRC-8 holds and that claim the largest frame there
+ * is, one every few bytes, none of them a frame.  Reading each to its
+ * end would cost the size of a frame for every few bytes of input; the
+ * decoder has to keep what it reads in vain in proportion to what it
+ * passes.  The count is of bytes read, not of time. */
+static void test_frame_search() {
+  BaacFlacStreamInfo info = {};
+  info.min_block_size = 16;
+  info.max_block_size = 65535;
+  info.sample_rate = 48000;
+  info.channels = 8;
+  info.bits_per_sample = 32;
+  const size_t largest_frame = 16 + 8 * ((size_t)65535 * 8 + 16) + 2;
+
+  /* Real frames of the stream's format, to be found behind the rest. */
+  StreamBuilder real(48000, 8, 32);
+  for (int frame = 0; frame < 24; frame++) {
+    TestFrame f;
+    f.subframes.assign(8, TestSubframe::fixed(1));
+    real.add(f, flac_gen_tones(256, 8, 32, 0.4, (unsigned)frame));
+  }
+
+  /* A header of 65535 samples in eight channels of 32 bits, and the
+   * start of a verbatim subframe; with a period of nine bytes the next
+   * header begins inside the first subframe, with eleven behind more. */
+  uint8_t pattern[11] = {0xFF, 0xF8, 0x7A, 0x7E, 0x00, 0xFF, 0xFE, 0x00, 0x02, 0x00, 0x00};
+  pattern[7] = flac_crc8(pattern, 7);
+  for (int period : {9, 11}) {
+    std::vector<uint8_t> s = flac_stream_start(info);
+    const size_t crafted = 1500000;
+    for (size_t i = 0; i < crafted; i++) {
+      s.push_back(pattern[i % (size_t)period]);
+    }
+    flac_append(s, real.frames);
+
+    BaacFlacDecoder* dec = baac_flac_decoder_create();
+    std::vector<int32_t> pcm((size_t)65535 * 8);
+    std::vector<int32_t> decoded;
+    uint64_t most_in_a_call = 0;
+    int unsupported = 0;
+    const auto drain = [&]() {
+      for (;;) {
+        const uint64_t before = flac_decoder_rejected_work(dec);
+        const int n = baac_flac_decoder_decode_next(dec, pcm.data(), (int)pcm.size());
+        most_in_a_call = std::max(most_in_a_call, flac_decoder_rejected_work(dec) - before);
+        if (n > 0) {
+          decoded.insert(decoded.end(), pcm.begin(), pcm.begin() + (size_t)n * 8);
+        } else if (n == AAC_ERR_UNSUPPORTED) {
+          unsupported++;
+          break;
+        } else if (n != AAC_ERR_DECODE) {
+          break;
+        }
+      }
+    };
+    for (size_t pos = 0; pos < s.size();) {
+      const int took = baac_flac_decoder_feed(dec, s.data() + pos, (int)(s.size() - pos));
+      if (took < 0) {
+        break;
+      }
+      pos += (size_t)took;
+      drain();
+      if (took == 0) {
+        break;
+      }
+    }
+    baac_flac_decoder_end_input(dec);
+    drain();
+    const uint64_t work = flac_decoder_rejected_work(dec);
+    baac_flac_decoder_destroy(dec);
+    CHECK(work <= 6 * (uint64_t)s.size() + 3 * (uint64_t)largest_frame,
+          "period %d: %llu bytes were read for rejected candidates in %zu bytes of input", period,
+          (unsigned long long)work, s.size());
+    CHECK(most_in_a_call <= 6 * (uint64_t)largest_frame,
+          "period %d: one call read %llu bytes for rejected candidates", period,
+          (unsigned long long)most_in_a_call);
+    /* The decoder comes out of it: the last real frames are decoded.
+     * The first of them may be passed while the search pays off. */
+    const size_t tail = (size_t)12 * 256 * 8;
+    CHECK(unsupported == 0 && decoded.size() >= tail &&
+              std::equal(decoded.end() - (long)tail, decoded.end(), real.pcm.end() - (long)tail),
+          "period %d: the frames behind the crafted bytes decode (%zu samples)", period,
+          decoded.size() / 8);
+  }
+
+  /* A stream that begins at a frame and has no STREAMINFO.  A sync code
+   * with a header that holds and leaves its bit depth to STREAMINFO is
+   * no frame unless a frame follows it: the bytes behind this one are
+   * none at any depth, so it is passed over like other bytes, and the
+   * frames behind it decode. */
+  {
+    StreamBuilder b(48000, 2, 16);
+    for (int frame = 0; frame < 6; frame++) {
+      b.add(TestSubframe::fixed(2, 2), flac_gen_tones(1024, 2, 16, 0.4, (unsigned)frame));
+    }
+    std::vector<uint8_t> s = {0xFF, 0xF8, 0x19, 0x10, 0x00, 0x00};
+    s[5] = flac_crc8(s.data(), 5);
+    s.insert(s.end(), 64, 0x00);
+    flac_append(s, b.frames);
+    for (size_t chunk : {SIZE_MAX, (size_t)7}) {
+      const FlacDecoded d = flac_decode(s, chunk);
+      bool unsupported = false;
+      for (const FlacDecodeEvent& e : d.errors) {
+        unsupported = unsupported || e.code == AAC_ERR_UNSUPPORTED;
+      }
+      CHECK(!unsupported && d.pcm == b.pcm,
+            "a false header that leaves its depth to STREAMINFO does not stop a stream without "
+            "one (%zu of %zu samples, %zu errors)",
+            d.pcm.size(), b.pcm.size(), d.errors.size());
+    }
+  }
+}
+
 static void test_property_change() {
   const int block = 576;
   const struct {
@@ -1707,6 +1821,7 @@ int main() {
   test_random_damage();
   test_truncation();
   test_frame_start();
+  test_frame_search();
   test_property_change();
   test_metadata();
   test_md5();

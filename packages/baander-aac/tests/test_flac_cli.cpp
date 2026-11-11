@@ -381,6 +381,65 @@ static void test_refusals() {
 }
 
 /* `test` and `dec` on streams that are wrong. */
+/* Failures that have to stay failures, and an output that is not the
+ * tool's to remove. */
+static void test_devices_and_read_errors() {
+  /* A failed enc leaves no output file behind, but what it was told to
+   * write into may be a pipe or a device: that stays.  The input ends
+   * inside its samples, which enc finds after the output exists. */
+  const std::vector<int32_t> pcm = flac_gen_tones(20000, 2, 16, 0.5, 4u);
+  std::vector<uint8_t> file = wav_file(wav_data(pcm, 16, 2), 44100, 2, 16, 2, false);
+  file.resize(file.size() - 10001);
+  write_file(path("cut.wav"), file.data(), file.size());
+  const std::string fifo = path("out.fifo");
+  CHECK(mkfifo(fifo.c_str(), 0600) == 0, "a named pipe for the output");
+  Run r = run("(cat " + shell_quote(fifo) + " > /dev/null &) ; " + g_tool + " flac enc " +
+              quoted("cut.wav") + " " + shell_quote(fifo));
+  struct stat st;
+  CHECK(r.status == 1 && stat(fifo.c_str(), &st) == 0 && S_ISFIFO(st.st_mode),
+        "a failed enc does not remove a named pipe it wrote into (exit %d)", r.status);
+  remove(fifo.c_str());
+
+  /* A read that fails is not the end of the input.  A directory opens
+   * and cannot be read. */
+  remove(path("unread.flac").c_str());
+  r = run(g_tool + " flac enc --raw 44100 2 16 " + shell_quote(g_tmp) + " " +
+          quoted("unread.flac"));
+  CHECK(r.status == 1 && r.err.find("cannot read") != std::string::npos &&
+            !exists(path("unread.flac")),
+        "enc reports an input it cannot read and leaves no stream (exit %d): %s", r.status,
+        r.err.c_str());
+  for (const char* command : {"test", "dec", "info"}) {
+    r = run(g_tool + " flac " + command + " " + shell_quote(g_tmp) +
+            (strcmp(command, "dec") == 0 ? " " + quoted("unread.wav") : ""));
+    CHECK(r.status == 1 && r.err.find("cannot read") != std::string::npos,
+          "%s reports an input it cannot read (exit %d): %s", command, r.status, r.err.c_str());
+  }
+
+  /* The same for something that is neither a file nor a pipe: a link
+   * to the null device stays where it is. */
+  const std::string link = path("null.link");
+  CHECK(symlink("/dev/null", link.c_str()) == 0, "a link to the null device");
+  r = run(g_tool + " flac enc " + quoted("cut.wav") + " " + shell_quote(link));
+  CHECK(r.status == 1 && lstat(link.c_str(), &st) == 0 && S_ISLNK(st.st_mode),
+        "a failed enc does not remove a path that is no regular file (exit %d)", r.status);
+  remove(link.c_str());
+
+  /* A STREAMINFO that states no sample rate: info prints the samples
+   * and no duration. */
+  FlacEncoded e = flac_encode(pcm, 44100, 2, 16, 5);
+  e.stream[8 + 10] = 0;
+  e.stream[8 + 11] = 0;
+  e.stream[8 + 12] &= 0x0F;
+  write_file(path("no-rate.flac"), e.stream.data(), e.stream.size());
+  r = run(g_tool + " flac info " + quoted("no-rate.flac"));
+  const std::string text = r.text();
+  CHECK(r.status == 0 && text.find("FLAC, 0 Hz") != std::string::npos &&
+            text.find(", 20000 samples\n") != std::string::npos,
+        "info on a stream without a sample rate prints its samples and no duration (exit %d):\n%s",
+        r.status, text.c_str());
+}
+
 static void test_integrity() {
   const int frames = 4096 * 6;
   const std::vector<int32_t> pcm = flac_gen_tones(frames, 2, 16, 0.5, 7u);
@@ -557,6 +616,59 @@ static std::string text_of(const std::vector<uint8_t>& bytes) {
 
 static bool has(const std::string& text, const std::string& what) {
   return text.find(what) != std::string::npos;
+}
+
+/* ID3 tags around a stream: passed over by dec and test, which say so,
+ * and shown by info. */
+static void test_id3_reports() {
+  const std::vector<int32_t> pcm = flac_gen_tones(4096 * 2 + 77, 2, 16, 0.5, 6u);
+  const FlacEncoded e = flac_encode(pcm, 44100, 2, 16, 5);
+  const int body = 1500;
+  std::vector<uint8_t> front = {
+      'I', 'D', '3', 4, 0, 0, 0, 0, (uint8_t)(body >> 7), (uint8_t)(body & 0x7F)};
+  front.insert(front.end(), (size_t)body, 0x41);
+  std::vector<uint8_t> behind(128, 0);
+  memcpy(behind.data(), "TAGTitle", 8);
+  std::vector<uint8_t> both = front;
+  flac_append(both, e.stream);
+  flac_append(both, behind);
+  write_file(path("id3.flac"), both.data(), both.size());
+  write_file(path("plain.flac"), e.stream.data(), e.stream.size());
+
+  Run r = run(g_tool + " flac test " + quoted("id3.flac"));
+  std::string text = r.text();
+  CHECK(r.status == 0 && has(text, ": ok, 8269 samples") && has(text, "MD5 verified"),
+        "test passes a stream between an ID3v2 and an ID3v1 tag (exit %d):\n%s%s", r.status,
+        text.c_str(), r.err.c_str());
+  CHECK(has(text, "an ID3v2 tag of 1510 bytes in front of the stream was passed over") &&
+            has(text, "an ID3v1 tag of 128 bytes behind the last frame was passed over"),
+        "test says which tags it passed over:\n%s", text.c_str());
+  r = run(g_tool + " flac test " + quoted("plain.flac"));
+  CHECK(r.status == 0 && !has(r.text(), "ID3"), "test says nothing of the kind for a plain stream");
+
+  /* dec keeps its standard output for the audio and says it on
+   * standard error. */
+  r = run(g_tool + " flac dec " + quoted("id3.flac") + " -");
+  CHECK(r.status == 0 && has(r.err, "an ID3v2 tag of 1510 bytes") &&
+            has(r.err, "an ID3v1 tag of 128 bytes") &&
+            parse_wav(r.out).data.size() == pcm.size() * 2,
+        "dec decodes the stream and reports the tags on standard error (exit %d): %s", r.status,
+        r.err.c_str());
+
+  r = run(g_tool + " flac info " + quoted("id3.flac"));
+  text = r.text();
+  CHECK(r.status == 0 && has(text, "ID3v2 tag in front of the stream: 1510 bytes, passed over") &&
+            has(text, "ID3v1 tag at the end of the file: 128 bytes"),
+        "info shows both tags (exit %d):\n%s", r.status, text.c_str());
+  r = run(g_tool + " flac info " + quoted("plain.flac"));
+  CHECK(r.status == 0 && !has(r.text(), "ID3"), "info shows no ID3 tag for a plain stream");
+  /* Through a pipe the end cannot be looked at: the tag in front shows. */
+  r = run("cat " + quoted("id3.flac") + " | " + g_tool + " flac info -");
+  text = r.text();
+  CHECK(r.status == 0 && has(text, "ID3v2 tag in front of the stream: 1510 bytes") &&
+            !has(text, "ID3v1"),
+        "info on a pipe shows the tag in front and cannot see the one at the end:\n%s",
+        text.c_str());
 }
 
 static void test_tags_and_pictures() {
@@ -873,9 +985,11 @@ int main() {
   test_raw_and_pipes();
   test_pipe_output();
   test_refusals();
+  test_devices_and_read_errors();
   test_integrity();
   test_existing_commands();
   test_tags_and_pictures();
+  test_id3_reports();
   test_memory(BAAC_TOOL);
   remove_temp_dir(g_tmp);
   return test_summary("test_flac_cli");

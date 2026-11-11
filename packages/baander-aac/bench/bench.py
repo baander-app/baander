@@ -659,6 +659,20 @@ HELD_OUT = [
 ]
 
 
+def expected_gates():
+    """The ids of every gate a complete run judges, in the order of the
+    report.  The check holds a complete result against this list, so a
+    run that lost a gate cannot pass for lack of it."""
+    ids = ["size-5", "size-8", "enc-5", "enc-8"]
+    ids += [f"dec-{level}-{ref}" for level in (5, 8) for ref in ("flac", "ffmpeg")]
+    ids += ["alac-size-ffmpeg", "alac-size-refalac", "alac-enc", "alac-dec"]
+    set_gates = ("size", "enc", "dec-flac", "dec-ffmpeg")
+    ids += [f"added-{s[0]}-{g}" for s in CORPUS_ADDITIONS for g in set_gates]
+    ids += ["size-5-enlarged", "size-8-enlarged"]
+    ids += [f"held-{s[0]}-{g}" for s in HELD_OUT for g in set_gates]
+    return ids
+
+
 def cpu_run(cmd, core, stdout=subprocess.DEVNULL):
     """Run cmd pinned to `core`; return (CPU seconds, peak RSS in KiB)."""
     p = subprocess.Popen(["taskset", "-c", str(core)] + cmd, stdout=stdout,
@@ -1382,6 +1396,12 @@ def check_lossless(result, out=sys.stdout):
         print("not a gate result: the run was limited (--only, --gates-only, --reps or --any-flac)",
               file=out)
         ok = False
+    else:
+        present = {g["id"] for g in result.get("gates", [])}
+        for gid in expected_gates():
+            if gid not in present:
+                print(f"failed    the gate {gid} is missing from the result", file=out)
+                ok = False
     if not host.get("quiet", False):
         print(f"not a gate result: the host was not quiet (load above "
               f"{host.get('quiet_load', QUIET_LOAD)}); run it again when it is", file=out)
@@ -1753,7 +1773,10 @@ def stage_selftest(args):
                     gates=[dict(id="size-5", group="flac", description="size", kind="size",
                                 **size_verdict(*size)),
                            dict(id="enc-5", group="flac", description="speed", kind="speed",
-                                **speed)])
+                                **speed)]
+                    + [dict(id=gid, group="test", description="made up", kind="size",
+                            **size_verdict(1000, 1000))
+                       for gid in expected_gates() if gid not in ("size-5", "enc-5")])
     sink = open(os.devnull, "w")
     expect(check_lossless(made_up(below), sink), "the check passes a run whose gates all passed")
     expect(not check_lossless(made_up(straddle), sink), "the check does not pass an undecided gate")
@@ -1766,6 +1789,11 @@ def stage_selftest(args):
            "the check does not pass a row that is not bit-exact")
     expect(not check_lossless(made_up(below, held=dict(touched=False, reason="test")), sink),
            "the check does not pass a run that did not read the held-out recordings")
+    for lost in ("dec-8-ffmpeg", "held-surround-enc", "size-8-enlarged"):
+        short = made_up(below)
+        short["gates"] = [g for g in short["gates"] if g["id"] != lost]
+        expect(not check_lossless(short, sink),
+               f"the check does not pass a complete run without the gate {lost}")
 
     # The ledger of the held-out recordings: the first run, a second run
     # of the same build, and a run of another build.

@@ -26,6 +26,25 @@
 extern "C" {
 #endif
 
+/* What the functions return.  A function that returns int gives a
+ * count or AAC_OK (0) when it succeeds and a negative AacError when it
+ * does not.  Every function answers a null handle or a null pointer it
+ * needs with AAC_ERR_INVALID_ARG and changes nothing.  The other codes
+ * mean the same wherever they occur, and each function below names the
+ * ones it can return:
+ *
+ *   AAC_ERR_INVALID_ARG  a value outside the range the function states
+ *   AAC_ERR_STATE        the call does not fit where the stream is
+ *                        (before its header, after its finish, ...);
+ *                        nothing was changed
+ *   AAC_ERR_OVERFLOW     the caller's buffer is smaller than the function
+ *                        requires; nothing was consumed or written
+ *   AAC_ERR_MEMORY       an allocation failed; the call can be made again
+ *   AAC_ERR_DECODE       decoder: a damaged stretch of the stream
+ *   AAC_ERR_UNSUPPORTED  a stream or a configuration the library does
+ *                        not handle
+ *   AAC_ERR_ENCODE       encoder: the stream cannot take more frames */
+
 /* Limits of the format. */
 #define BAAC_FLAC_MAX_CHANNELS 8
 #define BAAC_FLAC_MIN_BITS_PER_SAMPLE 4
@@ -135,10 +154,12 @@ typedef struct BaacFlacDecoder_ BaacFlacDecoder;
  * files are passed over: an ID3v2 tag in front of the marker, skipped by
  * the length it states (the reference decoder accepts such files too),
  * and an ID3v1 tag behind the last frame, which is 128 bytes that begin
- * with "TAG" and end the input (the reference decoder reports those as
- * lost sync; here every sample is decoded and verified before them, and
- * nothing is reported).  Any other bytes where a frame was expected are
- * damage.
+ * with "TAG" and end the input.  In the second case this decoder and
+ * the reference one differ: `flac` reports those bytes as lost sync,
+ * while here every sample is decoded and verified before them and no
+ * error is raised.  Neither tag is read, and neither goes unsaid:
+ * baac_flac_decoder_id3 tells what was passed over.  Any other bytes
+ * where a frame was expected are damage.
  *
  * It verifies the CRC-8 of every frame header and the CRC-16 of every
  * frame.  A damaged frame is reported once as AAC_ERR_DECODE and never
@@ -161,7 +182,7 @@ BaacFlacDecoder* baac_flac_decoder_create(void);
 void baac_flac_decoder_destroy(BaacFlacDecoder* dec);
 
 /* Starts over for a new stream: buffered input, the stream's properties
- * and the counters are dropped, the MD5 setting is kept. */
+ * and the counters are dropped, the MD5 setting is kept.  AAC_OK. */
 int baac_flac_decoder_reset(BaacFlacDecoder* dec);
 
 /* Supplies a STREAMINFO block out of band (its 34 bytes without the
@@ -169,7 +190,8 @@ int baac_flac_decoder_reset(BaacFlacDecoder* dec);
  * carries it), for a stream that starts at a frame.  Accepted until a
  * frame is decoded or the stream delivers its own STREAMINFO, then
  * AAC_ERR_STATE; AAC_ERR_INVALID_ARG for another size or for values the
- * format forbids. */
+ * format forbids; AAC_ERR_MEMORY when the buffers the stream needs could
+ * not be sized. */
 int baac_flac_decoder_set_streaminfo(BaacFlacDecoder* dec, const uint8_t* streaminfo, int size);
 
 /* Tags and pictures.  By default the decoder skips them unread, however
@@ -206,6 +228,18 @@ int baac_flac_decoder_pictures(BaacFlacDecoder* dec, const BaacFlacPicture** pic
  * gone past the limit of baac_flac_decoder_set_metadata. */
 int baac_flac_decoder_skipped_metadata(BaacFlacDecoder* dec);
 
+/* What the decoder passed over around the stream that is not FLAC.
+ * `*id3v2_bytes` (may be NULL) receives the bytes of the ID3v2 tags in
+ * front of the fLaC marker, headers included; 0 when the input began
+ * with the stream.  The offsets the decoder reports count from the
+ * first byte it was fed, so they include these bytes.  `*id3v1_trailer`
+ * (may be NULL) receives 1 when an ID3v1 tag of 128 bytes behind the
+ * last frame was passed over, which is known once the input has ended
+ * (baac_flac_decoder_end_input and the calls that drain the decoder, or
+ * baac_flac_decoder_finish), and 0 otherwise.  AAC_OK.  A reset clears
+ * both; a seek keeps them. */
+int baac_flac_decoder_id3(BaacFlacDecoder* dec, uint64_t* id3v2_bytes, int* id3v1_trailer);
+
 /* MD5 verification of the decoded samples against STREAMINFO: 1 on, 0
  * off (default).  Before the first frame is decoded, then
  * AAC_ERR_STATE.  The frame checksums are verified in either case. */
@@ -214,7 +248,11 @@ int baac_flac_decoder_set_md5_check(BaacFlacDecoder* dec, int enabled);
 /* Appends bytes to the input FIFO and returns the number taken: fewer
  * than `size` when the FIFO is full, which means a frame is waiting for
  * baac_flac_decoder_decode_next.  Metadata that is being skipped is
- * taken without being stored. */
+ * taken without being stored.  AAC_ERR_STATE after
+ * baac_flac_decoder_end_input and after baac_flac_decoder_finish, until
+ * a reset or a seek; AAC_ERR_MEMORY when memory for a block of tags or
+ * pictures could not be had and no byte was taken, in which case the
+ * same bytes can be fed again. */
 int baac_flac_decoder_feed(BaacFlacDecoder* dec, const uint8_t* data, int size);
 
 /* Decodes the next frame into `pcm`, interleaved, and returns its
@@ -234,7 +272,19 @@ int baac_flac_decoder_feed(BaacFlacDecoder* dec, const uint8_t* data, int size);
  * that leaves its sample rate or bit depth to a STREAMINFO the decoder
  * was not given (until baac_flac_decoder_set_streaminfo supplies one)
  * or whose sample rate, channel count or bit depth differs from the
- * stream's (then on every call until a reset or a seek). */
+ * stream's (then on every call until a reset or a seek).  A sync code
+ * with a header that leaves the depth open counts as such a frame only
+ * when a frame follows it: the decoder reads it at every depth and
+ * takes the one whose CRC-16 holds.  AAC_ERR_STATE after
+ * baac_flac_decoder_finish, and AAC_ERR_MEMORY when the buffers for a
+ * stream that came without STREAMINFO could not be sized.
+ *
+ * In the search for a frame behind damage the decoder reads what looks
+ * like one to its end.  What it reads in vain is bounded: beyond the
+ * size of one frame, four bytes at most for each byte of input it
+ * passes.  While that account is overdrawn it passes sync codes unread,
+ * so a stream built to make the search expensive may lose a frame that
+ * follows such a stretch closely; it cannot stall the call. */
 int baac_flac_decoder_decode_next(BaacFlacDecoder* dec, int32_t* pcm, int pcm_size);
 
 /* Bytes waiting in the FIFO. */
@@ -271,7 +321,7 @@ int64_t baac_flac_decoder_first_frame_offset(BaacFlacDecoder* dec);
  * found, whose position baac_flac_decoder_last_frame_info reports, and
  * nothing is reported as lost on the way to it.  The stream's properties
  * and its seek table are kept.  The MD5 verdict of the stream becomes
- * unknown. */
+ * unknown.  AAC_OK, or AAC_ERR_STATE after baac_flac_decoder_finish. */
 int baac_flac_decoder_seek_reset(BaacFlacDecoder* dec);
 
 /* Tells the decoder that no more bytes follow.  A frame the input ends
@@ -281,15 +331,17 @@ int baac_flac_decoder_seek_reset(BaacFlacDecoder* dec);
  * damaged frame near the end of a stream can hold back the valid frames
  * after it, because its garbled length reaches past the last byte.
  * baac_flac_decoder_feed returns AAC_ERR_STATE afterwards, until a reset
- * or a seek. */
+ * or a seek.  AAC_OK, or AAC_ERR_STATE after baac_flac_decoder_finish. */
 int baac_flac_decoder_end_input(BaacFlacDecoder* dec);
 
 /* Ends the stream.  Bytes still in the FIFO where a frame was expected
  * are a frame cut short, and a metadata block the input ended in is no
  * better: either counts as one more damaged stretch and the call
  * returns AAC_ERR_DECODE, otherwise AAC_OK.  `*verdict` (may be NULL)
- * receives the result of the MD5 comparison.  Afterwards the decoder
- * takes no input until baac_flac_decoder_reset. */
+ * receives the result of the MD5 comparison, with either of those two
+ * returns.  Afterwards the decoder takes no input until
+ * baac_flac_decoder_reset, and a second call returns AAC_ERR_STATE and
+ * leaves `*verdict` as it is. */
 int baac_flac_decoder_finish(BaacFlacDecoder* dec, BaacFlacMd5Verdict* verdict);
 
 /* ── Encoder ─────────────────────────────────────────────────────── */
@@ -383,13 +435,15 @@ void baac_flac_encoder_destroy(BaacFlacEncoder* enc);
  * bits. */
 int baac_flac_encoder_set_options(BaacFlacEncoder* enc, const BaacFlacEncoderOptions* options);
 
-/* Samples per channel in every frame but the last of a stream. */
+/* Samples per channel in every frame but the last of a stream; never an
+ * error for a valid handle. */
 int baac_flac_encoder_block_size(BaacFlacEncoder* enc);
 
 /* Starts a stream: writes the fLaC marker and the metadata blocks and
  * returns their length, which baac_flac_encoder_header_bytes reports
  * beforehand; AAC_ERR_OVERFLOW when `out_size` is smaller, AAC_ERR_STATE
- * while a stream runs.  A caller that stores frames without the header,
+ * while a stream runs, AAC_ERR_MEMORY when the points of a seek table
+ * could not be reserved.  A caller that stores frames without the header,
  * in a container, writes it to a buffer of its own. */
 int baac_flac_encoder_header_bytes(BaacFlacEncoder* enc);
 int baac_flac_encoder_write_header(BaacFlacEncoder* enc, uint8_t* out, int out_size);
@@ -398,9 +452,11 @@ int baac_flac_encoder_write_header(BaacFlacEncoder* enc, uint8_t* out, int out_s
  * writes every whole frame they complete; returns the bytes written,
  * which is 0 while a block is still filling.  A sample outside the bit
  * depth is refused with AAC_ERR_INVALID_ARG, a call before the header
- * with AAC_ERR_STATE, and an output buffer smaller than
+ * or after the finish with AAC_ERR_STATE, an output buffer smaller than
  * baac_flac_encoder_max_output_bytes(enc, n_samples) with
- * AAC_ERR_OVERFLOW; a refused call consumes no input.
+ * AAC_ERR_OVERFLOW, and samples that would take the stream past the
+ * last frame number the format has (2^31 - 1) with AAC_ERR_ENCODE; a
+ * refused call consumes no input.
  *
  * baac_flac_encoder_max_output_bytes is the most a call with that many
  * samples can write, counting what is buffered already: every channel
@@ -413,7 +469,9 @@ int baac_flac_encoder_encode(BaacFlacEncoder* enc, const int32_t* pcm, int n_sam
 
 /* Writes the samples still buffered as the stream's last, shorter
  * frame and returns its bytes (0 when none were buffered); the output
- * buffer follows baac_flac_encoder_max_output_bytes(enc, 0).  The next
+ * buffer follows baac_flac_encoder_max_output_bytes(enc, 0) and a
+ * smaller one is refused with AAC_ERR_OVERFLOW.  AAC_ERR_STATE when no
+ * stream runs: before the header, and for a second finish.  The next
  * baac_flac_encoder_write_header starts a new stream, identical to a
  * fresh encoder's. */
 int baac_flac_encoder_finish(BaacFlacEncoder* enc, uint8_t* out, int out_size);
@@ -427,7 +485,9 @@ int baac_flac_encoder_last_frame_info(BaacFlacEncoder* enc, BaacFlacFrameInfo* i
 /* After baac_flac_encoder_finish: the header again, of the same length,
  * with the sample total, the MD5, the frame size range and the seek
  * points of the finished stream, for the caller to write at offset 0.
- * AAC_ERR_STATE before the finish. */
+ * Returns its length.  AAC_ERR_STATE before the finish and once the
+ * next stream has begun; AAC_ERR_OVERFLOW when `out_size` is smaller
+ * than baac_flac_encoder_header_bytes. */
 int baac_flac_encoder_final_header(BaacFlacEncoder* enc, uint8_t* out, int out_size);
 
 /* The STREAMINFO of the stream as far as it is known: the totals and the

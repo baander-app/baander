@@ -167,7 +167,7 @@ void rice_sums_neon(const uint32_t* folded, int n, uint32_t, int k_low, int k_co
 
 }  // namespace
 
-void flac_dsp_init_neon(FlacDSP* dsp) {
+void flac_dsp_init_neon(FlacDSP* dsp, int) {
   dsp->window = window_neon;
   dsp->autocorrelation = autocorrelation_neon;
   dsp->lpc_residual_16 = lpc_residual_32_neon;
@@ -180,6 +180,6 @@ void flac_dsp_init_neon(FlacDSP* dsp) {
 
 /* On 32-bit ARM, which has no vectors of doubles, the scalar kernels
  * stay. */
-void flac_dsp_init_neon(FlacDSP*) {}
+void flac_dsp_init_neon(FlacDSP*, int) {}
 
 #endif

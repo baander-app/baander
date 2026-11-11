@@ -142,6 +142,87 @@ static std::vector<int32_t> flac_gen_tones(int n, int channels, int bits, double
   return pcm;
 }
 
+/* A signal made with integers alone, so that every compiler, library
+ * and processor makes the same samples: in each channel two triangle
+ * waves of its own periods and a little noise from a linear
+ * congruential generator, at about half of full scale. */
+static std::vector<int32_t> flac_gen_integer(int n, int channels, int bits, uint32_t seed) {
+  std::vector<int32_t> pcm((size_t)n * (size_t)channels);
+  const int64_t peak = ((int64_t)1 << (bits - 1)) - 1;
+  const auto triangle = [](int64_t i, int64_t period) {
+    const int64_t phase = i % (2 * period);
+    return 2 * (phase < period ? phase : 2 * period - phase) - period; /* -period..period */
+  };
+  for (int i = 0; i < n; i++) {
+    for (int c = 0; c < channels; c++) {
+      seed = seed * 1664525u + 1013904223u;
+      const int64_t slow = 97 + 31 * c;
+      const int64_t fast = 23 + 7 * c;
+      const int64_t v = triangle(i, slow) * (peak * 3 / 8) / slow +
+                        triangle(i, fast) * (peak / 8) / fast +
+                        ((int64_t)(seed >> 16) - 32768) * (peak / 64) / 32768;
+      pcm[(size_t)i * (size_t)channels + (size_t)c] = (int32_t)v;
+    }
+  }
+  return pcm;
+}
+
+/* SHA-256 (FIPS 180-4) of `size` bytes, as lowercase hexadecimal. */
+static std::string flac_sha256_hex(const uint8_t* data, size_t size) {
+  static const uint32_t k[64] = {
+      0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4,
+      0xab1c5ed5, 0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe,
+      0x9bdc06a7, 0xc19bf174, 0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f,
+      0x4a7484aa, 0x5cb0a9dc, 0x76f988da, 0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7,
+      0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967, 0x27b70a85, 0x2e1b2138, 0x4d2c6dfc,
+      0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85, 0xa2bfe8a1, 0xa81a664b,
+      0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070, 0x19a4c116,
+      0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
+      0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7,
+      0xc67178f2};
+  uint32_t h[8] = {0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
+                   0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19};
+  std::vector<uint8_t> m(data, data + size);
+  m.push_back(0x80);
+  while (m.size() % 64 != 56) {
+    m.push_back(0);
+  }
+  for (int i = 7; i >= 0; i--) {
+    m.push_back((uint8_t)(((uint64_t)size * 8) >> (8 * i)));
+  }
+  const auto rotr = [](uint32_t x, int n) { return (x >> n) | (x << (32 - n)); };
+  for (size_t block = 0; block < m.size(); block += 64) {
+    uint32_t w[64];
+    for (int i = 0; i < 16; i++) {
+      w[i] = (uint32_t)flac_load_be(m.data() + block + 4 * (size_t)i, 4);
+    }
+    for (int i = 16; i < 64; i++) {
+      const uint32_t s0 = rotr(w[i - 15], 7) ^ rotr(w[i - 15], 18) ^ (w[i - 15] >> 3);
+      const uint32_t s1 = rotr(w[i - 2], 17) ^ rotr(w[i - 2], 19) ^ (w[i - 2] >> 10);
+      w[i] = w[i - 16] + s0 + w[i - 7] + s1;
+    }
+    uint32_t v[8];
+    memcpy(v, h, sizeof(v));
+    for (int i = 0; i < 64; i++) {
+      const uint32_t s1 = rotr(v[4], 6) ^ rotr(v[4], 11) ^ rotr(v[4], 25);
+      const uint32_t t1 = v[7] + s1 + ((v[4] & v[5]) ^ (~v[4] & v[6])) + k[i] + w[i];
+      const uint32_t s0 = rotr(v[0], 2) ^ rotr(v[0], 13) ^ rotr(v[0], 22);
+      const uint32_t t2 = s0 + ((v[0] & v[1]) ^ (v[0] & v[2]) ^ (v[1] & v[2]));
+      memmove(v + 1, v, 7 * sizeof(uint32_t));
+      v[4] += t1;
+      v[0] = t1 + t2;
+    }
+    for (int i = 0; i < 8; i++) {
+      h[i] += v[i];
+    }
+  }
+  char hex[65];
+  for (int i = 0; i < 8; i++) {
+    snprintf(hex + 8 * i, 9, "%08x", h[i]);
+  }
+  return std::string(hex, 64);
+}
+
 /* White noise over the whole range of `bits` per sample. */
 static std::vector<int32_t> flac_gen_noise(int n, int channels, int bits, unsigned seed = 77u) {
   std::vector<int32_t> pcm((size_t)n * (size_t)channels);

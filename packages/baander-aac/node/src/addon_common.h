@@ -57,21 +57,31 @@ inline const char* error_name(int code) {
   }
 }
 
-/* Bytes of a Buffer, Uint8Array or ArrayBuffer argument. */
+/* Bytes of a Buffer, Uint8Array or ArrayBuffer argument.  False for any
+ * other value, and for bytes the runtime does not give out: a view over
+ * a SharedArrayBuffer can come back with a length and no address (the
+ * runtime may have thrown by then, which the caller's own throw leaves
+ * standing). */
 inline bool bytes_of(const Napi::Value& v, const uint8_t** data, size_t* size) {
+  const uint8_t* base = nullptr;
+  size_t offset = 0;
   if (v.IsArrayBuffer()) {
     Napi::ArrayBuffer ab = v.As<Napi::ArrayBuffer>();
-    *data = static_cast<const uint8_t*>(ab.Data());
+    base = static_cast<const uint8_t*>(ab.Data());
     *size = ab.ByteLength();
-    return true;
-  }
-  if (v.IsTypedArray()) {
+  } else if (v.IsTypedArray()) {
     Napi::TypedArray ta = v.As<Napi::TypedArray>();
-    *data = static_cast<const uint8_t*>(ta.ArrayBuffer().Data()) + ta.ByteOffset();
+    base = static_cast<const uint8_t*>(ta.ArrayBuffer().Data());
+    offset = ta.ByteOffset();
     *size = ta.ByteLength();
-    return true;
+  } else {
+    return false;
   }
-  return false;
+  if (!base && *size != 0) {
+    return false;
+  }
+  *data = base ? base + offset : nullptr;
+  return true;
 }
 
 /* An integer option that, when given, has to be a number: a boolean or an

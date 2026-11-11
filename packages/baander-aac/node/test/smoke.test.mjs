@@ -1,6 +1,7 @@
 /* Encode a synthetic signal, decode it, and check the reconstruction:
  * exercises both classes, chunked input, and the declared delay. */
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 
@@ -997,6 +998,231 @@ test('FLAC: a decode call returns no more than its bound, and the rest on the ca
   assert.equal(atOnce.finish().length, 0); // the seven bytes of a fourth frame are a frame cut short
   assert.equal(atOnce.errors, 1);
   assert.throws(() => atOnce.decode(stream), /finished/);
+});
+
+test('FLAC: finish() ends one stream once, also a stream of no samples', () => {
+  // no samples: the header of an empty stream, which decodes to nothing
+  const empty = new FlacEncoder({ sampleRate: 44100, channels: 2 });
+  const stream = empty.finish();
+  assert.equal(stream.length, empty.headerBytes);
+  assert.equal(stream.subarray(0, 4).toString('latin1'), 'fLaC');
+  const decoder = new FlacDecoder({ md5: true });
+  assert.equal(flacDecode(decoder, stream, [stream.length]).length, 0);
+  assert.equal(decoder.errors, 0);
+  assert.equal(empty.finalHeader().length, empty.headerBytes);
+  // a second finish() has no stream to end
+  assert.throws(() => empty.finish(), /the stream is finished; encode\(\) starts another/);
+  assert.throws(() => empty.finish(), /the stream is finished/);
+
+  // the same after samples, and encode() then starts a stream of its own
+  const pcm = intTones(5000, 2, 16);
+  const encoder = new FlacEncoder({ sampleRate: 44100, channels: 2 });
+  const first = Buffer.concat([encoder.encode(pcm), encoder.finish()]);
+  assert.throws(() => encoder.finish(), /the stream is finished/);
+  const second = Buffer.concat([encoder.encode(pcm), encoder.finish()]);
+  assert.deepEqual(second, first);
+  assert.deepEqual(flacDecode(new FlacDecoder(), second, [3000]), pcm);
+});
+
+test('FLAC: an error that ends a stream leaves nothing pending', () => {
+  // a stereo stream, and behind it frames of a mono stream: a change of
+  // format in the middle, which the decoder does not follow
+  const stereo = intTones(4096 * 3, 2, 16);
+  const mono = intTones(4096 * 3, 1, 16);
+  const a = new FlacEncoder({ sampleRate: 44100, channels: 2 });
+  const b = new FlacEncoder({ sampleRate: 44100, channels: 1 });
+  const first = flacEncode(a, stereo, 2, [4096]);
+  const second = flacEncode(b, mono, 1, [4096]);
+  const joined = Buffer.concat([first, second.subarray(b.headerBytes), Buffer.alloc(5000, 0x55)]);
+
+  const decoder = new FlacDecoder();
+  // the samples before the change come out first, with the error waiting
+  const out = decoder.decode(joined);
+  assert.deepEqual(out, stereo);
+  assert.equal(decoder.pending, true);
+  assert.throws(() => decoder.decode(), /unsupported stream/);
+  // the error has been thrown: nothing waits, and a drain loop ends
+  assert.equal(decoder.pending, false);
+  // the stream stays where it is: with or without bytes, the same answer
+  assert.throws(() => decoder.decode(), /unsupported stream; the stream cannot be decoded further/);
+  assert.throws(() => decoder.decode(Buffer.alloc(100)), /cannot be decoded further/);
+  assert.equal(decoder.pending, false);
+  // finish() closes it without samples and without a verdict
+  assert.equal(decoder.finish().length, 0);
+  assert.equal(decoder.pending, false);
+  assert.equal(decoder.md5, 'unknown');
+  assert.throws(() => decoder.decode(), /the stream is finished/);
+  // reset() starts over
+  decoder.reset();
+  assert.equal(decoder.pending, false);
+  assert.deepEqual(flacDecode(decoder, first, [5000]), stereo);
+
+  // a seek leaves the error behind as well
+  const seeker = new FlacDecoder();
+  seeker.decode(joined);
+  assert.throws(() => seeker.decode(), /unsupported stream/);
+  seeker.seekReset();
+  assert.deepEqual(seeker.decode(first.subarray(a.headerBytes)), stereo);
+});
+
+test('FLAC: a stream cut short is counted, and a seek after finish() takes bytes again', () => {
+  const pcm = intTones(4096 * 4, 2, 16);
+  const encoder = new FlacEncoder({ sampleRate: 44100, channels: 2 });
+  const stream = flacEncode(encoder, pcm, 2, [4096]);
+  // the input ends inside the last frame: finish() does not throw, and
+  // `errors` has the damage
+  const cut = new FlacDecoder({ md5: true });
+  const got = cut.decode(stream.subarray(0, stream.length - 50));
+  const rest = cut.finish();
+  assert.equal(got.length + rest.length, 4096 * 3 * 2);
+  assert.equal(cut.errors, 1);
+  assert.equal(cut.pending, false);
+
+  // finish() was called while samples were still held back by the
+  // bound; a seek then starts input again
+  const long = intTones(1200000, 2, 16, 0.01);
+  const longEncoder = new FlacEncoder({ sampleRate: 44100, channels: 2, level: 0 });
+  const longStream = flacEncode(longEncoder, long, 2, [200000]);
+  const decoder = new FlacDecoder();
+  const head = decoder.decode(longStream);
+  assert.ok(head.length > 0 && head.length <= decoder.maxOutput);
+  assert.equal(decoder.pending, true);
+  const more = decoder.finish();
+  assert.ok(more.length > 0 && head.length + more.length < long.length);
+  assert.equal(decoder.pending, true);
+  assert.throws(() => decoder.decode(Buffer.alloc(10)), /the stream is finished/);
+  decoder.seekReset();
+  assert.equal(decoder.pending, false);
+  const again = decoder.decode(longStream.subarray(longEncoder.headerBytes));
+  assert.equal(again.length, head.length);
+  assert.ok(again.every((v, i) => v === long[i]));
+});
+
+test('FLAC: ID3 tags around a stream are passed over and reported', () => {
+  const pcm = intTones(4096 * 2 + 300, 2, 16);
+  const encoder = new FlacEncoder({ sampleRate: 44100, channels: 2 });
+  const stream = flacEncode(encoder, pcm, 2, [5000]);
+  // an ID3v2 tag: 'ID3', version, flags, and its length in four 7-bit bytes
+  const body = 2000;
+  const front = Buffer.concat([
+    Buffer.from([0x49, 0x44, 0x33, 4, 0, 0, (body >> 21) & 0x7f, (body >> 14) & 0x7f, (body >> 7) & 0x7f, body & 0x7f]),
+    Buffer.alloc(body, 0x41),
+  ]);
+  // an ID3v1 tag: 128 bytes that begin with 'TAG'
+  const behind = Buffer.alloc(128, 0);
+  behind.write('TAGTitle', 0, 'latin1');
+
+  const plain = new FlacDecoder({ md5: true });
+  assert.deepEqual(flacDecode(plain, stream, [3000]), pcm);
+  assert.equal(plain.id3v2Bytes, 0);
+  assert.equal(plain.id3v1, false);
+
+  const both = new FlacDecoder({ md5: true });
+  assert.equal(both.id3v2Bytes, 0);
+  assert.deepEqual(flacDecode(both, Buffer.concat([front, stream, behind]), [3000]), pcm);
+  assert.equal(both.errors, 0);
+  assert.equal(both.md5, 'match');
+  assert.equal(both.id3v2Bytes, front.length);
+  assert.equal(both.id3v1, true);
+  assert.equal(both.firstFrameOffset, front.length + encoder.headerBytes);
+  both.reset();
+  assert.equal(both.id3v2Bytes, 0);
+  assert.equal(both.id3v1, false);
+
+  // 128 bytes behind the last frame that are no ID3v1 tag are damage
+  const other = new FlacDecoder();
+  flacDecode(other, Buffer.concat([stream, Buffer.alloc(128, 0x55)]), [3000]);
+  assert.equal(other.id3v1, false);
+  assert.equal(other.errors, 1);
+});
+
+test('FLAC: bytes over a SharedArrayBuffer are decoded or refused, never read from nowhere', () => {
+  const pcm = intTones(5000, 2, 16);
+  const encoder = new FlacEncoder({ sampleRate: 44100, channels: 2 });
+  const stream = flacEncode(encoder, pcm, 2, [5000]);
+  const shared = new Uint8Array(new SharedArrayBuffer(stream.length));
+  shared.set(stream);
+  const decoder = new FlacDecoder();
+  let out = null;
+  let refused = null;
+  try {
+    out = decoder.decode(shared);
+  } catch (error) {
+    refused = error;
+  }
+  if (refused) {
+    // this runtime does not hand the bytes of a shared buffer to a binding
+    assert.ok(refused instanceof Error);
+    assert.equal(decoder.pending, false);
+  } else {
+    assert.deepEqual(Int32Array.from([...out, ...decoder.finish()]), pcm);
+  }
+  // the encoder's picture data takes the same road
+  const picture = { mimeType: 'image/png', data: new Uint8Array(new SharedArrayBuffer(64)) };
+  try {
+    new FlacEncoder({ pictures: [picture] }).finish();
+  } catch (error) {
+    assert.ok(error instanceof Error);
+  }
+});
+
+/* The signal of the codec's own digest test (flac_gen_integer in
+ * tests/test_flac_util.h), made with integers alone: two triangle waves
+ * a channel and a little noise. BigInt keeps the divisions exact. */
+function integerSignal(samples, channels, bits, seed) {
+  const pcm = new Int32Array(samples * channels);
+  const peak = (1n << BigInt(bits - 1)) - 1n;
+  const triangle = (i, period) => {
+    const phase = i % (2n * period);
+    return 2n * (phase < period ? phase : 2n * period - phase) - period;
+  };
+  let state = seed >>> 0;
+  for (let i = 0; i < samples; i++) {
+    for (let c = 0; c < channels; c++) {
+      state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
+      const slow = BigInt(97 + 31 * c);
+      const fast = BigInt(23 + 7 * c);
+      const v =
+        (triangle(BigInt(i), slow) * ((peak * 3n) / 8n)) / slow +
+        (triangle(BigInt(i), fast) * (peak / 8n)) / fast +
+        ((BigInt(state >>> 16) - 32768n) * (peak / 64n)) / 32768n;
+      pcm[i * channels + c] = Number(v);
+    }
+  }
+  return pcm;
+}
+
+test('FLAC: the encoder writes the pinned streams on this platform', () => {
+  // the digests tests/test_flac_encoder.cpp pins for the same inputs:
+  // the binding of every platform has to write these bytes
+  const pinned = [
+    {
+      sampleRate: 44100, channels: 2, bitsPerSample: 16, samples: 20000, seed: 1,
+      digests: {
+        0: '62e623de5614b170cd637d31387699ef9d3c3f88c92d60731e6ebf42a028d3f0',
+        5: 'f8826ec09138e2545a4cb6759a4d6ccfcd90c5cfa93134a5314e8d00fdf5de02',
+        8: 'b61d73372fd7caee7251f476e3cf807cab5df409826df03ba927eddc9609d45d',
+      },
+    },
+    {
+      sampleRate: 96000, channels: 2, bitsPerSample: 24, samples: 12000, seed: 2,
+      digests: {
+        0: '2fa0c50aba068607244450fc721d99070d440469f6a60655ccbed5862f70574f',
+        5: 'ac5e520aa11524a7f8f840e217cde775ecf59341db9b8b1acd27645961e33510',
+        8: '66fb30848692b13c9fb05e274b21cab3719165bdc5d6a001be714bdb43f1c48f',
+      },
+    },
+  ];
+  for (const p of pinned) {
+    const pcm = integerSignal(p.samples, p.channels, p.bitsPerSample, p.seed);
+    for (const [level, digest] of Object.entries(p.digests)) {
+      const encoder = new FlacEncoder({
+        sampleRate: p.sampleRate, channels: p.channels, bitsPerSample: p.bitsPerSample, level: Number(level),
+      });
+      const stream = flacEncode(encoder, pcm, p.channels, [p.samples]);
+      assert.equal(createHash('sha256').update(stream).digest('hex'), digest, `${p.sampleRate} Hz, ${p.bitsPerSample} bits, level ${level}`);
+    }
+  }
 });
 
 test('an option whose getter throws surfaces that error', () => {

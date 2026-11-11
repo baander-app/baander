@@ -15,11 +15,6 @@
 #include "aac_cpu.h"
 #include "test_flac_util.h"
 
-struct Level {
-  const char* name;
-  int flags;
-};
-
 static uint32_t next(uint32_t* seed) {
   *seed = *seed * 1664525u + 1013904223u;
   uint32_t x = *seed;
@@ -610,30 +605,35 @@ int main(int argc, char** argv) {
   }
   const int detected = aac_get_cpu_flags();
   printf("CPU: %s\n", aac_cpu_flags_string(detected));
-  aac_set_cpu_flags_override(AAC_CPU_FLAG_NONE);
+  /* The levels are the codec's own: the table it selects kernels from. */
+  int level_count = 0;
+  const FlacDspLevel* levels = flac_dsp_levels(&level_count);
+  int level_flags = 0;
+  for (int i = 0; i < level_count; i++) {
+    level_flags |= levels[i].flags;
+  }
   FlacDSP scalar;
-  flac_dsp_init(&scalar);
+  flac_dsp_init_for(&scalar, AAC_CPU_FLAG_NONE);
 
-  const Level levels[] = {
-      {"scalar", AAC_CPU_FLAG_NONE},
-      {"sse2", AAC_CPU_FLAG_SSE2},
-      {"avx2", AAC_CPU_FLAG_SSE2 | AAC_CPU_FLAG_AVX | AAC_CPU_FLAG_AVX2},
-      {"neon", AAC_CPU_FLAG_NEON},
-  };
   const char* required = getenv("BAAC_REQUIRE_KERNELS");
   for (const char* p = required ? required : ""; *p;) {
     const char* end = strchr(p, ',');
     const std::string name(p, end ? (size_t)(end - p) : strlen(p));
-    bool known = false;
-    for (const Level& level : levels) {
-      known = known || name == level.name;
+    /* A level this build does not have cannot run here either. */
+    CHECK(name == "scalar" || name == "sse2" || name == "avx2" || name == "neon",
+          "BAAC_REQUIRE_KERNELS names the level \"%s\", which the codec does not have",
+          name.c_str());
+    bool built = false;
+    for (int i = 0; i < level_count; i++) {
+      built = built || name == levels[i].name;
     }
-    CHECK(known, "BAAC_REQUIRE_KERNELS names the level \"%s\", which this suite does not have",
+    CHECK(built, "the %s kernels are required here and this build does not have them",
           name.c_str());
     p += name.size() + (end ? 1 : 0);
   }
   std::vector<const char*> caps;
-  for (const Level& level : levels) {
+  for (int i = 0; i < level_count; i++) {
+    const FlacDspLevel& level = levels[i];
     const bool must_run =
         required && level.flags != AAC_CPU_FLAG_NONE && listed(required, level.name);
     if ((level.flags & detected) != level.flags) {
@@ -641,14 +641,12 @@ int main(int argc, char** argv) {
             level.name);
       continue;
     }
-    /* The AVX2 level takes a kernel of its own when the processor has
-     * BMI2 and LZCNT as well. */
-    const int extra = (level.flags & AAC_CPU_FLAG_AVX2)
-                          ? (detected & (AAC_CPU_FLAG_BMI2 | AAC_CPU_FLAG_LZCNT))
-                          : 0;
-    aac_set_cpu_flags_override(level.flags | extra);
+    /* The table of a processor of this level that has what this one has
+     * besides: the flags no level is named after (BMI2, LZCNT) give a
+     * level further kernels. */
+    const int extra = detected & ~level_flags;
     FlacDSP dsp;
-    flac_dsp_init(&dsp);
+    flac_dsp_init_for(&dsp, level.flags | extra);
     const int own = own_kernels(dsp, scalar);
     printf("testing %s kernels, %d of the level's own%s%s\n", level.name, own,
            dsp.rice_decode != scalar.rice_decode ? ", with a Rice reader among them" : "",
@@ -664,13 +662,11 @@ int main(int argc, char** argv) {
     test_rice_decode(level.name, &scalar, &dsp);
     test_stereo_out(level.name, &scalar, &dsp);
     caps.push_back(level.name);
-    if (extra) {
-      /* The same level as a processor without BMI2 and LZCNT gets it:
-       * the kernels that wait for those two stay the shared ones, and
-       * every kernel is compared again. */
-      aac_set_cpu_flags_override(level.flags);
-      FlacDSP plain;
-      flac_dsp_init(&plain);
+    /* The same level as a processor without those further flags gets
+     * it, when that is another table. */
+    FlacDSP plain;
+    flac_dsp_init_for(&plain, level.flags);
+    if (own_kernels(plain, dsp) > 0) {
       const std::string name = std::string(level.name) + " without BMI2 and LZCNT";
       printf("testing %s kernels, %d of the level's own\n", name.c_str(),
              own_kernels(plain, scalar));

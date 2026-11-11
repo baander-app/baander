@@ -209,11 +209,15 @@ int flac_decoder_set_md5_check(BaacFlacDecoder* d, bool enabled);
  * reaches the code behind the checksums (RFC 9639 section 11 advises
  * this for fuzz testing). */
 void flac_decoder_ignore_checksums(BaacFlacDecoder* d, bool ignore);
+/* For the tests: the bytes the decoder has read so far for candidates of
+ * its frame search that it then rejected. */
+uint64_t flac_decoder_rejected_work(const BaacFlacDecoder* d);
 int flac_decoder_set_metadata(BaacFlacDecoder* d, bool collect, size_t max_bytes);
 int flac_decoder_comments(const BaacFlacDecoder* d, const BaacFlacComment** comments,
                           BaacFlacComment* vendor);
 int flac_decoder_pictures(const BaacFlacDecoder* d, const BaacFlacPicture** pictures);
 int flac_decoder_skipped_metadata(const BaacFlacDecoder* d);
+void flac_decoder_id3(const BaacFlacDecoder* d, uint64_t* v2_bytes, int* v1_trailer);
 int flac_decoder_feed(BaacFlacDecoder* d, const uint8_t* data, int size);
 int flac_decoder_decode_next(BaacFlacDecoder* d, int32_t* pcm, int pcm_size);
 int flac_decoder_pending_bytes(const BaacFlacDecoder* d);
@@ -389,14 +393,34 @@ struct FlacDSP {
   void (*stereo_out[4])(const int32_t* c0, const int32_t* c1, int n, int32_t* pcm);
 };
 
-/* Fills a table with the scalar kernels, then with those of the levels
- * the processor flags allow. */
+/* One level of kernels: the name the BAAC_AAC_CPU cap and the tests
+ * know it by, the CPU flags a processor of the level reports, all of
+ * which the level needs, and the function that puts its kernels into a
+ * table.  The function is given the flags the table is made for, so a
+ * level that has kernels for instructions beyond its own (BMI2, LZCNT)
+ * decides on those from the same flags and not by asking the processor
+ * again. */
+struct FlacDspLevel {
+  const char* name;
+  int flags;
+  void (*init)(FlacDSP* dsp, int flags);
+};
+
+/* The levels of this build, the scalar one first and each level above
+ * those it builds on.  This table is the one place that says which
+ * kernels a processor gets; the tests go through it. */
+const FlacDspLevel* flac_dsp_levels(int* count);
+/* The table for a processor that reports `flags`: the kernels of every
+ * level whose flags are all among them, in the order of the levels. */
+void flac_dsp_init_for(FlacDSP* dsp, int flags);
+/* The same for the processor the program runs on, as BAAC_AAC_CPU caps
+ * it. */
 void flac_dsp_init(FlacDSP* dsp);
 /* The process-wide table, filled once on first use. */
 const FlacDSP* flac_dsp_global(void);
-void flac_dsp_init_sse2(FlacDSP* dsp);
-void flac_dsp_init_avx2(FlacDSP* dsp);
-void flac_dsp_init_neon(FlacDSP* dsp);
+void flac_dsp_init_sse2(FlacDSP* dsp, int flags);
+void flac_dsp_init_avx2(FlacDSP* dsp, int flags);
+void flac_dsp_init_neon(FlacDSP* dsp, int flags);
 
 /* ── bit reader ─────────────────────────────────────────────────── */
 

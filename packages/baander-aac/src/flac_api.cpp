@@ -72,6 +72,14 @@ int baac_flac_decoder_skipped_metadata(BaacFlacDecoder* dec) {
   return flac_decoder_skipped_metadata(dec);
 }
 
+int baac_flac_decoder_id3(BaacFlacDecoder* dec, uint64_t* id3v2_bytes, int* id3v1_trailer) {
+  if (!dec) {
+    return AAC_ERR_INVALID_ARG;
+  }
+  flac_decoder_id3(dec, id3v2_bytes, id3v1_trailer);
+  return AAC_OK;
+}
+
 int baac_flac_decoder_feed(BaacFlacDecoder* dec, const uint8_t* data, int size) {
   if (!dec || size < 0 || (!data && size > 0)) {
     return AAC_ERR_INVALID_ARG;

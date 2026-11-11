@@ -32,6 +32,8 @@
  * no output file, dec leaves what could be decoded. */
 #include "baac_flac.h"
 
+#include <sys/stat.h>
+
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
@@ -86,6 +88,23 @@ struct File {
 };
 
 bool is_dash(const char* path) { return strcmp(path, "-") == 0; }
+
+/* Whether `path` names a file that holds data of its own: not a device,
+ * a pipe or a directory, which a failed command must not remove. */
+bool is_regular_file(const char* path) {
+  struct stat st;
+  return stat(path, &st) == 0 && (st.st_mode & S_IFMT) == S_IFREG;
+}
+
+/* Says so when a read from `in` failed, as opposed to having reached
+ * the end of the input; true when it did. */
+bool read_failed(const File& in) {
+  if (!ferror(in.f)) {
+    return false;
+  }
+  fprintf(stderr, "baac: cannot read %s\n", in.name.c_str());
+  return true;
+}
 
 bool open_file(File* file, const char* path, bool write) {
   if (is_dash(path)) {
@@ -525,6 +544,9 @@ bool read_picture(const char* path, PictureFile* pic) {
       break;
     }
   }
+  if (read_failed(in)) {
+    return false;
+  }
   if (got > BAAC_FLAC_MAX_PICTURE_BYTES) {
     return too_large();
   }
@@ -741,6 +763,9 @@ int encode_stream(const EncodeArgs& args, File* in, File* out, bool* created) {
   for (;;) {
     const size_t want = (size_t)std::min<uint64_t>(bytes.size(), left);
     const size_t got = want ? read_fully(in, bytes.data(), want) : 0;
+    if (got < want && read_failed(*in)) {
+      return 1;
+    }
     if (left != kUnknownLength) {
       left -= got;
     }
@@ -846,7 +871,7 @@ int encode(int argc, char** argv) {
   const int status = encode_stream(args, &in, &out, &created);
   if (status != 0 && created) {
     out.close();
-    if (!is_dash(args.out)) {
+    if (!is_dash(args.out) && is_regular_file(args.out)) {
       remove(args.out);
     }
   }
@@ -921,6 +946,10 @@ int decode_stream(const DecodeArgs& args, File* in, File* out) {
     if (!ended) {
       got = fread(input.get(), 1, kIoBuffer, in->f);
       if (got == 0) {
+        if (read_failed(*in)) {
+          fatal = true;
+          break;
+        }
         baac_flac_decoder_end_input(dec);
         ended = true;
       }
@@ -1051,6 +1080,23 @@ int decode_stream(const DecodeArgs& args, File* in, File* out) {
            : args.md5                     ? "no MD5 in the stream"
                                           : "MD5 not checked");
   }
+  /* ID3 tags around the stream are no FLAC and no damage: they are
+   * passed over, and said.  test reports them with its result; dec,
+   * whose standard output may be the audio, on standard error. */
+  uint64_t id3v2_bytes = 0;
+  int id3v1 = 0;
+  baac_flac_decoder_id3(dec, &id3v2_bytes, &id3v1);
+  FILE* notes = out ? stderr : stdout;
+  if (id3v2_bytes) {
+    fprintf(notes, "%s: an ID3v2 tag of %llu bytes in front of the stream was passed over\n", name,
+            (unsigned long long)id3v2_bytes);
+  }
+  if (id3v1) {
+    fprintf(notes,
+            "%s: an ID3v1 tag of 128 bytes behind the last frame was passed over (flac reports "
+            "such a tag as lost sync)\n",
+            name);
+  }
   return failures ? 1 : 0;
 }
 
@@ -1144,6 +1190,9 @@ int info(int argc, char** argv) {
   while (!done) {
     const size_t got = fread(input.get(), 1, kIoBuffer, in.f);
     if (got == 0) {
+      if (read_failed(in)) {
+        return 1;
+      }
       baac_flac_decoder_end_input(dec);
     }
     size_t pos = 0;
@@ -1180,12 +1229,30 @@ int info(int argc, char** argv) {
   if (!(export_path && is_dash(export_path))) {
     printf("%s: FLAC, %d Hz, %d channels, %d bits", name, stream.sample_rate, stream.channels,
            stream.bits_per_sample);
-    if (stream.total_samples) {
+    if (stream.total_samples && stream.sample_rate > 0) {
       const double seconds = (double)stream.total_samples / (double)stream.sample_rate;
       printf(", %llu samples (%d:%06.3f)", (unsigned long long)stream.total_samples,
              (int)(seconds / 60.0), fmod(seconds, 60.0));
+    } else if (stream.total_samples) {
+      /* A stream that states no sample rate has no duration to print. */
+      printf(", %llu samples", (unsigned long long)stream.total_samples);
     }
     printf("\n");
+    uint64_t id3v2_bytes = 0;
+    baac_flac_decoder_id3(dec, &id3v2_bytes, nullptr);
+    if (id3v2_bytes) {
+      printf("ID3v2 tag in front of the stream: %llu bytes, passed over\n",
+             (unsigned long long)id3v2_bytes);
+    }
+    /* info reads the header only.  The end of a file that can seek is
+     * looked at for the other tag dec and test pass over. */
+    uint8_t tail[3];
+    if (in.owned && fseek(in.f, -128, SEEK_END) == 0 && fread(tail, 1, 3, in.f) == 3 &&
+        memcmp(tail, "TAG", 3) == 0) {
+      printf(
+          "ID3v1 tag at the end of the file: 128 bytes, which dec and test pass over (flac "
+          "reports such a tag as lost sync)\n");
+    }
     if (stream.max_block_size) {
       printf("block size: %d", stream.min_block_size);
       if (stream.max_block_size != stream.min_block_size) {

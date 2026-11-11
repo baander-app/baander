@@ -182,14 +182,22 @@ endif()
 set_source_files_properties(src/dsp.cpp PROPERTIES COMPILE_FLAGS "-ffp-contract=off")
 # The analysis of the FLAC encoder decides which bytes are written, so
 # its floating-point sums must come out the same in every build of one
-# machine: the file is compiled without the Release math options above
-# and without contraction.  (On another compiler than GCC or Clang the
-# options above are not in force either.)
+# machine: the files that hold such sums (the predictor analysis, the
+# scalar kernels, and the encoder, which adds up autocorrelations and
+# size estimates of its own) are compiled without the Release math
+# options above and without contraction.  (On another compiler than GCC
+# or Clang the options above are not in force either.)
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     set(BAAC_FLAC_STRICT_MATH
         "-fno-associative-math -fno-reciprocal-math -fsigned-zeros -ftrapping-math -fno-finite-math-only -ffp-contract=off")
-    set_source_files_properties(src/flac_lpc.cpp src/flac_dsp.cpp PROPERTIES COMPILE_FLAGS
-        "${BAAC_FLAC_STRICT_MATH}")
+    # On 32-bit x86 the compiler would otherwise do this arithmetic in
+    # the x87 unit, whose extended precision gives other sums than the
+    # SSE2 the kernels of the level above are written in.
+    if(HAS_SSE2 AND CMAKE_SYSTEM_PROCESSOR MATCHES "i686|i386")
+        set(BAAC_FLAC_STRICT_MATH "${BAAC_FLAC_STRICT_MATH} -mfpmath=sse")
+    endif()
+    set_source_files_properties(src/flac_lpc.cpp src/flac_dsp.cpp src/flac_enc.cpp PROPERTIES
+        COMPILE_FLAGS "${BAAC_FLAC_STRICT_MATH}")
     # The FLAC kernels of each SIMD level follow the same rule, with the
     # instruction set the level names and nothing beyond it.
     if(HAS_SSE2 AND CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64|i686|i386")

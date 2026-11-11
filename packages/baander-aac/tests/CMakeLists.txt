@@ -81,6 +81,10 @@ if(UNIX)
     target_link_libraries(test_tables_lazy PRIVATE m)
 endif()
 add_test(NAME test_tables_lazy COMMAND test_tables_lazy)
+# The same with decoders, and with decoders and encoders together, as
+# the first users of the tables: each start needs a process of its own.
+add_test(NAME test_tables_lazy_decoders COMMAND test_tables_lazy decoders)
+add_test(NAME test_tables_lazy_both COMMAND test_tables_lazy both)
 
 # The fuzz smoke test generates the seed corpus and runs every harness
 # over it for a few seconds of mutations (in parallel; a libFuzzer build

@@ -154,8 +154,6 @@ extern const float aac_sbr_qmf_window[AAC_SBR_QMF_FILTER_LENGTH];
  * the public API never has to; code that reads the tables without
  * creating either (a unit test, an internal tool) calls it first. */
 void aac_tables_init(void);
-/* The Huffman decoding trees of bitstream.cpp, built by aac_tables_init. */
-void aac_huffman_trees_build(void);
 
 #ifdef __cplusplus
 }

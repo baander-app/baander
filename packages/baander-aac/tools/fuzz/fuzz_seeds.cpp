@@ -1172,6 +1172,33 @@ void flac_decoder_seeds(const std::string& data) {
     put(h, "bound_block_past_streaminfo.bin",
         cat({{checked, 0x07}, flac_head(flac_streaminfo(48000, 8, 32, 4096)), frame}));
   }
+  /* Sync codes with headers that hold and claim the largest frame, one
+   * every nine or eleven bytes and none of them a frame: the search for
+   * a frame has to pass them without reading each to its end. */
+  for (int period : {9, 11}) {
+    uint8_t pattern[11] = {0xFF, 0xF8, 0x7A, 0x7E, 0x00, 0xFF, 0xFE, 0x00, 0x02, 0x00, 0x00};
+    pattern[7] = flac_crc8(pattern, 7);
+    Bytes crafted;
+    for (int i = 0; i < 9000; i++) {
+      crafted.push_back(pattern[i % period]);
+    }
+    put(h, "search_false_headers_" + std::to_string(period) + ".bin",
+        cat({{checked, 0x07}, flac_head(flac_streaminfo(48000, 8, 32, 65535)), crafted}));
+  }
+  /* A stream without STREAMINFO: a header that holds and leaves its bit
+   * depth to one, with no frame behind it, and then real frames. */
+  {
+    Bytes false_header;
+    for (uint8_t b : {0xFF, 0xF8, 0x19, 0x10, 0x00}) {
+      false_header.push_back(b);
+    }
+    false_header.push_back(flac_crc8(false_header.data(), false_header.size()));
+    false_header.insert(false_header.end(), 64, 0x00);
+    const Bytes s = flac_encoded(44100, 2, 16, 5, 6000, false);
+    const size_t frames = flac_frames_at(s);
+    put(h, "search_depth_left_to_streaminfo.bin",
+        cat({{kFlacChecksums, 0x05}, false_header, slice(s, frames, frames + 6000)}));
+  }
   /* The highest partition order: 32768 partitions of one sample. */
   {
     const Bytes frame = flac_frame(32768, 44100, 1, FLAC_ASSIGN_INDEPENDENT, 16, 0,

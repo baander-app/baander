@@ -1044,6 +1044,12 @@ const float aac_sbr_qmf_window[AAC_SBR_QMF_FILTER_LENGTH] = {0.0f,
                                                              -0.00056176925738f,
                                                              -0.00055252865047f};
 
+/* The Huffman decoding trees of bitstream.cpp, built from the code
+ * tables.  It has one caller, build_tables below, which runs once; it
+ * is declared here and in no header, because a second call would
+ * rewrite the trees under the decoders that read them. */
+void aac_huffman_trees_build(void);
+
 /* Fills every table that is computed and not written out: the Huffman
  * code pointers and bit costs, the windows, the |q|^(4/3) table and the
  * Huffman decoding trees of bitstream.cpp. */

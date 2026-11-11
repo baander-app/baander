@@ -1,7 +1,7 @@
 {
   "name": "@baander/aac-native",
   "version": "0.2.0",
-  "description": "baander-aac: AAC-LC encoder and decoder with a native Node-API binding",
+  "description": "baander-aac: an AAC encoder and decoder (AAC-LC, HE-AAC, the low-delay profiles and xHE-AAC) and a lossless FLAC encoder and decoder, with a native Node-API binding",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",

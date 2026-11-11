@@ -50,6 +50,20 @@ const size_t kFifoMinBytes = 65536;
 
 enum FrameResult { kFrameOk = 1, kFrameNeedMore = 0, kFrameInvalid = -1 };
 
+/* The search for a frame behind damage reads each candidate, a sync
+ * code with a header whose CRC-8 holds, to its end, and a stream can be
+ * made of such headers that are no frames.  What is read in vain is
+ * therefore kept in proportion to what is passed: beyond the size of
+ * one frame, every byte read for a candidate that was rejected has to
+ * be paid for by passing input, at this many bytes read to a byte
+ * passed.  While the debt stands, candidates are passed unread. */
+const uint64_t kSearchRate = 4;
+
+/* The bit depths a frame can have, for one that leaves its depth to a
+ * STREAMINFO the decoder was not given. */
+const int kMinBits = 4;
+const int kMaxBits = 32;
+
 /* The largest frame the decoder accepts for a block size and channel
  * count: 64 bits per sample and 16 bytes of side information per
  * subframe around the header and the CRC-16.  A verbatim frame of
@@ -72,17 +86,16 @@ int read_fixed_width(FlacBitReader* r, T* FLAC_RESTRICT out, int count, int widt
   const int whole = (int)std::min<size_t>((size_t)count, left / (size_t)width);
   /* The reader works on a copy for the length of the loop, so that the
    * stores to `out` cannot be taken for stores to its state. */
-  FlacBitReader local = *r;
   if (out) {
+    FlacBitReader local = *r;
     for (int i = 0; i < whole; i++) {
       out[i] = (T)flac_bitreader_read_signed(&local, width);
     }
+    *r = local;
   } else {
-    for (int i = 0; i < whole; i++) {
-      flac_bitreader_read_signed(&local, width);
-    }
+    /* Nothing is kept, so the values are passed over in one step. */
+    flac_bitreader_seek(r, flac_bitreader_position(r) + (size_t)whole * (size_t)width);
   }
-  *r = local;
   if (whole < count) {
     flac_bitreader_fail(r);
   }
@@ -421,6 +434,10 @@ struct BaacFlacDecoder_ {
   bool synced = false;           /* a frame is expected right at the head; otherwise the
                                   * decoder is searching and skips what is none */
   bool ignore_checksums = false; /* fuzzing: frames are taken whatever their CRCs say */
+  uint64_t id3v2_bytes = 0;      /* of the ID3v2 tags passed over in front of the stream */
+  bool id3v1 = false;            /* an ID3v1 tag behind the last frame was passed over */
+  uint64_t search_debt = 0;      /* bytes read for rejected candidates and not yet paid for */
+  uint64_t rejected_work = 0;    /* every byte read for a rejected candidate, for the tests */
 
   /* The stream. */
   bool have_info = false; /* `info` is a STREAMINFO, from the stream or the caller */
@@ -518,6 +535,7 @@ void clear_input(Decoder* d) {
   d->pending_error = false;
   d->ended = false;
   d->synced = false;
+  d->search_debt = 0;
 }
 
 void fifo_append(Decoder* d, const uint8_t* data, size_t n) {
@@ -701,6 +719,7 @@ void process_metadata(Decoder* d) {
           if (id3v2_header(p, &following)) {
             drop(d, kId3v2HeaderBytes);
             d->skip = following;
+            d->id3v2_bytes += kId3v2HeaderBytes + following;
             break;
           }
         }
@@ -841,10 +860,15 @@ void process_metadata(Decoder* d) {
  * frame the input does not hold whole yet leaves its progress behind,
  * and the next call for the same frame continues from it. */
 FrameResult decode_frame(Decoder* d, const uint8_t* p, size_t avail, const FlacFrameHeader& h,
-                         int bits, bool restore, size_t* frame_bytes) {
+                         int bits, bool restore, size_t* frame_bytes, size_t* examined) {
   Progress& pg = d->progress;
   FlacBitReader r;
   flac_bitreader_init(&r, p + h.header_bytes, avail - (size_t)h.header_bytes);
+  /* What the attempt read of the input, for the caller's account of
+   * work spent on what turns out to be no frame. */
+  const auto read_so_far = [&]() {
+    return std::min(avail, (size_t)h.header_bytes + (flac_bitreader_position(&r) + 7) / 8);
+  };
   if (pg.valid) {
     flac_bitreader_seek(&r, pg.subframe_bit);
   } else {
@@ -863,10 +887,12 @@ FrameResult decode_frame(Decoder* d, const uint8_t* p, size_t avail, const FlacF
     pg.subframe_bit = flac_bitreader_position(&r);
     const bool ok = decode_subframe(d->dsp, &r, bps, h.block_size, out, wide, restore, &pg);
     if (r.overread) {
+      *examined = avail;
       return kFrameNeedMore;
     }
     if (!ok) {
       pg.valid = false;
+      *examined = read_so_far();
       return kFrameInvalid;
     }
     pg.inside = false;
@@ -876,15 +902,42 @@ FrameResult decode_frame(Decoder* d, const uint8_t* p, size_t avail, const FlacF
   flac_bitreader_align(&r);
   const size_t crc_pos = (size_t)h.header_bytes + flac_bitreader_position(&r) / 8;
   if (avail < crc_pos + 2) {
+    *examined = avail;
     return kFrameNeedMore;
   }
   pg.valid = false;
+  /* The checksum reads the frame a second time. */
+  *examined = 2 * crc_pos + 2;
   if (!d->ignore_checksums &&
       flac_crc16(p, crc_pos) != (uint16_t)((p[crc_pos] << 8) | p[crc_pos + 1])) {
     return kFrameInvalid;
   }
   *frame_bytes = crc_pos + 2;
   return kFrameOk;
+}
+
+/* Whether a frame follows a header that leaves its bit depth to a
+ * STREAMINFO the decoder does not have.  The header cannot say, but a
+ * frame read at its true depth ends in its CRC-16, so the frame is read
+ * at each depth there is, without keeping samples.  kFrameOk when one
+ * of them ends in a checksum that holds. */
+FrameResult probe_depths(Decoder* d, const uint8_t* p, size_t avail, const FlacFrameHeader& h,
+                         size_t* examined) {
+  bool more = false;
+  *examined = 0;
+  for (int bits = kMinBits; bits <= kMaxBits; bits++) {
+    size_t frame_bytes = 0;
+    size_t read = 0;
+    d->progress.valid = false;
+    const FrameResult result = decode_frame(d, p, avail, h, bits, false, &frame_bytes, &read);
+    d->progress.valid = false;
+    *examined += read;
+    if (result == kFrameOk) {
+      return kFrameOk;
+    }
+    more = more || result == kFrameNeedMore;
+  }
+  return more ? kFrameNeedMore : kFrameInvalid;
 }
 
 /* Turns the channel rows of a decoded frame back into left and right
@@ -969,6 +1022,18 @@ void interleave(const Decoder* d, int channels, int n, int32_t* FLAC_RESTRICT pc
 /* The bytes at the head are no frame.  When a frame was expected there
  * this is damage: it is counted and reported, and the search starts
  * one byte on.  While searching it is only one more byte to pass. */
+/* `n` bytes of input were passed in the search: they pay off what was
+ * read in vain. */
+void pay(Decoder* d, size_t n) {
+  d->search_debt -= std::min<uint64_t>(d->search_debt, kSearchRate * (uint64_t)n);
+}
+
+/* `bytes` of input were read for a candidate that is no frame. */
+void charge(Decoder* d, size_t bytes) {
+  d->search_debt += bytes;
+  d->rejected_work += bytes;
+}
+
 bool reject(Decoder* d) {
   const bool report = d->synced;
   if (report) {
@@ -976,6 +1041,7 @@ bool reject(Decoder* d) {
     flac_count(&d->lost);
   }
   drop(d, 1);
+  pay(d, 1);
   return report;
 }
 
@@ -1028,6 +1094,8 @@ void flac_decoder_reset(BaacFlacDecoder* d) {
   d->lost = 0;
   d->md5_valid = true;
   flac_md5_init(&d->md5);
+  d->id3v2_bytes = 0;
+  d->id3v1 = false;
 }
 
 int flac_decoder_set_streaminfo(BaacFlacDecoder* d, const uint8_t* data) {
@@ -1048,6 +1116,17 @@ int flac_decoder_set_md5_check(BaacFlacDecoder* d, bool enabled) {
   }
   d->md5_enabled = enabled;
   return AAC_OK;
+}
+
+uint64_t flac_decoder_rejected_work(const BaacFlacDecoder* d) { return d->rejected_work; }
+
+void flac_decoder_id3(const BaacFlacDecoder* d, uint64_t* v2_bytes, int* v1_trailer) {
+  if (v2_bytes) {
+    *v2_bytes = d->id3v2_bytes;
+  }
+  if (v1_trailer) {
+    *v1_trailer = d->id3v1 ? 1 : 0;
+  }
 }
 
 void flac_decoder_ignore_checksums(BaacFlacDecoder* d, bool ignore) {
@@ -1146,7 +1225,9 @@ int flac_decoder_decode_next(BaacFlacDecoder* d, int32_t* pcm, int pcm_size) {
       /* Every frame starts with 0xFF: pass what cannot start one. */
       const uint8_t* p = fifo_data(d);
       const void* hit = memchr(p, 0xFF, pending(d));
-      drop(d, hit ? (size_t)((const uint8_t*)hit - p) : pending(d));
+      const size_t passed = hit ? (size_t)((const uint8_t*)hit - p) : pending(d);
+      drop(d, passed);
+      pay(d, passed);
     }
     const size_t avail = pending(d);
     if (avail == 0 || avail < d->need) {
@@ -1158,6 +1239,7 @@ int flac_decoder_decode_next(BaacFlacDecoder* d, int32_t* pcm, int pcm_size) {
        * the input ends with it, and is passed over then. */
       if (id3v1_trailer(d) && d->ended) {
         drop(d, kId3v1Bytes);
+        d->id3v1 = true;
         return 0;
       }
       if (!d->ended && memcmp(p, "TAG", std::min<size_t>(avail, 3)) == 0) {
@@ -1178,6 +1260,13 @@ int flac_decoder_decode_next(BaacFlacDecoder* d, int32_t* pcm, int pcm_size) {
       }
       continue;
     }
+    /* In the search, a candidate is read only while the account of
+     * what was read in vain allows it. */
+    const bool searching = !d->synced;
+    if (searching && d->search_debt > d->fifo_limit && !d->progress.valid) {
+      reject(d);
+      continue;
+    }
 
     /* A header may leave the sample rate or the bit depth to the
      * stream's description. */
@@ -1194,15 +1283,27 @@ int flac_decoder_decode_next(BaacFlacDecoder* d, int32_t* pcm, int pcm_size) {
     const size_t bound = frame_bound(h.block_size, h.channels);
     FrameResult result = kFrameOk;
     size_t frame_bytes = 0;
-    if (bits) {
-      if (differs || !readable) {
-        /* The frame will not be decoded, but whether it is one decides
-         * between an unsupported stream and one more false sync code. */
-        ensure_buffers(d, 1, h.block_size, 0);
-        result = decode_frame(d, p, avail, h, bits, false, &frame_bytes);
-      } else {
-        ensure_buffers(d, h.channels, h.block_size, bits);
-        result = decode_frame(d, p, avail, h, bits, true, &frame_bytes);
+    size_t examined = 0;
+    if (!bits) {
+      /* Neither the header nor the stream says how deep the samples
+       * are, so the frame cannot be decoded; whether it is a frame at
+       * all still decides between a stream that needs its STREAMINFO
+       * and one more false sync code. */
+      ensure_buffers(d, 1, h.block_size, 0);
+      result = probe_depths(d, p, avail, h, &examined);
+    } else if (differs || !readable) {
+      /* The frame will not be decoded, but whether it is one decides
+       * between an unsupported stream and one more false sync code. */
+      ensure_buffers(d, 1, h.block_size, 0);
+      result = decode_frame(d, p, avail, h, bits, false, &frame_bytes, &examined);
+    } else {
+      /* A frame that is expected is decoded as it is read.  A candidate
+       * of the search is read first and decoded once its checksum
+       * holds, which is all a false one costs. */
+      ensure_buffers(d, h.channels, h.block_size, bits);
+      result = decode_frame(d, p, avail, h, bits, !searching, &frame_bytes, &examined);
+      if (searching && result == kFrameOk) {
+        result = decode_frame(d, p, avail, h, bits, true, &frame_bytes, &examined);
       }
     }
     if (result == kFrameNeedMore && avail < bound && !d->ended) {
@@ -1213,12 +1314,20 @@ int flac_decoder_decode_next(BaacFlacDecoder* d, int32_t* pcm, int pcm_size) {
       if (avail >= d->fifo_limit) {
         raise_fifo_limit(d, bound);
       }
-      d->need = avail + 1;
+      if (bits) {
+        d->need = avail + 1;
+      } else {
+        /* Every depth is read again from the start when more has come,
+         * so the next look waits for the input to double. */
+        charge(d, examined);
+        d->need = std::min(bound, 2 * avail + kFifoMinBytes);
+      }
       return 0;
     }
     if (result != kFrameOk) {
       /* A syntax error, a CRC-16 mismatch, more bytes than a frame of
        * this size may take, or a frame the input ends in. */
+      charge(d, examined);
       if (reject(d)) {
         return AAC_ERR_DECODE;
       }
@@ -1283,6 +1392,7 @@ int flac_decoder_decode_next(BaacFlacDecoder* d, int32_t* pcm, int pcm_size) {
     d->have_frame = true;
     d->next_position = position + (uint64_t)h.block_size;
     d->synced = true;
+    d->search_debt = 0;
     drop(d, frame_bytes);
     return h.block_size;
   }
@@ -1350,6 +1460,7 @@ int flac_decoder_finish(BaacFlacDecoder* d, BaacFlacMd5Verdict* verdict) {
   process_metadata(d);
   if (d->stage == Decoder::kFrames && id3v1_trailer(d)) {
     drop(d, kId3v1Bytes);
+    d->id3v1 = true;
   }
   int result = AAC_OK;
   /* What is left is damage when it was to be a frame or part of the

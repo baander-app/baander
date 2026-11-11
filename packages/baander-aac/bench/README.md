@@ -41,7 +41,9 @@ quality, speed and compat stages also need scipy and soundfile.
 only when the stage has a cache under `work/`; the others stay as they
 are, so one stage can be measured again without the tools of the rest.
 `./bench.py selftest` checks the harness's own logic (the gate
-statistic, the check mode, the report) on made-up figures.
+statistic, the check mode, the report) on made-up figures. The check
+mode holds a complete result against the list of gates a complete run
+has to judge, so a run that lost a gate does not pass for lack of it.
 
 `corpus.sh` fetches the ten TCDAudio14 music excerpts (48 kHz, 16-bit
 stereo, 7 to 16 s each) from the ViSQOL repository at a pinned commit

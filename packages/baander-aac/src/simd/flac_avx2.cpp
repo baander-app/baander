@@ -536,7 +536,7 @@ __attribute__((target("lzcnt,bmi2"))) int rice_decode_lzcnt(FlacBitReader* r, in
 
 }  // namespace
 
-void flac_dsp_init_avx2(FlacDSP* dsp) {
+void flac_dsp_init_avx2(FlacDSP* dsp, int flags) {
   dsp->window = window_avx2;
   dsp->autocorrelation = autocorrelation_avx2;
   dsp->fixed_sums = fixed_sums_avx2;
@@ -546,16 +546,17 @@ void flac_dsp_init_avx2(FlacDSP* dsp) {
   dsp->rice_fold = rice_fold_avx2;
   dsp->rice_sums = rice_sums_avx2;
 #if defined(FLAC_HAVE_RICE_ENCODE_BMI2)
-  if (aac_get_cpu_flags() & AAC_CPU_FLAG_BMI2) {
+  if (flags & AAC_CPU_FLAG_BMI2) {
     dsp->rice_encode = rice_encode_bmi2;
   }
 #endif
 #if defined(FLAC_HAVE_RICE_DECODE_LZCNT)
   const int wanted = AAC_CPU_FLAG_BMI2 | AAC_CPU_FLAG_LZCNT;
-  if ((aac_get_cpu_flags() & wanted) == wanted) {
+  if ((flags & wanted) == wanted) {
     dsp->rice_decode = rice_decode_lzcnt;
   }
 #endif
+  (void)flags;
 }
 
 #endif /* BAAC_AAC_AVX2 || __AVX2__ */

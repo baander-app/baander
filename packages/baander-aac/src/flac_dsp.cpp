@@ -197,9 +197,9 @@ void stereo_out_mid_side_c(const int32_t* c0, const int32_t* c1, int n, int32_t*
   }
 }
 
-}  // namespace
+/* ── the levels ─────────────────────────────────────────────────── */
 
-void flac_dsp_init(FlacDSP* dsp) {
+void init_scalar(FlacDSP* dsp, int) {
   dsp->window = window_c;
   dsp->autocorrelation = autocorrelation_c;
   dsp->fixed_sums = fixed_sums_c;
@@ -216,25 +216,37 @@ void flac_dsp_init(FlacDSP* dsp) {
   dsp->stereo_out[FLAC_ASSIGN_LEFT_SIDE] = stereo_out_left_side_c;
   dsp->stereo_out[FLAC_ASSIGN_SIDE_RIGHT] = stereo_out_side_right_c;
   dsp->stereo_out[FLAC_ASSIGN_MID_SIDE] = stereo_out_mid_side_c;
+}
 
-  const int flags = aac_get_cpu_flags();
+const FlacDspLevel kLevels[] = {
+    {"scalar", AAC_CPU_FLAG_NONE, init_scalar},
 #if defined(BAAC_AAC_SSE2)
-  if (flags & AAC_CPU_FLAG_SSE2) {
-    flac_dsp_init_sse2(dsp);
-  }
+    {"sse2", AAC_CPU_FLAG_SSE2, flac_dsp_init_sse2},
 #endif
 #if defined(BAAC_AAC_AVX2)
-  if (flags & AAC_CPU_FLAG_AVX2) {
-    flac_dsp_init_avx2(dsp);
-  }
+    {"avx2", AAC_CPU_FLAG_SSE2 | AAC_CPU_FLAG_AVX | AAC_CPU_FLAG_AVX2, flac_dsp_init_avx2},
 #endif
 #if defined(BAAC_AAC_NEON)
-  if (flags & AAC_CPU_FLAG_NEON) {
-    flac_dsp_init_neon(dsp);
-  }
+    {"neon", AAC_CPU_FLAG_NEON, flac_dsp_init_neon},
 #endif
-  (void)flags;
+};
+
+}  // namespace
+
+const FlacDspLevel* flac_dsp_levels(int* count) {
+  *count = (int)(sizeof(kLevels) / sizeof(kLevels[0]));
+  return kLevels;
 }
+
+void flac_dsp_init_for(FlacDSP* dsp, int flags) {
+  for (const FlacDspLevel& level : kLevels) {
+    if ((flags & level.flags) == level.flags) {
+      level.init(dsp, flags);
+    }
+  }
+}
+
+void flac_dsp_init(FlacDSP* dsp) { flac_dsp_init_for(dsp, aac_get_cpu_flags()); }
 
 const FlacDSP* flac_dsp_global(void) {
   static const FlacDSP table = [] {
