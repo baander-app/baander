@@ -21,6 +21,7 @@ use App\Shared\Domain\Model\Uuid;
 use App\Shared\Infrastructure\Doctrine\Type\InstantType;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\LockMode;
+use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\EntityManagerInterface;
 use App\Shared\Application\Exception\ConflictException;
 
@@ -28,12 +29,20 @@ use App\Shared\Application\Exception\ConflictException;
  * Reads go through the mapping as DQL and return plain rows, never managed entities: the coordinator
  * reads an endpoint before it holds the session lock, the relay serves every socket of a worker
  * through one entity manager, and a managed copy would go stale behind both.
+ *
+ * A row is created through the unit of work, flushed and detached in the method that creates it, so
+ * later reads of the same operation see it and nothing managed outlives the call. A row is changed
+ * by one DQL update whose predicate is the guard. The database clock stamps every instant except a
+ * recovery credential's expiry: an update stamps in its statement, an insert with the transaction's
+ * clock read beforehand. Five statements stay SQL, each for the reason given where it stands.
  */
 final readonly class PlaybackStore implements PlaybackStoreInterface
 {
     /** True while the incarnation's registration holds: neither lapsed nor retired. */
     private const string AVAILABLE = 'CASE WHEN i.expiresAt > CURRENT_TIMESTAMP() AND i.retiredAt IS NULL THEN true ELSE false END';
     private const string CONTROL_TYPES = "'play', 'pause', 'seek', 'load', 'stop', 'volume', 'queue'";
+    private const string COMMAND_LIFETIME = "DATE_ADD(CURRENT_TIMESTAMP(), 20, 'second')";
+    private const string PRESENCE_LIFETIME = "DATE_ADD(CURRENT_TIMESTAMP(), 30, 'second')";
 
     public function __construct(private EntityManagerInterface $entityManager) {}
 
@@ -44,7 +53,8 @@ final readonly class PlaybackStore implements PlaybackStoreInterface
 
     public function lockSession(string $userId): ListeningSession
     {
-        // The account lock also serializes the first insert, before a session row exists.
+        // The account lock also serializes the first insert, before a session row exists. DQL has no
+        // advisory lock.
         $this->connection()->executeQuery('SELECT pg_advisory_xact_lock(hashtextextended(:owner,0))', ['owner' => $userId]);
         $locked = 'SELECT s FROM ' . ListeningSessionEntity::class . ' s WHERE s.userId = :owner';
         $row = $this->rows($locked, ['owner' => $userId], lock: true)[0] ?? null;
@@ -67,23 +77,24 @@ final readonly class PlaybackStore implements PlaybackStoreInterface
     public function saveSession(ListeningSession $aggregate): void
     {
         $session = $this->sessionRow($aggregate);
-        $this->connection()->executeStatement(<<<'SQL'
-            UPDATE listening_sessions SET revision=:revision, media=CAST(:media AS jsonb),queue=CAST(:queue AS jsonb),
-                current_track_index=:index,position=:position,playback_state=:desired,desired_state=:desired,
-                observed_state=:observed,selected_destination_id=:destination,active_incarnation_id=:incarnation,
-                updated_at=CURRENT_TIMESTAMP,last_used_at=CURRENT_TIMESTAMP WHERE id=:id
-            SQL, [
-            'revision' => $session['revision'], 'media' => json_encode($session['media'], JSON_THROW_ON_ERROR),
-            'queue' => json_encode($session['queue'], JSON_THROW_ON_ERROR), 'index' => $session['current_track_index'],
-            'position' => $session['position'], 'desired' => $session['desired_state'], 'observed' => $session['observed_state'],
-            'destination' => $session['selected_destination_id'], 'incarnation' => $session['active_incarnation_id'], 'id' => $session['id'],
-        ]);
+        $this->change(
+            'UPDATE ' . ListeningSessionEntity::class . ' s SET s.revision = :revision, s.media = :media, s.queue = :queue,'
+            . ' s.currentTrackIndex = :index, s.position = :position, s.playbackState = :desired, s.desiredState = :desired,'
+            . ' s.observedState = :observed, s.selectedDestinationId = :destination, s.activeIncarnationId = :incarnation,'
+            . ' s.updatedAt = CURRENT_TIMESTAMP(), s.lastUsedAt = CURRENT_TIMESTAMP() WHERE s.id = :id',
+            ['revision' => $session['revision'], 'media' => $session['media'], 'queue' => $session['queue'], 'index' => $session['current_track_index'],
+                'position' => $session['position'], 'desired' => $session['desired_state'], 'observed' => $session['observed_state'],
+                'destination' => $session['selected_destination_id'], 'incarnation' => $session['active_incarnation_id'], 'id' => $session['id']],
+            ['media' => Types::JSON, 'queue' => Types::JSON],
+        );
     }
 
     public function retireConfirmedPausedBrowser(ListeningSession $session): bool
     {
         // The caller holds the account/session lock. All commands and observations use that lock.
         // This proof covers managed browser execution only; independent external routes need their own proof.
+        // It stays one SQL statement: the proof is a single predicate over the session's whole command
+        // ledger, which DQL cannot write and PHP could only evaluate by reading the ledger.
         // The acknowledgement must be the last thing that moved the session. A command settled as never
         // effective since then cannot have changed the runner, so it is no later command, and the
         // session may stand at the revision the last such settlement recorded instead of the one the
@@ -134,7 +145,7 @@ final readonly class PlaybackStore implements PlaybackStoreInterface
     public function retireConfirmedStoppedBrowser(ListeningSession $session): bool
     {
         // The caller holds the account/session lock, and this covers managed browser execution only,
-        // as for a confirmed paused browser. No acknowledged command is required as proof: a session
+        // as for a confirmed paused browser, in the same SQL form. No acknowledged command is required as proof: a session
         // that never played has none, and while a stop is wanted and no command or transfer is
         // outstanding, nothing can have restarted the runner after its own stop report.
         if ($session->activeIncarnationId() === null || $session->desiredState() !== PlaybackState::Stopped
@@ -160,8 +171,9 @@ final readonly class PlaybackStore implements PlaybackStoreInterface
     {
         $deviceId = Uuid::fromString($input['deviceId'])->toString();
         $endpointId = Uuid::fromString($input['endpointId'])->toString();
+        // The device row carries the transaction's clock along, for the rows inserted below.
         $device = $this->rows(
-            'SELECT d.name FROM ' . DeviceEntity::class . ' d WHERE d.userId = :owner AND d.deviceId = :device',
+            'SELECT d.name, CURRENT_TIMESTAMP() AS now FROM ' . DeviceEntity::class . ' d WHERE d.userId = :owner AND d.deviceId = :device',
             ['owner' => $userId, 'device' => $deviceId],
         )[0] ?? null;
         if ($device === null) {
@@ -183,37 +195,60 @@ final readonly class PlaybackStore implements PlaybackStoreInterface
         if (!is_array($capabilities) || !array_is_list($capabilities) || array_intersect($capabilities, ['song', 'video']) === [] || array_filter($capabilities, static fn(mixed $kind): bool => !is_string($kind)) !== [] || array_diff($capabilities, ['song', 'video', 'volume']) !== []) {
             throw new \InvalidArgumentException('Endpoint capabilities require song or video and may include volume.');
         }
-        $this->connection()->executeStatement(<<<'SQL'
-            INSERT INTO playback_destinations(id,public_id,user_id,device_id,endpoint_id,name,capabilities,created_at)
-            VALUES(:id,:publicId,:owner,:device,:endpoint,:name,CAST(:capabilities AS jsonb),CURRENT_TIMESTAMP)
-            ON CONFLICT(user_id,device_id,endpoint_id) DO UPDATE SET name=EXCLUDED.name,capabilities=EXCLUDED.capabilities
-            SQL, ['id' => (new Uuid())->toString(), 'publicId' => (new PublicId())->toString(), 'owner' => $userId,
-            'device' => $deviceId, 'endpoint' => $endpointId, 'name' => $name,
-            'capabilities' => json_encode($capabilities, JSON_THROW_ON_ERROR)]);
-        $destination = $this->connection()->fetchAssociative('SELECT * FROM playback_destinations WHERE user_id=:owner AND device_id=:device AND endpoint_id=:endpoint', ['owner' => $userId, 'device' => $deviceId, 'endpoint' => $endpointId]);
-        if ($destination === false) {
-            throw new ConflictException('Endpoint registration failed.');
+        $now = new \DateTimeImmutable($device['now']);
+        // Every writer of these rows holds the account lock, so a destination the update did not
+        // find cannot appear before the insert.
+        $tab = ['owner' => $userId, 'device' => $deviceId, 'endpoint' => $endpointId];
+        $known = ' WHERE d.userId = :owner AND d.deviceId = :device AND d.endpointId = :endpoint';
+        $renamed = $this->change(
+            'UPDATE ' . PlaybackDestinationEntity::class . ' d SET d.name = :name, d.capabilities = :capabilities' . $known,
+            $tab + ['name' => $name, 'capabilities' => $capabilities],
+            ['capabilities' => Types::JSON],
+        );
+        if ($renamed === 0) {
+            $destination = ['id' => new Uuid(), 'publicId' => new PublicId()->toString()];
+            $this->insert(new PlaybackDestinationEntity(
+                $destination['id'],
+                PublicId::fromString($destination['publicId']),
+                Uuid::fromString($userId),
+                Uuid::fromString($deviceId),
+                Uuid::fromString($endpointId),
+                $name,
+                $capabilities,
+                $now,
+            ));
+        } else {
+            $destination = $this->rows('SELECT d.id, d.publicId FROM ' . PlaybackDestinationEntity::class . ' d' . $known, $tab)[0]
+                ?? throw new ConflictException('Endpoint registration failed.');
         }
         $epoch = 1 + (int) $this->entityManager
             ->createQuery('SELECT COALESCE(MAX(i.epoch), 0) FROM ' . PlaybackDestinationIncarnationEntity::class . ' i WHERE i.destinationId = :destination')
-            ->setParameters(['destination' => $destination['id']])
+            ->setParameters(['destination' => $destination['id']->toString()])
             ->getSingleScalarResult();
-        $this->connection()->executeStatement('UPDATE playback_destination_incarnations SET retired_at=CURRENT_TIMESTAMP WHERE destination_id=:destination AND retired_at IS NULL', ['destination' => $destination['id']]);
-        $incarnation = (new Uuid())->toString();
+        // Earlier incarnations are retired before the new one exists, so it is not retired by its own registration.
+        $this->change(
+            'UPDATE ' . PlaybackDestinationIncarnationEntity::class . ' i SET i.retiredAt = CURRENT_TIMESTAMP() WHERE i.destinationId = :destination AND i.retiredAt IS NULL',
+            ['destination' => $destination['id']->toString()],
+        );
+        $incarnation = new Uuid();
         $capability = bin2hex(random_bytes(32));
-        $this->connection()->executeStatement(<<<'SQL'
-            INSERT INTO playback_destination_incarnations(id,destination_id,user_id,epoch,capability_hash,expires_at)
-            VALUES(:id,:destination,:owner,:epoch,:hash,CURRENT_TIMESTAMP+INTERVAL '30 seconds')
-            SQL, ['id' => $incarnation, 'destination' => $destination['id'], 'owner' => $userId, 'epoch' => $epoch, 'hash' => hash('sha256', $capability)]);
-        $result = ['destinationId' => $destination['public_id'], 'incarnationId' => $incarnation, 'epoch' => $epoch, 'capability' => $capability];
-        if ($eligible) {
-            $credential = bin2hex(random_bytes(32));
-            $expires = new \DateTimeImmutable('+30 days');
-            $this->connection()->executeStatement(<<<'SQL'
-                UPDATE playback_destination_incarnations SET tab_id=:tab,local_recovery_eligible=TRUE,
-                    recovery_credential_hash=:hash,recovery_expires_at=:expires WHERE id=:id
-                SQL, ['tab' => $tabId, 'hash' => hash('sha256', $credential),
-                'expires' => $expires->format('Y-m-d H:i:s.uP'), 'id' => $incarnation]);
+        $credential = $eligible ? bin2hex(random_bytes(32)) : null;
+        // The recovery credential outlives the transaction by thirty days and is the one instant set from this process's clock.
+        $expires = $eligible ? new \DateTimeImmutable('+30 days') : null;
+        $this->insert(new PlaybackDestinationIncarnationEntity(
+            $incarnation,
+            $destination['id'],
+            Uuid::fromString($userId),
+            $epoch,
+            hash('sha256', $capability),
+            $now->modify('+30 seconds'),
+            $eligible,
+            $eligible ? Uuid::fromString($tabId) : null,
+            $credential === null ? null : hash('sha256', $credential),
+            $expires,
+        ));
+        $result = ['destinationId' => $destination['publicId'], 'incarnationId' => $incarnation->toString(), 'epoch' => $epoch, 'capability' => $capability];
+        if ($credential !== null && $expires !== null) {
             $result += ['recoveryCredential' => $credential, 'recoveryExpiresAt' => $expires->format(\DateTimeInterface::ATOM), 'recoveryTabId' => $tabId];
         }
         return $result;
@@ -249,6 +284,8 @@ final readonly class PlaybackStore implements PlaybackStoreInterface
             || !hash_equals($row['recovery_credential_hash'], hash('sha256', $credential))) {
             throw new ConflictException('Local recovery authority is invalid or expired.');
         }
+        // The expiry is judged on the clock as it stands after this transaction waited for its locks.
+        // DQL offers only the transaction's start time.
         $valid = $this->connection()->fetchOne('SELECT recovery_expires_at>clock_timestamp() FROM playback_destination_incarnations WHERE id=:id', ['id' => $incarnationId]);
         if (!$valid) {
             throw new ConflictException('Local recovery authority is invalid or expired.');
@@ -258,15 +295,20 @@ final readonly class PlaybackStore implements PlaybackStoreInterface
 
     public function completeLocalRecovery(string $incarnationId, array $result): void
     {
-        $this->connection()->executeStatement(<<<'SQL'
-            UPDATE playback_destination_incarnations SET retired_at=coalesce(retired_at,CURRENT_TIMESTAMP),
-                observed_state='stopped',recovery_result=CAST(:result AS jsonb) WHERE id=:id
-            SQL, ['id' => $incarnationId, 'result' => json_encode($result, JSON_THROW_ON_ERROR)]);
+        $this->change(
+            'UPDATE ' . PlaybackDestinationIncarnationEntity::class . " i SET i.retiredAt = COALESCE(i.retiredAt, CURRENT_TIMESTAMP()),"
+            . " i.observedState = 'stopped', i.recoveryResult = :result WHERE i.id = :id",
+            ['id' => $incarnationId, 'result' => $result],
+            ['result' => Types::JSON],
+        );
     }
 
     public function supersedeIncarnationCommands(string $incarnationId): void
     {
-        $this->connection()->executeStatement("UPDATE playback_commands SET outcome='superseded',acknowledged_at=CURRENT_TIMESTAMP WHERE incarnation_id=:id AND acknowledged_at IS NULL", ['id' => $incarnationId]);
+        $this->change(
+            'UPDATE ' . PlaybackCommandEntity::class . " c SET c.outcome = 'superseded', c.acknowledgedAt = CURRENT_TIMESTAMP() WHERE c.incarnationId = :id AND c.acknowledgedAt IS NULL",
+            ['id' => $incarnationId],
+        );
     }
 
     public function sourceQuiesced(string $attemptId, string $sourceId): bool
@@ -289,25 +331,73 @@ final readonly class PlaybackStore implements PlaybackStoreInterface
 
     public function saveTransfer(array $transfer): void
     {
-        $this->connection()->executeStatement(<<<'SQL'
-            INSERT INTO playback_transfers(id,session_id,user_id,request_id,request_digest,source_incarnation_id,target_incarnation_id,state,desired_state,position,revision,expires_at,created_at)
-            VALUES(:id,:session,:owner,:request,:digest,:source,:target,:state,:desired,:position,:revision,CURRENT_TIMESTAMP+INTERVAL '20 seconds',CURRENT_TIMESTAMP)
-            ON CONFLICT(id) DO UPDATE SET state=EXCLUDED.state,position=EXCLUDED.position,revision=EXCLUDED.revision,expires_at=EXCLUDED.expires_at
-            SQL, ['id' => $transfer['id'], 'session' => $transfer['session_id'], 'owner' => $transfer['user_id'],
-            'request' => $transfer['request_id'], 'digest' => $transfer['request_digest'], 'source' => $transfer['source_incarnation_id'], 'target' => $transfer['target_incarnation_id'],
-            'state' => $transfer['state'], 'desired' => $transfer['desired_state'], 'position' => $transfer['position'], 'revision' => $transfer['revision']]);
+        $progressed = $this->change(
+            'UPDATE ' . PlaybackTransferEntity::class . ' t SET t.state = :state, t.position = :position, t.revision = :revision,'
+            . ' t.expiresAt = ' . self::COMMAND_LIFETIME . ' WHERE t.id = :id',
+            ['id' => $transfer['id'], 'state' => $transfer['state'], 'position' => $transfer['position'], 'revision' => $transfer['revision']],
+        );
+        if ($progressed > 0) {
+            return;
+        }
+        // Only the holder of the account lock creates this session's transfers, so none can appear
+        // between the update that found no row and the insert.
+        $now = $this->transactionClock($transfer['session_id']);
+        $this->insert(new PlaybackTransferEntity(
+            Uuid::fromString($transfer['id']),
+            Uuid::fromString($transfer['session_id']),
+            Uuid::fromString($transfer['user_id']),
+            Uuid::fromString($transfer['request_id']),
+            $transfer['request_digest'],
+            $transfer['source_incarnation_id'] === null ? null : Uuid::fromString($transfer['source_incarnation_id']),
+            Uuid::fromString($transfer['target_incarnation_id']),
+            $transfer['state'],
+            $transfer['desired_state'],
+            (float) $transfer['position'],
+            (int) $transfer['revision'],
+            $now->modify('+20 seconds'),
+            $now,
+        ));
     }
 
     public function insertCommand(array $command): void
     {
-        $this->connection()->executeStatement(<<<'SQL'
-            INSERT INTO playback_commands(id,session_id,user_id,attempt_id,request_id,request_digest,incarnation_id,epoch,revision,type,payload,outcome,acknowledged_at,expires_at,created_at)
-            VALUES(:id,:session,:owner,:attempt,:request,:digest,:incarnation,:epoch,:revision,:type,CAST(:payload AS jsonb),:outcome,CASE WHEN :retained=1 THEN CURRENT_TIMESTAMP ELSE NULL END,CURRENT_TIMESTAMP+INTERVAL '20 seconds',CURRENT_TIMESTAMP)
-            ON CONFLICT(session_id,request_id,type,incarnation_id,revision) DO NOTHING
-            SQL, ['id' => $command['id'], 'session' => $command['session_id'], 'owner' => $command['user_id'],
-            'attempt' => $command['attempt_id'], 'request' => $command['request_id'], 'digest' => $command['request_digest'], 'outcome' => $command['incarnation_id'] === null ? 'retained' : null, 'retained' => $command['incarnation_id'] === null ? 1 : 0, 'incarnation' => $command['incarnation_id'],
-            'epoch' => $command['epoch'], 'revision' => $command['revision'], 'type' => $command['type'],
-            'payload' => json_encode($command['payload'], JSON_THROW_ON_ERROR)]);
+        $addressed = $command['incarnation_id'] !== null;
+        if ($addressed) {
+            // A command replayed under the same key is the command already stored. The session row
+            // carries the transaction's clock along with the answer. A retained command has no
+            // incarnation, which the key never matches, so each one is stored.
+            $known = $this->rows(
+                'SELECT CURRENT_TIMESTAMP() AS now, (SELECT COUNT(replayed.id) FROM ' . PlaybackCommandEntity::class . ' replayed'
+                . ' WHERE replayed.sessionId = s.id AND replayed.requestId = :request AND replayed.type = :type'
+                . ' AND replayed.incarnationId = :incarnation AND replayed.revision = :revision) AS replays'
+                . ' FROM ' . ListeningSessionEntity::class . ' s WHERE s.id = :session',
+                ['session' => $command['session_id'], 'request' => $command['request_id'], 'type' => $command['type'],
+                    'incarnation' => $command['incarnation_id'], 'revision' => $command['revision']],
+            )[0] ?? throw new ConflictException('Playback session is unavailable.');
+            if ((int) $known['replays'] > 0) {
+                return;
+            }
+            $now = new \DateTimeImmutable($known['now']);
+        } else {
+            $now = $this->transactionClock($command['session_id']);
+        }
+        $this->insert(new PlaybackCommandEntity(
+            Uuid::fromString($command['id']),
+            Uuid::fromString($command['session_id']),
+            Uuid::fromString($command['user_id']),
+            Uuid::fromString($command['attempt_id']),
+            Uuid::fromString($command['request_id']),
+            $command['request_digest'],
+            $addressed ? Uuid::fromString($command['incarnation_id']) : null,
+            $command['epoch'],
+            (int) $command['revision'],
+            $command['type'],
+            $command['payload'],
+            $addressed ? null : 'retained',
+            $addressed ? null : $now,
+            $now->modify('+20 seconds'),
+            $now,
+        ));
     }
 
     public function command(string $userId, string $commandId): array
@@ -324,7 +414,12 @@ final readonly class PlaybackStore implements PlaybackStoreInterface
 
     public function acknowledgeCommand(string $commandId, string $outcome, ?string $rejectionReason = null): void
     {
-        $this->connection()->executeStatement('UPDATE playback_commands SET outcome=:outcome,rejection_reason=:reason,acknowledged_at=CURRENT_TIMESTAMP WHERE id=:id AND acknowledged_at IS NULL', ['outcome' => $outcome, 'reason' => $rejectionReason, 'id' => $commandId]);
+        // An answer is written once: a command that already has one keeps it.
+        $this->change(
+            'UPDATE ' . PlaybackCommandEntity::class . ' c SET c.outcome = :outcome, c.rejectionReason = :reason, c.acknowledgedAt = CURRENT_TIMESTAMP()'
+            . ' WHERE c.id = :id AND c.acknowledgedAt IS NULL',
+            ['outcome' => $outcome, 'reason' => $rejectionReason, 'id' => $commandId],
+        );
     }
 
     public function requestedCommand(string $sessionId, string $requestId): ?array
@@ -359,12 +454,19 @@ final readonly class PlaybackStore implements PlaybackStoreInterface
 
     public function cancelCommands(string $attemptId): void
     {
-        $this->connection()->executeStatement("UPDATE playback_commands SET outcome='superseded',acknowledged_at=CURRENT_TIMESTAMP WHERE attempt_id=:attempt AND acknowledged_at IS NULL", ['attempt' => $attemptId]);
+        $this->change(
+            'UPDATE ' . PlaybackCommandEntity::class . " c SET c.outcome = 'superseded', c.acknowledgedAt = CURRENT_TIMESTAMP() WHERE c.attemptId = :attempt AND c.acknowledgedAt IS NULL",
+            ['attempt' => $attemptId],
+        );
     }
 
     public function settleNeverEffective(string $attemptId, int $sessionRevision): void
     {
-        $this->connection()->executeStatement("UPDATE playback_commands SET outcome='never_effective',settled_revision=:revision,acknowledged_at=CURRENT_TIMESTAMP WHERE attempt_id=:attempt AND acknowledged_at IS NULL", ['attempt' => $attemptId, 'revision' => $sessionRevision]);
+        $this->change(
+            'UPDATE ' . PlaybackCommandEntity::class . " c SET c.outcome = 'never_effective', c.settledRevision = :revision, c.acknowledgedAt = CURRENT_TIMESTAMP()"
+            . ' WHERE c.attemptId = :attempt AND c.acknowledgedAt IS NULL',
+            ['attempt' => $attemptId, 'revision' => $sessionRevision],
+        );
     }
 
     public function attemptDisclosed(string $attemptId, string $type): bool
@@ -378,17 +480,25 @@ final readonly class PlaybackStore implements PlaybackStoreInterface
 
     public function markRunnerUnknown(string $incarnationId): void
     {
-        $this->connection()->executeStatement("UPDATE playback_destination_incarnations SET observed_state='unknown' WHERE id=:id", ['id' => $incarnationId]);
+        $this->change('UPDATE ' . PlaybackDestinationIncarnationEntity::class . " i SET i.observedState = 'unknown' WHERE i.id = :id", ['id' => $incarnationId]);
     }
 
     public function observe(string $incarnationId, string $state, float $position, ?float $volume = null): void
     {
-        $this->connection()->executeStatement("UPDATE playback_destination_incarnations SET observed_state=:state,position=:position,observed_volume=coalesce(CAST(:volume AS double precision),observed_volume),expires_at=CURRENT_TIMESTAMP+INTERVAL '30 seconds' WHERE id=:id", ['state' => $state, 'position' => $position, 'volume' => $volume, 'id' => $incarnationId]);
+        $this->change(
+            'UPDATE ' . PlaybackDestinationIncarnationEntity::class . ' i SET i.observedState = :state, i.position = :position,'
+            . ' i.observedVolume = COALESCE(:volume, i.observedVolume), i.expiresAt = ' . self::PRESENCE_LIFETIME . ' WHERE i.id = :id',
+            ['state' => $state, 'position' => $position, 'volume' => $volume, 'id' => $incarnationId],
+            ['volume' => Types::FLOAT],
+        );
     }
 
     public function observeVolume(string $incarnationId, float $volume): void
     {
-        $this->connection()->executeStatement("UPDATE playback_destination_incarnations SET observed_volume=:volume,expires_at=CURRENT_TIMESTAMP+INTERVAL '30 seconds' WHERE id=:id", ['volume' => $volume, 'id' => $incarnationId]);
+        $this->change(
+            'UPDATE ' . PlaybackDestinationIncarnationEntity::class . ' i SET i.observedVolume = :volume, i.expiresAt = ' . self::PRESENCE_LIFETIME . ' WHERE i.id = :id',
+            ['volume' => $volume, 'id' => $incarnationId],
+        );
     }
 
     public function snapshot(ListeningSession $aggregate, ?string $incarnationId): array
@@ -409,19 +519,22 @@ final readonly class PlaybackStore implements PlaybackStoreInterface
         if ($incarnationId !== null && $this->connection()->getTransactionNestingLevel() <= 1) {
             // This is the only place a pending command leaves the server. Recording it in the transaction
             // that builds the snapshot means a command without the mark was never shown to its runner.
-            // The mark is written by the statement that reads the commands: PostgreSQL runs a
-            // data-modifying WITH to completion whether or not the main query refers to it, and the
-            // main query reads the rows as they stood when the statement began.
-            $commands = $this->connection()->fetchAllAssociative(<<<'SQL'
-                WITH shown AS (
-                    UPDATE playback_commands SET disclosed_at=CURRENT_TIMESTAMP
-                    WHERE session_id=:session AND incarnation_id=:incarnation AND acknowledged_at IS NULL AND disclosed_at IS NULL
-                    RETURNING id
-                )
-                SELECT id,attempt_id AS "attemptId",revision,incarnation_id AS "incarnationId",epoch,type,payload,expires_at AS "expiresAt"
-                FROM playback_commands WHERE session_id=:session AND incarnation_id=:incarnation AND acknowledged_at IS NULL
-                ORDER BY created_at,id
-                SQL, ['session' => $session['id'], 'incarnation' => $incarnationId]);
+            // Nothing can add or answer a command between the read and the mark: both run under the
+            // session lock. A resting session and one whose commands were all shown before pay no mark.
+            $pending = ' WHERE c.sessionId = :session AND c.incarnationId = :incarnation AND c.acknowledgedAt IS NULL';
+            $addressee = ['session' => $session['id'], 'incarnation' => $incarnationId];
+            $commands = $this->rows(
+                'SELECT c.id AS id, c.attemptId AS attemptId, c.revision AS revision, c.incarnationId AS incarnationId, c.epoch AS epoch,'
+                . ' c.type AS type, c.payload AS payload, c.expiresAt AS expiresAt, c.disclosedAt AS disclosedAt'
+                . ' FROM ' . PlaybackCommandEntity::class . ' c' . $pending . ' ORDER BY c.createdAt, c.id',
+                $addressee,
+            );
+            if (array_any($commands, static fn(array $command): bool => $command['disclosedAt'] === null)) {
+                $this->change(
+                    'UPDATE ' . PlaybackCommandEntity::class . ' c SET c.disclosedAt = CURRENT_TIMESTAMP()' . $pending . ' AND c.disclosedAt IS NULL',
+                    $addressee,
+                );
+            }
         }
         $selected = $session['selected_destination_id'] === null ? null : $this->rows(
             'SELECT d.publicId FROM ' . PlaybackDestinationEntity::class . ' d WHERE d.id = :id',
@@ -445,9 +558,9 @@ final readonly class PlaybackStore implements PlaybackStoreInterface
                 $destinations,
             ),
             'commands' => array_map(static fn(array $command): array => [
-                ...$command,
-                'payload' => json_decode($command['payload'], true, 512, JSON_THROW_ON_ERROR),
-                'expiresAt' => new \DateTimeImmutable($command['expiresAt'])->format(\DateTimeInterface::RFC3339_EXTENDED),
+                'id' => $command['id']->toString(), 'attemptId' => $command['attemptId']->toString(), 'revision' => $command['revision'],
+                'incarnationId' => $command['incarnationId']->toString(), 'epoch' => $command['epoch'], 'type' => $command['type'],
+                'payload' => $command['payload'], 'expiresAt' => $command['expiresAt']->format(\DateTimeInterface::RFC3339_EXTENDED),
             ], $commands)];
     }
 
@@ -497,6 +610,41 @@ final readonly class PlaybackStore implements PlaybackStoreInterface
             $query->setLockMode(LockMode::PESSIMISTIC_WRITE);
         }
         return $query->getArrayResult();
+    }
+
+    /**
+     * One guarded statement. The predicate is the fence; no entity is loaded.
+     *
+     * @param array<string,mixed> $parameters
+     * @param array<string,string> $types The mapping type of each parameter that is not a plain scalar.
+     * @return int The number of rows the statement changed.
+     */
+    private function change(string $dql, array $parameters, array $types = []): int
+    {
+        $query = $this->entityManager->createQuery($dql);
+        foreach ($parameters as $name => $value) {
+            $query->setParameter($name, $value, $types[$name] ?? null);
+        }
+        return (int) $query->execute();
+    }
+
+    /**
+     * Writes the new row before the method returns, so a later read of the operation finds it, and
+     * lets go of the entity: these rows change only through guarded statements.
+     */
+    private function insert(object $row): void
+    {
+        $this->entityManager->persist($row);
+        $this->entityManager->flush();
+        $this->entityManager->detach($row);
+    }
+
+    /** The instant the current transaction began, which is what CURRENT_TIMESTAMP stamps in every statement of it. */
+    private function transactionClock(string $sessionId): \DateTimeImmutable
+    {
+        $now = $this->rows('SELECT CURRENT_TIMESTAMP() AS now FROM ' . ListeningSessionEntity::class . ' s WHERE s.id = :session', ['session' => $sessionId])[0]['now']
+            ?? throw new ConflictException('Playback session is unavailable.');
+        return new \DateTimeImmutable($now);
     }
 
     /**

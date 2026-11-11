@@ -25,7 +25,10 @@ final class PlaybackSnapshotCostTest extends TestCase
     private const int UNBOUND_PLAYING_SNAPSHOT = 9;
     private const int BOUND_RESTING_SNAPSHOT = 12;
     private const int BOUND_FIRST_DISCLOSURE_SNAPSHOT = 12;
-    private const int CONTROL_ISSUING_ONE_COMMAND = 19;
+    // An addressed command is inserted through the unit of work: one read carries the
+    // transaction clock and the replay-key check, a savepoint wraps the insert, and the
+    // control's own answer marks the new command as shown. The SQL store used 19.
+    private const int CONTROL_ISSUING_ONE_COMMAND = 23;
 
     private string $schema;
     private Connection $connection;

@@ -701,6 +701,264 @@ final class PlaybackStoreContractTest extends TestCase
         self::assertSame([], $this->manager->getUnitOfWork()->getIdentityMap());
     }
 
+    public function testAnAnswerIsWrittenOnce(): void
+    {
+        $account = $this->account();
+        $command = $this->command($account, ['type' => 'play']);
+        $this->store->insertCommand($command);
+        $this->store->acknowledgeCommand($command['id'], 'rejected', 'audio_codec_unsupported');
+        $first = $this->observer->fetchAssociative('SELECT outcome,rejection_reason,acknowledged_at FROM playback_commands WHERE id=?', [$command['id']]);
+        self::assertSame(['rejected', 'audio_codec_unsupported'], [$first['outcome'], $first['rejection_reason']]);
+        self::assertNotNull($first['acknowledged_at']);
+
+        $this->store->acknowledgeCommand($command['id'], 'playing');
+        $this->store->cancelCommands($command['attempt_id']);
+        $this->store->settleNeverEffective($command['attempt_id'], 9);
+        $this->store->supersedeIncarnationCommands($account['incarnation']);
+
+        self::assertSame($first, $this->observer->fetchAssociative('SELECT outcome,rejection_reason,acknowledged_at FROM playback_commands WHERE id=?', [$command['id']]));
+        self::assertNull($this->observer->fetchOne('SELECT settled_revision FROM playback_commands WHERE id=?', [$command['id']]));
+    }
+
+    public function testClosingAnAttemptsCommandsLeavesItsAnsweredOnesAndOtherAttemptsAlone(): void
+    {
+        $account = $this->account();
+        $outcomes = fn(): array => $this->observer->fetchAllKeyValue('SELECT type,outcome FROM playback_commands WHERE session_id=? ORDER BY type', [$account['session']]);
+        $settledAttempt = new Uuid()->toString();
+        $cancelledAttempt = new Uuid()->toString();
+        $answered = $this->command($account, ['type' => 'prepare', 'attempt_id' => $settledAttempt]);
+        $settled = [$this->command($account, ['type' => 'play', 'attempt_id' => $settledAttempt]), $this->command($account, ['type' => 'stop', 'attempt_id' => $settledAttempt])];
+        $cancelled = $this->command($account, ['type' => 'quiesce', 'attempt_id' => $cancelledAttempt]);
+        $other = $this->command($account, ['type' => 'seek']);
+        foreach ([$answered, ...$settled, $cancelled, $other] as $command) {
+            $this->store->insertCommand($command);
+        }
+        $this->store->acknowledgeCommand($answered['id'], 'prepared');
+
+        $this->connection->beginTransaction();
+        $this->store->settleNeverEffective($settledAttempt, 11);
+        $this->store->cancelCommands($cancelledAttempt);
+        $stamped = $this->connection->fetchOne("SELECT bool_and(acknowledged_at=CURRENT_TIMESTAMP) FROM playback_commands WHERE session_id=? AND outcome IN ('never_effective','superseded')", [$account['session']]);
+        $this->connection->commit();
+
+        self::assertTrue($stamped);
+        self::assertSame(['play' => 'never_effective', 'prepare' => 'prepared', 'quiesce' => 'superseded', 'seek' => null, 'stop' => 'never_effective'], $outcomes());
+        self::assertSame(
+            ['play' => 11, 'prepare' => null, 'quiesce' => null, 'seek' => null, 'stop' => 11],
+            $this->observer->fetchAllKeyValue('SELECT type,settled_revision FROM playback_commands WHERE session_id=? ORDER BY type', [$account['session']]),
+        );
+
+        // A recovered incarnation's unanswered commands are closed, whatever their attempt.
+        $elsewhere = $this->register($account['owner'], $account['device']);
+        $kept = $this->command($account, ['type' => 'pause', 'incarnation_id' => $elsewhere['incarnationId']]);
+        $this->store->insertCommand($kept);
+        $this->store->supersedeIncarnationCommands($account['incarnation']);
+        self::assertSame(['pause' => null, 'play' => 'never_effective', 'prepare' => 'prepared', 'quiesce' => 'superseded', 'seek' => 'superseded', 'stop' => 'never_effective'], $outcomes());
+    }
+
+    public function testAnObservationKeepsTheVolumeUnlessItReportsOneAndRenewsTheRegistration(): void
+    {
+        $account = $this->account();
+        $endpoint = $this->store->endpoint($account['owner'], $account['incarnation']);
+        self::assertSame('unknown', $endpoint['observed_state']);
+        $row = fn(): array => $this->connection->fetchAssociative(
+            "SELECT observed_state,position,observed_volume,expires_at=CURRENT_TIMESTAMP+INTERVAL '30 seconds' AS renewed,retired_at FROM playback_destination_incarnations WHERE id=?",
+            [$account['incarnation']],
+        );
+
+        $this->connection->beginTransaction();
+        $this->connection->executeQuery('SELECT pg_sleep(0.05)')->free();
+        $this->store->observe($account['incarnation'], 'playing', 4.0, 0.25);
+        self::assertSame(['observed_state' => 'playing', 'position' => 4.0, 'observed_volume' => 0.25, 'renewed' => true, 'retired_at' => null], $row());
+        $this->store->observe($account['incarnation'], 'paused', 5.5);
+        self::assertSame(['observed_state' => 'paused', 'position' => 5.5, 'observed_volume' => 0.25, 'renewed' => true, 'retired_at' => null], $row());
+        $this->connection->commit();
+
+        // The state written is the one reported, whatever the row held when the endpoint was read.
+        $this->connection->executeStatement("UPDATE playback_destination_incarnations SET observed_state='unknown',expires_at=CURRENT_TIMESTAMP-INTERVAL '1 hour' WHERE id=?", [$account['incarnation']]);
+        $this->connection->beginTransaction();
+        $this->store->observe($account['incarnation'], 'stopped', 6.0);
+        self::assertSame(['observed_state' => 'stopped', 'position' => 6.0, 'observed_volume' => 0.25, 'renewed' => true, 'retired_at' => null], $row());
+        $this->connection->executeStatement("UPDATE playback_destination_incarnations SET expires_at=CURRENT_TIMESTAMP-INTERVAL '1 hour' WHERE id=?", [$account['incarnation']]);
+        $this->store->observeVolume($account['incarnation'], 1.0);
+        self::assertSame(['observed_state' => 'stopped', 'position' => 6.0, 'observed_volume' => 1.0, 'renewed' => true, 'retired_at' => null], $row());
+        $this->store->markRunnerUnknown($account['incarnation']);
+        $this->connection->executeStatement("UPDATE playback_destination_incarnations SET expires_at=CURRENT_TIMESTAMP-INTERVAL '1 hour' WHERE id=?", [$account['incarnation']]);
+        $this->store->markRunnerUnknown($account['incarnation']);
+        self::assertSame(['observed_state' => 'unknown', 'position' => 6.0, 'observed_volume' => 1.0, 'renewed' => false, 'retired_at' => null], $row());
+        $this->connection->commit();
+    }
+
+    public function testACompletedRecoveryRetiresTheIncarnationOnceAndStoresItsResult(): void
+    {
+        $account = $this->account(recoverable: true);
+        $this->store->observe($account['incarnation'], 'playing', 2.0);
+
+        $this->connection->beginTransaction();
+        $this->store->completeLocalRecovery($account['incarnation'], ['incarnationId' => $account['incarnation'], 'outcome' => 'recovered', 'revision' => 4]);
+        $first = $this->connection->fetchAssociative('SELECT retired_at=CURRENT_TIMESTAMP AS stamped,retired_at,observed_state,recovery_result FROM playback_destination_incarnations WHERE id=?', [$account['incarnation']]);
+        $this->connection->commit();
+        self::assertTrue($first['stamped']);
+        self::assertSame('stopped', $first['observed_state']);
+        self::assertEquals(['incarnationId' => $account['incarnation'], 'outcome' => 'recovered', 'revision' => 4], json_decode($first['recovery_result'], true, flags: JSON_THROW_ON_ERROR));
+
+        $this->store->completeLocalRecovery($account['incarnation'], ['incarnationId' => $account['incarnation'], 'outcome' => 'recovered', 'revision' => 6]);
+        $again = $this->observer->fetchAssociative('SELECT retired_at,recovery_result FROM playback_destination_incarnations WHERE id=?', [$account['incarnation']]);
+        self::assertSame($first['retired_at'], $again['retired_at']);
+        self::assertSame(6, json_decode($again['recovery_result'], true, flags: JSON_THROW_ON_ERROR)['revision']);
+    }
+
+    public function testTheSnapshotThatFirstReturnsACommandMarksItAndLaterOnesLeaveTheMark(): void
+    {
+        $account = $this->account();
+        $other = $this->register($account['owner'], $account['device']);
+        $shown = $this->command($account, ['type' => 'play']);
+        $answered = $this->command($account, ['type' => 'seek']);
+        $elsewhere = $this->command($account, ['type' => 'pause', 'incarnation_id' => $other['incarnationId']]);
+        foreach ([$shown, $answered, $elsewhere] as $command) {
+            $this->store->insertCommand($command);
+        }
+        $this->store->acknowledgeCommand($answered['id'], 'applied');
+        $session = $this->store->lockSession($account['owner']);
+        $marks = fn(): array => $this->observer->fetchAllKeyValue('SELECT type,disclosed_at FROM playback_commands WHERE session_id=? ORDER BY type', [$account['session']]);
+        self::assertSame(['pause' => null, 'play' => null, 'seek' => null], $marks());
+
+        $this->connection->beginTransaction();
+        $first = $this->store->snapshot($session, $account['incarnation']);
+        $stamped = $this->connection->fetchOne('SELECT disclosed_at=CURRENT_TIMESTAMP FROM playback_commands WHERE id=?', [$shown['id']]);
+        $this->connection->commit();
+        self::assertSame([$shown['id']], array_column($first['commands'], 'id'));
+        self::assertTrue($stamped);
+        $marked = $marks();
+        self::assertNotNull($marked['play']);
+        self::assertNull($marked['pause']);
+        self::assertNull($marked['seek']);
+
+        $second = $this->store->snapshot($session, $account['incarnation']);
+        self::assertSame($first['commands'], $second['commands']);
+        self::assertSame($marked, $marks());
+
+        // A command added later is marked by the next snapshot, and the earlier mark stays.
+        $later = $this->command($account, ['type' => 'stop', 'revision' => 8]);
+        $this->store->insertCommand($later);
+        self::assertSame([$shown['id'], $later['id']], array_column($this->store->snapshot($session, $account['incarnation'])['commands'], 'id'));
+        self::assertSame($marked['play'], $marks()['play']);
+        self::assertNotNull($marks()['stop']);
+    }
+
+    public function testAWholeNumberInACommandsPayloadReadsBackNumericallyEqual(): void
+    {
+        $account = $this->account();
+        $command = $this->command($account, ['type' => 'load', 'payload' => ['position' => 30.0, 'currentTrackIndex' => 2, 'queue' => [], 'media' => null, 'desiredState' => 'playing']]);
+        $this->store->insertCommand($command);
+
+        $stored = $this->store->command($account['owner'], $command['id'])['payload'];
+        self::assertEquals(30, $stored['position']);
+        self::assertEquals(2, $stored['currentTrackIndex']);
+        self::assertEquals($command['payload'], $stored);
+        self::assertEquals($command['payload'], $this->store->snapshot($this->store->lockSession($account['owner']), $account['incarnation'])['commands'][0]['payload']);
+    }
+
+    public function testSavingASessionStampsItWithTheTransactionsClockAndMirrorsTheDesiredState(): void
+    {
+        $account = $this->account();
+        $device = Uuid::fromString($account['device']);
+        $this->connection->executeStatement('UPDATE listening_sessions SET active_device_id=:device WHERE id=:id', ['device' => $device->toString(), 'id' => $account['session']]);
+        $before = $this->observer->fetchAssociative('SELECT created_at,public_id,user_id FROM listening_sessions WHERE id=?', [$account['session']]);
+        $track = new PublicId();
+
+        $this->connection->beginTransaction();
+        $this->connection->executeQuery('SELECT pg_sleep(0.05)')->free();
+        $session = $this->store->lockSession($account['owner']);
+        $session->control('load', new PlaybackMedia('song', $track), [$track->toString()], 0, 7.25, PlaybackState::Playing);
+        $session->commitDestination(Uuid::fromString($account['incarnation']), Uuid::fromString($this->connection->fetchOne('SELECT destination_id FROM playback_destination_incarnations WHERE id=?', [$account['incarnation']])), PlaybackState::Playing, 7.25);
+        $this->store->saveSession($session);
+        $row = $this->connection->fetchAssociative('SELECT *,updated_at=CURRENT_TIMESTAMP AS updated,last_used_at=CURRENT_TIMESTAMP AS used FROM listening_sessions WHERE id=?', [$account['session']]);
+        $this->connection->commit();
+
+        self::assertTrue($row['updated']);
+        self::assertTrue($row['used']);
+        self::assertSame(['playing', 'playing', 'playing'], [$row['playback_state'], $row['desired_state'], $row['observed_state']]);
+        self::assertSame($device->toString(), $row['active_device_id']);
+        self::assertSame($account['incarnation'], $row['active_incarnation_id']);
+        self::assertSame(1, $row['revision']);
+        self::assertSame(7.25, $row['position']);
+        self::assertSame(0, $row['current_track_index']);
+        self::assertEquals(['kind' => 'song', 'publicId' => $track->toString()], json_decode($row['media'], true, flags: JSON_THROW_ON_ERROR));
+        self::assertSame([$track->toString()], json_decode($row['queue'], true, flags: JSON_THROW_ON_ERROR));
+        self::assertEquals($before, array_intersect_key($row, $before));
+
+        // Releasing the runner clears both references again.
+        $released = $this->store->lockSession($account['owner']);
+        $released->control('pause', null, null, null, null, null);
+        $released->confirmControl(false, null);
+        $released->releaseConfirmedPausedRunner();
+        $this->store->saveSession($released);
+        $cleared = $this->observer->fetchAssociative('SELECT selected_destination_id,active_incarnation_id,active_device_id,playback_state FROM listening_sessions WHERE id=?', [$account['session']]);
+        self::assertSame(['selected_destination_id' => null, 'active_incarnation_id' => null, 'active_device_id' => $device->toString(), 'playback_state' => 'paused'], $cleared);
+    }
+
+    public function testWritesLeaveNoEntityBehindAndNothingScheduled(): void
+    {
+        $owner = $this->owner();
+        $device = $this->device($owner);
+        $this->manager->clear();
+        $unit = $this->manager->getUnitOfWork();
+        $clean = function (string $after) use ($unit): void {
+            self::assertSame(0, $unit->size(), $after);
+            self::assertSame([], $unit->getScheduledEntityInsertions(), $after);
+            self::assertSame([], $unit->getScheduledEntityUpdates(), $after);
+            self::assertSame([], $unit->getScheduledEntityDeletions(), $after);
+        };
+
+        $this->connection->beginTransaction();
+        $session = $this->store->lockSession($owner);
+        $endpoint = $this->store->register($owner, ['deviceId' => $device, 'endpointId' => new Uuid()->toString(), 'tabId' => new Uuid()->toString(), 'localRecoveryEligible' => true]);
+        $clean('a registration');
+        $this->store->register($owner, ['deviceId' => $device, 'endpointId' => new Uuid()->toString()]);
+        $account = ['owner' => $owner, 'session' => $session->getId()->toString(), 'incarnation' => $endpoint['incarnationId']];
+        $command = $this->command($account, ['type' => 'play']);
+        $this->store->insertCommand($command);
+        $this->store->insertCommand(['id' => new Uuid()->toString()] + $command);
+        $this->store->insertCommand($this->command($account, ['type' => 'pause', 'incarnation_id' => null, 'epoch' => null]));
+        $clean('command inserts');
+        $transfer = $this->transfer($account);
+        $this->store->saveTransfer($transfer);
+        $this->store->saveTransfer(['state' => 'starting'] + $transfer);
+        $clean('a transfer');
+        $session->control('queue', null, [], 0, null, null);
+        $this->store->saveSession($session);
+        $this->store->acknowledgeCommand($command['id'], 'playing');
+        $this->store->cancelCommands($transfer['id']);
+        $this->store->settleNeverEffective($command['attempt_id'], 3);
+        $this->store->supersedeIncarnationCommands($endpoint['incarnationId']);
+        $this->store->observe($endpoint['incarnationId'], 'paused', 1.0, 0.5);
+        $this->store->observeVolume($endpoint['incarnationId'], 0.75);
+        $this->store->markRunnerUnknown($endpoint['incarnationId']);
+        $this->store->completeLocalRecovery($endpoint['incarnationId'], ['outcome' => 'recovered']);
+        $this->store->snapshot($session, $endpoint['incarnationId']);
+        $clean('every other write');
+        $this->connection->commit();
+
+        self::assertSame(2, (int) $this->observer->fetchOne('SELECT count(*) FROM playback_commands WHERE user_id=?', [$owner]));
+        self::assertSame(2, (int) $this->observer->fetchOne('SELECT count(*) FROM playback_destinations WHERE user_id=?', [$owner]));
+    }
+
+    public function testOnlyTheFiveStatementsDqlCannotExpressReachTheConnection(): void
+    {
+        $source = (string) file_get_contents(new \ReflectionClass(PlaybackStore::class)->getFileName());
+        preg_match_all('/connection\(\)\s*->\s*(executeStatement|executeQuery|fetch\w+)\(\s*(?:<<<\'SQL\'\s*)?[\'"]?\s*([A-Z ]+?[a-z_]+)/', $source, $calls, PREG_SET_ORDER);
+
+        self::assertSame([
+            ['executeQuery', 'SELECT pg_advisory_xact_lock'],
+            ['executeStatement', 'INSERT INTO listening_sessions'],
+            ['fetchOne', 'UPDATE playback_destination_incarnations'],
+            ['fetchOne', 'UPDATE playback_destination_incarnations'],
+            ['fetchOne', 'SELECT recovery_expires_at'],
+        ], array_map(static fn(array $call): array => [$call[1], $call[2]], $calls));
+        self::assertSame(5, preg_match_all('/connection\(\)\s*->\s*(?:execute|fetch|prepare|insert|update|delete)/', $source));
+    }
+
     private function owner(): string
     {
         $owner = new UserEntity(new PublicId(), 'Playback store owner', new Uuid()->toString() . '@baander.app', 'unused-password', '');
