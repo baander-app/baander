@@ -353,6 +353,105 @@ static void test_rice_decode(const char* name, const FlacDSP* ref, const FlacDSP
   }
 }
 
+/* The 64-bit residual at the ends of its range, in every position of
+ * a vector: with a predictor that takes the sample before, the residual
+ * is a difference the test picks.  The largest and the smallest value a
+ * residual may have are in range; one beyond either is not. */
+static void test_residual_edges(const char* name, const FlacDSP* dsp) {
+  const int32_t coefs[1] = {1};
+  const int n = 40;
+  const struct {
+    int32_t before, at;
+    bool in_range;
+  } cases[] = {
+      {0, INT32_MAX, true},          /* 2^31 - 1 */
+      {-1, INT32_MAX, false},        /* 2^31 */
+      {INT32_MAX, 0, true},          /* -(2^31 - 1) */
+      {INT32_MAX, -1, false},        /* -2^31, which has no place in a residual */
+      {INT32_MAX, INT32_MIN, false}, /* far outside */
+      {INT32_MIN, INT32_MAX, false},
+  };
+  for (const auto& c : cases) {
+    for (int at = 1; at < n; at++) {
+      std::vector<int32_t> x((size_t)n, 0);
+      x[(size_t)at - 1] = c.before;
+      x[(size_t)at] = c.at;
+      /* The sample after the pair, so that only the one difference
+       * leaves the range. */
+      if (at + 1 < n) {
+        x[(size_t)at + 1] = c.at / 2;
+      }
+      std::vector<int32_t> residual((size_t)n, 0);
+      const bool ok = dsp->lpc_residual_64(x.data(), n, 1, coefs, 0, residual.data());
+      const int64_t want = (int64_t)c.at - (int64_t)c.before;
+      CHECK(ok == c.in_range && (!ok || residual[(size_t)at] == want),
+            "%s lpc_residual_64: a residual of %lld at sample %d is %s", name, (long long)want, at,
+            c.in_range ? "in range" : "out of range");
+    }
+  }
+}
+
+/* What a Rice writer must produce: each code written bit by bit, after
+ * `lead` bits that leave the writer in the middle of a byte. */
+static std::vector<uint8_t> rice_reference(const std::vector<int32_t>& residual, int k, int lead,
+                                           size_t* bits) {
+  std::vector<uint8_t> bytes(residual.size() * 48 + 16);
+  FlacBitWriter w;
+  flac_bitwriter_init(&w, bytes.data(), bytes.size());
+  flac_bitwriter_write(&w, 0x55555555u, lead);
+  for (int32_t v : residual) {
+    const uint32_t folded = ((uint32_t)v << 1) ^ (0u - ((uint32_t)v >> 31));
+    flac_bitwriter_write_unary(&w, folded >> k);
+    flac_bitwriter_write(&w, folded, k);
+  }
+  *bits = flac_bitwriter_bits(&w);
+  bytes.resize(flac_bitwriter_flush(&w));
+  return bytes;
+}
+
+static void test_rice_encode(const char* name, const FlacDSP* ref, const FlacDSP* dsp) {
+  uint32_t seed = 23;
+  for (int k : {0, 1, 2, 4, 5, 9, 11, 12, 13, 14, 20, 25, 26, 30}) {
+    for (int n : {1, 2, 3, 4, 7, 8, 9, 64, 1000}) {
+      for (int lead : {0, 5, 31}) {
+        /* Residuals near the size the parameter suits, and now and then
+         * one far larger: codes that do not fit a group, and ones longer
+         * than a word. */
+        std::vector<int32_t> residual((size_t)n);
+        for (int32_t& v : residual) {
+          const uint32_t pick = next(&seed) % 32;
+          const int bits = pick == 0 ? k + 9 : pick < 4 ? k + 4 : k + 2;
+          v = sample(&seed, std::min(bits, 31));
+        }
+        size_t want_bits = 0;
+        const std::vector<uint8_t> want = rice_reference(residual, k, lead, &want_bits);
+        /* With room to spare, and in a buffer that ends where the codes
+         * do, so that the last ones are written a byte at a time. */
+        for (const size_t capacity : {want.size() + 64, want.size()}) {
+          for (const FlacDSP* kernel : {ref, dsp}) {
+            std::vector<uint8_t> got(capacity + 8, 0xA5);
+            FlacBitWriter w;
+            flac_bitwriter_init(&w, got.data(), capacity);
+            flac_bitwriter_write(&w, 0x55555555u, lead);
+            kernel->rice_encode(&w, residual.data(), n, k);
+            const size_t got_bits = flac_bitwriter_bits(&w);
+            const size_t size = flac_bitwriter_flush(&w);
+            bool guard = true;
+            for (size_t i = capacity; i < got.size(); i++) {
+              guard = guard && got[i] == 0xA5;
+            }
+            CHECK(!w.overflow && got_bits == want_bits && size == want.size() &&
+                      memcmp(got.data(), want.data(), size) == 0 && guard,
+                  "%s rice_encode%s, parameter %d, %d values after %d bits, %zu bytes of room for "
+                  "%zu",
+                  name, kernel == ref ? " (scalar)" : "", k, n, lead, capacity, want.size());
+          }
+        }
+      }
+    }
+  }
+}
+
 static void test_stereo_out(const char* name, const FlacDSP* ref, const FlacDSP* dsp) {
   uint32_t seed = 13;
   for (int n : kLengths) {
@@ -491,12 +590,15 @@ int main(int argc, char** argv) {
     aac_set_cpu_flags_override(level.flags | extra);
     FlacDSP dsp;
     flac_dsp_init(&dsp);
-    printf("testing %s kernels%s\n", level.name,
-           dsp.rice_decode != scalar.rice_decode ? ", with a Rice reader of the level's own" : "");
+    printf("testing %s kernels%s%s\n", level.name,
+           dsp.rice_decode != scalar.rice_decode ? ", with a Rice reader of the level's own" : "",
+           dsp.rice_encode != scalar.rice_encode ? ", with a Rice writer of the level's own" : "");
     test_analysis(level.name, &scalar, &dsp);
     test_fixed_sums(level.name, &scalar, &dsp);
     test_prediction(level.name, &scalar, &dsp);
+    test_residual_edges(level.name, &dsp);
     test_rice(level.name, &scalar, &dsp);
+    test_rice_encode(level.name, &scalar, &dsp);
     test_rice_decode(level.name, &scalar, &dsp);
     test_stereo_out(level.name, &scalar, &dsp);
     caps.push_back(level.name);

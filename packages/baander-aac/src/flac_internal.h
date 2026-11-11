@@ -328,6 +328,7 @@ bool flac_meta_read_picture(uint8_t* block, size_t size, BaacFlacPicture* pictur
  *   stated order, are compiled without the package's Release math
  *   options and without contraction, and use no fused multiply-add. */
 struct FlacBitReader;
+struct FlacBitWriter;
 
 struct FlacDSP {
   /* y[i] = x[i] * w[i]. */
@@ -365,6 +366,10 @@ struct FlacDSP {
    * together, which bounds each one. */
   void (*rice_sums)(const uint32_t* folded, int n, uint32_t bits, int k_low, int k_count,
                     uint64_t* sums, size_t stride);
+
+  /* The Rice code words of n residuals with parameter k, appended to
+   * the writer: integer work whose bytes every level writes alike. */
+  void (*rice_encode)(FlacBitWriter* w, const int32_t* residual, int n, int k);
 
   /* Rice code words of parameter k from the reader into out[0 ..
    * count), for as long as each lies whole in the reader's cache, which
@@ -463,6 +468,19 @@ static inline uint64_t flac_load_be64(const uint8_t* p) {
   return ((uint64_t)p[0] << 56) | ((uint64_t)p[1] << 48) | ((uint64_t)p[2] << 40) |
          ((uint64_t)p[3] << 32) | ((uint64_t)p[4] << 24) | ((uint64_t)p[5] << 16) |
          ((uint64_t)p[6] << 8) | (uint64_t)p[7];
+}
+
+/* Eight bytes, most significant first; compilers turn this into one
+ * byte swap and one store. */
+static inline void flac_put_be64(uint8_t* p, uint64_t v) {
+  p[0] = (uint8_t)(v >> 56);
+  p[1] = (uint8_t)(v >> 48);
+  p[2] = (uint8_t)(v >> 40);
+  p[3] = (uint8_t)(v >> 32);
+  p[4] = (uint8_t)(v >> 24);
+  p[5] = (uint8_t)(v >> 16);
+  p[6] = (uint8_t)(v >> 8);
+  p[7] = (uint8_t)v;
 }
 
 /* Reads bits most significant first.  `cache` holds the unread bits with
@@ -735,6 +753,107 @@ static inline size_t flac_bitwriter_flush(FlacBitWriter* w) {
     w->data[w->pos++] = (uint8_t)(w->cache >> w->bits);
   }
   return w->pos;
+}
+
+/* The loops of the rice_encode kernel: the Rice codes of one partition,
+ * `n` residuals with the parameter `k`.  They are here so that every
+ * level compiles the same statements, each with the instructions it may
+ * use; a processor that shifts by a variable count without touching the
+ * flags gets shorter loops.
+ *
+ * The writer's state stays in locals, with the pending bits at the top
+ * of `pending`.  Codes are put below them and the eight bytes stored
+ * where the stream stands; the position then moves on by the whole
+ * bytes among them, so the next store starts on the bits that are left.
+ * A code is the zeros of its unary part, a one and the low `k` bits,
+ * read as one number of that many bits.  `group` codes are joined and
+ * stored at once when they come to 56 bits or fewer, which is what fits
+ * the word beside at most seven pending bits; when they do not, one
+ * code goes out alone and the next group is tried.  The state goes back
+ * to the writer around the rare code too long for one word, and for the
+ * last bytes of the buffer, where eight do not fit. */
+template <int group>
+static FLAC_ALWAYS_INLINE void flac_rice_encode_groups(FlacBitWriter* w,
+                                                       const int32_t* FLAC_RESTRICT residual, int n,
+                                                       int k) {
+  const uint32_t stop = 1u << k;
+  const uint32_t low = stop - 1;
+  const uint32_t shortest = (uint32_t)k + 1;
+  uint8_t* const data = w->data;
+  const size_t capacity = w->capacity;
+  int bits = w->bits;
+  uint64_t pending = bits ? w->cache << (64 - bits) : 0;
+  size_t pos = w->pos;
+  int i = 0;
+  while (i < n) {
+    if (group > 1 && n - i >= group && bits <= 7 && capacity - pos >= 8) {
+      uint32_t folded[group];
+      uint64_t length = (uint64_t)group * shortest;
+      for (int j = 0; j < group; j++) {
+        const uint32_t r = (uint32_t)residual[i + j];
+        folded[j] = (r << 1) ^ (0u - (r >> 31));
+        length += folded[j] >> k;
+      }
+      if (length <= 56) {
+        uint64_t codes = 0;
+        for (int j = 0; j < group; j++) {
+          codes = (codes << ((folded[j] >> k) + shortest)) | (stop | (folded[j] & low));
+        }
+        bits += (int)length;
+        pending |= codes << (64 - bits);
+        flac_put_be64(data + pos, pending);
+        const int whole = bits & ~7;
+        pos += (size_t)(whole >> 3);
+        pending <<= whole;
+        bits &= 7;
+        i += group;
+        continue;
+      }
+    }
+    const uint32_t r = (uint32_t)residual[i++];
+    const uint32_t u = (r << 1) ^ (0u - (r >> 31));
+    const uint32_t quotient = u >> k;
+    const uint32_t length = quotient + shortest;
+    if (length > 32 || capacity - pos < 8) {
+      w->cache = bits ? pending >> (64 - bits) : 0;
+      w->bits = bits;
+      w->pos = pos;
+      flac_bitwriter_write_unary(w, quotient);
+      flac_bitwriter_write(w, u, k);
+      bits = w->bits;
+      pending = bits ? w->cache << (64 - bits) : 0;
+      pos = w->pos;
+      continue;
+    }
+    bits += (int)length;
+    pending |= (uint64_t)(stop | (u & low)) << (64 - bits);
+    flac_put_be64(data + pos, pending);
+    const int whole = bits & ~7;
+    pos += (size_t)(whole >> 3);
+    pending <<= whole;
+    bits &= 7;
+  }
+  w->cache = bits ? pending >> (64 - bits) : 0;
+  w->bits = bits;
+  w->pos = pos;
+}
+
+/* The group is as large as the parameter allows with two bits to spare
+ * for the unary part of each code, which is about what a parameter
+ * that suits its partition leaves. */
+static FLAC_ALWAYS_INLINE void flac_rice_encode_words(FlacBitWriter* w, const int32_t* residual,
+                                                      int n, int k) {
+  if (8 * (k + 3) <= 56) {
+    flac_rice_encode_groups<8>(w, residual, n, k);
+  } else if (4 * (k + 3) <= 56) {
+    flac_rice_encode_groups<4>(w, residual, n, k);
+  } else if (3 * (k + 3) <= 56) {
+    flac_rice_encode_groups<3>(w, residual, n, k);
+  } else if (2 * (k + 3) <= 56) {
+    flac_rice_encode_groups<2>(w, residual, n, k);
+  } else {
+    flac_rice_encode_groups<1>(w, residual, n, k);
+  }
 }
 
 #endif /* BAANDER_AAC_FLAC_INTERNAL_H */

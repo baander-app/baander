@@ -21,12 +21,12 @@ struct Crc8Table {
   }
 };
 
-/* Eight tables for the CRC-16, so that a frame is checked eight bytes
- * at a step: v[0][i] is the checksum of the byte i, and v[k][i] that of
- * the byte i followed by k zero bytes, which is v[k - 1][i] taken
- * through one more byte. */
+/* Sixteen tables for the CRC-16, so that a frame is checked sixteen
+ * bytes at a step: v[0][i] is the checksum of the byte i, and v[k][i]
+ * that of the byte i followed by k zero bytes, which is v[k - 1][i]
+ * taken through one more byte. */
 struct Crc16Table {
-  uint16_t v[8][256];
+  uint16_t v[16][256];
   constexpr Crc16Table() : v() {
     for (int i = 0; i < 256; i++) {
       uint16_t crc = (uint16_t)(i << 8);
@@ -35,7 +35,7 @@ struct Crc16Table {
       }
       v[0][i] = crc;
     }
-    for (int k = 1; k < 8; k++) {
+    for (int k = 1; k < 16; k++) {
       for (int i = 0; i < 256; i++) {
         v[k][i] = (uint16_t)((v[k - 1][i] << 8) ^ v[0][v[k - 1][i] >> 8]);
       }
@@ -58,10 +58,22 @@ uint8_t flac_crc8(const uint8_t* data, size_t size) {
 
 uint16_t flac_crc16_update(uint16_t crc, const uint8_t* data, size_t size) {
   FLAC_PROFILE(FLAC_PROF_CRC);
-  /* Eight bytes at a step: the checksum so far goes into the first two,
-   * and each byte contributes through the table of its distance from
-   * the end of the group. */
-  while (size >= 8) {
+  /* Sixteen bytes at a step: the checksum so far goes into the first
+   * two, and each byte contributes through the table of its distance
+   * from the end of the group.  The step waits only for the two lookups
+   * that take the checksum, so a longer group costs no more waiting
+   * than a shorter one. */
+  while (size >= 16) {
+    crc = (uint16_t)(kCrc16.v[15][data[0] ^ (crc >> 8)] ^ kCrc16.v[14][data[1] ^ (crc & 0xFF)] ^
+                     kCrc16.v[13][data[2]] ^ kCrc16.v[12][data[3]] ^ kCrc16.v[11][data[4]] ^
+                     kCrc16.v[10][data[5]] ^ kCrc16.v[9][data[6]] ^ kCrc16.v[8][data[7]] ^
+                     kCrc16.v[7][data[8]] ^ kCrc16.v[6][data[9]] ^ kCrc16.v[5][data[10]] ^
+                     kCrc16.v[4][data[11]] ^ kCrc16.v[3][data[12]] ^ kCrc16.v[2][data[13]] ^
+                     kCrc16.v[1][data[14]] ^ kCrc16.v[0][data[15]]);
+    data += 16;
+    size -= 16;
+  }
+  if (size >= 8) {
     crc = (uint16_t)(kCrc16.v[7][data[0] ^ (crc >> 8)] ^ kCrc16.v[6][data[1] ^ (crc & 0xFF)] ^
                      kCrc16.v[5][data[2]] ^ kCrc16.v[4][data[3]] ^ kCrc16.v[3][data[4]] ^
                      kCrc16.v[2][data[5]] ^ kCrc16.v[1][data[6]] ^ kCrc16.v[0][data[7]]);

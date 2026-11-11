@@ -254,13 +254,16 @@ if(BAAC_AAC_BUILD_TOOLS AND BAAC_AAC_BUILD_ENCODER AND BAAC_AAC_BUILD_DECODER)
     # MPEG Surround test encoder: 5.1 PCM to a LOAS stream with an AAC-LC
     # downmix and a spatial payload, for conformance checks against
     # reference decoders.
-    add_executable(mps-enc tools/mps-enc.cpp)
+    # The internal tools below read the codec's tables without always
+    # creating an encoder or decoder first, so they get them built at
+    # program start (tests/tables_at_load.cpp); `baac` does not.
+    add_executable(mps-enc tools/mps-enc.cpp tests/tables_at_load.cpp)
     target_include_directories(mps-enc PRIVATE src)
     target_link_libraries(mps-enc PRIVATE baander-aac)
     # Bitstream probe: per-frame side information of an AAC-LC ADTS
     # stream and the quantisation it chose against the source spectrum,
     # for comparing encoders by their output.
-    add_executable(aac-probe tools/aac-probe.cpp)
+    add_executable(aac-probe tools/aac-probe.cpp tests/tables_at_load.cpp)
     target_link_libraries(aac-probe PRIVATE baander-aac)
     # The fuzz harnesses and their seed generator (tools/fuzz/README.md),
     # which use POSIX processes, signals and directories.

@@ -113,6 +113,10 @@ void rice_sums_c(const uint32_t* folded, int n, uint32_t, int k_low, int k_count
   }
 }
 
+void rice_encode_c(FlacBitWriter* w, const int32_t* residual, int n, int k) {
+  flac_rice_encode_words(w, residual, n, k);
+}
+
 /* ── decoder ────────────────────────────────────────────────────── */
 
 int rice_decode_c(FlacBitReader* r, int32_t* out, int count, int k) {
@@ -204,6 +208,7 @@ void flac_dsp_init(FlacDSP* dsp) {
   dsp->lpc_residual_64 = lpc_residual_64_c;
   dsp->rice_fold = rice_fold_c;
   dsp->rice_sums = rice_sums_c;
+  dsp->rice_encode = rice_encode_c;
   dsp->rice_decode = rice_decode_c;
   dsp->lpc_restore_32 = lpc_restore_32_c;
   dsp->lpc_restore_wide = lpc_restore_wide_c;

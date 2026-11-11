@@ -259,38 +259,56 @@ void lpc_residual_32_avx2(const int32_t* x, int n, int order, const int32_t* coe
 
 bool lpc_residual_64_avx2(const int32_t* x, int n, int order, const int32_t* coefs, int shift,
                           int32_t* residual) {
-  /* Four samples at a time in 64-bit lanes: a signed 32 by 32 bit
-   * product per lane, an arithmetic shift put together from a logical
-   * one and the sign, and a residual that is in range when it equals
-   * its own low 32 bits sign-extended and is not the most negative
-   * value. */
+  /* Eight samples at a time, the even ones and the odd ones in the
+   * 64-bit lanes of two sums.  A signed 32 by 32 bit product reads only
+   * the low half of each lane, so one load of eight samples serves both:
+   * as it lies for the even ones, and moved down by 32 bits for the odd
+   * ones.  The arithmetic shift is put together from a logical one and
+   * the sign.  A residual is in range when, with the largest value
+   * added, it lies between zero and twice that: its high half is then
+   * zero and its low half is not all ones. */
   __m256i c[FLAC_MAX_LPC_ORDER];
   for (int j = 0; j < order; j++) {
     c[j] = _mm256_set1_epi64x(coefs[j]);
   }
   const __m128i count = _mm_cvtsi32_si128(shift);
   const __m128i fill = _mm_cvtsi32_si128(64 - shift);
-  const __m256i low = _mm256_setr_epi32(0, 2, 4, 6, 0, 2, 4, 6);
-  __m256i bad = _mm256_setzero_si256();
-  __m128i lowest = _mm_setzero_si128();
+  const __m256i zero = _mm256_setzero_si256();
+  const __m256i largest = _mm256_set1_epi64x(INT32_MAX);
+  const __m256i all_ones = _mm256_set1_epi32(-1);
+  __m256i high = zero;
+  __m256i ones = zero;
   int i = order;
-  for (; i + 4 <= n; i += 4) {
-    __m256i sum = _mm256_setzero_si256();
+  for (; i + 8 <= n; i += 8) {
+    __m256i even = zero;
+    __m256i odd = zero;
     for (int j = 0; j < order; j++) {
-      const __m256i s = _mm256_cvtepi32_epi64(_mm_loadu_si128((const __m128i*)(x + i - 1 - j)));
-      sum = _mm256_add_epi64(sum, _mm256_mul_epi32(c[j], s));
+      const __m256i s = _mm256_loadu_si256((const __m256i*)(x + i - 1 - j));
+      even = _mm256_add_epi64(even, _mm256_mul_epi32(c[j], s));
+      odd = _mm256_add_epi64(odd, _mm256_mul_epi32(c[j], _mm256_srli_epi64(s, 32)));
     }
-    const __m256i sign = _mm256_cmpgt_epi64(_mm256_setzero_si256(), sum);
-    const __m256i prediction =
-        _mm256_or_si256(_mm256_srl_epi64(sum, count), _mm256_sll_epi64(sign, fill));
-    const __m256i r = _mm256_sub_epi64(
-        _mm256_cvtepi32_epi64(_mm_loadu_si128((const __m128i*)(x + i))), prediction);
-    const __m128i r32 = _mm256_castsi256_si128(_mm256_permutevar8x32_epi32(r, low));
-    _mm_storeu_si128((__m128i*)(residual + i), r32);
-    bad = _mm256_or_si256(bad, _mm256_xor_si256(r, _mm256_cvtepi32_epi64(r32)));
-    lowest = _mm_or_si128(lowest, _mm_cmpeq_epi32(r32, _mm_set1_epi32(INT32_MIN)));
+    const __m256i predicted_even = _mm256_or_si256(
+        _mm256_srl_epi64(even, count), _mm256_sll_epi64(_mm256_cmpgt_epi64(zero, even), fill));
+    const __m256i predicted_odd = _mm256_or_si256(
+        _mm256_srl_epi64(odd, count), _mm256_sll_epi64(_mm256_cmpgt_epi64(zero, odd), fill));
+    /* The samples sign-extended into the lanes. */
+    const __m256i v = _mm256_loadu_si256((const __m256i*)(x + i));
+    const __m256i signs = _mm256_srai_epi32(v, 31);
+    const __m256i x_even = _mm256_blend_epi32(v, _mm256_slli_epi64(signs, 32), 0xAA);
+    const __m256i x_odd = _mm256_blend_epi32(_mm256_srli_epi64(v, 32), signs, 0xAA);
+    const __m256i r_even = _mm256_sub_epi64(x_even, predicted_even);
+    const __m256i r_odd = _mm256_sub_epi64(x_odd, predicted_odd);
+    _mm256_storeu_si256((__m256i*)(residual + i),
+                        _mm256_blend_epi32(r_even, _mm256_slli_epi64(r_odd, 32), 0xAA));
+    const __m256i t_even = _mm256_add_epi64(r_even, largest);
+    const __m256i t_odd = _mm256_add_epi64(r_odd, largest);
+    high = _mm256_or_si256(high, _mm256_or_si256(t_even, t_odd));
+    ones = _mm256_or_si256(ones, _mm256_or_si256(_mm256_cmpeq_epi32(t_even, all_ones),
+                                                 _mm256_cmpeq_epi32(t_odd, all_ones)));
   }
-  bool outside = !_mm256_testz_si256(bad, bad) || !_mm_testz_si128(lowest, lowest);
+  const __m256i high_halves = _mm256_set1_epi64x((int64_t)0xFFFFFFFF00000000ull);
+  const __m256i low_halves = _mm256_set1_epi64x(0xFFFFFFFFll);
+  bool outside = !_mm256_testz_si256(high, high_halves) || !_mm256_testz_si256(ones, low_halves);
   for (; i < n; i++) {
     int64_t sum = 0;
     for (int j = 0; j < order; j++) {
@@ -396,6 +414,110 @@ void rice_sums_avx2(const uint32_t* folded, int n, uint32_t bits, int k_low, int
   }
 }
 
+/* The Rice writer of this level makes the codes of eight residuals at
+ * once: the folded values, their unary parts and the lengths in 32-bit
+ * lanes, then each two neighbours joined in a 64-bit lane, and each two
+ * of those joined again, as long as the four codes come to 56 bits or
+ * fewer, which is what fits the writer's word beside at most seven
+ * pending bits.  A group with a longer pair goes through the loop every
+ * level shares, as do the last residuals of a partition and the last
+ * bytes of the buffer.
+ *
+ * What is left for each group is two stores, or four, with shifts by a
+ * variable count; a processor with BMI2 does those without touching the
+ * flags, so the function is compiled for it on top of the file's
+ * instruction set and installed only when the processor reports it. */
+#if defined(__GNUC__) || defined(__clang__)
+#define FLAC_HAVE_RICE_ENCODE_BMI2 1
+
+__attribute__((target("bmi2"))) void rice_encode_bmi2(FlacBitWriter* w, const int32_t* residual,
+                                                      int n, int k) {
+  /* Above this parameter not even two codes fit a store. */
+  if (2 * (k + 1) > 56) {
+    flac_rice_encode_words(w, residual, n, k);
+    return;
+  }
+  const __m128i count = _mm_cvtsi32_si128(k);
+  const __m256i low = _mm256_set1_epi32((int)((1u << k) - 1));
+  const __m256i stop = _mm256_set1_epi32((int)(1u << k));
+  const __m256i shortest = _mm256_set1_epi32(k + 1);
+  const __m256i low_half = _mm256_set1_epi64x(0xFFFFFFFFll);
+  const __m256i most = _mm256_set1_epi64x(56);
+  uint8_t* const data = w->data;
+  const size_t capacity = w->capacity;
+  int bits = w->bits;
+  uint64_t pending = bits ? w->cache << (64 - bits) : 0;
+  size_t pos = w->pos;
+  /* Puts `length` bits below the pending ones, stores the word and
+   * moves on by its whole bytes; with nothing to add it only moves the
+   * whole bytes out. */
+  const auto append = [&](uint64_t codes, int length) {
+    bits += length;
+    pending |= codes << (64 - bits);
+    flac_put_be64(data + pos, pending);
+    const int whole = bits & ~7;
+    pos += (size_t)(whole >> 3);
+    pending <<= whole;
+    bits &= 7;
+  };
+  int i = 0;
+  /* A group takes four stores at most, each of seven bytes or fewer
+   * that count and eight that are written. */
+  for (; i + 8 <= n && capacity - pos >= 48; i += 8) {
+    const __m256i r = _mm256_loadu_si256((const __m256i*)(residual + i));
+    const __m256i u = _mm256_xor_si256(_mm256_slli_epi32(r, 1), _mm256_srai_epi32(r, 31));
+    const __m256i length = _mm256_add_epi32(_mm256_srl_epi32(u, count), shortest);
+    const __m256i code = _mm256_or_si256(_mm256_and_si256(u, low), stop);
+    /* The even residual of each pair comes first in the stream. */
+    const __m256i second_length = _mm256_srli_epi64(length, 32);
+    const __m256i pair_length = _mm256_add_epi64(_mm256_and_si256(length, low_half), second_length);
+    if (_mm256_movemask_epi8(_mm256_cmpgt_epi64(pair_length, most))) {
+      w->cache = bits ? pending >> (64 - bits) : 0;
+      w->bits = bits;
+      w->pos = pos;
+      flac_rice_encode_words(w, residual + i, 8, k);
+      bits = w->bits;
+      pending = bits ? w->cache << (64 - bits) : 0;
+      pos = w->pos;
+      continue;
+    }
+    const __m256i pair =
+        _mm256_or_si256(_mm256_sllv_epi64(_mm256_and_si256(code, low_half), second_length),
+                        _mm256_srli_epi64(code, 32));
+    /* The second pair of each half beside the first. */
+    const __m256i next_length = _mm256_srli_si256(pair_length, 8);
+    const __m256i four_length = _mm256_add_epi64(pair_length, next_length);
+    const __m256i four =
+        _mm256_or_si256(_mm256_sllv_epi64(pair, next_length), _mm256_srli_si256(pair, 8));
+    alignas(32) uint64_t pairs[4];
+    alignas(32) uint64_t pair_lengths[4];
+    alignas(32) uint64_t fours[4];
+    alignas(32) uint64_t four_lengths[4];
+    _mm256_store_si256((__m256i*)pairs, pair);
+    _mm256_store_si256((__m256i*)pair_lengths, pair_length);
+    _mm256_store_si256((__m256i*)fours, four);
+    _mm256_store_si256((__m256i*)four_lengths, four_length);
+    if (bits > 7) {
+      append(0, 0);
+    }
+    for (int half = 0; half < 4; half += 2) {
+      if (four_lengths[half] <= 56) {
+        append(fours[half], (int)four_lengths[half]);
+      } else {
+        append(pairs[half], (int)pair_lengths[half]);
+        append(pairs[half + 1], (int)pair_lengths[half + 1]);
+      }
+    }
+  }
+  w->cache = bits ? pending >> (64 - bits) : 0;
+  w->bits = bits;
+  w->pos = pos;
+  if (i < n) {
+    flac_rice_encode_words(w, residual + i, n - i, k);
+  }
+}
+#endif
+
 /* ── decoder ────────────────────────────────────────────────────── */
 
 /* Processors with AVX2 count leading zeros in one instruction and shift
@@ -423,6 +545,11 @@ void flac_dsp_init_avx2(FlacDSP* dsp) {
   dsp->lpc_residual_64 = lpc_residual_64_avx2;
   dsp->rice_fold = rice_fold_avx2;
   dsp->rice_sums = rice_sums_avx2;
+#if defined(FLAC_HAVE_RICE_ENCODE_BMI2)
+  if (aac_get_cpu_flags() & AAC_CPU_FLAG_BMI2) {
+    dsp->rice_encode = rice_encode_bmi2;
+  }
+#endif
 #if defined(FLAC_HAVE_RICE_DECODE_LZCNT)
   const int wanted = AAC_CPU_FLAG_BMI2 | AAC_CPU_FLAG_LZCNT;
   if ((aac_get_cpu_flags() & wanted) == wanted) {

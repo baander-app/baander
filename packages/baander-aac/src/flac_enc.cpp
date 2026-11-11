@@ -255,7 +255,8 @@ uint64_t rice_search(const FlacDSP* dsp, RiceScratch* rs, const int32_t* residua
   return best;
 }
 
-void write_residual(FlacBitWriter* w, const Coding& c, const int32_t* residual, int n) {
+void write_residual(const FlacDSP* dsp, FlacBitWriter* w, const Coding& c, const int32_t* residual,
+                    int n) {
   flac_bitwriter_write(w, c.parameter_bits == 5 ? 1 : 0, 2);
   flac_bitwriter_write(w, (uint32_t)c.partition_order, 4);
   const int parts = 1 << c.partition_order;
@@ -275,49 +276,7 @@ void write_residual(FlacBitWriter* w, const Coding& c, const int32_t* residual, 
     }
     const int k = c.parameters[p];
     flac_bitwriter_write(w, (uint32_t)k, c.parameter_bits);
-    /* The writer's state stays in locals over the partition, and goes
-     * back to the writer around the rare code too long for one word. */
-    const uint32_t stop = 1u << k;
-    uint64_t cache = w->cache;
-    int bits = w->bits;
-    size_t pos = w->pos;
-    for (int i = begin; i < end; i++) {
-      const uint32_t r = (uint32_t)residual[i];
-      const uint32_t u = (r << 1) ^ (0u - (r >> 31));
-      const uint32_t quotient = u >> k;
-      const uint32_t length = quotient + 1 + (uint32_t)k;
-      if (length > 32) {
-        w->cache = cache;
-        w->bits = bits;
-        w->pos = pos;
-        flac_bitwriter_write_unary(w, quotient);
-        flac_bitwriter_write(w, u, k);
-        cache = w->cache;
-        bits = w->bits;
-        pos = w->pos;
-        continue;
-      }
-      /* The zeros of the unary part, its one and the low bits as one
-       * number of that many bits. */
-      cache = (cache << length) | (stop | (u & (stop - 1)));
-      bits += (int)length;
-      if (bits >= 32) {
-        bits -= 32;
-        if (w->capacity - pos < 4) {
-          w->overflow = true;
-          continue;
-        }
-        const uint32_t word = (uint32_t)(cache >> bits);
-        w->data[pos] = (uint8_t)(word >> 24);
-        w->data[pos + 1] = (uint8_t)(word >> 16);
-        w->data[pos + 2] = (uint8_t)(word >> 8);
-        w->data[pos + 3] = (uint8_t)word;
-        pos += 4;
-      }
-    }
-    w->cache = cache;
-    w->bits = bits;
-    w->pos = pos;
+    dsp->rice_encode(w, residual + begin, end - begin, k);
   }
 }
 
@@ -786,6 +745,33 @@ void try_predictors(Encoder* e, Slot* slot, const S* x, int n) {
   }
 }
 
+/* All the samples or-ed together into `any`, whose lowest set bit is
+ * the lowest one set in any sample; true when every sample equals the
+ * first.  The 32-bit form keeps to 32-bit words, which a compiler turns
+ * into vector operations. */
+bool scan(const int32_t* x, int n, uint64_t* any) {
+  const uint32_t first = (uint32_t)x[0];
+  uint32_t ored = 0;
+  uint32_t differing = 0;
+  for (int i = 0; i < n; i++) {
+    ored |= (uint32_t)x[i];
+    differing |= (uint32_t)x[i] ^ first;
+  }
+  *any = ored;
+  return differing == 0;
+}
+
+bool scan(const int64_t* x, int n, uint64_t* any) {
+  uint64_t ored = 0;
+  uint64_t differing = 0;
+  for (int i = 0; i < n; i++) {
+    ored |= (uint64_t)x[i];
+    differing |= (uint64_t)(x[i] ^ x[0]);
+  }
+  *any = ored;
+  return differing == 0;
+}
+
 /* Finds the smallest subframe for the `n` samples of `x`, which have
  * `bps` bits each, and leaves it in the slot.  `fixed_order` is the
  * fixed predictor to try when the caller has picked it already, or -1. */
@@ -797,12 +783,7 @@ void analyse(Encoder* e, Slot* slot, const S* x, S* shifted, int n, int bps, int
   int wasted = 0;
   {
     FLAC_PROFILE(FLAC_PROF_SCAN);
-    uint64_t differing = 0;
-    for (int i = 0; i < n; i++) {
-      any |= (uint64_t)(int64_t)x[i];
-      differing |= (uint64_t)(int64_t)(x[i] ^ x[0]);
-    }
-    constant = differing == 0;
+    constant = scan(x, n, &any);
     if (any) {
       while (!((any >> wasted) & 1)) {
         wasted++;
@@ -847,7 +828,7 @@ void analyse(Encoder* e, Slot* slot, const S* x, S* shifted, int n, int bps, int
 
 /* ── writing ────────────────────────────────────────────────────── */
 
-void write_subframe(FlacBitWriter* w, const Slot& slot, int n) {
+void write_subframe(const FlacDSP* dsp, FlacBitWriter* w, const Slot& slot, int n) {
   FLAC_PROFILE(FLAC_PROF_WRITE);
   const Coding& c = slot.coding;
   const int type_code = c.type == kConstant   ? 0
@@ -881,7 +862,7 @@ void write_subframe(FlacBitWriter* w, const Slot& slot, int n) {
       flac_bitwriter_write_signed(w, c.coefs[i], c.precision);
     }
   }
-  write_residual(w, c, slot.residual.data(), n);
+  write_residual(dsp, w, c, slot.residual.data(), n);
 }
 
 /* A slot that stores its channel unencoded, whatever was found for it. */
@@ -1040,7 +1021,7 @@ size_t encode_block(Encoder* e, int n, uint8_t* out) {
   FlacBitWriter w;
   flac_bitwriter_init(&w, out + header_bytes, frame_bound(e, n) - (size_t)header_bytes - 2);
   for (int ch = 0; ch < e->channels; ch++) {
-    write_subframe(&w, *coded[ch], n);
+    write_subframe(e->dsp, &w, *coded[ch], n);
   }
   uint64_t counted = 0;
   for (int ch = 0; ch < e->channels; ch++) {
@@ -1333,10 +1314,11 @@ int flac_encoder_encode(BaacFlacEncoder* e, const int32_t* pcm, int n_samples, u
     /* Every sample has to lie within the bit depth; the encoder codes
      * nothing with loss. */
     FLAC_PROFILE(FLAC_PROF_INPUT);
-    const uint32_t half = 1u << (e->bits - 1);
+    const int bits = e->bits;
+    const uint32_t half = 1u << (bits - 1);
     uint32_t outside = 0;
     for (size_t i = 0; i < values; i++) {
-      outside |= ((uint32_t)pcm[i] + half) >> e->bits;
+      outside |= ((uint32_t)pcm[i] + half) >> bits;
     }
     if (outside) {
       return AAC_ERR_INVALID_ARG;
@@ -1349,12 +1331,25 @@ int flac_encoder_encode(BaacFlacEncoder* e, const int32_t* pcm, int n_samples, u
   int done = 0;
   while (done < n_samples) {
     const int take = std::min(block - e->fill, n_samples - done);
-    for (int ch = 0; ch < e->channels; ch++) {
+    {
       FLAC_PROFILE(FLAC_PROF_INPUT);
-      int32_t* row = e->input.data() + (size_t)ch * (size_t)block + (size_t)e->fill;
-      const int32_t* in = pcm + (size_t)done * (size_t)e->channels + (size_t)ch;
-      for (int i = 0; i < take; i++) {
-        row[i] = in[(size_t)i * (size_t)e->channels];
+      const int32_t* in = pcm + (size_t)done * (size_t)e->channels;
+      int32_t* rows = e->input.data() + (size_t)e->fill;
+      if (e->channels == 2) {
+        /* Both rows in one pass over the pairs. */
+        int32_t* FLAC_RESTRICT left = rows;
+        int32_t* FLAC_RESTRICT right = rows + block;
+        for (int i = 0; i < take; i++) {
+          left[i] = in[2 * (size_t)i];
+          right[i] = in[2 * (size_t)i + 1];
+        }
+      } else {
+        for (int ch = 0; ch < e->channels; ch++) {
+          int32_t* row = rows + (size_t)ch * (size_t)block;
+          for (int i = 0; i < take; i++) {
+            row[i] = in[(size_t)i * (size_t)e->channels + (size_t)ch];
+          }
+        }
       }
     }
     e->fill += take;

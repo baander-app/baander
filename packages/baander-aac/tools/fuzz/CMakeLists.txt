@@ -13,7 +13,7 @@ set(FUZZ_HARNESSES fuzz_decoder fuzz_asc fuzz_encoder fuzz_unidrc fuzz_mps
 
 # The seed generator builds FLAC frames by hand with the internal bit
 # writer and header routines.
-add_executable(fuzz_seeds fuzz_seeds.cpp)
+add_executable(fuzz_seeds fuzz_seeds.cpp ../../tests/tables_at_load.cpp)
 target_link_libraries(fuzz_seeds PRIVATE baander-aac)
 target_include_directories(fuzz_seeds PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../src)
 

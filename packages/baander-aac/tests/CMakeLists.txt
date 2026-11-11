@@ -51,9 +51,14 @@ set(TEST_SOURCES
     test_flac_meta.cpp
 )
 
+# The library builds its computed tables when the first encoder or
+# decoder is created.  The unit tests also read tables and call table
+# routines directly, so each of them gets the tables at program start
+# (tables_at_load.cpp), as before the library built them lazily.
+# test_tables_lazy, below, is the one suite without that file.
 foreach(test_src ${TEST_SOURCES})
     get_filename_component(test_name ${test_src} NAME_WE)
-    add_executable(${test_name} ${test_src})
+    add_executable(${test_name} ${test_src} tables_at_load.cpp)
     target_link_libraries(${test_name} PRIVATE baander-aac)
     target_compile_definitions(${test_name} PRIVATE
         BAAC_TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/data")
@@ -62,6 +67,20 @@ foreach(test_src ${TEST_SOURCES})
     endif()
     add_test(NAME ${test_name} COMMAND ${test_name})
 endforeach()
+
+# The tables built on first use: every profile through the public API
+# from several threads at once, in a program that has nothing built at
+# its start.
+add_executable(test_tables_lazy test_tables_lazy.cpp)
+target_link_libraries(test_tables_lazy PRIVATE baander-aac)
+target_compile_definitions(test_tables_lazy PRIVATE
+    BAAC_TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/data")
+find_package(Threads REQUIRED)
+target_link_libraries(test_tables_lazy PRIVATE Threads::Threads)
+if(UNIX)
+    target_link_libraries(test_tables_lazy PRIVATE m)
+endif()
+add_test(NAME test_tables_lazy COMMAND test_tables_lazy)
 
 # The fuzz smoke test generates the seed corpus and runs every harness
 # over it for a few seconds of mutations (in parallel; a libFuzzer build

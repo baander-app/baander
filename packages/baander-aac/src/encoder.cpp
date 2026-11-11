@@ -64,16 +64,18 @@ bool fast_rate_loop(const AacEncoderState* s) {
 float g_sf_gain[kMaxSf + 1];    /* 2^((sf - 100) / 4) */
 float g_sf_scale34[kMaxSf + 1]; /* 2^(-(sf - 100) * 3 / 16) */
 
-void init_sf_tables() {
-  static bool done = false;
-  if (done) {
-    return;
-  }
+bool build_sf_tables() {
   for (int sf = 0; sf <= kMaxSf; sf++) {
     g_sf_gain[sf] = exp2f(0.25f * (float)(sf - 100));
     g_sf_scale34[sf] = exp2f(-0.1875f * (float)(sf - 100));
   }
-  done = true;
+  return true;
+}
+
+/* Once, whichever thread creates the first encoder. */
+void init_sf_tables() {
+  static const bool built = build_sf_tables();
+  (void)built;
 }
 
 float bark(float f) {

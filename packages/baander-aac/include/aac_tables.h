@@ -147,8 +147,15 @@ extern const AacChannelConfig aac_channel_config[8];
 
 extern const float aac_sbr_qmf_window[AAC_SBR_QMF_FILTER_LENGTH];
 
-/* Table auto-init */
+/* Builds the tables that are computed (the Huffman pointers, costs and
+ * decoding trees, the windows, the |q|^(4/3) table) on the first call;
+ * safe to call from several threads at once, and cheap afterwards.  The
+ * encoder and the decoder call it when they are created, so a caller of
+ * the public API never has to; code that reads the tables without
+ * creating either (a unit test, an internal tool) calls it first. */
 void aac_tables_init(void);
+/* The Huffman decoding trees of bitstream.cpp, built by aac_tables_init. */
+void aac_huffman_trees_build(void);
 
 #ifdef __cplusplus
 }
