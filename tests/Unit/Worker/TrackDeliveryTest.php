@@ -213,23 +213,48 @@ PHP);
 
     public function testCompletionTimeoutNamesTheBytesReceivedTheBytesExpectedAndTheTimeElapsed(): void
     {
-        file_put_contents($this->directory . '/mode', 'slow-fragment');
-        $silent = new HttpExchange($this->resources()['audio']['segmentUrl'], []);
-        try {
-            $silent->complete(.1, 4096);
-            self::fail('A response that had not started finished in time.');
-        } catch (RuntimeException $error) {
-            self::assertMatchesRegularExpression('/^The request did not finish in time: 0 of about 4096 body bytes received in 0\.\d seconds\.$/D', $error->getMessage());
-        }
+        // The test is the peer, so neither response can finish however slowly this process runs:
+        // the first connection is never answered, and the second gets half of its announced body.
+        $listen = static function (): array {
+            $server = stream_socket_server('tcp://127.0.0.1:0', $number, $message);
+            self::assertIsResource($server, $message);
 
-        file_put_contents($this->directory . '/mode', 'slow-body');
-        $partial = new HttpExchange($this->resources()['video']['segmentUrl'], []);
-        self::assertTrue($partial->until(static fn(HttpExchange $value): bool => strlen($value->body) >= 32, 1));
+            return [$server, 'http://' . stream_socket_get_name($server, false) . '/'];
+        };
+        [$unanswered, $unansweredUrl] = $listen();
+        [$halfSent, $halfSentUrl] = $listen();
+        $connection = null;
         try {
-            $partial->complete(.02);
-            self::fail('A body that was still arriving finished in time.');
-        } catch (RuntimeException $error) {
-            self::assertMatchesRegularExpression('/^The request did not finish in time: 32 body bytes received in \d\.\d seconds, the last 0\.\d seconds ago\.$/D', $error->getMessage());
+            $silent = new HttpExchange($unansweredUrl, []);
+            try {
+                $silent->complete(.1, 4096);
+                self::fail('A request that was never answered finished in time.');
+            } catch (RuntimeException $error) {
+                self::assertSame(1, preg_match('/^The request did not finish in time: 0 of about 4096 body bytes received in (\d+\.\d) seconds\.$/D', $error->getMessage(), $silentMatch), $error->getMessage());
+                self::assertGreaterThanOrEqual(.1, (float) $silentMatch[1]);
+            }
+
+            $partial = new HttpExchange($halfSentUrl, []);
+            self::assertFalse($partial->poll());
+            $connection = stream_socket_accept($halfSent, 10);
+            self::assertIsResource($connection);
+            fwrite($connection, "HTTP/1.1 200 OK\r\nContent-Length: 64\r\n\r\n" . str_repeat('a', 32));
+            self::assertTrue($partial->until(static fn(HttpExchange $value): bool => strlen($value->body) === 32, 10));
+            try {
+                $partial->complete(.1);
+                self::fail('A body whose second half was never sent finished in time.');
+            } catch (RuntimeException $error) {
+                self::assertSame(1, preg_match('/^The request did not finish in time: 32 body bytes received in (\d+\.\d) seconds, the last (\d+\.\d) seconds ago\.$/D', $error->getMessage(), $partialMatch), $error->getMessage());
+                self::assertGreaterThanOrEqual(.1, (float) $partialMatch[1]);
+                self::assertLessThanOrEqual((float) $partialMatch[1], (float) $partialMatch[2]);
+            }
+            self::assertFalse($partial->done);
+        } finally {
+            foreach ([$connection, $unanswered, $halfSent] as $socket) {
+                if (is_resource($socket)) {
+                    fclose($socket);
+                }
+            }
         }
     }
 
