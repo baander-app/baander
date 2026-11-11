@@ -36,9 +36,11 @@ void add_tapered_range(double* w, int begin, int end, int taper) {
   }
 }
 
-}  // namespace
+/* Parts the windows of a set cut the block into: 1, 2 or 3 for sets of
+ * 1, 3 and 9 windows. */
+int window_parts(int windows) { return windows >= 9 ? 3 : windows >= 3 ? 2 : 1; }
 
-int flac_lpc_window_parts(int windows) { return windows >= 9 ? 3 : windows >= 3 ? 2 : 1; }
+}  // namespace
 
 int flac_lpc_window_ranges(int n, int index, int* ranges) {
   if (index == 0) {
@@ -78,7 +80,7 @@ int flac_lpc_window_ranges(int n, int index, int* ranges) {
 void flac_lpc_window(double* w, int n, int windows, int index, double taper_fraction) {
   /* The tapers of every window of a set have one length: the fraction of
    * the smallest part the set cuts the block into, half of it per side. */
-  const int parts = flac_lpc_window_parts(windows);
+  const int parts = window_parts(windows);
   int taper = (int)((double)n * taper_fraction * 0.5 / (double)parts);
   if (taper < 1) {
     taper = 1;

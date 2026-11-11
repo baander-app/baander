@@ -85,6 +85,8 @@ void autocorrelation_groups(const double* y, int n, int max_lag, double* r) {
 }
 
 void autocorrelation_neon(const double* y, int n, int max_lag, double* r) {
+  /* The orders the encoder's levels use get loops of their own length;
+   * every other one takes the longest. */
   const int groups = max_lag / 2 + 1;
   if (groups <= 4) {
     autocorrelation_groups<4>(y, n, max_lag, r);

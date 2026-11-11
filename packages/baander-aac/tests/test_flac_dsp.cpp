@@ -108,14 +108,6 @@ static void test_fixed_sums(const char* name, const FlacDSP* ref, const FlacDSP*
   }
 }
 
-static int ceil_log2(int n) {
-  int bits = 0;
-  while ((1 << bits) < n) {
-    bits++;
-  }
-  return bits;
-}
-
 /* The residual as the format defines it, in 64-bit arithmetic. */
 static std::vector<int64_t> residual_reference(const std::vector<int32_t>& x, int order,
                                                const std::vector<int32_t>& coefs, int shift) {
@@ -150,7 +142,7 @@ static void check_prediction(const char* name, const FlacDSP* ref, const FlacDSP
     c = extreme ? (int32_t)flac_sample_min(precision) : sample(seed, precision);
   }
   const std::vector<int64_t> want = residual_reference(x, order, coefs, shift);
-  const bool fits_32 = bps <= 30 && bps + precision + ceil_log2(order) <= 32;
+  const bool fits_32 = bps <= 30 && bps + precision + flac_ceil_log2(order) <= 32;
   const int kSentinel = 0x5A5A5A5A;
   char what[160];
   snprintf(what, sizeof(what), "%s: %d samples of %d bits, order %d, precision %d, shift %d%s",
@@ -206,7 +198,7 @@ static void test_prediction(const char* name, const FlacDSP* ref, const FlacDSP*
       }
       /* 16-bit samples with the widest coefficients the 32-bit sum
        * leaves room for: every form applies. */
-      const int room = 32 - 16 - ceil_log2(order);
+      const int room = 32 - 16 - flac_ceil_log2(order);
       for (int precision : {2, 7, std::min(15, room)}) {
         check_prediction(name, ref, dsp, samples(&seed, n, 16), 16, order, precision,
                          (int)(next(&seed) % 15), &seed, false);
@@ -215,7 +207,7 @@ static void test_prediction(const char* name, const FlacDSP* ref, const FlacDSP*
        * add up to exactly 32, with the signal and the coefficients at
        * the most negative value, where the sum is largest. */
       for (int bps : {8, 12, 17, 20, 24}) {
-        const int precision = 32 - bps - ceil_log2(order);
+        const int precision = 32 - bps - flac_ceil_log2(order);
         if (precision < 2 || precision > 15) {
           continue;
         }
@@ -492,8 +484,10 @@ int main(int argc, char** argv) {
       continue;
     }
     /* The AVX2 level takes a kernel of its own when the processor has
-     * BMI2 as well. */
-    const int extra = (level.flags & AAC_CPU_FLAG_AVX2) ? (detected & AAC_CPU_FLAG_BMI2) : 0;
+     * BMI2 and LZCNT as well. */
+    const int extra = (level.flags & AAC_CPU_FLAG_AVX2)
+                          ? (detected & (AAC_CPU_FLAG_BMI2 | AAC_CPU_FLAG_LZCNT))
+                          : 0;
     aac_set_cpu_flags_override(level.flags | extra);
     FlacDSP dsp;
     flac_dsp_init(&dsp);

@@ -26,14 +26,6 @@ static const LevelCeiling kCeilings[9] = {
     {4096, 8, 6, true},  {4096, 12, 6, true}, {4096, 12, 6, true},
 };
 
-static int ceil_log2(int n) {
-  int bits = 0;
-  while ((1 << bits) < n) {
-    bits++;
-  }
-  return bits;
-}
-
 /* The size no frame may exceed: every channel unencoded. */
 static size_t frame_bound(int n, int channels, int bits) {
   return FLAC_MAX_FRAME_HEADER_BYTES + ((size_t)channels * (8 + (size_t)n * (size_t)bits) + 7) / 8 +
@@ -99,7 +91,7 @@ static void check_shape(const char* name, const FlacEncoded& e, int level, int r
         orders = orders && sf.order <= ceiling.max_lpc_order && sf.order <= 12;
         /* At 16 bits and below a decoder can add up the prediction in
          * 32 bits. */
-        sums = sums && (bits > 16 || sf.bps + sf.precision + ceil_log2(sf.order) <= 32);
+        sums = sums && (bits > 16 || sf.bps + sf.precision + flac_ceil_log2(sf.order) <= 32);
       }
       if (sf.type >= 2) {
         partitions = partitions && sf.partition_order <= ceiling.max_partition_order &&

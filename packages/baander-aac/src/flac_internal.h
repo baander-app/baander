@@ -81,6 +81,20 @@ struct FlacProfileScope {
 #define FLAC_MAX_LPC_ORDER 32
 #define FLAC_MAX_PARTITION_ORDER 15
 
+/* The fixed predictors as coefficients (RFC 9639 section 9.2.5): row
+ * `order` weights the sample before, the one before that and so on. */
+static const int32_t kFlacFixedWeights[FLAC_MAX_FIXED_ORDER + 1][FLAC_MAX_FIXED_ORDER] = {
+    {0, 0, 0, 0}, {1, 0, 0, 0}, {2, -1, 0, 0}, {3, -3, 1, 0}, {4, -6, 4, -1}};
+
+/* Bits a sum of `n` terms adds to the width of one term. */
+static inline int flac_ceil_log2(int n) {
+  int bits = 0;
+  while ((1 << bits) < n) {
+    bits++;
+  }
+  return bits;
+}
+
 enum FlacBlockType {
   FLAC_BLOCK_STREAMINFO = 0,
   FLAC_BLOCK_PADDING = 1,
@@ -228,9 +242,6 @@ void flac_encoder_stream_info(const BaacFlacEncoder* e, BaacFlacStreamInfo* info
 
 #define FLAC_MAX_ANALYSIS_WINDOWS 9
 
-/* Parts the windows of a set cut the block into: 1, 2 or 3 for sets of
- * 1, 3 and 9 windows. */
-int flac_lpc_window_parts(int windows);
 /* Fills w[0 .. n) with window `index` of a set of `windows`: 0 is the
  * whole block, 1 and 2 its halves, 3 to 5 its thirds, 6 to 8 the block
  * without one third.  `taper_fraction` of the smallest part rises and

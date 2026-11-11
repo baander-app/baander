@@ -8,9 +8,8 @@
 #if defined(BAAC_AAC_AVX2) || defined(__AVX2__)
 
 #include <immintrin.h>
-#if defined(__GNUC__) || defined(__clang__)
-#include <cpuid.h>
-#endif
+
+#include "flac_x86.h"
 
 namespace {
 
@@ -173,40 +172,7 @@ void fixed_sums_avx2(const int32_t* x, int n, int max_order, uint64_t* sums) {
     }
   }
   /* The rest, and blocks too short for order 4, sample by sample. */
-  for (; i < n; i++) {
-    int32_t e = x[i];
-    for (int k = 0; k <= max_order; k++) {
-      sums[k] += (uint64_t)(e < 0 ? -(int64_t)e : (int64_t)e);
-      if (k < max_order) {
-        /* The difference of order k at the sample before, from the
-         * samples themselves. */
-        static const int kBinomial[4][5] = {
-            {1, 0, 0, 0, 0}, {1, -1, 0, 0, 0}, {1, -2, 1, 0, 0}, {1, -3, 3, -1, 0}};
-        uint32_t before = 0;
-        for (int j = 0; j <= k; j++) {
-          before += (uint32_t)kBinomial[k][j] * (uint32_t)x[i - 1 - j];
-        }
-        e = (int32_t)((uint32_t)e - before);
-      }
-    }
-  }
-}
-
-/* The samples x[base .. base + count) narrowed to 16 bits each, a zero
- * standing in for an index below the row. */
-inline void narrow_samples(const int32_t* x, int base, int count, int16_t* packed) {
-  int m = 0;
-  if (base < 0) {
-    packed[m++] = 0;
-  }
-  for (; m + 8 <= count; m += 8) {
-    _mm_storeu_si128((__m128i*)(packed + m),
-                     _mm_packs_epi32(_mm_loadu_si128((const __m128i*)(x + base + m)),
-                                     _mm_loadu_si128((const __m128i*)(x + base + m + 4))));
-  }
-  for (; m < count; m++) {
-    packed[m] = (int16_t)x[base + m];
-  }
+  flac_x86_fixed_sums_tail(x, i, n, max_order, sums);
 }
 
 void lpc_residual_16_avx2(const int32_t* x, int n, int order, const int32_t* coefs, int shift,
@@ -230,7 +196,7 @@ void lpc_residual_16_avx2(const int32_t* x, int n, int order, const int32_t* coe
   int i = order;
   while (i + 16 <= n) {
     const int outputs = (n - i) < kStretch ? ((n - i) & ~15) : kStretch;
-    narrow_samples(x, i - 2 * pairs, outputs + 2 * pairs, packed);
+    flac_x86_narrow_samples(x, i - 2 * pairs, outputs + 2 * pairs, packed);
     for (int o = 0; o < outputs; o += 16) {
       __m256i even = _mm256_setzero_si256();
       __m256i odd = _mm256_setzero_si256();
@@ -444,14 +410,6 @@ __attribute__((target("lzcnt,bmi2"))) int rice_decode_lzcnt(FlacBitReader* r, in
                                                             int count, int k) {
   return flac_rice_decode_words(r, out, count, k);
 }
-
-bool has_lzcnt() {
-  unsigned int eax = 0;
-  unsigned int ebx = 0;
-  unsigned int ecx = 0;
-  unsigned int edx = 0;
-  return __get_cpuid(0x80000001u, &eax, &ebx, &ecx, &edx) && (ecx & (1u << 5)) != 0;
-}
 #endif
 
 }  // namespace
@@ -466,7 +424,8 @@ void flac_dsp_init_avx2(FlacDSP* dsp) {
   dsp->rice_fold = rice_fold_avx2;
   dsp->rice_sums = rice_sums_avx2;
 #if defined(FLAC_HAVE_RICE_DECODE_LZCNT)
-  if ((aac_get_cpu_flags() & AAC_CPU_FLAG_BMI2) && has_lzcnt()) {
+  const int wanted = AAC_CPU_FLAG_BMI2 | AAC_CPU_FLAG_LZCNT;
+  if ((aac_get_cpu_flags() & wanted) == wanted) {
     dsp->rice_decode = rice_decode_lzcnt;
   }
 #endif

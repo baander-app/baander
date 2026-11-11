@@ -8,6 +8,8 @@
 
 #include <emmintrin.h>
 
+#include "flac_x86.h"
+
 namespace {
 
 /* ── analysis ───────────────────────────────────────────────────── */
@@ -154,40 +156,7 @@ void fixed_sums_sse2(const int32_t* x, int n, int max_order, uint64_t* sums) {
     }
   }
   /* The rest, and blocks too short for order 4, sample by sample. */
-  for (; i < n; i++) {
-    int32_t e = x[i];
-    for (int k = 0; k <= max_order; k++) {
-      sums[k] += (uint64_t)(e < 0 ? -(int64_t)e : (int64_t)e);
-      if (k < max_order) {
-        /* The difference of order k at the sample before, from the
-         * samples themselves. */
-        static const int kBinomial[4][5] = {
-            {1, 0, 0, 0, 0}, {1, -1, 0, 0, 0}, {1, -2, 1, 0, 0}, {1, -3, 3, -1, 0}};
-        uint32_t before = 0;
-        for (int j = 0; j <= k; j++) {
-          before += (uint32_t)kBinomial[k][j] * (uint32_t)x[i - 1 - j];
-        }
-        e = (int32_t)((uint32_t)e - before);
-      }
-    }
-  }
-}
-
-/* The samples x[base .. base + count) narrowed to 16 bits each, a zero
- * standing in for an index below the row. */
-inline void narrow_samples(const int32_t* x, int base, int count, int16_t* packed) {
-  int m = 0;
-  if (base < 0) {
-    packed[m++] = 0;
-  }
-  for (; m + 8 <= count; m += 8) {
-    _mm_storeu_si128((__m128i*)(packed + m),
-                     _mm_packs_epi32(_mm_loadu_si128((const __m128i*)(x + base + m)),
-                                     _mm_loadu_si128((const __m128i*)(x + base + m + 4))));
-  }
-  for (; m < count; m++) {
-    packed[m] = (int16_t)x[base + m];
-  }
+  flac_x86_fixed_sums_tail(x, i, n, max_order, sums);
 }
 
 void lpc_residual_16_sse2(const int32_t* x, int n, int order, const int32_t* coefs, int shift,
@@ -211,7 +180,7 @@ void lpc_residual_16_sse2(const int32_t* x, int n, int order, const int32_t* coe
   int i = order;
   while (i + 8 <= n) {
     const int outputs = (n - i) < kStretch ? ((n - i) & ~7) : kStretch;
-    narrow_samples(x, i - 2 * pairs, outputs + 2 * pairs, packed);
+    flac_x86_narrow_samples(x, i - 2 * pairs, outputs + 2 * pairs, packed);
     for (int o = 0; o < outputs; o += 8) {
       __m128i even = _mm_setzero_si128();
       __m128i odd = _mm_setzero_si128();

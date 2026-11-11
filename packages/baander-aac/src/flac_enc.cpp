@@ -73,10 +73,12 @@ const double kEstimateOffset = 1.9;
  * streamable subset allows. */
 const int kMaxPartitionOrder = 8;
 const int kMaxPartitions = 1 << kMaxPartitionOrder;
-const int kMaxRiceParameter = 30; /* with 5-bit parameters; 14 with 4-bit ones */
-const uint8_t kEscaped = 0xFF;    /* in place of a partition's Rice parameter */
+const int kMaxRiceParameter = 30;     /* with 5-bit parameters */
+const int kMaxRiceParameter4Bit = 14; /* with 4-bit ones */
+const uint8_t kEscaped = 0xFF;        /* in place of a partition's Rice parameter */
 
-/* A seek point for every ten seconds, and never more of them than a
+/* Seconds from one seek point to the next.  seek_point_count spaces
+ * them wider in a stream that would otherwise get more points than a
  * decoder of this library keeps. */
 const int kSeekSeconds = 10;
 
@@ -116,14 +118,6 @@ struct Slot {
   std::vector<int32_t> shifted;  /* the samples when wasted bits were removed */
   std::vector<int32_t> residual; /* of `coding`, when it has one */
 };
-
-int ceil_log2(int n) {
-  int bits = 0;
-  while ((1 << bits) < n) {
-    bits++;
-  }
-  return bits;
-}
 
 int bit_length(uint64_t v) { return v ? 64 - flac_clz64(v) : 0; }
 
@@ -186,7 +180,7 @@ uint64_t rice_search(const FlacDSP* dsp, RiceScratch* rs, const int32_t* residua
   /* The parameters worth counting exactly: the best one of a partition
    * lies next to the logarithm of its mean, and the mean of a coarser
    * partition lies between the means of the finest ones. */
-  const int cap = wide_parameters ? kMaxRiceParameter : 14;
+  const int cap = wide_parameters ? kMaxRiceParameter : kMaxRiceParameter4Bit;
   int k_low = std::max(0, bit_length(smallest_mean) - 2);
   int k_high = std::min(cap, bit_length(largest_mean));
   k_low = std::min(k_low, k_high);
@@ -205,9 +199,10 @@ uint64_t rice_search(const FlacDSP* dsp, RiceScratch* rs, const int32_t* residua
   uint64_t best = UINT64_MAX;
   for (int po = finest; po >= 0; po--) {
     const int size = n >> po;
-    for (int form = k_low > 14 ? 1 : 0; form < (k_high > 14 ? 2 : 1); form++) {
+    for (int form = k_low > kMaxRiceParameter4Bit ? 1 : 0;
+         form < (k_high > kMaxRiceParameter4Bit ? 2 : 1); form++) {
       const int parameter_bits = form ? 5 : 4;
-      const int form_cap = form ? kMaxRiceParameter : 14;
+      const int form_cap = form ? kMaxRiceParameter : kMaxRiceParameter4Bit;
       uint64_t total = 2 + 4;
       for (int p = 0; p < parts; p++) {
         const uint64_t count = (uint64_t)(p ? size : size - order);
@@ -327,10 +322,7 @@ void write_residual(FlacBitWriter* w, const Coding& c, const int32_t* residual, 
 
 /* ── prediction ─────────────────────────────────────────────────── */
 
-/* The fixed predictors as coefficients (RFC 9639 section 9.2.5), and the
- * bits the widest of each order takes. */
-const int32_t kFixedWeights[FLAC_MAX_FIXED_ORDER + 1][FLAC_MAX_FIXED_ORDER] = {
-    {0, 0, 0, 0}, {1, 0, 0, 0}, {2, -1, 0, 0}, {3, -3, 1, 0}, {4, -6, 4, -1}};
+/* The bits the widest weight of each fixed predictor takes. */
 const int kFixedWeightBits[FLAC_MAX_FIXED_ORDER + 1] = {0, 2, 3, 3, 4};
 
 /* A residual has to be above -2^31 and below 2^31 (RFC 9639 section
@@ -472,7 +464,7 @@ void finish_candidate(Encoder* e, Slot* slot, Coding* c, int n, uint64_t side_bi
  * it, and where it does not (above 16 bits or so) it takes the format's
  * 15 bits and the 64-bit sum they need. */
 int precision_ceiling(int bps, int order) {
-  const int within_32 = 32 - bps - ceil_log2(order);
+  const int within_32 = 32 - bps - flac_ceil_log2(order);
   return within_32 >= 10 ? std::min(15, within_32) : 15;
 }
 
@@ -481,12 +473,12 @@ int precision_ceiling(int bps, int order) {
  * coefficients and the bits the summation adds stay within 32, which
  * keeps every sum and every residual in range, and of those in 16 by 16
  * bit products when samples and coefficients are that narrow; in 64
- * bits otherwise, with each residual checked.  False when a residual leaves the range
- * it may have. */
+ * bits otherwise, with each residual checked.  False when a residual
+ * leaves the range it may have. */
 bool compute_residual(Encoder* e, const int32_t* x, int n, int order, const int32_t* coefs,
                       int shift, int bps, int coef_bits) {
   FLAC_PROFILE(FLAC_PROF_RESIDUAL);
-  if (bps <= 30 && bps + coef_bits + ceil_log2(order) <= 32) {
+  if (bps <= 30 && bps + coef_bits + flac_ceil_log2(order) <= 32) {
     if (bps <= 16 && coef_bits <= 16) {
       e->dsp->lpc_residual_16(x, n, order, coefs, shift, e->residual.data());
     } else {
@@ -543,7 +535,7 @@ int best_fixed_order(Encoder*, const int64_t* x, int n, int, uint64_t* magnitude
  * subframe to the slot. */
 template <typename S>
 void try_fixed(Encoder* e, Slot* slot, const S* x, int n, int order) {
-  if (compute_residual(e, x, n, order, kFixedWeights[order], 0, slot->bps,
+  if (compute_residual(e, x, n, order, kFlacFixedWeights[order], 0, slot->bps,
                        kFixedWeightBits[order])) {
     Coding c;
     c.type = kFixed;
@@ -638,12 +630,11 @@ void try_candidate(Encoder* e, Slot* slot, const S* x, int n, const Candidate& c
   finish_candidate(e, slot, &c, n, 4 + 5 + (uint64_t)c.order * (uint64_t)c.precision);
 }
 
-/* Predictors for a channel of a level with linear prediction.
+/* The linear predictors for a channel, after the fixed one.
  *
- * The fixed predictor whose residual is smallest in magnitude is always
- * coded.  For each analysis window the autocorrelation and the recursion
- * give a predictor of every order, of which the one that looks smallest
- * on that window is kept.  A level with few windows codes each window's
+ * For each analysis window the autocorrelation and the recursion give a
+ * predictor of every order, of which the one that looks smallest on that
+ * window is kept.  A level with few windows codes each window's
  * predictor.  A level with many codes only the best few, and to pick
  * them it needs an estimate that holds across windows: a predictor made
  * from one third of the block looks perfect on its own window and says
@@ -661,10 +652,6 @@ template <typename S>
 void try_predictors(Encoder* e, Slot* slot, const S* x, int n) {
   const Level& level = e->level;
   const int max_order = std::min(level.max_lpc_order, n - 1);
-  {
-    uint64_t magnitude;
-    try_fixed(e, slot, x, n, best_fixed_order(e, x, n, slot->bps, &magnitude));
-  }
   double* signal = e->signal.data();
   {
     FLAC_PROFILE(FLAC_PROF_WINDOW);
@@ -672,15 +659,15 @@ void try_predictors(Encoder* e, Slot* slot, const S* x, int n) {
       signal[i] = (double)x[i];
     }
   }
+  /* The pieces: each two hops long, a hop apart, the last one taking
+   * what is left of the block. */
+  const int hop = n / (kScorePieces + 1);
   if (e->window_size != n) {
     for (int w = 0; w < level.windows; w++) {
       double* window = e->windows.data() + (size_t)w * (size_t)level.block_size;
       flac_lpc_window(window, n, level.windows, w, kWindowTaper);
       e->window_energy[w] = flac_lpc_energy(window, n);
     }
-    /* The pieces: each two hops long, a hop apart, the last one taking
-     * what is left of the block. */
-    const int hop = n / (kScorePieces + 1);
     e->piece_last = n - (kScorePieces - 1) * hop;
     flac_lpc_hann(e->piece_window.data(), 2 * hop);
     flac_lpc_hann(e->piece_window.data() + 2 * hop, e->piece_last);
@@ -691,7 +678,6 @@ void try_predictors(Encoder* e, Slot* slot, const S* x, int n) {
 
   Candidate candidates[FLAC_MAX_ANALYSIS_WINDOWS];
   bool found[FLAC_MAX_ANALYSIS_WINDOWS];
-  const int hop = n / (kScorePieces + 1);
   const bool ranked = level.coded < level.windows && hop > 2 * max_order;
   double piece_r[kScorePieces][FLAC_MAX_LPC_ORDER + 1];
   if (ranked) {
@@ -838,17 +824,18 @@ void analyse(Encoder* e, Slot* slot, const S* x, S* shifted, int n, int bps, int
   best.type = kVerbatim;
   best.bits = subframe_header_bits(wasted) + (uint64_t)n * (uint64_t)slot->bps;
 
-  if (e->level.max_lpc_order > 0 && n >= kMinLpcBlock) {
-    try_predictors(e, slot, x, n);
-    return;
-  }
-  /* Without linear prediction: the fixed predictor whose residual is
-   * smallest in magnitude. */
+  /* The fixed predictor whose residual is smallest in magnitude is
+   * always coded; a level with linear prediction adds its predictors.
+   * An order the caller picked on the samples as they came holds here:
+   * the low bits removed above scale every magnitude alike. */
   if (fixed_order < 0) {
     uint64_t magnitude;
     fixed_order = best_fixed_order(e, x, n, slot->bps, &magnitude);
   }
   try_fixed(e, slot, x, n, fixed_order);
+  if (e->level.max_lpc_order > 0 && n >= kMinLpcBlock) {
+    try_predictors(e, slot, x, n);
+  }
 }
 
 /* ── writing ────────────────────────────────────────────────────── */

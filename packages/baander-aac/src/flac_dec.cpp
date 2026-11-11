@@ -60,15 +60,6 @@ size_t frame_bound(int block_size, int channels) {
   return FLAC_MAX_FRAME_HEADER_BYTES + (size_t)channels * ((size_t)block_size * 8 + 16) + 2;
 }
 
-/* Bits a sum of `n` terms adds to the width of one term. */
-int ceil_log2(int n) {
-  int bits = 0;
-  while ((1 << bits) < n) {
-    bits++;
-  }
-  return bits;
-}
-
 /* ── residual ───────────────────────────────────────────────────── */
 
 /* Reads `count` two's complement values of `width` bits, or as many as
@@ -238,12 +229,10 @@ void restore_fixed32(int32_t* FLAC_RESTRICT s, int n, int order) {
  * whose first `order` entries are the warm-up samples. */
 void restore_fixed64(int64_t* FLAC_RESTRICT s, const int32_t* FLAC_RESTRICT res, int n, int order) {
   FLAC_PROFILE(FLAC_PROF_RESTORE);
-  static const int kWeights[5][4] = {
-      {0, 0, 0, 0}, {1, 0, 0, 0}, {2, -1, 0, 0}, {3, -3, 1, 0}, {4, -6, 4, -1}};
   for (int i = order; i < n; i++) {
     uint64_t v = (uint64_t)(int64_t)res[i];
     for (int j = 0; j < order; j++) {
-      v += (uint64_t)(int64_t)kWeights[order][j] * (uint64_t)s[i - 1 - j];
+      v += (uint64_t)(int64_t)kFlacFixedWeights[order][j] * (uint64_t)s[i - 1 - j];
     }
     s[i] = (int64_t)v;
   }
@@ -372,7 +361,7 @@ bool decode_subframe(const FlacDSP* dsp, FlacBitReader* r, int bps, int block_si
       }
       if (!lpc) {
         restore_fixed32(out, block_size, order);
-      } else if (bps + coef_bits + ceil_log2(order) <= 32) {
+      } else if (bps + coef_bits + flac_ceil_log2(order) <= 32) {
         FLAC_PROFILE(FLAC_PROF_RESTORE);
         dsp->lpc_restore_32(out, block_size, order, coefs, shift);
       } else {

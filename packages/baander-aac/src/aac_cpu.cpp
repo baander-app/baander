@@ -45,7 +45,7 @@ static int env_cpu_cap(void) {
   }
   if (strcmp(v, "avx2") == 0) {
     return AAC_CPU_FLAG_SSE2 | AAC_CPU_FLAG_SSE41 | AAC_CPU_FLAG_AVX | AAC_CPU_FLAG_AVX2 |
-           AAC_CPU_FLAG_FMA3 | AAC_CPU_FLAG_BMI2;
+           AAC_CPU_FLAG_FMA3 | AAC_CPU_FLAG_BMI2 | AAC_CPU_FLAG_LZCNT;
   }
   if (strcmp(v, "neon") == 0) {
     return AAC_CPU_FLAG_NEON;
@@ -129,6 +129,15 @@ static int detect_x86_flags() {
     }
     if ((ebx & (1u << 8)) && (ebx & (1u << 3))) {
       flags |= AAC_CPU_FLAG_BMI2;
+    }
+  }
+
+  /* Extended leaf 0x80000001: LZCNT */
+  cpuid(0x80000000u, 0, &eax, &ebx, &ecx, &edx);
+  if (eax >= 0x80000001u) {
+    cpuid(0x80000001u, 0, &eax, &ebx, &ecx, &edx);
+    if (ecx & (1u << 5)) {
+      flags |= AAC_CPU_FLAG_LZCNT;
     }
   }
 
@@ -218,6 +227,7 @@ const char* aac_cpu_flags_string(int flags) {
   F(AAC_CPU_FLAG_AVX2, "AVX2");
   F(AAC_CPU_FLAG_FMA3, "FMA3");
   F(AAC_CPU_FLAG_BMI2, "BMI2");
+  F(AAC_CPU_FLAG_LZCNT, "LZCNT");
   F(AAC_CPU_FLAG_NEON, "NEON");
 #undef F
   if (pos == 0) {
