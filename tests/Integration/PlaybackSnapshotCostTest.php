@@ -22,8 +22,11 @@ require_once dirname(__DIR__) . '/Fixtures/Session/playback-snapshot-cost.php';
  */
 final class PlaybackSnapshotCostTest extends TestCase
 {
-    private const int UNBOUND_PLAYING_SNAPSHOT = 9;
-    private const int BOUND_RESTING_SNAPSHOT = 12;
+    // The SQL store used 9, 12 and 12. The session row is now inserted only when the locked read
+    // finds none, which saves a statement on every snapshot, and the snapshot that first shows a
+    // command to its runner pays one more statement for the mark.
+    private const int UNBOUND_PLAYING_SNAPSHOT = 8;
+    private const int BOUND_RESTING_SNAPSHOT = 11;
     private const int BOUND_FIRST_DISCLOSURE_SNAPSHOT = 12;
     // An addressed command is inserted through the unit of work: one read carries the
     // transaction clock and the replay-key check, a savepoint wraps the insert, and the
@@ -132,6 +135,31 @@ final class PlaybackSnapshotCostTest extends TestCase
         self::assertNull($issued['requestResult']['outcome']);
         self::assertSame($paused['revision'] + 1, $issued['revision']);
         $this->assertWithin(self::CONTROL_ISSUING_ONE_COMMAND, $statements);
+    }
+
+    public function testServingManyAccountsInTurnThroughOneEntityManagerCostsEachSnapshotTheSame(): void
+    {
+        $accounts = array_map(fn(): array => PlaybackCostFixture::pausedRunner($this->service, $this->manager), range(1, 50));
+        // Setting up fifty accounts takes longer than a registration lasts, and a lapsed resting
+        // runner would be released by its first snapshot.
+        $this->connection->executeStatement("UPDATE playback_destination_incarnations SET expires_at=CURRENT_TIMESTAMP+INTERVAL '1 day'");
+        $this->manager->clear();
+        $serve = fn(array $account): array => $this->log->during(fn(): array => PlaybackCostFixture::boundSnapshot($this->service, $account['owner'], $account['runner']));
+
+        $alone = $serve($accounts[0]);
+        $this->assertWithin(self::BOUND_RESTING_SNAPSHOT, $alone);
+        foreach ([1, 2] as $tick) {
+            foreach ($accounts as $number => $account) {
+                self::assertCount(count($alone), $serve($account), "Tick {$tick}, account {$number}.");
+            }
+            // Nothing the relay served stays managed, so the next tick's flushes have nothing to walk.
+            self::assertSame(0, $this->manager->getUnitOfWork()->size(), "After tick {$tick}.");
+        }
+        self::assertSame(
+            50,
+            (int) $this->connection->fetchOne('SELECT count(*) FROM listening_sessions WHERE active_incarnation_id IS NOT NULL'),
+            'Every served runner still holds its session.',
+        );
     }
 
     /** @param list<string> $statements */
