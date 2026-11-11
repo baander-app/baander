@@ -217,7 +217,8 @@ Open items:
   Debian's FFmpeg nor this build has;
   `PlaybackTransferPersistenceTest::testReconnectUsesExplicitOldEndpointStopProofWithoutInheritingItsAuthority`
   fails on master code on both FFmpeg builds; `packages/baander-aac`'s
-  `test_usac_enc` byte-identical fixture fails on this host's compiler;
+  `test_usac_enc` byte-identical fixture failed on this host's compiler (fixed
+  2026-11-11; see [bAAC exact arithmetic](#baac-exact-arithmetic));
   `MediaWorkerRunnerTest::testSerialAudioJobsReuseOneSlotWithIncreasingLaunchGenerations`
   failed once under CPU load and passes alone; GitHub reports 178 Dependabot alerts
   on the default branch (3 critical, 78 high).
@@ -851,6 +852,79 @@ Open, known limits:
 - **Planned next:** Doctrine entities for the four SQL-owned playback tables, on
   their own plan and branch. Delivered since; see
   [Playback session entities](#playback-session-entities).
+
+### bAAC exact arithmetic
+
+Delivered from the [plan](docs/plans/2026-11-11-1916-fix-baac-exact-arithmetic-plan.md)
+on the branch `fix-usac-encoder-vector`, by the user's decision of 2026-11-11: every
+compiler writes the same bytes, and nothing on the transcoder's path gets slower.
+The Release build had put `-fassociative-math`, `-freciprocal-math`,
+`-fno-signed-zeros` and `-ffinite-math-only` on every file, so each compiler
+regrouped sums its own way: CI's GCC 13.3 passed 46 of 46, GCC 16 failed
+`test_usac_enc`, and when GitHub's `ubuntu-latest` moved to GCC 15.2 the AAC native
+addon workflow failed on master. Swapping object files between compilers located two
+causes, the tests' signal generator and the QMF reductions.
+
+- **Flags (`bd175794f`):** Release keeps `-O3 -fno-math-errno -fno-trapping-math`;
+  `-ffp-contract=off` applies in every configuration; 32-bit x86 builds with GCC add
+  `-mfpmath=sse`. The stored-vector suites check their generated signal's checksum
+  first, so a different signal is named as such.
+- **Speed remedies (`bd175794f`, `4039dff18`, `768802054`):** the QMF loops are
+  interchanged over transposed tables; `fmaxf` and `fminf` became inline
+  comparisons; the AAC-LC noise sum is a DSP kernel with identical scalar, SSE2,
+  AVX2 and NEON bits; the LPD synthesis filter, `lpd_dct4`, SBR tonality and the TNS
+  autocorrelation use fixed-order partial sums.
+- **Review fixes (`5210f3e7c`):** the afterburner measures noise with the same
+  kernel; NaN or huge input is coded from a cleaned copy (it had made `bit_demand`
+  convert a NaN to an integer); sort ties break by channel then band, so every C++
+  library orders them alike.
+
+Measured, 2026-11-11: 48 of 48 on GCC 14.2 (the FFmpeg image's compiler), 15.2
+(CI), 16.2, clang 23, the sanitizer build and a Debug build, and 46 of 46 earlier on
+GCC 13.3, 14.3, 15.3 and clang 18 and 21; every build writes the fourteen committed
+streams at the default, scalar, SSE2 and AVX2 levels; 41 committed streams decode to
+identical samples across builds; glibc's non-FMA libm variants change no byte.
+Against the old flags on GCC 14.2 and 16.2 (alternating pairs on one core) no
+workload is slower: encodes 0.90 to 0.98, decodes 0.70 to 1.01, xHE-AAC speech
+decode 0.99 (it was 1.06 and 1.08 before the fixed-order sums). The six LPD streams
+decode differently from before by at most 3.2e-6 of full scale, 112 to 141 dB below
+the signal.
+
+Open:
+
+- NEON code, including the new kernel, has never executed; no CI runner compares it
+  with scalar. The lossless branch's CI adds native arm64 suites.
+- CI writes the committed streams and checks against them with the same compiler; a
+  second compiler in the Linux job is the requirement that catches a regression.
+- The published speed tables and per-stream decoder figures in the package's
+  documents were measured with the fast-math build; FDK and libxaac are not on this
+  host to measure again.
+- MSVC and toolchains other than GCC and Clang get none of the options, and other C
+  libraries are unverified.
+
+### Master CI repair
+
+`master` had failed every `CI` run since 2026-11-05 and, after the movie playback
+merge, Frontend CI too. Fixed 2026-11-11 (`dfa6e4967`, `76474e24f`, `c643dcb4f`,
+`4a4133ffd`, `72cc1ab49`):
+
+- 24 player cases in `ui/web/tests/features/catalog/hooks` still asserted behaviour
+  that the movie playback commits changed on purpose; the branch's checkpoints had
+  run only the co-located tests.
+- The desktop lockfile records a hash of the whole `packages/baander-aac` folder, so
+  every change there moved it; Frontend CI now runs on that folder, and the CI guide
+  states the rule.
+- The DASH publication fixture required FFmpeg 7, and the image has shipped 8.1
+  since `537f20336`; it now requires 8 and prints the fixture's output on failure.
+  Locally it passes on 8.1.
+- ThreadSanitizer cannot disable address randomization on the Ubuntu 26.04 runner,
+  so the registry thread job runs on 24.04.
+- The worker cleanup regression ran PHPUnit on the runner, where no `vendor` exists;
+  it runs in the CI image.
+
+Open: the runs for `4a4133ffd` and `72cc1ab49` stayed queued on GitHub for hours,
+so no complete green run has been observed yet. The registry release job failed once
+on a load-smoke lookup that answered 503; it had passed on the two runs before.
 
 ### Playback session entities
 
