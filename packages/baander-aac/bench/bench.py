@@ -785,11 +785,11 @@ def stage_selftest(args):
     # busy ticks are 42 CPU seconds; the run used 12 of them over 20 s, so
     # the rest of the host used 1.5 CPUs.  Idle and iowait are not busy.
     stat_a = "cpu  1000 0 500 90000 300 0 0 0 0 0\ncpu0 1 2 3 4\n"
-    stat_b = "cpu  4000 0 1500 99000 900 100 100 0 0 0\ncpu0 1 2 3 4\n"
+    stat_b = "cpu  3900 0 1500 99000 900 100 100 100 0 0\ncpu0 1 2 3 4\n"
     a = dict(busy=busy_seconds(stat_a, 100), own=3.0, clock=100.0)
     b = dict(busy=busy_seconds(stat_b, 100), own=15.0, clock=120.0)
     expect(abs(busy_seconds(stat_b, 100) - busy_seconds(stat_a, 100) - 42.0) < 1e-9,
-           "the busy time of /proc/stat counts user, nice, system, irq and softirq")
+           "the busy time of /proc/stat counts user, nice, system, irq, softirq and steal")
     expect(abs(other_cpu(a, b) - 1.5) < 1e-9, "the rest of the host used 1.5 CPUs")
     expect(quiet_verdict(dict(other_cpu_start=0.4, other_cpu_run=other_cpu(a, b)))[0],
            "1.5 CPUs is quiet")

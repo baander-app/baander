@@ -142,8 +142,9 @@ and the corpus items.
   runnable at its sampling ticks, every five seconds, so on a host
   running containers that wake briefly and often it reads well above the
   CPU they use. A run that was limited (`--only`, `--gates-only`,
-  `--reps`) or whose host was not quiet is recorded as such and is not a
-  gate result: `check` exits non-zero for it.
+  `--reps`, `--any-flac`, or `--quiet-cpu` above 2.0) or whose host was
+  not quiet is recorded as such and is not a gate result: `check` exits
+  non-zero for it.
 - **Locale.** The harness sets `LC_ALL=C` for every tool it starts:
   `flac` reads the times given to `--skip` and `--until` with the
   locale's decimal separator, and refuses `5:00.00` where that separator

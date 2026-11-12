@@ -534,7 +534,10 @@ class LosslessRun:
         self.core = args.core if args.core is not None else pick_core()
         self.repeats = max(args.repeat, 5)
         self.only = re.compile(args.only or ".")
-        self.limited = bool(args.only or args.gates_only or args.any_flac or args.reps)
+        # A quiet-host limit above the rule's is a measurement for
+        # information, like the other limits: it cannot make a gate result.
+        self.limited = bool(args.only or args.gates_only or args.any_flac or args.reps
+                            or args.quiet_cpu > QUIET_CPU)
         self.load_start = os.getloadavg()
         self.started = datetime.datetime.now().astimezone().isoformat(timespec="seconds")
         self.host = host_info(self.core)
@@ -1007,7 +1010,8 @@ def check_lossless(result, out=sys.stdout):
                              else "bAAC levels larger than the level below: " + ", ".join(larger)),
           file=out)
     if not result.get("complete", False):
-        print("not a gate result: the run was limited (--only, --gates-only, --reps or --any-flac)",
+        print("not a gate result: the run was limited (--only, --gates-only, --reps, --any-flac or "
+              "a raised --quiet-cpu)",
               file=out)
         ok = False
     else:
