@@ -44,10 +44,12 @@ the generated tables are in `bench/results/` (`quality.csv`,
 - **Lossless:** bAAC's lossless mode writes FLAC. At level 5 its frames
   take 10,232,449 bytes on this corpus against 10,248,681 for `flac -5`,
   and at level 8 9,998,768 against 10,010,621. ALAC needs 690 to 697
-  kbit/s on the same corpus, FLAC 614 to 691 by level. The speed
-  comparison with `flac` is judged by gates, which
-  [Lossless](#lossless) states. AAC-LC at 256 kbit/s is 2.7 times
-  smaller than ALAC and scores -0.02 on PEAQ.
+  kbit/s on the same corpus, FLAC 614 to 691 by level. Every gate of
+  the recorded run passed: bAAC encodes in 0.81 and 0.87 of `flac`'s
+  CPU time at levels 5 and 8, decodes `flac`'s own streams in 0.79 to
+  0.81 of it, and passes the same gates on three held-out recordings
+  ([Lossless](#lossless)). AAC-LC at 256 kbit/s is 2.7 times smaller
+  than ALAC and scores -0.02 on PEAQ.
 
 ## What was measured
 
@@ -481,21 +483,28 @@ and with the others.
 
 ### Speed
 
-The speed gates are read from the recorded run: the first complete run
-on a quiet host after the last change to the codec. That run has not
-been taken yet, so the cells below are empty; `bench/results/tables.md`
-will carry them, and this table is filled from it.
+The speed gates are read from the recorded run of 12 November 2026, the
+first complete run on a quiet host after the last change to the codec.
+A ratio is bAAC's CPU time over the reference's: the median of five
+paired repeats, with their range. Each timed process ran over the
+corpus repeated 36 times.
 
 | Gate | Ratio, median (range) | Threshold | Verdict |
 |---|---:|---:|---|
-| Encode at level 5 against `flac -5` | | | |
-| Encode at level 8 against `flac -8` | | | |
-| Decode of `flac -5` streams against `flac -d` | | | |
-| Decode of `flac -5` streams against FFmpeg | | | |
-| Decode of `flac -8` streams against `flac -d` | | | |
-| Decode of `flac -8` streams against FFmpeg | | | |
-| Encode at level 5 against FFmpeg ALAC | | | |
-| Decode of its own level 5 stream against FFmpeg decoding ALAC | | | |
+| Encode at level 5 against `flac -5` | 0.813 (0.810 to 0.817) | 1.009 | Passed |
+| Encode at level 8 against `flac -8` | 0.868 (0.862 to 0.872) | 1.008 | Passed |
+| Decode of `flac -5` streams against `flac -d` | 0.792 (0.790 to 0.794) | 1.004 | Passed |
+| Decode of `flac -5` streams against FFmpeg | 0.411 (0.410 to 0.411) | 1.004 | Passed |
+| Decode of `flac -8` streams against `flac -d` | 0.808 (0.806 to 0.810) | 1.002 | Passed |
+| Decode of `flac -8` streams against FFmpeg | 0.452 (0.452 to 0.454) | 1.005 | Passed |
+| Encode at level 5 against FFmpeg ALAC | 0.259 (0.256 to 0.260) | 1.005 | Passed |
+| Decode of its own level 5 stream against FFmpeg decoding ALAC | 0.232 (0.231 to 0.232) | 1.003 | Passed |
+
+The figures recorded beside the judged ones agree. Encoding from WAV
+gives 0.786 and 0.854 at levels 5 and 8. With one process per corpus
+item, which adds each tool's start, encoding gives 0.849 to 0.895 and
+decoding against `flac -d` 0.879 and 0.887. `bench/results/tables.md`
+lists every figure.
 
 ### Corpus additions and the enlarged corpus
 
@@ -515,9 +524,14 @@ encode gate and two decode gates at level 5. The sizes at level 5:
 | 5.1, 16-bit | 41 | 164,138 | 167,275 |
 | 16-bit stereo | 01 | 541,106 | 541,445 |
 
+Each set passed its size, encode and decode gates in the recorded run.
+bAAC encodes in 0.79 to 0.92 of `flac`'s CPU time, and decodes in 0.79
+to 0.80 of the time `flac -d` takes and 0.39 to 0.49 of FFmpeg's.
+
 The enlarged corpus is the ten items and these seven recordings. Its
-totals at levels 5 and 8, and its size gates, are read from the recorded
-run. The figures of the size table above are those of the original
+frame bytes are 27,386,433 for bAAC against 27,415,181 for `flac -5`,
+and 27,084,711 against 27,111,090 at level 8, so both of its size gates
+passed. The figures of the size table above are those of the original
 corpus, the ten items alone.
 
 ### Held-out recordings
@@ -529,8 +543,26 @@ master of the film Sintel (48 kHz, 16-bit) and the audio of that film's
 trailer (48 kHz, 16-bit stereo, 52 s). The harness reads them only in a
 complete run that starts on a quiet host and records whether that run
 was their first; [bench/README.md](../bench/README.md#held-out-recordings)
-states the mechanism and the sources. Their sizes and gates are read
-from the recorded run, which is their first.
+states the mechanism and the sources.
+
+| Recording | bAAC frame bytes | `flac -5` frame bytes | Encode | Decode against `flac -d` | Decode against FFmpeg |
+|---|---:|---:|---:|---:|---:|
+| Variatio 4, 96 kHz, 24-bit stereo, 68.6 s | 19,050,607 | 19,054,554 | 0.940 | 0.825 | 0.474 |
+| Sintel 5.1 master, 5:00 to 5:20, 48 kHz, 16-bit | 4,685,215 | 4,691,270 | 0.874 | 0.824 | 0.508 |
+| Sintel trailer, 48 kHz, 16-bit stereo, 52.0 s | 4,649,481 | 4,662,873 | 0.874 | 0.794 | 0.399 |
+
+Every gate passed, and every stream decodes bit for bit. The ratios are
+bAAC's CPU time over the reference's, as above.
+
+The recorded run was the fourth on these recordings, and all four
+measured the same build of `baac`. The first stopped after the 96 kHz
+recording because the harness failed: `flac` refused the start time of
+the film master's span, which it read with the host locale's decimal
+comma. The second and third completed with every gate passed, but did
+not count, because the rule for a quiet host then used the load
+average. That rule now measures the CPU used by the rest of the host,
+and the fourth run was quiet by it. The encoder did not change between
+the runs.
 
 The seven testbench recordings above were the first held-out set. They
 were run once before the encoder was final, on a host under load, and
@@ -547,7 +579,11 @@ answer to it.
 
 The figures are those of one build on one machine: the `baac` tool and
 the library as CMake builds them in Release with GCC, on an x86-64
-processor with AVX2. Three things differ elsewhere.
+processor with AVX2. The recorded run used an AMD Ryzen 7 5800X3D with
+GCC 16.2.1, `flac` 1.4.3 and FFmpeg 8.1.3 on Linux 7.3, each timed
+process pinned to one core under the performance governor. The rest of
+the host used 0.63 CPUs on average during the run and 1.78 in the
+minute before it. Three things differ elsewhere.
 
 - A build with MSVC, which is how the Windows prebuild of the binding is
   made, writes Rice codes with the loop every level shares and not with
