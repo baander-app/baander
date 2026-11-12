@@ -245,11 +245,42 @@ final class OperatorQualification
             // loopback at the application origin, so its Origin header matches the websocket
             // and CORS policies the same way the drill's in-container clients do, and the
             // web's network alias keeps that path valid when the web container is replaced.
-            $this->commands->run(
-                [$hook, $phase, $this->state->artifacts, OperatorProvisioning::WEB_ORIGIN, $this->state->runId, 'web:9501'],
-                terminationGrace: 40,
-            );
+            try {
+                $this->commands->run(
+                    [$hook, $phase, $this->state->artifacts, OperatorProvisioning::WEB_ORIGIN, $this->state->runId, 'web:9501'],
+                    terminationGrace: 40,
+                );
+            } catch (Throwable $error) {
+                // A worker unit that stopped during the phase fails whichever wait the browser
+                // was in, so the browser's message alone points at the wrong layer. The
+                // diagnosis never takes the place of the checkpoint's own error.
+                try {
+                    $stopped = $this->stoppedUnits();
+                } catch (Throwable) {
+                    $stopped = [];
+                }
+                if ($stopped !== []) {
+                    fwrite(STDERR, 'Worker units not running when the ' . $phase . ' checkpoint failed: ' . implode('; ', $stopped) . "\n");
+                }
+                throw $error;
+            }
         }
+    }
+
+    /** @return list<string> */
+    private function stoppedUnits(): array
+    {
+        $stopped = [];
+        foreach ([$this->state->controlName, $this->state->workerName] as $name) {
+            if ($name === '') {
+                continue;
+            }
+            $state = trim($this->docker(['inspect', '--format', '{{.State.Status}} exit {{.State.ExitCode}} at {{.State.FinishedAt}}', $name], false)->stdout);
+            if (!str_starts_with($state, 'running')) {
+                $stopped[] = $name . ' ' . ($state === '' ? 'missing' : $state);
+            }
+        }
+        return $stopped;
     }
 
     public function snapshot(string $role, string $name, string $label): void

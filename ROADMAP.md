@@ -1016,9 +1016,38 @@ merge, Frontend CI too. Fixed 2026-11-11 (`dfa6e4967`, `76474e24f`, `c643dcb4f`,
 - The worker cleanup regression ran PHPUnit on the runner, where no `vendor` exists;
   it runs in the CI image.
 
-Open: the runs for `4a4133ffd` and `72cc1ab49` stayed queued on GitHub for hours,
-so no complete green run has been observed yet. The registry release job failed once
-on a load-smoke lookup that answered 503; it had passed on the two runs before.
+Fixed 2026-11-12 (`424184a6b`, `dd8d463b5`, `ee25b6456`): the reviewed local change
+to two swoole-bundle files is recorded, the CI image installs `zstd` for the package
+store's tests, and the Python-free tooling step passes.
+
+The run for `ee25b6456` then failed twice in the Firefox two-command gate, with a
+different error each time; the Chromium gate passed both times. Fixed on the branch
+`fix-two-command-firefox`:
+
+- **Gate defect, shown and fixed:** the checkpoint parsed the player's source with
+  `new URL()` while the player had emptied the element between two attachments,
+  and threw "Invalid URL". Firefox leaves the element empty for 9 to 26 ms (median
+  18 ms over 12 attachments in the failed run's receipts), Chromium for 5 to 7 ms.
+  An empty source is now treated as not yet the expected one.
+- **Worker drain, likely cause:** in the second attempt an empty Messenger poll ended
+  with "Ordinary delivery ownership is uncertain" and both worker units drained, so
+  the subtitle wait that was running timed out. Returning an empty receive's permit
+  now retries for up to two seconds when the admission lock is contended, and the
+  error names its fault code. The run recorded no code, so contention is the likely
+  cause, not an established one; a unit test with another process holding the lock
+  for 200 ms reproduces the failure and fails without the change. A checkpoint that
+  fails now prints which worker units were not running.
+
+Verified locally: unit suite 8,594 of 8,594 (7,704 ordinary, 890 native); the four
+Messenger integration files, 24 of 24; PHPStan, Deptrac, the tooling analysis and its
+format check; the Firefox two-command gate with client controls. The Firefox gate
+had also passed locally before the change, so the proof of the fix is the next
+GitHub run. Not run: the 8 + 12 load proof, whose source and profile are not
+recorded.
+
+Open: no complete green `CI` run on GitHub has been observed since 2026-11-05. The
+registry release job failed once on a load-smoke lookup that answered 503; it had
+passed on the two runs before.
 
 ### Playback session entities
 

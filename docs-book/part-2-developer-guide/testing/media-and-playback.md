@@ -740,6 +740,15 @@ class and location, and a tick that finds its admission lock contended publishes
 nothing instead of ending the autoscaler. The passes above ran after both
 changes.
 
+On GitHub on 2026-11-12 the Firefox two-command gate lost its deployment in the
+same way during the attached phase: an empty Messenger poll ended with "Ordinary
+delivery ownership is uncertain", and both units drained. Returning the permit of
+an empty receive now retries for up to two seconds when the lock is contended,
+because such a receive owns no message, and the error names its fault code. The
+run recorded no fault code, so lock contention is the likely cause but not an
+established one. A unit test reproduces the failure with another process holding
+the lock for 200 ms.
+
 Run browser controls against the immutable production worker image through the
 combined deployment runner:
 

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Shared\Infrastructure\Messenger;
 
+use App\Shared\Infrastructure\Worker\Autoscaling\AdmissionLockContended;
 use App\Shared\Infrastructure\Worker\Autoscaling\WorkerAdmissionContext;
 use Symfony\Component\DependencyInjection\Attribute\Exclude;
 use Symfony\Component\Messenger\Bridge\Redis\Transport\RedisTransport;
@@ -18,6 +19,12 @@ use Symfony\Component\Messenger\Transport\TransportInterface;
 #[Exclude]
 final class OrdinaryAdmissionTransport implements TransportInterface, KeepaliveReceiverInterface, SetupableTransportInterface, CloseableTransportInterface, MessageCountAwareInterface
 {
+    /**
+     * How long a receive that delivered nothing keeps trying to return its permit. A peer whose
+     * heartbeat is two seconds old already drains the deployment, so waiting longer gains nothing.
+     */
+    private const float EMPTY_RELEASE_SECONDS = 2.0;
+
     private int $sequence = 0;
     private ?string $activeRequest = null;
 
@@ -50,21 +57,42 @@ final class OrdinaryAdmissionTransport implements TransportInterface, KeepaliveR
             return [];
         }
         $this->activeRequest = $request;
+        $result = [];
         try {
-            $result = [];
             foreach ($this->inner->get() as $envelope) {
                 if ($result !== []) {
                     throw new \RuntimeException('Unsupported ordinary receiver batching.');
                 }
                 $result[] = $envelope->with(new OrdinaryAdmissionStamp($request));
             }
-            if ($result === []) {
-                $this->admission->ledger->complete($this->admission->identity, $request, hrtime(true) / 1e9);
-                $this->activeRequest = null;
-            }
-            return $result;
         } catch (\Throwable) {
             $this->fail($request, 'receive_uncertain');
+        }
+        if ($result === []) {
+            $this->releaseEmpty($request);
+        }
+        return $result;
+    }
+
+    /**
+     * Returns the permit of a receive that delivered nothing. No message is owned under it, so a
+     * lock that another process holds past one deadline only delays the return.
+     */
+    private function releaseEmpty(string $request): void
+    {
+        $deadline = hrtime(true) / 1e9 + self::EMPTY_RELEASE_SECONDS;
+        while (true) {
+            try {
+                $this->admission->ledger->complete($this->admission->identity, $request, hrtime(true) / 1e9);
+                $this->activeRequest = null;
+                return;
+            } catch (AdmissionLockContended) {
+                if (hrtime(true) / 1e9 >= $deadline) {
+                    $this->fail($request, 'release_contended');
+                }
+            } catch (\Throwable) {
+                $this->fail($request, 'receive_uncertain');
+            }
         }
     }
 
@@ -134,6 +162,6 @@ final class OrdinaryAdmissionTransport implements TransportInterface, KeepaliveR
         } catch (\Throwable) {
             // An unavailable ledger cannot release possibly owned work.
         }
-        throw new \RuntimeException('Ordinary delivery ownership is uncertain; worker reconciliation is required.');
+        throw new \RuntimeException('Ordinary delivery ownership is uncertain (' . $code . '); worker reconciliation is required.');
     }
 }
