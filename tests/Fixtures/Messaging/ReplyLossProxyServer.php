@@ -86,7 +86,9 @@ try {
         throw new RuntimeException('Reply-loss proxy could not listen.');
     }
     $address = stream_socket_get_name($server, false);
-    file_put_contents($prefix . '.ready', substr($address, strrpos($address, ':') + 1));
+    // The proxy's owner reads the port as soon as the file exists, so it appears whole.
+    file_put_contents($prefix . '.ready.tmp', substr($address, strrpos($address, ':') + 1));
+    rename($prefix . '.ready.tmp', $prefix . '.ready');
     $client = stream_socket_accept($server, 5);
     $upstream = stream_socket_client('tcp://' . $config['host'] . ':' . $config['port'], $errno, $error, 2);
     if ($client === false || $upstream === false) {
