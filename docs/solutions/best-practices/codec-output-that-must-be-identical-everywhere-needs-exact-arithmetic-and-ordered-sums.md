@@ -31,8 +31,8 @@ it.
 
 Fixed on `master` in `c501eebf1` (`bd175794f`, `4039dff18`, `768802054`, `5210f3e7c`).
 The FLAC encoder's part (its own cosine and base-2 logarithm, and strict math for
-`flac_enc.cpp`) is on the branch `baac-lossless` (`c65fcea36`, `5e3f4b9c2`) and not
-merged yet.
+`flac_enc.cpp`) came with the lossless mode (`c65fcea36`, `5e3f4b9c2`), merged on
+2026-11-12.
 
 ## Symptoms
 
@@ -155,5 +155,7 @@ compiler must follow.
 
 - `docs/solutions/best-practices/static-ffmpeg-build-silently-drops-components-the-application-uses.md`:
   another way the FFmpeg image's build differs from what was tested.
-- Open, recorded in `ROADMAP.md`: NEON code has never executed and no CI runner compares
-  it with scalar; MSVC and toolchains other than GCC and Clang get none of the options.
+- Since 2026-11-12 the arm64 job of `aac-native.yml` compares the NEON kernels with
+  scalar, 8 of the AAC table and 6 of the lossless mode, and checks that they are the
+  level's own. Open, recorded in `ROADMAP.md`: MSVC and toolchains other than GCC and
+  Clang get none of the options.

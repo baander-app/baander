@@ -986,8 +986,9 @@ the signal.
 
 Open:
 
-- NEON code, including the new kernel, has never executed; no CI runner compares it
-  with scalar. The lossless branch's CI adds native arm64 suites.
+- Closed 2026-11-12: the arm64 job of `aac-native.yml` runs `test_dsp`, which compares
+  the 8 NEON kernels of the AAC table, the noise kernel among them, with scalar bit for
+  bit and checks that they are the level's own; the lossless suites do the same for 6.
 - CI writes the committed streams and checks against them with the same compiler; a
   second compiler in the Linux job is the requirement that catches a regression.
 - The published speed tables and per-stream decoder figures in the package's
@@ -1040,10 +1041,11 @@ different error each time; the Chromium gate passed both times. Fixed on the bra
 
 Verified locally: unit suite 8,594 of 8,594 (7,704 ordinary, 890 native); the four
 Messenger integration files, 24 of 24; PHPStan, Deptrac, the tooling analysis and its
-format check; the Firefox two-command gate with client controls. The Firefox gate
-had also passed locally before the change, so the proof of the fix is the next
-GitHub run. Not run: the 8 + 12 load proof, whose source and profile are not
-recorded.
+format check; the two-command gates in Firefox and Chromium with client controls,
+the movie-endpoint gate and the media-control gate. The Firefox gate had also passed
+locally before the change, so the proof of the fix is GitHub: in the run for
+`715eeb86e` the Firefox two-command gate passed. Not run: the 8 + 12 load proof,
+whose source and profile are not recorded.
 
 Open: no complete green `CI` run on GitHub has been observed since 2026-11-05. The
 registry release job failed once on a load-smoke lookup that answered 503; it had
@@ -1214,6 +1216,82 @@ merge:
   about 0.87 of this host on one thread would have failed the old wait every time;
   hosted results were not checked for that.
 
+
+### bAAC lossless mode
+
+Delivered from the [plan](docs/plans/2026-11-10-2313-feat-baac-lossless-flac-plan.md)
+on the branch `baac-lossless`, by the user's request of 2026-11-10: "baac does not
+support lossless, it should so we are on par with the other codecs (or better). It
+should be efficient with good performance." bAAC writes and reads standard FLAC with
+its own encoder and decoder, written from RFC 9639; the package version is 0.2.0.
+
+- **Codec (U1 to U6):** a decoder for every valid native FLAC stream (1 to 8
+  channels, 4 to 32 bits, fixed and variable block sizes), an encoder at levels 0 to
+  8 in the streamable subset, and SSE2, AVX2 and NEON kernels with the scalar
+  kernels' bits. The analysis uses its own cosine and base-2 logarithm, so encoded
+  bytes do not depend on the C library (KD8).
+- **Surfaces (U7, U8, U15):** `baac flac enc`, `dec`, `test` and `info`; Node
+  `FlacEncoder` and `FlacDecoder`; Vorbis comments and pictures; ID3 tags passed over
+  and reported (KD7).
+- **Hardening (U9):** fuzz harnesses for the decoder and the encoder; a work budget
+  for the frame search behind damage, which on input crafted to overdraw it may pass
+  over a frame right behind the damage (KD10).
+- **Measurement (U10, U11):** the harness's lossless stage, its gates and the
+  recorded run below. The held-out set was replaced twice: the first after a run
+  under load had failed two encode gates (KD6), the second after the code review
+  changed the binary that had first read it (KD11).
+- **Documentation, website and CI (U12 to U14):** the package README, the codec
+  comparison, `CONCEPTS.md`, the `/baac` page with its evidence validator, and
+  `aac-native.yml` on four platforms, which runs the lossless suites with the
+  reference `flac`, FFmpeg and the decoder testbench required.
+
+Reviews: the first code review (`5957de556..3131bba38`) was closed in `5e3f4b9c2`. The
+second, of the work after it, confirmed two decoder defects in the frame search (a
+frame that leaves its depth to a missing STREAMINFO vanished or stalled the decoder
+when fed in pieces), an incomplete candidate read again outside the budget, and a
+website claim that Windows reproduced fifteen pinned streams when it checked six. All
+four were fixed in `7f95ce809` and `54d5484e3`, with tests that fail without the fix.
+The addon workflow had failed on three platforms (`mkdtemp` undeclared on macOS; the
+tool sized a raw input from a directory's seek offset on ext4); fixed in `7a936746f`.
+
+Recorded run (run 6, 2026-11-12, AMD Ryzen 7 5800X3D, GCC 16.2.1, `flac` 1.4.3,
+FFmpeg 8.1.3; the rest of the host used 0.49 CPUs in the minute before and 0.82
+during the run): 37 of 38 gates passed and every stream is bit-exact. bAAC's frames
+are smaller than `flac`'s at every level on the corpus (level 5: 10,232,449 against
+10,248,681 bytes; level 8: 9,998,768 against 10,010,621). Judged speed, bAAC's CPU
+time over the reference's: encode 0.814 and 0.870 at levels 5 and 8; decode of
+`flac`'s streams 0.794 and 0.809 of `flac -d`, 0.406 and 0.453 of FFmpeg; ALAC encode
+0.260, decode 0.229. The failed gate is the held-out size gate on the 96 kHz 24-bit
+piano recording: 9,821,712 bytes against 9,795,735 for `flac -5`, 0.27 % larger. By
+the user's decision of 2026-11-12 the mode lands with the failure disclosed in the
+results, the comparison and the website (KD12).
+
+Verification (no code under `packages/baander-aac` changed after `8248b0cdb`): Release and sanitizer suites 68 of 68 with every oracle
+required; Node binding 31 of 31; ten minutes each of the FLAC decoder and encoder fuzz
+harnesses, no finding; `aac-native.yml` on all four platforms at `8248b0cdb`, with the
+arm64 runner comparing 8 AAC and 6 lossless NEON kernels with scalar; the FFmpeg
+image's `baac-builder` stage builds with GCC 14.2; the evidence test 40 of 40, the
+website build and the `/baac` browser test 10 of 10.
+
+Open:
+
+- Better compression of material like the failed held-out recording is its own plan
+  (KD12). It counts as tuning in answer to the third set, so it ends with a fourth
+  fresh held-out set and a new recorded run.
+- The server's lossless renditions and a FLAC codec in the FFmpeg wrapper are their
+  own plans (KD3). The wrapper plan decides how the C structs are versioned.
+- No speed was measured on ARM or with MSVC, whose build writes Rice codes with the
+  shared loop and not the AVX2 kernel.
+- FLAC in fragmented MP4, the Electron bridge and a browser playback matrix belong to
+  the feature that delivers FLAC to clients.
+- The harness selftest runs in no CI job; it needs numpy on the runner.
+- The library is renamed to Bånder Audio Core (`bac`) next, by the user's decision
+  of 2026-11-12: it has grown from one codec into an audio component. The rename is
+  full (package, library, CLI, headers, the `baac_*` prefix, the Node package, the
+  FFmpeg codec names, the server setting and the website page, with `/baac/`
+  redirected) and its plan is ready on the branch `rename-audio-core` (KD13). The
+  `aac-native-v0.2.0` tag is held, so the first release carries the new name; until
+  then installs build the binding from source.
 
 ## Roadmap maintenance
 
