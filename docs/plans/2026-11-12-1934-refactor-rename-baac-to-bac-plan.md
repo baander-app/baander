@@ -18,7 +18,7 @@ execution: code
 
 **Product authority:** The user's decisions of 2026-11-12, recorded in Key Decisions KD1 to KD3.
 
-**Base:** The branch `rename-audio-core` was created from `baac-lossless` at `8248b0cdb` to take the inventory. The lossless work lands on `master` first, under the current names. Implementation starts from `master` after that landing (U1).
+**Base:** The inventory was first taken on a branch cut from `baac-lossless` at `8248b0cdb`. The lossless work landed on `master` at `28866bf56` on 2026-11-12, under the current names. The landing brought the third held-out set (Avon Chang's recording of Bach's Cello Suite No. 6, the Tears of Steel 5.1 mix and Cloudkicker) and one failed held-out size gate, disclosed under the lossless plan's KD12. It recorded the rename decision as that plan's KD13, and it changed the `/baac` page text, the ROADMAP's rename item and the codec comparison. The branch `rename-audio-core` was then cut from `master` at `28866bf56`, with this plan as its first commit (`ce41378f1`), and U1 re-takes the inventory against `master`.
 
 **Execution profile:** One branch with eleven units, landing as local commits in U-ID order. U10 must stay the last code commit: its image pin exists only after the image is built from it, and the pin is added by amending U10 at the branch tip (KTD5). U11 records the delivery.
 
@@ -30,8 +30,9 @@ execution: code
 - At the end of U10, the residue gate in the Verification Contract finds an old-name token outside its allowlist.
 - The renamed FFmpeg patch does not apply, or `configure` does not find the `bac` module.
 - A renamed CMake option, environment variable or path filter is not read under its new name (the negative checks of KTD13).
+- A step would read the follow-up's fourth held-out set before the rename lands (KD4).
 
-**Who finishes:** `ce-work` implements on the branch, and the lead owns the commits and the ROADMAP record. The user asks for every push and dispatch, cuts `audio-core-v0.2.0` and publishes the website (KTD6).
+**Who finishes:** `ce-work` implements on the branch, and the lead owns the commits and the ROADMAP record. The user asks for every push and dispatch, cuts `audio-core-v0.2.0` and publishes the website (KTD6). On 2026-11-12 the user authorized the persistent instance's `make dev-up` at the landing (KTD6 step 4). The lead runs it; implementation workers never touch that instance.
 
 ---
 
@@ -47,7 +48,7 @@ bAAC began as Bånder's AAC encoder and decoder, and the name says so. The libra
 
 The timing makes the rename cheap. No release of the binding exists: GitHub has no `aac-native-v*` tag or release (checked 2026-11-12), and the 0.2.0 tag is held so that the first release carries the new name. The project has no production deployments (AGENTS.md, temporary pre-release policy). Three things do exist under the old names: local instances that store the setting value `baac`, the published FFmpeg image whose codec is `libbaac`, and the public page `https://baander.app/baac/`, live since 2026-10-31.
 
-The lossless plan's KD4 kept the names because FFmpeg's configure check, the Electron dependency and the prebuild assets referred to them. This plan changes all three together, which removes that reason.
+The lossless plan's KD4 kept the names because FFmpeg's configure check, the Electron dependency and the prebuild assets referred to them. This plan changes all three together, which removes that reason. The lossless plan records the rename as its KD13, which supersedes KD4.
 
 ### Key Decisions
 
@@ -62,7 +63,8 @@ The lossless plan's KD4 kept the names because FFmpeg's configure check, the Ele
   - FFmpeg's `libbaac` becomes `libbac`, the setting value `baac` becomes `bac`, and the page `/baac` becomes `/bac`.
 
   Governs R1, R4 to R7, R9, R10.
-- KD3. **The rename follows the lossless landing on its own branch, and the first release carries the new name.** (session-settled: user-directed — chosen over cutting `aac-native-v0.2.0` first or renaming inside the lossless branch: the lossless work lands tonight under the current names) Governs R5.
+- KD3. **The rename follows the lossless landing on its own branch, and the first release carries the new name.** (session-settled: user-directed — chosen over cutting `aac-native-v0.2.0` first or renaming inside the lossless branch: the lossless work lands tonight under the current names) The lossless work landed that night, at `28866bf56`. Governs R5.
+- KD4. **The rename lands before the follow-up on hi-res compression.** (Lead decision, 2026-11-12, derived from the held-out rule; the user decided that the lossless mode lands first and that the follow-up is planned, not this order.) The lossless plan's KD12 opened a follow-up for material like the failed 96 kHz piano recording, and that follow-up ends with a fourth fresh held-out set and a new recorded run. The rename changes the binary, both its name and the FLAC vendor string (KTD7), and a held-out set that an earlier build has read is spent. So no tool reads the fourth set before the rename lands.
 
 ### Requirements
 
@@ -106,6 +108,7 @@ The lossless plan's KD4 kept the names because FFmpeg's configure check, the Ele
 - The FFmpeg image keeps its name, `ffmpeg-baander-static`.
 - Codec behaviour, the package version and the measured figures do not change.
 - `ui/rn` carries no old name and is not touched.
+- No step on this branch reads held-out recordings. The only ones sit in the lossless worktree, and U4's ledger checks run on a made-up ledger. Benchmark data in other checkouts is moved at the landing, not on this branch (U4).
 - `.idea/.name` holds the IDE project name `baander-aac`. It is the user's IDE metadata, and the main checkout has local `.idea` edits, so this plan leaves it alone.
 - Considered and not built (KD1): a CMake alias target, a `libbaac.pc` shim, a symlink at the old directory, an FFmpeg codec alias, an npm alias package, runtime acceptance of the value `baac`, and a migration fallback in the application. A production deployment or a published release under the old names would change this; neither exists.
 
@@ -165,13 +168,13 @@ Answered by the user on 2026-11-12:
 - KTD6. **Landing route.** Each step happens only when the user asks.
   1. Push the branch to GitHub, dispatch `ffmpeg.yaml` and amend U10 with the pin (KTD5). Commit U11, then push the rewritten branch.
   2. Open a draft pull request on GitHub (OQ2). It runs `ci.yaml`, `frontend.yaml`, `website.yaml` and `audio-core.yml` on the final tree, including MSVC, Apple clang and NEON.
-  3. Push `master` to both forges. GitHub CI builds against the pinned digest. Forgejo's `ci.yaml` reads Forgejo's `ffmpeg-baander-static:latest` (`ci.yaml:16`), which keeps `libbaac` until Forgejo's own `ffmpeg.yaml`, started by the same push, publishes about 1.5 h later. Push nothing else to Forgejo's `master` in that window, then re-run Forgejo's `ci.yaml`. `[skip ci]` is no way out: it would also skip Forgejo's FFmpeg build.
-  4. Restore the persistent instance. Its automatic update builds with the FFmpeg reference captured at its last `make dev-up` (`ToolingConfiguration::fromArray` over the saved selection in `packages/baander-tooling/src/Development/Cli.php`), so the update to the rename revision fails the application image gate and the instance stays on its old release. Run `make dev-up`, which targets `baander.test`, from a checkout of `master` that holds the new pin, such as the main checkout once it is on `master`; `make dev-update OPTIONS=--retry` from the same checkout also works. `configure` in `Cli.php` replaces the saved tooling selection and keeps the instance's own checkout, so the command does not move the persistent instance onto another branch. The updater then stops writers, migrates and starts the new release.
+  3. Push `master` to both forges. GitHub CI builds against the pinned digest. Forgejo's `ci.yaml` reads Forgejo's `ffmpeg-baander-static:latest` (`ci.yaml:16`), which keeps `libbaac` until Forgejo's own `ffmpeg.yaml`, started by the same push, publishes about 1.5 h later. `[skip ci]` on the landing push is no way out: it would also skip Forgejo's FFmpeg build. In that window, push to Forgejo's `master` only a commit whose message carries `[skip ci]`, such as a records-only commit. Forgejo honoured `[skip ci]` on the lossless landing's first push (the user checked on 2026-11-12), so such a push starts neither workflow, and `ffmpeg.yaml` cancels a running build only for a pull request. Then re-run Forgejo's `ci.yaml`.
+  4. Restore the persistent instance. Its automatic update builds with the FFmpeg reference captured at its last `make dev-up` (`ToolingConfiguration::fromArray` over the saved selection in `packages/baander-tooling/src/Development/Cli.php`), so the update to the rename revision fails the application image gate and the instance stays on its old release. Run `make dev-up`, which targets `baander.test`, from a checkout of `master` that holds the new pin, such as the main checkout once it is on `master`; `make dev-update OPTIONS=--retry` from the same checkout also works. `configure` in `Cli.php` replaces the saved tooling selection and keeps the instance's own checkout, so the command does not move the persistent instance onto another branch. The updater then stops writers, migrates and starts the new release. The user authorized this `make dev-up` on 2026-11-12, and the lead runs it.
   5. Dispatch `audio-core.yml` on `master`. The user cuts `audio-core-v0.2.0`, and the release job attaches four prebuilds and `SHA256SUMS`.
   6. Build the website from `master`, publish it per `ui/site/README.md` (preview, then production) and check `/bac/` and, per OQ1, `/baac/`.
-  7. Close the draft pull request unmerged, delete the GitHub branch, clean the developer checkouts after moving their benchmark data (System-Wide Impact, U4), and record the landing results in `ROADMAP.md` (U11).
+  7. Close the draft pull request unmerged, delete the GitHub branch, clean the developer checkouts after moving their benchmark data (System-Wide Impact, U4), and record the landing results in `ROADMAP.md` (U11). The lead moves the benchmark data and rewrites its ledger with the code U4 adds.
 - KTD7. **The FLAC vendor string becomes "Baander Audio Core" (OQ3).** `src/flac_meta.cpp` writes `kVendor` (today `"bAAC"`) into the comment block of a tagged stream when the caller names no vendor. It is the only rename that changes encoded bytes, and only for tagged streams. `tests/test_flac_meta.cpp` and `tests/test_flac_cli.cpp` assert it and change with it. No committed stream contains it.
-- KTD8. **Every commit that changes the package refreshes the desktop lockfile.** `ui/electron/yarn.lock` records a hash of the `file:` dependency's folder, and Frontend CI's immutable install rejects a stale one. The refresh runs `corepack yarn install --mode=update-lockfile` in `ui/electron` inside a clean copy of the tracked files, because untracked build trees (`cmake-build/`, `build/`, `prebuilds/`) change the hash. The same clean copy then accepts `corepack yarn install --immutable`.
+- KTD8. **Every commit that changes the package refreshes the desktop lockfile.** `ui/electron/yarn.lock` records a hash of the `file:` dependency's folder, and Frontend CI's immutable install rejects a stale one. The refresh runs `corepack yarn install --mode=update-lockfile` in `ui/electron` inside a clean copy of the tracked files, because untracked build trees (`cmake-build/`, `build/`, `prebuilds/`) change the hash. The same clean copy then accepts `corepack yarn install --immutable`. The copy keeps the tracked symlink `compile_commands.json`, which dangles there as it does in CI's checkout, because Yarn's hash covers it. The refreshes in `8248b0cdb` and `0b7520b9e` were taken from a copy without it, so the lockfile on `master` at `28866bf56` (`hash=695400`) is not the one Frontend CI computes (`hash=caf420`, U1). GitHub's Frontend CI has not run since `715eeb86e` (its run list, checked 2026-11-12). The lockfile it accepted there matches a copy with the symlink (`hash=3971d5`; `ea5b69` without it). U2's refresh corrects it.
 - KTD9. **Result ids are renamed in the committed results, and every measured value stays.** The lossless harness emits the encoder id `baac` and rows `baac-0` to `baac-8`, and `AacEvidence::LOSSLESS_ENCODERS` accepts only known ids. U4 renames the ids, the revision key and the labels in `bench/results/lossless.json` and `bench/results/tables.md`, in the harness, in the validator and in the PHP fixture together. A comparison that maps old ids to new ones shows identical values. Two alternatives are rejected. Re-measuring would move figures the documentation quotes and needs the quiet host the benchmark needs. Keeping `baac` as a data key behind a new label would leave the old name in the format the harness writes from now on.
 - KTD10. **The binding workflow is renamed and first runs on a pull request.** `.github/workflows/aac-native.yml` becomes `.github/workflows/audio-core.yml`, named "Audio Core binding". It lists itself in its path filters, releases on `audio-core-v*` tags, names artifacts `baander_audio_core-<target>` and titles releases `@baander/audio-core <version>`. Its first run before `master` moves is the pull request of KTD6 step 2. `tests/Unit/Shared/Infrastructure/Ci/PublicationWorkflowTest.php` moves with the file.
 - KTD11. **The `/baac/` redirect is a moved-page entry read by both website routers.** A map of moved pages in `packages/baander-tooling/src/Website/Publication.php` gives `/baac/` → `/bac/`. It lives there rather than in `Command.php`, so the residue gate can exclude a file with no other old names while `Command.php`, which computes the codec's source revision from the package path, stays under the gate. `Publication::package` emits 308 routes for `/baac` and `/baac/` ahead of the filesystem handler, and `Preview::route` answers the same, so the browser tests exercise it. The sitemap lists `/bac/` only. This decision applies only if OQ1 is answered yes.
@@ -264,7 +267,7 @@ These are the planner's readings, not confirmed by the user.
 
 - **Local instances.** The persistent instance migrates once `make dev-up` has captured the new pin (KTD6 step 4); previews migrate on `make preview-up`, taking the pin from their own worktree. Running sessions keep their desired state, rewritten in place. Rendition keys do not include the implementation (`AudioRenditionInput::key()`), so no cached rendition is encoded again.
 - **Previews between a pull and `make preview-up`.** A preview's web PHP reads the live worktree, so after pulling the rename it runs the new enum against unmigrated rows and fails transcode reads until `make preview-up` migrates. A worktree that has migrated cannot switch back to a pre-rename branch: the tooling refuses a database ahead of its migrations.
-- **Developer checkouts.** After the move, each checkout keeps its ignored build trees (`build/`, `cmake-build*/`, `node_modules/`, `prebuilds/`) under `packages/baander-aac/`, and they turn untracked because the package's `.gitignore` moved. The preview build snapshot includes untracked files (`packages/baander-tooling/src/Build/Source.php`), so a stale tree, 459 MB for the lossless worktree's fuzz build, would enter the preview image, and `git add -A` would commit it. First move `bench/work/`, the benchmark's measurement data, to the new path and rewrite its ledger (U4). Then delete `packages/baander-aac/` once git tracks nothing under it, configure CMake afresh at the new path (a moved CMake cache is refused), and run `corepack yarn install` in `ui/electron` to drop `node_modules/@baander/aac-native`. Hosts that ran `cmake --install` keep the old installed files; the project has no uninstall step. A host whose `BAANDER_FFMPEG_IMAGE` names a local FFmpeg build must rebuild it after U10, or its application image fails the gate.
+- **Developer checkouts.** After the move, each checkout keeps its ignored build trees (`build/`, `cmake-build*/`, `node_modules/`, `prebuilds/`) under `packages/baander-aac/`, and they turn untracked because the package's `.gitignore` moved. The preview build snapshot includes untracked files (`packages/baander-tooling/src/Build/Source.php`), so a stale tree, 459 MB for the lossless worktree's fuzz build, would enter the preview image, and `git add -A` would commit it. First move `bench/work/`, the benchmark's measurement data, to the new path and rewrite its ledger (U4); only the lossless worktree has one, and the lead does this at the landing. Then delete `packages/baander-aac/` once git tracks nothing under it, configure CMake afresh at the new path (a moved CMake cache is refused), and run `corepack yarn install` in `ui/electron` to drop `node_modules/@baander/aac-native`. Hosts that ran `cmake --install` keep the old installed files; the project has no uninstall step. A host whose `BAANDER_FFMPEG_IMAGE` names a local FFmpeg build must rebuild it after U10, or its application image fails the gate.
 - **Prebuilt binding.** No release exists, so installs build from source until `audio-core-v0.2.0` is cut. `fetch-prebuilds.mjs` already falls back to node-gyp and exits zero.
 - **FFmpeg image.** GHCR's `:latest` moves at the dispatch, and Forgejo's at the `master` push (KTD6).
 - **Website.** The live site keeps `/baac/` until the manual Vercel deployment; `/bac/` exists only after it.
@@ -274,7 +277,7 @@ These are the planner's readings, not confirmed by the user.
 
 | Risk | Mitigation |
 |---|---|
-| The lossless landing adds files and names after `8248b0cdb`; `baac-lossless` is already at `50568561c` | U1 starts from `master` and re-takes the inventory |
+| The lossless landing (`28866bf56`) added names after `8248b0cdb` | U1 starts from `master` and re-takes the inventory |
 | Another branch that touches the package lands after the rename and brings old names back; `feat-aac-noise-kernel` has one such commit, which adds `BAAC_AAC_CPU` and `BAAC_RELEASE_MATH` uses | U1 asks the lead for the landing order; a branch that lands later rebases onto the renamed `master` and must pass the residue gate |
 | A change to the image inputs after the dispatch leaves the pin describing another tree | KTD5: review before the dispatch, re-dispatch after any later change, and the image-input diff before the `master` push |
 | The persistent instance's automatic update fails after the landing | KTD6 step 4; the failed update leaves the old release running |
@@ -385,7 +388,7 @@ These are the planner's readings, not confirmed by the user.
 - **Files:** `packages/baander-audio-core/bench/lossless.py`, `bench/bench.py`, `bench/common.py`, `bench/results/lossless.json`, `bench/results/tables.md`, `bench/README.md`, `packages/baander-tooling/src/Website/AacEvidence.php`, `scripts/tests/php/Website/AacEvidenceTest.php`, `scripts/tests/php/Fixtures/aac-lossless-result.json`, `ui/electron/yarn.lock`.
 - **Approach:**
   - Rename the encoder id, the row ids, the `baac` revision key, the `baac_frame_bytes*` and `baac_sha*` fields and the labels. Run `.php-cs-fixer.tooling.php` on the tooling PHP.
-  - The held-out ledger is local measurement data, not a build tree. Each checkout that ran the benchmark keeps it in the ignored `bench/work/` (3.9 GB in the lossless worktree: corpus, reference tools, held-out recordings and `work/heldout/runs.json`). The bench README's protocol counts held-out gates only on a run the ledger books as the first on its recordings. The ledger's entries carry `baac_sha256`, which this unit renames. So `bench/work/` moves to the new package path rather than being deleted, `baac_sha256` is rewritten to `bac_sha256` once in each moved `runs.json` (a one-time rewrite like KTD3's, with no reader fallback), and `setup-refs.sh` runs again so `work/ext/env.sh` exports the `BAC_` names. This applies to the lossless worktree and any other checkout with a `bench/work/`.
+  - The held-out ledger is local measurement data, not a build tree. Each checkout that ran the benchmark keeps it in the ignored `bench/work/` (3.9 GB in the lossless worktree: corpus, reference tools, held-out recordings and `work/heldout/runs.json`). The bench README's protocol counts held-out gates only on a run the ledger books as the first on its recordings. The ledger's entries carry `baac_sha256`, which this unit renames. So `bench/work/` moves to the new package path rather than being deleted, `baac_sha256` is rewritten to `bac_sha256` once in each moved `runs.json` (a one-time rewrite like KTD3's, with no reader fallback), and `setup-refs.sh` runs again so `work/ext/env.sh` exports the `BAC_` names. This applies to every checkout with a `bench/work/`. Today that is only the lossless worktree, `baander-baac-lossless`, whose untracked `bench/work/` holds the ledger and the 3.9 GB of data. This branch carries only the code that performs the rewrite. Moving `bench/work/`, running the rewrite on the moved ledger and running `setup-refs.sh` again are landing and cleanup steps for the lead (KTD6 step 7), and no worker modifies or moves anything in that checkout.
 - **Test scenarios:**
   - The validator accepts the renamed committed results.
   - The validator rejects a results file that still carries a `baac-5` row.
@@ -494,9 +497,9 @@ These are the planner's readings, not confirmed by the user.
 - **Approach:**
   - `CONCEPTS.md`: rename `### bAAC` to `### Bånder Audio Core`. The definition names the short name `bac` and the library's scope, and the entry gains "*Avoid: bAAC, the library's name until 2026-11-12, which named its AAC codec only.*" Update the Lossless mode, AAC implementation setting, USAC, xHE-AAC encoder and Prebuilt binding entries.
   - The CI guide calls the binding workflow "AAC native addon" in its table and two paragraphs; it becomes "Audio Core binding".
-  - Solution docs: update `module`, `tags` and references to current paths. Keep branch names, commits, dated evidence and quoted symptoms, such as the codec-output doc's frontmatter line about "The AAC native addon workflow". The codec-output doc's lines 32 to 35 say the FLAC work is not yet merged, which the lossless landing makes false; correct them.
+  - Solution docs: update `module`, `tags` and references to current paths. Keep branch names, commits, dated evidence and quoted symptoms, such as the codec-output doc's frontmatter line about "The AAC native addon workflow". The landing's `3a38de9be` already corrected the codec-output doc's lines that called the FLAC work unmerged.
   - ROADMAP: rename the open section "bAAC in the server transcoder" and update its citations, including line 149 of the static-FFmpeg solution doc and the maintenance list. Completed entries keep their text, and U2 already repointed their links.
-  - The lossless plan gets one line under KD4 naming this plan as its successor.
+  - The lossless plan gets one line under KD4 naming this plan as its successor. Its KD13 already records the decision, so the line adds this plan's path.
   - `packages/dsp/dsp.d.ts` exports `./baander-aac/baander-aac`, a module that `fbf7e6964` deleted with the WebAssembly codec; remove the line. `dsp-regeneration.test.ts` lists the same module as a dormant package; remove it from that list.
   - Run `prose-fix` on changed prose.
 - **Test scenarios:**
@@ -618,6 +621,33 @@ After U10 the command prints nothing. The path gate runs `git ls-files` through 
 ---
 
 ## Appendix
+
+### Surface inventory at `28866bf56` (U1)
+
+Counted over every tracked file with the residue gate's pattern and stripping, `master` at `28866bf56` has 3,683 occurrences in 210 files. The same count at `8248b0cdb` reproduces the 3,657 occurrences in 210 files of the table below. The package still has 350 tracked files, nine with the old name in the file name. Outside the package, eleven tracked paths carry the old name at `28866bf56`, the same eleven as at `8248b0cdb`. The twelfth path of the earlier count is this plan's own file name, which the path gate allows under `docs/plans/`. Seven files changed their count, all in areas the table below already assigns:
+
+| File | `8248b0cdb` | `28866bf56` | Disposition | Unit |
+|---|---|---|---|---|
+| `docs/plans/2026-11-10-2313-feat-baac-lossless-flac-plan.md` | 282 | 285 | History: KD11 to KD13. KD13 already supersedes KD4, so U9's line under KD4 only adds this plan's path | U9 |
+| `ROADMAP.md` | 19 | 37 | The "bAAC lossless mode" record is history. Its open item on the rename is closed by the delivery record | U11 |
+| `packages/baander-aac/bench/bench.py` | 24 | 25 | Change | U3, U4 |
+| `packages/baander-aac/bench/README.md` | 13 | 15 | Change | U3, U4 |
+| `packages/baander-aac/bench/results/tables.md` | 25 | 24 | Change; result ids per KTD9 | U4 |
+| `packages/baander-aac/docs/codec-comparison.md` | 33 | 35 | Change | U3 |
+| `ui/site/templates/baac.php` | 71 | 72 | Change | U7 |
+
+The landing's `3a38de9be` already corrected the lines of the codec-output solution doc that called the FLAC work unmerged, so U9 has no correction to make there.
+
+Baseline at `28866bf56`, taken with the package at its old path:
+
+- CTest: 68 of 68 suites pass (Release, Ninja, GCC 16.2.1). The run sets `BAAC_REQUIRE_ORACLES=1` and `BAAC_REQUIRE_KERNELS=sse2,avx2`, uses the reference `flac` 1.4.3 from `tests/flac-reference.sh`, the testbench from `tests/flac-testbench.sh` and FFmpeg 8.1.3, and `LastTest.log` has no `SKIP:` line. `test_flac_dsp` prints its kernel lines for `sse2` (7 of the level's own), `avx2` (10, with a Rice reader and a Rice writer among them) and `avx2` without BMI2 and LZCNT (8).
+- Compile database: 207 entries. Each defines `BAAC_AAC_AVX2`, `BAAC_AAC_HAVE_DECODER`, `BAAC_AAC_HAVE_ENCODER`, `BAAC_AAC_SSE2`, `BAAC_EXACT_MATH=1` and `NDEBUG`. Ninety-five define `BAAC_TEST_DATA_DIR`; `test_flac_cli.cpp` defines `BAAC_TOOL`, and `test_fuzz_smoke.cpp` the eight `BAAC_FUZZ_*` paths. `flac_lpc.cpp`, `flac_dsp.cpp`, `simd/flac_sse2.cpp` and `simd/flac_avx2.cpp` carry the strict-math flags (`-fno-associative-math -fno-reciprocal-math -fsigned-zeros -ftrapping-math -fno-finite-math-only -ffp-contract=off`).
+- Binding: `node-gyp rebuild` builds `build/Release/baander_aac.node` with the definitions `NAPI_DISABLE_CPP_EXCEPTIONS`, `NAPI_VERSION=8`, `BAAC_AAC_HAVE_ENCODER`, `BAAC_AAC_HAVE_DECODER` and `BAAC_AAC_SSE2`, and `-std=c++17 -O3 -fvisibility=hidden -ffp-contract=off -msse2`. The smoke test passes 31 of 31, none skipped (Node 24.15.0).
+- Install into a scratch prefix: `bin/baac`, `lib64/libbaander-aac.a`, `lib64/pkgconfig/libbaac.pc` and 42 headers under `include/baac/`. The module is named `libbaac`, and `pkg-config --static --libs libbaac` gives `-lbaander-aac -lstdc++ -lm`.
+- Harness: `./bench.py selftest` reports 41 checks and 0 failures.
+- Results: the measured values are those of `bench/results/lossless.json` at `28866bf56`.
+- Pinned FFmpeg image `dbec52eb…4cd8aa`: the encoder listing has 235 lines and the decoder listing 568. Both list `libbaac` as "bAAC (Baander AAC) (codec aac)".
+- Desktop: the tests read beyond `ui/electron`, so the clean copy holds the tracked files of the package, `ui/electron`, `ui/web`, `ui/shared`, `ui/design-tokens`, `packages/dsp` and `scripts`. With `ui/web` installed and the lockfile refreshed per KTD8, `corepack yarn install --immutable` builds the binding, `corepack yarn tsc` passes, and `corepack yarn test` passes 75 of 75, none skipped.
 
 ### Surface inventory at `8248b0cdb`
 
