@@ -585,7 +585,7 @@ It reports whether the results match or the comparison is unavailable and leaves
 
 ### bAAC
 
-The public name of Bånder's AAC encoder and decoder library.
+The public name of Bånder's audio codec library: its AAC encoder and decoder, and the FLAC encoder and decoder of its lossless mode.
 
 ### Lossless mode
 
