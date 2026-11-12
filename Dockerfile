@@ -630,9 +630,10 @@ FROM dev AS ci
 
 USER root
 
-# Validate both nginx configurations with the real binary in integration tests.
+# Validate both nginx configurations with the real binary in integration tests, and
+# give the CI package store's tests the zstd command that `tar --zstd` runs.
 RUN apt-get update -qq \
-    && DEBIAN_FRONTEND=noninteractive apt-get install -yqq --no-install-recommends nginx \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -yqq --no-install-recommends nginx zstd \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy PHP config with higher memory limit for CI
