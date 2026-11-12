@@ -540,10 +540,11 @@ corpus, the ten items alone.
 ### Held-out recordings
 
 Three recordings are measured at level 5 by the same rules and are
-never used to tune the encoder: Variatio 4 of the Open Goldberg
-Variations (96 kHz, 24-bit stereo, 69 s), twenty seconds of the 5.1
-master of the film Sintel (48 kHz, 16-bit) and the audio of that film's
-trailer (48 kHz, 16-bit stereo, 52 s). The harness reads them only in a
+never used to tune the encoder: Avon Chang's piano recording of Bach's
+Cello Suite No. 6 (96 kHz, 24-bit stereo, 62 s), twenty seconds of the
+5.1 mix of the film Tears of Steel (48 kHz, 24-bit) and a minute of
+Cloudkicker's "Let Yourself Be Huge" (44.1 kHz, 16-bit stereo). The
+harness reads them only in a
 complete run that starts on a quiet host and records whether that run
 was their first; [bench/README.md](../bench/README.md#held-out-recordings)
 states the mechanism and the sources.
@@ -574,9 +575,13 @@ the 16-bit stereo file at 1.031. Four speed changes to the encoder
 followed, chosen and measured on the ten items and on the ten items
 scaled to 24 bits, with every encoded byte unchanged. Because those
 failures had prompted the work, the set was folded into the corpus and
-replaced by the three recordings above. A held-out gate that fails in
-the recorded run is reported as failed, and the encoder is not tuned in
-answer to it.
+replaced by a second set: Variatio 4 of the Open Goldberg Variations,
+twenty seconds of the 5.1 master of the film Sintel and the audio of
+that film's trailer. After the second set's recorded run, code review
+changed the `baac` binary. Recordings that an earlier build has read
+cannot judge a later one, so the three recordings above replaced the
+second set as well. A held-out gate that fails in the recorded run is
+reported as failed, and the encoder is not tuned in answer to it.
 
 ### What the figures describe
 

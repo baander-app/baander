@@ -807,20 +807,33 @@ def stage_selftest(args):
         expect(not check_lossless(short, sink),
                f"the check does not pass a complete run without the gate {lost}")
 
-    # The ledger of the held-out recordings: the first run, a second run
-    # of the same build, and a run of another build.
+    # The ledger of the held-out recordings: a run of an earlier set
+    # booked without its files' digests, then on one set the first run, a
+    # second run of the same build and a run of another build, a run on a
+    # new set, and a run on a set that shares a file with the first.
     with tempfile.TemporaryDirectory() as tmp:
         ledger = Path(tmp) / "heldout" / "runs.json"
-        first = held_out_entry(ledger, "day 1", "aaaa", "rev1")
-        again = held_out_entry(ledger, "day 2", "aaaa", "rev1")
-        other = held_out_entry(ledger, "day 3", "bbbb", "rev2")
-        expect(first["first_run"] and first["run"] == 1, "the ledger books a first run as the first")
+        ledger.parent.mkdir()
+        ledger.write_text(json.dumps(dict(runs=[dict(date="day 0", baac_sha256="0000",
+                                                     git="rev0")])))
+        first = held_out_entry(ledger, ["a1", "a2"], "day 1", "aaaa", "rev1")
+        again = held_out_entry(ledger, ["a2", "a1"], "day 2", "aaaa", "rev1")
+        other = held_out_entry(ledger, ["a1", "a2"], "day 3", "bbbb", "rev2")
+        fresh = held_out_entry(ledger, ["b1", "b2"], "day 4", "bbbb", "rev2")
+        shared = held_out_entry(ledger, ["a2", "c1"], "day 5", "bbbb", "rev2")
+        expect(first["first_run"] and first["run"] == 1,
+               "the ledger books a first run as the first, whatever runs an earlier set had")
         expect(not again["first_run"] and again["same_build_as_first"] and again["run"] == 2
                and again["first_date"] == "day 1",
                "a second run of the same build is booked as a repeat")
         expect(not other["first_run"] and not other["same_build_as_first"] and other["run"] == 3,
                "a run of another build is booked as such")
-        expect(len(json.loads(ledger.read_text())["runs"]) == 3, "the ledger keeps every run")
+        expect(fresh["first_run"] and fresh["run"] == 1 and fresh["first_date"] == "day 4",
+               "a run on a new set of recordings is booked as that set's first")
+        expect(not shared["first_run"] and not shared["same_build_as_first"]
+               and shared["first_date"] == "day 1",
+               "a set that shares a file with an earlier set is not booked as a first run")
+        expect(len(json.loads(ledger.read_text())["runs"]) == 6, "the ledger keeps every run")
         expect(check_lossless(made_up(below, held=again), sink),
                "the check passes a repeat on the build the first run measured")
         expect(not check_lossless(made_up(below, held=other), sink),

@@ -67,14 +67,17 @@ from common import HERE, MUSIC, TOOLS, WORK, have, run, wine
 # gates of its own at levels 5 and 8.
 #
 # Held-out recordings.  Three recordings that no encoder or decoder has
-# been run on before the recorded run: a 96 kHz 24-bit file, twenty
-# seconds of a 5.1 film master and a 16-bit stereo file
-# (fetch-heldout.sh).  The stage touches them only in a complete run
-# with --check that starts on a quiet host, writes a ledger entry
-# before it reads the first of them, and records in its result whether
-# that run was the first.  A later run with another build of baac is
-# not a gate result for these recordings.  Each set's total frame bytes
-# gate at level 5, with an encode gate and two decode gates.
+# been run on before the recorded run: a 96 kHz 24-bit stereo file,
+# twenty seconds of a 24-bit 5.1 film mix and a minute of a 16-bit
+# stereo file (fetch-heldout.sh).  The stage touches them only in a
+# complete run with --check that starts on a quiet host, writes a ledger
+# entry before it reads the first of them, and records in its result
+# whether that run was the first on these recordings.  The ledger names
+# each run's recordings by their SHA-256, so a run on a new set is that
+# set's first however many runs earlier sets had, and a set that shares
+# a file with an earlier one is not new.  A later run with another build
+# of baac is not a gate result for these recordings.  Each set's total
+# frame bytes gate at level 5, with an encode gate and two decode gates.
 #
 # Host.  The run records the processor, the compiler and the versions of
 # the references, and measures the CPU the rest of the host uses: over
@@ -116,15 +119,17 @@ CORPUS_ADDITIONS = [
     ("stereo16", "44.1 kHz, 16-bit stereo", dict(sample_rate=44100, channels=2, bits=16),
      [("01 - blocksize 4096.flac", None, None)]),
 ]
-# The held-out set.  The span of the film master was fixed before the
-# file was ever decoded: twenty seconds from the fifth minute.
+# The held-out set.  Each span was fixed from the file's duration alone,
+# before anything decoded it: the 62-second piano recording whole,
+# twenty seconds of the film mix from 5:00, as for the film master of the
+# set before, and the minute after the first minute of the 4:21 track.
 HELD_OUT = [
     ("hires", "96 kHz, 24-bit stereo", dict(sample_rate=96000, channels=2, bits=24),
-     [("open-goldberg-variatio-4.flac", None, None)]),
-    ("surround", "5.1, 48 kHz, 16-bit", dict(sample_rate=48000, channels=6, bits=16),
-     [("sintel-master-51.flac", "5:00.00", "5:20.00")]),
-    ("stereo16", "48 kHz, 16-bit stereo", dict(sample_rate=48000, channels=2, bits=16),
-     [("sintel_trailer-audio.flac", None, None)]),
+     [("avon-chang-cello-suite-6.flac", None, None)]),
+    ("surround", "5.1, 48 kHz, 24-bit", dict(sample_rate=48000, channels=6, bits=24),
+     [("tearsofsteel-surround.flac", "5:00.00", "5:20.00")]),
+    ("stereo16", "44.1 kHz, 16-bit stereo", dict(sample_rate=44100, channels=2, bits=16),
+     [("cloudkicker-let-yourself-be-huge.flac", "1:00.00", "2:00.00")]),
 ]
 
 
@@ -465,22 +470,45 @@ def file_sha256(path):
     return h.hexdigest()
 
 
-def held_out_entry(ledger_path, date, baac_sha256, git):
+def held_out_entry(ledger_path, recordings, date, baac_sha256, git):
     """Books a run on the held-out recordings in the ledger, before the
     run reads the first of them, and returns what the result records:
-    whether it is the first run, and whether it measures the build of
-    baac the first run measured.  An interrupted run stays booked: the
-    recordings were read."""
+    whether it is the first run on these recordings, and whether it
+    measures the build of baac that first run measured.  `recordings` are
+    the SHA-256 digests of the files the run reads.  Earlier runs count
+    when they read any of these files; a run booked without its digests
+    read an earlier set.  An interrupted run stays booked: the recordings
+    were read."""
     runs = json.loads(ledger_path.read_text())["runs"] if ledger_path.exists() else []
-    record = dict(touched=True, run=len(runs) + 1, first_run=not runs,
-                  same_build_as_first=not runs or runs[0]["baac_sha256"] == baac_sha256,
-                  first_date=runs[0]["date"] if runs else date, baac_sha256=baac_sha256)
-    runs.append(dict(date=date, baac_sha256=baac_sha256, git=git))
+    recordings = sorted(recordings)
+    seen = [r for r in runs if set(r.get("recordings", ())) & set(recordings)]
+    record = dict(touched=True, run=len(seen) + 1, first_run=not seen,
+                  same_build_as_first=not seen or seen[0]["baac_sha256"] == baac_sha256,
+                  first_date=seen[0]["date"] if seen else date, baac_sha256=baac_sha256,
+                  recordings=recordings)
+    runs.append(dict(date=date, baac_sha256=baac_sha256, git=git, recordings=recordings))
     ledger_path.parent.mkdir(parents=True, exist_ok=True)
     ledger_path.write_text(json.dumps(dict(
-        note="Runs of the lossless stage on the held-out recordings. Deleting this file does "
-             "not make the recordings unseen.", runs=runs), indent=1) + "\n")
+        note="Runs of the lossless stage on the held-out recordings, each with the SHA-256 of "
+             "the files it read; a run without them read an earlier set. Deleting this file "
+             "does not make the recordings unseen.", runs=runs), indent=1) + "\n")
     return record
+
+
+def held_out_files():
+    """The paths of the held-out recordings, each checked to exist and to
+    have its set's format, read from STREAMINFO alone, so that a run that
+    could not read them stops before it is booked."""
+    paths = []
+    for _, _, expected, sources in HELD_OUT:
+        for name, _, _ in sources:
+            path = HELDOUT_DIR / name
+            if not path.exists():
+                raise SystemExit(f"the held-out recording \"{path}\" is missing: run "
+                                 "./fetch-heldout.sh")
+            check_held_out_format(name, flac_properties(path)[0], expected)
+            paths.append(path)
+    return paths
 
 
 def alac_rows(have_refalac, measured):
@@ -923,10 +951,8 @@ def held_out(ctx):
         held_run = dict(touched=False, reason=f"the host was not quiet at the start (the rest "
                                               f"of it used {ctx.other_start:.2f} CPUs)")
     else:
-        if not HELDOUT_DIR.is_dir():
-            raise SystemExit(f"the held-out recordings are missing at {HELDOUT_DIR}: run "
-                             "./fetch-heldout.sh")
-        held_run = held_out_entry(HELDOUT_DIR / "runs.json", ctx.started,
+        recordings = [file_sha256(path) for path in held_out_files()]
+        held_run = held_out_entry(HELDOUT_DIR / "runs.json", recordings, ctx.started,
                                   file_sha256(TOOLS["baac"]), git_state())
         for set_id, label, expected, sources in HELD_OUT:
             records, _ = measure_set(ctx, "held", "held-out", "held-out", HELDOUT_DIR, set_id,

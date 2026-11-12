@@ -10,14 +10,21 @@
 # only thing that may, and it keeps a ledger of when it did (see
 # README.md, "Held-out recordings").
 #
-#   sintel-master-51.flac, sintel_trailer-audio.flac
-#       the 5.1 master and the trailer audio of the open movie Sintel,
-#       (c) Blender Foundation | durian.blender.org, Creative Commons
+#   avon-chang-cello-suite-6.flac
+#       Avon Chang plays J.S. Bach's Cello Suite No. 6 in D major on the
+#       piano, recorded with a Sony PCM-D1 at 96 kHz, 24-bit, in Guelph
+#       on 27 January 2012; Creative Commons Zero 1.0, from the Internet
+#       Archive item
+#       PCMD1_piano_1119006_Bach_Cello_Suite_6_D_Major_120127_front_right,
+#       whose FLAC the Archive derived from the uploaded WAV (a checksum
+#       failure here may mean the Archive derived it again)
+#   tearsofsteel-surround.flac
+#       the DVD 5.1 mix of the open movie Tears of Steel,
+#       (CC) Blender Foundation | mango.blender.org, Creative Commons
 #       Attribution 3.0, from media.xiph.org
-#   open-goldberg-variatio-4.flac
-#       Kimiko Ishizaka, J.S. Bach: "Open" Goldberg Variations, BWV 988,
-#       Variatio 4, 96 kHz 24-bit; Creative Commons Zero 1.0, from the
-#       Internet Archive item OpenGoldbergVariations
+#   cloudkicker-let-yourself-be-huge.flac
+#       Cloudkicker (Ben Sharp), "Let Yourself Be Huge" (2011), Creative
+#       Commons Attribution 3.0, from Wikimedia Commons
 #
 # Needs: curl, sha256sum.
 set -euo pipefail
@@ -26,9 +33,9 @@ dest=$(realpath -m "${1:-$here/work/heldout}")
 manifest="$here/heldout.sha256"
 
 sources=(
-  "sintel-master-51.flac https://media.xiph.org/sintel/sintel-master-51.flac"
-  "sintel_trailer-audio.flac https://media.xiph.org/sintel/sintel_trailer-audio.flac"
-  "open-goldberg-variatio-4.flac https://archive.org/download/OpenGoldbergVariations/Kimiko%20Ishizaka%20-%20J.S.%20Bach-%20-Open-%20Goldberg%20Variations%2C%20BWV%20988%20%28Piano%29%20-%2005%20Variatio%204%20a%201%20Clav..flac"
+  "avon-chang-cello-suite-6.flac https://archive.org/download/PCMD1_piano_1119006_Bach_Cello_Suite_6_D_Major_120127_front_right/12012709_front_right_cello.flac"
+  "tearsofsteel-surround.flac https://media.xiph.org/tearsofsteel/tearsofsteel-surround.flac"
+  "cloudkicker-let-yourself-be-huge.flac https://upload.wikimedia.org/wikipedia/commons/0/04/Cloudkicker_-_Let_Yourself_Be_Huge.flac"
 )
 
 verified() {

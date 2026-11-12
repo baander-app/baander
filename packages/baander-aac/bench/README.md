@@ -116,13 +116,14 @@ and the corpus items.
   size gates of its own at levels 5 and 8. The totals of the ten items
   stay as they were and are labelled as the original corpus.
 - **Held-out recordings.** Three recordings that are never used to tune
-  the encoder, at level 5, with the same four gates for each: Variatio 4
-  of the Open Goldberg Variations (96 kHz, 24-bit stereo, 69 s), twenty
-  seconds of the 5.1 master of the film Sintel (48 kHz, 16-bit, from
-  5:00 to 5:20) and the audio of the film's trailer (48 kHz, 16-bit
-  stereo, 52 s). [Held-out recordings](#held-out-recordings) states
+  the encoder, at level 5, with the same four gates for each: Avon
+  Chang's piano recording of Bach's Cello Suite No. 6 (96 kHz, 24-bit
+  stereo, 62 s), twenty seconds of the 5.1 mix of the film Tears of
+  Steel (48 kHz, 24-bit, from 5:00 to 5:20) and a minute of
+  Cloudkicker's "Let Yourself Be Huge" (44.1 kHz, 16-bit stereo, from
+  1:00 to 2:00). [Held-out recordings](#held-out-recordings) states
   where they come from, how the stage keeps them unseen and what
-  happened to the set before them.
+  happened to the two sets before them.
 - **What the figures describe.** One build on one machine: `baac` as
   CMake builds it in Release, on the processor the run records. The
   judged speed figure leaves the start of a process out, and the
@@ -163,23 +164,28 @@ downloads and checksums and does nothing else.
 
 | File | Source | Licence |
 |---|---|---|
-| `open-goldberg-variatio-4.flac` | Kimiko Ishizaka, J.S. Bach: "Open" Goldberg Variations, BWV 988, Variatio 4; Internet Archive item `OpenGoldbergVariations` | Creative Commons Zero 1.0 |
-| `sintel-master-51.flac` | The 5.1 master of the open movie Sintel, (c) Blender Foundation, durian.blender.org; `media.xiph.org/sintel` | Creative Commons Attribution 3.0 |
-| `sintel_trailer-audio.flac` | The trailer audio of the same film; `media.xiph.org/sintel` | Creative Commons Attribution 3.0 |
+| `avon-chang-cello-suite-6.flac` | Avon Chang plays J.S. Bach's Cello Suite No. 6 in D major on the piano, recorded with a Sony PCM-D1 at 96 kHz, 24-bit, 2012; Internet Archive item `PCMD1_piano_1119006_Bach_Cello_Suite_6_D_Major_120127_front_right`, the FLAC the Archive derived from the uploaded WAV | Creative Commons Zero 1.0 |
+| `tearsofsteel-surround.flac` | The DVD 5.1 mix of the open movie Tears of Steel, (CC) Blender Foundation, mango.blender.org; `media.xiph.org/tearsofsteel` | Creative Commons Attribution 3.0 |
+| `cloudkicker-let-yourself-be-huge.flac` | Cloudkicker (Ben Sharp), "Let Yourself Be Huge", 2011; Wikimedia Commons file `Cloudkicker - Let Yourself Be Huge.flac` | Creative Commons Attribution 3.0 |
 
 Only the lossless stage reads the files, and only in a run that can
 count: a complete run with `--check` that starts on a quiet host. A
 limited run, a run without `--check` and a run that starts on a busy
-host leave them alone and say so. Before the stage decodes the first file it
-books the run in `work/heldout/runs.json`, with the date and the SHA-256
-of the `baac` binary it measures, and the result records whether the run
-was the first. A later run of the same binary is a repeat of the same
-measurement and counts. A later run of another binary does not: `check`
-reports its held-out gates and exits non-zero, because the encoder may
-have changed in answer to the first look. Deleting the ledger does not
-make the recordings unseen; a set that has been looked at is replaced,
-not reused. The span of the film master was fixed before the file was
-decoded.
+host leave them alone and say so. Before the stage decodes the first file
+it checks that every file is present and has its set's format, which it
+reads from the file's header alone. It then books the run in
+`work/heldout/runs.json`, with the date, the SHA-256 of the `baac` binary
+it measures and the SHA-256 of each file it reads, and the result records
+whether the run was the first on these files. A later run of the same
+binary is a repeat of the same measurement and counts. A later run of
+another binary does not: `check` reports its held-out gates and exits
+non-zero, because the encoder may have changed in answer to the first
+look. Runs are matched by file: a run's predecessors are the earlier runs
+that read any of its files. A new set therefore starts at its own first
+run, and a set that reuses a file of an earlier set does not. Deleting
+the ledger does not make the recordings unseen; a set that has been
+looked at is replaced, not reused. Every span was fixed from the file's
+duration before anything decoded the file.
 
 A held-out gate that fails in the recorded run is reported as failed.
 The encoder is not tuned in answer to it.
@@ -197,7 +203,20 @@ at a step). They were chosen and measured on the ten items and on the
 ten items scaled to 24 bits, and they left every encoded byte as it was.
 The failed gates had nonetheless prompted the work, so the set could no
 longer serve as held-out. It was folded into the corpus, where tuning on
-it is allowed, and the three recordings above replaced it.
+it is allowed, and the second set replaced it.
+
+### The second held-out set
+
+The second set was Variatio 4 of Kimiko Ishizaka's Open Goldberg
+Variations (96 kHz, 24-bit stereo), twenty seconds of the 5.1 master of
+the film Sintel (from 5:00 to 5:20) and the audio of the film's trailer.
+Five runs read it. The first four measured one build of `baac`, and the
+fourth was the recorded run, in which every gate passed. Code review then
+changed the binary. The fifth run measured the changed build, so its
+held-out gates did not count, and because an earlier build had already
+looked at the set, it was replaced, as the first set was, by the three
+recordings above. Its runs stay in the ledger and do not count against
+the new set, whose files they never read.
 
 ## ViSQOL
 
