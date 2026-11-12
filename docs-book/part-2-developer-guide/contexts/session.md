@@ -21,7 +21,7 @@ The Session context coordinates an account's playback destination, media selecti
 | `PlaybackMedia` | Value object | Selected media item (`song` or `video` kind and `PublicId`) |
 | `PlaybackState` | Enum | Desired playback state: `Playing`, `Paused`, `Stopped` |
 | `ObservedPlaybackState` | Enum | Endpoint-reported playback state: `Playing`, `Paused`, `Stopped`, `Unknown` |
-| `PlaybackOperation` | Enum | Coordination operation dispatched to `PlaybackCoordinationInterface`: `Endpoint`, `Transfer`, `Acknowledge`, `Observe`, `Control`, `Reconcile`, `Snapshot`, `RecoverLocal` |
+| `PlaybackOperation` | Enum | Coordination operation dispatched to `PlaybackCoordinationInterface`: `Endpoint`, `Transfer`, `Acknowledge`, `Observe`, `Control`, `Reconcile`, `Snapshot`, `RecoverLocal`, `Close`, `Override` |
 
 ## Application Services & Ports
 
@@ -29,7 +29,7 @@ Session uses `PlaybackCoordinator` instead of Messenger command handlers for ses
 
 | Interface | Implementation | Purpose |
 |-----------|---------------|---------|
-| `PlaybackCoordinationInterface` | `PlaybackCoordinator` | Apply controls (`load`, `play`, `pause`, `seek`, `stop`, `volume`, `queue`), endpoint registration, transfers, acknowledgements, observations, local recovery, snapshots, and reconciliation |
+| `PlaybackCoordinationInterface` | `PlaybackCoordinator` | Apply controls (`load`, `play`, `pause`, `seek`, `stop`, `volume`, `queue`), endpoint registration, transfers, acknowledgements, observations, local recovery, close reports, overrides, snapshots, and reconciliation |
 | `DevicePortInterface` | `DeviceAdapter` | Register, list, rename, and forget devices |
 | `PlaybackStoreInterface` | `PlaybackStore` | Lock session state and persist destinations, incarnations, transfers, command intent, and request identity |
 | `PlaybackConnectionsInterface` | `PlaybackCommandRelay` | Bind authenticated WebSocket connections and replay changed complete snapshots and pending commands |
@@ -50,18 +50,22 @@ All endpoints are prefixed with `/api`.
 
 ### Sessions (`PlaybackController`)
 
-Endpoint-authenticated operations take the endpoint capability token in the `X-Baander-Playback-Endpoint` header (required on `/api/session/ack` and `/api/session/observe`, and accepted on `/api/session/control` and `/api/session/snapshot` when `incarnationId` is supplied so the response includes that endpoint's pending commands).
+Endpoint-authenticated operations take the endpoint capability token in the `X-Baander-Playback-Endpoint` header (required on `/api/session/ack`, `/api/session/observe`, `/api/session/close` and `/api/session/override`, and accepted on `/api/session/control` and `/api/session/snapshot` when `incarnationId` is supplied so the response includes that endpoint's pending commands).
 
 | Method | Path | Purpose |
 |--------|------|---------|
-| POST | `/api/session/endpoints` | Register a fresh playback endpoint incarnation for a tab and connection |
+| POST | `/api/session/endpoints` | Register a fresh playback endpoint incarnation for a tab and connection, optionally naming the registering page (`pageId`) |
 | POST | `/api/session/transfer` | Begin an acknowledged playback transfer between incarnations |
 | POST | `/api/session/ack` | Acknowledge an owned endpoint command (`X-Baander-Playback-Endpoint` required) |
 | POST | `/api/session/observe` | Renew endpoint presence and report observed playback state (`X-Baander-Playback-Endpoint` required) |
 | POST | `/api/session/control` | Control the committed playback runner (`load`, `play`, `pause`, `seek`, `stop`, `volume`, `queue`) |
 | POST | `/api/session/reconcile` | Stop an uncertain transfer target |
 | POST | `/api/session/recover-local` | Recover a proven stopped local browser incarnation using its recovery credential |
+| POST | `/api/session/close` | Report that an endpoint is going away and its players have stopped; the session is released from it in the same request (`X-Baander-Playback-Endpoint` required) |
+| POST | `/api/session/override` | End the hold of a browser destination that is no longer registered, as "Play here anyway" in the web client (`X-Baander-Playback-Endpoint` required) |
 | GET | `/api/session/snapshot` | Recover the complete playback snapshot |
+
+A registration from another page of the same tab, a close report, a local recovery and an override each release the session from an incarnation that has gone. `src/Session/README.md` states when each applies and what each records.
 
 ### Devices (`DeviceController`)
 

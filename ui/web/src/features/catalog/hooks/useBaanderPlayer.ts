@@ -268,11 +268,16 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, coor
       callbacks.current.onError?.(video.error)
     }
     const nativeFailure = () => video.error?.code === 2 ? 'network' as const : undefined
+    // A seek the session accepted into a newer generation retires the attached media at once,
+    // before the read that names the new generation lands.
+    const retiredBySeek = (chain: PlaybackSeekChain) => chain.generation !== null
+      && !loadedIdentity?.startsWith(`${chain.jobId}:${chain.generation}:`)
     const failAttachment = (failure?: 'network') => {
       if (!active() || terminal || recoveryPosition !== null) return
-      // Retiring media can fail before its replacement seek is acknowledged.
-      // Keep the submitted controls and latest target owned until they settle.
-      if (seekReconciliation || (seekChain?.started && seekChain.remaining > 0)
+      // Retiring media can fail before its replacement seek is acknowledged, or after it was
+      // accepted and before the new generation is read. Keep the submitted controls and latest
+      // target owned until they settle.
+      if (seekReconciliation || (seekChain?.started && (seekChain.remaining > 0 || retiredBySeek(seekChain)))
         || (snapshot && loadedIdentity && !loadedIdentity.startsWith(`${snapshot.jobId}:${snapshot.generation}:`))) {
         releaseAttachment()
         changeState('preparing')

@@ -19,7 +19,7 @@ import { useGetDeviceList, getGetDeviceListQueryKey } from '@/shared/api-client/
 import type { LiveSnapshot } from '@/shared/live/recovery'
 
 vi.mock('@/features/auth/stores/auth-store', () => ({
-  useAuthStore: Object.assign((selector: (state: { isAuthenticated: boolean }) => unknown) => selector({ isAuthenticated: true }), { getState: () => ({ accessToken: null, refreshToken: null }) }),
+  useAuthStore: Object.assign((selector: (state: { isAuthenticated: boolean }) => unknown) => selector({ isAuthenticated: true }), { getState: () => ({ accessToken: null, refreshToken: null }), subscribe: () => () => {} }),
 }))
 vi.mock('@/shared/crypto/dpop-store', () => ({
   getDpopKeyPair: () => null, getDpopNonce: () => null, setDpopNonce: vi.fn(),

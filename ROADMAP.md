@@ -645,7 +645,7 @@ Open:
   longer held: between 2026-11-02 and 2026-11-07 every image without a container was
   removed from the daemon from outside, with the footprint of `docker system prune -a`.
   The tooling has no path that removes release pins.
-- **Rules added for a pruned release, to be accepted or rejected by the user:** the
+- **Rules added for a pruned release, accepted by the user on 2026-11-11:** the
   preflight runs from the prepared release when the previous release's images are gone;
   a worker boot whose operator image is gone is recorded retired without the operator
   when none of its containers exists, and refused before anything starts while
@@ -808,27 +808,20 @@ each gate run alone on a quiet host.
   phase's review returned two confirmed P2 findings, fixed in `b26455a68`. The
   cross-model pass is disabled by the checkout configuration.
 
-Decided by the user on 2026-11-11, not yet planned or built:
+The two user decisions of 2026-11-11 about a runner that went away (a same-tab
+registration as proof, "Play here anyway", no timer; queue edits and volume changes
+passing the release proof) are delivered; see
+[Releasing a browser runner that went away](#releasing-a-browser-runner-that-went-away).
 
-- **What ends the fence of a runner that was shown a start and then went away.** A
-  registration from the same tab is taken as proof that the old page is gone and
-  ends the fence at once. For a tab that closed or lost its network, the refused
-  tab offers an explicit "Play here anyway". Nothing is released on a timer.
-- **Queue edits and volume changes:** the release proof ignores a queue edit or a
-  volume change shown after the confirmed pause or stop. Only a command that can
-  start or move playback keeps the runner fenced.
-
-Open, for the user to decide:
-
-- **The two tooling rules** named under "Development controller image identities".
+The two tooling rules named under "Development controller image identities" were
+accepted by the user on 2026-11-11.
 
 Open, known limits:
 
-- **Stop, close, play elsewhere:** the first Play inside the closed tab's 30-second
-  registration waits 20 seconds and fails with "The destination did not answer the
-  playback request. Nothing changed there; try again."; a second press after the
-  lapse plays. A tab that lost its network without closing counts as shown and stays
-  fenced until it returns.
+- **Stop, close, play elsewhere:** a closing tab now reports its close and the next
+  tab plays at once. A tab that crashed, was killed or lost its network sends
+  nothing: the session stays held until that tab's 30-second registration lapses,
+  and then "Play here anyway" ends it.
 - **Join lead:** a sibling that encodes slower than playback is not offered, so on a
   host where 1080p encodes at about real time it never appears; each join still
   replaces the attachment once.
@@ -838,7 +831,9 @@ Open, known limits:
 - **End-of-stream landing:** the restore holds 250 ms on the landing and keeps a
   one-second backstop, because the hook cannot see hls.js end the stream.
 - **Registration proof in Chromium:** local recovery releases the runner before
-  registration, so only the Firefox run binds the proof to the server change.
+  registration, so only the Firefox run binds the proof to the server change. The
+  page identity now also releases a reloaded page's runner in the registration
+  itself, in every engine.
 - **Command disclosure by another incarnation:** a WebSocket transfer or registration
   payload carrying another of the same user's incarnation ids is returned that
   incarnation's commands and marks them shown. It can only block a settlement.
@@ -853,6 +848,105 @@ Open, known limits:
   their own plan and branch. Delivered since; see
   [Playback session entities](#playback-session-entities).
 
+### Releasing a browser runner that went away
+
+Delivered on the branch `session-runner-fence-release` from the
+[plan](docs/plans/2026-11-11-1737-feat-session-runner-fence-release-plan.md). A tab
+that was the runner and then reloaded, closed or lost its network left the session
+unknown, and every other tab was refused with "Previous playback is unconfirmed"
+until it came back. Nothing is released on a timer.
+
+- **Queue edits and volume changes (`d6ead4875`):** the paused-runner proof passes
+  over them, still in one SQL statement; a queue edit's answer records cursor and
+  presence only. The store keeps five SQL statements; the statement ceilings stay 6,
+  9, 10 and 21.
+- **Page identity and succession (`4e06eff9a`, `d6ead4875`):** every registration
+  carries one identity per loaded document (column
+  `playback_destination_incarnations.page_id`, migration `Version20261111180000`).
+  Another page of the same tab releases the earlier incarnation in the registration's
+  own transaction; the same page succeeds it and keeps playing through a silent socket
+  replacement. A duplicated tab gets a new tab identity through its Web Lock, so it is
+  never taken for a reload.
+- **Close report (`4e06eff9a`, `ac718191a`):** `POST /api/session/close`, sent at
+  `pagehide` from a request prepared ahead (a DPoP proof cannot be signed while the
+  page goes away) and after a socket close when nothing plays.
+- **"Play here anyway" (`8c7252fb2`, `ac718191a`):** `POST /api/session/override`,
+  accepted only when the runner, or an uncertain transfer's target, is a browser
+  whose registration lapsed; idempotent by request identity. An accepted override
+  re-issues the refused play or song selection only when the refusal is at most two
+  minutes old.
+- **Beside it:** a stopped video player keeps a volume change for its next load; a
+  disconnected playing music runner no longer rejects with "Playback execution was
+  cancelled."; the runtime test under `ui/web/tests` that had failed since
+  `79a7cf3c4` runs again.
+- **Simplification and documentation (`83b8dc307`, `d20d17ecc`).**
+
+Code review, 2026-11-11, six reviewers against `c643dcb4f`: no P0 or P1, and nothing
+against the property that two devices never play at once unless a user chose the
+override. Confirmed: this entry was missing, and the repeated-close test could not
+see a cursor rewrite. Fixed after review, each with a test that failed first:
+
+- A returning overridden tab is silenced by its own registration answer; before, it
+  could play on for up to one 10-second presence interval.
+- A close report that crosses its page's re-registration also releases the
+  successor while the session still stands at the reported revision; before, the
+  successor stayed runner of a session nothing played.
+- A transfer source succeeded after answering its quiesce keeps that proof; before,
+  a target's close then left the session unknown and owed a stop to a paused
+  player.
+- A close report on an incarnation already retired as stopped changes nothing.
+- "Play here anyway" is offered only for browser destinations; an override from
+  another account is refused (tested); the offline-return browser case can no
+  longer pass when the song ends by itself.
+
+Fixed during the gates:
+
+- **A resume that seeks (`7a650b42f`):** in Chromium the reloaded page's local
+  recovery gave a cursor 0.2 seconds off, so the resume sought; the old
+  generation's subtitle segment then answered 404, hls.js treats that as fatal, and
+  in the 13 ms before the new generation was signed the player gave up the resume.
+  A failing attachment is now retiring once its seek was accepted into another
+  generation. This is older player code that the new gate step exposed.
+- **Play right after a page load (`6b5644f83`):** every control was refused until
+  the registration was answered, so a press within about half a second of loading
+  showed "Playback connection is unavailable." (also on master). A control issued
+  while a registration is in flight now waits for the answer, for at most 15
+  seconds.
+- **Specs:** the two new specs had four test defects (a layout-preference conflict
+  between two tabs of one account, a check that counted the helper's own recovery,
+  an ambiguous locator, a following tab that offers Pause); the video transfer spec
+  now asserts the close report's cursor, which is more recent than the recovery
+  checkpoint.
+
+Checkpoint, 2026-11-12, at `956ddaa3c` (the merge with master's AAC and CI work;
+one later commit makes a player test independent of host load): the two-command gate
+passes all phases in Firefox 157 and Chromium 156 with client controls, including the
+new reload while a shown play is held unanswered; the movie-endpoint step passes; the
+`playback-destinations` browser specs pass 14 of 14 in Chromium; the complete web
+suite passes 3,480 tests; at `6db645330` the whole unit directory passed 8,593 tests,
+fourteen PostgreSQL integration files 246 tests, and PHPStan, Deptrac, the container
+lint and the OpenAPI check were clean. The statement ceilings stay 6, 9, 10 and 21.
+
+Open, known limits:
+
+- **Stale close-report proof:** the prepared proof is renewed with each presence
+  report; a hidden tab whose timers are throttled to about once a minute can close
+  with a proof older than the server's 60 seconds, which is refused, and the session
+  stays held until "Play here anyway".
+- **Crash, killed browser, discarded mobile page:** no close report is sent; the
+  override after the 30-second lapse is the way back.
+- **Browser proof:** the close report and the override are proved in Chromium only.
+  In Firefox, 2 of the 5 cases pass (closing a tab released the session in 74 ms);
+  after navigating away, the session was not released within 8 seconds, and whether
+  Firefox did not send the keepalive report or the request was lost is not
+  established (the next step is to log it on the server). No browser spec drives a
+  duplicated tab or a back/forward-cache restore; the unit and PostgreSQL tests
+  cover them.
+- **Settings conflict between tabs (older, separate defect):** every tab that shows
+  the session's track writes the layout preference, so a second tab of the same
+  account gets a 409 and a "Settings conflict" dialog when the first plays. The new
+  specs answer those writes themselves; `browser-transfer.spec.ts` does not and can
+  fail on it.
 ### bAAC exact arithmetic
 
 Delivered from the [plan](docs/plans/2026-11-11-1916-fix-baac-exact-arithmetic-plan.md)
@@ -1006,10 +1100,23 @@ Open:
   unmeasured.
 - **Control cost:** a control that issues a command costs two more statements than
   the SQL store and 1.26 times its time, inside the bound of 1.5.
-- **Associations with a database cascade:** 29 entity files map a to-one association
-  whose row the database deletes by cascade while the unit of work keeps the child
-  managed. Removing the parent and flushing again fails, as the cleanup defect below
-  showed. They are not audited. The playback entities have no associations.
+- **Associations with a database cascade, audited 2026-11-11 by reading:** 51 to-one
+  join columns carry `onDelete` (39 `CASCADE`, 12 `SET NULL`) in 33 entity files; the
+  earlier count of 29 files left out four that carry only `SET NULL`. No schema
+  listener adds one on an association column, and no mapping uses `cascade` or
+  `orphanRemoval`. None is reachable today: the failure needs managed children, the
+  parent removed through the ORM, and a later flush with something to write, and for
+  every pair at least one is missing. Three places are one change away and have no
+  test that would catch it:
+  - `PruneMissingImagesHandler` removes images in a loop with a flush each, and is
+    safe only while the owning albums and artists are uninitialized references;
+  - `AlbumRepository::delete` detaches songs without skipping uninitialized ones, and
+    covers neither credits, genre links nor activities (`MovieRepository::delete` has
+    the same gaps);
+  - `UserRepository::delete` has eleven child classes, and an administrator deleting
+    their own account already holds managed token entities, so any write added after
+    the delete in that request would fail.
+  Not covered: `tests/`, and the long-lived runners were not traced line by line.
 - **Not run:** the gate on a hosted runner, and the adaptive and media-control gates,
   whose code this branch does not touch.
 - **Store preconditions:** `register()`, `saveTransfer()` and `insertCommand()` look

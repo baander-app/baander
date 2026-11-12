@@ -4,7 +4,7 @@ import { useId, useState } from 'react'
 import { Button } from '@/shared/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/shared/components/ui/dropdown-menu'
 import { usePlaybackSession } from '../hooks/use-playback-session'
-import { hasUnconfirmedPlayback } from '../services/playback-status'
+import { canOverrideHold, hasUnconfirmedPlayback } from '../services/playback-status'
 import { textRole } from '@/shared/theme'
 
 const DestinationMenu = styled(DropdownMenuContent)`
@@ -45,27 +45,38 @@ const CompactStatus = styled.span`
 `
 
 export function PlaybackDestinationSelector({ compact = false }: { compact?: boolean }) {
-  const { snapshot, endpoint, connected, error, localRecovery, transfer, reconcile, retry } = usePlaybackSession()
+  const { snapshot, endpoint, connected, error, localRecovery, transfer, reconcile, override, retry } = usePlaybackSession()
   const statusId = useId()
+  const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   const [failure, setFailure] = useState<string | null>(null)
   const active = snapshot?.destinations.find(destination => destination.incarnationId === snapshot.activeIncarnationId)
   const available = snapshot?.destinations.filter(destination => destination.available) ?? []
   const uncertain = snapshot?.transfer?.state === 'uncertain'
   const unconfirmed = hasUnconfirmedPlayback(snapshot)
+  const overridable = canOverrideHold(snapshot)
   const recoveryMessage = localRecovery?.status === 'recovered' && (snapshot?.activeIncarnationId || snapshot?.transfer)
     ? null : localRecovery?.message
   const recovering = localRecovery?.status === 'recovering'
   const progress = recovering ? 'Recovering local playback…' : unconfirmed ? 'Previous playback is unconfirmed.' : uncertain ? 'Playback at the destination is uncertain.' : snapshot?.transfer ? 'Transferring playback…' : null
-  const perform = async (action: () => Promise<void>) => {
+  const perform = async (action: () => Promise<void>): Promise<boolean> => {
     setBusy(true)
     setFailure(null)
-    try { await action() }
-    catch (reason) { setFailure(reason instanceof Error ? reason.message : 'Playback destination could not change.') }
-    finally { setBusy(false) }
+    try {
+      await action()
+      return true
+    } catch (reason) {
+      setFailure(reason instanceof Error ? reason.message : 'Playback destination could not change.')
+      return false
+    } finally { setBusy(false) }
   }
+  // The menu stays open until the server has answered, so a refusal appears where the listener pressed.
+  const playHereAnyway = async () => {
+    if (await perform(override)) setOpen(false)
+  }
+  const overrideConsequence = 'Play here anyway ends its hold; if it is still playing, it continues until it reconnects.'
   return (
-    <DropdownMenu>
+    <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
         <Control type="button" size={compact ? 'icon-xs' : 'xs'} aria-label="Playback destination" aria-describedby={compact && progress ? statusId : undefined} title={progress ?? (active?.available ? `Playing on ${active.name}` : 'Choose playback destination')}>
           {uncertain || unconfirmed ? <TriangleAlert size={14} aria-hidden="true" /> : (snapshot?.transfer || recovering) ? <TransferSpinner size={14} aria-hidden="true" /> : <Monitor size={14} aria-hidden="true" />}
@@ -100,11 +111,23 @@ export function PlaybackDestinationSelector({ compact = false }: { compact?: boo
         ) : null}
         {uncertain ? (
           <>
-            <Status role="status">The destination has not confirmed it stopped. Playback here remains paused until it is safe to resume.</Status>
+            <Status role="status">
+              The destination has not confirmed it stopped. Playback here remains paused until it is safe to resume.
+              {overridable ? ` It is unavailable. ${overrideConsequence}` : null}
+            </Status>
             <DropdownMenuItem disabled={!connected || busy} onSelect={() => { perform(reconcile) }}>Check destination stopped</DropdownMenuItem>
           </>
+        ) : unconfirmed ? (
+          <Status role="status">
+            {active ? active.name : 'The previous destination'} is unavailable and has not confirmed that it stopped.
+            {overridable ? ` ${overrideConsequence}` : null}
+          </Status>
         ) : null}
-        {unconfirmed ? <Status role="status">{active ? `${active.name} is unavailable` : 'The previous destination is unavailable'} and may still be playing. Resume requires its stop acknowledgement or a valid local recovery proof.</Status> : null}
+        {overridable ? (
+          <DropdownMenuItem disabled={!connected || busy || recovering} onSelect={event => { event.preventDefault(); playHereAnyway() }}>
+            Play here anyway
+          </DropdownMenuItem>
+        ) : null}
         {!connected ? <Status role="status">Connection lost. Remote playback may still be active.</Status> : null}
         {recoveryMessage ? <Status role={localRecovery?.status === 'unavailable' ? 'alert' : 'status'}>{recoveryMessage}</Status> : null}
         {localRecovery?.status === 'retryable' && !error ? <DropdownMenuItem disabled={busy} onSelect={() => { perform(retry) }}>Retry local recovery</DropdownMenuItem> : null}

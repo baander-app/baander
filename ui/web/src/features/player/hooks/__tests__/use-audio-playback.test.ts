@@ -15,6 +15,7 @@ import { PlayerProgress } from '@/features/layout/components/PlayerProgress'
 import { ProgressBar } from '../../components/ProgressBar'
 import { negotiateMediaDelivery } from '../../services/media-delivery'
 import { getPlaybackAdapter, registerPlaybackIntentHandler } from '@/features/session/services/playback-execution'
+import { PlaybackCommandRunner } from '@/features/session/services/playback-command-runner'
 
 const renderHook: typeof renderBaseHook = (callback, options) => {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, queryFn: async () => null } } })
@@ -731,6 +732,91 @@ describe('useAudioPlayback', () => {
     radio.src = 'https://radio.baander.app/live'
     adapter.localRecovery!.fence()
     expect(radio.src).toBe('')
+  })
+
+  it('is silent but not stopped once a disconnecting runner has fenced and stopped it', async () => {
+    seedQueue(0, 1)
+    renderHook(() => useAudioPlayback())
+    const [audio] = capturedAudioElements
+    audio.src = '/api/stream/track?id=t0'
+    audio.currentTime = 17
+    vi.mocked(audio.play).mockImplementation(async () => { audio.paused = false })
+    for (const element of capturedAudioElements) vi.mocked(element.pause).mockImplementation(() => { element.paused = true })
+    const adapter = getPlaybackAdapter('song')!
+    const runner = new PlaybackCommandRunner(async () => {})
+    runner.bind({ incarnationId: 'browser', epoch: 1, destinationId: 'device' })
+    await act(async () => {
+      await runner.accept({ ...loadCommand(), type: 'play', expiresAt: new Date(Date.now() + 20_000).toISOString() }, 1)
+    })
+    expect(adapter.observe()).toMatchObject({ observedState: 'playing', position: 17 })
+
+    runner.fenceLocalExecution()
+    expect(adapter.observe()).toMatchObject({ observedState: 'stopped', position: 17 })
+
+    // The fenced adapter refuses the runner's stop, and its quiesce has already silenced it. What
+    // it observes from then on is "paused": a page tells that its players are silent by none of
+    // them playing, not by all of them reporting a stop.
+    await expect(runner.disconnect()).resolves.toMatchObject({ observedState: 'paused', position: 17 })
+    expect(adapter.observe()).toMatchObject({ observedState: 'paused', position: 17 })
+    expect(capturedAudioElements.every(element => element.paused)).toBe(true)
+  })
+
+  // A tab whose runner holds the music adapter, as it does once a command of the session ran on it.
+  const runnerWith = async (...types: PlaybackCommandResource['type'][]) => {
+    const runner = new PlaybackCommandRunner(async () => {})
+    runner.bind({ incarnationId: 'local', epoch: 1, destinationId: 'local-device' })
+    for (const [index, type] of types.entries()) {
+      await act(async () => {
+        await runner.accept({ ...loadCommand(), id: `${type}-${index}`, incarnationId: 'local', type, expiresAt: new Date(Date.now() + 20_000).toISOString() }, 1)
+      })
+    }
+    return runner
+  }
+
+  it('stays silent after it lost the session while its playing indicator follows the new runner', async () => {
+    seedQueue(0, 1)
+    const { client, snapshot } = renderController({ activeIncarnationId: 'local', media: { kind: 'song', publicId: 't0' }, queue: ['t0'] })
+    const [audio] = capturedAudioElements
+    audio.src = '/api/stream/track?id=t0'
+    vi.mocked(audio.play).mockImplementation(async () => { audio.paused = false })
+    for (const element of capturedAudioElements) vi.mocked(element.pause).mockImplementation(() => { element.paused = true })
+    const runner = await runnerWith('play')
+    expect(audio.paused).toBe(false)
+    expect(usePlayerStore.getState().playbackExecutionActive).toBe(true)
+
+    await act(async () => { await runner.silenceLostPlayback() })
+    expect(audio.paused).toBe(true)
+    expect(usePlayerStore.getState().isPlaying).toBe(false)
+
+    act(() => { client.setQueryData(PLAYBACK_SESSION_KEY, { ...snapshot, revision: 2, activeIncarnationId: 'remote' }) })
+    await waitFor(() => expect(usePlayerStore.getState().isPlaying).toBe(true))
+    await act(async () => { await Promise.resolve(); await Promise.resolve() })
+
+    expect(usePlayerStore.getState().isPlaying).toBe(true)
+    expect(audio.paused).toBe(true)
+    expect(audio.play).toHaveBeenCalledOnce()
+    expect(getPlaybackAdapter('song')!.observe().observedState).toBe('paused')
+  })
+
+  it('leaves the radio playing when the session that paused its music moves on', async () => {
+    seedQueue(0, 1)
+    renderHook(() => useAudioPlayback())
+    const [audio] = capturedAudioElements
+    audio.src = '/api/stream/track?id=t0'
+    vi.mocked(audio.play).mockImplementation(async () => { audio.paused = false })
+    for (const element of capturedAudioElements) vi.mocked(element.pause).mockImplementation(() => { element.paused = true })
+    const runner = await runnerWith('play', 'pause')
+    const radio = { src: 'https://radio.baander.app/live', paused: false, pause: vi.fn() } as unknown as HTMLAudioElement
+    useRadioStore.getState().setAudioElement(radio)
+    useRadioStore.setState({ isPlaying: true })
+    for (const element of capturedAudioElements) vi.mocked(element.pause).mockClear()
+
+    await act(async () => { await runner.silenceLostPlayback() })
+
+    expect(radio.pause).not.toHaveBeenCalled()
+    expect(radio.src).toBe('https://radio.baander.app/live')
+    expect(useRadioStore.getState().isPlaying).toBe(true)
+    expect(capturedAudioElements.every(element => vi.mocked(element.pause).mock.calls.length === 0)).toBe(true)
   })
 
   it('registers its owned runtime and removes it on unmount', async () => {

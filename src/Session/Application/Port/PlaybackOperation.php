@@ -14,4 +14,6 @@ enum PlaybackOperation: string
     case Reconcile = 'reconcile';
     case Snapshot = 'snapshot';
     case RecoverLocal = 'recover-local';
+    case Close = 'close';
+    case Override = 'override';
 }

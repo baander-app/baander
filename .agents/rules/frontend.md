@@ -82,10 +82,15 @@ shape. Regenerate the client with `yarn generate` after a relevant schema change
 do not hand-edit generated endpoints.
 
 Native `fetch` is appropriate for the service worker's native request forwarding
-and streaming interception, and for binary/static assets such as WASM. Keep those
-exceptions local to their browser/worker contract and preserve origin, client,
-credential, redirect, and DPoP checks. An ordinary API request or arbitrary image
-URL is not exempt simply because other fetch calls exist.
+and streaming interception, and for binary/static assets such as WASM. The third
+exception is the playback close report, confined to
+`ui/web/src/shared/api-client/keepalive-request.ts`: a page that unloads cannot
+wait for the client's asynchronous DPoP signing, so the request is prepared ahead
+with the headers the client's interceptor would add and sent at `pagehide` with
+`keepalive`; it gets no nonce retry or token refresh. Keep those exceptions local
+to their browser/worker contract and preserve origin, client, credential,
+redirect, and DPoP checks. An ordinary API request or arbitrary image URL is not
+exempt simply because other fetch calls exist.
 
 ## Verification
 

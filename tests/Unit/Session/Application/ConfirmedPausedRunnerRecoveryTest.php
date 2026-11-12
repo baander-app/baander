@@ -11,9 +11,11 @@ use App\Session\Application\Service\PlaybackCoordinator;
 use App\Session\Domain\Model\ListeningSession\ListeningSession;
 use App\Session\Domain\Model\Playback\PlaybackMedia;
 use App\Session\Domain\Model\Playback\PlaybackState;
+use App\Shared\Application\Exception\InvalidInputException;
 use App\Shared\Application\Port\TransactionPortInterface;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class ConfirmedPausedRunnerRecoveryTest extends TestCase
@@ -144,6 +146,110 @@ final class ConfirmedPausedRunnerRecoveryTest extends TestCase
         self::assertSame($runner, $session->activeIncarnationId());
     }
 
+    public function testARegistrationFromAnotherPageReleasesARunnerNoProofReleases(): void
+    {
+        $owner = new Uuid();
+        $runner = new Uuid();
+        $session = $this->pausedSession($owner, $runner);
+        $session->control('play', null, null, null, null, null);
+        $session->confirmControl(false, 61.0);
+        $revision = $session->revision();
+        $destination = new PublicId()->toString();
+        $store = $this->createMock(PlaybackStoreInterface::class);
+        $store->method('lockSession')->willReturn($session);
+        $store->method('register')->willReturn(['destinationId' => $destination, 'incarnationId' => new Uuid()->toString()]);
+        $store->method('endpoint')->willReturn(['id' => $runner->toString(), 'public_id' => $destination, 'page_id' => new Uuid()->toString()]);
+        $store->expects(self::never())->method('retireConfirmedPausedBrowser');
+        $store->expects(self::once())->method('supersedeIncarnationCommands')->with($runner->toString());
+        $store->expects(self::once())->method('retireIncarnation')->with($runner->toString(), true);
+        $store->expects(self::once())->method('saveSession')->with($session);
+        $store->method('snapshot')->willReturn([]);
+
+        $this->register($store, $owner, new Uuid()->toString());
+
+        self::assertNull($session->activeIncarnationId());
+        self::assertNull($session->selectedDestinationId());
+        self::assertSame(PlaybackState::Paused, $session->desiredState());
+        self::assertSame('paused', $session->observedState()->value);
+        self::assertSame(61.0, $session->getPosition());
+        self::assertSame($revision + 1, $session->revision());
+    }
+
+    /** @return iterable<string,array{string,array<string,mixed>,string}> The registration's page, the runner's row and the registered destination. */
+    public static function registrationsThatProveNothing(): iterable
+    {
+        $destination = new PublicId()->toString();
+        $page = new Uuid()->toString();
+        yield 'the runner belongs to another tab' => [$page, ['public_id' => new PublicId()->toString(), 'page_id' => new Uuid()->toString()], $destination];
+        yield 'the runner registered without a page identity' => [$page, ['public_id' => $destination, 'page_id' => null], $destination];
+    }
+
+    /** @param array<string,mixed> $row */
+    #[DataProvider('registrationsThatProveNothing')]
+    public function testARegistrationThatProvesNothingAboutTheRunnerKeepsIt(string $page, array $row, string $destination): void
+    {
+        $owner = new Uuid();
+        $runner = new Uuid();
+        $session = $this->pausedSession($owner, $runner);
+        $session->control('play', null, null, null, null, null);
+        $session->confirmControl(false, null);
+        $revision = $session->revision();
+        $store = $this->createMock(PlaybackStoreInterface::class);
+        $store->method('lockSession')->willReturn($session);
+        $store->method('register')->willReturn(['destinationId' => $destination, 'incarnationId' => new Uuid()->toString()]);
+        $store->method('endpoint')->willReturn(['id' => $runner->toString()] + $row);
+        foreach (['supersedeIncarnationCommands', 'retireIncarnation', 'saveSession'] as $method) {
+            $store->expects(self::never())->method($method);
+        }
+        $store->method('snapshot')->willReturn([]);
+
+        $this->register($store, $owner, $page);
+
+        self::assertSame($runner, $session->activeIncarnationId());
+        self::assertSame($revision, $session->revision());
+        self::assertSame('playing', $session->observedState()->value);
+    }
+
+    public function testARegistrationWithoutAPageIdentityReadsNoEarlierIncarnation(): void
+    {
+        $owner = new Uuid();
+        $runner = new Uuid();
+        $session = $this->pausedSession($owner, $runner);
+        $session->control('play', null, null, null, null, null);
+        $session->confirmControl(false, null);
+        $store = $this->createMock(PlaybackStoreInterface::class);
+        $store->method('lockSession')->willReturn($session);
+        $store->expects(self::once())->method('register')->with($owner->toString(), self::callback(static fn(array $input): bool => $input['pageId'] === null))
+            ->willReturn(['incarnationId' => new Uuid()->toString()]);
+        foreach (['endpoint', 'supersedeIncarnationCommands', 'retireIncarnation', 'saveSession'] as $method) {
+            $store->expects(self::never())->method($method);
+        }
+        $store->method('snapshot')->willReturn([]);
+
+        $this->register($store, $owner);
+
+        self::assertSame($runner, $session->activeIncarnationId());
+    }
+
+    public function testAPageIdentityThatIsNoUuidIsRefusedBeforeAnythingIsRegistered(): void
+    {
+        $owner = new Uuid();
+        $session = $this->pausedSession($owner, new Uuid());
+        $store = $this->createMock(PlaybackStoreInterface::class);
+        $store->method('lockSession')->willReturn($session);
+        $store->expects(self::never())->method('register');
+
+        foreach (['this page', 17, ['page']] as $page) {
+            try {
+                new PlaybackCoordinator($store, $this->transactions(), $this->createStub(PlaybackMediaAccessInterface::class))
+                    ->execute($owner, PlaybackOperation::Endpoint, ['deviceId' => new Uuid()->toString(), 'endpointId' => new Uuid()->toString(), 'pageId' => $page]);
+                self::fail('A page identity that is no UUID was accepted.');
+            } catch (InvalidInputException $error) {
+                self::assertSame('pageId must be a UUID.', $error->getMessage());
+            }
+        }
+    }
+
     private function pausedSession(Uuid $owner, Uuid $runner): ListeningSession
     {
         $track = new PublicId();
@@ -154,11 +260,17 @@ final class ConfirmedPausedRunnerRecoveryTest extends TestCase
     }
 
     /** @return array<string,mixed> */
-    private function register(PlaybackStoreInterface $store, Uuid $owner): array
+    private function register(PlaybackStoreInterface $store, Uuid $owner, ?string $pageId = null): array
+    {
+        return new PlaybackCoordinator($store, $this->transactions(), $this->createStub(PlaybackMediaAccessInterface::class))
+            ->execute($owner, PlaybackOperation::Endpoint, ['deviceId' => new Uuid()->toString(), 'endpointId' => new Uuid()->toString()]
+                + ($pageId === null ? [] : ['pageId' => $pageId]));
+    }
+
+    private function transactions(): TransactionPortInterface
     {
         $transactions = $this->createStub(TransactionPortInterface::class);
         $transactions->method('run')->willReturnCallback(static fn(callable $operation): mixed => $operation());
-        return new PlaybackCoordinator($store, $transactions, $this->createStub(PlaybackMediaAccessInterface::class))
-            ->execute($owner, PlaybackOperation::Endpoint, ['deviceId' => new Uuid()->toString(), 'endpointId' => new Uuid()->toString()]);
+        return $transactions;
     }
 }

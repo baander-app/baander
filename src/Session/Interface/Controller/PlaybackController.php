@@ -7,8 +7,10 @@ namespace App\Session\Interface\Controller;
 use App\Session\Application\Port\PlaybackCoordinationInterface;
 use App\Session\Application\Port\PlaybackOperation;
 use App\Session\Interface\Request\AcknowledgePlaybackRequest;
+use App\Session\Interface\Request\ClosePlaybackEndpointRequest;
 use App\Session\Interface\Request\ControlPlaybackRequest;
 use App\Session\Interface\Request\ObservePlaybackRequest;
+use App\Session\Interface\Request\OverridePlaybackRequest;
 use App\Session\Interface\Request\ReconcilePlaybackRequest;
 use App\Session\Interface\Request\RecoverLocalPlaybackRequest;
 use App\Session\Interface\Request\RegisterPlaybackEndpointRequest;
@@ -299,6 +301,102 @@ final readonly class PlaybackController
     public function recoverLocal(#[MapRequestPayload] RecoverLocalPlaybackRequest $input, Request $request): JsonResponse
     {
         return $this->respond(PlaybackOperation::RecoverLocal, $input->toArray(), $request);
+    }
+
+    #[OA\Post(
+        path: '/api/session/close',
+        summary: 'Report that an endpoint is going away and its players have stopped',
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(ref: new Model(type: ClosePlaybackEndpointRequest::class)),
+        ),
+        parameters: [
+            new OA\Parameter(
+                name: 'X-Baander-Playback-Endpoint',
+                in: 'header',
+                description: 'The capability of the incarnation that reports its close.',
+                required: true,
+                schema: new OA\Schema(type: 'string'),
+            ),
+        ],
+        responses: [
+            new OA\Response(
+                response: '200',
+                description: 'Complete playback snapshot without commands. The same for a repeated report and for an incarnation the session no longer names.',
+                content: new OA\JsonContent(
+                    required: ['data'],
+                    properties: [new OA\Property(property: 'data', ref: new Model(type: PlaybackSnapshotResource::class))],
+                ),
+            ),
+            new OA\Response(
+                response: '422',
+                description: 'Invalid playback request',
+                content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class)),
+            ),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated',
+                content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class)),
+            ),
+            new OA\Response(
+                response: '409',
+                description: 'Endpoint capability missing or invalid',
+                content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class)),
+            ),
+        ],
+    )]
+    #[Route('/close', name: 'close', methods: ['POST'])]
+    public function close(#[MapRequestPayload] ClosePlaybackEndpointRequest $input, Request $request): JsonResponse
+    {
+        return $this->respond(PlaybackOperation::Close, $input->toArray(), $request);
+    }
+
+    #[OA\Post(
+        path: '/api/session/override',
+        summary: 'End the hold of a destination that is no longer registered',
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(ref: new Model(type: OverridePlaybackRequest::class)),
+        ),
+        parameters: [
+            new OA\Parameter(
+                name: 'X-Baander-Playback-Endpoint',
+                in: 'header',
+                description: 'The capability of the registered endpoint that asks.',
+                required: true,
+                schema: new OA\Schema(type: 'string'),
+            ),
+        ],
+        responses: [
+            new OA\Response(
+                response: '200',
+                description: 'Complete playback snapshot with the recorded result of the request. A repeated request returns the same result.',
+                content: new OA\JsonContent(
+                    required: ['data'],
+                    properties: [new OA\Property(property: 'data', ref: new Model(type: PlaybackSnapshotResource::class))],
+                ),
+            ),
+            new OA\Response(
+                response: '422',
+                description: 'Invalid playback request',
+                content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class)),
+            ),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated',
+                content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class)),
+            ),
+            new OA\Response(
+                response: '409',
+                description: 'Playback authority or revision conflict, a destination that is still registered, or nothing to override',
+                content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class)),
+            ),
+        ],
+    )]
+    #[Route('/override', name: 'override', methods: ['POST'])]
+    public function override(#[MapRequestPayload] OverridePlaybackRequest $input, Request $request): JsonResponse
+    {
+        return $this->respond(PlaybackOperation::Override, $input->toArray(), $request);
     }
 
     #[OA\Get(
