@@ -1,38 +1,38 @@
 {
  "schema": 2,
- "date": "2026-11-12T12:48:03+01:00",
+ "date": "2026-11-12T19:33:58+01:00",
  "complete": true,
  "host": {
   "cpu": "AMD Ryzen 7 5800X3D 8-Core Processor",
   "cores": 16,
   "kernel": "7.3.1-1-default",
-  "core": 14,
+  "core": 15,
   "governor": "performance",
   "compiler": "c++ (SUSE Linux) 16.2.1 20260929",
   "build_type": "Release",
-  "other_cpu_start": 1.782,
-  "other_cpu_run": 0.629,
+  "other_cpu_start": 0.489,
+  "other_cpu_run": 0.818,
   "quiet_cpu": 2.0,
   "load_start": [
-   1.96,
-   1.57,
-   1.37
+   0.76,
+   2.11,
+   2.96
   ],
   "load_end": [
-   1.87,
-   1.84,
-   1.95
+   1.76,
+   1.92,
+   2.08
   ],
   "quiet": true
  },
  "tools": {
-  "baac": "a5955e15d",
+  "baac": "50568561c",
   "flac": "flac 1.4.3",
   "ffmpeg": "ffmpeg version 8.1.3 Copyright (c) 2000-2026 the FFmpeg developers",
   "refalac": "carried from 2026-10-30"
  },
  "method": {
-  "pinned": "taskset -c 14",
+  "pinned": "taskset -c 15",
   "repeats": 5,
   "corpus_seconds": 130.3173125,
   "corpus_repetitions": 36,
@@ -51,10 +51,10 @@
    "kbps": 690.4875359519096,
    "frame_bytes": 11247512,
    "bit_exact": true,
-   "enc_cpu": 0.07064066666666666,
-   "enc_rss_kb": 118972,
-   "dec_cpu": 0.09292558333333334,
-   "dec_rss_kb": 118972
+   "enc_cpu": 0.0705645,
+   "enc_rss_kb": 113384,
+   "dec_cpu": 0.09254697222222222,
+   "dec_rss_kb": 113384
   },
   {
    "codec": "baac-1",
@@ -66,10 +66,10 @@
    "kbps": 685.7948670480754,
    "frame_bytes": 11171070,
    "bit_exact": true,
-   "enc_cpu": 0.0883989722222222,
-   "enc_rss_kb": 118972,
-   "dec_cpu": 0.09345027777777777,
-   "dec_rss_kb": 118972
+   "enc_cpu": 0.08954088888888889,
+   "enc_rss_kb": 113384,
+   "dec_cpu": 0.09350891666666666,
+   "dec_rss_kb": 113384
   },
   {
    "codec": "baac-2",
@@ -81,10 +81,10 @@
    "kbps": 685.7706185431041,
    "frame_bytes": 11170675,
    "bit_exact": true,
-   "enc_cpu": 0.08988772222222223,
-   "enc_rss_kb": 118972,
-   "dec_cpu": 0.09357805555555555,
-   "dec_rss_kb": 118972
+   "enc_cpu": 0.08962716666666666,
+   "enc_rss_kb": 113384,
+   "dec_cpu": 0.09345108333333334,
+   "dec_rss_kb": 113384
   },
   {
    "codec": "baac-3",
@@ -96,10 +96,10 @@
    "kbps": 641.5867116658042,
    "frame_bytes": 10450934,
    "bit_exact": true,
-   "enc_cpu": 0.09157847222222222,
-   "enc_rss_kb": 118972,
-   "dec_cpu": 0.10928836111111111,
-   "dec_rss_kb": 118972
+   "enc_cpu": 0.09153649999999999,
+   "enc_rss_kb": 113384,
+   "dec_cpu": 0.10931752777777777,
+   "dec_rss_kb": 113384
   },
   {
    "codec": "baac-4",
@@ -111,10 +111,10 @@
    "kbps": 628.6109990182615,
    "frame_bytes": 10239564,
    "bit_exact": true,
-   "enc_cpu": 0.14275633333333332,
-   "enc_rss_kb": 118972,
-   "dec_cpu": 0.11319800000000001,
-   "dec_rss_kb": 118972
+   "enc_cpu": 0.14233677777777778,
+   "enc_rss_kb": 113384,
+   "dec_cpu": 0.11326180555555555,
+   "dec_rss_kb": 113384
   },
   {
    "codec": "baac-5",
@@ -126,10 +126,10 @@
    "kbps": 628.1742189856777,
    "frame_bytes": 10232449,
    "bit_exact": true,
-   "enc_cpu": 0.1553472777777778,
-   "enc_rss_kb": 118972,
-   "dec_cpu": 0.11327963888888888,
-   "dec_rss_kb": 118972
+   "enc_cpu": 0.15428066666666665,
+   "enc_rss_kb": 113384,
+   "dec_cpu": 0.11321702777777778,
+   "dec_rss_kb": 113384
   },
   {
    "codec": "baac-6",
@@ -141,10 +141,10 @@
    "kbps": 625.0257808224828,
    "frame_bytes": 10181162,
    "bit_exact": true,
-   "enc_cpu": 0.27662305555555555,
-   "enc_rss_kb": 118972,
-   "dec_cpu": 0.11377830555555556,
-   "dec_rss_kb": 118972
+   "enc_cpu": 0.27435127777777774,
+   "enc_rss_kb": 113384,
+   "dec_cpu": 0.11394938888888889,
+   "dec_rss_kb": 113384
   },
   {
    "codec": "baac-7",
@@ -156,10 +156,10 @@
    "kbps": 614.3361803904603,
    "frame_bytes": 10007032,
    "bit_exact": true,
-   "enc_cpu": 0.32369358333333337,
-   "enc_rss_kb": 118972,
-   "dec_cpu": 0.12070252777777779,
-   "dec_rss_kb": 118972
+   "enc_cpu": 0.3239558888888889,
+   "enc_rss_kb": 113384,
+   "dec_cpu": 0.121119,
+   "dec_rss_kb": 113384
   },
   {
    "codec": "baac-8",
@@ -171,10 +171,10 @@
    "kbps": 613.828864833289,
    "frame_bytes": 9998768,
    "bit_exact": true,
-   "enc_cpu": 0.45556383333333333,
-   "enc_rss_kb": 118972,
-   "dec_cpu": 0.12060133333333334,
-   "dec_rss_kb": 118972
+   "enc_cpu": 0.45955783333333333,
+   "enc_rss_kb": 113384,
+   "dec_cpu": 0.12076363888888891,
+   "dec_rss_kb": 113384
   },
   {
    "codec": "flac-0",
@@ -186,10 +186,10 @@
    "kbps": 691.1134543232696,
    "frame_bytes": 11249468,
    "bit_exact": true,
-   "enc_cpu": 0.14732705555555559,
-   "enc_rss_kb": 118972,
-   "dec_cpu": 0.1293551666666667,
-   "dec_rss_kb": 118972
+   "enc_cpu": 0.1472926111111111,
+   "enc_rss_kb": 113384,
+   "dec_cpu": 0.12952319444444446,
+   "dec_rss_kb": 113384
   },
   {
    "codec": "flac-1",
@@ -201,10 +201,10 @@
    "kbps": 688.0418747125406,
    "frame_bytes": 11199433,
    "bit_exact": true,
-   "enc_cpu": 0.15139950000000002,
-   "enc_rss_kb": 118972,
-   "dec_cpu": 0.1327318888888889,
-   "dec_rss_kb": 118972
+   "enc_cpu": 0.1516913888888889,
+   "enc_rss_kb": 113384,
+   "dec_cpu": 0.13317705555555553,
+   "dec_rss_kb": 113384
   },
   {
    "codec": "flac-2",
@@ -216,10 +216,10 @@
    "kbps": 686.3993607909923,
    "frame_bytes": 11172677,
    "bit_exact": true,
-   "enc_cpu": 0.18839633333333333,
-   "enc_rss_kb": 118972,
-   "dec_cpu": 0.13280713888888887,
-   "dec_rss_kb": 118972
+   "enc_cpu": 0.1872966388888889,
+   "enc_rss_kb": 113384,
+   "dec_cpu": 0.13288894444444443,
+   "dec_rss_kb": 113384
   },
   {
    "codec": "flac-3",
@@ -231,10 +231,10 @@
    "kbps": 642.8578858238808,
    "frame_bytes": 10463401,
    "bit_exact": true,
-   "enc_cpu": 0.14336333333333334,
-   "enc_rss_kb": 118972,
-   "dec_cpu": 0.13090669444444444,
-   "dec_rss_kb": 118972
+   "enc_cpu": 0.14348311111111112,
+   "enc_rss_kb": 113384,
+   "dec_cpu": 0.13168711111111112,
+   "dec_rss_kb": 113384
   },
   {
    "codec": "flac-4",
@@ -246,10 +246,10 @@
    "kbps": 630.9882733347496,
    "frame_bytes": 10270049,
    "bit_exact": true,
-   "enc_cpu": 0.15997883333333332,
-   "enc_rss_kb": 118972,
-   "dec_cpu": 0.14341844444444446,
-   "dec_rss_kb": 118972
+   "enc_cpu": 0.16041588888888889,
+   "enc_rss_kb": 113384,
+   "dec_cpu": 0.1435608888888889,
+   "dec_rss_kb": 113384
   },
   {
    "codec": "flac-5",
@@ -261,10 +261,10 @@
    "kbps": 629.6765212987337,
    "frame_bytes": 10248681,
    "bit_exact": true,
-   "enc_cpu": 0.19784816666666666,
-   "enc_rss_kb": 118972,
-   "dec_cpu": 0.14332088888888891,
-   "dec_rss_kb": 118972
+   "enc_cpu": 0.19782158333333333,
+   "enc_rss_kb": 113384,
+   "dec_cpu": 0.14349013888888887,
+   "dec_rss_kb": 113384
   },
   {
    "codec": "flac-6",
@@ -276,10 +276,10 @@
    "kbps": 626.3714807654584,
    "frame_bytes": 10194843,
    "bit_exact": true,
-   "enc_cpu": 0.2819173611111111,
-   "enc_rss_kb": 118972,
-   "dec_cpu": 0.14393605555555555,
-   "dec_rss_kb": 118972
+   "enc_cpu": 0.28133625000000007,
+   "enc_rss_kb": 113384,
+   "dec_cpu": 0.14403352777777778,
+   "dec_rss_kb": 113384
   },
   {
    "codec": "flac-7",
@@ -291,10 +291,10 @@
    "kbps": 615.5484828617839,
    "frame_bytes": 10018540,
    "bit_exact": true,
-   "enc_cpu": 0.34315725,
-   "enc_rss_kb": 118972,
-   "dec_cpu": 0.15357436111111109,
-   "dec_rss_kb": 119996
+   "enc_cpu": 0.34872825,
+   "enc_rss_kb": 113384,
+   "dec_cpu": 0.15382127777777777,
+   "dec_rss_kb": 113384
   },
   {
    "codec": "flac-8",
@@ -306,10 +306,10 @@
    "kbps": 615.062346378575,
    "frame_bytes": 10010621,
    "bit_exact": true,
-   "enc_cpu": 0.5334121388888889,
-   "enc_rss_kb": 119996,
-   "dec_cpu": 0.15319941666666667,
-   "dec_rss_kb": 119996
+   "enc_cpu": 0.5336617499999999,
+   "enc_rss_kb": 113384,
+   "dec_cpu": 0.15420436111111113,
+   "dec_rss_kb": 113384
   },
   {
    "codec": "flac-ffmpeg-5",
@@ -321,10 +321,10 @@
    "kbps": 645.6093237803686,
    "frame_bytes": 10508471,
    "bit_exact": true,
-   "enc_cpu": 0.259418,
-   "enc_rss_kb": 119996,
-   "dec_cpu": 0.18978469444444446,
-   "dec_rss_kb": 119996
+   "enc_cpu": 0.2629748333333333,
+   "enc_rss_kb": 113384,
+   "dec_cpu": 0.1898105,
+   "dec_rss_kb": 113384
   },
   {
    "codec": "flac-ffmpeg-8",
@@ -336,10 +336,10 @@
    "kbps": 634.1866818347715,
    "frame_bytes": 10322400,
    "bit_exact": true,
-   "enc_cpu": 0.5238054722222222,
-   "enc_rss_kb": 119996,
-   "dec_cpu": 0.19195891666666665,
-   "dec_rss_kb": 119996
+   "enc_cpu": 0.5406788888888889,
+   "enc_rss_kb": 113384,
+   "dec_cpu": 0.19242075,
+   "dec_rss_kb": 113384
   },
   {
    "codec": "alac-ffmpeg",
@@ -349,8 +349,8 @@
    "bytes": 11354157,
    "kbps": 697.0160315422403,
    "bit_exact": true,
-   "enc_cpu": 0.6065155277777777,
-   "dec_cpu": 0.48865519444444444
+   "enc_cpu": 0.6074961388888889,
+   "dec_cpu": 0.4950360833333333
   },
   {
    "codec": "alac-apple-ref",
@@ -384,35 +384,35 @@
    "group": "flac",
    "description": "encode at level 5 against flac -5",
    "kind": "speed",
-   "ratio_median": 0.8131175909410695,
-   "ratio_min": 0.8096396419755497,
-   "ratio_max": 0.8169729825761846,
-   "reference_spread": 0.008589335142969712,
-   "threshold": 1.0085893351429698,
-   "ours_median": 5.571236,
-   "reference_median": 6.834522000000001,
-   "min_cpu": 5.551179,
+   "ratio_median": 0.8142864486262692,
+   "ratio_min": 0.8032264323489852,
+   "ratio_max": 0.8174203728934912,
+   "reference_spread": 0.008228032192952569,
+   "threshold": 1.0082280321929527,
+   "ours_median": 5.544338,
+   "reference_median": 6.824475,
+   "min_cpu": 5.5141350000000005,
    "verdict": "passed",
    "pairs": [
     [
-     5.5582,
+     5.5599,
+     6.8245
+    ],
+    [
+     5.5443,
+     6.8088
+    ],
+    [
+     5.5759,
+     6.8214
+    ],
+    [
+     5.5141,
      6.865
     ],
     [
-     5.5712,
-     6.8345
-    ],
-    [
-     5.5512,
-     6.827
-    ],
-    [
-     5.582,
-     6.8807
-    ],
-    [
-     5.5734,
-     6.822
+     5.532,
+     6.8373
     ]
    ],
    "judged_on": "one process over the repeated corpus, raw input"
@@ -422,35 +422,35 @@
    "group": "flac",
    "description": "encode at level 8 against flac -8",
    "kind": "speed",
-   "ratio_median": 0.867831073787223,
-   "ratio_min": 0.8622073819752593,
-   "ratio_max": 0.8717097367747069,
-   "reference_spread": 0.008030902875754142,
-   "threshold": 1.0080309028757541,
-   "ours_median": 16.405682,
-   "reference_median": 18.903354,
-   "min_cpu": 16.369585,
+   "ratio_median": 0.8696076673115803,
+   "ratio_min": 0.8636318314632119,
+   "ratio_max": 0.870963993842518,
+   "reference_spread": 0.007364753493211993,
+   "threshold": 1.007364753493212,
+   "ours_median": 16.461161999999998,
+   "reference_median": 18.935868,
+   "min_cpu": 16.431106,
    "verdict": "passed",
    "pairs": [
     [
-     16.4049,
-     18.9034
+     16.4322,
+     18.8861
     ],
     [
-     16.4167,
-     18.8757
+     16.4612,
+     18.8999
     ],
     [
-     16.4057,
-     19.0275
+     16.4668,
+     18.9359
     ],
     [
-     16.4666,
-     18.8901
+     16.4641,
+     18.9772
     ],
     [
-     16.3696,
-     18.9316
+     16.4311,
+     19.0256
     ]
    ],
    "judged_on": "one process over the repeated corpus, raw input"
@@ -460,35 +460,35 @@
    "group": "decode",
    "description": "decode of flac -5 streams against flac (MD5 verified by both)",
    "kind": "speed",
-   "ratio_median": 0.7922524623302752,
-   "ratio_min": 0.7896862808575452,
-   "ratio_max": 0.7937307461849634,
-   "reference_spread": 0.004108206514672092,
-   "threshold": 1.004108206514672,
-   "ours_median": 4.083388,
-   "reference_median": 5.15237,
-   "min_cpu": 4.08026,
+   "ratio_median": 0.794391494982259,
+   "ratio_min": 0.7932929824544406,
+   "ratio_max": 0.7957952293277752,
+   "reference_spread": 0.0015029000850762919,
+   "threshold": 1.0015029000850764,
+   "ours_median": 4.09384,
+   "reference_median": 5.155366,
+   "min_cpu": 4.092877,
    "verdict": "passed",
    "pairs": [
     [
-     4.0803,
-     5.1524
+     4.1048,
+     5.1581
     ],
     [
-     4.0838,
-     5.1547
+     4.0929,
+     5.1554
     ],
     [
-     4.0824,
-     5.1497
+     4.096,
+     5.153
     ],
     [
-     4.0879,
-     5.1503
+     4.0938,
+     5.1606
     ],
     [
-     4.0834,
-     5.1709
+     4.0934,
+     5.1528
     ]
    ],
    "judged_on": "one process over the repeated corpus"
@@ -498,35 +498,35 @@
    "group": "decode",
    "description": "decode of flac -5 streams against ffmpeg (frame CRCs checked by both, no MD5)",
    "kind": "speed",
-   "ratio_median": 0.41062318984229157,
-   "ratio_min": 0.4103227924022389,
-   "ratio_max": 0.4108935371984738,
-   "reference_spread": 0.0036135843872830394,
-   "threshold": 1.003613584387283,
-   "ours_median": 2.747791,
-   "reference_median": 6.6914169999999995,
-   "min_cpu": 2.7463279999999997,
+   "ratio_median": 0.40639764786116817,
+   "ratio_min": 0.4058721455952867,
+   "ratio_max": 0.4083138680380345,
+   "reference_spread": 0.005119596787720089,
+   "threshold": 1.00511959678772,
+   "ours_median": 2.757012,
+   "reference_median": 6.784714,
+   "min_cpu": 2.754623,
    "verdict": "passed",
    "pairs": [
     [
-     2.7572,
-     6.7132
+     2.7562,
+     6.7847
     ],
     [
-     2.7495,
-     6.6914
+     2.7546,
+     6.7869
     ],
     [
-     2.7463,
-     6.6903
+     2.7593,
+     6.7737
     ],
     [
-     2.7478,
-     6.6967
+     2.7578,
+     6.786
     ],
     [
-     2.7467,
-     6.689
+     2.757,
+     6.7522
     ]
    ],
    "judged_on": "one process over the repeated corpus"
@@ -536,35 +536,35 @@
    "group": "decode",
    "description": "decode of flac -8 streams against flac (MD5 verified by both)",
    "kind": "speed",
-   "ratio_median": 0.8084658347886216,
-   "ratio_min": 0.8064399542977995,
-   "ratio_max": 0.8096591712834234,
-   "reference_spread": 0.002330696444867877,
-   "threshold": 1.002330696444868,
-   "ours_median": 4.457969,
-   "reference_median": 5.5172349999999994,
-   "min_cpu": 4.453734,
+   "ratio_median": 0.8090097991354477,
+   "ratio_min": 0.8025551503810977,
+   "ratio_max": 0.8140377211834244,
+   "reference_spread": 0.009330307940722303,
+   "threshold": 1.0093303079407223,
+   "ours_median": 4.498316,
+   "reference_median": 5.571949,
+   "min_cpu": 4.475544,
    "verdict": "passed",
    "pairs": [
     [
-     4.4557,
-     5.5101
+     4.4755,
+     5.5719
     ],
     [
-     4.4644,
-     5.514
+     4.4959,
+     5.5573
     ],
     [
-     4.4605,
-     5.5172
+     4.5662,
+     5.6093
     ],
     [
-     4.4537,
-     5.5227
+     4.5142,
+     5.57
     ],
     [
-     4.458,
-     5.523
+     4.4983,
+     5.605
     ]
    ],
    "judged_on": "one process over the repeated corpus"
@@ -574,35 +574,35 @@
    "group": "decode",
    "description": "decode of flac -8 streams against ffmpeg (frame CRCs checked by both, no MD5)",
    "kind": "speed",
-   "ratio_median": 0.45247088155937526,
-   "ratio_min": 0.45181611362146346,
-   "ratio_max": 0.4543595039039856,
-   "reference_spread": 0.005142482889343236,
-   "threshold": 1.0051424828893432,
-   "ours_median": 3.119723,
-   "reference_median": 6.892196,
-   "min_cpu": 3.1176709999999996,
+   "ratio_median": 0.4525645593637757,
+   "ratio_min": 0.4513894276890681,
+   "ratio_max": 0.4534114879353293,
+   "reference_spread": 0.002834313531614917,
+   "threshold": 1.002834313531615,
+   "ours_median": 3.117598,
+   "reference_median": 6.887382,
+   "min_cpu": 3.11254,
    "verdict": "passed",
    "pairs": [
     [
-     3.1197,
-     6.8757
+     3.1176,
+     6.8781
     ],
     [
-     3.1177,
-     6.8925
+     3.118,
+     6.8918
     ],
     [
-     3.1185,
-     6.8922
+     3.1176,
+     6.8759
     ],
     [
-     3.1226,
-     6.9112
+     3.1125,
+     6.8955
     ],
     [
-     3.1258,
-     6.8796
+     3.117,
+     6.8874
     ]
    ],
    "judged_on": "one process over the repeated corpus"
@@ -630,35 +630,35 @@
    "group": "alac",
    "description": "encode at level 5 against FFmpeg ALAC",
    "kind": "speed",
-   "ratio_median": 0.2586713083103864,
-   "ratio_min": 0.25587993629319933,
-   "ratio_max": 0.2602775055993287,
-   "reference_spread": 0.004794692670458859,
-   "threshold": 1.004794692670459,
-   "ours_median": 5.6600719999999995,
-   "reference_median": 21.834559,
-   "min_cpu": 5.572204999999999,
+   "ratio_median": 0.25990788727730646,
+   "ratio_min": 0.2586662292888411,
+   "ratio_max": 0.26167372531540095,
+   "reference_spread": 0.006129897213338558,
+   "threshold": 1.0061298972133386,
+   "ours_median": 5.698561,
+   "reference_median": 21.869861,
+   "min_cpu": 5.637370000000001,
    "verdict": "passed",
    "pairs": [
     [
-     5.5722,
-     21.7766
+     5.6374,
+     21.7912
     ],
     [
-     5.6787,
-     21.8178
+     5.6999,
+     21.8116
     ],
     [
-     5.6278,
-     21.8346
+     5.7228,
+     21.8699
     ],
     [
-     5.6601,
-     21.8813
+     5.6648,
+     21.9002
     ],
     [
-     5.6738,
-     21.8692
+     5.6986,
+     21.9253
     ]
    ],
    "judged_on": "one process over the repeated corpus, WAV input, both writing a file"
@@ -668,35 +668,35 @@
    "group": "alac",
    "description": "decode of its own level 5 stream against FFmpeg decoding ALAC",
    "kind": "speed",
-   "ratio_median": 0.23202971966088107,
-   "ratio_min": 0.23144987075908746,
-   "ratio_max": 0.23218118246885633,
-   "reference_spread": 0.002956697425877424,
-   "threshold": 1.0029566974258775,
-   "ours_median": 4.0802689999999995,
-   "reference_median": 17.591587,
-   "min_cpu": 4.077744,
+   "ratio_median": 0.22912988886227814,
+   "ratio_min": 0.22818876377993247,
+   "ratio_max": 0.23756612418718287,
+   "reference_spread": 0.02793124115138858,
+   "threshold": 1.0279312411513886,
+   "ours_median": 4.086615,
+   "reference_median": 17.821299,
+   "min_cpu": 4.08223,
    "verdict": "passed",
    "pairs": [
     [
-     4.0805,
-     17.6119
+     4.0866,
+     17.9089
     ],
     [
-     4.0818,
-     17.5916
+     4.1464,
+     18.0963
     ],
     [
-     4.0777,
-     17.6183
+     4.1808,
+     17.5985
     ],
     [
-     4.0786,
-     17.5662
+     4.083,
+     17.8213
     ],
     [
-     4.0803,
-     17.5777
+     4.0822,
+     17.5988
     ]
    ],
    "judged_on": "one process over the repeated corpus"
@@ -715,35 +715,35 @@
    "group": "corpus",
    "description": "corpus addition 96 kHz, 24-bit stereo: encode at level 5 against flac -5",
    "kind": "speed",
-   "ratio_median": 0.921753504598372,
-   "ratio_min": 0.9203140496820577,
-   "ratio_max": 0.9249619092711248,
-   "reference_spread": 0.006131104311236872,
-   "threshold": 1.0061311043112369,
-   "ours_median": 6.0830210000000005,
-   "reference_median": 6.5968539999999996,
-   "min_cpu": 6.066782,
+   "ratio_median": 0.9248703689388668,
+   "ratio_min": 0.9070161643948565,
+   "ratio_max": 0.937870118871648,
+   "reference_spread": 0.018134104886796745,
+   "threshold": 1.0181341048867967,
+   "ours_median": 6.118237000000001,
+   "reference_median": 6.670525,
+   "min_cpu": 6.050274,
    "verdict": "passed",
    "pairs": [
     [
-     6.0932,
-     6.5876
+     6.2725,
+     6.6881
     ],
     [
-     6.0668,
-     6.5921
+     6.1182,
+     6.7185
     ],
     [
-     6.0741,
-     6.5969
+     6.1195,
+     6.6116
     ],
     [
-     6.1143,
-     6.628
+     6.0503,
+     6.6705
     ],
     [
-     6.083,
-     6.5994
+     6.1019,
+     6.5976
     ]
    ],
    "judged_on": "one process over the set repeated 46 times, raw input"
@@ -753,35 +753,35 @@
    "group": "corpus",
    "description": "corpus addition 96 kHz, 24-bit stereo: decode of the flac -5 stream against flac (MD5 verified by both)",
    "kind": "speed",
-   "ratio_median": 0.8033816510388726,
-   "ratio_min": 0.7969104105362831,
-   "ratio_max": 0.8041556243458121,
-   "reference_spread": 0.008070720586689482,
-   "threshold": 1.0080707205866895,
-   "ours_median": 4.507047,
-   "reference_median": 5.61251,
-   "min_cpu": 4.505902,
+   "ratio_median": 0.8020968323879103,
+   "ratio_min": 0.8005064245238318,
+   "ratio_max": 0.8030250178099541,
+   "reference_spread": 0.00740634647428647,
+   "threshold": 1.0074063464742864,
+   "ours_median": 4.519,
+   "reference_median": 5.627471,
+   "min_cpu": 4.508397,
    "verdict": "passed",
    "pairs": [
     [
-     4.5059,
-     5.6542
+     4.5282,
+     5.6473
     ],
     [
-     4.5061,
-     5.6089
+     4.5162,
+     5.6247
     ],
     [
-     4.507,
-     5.6097
+     4.519,
+     5.6275
     ],
     [
-     4.5136,
-     5.6129
+     4.5084,
+     5.6208
     ],
     [
-     4.508,
-     5.6125
+     4.5328,
+     5.6624
     ]
    ],
    "judged_on": "one process over the set repeated 46 times"
@@ -791,35 +791,35 @@
    "group": "corpus",
    "description": "corpus addition 96 kHz, 24-bit stereo: decode of the flac -5 stream against FFmpeg (frame CRCs checked by both, no MD5)",
    "kind": "speed",
-   "ratio_median": 0.48507911033580464,
-   "ratio_min": 0.48412408695378795,
-   "ratio_max": 0.48695192049938485,
-   "reference_spread": 0.0029140627456185485,
-   "threshold": 1.0029140627456186,
-   "ours_median": 2.7728270000000004,
-   "reference_median": 5.725339999999999,
-   "min_cpu": 2.7706779999999998,
+   "ratio_median": 0.4844221485002718,
+   "ratio_min": 0.47091179281578116,
+   "ratio_max": 0.4931441594687624,
+   "reference_spread": 0.037270210193004555,
+   "threshold": 1.0372702101930045,
+   "ours_median": 2.806048,
+   "reference_median": 5.773645999999999,
+   "min_cpu": 2.787679,
    "verdict": "passed",
    "pairs": [
     [
-     2.7707,
-     5.722
+     2.7877,
+     5.8545
     ],
     [
-     2.7718,
-     5.7253
+     2.8324,
+     5.7436
     ],
     [
-     2.7884,
-     5.7262
+     2.8142,
+     5.7668
     ],
     [
-     2.7728,
-     5.7158
+     2.806,
+     5.9588
     ],
     [
-     2.7807,
-     5.7325
+     2.7969,
+     5.7736
     ]
    ],
    "judged_on": "one process over the set repeated 46 times"
@@ -838,114 +838,114 @@
    "group": "corpus",
    "description": "corpus addition 5.1, 44.1 kHz, 16-bit: encode at level 5 against flac -5",
    "kind": "speed",
-   "ratio_median": 0.7899093147506777,
-   "ratio_min": 0.7880582887691463,
-   "ratio_max": 0.7920141707875118,
-   "reference_spread": 0.0021727417301595766,
-   "threshold": 1.0021727417301596,
-   "ours_median": 10.231817,
-   "reference_median": 12.952759,
-   "min_cpu": 10.219097000000001,
+   "ratio_median": 0.7907913314473772,
+   "ratio_min": 0.7866771440749513,
+   "ratio_max": 0.7931339914691905,
+   "reference_spread": 0.007249952753178857,
+   "threshold": 1.0072499527531789,
+   "ours_median": 10.034433,
+   "reference_median": 12.683392999999999,
+   "min_cpu": 10.011612,
    "verdict": "passed",
    "pairs": [
     [
-     10.2318,
-     12.9532
+     10.0405,
+     12.6593
     ],
     [
-     10.2191,
-     12.9674
+     10.0116,
+     12.6602
     ],
     [
-     10.2481,
-     12.9393
+     10.0311,
+     12.7512
     ],
     [
-     10.222,
-     12.9439
+     10.0344,
+     12.6834
     ],
     [
-     10.2427,
-     12.9528
+     10.0374,
+     12.6958
     ]
    ],
-   "judged_on": "one process over the set repeated 925 times, raw input"
+   "judged_on": "one process over the set repeated 903 times, raw input"
   },
   {
    "id": "added-surround-dec-flac",
    "group": "corpus",
    "description": "corpus addition 5.1, 44.1 kHz, 16-bit: decode of the flac -5 stream against flac (MD5 verified by both)",
    "kind": "speed",
-   "ratio_median": 0.8022049106288685,
-   "ratio_min": 0.8003053822182818,
-   "ratio_max": 0.8029752135415478,
-   "reference_spread": 0.0031975338580948177,
-   "threshold": 1.0031975338580947,
-   "ours_median": 8.65672,
-   "reference_median": 10.787376,
-   "min_cpu": 8.653686,
+   "ratio_median": 0.802570967396406,
+   "ratio_min": 0.800482868478011,
+   "ratio_max": 0.8053017901711618,
+   "reference_spread": 0.006781633907506523,
+   "threshold": 1.0067816339075064,
+   "ours_median": 8.469388,
+   "reference_median": 10.55837,
+   "min_cpu": 8.455718000000001,
    "verdict": "passed",
    "pairs": [
     [
-     8.6537,
-     10.7874
+     8.5436,
+     10.6092
     ],
     [
-     8.6567,
-     10.7808
+     8.4592,
+     10.5402
     ],
     [
-     8.6555,
-     10.8153
+     8.4557,
+     10.5584
     ],
     [
-     8.6693,
-     10.8075
+     8.4715,
+     10.583
     ],
     [
-     8.6595,
-     10.7866
+     8.4694,
+     10.5376
     ]
    ],
-   "judged_on": "one process over the set repeated 925 times"
+   "judged_on": "one process over the set repeated 903 times"
   },
   {
    "id": "added-surround-dec-ffmpeg",
    "group": "corpus",
    "description": "corpus addition 5.1, 44.1 kHz, 16-bit: decode of the flac -5 stream against FFmpeg (frame CRCs checked by both, no MD5)",
    "kind": "speed",
-   "ratio_median": 0.45016730326867355,
-   "ratio_min": 0.44828433386297506,
-   "ratio_max": 0.4523205513765544,
-   "reference_spread": 0.004207132131855515,
-   "threshold": 1.0042071321318555,
-   "ours_median": 2.806117,
-   "reference_median": 6.2422569999999995,
-   "min_cpu": 2.7990169999999996,
+   "ratio_median": 0.4503662308183427,
+   "ratio_min": 0.43970313972167585,
+   "ratio_max": 0.4563134305992617,
+   "reference_spread": 0.03774251373686939,
+   "threshold": 1.0377425137368694,
+   "ours_median": 2.752712,
+   "reference_median": 6.239595,
+   "min_cpu": 2.7445649999999997,
    "verdict": "passed",
    "pairs": [
     [
-     2.8061,
-     6.2179
+     2.7504,
+     6.1069
     ],
     [
-     2.799,
-     6.2438
+     2.7527,
+     6.1095
     ],
     [
-     2.7992,
-     6.2442
+     2.7446,
+     6.2419
     ],
     [
-     2.8101,
-     6.2423
+     2.8421,
+     6.3424
     ],
     [
-     2.8166,
-     6.227
+     2.8472,
+     6.2396
     ]
    ],
-   "judged_on": "one process over the set repeated 925 times"
+   "judged_on": "one process over the set repeated 903 times"
   },
   {
    "id": "added-stereo16-size",
@@ -961,114 +961,114 @@
    "group": "corpus",
    "description": "corpus addition 44.1 kHz, 16-bit stereo: encode at level 5 against flac -5",
    "kind": "speed",
-   "ratio_median": 0.8958673582940297,
-   "ratio_min": 0.8877245907060014,
-   "ratio_max": 0.8973814438138691,
-   "reference_spread": 0.00917223325168266,
-   "threshold": 1.0091722332516826,
-   "ours_median": 6.148351,
-   "reference_median": 6.867465999999999,
-   "min_cpu": 6.1425019999999995,
+   "ratio_median": 0.890937735074093,
+   "ratio_min": 0.8891156660461266,
+   "ratio_max": 0.9070761118253843,
+   "reference_spread": 0.02475739637311045,
+   "threshold": 1.0247573963731105,
+   "ours_median": 6.0663730000000005,
+   "reference_median": 6.798332,
+   "min_cpu": 6.024808,
    "verdict": "passed",
    "pairs": [
     [
-     6.1426,
-     6.9195
+     6.0522,
+     6.807
     ],
     [
-     6.1425,
-     6.8565
+     6.1507,
+     6.7808
     ],
     [
-     6.1484,
-     6.8651
+     6.1777,
+     6.934
     ],
     [
-     6.1527,
-     6.8675
+     6.0248,
+     6.7657
     ],
     [
-     6.1807,
-     6.8875
+     6.0664,
+     6.7983
     ]
    ],
-   "judged_on": "one process over the set repeated 774 times, raw input"
+   "judged_on": "one process over the set repeated 767 times, raw input"
   },
   {
    "id": "added-stereo16-dec-flac",
    "group": "corpus",
    "description": "corpus addition 44.1 kHz, 16-bit stereo: decode of the flac -5 stream against flac (MD5 verified by both)",
    "kind": "speed",
-   "ratio_median": 0.7941468542294843,
-   "ratio_min": 0.7860383456770815,
-   "ratio_max": 0.7947163825912846,
-   "reference_spread": 0.012256256091305213,
-   "threshold": 1.0122562560913053,
-   "ours_median": 4.217928000000001,
-   "reference_median": 5.3159790000000005,
-   "min_cpu": 4.216098,
+   "ratio_median": 0.7954377488692613,
+   "ratio_min": 0.7851359588989018,
+   "ratio_max": 0.8031765655591555,
+   "reference_spread": 0.01677792912298366,
+   "threshold": 1.0167779291229837,
+   "ours_median": 4.190028,
+   "reference_median": 5.267575000000001,
+   "min_cpu": 4.182084,
    "verdict": "passed",
    "pairs": [
     [
-     4.2219,
-     5.3711
+     4.1821,
+     5.3266
     ],
     [
-     4.2179,
-     5.3345
+     4.2659,
+     5.3395
     ],
     [
-     4.2217,
-     5.316
+     4.2176,
+     5.2511
     ],
     [
-     4.2168,
-     5.306
+     4.19,
+     5.2676
     ],
     [
-     4.2161,
-     5.3061
+     4.1831,
+     5.2658
     ]
    ],
-   "judged_on": "one process over the set repeated 774 times"
+   "judged_on": "one process over the set repeated 767 times"
   },
   {
    "id": "added-stereo16-dec-ffmpeg",
    "group": "corpus",
    "description": "corpus addition 44.1 kHz, 16-bit stereo: decode of the flac -5 stream against FFmpeg (frame CRCs checked by both, no MD5)",
    "kind": "speed",
-   "ratio_median": 0.38807027910231173,
-   "ratio_min": 0.3871978728209534,
-   "ratio_max": 0.3885671284731364,
-   "reference_spread": 0.004085885379878771,
-   "threshold": 1.0040858853798789,
-   "ours_median": 2.803045,
-   "reference_median": 7.226096,
-   "min_cpu": 2.7979290000000003,
+   "ratio_median": 0.3875845930897037,
+   "ratio_min": 0.3864376728771421,
+   "ratio_max": 0.3890655062692843,
+   "reference_spread": 0.003439867308235517,
+   "threshold": 1.0034398673082354,
+   "ours_median": 2.7750239999999997,
+   "reference_median": 7.163067,
+   "min_cpu": 2.7696199999999997,
    "verdict": "passed",
    "pairs": [
     [
-     2.8031,
-     7.2231
+     2.774,
+     7.1572
     ],
     [
-     2.8116,
-     7.2357
+     2.7843,
+     7.1564
     ],
     [
-     2.7979,
-     7.2261
+     2.7824,
+     7.1683
     ],
     [
-     2.7981,
-     7.2062
+     2.775,
+     7.181
     ],
     [
-     2.803,
-     7.2326
+     2.7696,
+     7.1631
     ]
    ],
-   "judged_on": "one process over the set repeated 774 times"
+   "judged_on": "one process over the set repeated 767 times"
   },
   {
    "id": "size-5-enlarged",
@@ -1093,369 +1093,369 @@
    "group": "held-out",
    "description": "held-out 96 kHz, 24-bit stereo: level 5 frame bytes against flac -5",
    "kind": "size",
-   "ours": 19050607,
-   "reference": 19054554,
-   "verdict": "passed"
+   "ours": 9821712,
+   "reference": 9795735,
+   "verdict": "failed"
   },
   {
    "id": "held-hires-enc",
    "group": "held-out",
    "description": "held-out 96 kHz, 24-bit stereo: encode at level 5 against flac -5",
    "kind": "speed",
-   "ratio_median": 0.9400987703155645,
-   "ratio_min": 0.9339059928575243,
-   "ratio_max": 0.9454943975892898,
-   "reference_spread": 0.0073456603373840985,
-   "threshold": 1.007345660337384,
-   "ours_median": 6.278014,
-   "reference_median": 6.683538,
-   "min_cpu": 6.24486,
+   "ratio_median": 0.878525913603121,
+   "ratio_min": 0.8685990822061244,
+   "ratio_max": 0.8884298139881601,
+   "reference_spread": 0.019856976568789205,
+   "threshold": 1.0198569765687893,
+   "ours_median": 6.503653,
+   "reference_median": 7.3985080000000005,
+   "min_cpu": 6.44301,
    "verdict": "passed",
    "pairs": [
     [
-     6.2449,
-     6.6835
+     6.5037,
+     7.4875
     ],
     [
-     6.278,
-     6.7223
+     6.5174,
+     7.4075
     ],
     [
-     6.2743,
-     6.6741
+     6.4998,
+     7.3985
     ],
     [
-     6.2976,
-     6.6732
+     6.5216,
+     7.3406
     ],
     [
-     6.3242,
-     6.6888
+     6.443,
+     7.3515
     ]
    ],
-   "judged_on": "one process over the set repeated 28 times, raw input"
+   "judged_on": "one process over the set repeated 34 times, raw input"
   },
   {
    "id": "held-hires-dec-flac",
    "group": "held-out",
    "description": "held-out 96 kHz, 24-bit stereo: decode of the flac -5 stream against flac (MD5 verified by both)",
    "kind": "speed",
-   "ratio_median": 0.8247292137634317,
-   "ratio_min": 0.8209711848242769,
-   "ratio_max": 0.8260953975685676,
-   "reference_spread": 0.006994224822437901,
-   "threshold": 1.006994224822438,
-   "ours_median": 4.552167000000001,
-   "reference_median": 5.523986,
-   "min_cpu": 4.547724,
+   "ratio_median": 0.7946273977898174,
+   "ratio_min": 0.7916935652345919,
+   "ratio_max": 0.7965662913901125,
+   "reference_spread": 0.005210885651369003,
+   "threshold": 1.005210885651369,
+   "ours_median": 4.707458,
+   "reference_median": 5.923945,
+   "min_cpu": 4.7067559999999995,
    "verdict": "passed",
    "pairs": [
     [
-     4.5522,
-     5.5449
+     4.7068,
+     5.9452
     ],
     [
-     4.5592,
-     5.5281
+     4.7075,
+     5.936
     ],
     [
-     4.5569,
-     5.5183
+     4.7073,
+     5.9239
     ],
     [
-     4.5477,
-     5.524
+     4.7083,
+     5.9213
     ],
     [
-     4.5487,
-     5.5062
+     4.7111,
+     5.9143
     ]
    ],
-   "judged_on": "one process over the set repeated 28 times"
+   "judged_on": "one process over the set repeated 34 times"
   },
   {
    "id": "held-hires-dec-ffmpeg",
    "group": "held-out",
    "description": "held-out 96 kHz, 24-bit stereo: decode of the flac -5 stream against FFmpeg (frame CRCs checked by both, no MD5)",
    "kind": "speed",
-   "ratio_median": 0.47359074012612584,
-   "ratio_min": 0.4727122932049677,
-   "ratio_max": 0.47396080734746976,
-   "reference_spread": 0.0026725618348419416,
-   "threshold": 1.002672561834842,
-   "ours_median": 2.7764230000000003,
-   "reference_median": 5.867404,
-   "min_cpu": 2.773594,
+   "ratio_median": 0.42950473071216655,
+   "ratio_min": 0.4274671580058982,
+   "ratio_max": 0.42993215082312797,
+   "reference_spread": 0.005951524979713685,
+   "threshold": 1.0059515249797137,
+   "ours_median": 2.7420210000000003,
+   "reference_median": 6.404577000000001,
+   "min_cpu": 2.739496,
    "verdict": "passed",
    "pairs": [
     [
-     2.7792,
-     5.8723
+     2.742,
+     6.4146
     ],
     [
-     2.7811,
-     5.8724
+     2.75,
+     6.3964
     ],
     [
-     2.7764,
-     5.8608
+     2.7395,
+     6.3765
     ],
     [
-     2.7736,
-     5.8674
+     2.7416,
+     6.4046
     ],
     [
-     2.7759,
-     5.8567
+     2.751,
+     6.4051
     ]
    ],
-   "judged_on": "one process over the set repeated 28 times"
+   "judged_on": "one process over the set repeated 34 times"
   },
   {
    "id": "held-surround-size",
    "group": "held-out",
-   "description": "held-out 5.1, 48 kHz, 16-bit: level 5 frame bytes against flac -5",
+   "description": "held-out 5.1, 48 kHz, 24-bit: level 5 frame bytes against flac -5",
    "kind": "size",
-   "ours": 4685215,
-   "reference": 4691270,
+   "ours": 8887203,
+   "reference": 8936904,
    "verdict": "passed"
   },
   {
    "id": "held-surround-enc",
    "group": "held-out",
-   "description": "held-out 5.1, 48 kHz, 16-bit: encode at level 5 against flac -5",
+   "description": "held-out 5.1, 48 kHz, 24-bit: encode at level 5 against flac -5",
    "kind": "speed",
-   "ratio_median": 0.873793449210952,
-   "ratio_min": 0.8704738533414701,
-   "ratio_max": 0.8740126083817855,
-   "reference_spread": 0.003078236295401806,
-   "threshold": 1.0030782362954018,
-   "ours_median": 4.015551,
-   "reference_median": 4.599387,
-   "min_cpu": 4.008158,
+   "ratio_median": 0.9618023086759975,
+   "ratio_min": 0.9569063861059496,
+   "ratio_max": 0.9656953935725264,
+   "reference_spread": 0.00663959028756635,
+   "threshold": 1.0066395902875664,
+   "ours_median": 4.7726239999999995,
+   "reference_median": 4.962505,
+   "min_cpu": 4.766966,
    "verdict": "passed",
    "pairs": [
     [
-     4.0082,
-     4.5994
+     4.7688,
+     4.9521
     ],
     [
-     4.0156,
-     4.5955
+     4.767,
+     4.9816
     ],
     [
-     4.0164,
-     4.5955
+     4.7789,
+     4.9487
     ],
     [
-     4.0126,
-     4.6096
+     4.7726,
+     4.9625
     ],
     [
-     4.0244,
-     4.6046
+     4.7797,
+     4.9695
     ]
    ],
-   "judged_on": "one process over the set repeated 76 times, raw input"
+   "judged_on": "one process over the set repeated 63 times, raw input"
   },
   {
    "id": "held-surround-dec-flac",
    "group": "held-out",
-   "description": "held-out 5.1, 48 kHz, 16-bit: decode of the flac -5 stream against flac (MD5 verified by both)",
+   "description": "held-out 5.1, 48 kHz, 24-bit: decode of the flac -5 stream against flac (MD5 verified by both)",
    "kind": "speed",
-   "ratio_median": 0.8235385663770901,
-   "ratio_min": 0.8203473463320984,
-   "ratio_max": 0.8249928405761529,
-   "reference_spread": 0.004280971793175927,
-   "threshold": 1.004280971793176,
-   "ours_median": 3.926892,
-   "reference_median": 4.769945000000001,
-   "min_cpu": 3.92479,
+   "ratio_median": 0.8498503206666781,
+   "ratio_min": 0.8456398123456219,
+   "ratio_max": 0.8516458622095155,
+   "reference_spread": 0.008007510032400902,
+   "threshold": 1.0080075100324009,
+   "ours_median": 4.382215,
+   "reference_median": 5.160031,
+   "min_cpu": 4.380095,
    "verdict": "passed",
    "pairs": [
     [
-     3.9269,
-     4.7869
+     4.3856,
+     5.1861
     ],
     [
-     3.9248,
-     4.7725
+     4.3822,
+     5.1685
     ],
     [
-     3.929,
-     4.7699
+     4.3853,
+     5.16
     ],
     [
-     3.9264,
-     4.7678
+     4.3801,
+     5.1475
     ],
     [
-     3.9323,
-     4.7664
+     4.3816,
+     5.1448
     ]
    ],
-   "judged_on": "one process over the set repeated 76 times"
+   "judged_on": "one process over the set repeated 63 times"
   },
   {
    "id": "held-surround-dec-ffmpeg",
    "group": "held-out",
-   "description": "held-out 5.1, 48 kHz, 16-bit: decode of the flac -5 stream against FFmpeg (frame CRCs checked by both, no MD5)",
+   "description": "held-out 5.1, 48 kHz, 24-bit: decode of the flac -5 stream against FFmpeg (frame CRCs checked by both, no MD5)",
    "kind": "speed",
-   "ratio_median": 0.5078706843726735,
-   "ratio_min": 0.5071916624878364,
-   "ratio_max": 0.5098202613718548,
-   "reference_spread": 0.0012385412317382266,
-   "threshold": 1.0012385412317382,
-   "ours_median": 2.6372780000000002,
-   "reference_median": 5.194821,
-   "min_cpu": 2.633214,
+   "ratio_median": 0.5524431295299894,
+   "ratio_min": 0.551732793428879,
+   "ratio_max": 0.5542421170027271,
+   "reference_spread": 0.003543383780370756,
+   "threshold": 1.0035433837803707,
+   "ours_median": 2.6324979999999996,
+   "reference_median": 4.763808,
+   "min_cpu": 2.6310729999999998,
    "verdict": "passed",
    "pairs": [
     [
-     2.6348,
-     5.1948
+     2.6335,
+     4.7718
     ],
     [
-     2.6433,
-     5.1958
+     2.6325,
+     4.7585
     ],
     [
-     2.6484,
-     5.1948
+     2.6354,
+     4.7549
     ],
     [
-     2.6373,
-     5.1928
+     2.6311,
+     4.7687
     ],
     [
-     2.6332,
-     5.1894
+     2.6317,
+     4.7638
     ]
    ],
-   "judged_on": "one process over the set repeated 76 times"
+   "judged_on": "one process over the set repeated 63 times"
   },
   {
    "id": "held-stereo16-size",
    "group": "held-out",
-   "description": "held-out 48 kHz, 16-bit stereo: level 5 frame bytes against flac -5",
+   "description": "held-out 44.1 kHz, 16-bit stereo: level 5 frame bytes against flac -5",
    "kind": "size",
-   "ours": 4649481,
-   "reference": 4662873,
+   "ours": 7324872,
+   "reference": 7328139,
    "verdict": "passed"
   },
   {
    "id": "held-stereo16-enc",
    "group": "held-out",
-   "description": "held-out 48 kHz, 16-bit stereo: encode at level 5 against flac -5",
+   "description": "held-out 44.1 kHz, 16-bit stereo: encode at level 5 against flac -5",
    "kind": "speed",
-   "ratio_median": 0.8737355794519365,
-   "ratio_min": 0.8644627625631545,
-   "ratio_max": 0.8784144639667182,
-   "reference_spread": 0.003435487056910885,
-   "threshold": 1.0034354870569109,
-   "ours_median": 5.445038,
-   "reference_median": 6.232012999999999,
-   "min_cpu": 5.40114,
+   "ratio_median": 0.8850808098410538,
+   "ratio_min": 0.8794288693766035,
+   "ratio_max": 0.8870697577140456,
+   "reference_spread": 0.0052066497711147535,
+   "threshold": 1.0052066497711147,
+   "ours_median": 5.2929189999999995,
+   "reference_median": 5.986191,
+   "min_cpu": 5.270747,
    "verdict": "passed",
    "pairs": [
     [
-     5.4553,
-     6.2413
+     5.2929,
+     5.9932
     ],
     [
-     5.445,
-     6.2319
+     5.2707,
+     5.9934
     ],
     [
-     5.4011,
-     6.248
+     5.3017,
+     5.9811
     ],
     [
-     5.4695,
-     6.2266
+     5.277,
+     5.9622
     ],
     [
-     5.43,
-     6.232
+     5.3102,
+     5.9862
     ]
    ],
-   "judged_on": "one process over the set repeated 87 times, raw input"
+   "judged_on": "one process over the set repeated 77 times, raw input"
   },
   {
    "id": "held-stereo16-dec-flac",
    "group": "held-out",
-   "description": "held-out 48 kHz, 16-bit stereo: decode of the flac -5 stream against flac (MD5 verified by both)",
+   "description": "held-out 44.1 kHz, 16-bit stereo: decode of the flac -5 stream against flac (MD5 verified by both)",
    "kind": "speed",
-   "ratio_median": 0.7941448689749209,
-   "ratio_min": 0.7911327988536954,
-   "ratio_max": 0.7974995659602501,
-   "reference_spread": 0.0055479680718685115,
-   "threshold": 1.0055479680718684,
-   "ours_median": 3.922746,
-   "reference_median": 4.942349999999999,
-   "min_cpu": 3.9220520000000003,
+   "ratio_median": 0.8230148835949889,
+   "ratio_min": 0.8199599319246159,
+   "ratio_max": 0.8242032993433347,
+   "reference_spread": 0.005702152890640748,
+   "threshold": 1.0057021528906407,
+   "ours_median": 3.859538,
+   "reference_median": 4.68858,
+   "min_cpu": 3.854075,
    "verdict": "passed",
    "pairs": [
     [
-     3.9223,
-     4.9578
+     3.8616,
+     4.7095
     ],
     [
-     3.932,
-     4.9304
+     3.8541,
+     4.6829
     ],
     [
-     3.9227,
-     4.9423
+     3.8635,
+     4.6886
     ],
     [
-     3.927,
-     4.9427
+     3.8595,
+     4.6827
     ],
     [
-     3.9221,
-     4.9387
+     3.855,
+     4.6935
     ]
    ],
-   "judged_on": "one process over the set repeated 87 times"
+   "judged_on": "one process over the set repeated 77 times"
   },
   {
    "id": "held-stereo16-dec-ffmpeg",
    "group": "held-out",
-   "description": "held-out 48 kHz, 16-bit stereo: decode of the flac -5 stream against FFmpeg (frame CRCs checked by both, no MD5)",
+   "description": "held-out 44.1 kHz, 16-bit stereo: decode of the flac -5 stream against FFmpeg (frame CRCs checked by both, no MD5)",
    "kind": "speed",
-   "ratio_median": 0.3991039995555026,
-   "ratio_min": 0.3988743723030923,
-   "ratio_max": 0.3992383818746141,
-   "reference_spread": 0.0018976032193174783,
-   "threshold": 1.0018976032193174,
-   "ours_median": 2.639957,
-   "reference_median": 6.613079,
-   "min_cpu": 2.637623,
+   "ratio_median": 0.4220558733803645,
+   "ratio_min": 0.41730334459493357,
+   "ratio_max": 0.42975346398632847,
+   "reference_spread": 0.0226095784761244,
+   "threshold": 1.0226095784761244,
+   "ours_median": 2.7031929999999997,
+   "reference_median": 6.37283,
+   "min_cpu": 2.673166,
    "verdict": "passed",
    "pairs": [
     [
-     2.64,
-     6.6131
+     2.7032,
+     6.4778
     ],
     [
-     2.6376,
-     6.6127
+     2.7353,
+     6.4741
     ],
     [
-     2.6392,
-     6.6107
+     2.7237,
+     6.3379
     ],
     [
-     2.6433,
-     6.6232
+     2.6732,
+     6.3728
     ],
     [
-     2.6404,
-     6.6162
+     2.6732,
+     6.3337
     ]
    ],
-   "judged_on": "one process over the set repeated 87 times"
+   "judged_on": "one process over the set repeated 77 times"
   }
  ],
  "figures": [
@@ -1463,35 +1463,35 @@
    "measure": "enc-5",
    "variant": "long-raw",
    "judged": true,
-   "ratio_median": 0.8131175909410695,
-   "ratio_min": 0.8096396419755497,
-   "ratio_max": 0.8169729825761846,
-   "reference_spread": 0.008589335142969712,
-   "threshold": 1.0085893351429698,
-   "ours_median": 5.571236,
-   "reference_median": 6.834522000000001,
-   "min_cpu": 5.551179,
+   "ratio_median": 0.8142864486262692,
+   "ratio_min": 0.8032264323489852,
+   "ratio_max": 0.8174203728934912,
+   "reference_spread": 0.008228032192952569,
+   "threshold": 1.0082280321929527,
+   "ours_median": 5.544338,
+   "reference_median": 6.824475,
+   "min_cpu": 5.5141350000000005,
    "verdict": "passed",
    "pairs": [
     [
-     5.5582,
+     5.5599,
+     6.8245
+    ],
+    [
+     5.5443,
+     6.8088
+    ],
+    [
+     5.5759,
+     6.8214
+    ],
+    [
+     5.5141,
      6.865
     ],
     [
-     5.5712,
-     6.8345
-    ],
-    [
-     5.5512,
-     6.827
-    ],
-    [
-     5.582,
-     6.8807
-    ],
-    [
-     5.5734,
-     6.822
+     5.532,
+     6.8373
     ]
    ]
   },
@@ -1499,35 +1499,35 @@
    "measure": "enc-5",
    "variant": "long-wav",
    "judged": false,
-   "ratio_median": 0.785641754728061,
-   "ratio_min": 0.7800271116878755,
-   "ratio_max": 0.7897087474635345,
-   "reference_spread": 0.004876802279661191,
-   "threshold": 1.0048768022796613,
-   "ours_median": 5.592307999999999,
-   "reference_median": 7.10281,
-   "min_cpu": 5.526886,
+   "ratio_median": 0.7852596572351135,
+   "ratio_min": 0.776369198809858,
+   "ratio_max": 0.7875309447007566,
+   "reference_spread": 0.02885618926625623,
+   "threshold": 1.0288561892662562,
+   "ours_median": 5.583329,
+   "reference_median": 7.118057,
+   "min_cpu": 5.546137,
    "verdict": "passed",
    "pairs": [
     [
-     5.6228,
-     7.1201
+     5.5707,
+     7.0833
     ],
     [
-     5.5923,
+     5.5895,
      7.1181
     ],
     [
-     5.5972,
-     7.0942
+     5.6711,
+     7.2887
     ],
     [
-     5.5639,
-     7.1028
+     5.5461,
+     7.1437
     ],
     [
-     5.5269,
-     7.0855
+     5.5833,
+     7.0897
     ]
    ]
   },
@@ -1535,35 +1535,35 @@
    "measure": "enc-5",
    "variant": "per-file-raw",
    "judged": false,
-   "ratio_median": 0.8742667011093137,
-   "ratio_min": 0.8723119752734607,
-   "ratio_max": 0.8762589842451697,
-   "reference_spread": 0.0029831083485635838,
-   "threshold": 1.0029831083485636,
-   "ours_median": 6.460885999999996,
-   "reference_median": 7.3902779999999995,
-   "min_cpu": 6.4466280000000005,
+   "ratio_median": 0.8769940046225999,
+   "ratio_min": 0.875468778506801,
+   "ratio_max": 0.8800930903032734,
+   "reference_spread": 0.0016763144662107093,
+   "threshold": 1.0016763144662106,
+   "ours_median": 6.4847519999999985,
+   "reference_median": 7.395987000000002,
+   "min_cpu": 6.4780750000000005,
    "verdict": "passed",
    "pairs": [
     [
-     6.4622,
-     7.3977
+     6.4848,
+     7.396
     ],
     [
-     6.4803,
-     7.3954
+     6.48,
+     7.3872
     ],
     [
-     6.4466,
-     7.3903
+     6.5083,
+     7.395
     ],
     [
-     6.4609,
-     7.3901
+     6.4781,
+     7.3996
     ],
     [
-     6.4521,
-     7.3756
+     6.4888,
+     7.3989
     ]
    ]
   },
@@ -1571,35 +1571,35 @@
    "measure": "enc-5",
    "variant": "per-file-wav",
    "judged": false,
-   "ratio_median": 0.849166690040255,
-   "ratio_min": 0.8484157249628894,
-   "ratio_max": 0.8510614628768399,
-   "reference_spread": 0.0014001872158957704,
-   "threshold": 1.0014001872158957,
-   "ours_median": 6.480231999999997,
-   "reference_median": 7.629694000000002,
-   "min_cpu": 6.476159999999999,
+   "ratio_median": 0.8487143864989243,
+   "ratio_min": 0.8431459191247471,
+   "ratio_max": 0.8512342925901183,
+   "reference_spread": 0.008804009440243617,
+   "threshold": 1.0088040094402435,
+   "ours_median": 6.500924000000001,
+   "reference_median": 7.659124000000001,
+   "min_cpu": 6.4866289999999935,
    "verdict": "passed",
    "pairs": [
     [
-     6.4802,
-     7.6335
+     6.5009,
+     7.7103
     ],
     [
-     6.4762,
-     7.6332
+     6.5197,
+     7.6591
     ],
     [
-     6.4875,
-     7.6228
+     6.4886,
+     7.6583
     ],
     [
-     6.4789,
-     7.6297
+     6.4866,
+     7.6429
     ],
     [
-     6.4807,
-     7.6251
+     6.5096,
+     7.6696
     ]
    ]
   },
@@ -1607,35 +1607,35 @@
    "measure": "enc-8",
    "variant": "long-raw",
    "judged": true,
-   "ratio_median": 0.867831073787223,
-   "ratio_min": 0.8622073819752593,
-   "ratio_max": 0.8717097367747069,
-   "reference_spread": 0.008030902875754142,
-   "threshold": 1.0080309028757541,
-   "ours_median": 16.405682,
-   "reference_median": 18.903354,
-   "min_cpu": 16.369585,
+   "ratio_median": 0.8696076673115803,
+   "ratio_min": 0.8636318314632119,
+   "ratio_max": 0.870963993842518,
+   "reference_spread": 0.007364753493211993,
+   "threshold": 1.007364753493212,
+   "ours_median": 16.461161999999998,
+   "reference_median": 18.935868,
+   "min_cpu": 16.431106,
    "verdict": "passed",
    "pairs": [
     [
-     16.4049,
-     18.9034
+     16.4322,
+     18.8861
     ],
     [
-     16.4167,
-     18.8757
+     16.4612,
+     18.8999
     ],
     [
-     16.4057,
-     19.0275
+     16.4668,
+     18.9359
     ],
     [
-     16.4666,
-     18.8901
+     16.4641,
+     18.9772
     ],
     [
-     16.3696,
-     18.9316
+     16.4311,
+     19.0256
     ]
    ]
   },
@@ -1643,35 +1643,35 @@
    "measure": "enc-8",
    "variant": "long-wav",
    "judged": false,
-   "ratio_median": 0.8543857283104056,
-   "ratio_min": 0.8537117739385178,
-   "ratio_max": 0.8568070001857755,
-   "reference_spread": 0.005254748233117992,
-   "threshold": 1.005254748233118,
-   "ours_median": 16.425902,
-   "reference_median": 19.232891,
-   "min_cpu": 16.418924,
+   "ratio_median": 0.859358456592282,
+   "ratio_min": 0.8517249568685975,
+   "ratio_max": 0.8746012932355901,
+   "reference_spread": 0.017472750138144356,
+   "threshold": 1.0174727501381444,
+   "ours_median": 16.583513,
+   "reference_median": 19.233492,
+   "min_cpu": 16.418453,
    "verdict": "passed",
    "pairs": [
     [
-     16.4259,
-     19.2406
+     16.6513,
+     19.5501
     ],
     [
-     16.4245,
-     19.2329
+     16.5285,
+     19.2335
     ],
     [
-     16.4189,
-     19.1629
+     16.4185,
+     19.2323
     ],
     [
-     16.428,
-     19.2272
+     16.5835,
+     19.2141
     ],
     [
-     16.4589,
-     19.264
+     16.9746,
+     19.4084
     ]
    ]
   },
@@ -1679,35 +1679,35 @@
    "measure": "enc-8",
    "variant": "per-file-raw",
    "judged": false,
-   "ratio_median": 0.8954065029997855,
-   "ratio_min": 0.8948410767533967,
-   "ratio_max": 0.8955890510048914,
-   "reference_spread": 0.001265355936906112,
-   "threshold": 1.001265355936906,
-   "ours_median": 17.45112199999999,
-   "reference_median": 19.487007000000006,
-   "min_cpu": 17.43406699999998,
+   "ratio_median": 0.9015636291568867,
+   "ratio_min": 0.8946319324947756,
+   "ratio_max": 0.903165180321963,
+   "reference_spread": 0.012441258333061055,
+   "threshold": 1.012441258333061,
+   "ours_median": 17.602305,
+   "reference_median": 19.528089000000016,
+   "min_cpu": 17.470451999999984,
    "verdict": "passed",
    "pairs": [
     [
-     17.4511,
-     19.487
+     17.7915,
+     19.734
     ],
     [
-     17.4341,
-     19.4829
+     17.8321,
+     19.744
     ],
     [
-     17.4602,
-     19.506
+     17.6023,
+     19.5094
     ],
     [
-     17.4603,
-     19.4999
+     17.4705,
+     19.5281
     ],
     [
-     17.4473,
-     19.4814
+     17.5158,
+     19.501
     ]
    ]
   },
@@ -1715,35 +1715,35 @@
    "measure": "enc-8",
    "variant": "per-file-wav",
    "judged": false,
-   "ratio_median": 0.8847332039273481,
-   "ratio_min": 0.8844082426101119,
-   "ratio_max": 0.8857278649291024,
-   "reference_spread": 0.0023794935691228113,
-   "threshold": 1.0023794935691228,
-   "ours_median": 17.456378000000004,
-   "reference_median": 19.730669,
-   "min_cpu": 17.450225999999983,
+   "ratio_median": 0.8873329287080427,
+   "ratio_min": 0.8830369355317538,
+   "ratio_max": 0.895339640804643,
+   "reference_spread": 0.005084391660060565,
+   "threshold": 1.0050843916600605,
+   "ours_median": 17.517480000000006,
+   "reference_median": 19.75870599999999,
+   "min_cpu": 17.480675999999992,
    "verdict": "passed",
    "pairs": [
     [
-     17.4502,
-     19.7065
+     17.4823,
+     19.7587
     ],
     [
-     17.4502,
-     19.731
+     17.5175,
+     19.7417
     ],
     [
-     17.4564,
-     19.7307
+     17.4807,
+     19.7961
     ],
     [
-     17.4763,
-     19.7534
+     17.7655,
+     19.8422
     ],
     [
-     17.4677,
-     19.7213
+     17.5507,
+     19.7537
     ]
    ]
   },
@@ -1751,35 +1751,35 @@
    "measure": "dec-5-flac",
    "variant": "long",
    "judged": true,
-   "ratio_median": 0.7922524623302752,
-   "ratio_min": 0.7896862808575452,
-   "ratio_max": 0.7937307461849634,
-   "reference_spread": 0.004108206514672092,
-   "threshold": 1.004108206514672,
-   "ours_median": 4.083388,
-   "reference_median": 5.15237,
-   "min_cpu": 4.08026,
+   "ratio_median": 0.794391494982259,
+   "ratio_min": 0.7932929824544406,
+   "ratio_max": 0.7957952293277752,
+   "reference_spread": 0.0015029000850762919,
+   "threshold": 1.0015029000850764,
+   "ours_median": 4.09384,
+   "reference_median": 5.155366,
+   "min_cpu": 4.092877,
    "verdict": "passed",
    "pairs": [
     [
-     4.0803,
-     5.1524
+     4.1048,
+     5.1581
     ],
     [
-     4.0838,
-     5.1547
+     4.0929,
+     5.1554
     ],
     [
-     4.0824,
-     5.1497
+     4.096,
+     5.153
     ],
     [
-     4.0879,
-     5.1503
+     4.0938,
+     5.1606
     ],
     [
-     4.0834,
-     5.1709
+     4.0934,
+     5.1528
     ]
    ]
   },
@@ -1787,35 +1787,35 @@
    "measure": "dec-5-flac",
    "variant": "per-file",
    "judged": false,
-   "ratio_median": 0.8788753641654076,
-   "ratio_min": 0.8774471611539316,
-   "ratio_max": 0.8805787747819555,
-   "reference_spread": 0.0033530811024142806,
-   "threshold": 1.0033530811024143,
-   "ours_median": 4.919224999999998,
-   "reference_median": 5.594555999999996,
-   "min_cpu": 4.904776000000009,
+   "ratio_median": 0.8832228006279393,
+   "ratio_min": 0.874289198542769,
+   "ratio_max": 0.8858224551632321,
+   "reference_spread": 0.01992278261779943,
+   "threshold": 1.0199227826177995,
+   "ours_median": 5.0580069999999955,
+   "reference_median": 5.730575,
+   "min_cpu": 4.9410829999999955,
    "verdict": "passed",
    "pairs": [
     [
-     4.9225,
-     5.5946
+     4.9411,
+     5.6515
     ],
     [
-     4.9113,
-     5.5881
+     5.058,
+     5.7627
     ],
     [
-     4.9192,
-     5.6063
+     5.0036,
+     5.6485
     ],
     [
-     4.9315,
-     5.6002
+     5.0703,
+     5.7407
     ],
     [
-     4.9048,
-     5.5875
+     5.0621,
+     5.7306
     ]
    ]
   },
@@ -1823,35 +1823,35 @@
    "measure": "dec-5-ffmpeg",
    "variant": "long",
    "judged": true,
-   "ratio_median": 0.41062318984229157,
-   "ratio_min": 0.4103227924022389,
-   "ratio_max": 0.4108935371984738,
-   "reference_spread": 0.0036135843872830394,
-   "threshold": 1.003613584387283,
-   "ours_median": 2.747791,
-   "reference_median": 6.6914169999999995,
-   "min_cpu": 2.7463279999999997,
+   "ratio_median": 0.40639764786116817,
+   "ratio_min": 0.4058721455952867,
+   "ratio_max": 0.4083138680380345,
+   "reference_spread": 0.005119596787720089,
+   "threshold": 1.00511959678772,
+   "ours_median": 2.757012,
+   "reference_median": 6.784714,
+   "min_cpu": 2.754623,
    "verdict": "passed",
    "pairs": [
     [
-     2.7572,
-     6.7132
+     2.7562,
+     6.7847
     ],
     [
-     2.7495,
-     6.6914
+     2.7546,
+     6.7869
     ],
     [
-     2.7463,
-     6.6903
+     2.7593,
+     6.7737
     ],
     [
-     2.7478,
-     6.6967
+     2.7578,
+     6.786
     ],
     [
-     2.7467,
-     6.689
+     2.757,
+     6.7522
     ]
    ]
   },
@@ -1859,35 +1859,35 @@
    "measure": "dec-5-ffmpeg",
    "variant": "per-file",
    "judged": false,
-   "ratio_median": 0.08385666352192375,
-   "ratio_min": 0.08334689315330364,
-   "ratio_max": 0.0840385853094073,
-   "reference_spread": 0.006371651159900565,
-   "threshold": 1.0063716511599006,
-   "ours_median": 3.5787509999999987,
-   "reference_median": 42.78529899999999,
-   "min_cpu": 3.5747990000000023,
+   "ratio_median": 0.08308824882428613,
+   "ratio_min": 0.08218531858258205,
+   "ratio_max": 0.08379090050873592,
+   "reference_spread": 0.028491668960155543,
+   "threshold": 1.0284916689601555,
+   "ours_median": 3.604361000000004,
+   "reference_median": 43.40184500000003,
+   "min_cpu": 3.5979780000000003,
    "verdict": "passed",
    "pairs": [
     [
-     3.5788,
-     42.7896
+     3.6044,
+     43.0671
     ],
     [
-     3.5884,
-     42.7825
+     3.6394,
+     43.8019
     ],
     [
-     3.5956,
-     42.7853
+     3.6307,
+     44.1766
     ],
     [
-     3.5748,
-     42.6299
+     3.5981,
+     43.4018
     ],
     [
-     3.5758,
-     42.9025
+     3.598,
+     42.94
     ]
    ]
   },
@@ -1895,35 +1895,35 @@
    "measure": "dec-8-flac",
    "variant": "long",
    "judged": true,
-   "ratio_median": 0.8084658347886216,
-   "ratio_min": 0.8064399542977995,
-   "ratio_max": 0.8096591712834234,
-   "reference_spread": 0.002330696444867877,
-   "threshold": 1.002330696444868,
-   "ours_median": 4.457969,
-   "reference_median": 5.5172349999999994,
-   "min_cpu": 4.453734,
+   "ratio_median": 0.8090097991354477,
+   "ratio_min": 0.8025551503810977,
+   "ratio_max": 0.8140377211834244,
+   "reference_spread": 0.009330307940722303,
+   "threshold": 1.0093303079407223,
+   "ours_median": 4.498316,
+   "reference_median": 5.571949,
+   "min_cpu": 4.475544,
    "verdict": "passed",
    "pairs": [
     [
-     4.4557,
-     5.5101
+     4.4755,
+     5.5719
     ],
     [
-     4.4644,
-     5.514
+     4.4959,
+     5.5573
     ],
     [
-     4.4605,
-     5.5172
+     4.5662,
+     5.6093
     ],
     [
-     4.4537,
-     5.5227
+     4.5142,
+     5.57
     ],
     [
-     4.458,
-     5.523
+     4.4983,
+     5.605
     ]
    ]
   },
@@ -1931,35 +1931,35 @@
    "measure": "dec-8-flac",
    "variant": "per-file",
    "judged": false,
-   "ratio_median": 0.8869351782716957,
-   "ratio_min": 0.8861303226476788,
-   "ratio_max": 0.8880360318363942,
-   "reference_spread": 0.002728189193334449,
-   "threshold": 1.0027281891933344,
-   "ours_median": 5.2919830000000045,
-   "reference_median": 5.966594999999996,
-   "min_cpu": 5.287145999999996,
+   "ratio_median": 0.8864150894816111,
+   "ratio_min": 0.8844857327435028,
+   "ratio_max": 0.8921253197119461,
+   "reference_spread": 0.011629825788353186,
+   "threshold": 1.0116298257883531,
+   "ours_median": 5.3254850000000005,
+   "reference_median": 5.9811730000000045,
+   "min_cpu": 5.301802,
    "verdict": "passed",
    "pairs": [
     [
-     5.2959,
-     5.9636
+     5.3421,
+     6.039
     ],
     [
-     5.2877,
-     5.9672
+     5.3382,
+     6.0354
     ],
     [
-     5.292,
-     5.9666
+     5.3255,
+     5.9694
     ],
     [
-     5.2871,
-     5.9609
+     5.3161,
+     5.9774
     ],
     [
-     5.3012,
-     5.9772
+     5.3018,
+     5.9812
     ]
    ]
   },
@@ -1967,35 +1967,35 @@
    "measure": "dec-8-ffmpeg",
    "variant": "long",
    "judged": true,
-   "ratio_median": 0.45247088155937526,
-   "ratio_min": 0.45181611362146346,
-   "ratio_max": 0.4543595039039856,
-   "reference_spread": 0.005142482889343236,
-   "threshold": 1.0051424828893432,
-   "ours_median": 3.119723,
-   "reference_median": 6.892196,
-   "min_cpu": 3.1176709999999996,
+   "ratio_median": 0.4525645593637757,
+   "ratio_min": 0.4513894276890681,
+   "ratio_max": 0.4534114879353293,
+   "reference_spread": 0.002834313531614917,
+   "threshold": 1.002834313531615,
+   "ours_median": 3.117598,
+   "reference_median": 6.887382,
+   "min_cpu": 3.11254,
    "verdict": "passed",
    "pairs": [
     [
-     3.1197,
-     6.8757
+     3.1176,
+     6.8781
     ],
     [
-     3.1177,
-     6.8925
+     3.118,
+     6.8918
     ],
     [
-     3.1185,
-     6.8922
+     3.1176,
+     6.8759
     ],
     [
-     3.1226,
-     6.9112
+     3.1125,
+     6.8955
     ],
     [
-     3.1258,
-     6.8796
+     3.117,
+     6.8874
     ]
    ]
   },
@@ -2003,35 +2003,35 @@
    "measure": "dec-8-ffmpeg",
    "variant": "per-file",
    "judged": false,
-   "ratio_median": 0.0921174667274881,
-   "ratio_min": 0.09151108472561617,
-   "ratio_max": 0.0923807037653598,
-   "reference_spread": 0.006317657881002541,
-   "threshold": 1.0063176578810025,
-   "ours_median": 3.9576289999999994,
-   "reference_median": 42.973837,
-   "min_cpu": 3.9405310000000013,
+   "ratio_median": 0.09139325925289324,
+   "ratio_min": 0.09013930609587159,
+   "ratio_max": 0.09547802738938434,
+   "reference_spread": 0.03197904091953635,
+   "threshold": 1.0319790409195364,
+   "ours_median": 4.013851000000001,
+   "reference_median": 43.884367999999995,
+   "min_cpu": 3.983594000000002,
    "verdict": "passed",
    "pairs": [
     [
-     3.9405,
-     43.0607
+     3.9836,
+     43.5874
     ],
     [
-     3.9576,
-     42.9908
+     4.0139,
+     44.3049
     ],
     [
-     3.9586,
-     42.9738
+     4.0008,
+     44.3848
     ],
     [
-     3.95,
-     42.7892
+     4.1067,
+     43.8844
     ],
     [
-     3.9642,
-     42.9119
+     4.1038,
+     42.9814
     ]
    ]
   },
@@ -2039,35 +2039,35 @@
    "measure": "alac-enc",
    "variant": "long-wav",
    "judged": true,
-   "ratio_median": 0.2586713083103864,
-   "ratio_min": 0.25587993629319933,
-   "ratio_max": 0.2602775055993287,
-   "reference_spread": 0.004794692670458859,
-   "threshold": 1.004794692670459,
-   "ours_median": 5.6600719999999995,
-   "reference_median": 21.834559,
-   "min_cpu": 5.572204999999999,
+   "ratio_median": 0.25990788727730646,
+   "ratio_min": 0.2586662292888411,
+   "ratio_max": 0.26167372531540095,
+   "reference_spread": 0.006129897213338558,
+   "threshold": 1.0061298972133386,
+   "ours_median": 5.698561,
+   "reference_median": 21.869861,
+   "min_cpu": 5.637370000000001,
    "verdict": "passed",
    "pairs": [
     [
-     5.5722,
-     21.7766
+     5.6374,
+     21.7912
     ],
     [
-     5.6787,
-     21.8178
+     5.6999,
+     21.8116
     ],
     [
-     5.6278,
-     21.8346
+     5.7228,
+     21.8699
     ],
     [
-     5.6601,
-     21.8813
+     5.6648,
+     21.9002
     ],
     [
-     5.6738,
-     21.8692
+     5.6986,
+     21.9253
     ]
    ]
   },
@@ -2075,35 +2075,35 @@
    "measure": "alac-dec",
    "variant": "long",
    "judged": true,
-   "ratio_median": 0.23202971966088107,
-   "ratio_min": 0.23144987075908746,
-   "ratio_max": 0.23218118246885633,
-   "reference_spread": 0.002956697425877424,
-   "threshold": 1.0029566974258775,
-   "ours_median": 4.0802689999999995,
-   "reference_median": 17.591587,
-   "min_cpu": 4.077744,
+   "ratio_median": 0.22912988886227814,
+   "ratio_min": 0.22818876377993247,
+   "ratio_max": 0.23756612418718287,
+   "reference_spread": 0.02793124115138858,
+   "threshold": 1.0279312411513886,
+   "ours_median": 4.086615,
+   "reference_median": 17.821299,
+   "min_cpu": 4.08223,
    "verdict": "passed",
    "pairs": [
     [
-     4.0805,
-     17.6119
+     4.0866,
+     17.9089
     ],
     [
-     4.0818,
-     17.5916
+     4.1464,
+     18.0963
     ],
     [
-     4.0777,
-     17.6183
+     4.1808,
+     17.5985
     ],
     [
-     4.0786,
-     17.5662
+     4.083,
+     17.8213
     ],
     [
-     4.0803,
-     17.5777
+     4.0822,
+     17.5988
     ]
    ]
   }
@@ -2226,48 +2226,57 @@
  "held_out": [
   {
    "set": "hires",
-   "file": "open-goldberg-variatio-4",
+   "file": "avon-chang-cello-suite-6",
    "sample_rate": 96000,
    "channels": 2,
    "bits": 24,
-   "seconds": 68.57333333333334,
-   "baac_frame_bytes": 19050607,
-   "flac_frame_bytes": 19054554,
+   "seconds": 62.50666666666667,
+   "baac_frame_bytes": 9821712,
+   "flac_frame_bytes": 9795735,
    "bit_exact": true
   },
   {
    "set": "surround",
-   "file": "sintel-master-51",
+   "file": "tearsofsteel-surround",
    "sample_rate": 48000,
    "channels": 6,
-   "bits": 16,
+   "bits": 24,
    "seconds": 20.0,
    "span": [
     "5:00.00",
     "5:20.00"
    ],
-   "baac_frame_bytes": 4685215,
-   "flac_frame_bytes": 4691270,
+   "baac_frame_bytes": 8887203,
+   "flac_frame_bytes": 8936904,
    "bit_exact": true
   },
   {
    "set": "stereo16",
-   "file": "sintel_trailer-audio",
-   "sample_rate": 48000,
+   "file": "cloudkicker-let-yourself-be-huge",
+   "sample_rate": 44100,
    "channels": 2,
    "bits": 16,
-   "seconds": 52.0,
-   "baac_frame_bytes": 4649481,
-   "flac_frame_bytes": 4662873,
+   "seconds": 60.0,
+   "span": [
+    "1:00.00",
+    "2:00.00"
+   ],
+   "baac_frame_bytes": 7324872,
+   "flac_frame_bytes": 7328139,
    "bit_exact": true
   }
  ],
  "held_out_run": {
   "touched": true,
-  "run": 4,
-  "first_run": false,
+  "run": 1,
+  "first_run": true,
   "same_build_as_first": true,
-  "first_date": "2026-11-12T01:57:50+01:00",
-  "baac_sha256": "6576283d1e0a666b73312668f0d8267634c915a24b218f273142ba27ccb273ad"
+  "first_date": "2026-11-12T19:33:58+01:00",
+  "baac_sha256": "dcb0709c0d6826c540b1ad1f7a85a4293c4b20a6e67171e163ac8c66ecf28d10",
+  "recordings": [
+   "241f5163b92fe06f3344fbae58958f88fbc39a49a993ed65f190be69f802c3db",
+   "70d3fd40abd0a6761007ccf882011c1b7e22ccea7464168bdaa7a621ea7cfe40",
+   "fb3eeeea2bedd6dd6d416a7cf896f4690eb9eb1932ed45dd821554192030b1d3"
+  ]
  }
 }

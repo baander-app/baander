@@ -190,6 +190,12 @@ duration before anything decoded the file.
 A held-out gate that fails in the recorded run is reported as failed.
 The encoder is not tuned in answer to it.
 
+The third set's first run, recorded on 12 November 2026, failed one gate:
+on the piano recording bAAC's level 5 frames were 0.27 % larger than
+those of `flac -5`. Every other gate passed. The failure stands; better
+compression of such material is separate work, which a fresh set will
+judge.
+
 ### The first held-out set
 
 The seven testbench recordings that are now corpus additions were the
