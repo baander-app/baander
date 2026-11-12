@@ -129,10 +129,18 @@ references and judges the gates of the lossless mode; the comment above
   the AVX2 kernels run, among them a Rice writer that only GCC and Clang
   build, so an MSVC build encodes more slowly than a run here shows. The
   NEON kernels do not run on an x86 host, and no ARM speed is recorded.
-- **Host.** A run records the processor, the compiler, the versions of
-  the references and the load average at its start and end. A run that
-  was limited (`--only`, `--gates-only`, `--reps`) or made while the
-  load was above `--quiet-load` (2.0) is recorded as such and is not a
+- **Host.** A run records the processor, the compiler and the versions
+  of the references. It also measures how much CPU the rest of the host
+  uses, over the minute before the run and over the whole run: the
+  host's busy time from `/proc/stat`, less the CPU time of the harness
+  and of every process it ran, divided by the elapsed time. The host is
+  quiet when both figures are at most 2.0 CPUs (`--quiet-cpu`). The rule
+  measures CPU time and not the load average, which the run records for
+  information only: the load average counts the tasks that happen to be
+  runnable at its sampling ticks, every five seconds, so on a host
+  running containers that wake briefly and often it reads well above the
+  CPU they use. A run that was limited (`--only`, `--gates-only`,
+  `--reps`) or whose host was not quiet is recorded as such and is not a
   gate result: `check` exits non-zero for it.
 - **Locale.** The harness sets `LC_ALL=C` for every tool it starts:
   `flac` reads the times given to `--skip` and `--until` with the
@@ -158,8 +166,8 @@ downloads and checksums and does nothing else.
 
 Only the lossless stage reads the files, and only in a run that can
 count: a complete run with `--check` that starts on a quiet host. A
-limited run, a run without `--check` and a run that starts under load
-leave them alone and say so. Before the stage decodes the first file it
+limited run, a run without `--check` and a run that starts on a busy
+host leave them alone and say so. Before the stage decodes the first file it
 books the run in `work/heldout/runs.json`, with the date and the SHA-256
 of the `baac` binary it measures, and the result records whether the run
 was the first. A later run of the same binary is a repeat of the same

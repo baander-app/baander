@@ -622,16 +622,24 @@ def stage_compat(args):
 # not a gate result for these recordings.  Each set's total frame bytes
 # gate at level 5, with an encode gate and two decode gates.
 #
-# Host.  The run records the processor, the compiler, the versions of
-# the references and the load average at its start and end.  A run on a
-# host that is not quiet is recorded as such and is not a gate result.
+# Host.  The run records the processor, the compiler and the versions of
+# the references, and measures the CPU the rest of the host uses: over
+# the minute before the run and over the run, the host's busy time from
+# /proc/stat less the CPU time of the harness and of every process it
+# ran, divided by the elapsed time.  The host is quiet when both are at
+# most QUIET_CPU.  The load average, recorded for information, is not
+# the test: it counts the tasks that happen to be runnable at its
+# sampling ticks, so on a host running containers that wake briefly and
+# often it reads far above the CPU they use.  A run on a host that is not
+# quiet is recorded as such and is not a gate result.
 
 LOSSLESS_LEVELS = list(range(9))
 MIN_CPU_SECONDS = 2.0
 # The repeated input is sized for this much over the minimum, so that a
 # run a little faster than the one that sized it still counts.
 LONG_MARGIN = 1.4
-QUIET_LOAD = 2.0
+QUIET_CPU = 2.0     # CPUs' worth the rest of the host may use
+QUIET_WINDOW = 60   # seconds the host is measured before a run starts
 CARRIED_REFALAC = dict(codec="alac-apple-ref", seconds=130.3173125, kbps=690.2499619918112,
                        bit_exact=True, carried="2026-10-30")
 TESTBENCH = Path(os.environ.get("BAAC_FLAC_TESTBENCH", HERE / "work" / "flac-test-files"))
@@ -792,6 +800,42 @@ def pick_core():
     allowed = os.sched_getaffinity(0)
     busy = {c: 1.0 - (b[c][0] - a[c][0]) / max(1, b[c][1] - a[c][1]) for c in b if c in allowed}
     return min(busy, key=lambda c: (round(busy[c], 2), -c)) if busy else 0
+
+
+def busy_seconds(stat_text, ticks):
+    """The CPU seconds the whole host has been busy, from the first line
+    of /proc/stat: user, nice, system, irq, softirq and steal.  Idle and
+    iowait are not busy, and guest time is inside user and nice already."""
+    v = [int(x) for x in stat_text.split("\n", 1)[0].split()[1:]]
+    return (v[0] + v[1] + v[2] + sum(v[5:8])) / ticks
+
+
+def cpu_sample():
+    """The host's busy CPU seconds, the CPU seconds of this process and
+    of every child it has waited for, and a monotonic clock."""
+    t = os.times()
+    return dict(busy=busy_seconds(Path("/proc/stat").read_text(), os.sysconf("SC_CLK_TCK")),
+                own=t.user + t.system + t.children_user + t.children_system,
+                clock=time.monotonic())
+
+
+def other_cpu(a, b):
+    """The CPUs' worth that everything except this process and its
+    children used between two samples, on average."""
+    return max(0.0, (b["busy"] - a["busy"] - (b["own"] - a["own"])) / (b["clock"] - a["clock"]))
+
+
+def quiet_verdict(host):
+    """Whether the rest of the host was quiet before and during a run, and
+    the reason when it was not."""
+    start, during = host.get("other_cpu_start"), host.get("other_cpu_run")
+    limit = host.get("quiet_cpu", QUIET_CPU)
+    if start is None or during is None:
+        return False, "the result does not measure the rest of the host"
+    if max(start, during) > limit:
+        return False, (f"the rest of the host used {during:.2f} CPUs on average during the run "
+                       f"and {start:.2f} in the minute before it, above {limit}")
+    return True, ""
 
 
 def host_info(core):
@@ -1014,6 +1058,13 @@ def stage_lossless(args):
                          "run that is not a gate result)")
     d = WORK / "lossless"
     d.mkdir(parents=True, exist_ok=True)
+    # The rest of the host over the minute before the run, then from here
+    # to the end of the run.
+    print(f"lossless: measuring the host for {QUIET_WINDOW} s", file=sys.stderr)
+    before = cpu_sample()
+    time.sleep(QUIET_WINDOW)
+    start = cpu_sample()
+    other_start = other_cpu(before, start)
     core = args.core if args.core is not None else pick_core()
     repeats = max(args.repeat, 5)
     only = re.compile(args.only or ".")
@@ -1021,7 +1072,8 @@ def stage_lossless(args):
     load_start = os.getloadavg()
     started = datetime.datetime.now().astimezone().isoformat(timespec="seconds")
     host = host_info(core)
-    print(f"lossless: core {core}, {repeats} repeats, load {load_start[0]:.2f}", file=sys.stderr)
+    print(f"lossless: core {core}, {repeats} repeats, the rest of the host using "
+          f"{other_start:.2f} CPUs, load {load_start[0]:.2f}", file=sys.stderr)
 
     # The corpus: the ten items back to back, once and repeated.
     corpus = WORK / "corpus"
@@ -1320,9 +1372,9 @@ def stage_lossless(args):
     if limited or not args.check:
         held_run = dict(touched=False, reason="the run was limited" if limited else
                         "the stage was not run with --check")
-    elif load_start[0] > args.quiet_load:
-        held_run = dict(touched=False, reason=f"the host was not quiet at the start (load "
-                                              f"{load_start[0]:.2f})")
+    elif other_start > args.quiet_cpu:
+        held_run = dict(touched=False, reason=f"the host was not quiet at the start (the rest "
+                                              f"of it used {other_start:.2f} CPUs)")
     else:
         if not HELDOUT_DIR.is_dir():
             raise SystemExit(f"the held-out recordings are missing at {HELDOUT_DIR}: run "
@@ -1336,14 +1388,15 @@ def stage_lossless(args):
     if not held_run["touched"]:
         print(f"the held-out recordings were not read: {held_run['reason']}", file=sys.stderr)
 
+    other_run = other_cpu(start, cpu_sample())
     load_end = os.getloadavg()
-    quiet = max(load_start[0], load_end[0]) <= args.quiet_load
     complete = not limited
+    host = dict(host, other_cpu_start=round(other_start, 3), other_cpu_run=round(other_run, 3),
+                quiet_cpu=args.quiet_cpu, load_start=[round(x, 2) for x in load_start],
+                load_end=[round(x, 2) for x in load_end])
+    host["quiet"] = quiet_verdict(host)[0]
     result = dict(
-        schema=2, date=started, complete=complete,
-        host=dict(host, load_start=[round(x, 2) for x in load_start],
-                  load_end=[round(x, 2) for x in load_end], quiet=quiet,
-                  quiet_load=args.quiet_load),
+        schema=2, date=started, complete=complete, host=host,
         tools=dict(baac=git_state(), flac=flac_version, ffmpeg=tool_version([ff, "-version"]),
                    refalac="measured" if have("refalac") else "carried from 2026-10-30"),
         method=dict(pinned=f"taskset -c {core}", repeats=repeats, corpus_seconds=seconds,
@@ -1357,7 +1410,8 @@ def stage_lossless(args):
     (WORK / "lossless.json").write_text(json.dumps(result, indent=1) + "\n")
     for f in d.glob("*.long.*"):
         f.unlink()
-    print(f"load {load_end[0]:.2f} at the end; wrote {WORK / 'lossless.json'}", file=sys.stderr)
+    print(f"the rest of the host used {other_run:.2f} CPUs during the run, load {load_end[0]:.2f} "
+          f"at the end; wrote {WORK / 'lossless.json'}", file=sys.stderr)
     if args.check:
         sys.exit(0 if check_lossless(result) else 1)
 
@@ -1368,7 +1422,9 @@ def check_lossless(result, out=sys.stdout):
     ok = True
     host = result.get("host", {})
     print(f"lossless run of {result.get('date', '?')} on {host.get('cpu', '?')}, core "
-          f"{host.get('core', '?')}, load {host.get('load_start', ['?'])[0]} at the start and "
+          f"{host.get('core', '?')}, the rest of the host using {host.get('other_cpu_run', '?')} "
+          f"CPUs during the run and {host.get('other_cpu_start', '?')} in the minute before it, "
+          f"load {host.get('load_start', ['?'])[0]} at the start and "
           f"{host.get('load_end', ['?'])[0]} at the end", file=out)
     for g in result.get("gates", []):
         if g["kind"] == "size":
@@ -1409,9 +1465,10 @@ def check_lossless(result, out=sys.stdout):
             if gid not in present:
                 print(f"failed    the gate {gid} is missing from the result", file=out)
                 ok = False
-    if not host.get("quiet", False):
-        print(f"not a gate result: the host was not quiet (load above "
-              f"{host.get('quiet_load', QUIET_LOAD)}); run it again when it is", file=out)
+    quiet, why = quiet_verdict(host)
+    if not quiet:
+        print(f"not a gate result: the host was not quiet ({why}); run it again when it is",
+              file=out)
         ok = False
     # The held-out recordings count once: in their first run, or in a
     # later run of the build the first run measured.
@@ -1444,10 +1501,12 @@ def lossless_section(result):
     """The Lossless section of tables.md from a run's results."""
     md = ["## Lossless (generated)\n"]
     host, method, tools = result["host"], result["method"], result["tools"]
+    noisy = "" if quiet_verdict(host)[0] else ": the host was not quiet, so this is not a gate result"
     md.append(f"Run of {result['date']} on {host['cpu']} (core {host['core']}, "
-              f"{host['compiler'] or 'unknown compiler'}), load {host['load_start'][0]} at the "
-              f"start and {host['load_end'][0]} at the end"
-              f"{'' if host['quiet'] else ': the host was not quiet, so this is not a gate result'}"
+              f"{host['compiler'] or 'unknown compiler'}). The rest of the host used "
+              f"{host['other_cpu_run']:.2f} CPUs on average during the run and "
+              f"{host['other_cpu_start']:.2f} in the minute before it (load average "
+              f"{host['load_start'][0]} at the start and {host['load_end'][0]} at the end){noisy}"
               f". bAAC {tools['baac']}, {tools['flac']}, {tools['ffmpeg'].split(' Copyright')[0]}; "
               f"refalac {tools['refalac']}. The corpus is {method['corpus_seconds']:.1f} s; timed "
               f"runs repeat it {method['corpus_repetitions']} times in one process pinned with "
@@ -1769,9 +1828,10 @@ def stage_selftest(args):
     expect(size_verdict(1001, 1000)["verdict"] == "failed", "one byte more than the reference fails")
 
     # The check mode on a whole made-up run.
-    def made_up(speed, size=(1000, 1000), quiet=True, exact=True, held=None):
-        host = dict(cpu="test", core=0, load_start=[0.1], load_end=[0.1], quiet=quiet,
-                    quiet_load=QUIET_LOAD)
+    def made_up(speed, size=(1000, 1000), other=(0.2, 0.3), exact=True, held=None):
+        host = dict(cpu="test", core=0, other_cpu_start=other[0], other_cpu_run=other[1],
+                    quiet_cpu=QUIET_CPU, load_start=[2.5], load_end=[2.5])
+        host["quiet"] = quiet_verdict(host)[0]
         return dict(date="test", complete=True, host=host, held_out=[],
                     held_out_run=held or dict(touched=True, run=1, first_run=True,
                                               same_build_as_first=True, first_date="test"),
@@ -1790,8 +1850,34 @@ def stage_selftest(args):
     expect(not check_lossless(made_up(above), sink), "the check does not pass a failed gate")
     expect(not check_lossless(made_up(below, size=(1001, 1000)), sink),
            "the check does not pass a row one byte larger than its reference")
-    expect(not check_lossless(made_up(below, quiet=False), sink),
-           "the check does not pass a run on a host that was not quiet")
+    expect(not check_lossless(made_up(below, other=(0.2, 2.5)), sink),
+           "the check does not pass a run during which the rest of the host used 2.5 CPUs")
+    expect(not check_lossless(made_up(below, other=(2.5, 0.3)), sink),
+           "the check does not pass a run that began while the rest of the host used 2.5 CPUs")
+    expect(check_lossless(made_up(below, other=(2.0, 2.0)), sink),
+           "the check passes a run with the rest of the host at 2.0 CPUs, whatever the load average")
+    unmeasured = made_up(below)
+    for key in ("other_cpu_start", "other_cpu_run"):
+        del unmeasured["host"][key]
+    expect(not check_lossless(unmeasured, sink),
+           "the check does not pass a result that does not measure the rest of the host")
+
+    # The share of the rest of the host.  At 100 ticks a second, 4,200
+    # busy ticks are 42 CPU seconds; the run used 12 of them over 20 s, so
+    # the rest of the host used 1.5 CPUs.  Idle and iowait are not busy.
+    stat_a = "cpu  1000 0 500 90000 300 0 0 0 0 0\ncpu0 1 2 3 4\n"
+    stat_b = "cpu  4000 0 1500 99000 900 100 100 0 0 0\ncpu0 1 2 3 4\n"
+    a = dict(busy=busy_seconds(stat_a, 100), own=3.0, clock=100.0)
+    b = dict(busy=busy_seconds(stat_b, 100), own=15.0, clock=120.0)
+    expect(abs(busy_seconds(stat_b, 100) - busy_seconds(stat_a, 100) - 42.0) < 1e-9,
+           "the busy time of /proc/stat counts user, nice, system, irq and softirq")
+    expect(abs(other_cpu(a, b) - 1.5) < 1e-9, "the rest of the host used 1.5 CPUs")
+    expect(quiet_verdict(dict(other_cpu_start=0.4, other_cpu_run=other_cpu(a, b)))[0],
+           "1.5 CPUs is quiet")
+    busier = dict(b, busy=b["busy"] + 20.0)
+    expect(abs(other_cpu(a, busier) - 2.5) < 1e-9 and
+           not quiet_verdict(dict(other_cpu_start=0.4, other_cpu_run=other_cpu(a, busier)))[0],
+           "20 busy CPU seconds more make 2.5 CPUs, which is not quiet")
     expect(not check_lossless(made_up(below, exact=False), sink),
            "the check does not pass a row that is not bit-exact")
     expect(not check_lossless(made_up(below, held=dict(touched=False, reason="test")), sink),
@@ -1909,8 +1995,9 @@ def main():
                     help="lossless: skip the speed of the rows that carry no gate")
     ap.add_argument("--any-flac", action="store_true",
                     help="lossless: take a flac that is not the pinned 1.4.3")
-    ap.add_argument("--quiet-load", type=float, default=QUIET_LOAD,
-                    help="lossless: the 1-minute load average above which the host is not quiet")
+    ap.add_argument("--quiet-cpu", type=float, default=QUIET_CPU,
+                    help="lossless: the CPUs' worth the rest of the host may use, in the minute "
+                         "before a run and over it, for the host to count as quiet")
     ap.add_argument("--results", help="check: a lossless.json other than the work cache")
     args = ap.parse_args()
     if args.stage == "list":

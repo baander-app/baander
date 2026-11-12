@@ -444,8 +444,9 @@ eye.
   and compared on size only.
 
 A run counts as a gate result only when it is complete and the host was
-quiet: `bench.py` records the load average at its start and end and
-says so when it was not.
+quiet: the rest of the host may use at most 2.0 CPUs on average, over
+the minute before the run and over the run. `bench.py` measures that
+CPU time, records it and says so when the host was not quiet.
 
 ### Size on the corpus
 
