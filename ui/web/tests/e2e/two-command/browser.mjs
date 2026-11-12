@@ -581,6 +581,36 @@ function observeRegistrationAnswer(milliseconds = 45000) {
   })
 }
 
+// The source position of paused, decoded media the element can seek within.
+async function seekablePausedPosition(label) {
+  let position
+  await until(async () => {
+    const state = await mediaState()
+    const usable = state.connected && state.paused && state.ready >= 2 && hasDecodedFrame(state)
+      && !state.seeking && state.error === null && snapshot?.ready && snapshot.status === 'paused'
+      && currentSource(state) && state.seekable.some(([start, end]) => state.time >= start && state.time <= end)
+    if (usable) position = snapshot.startTime + state.time
+    return usable
+  }, `decoded seekable paused media matching the signed rendition set ${label}`)
+  return position
+}
+
+// Which session requests a page sends around a reload tells which rule released its runner: a
+// close report as the page goes away, a local recovery before the next page registers, or
+// neither, in which case the registration from another page of the same tab did it. Requests are
+// only observed. An unloading page's request may escape the driver, so "not seen" is weaker
+// evidence than "seen".
+function observeReleaseRequests() {
+  const seen = { closeReport: false, localRecovery: false }
+  const observe = request => {
+    const path = new URL(request.url()).pathname
+    if (path === '/api/session/close') seen.closeReport = true
+    if (path === '/api/session/recover-local') seen.localRecovery = true
+  }
+  context.on('request', observe)
+  return { seen, stop: () => { context.off('request', observe) } }
+}
+
 async function restingCursorNow() {
   const state = await mediaState()
   assert(snapshot?.ready, 'The browser must hold a ready owned session before the operator phases')
@@ -2398,15 +2428,7 @@ async function checkpoint({ phase, baseUrl, credentials }) {
       'the overlay pause to commit and be acknowledged to the playback session')
     samePlayback(owner)
     await recordClientControl('pause-before-remount', pauseStarted)
-    let pausedPosition
-    await until(async () => {
-      const state = await mediaState()
-      const usable = state.connected && state.paused && state.ready >= 2 && hasDecodedFrame(state)
-        && !state.seeking && state.error === null && snapshot?.ready && snapshot.status === 'paused'
-        && currentSource(state) && state.seekable.some(([start, end]) => state.time >= start && state.time <= end)
-      if (usable) pausedPosition = snapshot.startTime + state.time
-      return usable
-    }, 'decoded seekable paused media matching the signed rendition set before reload')
+    const pausedPosition = await seekablePausedPosition('before reload')
     samePlayback(owner)
 
     const remountStarted = Date.now()
@@ -2434,6 +2456,83 @@ async function checkpoint({ phase, baseUrl, credentials }) {
       assert(answer, 'The reloaded page must receive an answer to its endpoint registration')
       assert.equal(answer.activeIncarnationId, null, 'The registration answer after a reload must already show the confirmed paused runner released')
     })
+
+    // A second reload, this time with a start pending: the session shows the page a play, and
+    // the page goes away before the session hears its answer. No acknowledged pause stands
+    // behind such a runner any more, so only the reload itself can release it: the page's close
+    // report, or its next page registering for the same tab. The pause that precedes it goes
+    // through the overlay and is acknowledged, so the session has a recorded cursor to fall back to.
+    await until(async () => await pauseButton.count() > 0, 'the playback session to observe the playback resumed after the reload', 20000)
+    const acksBeforePendingStart = sessionAcks()
+    const pendingStartPause = Date.now()
+    // The page takes its next control only once it has read the outcome of this one, so the
+    // Play below waits for the pause's own result, not just for its acknowledgement.
+    const pauseSettled = page.waitForResponse(async response => {
+      if (new URL(response.url()).pathname !== '/api/session/control' || response.request().postDataJSON()?.action !== 'pause') return false
+      const body = await response.json().catch(() => null)
+      return body?.data?.requestResult?.outcome === 'paused'
+    }, { timeout: 45000 })
+    // Awaited below; a failure of the step before it must not leave this one unhandled.
+    pauseSettled.catch(() => {})
+    await pauseButton.click()
+    await until(async () => (await mediaState()).paused && snapshot?.status === 'paused' && sessionAcks() > acksBeforePendingStart,
+      'the overlay pause before the pending start to commit and be acknowledged to the playback session')
+    await pauseSettled
+    samePlayback(owner)
+    await recordClientControl('pause-before-pending-start', pendingStartPause)
+    await seekablePausedPosition('before the pending start')
+    samePlayback(owner)
+    // The page's answers are held back and never forwarded: the session must not learn that
+    // the play it showed was carried out.
+    const answerRoute = '**/api/session/ack'
+    const heldAnswers = []
+    const holdAnswer = route => { heldAnswers.push(route) }
+    const releaseRequests = observeReleaseRequests()
+    let pendingStartPosition
+    let pendingStartReload
+    let pendingStartRegistration
+    await page.route(answerRoute, holdAnswer)
+    try {
+      const playShown = Date.now()
+      await page.getByRole('button', { name: 'Play', exact: true }).click()
+      await until(() => heldAnswers.length > 0, 'the page to answer the play the session showed it', 20000)
+      const heldAnswer = heldAnswers[0].request().postDataJSON()
+      assert.equal(heldAnswer?.outcome, 'playing', 'The answer held back before the reload must be the page\'s answer to a play')
+      // The page played from the acknowledged pause until now; a close report carries this cursor.
+      const playing = await mediaState()
+      assert(snapshot?.ready, 'The page must hold its playback when it reloads with the start pending')
+      pendingStartPosition = snapshot.startTime + playing.time
+      clientControls.push({ action: 'pending-start-shown', at: Date.now(), elapsedMs: Date.now() - playShown, position: pendingStartPosition,
+        commandId: heldAnswer.commandId ?? null, revision: heldAnswer.revision ?? null, playback: safePlayback(snapshot) })
+
+      pendingStartReload = Date.now()
+      previousMediaEvents.push(...await page.evaluate(() => window.__twoCommandMediaEvents ?? []))
+      const pendingStartVideo = video
+      snapshot = undefined
+      pendingStartRegistration = observeRegistrationAnswer().then(answer => {
+        const at = answer?.at ?? Date.now()
+        clientControls.push({ action: 'pending-start-registration', at, elapsedMs: at - pendingStartReload, answered: answer !== null,
+          sinceRegistrationMs: answer?.sinceRegistrationMs ?? null, revision: answer?.revision ?? null,
+          activeIncarnationId: answer ? answer.activeIncarnationId : undefined,
+          closeReportRequested: releaseRequests.seen.closeReport, localRecoveryRequested: releaseRequests.seen.localRecovery, playback: null })
+        return answer
+      })
+      await page.reload()
+      await pendingStartVideo.dispose()
+    } finally {
+      await page.unroute(answerRoute, holdAnswer)
+      // The reload has already cancelled a held request; aborting it again is expected to fail.
+      await Promise.all(heldAnswers.map(route => route.abort().catch(() => {})))
+    }
+    try {
+      await resumeReleasedPlayback(owner, pendingStartPosition, 'pending-start', pendingStartReload, async () => {
+        const answer = await pendingStartRegistration
+        assert(answer, 'The page reloaded with a start pending must receive an answer to its endpoint registration')
+        assert.equal(answer.activeIncarnationId, null, 'The registration answer after a reload with a shown play unanswered must already show the runner released')
+      })
+    } finally {
+      releaseRequests.stop()
+    }
     await pausePlayback(owner, 'final-pause')
     // Leave a paused cursor that differs from the operator's seek position of the next phase.
     const pausedThumb = await sliderValue()

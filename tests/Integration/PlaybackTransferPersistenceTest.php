@@ -971,11 +971,12 @@ final class PlaybackTransferPersistenceTest extends TestCase
      * @param list<string> $capabilities
      * @return array{registration:array<string,mixed>,tab:array<string,mixed>,pause:array<string,mixed>,paused:array<string,mixed>}
      */
-    private function pausedTab(PlaybackCoordinator $service, Uuid $owner, array $capabilities = ['song', 'video']): array
+    private function pausedTab(PlaybackCoordinator $service, Uuid $owner, array $capabilities = ['song', 'video'], ?string $pageId = null): array
     {
         $device = new Uuid();
         new DeviceDoctrineRepository($this->manager)->save(Device::create($owner, $device, 'Reloading tab'));
-        $registration = ['deviceId' => $device->toString(), 'endpointId' => new Uuid()->toString(), 'capabilities' => $capabilities];
+        $registration = ['deviceId' => $device->toString(), 'endpointId' => new Uuid()->toString(), 'capabilities' => $capabilities]
+            + ($pageId === null ? [] : ['pageId' => $pageId]);
         $tab = $service->execute($owner, PlaybackOperation::Endpoint, $registration)['endpoint'];
         $playing = $this->playing($service, $owner, $tab);
         $pause = ['requestId' => new Uuid()->toString(), 'expectedRevision' => $playing['revision'], 'action' => 'pause', 'incarnationId' => $tab['incarnationId']];
@@ -1257,7 +1258,7 @@ final class PlaybackTransferPersistenceTest extends TestCase
         }
     }
 
-    public function testAPausedRunnerIsReleasedAfterAQueueEditOrVolumeChangeItWasNeverShownExpires(): void
+    public function testAPausedRunnerIsReleasedAfterAQueueEditOrVolumeChangeExpires(): void
     {
         $service = $this->coordinator();
         foreach (['queue' => ['queue' => [], 'currentTrackIndex' => 0], 'volume' => ['volume' => 0.5]] as $action => $payload) {
@@ -1288,12 +1289,242 @@ final class PlaybackTransferPersistenceTest extends TestCase
                 $this->expireRegistration($tab['incarnationId']);
                 $snapshot = $this->pending($service, $owner, $other);
 
-                // A command the runner was shown may have been applied; it still stands against the proof.
-                self::assertSame($shown ? $tab['incarnationId'] : null, $snapshot['activeIncarnationId'], $case);
-                self::assertSame($shown, $this->observer->fetchOne('SELECT retired_at FROM playback_destination_incarnations WHERE id=?', [$tab['incarnationId']]) === null, $case);
+                // Neither command can start or move playback, so one the runner was shown and may have
+                // applied stands against the pause no more than one it never received.
+                self::assertNull($snapshot['activeIncarnationId'], $case);
+                self::assertSame($expired['revision'] + 1, $snapshot['revision'], $case);
+                self::assertNotNull($this->observer->fetchOne('SELECT retired_at FROM playback_destination_incarnations WHERE id=?', [$tab['incarnationId']]), $case);
                 self::assertSame(43.0, $snapshot['position'], $case);
             }
         }
+    }
+
+    /**
+     * Sends one control from another tab and returns its answer.
+     *
+     * @param array<string,mixed> $from
+     * @param array<string,mixed> $payload
+     * @return array<string,mixed>
+     */
+    private function controlFrom(PlaybackCoordinator $service, Uuid $owner, array $from, int $revision, string $action, array $payload = []): array
+    {
+        return $service->execute($owner, PlaybackOperation::Control, ['requestId' => new Uuid()->toString(), 'expectedRevision' => $revision,
+            'action' => $action, 'incarnationId' => $from['incarnationId']] + $payload, $from['capability']);
+    }
+
+    /**
+     * The runner asks for its commands, which shows them to it, and answers the first one.
+     *
+     * @param array<string,mixed> $runner
+     * @return array<string,mixed>
+     */
+    private function answer(PlaybackCoordinator $service, Uuid $owner, array $runner, string $outcome, ?float $position = null, ?float $volume = null): array
+    {
+        return $this->ack($service, $owner, $runner, $this->pending($service, $owner, $runner)['commands'][0], $outcome, $position, $volume);
+    }
+
+    public function testAPausedRunnerThatHasGoneIsReleasedAfterQueueEditsAndVolumeChangesItWasShown(): void
+    {
+        $service = $this->coordinator();
+        $queue = ['queue' => [], 'currentTrackIndex' => 0];
+        /** @var array<string,\Closure(array<string,mixed>, array<string,mixed>, Uuid, int): array<string,mixed>> $histories What follows the acknowledged pause; each returns the last snapshot. */
+        $histories = [
+            'a volume change it applied' => function (array $tab, array $other, Uuid $owner, int $revision) use ($service): array {
+                $this->controlFrom($service, $owner, $other, $revision, 'volume', ['volume' => 0.5]);
+                return $this->answer($service, $owner, $tab, 'applied', volume: 0.5);
+            },
+            'a queue edit it applied' => function (array $tab, array $other, Uuid $owner, int $revision) use ($service, $queue): array {
+                $this->controlFrom($service, $owner, $other, $revision, 'queue', $queue);
+                return $this->answer($service, $owner, $tab, 'applied', 43.0);
+            },
+            'a queue edit it rejected' => function (array $tab, array $other, Uuid $owner, int $revision) use ($service, $queue): array {
+                $this->controlFrom($service, $owner, $other, $revision, 'queue', $queue);
+                return $this->answer($service, $owner, $tab, 'rejected');
+            },
+            'two volume changes it applied' => function (array $tab, array $other, Uuid $owner, int $revision) use ($service): array {
+                $this->controlFrom($service, $owner, $other, $revision, 'volume', ['volume' => 0.5]);
+                $first = $this->answer($service, $owner, $tab, 'applied', volume: 0.5);
+                $this->controlFrom($service, $owner, $other, $first['revision'], 'volume', ['volume' => 0.25]);
+                return $this->answer($service, $owner, $tab, 'applied', volume: 0.25);
+            },
+            'a play it was never shown that expired, then a queue edit it applied' => function (array $tab, array $other, Uuid $owner, int $revision) use ($service, $queue): array {
+                $this->controlFrom($service, $owner, $other, $revision, 'play');
+                $this->expireCommands($owner);
+                $settled = $this->pending($service, $owner, $other);
+                $this->controlFrom($service, $owner, $other, $settled['revision'], 'queue', $queue);
+                return $this->answer($service, $owner, $tab, 'applied', 43.0);
+            },
+            'a queue edit it applied, then a play it was never shown that expired' => function (array $tab, array $other, Uuid $owner, int $revision) use ($service, $queue): array {
+                $this->controlFrom($service, $owner, $other, $revision, 'queue', $queue);
+                $edited = $this->answer($service, $owner, $tab, 'applied', 43.0);
+                $this->controlFrom($service, $owner, $other, $edited['revision'], 'play');
+                $this->expireCommands($owner);
+                return $this->pending($service, $owner, $other);
+            },
+            'a volume change it was shown, replaced by a stop it was never shown that expired' => function (array $tab, array $other, Uuid $owner, int $revision) use ($service): array {
+                $changing = $this->controlFrom($service, $owner, $other, $revision, 'volume', ['volume' => 0.5]);
+                self::assertSame(['volume'], array_column($this->pending($service, $owner, $tab)['commands'], 'type'));
+                $this->controlFrom($service, $owner, $other, $changing['revision'], 'stop');
+                $this->expireCommands($owner);
+                return $this->pending($service, $owner, $other);
+            },
+        ];
+        foreach ($histories as $case => $history) {
+            $owner = $this->createUser();
+            ['tab' => $tab, 'paused' => $paused] = $this->pausedTab($service, $owner, ['song', 'video', 'volume']);
+            $other = $this->endpoint($service, $owner);
+
+            $last = $history($tab, $other, $owner, $paused['revision']);
+
+            self::assertSame($tab['incarnationId'], $last['activeIncarnationId'], $case);
+            self::assertSame('paused', $last['desiredState'], $case);
+            self::assertSame('paused', $last['observedState'], $case);
+            self::assertSame('paused', $this->observer->fetchOne('SELECT observed_state FROM playback_destination_incarnations WHERE id=?', [$tab['incarnationId']]), $case);
+            self::assertSame([], $this->unanswered($owner), $case);
+            // While it is registered the runner keeps its place.
+            self::assertSame($last['revision'], $this->pending($service, $owner, $other)['revision'], $case);
+
+            $this->expireRegistration($tab['incarnationId']);
+            $released = $this->pending($service, $owner, $other);
+
+            self::assertNull($released['activeIncarnationId'], $case);
+            self::assertNull($released['selectedDestinationId'], $case);
+            self::assertSame('paused', $released['desiredState'], $case);
+            self::assertSame('paused', $released['observedState'], $case);
+            self::assertSame(43.0, $released['position'], $case);
+            self::assertSame($last['revision'] + 1, $released['revision'], $case);
+            self::assertNotNull($this->observer->fetchOne('SELECT retired_at FROM playback_destination_incarnations WHERE id=?', [$tab['incarnationId']]), $case);
+            // The other tab's Play is retained without a runner and it then takes playback itself.
+            $play = $this->controlFrom($service, $owner, $other, $released['revision'], 'play');
+            self::assertSame('retained', $play['requestResult']['outcome'], $case);
+        }
+    }
+
+    public function testAVolumeChangeAPausedRunnerWasShownHoldsItsReleaseOnlyUntilItExpires(): void
+    {
+        $owner = $this->createUser();
+        $service = $this->coordinator();
+        ['tab' => $tab, 'paused' => $paused] = $this->pausedTab($service, $owner, ['song', 'video', 'volume']);
+        $other = $this->endpoint($service, $owner);
+
+        $changing = $this->controlFrom($service, $owner, $other, $paused['revision'], 'volume', ['volume' => 0.5]);
+        self::assertSame(['volume'], array_column($this->pending($service, $owner, $tab)['commands'], 'type'));
+        // The tab is killed before it answers, and its registration lapses before the command expires.
+        $this->expireRegistration($tab['incarnationId']);
+        $held = $this->pending($service, $owner, $other);
+        self::assertSame($tab['incarnationId'], $held['activeIncarnationId']);
+        self::assertSame($changing['revision'], $held['revision']);
+        self::assertCount(1, $this->unanswered($owner));
+
+        // The operation that expires the command also releases the runner.
+        $this->expireCommands($owner);
+        $released = $this->pending($service, $owner, $other);
+        self::assertNull($released['activeIncarnationId']);
+        self::assertSame('paused', $released['observedState']);
+        self::assertSame($changing['revision'] + 2, $released['revision']);
+        self::assertSame([], $this->unanswered($owner));
+    }
+
+    public function testAPausedRunnerThatAnsweredAVolumeChangeAndWasThenShownAPlayStaysHeld(): void
+    {
+        $owner = $this->createUser();
+        $service = $this->coordinator();
+        ['tab' => $tab, 'paused' => $paused] = $this->pausedTab($service, $owner, ['song', 'video', 'volume']);
+        $other = $this->endpoint($service, $owner);
+
+        $this->controlFrom($service, $owner, $other, $paused['revision'], 'volume', ['volume' => 0.5]);
+        $changed = $this->answer($service, $owner, $tab, 'applied', volume: 0.5);
+        $this->controlFrom($service, $owner, $other, $changed['revision'], 'play');
+        self::assertSame(['play'], array_column($this->pending($service, $owner, $tab)['commands'], 'type'));
+        $this->expireCommands($owner);
+        $this->expireRegistration($tab['incarnationId']);
+
+        $unknown = $this->pending($service, $owner, $other);
+
+        self::assertSame($tab['incarnationId'], $unknown['activeIncarnationId']);
+        self::assertSame('unknown', $unknown['observedState']);
+        self::assertNull($this->observer->fetchOne('SELECT retired_at FROM playback_destination_incarnations WHERE id=?', [$tab['incarnationId']]));
+    }
+
+    public function testAPausedRunnerThatAnsweredALoadAfterItsPauseStaysHeld(): void
+    {
+        $owner = $this->createUser();
+        $service = $this->coordinator();
+        ['tab' => $tab, 'paused' => $paused] = $this->pausedTab($service, $owner);
+        $other = $this->endpoint($service, $owner);
+
+        // Removing the current track from the queue reaches the runner as a load that wants the paused state.
+        $this->controlFrom($service, $owner, $other, $paused['revision'], 'load', ['queue' => [], 'currentTrackIndex' => 0, 'desiredState' => 'paused']);
+        $loaded = $this->answer($service, $owner, $tab, 'applied', 0.0);
+        self::assertSame('paused', $loaded['desiredState']);
+        self::assertSame('paused', $loaded['observedState']);
+        $this->expireRegistration($tab['incarnationId']);
+
+        $snapshot = $this->pending($service, $owner, $other);
+
+        self::assertSame($tab['incarnationId'], $snapshot['activeIncarnationId']);
+        self::assertSame($loaded['revision'], $snapshot['revision']);
+        self::assertNull($this->observer->fetchOne('SELECT retired_at FROM playback_destination_incarnations WHERE id=?', [$tab['incarnationId']]));
+    }
+
+    public function testAStoppedRunnerThatHasGoneIsReleasedAfterAVolumeChangeAndAQueueEditItAnswered(): void
+    {
+        $owner = $this->createUser();
+        $service = $this->coordinator();
+        $runner = $this->endpoint($service, $owner, capabilities: ['song', 'video', 'volume']);
+        $stopped = $this->playThenStop($service, $owner, $runner);
+        $other = $this->endpoint($service, $owner);
+
+        $this->controlFrom($service, $owner, $other, $stopped['revision'], 'volume', ['volume' => 0.5]);
+        $changed = $this->answer($service, $owner, $runner, 'applied', volume: 0.5);
+        $this->controlFrom($service, $owner, $other, $changed['revision'], 'queue', ['queue' => [], 'currentTrackIndex' => 0]);
+        $edited = $this->answer($service, $owner, $runner, 'applied', 42.5);
+        self::assertSame('stopped', $edited['observedState']);
+        self::assertSame('stopped', $this->observer->fetchOne('SELECT observed_state FROM playback_destination_incarnations WHERE id=?', [$runner['incarnationId']]));
+        $this->expireRegistration($runner['incarnationId']);
+
+        $released = $this->pending($service, $owner, $other);
+
+        self::assertNull($released['activeIncarnationId']);
+        self::assertSame('stopped', $released['desiredState']);
+        self::assertSame('stopped', $released['observedState']);
+        self::assertSame($edited['revision'] + 1, $released['revision']);
+    }
+
+    public function testAQueueEditsAnswerRecordsTheCursorAndSaysNothingAboutPlayback(): void
+    {
+        $owner = $this->createUser();
+        $service = $this->coordinator();
+        ['tab' => $tab, 'paused' => $paused] = $this->pausedTab($service, $owner);
+        $other = $this->endpoint($service, $owner);
+        $queue = ['queue' => [], 'currentTrackIndex' => 0];
+        $reported = function () use ($tab): array {
+            $row = $this->observer->fetchAssociative('SELECT observed_state,position FROM playback_destination_incarnations WHERE id=?', [$tab['incarnationId']]);
+            self::assertIsArray($row);
+            return ['observed_state' => $row['observed_state'], 'position' => (float) $row['position']];
+        };
+
+        // A rejected queue edit leaves a confirmed pause confirmed, on the session and on the runner.
+        $this->controlFrom($service, $owner, $other, $paused['revision'], 'queue', $queue);
+        $this->expireRegistration($tab['incarnationId']);
+        $rejected = $this->answer($service, $owner, $tab, 'rejected', 44.0);
+        self::assertSame('paused', $rejected['observedState']);
+        self::assertSame(44.0, $rejected['position']);
+        self::assertSame(['observed_state' => 'paused', 'position' => 44.0], $reported());
+        // The answer renewed the runner's registration.
+        self::assertTrue($this->observer->fetchOne('SELECT expires_at>CURRENT_TIMESTAMP FROM playback_destination_incarnations WHERE id=?', [$tab['incarnationId']]));
+
+        // The runner rejects a play, which leaves it unknown; an applied queue edit does not confirm it.
+        $this->controlFrom($service, $owner, $other, $rejected['revision'], 'play');
+        $unknown = $this->answer($service, $owner, $tab, 'rejected');
+        self::assertSame('unknown', $unknown['observedState']);
+        $this->controlFrom($service, $owner, $other, $unknown['revision'], 'queue', $queue);
+        $applied = $this->answer($service, $owner, $tab, 'applied', 45.0);
+        self::assertSame('playing', $applied['desiredState']);
+        self::assertSame('unknown', $applied['observedState']);
+        self::assertSame(45.0, $applied['position']);
+        self::assertSame($unknown['revision'] + 2, $applied['revision']);
+        self::assertSame(['observed_state' => 'unknown', 'position' => 45.0], $reported());
     }
 
     public function testAPausedRunnerThatHasGoneIsReleasedByWhicheverOperationFirstSeesTheLapse(): void
@@ -1561,12 +1792,615 @@ final class PlaybackTransferPersistenceTest extends TestCase
     }
 
     /** @return array<string,mixed> */
-    private function registerAnotherTab(PlaybackCoordinator $service, Uuid $owner): array
+    private function registerAnotherTab(PlaybackCoordinator $service, Uuid $owner, ?string $pageId = null): array
     {
         $device = new Uuid();
         new DeviceDoctrineRepository($this->manager)->save(Device::create($owner, $device, 'Another tab'));
-        return $service->execute($owner, PlaybackOperation::Endpoint, ['deviceId' => $device->toString(), 'endpointId' => new Uuid()->toString()]);
+        return $service->execute($owner, PlaybackOperation::Endpoint, ['deviceId' => $device->toString(), 'endpointId' => new Uuid()->toString()]
+            + ($pageId === null ? [] : ['pageId' => $pageId]));
     }
+
+    /**
+     * What one tab registers with: the device and the endpoint stand for the tab, the page identity
+     * for the document loaded in it.
+     *
+     * @param array<string,mixed> $extra
+     * @return array<string,mixed>
+     */
+    private function tabOnAPage(Uuid $owner, array $extra = []): array
+    {
+        $device = new Uuid();
+        new DeviceDoctrineRepository($this->manager)->save(Device::create($owner, $device, 'Reloading tab'));
+        return ['deviceId' => $device->toString(), 'endpointId' => new Uuid()->toString(), 'pageId' => new Uuid()->toString()] + $extra;
+    }
+
+    /**
+     * The tab registers from a page it has not registered from before, as after a reload.
+     *
+     * @param array<string,mixed> $registration
+     * @return array<string,mixed>
+     */
+    private function reload(PlaybackCoordinator $service, Uuid $owner, array $registration): array
+    {
+        return $service->execute($owner, PlaybackOperation::Endpoint, ['pageId' => new Uuid()->toString()] + $registration);
+    }
+
+    /** @return array{observed_state:string,retired:bool,page_id:?string} */
+    private function incarnation(string $incarnationId): array
+    {
+        $row = $this->observer->fetchAssociative('SELECT observed_state,retired_at IS NOT NULL AS retired,page_id FROM playback_destination_incarnations WHERE id=?', [$incarnationId]);
+        self::assertIsArray($row);
+        return $row;
+    }
+
+    /**
+     * A transfer to a tab on a page, advanced to the given state. With a source, a tab on a page that
+     * plays hands over; without one the target starts playback in a session nobody plays.
+     *
+     * @return array{source:?array<string,mixed>,sourceRegistration:?array<string,mixed>,target:array<string,mixed>,targetRegistration:array<string,mixed>,request:array<string,mixed>,snapshot:array<string,mixed>}
+     */
+    private function transferBetweenPages(PlaybackCoordinator $service, Uuid $owner, bool $withSource, string $state, bool $recoverableSource = false): array
+    {
+        $sourceRegistration = $withSource ? $this->tabOnAPage($owner, $recoverableSource ? ['localRecoveryEligible' => true, 'tabId' => new Uuid()->toString()] : []) : null;
+        $source = $sourceRegistration === null ? null : $service->execute($owner, PlaybackOperation::Endpoint, $sourceRegistration)['endpoint'];
+        $targetRegistration = $this->tabOnAPage($owner);
+        $target = $service->execute($owner, PlaybackOperation::Endpoint, $targetRegistration)['endpoint'];
+        $revision = $source === null ? $service->execute($owner, PlaybackOperation::Snapshot, [])['revision'] : $this->playing($service, $owner, $source)['revision'];
+        $request = ['requestId' => new Uuid()->toString(), 'expectedRevision' => $revision, 'targetIncarnationId' => $target['incarnationId']];
+        $snapshot = $service->execute($owner, PlaybackOperation::Transfer, $request);
+        if ($state !== 'preparing') {
+            $snapshot = $this->answer($service, $owner, $target, 'prepared');
+            if ($source !== null && $state !== 'quiescing') {
+                $snapshot = $this->answer($service, $owner, $source, 'quiesced', 50.0);
+            }
+        }
+        if (in_array($state, ['starting', 'uncertain'], true)) {
+            // The target is shown its start and does not answer it.
+            self::assertSame(['start'], array_column($this->pending($service, $owner, $target)['commands'], 'type'));
+        }
+        if ($state === 'uncertain') {
+            $this->expireTransfer($owner);
+            $snapshot = $service->execute($owner, PlaybackOperation::Snapshot, []);
+        }
+        self::assertSame($state, $snapshot['transfer']['state']);
+        return ['source' => $source, 'sourceRegistration' => $sourceRegistration, 'target' => $target, 'targetRegistration' => $targetRegistration,
+            'request' => $request, 'snapshot' => $snapshot];
+    }
+
+    public function testATabThatRegistersFromAnotherPageReleasesTheSessionFromItsEarlierIncarnationInTheAnswer(): void
+    {
+        $service = $this->coordinator();
+        /** @var array<string,array{\Closure(Uuid): array{array<string,mixed>, array<string,mixed>, array<string,mixed>}, float}> $runners Each returns the registration, the runner and the last snapshot; then the cursor last recorded. */
+        $runners = [
+            'was shown a play it has not answered' => [function (Uuid $owner) use ($service): array {
+                ['registration' => $registration, 'tab' => $tab, 'paused' => $paused] = $this->pausedTab($service, $owner, pageId: new Uuid()->toString());
+                $shown = $this->controlFrom($service, $owner, $tab, $paused['revision'], 'play');
+                self::assertSame(['play'], array_column($shown['commands'], 'type'));
+                return [$registration, $tab, $shown];
+            }, 43.0],
+            'was shown a play that expired, and is owed a stop' => [function (Uuid $owner) use ($service): array {
+                ['registration' => $registration, 'tab' => $tab, 'paused' => $paused] = $this->pausedTab($service, $owner, pageId: new Uuid()->toString());
+                $this->controlFrom($service, $owner, $tab, $paused['revision'], 'play');
+                $this->expireCommands($owner);
+                $unknown = $service->execute($owner, PlaybackOperation::Snapshot, []);
+                self::assertSame('unknown', $unknown['observedState']);
+                self::assertSame(['stop'], array_column($this->unanswered($owner), 'type'));
+                return [$registration, $tab, $unknown];
+            }, 43.0],
+            'confirmed that it plays' => [function (Uuid $owner) use ($service): array {
+                $registration = $this->tabOnAPage($owner);
+                $tab = $service->execute($owner, PlaybackOperation::Endpoint, $registration)['endpoint'];
+                return [$registration, $tab, $this->playing($service, $owner, $tab)];
+            }, 42.5],
+            'confirmed its pause and then answered a load' => [function (Uuid $owner) use ($service): array {
+                ['registration' => $registration, 'tab' => $tab, 'paused' => $paused] = $this->pausedTab($service, $owner, pageId: new Uuid()->toString());
+                $this->controlFrom($service, $owner, $tab, $paused['revision'], 'load', ['queue' => [], 'currentTrackIndex' => 0, 'desiredState' => 'paused']);
+                return [$registration, $tab, $this->answer($service, $owner, $tab, 'applied', 12.0)];
+            }, 12.0],
+            'confirmed its stop and was then shown a stop it has not answered' => [function (Uuid $owner) use ($service): array {
+                $registration = $this->tabOnAPage($owner);
+                $tab = $service->execute($owner, PlaybackOperation::Endpoint, $registration)['endpoint'];
+                $stopped = $this->playThenStop($service, $owner, $tab);
+                $shown = $this->controlFrom($service, $owner, $tab, $stopped['revision'], 'stop');
+                self::assertSame(['stop'], array_column($shown['commands'], 'type'));
+                return [$registration, $tab, $shown];
+            }, 42.5],
+        ];
+        foreach ($runners as $case => [$runner, $cursor]) {
+            $owner = $this->createUser();
+            [$registration, $tab, $before] = $runner($owner);
+            self::assertSame($tab['incarnationId'], $before['activeIncarnationId'], $case);
+
+            // Another tab that registers, from whatever page, proves nothing about this one.
+            $other = $this->registerAnotherTab($service, $owner, new Uuid()->toString());
+            self::assertSame($tab['incarnationId'], $other['activeIncarnationId'], $case);
+            self::assertSame($before['revision'], $other['revision'], $case);
+
+            $registered = $this->reload($service, $owner, $registration);
+
+            $reloaded = $registered['endpoint'];
+            self::assertNotSame($tab['incarnationId'], $reloaded['incarnationId'], $case);
+            self::assertNull($registered['activeIncarnationId'], $case);
+            self::assertNull($registered['activeDestinationId'], $case);
+            self::assertNull($registered['selectedDestinationId'], $case);
+            self::assertSame('paused', $registered['desiredState'], $case);
+            self::assertSame('paused', $registered['observedState'], $case);
+            self::assertSame($cursor, $registered['position'], $case);
+            self::assertNull($registered['transfer'], $case);
+            self::assertSame($before['revision'] + 1, $registered['revision'], $case);
+            self::assertSame(['observed_state' => 'stopped', 'retired' => true, 'page_id' => $registration['pageId']], $this->incarnation($tab['incarnationId']), $case);
+            self::assertSame([], $this->unanswered($owner), $case);
+            self::assertSame(0, (int) $this->observer->fetchOne("SELECT count(*) FROM playback_commands WHERE user_id=? AND incarnation_id=? AND outcome IS NULL", [$owner->toString(), $tab['incarnationId']]), $case);
+            // Neither page identity leaves the server.
+            $answer = json_encode($registered, JSON_THROW_ON_ERROR);
+            self::assertStringNotContainsString($registration['pageId'], $answer, $case);
+            self::assertStringNotContainsString((string) $this->incarnation($reloaded['incarnationId'])['page_id'], $answer, $case);
+
+            // Nothing is owed to the gone page any more, so a later expiry issues nothing.
+            $this->expireCommands($owner);
+            $later = $service->execute($owner, PlaybackOperation::Snapshot, []);
+            self::assertSame($registered['revision'], $later['revision'], $case);
+            self::assertSame([], $this->unanswered($owner), $case);
+
+            // Play in the reloaded tab is retained without a runner, and the tab then takes playback itself.
+            $play = $this->controlFrom($service, $owner, $reloaded, $later['revision'], 'play');
+            self::assertSame('retained', $play['requestResult']['outcome'], $case);
+            $transfer = $service->execute($owner, PlaybackOperation::Transfer, ['requestId' => new Uuid()->toString(), 'expectedRevision' => $play['revision'], 'targetIncarnationId' => $reloaded['incarnationId']]);
+            self::assertNull($transfer['transfer']['sourceIncarnationId'], $case);
+            self::assertSame($cursor, $transfer['position'], $case);
+        }
+    }
+
+    public function testATabThatRegistersFromAnotherPageLeavesWhatAProofReleasesAsTheProofLeftIt(): void
+    {
+        $service = $this->coordinator();
+
+        // A confirmed stop with nothing outstanding ends stopped, not paused.
+        $owner = $this->createUser();
+        $registration = $this->tabOnAPage($owner);
+        $tab = $service->execute($owner, PlaybackOperation::Endpoint, $registration)['endpoint'];
+        $stopped = $this->playThenStop($service, $owner, $tab);
+        $registered = $this->reload($service, $owner, $registration);
+        self::assertNull($registered['activeIncarnationId']);
+        self::assertSame('stopped', $registered['desiredState']);
+        self::assertSame('stopped', $registered['observedState']);
+        self::assertSame(42.5, $registered['position']);
+        self::assertSame($stopped['revision'] + 1, $registered['revision']);
+        self::assertSame('stopped', $this->incarnation($tab['incarnationId'])['observed_state']);
+
+        // A confirmed pause is released once, at the revision its proof leaves.
+        $owner = $this->createUser();
+        ['registration' => $registration, 'tab' => $tab, 'paused' => $paused] = $this->pausedTab($service, $owner, pageId: new Uuid()->toString());
+        $registered = $this->reload($service, $owner, $registration);
+        self::assertNull($registered['activeIncarnationId']);
+        self::assertSame('paused', $registered['desiredState']);
+        self::assertSame('paused', $registered['observedState']);
+        self::assertSame(43.0, $registered['position']);
+        self::assertSame($paused['revision'] + 1, $registered['revision']);
+    }
+
+    public function testARegistrationWithoutAPageIdentityOnEitherSideIsNoProofThatThePageHasGone(): void
+    {
+        $service = $this->coordinator();
+        foreach (['the registration names no page', 'the earlier incarnation named no page'] as $case) {
+            $owner = $this->createUser();
+            $registration = $this->tabOnAPage($owner);
+            $first = $case === 'the registration names no page' ? $registration : array_diff_key($registration, ['pageId' => true]);
+            $second = $case === 'the registration names no page' ? array_diff_key($registration, ['pageId' => true]) : $registration;
+            $tab = $service->execute($owner, PlaybackOperation::Endpoint, $first)['endpoint'];
+            $playing = $this->playing($service, $owner, $tab);
+
+            $registered = $service->execute($owner, PlaybackOperation::Endpoint, $second);
+
+            self::assertNotSame($tab['incarnationId'], $registered['endpoint']['incarnationId'], $case);
+            self::assertSame($tab['incarnationId'], $registered['activeIncarnationId'], $case);
+            self::assertSame('playing', $registered['observedState'], $case);
+            self::assertSame($playing['revision'], $registered['revision'], $case);
+            self::assertSame('playing', $this->incarnation($tab['incarnationId'])['observed_state'], $case);
+
+            // A page identity the runner's own registration can be compared with settles it: a runner
+            // that named a page is released by another page, and one that named none never is.
+            $reloaded = $this->reload($service, $owner, $registration);
+            self::assertSame($case === 'the registration names no page' ? null : $tab['incarnationId'], $reloaded['activeIncarnationId'], $case);
+        }
+    }
+
+    public function testAPageIdentityThatIsNoUuidIsRefusedAndRegistersNothing(): void
+    {
+        $owner = $this->createUser();
+        $service = $this->coordinator();
+        $registration = $this->tabOnAPage($owner);
+
+        try {
+            $service->execute($owner, PlaybackOperation::Endpoint, ['pageId' => 'the first page'] + $registration);
+            self::fail('A page identity that is no UUID was accepted.');
+        } catch (\App\Shared\Application\Exception\InvalidInputException $error) {
+            self::assertSame('pageId must be a UUID.', $error->getMessage());
+        }
+
+        self::assertSame(0, (int) $this->observer->fetchOne('SELECT count(*) FROM playback_destinations WHERE user_id=?', [$owner->toString()]));
+        self::assertSame(0, (int) $this->observer->fetchOne('SELECT count(*) FROM playback_destination_incarnations WHERE user_id=?', [$owner->toString()]));
+    }
+
+    public function testAReleaseByAnotherPageRollsBackWithItsRegistration(): void
+    {
+        $owner = $this->createUser();
+        $service = $this->coordinator();
+        ['registration' => $registration, 'tab' => $tab, 'paused' => $paused] = $this->pausedTab($service, $owner, pageId: new Uuid()->toString());
+        $shown = $this->controlFrom($service, $owner, $tab, $paused['revision'], 'play');
+        $state = fn(): array => [
+            $this->observer->fetchAssociative('SELECT revision,active_incarnation_id,desired_state,observed_state FROM listening_sessions WHERE user_id=?', [$owner->toString()]),
+            $this->observer->fetchAllAssociative('SELECT id,incarnation_id,outcome,acknowledged_at FROM playback_commands WHERE user_id=? ORDER BY created_at,id', [$owner->toString()]),
+            $this->observer->fetchAllAssociative('SELECT id,retired_at,observed_state FROM playback_destination_incarnations WHERE user_id=? ORDER BY epoch', [$owner->toString()]),
+        ];
+        $before = $state();
+
+        $connection = $this->manager->getConnection();
+        $connection->beginTransaction();
+        $registered = $this->reload($service, $owner, $registration);
+        self::assertNull($registered['activeIncarnationId']);
+        self::assertSame($shown['revision'] + 1, $registered['revision']);
+        $connection->rollBack();
+
+        self::assertSame($before, $state());
+        self::assertSame($tab['incarnationId'], $service->execute($owner, PlaybackOperation::Snapshot, [])['activeIncarnationId']);
+    }
+
+    /**
+     * The acknowledgement an endpoint sends for a command as it was delivered to it.
+     *
+     * @param array<string,mixed> $endpoint
+     * @param array<string,mixed> $command
+     * @return array<string,mixed>
+     */
+    private function acknowledgement(array $endpoint, array $command, string $outcome): array
+    {
+        return ['commandId' => $command['id'], 'attemptId' => $command['attemptId'], 'revision' => (int) $command['revision'],
+            'incarnationId' => $endpoint['incarnationId'], 'epoch' => (int) $command['epoch'], 'outcome' => $outcome];
+    }
+
+    public function testAPageThatRegistersAgainKeepsItsPlaceAsTheRunnerAndKeepsPlaying(): void
+    {
+        $owner = $this->createUser();
+        $service = $this->coordinator();
+        $registration = $this->tabOnAPage($owner);
+        $first = $service->execute($owner, PlaybackOperation::Endpoint, $registration)['endpoint'];
+        $playing = $this->playing($service, $owner, $first);
+        $runner = $first;
+
+        // The page's socket is replaced three times; each time the same document registers again.
+        self::assertSame('playing', $this->incarnation($first['incarnationId'])['observed_state']);
+        foreach ([1, 2, 3] as $replacement) {
+            $reported = $this->incarnation($runner['incarnationId'])['observed_state'];
+            $registered = $service->execute($owner, PlaybackOperation::Endpoint, $registration);
+
+            $successor = $registered['endpoint'];
+            self::assertNotSame($runner['incarnationId'], $successor['incarnationId']);
+            self::assertSame($runner['epoch'] + 1, $successor['epoch']);
+            self::assertSame($successor['incarnationId'], $registered['activeIncarnationId']);
+            self::assertSame($first['destinationId'], $registered['activeDestinationId']);
+            self::assertSame($first['destinationId'], $registered['selectedDestinationId']);
+            self::assertSame('playing', $registered['desiredState']);
+            self::assertSame('playing', $registered['observedState']);
+            self::assertSame(42.5, $registered['position']);
+            self::assertSame($playing['revision'], $registered['revision']);
+            // The earlier incarnation is retired and keeps what it last reported: nothing proved it silent.
+            self::assertSame(['observed_state' => $reported, 'retired' => true, 'page_id' => $registration['pageId']], $this->incarnation($runner['incarnationId']), "Replacement {$replacement}.");
+            self::assertSame($successor['incarnationId'], $this->observer->fetchOne('SELECT active_incarnation_id FROM listening_sessions WHERE user_id=?', [$owner->toString()]));
+            $runner = $successor;
+        }
+
+        // The page reports as before, under its latest incarnation.
+        $observed = $service->execute($owner, PlaybackOperation::Observe, ['incarnationId' => $runner['incarnationId'], 'expectedRevision' => $playing['revision'], 'observedState' => 'playing', 'position' => 61.0], $runner['capability']);
+        self::assertSame(61.0, $observed['position']);
+        self::assertSame($runner['incarnationId'], $observed['activeIncarnationId']);
+    }
+
+    public function testACommandIssuedToAPageThatThenRegistersAgainIsDeliveredToItsNewIncarnationAndAnswered(): void
+    {
+        $service = $this->coordinator();
+        foreach (['a pause it was not shown yet', 'a play it was shown'] as $case) {
+            $owner = $this->createUser();
+            $registration = $this->tabOnAPage($owner);
+            $earlier = $service->execute($owner, PlaybackOperation::Endpoint, $registration)['endpoint'];
+            if ($case === 'a pause it was not shown yet') {
+                $before = $this->playing($service, $owner, $earlier);
+                $other = $this->endpoint($service, $owner);
+                $issued = $this->controlFrom($service, $owner, $other, $before['revision'], 'pause');
+                $shown = null;
+            } else {
+                $before = $this->playThenStop($service, $owner, $earlier);
+                $issued = $this->controlFrom($service, $owner, $earlier, $before['revision'], 'play');
+                $shown = $issued['commands'][0];
+            }
+            $commandId = $issued['requestResult']['commandId'];
+            $disclosed = fn(): mixed => $this->observer->fetchOne('SELECT disclosed_at FROM playback_commands WHERE id=?', [$commandId]);
+            $markBefore = $disclosed();
+            self::assertSame($shown !== null, $markBefore !== null, $case);
+
+            $registered = $service->execute($owner, PlaybackOperation::Endpoint, $registration);
+
+            $successor = $registered['endpoint'];
+            self::assertSame($successor['incarnationId'], $registered['activeIncarnationId'], $case);
+            self::assertSame($issued['revision'], $registered['revision'], $case);
+            // The command keeps its identity and the mark that it was shown, and names the new incarnation.
+            self::assertSame($markBefore, $disclosed(), $case);
+            $delivered = $this->pending($service, $owner, $successor)['commands'];
+            self::assertCount(1, $delivered, $case);
+            self::assertSame([$commandId, $successor['incarnationId'], $successor['epoch'], (int) $issued['revision']], [$delivered[0]['id'], $delivered[0]['incarnationId'], $delivered[0]['epoch'], (int) $delivered[0]['revision']], $case);
+            if ($shown !== null) {
+                self::assertSame([$shown['attemptId'], $shown['type'], $shown['payload']], [$delivered[0]['attemptId'], $delivered[0]['type'], $delivered[0]['payload']], $case);
+                self::assertSame($markBefore, $disclosed(), $case);
+            } else {
+                self::assertNotNull($disclosed(), $case);
+            }
+            self::assertSame([], $this->pending($service, $owner, $earlier)['commands'], $case);
+
+            // An answer that still names the earlier incarnation, with its capability, is stale.
+            $outcome = $delivered[0]['type'] === 'pause' ? 'paused' : 'playing';
+            try {
+                $service->execute($owner, PlaybackOperation::Acknowledge, $this->acknowledgement($earlier, ['epoch' => $earlier['epoch']] + $delivered[0], $outcome), $earlier['capability']);
+                self::fail('The earlier incarnation answered a command that follows its successor.');
+            } catch (ConflictException $error) {
+                self::assertSame('Stale command acknowledgement.', $error->getMessage(), $case);
+            }
+            self::assertSame($issued['revision'], $service->execute($owner, PlaybackOperation::Snapshot, [])['revision'], $case);
+
+            $answered = $service->execute($owner, PlaybackOperation::Acknowledge, $this->acknowledgement($successor, $delivered[0], $outcome) + ['position' => 44.0], $successor['capability']);
+            self::assertSame($outcome, $answered['observedState'], $case);
+            self::assertSame($outcome, $answered['desiredState'], $case);
+            self::assertSame($successor['incarnationId'], $answered['activeIncarnationId'], $case);
+            self::assertSame($issued['revision'] + 1, $answered['revision'], $case);
+            self::assertSame([], $this->unanswered($owner), $case);
+        }
+    }
+
+    public function testAStartShownToAPageThatRegistersAgainAndNeverAnswersExpiresAgainstItsNewIncarnation(): void
+    {
+        $owner = $this->createUser();
+        $service = $this->coordinator();
+        $registration = $this->tabOnAPage($owner);
+        $earlier = $service->execute($owner, PlaybackOperation::Endpoint, $registration)['endpoint'];
+        $stopped = $this->playThenStop($service, $owner, $earlier);
+        $shown = $this->controlFrom($service, $owner, $earlier, $stopped['revision'], 'play');
+        self::assertSame(['play'], array_column($shown['commands'], 'type'));
+        $successor = $service->execute($owner, PlaybackOperation::Endpoint, $registration)['endpoint'];
+
+        // The page never answers. The start was shown, so the session turns unknown and a stop is owed
+        // to the incarnation the page now answers under.
+        $this->expireCommands($owner);
+        $unknown = $service->execute($owner, PlaybackOperation::Snapshot, []);
+        self::assertSame($successor['incarnationId'], $unknown['activeIncarnationId']);
+        self::assertSame('unknown', $unknown['observedState']);
+        self::assertSame('unknown', $this->incarnation($successor['incarnationId'])['observed_state']);
+        self::assertSame('stopped', $this->incarnation($earlier['incarnationId'])['observed_state']);
+        $owed = $this->unanswered($owner);
+        self::assertSame([['stop', $successor['incarnationId']]], array_map(static fn(array $command): array => [$command['type'], $command['incarnation_id']], $owed));
+
+        // The page registers once more while the stop is owed; the stop follows it and its answer confirms the session.
+        $latest = $service->execute($owner, PlaybackOperation::Endpoint, $registration);
+        self::assertSame($latest['endpoint']['incarnationId'], $latest['activeIncarnationId']);
+        self::assertSame($unknown['revision'], $latest['revision']);
+        $confirmed = $this->answer($service, $owner, $latest['endpoint'], 'stopped');
+        self::assertSame('stopped', $confirmed['desiredState']);
+        self::assertSame('stopped', $confirmed['observedState']);
+        self::assertSame($latest['endpoint']['incarnationId'], $confirmed['activeIncarnationId']);
+        self::assertSame([], $this->unanswered($owner));
+    }
+
+    public function testAPageThatRegistersAgainDuringATransferKeepsItsPlaceInIt(): void
+    {
+        $service = $this->coordinator();
+
+        // As the target that was asked to start: its new incarnation answers the start and becomes the runner.
+        $owner = $this->createUser();
+        ['source' => $source, 'targetRegistration' => $registration, 'snapshot' => $before] = $this->transferBetweenPages($service, $owner, true, 'starting');
+        $registered = $service->execute($owner, PlaybackOperation::Endpoint, $registration);
+        $successor = $registered['endpoint'];
+        self::assertSame(['starting', $source['incarnationId'], $successor['incarnationId']], [$registered['transfer']['state'], $registered['transfer']['sourceIncarnationId'], $registered['transfer']['targetIncarnationId']]);
+        self::assertSame($source['incarnationId'], $registered['activeIncarnationId']);
+        self::assertSame($before['revision'], $registered['revision']);
+        $committed = $this->answer($service, $owner, $successor, 'started');
+        self::assertNull($committed['transfer']);
+        self::assertSame($successor['incarnationId'], $committed['activeIncarnationId']);
+        self::assertSame(50.0, $committed['position']);
+
+        // As the source that was asked to quiesce: its new incarnation is the runner, quiesces, and the transfer goes on.
+        $owner = $this->createUser();
+        ['target' => $target, 'sourceRegistration' => $registration, 'snapshot' => $before] = $this->transferBetweenPages($service, $owner, true, 'quiescing');
+        $registered = $service->execute($owner, PlaybackOperation::Endpoint, $registration);
+        $successor = $registered['endpoint'];
+        self::assertSame(['quiescing', $successor['incarnationId'], $target['incarnationId']], [$registered['transfer']['state'], $registered['transfer']['sourceIncarnationId'], $registered['transfer']['targetIncarnationId']]);
+        self::assertSame($successor['incarnationId'], $registered['activeIncarnationId']);
+        self::assertSame($before['revision'], $registered['revision']);
+        $starting = $this->answer($service, $owner, $successor, 'quiesced', 50.0);
+        self::assertSame('starting', $starting['transfer']['state']);
+        $committed = $this->answer($service, $owner, $target, 'started');
+        self::assertSame($target['incarnationId'], $committed['activeIncarnationId']);
+    }
+
+    public function testAPausedPageThatRegistersAgainStaysTheRunnerAndHasNoPauseProofUnderItsNewIncarnation(): void
+    {
+        $owner = $this->createUser();
+        $service = $this->coordinator();
+        ['registration' => $registration, 'tab' => $tab, 'paused' => $paused] = $this->pausedTab($service, $owner, pageId: new Uuid()->toString());
+        $other = $this->endpoint($service, $owner);
+
+        $registered = $service->execute($owner, PlaybackOperation::Endpoint, $registration);
+
+        $successor = $registered['endpoint'];
+        self::assertSame($successor['incarnationId'], $registered['activeIncarnationId']);
+        self::assertSame('paused', $registered['observedState']);
+        self::assertSame($paused['revision'], $registered['revision']);
+        self::assertSame('paused', $this->incarnation($tab['incarnationId'])['observed_state']);
+
+        // The pause was acknowledged under the earlier incarnation and proves nothing for this one.
+        $this->expireRegistration($successor['incarnationId']);
+        $lapsed = $this->pending($service, $owner, $other);
+        self::assertSame($successor['incarnationId'], $lapsed['activeIncarnationId']);
+        self::assertSame($paused['revision'], $lapsed['revision']);
+    }
+
+    public function testASucceededRunnerThatReportsItselfStoppedWhilePlayingIsWantedReleasesTheSession(): void
+    {
+        $owner = $this->createUser();
+        $service = $this->coordinator();
+        $registration = $this->tabOnAPage($owner);
+        $earlier = $service->execute($owner, PlaybackOperation::Endpoint, $registration)['endpoint'];
+        $playing = $this->playing($service, $owner, $earlier);
+        $successor = $service->execute($owner, PlaybackOperation::Endpoint, $registration)['endpoint'];
+
+        $released = $service->execute($owner, PlaybackOperation::Observe, ['incarnationId' => $successor['incarnationId'], 'expectedRevision' => $playing['revision'], 'observedState' => 'stopped', 'position' => 77.0], $successor['capability']);
+
+        self::assertNull($released['activeIncarnationId']);
+        self::assertSame('paused', $released['desiredState']);
+        self::assertSame('paused', $released['observedState']);
+        self::assertSame(77.0, $released['position']);
+        self::assertSame($playing['revision'] + 1, $released['revision']);
+    }
+
+    public function testASuccessionRollsBackWithItsRegistration(): void
+    {
+        $owner = $this->createUser();
+        $service = $this->coordinator();
+        ['source' => $source, 'sourceRegistration' => $registration] = $this->transferBetweenPages($service, $owner, true, 'quiescing');
+        $state = fn(): array => [
+            $this->observer->fetchAssociative('SELECT revision,active_incarnation_id FROM listening_sessions WHERE user_id=?', [$owner->toString()]),
+            $this->observer->fetchAllAssociative('SELECT id,incarnation_id,epoch,acknowledged_at FROM playback_commands WHERE user_id=? ORDER BY created_at,id', [$owner->toString()]),
+            $this->observer->fetchAllAssociative('SELECT id,source_incarnation_id,target_incarnation_id,state FROM playback_transfers WHERE user_id=? ORDER BY created_at,id', [$owner->toString()]),
+            $this->observer->fetchAllAssociative('SELECT id,retired_at FROM playback_destination_incarnations WHERE user_id=? ORDER BY id', [$owner->toString()]),
+        ];
+        $before = $state();
+
+        $connection = $this->manager->getConnection();
+        $connection->beginTransaction();
+        $registered = $service->execute($owner, PlaybackOperation::Endpoint, $registration);
+        self::assertSame($registered['endpoint']['incarnationId'], $registered['activeIncarnationId']);
+        self::assertSame($registered['endpoint']['incarnationId'], $registered['transfer']['sourceIncarnationId']);
+        $connection->rollBack();
+
+        self::assertSame($before, $state());
+        self::assertSame($source['incarnationId'], $service->execute($owner, PlaybackOperation::Snapshot, [])['activeIncarnationId']);
+    }
+
+    public function testATransferTargetThatRegistersFromAnotherPageFailsTheTransferAndASourceKeepsTheSession(): void
+    {
+        $service = $this->coordinator();
+        // Without a source. A target that had only been asked to prepare changed nothing, so the
+        // session stands as it stood; one that was asked to start leaves it paused.
+        foreach (['preparing', 'starting', 'uncertain'] as $state) {
+            $owner = $this->createUser();
+            ['target' => $target, 'targetRegistration' => $registration, 'request' => $request, 'snapshot' => $before] = $this->transferBetweenPages($service, $owner, false, $state);
+
+            $registered = $this->reload($service, $owner, $registration);
+
+            self::assertNull($registered['transfer'], $state);
+            self::assertNull($registered['activeIncarnationId'], $state);
+            self::assertNull($registered['selectedDestinationId'], $state);
+            self::assertSame($state === 'preparing' ? $before['desiredState'] : 'paused', $registered['desiredState'], $state);
+            self::assertSame($state === 'preparing' ? $before['observedState'] : 'paused', $registered['observedState'], $state);
+            self::assertSame($before['revision'] + 1, $registered['revision'], $state);
+            self::assertSame('failed', $service->execute($owner, PlaybackOperation::Transfer, $request)['transferResult']['state'], $state);
+            self::assertSame(['observed_state' => 'stopped', 'retired' => true, 'page_id' => $registration['pageId']], $this->incarnation($target['incarnationId']), $state);
+            self::assertSame([], $this->unanswered($owner), $state);
+        }
+
+        // With a source: the source is the runner again, and is unknown only where it never quiesced.
+        foreach (['quiescing' => 'unknown', 'starting' => 'paused', 'uncertain' => 'paused'] as $state => $observed) {
+            $owner = $this->createUser();
+            ['source' => $source, 'target' => $target, 'targetRegistration' => $registration, 'request' => $request, 'snapshot' => $before] = $this->transferBetweenPages($service, $owner, true, $state);
+
+            $registered = $this->reload($service, $owner, $registration);
+
+            self::assertNull($registered['transfer'], $state);
+            self::assertSame($source['incarnationId'], $registered['activeIncarnationId'], $state);
+            self::assertSame($source['destinationId'], $registered['selectedDestinationId'], $state);
+            self::assertSame('paused', $registered['desiredState'], $state);
+            self::assertSame($observed, $registered['observedState'], $state);
+            self::assertSame($before['revision'] + 1, $registered['revision'], $state);
+            self::assertSame('failed', $service->execute($owner, PlaybackOperation::Transfer, $request)['transferResult']['state'], $state);
+            self::assertSame('stopped', $this->incarnation($target['incarnationId'])['observed_state'], $state);
+            // A source that never quiesced may still play and is owed a stop; one that did is owed nothing.
+            self::assertSame(
+                $state === 'quiescing' ? [['stop', $source['incarnationId']]] : [],
+                array_map(static fn(array $command): array => [$command['type'], $command['incarnation_id']], $this->unanswered($owner)),
+                $state,
+            );
+        }
+    }
+
+    public function testATransferSourceThatRegistersFromAnotherPageBeforeTheStartWasIssuedFailsTheTransferAndLeavesNoRunner(): void
+    {
+        $service = $this->coordinator();
+        foreach (['preparing', 'quiescing'] as $state) {
+            $owner = $this->createUser();
+            ['source' => $source, 'sourceRegistration' => $registration, 'request' => $request, 'snapshot' => $before] = $this->transferBetweenPages($service, $owner, true, $state);
+
+            $registered = $this->reload($service, $owner, $registration);
+
+            self::assertNull($registered['transfer'], $state);
+            self::assertNull($registered['activeIncarnationId'], $state);
+            self::assertNull($registered['selectedDestinationId'], $state);
+            self::assertSame('paused', $registered['desiredState'], $state);
+            self::assertSame('paused', $registered['observedState'], $state);
+            self::assertSame(42.5, $registered['position'], $state);
+            self::assertSame($before['revision'] + 1, $registered['revision'], $state);
+            self::assertSame('failed', $service->execute($owner, PlaybackOperation::Transfer, $request)['transferResult']['state'], $state);
+            self::assertSame('stopped', $this->incarnation($source['incarnationId'])['observed_state'], $state);
+            self::assertSame([], $this->unanswered($owner), $state);
+        }
+    }
+
+    public function testATransferWhoseSourceRegisteredFromAnotherPageAfterTheStartWasIssuedGoesOnAndNeverFallsBackToThatSource(): void
+    {
+        $service = $this->coordinator();
+        /** @var array<string,array{string,bool}> $endings The state the source's page left in, and whether the session ends with the target as its runner. */
+        $endings = [
+            'the target answers its start' => ['starting', true],
+            'the target rejects its start' => ['starting', false],
+            'the target confirms its stop after the transfer turned uncertain' => ['uncertain', false],
+            'the target registers from another page while the transfer is starting' => ['starting', false],
+            'the target registers from another page while the transfer is uncertain' => ['uncertain', false],
+            'the target registers from another page after the source was recovered locally while starting' => ['starting', false],
+            'the target registers from another page after the source was recovered locally while uncertain' => ['uncertain', false],
+        ];
+        foreach ($endings as $case => [$state, $committed]) {
+            $owner = $this->createUser();
+            $recovered = str_contains($case, 'recovered locally');
+            ['source' => $source, 'sourceRegistration' => $sourceRegistration, 'target' => $target, 'targetRegistration' => $targetRegistration, 'request' => $request, 'snapshot' => $before]
+                = $this->transferBetweenPages($service, $owner, true, $state, recoverableSource: $recovered);
+
+            // The source's page goes away. Playback was already handed to the target, so the transfer goes on.
+            $gone = $recovered
+                ? $service->execute($owner, PlaybackOperation::RecoverLocal, ['incarnationId' => $source['incarnationId'], 'tabId' => $source['recoveryTabId'],
+                    'recoveryCredential' => $source['recoveryCredential'], 'checkpoint' => ['revision' => $before['revision'], 'media' => null, 'currentTrackIndex' => 0, 'position' => 50.0]])
+                : $this->reload($service, $owner, $sourceRegistration);
+            self::assertSame($state, $gone['transfer']['state'], $case);
+            self::assertSame($source['incarnationId'], $gone['activeIncarnationId'], $case);
+            self::assertSame($before['revision'], $gone['revision'], $case);
+            self::assertSame(['stopped', true], [$this->incarnation($source['incarnationId'])['observed_state'], $this->incarnation($source['incarnationId'])['retired']], $case);
+
+            $ended = match (true) {
+                str_contains($case, 'registers from another page') => $this->reload($service, $owner, $targetRegistration),
+                $case === 'the target answers its start' => $this->answer($service, $owner, $target, 'started'),
+                $case === 'the target rejects its start' => $this->answer($service, $owner, $target, 'rejected'),
+                default => $this->answer($service, $owner, $target, 'stopped'),
+            };
+
+            self::assertNull($ended['transfer'], $case);
+            self::assertSame($committed ? $target['incarnationId'] : null, $ended['activeIncarnationId'], $case);
+            self::assertSame($committed ? 'committed' : 'failed', $service->execute($owner, PlaybackOperation::Transfer, $request)['transferResult']['state'], $case);
+            if (!$committed) {
+                // The gone source does not get the session back, and nothing is left that could be playing.
+                self::assertNull($ended['selectedDestinationId'], $case);
+                self::assertSame('paused', $ended['desiredState'], $case);
+                self::assertSame('paused', $ended['observedState'], $case);
+                self::assertSame(50.0, $ended['position'], $case);
+            }
+            self::assertSame([], $this->unanswered($owner), $case);
+        }
+    }
+
 
     public function testATransferRightAfterTheLapseStartsItsTargetWithoutASource(): void
     {
@@ -1780,7 +2614,7 @@ final class PlaybackTransferPersistenceTest extends TestCase
     public function testReRegisteringTheSameTabKeepsARunnerWithoutPauseProof(): void
     {
         $service = $this->coordinator();
-        foreach (['playing', 'a later volume command', 'a pending command the runner was shown'] as $case) {
+        foreach (['playing', 'a pending command the runner was shown'] as $case) {
             $owner = $this->createUser();
             if ($case === 'playing') {
                 $device = new Uuid();
@@ -1789,14 +2623,9 @@ final class PlaybackTransferPersistenceTest extends TestCase
                 $tab = $service->execute($owner, PlaybackOperation::Endpoint, $registration)['endpoint'];
                 $before = $this->playing($service, $owner, $tab);
             } else {
-                ['registration' => $registration, 'tab' => $tab, 'paused' => $paused] = $this->pausedTab($service, $owner, ['song', 'video', 'volume']);
-                $control = ['requestId' => new Uuid()->toString(), 'expectedRevision' => $paused['revision'], 'incarnationId' => $tab['incarnationId']]
-                    + ($case === 'a later volume command' ? ['action' => 'volume', 'volume' => 0.5] : ['action' => 'play']);
-                $before = $service->execute($owner, PlaybackOperation::Control, $control, $tab['capability']);
+                ['registration' => $registration, 'tab' => $tab, 'paused' => $paused] = $this->pausedTab($service, $owner);
+                $before = $this->controlFrom($service, $owner, $tab, $paused['revision'], 'play');
                 self::assertCount(1, $before['commands'], $case);
-                if ($case === 'a later volume command') {
-                    $before = $this->ack($service, $owner, $tab, $before['commands'][0], 'applied', volume: 0.5);
-                }
             }
 
             $registered = $service->execute($owner, PlaybackOperation::Endpoint, $registration);
@@ -1805,6 +2634,23 @@ final class PlaybackTransferPersistenceTest extends TestCase
             self::assertSame($before['revision'], $registered['revision'], $case);
             self::assertNotSame($tab['incarnationId'], $registered['endpoint']['incarnationId'], $case);
         }
+    }
+
+    public function testReRegisteringTheSameTabReleasesAPausedRunnerThatAnsweredALaterVolumeChange(): void
+    {
+        $owner = $this->createUser();
+        $service = $this->coordinator();
+        ['registration' => $registration, 'tab' => $tab, 'paused' => $paused] = $this->pausedTab($service, $owner, ['song', 'video', 'volume']);
+        $changing = $this->controlFrom($service, $owner, $tab, $paused['revision'], 'volume', ['volume' => 0.5]);
+        $changed = $this->ack($service, $owner, $tab, $changing['commands'][0], 'applied', volume: 0.5);
+
+        $registered = $service->execute($owner, PlaybackOperation::Endpoint, $registration);
+
+        self::assertNull($registered['activeIncarnationId']);
+        self::assertSame('paused', $registered['desiredState']);
+        self::assertSame('paused', $registered['observedState']);
+        self::assertSame(43.0, $registered['position']);
+        self::assertSame($changed['revision'] + 1, $registered['revision']);
     }
 
     public function testAPausedRunnerIsReleasedAfterAPlayItWasNeverShownSettles(): void

@@ -27,8 +27,7 @@ constexpr int kOut = 2;
 constexpr int kMatrixFloats = (int)(sizeof(AacMpsBandMatrices) / sizeof(float));
 constexpr float kAbsThr = 1e-9f * 32768.0f * 32768.0f;
 
-/* The modulation tables as the sums of qmf_sums.h read them: the
- * analysis tables by term, the synthesis tables by band. */
+/* The modulation tables, laid out for the sums of qmf_sums.h. */
 float g_ana_cos[2 * kBands][kBands], g_ana_sin[2 * kBands][kBands];
 float g_syn_cos[kBands][2 * kBands], g_syn_sin[kBands][2 * kBands];
 

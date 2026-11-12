@@ -233,12 +233,15 @@ jobs:
                         || { echo "the $level kernels did not run"; exit 1; }
                     done
 
-            -   name: Lossless suites on this runner's kernels
-                # The lossless mode fills its kernel table for the
-                # processor it runs on, so the arm64 runner is the one
-                # place where the NEON kernels are compared with the
-                # scalar ones, bit for bit, and where whole streams have
-                # to come out the same with and without them.
+            -   name: Kernel suites on this runner's kernels
+                # The AAC transforms and the lossless mode fill their
+                # kernel tables for the processor they run on, so the
+                # arm64 runner is the one place where the NEON kernels
+                # are compared with the scalar ones, bit for bit: those
+                # of the AAC table, the encoder's noise sum among them,
+                # in test_dsp, and those of the lossless mode in
+                # test_flac_dsp, where whole streams also have to come out
+                # the same with and without them.
                 # BAAC_REQUIRE_KERNELS fails the suite when the level it
                 # names did not run or installed no kernel of its own, and
                 # the step reads the suite's own account of it as well.
@@ -254,9 +257,9 @@ jobs:
                 run: |
                     cmake -S . -B cmake-build -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="$OSX_ARCHITECTURE"
                     cmake --build cmake-build --parallel 3 \
-                      --target test_flac_format test_flac_dsp test_flac_encoder test_flac_decoder
+                      --target test_dsp test_flac_format test_flac_dsp test_flac_encoder test_flac_decoder
                     ctest --test-dir cmake-build --output-on-failure \
-                      -R '^test_flac_(format|dsp|encoder|decoder)(_scalar|_sse2)?$'
+                      -R '^(test_dsp|test_flac_(format|dsp|encoder|decoder)(_scalar|_sse2)?)$'
                     # The same proof in the log: the level ran, and the suite
                     # compared kernels of its own with the scalar ones.
                     cmake-build/tests/test_flac_dsp | tee "$RUNNER_TEMP/flac-dsp.log"

@@ -8,8 +8,13 @@ use App\Shared\Infrastructure\Http\PublicDestinationPolicy;
 use App\Shared\Infrastructure\Http\PublicHttpClient;
 use Baander\Tooling\Fixtures\Household\Dataset;
 use Baander\Tooling\Fixtures\Household\MetadataTransport;
+use PHPUnit\Framework\Attributes\RequiresPhpExtension;
 use PHPUnit\Framework\TestCase;
 
+/**
+ * The tests that drive the application's PublicHttpClient require the curl extension: the client
+ * passes curl options, and the application image always loads it.
+ */
 final class HouseholdMetadataTransportTest extends TestCase
 {
     private string $directory;
@@ -29,6 +34,7 @@ final class HouseholdMetadataTransportTest extends TestCase
         rmdir($this->directory);
     }
 
+    #[RequiresPhpExtension('curl')]
     public function testRealPublicPolicyRetainsHostValidationAndTransportReturnsOwnedMetadata(): void
     {
         $plan = Dataset::plan('metadata-test');
@@ -68,6 +74,7 @@ final class HouseholdMetadataTransportTest extends TestCase
         $transport->request('GET', $url)->getContent();
     }
 
+    #[RequiresPhpExtension('curl')]
     public function testRealAdaptersAcceptTheRecordedSearchAndLookupContracts(): void
     {
         $plan = Dataset::plan('metadata-test');

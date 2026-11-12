@@ -9,14 +9,9 @@
 #include "fft.h"
 #include "test_util.h"
 
-static float rnd(unsigned* seed) {
-  *seed = *seed * 1664525u + 1013904223u;
-  return (float)(*seed >> 8) / 8388608.0f - 1.0f;
-}
-
 static void fill(std::vector<float>& v, unsigned* seed, float scale) {
   for (float& x : v) {
-    x = scale * rnd(seed);
+    x = scale * lcg_float(seed);
   }
 }
 
@@ -135,11 +130,11 @@ static void test_mdct_twiddles(const char* name, const AacDSP* ref, const AacDSP
 
 /* A random float with a random exponent in [lo, hi], either sign. */
 static float rnd_exp(unsigned* seed, int lo, int hi) {
-  const float m = 1.0f + 0.5f * (rnd(seed) + 1.0f); /* [1, 2) */
-  *seed = *seed * 1664525u + 1013904223u;
-  const int e = lo + (int)((*seed >> 8) % (unsigned)(hi - lo + 1));
+  const float m = 1.0f + 0.5f * (lcg_float(seed) + 1.0f); /* [1, 2) */
+  const unsigned r = lcg_next(seed);
+  const int e = lo + (int)((r >> 8) % (unsigned)(hi - lo + 1));
   const float v = ldexpf(m, e);
-  return (*seed & 0x80u) ? -v : v;
+  return (r & 0x80u) ? -v : v;
 }
 
 static float x34_of(float coef) { return (float)pow(fabs((double)coef), 0.75); }
@@ -162,7 +157,7 @@ static void fill_noise_input(NoiseInput kind, std::vector<float>& coef, std::vec
     float c = 0.0f;
     switch (kind) {
       case kTypical:
-        c = 30000.0f * rnd(seed) * fabsf(rnd(seed));
+        c = 30000.0f * lcg_float(seed) * fabsf(lcg_float(seed));
         break;
       case kNearMax:
         c = rnd_exp(seed, 60, 63);
@@ -174,10 +169,10 @@ static void fill_noise_input(NoiseInput kind, std::vector<float>& coef, std::vec
         c = rnd_exp(seed, -149, 127);
         break;
       case kWildX34:
-        c = 1000.0f * rnd(seed);
+        c = 1000.0f * lcg_float(seed);
         break;
       case kZeros:
-        c = (i % 3 == 0) ? 0.0f : (i % 3 == 1) ? -0.0f : 100.0f * rnd(seed);
+        c = (i % 3 == 0) ? 0.0f : (i % 3 == 1) ? -0.0f : 100.0f * lcg_float(seed);
         break;
       case kNoiseInputs:
         break;
@@ -214,30 +209,36 @@ static float documented_noise(const std::vector<float>& coef, const std::vector<
 
 static bool same_bits(float a, float b) { return memcmp(&a, &b, sizeof a) == 0; }
 
-/* Every span length from 0 to 72 (all tails of one to seven lines), one
- * to eight spans that touch or lie 128 apart, the codec's scalefactor
- * range and a few beyond it.  The buffers end at the last line, so that a
- * kernel reading past a span shows under the sanitizers. */
-static void test_quant_noise(const char* name, const AacDSP* ref, const AacDSP* dsp,
-                             bool check_order) {
+/* q^(4/3) for the 8192 quantized magnitudes, as the codec's table. */
+static std::vector<float> make_pow43() {
   std::vector<float> pow43(8192);
   for (int q = 0; q < 8192; q++) {
     pow43[q] = (float)pow((double)q, 4.0 / 3.0);
   }
+  return pow43;
+}
+
+/* Every span length from 0 to 128 (every tail of one to seven lines, and
+ * every band width of the tables, the widest 96 lines), one to eight spans
+ * that touch or lie 128 apart, the codec's scalefactor range and a few
+ * beyond it.  The buffers end at the last line, so that a kernel reading
+ * past a span shows under the sanitizers. */
+static void test_quant_noise(const char* name, const AacDSP* ref, const AacDSP* dsp,
+                             bool check_order) {
+  const std::vector<float> pow43 = make_pow43();
   unsigned seed = 53;
   int cases = 0, finite = 0, mismatches = 0;
   for (int kind = 0; kind < kNoiseInputs; kind++) {
-    for (int len = 0; len <= 72; len++) {
+    for (int len = 0; len <= 128; len++) {
       for (int windows = 1; windows <= 8; windows++) {
         for (int stride : {len, 128}) {
           const size_t size = (size_t)stride * (windows - 1) + len;
           std::vector<float> coef(size), x34(size);
           fill_noise_input((NoiseInput)kind, coef, x34, &seed);
-          seed = seed * 1664525u + 1013904223u;
-          const int sf = (int)((seed >> 8) % 300u) - 20; /* 0..255 in the codec */
+          const int sf = (int)((lcg_next(&seed) >> 8) % 300u) - 20; /* 0..255 in the codec */
           const float scale = exp2f(-0.1875f * (float)(sf - 100));
           const float gain = exp2f(0.25f * (float)(sf - 100));
-          const float round = kind == kWildX34 ? 0.5f * (rnd(&seed) + 1.0f) : 0.4054f;
+          const float round = kind == kWildX34 ? 0.5f * (lcg_float(&seed) + 1.0f) : 0.4054f;
           const float r1 = ref->quant_noise(coef.data(), x34.data(), len, windows, stride, scale,
                                             round, gain, pow43.data());
           const float r2 = dsp->quant_noise(coef.data(), x34.data(), len, windows, stride, scale,
@@ -271,10 +272,7 @@ static void test_quant_noise(const char* name, const AacDSP* ref, const AacDSP* 
  * errors: the scalar kernel stays within float rounding of it on encoder
  * spectra. */
 static void test_quant_noise_value(const AacDSP* ref) {
-  std::vector<float> pow43(8192);
-  for (int q = 0; q < 8192; q++) {
-    pow43[q] = (float)pow((double)q, 4.0 / 3.0);
-  }
+  const std::vector<float> pow43 = make_pow43();
   unsigned seed = 71;
   for (int len : {4, 12, 32, 96}) {
     for (int sf : {60, 100, 140}) {

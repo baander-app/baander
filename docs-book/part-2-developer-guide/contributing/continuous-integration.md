@@ -59,9 +59,12 @@ commit and checks it against the committed manifest. Each sits behind an
 has moved, and the scripts leave a restored copy alone once they have checked it.
 The runner's `flac` package is not used.
 
-The two macOS runners build the lossless suites for their own architecture and run
-them. The lossless mode picks its kernels for the processor it runs on, so the arm64
-runner is the only place where the NEON kernels execute. `BAAC_REQUIRE_KERNELS`
+The two macOS runners build the kernel suites, `test_dsp` and the lossless suites,
+for their own architecture and run them. The AAC transforms and the lossless mode
+pick their kernels for the processor they run on, so the arm64 runner is the only
+place where the NEON kernels execute: `test_dsp` compares those of the AAC table, the
+encoder's noise sum among them, with the scalar ones, and `test_flac_dsp` those of
+the lossless mode. `BAAC_REQUIRE_KERNELS`
 names the kernel levels a runner has to exercise (`neon` on arm64, `sse2,avx2` on
 Linux, `sse2` on the Intel Mac): `test_flac_dsp` fails when a named level did not
 run or installed no kernel of its own, and the step checks the suite's output for
@@ -92,11 +95,22 @@ otherwise produce a label that no runner serves, and the job would wait in the q
 indefinitely. A fork pull request, which may not receive variables, therefore still
 resolves its runner label.
 
+### The desktop lockfile and the codec package
+
+The desktop app depends on `packages/baander-aac` through a `file:` dependency, and
+Yarn records a hash of that whole folder in `ui/electron/yarn.lock`. Any change under
+`packages/baander-aac`, a documentation edit included, moves the hash, and the
+immutable install in Frontend CI's desktop checks then refuses the stale lockfile.
+Commit such a change together with the lockfile it produces: run
+`corepack yarn install --mode=update-lockfile` in `ui/electron`. Frontend CI runs on
+changes to `packages/baander-aac/**` so a missed refresh fails on the commit that
+caused it.
+
 ### What differs per forge
 
 | Concern | Forgejo | GitHub |
 | --- | --- | --- |
-| Runner label | `docker-cli` (self-hosted) | `ubuntu-latest` (hosted) |
+| Runner label | `docker-cli` (self-hosted) | `ubuntu-latest` (hosted); `ubuntu-24.04` for the registry thread job, whose ThreadSanitizer cannot disable address randomization on the 26.04 runner |
 | Job container | `<REGISTRY_URL>/<REGISTRY_OWNER>/baander-runner:latest` | `ghcr.io/baander-app/baander-runner:latest` |
 | Registry and image owner | The `REGISTRY_URL` and `REGISTRY_OWNER` variables | `ghcr.io` and `baander-app` |
 | Registry login | The `REGISTRY_TOKEN` secret | The workflow token (`github.token`) |

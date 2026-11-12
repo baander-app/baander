@@ -35,28 +35,34 @@ static int test_summary(const char* name) {
   return g_failures ? 1 : 0;
 }
 
+/* The directory of `--write-streams <dir>`, or NULL: a suite with
+ * committed streams then writes them there instead of testing. */
+static const char* write_streams_dir(int argc, char** argv) {
+  return argc >= 3 && strcmp(argv[1], "--write-streams") == 0 ? argv[2] : nullptr;
+}
+
+/* The tests' linear congruential generator: the next state of *seed, and
+ * a value in [-1, 1) from the top 24 bits of the next state. */
+static unsigned lcg_next(unsigned* seed) {
+  *seed = *seed * 1664525u + 1013904223u;
+  return *seed;
+}
+
+static float lcg_float(unsigned* seed) { return (float)(lcg_next(seed) >> 8) / 8388608.0f - 1.0f; }
+
 /* ── the reference build ───────────────────────────────────────── */
 
 /* The encoder streams under tests/data are compared byte for byte by
- * the reference build: the Release configuration, optimised and without
- * sanitizers.  The library and the tests compute in exact arithmetic,
- * so the bytes are a function of the source and of the C library's
- * functions, not of the compiler: GCC 13 to 16 and clang write the same
- * streams.  The streams are written with --write-streams by the build
- * the CI runs, a Release build with GCC 15.2 on Ubuntu 26.04.  Other
- * configurations compare their streams with the committed ones through
- * the decodes. */
-#if defined(__SANITIZE_ADDRESS__) || defined(__SANITIZE_UNDEFINED__)
-#define BAAC_SANITIZED 1
-#elif defined(__has_feature)
-#if __has_feature(address_sanitizer) || __has_feature(undefined_behavior_sanitizer)
-#define BAAC_SANITIZED 1
-#endif
-#endif
-#ifndef BAAC_SANITIZED
-#define BAAC_SANITIZED 0
-#endif
-#if defined(__OPTIMIZE__) && BAAC_RELEASE_MATH && !BAAC_SANITIZED
+ * every reference build: a build with the options of CMakeLists.txt
+ * that keep arithmetic exact (BAAC_EXACT_MATH), in any configuration,
+ * Debug and the sanitizers included.  The library and the tests compute
+ * in exact arithmetic, so the bytes are a function of the source and of
+ * the C library's functions, not of the compiler or the optimisation
+ * level.  The streams are written with --write-streams by a Release build
+ * with the compiler of the linux-x64 job in
+ * .github/workflows/aac-native.yml.  A build without those options
+ * compares its streams with the committed ones through the decodes. */
+#if BAAC_EXACT_MATH
 #define BAAC_REFERENCE_BUILD 1
 #else
 #define BAAC_REFERENCE_BUILD 0

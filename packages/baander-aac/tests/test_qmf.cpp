@@ -220,10 +220,7 @@ static bool same_bits(const float* a, const float* b, int n) {
  * other bytes than the committed streams. */
 static void test_sums_keep_term_order() {
   unsigned seed = 4711u;
-  auto rnd = [&]() {
-    seed = seed * 1664525u + 1013904223u;
-    return (float)(seed >> 8) / 8388608.0f - 1.0f;
-  };
+  const auto rnd = [&seed]() { return lcg_float(&seed); };
   std::vector<float> x(1280), window(1280), cos_t(128 * 64), sin_t(128 * 64), v(2560);
   float X[64][2];
   for (int round = 0; round < 8; round++) {

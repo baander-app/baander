@@ -9,6 +9,31 @@ interface VideoManifest extends FixtureManifest {
   video: { id: string; publicId: string; path: string }
 }
 
+const CLOSE_REPORTS_KEY = 'baander-e2e-close-reports'
+
+interface SentCloseReport {
+  sentAt: number
+  incarnationId: string
+  checkpoint: { revision: number; media: unknown; currentTrackIndex: number; position: number }
+}
+
+/**
+ * Keeps each close report a page of the tab sends in the tab's session storage. A page sends its
+ * report from `pagehide` with a keepalive `fetch` while it unloads, and the driver does not report
+ * that request, so the page records what it sent and the next page of the tab reads it back.
+ */
+function recordCloseReports(key: string) {
+  const send = window.fetch.bind(window)
+  window.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = new URL(input instanceof Request ? input.url : String(input), location.href)
+    if (init?.keepalive && url.pathname === '/api/session/close' && typeof init.body === 'string') {
+      const reports = JSON.parse(sessionStorage.getItem(key) ?? '[]') as unknown[]
+      sessionStorage.setItem(key, JSON.stringify([...reports, { sentAt: Date.now(), ...JSON.parse(init.body) }]))
+    }
+    return send(input, init)
+  }
+}
+
 async function openBrowser(browser: Browser, user: FixtureUser, baseURL: string, name: string) {
   const context = await browser.newContext({ baseURL, ignoreHTTPSErrors: true })
   await context.addInitScript(deviceName => localStorage.setItem('baander-device-name', deviceName), name)
@@ -90,6 +115,7 @@ test('paused video transfers, reopens remotely, returns locally, and recovers af
     const manifest = (await fixture.request<VideoManifest>({ op: 'create', run, delivery: 'encoded' })).receipt
     const source = await openBrowser(browser, manifest.users[0]!, baseURL, 'Video source')
     contexts.push(source)
+    await source.context.addInitScript(recordCloseReports, CLOSE_REPORTS_KEY)
     diagnostics.observe(source.page, 'source')
     const receiver = await openBrowser(browser, manifest.users[0]!, baseURL, 'Video receiver')
     contexts.push(receiver)
@@ -184,6 +210,7 @@ test('paused video transfers, reopens remotely, returns locally, and recovers af
     expect(await receiver.page.locator('video').evaluateAll(videos => videos.every(video => video instanceof HTMLVideoElement && video.paused))).toBe(true)
     await expect.poll(sourcePosition).toBeGreaterThan(13)
     const beforeReload = await snapshot(source.page)
+    const measuredBeforeReloadAt = Date.now()
     const nativePositionBeforeReload = await sourcePosition()
     expect(beforeReload.activeIncarnationId).toBeTruthy()
     const recoveredResponse = source.page.waitForResponse(response => {
@@ -201,9 +228,21 @@ test('paused video transfers, reopens remotely, returns locally, and recovers af
     const recovered = await snapshot(source.page)
     expect(recovered.media).toEqual(beforeReload.media)
     expect(recovered.desiredState).toBe('paused')
-    expect(recovered.position).toBe(recoveryRequest.checkpoint.position)
-    expect(recovered.position).toBeGreaterThanOrEqual(12)
-    expect(recovered.position).toBeLessThanOrEqual(nativePositionBeforeReload + 0.5)
+    // The unloading page reported its close at pagehide with the cursor its player stood at, and
+    // the report released the session before the new page recovered the tab. The recovery found
+    // nothing left to release, answered as recovered and kept the reported cursor, which is newer
+    // than the checkpoint the page last saved while it played.
+    const closeReports = await source.page.evaluate(key => JSON.parse(sessionStorage.getItem(key) ?? '[]'), CLOSE_REPORTS_KEY) as SentCloseReport[]
+    expect(closeReports.map(report => report.incarnationId)).toEqual([beforeReload.activeIncarnationId])
+    const [closeReport] = closeReports
+    expect(closeReport.checkpoint.media).toEqual(beforeReload.media)
+    expect(recovered.position).toBe(closeReport.checkpoint.position)
+    expect(recoveryRequest.checkpoint.position).toBeGreaterThanOrEqual(12)
+    expect(closeReport.checkpoint.position).toBeGreaterThan(recoveryRequest.checkpoint.position)
+    // The movie played on until the page unloaded: the reported cursor is no earlier than the
+    // position read before the reload, and no later than playing on from there could reach.
+    expect(closeReport.checkpoint.position).toBeGreaterThanOrEqual(nativePositionBeforeReload)
+    expect(closeReport.checkpoint.position).toBeLessThanOrEqual(nativePositionBeforeReload + (closeReport.sentAt - measuredBeforeReloadAt) / 1000 + 0.25)
     expect(await source.page.locator('video').evaluateAll(videos => videos.every(video => video instanceof HTMLVideoElement && video.paused))).toBe(true)
     await diagnostics.instrument(source.page)
     await source.page.getByRole('heading', { name: `Owned playback movie ${run}`, exact: true }).locator('..').getByRole('button', { name: 'Play', exact: true }).click()
@@ -223,6 +262,7 @@ test('paused video transfers, reopens remotely, returns locally, and recovers af
     expect(await receiver.page.locator('video').evaluateAll(videos => videos.every(video => video instanceof HTMLVideoElement && video.paused))).toBe(true)
     await testInfo.attach('video-reload-recovery', {
       body: JSON.stringify({ beforeReload: { incarnationId: beforeReload.activeIncarnationId, nativePosition: nativePositionBeforeReload },
+        closeReport, recoveryCheckpoint: recoveryRequest.checkpoint,
         recovered: { position: recovered.position, media: recovered.media, desiredState: recovered.desiredState, activeIncarnationId: recovered.activeIncarnationId },
         resumed: { incarnationId: resumed.activeIncarnationId, nativePosition: await sourcePosition() } }), contentType: 'application/json',
     })

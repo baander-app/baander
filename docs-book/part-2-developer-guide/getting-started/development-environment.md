@@ -179,6 +179,18 @@ PostgreSQL and Redis data keep their recorded image identities; an image overrid
 does not upgrade those data stores. Preserve saved state when conversion or
 ownership checks refuse recovery. Lifecycle commands do not authorize a reset.
 
+An instance can lose its release images while it is stopped, most often to
+`docker system prune -a`. Startup then applies three rules. A recorded PostgreSQL or
+Redis identity is kept only while the daemon still holds that image; when the daemon
+answers "No such image", the role's image is built or pulled as for a new instance and
+the retained data is started on it. The preflight runs from the newly prepared release
+when the previous release's images are gone. A worker boot whose operator image is gone
+is recorded as retired when none of its containers exists. Startup refuses before
+anything starts while containers of that boot survive or the database still registers
+it, because only the lost operator image could have retired it; that case, and a
+database whose applied migrations were later rewritten, need a repair or a data reset,
+which the instance's owner approves.
+
 ## Media mounts
 
 To create libraries automatically during startup, copy `dev.local.example.json`

@@ -12,9 +12,8 @@
  * modulation through a complex FFT with a twiddle before and after; the
  * encoder's banks (64-band analysis, 32-band synthesis) keep the direct
  * sums over the modulation tables, so that the encoder's output does not
- * depend on the transform's rounding.  The direct sums are those of
- * qmf_sums.h, and the modulation tables are stored the way they read
- * them: the analysis tables by term, the synthesis tables by band.
+ * depend on the transform's rounding.  The direct sums and the layout of
+ * their modulation tables are those of qmf_sums.h.
  *
  * Analysis with B bands: the window of 10 B taps (the prototype, or every
  * second tap for 32 bands) weights the newest 10 B input samples, the

@@ -64,7 +64,7 @@ final class MutationRouteInventoryTest extends TestCase
         ],
         'playback sessions and devices' => [
             'playback_endpoint', 'playback_transfer', 'playback_ack', 'playback_observe', 'playback_control',
-            'playback_reconcile', 'playback_recover_local', 'device_register', 'device_rename', 'device_forget',
+            'playback_reconcile', 'playback_recover_local', 'playback_close', 'playback_override', 'device_register', 'device_rename', 'device_forget',
         ],
         'radio' => [
             'radio_session_start', 'radio_session_stop', 'radio_source_create',

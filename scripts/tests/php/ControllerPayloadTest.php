@@ -483,9 +483,15 @@ CODE);
     {
         $this->payload->publish($this->root . '/source');
         AtomicFile::writeJson($this->root . '/state/controller/selected.json', ['generation' => '../../source']);
-        $result = new EngineExecutor(ExecutionContext::bounded(30, Environment::clean()))->run(new ProcessSpec([PHP_BINARY, $this->payload->launcher()]), new CompletionPolicy(null));
-        self::assertNotSame(0, $result->exitCode);
+        // PHP's settings without an ini file, where an uncaught exception reaches stdout only: the
+        // launcher must report the refusal on stderr itself, whatever the host's ini says.
+        $result = new EngineExecutor(ExecutionContext::bounded(30, Environment::clean()))->run(
+            new ProcessSpec([PHP_BINARY, '-d', 'display_errors=1', '-d', 'log_errors=0', $this->payload->launcher()]),
+            new CompletionPolicy(null),
+        );
+        self::assertSame(1, $result->exitCode);
         self::assertStringContainsString('Invalid controller generation selector', $result->stderr);
+        self::assertSame('', $result->stdout);
     }
 
     private function generation(string $id): string

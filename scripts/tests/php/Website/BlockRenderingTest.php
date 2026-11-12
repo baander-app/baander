@@ -50,6 +50,7 @@ final class BlockRenderingTest extends TestCase
                 self::fail('Invalid helper HTML must fail.');
             } catch (\RuntimeException $error) {
                 self::assertStringContainsString('manual.md, block 3', $error->getMessage());
+                self::assertStringContainsString('Highlighted code', $error->getMessage());
             }
             self::assertSame([], glob($this->root . '/var/website-render-*'));
         }

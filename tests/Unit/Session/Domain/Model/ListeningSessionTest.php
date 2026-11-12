@@ -310,6 +310,91 @@ final class ListeningSessionTest extends TestCase
         $this->assertSame(45.5, $session->getPosition());
     }
 
+    public function testAGoneIncarnationLeavesTheSessionPausedAtTheCursorItLastRecorded(): void
+    {
+        $session = $this->sessionWithRunner(PlaybackState::Playing);
+        $queue = $session->getQueue();
+        $revision = $session->revision();
+
+        $session->releaseGoneIncarnation(releaseRunner: true, sourceStopped: true);
+
+        $this->assertNull($session->activeIncarnationId());
+        $this->assertNull($session->selectedDestinationId());
+        $this->assertSame(PlaybackState::Paused, $session->desiredState());
+        $this->assertSame(ObservedPlaybackState::Paused, $session->observedState());
+        $this->assertSame('paused', $session->getPlaybackState());
+        $this->assertSame(45.5, $session->getPosition());
+        $this->assertSame($queue, $session->getQueue());
+        $this->assertSame($revision + 1, $session->revision());
+    }
+
+    public function testAGoneTransferTargetLeavesItsSourceTheRunnerAndUnknownUntilTheSourceIsKnownStopped(): void
+    {
+        foreach ([[true, ObservedPlaybackState::Paused], [false, ObservedPlaybackState::Unknown]] as [$sourceStopped, $observed]) {
+            $session = $this->sessionWithRunner(PlaybackState::Playing);
+            $runner = $session->activeIncarnationId();
+            $destination = $session->selectedDestinationId();
+            $revision = $session->revision();
+
+            $session->releaseGoneIncarnation(releaseRunner: false, sourceStopped: $sourceStopped);
+
+            $this->assertSame($runner, $session->activeIncarnationId());
+            $this->assertSame($destination, $session->selectedDestinationId());
+            $this->assertSame(PlaybackState::Paused, $session->desiredState());
+            $this->assertSame($observed, $session->observedState());
+            $this->assertSame(45.5, $session->getPosition());
+            $this->assertSame($revision + 1, $session->revision());
+        }
+    }
+
+    public function testARunnerRecordedGoneAndStoppedIsDroppedWhereTheSessionStands(): void
+    {
+        $paused = $this->sessionWithRunner(PlaybackState::Paused);
+        $stopped = $this->sessionWithRunner(PlaybackState::Stopped);
+        $wanted = $this->sessionWithRunner(PlaybackState::Stopped);
+        $wanted->control('play', null, null, null, null, null);
+        // A transfer that turned uncertain leaves the session unknown; once it has failed nothing can be playing.
+        $unknown = $this->sessionWithRunner(PlaybackState::Playing);
+        $unknown->retainUncertainRunner();
+
+        foreach ([
+            [$paused, PlaybackState::Paused, ObservedPlaybackState::Paused],
+            [$stopped, PlaybackState::Stopped, ObservedPlaybackState::Stopped],
+            [$wanted, PlaybackState::Playing, ObservedPlaybackState::Stopped],
+            [$unknown, PlaybackState::Paused, ObservedPlaybackState::Paused],
+        ] as [$session, $desired, $observed]) {
+            $revision = $session->revision();
+
+            $session->releaseSilentRunner();
+
+            $this->assertNull($session->activeIncarnationId());
+            $this->assertNull($session->selectedDestinationId());
+            $this->assertSame($desired, $session->desiredState());
+            $this->assertSame($observed, $session->observedState());
+            $this->assertSame(45.5, $session->getPosition());
+            $this->assertSame($revision, $session->revision());
+        }
+    }
+
+    public function testARunnersSuccessorTakesItsPlaceAndNothingElseChanges(): void
+    {
+        $session = $this->sessionWithRunner(PlaybackState::Playing);
+        $destination = $session->selectedDestinationId();
+        $revision = $session->revision();
+        $updated = $session->getUpdatedAt();
+        $successor = new Uuid();
+
+        $session->succeedRunner($successor);
+
+        $this->assertSame($successor, $session->activeIncarnationId());
+        $this->assertSame($destination, $session->selectedDestinationId());
+        $this->assertSame(PlaybackState::Playing, $session->desiredState());
+        $this->assertSame(ObservedPlaybackState::Playing, $session->observedState());
+        $this->assertSame(45.5, $session->getPosition());
+        $this->assertSame($revision, $session->revision());
+        $this->assertSame($updated, $session->getUpdatedAt());
+    }
+
     private function sessionWithRunner(PlaybackState $state): ListeningSession
     {
         $session = ListeningSession::create(userId: $this->userId, queue: [new PublicId()->toString()], currentTrackIndex: 0, position: 45.5);

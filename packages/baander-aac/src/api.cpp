@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <cmath>
 #include <cstring>
 #include <vector>
 
@@ -82,15 +83,43 @@ static int encode_block(AacEncoderState* s, const float* pcm, uint8_t* out, int 
   return len;
 }
 
-int aac_encoder_encode(AacEncoderHandle ctx, const float* pcm, int n_samples, uint8_t* out,
+/* The largest input magnitude the encoder codes, 2^16 times full scale
+ * (96 dB above it): every energy the encoder forms from such samples
+ * stays far inside the float range. */
+constexpr float kInputLimit = 65536.0f;
+
+/* The block as the encoder codes it: pcm itself when every sample lies
+ * within kInputLimit, else a copy in which a NaN is silence and every
+ * other sample, an infinity included, is clamped to the limit.  A NaN or
+ * an infinity would otherwise make the frame's energies and perceptual
+ * entropy NaN, and through the rate control's running state every frame
+ * after it. */
+static const float* input_in_range(AacEncoderState* s, const float* pcm) {
+  const int n = s->frame_size * s->input_channels;
+  int out_of_range = 0;
+  for (int i = 0; i < n; i++) {
+    out_of_range |= !(fabsf(pcm[i]) <= kInputLimit);
+  }
+  if (!out_of_range) {
+    return pcm;
+  }
+  for (int i = 0; i < n; i++) {
+    const float v = pcm[i];
+    s->input_copy[i] = std::isnan(v) ? 0.0f : std::clamp(v, -kInputLimit, kInputLimit);
+  }
+  return s->input_copy;
+}
+
+int aac_encoder_encode(AacEncoderHandle ctx, const float* input, int n_samples, uint8_t* out,
                        int out_size) {
-  if (!ctx || !pcm || !out || out_size <= 0) {
+  if (!ctx || !input || !out || out_size <= 0) {
     return AAC_ERR_INVALID_ARG;
   }
   auto* s = static_cast<AacEncoderState*>(ctx);
   if (n_samples != s->frame_size) {
     return AAC_ERR_INVALID_ARG;
   }
+  const float* pcm = input_in_range(s, input);
   /* The meter measures one stream: the first frame after creation or a
    * flush starts it over, and a refused frame (the output too small)
    * consumed no input, so nothing is fed for it. */

@@ -955,8 +955,8 @@ void test_committed() {
 
 int main(int argc, char** argv) {
   aac_tables_init();
-  if (argc >= 3 && strcmp(argv[1], "--write-streams") == 0) {
-    return write_streams(argv[2]);
+  if (const char* dir = write_streams_dir(argc, argv)) {
+    return write_streams(dir);
   }
   test_config_round_trip();
   test_gain_round_trip();

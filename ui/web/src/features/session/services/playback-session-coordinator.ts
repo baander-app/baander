@@ -1,5 +1,5 @@
 import type { QueryClient } from '@tanstack/react-query'
-import type { PlaybackEndpointResource, PlaybackSnapshotResource } from '@/shared/api-client/gen/endpoints'
+import type { OverridePlaybackRequest, PlaybackEndpointResource, PlaybackSnapshotResource } from '@/shared/api-client/gen/endpoints'
 import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
 import { authenticatedTransport, type SharedLiveTransport } from '@/shared/live/transport'
 import { captureOwnership, isCurrentOwnership, subscribeOwnership } from '@/shared/live/ownership'
@@ -11,6 +11,8 @@ import { PlaybackLocalRecovery, type LocalRecoveryState, type RecoveryEndpoint }
 import type { PlaybackRecoveryCheckpoint, PlaybackRecoveryRecord } from './playback-recovery-store'
 import { PlaybackCommandRunner, type PlaybackAcknowledgement } from './playback-command-runner'
 import { hasUnconfirmedPlayback, UNCONFIRMED_PLAYBACK_REFUSAL } from './playback-status'
+import { playbackPageId } from './playback-page-identity'
+import { CLOSE_REPORT_PATH, PlaybackCloseReporter } from './playback-close-reporter'
 import { MediaCompatibilityError } from '@/features/player/services/media-delivery'
 
 type RequestResult = NonNullable<PlaybackSnapshotResource['requestResult']>
@@ -34,10 +36,42 @@ interface PendingTransfer {
   lastRevision: number
 }
 
-type StopProof = { endpoint: PlaybackEndpointResource; position: number }
-let retirement: { owner: ReturnType<typeof captureOwnership>; recovery: Promise<StopProof | null> } | null = null
+/** An incarnation this page stopped playing for and has not yet reported closed. */
+interface ClosedIncarnation {
+  endpoint: PlaybackEndpointResource
+  checkpoint: PlaybackRecoveryCheckpoint
+}
+let retirement: { owner: ReturnType<typeof captureOwnership>; closing: Promise<ClosedIncarnation | null> } | null = null
 
 const PRESENCE_INTERVAL_MS = 10_000
+const REQUEST_TIMEOUT_MS = 15_000
+/** How long the server keeps a command deliverable. A page that cannot be registered for that long cannot be commanded. */
+const COMMAND_LIFETIME_MS = 20_000
+const REGISTRATION_RETRY_MS = 1_000
+const OVERRIDE_PATH = '/api/session/override'
+/** How long a refused request still says what the listener wants once the hold on the session is overridden. */
+const REFUSED_REQUEST_LIFETIME_MS = 120_000
+
+/** A request this tab was refused for unconfirmed playback, which an override may start again. */
+class RefusedRequest {
+  private readonly intent: PlaybackIntent
+  private readonly at: number
+
+  constructor(intent: PlaybackIntent, at: number) {
+    this.intent = intent
+    this.at = at
+  }
+
+  /**
+   * The refused intent while it is still what the listener wants at `now`. The wall clock keeps
+   * counting while the machine sleeps: a refusal older than the limit, or one the clock puts in
+   * the future, starts nothing.
+   */
+  freshIntent(now: number): PlaybackIntent | null {
+    const age = now - this.at
+    return age >= 0 && age <= REFUSED_REQUEST_LIFETIME_MS ? this.intent : null
+  }
+}
 
 export const PLAYBACK_SESSION_KEY = ['session', 'current'] as const
 export const PLAYBACK_CONNECTION_KEY = ['session', 'connection'] as const
@@ -71,10 +105,29 @@ export class PlaybackSessionCoordinator {
   private registrationStartedAt: number | null = null
   private ready = false
   private registrationPending = false
+  /** Whether the socket now open carries an answered registration: the server reaches the page only through such a socket. */
+  private socketRegistered = false
+  private registrationRetry: ReturnType<typeof setTimeout> | undefined
+  private registrationDeadline: ReturnType<typeof setTimeout> | undefined
   private cleanup: (() => void)[] = []
   private interval: ReturnType<typeof setInterval> | undefined
   private recovery: Promise<void> = Promise.resolve()
-  private stopProof: StopProof | null = null
+  private closed: ClosedIncarnation | null = null
+  /** Whether the page has disconnected, and stopped its players, since its last answered registration. */
+  private returning = false
+  /** Every incarnation this page has been assigned. A snapshot that names any of them names this page. */
+  private readonly incarnations = new Set<string>()
+  /** Set from the moment a page that never disconnected sends its registration until the answer is bound. */
+  private rebinding = false
+  /** The last request this tab was refused for unconfirmed playback, when starting it again is what an override is for. */
+  private refused: RefusedRequest | null = null
+  private readonly closeReport = new PlaybackCloseReporter({
+    current: () => this.current(),
+    endpoint: () => this.endpoint,
+    snapshot: () => this.snapshot,
+    cursor: snapshot => this.cursor(snapshot),
+    checkpoint: (snapshot, position) => this.checkpointAt(snapshot, position),
+  })
 
   private readonly client: QueryClient
   private readonly transport: SharedLiveTransport
@@ -93,14 +146,18 @@ export class PlaybackSessionCoordinator {
       if (!this.current()) this.dispose()
     }))
     this.cleanup.push(this.transport.subscribe({
-      onOpen: () => { this.reconnect().catch(error => { this.registrationPending = false; this.fail(error) }) },
+      onOpen: () => { this.opened() },
       onClose: () => { this.disconnect() },
       onMessage: message => this.message(message),
       onError: error => this.fail(error),
     }))
     this.cleanup.push(this.transport.retain())
-    if (this.transport.isConnected()) this.reconnect().catch(error => { this.registrationPending = false; this.fail(error) })
+    this.cleanup.push(this.closeReport.start())
+    if (this.transport.isConnected()) this.register()
+    // Only an unloading page reports its close. A tab that is merely hidden keeps playing, and
+    // nothing tells the two apart but this event.
     const hide = () => {
+      this.closeReport.send()
       this.suspended = true
       this.disconnect()
       this.localRecovery?.dispose()
@@ -177,24 +234,43 @@ export class PlaybackSessionCoordinator {
     // The refusal describes the session, not a failed request: once the session has no unconfirmed
     // playback left, the alert would tell the viewer to recover a browser that holds nothing.
     const connection = this.client.getQueryData<PlaybackConnection>(PLAYBACK_CONNECTION_KEY)
-    if (connection?.error === UNCONFIRMED_PLAYBACK_REFUSAL && !hasUnconfirmedPlayback(snapshot)) this.publish(connection.connected, null)
-    this.runner.fence(snapshot.revision)
-    // A transfer that failed or expired sends its target nothing further. A target that is neither
-    // the runner nor named by a transfer any more holds a preparation nobody will start or stop.
-    const local = this.endpoint?.incarnationId
-    if (local && snapshot.activeIncarnationId !== local && snapshot.transfer?.targetIncarnationId !== local) {
-      this.runner.dropPreparation().catch(error => this.fail(error))
+    if (!hasUnconfirmedPlayback(snapshot)) {
+      // Whatever released the session, the refused request was an answer to a hold that is gone.
+      this.refused = null
+      if (connection?.error === UNCONFIRMED_PLAYBACK_REFUSAL) this.publish(connection.connected, null)
     }
+    this.runner.fence(snapshot.revision)
+    // While the page registers again as itself its place moves to a new incarnation without a new
+    // revision, so nothing is judged until the answer is bound; binding the answer judges it then.
+    if (this.endpoint && !this.rebinding) this.letGoUnlessNamed(snapshot)
     this.refreshRequests()
     this.refreshTransfers()
     return snapshot
+  }
+
+  /**
+   * A session that no longer names this tab sends it nothing further. A transfer that failed or
+   * expired leaves its target a preparation nobody will start or stop, and a session that was
+   * taken over elsewhere leaves a tab that still plays: the tab lets go of the one and silences
+   * the other.
+   */
+  private letGoUnlessNamed(snapshot: PlaybackSnapshotResource): void {
+    if (this.names(snapshot)) return
+    this.runner.dropPreparation().catch(error => this.fail(error))
+    this.runner.silenceLostPlayback().catch(error => this.fail(error))
+  }
+
+  /** Whether the session names this page: as its runner, or as a participant of its open transfer. */
+  private names(snapshot: PlaybackSnapshotResource): boolean {
+    return [snapshot.activeIncarnationId, snapshot.transfer?.sourceIncarnationId, snapshot.transfer?.targetIncarnationId]
+      .some(incarnation => incarnation != null && this.incarnations.has(incarnation))
   }
 
   private async withRequest<T>(operation: (signal: AbortSignal) => Promise<T>): Promise<T> {
     if (!this.current()) throw new Error('Playback account changed.')
     const request = new AbortController()
     this.httpRequests.add(request)
-    const timeout = setTimeout(() => request.abort(new Error('Playback request timed out; its result is unconfirmed.')), 15_000)
+    const timeout = setTimeout(() => request.abort(new Error('Playback request timed out; its result is unconfirmed.')), REQUEST_TIMEOUT_MS)
     let onAbort = () => {}
     const aborted = new Promise<never>((_, reject) => {
       onAbort = () => reject(request.signal.reason instanceof Error ? request.signal.reason : new Error('Playback request aborted.'))
@@ -224,17 +300,25 @@ export class PlaybackSessionCoordinator {
     if (!this.current() || typeof message !== 'object' || message === null || !('type' in message)) return
     if (message.type === 'session.error') {
       this.registrationPending = false
+      this.rebinding = false
       this.fail(new Error('message' in message && typeof message.message === 'string' ? message.message : 'Playback request failed.'))
+      this.registerAgainWhileBound()
       return
     }
     if (message.type !== 'session.snapshot' || !('data' in message)) return
     try {
       const snapshot = this.apply(message.data)
-      if (this.snapshot && snapshot.revision < this.snapshot.revision) return
+      // A registration answer binds the page whatever its revision: a control this page sent
+      // meanwhile may already have shown it a later one.
       if (snapshot.endpoint?.capability && this.transport.isConnected()) {
-        this.acceptEndpoint(snapshot).catch(error => { this.registrationPending = false; this.fail(error) })
+        this.acceptEndpoint(snapshot).catch(error => {
+          this.registrationPending = false
+          this.fail(error)
+          this.registerAgainWhileBound()
+        })
         return
       }
+      if (this.snapshot && snapshot.revision < this.snapshot.revision) return
       this.dispatchCommands(snapshot)
     } catch (error) { this.fail(error) }
   }
@@ -250,6 +334,12 @@ export class PlaybackSessionCoordinator {
     this.clientRequestId = null
     this.presenceConfirmedAt = null
     this.registrationStartedAt = null
+    this.clearRegistrationTimers()
+    this.socketRegistered = false
+    this.rebinding = false
+    this.refused = null
+    this.closeReport.discard()
+    const cursor = this.runner.observe()?.position
     const fenced = this.runner.fenceLocalExecution()
     this.localRecovery?.noteFence(fenced)
     this.abortRequests()
@@ -257,17 +347,76 @@ export class PlaybackSessionCoordinator {
     this.registrationPending = false
     this.connection++
     const endpoint = this.endpoint
+    const snapshot = this.snapshot
     this.endpoint = null
     this.publish(false, 'Playback connection lost. Remote playback may still be active.')
     const previous = this.recovery
-    const stopping = this.runner.disconnect()
-    const stopped = Promise.all([previous, stopping]).then(([, observation]) => {
-      const proof = endpoint && observation?.observedState === 'stopped' ? { endpoint, position: observation.position } : this.stopProof
-      this.stopProof = proof
-      return proof
-    }).catch(error => { this.fail(error); return null })
-    retirement = { owner: this.ownership, recovery: stopped }
-    this.recovery = stopped.then(() => {})
+    const stopping = this.runner.disconnect().catch(error => { this.fail(error); return null })
+    const closing = Promise.all([previous, stopping]).then(([, observation]) => {
+      if (endpoint && snapshot) {
+        const position = observation?.position ?? cursor ?? snapshot.position
+        this.closed = { endpoint, checkpoint: this.checkpointAt(snapshot, position) }
+      }
+      return this.closed
+    })
+    retirement = { owner: this.ownership, closing }
+    this.recovery = closing.then(() => {})
+  }
+
+  private clearRegistrationTimers(): void {
+    clearTimeout(this.registrationRetry)
+    clearTimeout(this.registrationDeadline)
+    this.registrationRetry = undefined
+    this.registrationDeadline = undefined
+  }
+
+  /** Whether any player of this page is audible, whoever started it. */
+  private playing(): boolean {
+    return getPlaybackAdapters().some(adapter => adapter.observe().observedState === 'playing')
+  }
+
+  private opened(): void {
+    if (!this.current()) return
+    // The socket this one replaced will never answer a registration that was sent on it.
+    this.registrationPending = false
+    this.socketRegistered = false
+    this.clearRegistrationTimers()
+    // An endpoint that is still bound means the socket was replaced without a close, and the page
+    // keeps playing. The server reaches a page only through a socket that carries its
+    // registration, so a page that stays without one for a command's lifetime cannot be
+    // commanded any more: it then stops as it does after a close.
+    if (this.endpoint) this.registrationDeadline = setTimeout(() => this.registrationOverdue(), COMMAND_LIFETIME_MS)
+    this.register()
+  }
+
+  private register(): void {
+    this.reconnect().catch(error => {
+      this.fail(error)
+      this.registerAgainWhileBound()
+    })
+  }
+
+  /**
+   * A page that plays through a replaced socket has nobody to press Retry for it: a registration
+   * that failed, was refused or stayed unanswered is sent again for as long as the socket is open.
+   */
+  private registerAgainWhileBound(delay = REGISTRATION_RETRY_MS): void {
+    const due = () => this.current() && this.endpoint !== null && !this.socketRegistered && !this.suspended && this.transport.isConnected()
+    if (!due()) return
+    clearTimeout(this.registrationRetry)
+    this.registrationRetry = setTimeout(() => {
+      this.registrationRetry = undefined
+      if (!due()) return
+      this.registrationPending = false
+      this.register()
+    }, delay)
+  }
+
+  private registrationOverdue(): void {
+    this.registrationDeadline = undefined
+    if (!this.current() || this.socketRegistered || !this.endpoint) return
+    this.disconnect()
+    if (this.transport.isConnected()) this.register()
   }
 
   private async reconnect(): Promise<void> {
@@ -275,58 +424,86 @@ export class PlaybackSessionCoordinator {
     this.registrationPending = true
     this.registrationStartedAt = Date.now()
     const connection = ++this.connection
+    try {
+      await this.sendRegistration(connection)
+    } catch (error) {
+      // A later attempt or a disconnect took over: this failure describes nothing that is current.
+      if (connection !== this.connection) return
+      this.registrationPending = false
+      throw error
+    }
+  }
+
+  private async sendRegistration(connection: number): Promise<void> {
     const current = () => this.current() && connection === this.connection && this.transport.isConnected()
+    // An endpoint that is still bound means the socket was replaced without a close. The page
+    // never stopped and still answers for its own players, so it fences nothing, recovers nothing
+    // of its own and registers again as the same page; the server then keeps its place.
+    const bound = this.endpoint !== null
     await this.recovery
-    if (retirement && this.ownership.principal !== null && retirement.owner.principal === this.ownership.principal) this.stopProof = await retirement.recovery
+    if (!bound && retirement && this.ownership.principal !== null && retirement.owner.principal === this.ownership.principal) this.closed = await retirement.closing
     if (!current()) return
+    const closed = bound ? null : this.closed
+    if (closed) this.returning = true
+    // A player that survived the stop still speaks for itself: reporting its incarnation closed,
+    // or recovering its record, would tell the server that a playing page had stopped.
+    const silent = closed === null || !this.playing()
+    if (closed) {
+      this.closed = null
+      retirement = null
+      if (silent) await this.reportClosed(closed)
+      if (!current()) return
+    }
     if (this.localRecovery) {
-      const initializing = this.localRecovery.initialize(record => this.recoverLocal(record))
-      this.publish(false, null)
+      const initializing = this.localRecovery.initialize(record => this.recoverLocal(record), bound || !silent ? 'keep' : 'recover')
+      this.publishRecovery(bound)
       await initializing
       if (!current()) return
-      this.publish(false, null)
+      this.publishRecovery(bound)
     }
     this.clientRequestId = this.localRecovery?.tabId ?? this.endpointId
     for (const waiter of this.identityWaiters) waiter.resolve(this.clientRequestId)
-    if (this.stopProof && this.localRecovery?.wasRecovered(this.stopProof.endpoint.incarnationId)) { this.stopProof = null; retirement = null }
-    const proof = this.stopProof
-    if (proof) {
-      const response = await this.withRequest(signal => AXIOS_INSTANCE.get('/api/session/snapshot', {
-        signal,
-        params: { incarnationId: proof.endpoint.incarnationId },
-        headers: { 'X-Baander-Playback-Endpoint': proof.endpoint.capability },
-      }))
-      if (!current()) return
-      const old = this.apply(response.data?.data ?? response.data)
-      await this.post('/api/session/observe', {
-        incarnationId: proof.endpoint.incarnationId, expectedRevision: old.revision,
-        observedState: 'stopped', position: proof.position,
-      }, proof.endpoint)
-      if (!current()) return
-      for (const command of old.commands) {
-        if (command.type !== 'stop' || command.incarnationId !== proof.endpoint.incarnationId) continue
-        await this.post('/api/session/ack', {
-          commandId: command.id, attemptId: command.attemptId, revision: command.revision,
-          incarnationId: command.incarnationId, epoch: command.epoch, outcome: 'stopped', position: proof.position,
-        }, proof.endpoint)
-        if (!current()) return
-      }
-      this.stopProof = null
-      retirement = null
-    }
     await this.withRequest(signal => AXIOS_INSTANCE.post('/api/devices', { deviceId: getDeviceId(), name: getDeviceName() }, { signal }))
     if (!current()) return
     const adapters = (['song', 'video'] as const).map(kind => getPlaybackAdapter(kind)).filter(adapter => adapter !== undefined)
     const capabilities: string[] = adapters.map(adapter => adapter.kind)
     if (adapters.length > 0 && adapters.every(adapter => adapter.supportsVolume)) capabilities.push('volume')
     this.localQualified = !!this.localRecovery?.isEligible() && adapters.length > 0 && adapters.every(adapter => adapter.localRecovery?.eligible)
+    this.rebinding = bound
     this.transport.send({ type: 'session.endpoint', deviceId: getDeviceId(), endpointId: this.localRecovery?.tabId ?? this.endpointId, name: getDeviceName(), capabilities,
+      pageId: playbackPageId,
       ...(this.localRecovery ? { tabId: this.localRecovery.tabId, localRecoveryEligible: this.localQualified } : {}),
     })
+    if (bound) this.registerAgainWhileBound(REQUEST_TIMEOUT_MS)
   }
 
-  private checkpoint(snapshot: Pick<PlaybackSnapshotResource, 'revision' | 'media' | 'currentTrackIndex' | 'position'>): PlaybackRecoveryCheckpoint {
-    return { revision: snapshot.revision, media: snapshot.media, currentTrackIndex: snapshot.currentTrackIndex, position: snapshot.position }
+  /** Shows the recovery progress without calling a page that never disconnected disconnected. */
+  private publishRecovery(bound: boolean): void {
+    if (!bound) this.publish(false, null)
+    else this.publish(this.ready, this.client.getQueryData<PlaybackConnection>(PLAYBACK_CONNECTION_KEY)?.error ?? null)
+  }
+
+  /**
+   * Tells the server that an incarnation of this page has gone and its players are silent, so the
+   * session is released from it at once. The registration that follows does not depend on the
+   * answer: a page that registers again keeps its place, and a runner that holds no player then
+   * reports itself stopped.
+   */
+  private async reportClosed(closed: ClosedIncarnation): Promise<void> {
+    try {
+      await this.post(CLOSE_REPORT_PATH, { incarnationId: closed.endpoint.incarnationId, checkpoint: closed.checkpoint }, closed.endpoint)
+    } catch (error) {
+      console.warn('[PlaybackSession] The close report for the previous registration was not accepted:', this.refusal(error, 'The request failed.').message)
+    }
+  }
+
+  /** Where this page's player stands, or the snapshot's cursor while it holds none. */
+  private cursor(snapshot: PlaybackSnapshotResource): number {
+    return this.runner.observe()?.position ?? snapshot.position
+  }
+
+  private checkpointAt(snapshot: Pick<PlaybackSnapshotResource, 'revision' | 'media' | 'currentTrackIndex'>, position: number): PlaybackRecoveryCheckpoint {
+    return { revision: snapshot.revision, media: snapshot.media, currentTrackIndex: snapshot.currentTrackIndex, position }
   }
 
   private async recoverLocal(record: PlaybackRecoveryRecord): Promise<void> {
@@ -340,20 +517,43 @@ export class PlaybackSessionCoordinator {
     const generation = this.connection
     const endpoint = snapshot.endpoint as RecoveryEndpoint
     if (!endpoint?.capability) return
-    if (this.localRecovery) await this.localRecovery.registered(endpoint, this.checkpoint(snapshot), this.localQualified)
+    if (this.localRecovery) await this.localRecovery.registered(endpoint, this.checkpointAt(snapshot, snapshot.position), this.localQualified)
     if (!this.current() || this.suspended || generation !== this.connection) return
+    // A page that registered again through a replaced socket was never fenced. Rearming its
+    // adapters would cancel what they are executing, so only a fenced page is rearmed.
+    const fenced = this.endpoint === null || this.executionBlocked
+    const returning = this.returning
+    this.returning = false
     this.registrationPending = false
+    this.clearRegistrationTimers()
+    this.socketRegistered = true
+    this.rebinding = false
+    if (this.endpoint?.incarnationId !== endpoint.incarnationId) this.refused = null
     this.endpoint = endpoint
+    this.incarnations.add(endpoint.incarnationId)
     this.runner.bind(endpoint)
+    // The answer is the first session this incarnation is shown. A page that kept playing through
+    // a replaced socket, and was taken over while it could not be reached, learns here that the
+    // server kept no place for it, as any other snapshot would tell it.
+    if (this.snapshot) this.letGoUnlessNamed(this.snapshot)
     this.executionBlocked = false
-    for (const adapter of getPlaybackAdapters()) adapter.localRecovery?.rearmAfterRegistration()
+    if (fenced) for (const adapter of getPlaybackAdapters()) adapter.localRecovery?.rearmAfterRegistration()
     this.ready = true
     this.presenceConfirmedAt = this.registrationStartedAt
     this.publish(true, null)
+    this.closeReport.prepare()
     this.refreshRequests(true)
     this.refreshTransfers(true)
     this.dispatchCommands(snapshot)
+    // A command for the new incarnation may have been relayed while the answer was being bound.
+    if (this.snapshot && this.snapshot !== snapshot) this.dispatchCommands(this.snapshot)
     for (const ready of this.registrationReady) ready()
+    // The session may still name this page as its runner although the page stopped its players
+    // when it disconnected: its close report was lost, and the registration kept its place. It
+    // says so at once instead of leaving the session to show playback that is not there.
+    if (returning && this.snapshot?.activeIncarnationId === endpoint.incarnationId && this.runner.observe() === null) {
+      this.observe().catch(error => this.fail(error))
+    }
   }
 
   private async ensureLocalEndpoint(): Promise<PlaybackEndpointResource> {
@@ -371,24 +571,36 @@ export class PlaybackSessionCoordinator {
     if (observedAvailable) return this.endpoint
 
     this.disconnect()
+    try {
+      await this.untilRegistered(this.reconnect())
+    } catch (error) {
+      // The registration was sent and stayed unanswered: a later retry may send another.
+      this.registrationPending = false
+      throw error
+    }
+    if (!this.current() || !this.ready || !this.endpoint || !available()) throw new Error('Local playback registration is unavailable. Retry the playback connection.')
+    return this.endpoint
+  }
+
+  /**
+   * Waits until a registration answer is bound, for at most the request timeout. A disconnect or
+   * an account change ends the wait, and so does the failure of `sending`, a registration the
+   * caller sends itself.
+   */
+  private async untilRegistered(sending?: Promise<void>): Promise<void> {
     let finish: (() => void) | undefined
-    const readiness = this.withRequest(() => new Promise<void>(resolve => {
+    const answered = this.withRequest(() => new Promise<void>(resolve => {
       finish = resolve
       this.registrationReady.add(resolve)
     }))
     try {
-      await Promise.all([this.reconnect(), readiness])
-    } catch (error) {
-      this.registrationPending = false
-      throw error
+      await Promise.all([sending, answered])
     } finally {
       if (finish) {
         this.registrationReady.delete(finish)
         finish()
       }
     }
-    if (!this.current() || !this.ready || !this.endpoint || !available()) throw new Error('Local playback registration is unavailable. Retry the playback connection.')
-    return this.endpoint
   }
 
   private async checkpointCommand(command: PlaybackCommandResource, signal: AbortSignal): Promise<void> {
@@ -420,6 +632,12 @@ export class PlaybackSessionCoordinator {
     if (this.ready && !this.executionBlocked) {
       this.refreshRequests(true)
       this.refreshTransfers(true)
+      // A page that kept playing through a replaced socket is ready and still has to register on it.
+      if (this.socketRegistered || this.registrationPending || !this.transport.isConnected()) return
+      clearTimeout(this.registrationRetry)
+      this.registrationRetry = undefined
+      try { await this.reconnect() }
+      catch (error) { this.fail(error); this.registerAgainWhileBound(); throw error }
       return
     }
     if (this.executionBlocked) this.disconnect()
@@ -428,13 +646,20 @@ export class PlaybackSessionCoordinator {
     try {
       if (this.transport.isConnected()) await this.reconnect()
       else this.transport.reconnect()
-    } catch (error) { this.registrationPending = false; this.fail(error); throw error }
+    } catch (error) { this.fail(error); throw error }
   }
 
   private async acknowledge(ack: PlaybackAcknowledgement): Promise<void> {
     const endpoint = this.endpoint
     if (!endpoint || !this.ready) return
-    await this.post('/api/session/ack', ack, endpoint)
+    try {
+      await this.post('/api/session/ack', ack, endpoint)
+    } catch (error) {
+      // The page registered again while this answer was on its way, so the answer named an
+      // incarnation that has been succeeded. The command comes again for the new one.
+      if (this.endpoint !== endpoint) return
+      throw error
+    }
     if (ack.outcome === 'rejected') this.fail(ack.rejectionReason
       ? new MediaCompatibilityError(ack.rejectionReason)
       : new Error('Playback could not start or apply the control. Try again on the destination; it may require a user gesture.'))
@@ -446,9 +671,13 @@ export class PlaybackSessionCoordinator {
     const endpoint = this.endpoint
     const snapshot = this.snapshot
     if (!this.current() || !this.ready || !endpoint || !snapshot) return
-    const observation = this.runner.observe() ?? { observedState: 'unknown' as const, position: snapshot.position }
+    // A runner that holds no player and hears none plays nothing: it disconnected, stopped, and
+    // was kept as the runner when it registered again. Saying so releases the session from it.
+    const held = this.runner.observe()
+    const silentRunner = held === null && snapshot.activeIncarnationId === endpoint.incarnationId && !this.playing()
+    const observation = held ?? { observedState: silentRunner ? 'stopped' as const : 'unknown' as const, position: snapshot.position }
     if (this.localQualified && this.localRecovery) {
-      try { await this.localRecovery.checkpoint(this.checkpoint({ ...snapshot, position: observation.position })) }
+      try { await this.localRecovery.checkpoint(this.checkpointAt(snapshot, observation.position)) }
       catch (error) {
         if (generation !== this.connection || !this.current()) return
         this.executionBlocked = true; this.localRecovery.noteFence(this.runner.fenceLocalExecution()); throw error
@@ -459,7 +688,11 @@ export class PlaybackSessionCoordinator {
     const startedAt = Date.now()
     try {
       await this.post('/api/session/observe', { incarnationId: endpoint.incarnationId, expectedRevision: snapshot.revision, ...observation }, endpoint)
-      if (generation === this.connection && endpoint === this.endpoint && this.ready && this.current()) this.presenceConfirmedAt = startedAt
+      if (generation === this.connection && endpoint === this.endpoint && this.ready && this.current()) {
+        this.presenceConfirmedAt = startedAt
+        // The proof inside a prepared close report ages; each presence report replaces it.
+        this.closeReport.prepare()
+      }
     } catch (error) {
       this.presenceConfirmedAt = null
       throw error
@@ -489,6 +722,14 @@ export class PlaybackSessionCoordinator {
 
   private async executeIntent(intent: PlaybackIntent): Promise<void> {
     performance.mark('baander:intent-execute', { detail: { action: intent.action, current: this.current(), ready: this.ready, snapshot: !!this.snapshot, endpoint: this.endpoint?.incarnationId ?? null, active: this.snapshot?.activeIncarnationId ?? null, pending: this.pendingRequests.size, transfer: !!this.snapshot?.transfer } })
+    // A page that has just loaded, or whose socket closed, has no endpoint to send under until its
+    // registration is answered. An intent issued meanwhile waits for that answer instead of
+    // failing, and is then sent under the endpoint the answer bound.
+    if (this.current() && !this.ready && this.registrationPending) {
+      await this.untilRegistered().catch(() => {
+        // The wait timed out, or the connection or account changed: the check below refuses the intent.
+      })
+    }
     if (!this.current() || !this.ready || !this.snapshot || !this.endpoint) throw new Error('Playback connection is unavailable.')
     try {
       if (intent.action === 'stop-local-video') {
@@ -518,6 +759,11 @@ export class PlaybackSessionCoordinator {
         await this.ensureLocalEndpoint()
       }
       if ((intent.action === 'load' || intent.action === 'play') && hasUnconfirmedPlayback(this.snapshot)) {
+        // Only a Play or a song selection that wanted to play is worth starting after an override:
+        // a queue restore wants paused, and a movie opens its view from its own Play button.
+        const wantsPlaying = intent.action === 'play'
+          || (intent.action === 'load' && intent.media.kind === 'song' && intent.desiredState === 'playing')
+        this.refused = wantsPlaying ? new RefusedRequest(intent, Date.now()) : null
         throw new Error(UNCONFIRMED_PLAYBACK_REFUSAL)
       }
       if (intent.action === 'queue' && 'operation' in intent) {
@@ -535,6 +781,8 @@ export class PlaybackSessionCoordinator {
       if ((intent.action === 'load' || intent.action === 'play') && !this.snapshot.activeIncarnationId && !this.snapshot.transfer) {
         await this.performTransfer(this.endpoint.incarnationId)
       }
+      // A request of this tab went through: an earlier refusal no longer says what the listener wants.
+      this.refused = null
       performance.mark('baander:intent-done', { detail: { action: intent.action, active: this.snapshot?.activeIncarnationId ?? null } })
     } catch (error) {
       performance.mark('baander:intent-error', { detail: { action: intent.action, message: error instanceof Error ? error.message : String(error) } })
@@ -693,6 +941,7 @@ export class PlaybackSessionCoordinator {
     const result = this.intentTail.then(async () => {
       if (local) {
         if (hasUnconfirmedPlayback(this.snapshot) && this.snapshot?.activeIncarnationId !== this.endpoint?.incarnationId) {
+          this.refused = null
           throw new Error(UNCONFIRMED_PLAYBACK_REFUSAL)
         }
         incarnationId = (await this.ensureLocalEndpoint()).incarnationId
@@ -754,6 +1003,41 @@ export class PlaybackSessionCoordinator {
     }
   }
 
+  /**
+   * Ends the hold of a destination that is no longer registered and never confirmed that it
+   * stopped, because the listener chose to play here anyway. The server decides whether that
+   * destination is really gone. The tab then starts what it was last refused, when that was a
+   * Play or a song selection and recent enough to still be what the listener wants.
+   */
+  override(): Promise<void> {
+    const result = this.intentTail.then(() => this.performOverride())
+    this.intentTail = result.catch(() => {})
+    return result
+  }
+
+  private async performOverride(): Promise<void> {
+    try {
+      // The server takes an override only from a tab whose own registration holds.
+      const endpoint = await this.ensureLocalEndpoint()
+      if (!this.snapshot) throw new Error('Playback connection is unavailable.')
+      const refused = this.refused
+      const payload: OverridePlaybackRequest = { requestId: crypto.randomUUID(), expectedRevision: this.snapshot.revision, incarnationId: endpoint.incarnationId }
+      let answer: ControlSnapshot
+      try { answer = await this.post(OVERRIDE_PATH, payload, endpoint) }
+      catch (error) { throw this.refusal(error, 'The override could not be confirmed.') }
+      if (answer.requestResult?.requestId !== payload.requestId || answer.requestResult.outcome !== 'overridden') {
+        throw new Error('The server did not confirm the override.')
+      }
+      this.refused = null
+      this.publish(this.ready, null)
+      // Without a fresh refusal, the override only takes over and starts nothing.
+      const intent = refused?.freshIntent(Date.now())
+      if (intent && !answer.activeIncarnationId && !answer.transfer) {
+        await this.executeIntent(intent)
+      }
+    } catch (error) { this.fail(error); throw error }
+  }
+
   async reconcile(): Promise<void> {
     if (!this.snapshot) return
     try { await this.post('/api/session/reconcile', { expectedRevision: this.snapshot.revision }) }
@@ -788,6 +1072,10 @@ export function getPlaybackClientRequestId(signal: AbortSignal): Promise<string>
 
 export function transferPlayback(incarnationId: string): Promise<void> {
   return activeCoordinator ? activeCoordinator.transfer(incarnationId) : Promise.reject(new Error('Playback connection is unavailable.'))
+}
+
+export function overridePlayback(): Promise<void> {
+  return activeCoordinator ? activeCoordinator.override() : Promise.reject(new Error('Playback connection is unavailable.'))
 }
 
 export function reconcilePlayback(): Promise<void> {

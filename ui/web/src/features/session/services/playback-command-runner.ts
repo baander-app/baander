@@ -60,7 +60,12 @@ export class PlaybackCommandRunner {
       this.pending.set(command.id, effect)
     }
     const ack = await effect
-    if (ack && this.endpoint === endpoint && this.revision === command.revision) await this.acknowledge(ack)
+    // A page that registers again keeps its unanswered commands: one comes again under the same
+    // identity for the next incarnation, and the effect it already had answers it. The answer
+    // names the delivery it answers, not the one that started the effect.
+    if (ack && this.endpoint === endpoint && this.revision === command.revision) {
+      await this.acknowledge({ ...ack, incarnationId: command.incarnationId, epoch: command.epoch })
+    }
   }
 
   private async execute(command: PlaybackCommandResource): Promise<PlaybackAcknowledgement | null> {
@@ -74,7 +79,7 @@ export class PlaybackCommandRunner {
       incarnationId: command.incarnationId, epoch: command.epoch, outcome: 'rejected',
     }
     try {
-      // A preparation being dropped still owns the player; the next command waits for it to let go.
+      // A player being let go is still owned; the next command waits for it.
       if (this.dropping) await this.dropping
       await this.beforeExecute(command, effect.signal)
       if (!current()) return null
@@ -140,19 +145,48 @@ export class PlaybackCommandRunner {
     const adapter = this.adapter
     const command = this.lastCommand
     if (!adapter || command?.type !== 'prepare') return this.dropping ?? Promise.resolve()
-    this.adapter = undefined
-    this.lastCommand = undefined
-    const dropped = (this.dropping ?? Promise.resolve()).then(async () => {
-      const signal = new AbortController().signal
+    return this.letGo(async signal => {
       let observation = await adapter.quiesce(signal)
       if (observation.observedState !== 'stopped') observation = await adapter.execute({ ...command, type: 'stop' }, signal)
-      if (!this.adapter) this.idleObservation = { ...observation, observedState: 'stopped' }
+      return { ...observation, observedState: 'stopped' }
     })
-    const settled = dropped.catch(() => {}).then(() => {
+  }
+
+  /**
+   * Silences media this runner still plays although the session no longer names this tab, and
+   * lets go of the player. The session did not ask, so nothing is acknowledged. Only playing
+   * media is touched: a paused or stopped player keeps its place, because the session may have
+   * released a paused tab that is still open, and a stop would close its video.
+   */
+  silenceLostPlayback(): Promise<void> {
+    const adapter = this.adapter
+    const command = this.lastCommand
+    if (!adapter || !command || command.type === 'prepare' || adapter.observe().observedState !== 'playing') {
+      return this.dropping ?? Promise.resolve()
+    }
+    return this.letGo(async signal => {
+      const observation = await adapter.quiesce(signal)
+      return observation.observedState === 'playing' ? adapter.execute({ ...command, type: 'stop' }, signal) : observation
+    })
+  }
+
+  /**
+   * Gives up the bound player and settles it in the background. Each such settlement runs after
+   * the one before it, and the next command waits for all of them, so a command never meets a
+   * player that is still being let go.
+   */
+  private letGo(settle: (signal: AbortSignal) => Promise<PlaybackObservation>): Promise<void> {
+    this.adapter = undefined
+    this.lastCommand = undefined
+    const released = (this.dropping ?? Promise.resolve()).then(async () => {
+      const observation = await settle(new AbortController().signal)
+      if (!this.adapter) this.idleObservation = observation
+    })
+    const settled = released.catch(() => {}).then(() => {
       if (this.dropping === settled) this.dropping = null
     })
     this.dropping = settled
-    return dropped
+    return released
   }
 
   fenceLocalExecution(): boolean {
@@ -200,8 +234,15 @@ export class PlaybackCommandRunner {
     if (!adapter) return idle ? { ...idle, observedState: 'stopped' } : null
     const signal = new AbortController().signal
     const observation = await adapter.quiesce(signal)
-    return observation.observedState !== 'stopped' && command
-      ? adapter.execute({ ...command, type: 'stop' }, signal)
-      : observation
+    if (observation.observedState === 'stopped' || !command) return observation
+    try {
+      return await adapter.execute({ ...command, type: 'stop' }, signal)
+    } catch (error) {
+      // An adapter the page has fenced refuses every command, the stop included. Its quiesce has
+      // silenced it by then, and the cursor it gave is the one to report. Only a player that
+      // still plays makes the refused stop a failure.
+      if (observation.observedState === 'playing') throw error
+      return observation
+    }
   }
 }

@@ -1,8 +1,10 @@
-/* Afterburner: switched off it leaves the stream untouched, switched on
- * it keeps every frame within the rate control's limits, raises the
- * segmental SNR at low bitrates and never lowers it, and its streams
- * decode in our decoder and in FFmpeg. */
+/* Afterburner: it measures a band's noise as the rate loop does, from the
+ * values the frame codes; switched off it leaves the stream untouched,
+ * switched on it keeps every frame within the rate control's limits,
+ * raises the segmental SNR at low bitrates and never lowers it, and its
+ * streams decode in our decoder and in FFmpeg. */
 #include "bitstream.h"
+#include "encoder.h"
 #include "test_util.h"
 
 /* Several tones with vibrato over a quiet noise floor, with a decaying
@@ -292,8 +294,79 @@ static void test_layouts_and_sbr() {
   }
 }
 
+/* After every frame, each coded band holds quantize_band's values at its
+ * scalefactor: the kernel's own index, min((int)(x34 scale + 0.4054),
+ * 8191), for every line.  So aac_enc_band_noise, through which the rate
+ * loop and the afterburner both measure a band, is the noise of the
+ * values the frame codes, summed in the kernel's order: line i of every
+ * window into accumulator i % 8, the accumulators combined as ((a0 + a4)
+ * + (a2 + a6)) + ((a1 + a5) + (a3 + a7)). */
+static void test_band_noise_of_coded_values() {
+  const int sr = 48000;
+  const std::vector<float> pcm = gen_music(sr * 2, sr, 2);
+  int bands = 0, wrong_index = 0, wrong_noise = 0;
+  for (int bitrate : {64000, 128000}) {
+    AacEncoderHandle enc = aac_encoder_create(sr, 2, bitrate, AAC_AOT_LC, AAC_RC_CBR);
+    CHECK(enc != nullptr, "create at %d bit/s", bitrate);
+    if (!enc) {
+      continue;
+    }
+    const AacEncoderState* s = static_cast<const AacEncoderState*>(enc);
+    std::vector<uint8_t> buf(8192);
+    for (size_t pos = 0; pos + 2 * 1024 <= pcm.size(); pos += 2 * 1024) {
+      CHECK(aac_encoder_encode(enc, pcm.data() + pos, 1024, buf.data(), (int)buf.size()) > 0,
+            "frame at %zu", pos);
+      for (int c = 0; c < 2; c++) {
+        const AacEncChannel* ch = &s->ch[c];
+        const AacIcsInfo* ics = &ch->ics;
+        const int* off = ics->swb_offset;
+        for (int g = 0, w0 = 0; g < ics->num_window_groups; w0 += ics->group_len[g++]) {
+          for (int b = 0; b < ics->num_swb; b++) {
+            const int idx = g * ics->num_swb + b;
+            const int sf = ch->sf[idx];
+            if (ch->cb[idx] < 1 || ch->cb[idx] > AAC_NUM_CODEBOOKS) {
+              continue;
+            }
+            const float scale = exp2f(-0.1875f * (float)(sf - 100));
+            const float gain = exp2f(0.25f * (float)(sf - 100));
+            float a[8] = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
+            int max_mag = 0, off_index = 0;
+            for (int w = w0; w < w0 + ics->group_len[g]; w++) {
+              for (int i = 0; i < off[b + 1] - off[b]; i++) {
+                const int line = w * 128 + off[b] + i;
+                const int q = abs(ch->quant[line]);
+                const float v = ch->x34[line] * scale + 0.4054f;
+                off_index += q != (int)std::min(v, 8191.0f);
+                const float d = fabsf(ch->coef[line]) - aac_pow43[q] * gain;
+                a[i % 8] += d * d;
+                max_mag = std::max(max_mag, q);
+              }
+            }
+            if (max_mag == 0) {
+              continue; /* a zero band inside a section carries its neighbour's scalefactor */
+            }
+            const float want = ((a[0] + a[4]) + (a[2] + a[6])) + ((a[1] + a[5]) + (a[3] + a[7]));
+            const float got = aac_enc_band_noise(s->dsp, ch, g, w0, b, sf);
+            wrong_index += off_index;
+            wrong_noise += memcmp(&want, &got, sizeof want) != 0;
+            bands++;
+          }
+        }
+      }
+    }
+    aac_encoder_destroy(enc);
+  }
+  printf("band noise: %d coded bands, %d lines off the kernel's index, %d noises differ\n", bands,
+         wrong_index, wrong_noise);
+  CHECK(bands > 1000, "%d coded bands checked", bands);
+  CHECK(wrong_index == 0, "%d coded lines differ from the kernel's index", wrong_index);
+  CHECK(wrong_noise == 0, "%d bands: the measured noise is not that of the coded values",
+        wrong_noise);
+}
+
 int main() {
   const std::string tmp = make_temp_dir();
+  test_band_noise_of_coded_values();
   test_default_on();
   test_switch_midstream();
   test_quality_and_budget(tmp);

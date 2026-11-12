@@ -146,21 +146,25 @@ set_tests_properties(test_flac_encoder_plain_libm PROPERTIES
     ENVIRONMENT "GLIBC_TUNABLES=glibc.cpu.hwcaps=-FMA,-AVX2,-AVX")
 
 # The transforms, the filterbanks and the encoder's quantization noise go
-# through the DSP dispatch table; the same suites run again with the table
-# capped at the scalar and the SSE2 kernels (BAAC_AAC_CPU), so that every
-# level this machine can run is exercised end to end, not only in the
-# kernel comparison of test_dsp (test_roundtrip drives the AAC-LC and
-# HE-AAC encoders, whose scalefactor search sums the noise).
+# through the DSP dispatch table.  test_dsp compares the kernels of every
+# level the machine has with the scalar ones, bit for bit; the default run
+# of every suite takes the highest level.  The suites below run again with
+# the table capped at the scalar and the SSE2 kernels (BAAC_AAC_CPU):
+# test_mdct, test_qmf and test_roundtrip check their accuracy bounds there,
+# and test_encoder_tuning compares the committed AAC-LC, HE-AAC and HE-AAC
+# v2 streams byte for byte at each level (where test_util.h compares
+# bytes), so an encoder that writes other bytes at a lower level fails.
 # The lossless mode has a kernel table of its own under the same cap, and
-# its suites run again the same way.
+# its suites run again the same way: the FLAC streams have to come out the
+# same at every level.
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64|i686|i386")
     set(BAAC_DISPATCH_LEVELS scalar sse2)
 else()
     set(BAAC_DISPATCH_LEVELS scalar)
 endif()
 foreach(level ${BAAC_DISPATCH_LEVELS})
-    foreach(test_name test_mdct test_qmf test_roundtrip test_flac_decoder test_flac_conformance
-            test_flac_encoder test_flac_interop)
+    foreach(test_name test_mdct test_qmf test_roundtrip test_encoder_tuning test_flac_decoder
+            test_flac_conformance test_flac_encoder test_flac_interop)
         add_test(NAME ${test_name}_${level} COMMAND ${test_name})
         set_tests_properties(${test_name}_${level} PROPERTIES ENVIRONMENT "BAAC_AAC_CPU=${level}")
     endforeach()

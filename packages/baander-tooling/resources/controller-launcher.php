@@ -35,26 +35,33 @@ declare(strict_types=1);
         }
         return $stream;
     };
-    $publication = $lock($root . '/publication.lock', LOCK_EX);
+    // Report a refused selection on stderr directly: where PHP prints an uncaught
+    // exception depends on the host's ini, and without one it goes to stdout.
     try {
-        $assertPath($root . '/selected.json');
-        $selector = json_decode((string) file_get_contents($root . '/selected.json'), true, flags: JSON_THROW_ON_ERROR);
-        $id = $selector['generation'] ?? null;
-        if (!is_string($id) || preg_match('/\A[a-f0-9]{32}\z/D', $id) !== 1) {
-            throw new RuntimeException('Invalid controller generation selector.');
+        $publication = $lock($root . '/publication.lock', LOCK_EX);
+        try {
+            $assertPath($root . '/selected.json');
+            $selector = json_decode((string) file_get_contents($root . '/selected.json'), true, flags: JSON_THROW_ON_ERROR);
+            $id = $selector['generation'] ?? null;
+            if (!is_string($id) || preg_match('/\A[a-f0-9]{32}\z/D', $id) !== 1) {
+                throw new RuntimeException('Invalid controller generation selector.');
+            }
+            $entrypoint = $root . '/generations/' . $id . '/scripts/dev-environment.php';
+            $assertPath($entrypoint);
+            if (!is_file($entrypoint)) {
+                throw new RuntimeException('Selected controller generation is incomplete.');
+            }
+            $lease = $lock($root . '/leases/' . $id . '.lock', LOCK_SH);
+            // Global resources survive shutdown callbacks and object destructors; PHP
+            // closes the stream during final resource cleanup when the invocation ends.
+            $GLOBALS['baanderControllerGenerationLease'] = $lease;
+            $GLOBALS['baanderControllerGeneration'] = ['root' => $root, 'id' => $id];
+        } finally {
+            fclose($publication);
         }
-        $entrypoint = $root . '/generations/' . $id . '/scripts/dev-environment.php';
-        $assertPath($entrypoint);
-        if (!is_file($entrypoint)) {
-            throw new RuntimeException('Selected controller generation is incomplete.');
-        }
-        $lease = $lock($root . '/leases/' . $id . '.lock', LOCK_SH);
-        // Global resources survive shutdown callbacks and object destructors; PHP
-        // closes the stream during final resource cleanup when the invocation ends.
-        $GLOBALS['baanderControllerGenerationLease'] = $lease;
-        $GLOBALS['baanderControllerGeneration'] = ['root' => $root, 'id' => $id];
-    } finally {
-        fclose($publication);
+    } catch (RuntimeException|JsonException $error) {
+        fwrite(STDERR, $error->getMessage() . "\n");
+        exit(1);
     }
     global $argv, $argc;
     require $entrypoint;

@@ -163,10 +163,13 @@ final class ConfirmedPausedRunnerPersistenceTest extends TestCase
             } else {
                 $connection->executeStatement(<<<'SQL'
                     INSERT INTO playback_commands(id,session_id,user_id,attempt_id,request_id,request_digest,incarnation_id,epoch,revision,type,payload,outcome,acknowledged_at,expires_at,created_at)
-                    SELECT :id,session_id,user_id,:attempt,:request,request_digest,incarnation_id,epoch,:revision,'volume',payload,
+                    SELECT :id,session_id,user_id,:attempt,:request,request_digest,incarnation_id,epoch,:revision,:type,payload,
                         :outcome,CASE WHEN :pending=1 THEN NULL ELSE acknowledged_at END,expires_at,created_at-INTERVAL '1 second'
                     FROM playback_commands WHERE id=:proof
                     SQL, ['id' => new Uuid()->toString(), 'attempt' => new Uuid()->toString(), 'request' => new Uuid()->toString(),
+                        // A seek can move playback, so an answered one stands against the pause. A volume
+                        // change does not, and holds the release only while it is unanswered.
+                        'type' => $case === 'older pending' ? 'volume' : 'seek',
                         'revision' => match ($case) { 'later' => 3, 'same revision' => 2, default => 1 },
                         'outcome' => $case === 'older pending' ? null : 'applied', 'pending' => $case === 'older pending' ? 1 : 0,
                         'proof' => $fixture['command']]);
@@ -208,6 +211,52 @@ final class ConfirmedPausedRunnerPersistenceTest extends TestCase
                     FROM playback_commands WHERE id=:proof
                     SQL, ['id' => new Uuid()->toString(), 'attempt' => new Uuid()->toString(), 'request' => new Uuid()->toString(),
                     'revision' => $commandRevision, 'outcome' => $outcome, 'settled' => $settledRevision, 'proof' => $fixture['command']]);
+            }
+            $connection->executeStatement('UPDATE listening_sessions SET revision=:revision WHERE id=:session', ['revision' => $revision, 'session' => $fixture['session']]);
+
+            $result = PlaybackPersistenceFixture::coordinator($this->manager)->execute($fixture['owner'], PlaybackOperation::Snapshot, []);
+
+            self::assertSame($released ? null : $fixture['incarnation'], $result['activeIncarnationId'], $case);
+            self::assertSame($released ? $revision + 1 : $revision, $result['revision'], $case);
+            self::assertSame($released, $this->observer->fetchOne('SELECT retired_at FROM playback_destination_incarnations WHERE id=?', [$fixture['incarnation']]) !== null, $case);
+            self::assertSame(31.25, $result['position'], $case);
+        }
+    }
+
+    public function testQueueEditsAndVolumeChangesAreNoLaterCommandsWhereTheSessionStandsOneRevisionPastTheLastOfThem(): void
+    {
+        $connection = $this->manager->getConnection();
+        // The fixture's pause is acknowledged at revision 2 and leaves the session at revision 3. A
+        // control advances the session once and carries that revision, and its answer or its expiry
+        // advances it once more. Each later command is its type, its own revision, its outcome and,
+        // for one settled as never effective, the session revision that settlement left.
+        /** @var array<string,array{commands:list<array{string,int,string,int|null}>,revision:int,released:bool}> $cases */
+        $cases = [
+            'an applied volume change' => ['commands' => [['volume', 4, 'applied', null]], 'revision' => 5, 'released' => true],
+            'an applied queue edit' => ['commands' => [['queue', 4, 'applied', null]], 'revision' => 5, 'released' => true],
+            'a rejected queue edit' => ['commands' => [['queue', 4, 'rejected', null]], 'revision' => 5, 'released' => true],
+            'a volume change that expired after the runner was shown it' => ['commands' => [['volume', 4, 'superseded', null]], 'revision' => 5, 'released' => true],
+            'two volume changes' => ['commands' => [['volume', 4, 'applied', null], ['volume', 6, 'applied', null]], 'revision' => 7, 'released' => true],
+            'a settled play, then a queue edit' => ['commands' => [['play', 4, 'never_effective', 5], ['queue', 6, 'applied', null]], 'revision' => 7, 'released' => true],
+            'a queue edit, then a settled play' => ['commands' => [['queue', 4, 'applied', null], ['play', 6, 'never_effective', 7]], 'revision' => 7, 'released' => true],
+            'a shown volume change a stop replaced, the stop settled' => ['commands' => [['volume', 4, 'superseded', null], ['stop', 5, 'never_effective', 6]], 'revision' => 6, 'released' => true],
+            'a volume change with the session one revision further' => ['commands' => [['volume', 4, 'applied', null]], 'revision' => 6, 'released' => false],
+            'a volume change with the session where the change was issued' => ['commands' => [['volume', 4, 'applied', null]], 'revision' => 4, 'released' => false],
+            'a queue edit after the last settlement, with the session at that settlement' => ['commands' => [['play', 4, 'never_effective', 5], ['queue', 6, 'applied', null]], 'revision' => 5, 'released' => false],
+            'an applied seek' => ['commands' => [['seek', 4, 'applied', null]], 'revision' => 5, 'released' => false],
+            'an applied load' => ['commands' => [['load', 4, 'applied', null]], 'revision' => 5, 'released' => false],
+            'a shown play between two volume changes' => ['commands' => [['volume', 4, 'applied', null], ['play', 6, 'superseded', null], ['volume', 8, 'applied', null]], 'revision' => 9, 'released' => false],
+        ];
+        foreach ($cases as $case => ['commands' => $commands, 'revision' => $revision, 'released' => $released]) {
+            $fixture = $this->pausedBrowser();
+            foreach ($commands as $at => [$type, $commandRevision, $outcome, $settledRevision]) {
+                $connection->executeStatement(<<<'SQL'
+                    INSERT INTO playback_commands(id,session_id,user_id,attempt_id,request_id,request_digest,incarnation_id,epoch,revision,type,payload,outcome,settled_revision,disclosed_at,acknowledged_at,expires_at,created_at)
+                    SELECT :id,session_id,user_id,:attempt,:request,request_digest,incarnation_id,epoch,:revision,:type,payload,
+                        :outcome,:settled,CASE WHEN :outcome<>'never_effective' THEN acknowledged_at END,acknowledged_at,expires_at,created_at+make_interval(secs => :age)
+                    FROM playback_commands WHERE id=:proof
+                    SQL, ['id' => new Uuid()->toString(), 'attempt' => new Uuid()->toString(), 'request' => new Uuid()->toString(),
+                    'revision' => $commandRevision, 'type' => $type, 'outcome' => $outcome, 'settled' => $settledRevision, 'age' => $at + 1, 'proof' => $fixture['command']]);
             }
             $connection->executeStatement('UPDATE listening_sessions SET revision=:revision WHERE id=:session', ['revision' => $revision, 'session' => $fixture['session']]);
 

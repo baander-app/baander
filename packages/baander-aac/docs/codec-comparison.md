@@ -55,7 +55,7 @@ the generated tables are in `bench/results/` (`quality.csv`,
 
 | Item | Version or setting |
 |------|--------------------|
-| Ours | `baac` from this branch, Release build, GCC 13.3 |
+| Ours | `baac` from this branch, Release build, GCC 13.3; in both runs the build still compiled with the fast-math rewrites `-fassociative-math -freciprocal-math -fno-signed-zeros -ffinite-math-only`, which Release builds have since dropped ([README](README.md#native)) |
 | FFmpeg | 6.1.1 (Ubuntu 24.04): native `aac` encoder (two-loop coder) and decoder, ALAC encoder and decoder |
 | FDK AAC | AOSP mirror `mstorsjo/fdk-aac` c41c3c7 (2026-10-12), C++ tree: `aac-enc` (afterburner on, its default), `aac-dec`, `xhe-aac-enc` |
 | libxaac | `ittiam-systems/libxaac` v0.1.14 (2fbadd5): `xaacenc`, `xaacdec` |
@@ -337,6 +337,9 @@ system).
 These figures are from the second run, on 2026-10-31. The machine ran
 about 20 % slower than in the first run: FDK's unchanged encoder went
 from 101× to 83×. Compare within the table, not with the first run.
+Our figures were measured with the Release build of that date, which
+compiled with the fast-math rewrites listed under
+[What was measured](#what-was-measured).
 
 The decodes are of FDK's streams, or libxaac's where FDK has none. The
 FFmpeg figures include its demuxer and WAV muxer.
