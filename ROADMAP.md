@@ -236,6 +236,50 @@ that limitation is recorded for follow-up, with no runtime change in the 2026-10
 
 ## Resume here
 
+### State at the end of the session of 2026-11-12
+
+`master` is `98498798b` on GitHub and Forgejo. Landed on 2026-11-12: the session
+runner release, bAAC exact arithmetic, the CI repairs, the Firefox gate and admission
+release fixes, the bAAC lossless mode (with its failed held-out size gate disclosed,
+lossless plan KD12), the desktop lockfile hash with its tracked symlink, the `/baac`
+lead line and three test-fixture ready-file races.
+
+- **Master CI.** On `98498798b` Frontend CI, the website and the addon workflow passed.
+  The `CI` run was still queued when the session ended. The run before it, on
+  `28866bf56`, failed only in `registry-thread-quality`, on the fault-network race
+  that `98498798b` fixes. Check the `CI` result first. A green run is the first since
+  2026-11-05; then write the CI-repair learning with `ce-compound`, which the user
+  confirmed.
+- **Capability and size, in flight.** Worktree `/home/martin/dev/baander-capability`,
+  branch `feat/capability-and-size-deployment-settings`: `master` is merged with every
+  conflict resolved, but the merge is not committed (`MERGE_HEAD` is in place). Its
+  checks were running when the session ended. User decision, 2026-11-12: land it with
+  no host size qualified, and run the 4 GB remux qualification in the VM (its plan's
+  U9) afterwards. Next: rerun the backend, tooling, PHPStan, Deptrac and format
+  checks, commit the merge, push `master`.
+- **Rename to Bånder Audio Core (`bac`), in flight.** Worktree
+  `/home/martin/dev/baander-rename-audio-core`, branch `rename-audio-core`, plan
+  [refactor-rename-baac-to-bac](docs/plans/2026-11-12-1934-refactor-rename-baac-to-bac-plan.md)
+  (on that branch). U1 is committed (`5f3fbab34`); U2, the move of the package
+  directory, was in progress and is uncommitted. User decisions of 2026-11-12: full
+  rename with no aliases, `/baac/` redirects to `/bac/`, the landing may open a draft
+  pull request, FFmpeg's long name and the FLAC vendor string use "Baander Audio
+  Core", and `make dev-up` for the persistent instance is authorized at the landing.
+  The `aac-native-v0.2.0` tag is held. Work one unit at a time, committing each. A
+  lockfile refresh must copy the package with its tracked `compile_commands.json`
+  symlink.
+- **Keep** `packages/baander-aac/bench/work/` in the worktree
+  `/home/martin/dev/baander-baac-lossless` (3.9 GB). It holds the held-out ledger
+  `heldout/runs.json`, whose third set had its first run on 2026-11-12. The rename's
+  landing moves it and rewrites its keys once.
+- **Next plans.** Better compression of material like the failed held-out recording
+  (lossless plan KD12) follows the rename; its fourth held-out set must not be read
+  before the rename lands.
+- **Cleanup once `master` is green.** The merged branch `fix-two-command-firefox`
+  (worktree `/home/martin/dev/baander-ci-repair`), the review checkout
+  `/home/martin/dev/baander-baac-review` and the merged branch `baac-lossless`, but not
+  that worktree's `bench/work`.
+
 Continue the Back-to-next-movie investigation through a newly reviewed, bounded
 scope. Capture the browser failure and the next movie's actual startup outcome,
 including its mounted/retry state, then complete authenticated cancellation and
