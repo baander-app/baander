@@ -918,6 +918,15 @@ Fixed during the gates:
   now asserts the close report's cursor, which is more recent than the recovery
   checkpoint.
 
+Checkpoint, 2026-11-12, at `956ddaa3c` (the merge with master's AAC and CI work;
+one later commit makes a player test independent of host load): the two-command gate
+passes all phases in Firefox 157 and Chromium 156 with client controls, including the
+new reload while a shown play is held unanswered; the movie-endpoint step passes; the
+`playback-destinations` browser specs pass 14 of 14 in Chromium; the complete web
+suite passes 3,480 tests; at `6db645330` the whole unit directory passed 8,593 tests,
+fourteen PostgreSQL integration files 246 tests, and PHPStan, Deptrac, the container
+lint and the OpenAPI check were clean. The statement ceilings stay 6, 9, 10 and 21.
+
 Open, known limits:
 
 - **Stale close-report proof:** the prepared proof is renewed with each presence
