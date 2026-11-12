@@ -56,6 +56,13 @@ HERE = Path(__file__).resolve().parent
 WORK = Path(os.environ.get("BENCH_WORK", HERE / "work"))
 RESULTS = Path(os.environ.get("BENCH_RESULTS", HERE / "results"))
 
+# Every tool the harness starts runs in the C locale: flac reads the times
+# given to --skip and --until with the locale's decimal separator, and
+# refuses 5:00.00 where that separator is a comma.  The harness sets the
+# locale in its own environment before it starts any tool, so every child
+# inherits it and no timed command needs a wrapper.
+os.environ["LC_ALL"] = "C"
+
 TOOLS = {
     "baac": os.environ.get("BAAC", str(HERE.parent / "cmake-build" / "baac")),
     "ffmpeg": os.environ.get("FFMPEG", "ffmpeg"),
@@ -1820,6 +1827,11 @@ def stage_selftest(args):
     altered[1000] ^= 1
     expect(same_bytes(pcm, bytes(pcm)) and not same_bytes(pcm, bytes(altered)),
            "a decode altered by one sample is not bit-exact")
+
+    # The locale every tool inherits.
+    child = subprocess.run([sys.executable, "-c", "import os; print(os.environ.get('LC_ALL'))"],
+                           stdout=subprocess.PIPE).stdout.decode().strip()
+    expect(child == "C", "a tool the harness starts runs in the C locale")
 
     # The carried refalac row.
     measured = [dict(codec="alac-ffmpeg", kbps=697.0, seconds=130.3, bit_exact=True)]

@@ -134,6 +134,10 @@ references and judges the gates of the lossless mode; the comment above
   was limited (`--only`, `--gates-only`, `--reps`) or made while the
   load was above `--quiet-load` (2.0) is recorded as such and is not a
   gate result: `check` exits non-zero for it.
+- **Locale.** The harness sets `LC_ALL=C` for every tool it starts:
+  `flac` reads the times given to `--skip` and `--until` with the
+  locale's decimal separator, and refuses `5:00.00` where that separator
+  is a comma.
 
 ## Held-out recordings
 
