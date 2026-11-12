@@ -150,8 +150,9 @@ int encode_stream(const EncodeArgs& args, File* in, File* out, bool* created) {
   uint64_t data_bytes = kUnknownLength;
   if (args.raw) {
     layout = raw_layout(args.raw_rate, args.raw_channels, args.raw_bits);
-    /* A file says how long it is; a pipe does not. */
-    if (in->owned && fseek(in->f, 0, SEEK_END) == 0) {
+    /* A regular file says how long it is; a pipe does not, and a
+     * directory on ext4 seeks to an end offset that is no length. */
+    if (in->owned && is_regular_file(args.in) && fseek(in->f, 0, SEEK_END) == 0) {
       const long size = ftell(in->f);
       if (size >= 0 && fseek(in->f, 0, SEEK_SET) == 0) {
         data_bytes = (uint64_t)size;
@@ -216,7 +217,9 @@ int encode_stream(const EncodeArgs& args, File* in, File* out, bool* created) {
   }
   *created = true;
   const bool rewrite = can_rewrite(*out);
-  if (rewrite && data_bytes != kUnknownLength) {
+  /* STREAMINFO counts samples in 36 bits; a longer input is coded without
+   * the count, as from a pipe. */
+  if (rewrite && data_bytes != kUnknownLength && (data_bytes / frame_bytes) >> 36 == 0) {
     options.total_samples_hint = data_bytes / frame_bytes;
     options.seek_table = 1;
   }

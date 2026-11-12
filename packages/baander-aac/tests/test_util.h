@@ -14,6 +14,7 @@
 
 #if !defined(_WIN32)
 #include <sys/wait.h>
+#include <unistd.h> /* mkdtemp: Apple's C library declares it here only */
 #endif
 
 #include "aac.h"
