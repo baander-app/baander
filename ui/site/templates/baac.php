@@ -20,7 +20,7 @@ $speed = static fn (?float $value): string => $value === null ? 'Not measured' :
   <section class="baac-intro" aria-labelledby="baac-title">
     <p class="eyebrow">The codec library</p>
     <h1 id="baac-title">bAAC</h1>
-    <p class="baac-lead">AAC and lossless FLAC encoding and decoding for Bånder.</p>
+    <p class="baac-lead">AAC and lossless FLAC for Bånder.</p>
     <p>bAAC is a C++17 codec library with a C API, a command-line tool, a Node/Electron binding and an FFmpeg codec that Bånder's server transcoder uses by default. Its lossless mode writes and reads standard FLAC through the C API, the command-line tool and the binding. Explore what it implements and how its recorded measurements compare with other AAC, FLAC and ALAC encoders.</p>
     <div class="actions">
       <a class="button" href="<?= $source('docs/README.md') ?>">Read the source guide <span class="arrow" aria-hidden="true">↗</span></a>
