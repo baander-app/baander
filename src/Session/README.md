@@ -126,8 +126,12 @@ command ledger.
 
 1. A browser registers its device, then registers an endpoint for its tab and
    connection, naming its page. The returned capability stays in tab memory.
-   Reconnecting creates a fresh incarnation, and the old capability stays valid
-   for the old one. A page whose socket closed stops its players at the close.
+   A web page sends no control until it holds an answered registration. A
+   control issued while its registration is in flight waits for the answer, for at
+   most 15 seconds; one issued while the socket is closed and no registration is in
+   flight is refused at once. Reconnecting creates a fresh incarnation, and the old
+   capability stays valid for the old one. A page whose socket closed stops its
+   players at the close.
    Unless one of them still plays, it then sends a
    [close report](#close-report) for its earlier incarnation with the old
    capability before it registers again. A page whose socket was replaced without

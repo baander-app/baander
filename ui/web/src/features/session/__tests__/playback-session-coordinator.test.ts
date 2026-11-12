@@ -5,6 +5,7 @@ import type { LiveTransportListener, SharedLiveTransport } from '@/shared/live/t
 import { advanceAuthorization, synchronizeOwnership } from '@/shared/live/ownership'
 import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
 import { PlaybackLocalRecovery } from '../services/playback-local-recovery'
+import type { PlaybackRecoveryRecord } from '../services/playback-recovery-store'
 import { registerPlaybackAdapter, requestPlayback, type PlaybackObservation } from '../services/playback-execution'
 import { PlaybackSessionCoordinator, getPlaybackClientRequestId, overridePlayback, registerPlaybackCoordinator, transferPlayback, PLAYBACK_CONNECTION_KEY, PLAYBACK_SESSION_KEY } from '../services/playback-session-coordinator'
 
@@ -1021,6 +1022,152 @@ describe('browser playback coordination', () => {
     expect(h.transport.send).not.toHaveBeenCalled()
     await h.runtime.retry()
     expect(h.transport.send).toHaveBeenCalledWith(expect.objectContaining({ type: 'session.endpoint' }))
+  })
+
+  describe('an intent issued while the tab registers', () => {
+    const earlierTab: PlaybackRecoveryRecord = { server: 'https://baander.app/', account: 'listener', tabId: 'earlier-tab',
+      incarnationId: 'earlier-incarnation', recoveryCredential: 'recovery-secret', recoveryExpiresAt: '2099-01-01T00:00:00Z', eligible: true,
+      checkpoint: { revision: 1, media: song, currentTrackIndex: 0, position: 0 } }
+    const selection = { action: 'load' as const, media: song, position: 0, desiredState: 'playing' as const }
+    const controls = () => posts('/api/session/control').map(([, body]) => body as Record<string, unknown>)
+
+    /**
+     * A page that has just loaded and registers: it recovers an earlier tab of the browser,
+     * registers its device and then its endpoint. The server holds the request to `held` until
+     * the test releases it, and answers the registration only when the test says so. Without a
+     * runner in the session, a song played there starts in this tab; an override leaves the
+     * session paused without a runner.
+     */
+    function loadingPage(held: string | null, initial: Partial<PlaybackSnapshotResource> = {}) {
+      const recovery = new PlaybackLocalRecovery('https://baander.app', 'listener')
+      const spies = [
+        vi.spyOn(recovery, 'initialize').mockImplementation(recover => recover(earlierTab)),
+        vi.spyOn(recovery, 'isEligible').mockReturnValue(false),
+        vi.spyOn(recovery, 'registered').mockResolvedValue(),
+      ]
+      cleanup.push(() => spies.forEach(spy => spy.mockRestore()))
+      let state = snapshot({ media: song, queue: ['song'], desiredState: 'paused', observedState: 'paused', ...initial })
+      const gate = { release: () => {} }
+      vi.mocked(AXIOS_INSTANCE.post).mockImplementation(async (path, body) => {
+        const request = body as Record<string, unknown>
+        if (path === held) await new Promise<void>(resolve => { gate.release = resolve })
+        if (path === '/api/session/recover-local') {
+          return { data: { data: { ...state, recoveryResult: { incarnationId: earlierTab.incarnationId, outcome: 'recovered', revision: state.revision } } } }
+        }
+        if (path === '/api/session/control') {
+          state = { ...state, revision: state.revision + 1 }
+          return { data: { data: { ...state, requestResult: { requestId: request.requestId, commandId: 'control', outcome: 'retained', rejectionReason: null } } } }
+        }
+        if (path === '/api/session/transfer') {
+          state = { ...state, revision: state.revision + 1, activeIncarnationId: endpoint.incarnationId, activeDestinationId: endpoint.destinationId }
+          return { data: { data: { ...state, transferResult: { requestId: request.requestId, attemptId: 'attempt', state: 'committed', rejectionReason: null } } } }
+        }
+        if (path === '/api/session/override') {
+          state = { ...state, revision: state.revision + 1, activeIncarnationId: null, activeDestinationId: null }
+          return { data: { data: { ...state, requestResult: { requestId: request.requestId, commandId: 'override', outcome: 'overridden', rejectionReason: null } } } }
+        }
+        return { data: { data: state } }
+      })
+      const h = harness(recovery)
+      cleanup.push(h.stop, registerPlaybackCoordinator(h.runtime))
+      return { ...h, gate, answer: () => h.receive({ ...state, endpoint }) }
+    }
+
+    it.each([
+      { step: 'the recovery of an earlier tab', held: '/api/session/recover-local' },
+      { step: 'the device registration', held: '/api/devices' },
+      { step: 'the endpoint registration', held: null },
+    ])('plays a song selected during $step once the registration is answered, and sends it once', async ({ held }) => {
+      const h = loadingPage(held)
+      if (held) await vi.waitFor(() => expect(posts(held)).toHaveLength(1))
+      else await vi.waitFor(() => expect(h.transport.send).toHaveBeenCalledOnce())
+
+      const selected = requestPlayback(selection).then(() => null, error => error as Error)
+      await settled()
+      h.gate.release()
+      await vi.waitFor(() => expect(h.transport.send).toHaveBeenCalledOnce())
+      await settled()
+      expect(controls()).toEqual([])
+
+      h.answer()
+
+      expect(await selected).toBeNull()
+      expect(controls()).toEqual([expect.objectContaining({ action: 'load', media: song, desiredState: 'playing', incarnationId: endpoint.incarnationId })])
+      expect(posts('/api/session/transfer')[0][1]).toMatchObject({ targetIncarnationId: endpoint.incarnationId })
+      expect(h.client.getQueryData(PLAYBACK_CONNECTION_KEY)).toMatchObject({ connected: true, error: null })
+      h.receive({ ...h.client.getQueryData<PlaybackSnapshotResource>(PLAYBACK_SESSION_KEY)!, revision: 10 })
+      await settled()
+      expect(controls()).toHaveLength(1)
+      expect(posts('/api/session/transfer')).toHaveLength(1)
+    })
+
+    it('refuses an intent at once while the socket is closed and nothing registers', async () => {
+      const h = loadingPage(null)
+      await vi.waitFor(() => expect(h.transport.send).toHaveBeenCalledOnce())
+      h.answer()
+      await vi.waitFor(() => expect(h.client.getQueryData(PLAYBACK_CONNECTION_KEY)).toHaveProperty('connected', true))
+      h.close()
+
+      let refused: Error | undefined
+      requestPlayback(selection).catch((error: Error) => { refused = error })
+      await settled()
+
+      expect(refused?.message).toBe('Playback connection is unavailable.')
+      expect(controls()).toEqual([])
+    })
+
+    it('refuses an intent that waits for the registration at once when the socket closes', async () => {
+      const h = loadingPage(null)
+      await vi.waitFor(() => expect(h.transport.send).toHaveBeenCalledOnce())
+      let refused: Error | undefined
+      requestPlayback(selection).catch((error: Error) => { refused = error })
+      await settled()
+      expect(refused).toBeUndefined()
+
+      h.close()
+      await settled()
+
+      expect(refused?.message).toBe('Playback connection is unavailable.')
+      expect(controls()).toEqual([])
+    })
+
+    it('refuses an intent with the connection message once its registration stays unanswered for the request timeout', async () => {
+      vi.useFakeTimers()
+      const h = loadingPage(null)
+      await vi.waitFor(() => expect(h.transport.send).toHaveBeenCalledOnce())
+
+      let refused: Error | undefined
+      requestPlayback({ action: 'play' }).catch((error: Error) => { refused = error })
+      await vi.advanceTimersByTimeAsync(14_999)
+      expect(refused).toBeUndefined()
+      await vi.advanceTimersByTimeAsync(1)
+
+      expect(refused?.message).toBe('Playback connection is unavailable.')
+      // An answer that arrives later starts nothing the listener was already told failed.
+      h.answer()
+      await vi.advanceTimersByTimeAsync(0)
+      expect(h.client.getQueryData(PLAYBACK_CONNECTION_KEY)).toHaveProperty('connected', true)
+      expect(controls()).toEqual([])
+      expect(posts('/api/session/observe')).toEqual([])
+    })
+
+    it('holds a Play that waited for the registration and was refused for unconfirmed playback, and plays it after Play here anyway', async () => {
+      const gone = { destinationId: 'gone-device', incarnationId: 'gone-tab', name: 'Firefox on Linux', kind: 'browser' as const,
+        epoch: 1, available: false, capabilities: ['song' as const], observedState: 'unknown' as const, position: 0, observedVolume: null }
+      const h = loadingPage('/api/devices', { activeIncarnationId: gone.incarnationId, activeDestinationId: gone.destinationId,
+        desiredState: 'playing', observedState: 'unknown', destinations: [...snapshot().destinations, gone] })
+      await vi.waitFor(() => expect(posts('/api/devices')).toHaveLength(1))
+
+      const played = requestPlayback({ action: 'play' }).then(() => null, error => error as Error)
+      h.gate.release()
+      await vi.waitFor(() => expect(h.transport.send).toHaveBeenCalledOnce())
+      h.answer()
+
+      expect((await played)?.message).toBe('Previous playback is unconfirmed. Stop it in its original browser, or choose Play here anyway in the playback destination menu.')
+      expect(controls()).toEqual([])
+      await overridePlayback()
+      expect(controls().map(control => control.action)).toEqual(['play'])
+    })
   })
 
   it.each(['same principal', 'same principal with a refused report', 'different principal'] as const)('reports the incarnation of a replaced runtime closed only across the %s ownership change', async principal => {

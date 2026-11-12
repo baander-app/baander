@@ -571,25 +571,36 @@ export class PlaybackSessionCoordinator {
     if (observedAvailable) return this.endpoint
 
     this.disconnect()
-    let finish: (() => void) | undefined
-    const readiness = this.withRequest(() => new Promise<void>(resolve => {
-      finish = resolve
-      this.registrationReady.add(resolve)
-    }))
     try {
-      await Promise.all([this.reconnect(), readiness])
+      await this.untilRegistered(this.reconnect())
     } catch (error) {
       // The registration was sent and stayed unanswered: a later retry may send another.
       this.registrationPending = false
       throw error
+    }
+    if (!this.current() || !this.ready || !this.endpoint || !available()) throw new Error('Local playback registration is unavailable. Retry the playback connection.')
+    return this.endpoint
+  }
+
+  /**
+   * Waits until a registration answer is bound, for at most the request timeout. A disconnect or
+   * an account change ends the wait, and so does the failure of `sending`, a registration the
+   * caller sends itself.
+   */
+  private async untilRegistered(sending?: Promise<void>): Promise<void> {
+    let finish: (() => void) | undefined
+    const answered = this.withRequest(() => new Promise<void>(resolve => {
+      finish = resolve
+      this.registrationReady.add(resolve)
+    }))
+    try {
+      await Promise.all([sending, answered])
     } finally {
       if (finish) {
         this.registrationReady.delete(finish)
         finish()
       }
     }
-    if (!this.current() || !this.ready || !this.endpoint || !available()) throw new Error('Local playback registration is unavailable. Retry the playback connection.')
-    return this.endpoint
   }
 
   private async checkpointCommand(command: PlaybackCommandResource, signal: AbortSignal): Promise<void> {
@@ -711,6 +722,14 @@ export class PlaybackSessionCoordinator {
 
   private async executeIntent(intent: PlaybackIntent): Promise<void> {
     performance.mark('baander:intent-execute', { detail: { action: intent.action, current: this.current(), ready: this.ready, snapshot: !!this.snapshot, endpoint: this.endpoint?.incarnationId ?? null, active: this.snapshot?.activeIncarnationId ?? null, pending: this.pendingRequests.size, transfer: !!this.snapshot?.transfer } })
+    // A page that has just loaded, or whose socket closed, has no endpoint to send under until its
+    // registration is answered. An intent issued meanwhile waits for that answer instead of
+    // failing, and is then sent under the endpoint the answer bound.
+    if (this.current() && !this.ready && this.registrationPending) {
+      await this.untilRegistered().catch(() => {
+        // The wait timed out, or the connection or account changed: the check below refuses the intent.
+      })
+    }
     if (!this.current() || !this.ready || !this.snapshot || !this.endpoint) throw new Error('Playback connection is unavailable.')
     try {
       if (intent.action === 'stop-local-video') {
