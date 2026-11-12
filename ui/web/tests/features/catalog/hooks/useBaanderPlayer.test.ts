@@ -3190,8 +3190,13 @@ describe('useBaanderPlayer authorization', () => {
     // end only once the element has stood on a decoded frame there.
     expect(nativeTime).toBe(17)
     seeking = false
+    // The dwell on the landing is measured with the clock and a timer, so the test moves both.
+    vi.useFakeTimers()
     await act(async () => video.dispatchEvent(new Event('seeked')))
-    await waitFor(() => expect(nativeTime).toBe(17.92))
+    await act(async () => vi.advanceTimersByTime(249))
+    expect(nativeTime).toBe(17)
+    await act(async () => vi.advanceTimersByTime(1))
+    expect(nativeTime).toBe(17.92)
     await act(async () => video.dispatchEvent(new Event('seeking')))
     seeking = false
     await act(async () => {
