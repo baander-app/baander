@@ -283,7 +283,8 @@ install(FILES ${CMAKE_CURRENT_BINARY_DIR}/libbaac.pc
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig)
 
 if(BAAC_AAC_BUILD_TOOLS AND BAAC_AAC_BUILD_ENCODER AND BAAC_AAC_BUILD_DECODER)
-    add_executable(baac tools/baac.cpp tools/baac_flac.cpp)
+    add_executable(baac tools/baac.cpp tools/baac_flac.cpp tools/baac_flac_pcm.cpp
+        tools/baac_flac_picture.cpp)
     target_link_libraries(baac PRIVATE baander-aac)
     install(TARGETS baac RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
     # MPEG Surround test encoder: 5.1 PCM to a LOAS stream with an AAC-LC

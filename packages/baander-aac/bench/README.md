@@ -76,8 +76,10 @@ there is under load; use the speed stage for speed).
 ## Lossless stage
 
 `./bench.py lossless` measures the `baac flac` commands against the
-references and judges the gates of the lossless mode; the comment above
-`stage_lossless` in `bench.py` is the full statement of the method.
+references and judges the gates of the lossless mode. The stage lives in
+`lossless.py`, whose opening comment is the full statement of the
+method; `common.py` holds what every stage shares: the paths, the tools
+and the corpus items.
 
 - **Rows.** bAAC levels 0 to 8, `flac -0` to `-8`, FFmpeg's FLAC encoder
   at levels 5 and 8 (for reference, no gate), FFmpeg ALAC, and `refalac`

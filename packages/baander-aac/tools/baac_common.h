@@ -1,5 +1,5 @@
-/* What the parts of the baac tool share (baac.cpp and baac_flac.cpp,
- * which link into one program). */
+/* What the parts of the baac tool share (baac.cpp and the baac_flac
+ * files, which link into one program). */
 #ifndef BAANDER_AAC_TOOLS_BAAC_COMMON_H
 #define BAANDER_AAC_TOOLS_BAAC_COMMON_H
 
