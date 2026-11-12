@@ -1047,6 +1047,13 @@ locally before the change, so the proof of the fix is GitHub: in the run for
 `715eeb86e` the Firefox two-command gate passed. Not run: the 8 + 12 load proof,
 whose source and profile are not recorded.
 
+That run then failed in the PHP tooling suite, 1 error in 1,553 tests:
+`HttpFixtureTest::testDnsUdpTruncationFallsBackToCompleteTcpAnswers` read the DNS
+fixture's ready file while the fixture was still writing it and got "Syntax error"
+from `json_decode`. The DNS and echo fixtures wrote that file in place; they now
+write it whole through a temporary file and a rename. Locally `HttpFixtureTest`
+passes 33 of 33, and the truncation case passed five runs in a row.
+
 Open: no complete green `CI` run on GitHub has been observed since 2026-11-05. The
 registry release job failed once on a load-smoke lookup that answered 503; it had
 passed on the two runs before.
