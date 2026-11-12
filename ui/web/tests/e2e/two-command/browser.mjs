@@ -184,7 +184,10 @@ const requestAttachments = new WeakMap()
 let attachmentNumber = 0
 let attachedRenditionSet = null
 function currentSource(state) {
-  return state.source?.startsWith('blob:')
+  // The player empties the element before every new attachment, so a sample can find no
+  // source at all. That is not the signed rendition set yet, and the wait goes on.
+  if (!state.source) return false
+  return state.source.startsWith('blob:')
     ? attachedRenditionSet === snapshot.renditionSet
     : new URL(state.source).searchParams.get('set') === snapshot.renditionSet
 }
