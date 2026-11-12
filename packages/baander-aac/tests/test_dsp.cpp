@@ -294,6 +294,24 @@ static void test_quant_noise_value(const AacDSP* ref) {
   }
 }
 
+/* The kernels of a level's table that are not the scalar ones.  A build
+ * that compiled none of the level's kernels installs the scalar ones and
+ * compares them with themselves, which proves nothing. */
+static int own_kernels(const AacDSP& dsp, const AacDSP& scalar) {
+  int own = 0;
+  own += dsp.vector_fmul != scalar.vector_fmul;
+  own += dsp.vector_fmul_scalar != scalar.vector_fmul_scalar;
+  own += dsp.vector_fmul_add != scalar.vector_fmul_add;
+  own += dsp.vector_fmul_window != scalar.vector_fmul_window;
+  own += dsp.vector_fmul_reverse != scalar.vector_fmul_reverse;
+  own += dsp.vector_fmul_accumulate != scalar.vector_fmul_accumulate;
+  own += dsp.fft_radix2_stage != scalar.fft_radix2_stage;
+  own += dsp.mdct_pre_twiddle != scalar.mdct_pre_twiddle;
+  own += dsp.mdct_post_twiddle != scalar.mdct_post_twiddle;
+  own += dsp.quant_noise != scalar.quant_noise;
+  return own;
+}
+
 int main() {
   const int detected = aac_get_cpu_flags();
   printf("CPU: %s\n", aac_cpu_flags_string(detected));
@@ -315,7 +333,7 @@ int main() {
     aac_set_cpu_flags_override(level.flags);
     AacDSP dsp;
     aac_dsp_init(&dsp);
-    printf("testing %s kernels\n", level.name);
+    printf("testing %s kernels, %d of the level's own\n", level.name, own_kernels(dsp, scalar));
     test_vector_ops(level.name, &scalar, &dsp);
     test_fft_stage(level.name, &scalar, &dsp);
     test_mdct_twiddles(level.name, &scalar, &dsp);

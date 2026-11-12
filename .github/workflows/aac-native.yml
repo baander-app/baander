@@ -242,9 +242,9 @@ jobs:
                 # in test_dsp, and those of the lossless mode in
                 # test_flac_dsp, where whole streams also have to come out
                 # the same with and without them.
-                # BAAC_REQUIRE_KERNELS fails the suite when the level it
+                # BAAC_REQUIRE_KERNELS fails test_flac_dsp when the level it
                 # names did not run or installed no kernel of its own, and
-                # the step reads the suite's own account of it as well.
+                # the step reads both suites' own account of it.
                 # The build is for this runner's architecture alone, since
                 # the suites run where they are built.  Windows has no
                 # step of this kind: the suites are POSIX programs, and
@@ -260,11 +260,15 @@ jobs:
                       --target test_dsp test_flac_format test_flac_dsp test_flac_encoder test_flac_decoder
                     ctest --test-dir cmake-build --output-on-failure \
                       -R '^(test_dsp|test_flac_(format|dsp|encoder|decoder)(_scalar|_sse2)?)$'
-                    # The same proof in the log: the level ran, and the suite
-                    # compared kernels of its own with the scalar ones.
-                    cmake-build/tests/test_flac_dsp | tee "$RUNNER_TEMP/flac-dsp.log"
-                    grep -Eq "^testing $BAAC_REQUIRE_KERNELS kernels, [1-9][0-9]* of the level's own" "$RUNNER_TEMP/flac-dsp.log" \
-                      || { echo "the $BAAC_REQUIRE_KERNELS kernels did not run"; exit 1; }
+                    # The same proof in the log: the level ran, and each
+                    # suite compared kernels of its own with the scalar ones.
+                    # test_dsp reads no BAAC_REQUIRE_KERNELS, so this check
+                    # is its only one.
+                    for suite in test_dsp test_flac_dsp; do
+                      cmake-build/tests/$suite | tee "$RUNNER_TEMP/$suite.log"
+                      grep -Eq "^testing $BAAC_REQUIRE_KERNELS kernels, [1-9][0-9]* of the level's own" "$RUNNER_TEMP/$suite.log" \
+                        || { echo "$suite: the $BAAC_REQUIRE_KERNELS kernels did not run"; exit 1; }
+                    done
 
             -   name: Keep the prebuild
                 uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

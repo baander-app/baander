@@ -67,9 +67,9 @@ encoder's noise sum among them, with the scalar ones, and `test_flac_dsp` those 
 the lossless mode. `BAAC_REQUIRE_KERNELS`
 names the kernel levels a runner has to exercise (`neon` on arm64, `sse2,avx2` on
 Linux, `sse2` on the Intel Mac): `test_flac_dsp` fails when a named level did not
-run or installed no kernel of its own, and the step checks the suite's output for
-the line that says the level ran and how many of its kernels were compared with the
-scalar ones. Windows has no such step. The CTest suites
+run or installed no kernel of its own, and the step checks the output of both suites
+for the line that says the level ran and how many of its kernels were compared with
+the scalar ones. Windows has no such step. The CTest suites
 are POSIX programs, and the Windows build of the codec is tested through the
 binding.
 
