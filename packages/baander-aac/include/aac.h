@@ -113,6 +113,11 @@ AacEncoderHandle aac_encoder_create(int sample_rate, int channels, int bitrate, 
 
 void aac_encoder_destroy(AacEncoderHandle ctx);
 
+/* Encodes one block of n_samples (aac_encoder_frame_size) interleaved
+ * frames at full scale 1.0 and returns the length of the frame written to
+ * out, or a negative AacError.  A NaN sample is coded as silence and a
+ * sample beyond 65536 in magnitude, an infinity included, as 65536 of its
+ * sign. */
 int aac_encoder_encode(AacEncoderHandle ctx, const float* pcm, int n_samples, uint8_t* out,
                        int out_size);
 

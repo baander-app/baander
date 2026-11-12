@@ -291,7 +291,11 @@ what it was before the 960-frame work on every profile and mode checked
 ## Low delay, dynamics and speed
 
 Measured on 2026-10-24 with FFmpeg 6.1.1 on this machine (a 2.8 GHz
-Xeon, four cores, GCC 13, release build at the AVX2 level).
+Xeon, four cores, GCC 13, release build at the AVX2 level). That release
+build compiled with `-O3 -ffast-math -fno-math-errno`, and the
+afterburner's encode times and the `baac bench` realtime factors below
+were measured with it; Release builds have since dropped the fast-math
+rewrites ([README](README.md#native)).
 
 | Stream | Difference SNR |
 |--------|---------------:|
@@ -375,6 +379,10 @@ streams wrongly.
 | `usac_music_48000_24000` (stereo 24 kbit/s) | LPD, 8:3 (768-line core), MPS 212 (stereoConfigIndex 1) | 23.9 dB |
 | `usac_music_48000_16000` (stereo 16 kbit/s) | LPD, 4:1, MPS 212 (stereoConfigIndex 1) | 25.9 dB |
 
+The figures of the six LPD streams predate the reordered LPC synthesis
+filter (`lpd_syn_filter` in `src/usac_lpc.cpp`), which changes their
+decoded samples by at most 3.2e-6 of full scale.
+
 On the two LPD music streams libxaac itself reaches 19.8 and 27.4 dB
 against the FDK decode, and the two references disagree by 38 to 50 dB in
 the SBR bands: the limit there is the two implementations' LPD core on
@@ -409,6 +417,13 @@ decodes in all four without an error; the FDK decoder also starts
 cleanly at the second independent frame of the three-second mono mix
 from its pre-roll (27.1 dB against the source from the second frame on,
 the same as ours).
+
+The committed streams in this section and the next were measured as the
+Release build of that date wrote them, with `-ffast-math`; the suites
+then compared them byte for byte only in such a build. Release builds
+have since dropped the fast-math rewrites, and the files under
+`tests/data` are now the output of the exact-arithmetic build
+([README](README.md#testing)).
 
 | Stream | Decoder | SNR against the source | Against our decode |
 |--------|---------|-----------------------:|-------------------:|

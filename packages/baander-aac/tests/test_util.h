@@ -31,6 +31,71 @@ static int test_summary(const char* name) {
   return g_failures ? 1 : 0;
 }
 
+/* The directory of `--write-streams <dir>`, or NULL: a suite with
+ * committed streams then writes them there instead of testing. */
+static const char* write_streams_dir(int argc, char** argv) {
+  return argc >= 3 && strcmp(argv[1], "--write-streams") == 0 ? argv[2] : nullptr;
+}
+
+/* The tests' linear congruential generator: the next state of *seed, and
+ * a value in [-1, 1) from the top 24 bits of the next state. */
+static unsigned lcg_next(unsigned* seed) {
+  *seed = *seed * 1664525u + 1013904223u;
+  return *seed;
+}
+
+static float lcg_float(unsigned* seed) { return (float)(lcg_next(seed) >> 8) / 8388608.0f - 1.0f; }
+
+/* ── the reference build ───────────────────────────────────────── */
+
+/* The encoder streams under tests/data are compared byte for byte by
+ * every reference build: a build with the options of CMakeLists.txt
+ * that keep arithmetic exact (BAAC_EXACT_MATH), in any configuration,
+ * Debug and the sanitizers included.  The library and the tests compute
+ * in exact arithmetic, so the bytes are a function of the source and of
+ * the C library's functions, not of the compiler or the optimisation
+ * level.  The streams are written with --write-streams by a Release build
+ * with the compiler of the linux-x64 job in
+ * .github/workflows/aac-native.yml.  A build without those options
+ * compares its streams with the committed ones through the decodes. */
+#if BAAC_EXACT_MATH
+#define BAAC_REFERENCE_BUILD 1
+#else
+#define BAAC_REFERENCE_BUILD 0
+#endif
+
+/* FNV-1a over the bit patterns of the samples. */
+static uint32_t signal_checksum(const std::vector<float>& pcm) {
+  uint32_t h = 2166136261u;
+  for (float v : pcm) {
+    uint32_t bits;
+    memcpy(&bits, &v, sizeof(bits));
+    for (int shift = 0; shift < 32; shift += 8) {
+      h = (h ^ ((bits >> shift) & 0xFFu)) * 16777619u;
+    }
+  }
+  return h;
+}
+
+/* A committed stream is reproduced only from the signal it was encoded
+ * from, to the last bit.  The generators below are a function of their
+ * source, since the tests compute in exact arithmetic like the library,
+ * and of the C library's sinf, cosf, expf and powf.  This check names a
+ * signal that came out different, so that the stream which then differs
+ * is not read as a change of the encoder; it returns whether the signal
+ * is the committed one. */
+static bool check_committed_signal(const char* name, const std::vector<float>& pcm,
+                                   uint32_t expected) {
+  const uint32_t got = signal_checksum(pcm);
+  CHECK(got == expected,
+        "%s: the generated signal has checksum 0x%08x, the committed stream was encoded from "
+        "0x%08x.  The stream is the output of exact arithmetic, which every compiler reproduces "
+        "from the same signal; a different signal comes from the C library's sinf, cosf, expf or "
+        "powf, or from options that let the compiler regroup arithmetic",
+        name, (unsigned)got, (unsigned)expected);
+  return got == expected;
+}
+
 /* ── signals (interleaved float, full scale 1.0) ────────────────── */
 
 static std::vector<float> gen_tones(int n, int sr, int channels) {

@@ -746,7 +746,9 @@ int aac_encoder_set_vbr_mode(AacEncoderHandle ctx, int mode);
 - `aac_encoder_encode` takes exactly `frame_size()` (1024 or 960, twice
   that with SBR) interleaved float samples per channel at full scale 1.0
   and writes one frame of the transport: an ADTS frame, a LOAS frame, a
-  LATM AudioMuxElement or a raw access unit. The output buffer must hold
+  LATM AudioMuxElement or a raw access unit. A NaN sample is coded as
+  silence, and a sample beyond 65536 in magnitude, an infinity included,
+  as 65536 of its sign. The output buffer must hold
   `aac_encoder_max_frame_bytes` (768 bytes per channel plus the header,
   plus 272 bytes per SBR element, plus the LATM overhead); a smaller one
   is refused with `AAC_ERR_OVERFLOW` before any input is consumed.
@@ -988,11 +990,13 @@ it. FFmpeg's `--enable-libbaac` finds the codec through that file; the
 project's FFmpeg image builds it this way
 ([`docker/ffmpeg/baac/README.md`](../../../docker/ffmpeg/baac/README.md)).
 
-SIMD: the vector operations, the radix-2 FFT stages and the MDCT twiddles
-dispatch at runtime through one function table (`include/aac_dsp.h`) to
+SIMD: the vector operations, the radix-2 FFT stages, the MDCT twiddles
+and the AAC-LC encoder's quantisation noise sum dispatch at runtime
+through one function table (`include/aac_dsp.h`) to
 SSE2, AVX2 (x86) or NEON (ARM); only `src/simd/avx2.cpp` is compiled with
 AVX2 flags, so the library runs on CPUs without it. The transform kernels
-compute the same products and sums as the scalar ones, without fused
+compute the same products and sums as the scalar ones and the noise sum
+adds its terms in one order on every level, all without fused
 multiply-adds, so an encoder produces the same stream on every level;
 `BAAC_AAC_CPU=scalar|sse2|avx2|neon` in the environment caps the level
 for comparisons, and `tests/test_dsp.cpp` checks every kernel of every
@@ -1000,6 +1004,31 @@ level the machine can run against the scalar one. The decoder's QMF
 banks run their modulation through the FFT; the encoder's keep the direct
 sums. Neither the encoder nor the decoder allocates once it is running
 (`tests/test_allocation.cpp` counts).
+
+Floating point: a GCC or Clang build computes in exact arithmetic, every
+sum, product and quotient rounded in the order the source writes it, so
+that its streams do not depend on the compiler. For those compilers
+(AppleClang included) CMake compiles Release with
+`-O3 -fno-math-errno -fno-trapping-math` and every configuration with
+`-ffp-contract=off`. The fast-math rewrites stay off because each
+compiler applies them its own way: under `-fassociative-math` each
+regroups and vectorises a sum differently, and a sum rounded
+differently can turn a rate or masking decision; `-freciprocal-math`,
+`-fno-signed-zeros` and `-ffinite-math-only` do the same to quotients,
+zeros and comparisons;
+and under the unsafe-math group x86 compilers take 1/sqrt(x) from the
+RSQRTSS estimate, which differs between processor vendors. Contraction
+is off so that a target with fused multiply-add rounds like one
+without; `-fno-math-errno` and `-fno-trapping-math` change no result. On
+32-bit x86 CMake adds `-mfpmath=sse` next to `-msse2`, since GCC
+otherwise evaluates float arithmetic on the x87 unit at extended
+precision (`FLT_EVAL_METHOD` 2, and 0 with the option). The Node
+binding sets its own flags in `binding.gyp`: `-O3 -ffp-contract=off`,
+`-msse2` on x86 and `-mfpmath=sse` on ia32; it never took the fast-math
+options. Other toolchains get none of these options, MSVC included
+(CMake adds none for it, and the binding builds with `/O2`), and the
+byte-for-byte reproducibility stated under [Testing](#testing) does not
+cover them.
 
 ### Command-line tool
 
@@ -1188,9 +1217,13 @@ the asar archive, which `process.dlopen` cannot read.
 
 ## Testing
 
-`ctest` runs forty suites, and the transform, filterbank and
-roundtrip suites again at every DSP dispatch level this machine can run:
-table consistency (prefix-free, complete
+`ctest` runs forty suites at the highest DSP dispatch level the machine
+has, and four of them again with the dispatch table capped
+(`BAAC_AAC_CPU`) at the scalar and the SSE2 kernels on x86, and at the
+scalar kernels elsewhere: `test_mdct`, `test_qmf` and `test_roundtrip`
+check their accuracy bounds at each level, and `test_encoder_tuning`
+compares the committed AAC-LC, HE-AAC and HE-AAC v2 streams byte for
+byte at each. The forty cover table consistency (prefix-free, complete
 Huffman codebooks; scalefactor bands for 1024 and 960 frames;
 Princen-Bradley windows), MDCT against the direct definition and TDAC,
 the QMF banks (every analysis and
@@ -1226,9 +1259,12 @@ channels and two bands from a hand-built fill element, heavy
 compression from a hand-built data stream element, an HE-AAC stream,
 and FFmpeg decoding our metadata stream without complaint and, since
 its decoder parses but does not apply the gains, matching our decode
-with DRC off at 135 dB), the afterburner (byte identity with it off,
-determinism, the segmental SNR gain per bitrate, the budget limits of
-every rate-control mode, decoding by our decoder and FFmpeg), the
+with DRC off at 135 dB), the afterburner (every coded band's stored
+values are the plain quantisation at its scalefactor, so the noise the
+rate loop and the afterburner measure is that of the coded values; byte
+identity with it off, determinism, the segmental SNR gain per bitrate,
+the budget limits of every rate-control mode, decoding by our decoder
+and FFmpeg), the
 LD-SBR module (filterbank reconstruction and delay, grid and bitstream
 roundtrips, a coding roundtrip with an ideal core at 512 and 480 in
 dual and single rate), the low-delay types (window and filterbank
@@ -1304,9 +1340,7 @@ signal of loud, medium and quiet passages (the direction and bounds of
 the gains, attack and release, the peak bounds, the loudness range of
 each set's output, one- and two-pass), streams with the gain sets on
 and off through our decoder's DRC requests, and the committed stream
-`usac_enc_drc_cpe_64k.loas`; a fresh encode reproduces every committed stream byte for
-byte, and `--write-streams tests/data` on each suite regenerates its
-own) and its loudness metadata in another
+`usac_enc_drc_cpe_64k.loas`) and its loudness metadata in another
 (`test_encoder_loudness`: the two-pass set in the configuration as the
 writer's bytes and read back by the decoder as the declared loudness
 with its normalisation gain, the set's removal and replacement and its
@@ -1322,9 +1356,26 @@ modes' bitrate order and ceilings, a peak lowering the mode in either
 order, a cleared mode reproducing the plain stream, the element order
 SCE FIL CPE FIL CPE FIL LFE END of 5.1 HE-AAC with each SBR payload in
 the fill element after its own element, FFmpeg decoding that stream
-channel for channel, and HE-AAC v2 draining a short last block and a
-one-sample input). The
-other USAC
+channel for channel, HE-AAC v2 draining a short last block and a
+one-sample input, the coding of NaN, infinite and huge input samples
+as their replacements (byte identity with the replaced signal in AAC-LC
+CBR and TVBR, HE-AAC v1 and v2, xHE-AAC and AAC-ELD, and finite
+decodes), and the committed streams `lc_enc_cpe_128k.aac`,
+`he_enc_cpe_48k.aac` and `hev2_enc_cpe_32k.aac`).
+
+Six suites keep committed encoder streams under `tests/data`:
+`test_eld_sbr`, the four xHE-AAC encoder suites and
+`test_encoder_tuning`. A fresh encode reproduces each stream byte for
+byte with GCC 13.3, 14.2, 14.3, 15.2, 15.3 and 16.x and clang 18, 21
+and 23 on x86-64 with glibc 2.39 to 2.44; ARM, MSVC and other C
+libraries are unverified. Every GCC or Clang build compares its fresh
+encodes with the committed streams byte for byte, Debug and the
+sanitizer build included; a build with another compiler compares the
+decodes instead. `--write-streams tests/data` on each suite regenerates
+its own streams, and the committed ones come from a Release build with
+the compiler of the `linux-x64` job in
+`.github/workflows/aac-native.yml` (`ubuntu-latest`, today Ubuntu 26.04
+with GCC 15.2). The other USAC
 data under `tests/data` is the FDK xHE-AAC encoder's output
 (`usac_*.loas`, 48 access units each, mono and stereo at 12 to
 96 kbit/s), the FDK decoder's 16-bit decodes with loudness
@@ -1431,7 +1482,9 @@ in the SBR linear prediction, now summed in double, and speech
 synthesis filters that rounding to float made unstable for corrupt,
 tightly packed LPC sets, now pulled back inside the unit circle.
 
-The CMake option `BAAC_FUZZ` builds the tree with ASan and UBSan.
+The CMake option `BAAC_FUZZ` builds the tree with ASan and UBSan,
+UBSan including its check for a float converted to an integer out of
+range (`float-cast-overflow`), which `-fsanitize=undefined` leaves out.
 Under libFuzzer when the compiler links `-fsanitize=fuzzer` (clang with
 its compiler-rt runtimes), else under the mutation driver
 `fuzz_driver.cpp`, which replays the seeds, mutates them for a time or
@@ -1444,7 +1497,13 @@ side), so the same inputs run on every machine.
 `baac bench --streams tests/data` gives the realtime factors (audio
 seconds per wall-clock second, one thread, Release build). The figures
 below come from a shared 2.1 GHz Xeon virtual machine, where repeated
-runs vary by about a quarter, so read them as orders of magnitude.
+runs vary by about a quarter, so read them as orders of magnitude. They
+were measured with the earlier Release build, which still used the
+fast-math rewrites ([Native](#native) lists today's options): the
+synthetic signal's figures on 2026-10-31, under `-fassociative-math`,
+`-freciprocal-math`, `-fno-signed-zeros` and `-ffinite-math-only`, and
+those of the committed streams, as they stood on 2026-10-30, under
+`-ffast-math`.
 
 The synthetic 30 s stereo signal at 48 kHz:
 
@@ -1474,6 +1533,14 @@ pair, so those count as stereo):
 | HE-AAC v2 stereo | 1 | 450x |
 | xHE-AAC mono / stereo | 3 / 3 | 530x / 300x |
 | xHE-AAC SBR mono / stereo | 6 / 6 | 420x / 200x |
+
+The xHE-AAC SBR rows include the six LPD streams
+(`usac_lpd_speech_12000.loas`, `usac_speech_48000_16000.loas`,
+`usac_lpd_speech_24000.loas` and `usac_speech_48000_24000.loas` mono,
+`usac_music_48000_24000.loas` and `usac_music_48000_16000.loas`
+stereo). Their figures also predate the reordered LPC synthesis filter
+(`lpd_syn_filter` in `src/usac_lpc.cpp`), which changes their decoded
+samples by at most 3.2e-6 of full scale.
 
 On the synthetic signal, encoding runs at 22 to 84 times realtime and
 decoding at 180 to 700 times. AAC-LC and HE-AAC encode with the

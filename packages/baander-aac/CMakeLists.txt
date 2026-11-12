@@ -70,32 +70,40 @@ if(BAAC_AAC_BUILD_ENCODER)
     list(APPEND ALL_SOURCES ${BAAC_AAC_ENCODER_SOURCES})
 endif()
 
-# Release builds take the fast-math rewrites except the unsafe-math
-# group as a whole: under -funsafe-math-optimizations x86 compilers turn
-# 1/sqrt(x) into the RSQRTSS/RSQRTPS estimate plus a Newton step, and
-# the estimate differs between processor vendors, so one binary would
-# encode differently on Intel and AMD machines.  Reassociation,
-# reciprocal multiplication and the finite-math assumptions stay; with
-# exact division and square root the output is a function of the input.
-# BAAC_RELEASE_MATH tells the tests that compare committed streams byte
-# for byte that this arithmetic is in force.
+# The library computes in exact arithmetic: every sum, product and
+# quotient is rounded in the order the source writes it, so the encoder's
+# output is a function of its input and of the C library's functions, the
+# same from every compiler.  The rewrites that change a result stay off:
+# under -fassociative-math each compiler regroups and vectorises a sum
+# its own way, and a sum rounded differently turns a rate or masking
+# decision; -freciprocal-math, -fno-signed-zeros and -ffinite-math-only
+# give the same licence for quotients, zeros and comparisons; under
+# -funsafe-math-optimizations x86 compilers take 1/sqrt(x) from the
+# RSQRTSS/RSQRTPS estimate, which differs between processor vendors.
+# Contraction is off for the same reason on targets with a fused
+# multiply-add; a kernel that wants one asks for it with the intrinsic.
+# -fno-math-errno and -fno-trapping-math change no result.  The options
+# reach the tests as well, whose signal generators must give every build
+# the same samples.  No configuration regroups arithmetic and contraction
+# is off in all of them, so a Debug build computes what a Release build
+# does; BAAC_EXACT_MATH tells the tests that compare committed streams
+# byte for byte that this holds for the build.
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     add_compile_options(
+        -ffp-contract=off
         $<$<CONFIG:Release>:-O3>
         $<$<CONFIG:Release>:-fno-math-errno>
-        $<$<CONFIG:Release>:-fassociative-math>
-        $<$<CONFIG:Release>:-freciprocal-math>
-        $<$<CONFIG:Release>:-fno-signed-zeros>
-        $<$<CONFIG:Release>:-fno-trapping-math>
-        $<$<CONFIG:Release>:-ffinite-math-only>)
-    add_compile_definitions($<$<CONFIG:Release>:BAAC_RELEASE_MATH=1>)
+        $<$<CONFIG:Release>:-fno-trapping-math>)
+    add_compile_definitions(BAAC_EXACT_MATH=1)
 endif()
 
 # BAAC_FUZZ: the sanitizers over the whole tree and, when the compiler
 # links libFuzzer, its coverage instrumentation; the harnesses under
 # tools/fuzz then run under libFuzzer, else under their own mutation
 # driver.  An undefined-behaviour report stops the run under either, so
-# that it leaves a reproducer.
+# that it leaves a reproducer.  UBSan's checks include the conversion of
+# a float out of an integer's range (float-cast-overflow), which
+# -fsanitize=undefined leaves out.
 set(BAAC_FUZZ_HAVE_LIBFUZZER OFF)
 if(BAAC_FUZZ)
     include(CheckCXXSourceCompiles)
@@ -114,14 +122,18 @@ if(BAAC_FUZZ)
     endif()
     if(BAAC_FUZZ_LIBFUZZER_LINKS)
         set(BAAC_FUZZ_HAVE_LIBFUZZER ON)
-        add_compile_options(-fsanitize=fuzzer-no-link,address,undefined
-                            -fno-sanitize-recover=undefined -fno-omit-frame-pointer)
-        add_link_options(-fsanitize=address,undefined -fno-sanitize-recover=undefined)
+        add_compile_options(-fsanitize=fuzzer-no-link,address,undefined,float-cast-overflow
+                            -fno-sanitize-recover=undefined,float-cast-overflow
+                            -fno-omit-frame-pointer)
+        add_link_options(-fsanitize=address,undefined,float-cast-overflow
+                         -fno-sanitize-recover=undefined,float-cast-overflow)
         message(STATUS "BAAC_FUZZ: libFuzzer with ASan and UBSan")
     else()
-        add_compile_options(-fsanitize=address,undefined -fno-sanitize-recover=undefined
+        add_compile_options(-fsanitize=address,undefined,float-cast-overflow
+                            -fno-sanitize-recover=undefined,float-cast-overflow
                             -fno-omit-frame-pointer)
-        add_link_options(-fsanitize=address,undefined -fno-sanitize-recover=undefined)
+        add_link_options(-fsanitize=address,undefined,float-cast-overflow
+                         -fno-sanitize-recover=undefined,float-cast-overflow)
         message(WARNING "BAAC_FUZZ: this compiler has no libFuzzer; the harnesses run their own mutation driver under ASan and UBSan")
     endif()
     add_compile_definitions(BAAC_FUZZ_SANITIZED=1)
@@ -132,6 +144,15 @@ check_cxx_compiler_flag("-msse2" HAS_SSE2)
 if(HAS_SSE2 AND CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64|i686|i386")
     add_compile_options(-msse2)
     add_compile_definitions(BAAC_AAC_SSE2)
+    # On 32-bit x86, GCC computes float arithmetic on the x87 unit unless
+    # told otherwise (FLT_EVAL_METHOD 2): an intermediate keeps extended
+    # precision until the compiler stores it, so a result depends on
+    # register allocation.  With -mfpmath=sse every operation rounds to
+    # float, as on x86-64 (FLT_EVAL_METHOD 0).
+    check_cxx_compiler_flag("-mfpmath=sse" HAS_MFPMATH_SSE)
+    if(HAS_MFPMATH_SSE AND CMAKE_SIZEOF_VOID_P EQUAL 4)
+        add_compile_options(-mfpmath=sse)
+    endif()
 endif()
 # AVX2 is enabled only for src/simd/avx2.cpp (below) and selected at
 # runtime; compiling everything with -mavx2 would make the library fault on

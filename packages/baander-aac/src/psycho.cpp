@@ -1,5 +1,6 @@
 #include "psycho.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstring>
 
@@ -108,23 +109,23 @@ void aac_psy_thresholds(AacPsyChannel* p, int sample_rate, int channel_bitrate,
     if (p->forward_masking && !is_short) {
       if (p->prev_long) {
         for (int b = 0; b < nswb; b++) {
-          t[b] = fmaxf(t[b], kForwardMasking * p->prev_energy[b]);
+          t[b] = std::max(t[b], kForwardMasking * p->prev_energy[b]);
         }
       }
       memcpy(p->prev_energy, e, (size_t)nswb * sizeof(float));
     }
     for (int b = 1; b < nswb; b++) {
-      t[b] = fmaxf(t[b], t[b - 1] * thr_hi[b]);
-      se[b] = fmaxf(se[b], se[b - 1] * en_hi[b]);
+      t[b] = std::max(t[b], t[b - 1] * thr_hi[b]);
+      se[b] = std::max(se[b], se[b - 1] * en_hi[b]);
     }
     for (int b = nswb - 2; b >= 0; b--) {
-      t[b] = fmaxf(t[b], t[b + 1] * thr_lo[b + 1]);
-      se[b] = fmaxf(se[b], se[b + 1] * en_lo[b + 1]);
+      t[b] = std::max(t[b], t[b + 1] * thr_lo[b + 1]);
+      se[b] = std::max(se[b], se[b + 1] * en_lo[b + 1]);
     }
     for (int b = 0; b < nswb; b++) {
-      t[b] = fmaxf(t[b], ath[b]);
+      t[b] = std::max(t[b], ath[b]);
       if (!is_short && p->prev_long) {
-        t[b] = fmaxf(kPreEchoMin * t[b], fminf(t[b], kPreEchoRise * p->prev_thr[b]));
+        t[b] = std::max(kPreEchoMin * t[b], std::min(t[b], kPreEchoRise * p->prev_thr[b]));
       }
     }
     if (!is_short) {
