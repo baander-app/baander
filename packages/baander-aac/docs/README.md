@@ -1040,7 +1040,7 @@ capped at the scalar kernels and, on x86, at the SSE2 ones.
   streams, of five inputs made with integers alone at levels 0, 5 and
   8, are pinned by their SHA-256 digests: every compiler, C library and
   processor the suite runs on has to write the same bytes. The binding's
-  smoke test pins six of them again, which covers the Windows build.
+  smoke test pins all fifteen again, which covers the Windows build.
 - `test_flac_interop`: the encoder against decoders it shares no line
   with. `flac -t` tests each stream, `flac -d` and FFmpeg decode it, and
   the samples of both are compared with the input.

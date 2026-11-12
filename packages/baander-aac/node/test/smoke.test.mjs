@@ -1212,6 +1212,30 @@ test('FLAC: the encoder writes the pinned streams on this platform', () => {
         8: '66fb30848692b13c9fb05e274b21cab3719165bdc5d6a001be714bdb43f1c48f',
       },
     },
+    {
+      sampleRate: 48000, channels: 6, bitsPerSample: 16, samples: 6000, seed: 3,
+      digests: {
+        0: '46bace5228eefde37262de505b3af04bf33ed8471a039b1da6d8647bac1cda7c',
+        5: 'df5dfe4db557654a1173b197041a852b8de017eba86a626339d46994c169b7f9',
+        8: '08925268e42deee249d85e2aec6a7e168e08955c0b429d566187c2f3b2896b44',
+      },
+    },
+    {
+      sampleRate: 48000, channels: 1, bitsPerSample: 8, samples: 9000, seed: 4,
+      digests: {
+        0: '39ca8a7868a3dd78502cb8a84b77ebfb88e4b4947008be6ea352dfc2502f85f6',
+        5: '5a8b4d36894a8aa45d515d9d46ec37e1193d4c6017a9e4748e2c6f62d5cc9ee1',
+        8: '44d8b2d546e77839387d1c39a637832970a446e56b8cbfdf4f37986368e830cd',
+      },
+    },
+    {
+      sampleRate: 192000, channels: 2, bitsPerSample: 32, samples: 5000, seed: 5,
+      digests: {
+        0: '3914bea6f67a0dee1e13bd96718c9f283b42caee8c40bdc485c64171a0e5d11d',
+        5: 'e53e439b860ea92f9d82194f621ff918884066ad9f4511d106bc80a3856a11f5',
+        8: '9a12c11ab6f64cb597428c190594e5542256d0d508e32fe48cf9d4d6e7f74d95',
+      },
+    },
   ];
   for (const p of pinned) {
     const pcm = integerSignal(p.samples, p.channels, p.bitsPerSample, p.seed);
@@ -1220,7 +1244,7 @@ test('FLAC: the encoder writes the pinned streams on this platform', () => {
         sampleRate: p.sampleRate, channels: p.channels, bitsPerSample: p.bitsPerSample, level: Number(level),
       });
       const stream = flacEncode(encoder, pcm, p.channels, [p.samples]);
-      assert.equal(createHash('sha256').update(stream).digest('hex'), digest, `${p.sampleRate} Hz, ${p.bitsPerSample} bits, level ${level}`);
+      assert.equal(createHash('sha256').update(stream).digest('hex'), digest, `${p.sampleRate} Hz, ${p.channels} channels, ${p.bitsPerSample} bits, level ${level}`);
     }
   }
 });
