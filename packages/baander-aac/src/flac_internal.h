@@ -212,6 +212,9 @@ void flac_decoder_ignore_checksums(BaacFlacDecoder* d, bool ignore);
 /* For the tests: the bytes the decoder has read so far for candidates of
  * its frame search that it then rejected. */
 uint64_t flac_decoder_rejected_work(const BaacFlacDecoder* d);
+/* For the tests: the bytes the decoder has read so far for frames and
+ * candidates, a frame read again in part counted once more for that part. */
+uint64_t flac_decoder_read_work(const BaacFlacDecoder* d);
 int flac_decoder_set_metadata(BaacFlacDecoder* d, bool collect, size_t max_bytes);
 int flac_decoder_comments(const BaacFlacDecoder* d, const BaacFlacComment** comments,
                           BaacFlacComment* vendor);

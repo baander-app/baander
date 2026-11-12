@@ -438,6 +438,8 @@ struct BaacFlacDecoder_ {
   bool id3v1 = false;            /* an ID3v1 tag behind the last frame was passed over */
   uint64_t search_debt = 0;      /* bytes read for rejected candidates and not yet paid for */
   uint64_t rejected_work = 0;    /* every byte read for a rejected candidate, for the tests */
+  uint64_t read_work = 0;        /* every byte read for a frame or a candidate, for the tests */
+  uint64_t probe_work = 0;       /* read so far by the depth probe of the frame at the head */
 
   /* The stream. */
   bool have_info = false; /* `info` is a STREAMINFO, from the stream or the caller */
@@ -500,6 +502,7 @@ const uint8_t* fifo_data(const Decoder* d) { return d->fifo.data() + d->head; }
 void forget_frame(Decoder* d) {
   d->need = 0;
   d->progress.valid = false;
+  d->probe_work = 0;
 }
 
 void drop(Decoder* d, size_t n) {
@@ -869,6 +872,14 @@ FrameResult decode_frame(Decoder* d, const uint8_t* p, size_t avail, const FlacF
   const auto read_so_far = [&]() {
     return std::min(avail, (size_t)h.header_bytes + (flac_bitreader_position(&r) + 7) / 8);
   };
+  /* A frame read before continues from its progress: only what lies
+   * beyond it is read again, which the tests' count of work records. */
+  const size_t resume_bit = pg.inside ? pg.bit : pg.subframe_bit;
+  const size_t from = pg.valid ? std::min(avail, (size_t)h.header_bytes + resume_bit / 8) : 0;
+  const auto account = [&](size_t bytes) {
+    *examined = bytes;
+    d->read_work += bytes - std::min(bytes, from);
+  };
   if (pg.valid) {
     flac_bitreader_seek(&r, pg.subframe_bit);
   } else {
@@ -887,12 +898,12 @@ FrameResult decode_frame(Decoder* d, const uint8_t* p, size_t avail, const FlacF
     pg.subframe_bit = flac_bitreader_position(&r);
     const bool ok = decode_subframe(d->dsp, &r, bps, h.block_size, out, wide, restore, &pg);
     if (r.overread) {
-      *examined = avail;
+      account(avail);
       return kFrameNeedMore;
     }
     if (!ok) {
       pg.valid = false;
-      *examined = read_so_far();
+      account(read_so_far());
       return kFrameInvalid;
     }
     pg.inside = false;
@@ -902,12 +913,12 @@ FrameResult decode_frame(Decoder* d, const uint8_t* p, size_t avail, const FlacF
   flac_bitreader_align(&r);
   const size_t crc_pos = (size_t)h.header_bytes + flac_bitreader_position(&r) / 8;
   if (avail < crc_pos + 2) {
-    *examined = avail;
+    account(avail);
     return kFrameNeedMore;
   }
   pg.valid = false;
   /* The checksum reads the frame a second time. */
-  *examined = 2 * crc_pos + 2;
+  account(2 * crc_pos + 2);
   if (!d->ignore_checksums &&
       flac_crc16(p, crc_pos) != (uint16_t)((p[crc_pos] << 8) | p[crc_pos + 1])) {
     return kFrameInvalid;
@@ -1120,6 +1131,8 @@ int flac_decoder_set_md5_check(BaacFlacDecoder* d, bool enabled) {
 
 uint64_t flac_decoder_rejected_work(const BaacFlacDecoder* d) { return d->rejected_work; }
 
+uint64_t flac_decoder_read_work(const BaacFlacDecoder* d) { return d->read_work; }
+
 void flac_decoder_id3(const BaacFlacDecoder* d, uint64_t* v2_bytes, int* v1_trailer) {
   if (v2_bytes) {
     *v2_bytes = d->id3v2_bytes;
@@ -1226,8 +1239,12 @@ int flac_decoder_decode_next(BaacFlacDecoder* d, int32_t* pcm, int pcm_size) {
       const uint8_t* p = fifo_data(d);
       const void* hit = memchr(p, 0xFF, pending(d));
       const size_t passed = hit ? (size_t)((const uint8_t*)hit - p) : pending(d);
-      drop(d, passed);
-      pay(d, passed);
+      /* A candidate that waits for more input stays where it is, and
+       * what was read of it still holds. */
+      if (passed) {
+        drop(d, passed);
+        pay(d, passed);
+      }
     }
     const size_t avail = pending(d);
     if (avail == 0 || avail < d->need) {
@@ -1318,16 +1335,20 @@ int flac_decoder_decode_next(BaacFlacDecoder* d, int32_t* pcm, int pcm_size) {
         d->need = avail + 1;
       } else {
         /* Every depth is read again from the start when more has come,
-         * so the next look waits for the input to double. */
-        charge(d, examined);
+         * so the next look waits for the input to double.  What the
+         * probe read is billed when the candidate is rejected. */
+        d->probe_work += examined;
         d->need = std::min(bound, 2 * avail + kFifoMinBytes);
       }
+      /* The FIFO has to admit what the next look waits for; `need` never
+       * exceeds the bound of a frame of this size. */
+      raise_fifo_limit(d, d->need);
       return 0;
     }
     if (result != kFrameOk) {
       /* A syntax error, a CRC-16 mismatch, more bytes than a frame of
        * this size may take, or a frame the input ends in. */
-      charge(d, examined);
+      charge(d, examined + d->probe_work);
       if (reject(d)) {
         return AAC_ERR_DECODE;
       }

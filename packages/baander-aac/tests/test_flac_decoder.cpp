@@ -1157,6 +1157,79 @@ static void test_frame_search() {
             d.pcm.size(), b.pcm.size(), d.errors.size());
     }
   }
+
+  /* Real frames that leave their depth to a STREAMINFO the stream does
+   * not carry, larger than the FIFO holds before a frame size is known,
+   * fed in pieces smaller than a frame.  However the input arrives, the
+   * decoder says the stream needs its STREAMINFO: it neither waits for
+   * more than it can take nor passes the frames over as false ones. */
+  {
+    StreamBuilder b(48000, 2, 16);
+    for (int frame = 0; frame < 6; frame++) {
+      TestFrame f;
+      f.defer_bits = true;
+      f.subframes.assign(2, TestSubframe::verbatim());
+      b.add(f, flac_gen_noise(4096, 2, 16, 60u + (unsigned)frame));
+    }
+    std::vector<uint8_t> with_marker = {'f', 'L', 'a', 'C'};
+    flac_append(with_marker,
+                flac_metadata_block(FLAC_BLOCK_PADDING, std::vector<uint8_t>(16), true));
+    flac_append(with_marker, b.frames);
+    std::vector<uint8_t> one_frame(b.frames.begin(),
+                                   b.frames.begin() + (std::ptrdiff_t)b.offsets[1]);
+    for (const std::vector<uint8_t>* s : {&b.frames, &with_marker, &one_frame}) {
+      for (size_t chunk : {SIZE_MAX, (size_t)8192, (size_t)4096, (size_t)1000}) {
+        const FlacDecoded d = flac_decode(*s, chunk);
+        bool unsupported = false;
+        for (const FlacDecodeEvent& e : d.errors) {
+          unsupported = unsupported || e.code == AAC_ERR_UNSUPPORTED;
+        }
+        CHECK(unsupported && d.pcm.empty(),
+              "frames that need a missing STREAMINFO are reported as such (%s, pieces of %zu "
+              "bytes, %zu samples, %zu errors)",
+              s == &b.frames ? "frames only" : s == &one_frame ? "one frame" : "marker and padding",
+              chunk, d.pcm.size(),
+              d.errors.size());
+      }
+    }
+  }
+
+  /* A candidate of the search that claims the largest frame and is fed in
+   * small pieces is read on from where the last piece ended, not again
+   * from its start for every piece.  The stream begins at the candidate,
+   * so the decoder is searching. */
+  {
+    std::vector<uint8_t> s(pattern, pattern + 9);
+    s.insert(s.end(), (size_t)1 << 20, 0x00);
+    flac_append(s, real.frames);
+    BaacFlacDecoder* dec = baac_flac_decoder_create();
+    std::vector<int32_t> pcm((size_t)65535 * 8);
+    size_t frames = 0;
+    for (size_t pos = 0; pos < s.size();) {
+      const int piece = (int)std::min<size_t>(4096, s.size() - pos);
+      const int took = baac_flac_decoder_feed(dec, s.data() + pos, piece);
+      if (took <= 0) {
+        break;
+      }
+      pos += (size_t)took;
+      while (baac_flac_decoder_decode_next(dec, pcm.data(), (int)pcm.size()) > 0) {
+        frames++;
+      }
+    }
+    baac_flac_decoder_end_input(dec);
+    for (int n; (n = baac_flac_decoder_decode_next(dec, pcm.data(), (int)pcm.size())) != 0;) {
+      frames += n > 0 ? 1 : 0;
+      if (n < 0 && n != AAC_ERR_DECODE) {
+        break;
+      }
+    }
+    const uint64_t work = flac_decoder_read_work(dec);
+    baac_flac_decoder_destroy(dec);
+    CHECK(work <= 4 * (uint64_t)s.size(),
+          "a candidate fed in pieces of 4096 bytes: %llu bytes read for %zu bytes of input",
+          (unsigned long long)work, s.size());
+    CHECK(frames >= 12, "the frames behind the candidate decode (%zu)", frames);
+  }
 }
 
 static void test_property_change() {
