@@ -95,6 +95,23 @@ final class OrdinaryAdmissionTransportTest extends TestCase
         self::assertNull($snapshot['slots']['consumer-0']['requestId']);
     }
 
+    public function testEmptyPollReturnsItsPermitWhileAnotherProcessBrieflyHoldsTheLock(): void
+    {
+        $inner = new AdmissionTestTransport();
+        $inner->empty = true;
+        $holder = null;
+        // Held past one 50 ms lock deadline, as any process descheduled while holding it can.
+        $inner->onGet = function () use (&$holder): void {
+            $holder = $this->holdLock(0.2);
+        };
+        self::assertSame([], iterator_to_array($this->transport(0, $inner)->get()));
+        proc_close($holder);
+        $snapshot = $this->ledger->snapshot(hrtime(true) / 1e9);
+        self::assertFalse($snapshot['fatal']);
+        self::assertSame(0, $snapshot['completed']);
+        self::assertNull($snapshot['slots']['consumer-0']['requestId']);
+    }
+
     public function testAmbiguousAcknowledgementRetainsPermitAndStopsNewAdmission(): void
     {
         $inner = new AdmissionTestTransport();
@@ -120,6 +137,17 @@ final class OrdinaryAdmissionTransportTest extends TestCase
         return new OrdinaryAdmissionTransport($inner, new WorkerAdmissionContext($this->ledger,
             new WorkerLaunchIdentity('worker.baander.app', $this->boot, 'consumer-' . $slot, 1)));
     }
+
+    /** Holds the admission lock from another process for the given time; returns once it is held. */
+    private function holdLock(float $seconds): mixed
+    {
+        $code = '$lock = fopen($argv[1], "r+"); flock($lock, LOCK_EX); echo "held\n"; usleep((int) ($argv[2] * 1e6));';
+        $process = proc_open([PHP_BINARY, '-r', $code, '--', $this->directory . '/' . $this->boot . '/admission.lock', (string) $seconds],
+            [1 => ['pipe', 'w']], $pipes);
+        self::assertIsResource($process);
+        self::assertSame("held\n", fgets($pipes[1]));
+        return $process;
+    }
 }
 
 final class AdmissionTestTransport implements TransportInterface, KeepaliveReceiverInterface, SetupableTransportInterface, CloseableTransportInterface, MessageCountAwareInterface
@@ -129,8 +157,16 @@ final class AdmissionTestTransport implements TransportInterface, KeepaliveRecei
     public int $rejections = 0;
     public bool $empty = false;
     public bool $failAck = false;
+    public ?\Closure $onGet = null;
 
-    public function get(): iterable { ++$this->receives; return $this->empty ? [] : [new Envelope(new \stdClass())]; }
+    public function get(): iterable
+    {
+        ++$this->receives;
+        if ($this->onGet !== null) {
+            ($this->onGet)();
+        }
+        return $this->empty ? [] : [new Envelope(new \stdClass())];
+    }
     public function ack(Envelope $envelope): void { if ($this->failAck) { throw new \RuntimeException('private transport details'); } }
     public function reject(Envelope $envelope): void { ++$this->rejections; }
     public function keepalive(Envelope $envelope, ?int $seconds = null): void { ++$this->keepalives; }
