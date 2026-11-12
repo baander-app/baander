@@ -14,11 +14,11 @@ __metadata:
 
 "@baander/aac-native@file:../../packages/baander-aac::locator=%40baander%2Fdesktop%40workspace%3A.":
   version: 0.2.0
-  resolution: "@baander/aac-native@file:../../packages/baander-aac#../../packages/baander-aac::hash=62ee44&locator=%40baander%2Fdesktop%40workspace%3A."
+  resolution: "@baander/aac-native@file:../../packages/baander-aac#../../packages/baander-aac::hash=e4aa59&locator=%40baander%2Fdesktop%40workspace%3A."
   dependencies:
     node-addon-api: "npm:^8.9.2"
     node-gyp: "npm:^11.0.0"
-  checksum: 10c0/06bda98786e9e23b60a6bdd4c86fd576a06ad9402e12d5bc5735862d4340d7abe13d08d33b967a228bf472167b8e92eb94fc3cee1c7958ccbb32dbbb1a97057b
+  checksum: 10c0/276475d235109fda69ace54c7b981ffd090a8aca163bbce561a3b0ca49efe76a19c3cf39e09b68fd84b1284baa57543ac025df5f593e6018bf2115509519a4a6
   languageName: node
   linkType: hard
 
