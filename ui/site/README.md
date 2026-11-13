@@ -25,10 +25,10 @@ credentials or other personal files under `var/website/`.
 
 Each build also writes `sitemap.xml` and `robots.txt` at the site root, so the
 sitemap follows every change without a separate step. It lists the homepage, the
-bAAC page and every manual page at its `https://baander.app` URL, and never the
+Bånder Audio Core page and every manual page at its `https://baander.app` URL, and never the
 404 page. Each `<lastmod>` is the date of the newest commit that touched the
 page's sources: the Markdown file for a manual page, and the template plus the
-data it renders for the homepage and the bAAC page. Uncommitted edits do not move
+data it renders for the homepage and the Bånder Audio Core page. Uncommitted edits do not move
 these dates, and a page whose sources have no commit yet is listed without one, so
 publish a build made from a commit.
 
@@ -67,30 +67,30 @@ fonts arrive keeps its width and line count. Change token inputs in `ui/design-t
 and regenerate them with its existing build command rather than editing generated
 CSS.
 
-The bAAC page at `/baac/` reads the recorded CSV and JSON results under
-`packages/baander-aac/bench/results/`. Its charts and tables share the same
+The Bånder Audio Core page at `/bac/` reads the recorded CSV and JSON results under
+`packages/baander-audio-core/bench/results/`. Its charts and tables share the same
 validated records: 55 quality configurations, 33 throughput observations and the
 22 rows of the lossless run. The build checks the quality summaries against
 their 550 selected per-item observations. It does not run codecs or download a
 corpus.
 
-The lossless table shows bAAC at its default level 5 and at level 8 beside `flac`
+The lossless table shows Bånder Audio Core at its default level 5 and at level 8 beside `flac`
 at the same levels, FFmpeg's FLAC encoder at levels 5 and 8, and the FFmpeg and
 Apple ALAC encoders. The build accepts exactly the rows the benchmark harness
-writes: bAAC and `flac` at levels 0 to 8 and the four other encoders, each once.
+writes: Bånder Audio Core and `flac` at levels 0 to 8 and the four other encoders, each once.
 It refuses an unknown, missing or repeated row and a figure that is not positive,
 with a message that names the row. Only the refalac row may lack speed figures,
 because the harness does not time it. The run's date,
 processor, compiler and reference versions come from the same file, and the
-package version comes from `packages/baander-aac/package.json`. The build also
+package version comes from `packages/baander-audio-core/package.json`. The build also
 accepts the list of four references that `lossless.json` held before the harness
-measured bAAC; that list has no bAAC rows and no run record. The tooling tests
+measured Bånder Audio Core; that list has no Bånder Audio Core rows and no run record. The tooling tests
 read a made-up run in the harness's shape,
 `scripts/tests/php/Fixtures/aac-lossless-result.json`.
 
-Capability and methodology text belongs in `ui/site/templates/baac.php`;
+Capability and methodology text belongs in `ui/site/templates/bac.php`;
 review it against the linked package documentation when the codec changes.
-bAAC source links identify the latest commit affecting the codec package in the
+Bånder Audio Core source links identify the latest commit affecting the codec package in the
 checkout, so website-only commits do not break those links in a local preview.
 Measurement commits and dates identify the recorded experiments separately.
 

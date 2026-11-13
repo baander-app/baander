@@ -20,14 +20,14 @@ final class AacCharts
         foreach (self::TITLES as $family => $title) {
             $result['quality'][$family] = ['title' => $title, 'charts' => []];
             foreach (['peaq_basic' => 'PEAQ Basic', 'visqol' => 'ViSQOL'] as $metric => $label) {
-                $id = "baac-$family-$metric";
+                $id = "bac-$family-$metric";
                 $rows = $evidence['quality'][$family];
                 $chartTitle = "$title: $label against measured bitrate";
                 $result['quality'][$family]['charts'][] = ['id' => $id, 'title' => $chartTitle, 'svg' => $this->quality($id, $chartTitle, $rows, $metric, $label), 'rows' => $rows, 'metric' => $metric, 'unit' => 'score'];
             }
             $result['speed'][$family] = ['title' => $title, 'charts' => []];
             foreach (['encode' => 'Encode', 'decode' => 'Decode'] as $kind => $label) {
-                $id = "baac-$family-$kind";
+                $id = "bac-$family-$kind";
                 $rows = $evidence['speed'][$family][$kind];
                 $chartTitle = "$title: $label throughput";
                 $result['speed'][$family]['charts'][] = ['id' => $id, 'title' => $chartTitle, 'svg' => $this->speed($id, $chartTitle, $rows), 'rows' => $rows, 'metric' => 'throughput', 'unit' => 'audio seconds / CPU second'];
@@ -63,24 +63,24 @@ final class AacCharts
             foreach ($points as $point) {
                 $coordinates[] = $this->format($this->x($point['kbps'], $xMin, $xMax)) . ',' . $this->format($this->y($point[$metric], $yMin, $yMax));
             }
-            $svg .= '<g class="baac-series baac-series-' . $vendor . '" data-codec="' . $vendor . '" data-dash="' . self::DASHES[$styleIndex] . '" style="color:var(--baac-series-' . $vendor . ',currentColor)">';
+            $svg .= '<g class="bac-series bac-series-' . $vendor . '" data-codec="' . $vendor . '" data-dash="' . self::DASHES[$styleIndex] . '" style="color:var(--bac-series-' . $vendor . ',currentColor)">';
             $svg .= '<polyline fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="' . self::DASHES[$styleIndex] . '" points="' . implode(' ', $coordinates) . '"/>';
             foreach ($points as $point) {
                 $x = $this->x($point['kbps'], $xMin, $xMax);
                 $y = $this->y($point[$metric], $yMin, $yMax);
                 $description = $point['label'] . ', nominal ' . $point['nominal'] . ' kbit/s, measured ' . $point['kbps'] . ' kbit/s, ' . $label . ' ' . $point[$metric];
-                $svg .= '<g class="baac-point" data-config="' . $this->escape($point['config']) . '" data-value="' . $this->escape((string) $point[$metric]) . '"'
+                $svg .= '<g class="bac-point" data-config="' . $this->escape($point['config']) . '" data-value="' . $this->escape((string) $point[$metric]) . '"'
                     . ' data-label="' . $this->escape($point['label']) . '" data-nominal="' . $this->escape((string) $point['nominal']) . '" data-kbps="' . $this->escape((string) $point['kbps']) . '"'
                     . ' data-x="' . $this->format($x) . '" data-y="' . $this->format($y) . '"><title>' . $this->escape($description) . '</title>' . $this->marker($styleIndex, $x, $y) . '</g>';
             }
             $svg .= '</g>';
             $legendX = 78 + ($index % 3) * 204;
             $legendY = 365 + intdiv($index, 3) * 23;
-            $legend .= '<g class="baac-legend-item" data-series="' . $vendor . '" data-dash="' . self::DASHES[$styleIndex] . '" style="color:var(--baac-series-' . $vendor . ',currentColor)">';
+            $legend .= '<g class="bac-legend-item" data-series="' . $vendor . '" data-dash="' . self::DASHES[$styleIndex] . '" style="color:var(--bac-series-' . $vendor . ',currentColor)">';
             $legend .= '<line x1="' . $legendX . '" x2="' . ($legendX + 25) . '" y1="' . $legendY . '" y2="' . $legendY . '" stroke="currentColor" stroke-width="2" stroke-dasharray="' . self::DASHES[$styleIndex] . '"/>' . $this->marker($styleIndex, $legendX + 12, $legendY);
             $legend .= '<text x="' . ($legendX + 33) . '" y="' . ($legendY + 4) . '" fill="currentColor">' . $this->escape($points[0]['label']) . '</text></g>';
         }
-        $svg .= '<g class="baac-legend">' . $legend . '</g>';
+        $svg .= '<g class="bac-legend">' . $legend . '</g>';
         return $svg . '</svg>';
     }
 
@@ -92,7 +92,7 @@ final class AacCharts
         for ($i = 0; $i <= 4; ++$i) {
             $value = $maximum * $i / 4;
             $x = 155 + 510 * $i / 4;
-            $svg .= '<line class="baac-grid" x1="' . $this->format($x) . '" x2="' . $this->format($x) . '" y1="35" y2="310" stroke="currentColor" opacity="0.15"/>';
+            $svg .= '<line class="bac-grid" x1="' . $this->format($x) . '" x2="' . $this->format($x) . '" y1="35" y2="310" stroke="currentColor" opacity="0.15"/>';
             $svg .= '<text x="' . $this->format($x) . '" y="332" text-anchor="middle" fill="currentColor">' . $this->format($value) . '</text>';
         }
         foreach ($rows as $index => $row) {
@@ -101,10 +101,10 @@ final class AacCharts
             $width = $row['throughput'] / $maximum * 510;
             $description = $row['label'] . ': ' . $row['throughput'] . ' audio seconds / CPU second';
             $svg .= '<text x="142" y="' . ($y + 20) . '" text-anchor="end" fill="currentColor">' . $this->escape($row['label']) . '</text>';
-            $svg .= '<rect class="baac-bar baac-series-' . $vendor . '" x="155" y="' . $y . '" width="' . $this->format($width) . '" height="28" fill="var(--baac-series-' . $vendor . ',currentColor)" data-config="' . $this->escape($row['config']) . '" data-codec="' . $this->escape($row['codec']) . '" data-value="' . $this->escape((string) $row['throughput']) . '" data-label="' . $this->escape($row['label']) . '" data-cpu="' . $this->escape((string) $row['cpu']) . '"><title>' . $this->escape($description) . '</title></rect>';
+            $svg .= '<rect class="bac-bar bac-series-' . $vendor . '" x="155" y="' . $y . '" width="' . $this->format($width) . '" height="28" fill="var(--bac-series-' . $vendor . ',currentColor)" data-config="' . $this->escape($row['config']) . '" data-codec="' . $this->escape($row['codec']) . '" data-value="' . $this->escape((string) $row['throughput']) . '" data-label="' . $this->escape($row['label']) . '" data-cpu="' . $this->escape((string) $row['cpu']) . '"><title>' . $this->escape($description) . '</title></rect>';
             $svg .= '<text x="' . $this->format(163 + $width) . '" y="' . ($y + 20) . '" fill="currentColor">' . $this->format($row['throughput']) . '</text>';
         }
-        $svg .= '<line class="baac-axis" x1="155" x2="155" y1="35" y2="310" stroke="currentColor"/>';
+        $svg .= '<line class="bac-axis" x1="155" x2="155" y1="35" y2="310" stroke="currentColor"/>';
         $svg .= '<text x="410" y="369" text-anchor="middle" fill="currentColor">Audio seconds / CPU second · higher is better</text>';
         return $svg . '</svg>';
     }
@@ -117,16 +117,16 @@ final class AacCharts
             $yValue = $yMin + ($yMax - $yMin) * $i / 4;
             $x = $this->format($this->x($xValue, $xMin, $xMax));
             $y = $this->format($this->y($yValue, $yMin, $yMax));
-            $svg .= '<line class="baac-grid" x1="78" x2="680" y1="' . $y . '" y2="' . $y . '" stroke="currentColor" opacity="0.15"/>';
+            $svg .= '<line class="bac-grid" x1="78" x2="680" y1="' . $y . '" y2="' . $y . '" stroke="currentColor" opacity="0.15"/>';
             $svg .= '<text x="66" y="' . $this->format((float) $y + 4) . '" text-anchor="end" fill="currentColor">' . $this->format($yValue) . '</text>';
             $svg .= '<text x="' . $x . '" y="318" text-anchor="middle" fill="currentColor">' . $this->format($xValue) . '</text>';
         }
-        return $svg . '<path class="baac-axis" d="M78 35V298H680" fill="none" stroke="currentColor"/><text x="380" y="343" text-anchor="middle" fill="currentColor">' . $this->escape($xLabel) . '</text><text x="78" y="21" fill="currentColor">' . $this->escape($yLabel) . '</text>';
+        return $svg . '<path class="bac-axis" d="M78 35V298H680" fill="none" stroke="currentColor"/><text x="380" y="343" text-anchor="middle" fill="currentColor">' . $this->escape($xLabel) . '</text><text x="78" y="21" fill="currentColor">' . $this->escape($yLabel) . '</text>';
     }
 
     private function start(string $id, string $title, string $description): string
     {
-        return '<svg xmlns="http://www.w3.org/2000/svg" class="baac-chart" viewBox="0 0 720 410" role="img" aria-labelledby="' . $id . '-title ' . $id . '-description" style="font-family:inherit;font-size:13px"><title id="' . $id . '-title">' . $this->escape($title) . '</title><desc id="' . $id . '-description">' . $this->escape($description) . '</desc>';
+        return '<svg xmlns="http://www.w3.org/2000/svg" class="bac-chart" viewBox="0 0 720 410" role="img" aria-labelledby="' . $id . '-title ' . $id . '-description" style="font-family:inherit;font-size:13px"><title id="' . $id . '-title">' . $this->escape($title) . '</title><desc id="' . $id . '-description">' . $this->escape($description) . '</desc>';
     }
 
     private function marker(int $index, float $x, float $y): string

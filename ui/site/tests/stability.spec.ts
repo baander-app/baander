@@ -45,7 +45,7 @@ declare global {
   }
 }
 
-const pages = ['/', '/docs/operator-guide/', '/baac/'];
+const pages = ['/', '/docs/operator-guide/', '/bac/'];
 const viewports = [{ width: 1440, height: 900 }, { width: 390, height: 844 }];
 const fontFiles = '**/assets/site/fonts/*.woff2';
 

@@ -6,7 +6,7 @@
       <nav aria-label="Main navigation">
         <a href="/#how-it-works">How it works</a>
         <a href="/docs/operator-guide/"<?= $page['guide'] === 'operator' ? ' aria-current="true"' : '' ?>>Manual</a>
-        <a href="/baac/"<?= $page['url'] === '/baac/' ? ' aria-current="page"' : '' ?>>bAAC</a>
+        <a href="/bac/"<?= $page['url'] === '/bac/' ? ' aria-current="page"' : '' ?>>Audio Core</a>
         <a href="/typography/"<?= $page['url'] === '/typography/' ? ' aria-current="page"' : '' ?>>Typography</a>
         <a href="<?= $escape($site['repositoryUrl']) ?>">Source <span class="arrow" aria-hidden="true">↗</span></a>
       </nav>

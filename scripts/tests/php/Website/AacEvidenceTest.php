@@ -301,17 +301,17 @@ final class AacEvidenceTest extends TestCase
                     $xpath = new \DOMXPath($document);
                     foreach (array_unique(array_column($chart['rows'], $kind === 'quality' ? 'encoder' : 'codec')) as $vendor) {
                         [$dash, $shape] = $vendors[$vendor];
-                        $nodes = $xpath->query('//*[@data-codec="' . $vendor . '" and contains(@class,"baac-series-")]');
+                        $nodes = $xpath->query('//*[@data-codec="' . $vendor . '" and contains(@class,"bac-series-")]');
                         self::assertCount(1, $nodes, $chart['id'] . ' / ' . $vendor);
                         $node = $nodes->item(0);
                         self::assertInstanceOf(\DOMElement::class, $node);
-                        $variable = 'var(--baac-series-' . $vendor . ',currentColor)';
+                        $variable = 'var(--bac-series-' . $vendor . ',currentColor)';
                         if ($kind === 'quality') {
                             self::assertSame('color:' . $variable, $node->getAttribute('style'));
                             $lines = $node->getElementsByTagName('polyline');
                             self::assertInstanceOf(\DOMElement::class, $lines->item(0));
                             self::assertSame($dash, $lines->item(0)->getAttribute('stroke-dasharray'));
-                            $markers = $xpath->query('./*[contains(@class,"baac-point")]/*[local-name()="' . $shape . '"]', $node);
+                            $markers = $xpath->query('./*[contains(@class,"bac-point")]/*[local-name()="' . $shape . '"]', $node);
                             self::assertGreaterThan(0, $markers->count());
                         } else {
                             self::assertSame($variable, $node->getAttribute('fill'));

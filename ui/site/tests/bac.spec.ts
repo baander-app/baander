@@ -15,37 +15,37 @@ const test = base.extend<{ localRequests: void }>({
       }
     });
     await use();
-    expect(outbound, 'bAAC must render without external services').toEqual([]);
+    expect(outbound, 'Bånder Audio Core must render without external services').toEqual([]);
   }, { auto: true }],
 });
 
-test('visitors discover bAAC and its direct route has one canonical URL', async ({ page }) => {
+test('visitors discover Bånder Audio Core and its direct route has one canonical URL', async ({ page }) => {
   await page.goto('/');
-  await page.getByRole('navigation', { name: 'Main navigation' }).getByRole('link', { name: 'bAAC', exact: true }).click();
-  await expect(page).toHaveURL(/\/baac\/$/);
-  await expect(page.getByRole('heading', { name: 'bAAC', exact: true })).toBeVisible();
-  await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', 'https://baander.app/baac/');
+  await page.getByRole('navigation', { name: 'Main navigation' }).getByRole('link', { name: 'Audio Core', exact: true }).click();
+  await expect(page).toHaveURL(/\/bac\/$/);
+  await expect(page.getByRole('heading', { name: 'Bånder Audio Core', exact: true })).toBeVisible();
+  await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', 'https://baander.app/bac/');
   await expect(page.getByRole('link', { name: 'Read the source guide' }))
     .toHaveAttribute('href', /^https:\/\/github\.com\/baander-app\/baander\/blob\/[a-f0-9]{40}\/packages\/baander-audio-core\/docs\/README\.md$/);
   await expect(page.getByRole('heading', { name: 'Server transcoding through FFmpeg' })).toBeVisible();
   await expect(page.locator('#integration')).toContainText('libbaac');
   await expect(page.locator('#integration').getByRole('link', { name: 'AAC implementation' }))
     .toHaveAttribute('href', '/docs/operator-guide/media/transcoding/#aac-implementation');
-  await expect(page.getByRole('navigation', { name: 'Main navigation' }).getByRole('link', { name: 'bAAC', exact: true }))
+  await expect(page.getByRole('navigation', { name: 'Main navigation' }).getByRole('link', { name: 'Audio Core', exact: true }))
     .toHaveAttribute('aria-current', 'page');
-  await expect(page.getByRole('navigation', { name: 'Footer navigation' }).getByRole('link', { name: 'bAAC', exact: true }))
-    .toHaveAttribute('href', '/baac/');
-  await page.goto('/baac');
-  await expect(page).toHaveURL(/\/baac\/$/);
-  await expect(page.getByRole('heading', { name: 'bAAC', exact: true })).toBeVisible();
+  await expect(page.getByRole('navigation', { name: 'Footer navigation' }).getByRole('link', { name: 'Audio Core', exact: true }))
+    .toHaveAttribute('href', '/bac/');
+  await page.goto('/bac');
+  await expect(page).toHaveURL(/\/bac\/$/);
+  await expect(page.getByRole('heading', { name: 'Bånder Audio Core', exact: true })).toBeVisible();
   await page.goto('/docs/operator-guide/');
-  await page.getByRole('navigation', { name: 'Main navigation' }).getByRole('link', { name: 'bAAC', exact: true }).click();
-  await expect(page).toHaveURL(/\/baac\/$/);
+  await page.getByRole('navigation', { name: 'Main navigation' }).getByRole('link', { name: 'Audio Core', exact: true }).click();
+  await expect(page).toHaveURL(/\/bac\/$/);
 });
 
 test('all sixteen charts reproduce their adjacent tables and complete recorded populations', async ({ page }) => {
-  await page.goto('/baac/');
-  const panels = page.locator('.baac-chart-panel');
+  await page.goto('/bac/');
+  const panels = page.locator('.bac-chart-panel');
   await expect(panels).toHaveCount(16);
   for (const panel of await panels.all()) {
     const mapping = await panel.evaluate((element) => {
@@ -79,13 +79,13 @@ test('all sixteen charts reproduce their adjacent tables and complete recorded p
   await expect(page.locator('#throughput svg [data-value]')).toHaveCount(33);
 });
 
-test('the lossless table sets bAAC level 5 and level 8 beside the references, every row bit-exact', async ({ page }) => {
-  await page.goto('/baac/');
+test('the lossless table sets Bånder Audio Core level 5 and level 8 beside the references, every row bit-exact', async ({ page }) => {
+  await page.goto('/bac/');
   await expect(page.locator('.release-note')).toContainText(`Version ${packageVersion} `);
   const section = page.locator('#lossless');
   await expect(section.getByRole('heading', { level: 2 })).toHaveText('Standard FLAC, measured level for level.');
-  await expect(section).not.toContainText('does not imply a bAAC lossless mode');
-  await expect(section.locator('.baac-dateline'))
+  await expect(section).not.toContainText('does not imply a Bånder Audio Core lossless mode');
+  await expect(section.locator('.bac-dateline'))
     .toHaveText(/^Recorded \d{1,2} [A-Z][a-z]+ \d{4} on .+\. The references were flac 1\.4\.3 and FFmpeg \S+\. /);
   await expect(section.locator('tbody th')).toHaveText([
     'Bånder Audio Core level 5 (default)',
@@ -112,20 +112,20 @@ test('the lossless table sets bAAC level 5 and level 8 beside the references, ev
 
 test('charts show readouts on hover and keyboard focus, and legend buttons toggle encoders', async ({ page }) => {
   const format = (value: string | null, digits = 3) => Number(value).toLocaleString('en-US', { minimumFractionDigits: digits, maximumFractionDigits: digits });
-  await page.goto('/baac/');
-  const panel = page.locator('#baac-lc-peaq_basic');
-  const chart = panel.locator('svg.baac-chart');
-  const tooltip = panel.locator('.baac-tooltip');
+  await page.goto('/bac/');
+  const panel = page.locator('#bac-lc-peaq_basic');
+  const chart = panel.locator('svg.bac-chart');
+  const tooltip = panel.locator('.bac-tooltip');
   await expect(tooltip).toBeHidden();
 
-  const point = panel.locator('.baac-series[data-codec="ours"] .baac-point').nth(2);
+  const point = panel.locator('.bac-series[data-codec="ours"] .bac-point').nth(2);
   await point.scrollIntoViewIfNeeded();
   const box = (await point.boundingBox())!;
   await page.mouse.move(box.x + box.width / 2 + 6, box.y + box.height / 2 + 6);
   await expect(tooltip).toBeVisible();
   const nominal = await point.getAttribute('data-nominal');
   await expect(tooltip).toContainText(`Nominal ${nominal} kbit/s`);
-  const peers = await panel.locator(`.baac-point[data-nominal="${nominal}"]`).evaluateAll((points) => points.map((element) => ({
+  const peers = await panel.locator(`.bac-point[data-nominal="${nominal}"]`).evaluateAll((points) => points.map((element) => ({
     label: element.getAttribute('data-label'),
     value: element.getAttribute('data-value'),
   })));
@@ -144,26 +144,26 @@ test('charts show readouts on hover and keyboard focus, and legend buttons toggl
   await chart.press('Escape');
   await expect(tooltip).toBeHidden();
 
-  const ffmpeg = panel.locator('.baac-legend-item[data-series="ffmpeg"]');
+  const ffmpeg = panel.locator('.bac-legend-item[data-series="ffmpeg"]');
   await expect(ffmpeg).toHaveAttribute('role', 'button');
   await expect(ffmpeg).toHaveAttribute('aria-pressed', 'true');
   await ffmpeg.press('Enter');
   await expect(ffmpeg).toHaveAttribute('aria-pressed', 'false');
-  await expect(panel.locator('.baac-series[data-codec="ffmpeg"]')).toBeHidden();
-  await expect(panel.locator('.baac-series.is-receded')).toHaveCount(0);
+  await expect(panel.locator('.bac-series[data-codec="ffmpeg"]')).toBeHidden();
+  await expect(panel.locator('.bac-series.is-receded')).toHaveCount(0);
   await page.mouse.move(box.x + box.width / 2 + 6, box.y + box.height / 2 + 6);
   await expect(tooltip).toBeVisible();
   await expect(tooltip).not.toContainText('FFmpeg');
   await ffmpeg.click();
   await expect(ffmpeg).toHaveAttribute('aria-pressed', 'true');
-  await expect(panel.locator('.baac-series[data-codec="ffmpeg"]')).toBeVisible();
+  await expect(panel.locator('.bac-series[data-codec="ffmpeg"]')).toBeVisible();
 
-  const speed = page.locator('#baac-lc-encode');
-  const bar = speed.locator('.baac-bar').first();
+  const speed = page.locator('#bac-lc-encode');
+  const bar = speed.locator('.bac-bar').first();
   await bar.scrollIntoViewIfNeeded();
   const barBox = (await bar.boundingBox())!;
   await page.mouse.move(barBox.x + 8, barBox.y + barBox.height / 2);
-  const barTooltip = speed.locator('.baac-tooltip');
+  const barTooltip = speed.locator('.bac-tooltip');
   await expect(barTooltip).toBeVisible();
   await expect(barTooltip).toContainText((await bar.getAttribute('data-label'))!);
   await expect(barTooltip).toContainText(format(await bar.getAttribute('data-value')));
@@ -172,23 +172,23 @@ test('charts show readouts on hover and keyboard focus, and legend buttons toggl
 
 for (const width of [1440, 390]) {
   for (const colorScheme of ['light', 'dark'] as const) {
-    test.describe(`${width}px ${colorScheme} bAAC without JavaScript`, () => {
+    test.describe(`${width}px ${colorScheme} Bånder Audio Core without JavaScript`, () => {
       test.use({ javaScriptEnabled: false, viewport: { width, height: 1000 }, colorScheme });
       test('plots and tables remain readable and keyboard scroll within the page', async ({ page }) => {
-        await page.goto('/baac/');
-        await expect(page.getByRole('heading', { name: 'bAAC', exact: true })).toBeVisible();
+        await page.goto('/bac/');
+        await expect(page.getByRole('heading', { name: 'Bånder Audio Core', exact: true })).toBeVisible();
         await expect(page.locator('[data-appearance-toggle]')).toBeHidden();
-        for (const family of await page.locator('.baac-family').all()) {
+        for (const family of await page.locator('.bac-family').all()) {
           if (await family.getAttribute('open') === null) {
             await family.locator(':scope > summary').focus();
             await family.locator(':scope > summary').press('Enter');
           }
           await expect(family).toHaveAttribute('open', '');
         }
-        const panels = page.locator('.baac-chart-panel');
-        const vendorColors = await page.locator('.baac-series[data-codec], .baac-bar[data-codec]').evaluateAll((series) => series.map((element) => ({
+        const panels = page.locator('.bac-chart-panel');
+        const vendorColors = await page.locator('.bac-series[data-codec], .bac-bar[data-codec]').evaluateAll((series) => series.map((element) => ({
           vendor: element.getAttribute('data-codec')!,
-          color: element.classList.contains('baac-bar') ? getComputedStyle(element).fill : getComputedStyle(element).color,
+          color: element.classList.contains('bac-bar') ? getComputedStyle(element).fill : getComputedStyle(element).color,
         })));
         const colors = new Map<string, string>();
         for (const { vendor, color } of vendorColors) {
@@ -199,7 +199,7 @@ for (const width of [1440, 390]) {
         expect(new Set(colors.values()).size, 'Every vendor has a distinct color').toBe(5);
         for (const panel of await panels.all()) {
           await expect(panel.locator('svg')).toBeVisible();
-          const region = panel.locator('.baac-plot-scroll');
+          const region = panel.locator('.bac-plot-scroll');
           await region.focus();
           await expect(region).toBeFocused();
           expect(await region.evaluate((element) => getComputedStyle(element).outlineStyle)).not.toBe('none');
@@ -208,7 +208,7 @@ for (const width of [1440, 390]) {
             await region.press('ArrowRight');
             await expect.poll(() => region.evaluate((element) => element.scrollLeft)).toBeGreaterThan(0);
           }
-          const disclosure = panel.locator('.baac-data');
+          const disclosure = panel.locator('.bac-data');
           await disclosure.locator('summary').focus();
           await disclosure.locator('summary').press('Enter');
           await expect(disclosure.locator('table')).toBeVisible();
@@ -232,9 +232,9 @@ for (const width of [1440, 390]) {
         }
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
         const first = panels.first();
-        const screenshot = test.info().outputPath(`baac-${width}-${colorScheme}.png`);
+        const screenshot = test.info().outputPath(`bac-${width}-${colorScheme}.png`);
         await first.screenshot({ path: screenshot });
-        await test.info().attach(`baac-${width}-${colorScheme}`, { path: screenshot, contentType: 'image/png' });
+        await test.info().attach(`bac-${width}-${colorScheme}`, { path: screenshot, contentType: 'image/png' });
         const widths = await panels.locator('svg').evaluateAll((charts) => charts.map((chart) => chart.getBoundingClientRect().width));
         for (const chartWidth of widths) expect(chartWidth, 'Keep 13px plot text at its intrinsic scale').toBeGreaterThanOrEqual(720);
       });
@@ -243,10 +243,10 @@ for (const width of [1440, 390]) {
 }
 
 for (const colorScheme of ['light', 'dark'] as const) {
-  test(`${colorScheme} system preference: explicit opposite bAAC theme persists`, async ({ page }) => {
+  test(`${colorScheme} system preference: explicit opposite Bånder Audio Core theme persists`, async ({ page }) => {
     await page.emulateMedia({ colorScheme });
-    await page.goto('/baac/');
-    const chart = page.locator('.baac-chart').first();
+    await page.goto('/bac/');
+    const chart = page.locator('.bac-chart').first();
     const initialColor = await chart.evaluate((element) => getComputedStyle(element).color);
     const opposite = colorScheme === 'light' ? 'dark' : 'light';
     const chosenTheme = opposite === 'light' ? 'balanced' : 'dark';

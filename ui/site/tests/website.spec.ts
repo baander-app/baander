@@ -48,8 +48,8 @@ test('pages set their text in the self-hosted Geist faces', async ({ page }) => 
   const code = await typography('.manual-article code');
   expect(code.family).toMatch(/^"Geist Mono Variable",/);
   expect(code.loaded).toContain('Geist Mono Variable');
-  await page.goto('/baac/');
-  const codec = await typography('.baac-method code');
+  await page.goto('/bac/');
+  const codec = await typography('.bac-method code');
   expect(codec.family, 'Code outside the manual uses the mono stack too').toMatch(/^"Geist Mono Variable",/);
   expect(codec.loaded).toContain('Geist Mono Variable');
 });
@@ -158,7 +158,8 @@ test('the sitemap lists every published page at its canonical URL and robots.txt
   expect(result.status).toBe(200);
   expect(result.type).toMatch(/xml/);
   expect(result.locations.length).toBeGreaterThan(200);
-  expect(result.locations).toEqual(expect.arrayContaining(['https://baander.app/', 'https://baander.app/baac/', 'https://baander.app/typography/', 'https://baander.app/docs/developer-guide/contexts/']));
+  expect(result.locations).toEqual(expect.arrayContaining(['https://baander.app/', 'https://baander.app/bac/', 'https://baander.app/typography/', 'https://baander.app/docs/developer-guide/contexts/']));
+  expect(result.locations).not.toContain('https://baander.app/baac/');
   expect(result.locations.some((location) => location.endsWith('404.html'))).toBe(false);
   for (const value of result.lastModified) expect(Number.isNaN(Date.parse(value)), value).toBe(false);
   for (const listed of result.pages) expect(listed, listed.location).toMatchObject({ status: 200, canonical: true });
@@ -323,6 +324,14 @@ test('manual remains readable and navigable with JavaScript disabled', async ({ 
   }
 });
 
+test('the codec page is not served at its address from before the rename', async ({ page }) => {
+  for (const path of ['/baac', '/baac/']) {
+    const response = await page.goto(path);
+    expect(response?.status(), path).toBe(404);
+    await expect(page.getByRole('heading', { name: /not found/i })).toBeVisible();
+  }
+});
+
 test('unknown and private paths return 404; chapter URLs canonicalize', async ({ page }) => {
   for (const path of ['/not-a-public-page/', '/.env', '/.vercel/output/config.json', '/scripts/build-website.php', '/docs/../.git/config']) {
     const response = await page.goto(path);
@@ -445,7 +454,7 @@ test('visitors reach the typography page from the header and it describes itself
   await expect(page).toHaveTitle(/^Typography/);
   await expect(page.getByRole('navigation', { name: 'Main navigation' }).getByRole('link', { name: 'Typography', exact: true }))
     .toHaveAttribute('aria-current', 'page');
-  await expect(page.getByRole('navigation', { name: 'Main navigation' }).getByRole('link', { name: 'bAAC', exact: true }))
+  await expect(page.getByRole('navigation', { name: 'Main navigation' }).getByRole('link', { name: 'Audio Core', exact: true }))
     .not.toHaveAttribute('aria-current');
   await expect(page.getByRole('navigation', { name: 'Footer navigation' }).getByRole('link', { name: 'Typography', exact: true }))
     .toHaveAttribute('href', '/typography/');
@@ -497,7 +506,7 @@ test('each script rule sample differs from its sample without the rule', async (
   expect(proportional.family).toMatch(/^"Geist Variable",/);
 });
 
-for (const path of ['/', '/docs/developer-guide/testing/', '/baac/']) {
+for (const path of ['/', '/docs/developer-guide/testing/', '/bac/']) {
   test(`${path}: every character renders from a bundled face and only the slices the text reaches load`, async ({ page }) => {
     await page.goto(path);
     await expect(page.locator('main h1')).toBeVisible();

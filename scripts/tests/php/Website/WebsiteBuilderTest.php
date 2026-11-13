@@ -138,13 +138,13 @@ final class WebsiteBuilderTest extends TestCase
 
     public function testPublicPageReceivesDataWithoutJoiningManualManifest(): void
     {
-        file_put_contents($this->root . '/ui/site/templates/baac.php', '<?php echo htmlspecialchars($data["name"]);');
+        file_put_contents($this->root . '/ui/site/templates/bac.php', '<?php echo htmlspecialchars($data["name"]);');
         $pages = $this->builder()->build(publicPages: [[
-            'template' => 'baac', 'url' => '/baac/', 'title' => 'bAAC',
-            'description' => 'Codec measurements', 'data' => ['name' => 'bAAC'],
+            'template' => 'bac', 'url' => '/bac/', 'title' => 'Bånder Audio Core',
+            'description' => 'Codec measurements', 'data' => ['name' => 'Bånder Audio Core'],
         ]]);
         self::assertCount(5, $pages);
-        self::assertSame('bAAC', file_get_contents($this->root . '/var/website/baac/index.html'));
+        self::assertSame('Bånder Audio Core', file_get_contents($this->root . '/var/website/bac/index.html'));
     }
 
     public function testInvalidPublicRouteKeepsPreviousArtifact(): void

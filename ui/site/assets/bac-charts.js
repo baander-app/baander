@@ -14,7 +14,7 @@
   };
   // A short stroke in the series color and dash pattern identifies each tooltip row.
   const lineKey = (color, dash) => {
-    const key = make('svg', { class: 'baac-tooltip-key', width: 18, height: 8, viewBox: '0 0 18 8', 'aria-hidden': 'true' });
+    const key = make('svg', { class: 'bac-tooltip-key', width: 18, height: 8, viewBox: '0 0 18 8', 'aria-hidden': 'true' });
     key.style.color = color;
     key.append(make('line', { x1: 1, x2: 17, y1: 4, y2: 4, stroke: 'currentColor', 'stroke-width': 2, 'stroke-linecap': 'round', 'stroke-dasharray': dash || 'none' }));
     return key;
@@ -22,23 +22,23 @@
 
   let hintCount = 0;
 
-  for (const panel of document.querySelectorAll('.baac-chart-panel')) {
-    const svg = panel.querySelector('svg.baac-chart');
-    const region = panel.querySelector('.baac-plot-scroll');
+  for (const panel of document.querySelectorAll('.bac-chart-panel')) {
+    const svg = panel.querySelector('svg.bac-chart');
+    const region = panel.querySelector('.bac-plot-scroll');
     if (!svg || !region) continue;
-    const quality = svg.querySelector('.baac-point') !== null;
+    const quality = svg.querySelector('.bac-point') !== null;
     const metric = panel.querySelector('thead th:last-child')?.textContent ?? '';
 
     const marks = quality
-      ? [...svg.querySelectorAll('.baac-point')].map((element) => {
-        const series = element.closest('.baac-series');
+      ? [...svg.querySelectorAll('.bac-point')].map((element) => {
+        const series = element.closest('.bac-series');
         return {
           element, series, codec: series.dataset.codec, dash: series.dataset.dash,
           x: Number(element.dataset.x), y: Number(element.dataset.y), value: Number(element.dataset.value),
           label: element.dataset.label, nominal: Number(element.dataset.nominal), kbps: Number(element.dataset.kbps),
         };
       })
-      : [...svg.querySelectorAll('.baac-bar')].map((element) => ({
+      : [...svg.querySelectorAll('.bac-bar')].map((element) => ({
         element, codec: element.dataset.codec,
         x: Number(element.getAttribute('x')) + Number(element.getAttribute('width')),
         y: Number(element.getAttribute('y')) + Number(element.getAttribute('height')) / 2,
@@ -48,19 +48,19 @@
 
     const hidden = new Set();
     const visible = () => marks.filter((mark) => !hidden.has(mark.codec));
-    const seriesColor = (codec) => `var(--baac-series-${codec}, currentColor)`;
+    const seriesColor = (codec) => `var(--bac-series-${codec}, currentColor)`;
 
     // Hover marks draw above the data; the transparent hit area above them takes the pointer,
     // so the pointer only has to be nearest to a mark, never on its painted pixels.
-    const layer = make('g', { class: 'baac-hover', 'aria-hidden': 'true' });
+    const layer = make('g', { class: 'bac-hover', 'aria-hidden': 'true' });
     const hit = quality
-      ? make('rect', { class: 'baac-hit', x: 40, y: 20, width: 660, height: 312, fill: 'transparent' })
-      : make('rect', { class: 'baac-hit', x: 0, y: 30, width: 720, height: Math.max(...marks.map((mark) => mark.y)) + 22 - 30, fill: 'transparent' });
-    const legend = svg.querySelector('.baac-legend');
+      ? make('rect', { class: 'bac-hit', x: 40, y: 20, width: 660, height: 312, fill: 'transparent' })
+      : make('rect', { class: 'bac-hit', x: 0, y: 30, width: 720, height: Math.max(...marks.map((mark) => mark.y)) + 22 - 30, fill: 'transparent' });
+    const legend = svg.querySelector('.bac-legend');
     svg.insertBefore(layer, legend);
     svg.insertBefore(hit, legend);
 
-    const tooltip = html('div', 'baac-tooltip');
+    const tooltip = html('div', 'bac-tooltip');
     tooltip.hidden = true;
     tooltip.setAttribute('aria-hidden', 'true');
     const announcer = html('p', 'visually-hidden');
@@ -68,7 +68,7 @@
     const hint = html('p', 'visually-hidden', quality
       ? 'Interactive chart. Use the left and right arrow keys to move along an encoder, and the up and down arrow keys to compare encoders at the same setting. Legend buttons after the chart show or hide encoders.'
       : 'Interactive chart. Use the arrow keys to move between codecs.');
-    hint.id = `baac-chart-hint-${++hintCount}`;
+    hint.id = `bac-chart-hint-${++hintCount}`;
     panel.append(tooltip, announcer, hint);
 
     svg.setAttribute('tabindex', '0');
@@ -85,19 +85,19 @@
     const fillTooltip = (mark) => {
       tooltip.replaceChildren();
       if (quality) {
-        tooltip.append(html('p', 'baac-tooltip-heading', `Nominal ${number(mark.nominal, 0)} kbit/s · ${metric}`));
+        tooltip.append(html('p', 'bac-tooltip-heading', `Nominal ${number(mark.nominal, 0)} kbit/s · ${metric}`));
         const peers = visible().filter((peer) => peer.nominal === mark.nominal).sort((a, b) => b.value - a.value);
-        const list = html('ul', 'baac-tooltip-rows');
+        const list = html('ul', 'bac-tooltip-rows');
         for (const peer of peers) {
           const row = html('li', peer === mark ? 'is-active' : '');
-          row.append(lineKey(seriesColor(peer.codec), peer.dash), html('strong', '', number(peer.value)), html('span', '', peer.label), html('span', 'baac-tooltip-muted', `${number(peer.kbps, 1)} kbit/s`));
+          row.append(lineKey(seriesColor(peer.codec), peer.dash), html('strong', '', number(peer.value)), html('span', '', peer.label), html('span', 'bac-tooltip-muted', `${number(peer.kbps, 1)} kbit/s`));
           list.append(row);
         }
         tooltip.append(list);
       } else {
-        const value = html('p', 'baac-tooltip-value');
-        value.append(html('strong', '', number(mark.value)), html('span', 'baac-tooltip-muted', ' audio s / CPU s'));
-        tooltip.append(value, html('p', '', mark.label), html('p', 'baac-tooltip-muted', `${number(mark.cpu)} CPU seconds`));
+        const value = html('p', 'bac-tooltip-value');
+        value.append(html('strong', '', number(mark.value)), html('span', 'bac-tooltip-muted', ' audio s / CPU s'));
+        tooltip.append(value, html('p', '', mark.label), html('p', 'bac-tooltip-muted', `${number(mark.cpu)} CPU seconds`));
       }
     };
 
@@ -125,9 +125,9 @@
     const drawHover = (mark) => {
       layer.replaceChildren();
       if (quality) {
-        layer.append(make('line', { class: 'baac-crosshair', x1: mark.x, x2: mark.x, y1: 35, y2: 298 }));
+        layer.append(make('line', { class: 'bac-crosshair', x1: mark.x, x2: mark.x, y1: 35, y2: 298 }));
         for (const peer of visible().filter((candidate) => candidate.nominal === mark.nominal)) {
-          const ring = make('circle', { class: peer === mark ? 'baac-ring is-active' : 'baac-ring', cx: peer.x, cy: peer.y, r: peer === mark ? 9 : 7 });
+          const ring = make('circle', { class: peer === mark ? 'bac-ring is-active' : 'bac-ring', cx: peer.x, cy: peer.y, r: peer === mark ? 9 : 7 });
           ring.style.color = seriesColor(peer.codec);
           layer.append(ring);
         }
@@ -246,14 +246,14 @@
     });
 
     if (!quality || !legend) continue;
-    const items = [...legend.querySelectorAll('.baac-legend-item')];
+    const items = [...legend.querySelectorAll('.bac-legend-item')];
     const emphasize = (codec) => {
-      for (const series of svg.querySelectorAll('.baac-series')) series.classList.toggle('is-receded', codec !== null && series.dataset.codec !== codec);
+      for (const series of svg.querySelectorAll('.bac-series')) series.classList.toggle('is-receded', codec !== null && series.dataset.codec !== codec);
     };
     for (const item of items) {
       const codec = item.dataset.series;
       const label = item.querySelector('text')?.textContent ?? codec;
-      const series = svg.querySelector(`.baac-series[data-codec="${CSS.escape(codec)}"]`);
+      const series = svg.querySelector(`.bac-series[data-codec="${CSS.escape(codec)}"]`);
       if (!series) continue;
       item.setAttribute('tabindex', '0');
       item.setAttribute('role', 'button');
@@ -261,7 +261,7 @@
       item.setAttribute('aria-label', `Show ${label}`);
       // A wider transparent target than the legend glyph and text.
       const box = item.getBBox();
-      item.prepend(make('rect', { class: 'baac-legend-hit', x: box.x - 8, y: box.y - 6, width: box.width + 16, height: box.height + 12, rx: 6 }));
+      item.prepend(make('rect', { class: 'bac-legend-hit', x: box.x - 8, y: box.y - 6, width: box.width + 16, height: box.height + 12, rx: 6 }));
       const toggle = () => {
         const showing = !hidden.has(codec);
         if (showing && hidden.size === items.length - 1) return;

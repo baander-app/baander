@@ -48,7 +48,7 @@ final class Command
             $revision = $executor->run(new ProcessSpec(['git', 'rev-parse', 'HEAD']))->stdout |> trim(...);
             $codecRevision = $executor->run(new ProcessSpec(['git', 'log', '-1', '--format=%H', '--', 'packages/baander-audio-core']))->stdout |> trim(...);
             if (!preg_match('/^[a-f0-9]{40}$/', $codecRevision)) {
-                throw new \RuntimeException('Cannot resolve the bAAC source revision.');
+                throw new \RuntimeException('Cannot resolve the Bånder Audio Core source revision.');
             }
             $blocks = new BlockRendering($root, $executor, Publication::theme($root));
             $revisionUrl = 'https://github.com/baander-app/baander/tree/' . $revision;
@@ -80,13 +80,13 @@ final class Command
                 },
                 $blocks->render(...),
                 [[
-                    'template' => 'baac',
-                    'url' => '/baac/',
-                    'title' => 'bAAC',
+                    'template' => 'bac',
+                    'url' => '/bac/',
+                    'title' => 'Bånder Audio Core',
                     'description' => 'Bånder’s AAC and lossless FLAC codec library: the server transcoder’s FFmpeg encoder, Electron integration, and recorded quality, size and speed comparisons.',
-                    'stylesheet' => 'baac.css',
-                    'script' => 'baac-charts.js',
-                    'sources' => ['ui/site/templates/baac.php', 'packages/baander-audio-core/bench/results'],
+                    'stylesheet' => 'bac.css',
+                    'script' => 'bac-charts.js',
+                    'sources' => ['ui/site/templates/bac.php', 'packages/baander-audio-core/bench/results'],
                     'data' => ['aac' => [
                         'evidence' => $evidence,
                         'charts' => new AacCharts()->render($evidence),
