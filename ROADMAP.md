@@ -244,12 +244,11 @@ release fixes, the bAAC lossless mode (with its failed held-out size gate disclo
 lossless plan KD12), the desktop lockfile hash with its tracked symlink, the `/baac`
 lead line and three test-fixture ready-file races.
 
-- **Master CI.** On `98498798b` Frontend CI, the website and the addon workflow passed.
-  The `CI` run was still queued when the session ended. The run before it, on
-  `28866bf56`, failed only in `registry-thread-quality`, on the fault-network race
-  that `98498798b` fixes. Check the `CI` result first. A green run is the first since
-  2026-11-05; then write the CI-repair learning with `ce-compound`, which the user
-  confirmed.
+- **Master CI.** The `CI` run on `a97ae0058` failed at the quality gate's step 39;
+  the fixes of 2026-11-13 (see "Master CI repair") clear steps 39 to 41 in an
+  emulated runner. Check the `CI` run that follows them. A green run is the first
+  since 2026-11-05; then write the CI-repair learning with `ce-compound`, which the
+  user confirmed.
 - **Capability and size, in flight.** Worktree `/home/martin/dev/baander-capability`,
   branch `feat/capability-and-size-deployment-settings`: `master` is merged with every
   conflict resolved, but the merge is not committed (`MERGE_HEAD` is in place). Its
@@ -395,6 +394,13 @@ retains the checkpoint narratives and suite counts.
 The final runtime receipt preserves the interrupted run's strict cleanup failure
 rather than claiming an uninterrupted pass. Seven older anonymous volumes remain
 untouched; six could not be attributed to a deleted container.
+
+Open: in a linked worktree the PHP tooling suite fails up to three
+`ApplicationInventoryTest` cases (the two `testInterruptedCollection…` cases always,
+`testShellRecoversUncertainCreationWhenCollectorIsInterrupted` sometimes) because a
+marker does not appear within its window. `RepositoryConfiguration::local` reads the
+primary checkout's `dev.local.json`, which slows configuration loading there. All
+three pass in a standalone clone and with `CI=1`.
 
 ## Playback investigation and evidence limits
 
@@ -1098,9 +1104,40 @@ from `json_decode`. The DNS and echo fixtures wrote that file in place; they now
 write it whole through a temporary file and a rename. Locally `HttpFixtureTest`
 passes 33 of 33, and the truncation case passed five runs in a row.
 
-Open: no complete green `CI` run on GitHub has been observed since 2026-11-05. The
-registry release job failed once on a load-smoke lookup that answered 503; it had
-passed on the two runs before.
+The run for `a97ae0058` reached the quality gate's step 39, "Development instance
+safety", for the first time since the port, and failed there with "Install Composer
+dependencies first". Fixed 2026-11-13, reproduced in the runner image as a job
+container with the Docker socket and the checkout mounted at a path the daemon host
+does not have, as on GitHub:
+
+- **Step 39:** its nested worker-source drill packed the runner's checkout, which has
+  no `vendor`. The step now sets `BAANDER_TEST_CHECKOUT_IN_IMAGE=1`, like the other
+  drill steps, and the drill copies the checkout out of the CI image. It passed
+  ("component safety and source admission") in 1,434 s.
+- **Step 41, outbox leak:** `PasswordChangeSessionRevocationTest` commits through a
+  production kernel, so its four `user.password_changed` events stayed in the outbox
+  after it deleted their users. A later test that relays the whole outbox then failed
+  with "Outbox relay failed for 4 event(s)" (a `notifications.user_id` foreign-key
+  violation). Running the two tests in that order fails before the change and passes
+  after it; the test now deletes its users' outbox rows. Nineteen other leftover rows
+  (`token.revoked`, `library.scan_completed`, `playlist.created`) relay without
+  failure and are left alone.
+- **Step 41, drain probe:** in `live-runtime-bridge-probe.php` each server process
+  kept its own drain flag, so the worker that the probe's reload replaced kept
+  projecting, through its 250 ms timer, until Swoole stopped it three seconds later. A
+  trace showed that worker still releasing connections after the drain. The flag now
+  lives in the probe's shared Swoole table, as the product's drain state does; the
+  trace then shows no releases after the drain.
+
+Verified in the emulated runner: steps 39, 40 (20 checks), 41 (ordinary 7,715,
+native 917, stack lanes 1,724 and 1,652, all passing, 2,798 s), 43 and 54 (lines
+84.96 %), and PHPStan on the final image. Steps 42 and 44 to 53 have not run in the
+emulation.
+
+Open: no complete green `CI` run on GitHub has been observed since 2026-11-05. Each
+run draws a new test-order seed, so another order-dependent test can still surface in
+step 41. The registry release job failed once on a load-smoke lookup that answered
+503; it had passed on the two runs before.
 
 ### Playback session entities
 
