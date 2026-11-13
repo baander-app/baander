@@ -12,9 +12,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@baander/aac-native@file:../../packages/baander-aac::locator=%40baander%2Fdesktop%40workspace%3A.":
+"@baander/aac-native@file:../../packages/baander-audio-core::locator=%40baander%2Fdesktop%40workspace%3A.":
   version: 0.2.0
-  resolution: "@baander/aac-native@file:../../packages/baander-aac#../../packages/baander-aac::hash=caf420&locator=%40baander%2Fdesktop%40workspace%3A."
+  resolution: "@baander/aac-native@file:../../packages/baander-audio-core#../../packages/baander-audio-core::hash=caf420&locator=%40baander%2Fdesktop%40workspace%3A."
   dependencies:
     node-addon-api: "npm:^8.9.2"
     node-gyp: "npm:^11.0.0"
@@ -26,7 +26,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@baander/desktop@workspace:."
   dependencies:
-    "@baander/aac-native": "file:../../packages/baander-aac"
+    "@baander/aac-native": "file:../../packages/baander-audio-core"
     "@electron/fuses": "npm:^2.1.1"
     "@electron/rebuild": "npm:^4.0.4"
     "@fontsource-variable/geist": "npm:^5.3.0"

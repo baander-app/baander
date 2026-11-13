@@ -162,19 +162,19 @@ RUN curl -sL -o libvpl.tar.gz https://github.com/intel/libvpl/archive/refs/tags/
     && cmake --build libvpl/build \
     && cmake --install libvpl/build
 
-# --- bAAC (packages/baander-aac, repository checkout) ---
+# --- bAAC (packages/baander-audio-core, repository checkout) ---
 # Installed with the workspace prefix through DESTDIR so that libbaac.pc
 # points at the paths FFmpeg's configure sees after the merge below.
 FROM lib-builder AS baac-builder
 WORKDIR /build
-COPY packages/baander-aac /build/baander-aac
-RUN cmake -S /build/baander-aac -B /build/baander-aac-build -G Ninja \
+COPY packages/baander-audio-core /build/baander-audio-core
+RUN cmake -S /build/baander-audio-core -B /build/baander-audio-core-build -G Ninja \
         -DCMAKE_BUILD_TYPE=Release \
         -DCMAKE_INSTALL_PREFIX=/usr/src/ffmpeg-build-script/workspace \
         -DCMAKE_INSTALL_LIBDIR=lib \
         -DBAAC_AAC_BUILD_TESTS=OFF -DBAAC_AAC_BUILD_TOOLS=OFF -DBAAC_AAC_SHARED=OFF \
-    && cmake --build /build/baander-aac-build \
-    && DESTDIR=/dist cmake --install /build/baander-aac-build \
+    && cmake --build /build/baander-audio-core-build \
+    && DESTDIR=/dist cmake --install /build/baander-audio-core-build \
     && PKG_CONFIG_PATH=/dist/usr/src/ffmpeg-build-script/workspace/lib/pkgconfig \
        PKG_CONFIG_SYSROOT_DIR=/dist pkg-config --static --libs libbaac
 

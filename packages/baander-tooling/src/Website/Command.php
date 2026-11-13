@@ -12,7 +12,7 @@ use Baander\Tooling\Process\ProcessSpec;
 final class Command
 {
     /** Repository paths whose commit dates become the sitemap's last-modified values. */
-    private const array SITE_SOURCES = ['docs-book', 'ui/site/templates', 'ui/site/assets/screenshots', 'ui/site/assets/typography.css', 'ui/design-tokens/tokens/base/type.json', 'packages/baander-aac/bench/results'];
+    private const array SITE_SOURCES = ['docs-book', 'ui/site/templates', 'ui/site/assets/screenshots', 'ui/site/assets/typography.css', 'ui/design-tokens/tokens/base/type.json', 'packages/baander-audio-core/bench/results'];
 
     /**
      * The site's elements, besides code, kbd, samp and pre, whose styles set the mono stack; a typography
@@ -46,7 +46,7 @@ final class Command
         $executor = new EngineExecutor(ExecutionContext::bounded($configuration->budgets->seconds('website'), $environment, $root));
         try {
             $revision = $executor->run(new ProcessSpec(['git', 'rev-parse', 'HEAD']))->stdout |> trim(...);
-            $codecRevision = $executor->run(new ProcessSpec(['git', 'log', '-1', '--format=%H', '--', 'packages/baander-aac']))->stdout |> trim(...);
+            $codecRevision = $executor->run(new ProcessSpec(['git', 'log', '-1', '--format=%H', '--', 'packages/baander-audio-core']))->stdout |> trim(...);
             if (!preg_match('/^[a-f0-9]{40}$/', $codecRevision)) {
                 throw new \RuntimeException('Cannot resolve the bAAC source revision.');
             }
@@ -86,11 +86,11 @@ final class Command
                     'description' => 'Bånder’s AAC and lossless FLAC codec library: the server transcoder’s FFmpeg encoder, Electron integration, and recorded quality, size and speed comparisons.',
                     'stylesheet' => 'baac.css',
                     'script' => 'baac-charts.js',
-                    'sources' => ['ui/site/templates/baac.php', 'packages/baander-aac/bench/results'],
+                    'sources' => ['ui/site/templates/baac.php', 'packages/baander-audio-core/bench/results'],
                     'data' => ['aac' => [
                         'evidence' => $evidence,
                         'charts' => new AacCharts()->render($evidence),
-                        'sourceBase' => 'https://github.com/baander-app/baander/blob/' . $codecRevision . '/packages/baander-aac/',
+                        'sourceBase' => 'https://github.com/baander-app/baander/blob/' . $codecRevision . '/packages/baander-audio-core/',
                     ]],
                 ], $typography],
                 $history,

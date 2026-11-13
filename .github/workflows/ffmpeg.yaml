@@ -4,7 +4,7 @@ on:
     push:
         branches: [ master ]
         paths:
-            - 'packages/baander-aac/**'
+            - 'packages/baander-audio-core/**'
             - 'docker/ffmpeg/**'
             - 'scripts/ffmpeg-capability-gate.sh'
             - '.github/workflows/ffmpeg.yaml'

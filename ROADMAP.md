@@ -397,7 +397,7 @@ Keep these limits separate from selected work:
   coverage, display-gamut certification or Dolby Vision support. See the
   [testing guide](docs-book/part-2-developer-guide/testing/media-and-playback.md) for the measured cases.
 - Native codec acceptance remains conditional on the selected release path.
-  [AAC reference coverage](packages/baander-aac/docs/README.md) does not
+  [AAC reference coverage](packages/baander-audio-core/docs/README.md) does not
   exercise the 34-band and phase decoder paths; listening tests and the HE-AAC
   IPC/bridge suites were not run in that checkpoint. The original 5% HE-AAC CBR
   target was not established by the delivered 6% acceptance gate. These limits
@@ -594,15 +594,15 @@ and encoder-tuning tiers are delivered in `packages/baander-aac`
   ViSQOL disagree), Apple's coupled stereo SBR and additional sinusoids,
   xHE-AAC rate accounting and the louder low band of low-rate xHE-AAC decodes,
   and the decoder's loudness default. The
-  [codec comparison](packages/baander-aac/docs/codec-comparison.md) keeps the
-  prioritized list and the [Apple probe note](packages/baander-aac/docs/apple-aac-probe.md)
+  [codec comparison](packages/baander-audio-core/docs/codec-comparison.md) keeps the
+  prioritized list and the [Apple probe note](packages/baander-audio-core/docs/apple-aac-probe.md)
   the remaining gaps.
 - **Not run across the tiers:** listening tests, the ISO conformance suite, and
   speech, 44.1 kHz, multichannel and low-delay codec comparisons.
 
 Figures and limits are in the
-[reference comparison](packages/baander-aac/docs/reference-comparison.md) and the
-[codec README](packages/baander-aac/docs/README.md).
+[reference comparison](packages/baander-audio-core/docs/reference-comparison.md) and the
+[codec README](packages/baander-audio-core/docs/README.md).
 
 ### Development controller image identities
 

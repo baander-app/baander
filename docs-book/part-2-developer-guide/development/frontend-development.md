@@ -294,7 +294,7 @@ for the low-delay and xHE-AAC (`profile: 'xhe'`) profiles, whose encoder
 options add the USAC settings (`usac`), a `loudnessInfo` set written into the
 stream and `measureLoudness` for the meter inside a session. The IPC module
 validates every payload before the service runs. See the codec's
-[README](../../../packages/baander-aac/docs/README.md) for the C API, the
+[README](../../../packages/baander-audio-core/docs/README.md) for the C API, the
 command-line tool and the measured interoperability with FFmpeg.
 
 ## Component Library

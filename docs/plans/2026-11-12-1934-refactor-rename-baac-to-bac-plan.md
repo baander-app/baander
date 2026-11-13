@@ -278,7 +278,7 @@ These are the planner's readings, not confirmed by the user.
 | Risk | Mitigation |
 |---|---|
 | The lossless landing (`28866bf56`) added names after `8248b0cdb` | U1 starts from `master` and re-takes the inventory |
-| Another branch that touches the package lands after the rename and brings old names back; `feat-aac-noise-kernel` has one such commit, which adds `BAAC_AAC_CPU` and `BAAC_RELEASE_MATH` uses | U1 asks the lead for the landing order; a branch that lands later rebases onto the renamed `master` and must pass the residue gate |
+| Another branch that touches the package lands after the rename and brings old names back | A branch that lands later rebases onto the renamed `master` and must pass the residue gate |
 | A change to the image inputs after the dispatch leaves the pin describing another tree | KTD5: review before the dispatch, re-dispatch after any later change, and the image-input diff before the `master` push |
 | The persistent instance's automatic update fails after the landing | KTD6 step 4; the failed update leaves the old release running |
 | A one-sided rename passes silently | KTD13's residue gate and failing checks |
@@ -315,9 +315,8 @@ These are the planner's readings, not confirmed by the user.
 - **Files:** None change. The Appendix inventory is the comparison point.
 - **Approach:**
   1. Confirm that `master` contains the lossless landing, then rebase `rename-audio-core` onto `master` or recreate it there. This plan file moves with it.
-  2. Ask the lead for the landing order of other branches that touch the package. Today that is `feat-aac-noise-kernel` (one commit). A branch that lands first is picked up here; one that lands later rebases onto the renamed `master` and passes the residue gate.
-  3. Run the residue gate and the path gate from the Verification Contract. Assign every hit that the Appendix does not list to the unit that owns its area. New files under the package go to U3 to U5; the lossless ROADMAP record is history.
-  4. Record the baseline: CTest and Node test counts, the compile database, `binding.gyp`'s effective flags, the measured values in `bench/results/lossless.json`, and the FFmpeg encoder and decoder listings of the pinned image.
+  2. Run the residue gate and the path gate from the Verification Contract. Assign every hit that the Appendix does not list to the unit that owns its area. New files under the package go to U3 to U5; the lossless ROADMAP record is history.
+  3. Record the baseline: CTest and Node test counts, the compile database, `binding.gyp`'s effective flags, the measured values in `bench/results/lossless.json`, and the FFmpeg encoder and decoder listings of the pinned image.
 - **Test expectation:** none -- no code changes; this unit fixes the baseline that U3, U4 and KTD13 compare against.
 - **Verification:** The branch starts at `master`'s tip, every inventory delta has an owning unit, and the baseline is recorded outside `var/`.
 

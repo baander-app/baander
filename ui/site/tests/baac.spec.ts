@@ -1,7 +1,7 @@
 import { test as base, expect } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 
-const packageVersion = JSON.parse(readFileSync(new URL('../../../packages/baander-aac/package.json', import.meta.url), 'utf8')).version as string;
+const packageVersion = JSON.parse(readFileSync(new URL('../../../packages/baander-audio-core/package.json', import.meta.url), 'utf8')).version as string;
 
 const test = base.extend<{ localRequests: void }>({
   localRequests: [async ({ context, baseURL }, use) => {
@@ -26,7 +26,7 @@ test('visitors discover bAAC and its direct route has one canonical URL', async 
   await expect(page.getByRole('heading', { name: 'bAAC', exact: true })).toBeVisible();
   await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', 'https://baander.app/baac/');
   await expect(page.getByRole('link', { name: 'Read the source guide' }))
-    .toHaveAttribute('href', /^https:\/\/github\.com\/baander-app\/baander\/blob\/[a-f0-9]{40}\/packages\/baander-aac\/docs\/README\.md$/);
+    .toHaveAttribute('href', /^https:\/\/github\.com\/baander-app\/baander\/blob\/[a-f0-9]{40}\/packages\/baander-audio-core\/docs\/README\.md$/);
   await expect(page.getByRole('heading', { name: 'Server transcoding through FFmpeg' })).toBeVisible();
   await expect(page.locator('#integration')).toContainText('libbaac');
   await expect(page.locator('#integration').getByRole('link', { name: 'AAC implementation' }))

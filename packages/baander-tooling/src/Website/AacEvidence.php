@@ -18,7 +18,7 @@ final class AacEvidence
     /** @return array{quality: array<string, list<array<string, mixed>>>, speed: array<string, array<string, list<array<string, mixed>>>>, lossless: array{rows: list<array<string, mixed>>, run: ?array<string, mixed>}, version: string} */
     public function load(string $root): array
     {
-        $package = rtrim($root, '/') . '/packages/baander-aac/';
+        $package = rtrim($root, '/') . '/packages/baander-audio-core/';
         $directory = $package . 'bench/results/';
         $expected = [];
         foreach (self::PROFILES as $family => $rates) {
