@@ -337,8 +337,7 @@ pin. The website is published from `cbc5540f4`, and the persistent instance runs
      `packages/baander-audio-core/bench/`. Copy `work/heldout/runs.json` first, then
      run `./rename_ledger.py work/heldout/runs.json` and `./setup-refs.sh` without
      `--lossless-only`, so `env.sh` loses the old absolute paths.
-  3. Delete the GitHub branch `rename-audio-core`.
-  4. Forgejo CI is set aside by the user; re-run its `ci.yaml` once Forgejo's FFmpeg
+  3. Forgejo CI is set aside by the user; re-run its `ci.yaml` once Forgejo's FFmpeg
      image carries `libbac`.
 
   Not run before `master`: the draft pull request CI (the user chose not to wait for
@@ -350,15 +349,11 @@ pin. The website is published from `cbc5540f4`, and the persistent instance runs
 - **Next plans.** Better compression of material like the failed held-out recording
   (lossless plan KD12) follows the rename. Its fourth held-out set may be read only
   after the benchmark data has moved and its ledger is rewritten.
-- **Cleanup once `master` is green.** The merged branches `fix-two-command-firefox`,
-  `baac-lossless`, `feat/capability-and-size-deployment-settings`,
-  `fix-ci-quality-gate-tail` and `rename-audio-core`; the worktrees
-  `/home/martin/dev/baander-ci-repair`, `/home/martin/dev/baander-baac-review`,
-  `/home/martin/dev/baander-capability`, `/home/martin/dev/baander-ci-gate` (its
-  root-owned build output needs a `chown` from a container first),
-  `/home/martin/dev/baander-rename-review` and
-  `/home/martin/dev/baander-rename-audio-core`; and
-  `/home/martin/dev/baander-baac-lossless` once its `bench/work/` has moved.
+- **Cleanup, done 2026-11-13.** Every branch was contained in `master`; GitHub and
+  Forgejo carry only `master`, and the merged local branches and agent worktrees are
+  removed, their `var/` receipts copied to
+  `~/.local/state/baander/receipts/2026-11-13/`. `/home/martin/dev/baander-baac-lossless`
+  stays, detached at `a97ae0058`, until its `bench/work/` has moved.
 
 Continue the Back-to-next-movie investigation through a newly reviewed, bounded
 scope. Capture the browser failure and the next movie's actual startup outcome,
