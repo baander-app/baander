@@ -865,7 +865,7 @@ $runner = new ProcessRunner();',
             'path' => 'scripts/tests/php/ImageCatalogTest.php',
             'rule' => 'default-image',
             'anchor' => '        self::assertSame(\'mcr.microsoft.com/playwright:v1.64.1-noble\', $images->role(\'browser\')->reference);
-        self::assertSame(\'ghcr.io/baander-app/ffmpeg-baander-static@sha256:dbec52ebab480b8bb80b410788594c05c9c8a4353ab8d01be43ae465dd4cd8aa\', $images->role(\'ffmpeg\')->reference);',
+        self::assertSame(\'ghcr.io/baander-app/ffmpeg-baander-static@sha256:4537b06f3e58f7bdf0c6c11d9ad494bf3cc851bcd23a7f7fd6f21c4b282a724a\', $images->role(\'ffmpeg\')->reference);',
             'count' => 1,
             'reason' => 'Independent catalog or image-selection assertion checks the documented default.',
         ],

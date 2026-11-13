@@ -26,7 +26,7 @@ final class ImageCatalogTest extends TestCase
         self::assertSame('redis:7-alpine', $images->role('developmentRedis')->reference);
         self::assertSame('redis/redis-stack-server:edge', $images->role('fixtureRedis')->reference);
         self::assertSame('mcr.microsoft.com/playwright:v1.64.1-noble', $images->role('browser')->reference);
-        self::assertSame('ghcr.io/baander-app/ffmpeg-baander-static@sha256:dbec52ebab480b8bb80b410788594c05c9c8a4353ab8d01be43ae465dd4cd8aa', $images->role('ffmpeg')->reference);
+        self::assertSame('ghcr.io/baander-app/ffmpeg-baander-static@sha256:4537b06f3e58f7bdf0c6c11d9ad494bf3cc851bcd23a7f7fd6f21c4b282a724a', $images->role('ffmpeg')->reference);
         self::assertSame('ffmpeg.baander.app/static@sha256:' . str_repeat('b', 64), ToolingConfiguration::resolve(environment: ['BAANDER_FFMPEG_IMAGE' => 'ffmpeg.baander.app/static@sha256:' . str_repeat('b', 64)])->images->role('ffmpeg')->reference);
         $images->role('browser')->assertPlaywrightVersion('1.64.1');
     }

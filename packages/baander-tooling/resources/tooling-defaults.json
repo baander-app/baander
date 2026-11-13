@@ -56,7 +56,7 @@
             ]
         },
         "ffmpeg": {
-            "reference": "ghcr.io/baander-app/ffmpeg-baander-static@sha256:dbec52ebab480b8bb80b410788594c05c9c8a4353ab8d01be43ae465dd4cd8aa",
+            "reference": "ghcr.io/baander-app/ffmpeg-baander-static@sha256:4537b06f3e58f7bdf0c6c11d9ad494bf3cc851bcd23a7f7fd6f21c4b282a724a",
             "capabilities": [
                 "ffmpeg"
             ]

@@ -313,24 +313,20 @@ pin follows as its own commit.
   `e1a850a85` fixes. Check the runs from `e1a850a85` on. A green run is the first since
   2026-11-05; then write the CI-repair learning with `ce-compound`, which the user
   confirmed.
-- **Rename landing, remaining steps** (the plan's KTD6, in order):
-  1. Pin the image of the `ffmpeg.yaml` dispatch on `rename-audio-core` (run
-     43473213860) in `tooling-defaults.json`, `ImageCatalogTest` and
-     `SourceExceptions`, and record its digest under "Bånder Audio Core rename".
-  2. Run `make dev-up` for the persistent instance from a checkout of `master` that
-     holds the pin. Its automatic update keeps the FFmpeg image saved at its last
-     `make dev-up`, so it stays on its old release until then. The user authorized
-     this on 2026-11-12.
-  3. Dispatch `audio-core.yml` on `master`; the user cuts `audio-core-v0.2.0`.
-  4. Publish the website (Vercel preview, then production, per `ui/site/README.md`)
-     and check `/bac/` and `/baac/`.
-  5. Re-run Forgejo's `ci.yaml` after Forgejo's own FFmpeg image publishes, about
-     1.5 h after the push.
-  6. Move `bench/work/` from `/home/martin/dev/baander-baac-lossless` into
+- **Rename landing, remaining steps.** Done: `master`, the FFmpeg pin, the website
+  and the tag `audio-core-v0.2.0`. Remaining:
+  1. Check the `audio-core-v0.2.0` release: four prebuilds and `SHA256SUMS`, and a
+     clean desktop install that fetches its prebuild.
+  2. Confirm the persistent instance is ready on the pinned `master` after
+     `make dev-recover` and `make dev-up` (see the open item in "Local development
+     workflow").
+  3. Move `bench/work/` from `/home/martin/dev/baander-baac-lossless` into
      `packages/baander-audio-core/bench/`. Copy `work/heldout/runs.json` first, then
      run `./rename_ledger.py work/heldout/runs.json` and `./setup-refs.sh` without
      `--lossless-only`, so `env.sh` loses the old absolute paths.
-  7. Delete the GitHub branch `rename-audio-core` and record the landing results.
+  4. Delete the GitHub branch `rename-audio-core` and record the landing results.
+  5. Forgejo CI is set aside by the user; re-run its `ci.yaml` once Forgejo's FFmpeg
+     image carries `libbac`.
 
   Not run before `master`: the draft pull request CI (the user chose not to wait for
   CI), the full backend suite on the merge with `master` and `test:tooling` after
@@ -480,6 +476,18 @@ Open: through `scripts/check-backend-container.php` the tooling suite fails four
 `mkdir()` and no mode, and `PrivateDirectory::ensure` refuses the world-writable
 result. The class passes under umask 022, which CI's `docker run` path uses. Set the
 umask in `StaticCheck::runCheck` or create the test directory with mode 0700.
+
+Open: automatic updates run the controller tooling installed by the last
+`make dev-up`, which can be older than the images they deploy. On 2026-11-13 the
+persistent instance's update to `60fc26b63` (the capability and size merge) started
+the new application container, then failed while resolving the worker profile: the
+installed tooling, from 2026-11-09, passed the settings to `DeploymentProfile` in the
+constructor's old argument order, and the image rejected them ("Argument #2
+($webWorkers) must be of type int, null given"). No database change had started.
+The instance stayed blocked, refusing every later update, until `make dev-recover`
+and `make dev-up` ran from a current checkout. A contract change between the tooling
+and the image needs either a controller generation that updates with `master` or a
+versioned profile request the image can refuse with a reason.
 
 ## Playback investigation and evidence limits
 
@@ -1512,8 +1520,9 @@ Commits: `dbae02463` (U2), `b6e0c66df` (U3), `530b1622e` (U4), `9c9c82663` (U5),
 (U9), `bf19b3baf` (U10), merged with `master` in `489926f68`, then
 `491009232` (the test budget below). The final desktop lockfile hash is `ecd85e`.
 The user chose to land before the dispatched FFmpeg image was ready, so `master`
-moved without the pin and the pin follows as its own commit; until then the
-application image built from `master` fails its FFmpeg capability gate.
+moved without the pin at `cbc5540f4`, and the next commit pins
+`ghcr.io/baander-app/ffmpeg-baander-static@sha256:4537b06f3e58f7bdf0c6c11d9ad494bf3cc851bcd23a7f7fd6f21c4b282a724a`. Between the two, the
+application image built from `master` failed its FFmpeg capability gate.
 
 Verification Contract, row by row (2026-11-13, AMD Ryzen 7 5800X3D, GCC 16.2.1,
 Node 24.15.0):
@@ -1590,18 +1599,24 @@ Node 24.15.0):
   that an `aac-native-v1.0.0` tag no longer releases, and the edited workflow YAML
   parses.
 - **Remote, before `master`:** the `ffmpeg.yaml` dispatch on `rename-audio-core` at
-  `489926f68` (run 43473213860) was still building when `master` moved; the pin
-  commit records its result and digest. The image inputs (`docker/ffmpeg/`,
+  `489926f68` (run 43473213860) passed the image's own smoke and gate and published
+  `sha256:4537b06f3e58f7bdf0c6c11d9ad494bf3cc851bcd23a7f7fd6f21c4b282a724a`, which the commit after the landing pins. The image inputs (`docker/ffmpeg/`,
   `packages/baander-audio-core/`, `scripts/ffmpeg-capability-gate.sh`) are identical
   at `bf19b3baf`, `489926f68` and the landed tip. Not run: the draft pull request
   runs of `ci.yaml`, `frontend.yaml`, `website.yaml` and `audio-core.yml`. The user
   chose to land without waiting for CI, so those workflows first run on `master`.
-- **Remote, after `master`, and website publication:** open at the push. GitHub CI,
-  Forgejo `ci.yaml` after Forgejo's FFmpeg image publishes, `audio-core.yml` on
-  `master`, the `audio-core-v0.2.0` release with four prebuilds and `SHA256SUMS`, a
-  clean desktop install that fetches its prebuild, and the Vercel preview and
-  production checks of `/bac/` (200) and `/baac/` (308) are recorded here when they
-  run.
+- **Remote, after `master`:** on `cbc5540f4`, `audio-core.yml`, `frontend.yaml` and
+  `website.yaml` passed on GitHub. The tag `audio-core-v0.2.0` points at `cbc5540f4`.
+  Open: GitHub CI on the pinned tip, Forgejo `ci.yaml` after Forgejo's FFmpeg image
+  publishes (the user set Forgejo CI aside), the release's four prebuilds and
+  `SHA256SUMS`, and a clean desktop install that fetches its prebuild.
+- **Website publication (2026-11-13):** the verified `website.yaml` artifact of
+  `cbc5540f4` was deployed as a Vercel preview, then to production
+  (`baander-qvq151xaq`, aliased to `https://baander.app`). Preview and production
+  answered `/` 200, `/bac/` 200 with the title "Bånder Audio Core — Bånder" and the
+  canonical `https://baander.app/bac/`, `/baac` and `/baac/` 308 to `/bac/`, a nested
+  manual page 200, the search index 200 and an unknown path 404, with valid HTTPS.
+  The sitemap lists 240 pages and no old name.
 
 Not run anywhere before the landing: the macOS and NEON kernel step, the Windows
 MSVC binding and the first CI run after the cache keys changed. Only the binding
