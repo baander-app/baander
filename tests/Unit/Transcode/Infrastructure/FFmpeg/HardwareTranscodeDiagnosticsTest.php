@@ -51,7 +51,7 @@ final class HardwareTranscodeDiagnosticsTest extends TestCase
             'vp9' => 'vp9_cuvid',
         ], $report->sourceDecoders);
         self::assertStringStartsWith('/usr/bin/ffmpeg -y -hwaccel cuda -hwaccel_output_format cuda -c:v h264_cuvid  -i source.mkv -c:v hevc_nvenc', $report->sampleCommands['720p']);
-        self::assertSame([['baac', 'libbaac', 'Yes', 'Yes'], ['fdk_aac', 'libfdk_aac', 'No', 'No'], ['ffmpeg', 'aac', 'Yes', 'Yes']], $report->aacImplementations);
+        self::assertSame([['bac', 'libbaac', 'Yes', 'Yes'], ['fdk_aac', 'libfdk_aac', 'No', 'No'], ['ffmpeg', 'aac', 'Yes', 'Yes']], $report->aacImplementations);
     }
 
     public function testMissingWorkerEvidenceIsUnavailable(): void

@@ -48,9 +48,9 @@ final class TranscodeSettingDefinitions implements SettingDefinitionProviderInte
             label: 'AAC implementation',
             description: 'Which codec implementation FFmpeg uses to encode AAC renditions and decode AAC sources for them',
             group: 'Media',
-            default: 'baac',
-            allowedValues: ['baac', 'fdk_aac', 'ffmpeg'],
-            valueLabels: ['baac' => 'bAAC', 'fdk_aac' => 'Fraunhofer fdk-aac', 'ffmpeg' => 'FFmpeg built-in'],
+            default: 'bac',
+            allowedValues: ['bac', 'fdk_aac', 'ffmpeg'],
+            valueLabels: ['bac' => 'Bånder Audio Core', 'fdk_aac' => 'Fraunhofer fdk-aac', 'ffmpeg' => 'FFmpeg built-in'],
         );
     }
 }

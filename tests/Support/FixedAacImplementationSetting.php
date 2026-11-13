@@ -11,7 +11,7 @@ use App\Transcode\Domain\ValueObject\AacImplementation;
 /** Settings that answer only the AAC implementation, for harnesses without a settings table. */
 final readonly class FixedAacImplementationSetting implements SystemSettingsPortInterface
 {
-    public function __construct(private AacImplementation $implementation = AacImplementation::Baac)
+    public function __construct(private AacImplementation $implementation = AacImplementation::Bac)
     {
     }
 

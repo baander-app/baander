@@ -382,7 +382,7 @@ final class AudioRenditionExecutorTest extends TestCase
 
     public function testAacRenditionsUseTheSelectedEncoderAndDecodeAacSourcesWithIt(): void
     {
-        foreach (['baac' => 'libbaac', 'fdk_aac' => 'libfdk_aac', 'ffmpeg' => 'aac'] as $implementation => $codec) {
+        foreach (['bac' => 'libbaac', 'fdk_aac' => 'libfdk_aac', 'ffmpeg' => 'aac'] as $implementation => $codec) {
             $this->setUp();
             $commands = $this->runEncode('aac', AudioRenditionFormat::Aac, $implementation);
             $encode = $commands[1];
@@ -397,14 +397,14 @@ final class AudioRenditionExecutorTest extends TestCase
 
     public function testAnAacSourceToOpusIsDecodedBySelectedImplementation(): void
     {
-        $encode = $this->runEncode('aac', AudioRenditionFormat::Opus, 'baac')[1];
+        $encode = $this->runEncode('aac', AudioRenditionFormat::Opus, 'bac')[1];
         self::assertSame('libbaac', $encode[array_search('-c:a:0', $encode, true) + 1]);
         self::assertSame('libopus', $encode[array_search('-c:a', $encode, true) + 1]);
     }
 
     public function testANonAacSourceGetsNoForcedDecoderAndNoAacCodecName(): void
     {
-        $encode = $this->runEncode('flac', AudioRenditionFormat::Mp3, 'baac')[1];
+        $encode = $this->runEncode('flac', AudioRenditionFormat::Mp3, 'bac')[1];
         self::assertNotContains('-c:a:0', $encode);
         foreach (['libbaac', 'libfdk_aac', 'aac'] as $token) {
             self::assertNotContains($token, $encode);
@@ -430,7 +430,7 @@ final class AudioRenditionExecutorTest extends TestCase
         $runtime = $this->createMock(AudioRenditionRuntimePort::class);
         $runtime->method('start')->willReturn(true);
         $runtime->method('renew')->willReturn(true);
-        $runtime->expects(self::once())->method('fail')->with($this->claim, 'AAC implementation "bAAC" is not available in this FFmpeg build', AacImplementation::Baac)->willReturn(true);
+        $runtime->expects(self::once())->method('fail')->with($this->claim, 'AAC implementation "Bånder Audio Core" is not available in this FFmpeg build', AacImplementation::Bac)->willReturn(true);
         $runtime->expects(self::never())->method('complete');
         $probe = new StubAacImplementationProbe(['libfdk_aac', 'aac'], ['libfdk_aac', 'aac']);
         (new AudioRenditionExecutor(new MediaExecutionPolicy(new DeploymentProfile('full')), $runtime, new NullLogger(), $this->settings(), $probe, '/usr/bin/ffmpeg'))->run($this->claim, static fn (): bool => false);
@@ -465,7 +465,7 @@ final class AudioRenditionExecutorTest extends TestCase
         self::assertSame('copied AAC', file_get_contents($this->final()));
     }
 
-    private function settings(string $implementation = 'baac'): SystemSettingsPortInterface
+    private function settings(string $implementation = 'bac'): SystemSettingsPortInterface
     {
         $settings = $this->createStub(SystemSettingsPortInterface::class);
         $settings->method('get')->willReturnCallback(static fn (string $key): string => $key === TranscodeSettingDefinitions::AAC_IMPLEMENTATION ? $implementation : throw new \LogicException($key));

@@ -46,7 +46,7 @@ ProcessExecutor::configureNativeExecution($client);
 $settings = new class implements \App\Shared\Application\Port\SystemSettingsPortInterface {
     public function get(string $key): string
     {
-        return \App\Transcode\Domain\ValueObject\AacImplementation::Baac->value;
+        return \App\Transcode\Domain\ValueObject\AacImplementation::Bac->value;
     }
 };
 try {

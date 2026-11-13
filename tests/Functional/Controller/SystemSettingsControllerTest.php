@@ -40,8 +40,9 @@ final class SystemSettingsControllerTest extends TestCase
 
         $implementation = $definitions['transcode.aac_implementation'];
         $this->assertSame('enum', $implementation['type']);
-        $this->assertSame('baac', $implementation['default']);
-        $this->assertSame(['baac', 'fdk_aac', 'ffmpeg'], array_column($implementation['options'], 'value'));
+        $this->assertSame('bac', $implementation['default']);
+        $this->assertSame(['bac', 'fdk_aac', 'ffmpeg'], array_column($implementation['options'], 'value'));
+        $this->assertSame(['value' => 'bac', 'label' => 'Bånder Audio Core'], $implementation['options'][0]);
         $this->assertSame(['value' => 'fdk_aac', 'label' => 'Fraunhofer fdk-aac'], $implementation['options'][1]);
         $this->assertTrue($implementation['enforced']);
     }
@@ -85,6 +86,20 @@ final class SystemSettingsControllerTest extends TestCase
         $this->assertSame(['transcode.max_bitrate'], array_keys($body['error']['details']));
         $this->assertSame('en', $this->setting($superAdmin, 'i18n.default_language')['value']);
         $this->assertFalse($this->setting($superAdmin, 'i18n.default_language')['isExplicit']);
+    }
+
+    public function testPatchRejectsTheAacImplementationValueFromBeforeTheRename(): void
+    {
+        $superAdmin = $this->createSuperAdminUser();
+
+        $response = $this->authenticatedRequest('PATCH', '/api/admin/settings', $superAdmin, [
+            'settings' => ['transcode.aac_implementation' => 'baac'],
+        ]);
+        $body = $this->assertJsonResponse($response, 422, 'error');
+
+        $this->assertSame(['transcode.aac_implementation'], array_keys($body['error']['details']));
+        $this->assertSame('bac', $this->setting($superAdmin, 'transcode.aac_implementation')['value']);
+        $this->assertFalse($this->setting($superAdmin, 'transcode.aac_implementation')['isExplicit']);
     }
 
     public function testPatchWithUnknownKeyIsRejectedNamingTheKey(): void

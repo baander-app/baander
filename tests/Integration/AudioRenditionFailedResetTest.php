@@ -31,12 +31,12 @@ final class AudioRenditionFailedResetTest extends TestCase
     {
         $runtime = new AudioRenditionRuntime($this->first);
         $other = new AudioRenditionRuntime($this->second);
-        $claim = $this->failed($runtime, AacImplementation::Baac);
+        $claim = $this->failed($runtime, AacImplementation::Bac);
         $key = $claim->runtime->key;
         $failed = $other->find($key);
         self::assertNotNull($failed);
         self::assertSame('failed', $failed->state);
-        self::assertSame(AacImplementation::Baac, $failed->failedAacImplementation);
+        self::assertSame(AacImplementation::Bac, $failed->failedAacImplementation);
 
         self::assertTrue($other->resetFailed($key, $failed->generation, AacImplementation::Ffmpeg));
         $pending = $runtime->find($key);
@@ -61,12 +61,12 @@ final class AudioRenditionFailedResetTest extends TestCase
     public function testFailureUnderTheCurrentImplementationStaysFailed(): void
     {
         $runtime = new AudioRenditionRuntime($this->first);
-        $claim = $this->failed($runtime, AacImplementation::Baac);
-        self::assertFalse($runtime->resetFailed($claim->runtime->key, $claim->runtime->generation, AacImplementation::Baac));
+        $claim = $this->failed($runtime, AacImplementation::Bac);
+        self::assertFalse($runtime->resetFailed($claim->runtime->key, $claim->runtime->generation, AacImplementation::Bac));
         $row = $runtime->find($claim->runtime->key);
         self::assertSame('failed', $row?->state);
         self::assertSame('the encoder failed', $row->error);
-        self::assertSame(AacImplementation::Baac, $row->failedAacImplementation);
+        self::assertSame(AacImplementation::Bac, $row->failedAacImplementation);
     }
 
     public function testFailureWithoutAnImplementationStaysFailed(): void
@@ -86,10 +86,10 @@ final class AudioRenditionFailedResetTest extends TestCase
         $runtime = new AudioRenditionRuntime($this->first);
         $claim = $this->failed($runtime, AacImplementation::FdkAac);
         $key = $claim->runtime->key;
-        self::assertFalse($runtime->resetFailed($key, $claim->runtime->generation - 1, AacImplementation::Baac));
-        self::assertFalse($runtime->resetFailed($key, $claim->runtime->generation + 1, AacImplementation::Baac));
+        self::assertFalse($runtime->resetFailed($key, $claim->runtime->generation - 1, AacImplementation::Bac));
+        self::assertFalse($runtime->resetFailed($key, $claim->runtime->generation + 1, AacImplementation::Bac));
         self::assertSame('failed', $runtime->find($key)?->state);
-        self::assertFalse($runtime->resetFailed('unknown-rendition', $claim->runtime->generation, AacImplementation::Baac));
+        self::assertFalse($runtime->resetFailed('unknown-rendition', $claim->runtime->generation, AacImplementation::Bac));
     }
 
     public function testCompletedOutputIsNotReopenedAsAFailure(): void
@@ -108,7 +108,7 @@ final class AudioRenditionFailedResetTest extends TestCase
     public function testTheCatalogRejectsAnImplementationOutsideAFailureOrTheKnownValues(): void
     {
         $runtime = new AudioRenditionRuntime($this->first);
-        $claim = $this->failed($runtime, AacImplementation::Baac);
+        $claim = $this->failed($runtime, AacImplementation::Bac);
         foreach ([
             "UPDATE audio_rendition_runtime SET failed_aac_implementation = 'libfdk_aac'",
             "UPDATE audio_rendition_runtime SET state = 'pending'",
@@ -121,6 +121,6 @@ final class AudioRenditionFailedResetTest extends TestCase
                 self::assertStringContainsString('chk_audio_rendition_runtime_failed_aac_implementation', $error->getMessage());
             }
         }
-        self::assertSame(AacImplementation::Baac, $runtime->find($claim->runtime->key)?->failedAacImplementation);
+        self::assertSame(AacImplementation::Bac, $runtime->find($claim->runtime->key)?->failedAacImplementation);
     }
 }

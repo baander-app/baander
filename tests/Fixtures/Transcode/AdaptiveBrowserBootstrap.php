@@ -42,8 +42,8 @@ $audioProfile = match (getenv('BAANDER_ADAPTIVE_AUDIO_PROFILE') ?: 'streaming_st
     default => throw new RuntimeException('The adaptive fixture supports only streaming_stereo and opus_stereo.'),
 };
 // The AAC implementation a DASH session would carry; the production default unless chosen.
-$aacImplementation = AacImplementation::tryFrom(getenv('BAANDER_ADAPTIVE_AAC_IMPLEMENTATION') ?: 'baac')
-    ?? throw new RuntimeException('The adaptive fixture supports only the baac, fdk_aac and ffmpeg AAC implementations.');
+$aacImplementation = AacImplementation::tryFrom(getenv('BAANDER_ADAPTIVE_AAC_IMPLEMENTATION') ?: 'bac')
+    ?? throw new RuntimeException('The adaptive fixture supports only the bac, fdk_aac and ffmpeg AAC implementations.');
 if ($scenario !== 'adaptive' && $audioProfile->name !== 'streaming_stereo') {
     throw new RuntimeException('Movie qualification scenarios require streaming_stereo audio.');
 }

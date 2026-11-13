@@ -767,7 +767,7 @@ final class SegmentEncoderStreamArgsTest extends TestCase
 
     public function testTheSelectedAacImplementationNamesTheEncoderAndDecodesOnlyAacSources(): void
     {
-        foreach ([[AacImplementation::Baac, 'libbaac'], [AacImplementation::FdkAac, 'libfdk_aac'], [AacImplementation::Ffmpeg, 'aac']] as [$implementation, $codec]) {
+        foreach ([[AacImplementation::Bac, 'libbaac'], [AacImplementation::FdkAac, 'libfdk_aac'], [AacImplementation::Ffmpeg, 'aac']] as [$implementation, $codec]) {
             $args = $this->encoder()->buildStreamArgs('/source.mkv', QualityTier::p720(), '', '/output',
                 audioStreamIndex: 2, audioProfile: AudioProfile::streamingStereo(), aacImplementation: $implementation, sourceAudioCodec: 'aac');
             $decoder = array_search('-c:a:2', $args, true);
@@ -785,7 +785,7 @@ final class SegmentEncoderStreamArgsTest extends TestCase
     public function testOnlyAnAacSourceGetsTheForcedDecoder(?string $sourceCodec): void
     {
         $args = $this->encoder()->buildStreamArgs('/source.mkv', QualityTier::p720(), '', '/output',
-            audioProfile: AudioProfile::streamingStereo(), aacImplementation: AacImplementation::Baac, sourceAudioCodec: $sourceCodec);
+            audioProfile: AudioProfile::streamingStereo(), aacImplementation: AacImplementation::Bac, sourceAudioCodec: $sourceCodec);
         self::assertNotContains('-c:a:0', $args);
         self::assertSame('libbaac', $args[array_search('-c:a', $args, true) + 1]);
     }
@@ -803,7 +803,7 @@ final class SegmentEncoderStreamArgsTest extends TestCase
         $builtIn = $this->encoder()->buildStreamArgs('/source.mkv', QualityTier::p720(), '', '/output',
             audioProfile: AudioProfile::streamingStereo(), sourceDuration: 14.0);
         $selected = $this->encoder()->buildStreamArgs('/source.mkv', QualityTier::p720(), '', '/output',
-            audioProfile: AudioProfile::streamingStereo(), sourceDuration: 14.0, aacImplementation: AacImplementation::Baac, sourceAudioCodec: 'aac');
+            audioProfile: AudioProfile::streamingStereo(), sourceDuration: 14.0, aacImplementation: AacImplementation::Bac, sourceAudioCodec: 'aac');
         self::assertSame('aac', $builtIn[array_search('-c:a', $builtIn, true) + 1]);
         $normalise = static function (array $args): array {
             $out = [];
@@ -822,7 +822,7 @@ final class SegmentEncoderStreamArgsTest extends TestCase
     public function testAnOpusProfileIgnoresTheAacImplementation(): void
     {
         $args = $this->encoder()->buildStreamArgs('/source.mkv', QualityTier::p720(), '', '/output',
-            audioProfile: AudioProfile::opusStereo(), aacImplementation: AacImplementation::Baac, sourceAudioCodec: 'aac');
+            audioProfile: AudioProfile::opusStereo(), aacImplementation: AacImplementation::Bac, sourceAudioCodec: 'aac');
         self::assertSame('libopus', $args[array_search('-c:a', $args, true) + 1]);
         self::assertSame('libbaac', $args[array_search('-c:a:0', $args, true) + 1], 'an AAC source is still decoded by the selected implementation');
     }

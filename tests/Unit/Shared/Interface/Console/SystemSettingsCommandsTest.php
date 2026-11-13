@@ -85,7 +85,16 @@ final class SystemSettingsCommandsTest extends TestCase
         $exitCode = $tester->execute(['key' => 'transcode.aac_implementation', 'value' => 'xhe']);
 
         $this->assertSame(Command::FAILURE, $exitCode);
-        $this->assertStringContainsString('transcode.aac_implementation: Must be one of: baac, fdk_aac, ffmpeg.', $tester->getDisplay());
+        $this->assertStringContainsString('transcode.aac_implementation: Must be one of: bac, fdk_aac, ffmpeg.', $tester->getDisplay());
+        $this->assertArrayNotHasKey('transcode.aac_implementation', $this->rows);
+    }
+
+    public function testSetRejectsTheAacImplementationValueFromBeforeTheRename(): void
+    {
+        $tester = new CommandTester(new SettingsSetCommand($this->bus, $this->settings));
+
+        $this->assertSame(Command::FAILURE, $tester->execute(['key' => 'transcode.aac_implementation', 'value' => 'baac']));
+        $this->assertStringContainsString('transcode.aac_implementation: Must be one of: bac, fdk_aac, ffmpeg.', $tester->getDisplay());
         $this->assertArrayNotHasKey('transcode.aac_implementation', $this->rows);
     }
 

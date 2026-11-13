@@ -227,7 +227,7 @@ final class AudioRenditionCacheTest extends TestCase
         });
         $runtime->method('find')->willReturnCallback(function () use ($row): AudioRenditionRuntimeSnapshot {
             if ($row->failed) {
-                return new AudioRenditionRuntimeSnapshot($this->input->key(), $this->input, 'failed', 1, null, null, 'AAC implementation "bAAC" is not available in this FFmpeg build', failedAacImplementation: AacImplementation::Baac);
+                return new AudioRenditionRuntimeSnapshot($this->input->key(), $this->input, 'failed', 1, null, null, 'AAC implementation "Bånder Audio Core" is not available in this FFmpeg build', failedAacImplementation: AacImplementation::Bac);
             }
             $this->write('re-encoded');
             return $this->snapshot('complete');
@@ -251,13 +251,13 @@ final class AudioRenditionCacheTest extends TestCase
         $runtime->expects(self::never())->method('resetFailed');
         $this->expectException(AudioRenditionFailedException::class);
         $this->expectExceptionMessage('invalid input');
-        $this->cache(aacImplementation: 'baac', runtime: $runtime)->open('track', $this->source, AudioRenditionFormat::Mp3, 192000);
+        $this->cache(aacImplementation: 'bac', runtime: $runtime)->open('track', $this->source, AudioRenditionFormat::Mp3, 192000);
     }
 
     /** @return iterable<string, array{?AacImplementation}> */
     public static function failuresThatStayFailed(): iterable
     {
-        yield 'failed under the selected implementation' => [AacImplementation::Baac];
+        yield 'failed under the selected implementation' => [AacImplementation::Bac];
         yield 'failed without an AAC implementation' => [null];
     }
 
@@ -371,12 +371,12 @@ final class AudioRenditionCacheTest extends TestCase
         self::assertNull($this->cache()->findComplete('track', $this->source, $format, 192000));
     }
 
-    private function cache(float $startTimeoutSeconds = .01, string $aacImplementation = 'baac', ?AudioRenditionRuntimePort $runtime = null): AudioRenditionCache
+    private function cache(float $startTimeoutSeconds = .01, string $aacImplementation = 'bac', ?AudioRenditionRuntimePort $runtime = null): AudioRenditionCache
     {
         return new AudioRenditionCache(new MediaExecutionPolicy(new DeploymentProfile('full')), new SegmentFileResolver($this->root), $runtime ?? $this->runtime, new NullLogger(), $this->settings($aacImplementation), pollIntervalSeconds: .001, startTimeoutSeconds: $startTimeoutSeconds);
     }
 
-    private function settings(string $aacImplementation = 'baac'): SystemSettingsPortInterface
+    private function settings(string $aacImplementation = 'bac'): SystemSettingsPortInterface
     {
         $settings = $this->createStub(SystemSettingsPortInterface::class);
         $settings->method('get')->willReturnCallback(static fn (string $key): string => $key === TranscodeSettingDefinitions::AAC_IMPLEMENTATION ? $aacImplementation : throw new \LogicException($key));

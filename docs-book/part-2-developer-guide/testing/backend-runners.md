@@ -208,7 +208,7 @@ The functional runner creates an isolated PostgreSQL/Redis network, extracts the
 checkout into a fresh directory, and runs Doctrine migrations twice before
 executing the requested PHPUnit paths or options. With no arguments it selects `tests/Functional`.
 A fresh database executes `Version20261017000000` and all forward migrations in
-`migrations/` (currently through `Version20261111180000`); the second run checks that recorded migrations
+`migrations/` (currently through `Version20261113120000`); the second run checks that recorded migrations
 leave no pending work. The paired-deployment migration must also reject unresolved
 or inconsistent singleton history and preserve confirmed retirement records.
 Integration tests and runtime fixtures use

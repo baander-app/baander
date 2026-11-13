@@ -7,10 +7,10 @@ case "$audio_profile" in
     streaming_stereo|opus_stereo) ;;
     *) echo 'BAANDER_TEST_AUDIO_PROFILE must be streaming_stereo or opus_stereo.' >&2; exit 1 ;;
 esac
-aac_implementation="${BAANDER_TEST_AAC_IMPLEMENTATION:-baac}"
+aac_implementation="${BAANDER_TEST_AAC_IMPLEMENTATION:-bac}"
 case "$aac_implementation" in
-    baac|fdk_aac|ffmpeg) ;;
-    *) echo 'BAANDER_TEST_AAC_IMPLEMENTATION must be baac, fdk_aac or ffmpeg.' >&2; exit 1 ;;
+    bac|fdk_aac|ffmpeg) ;;
+    *) echo 'BAANDER_TEST_AAC_IMPLEMENTATION must be bac, fdk_aac or ffmpeg.' >&2; exit 1 ;;
 esac
 scenario="${BAANDER_TEST_VIDEO_SCENARIO:-adaptive}"
 case "$scenario" in

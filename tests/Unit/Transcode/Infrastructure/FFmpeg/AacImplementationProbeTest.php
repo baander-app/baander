@@ -25,18 +25,18 @@ final class AacImplementationProbeTest extends TestCase
     {
         $probe = new StubAacImplementationProbe(['libfdk_aac', 'aac'], ['libfdk_aac', 'aac']);
         self::assertSame([AacImplementation::FdkAac, AacImplementation::Ffmpeg], $probe->available());
-        self::assertFalse($probe->isAvailable(AacImplementation::Baac));
+        self::assertFalse($probe->isAvailable(AacImplementation::Bac));
         $this->expectException(AacImplementationUnavailableException::class);
-        $this->expectExceptionMessage('AAC implementation "bAAC" is not available in this FFmpeg build');
-        $probe->assertAvailable(AacImplementation::Baac);
+        $this->expectExceptionMessage('AAC implementation "Bånder Audio Core" is not available in this FFmpeg build');
+        $probe->assertAvailable(AacImplementation::Bac);
     }
 
     public function testAnImplementationNeedsBothDirections(): void
     {
         $probe = new StubAacImplementationProbe(['libbaac', 'aac'], ['aac']);
-        self::assertFalse($probe->isAvailable(AacImplementation::Baac), 'an encoder without its decoder is unavailable');
-        self::assertTrue($probe->offersEncoder(AacImplementation::Baac));
-        self::assertFalse($probe->offersDecoder(AacImplementation::Baac));
+        self::assertFalse($probe->isAvailable(AacImplementation::Bac), 'an encoder without its decoder is unavailable');
+        self::assertTrue($probe->offersEncoder(AacImplementation::Bac));
+        self::assertFalse($probe->offersDecoder(AacImplementation::Bac));
         self::assertTrue($probe->isAvailable(AacImplementation::Ffmpeg));
     }
 
@@ -58,12 +58,12 @@ final class AacImplementationProbeTest extends TestCase
             }
         };
         try {
-            $probe->isAvailable(AacImplementation::Baac);
+            $probe->isAvailable(AacImplementation::Bac);
             self::fail('an empty listing must raise');
         } catch (\RuntimeException $error) {
             self::assertSame('FFmpeg at /usr/bin/ffmpeg listed no encoders', $error->getMessage());
         }
-        self::assertTrue($probe->isAvailable(AacImplementation::Baac), 'the failure was not cached');
+        self::assertTrue($probe->isAvailable(AacImplementation::Bac), 'the failure was not cached');
         self::assertSame(3, $probe->runs);
     }
 }

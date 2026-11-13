@@ -45,7 +45,7 @@ final class CreateTranscodeSessionPolicyTest extends TestCase
     private function settings(): \App\Shared\Application\Port\SystemSettingsPortInterface
     {
         $settings = $this->createStub(\App\Shared\Application\Port\SystemSettingsPortInterface::class);
-        $settings->method('get')->willReturn('baac');
+        $settings->method('get')->willReturn('bac');
         return $settings;
     }
 }

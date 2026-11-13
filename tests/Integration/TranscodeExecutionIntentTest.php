@@ -62,18 +62,18 @@ final class TranscodeExecutionIntentTest extends TestCase
     {
         $this->first->transactional(function (): void {
             $this->insertSession();
-            $this->runtime->admit($this->jobId, $this->sessionId, 'start', new DesiredTranscodeState(AudioProfile::streamingStereo(), aacImplementation: AacImplementation::Baac));
+            $this->runtime->admit($this->jobId, $this->sessionId, 'start', new DesiredTranscodeState(AudioProfile::streamingStereo(), aacImplementation: AacImplementation::Bac));
         });
-        self::assertSame(AacImplementation::Baac, $this->runtime->find($this->jobId)?->desired->aacImplementation);
+        self::assertSame(AacImplementation::Bac, $this->runtime->find($this->jobId)?->desired->aacImplementation);
         $paused = $this->runtime->control($this->jobId, $this->sessionId, 'pause', status: 'paused', seek: false)->runtime;
-        self::assertSame(AacImplementation::Baac, $paused->desired->aacImplementation);
+        self::assertSame(AacImplementation::Bac, $paused->desired->aacImplementation);
         $sought = $this->runtime->control($this->jobId, $this->sessionId, 'seek', position: 30.0)->runtime;
-        self::assertSame(AacImplementation::Baac, $sought->desired->aacImplementation);
+        self::assertSame(AacImplementation::Bac, $sought->desired->aacImplementation);
         self::assertSame($paused->generation + 1, $sought->generation);
         $same = $this->runtime->control($this->jobId, $this->sessionId, 'same-profile', audioProfile: AudioProfile::streamingStereo());
         self::assertSame($sought->generation, $same->runtime->generation, 'the implementation is not part of the profile comparison');
         $claim = $this->runtimeFor($this->second)->claim($this->jobId, $this->worker());
-        self::assertSame(AacImplementation::Baac, $claim?->runtime->desired->aacImplementation);
+        self::assertSame(AacImplementation::Bac, $claim?->runtime->desired->aacImplementation);
     }
 
     public function testADesiredStateWithoutTheImplementationKeyDecodesToNull(): void

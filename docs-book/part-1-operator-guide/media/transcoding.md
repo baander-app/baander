@@ -348,7 +348,7 @@ Three [server settings](../configuration/server-settings.md#server-settings) gov
 |---------|---------|--------|
 | `transcode.enabled` | `false` | Allows audio encoding only when the startup profile also permits it. Original and negotiated stream-copy delivery do not enable encoding. |
 | `transcode.max_bitrate` | `320` | The highest bitrate, in kbps: `128`, `192`, `256` or `320`. A higher requested bitrate is lowered to it, and a request without a bitrate gets it. |
-| `transcode.aac_implementation` | `baac` | Which codec implementation FFmpeg uses for AAC: `baac` (bAAC, Bånder's own codec), `fdk_aac` (Fraunhofer's fdk-aac) or `ffmpeg` (FFmpeg's built-in codec). See [AAC implementation](#aac-implementation). |
+| `transcode.aac_implementation` | `bac` | Which codec implementation FFmpeg uses for AAC: `bac` (Bånder Audio Core, Bånder's own codec), `fdk_aac` (Fraunhofer's fdk-aac) or `ffmpeg` (FFmpeg's built-in codec). See [AAC implementation](#aac-implementation). |
 
 Baander then rounds the bitrate down to the highest step of a fixed ladder that does not exceed it: 64, 96, 128, 160, 192, 256 and 320 kbps. A request below 64 kbps gets 64 kbps. The Opus ladder stops at 256 kbps, so an Opus stream never exceeds 256 kbps, whatever the maximum. Because only these steps exist, each track has at most seven renditions per format.
 
@@ -387,7 +387,7 @@ make exec cmd="php bin/console app:settings:set transcode.aac_implementation fdk
 
 When the FFmpeg binary in use lacks the selected implementation, for example an
 operator's own FFmpeg path, an AAC encode fails before it starts with the reason
-`AAC implementation "bAAC" is not available in this FFmpeg build`;
+`AAC implementation "Bånder Audio Core" is not available in this FFmpeg build`;
 [`debug:hw-transcode`](../commands/debug-hw-transcode.md) lists the implementations
 the binary offers.
 

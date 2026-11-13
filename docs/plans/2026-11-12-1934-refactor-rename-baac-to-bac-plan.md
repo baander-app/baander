@@ -595,7 +595,7 @@ The residue gate matches the spaced forms too ("AAC native addon", "Baander AAC"
 ```bash
 git grep -I -n -i -E 'baac|baander[-_ ]aac|aac[-_ ]?native' -- . \
   ':!docs/plans/' ':!docs/solutions/' ':!ROADMAP.md' ':!CONCEPTS.md' ':!.idea/' \
-  ':!migrations/Version20261107120000.php' ':!migrations/<the U6 migration>' \
+  ':!migrations/Version20261107120000.php' ':!migrations/Version20261113120000.php' \
   ':!tests/Integration/AacImplementationValueMigrationTest.php' \
   ':!tests/Functional/Controller/SystemSettingsControllerTest.php' \
   ':!tests/Unit/Shared/Interface/Console/SystemSettingsCommandsTest.php' \
@@ -615,7 +615,7 @@ After U10 the command prints nothing. The path gate runs `git ls-files` through 
 | `CONCEPTS.md` | The avoid-note of the Bånder Audio Core entry |
 | `.idea/` | `.idea/.name` (Scope Boundaries) |
 | `migrations/Version20261107120000.php` | The original constraint's `baac` |
-| The U6 migration and `tests/Integration/AacImplementationValueMigrationTest.php` | The `baac` value being rewritten, restored by `down()`, or seeded for the test |
+| `migrations/Version20261113120000.php` (U6) and `tests/Integration/AacImplementationValueMigrationTest.php` | The `baac` value being rewritten, restored by `down()`, or seeded for the test |
 | `tests/Functional/Controller/SystemSettingsControllerTest.php`, `tests/Unit/Shared/Interface/Console/SystemSettingsCommandsTest.php` | One rejected-value case each: setting `baac` is refused |
 | `tests/Unit/Shared/Infrastructure/Ci/PublicationWorkflowTest.php` | One negative tag case: `refs/tags/aac-native-v1.0.0` does not release |
 | `scripts/tests/php/Website/AacEvidenceTest.php` | One rejected-id case: a `baac-5` row is refused |

@@ -17,20 +17,20 @@ class AacImplementationTest extends TestCase
 
     public function testEnumValues(): void
     {
-        $this->assertSame('baac', AacImplementation::Baac->value);
+        $this->assertSame('bac', AacImplementation::Bac->value);
         $this->assertSame('fdk_aac', AacImplementation::FdkAac->value);
         $this->assertSame('ffmpeg', AacImplementation::Ffmpeg->value);
     }
 
     public function testCodecNamesAndLabels(): void
     {
-        $this->assertSame('libbaac', AacImplementation::Baac->encoderName());
-        $this->assertSame('libbaac', AacImplementation::Baac->decoderName());
+        $this->assertSame('libbaac', AacImplementation::Bac->encoderName());
+        $this->assertSame('libbaac', AacImplementation::Bac->decoderName());
         $this->assertSame('libfdk_aac', AacImplementation::FdkAac->encoderName());
         $this->assertSame('libfdk_aac', AacImplementation::FdkAac->decoderName());
         $this->assertSame('aac', AacImplementation::Ffmpeg->encoderName());
         $this->assertSame('aac', AacImplementation::Ffmpeg->decoderName());
-        $this->assertSame('bAAC', AacImplementation::Baac->label());
+        $this->assertSame('Bånder Audio Core', AacImplementation::Bac->label());
         $this->assertSame('Fraunhofer fdk-aac', AacImplementation::FdkAac->label());
         $this->assertSame('FFmpeg built-in', AacImplementation::Ffmpeg->label());
     }
@@ -51,7 +51,7 @@ class AacImplementationTest extends TestCase
         }
         $this->assertNotNull($definition);
         $this->assertSame(array_map(static fn (AacImplementation $case): string => $case->value, AacImplementation::cases()), $definition->allowedValues);
-        $this->assertSame(AacImplementation::Baac->value, $definition->default);
+        $this->assertSame(AacImplementation::Bac->value, $definition->default);
         foreach (AacImplementation::cases() as $case) {
             $this->assertSame($case->label(), $definition->valueLabels[$case->value]);
         }
