@@ -3816,11 +3816,11 @@ __metadata:
   linkType: hard
 
 "node-abi@npm:^4.2.0":
-  version: 4.31.0
-  resolution: "node-abi@npm:4.31.0"
+  version: 4.40.0
+  resolution: "node-abi@npm:4.40.0"
   dependencies:
     semver: "npm:^7.6.3"
-  checksum: 10c0/d08fcb9d01f51eacba3fccc10a70b2a92b646220e9a020e17213510dc5b3b2d508fc518070df743f45dd92bf6db05ef8c390b9df341e8204f6a82e2d4ced735d
+  checksum: 10c0/755f0d32475dcea0e41a9a45c70707735fe85ff9d08a17f9fcfac9a23377380b50d7e76f2362f77d4ee3d3b6cc7a8b216aca759a0f0dce0f80874b0d13b95db1
   languageName: node
   linkType: hard
 

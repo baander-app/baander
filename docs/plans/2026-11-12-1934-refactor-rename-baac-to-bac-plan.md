@@ -20,7 +20,7 @@ execution: code
 
 **Base:** The inventory was first taken on a branch cut from `baac-lossless` at `8248b0cdb`. The lossless work landed on `master` at `28866bf56` on 2026-11-12, under the current names. The landing brought the third held-out set (Avon Chang's recording of Bach's Cello Suite No. 6, the Tears of Steel 5.1 mix and Cloudkicker) and one failed held-out size gate, disclosed under the lossless plan's KD12. It recorded the rename decision as that plan's KD13, and it changed the `/baac` page text, the ROADMAP's rename item and the codec comparison. The branch `rename-audio-core` was then cut from `master` at `28866bf56`, with this plan as its first commit (`ce41378f1`), and U1 re-takes the inventory against `master`.
 
-**Execution profile:** One branch with eleven units, landing as local commits in U-ID order. U10 must stay the last code commit: its image pin exists only after the image is built from it, and the pin is added by amending U10 at the branch tip (KTD5). U11 records the delivery.
+**Execution profile:** One branch with twelve units, landing as local commits in U-ID order, except U12, which lands right after U5 because U5's packaging check found the defect it fixes. U10 must stay the last code commit: its image pin exists only after the image is built from it, and the pin is added by amending U10 at the branch tip (KTD5). U11 records the delivery.
 
 **Authority and stop conditions:** Follow `AGENTS.md`, then the Product Contract, then the Planning Contract. Stop and report when any of these holds:
 
@@ -219,6 +219,7 @@ flowchart TB
   U8 --> U9
   U9 --> U10[U10 FFmpeg codec libbac, then pin]
   U10 --> U11[U11 ROADMAP record]
+  U5 --> U12[U12 electron-builder detects Electron 45]
 ```
 
 Coupling groups. Everything in a row changes in one commit.
@@ -306,6 +307,7 @@ These are the planner's readings, not confirmed by the user.
 | U9 | Rename the documentation, vocabulary and leftovers | `CONCEPTS.md`, `docs-book/`, `ROADMAP.md`, `docs/solutions/` | U5, U6, U8 |
 | U10 | Flip the FFmpeg codec name and pin the new image | `docker/ffmpeg/`, `src/Transcode/Domain/ValueObject/AacImplementation.php`, `packages/baander-tooling/resources/tooling-defaults.json` | U9 |
 | U11 | Record the delivery | `ROADMAP.md` | U10 |
+| U12 | Let electron-builder detect Electron 45's ABI | `ui/electron/yarn.lock` | U5 |
 
 ### U1. Start from master and re-take the inventory
 
@@ -546,6 +548,23 @@ These are the planner's readings, not confirmed by the user.
 - **Test expectation:** none -- a record, not a behaviour change.
 - **Verification:** The record names every Verification Contract row as run or not run.
 
+### U12. Let electron-builder detect Electron 45's ABI
+
+- **Goal:** `electron-builder` packages the desktop app with its native rebuild step, so a packaged build carries the binding rebuilt for the Electron the app locks.
+- **Requirements:** R4; the packaged-build check of KTD13.
+- **Dependencies:** U5, whose packaging check found the defect. It lands right after U5.
+- **Files:** `ui/electron/yarn.lock`.
+- **Approach:**
+  - Before packaging, `electron-builder` runs `@electron/rebuild`, which asks `node-abi` for the ABI of the locked Electron 45.0.0. The lockfile resolves `node-abi@npm:^4.2.0` to 4.31.0, whose `abi_registry.json` ends at Electron 43 (`43.0.0-alpha.1`, ABI 148). The rebuild therefore stops with "Could not detect abi for version 45.0.0 and runtime electron", and `yarn dist` fails whatever the binding is called. No CI job packages the app, so nothing caught it.
+  - node-abi 4.35.0 is the first release that lists `45.0.0-alpha.1` (ABI 150); 4.40.0, the latest, also lists Electron 46. The latest `@electron/rebuild`, 4.2.1, still declares `node-abi ^4.2.0`, so bumping it or `electron-builder` would keep the locked 4.31.0.
+  - So the fix re-resolves `node-abi` inside the range already declared: `corepack yarn up -R node-abi` in a clean copy taken per KTD8. Only the lockfile's `node-abi` entry changes, to 4.40.0. `ui/electron/package.json` keeps its dependencies and needs no `resolutions` entry, and the `@baander/audio-core` folder hash does not move.
+- **Test scenarios:**
+  - In the clean copy, `require('node-abi').getAbi('45.0.0', 'electron')` returns 150; with 4.31.0 it throws "Could not detect abi for version 45".
+  - The copy accepts the lockfile with an immutable install; `corepack yarn tsc` passes and `corepack yarn test` passes 75 of 75 with none skipped.
+  - `electron-builder --dir --linux --publish never`, without `-c.npmRebuild=false`, rebuilds `@baander/audio-core` for Electron 45.0.0 and packages the app.
+  - The packaged `app.asar.unpacked/node_modules/@baander/audio-core/build/Release/baander_audio_core.node` loads under Electron 45 with `ELECTRON_RUN_AS_NODE=1`, and so does the packaged `node/index.js`.
+- **Verification:** The desktop row of the Verification Contract passes, its packaging check included, without skipping the native rebuild.
+
 ---
 
 ## Verification Contract
@@ -559,7 +578,7 @@ These are the planner's readings, not confirmed by the user.
 | Compile flags | Compile database and `binding.gyp` flags against U1's baseline | R2, R3 | U3 |
 | Binding | `npx node-gyp rebuild` and `npm test` in `packages/baander-audio-core` | R4 | U3, U5 |
 | Benchmark harness | `./bench.py selftest` in `packages/baander-audio-core/bench` (no codec runs, so it needs no quiet window) | R10 | U3, U4 |
-| Desktop | In a clean copy: `corepack yarn install --immutable`, `corepack yarn tsc`, `corepack yarn test` in `ui/electron`; `electron-builder --dir` packaging check | R4 | U2 to U5, U10 |
+| Desktop | In a clean copy: `corepack yarn install --immutable`, `corepack yarn tsc`, `corepack yarn test` in `ui/electron`; `electron-builder --dir` packaging check | R4 | U2 to U5, U10, U12 |
 | Backend suites | `bash scripts/test-backend-container.sh`, and `bash scripts/test-functional-container.sh` for the migration and transcoding tests | R7, R8 | U6, U10 |
 | Static gates | `make ci`; `composer run-script --timeout=7200 test:tooling`; `composer analyse:tooling`; `composer check:tooling-architecture`; `.php-cs-fixer.tooling.php` on touched tooling and scripts | All | Each unit touching PHP |
 | Website | `php scripts/build-website.php`; `node --test scripts/*.test.mjs` and `corepack yarn test:browser` in `ui/site` | R10, R13 | U2, U4, U7, U8, U9 |
