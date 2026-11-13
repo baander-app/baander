@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Codec comparison harness for baander-aac.
+"""Codec comparison harness for Bånder Audio Core.
 
 Stages (each caches its results under the work directory, so a stage can
 be re-run after a tool or a configuration changes by deleting its cache):
@@ -12,7 +12,7 @@ be re-run after a tool or a configuration changes by deleting its cache):
            with every encoder and decoder, single-threaded, best of N
   compat   decode our streams with every decoder and other encoders'
            streams with ours, and compare the decodes
-  lossless bAAC's lossless mode against FLAC and ALAC on the same corpus
+  lossless Bånder Audio Core's lossless mode against FLAC and ALAC on the same corpus
            and on held-out recordings: size, speed and bit-exactness,
            with the gates of the lossless mode (see lossless.py)
   check    print every lossless gate of the cached run as passed, failed
@@ -48,6 +48,7 @@ from common import HERE, MUSIC, TOOLS, WORK, have, run, wine
 from lossless import (QUIET_CPU, alac_rows, busy_seconds, check_held_out_format, check_lossless,
                       expected_gates, held_out_entry, lossless_section, other_cpu, quiet_verdict,
                       same_bytes, size_verdict, speed_verdict, stage_check, stage_lossless)
+from rename_ledger import OLD_KEY, rename_ledger
 
 RESULTS = Path(os.environ.get("BENCH_RESULTS", HERE / "results"))
 
@@ -754,7 +755,7 @@ def stage_selftest(args):
         return dict(date="test", complete=True, host=host, held_out=[],
                     held_out_run=held or dict(touched=True, run=1, first_run=True,
                                               same_build_as_first=True, first_date="test"),
-                    rows=[dict(codec="baac-5", encoder="baac", level=5, frame_bytes=10,
+                    rows=[dict(codec="bac-5", encoder="bac", level=5, frame_bytes=10,
                                bit_exact=exact)],
                     gates=[dict(id="size-5", group="flac", description="size", kind="size",
                                 **size_verdict(*size)),
@@ -814,7 +815,7 @@ def stage_selftest(args):
     with tempfile.TemporaryDirectory() as tmp:
         ledger = Path(tmp) / "heldout" / "runs.json"
         ledger.parent.mkdir()
-        ledger.write_text(json.dumps(dict(runs=[dict(date="day 0", baac_sha256="0000",
+        ledger.write_text(json.dumps(dict(runs=[dict(date="day 0", bac_sha256="0000",
                                                      git="rev0")])))
         first = held_out_entry(ledger, ["a1", "a2"], "day 1", "aaaa", "rev1")
         again = held_out_entry(ledger, ["a2", "a1"], "day 2", "aaaa", "rev1")
@@ -838,6 +839,46 @@ def stage_selftest(args):
                "the check passes a repeat on the build the first run measured")
         expect(not check_lossless(made_up(below, held=other), sink),
                "the check does not pass the held-out gates of another build's later run")
+
+    # A ledger booked before the build digest's key was renamed: the stage
+    # refuses it as it is, and once rewritten it books the next run on the
+    # same recordings as a repeat of the build the first run measured.
+    with tempfile.TemporaryDirectory() as tmp:
+        ledger = Path(tmp) / "heldout" / "runs.json"
+        ledger.parent.mkdir()
+        ledger.write_text(json.dumps(dict(note="test", runs=[
+            {"date": "day 1", OLD_KEY: "aaaa", "git": "rev1", "recordings": ["a1", "a2"]}]),
+            indent=1) + "\n")
+        before = ledger.read_text()
+        try:
+            held_out_entry(ledger, ["a1", "a2"], "day 2", "aaaa", "rev2")
+            refused = False
+        except SystemExit:
+            refused = True
+        expect(refused and ledger.read_text() == before,
+               "a ledger under the former key is refused and left as it was")
+        renamed, again = rename_ledger(ledger), rename_ledger(ledger)
+        expect(renamed == 1 and again == 0 and json.loads(ledger.read_text())["note"] == "test",
+               "the ledger rewrite renames each run's digest once and keeps the rest")
+        repeat = held_out_entry(ledger, ["a2", "a1"], "day 2", "aaaa", "rev2")
+        expect(not repeat["first_run"] and repeat["run"] == 2 and repeat["same_build_as_first"]
+               and repeat["first_date"] == "day 1",
+               "a rewritten ledger books the next run on its recordings as a repeat, not a first")
+        runs = json.loads(ledger.read_text())["runs"]
+        ledger.write_text(json.dumps(dict(runs=runs + [{"date": "day 3", OLD_KEY: "cccc"}])))
+        try:
+            rename_ledger(ledger)
+            mixed_refused = False
+        except SystemExit:
+            mixed_refused = True
+        expect(mixed_refused, "a ledger that books runs under both keys is refused")
+        ledger.write_text(json.dumps(dict(runs=runs + [{"date": "day 3", "git": "rev3"}])))
+        try:
+            rename_ledger(ledger)
+            bare_refused = False
+        except SystemExit:
+            bare_refused = True
+        expect(bare_refused, "a ledger with a run that has no build digest is refused")
 
     # Exactness: one sample altered is not the same decode.
     pcm = bytes(range(256)) * 16
@@ -883,7 +924,7 @@ def stage_selftest(args):
         shutil.copytree(HERE / "results", RESULTS)
         before = {p.name: p.read_bytes() for p in RESULTS.iterdir()}
         run_of = made_up(below)
-        run_of.update(tools=dict(baac="x", flac="flac 1.4.3", ffmpeg="ffmpeg", refalac="carried"),
+        run_of.update(tools=dict(bac="x", flac="flac 1.4.3", ffmpeg="ffmpeg", refalac="carried"),
                       method=dict(corpus_seconds=130.3, corpus_repetitions=25, pinned="taskset -c 0",
                                   repeats=5, judged="long run"), figures=[])
         run_of["host"].update(compiler="c++")
@@ -896,7 +937,7 @@ def stage_selftest(args):
         old, new = split_sections(before["tables.md"].decode()), split_sections(after["tables.md"].decode())
         expect(all(old[t] == new[t] for t in ("Quality", "Speed and memory", "Decoder agreement")),
                "with only the lossless cache, the other sections of tables.md are unchanged")
-        expect(old.get("Lossless") != new["Lossless"] and "baac-5" in new["Lossless"] and
+        expect(old.get("Lossless") != new["Lossless"] and "bac-5" in new["Lossless"] and
                list(new) == [t for t in SECTIONS if t in new],
                "and the Lossless section is the new one, in its place")
         expect(all(before[n] == after[n] for n in before if n not in ("tables.md", "lossless.json")),

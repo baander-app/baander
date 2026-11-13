@@ -300,19 +300,19 @@ Each decode aligned to the source; SNR of every decoder's output against our dec
 
 ## Lossless (generated)
 
-Run of 2026-11-12T19:33:58+01:00 on AMD Ryzen 7 5800X3D 8-Core Processor (core 15, c++ (SUSE Linux) 16.2.1 20260929). The rest of the host used 0.82 CPUs on average during the run and 0.49 in the minute before it (load average 0.76 at the start and 1.76 at the end). bAAC 50568561c, flac 1.4.3, ffmpeg version 8.1.3; refalac carried from 2026-10-30. The corpus is 130.3 s; timed runs repeat it 36 times in one process pinned with `taskset -c 15`, 5 repeats with the reference and bAAC alternated.
+Run of 2026-11-12T19:33:58+01:00 on AMD Ryzen 7 5800X3D 8-Core Processor (core 15, c++ (SUSE Linux) 16.2.1 20260929). The rest of the host used 0.82 CPUs on average during the run and 0.49 in the minute before it (load average 0.76 at the start and 1.76 at the end). Bånder Audio Core 50568561c, flac 1.4.3, ffmpeg version 8.1.3; refalac carried from 2026-10-30. The corpus is 130.3 s; timed runs repeat it 36 times in one process pinned with `taskset -c 15`, 5 repeats with the reference and Bånder Audio Core alternated.
 
 | Codec | kbit/s | Frame bytes | Enc × realtime | Dec × realtime | Bit-exact |
 |---|--:|--:|--:|--:|---|
-| baac-0 | 690.49 | 11247512 | 1847 | 1408 | True |
-| baac-1 | 685.79 | 11171070 | 1455 | 1394 | True |
-| baac-2 | 685.77 | 11170675 | 1454 | 1394 | True |
-| baac-3 | 641.59 | 10450934 | 1424 | 1192 | True |
-| baac-4 | 628.61 | 10239564 | 916 | 1151 | True |
-| baac-5 | 628.17 | 10232449 | 845 | 1151 | True |
-| baac-6 | 625.03 | 10181162 | 475 | 1144 | True |
-| baac-7 | 614.34 | 10007032 | 402 | 1076 | True |
-| baac-8 | 613.83 | 9998768 | 284 | 1079 | True |
+| bac-0 | 690.49 | 11247512 | 1847 | 1408 | True |
+| bac-1 | 685.79 | 11171070 | 1455 | 1394 | True |
+| bac-2 | 685.77 | 11170675 | 1454 | 1394 | True |
+| bac-3 | 641.59 | 10450934 | 1424 | 1192 | True |
+| bac-4 | 628.61 | 10239564 | 916 | 1151 | True |
+| bac-5 | 628.17 | 10232449 | 845 | 1151 | True |
+| bac-6 | 625.03 | 10181162 | 475 | 1144 | True |
+| bac-7 | 614.34 | 10007032 | 402 | 1076 | True |
+| bac-8 | 613.83 | 9998768 | 284 | 1079 | True |
 | flac-0 | 691.11 | 11249468 | 885 | 1006 | True |
 | flac-1 | 688.04 | 11199433 | 859 | 979 | True |
 | flac-2 | 686.40 | 11172677 | 696 | 981 | True |
@@ -329,20 +329,20 @@ Run of 2026-11-12T19:33:58+01:00 on AMD Ryzen 7 5800X3D 8-Core Processor (core 1
 
 ### Gates
 
-A speed ratio is bAAC's CPU time over the reference's, the median of the paired repeats with their range; the threshold is 1 plus the reference's own spread. Judged on: long run (one process over the repeated input); encode from raw PCM, which flac reads about 3 % faster than WAV.
+A speed ratio is Bånder Audio Core's CPU time over the reference's, the median of the paired repeats with their range; the threshold is 1 plus the reference's own spread. Judged on: long run (one process over the repeated input); encode from raw PCM, which flac reads about 3 % faster than WAV.
 
-| Gate | Group | bAAC | Reference | Ratio (range) | Threshold | Verdict |
+| Gate | Group | Bånder Audio Core | Reference | Ratio (range) | Threshold | Verdict |
 |---|---|--:|--:|--:|--:|---|
-| size-5: bAAC level 5 frame bytes against flac -5 | flac | 10232449 | 10248681 | | | passed |
-| size-8: bAAC level 8 frame bytes against flac -8 | flac | 9998768 | 10010621 | | | passed |
+| size-5: Bånder Audio Core level 5 frame bytes against flac -5 | flac | 10232449 | 10248681 | | | passed |
+| size-8: Bånder Audio Core level 8 frame bytes against flac -8 | flac | 9998768 | 10010621 | | | passed |
 | enc-5: encode at level 5 against flac -5 | flac | 5.544 s | 6.824 s | 0.814 (0.803 to 0.817) | 1.008 | passed |
 | enc-8: encode at level 8 against flac -8 | flac | 16.461 s | 18.936 s | 0.870 (0.864 to 0.871) | 1.007 | passed |
 | dec-5-flac: decode of flac -5 streams against flac (MD5 verified by both) | decode | 4.094 s | 5.155 s | 0.794 (0.793 to 0.796) | 1.002 | passed |
 | dec-5-ffmpeg: decode of flac -5 streams against ffmpeg (frame CRCs checked by both, no MD5) | decode | 2.757 s | 6.785 s | 0.406 (0.406 to 0.408) | 1.005 | passed |
 | dec-8-flac: decode of flac -8 streams against flac (MD5 verified by both) | decode | 4.498 s | 5.572 s | 0.809 (0.803 to 0.814) | 1.009 | passed |
 | dec-8-ffmpeg: decode of flac -8 streams against ffmpeg (frame CRCs checked by both, no MD5) | decode | 3.118 s | 6.887 s | 0.453 (0.451 to 0.453) | 1.003 | passed |
-| alac-size-ffmpeg: bAAC level 5 stream against alac-ffmpeg | alac | 10232747 | 11354157 | | | passed |
-| alac-size-refalac: bAAC level 5 stream against alac-apple-ref (row carried from 2026-10-30, size only) | alac | 10232747 | 11243940 | | | passed |
+| alac-size-ffmpeg: Bånder Audio Core level 5 stream against alac-ffmpeg | alac | 10232747 | 11354157 | | | passed |
+| alac-size-refalac: Bånder Audio Core level 5 stream against alac-apple-ref (row carried from 2026-10-30, size only) | alac | 10232747 | 11243940 | | | passed |
 | alac-enc: encode at level 5 against FFmpeg ALAC | alac | 5.699 s | 21.870 s | 0.260 (0.259 to 0.262) | 1.006 | passed |
 | alac-dec: decode of its own level 5 stream against FFmpeg decoding ALAC | alac | 4.087 s | 17.821 s | 0.229 (0.228 to 0.238) | 1.028 | passed |
 | added-hires-size: corpus addition 96 kHz, 24-bit stereo: level 5 frame bytes against flac -5 | corpus | 16448740 | 16457780 | | | passed |
@@ -357,8 +357,8 @@ A speed ratio is bAAC's CPU time over the reference's, the median of the paired 
 | added-stereo16-enc: corpus addition 44.1 kHz, 16-bit stereo: encode at level 5 against flac -5 | corpus | 6.066 s | 6.798 s | 0.891 (0.889 to 0.907) | 1.025 | passed |
 | added-stereo16-dec-flac: corpus addition 44.1 kHz, 16-bit stereo: decode of the flac -5 stream against flac (MD5 verified by both) | corpus | 4.190 s | 5.268 s | 0.795 (0.785 to 0.803) | 1.017 | passed |
 | added-stereo16-dec-ffmpeg: corpus addition 44.1 kHz, 16-bit stereo: decode of the flac -5 stream against FFmpeg (frame CRCs checked by both, no MD5) | corpus | 2.775 s | 7.163 s | 0.388 (0.386 to 0.389) | 1.003 | passed |
-| size-5-enlarged: bAAC level 5 frame bytes against flac -5 on the enlarged corpus | corpus | 27386433 | 27415181 | | | passed |
-| size-8-enlarged: bAAC level 8 frame bytes against flac -8 on the enlarged corpus | corpus | 27084711 | 27111090 | | | passed |
+| size-5-enlarged: Bånder Audio Core level 5 frame bytes against flac -5 on the enlarged corpus | corpus | 27386433 | 27415181 | | | passed |
+| size-8-enlarged: Bånder Audio Core level 8 frame bytes against flac -8 on the enlarged corpus | corpus | 27084711 | 27111090 | | | passed |
 | held-hires-size: held-out 96 kHz, 24-bit stereo: level 5 frame bytes against flac -5 | held-out | 9821712 | 9795735 | | | failed |
 | held-hires-enc: held-out 96 kHz, 24-bit stereo: encode at level 5 against flac -5 | held-out | 6.504 s | 7.399 s | 0.879 (0.869 to 0.888) | 1.020 | passed |
 | held-hires-dec-flac: held-out 96 kHz, 24-bit stereo: decode of the flac -5 stream against flac (MD5 verified by both) | held-out | 4.707 s | 5.924 s | 0.795 (0.792 to 0.797) | 1.005 | passed |
@@ -376,7 +376,7 @@ A speed ratio is bAAC's CPU time over the reference's, the median of the paired 
 
 Long: one process over the repeated corpus. Per file: one process per corpus item, which adds each tool's start. The judged figure is marked.
 
-| Measure | Variant | bAAC s | Reference s | Ratio (range) | Threshold | Reads as |
+| Measure | Variant | Bånder Audio Core s | Reference s | Ratio (range) | Threshold | Reads as |
 |---|---|--:|--:|--:|--:|---|
 | enc-5 | long-raw (judged) | 5.544 | 6.824 | 0.814 (0.803 to 0.817) | 1.008 | passed |
 | enc-5 | long-wav | 5.583 | 7.118 | 0.785 (0.776 to 0.788) | 1.029 | passed |
@@ -401,7 +401,7 @@ Long: one process over the repeated corpus. Per file: one process per corpus ite
 
 The original corpus is the ten items back to back. The enlarged corpus adds the recordings of the first held-out set, which are listed below.
 
-| Corpus | Level | bAAC | flac |
+| Corpus | Level | Bånder Audio Core | flac |
 |---|--:|--:|--:|
 | original | 5 | 10232449 | 10248681 |
 | original | 8 | 9998768 | 10010621 |
@@ -410,7 +410,7 @@ The original corpus is the ten items back to back. The enlarged corpus adds the 
 
 ### Corpus additions
 
-| Set | File | Seconds | bAAC level 5 | flac -5 | bAAC level 8 | flac -8 | Bit-exact |
+| Set | File | Seconds | Bånder Audio Core level 5 | flac -5 | Bånder Audio Core level 8 | flac -8 | Bit-exact |
 |---|---|--:|--:|--:|--:|--:|---|
 | hires | 28 - high resolution audio, default settings | 8.7 | 3466569 | 3468596 | 3428727 | 3431322 | True |
 | hires | 29 - high resolution audio, blocksize 16384 | 8.0 | 3258760 | 3260512 | 3254972 | 3257122 | True |
@@ -424,7 +424,7 @@ The original corpus is the ten items back to back. The enlarged corpus adds the 
 
 This was the first run on these recordings.
 
-| Set | File | Span | Seconds | bAAC frame bytes | flac -5 frame bytes | Bit-exact |
+| Set | File | Span | Seconds | Bånder Audio Core frame bytes | flac -5 frame bytes | Bit-exact |
 |---|---|---|--:|--:|--:|---|
 | hires | avon-chang-cello-suite-6 | whole | 62.5 | 9821712 | 9795735 | True |
 | surround | tearsofsteel-surround | 5:00.00 to 5:20.00 | 20.0 | 8887203 | 8936904 | True |

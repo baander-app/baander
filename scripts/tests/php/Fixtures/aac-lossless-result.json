@@ -27,7 +27,7 @@
   "quiet": true
  },
  "tools": {
-  "baac": "fixture",
+  "bac": "fixture",
   "flac": "flac 1.4.3",
   "ffmpeg": "ffmpeg version 8.1.3 Copyright (c) 2000-2025 the FFmpeg developers",
   "refalac": "carried from 2026-10-30"
@@ -38,14 +38,14 @@
   "corpus_seconds": 130.3173125,
   "corpus_repetitions": 24,
   "min_cpu_seconds": 2.0,
-  "statistic": "median of the paired ratios (bAAC CPU time over the reference's); threshold 1 + (max - min) / median of the reference's times",
+  "statistic": "median of the paired ratios (B\u00e5nder Audio Core CPU time over the reference's); threshold 1 + (max - min) / median of the reference's times",
   "judged": "long run (one process over the repeated input); encode from raw PCM, which flac reads about 3 % faster than WAV"
  },
  "rows": [
   {
-   "codec": "baac-0",
+   "codec": "bac-0",
    "family": "flac",
-   "encoder": "baac",
+   "encoder": "bac",
    "level": 0,
    "seconds": 130.3173125,
    "bytes": 11247850,
@@ -58,9 +58,9 @@
    "dec_rss_kb": 2934
   },
   {
-   "codec": "baac-1",
+   "codec": "bac-1",
    "family": "flac",
-   "encoder": "baac",
+   "encoder": "bac",
    "level": 1,
    "seconds": 130.3173125,
    "bytes": 11171289,
@@ -73,9 +73,9 @@
    "dec_rss_kb": 2920
   },
   {
-   "codec": "baac-2",
+   "codec": "bac-2",
    "family": "flac",
-   "encoder": "baac",
+   "encoder": "bac",
    "level": 2,
    "seconds": 130.3173125,
    "bytes": 11170963,
@@ -88,9 +88,9 @@
    "dec_rss_kb": 2940
   },
   {
-   "codec": "baac-3",
+   "codec": "bac-3",
    "family": "flac",
-   "encoder": "baac",
+   "encoder": "bac",
    "level": 3,
    "seconds": 130.3173125,
    "bytes": 10451286,
@@ -103,9 +103,9 @@
    "dec_rss_kb": 2914
   },
   {
-   "codec": "baac-4",
+   "codec": "bac-4",
    "family": "flac",
-   "encoder": "baac",
+   "encoder": "bac",
    "level": 4,
    "seconds": 130.3173125,
    "bytes": 10239846,
@@ -118,9 +118,9 @@
    "dec_rss_kb": 2909
   },
   {
-   "codec": "baac-5",
+   "codec": "bac-5",
    "family": "flac",
-   "encoder": "baac",
+   "encoder": "bac",
    "level": 5,
    "seconds": 130.3173125,
    "bytes": 10232678,
@@ -133,9 +133,9 @@
    "dec_rss_kb": 2960
   },
   {
-   "codec": "baac-6",
+   "codec": "bac-6",
    "family": "flac",
-   "encoder": "baac",
+   "encoder": "bac",
    "level": 6,
    "seconds": 130.3173125,
    "bytes": 10181529,
@@ -148,9 +148,9 @@
    "dec_rss_kb": 2932
   },
   {
-   "codec": "baac-7",
+   "codec": "bac-7",
    "family": "flac",
-   "encoder": "baac",
+   "encoder": "bac",
    "level": 7,
    "seconds": 130.3173125,
    "bytes": 10007392,
@@ -163,9 +163,9 @@
    "dec_rss_kb": 2936
   },
   {
-   "codec": "baac-8",
+   "codec": "bac-8",
    "family": "flac",
-   "encoder": "baac",
+   "encoder": "bac",
    "level": 8,
    "seconds": 130.3173125,
    "bytes": 9999084,
@@ -365,7 +365,7 @@
   {
    "id": "size-5",
    "group": "flac",
-   "description": "bAAC level 5 frame bytes against flac -5",
+   "description": "B\u00e5nder Audio Core level 5 frame bytes against flac -5",
    "kind": "size",
    "ours": 10232449,
    "reference": 10248681,
@@ -374,7 +374,7 @@
   {
    "id": "size-8",
    "group": "flac",
-   "description": "bAAC level 8 frame bytes against flac -8",
+   "description": "B\u00e5nder Audio Core level 8 frame bytes against flac -8",
    "kind": "size",
    "ours": 9998768,
    "reference": 10010621,
@@ -611,7 +611,7 @@
   {
    "id": "alac-size-ffmpeg",
    "group": "alac",
-   "description": "bAAC level 5 stream against alac-ffmpeg",
+   "description": "B\u00e5nder Audio Core level 5 stream against alac-ffmpeg",
    "kind": "size",
    "ours": 10232678,
    "reference": 11354157,
@@ -620,7 +620,7 @@
   {
    "id": "alac-size-refalac",
    "group": "alac",
-   "description": "bAAC level 5 stream against alac-apple-ref (row carried from 2026-10-30, size only)",
+   "description": "B\u00e5nder Audio Core level 5 stream against alac-apple-ref (row carried from 2026-10-30, size only)",
    "kind": "size",
    "ours": 10232678,
    "reference": 11243940,
@@ -1074,7 +1074,7 @@
   {
    "id": "size-5-enlarged",
    "group": "corpus",
-   "description": "bAAC level 5 frame bytes against flac -5 on the enlarged corpus",
+   "description": "B\u00e5nder Audio Core level 5 frame bytes against flac -5 on the enlarged corpus",
    "kind": "size",
    "ours": 27386433,
    "reference": 27415181,
@@ -1083,7 +1083,7 @@
   {
    "id": "size-8-enlarged",
    "group": "corpus",
-   "description": "bAAC level 8 frame bytes against flac -8 on the enlarged corpus",
+   "description": "B\u00e5nder Audio Core level 8 frame bytes against flac -8 on the enlarged corpus",
    "kind": "size",
    "ours": 26895442,
    "reference": 26936791,
@@ -2112,21 +2112,21 @@
  "corpus_totals": {
   "original": {
    "5": {
-    "baac": 10232449,
+    "bac": 10232449,
     "flac": 10248681
    },
    "8": {
-    "baac": 9998768,
+    "bac": 9998768,
     "flac": 10010621
    }
   },
   "enlarged": {
    "5": {
-    "baac": 27386433,
+    "bac": 27386433,
     "flac": 27415181
    },
    "8": {
-    "baac": 26895442,
+    "bac": 26895442,
     "flac": 26936791
    }
   }
@@ -2139,9 +2139,9 @@
    "channels": 2,
    "bits": 24,
    "seconds": 10.942453,
-   "baac_frame_bytes": 3466569,
+   "bac_frame_bytes": 3466569,
    "flac_frame_bytes": 3468596,
-   "baac_frame_bytes_8": 3414570,
+   "bac_frame_bytes_8": 3414570,
    "flac_frame_bytes_8": 3420036,
    "bit_exact": true
   },
@@ -2152,9 +2152,9 @@
    "channels": 2,
    "bits": 24,
    "seconds": 10.28649,
-   "baac_frame_bytes": 3258760,
+   "bac_frame_bytes": 3258760,
    "flac_frame_bytes": 3260512,
-   "baac_frame_bytes_8": 3209879,
+   "bac_frame_bytes_8": 3209879,
    "flac_frame_bytes_8": 3214865,
    "bit_exact": true
   },
@@ -2165,9 +2165,9 @@
    "channels": 2,
    "bits": 24,
    "seconds": 10.225641,
-   "baac_frame_bytes": 3239483,
+   "bac_frame_bytes": 3239483,
    "flac_frame_bytes": 3241266,
-   "baac_frame_bytes_8": 3190891,
+   "bac_frame_bytes_8": 3190891,
    "flac_frame_bytes_8": 3195888,
    "bit_exact": true
   },
@@ -2178,9 +2178,9 @@
    "channels": 2,
    "bits": 24,
    "seconds": 10.206913,
-   "baac_frame_bytes": 3233550,
+   "bac_frame_bytes": 3233550,
    "flac_frame_bytes": 3235312,
-   "baac_frame_bytes_8": 3185047,
+   "bac_frame_bytes_8": 3185047,
    "flac_frame_bytes_8": 3190018,
    "bit_exact": true
   },
@@ -2191,9 +2191,9 @@
    "channels": 2,
    "bits": 24,
    "seconds": 10.260032,
-   "baac_frame_bytes": 3250378,
+   "bac_frame_bytes": 3250378,
    "flac_frame_bytes": 3252094,
-   "baac_frame_bytes_8": 3201622,
+   "bac_frame_bytes_8": 3201622,
    "flac_frame_bytes_8": 3206565,
    "bit_exact": true
   },
@@ -2204,9 +2204,9 @@
    "channels": 6,
    "bits": 16,
    "seconds": 0.563932,
-   "baac_frame_bytes": 164138,
+   "bac_frame_bytes": 164138,
    "flac_frame_bytes": 167275,
-   "baac_frame_bytes_8": 161676,
+   "bac_frame_bytes_8": 161676,
    "flac_frame_bytes_8": 164933,
    "bit_exact": true
   },
@@ -2217,9 +2217,9 @@
    "channels": 2,
    "bits": 16,
    "seconds": 5.577262,
-   "baac_frame_bytes": 541106,
+   "bac_frame_bytes": 541106,
    "flac_frame_bytes": 541445,
-   "baac_frame_bytes_8": 532989,
+   "bac_frame_bytes_8": 532989,
    "flac_frame_bytes_8": 533865,
    "bit_exact": true
   }
@@ -2232,7 +2232,7 @@
    "channels": 2,
    "bits": 24,
    "seconds": 16.798939,
-   "baac_frame_bytes": 5321904,
+   "bac_frame_bytes": 5321904,
    "flac_frame_bytes": 5334117,
    "bit_exact": true
   },
@@ -2247,7 +2247,7 @@
     "5:00.00",
     "5:20.00"
    ],
-   "baac_frame_bytes": 1204522,
+   "bac_frame_bytes": 1204522,
    "flac_frame_bytes": 1217960,
    "bit_exact": true
   },
@@ -2258,7 +2258,7 @@
    "channels": 2,
    "bits": 16,
    "seconds": 29.383305,
-   "baac_frame_bytes": 3102877,
+   "bac_frame_bytes": 3102877,
    "flac_frame_bytes": 3109541,
    "bit_exact": true
   }
@@ -2269,6 +2269,6 @@
   "first_run": true,
   "same_build_as_first": true,
   "first_date": "2026-11-11T23:40:12+01:00",
-  "baac_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+  "bac_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
  }
 }

@@ -1,5 +1,5 @@
 """The lossless stage of the codec comparison harness (`bench.py lossless`
-and `bench.py check`): bAAC's lossless mode against FLAC and ALAC on the
+and `bench.py check`): Bånder Audio Core's lossless mode against FLAC and ALAC on the
 same corpus and on held-out recordings, with the gates of the lossless
 mode.  The comment below is the full statement of the method."""
 import datetime
@@ -20,7 +20,7 @@ from pathlib import Path
 
 from common import HERE, MUSIC, TOOLS, WORK, have, run, wine
 
-# The stage measures bAAC's lossless mode (the `baac flac`
+# The stage measures Bånder Audio Core's lossless mode (the `bac flac`
 # commands) against the pinned flac 1.4.3, FFmpeg's FLAC and ALAC
 # encoders and, when it can run, Apple's refalac, and judges the gates
 # of the lossless mode.
@@ -32,8 +32,8 @@ from common import HERE, MUSIC, TOOLS, WORK, have, run, wine
 #
 # Speed.  Every timed process is pinned to one core with taskset and
 # measured as user plus system CPU time (wait4).  A gate takes at least
-# five repeats; inside a repeat the reference and bAAC run back to back,
-# in alternating order, and yield one paired ratio, bAAC's time over the
+# five repeats; inside a repeat the reference and Bånder Audio Core run back to back,
+# in alternating order, and yield one paired ratio, Bånder Audio Core's time over the
 # reference's.  The threshold is 1 plus the reference's spread, (max -
 # min) / median of its times over the repeats.  A gate has passed when
 # every paired ratio is at or below the threshold, failed when every one
@@ -43,8 +43,8 @@ from common import HERE, MUSIC, TOOLS, WORK, have, run, wine
 # the input repeated until the fastest command of the gate set takes at
 # least 2 CPU seconds, which keeps the start of a process (about 1 ms)
 # out of the figure.  The encode gates are judged on raw input: flac
-# reads raw PCM about 3 % faster than WAV and bAAC reads both alike, so
-# raw input is the case that favours bAAC least.  The other three
+# reads raw PCM about 3 % faster than WAV and Bånder Audio Core reads both alike, so
+# raw input is the case that favours Bånder Audio Core least.  The other three
 # figures of each encode gate are measured and recorded beside it, each
 # labelled: long run from WAV, and one process per corpus item (which
 # adds each tool's start cost) from raw and from WAV.
@@ -55,7 +55,7 @@ from common import HERE, MUSIC, TOOLS, WORK, have, run, wine
 # crccheck).  Every decoder writes a WAV file to /dev/null.
 #
 # Exactness.  Every stream is decoded by its own decoder and by the
-# others that take it (bAAC's by flac and FFmpeg, theirs by bAAC) and
+# others that take it (Bånder Audio Core's by flac and FFmpeg, theirs by Bånder Audio Core) and
 # each decode is compared with the source bytes.
 #
 # Corpus additions.  Seven recordings from the FLAC decoder testbench,
@@ -76,7 +76,7 @@ from common import HERE, MUSIC, TOOLS, WORK, have, run, wine
 # each run's recordings by their SHA-256, so a run on a new set is that
 # set's first however many runs earlier sets had, and a set that shares
 # a file with an earlier one is not new.  A later run with another build
-# of baac is not a gate result for these recordings.  Each set's total
+# of bac is not a gate result for these recordings.  Each set's total
 # frame bytes gate at level 5, with an encode gate and two decode gates.
 #
 # Host.  The run records the processor, the compiler and the versions of
@@ -339,7 +339,7 @@ def raw_args(fmt):
             f"--sample-rate={fmt['sample_rate']}"]
 
 
-def enc_baac(level, src, out, fmt=None):
+def enc_bac(level, src, out, fmt=None):
     raw = ["--raw", str(fmt["sample_rate"]), str(fmt["channels"]), str(fmt["bits"])] if fmt else []
     return [TOOLS["bac"], "flac", "enc", "--level", str(level)] + raw + [str(src), str(out)]
 
@@ -349,7 +349,7 @@ def enc_flac(level, src, out, fmt=None):
         (raw_args(fmt) if fmt else []) + [str(src)]
 
 
-def dec_baac(stream, out, md5=True, raw=False):
+def dec_bac(stream, out, md5=True, raw=False):
     return [TOOLS["bac"], "flac", "dec"] + ([] if md5 else ["--no-md5"]) + \
         (["--raw"] if raw else []) + [str(stream), str(out)]
 
@@ -385,7 +385,7 @@ def decoded(cmd_for, core):
 
 def write_wav(path, raw, fmt):
     """A WAV file around raw PCM: the plain header for 16-bit stereo, the
-    extensible one for everything else, as bAAC and flac write them."""
+    extensible one for everything else, as Bånder Audio Core and flac write them."""
     width = (fmt["bits"] + 7) // 8
     ch, rate = fmt["channels"], fmt["sample_rate"]
     extensible = ch > 2 or fmt["bits"] > 16
@@ -417,7 +417,7 @@ def repeat_file(src, dst, reps):
 
 
 def long_input(d, tag, once_raw, fmt, core, reps=None):
-    """The input repeated until bAAC's decode without MD5, the fastest
+    """The input repeated until Bånder Audio Core's decode without MD5, the fastest
     command of a gate set, takes MIN_CPU_SECONDS, or `reps` times when the
     caller fixes the count: returns the repetition count and writes
     <tag>.long.raw and <tag>.long.wav."""
@@ -426,14 +426,14 @@ def long_input(d, tag, once_raw, fmt, core, reps=None):
     fixed = reps is not None
     if not fixed:
         cpu_run(enc_flac(5, once_raw, probe, fmt), core)
-        t = min(cpu_run(dec_baac(probe, "/dev/null", md5=False), core)[0] for _ in range(3))
+        t = min(cpu_run(dec_bac(probe, "/dev/null", md5=False), core)[0] for _ in range(3))
         reps = max(1, math.ceil(LONG_MARGIN * MIN_CPU_SECONDS / max(t, 1e-4)))
     for _ in range(4):
         repeat_file(once_raw, raw, reps)
         if fixed:
             break
         cpu_run(enc_flac(5, raw, probe, fmt), core)
-        t = min(cpu_run(dec_baac(probe, "/dev/null", md5=False), core)[0] for _ in range(2))
+        t = min(cpu_run(dec_bac(probe, "/dev/null", md5=False), core)[0] for _ in range(2))
         if t >= 0.9 * LONG_MARGIN * MIN_CPU_SECONDS:
             break
         reps = math.ceil(reps * LONG_MARGIN * MIN_CPU_SECONDS / max(t, 1e-4))
@@ -470,23 +470,26 @@ def file_sha256(path):
     return h.hexdigest()
 
 
-def held_out_entry(ledger_path, recordings, date, baac_sha256, git):
+def held_out_entry(ledger_path, recordings, date, bac_sha256, git):
     """Books a run on the held-out recordings in the ledger, before the
     run reads the first of them, and returns what the result records:
     whether it is the first run on these recordings, and whether it
-    measures the build of baac that first run measured.  `recordings` are
+    measures the build of bac that first run measured.  `recordings` are
     the SHA-256 digests of the files the run reads.  Earlier runs count
     when they read any of these files; a run booked without its digests
     read an earlier set.  An interrupted run stays booked: the recordings
     were read."""
     runs = json.loads(ledger_path.read_text())["runs"] if ledger_path.exists() else []
+    if any("bac_sha256" not in r for r in runs):
+        raise SystemExit(f"{ledger_path} books runs without bac_sha256; rewrite it once with "
+                         "./rename_ledger.py before a run reads the recordings")
     recordings = sorted(recordings)
     seen = [r for r in runs if set(r.get("recordings", ())) & set(recordings)]
     record = dict(touched=True, run=len(seen) + 1, first_run=not seen,
-                  same_build_as_first=not seen or seen[0]["baac_sha256"] == baac_sha256,
-                  first_date=seen[0]["date"] if seen else date, baac_sha256=baac_sha256,
+                  same_build_as_first=not seen or seen[0]["bac_sha256"] == bac_sha256,
+                  first_date=seen[0]["date"] if seen else date, bac_sha256=bac_sha256,
                   recordings=recordings)
-    runs.append(dict(date=date, baac_sha256=baac_sha256, git=git, recordings=recordings))
+    runs.append(dict(date=date, bac_sha256=bac_sha256, git=git, recordings=recordings))
     ledger_path.parent.mkdir(parents=True, exist_ok=True)
     ledger_path.write_text(json.dumps(dict(
         note="Runs of the lossless stage on the held-out recordings, each with the SHA-256 of "
@@ -649,7 +652,7 @@ def flac_row(ctx, codec, encoder, level, enc_cmd):
     o = d / f"{codec}.flac"
     cpu_run(enc_cmd(d / "corpus.wav", o), core)
     exact = True
-    for dec in (lambda out: dec_baac(o, out, raw=True), lambda out: dec_flac(o, out, raw=True),
+    for dec in (lambda out: dec_bac(o, out, raw=True), lambda out: dec_flac(o, out, raw=True),
                 lambda out: dec_ffmpeg(o, out, raw=True)):
         exact = exact and same_bytes(decoded(dec, core), ctx.source)
     size = os.path.getsize(o)
@@ -659,11 +662,11 @@ def flac_row(ctx, codec, encoder, level, enc_cmd):
 
 
 def flac_rows(ctx):
-    """bAAC and flac at every level and FFmpeg's FLAC encoder at 5 and 8."""
+    """Bånder Audio Core and flac at every level and FFmpeg's FLAC encoder at 5 and 8."""
     rows = []
     for level in LOSSLESS_LEVELS:
-        rows.append(flac_row(ctx, f"baac-{level}", "baac", level,
-                             lambda src, o, level=level: enc_baac(level, src, o)))
+        rows.append(flac_row(ctx, f"bac-{level}", "bac", level,
+                             lambda src, o, level=level: enc_bac(level, src, o)))
     for level in LOSSLESS_LEVELS:
         rows.append(flac_row(ctx, f"flac-{level}", "flac", level,
                              lambda src, o, level=level: enc_flac(level, src, o)))
@@ -707,9 +710,9 @@ def row_speeds(ctx, rows):
         for r in rows:
             level, enc = r["level"], r["encoder"]
             stream = d / f"{r['codec']}.long.flac"
-            if enc == "baac":
-                e, dcmd = enc_baac(level, long_wav, "/dev/null"), dec_baac(stream, "/dev/null")
-                make = enc_baac(level, long_wav, stream)
+            if enc == "bac":
+                e, dcmd = enc_bac(level, long_wav, "/dev/null"), dec_bac(stream, "/dev/null")
+                make = enc_bac(level, long_wav, stream)
             elif enc == "flac":
                 e, dcmd = enc_flac(level, long_wav, "/dev/null"), dec_flac(stream, "/dev/null")
                 make = enc_flac(level, long_wav, stream)
@@ -725,21 +728,22 @@ def row_speeds(ctx, rows):
                      enc_rss_kb=max(m for _, m in et),
                      dec_cpu=statistics.median(t for t, _ in dt) / reps,
                      dec_rss_kb=max(m for _, m in dt))
-            if not (enc == "flac" and level in (5, 8)) and not (enc == "baac" and level == 5):
+            if not (enc == "flac" and level in (5, 8)) and not (enc == "bac" and level == 5):
                 stream.unlink()
             print(f"  {r['codec']}: enc {seconds / r['enc_cpu']:.0f}x, dec "
                   f"{seconds / r['dec_cpu']:.0f}x", file=sys.stderr)
     for level in (5, 8):  # the neutral streams of the decode gates
         if not (d / f"flac-{level}.long.flac").exists():
             cpu_run(enc_flac(level, long_wav, d / f"flac-{level}.long.flac"), core)
-    if not (d / "baac-5.long.flac").exists():
-        cpu_run(enc_baac(5, long_wav, d / "baac-5.long.flac"), core)
+    if not (d / "bac-5.long.flac").exists():
+        cpu_run(enc_bac(5, long_wav, d / "bac-5.long.flac"), core)
 
 
 def flac_size_gates(ctx):
     for level in (5, 8):
-        ctx.gate(f"size-{level}", "flac", f"bAAC level {level} frame bytes against flac -{level}",
-                 dict(kind="size", **size_verdict(ctx.by[f"baac-{level}"]["frame_bytes"],
+        ctx.gate(f"size-{level}", "flac",
+                 f"Bånder Audio Core level {level} frame bytes against flac -{level}",
+                 dict(kind="size", **size_verdict(ctx.by[f"bac-{level}"]["frame_bytes"],
                                                   ctx.by[f"flac-{level}"]["frame_bytes"])))
 
 
@@ -761,7 +765,7 @@ def encode_gates(ctx):
         if not ctx.only.search(gid):
             continue
         for variant, mk in variants.items():
-            r = measure_gate(f"{gid} {variant}", mk(enc_baac, level), mk(enc_flac, level),
+            r = measure_gate(f"{gid} {variant}", mk(enc_bac, level), mk(enc_flac, level),
                              ctx.repeats, ctx.core)
             ctx.figures.append(dict(measure=gid, variant=variant, judged=variant == "long-raw",
                                     **r))
@@ -786,32 +790,32 @@ def decode_gates(ctx):
                 continue
             checks = "MD5 verified by both" if ref == "flac" else \
                 "frame CRCs checked by both, no MD5"
-            r = measure_gate(f"{gid} long", [dec_baac(stream, "/dev/null", md5=ours_md5)],
+            r = measure_gate(f"{gid} long", [dec_bac(stream, "/dev/null", md5=ours_md5)],
                              [their(stream, "/dev/null")], ctx.repeats, core)
             ctx.figures.append(dict(measure=gid, variant="long", judged=True, **r))
             ctx.gate(gid, "decode", f"decode of flac -{level} streams against {ref} ({checks})",
                      dict(kind="speed", **r), "one process over the repeated corpus")
             r = measure_gate(f"{gid} per-file",
-                             [dec_baac(s, "/dev/null", md5=ours_md5) for s in per_file],
+                             [dec_bac(s, "/dev/null", md5=ours_md5) for s in per_file],
                              [their(s, "/dev/null") for s in per_file], ctx.repeats, core)
             ctx.figures.append(dict(measure=gid, variant="per-file", judged=False, **r))
 
 
 def alac_gates(ctx, alac):
-    """bAAC at the default level against the ALAC encoders: size, and
+    """Bånder Audio Core at the default level against the ALAC encoders: size, and
     against FFmpeg's encoder and decoder, speed."""
     d, core, seconds, reps, long_wav = ctx.d, ctx.core, ctx.seconds, ctx.reps, ctx.long_wav
-    ours5 = ctx.by["baac-5"]
+    ours5 = ctx.by["bac-5"]
     for r in alac:
         ref_bytes = r.get("bytes") or round(r["kbps"] * r["seconds"] * 125)
         ours_bytes = ours5["bytes"] if r["seconds"] == seconds else \
             round(ours5["kbps"] * r["seconds"] * 125)
         note = f" (row carried from {r['carried']}, size only)" if r.get("carried") else ""
         ctx.gate(f"alac-size-{'refalac' if r['codec'] == 'alac-apple-ref' else 'ffmpeg'}", "alac",
-                 f"bAAC level 5 stream against {r['codec']}{note}",
+                 f"Bånder Audio Core level 5 stream against {r['codec']}{note}",
                  dict(kind="size", **size_verdict(ours_bytes, ref_bytes)))
     if ctx.only.search("alac-enc"):
-        r = measure_gate("alac-enc", [enc_baac(5, long_wav, d / "timing.flac")],
+        r = measure_gate("alac-enc", [enc_bac(5, long_wav, d / "timing.flac")],
                          [enc_alac(long_wav, d / "timing.m4a")], ctx.repeats, core)
         ctx.figures.append(dict(measure="alac-enc", variant="long-wav", judged=True, **r))
         ctx.gate("alac-enc", "alac", "encode at level 5 against FFmpeg ALAC",
@@ -821,7 +825,7 @@ def alac_gates(ctx, alac):
     if ctx.only.search("alac-dec"):
         if not (d / "timing.m4a").exists():
             cpu_run(enc_alac(long_wav, d / "timing.m4a"), core)
-        r = measure_gate("alac-dec", [dec_baac(d / "baac-5.long.flac", "/dev/null")],
+        r = measure_gate("alac-dec", [dec_bac(d / "bac-5.long.flac", "/dev/null")],
                          [dec_alac(d / "timing.m4a", "/dev/null")], ctx.repeats, core)
         ctx.figures.append(dict(measure="alac-dec", variant="long", judged=True, **r))
         ctx.gate("alac-dec", "alac",
@@ -839,7 +843,7 @@ def measure_set(ctx, prefix, group, what, directory, set_id, label, expected, so
     encoder."""
     d, core = ctx.d, ctx.core
     records = []
-    totals = {level: dict(baac=0, flac=0) for level in levels}
+    totals = {level: dict(bac=0, flac=0) for level in levels}
     set_raw = d / f"{prefix}.{set_id}.raw"
     with open(set_raw, "wb") as out:
         for name, skip, until in sources:
@@ -859,48 +863,48 @@ def measure_set(ctx, prefix, group, what, directory, set_id, label, expected, so
                 record["span"] = [skip, until]
             exact = True
             for level in levels:
-                ours, theirs = d / f"{prefix}.baac.flac", d / f"{prefix}.flac.flac"
-                cpu_run(enc_baac(level, raw, ours, expected), core)
+                ours, theirs = d / f"{prefix}.bac.flac", d / f"{prefix}.flac.flac"
+                cpu_run(enc_bac(level, raw, ours, expected), core)
                 cpu_run(enc_flac(level, raw, theirs, expected), core)
                 exact = exact and all(same_bytes(decoded(dec, core), pcm) for dec in (
-                    lambda o: dec_baac(ours, o, raw=True),
+                    lambda o: dec_bac(ours, o, raw=True),
                     lambda o: dec_flac(ours, o, raw=True),
                     lambda o: dec_ffmpeg(ours, o, expected["bits"], raw=True),
-                    lambda o: dec_baac(theirs, o, raw=True)))
+                    lambda o: dec_bac(theirs, o, raw=True)))
                 a, b = flac_frame_bytes(ours), flac_frame_bytes(theirs)
-                totals[level]["baac"] += a
+                totals[level]["bac"] += a
                 totals[level]["flac"] += b
                 suffix = "" if level == 5 else f"_{level}"
-                record[f"baac_frame_bytes{suffix}"] = a
+                record[f"bac_frame_bytes{suffix}"] = a
                 record[f"flac_frame_bytes{suffix}"] = b
             record["bit_exact"] = bool(exact)
             records.append(record)
     ctx.gate(f"{prefix}-{set_id}-size", group,
              f"{what} {label}: level 5 frame bytes against flac -5",
-             dict(kind="size", **size_verdict(totals[5]["baac"], totals[5]["flac"])))
+             dict(kind="size", **size_verdict(totals[5]["bac"], totals[5]["flac"])))
     set_reps = long_input(d, f"{prefix}.{set_id}", set_raw, expected, core)
     lraw = d / f"{prefix}.{set_id}.long.raw"
     stream = d / f"{prefix}.{set_id}.long.flac"
     cpu_run(enc_flac(5, lraw, stream, expected), core)
-    r = measure_gate(f"{prefix}-{set_id}-enc", [enc_baac(5, lraw, "/dev/null", expected)],
+    r = measure_gate(f"{prefix}-{set_id}-enc", [enc_bac(5, lraw, "/dev/null", expected)],
                      [enc_flac(5, lraw, "/dev/null", expected)], ctx.repeats, core)
     ctx.gate(f"{prefix}-{set_id}-enc", group,
              f"{what} {label}: encode at level 5 against flac -5",
              dict(kind="speed", **r), f"one process over the set repeated {set_reps} times, raw "
              "input")
-    r = measure_gate(f"{prefix}-{set_id}-dec-flac", [dec_baac(stream, "/dev/null")],
+    r = measure_gate(f"{prefix}-{set_id}-dec-flac", [dec_bac(stream, "/dev/null")],
                      [dec_flac(stream, "/dev/null")], ctx.repeats, core)
     ctx.gate(f"{prefix}-{set_id}-dec-flac", group,
              f"{what} {label}: decode of the flac -5 stream against flac (MD5 verified by both)",
              dict(kind="speed", **r), f"one process over the set repeated {set_reps} times")
-    r = measure_gate(f"{prefix}-{set_id}-dec-ffmpeg", [dec_baac(stream, "/dev/null", md5=False)],
+    r = measure_gate(f"{prefix}-{set_id}-dec-ffmpeg", [dec_bac(stream, "/dev/null", md5=False)],
                      [dec_ffmpeg(stream, "/dev/null", expected["bits"])], ctx.repeats, core)
     ctx.gate(f"{prefix}-{set_id}-dec-ffmpeg", group,
              f"{what} {label}: decode of the flac -5 stream against FFmpeg (frame CRCs checked "
              "by both, no MD5)", dict(kind="speed", **r),
              f"one process over the set repeated {set_reps} times")
     for f in (lraw, stream, d / f"{prefix}.{set_id}.long.wav", set_raw,
-              d / f"{prefix}.one.raw", d / f"{prefix}.baac.flac", d / f"{prefix}.flac.flac"):
+              d / f"{prefix}.one.raw", d / f"{prefix}.bac.flac", d / f"{prefix}.flac.flac"):
         f.unlink(missing_ok=True)
     return records, totals
 
@@ -909,7 +913,7 @@ def corpus_additions(ctx):
     """The corpus additions, and the totals of the enlarged corpus: the
     ten items back to back and these recordings."""
     added = []
-    corpus_totals = dict(original={str(level): dict(baac=ctx.by[f"baac-{level}"]["frame_bytes"],
+    corpus_totals = dict(original={str(level): dict(bac=ctx.by[f"bac-{level}"]["frame_bytes"],
                                                     flac=ctx.by[f"flac-{level}"]["frame_bytes"])
                                    for level in (5, 8)})
     enlarged = {level: dict(corpus_totals["original"][str(level)]) for level in (5, 8)}
@@ -926,14 +930,15 @@ def corpus_additions(ctx):
                                       (5, 8))
         added += records
         for level in (5, 8):
-            for side in ("baac", "flac"):
+            for side in ("bac", "flac"):
                 enlarged[level][side] += totals[level][side]
     if measured_all:
         corpus_totals["enlarged"] = {str(level): enlarged[level] for level in (5, 8)}
         for level in (5, 8):
             ctx.gate(f"size-{level}-enlarged", "corpus",
-                     f"bAAC level {level} frame bytes against flac -{level} on the enlarged corpus",
-                     dict(kind="size", **size_verdict(enlarged[level]["baac"],
+                     f"Bånder Audio Core level {level} frame bytes against flac -{level} "
+                     "on the enlarged corpus",
+                     dict(kind="size", **size_verdict(enlarged[level]["bac"],
                                                       enlarged[level]["flac"])))
     return added, corpus_totals
 
@@ -975,14 +980,15 @@ def finish(ctx, rows, added, corpus_totals, held, held_run):
     host["quiet"] = quiet_verdict(host)[0]
     result = dict(
         schema=2, date=ctx.started, complete=not ctx.limited, host=host,
-        tools=dict(baac=git_state(), flac=ctx.flac_version,
+        tools=dict(bac=git_state(), flac=ctx.flac_version,
                    ffmpeg=tool_version([TOOLS["ffmpeg"], "-version"]),
                    refalac="measured" if have("refalac") else "carried from 2026-10-30"),
         method=dict(pinned=f"taskset -c {ctx.core}", repeats=ctx.repeats,
                     corpus_seconds=ctx.seconds, corpus_repetitions=ctx.reps,
                     min_cpu_seconds=MIN_CPU_SECONDS,
-                    statistic="median of the paired ratios (bAAC CPU time over the reference's); "
-                              "threshold 1 + (max - min) / median of the reference's times",
+                    statistic="median of the paired ratios (Bånder Audio Core CPU time over the "
+                              "reference's); threshold 1 + (max - min) / median of the reference's "
+                              "times",
                     judged="long run (one process over the repeated input); encode from raw "
                            "PCM, which flac reads about 3 % faster than WAV"),
         rows=rows, gates=ctx.gates, figures=ctx.figures, corpus_totals=corpus_totals,
@@ -1029,11 +1035,13 @@ def check_lossless(result, out=sys.stdout):
                 ok = False
     # An observation, not a gate: each level against the level below it.
     sizes = {r["level"]: r["frame_bytes"] for r in result.get("rows", [])
-             if r.get("encoder") == "baac"}
+             if r.get("encoder") == "bac"}
     larger = [f"{n} ({sizes[n]} against {sizes[n - 1]})" for n in sorted(sizes)
               if n - 1 in sizes and sizes[n] > sizes[n - 1]]
-    print("observation: " + ("every bAAC level is no larger than the level below it" if not larger
-                             else "bAAC levels larger than the level below: " + ", ".join(larger)),
+    print("observation: " + ("every Bånder Audio Core level is no larger than the level below it"
+                             if not larger else
+                             "Bånder Audio Core levels larger than the level below: "
+                             + ", ".join(larger)),
           file=out)
     if not result.get("complete", False):
         print("not a gate result: the run was limited (--only, --gates-only, --reps, --any-flac or "
@@ -1065,7 +1073,7 @@ def check_lossless(result, out=sys.stdout):
               f"measured on {run.get('first_date')}", file=out)
     else:
         print(f"not a gate result for the held-out recordings: run {run.get('run')}, and the "
-              f"first, on {run.get('first_date')}, measured another build of baac", file=out)
+              f"first, on {run.get('first_date')}, measured another build of bac", file=out)
         ok = False
     print("every gate passed" if ok else "not every gate passed", file=out)
     return ok
@@ -1088,11 +1096,12 @@ def lossless_section(result):
               f"{host['other_cpu_run']:.2f} CPUs on average during the run and "
               f"{host['other_cpu_start']:.2f} in the minute before it (load average "
               f"{host['load_start'][0]} at the start and {host['load_end'][0]} at the end){noisy}"
-              f". bAAC {tools['baac']}, {tools['flac']}, {tools['ffmpeg'].split(' Copyright')[0]}; "
+              f". Bånder Audio Core {tools['bac']}, {tools['flac']}, "
+              f"{tools['ffmpeg'].split(' Copyright')[0]}; "
               f"refalac {tools['refalac']}. The corpus is {method['corpus_seconds']:.1f} s; timed "
               f"runs repeat it {method['corpus_repetitions']} times in one process pinned with "
-              f"`{method['pinned']}`, {method['repeats']} repeats with the reference and bAAC "
-              "alternated.\n")
+              f"`{method['pinned']}`, {method['repeats']} repeats with the reference and "
+              "Bånder Audio Core alternated.\n")
     md.append("| Codec | kbit/s | Frame bytes | Enc × realtime | Dec × realtime | Bit-exact |")
     md.append("|---|--:|--:|--:|--:|---|")
     for r in result["rows"]:
@@ -1102,10 +1111,12 @@ def lossless_section(result):
         md.append(f"| {name} | {r['kbps']:.2f} | {r.get('frame_bytes', '-')} | {enc} | {dec} | "
                   f"{r['bit_exact']} |")
     md.append("\n### Gates\n")
-    md.append("A speed ratio is bAAC's CPU time over the reference's, the median of the paired "
-              "repeats with their range; the threshold is 1 plus the reference's own spread. "
+    md.append("A speed ratio is Bånder Audio Core's CPU time over the reference's, the median of "
+              "the paired repeats with their range; the threshold is 1 plus the reference's "
+              "own spread. "
               f"Judged on: {method['judged']}.\n")
-    md.append("| Gate | Group | bAAC | Reference | Ratio (range) | Threshold | Verdict |")
+    md.append("| Gate | Group | Bånder Audio Core | Reference | Ratio (range) | Threshold | "
+              "Verdict |")
     md.append("|---|---|--:|--:|--:|--:|---|")
     for g in result["gates"]:
         if g["kind"] == "size":
@@ -1120,7 +1131,8 @@ def lossless_section(result):
         md.append("\n### Every figure of the speed gates\n")
         md.append("Long: one process over the repeated corpus. Per file: one process per corpus "
                   "item, which adds each tool's start. The judged figure is marked.\n")
-        md.append("| Measure | Variant | bAAC s | Reference s | Ratio (range) | Threshold | Reads as |")
+        md.append("| Measure | Variant | Bånder Audio Core s | Reference s | Ratio (range) | "
+                  "Threshold | Reads as |")
         md.append("|---|---|--:|--:|--:|--:|---|")
         for f in result["figures"]:
             md.append(f"| {f['measure']} | {f['variant']}{' (judged)' if f['judged'] else ''} | "
@@ -1132,19 +1144,19 @@ def lossless_section(result):
         md.append("\n### Corpus totals, frame bytes\n")
         md.append("The original corpus is the ten items back to back. The enlarged corpus adds "
                   "the recordings of the first held-out set, which are listed below.\n")
-        md.append("| Corpus | Level | bAAC | flac |")
+        md.append("| Corpus | Level | Bånder Audio Core | flac |")
         md.append("|---|--:|--:|--:|")
         for name in ("original", "enlarged"):
             for level, t in sorted(totals.get(name, {}).items()):
-                md.append(f"| {name} | {level} | {t['baac']} | {t['flac']} |")
+                md.append(f"| {name} | {level} | {t['bac']} | {t['flac']} |")
     if result.get("corpus_additions"):
         md.append("\n### Corpus additions\n")
-        md.append("| Set | File | Seconds | bAAC level 5 | flac -5 | bAAC level 8 | flac -8 | "
-                  "Bit-exact |")
+        md.append("| Set | File | Seconds | Bånder Audio Core level 5 | flac -5 | "
+                  "Bånder Audio Core level 8 | flac -8 | Bit-exact |")
         md.append("|---|---|--:|--:|--:|--:|--:|---|")
         for h in result["corpus_additions"]:
-            md.append(f"| {h['set']} | {h['file']} | {h['seconds']:.1f} | {h['baac_frame_bytes']} | "
-                      f"{h['flac_frame_bytes']} | {h['baac_frame_bytes_8']} | "
+            md.append(f"| {h['set']} | {h['file']} | {h['seconds']:.1f} | {h['bac_frame_bytes']} | "
+                      f"{h['flac_frame_bytes']} | {h['bac_frame_bytes_8']} | "
                       f"{h['flac_frame_bytes_8']} | {h['bit_exact']} |")
     run = result.get("held_out_run", {})
     md.append("\n### Held-out recordings, level 5\n")
@@ -1154,16 +1166,16 @@ def lossless_section(result):
         md.append("This was the first run on these recordings." if run.get("first_run") else
                   f"Run {run.get('run')} on these recordings; the first was on "
                   f"{run.get('first_date')}"
-                  + (" and measured this build of baac." if run.get("same_build_as_first") else
-                     " and measured another build of baac, so this run is not a gate result "
+                  + (" and measured this build of bac." if run.get("same_build_as_first") else
+                     " and measured another build of bac, so this run is not a gate result "
                      "for them."))
-        md.append("\n| Set | File | Span | Seconds | bAAC frame bytes | flac -5 frame bytes | "
-                  "Bit-exact |")
+        md.append("\n| Set | File | Span | Seconds | Bånder Audio Core frame bytes | "
+                  "flac -5 frame bytes | Bit-exact |")
         md.append("|---|---|---|--:|--:|--:|---|")
         for h in result.get("held_out", []):
             span = " to ".join(h["span"]) if h.get("span") else "whole"
             md.append(f"| {h['set']} | {h['file']} | {span} | {h['seconds']:.1f} | "
-                      f"{h['baac_frame_bytes']} | {h['flac_frame_bytes']} | {h['bit_exact']} |")
+                      f"{h['bac_frame_bytes']} | {h['flac_frame_bytes']} | {h['bit_exact']} |")
     return md
 
 

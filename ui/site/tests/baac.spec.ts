@@ -88,8 +88,8 @@ test('the lossless table sets bAAC level 5 and level 8 beside the references, ev
   await expect(section.locator('.baac-dateline'))
     .toHaveText(/^Recorded \d{1,2} [A-Z][a-z]+ \d{4} on .+\. The references were flac 1\.4\.3 and FFmpeg \S+\. /);
   await expect(section.locator('tbody th')).toHaveText([
-    'bAAC level 5 (default)',
-    'bAAC level 8',
+    'Bånder Audio Core level 5 (default)',
+    'Bånder Audio Core level 8',
     'flac level 5',
     'flac level 8',
     'FFmpeg FLAC level 5',
@@ -98,7 +98,7 @@ test('the lossless table sets bAAC level 5 and level 8 beside the references, ev
     /^Apple ALAC \(refalac\)(, carried from \d{1,2} [A-Z][a-z]+ \d{4})?$/,
   ]);
   await expect(section.locator('tbody td:last-child')).toHaveText(Array(8).fill('Passed'));
-  for (const codec of ['baac-5', 'baac-8', 'flac-5', 'flac-8', 'flac-ffmpeg-5', 'flac-ffmpeg-8', 'alac-ffmpeg']) {
+  for (const codec of ['bac-5', 'bac-8', 'flac-5', 'flac-8', 'flac-ffmpeg-5', 'flac-ffmpeg-8', 'alac-ffmpeg']) {
     const cells = section.locator(`tr[data-codec="${codec}"] td`);
     await expect(cells.nth(1)).toHaveText(/^\d{3}\.\d{2}$/);
     await expect(cells.nth(2)).toHaveText(/^[\d,]+×$/);

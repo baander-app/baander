@@ -11,7 +11,7 @@ $familyNotes = [
     'xhe' => 'bAAC and FDK at nominal 24, 32, 48, 64 and 96 kbit/s; libxaac at 64 and 96 only. Other combinations are unavailable.',
 ];
 $lossless = $aac['charts']['lossless'];
-$losslessShown = ['baac-5', 'baac-8', 'flac-5', 'flac-8', 'flac-ffmpeg-5', 'flac-ffmpeg-8', 'alac-ffmpeg', 'alac-apple-ref'];
+$losslessShown = ['bac-5', 'bac-8', 'flac-5', 'flac-8', 'flac-ffmpeg-5', 'flac-ffmpeg-8', 'alac-ffmpeg', 'alac-apple-ref'];
 $losslessRows = array_values(array_filter($lossless['rows'], static fn (array $row): bool => in_array($row['codec'], $losslessShown, true)));
 $losslessRun = $lossless['run'];
 $speed = static fn (?float $value): string => $value === null ? 'Not measured' : $number($value, 0) . '×';

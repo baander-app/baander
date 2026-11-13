@@ -14,7 +14,7 @@ final class AacEvidenceTest extends TestCase
     /** A made-up run in the shape the benchmark harness's lossless stage writes, generated from its own helpers. */
     private const string LOSSLESS_FIXTURE = __DIR__ . '/../Fixtures/aac-lossless-result.json';
     private const array LOSSLESS_ORDER = [
-        'baac-0', 'baac-1', 'baac-2', 'baac-3', 'baac-4', 'baac-5', 'baac-6', 'baac-7', 'baac-8',
+        'bac-0', 'bac-1', 'bac-2', 'bac-3', 'bac-4', 'bac-5', 'bac-6', 'bac-7', 'bac-8',
         'flac-0', 'flac-1', 'flac-2', 'flac-3', 'flac-4', 'flac-5', 'flac-6', 'flac-7', 'flac-8',
         'flac-ffmpeg-5', 'flac-ffmpeg-8', 'alac-ffmpeg', 'alac-apple-ref',
     ];
@@ -32,7 +32,7 @@ final class AacEvidenceTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->root = sys_get_temp_dir() . '/baander-aac-evidence-' . bin2hex(random_bytes(6));
+        $this->root = sys_get_temp_dir() . '/baander-audio-core-evidence-' . bin2hex(random_bytes(6));
         $this->directory = $this->root . '/packages/baander-audio-core/bench/results/';
         mkdir($this->directory, 0700, true);
         file_put_contents($this->root . '/packages/baander-audio-core/package.json', json_encode(['name' => '@baander/aac-native', 'version' => '0.2.0'], JSON_THROW_ON_ERROR));
@@ -87,7 +87,7 @@ final class AacEvidenceTest extends TestCase
         self::assertSame('0.2.0', $evidence['version']);
         self::assertSame(['lc' => [5, 5], 'he' => [4, 5], 'hev2' => [3, 5], 'xhe' => [3, 3]], array_map(static fn(array $rows): array => [count($rows['encode']), count($rows['decode'])], $evidence['speed']));
         $row = $evidence['quality']['lc'][0];
-        self::assertSame('bAAC', $row['label']);
+        self::assertSame('Bånder Audio Core', $row['label']);
         self::assertSame(64.0, $row['nominal']);
         self::assertSame(64.75, $row['kbps']);
         self::assertSame(65.0, $evidence['speed']['lc']['encode'][0]['throughput']);
@@ -139,7 +139,7 @@ final class AacEvidenceTest extends TestCase
             'speed-duplicate' => $this->speed[] = $this->speed[0],
             'speed-missing' => array_shift($this->speed),
             'lossless-schema' => $this->lossless['schema'] = 3,
-            'lossless-rows' => $this->lossless['rows'] = ['baac-5'],
+            'lossless-rows' => $this->lossless['rows'] = ['bac-5'],
             'lossless-date' => $this->lossless['date'] = '2026-11-31T23:40:12+01:00',
             'lossless-tools' => $this->lossless['tools']['ffmpeg'] = 'avconv 12',
             'version' => file_put_contents($this->root . '/packages/baander-audio-core/package.json', '{"version":"next"}'),
@@ -167,15 +167,15 @@ final class AacEvidenceTest extends TestCase
         self::assertSame($lossless, new AacEvidence()->load($this->root)['lossless']);
 
         $rows = array_column($lossless['rows'], null, 'codec');
-        self::assertSame(['bAAC level 5 (default)', 'bAAC level 8', 'flac level 5', 'FFmpeg FLAC level 8', 'FFmpeg ALAC'], array_map(static fn(string $codec): string => $rows[$codec]['label'], ['baac-5', 'baac-8', 'flac-5', 'flac-ffmpeg-8', 'alac-ffmpeg']));
-        self::assertSame(10232449, $rows['baac-5']['frame_bytes']);
+        self::assertSame(['Bånder Audio Core level 5 (default)', 'Bånder Audio Core level 8', 'flac level 5', 'FFmpeg FLAC level 8', 'FFmpeg ALAC'], array_map(static fn(string $codec): string => $rows[$codec]['label'], ['bac-5', 'bac-8', 'flac-5', 'flac-ffmpeg-8', 'alac-ffmpeg']));
+        self::assertSame(10232449, $rows['bac-5']['frame_bytes']);
         self::assertSame(10248681, $rows['flac-5']['frame_bytes']);
         self::assertSame(629.6765212987337, $rows['flac-5']['kbps']);
-        self::assertEqualsWithDelta(560.0, $rows['baac-5']['encode'], 1e-9);
-        self::assertEqualsWithDelta(436.0, $rows['baac-5']['decode'], 1e-9);
+        self::assertEqualsWithDelta(560.0, $rows['bac-5']['encode'], 1e-9);
+        self::assertEqualsWithDelta(436.0, $rows['bac-5']['decode'], 1e-9);
         self::assertEqualsWithDelta(195.0, $rows['flac-8']['encode'], 1e-9);
         self::assertNull($rows['alac-ffmpeg']['frame_bytes']);
-        self::assertTrue($rows['baac-8']['bit_exact']);
+        self::assertTrue($rows['bac-8']['bit_exact']);
         self::assertSame([
             'date' => '11 November 2026',
             'processor' => 'Fixture processor, not a measurement',
@@ -228,13 +228,14 @@ final class AacEvidenceTest extends TestCase
     public static function invalidLosslessRows(): iterable
     {
         yield 'unknown codec id' => ['unknown-codec', 'flac-ffmpeg-6'];
-        yield 'duplicate row' => ['duplicate', 'baac-5'];
-        yield 'missing bAAC level' => ['missing-level', 'baac-3'];
+        yield 'codec id from before the rename' => ['unknown-codec', 'baac-5'];
+        yield 'duplicate row' => ['duplicate', 'bac-5'];
+        yield 'missing Bånder Audio Core level' => ['missing-level', 'bac-3'];
         yield 'zero bitrate' => ['zero-rate', 'flac-8'];
-        yield 'negative frame bytes' => ['negative-frame-bytes', 'baac-8'];
+        yield 'negative frame bytes' => ['negative-frame-bytes', 'bac-8'];
         yield 'zero encode time' => ['zero-encode-time', 'alac-ffmpeg'];
         yield 'missing decode time' => ['missing-decode-time', 'flac-ffmpeg-8'];
-        yield 'bit-exact verdict as text' => ['bit-exact-string', 'baac-0'];
+        yield 'bit-exact verdict as text' => ['bit-exact-string', 'bac-0'];
         yield 'carried date not a date' => ['carried-date', 'alac-apple-ref'];
     }
 

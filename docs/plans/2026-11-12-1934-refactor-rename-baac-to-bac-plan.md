@@ -372,7 +372,7 @@ These are the planner's readings, not confirmed by the user.
   - `test_flac_meta` and `test_flac_cli` read the vendor "Baander Audio Core" from a tagged stream, and an untagged stream's bytes equal the baseline.
   - The `bac` CLI prefixes its errors with `bac:` (`test_flac_cli`).
   - An install into a scratch prefix yields `lib/libbac.a`, `lib/pkgconfig/bac.pc`, `include/bac/aac.h`, `include/bac/flac.h` and `bin/bac`, and `pkg-config --static --libs bac` names `-lbac`.
-  - The compile database differs from the baseline only in renamed tokens and paths, and the strict-math flags still apply to `flac_lpc.cpp`, `flac_dsp.cpp` and the FLAC SIMD files.
+  - The compile database differs from the baseline only in renamed tokens and paths, and the strict-math flags still apply to `flac_lpc.cpp`, `flac_dsp.cpp`, `flac_enc.cpp` and the FLAC SIMD files.
   - The Node smoke test passes with the renamed `binding.gyp` definitions.
   - Each malformed comment-block case in `test_flac_meta` still fails on the bound it names (field count, field length) after the fixture text changes.
   - `./bench.py selftest` passes with the renamed CLI path and variables.
@@ -584,6 +584,7 @@ git grep -I -n -i -E 'baac|baander[-_ ]aac|aac[-_ ]?native' -- . \
   ':!scripts/tests/php/Website/AacEvidenceTest.php' \
   ':!scripts/tests/php/Website/PublicationTest.php' ':!ui/site/tests/website.spec.ts' \
   ':!packages/baander-tooling/src/Website/Publication.php' \
+  ':!packages/baander-audio-core/bench/rename_ledger.py' \
   | perl -ne 's/[0-9a-f]{16,}//gi; s/StubAac//g; print if /baac|baander[-_ ]aac|aac[-_ ]?native/i'
 ```
 
@@ -600,6 +601,7 @@ After U10 the command prints nothing. The path gate runs `git ls-files` through 
 | `tests/Unit/Shared/Infrastructure/Ci/PublicationWorkflowTest.php` | One negative tag case: `refs/tags/aac-native-v1.0.0` does not release |
 | `scripts/tests/php/Website/AacEvidenceTest.php` | One rejected-id case: a `baac-5` row is refused |
 | `packages/baander-tooling/src/Website/Publication.php` | The moved-page entry for `/baac/` (U8) |
+| `packages/baander-audio-core/bench/rename_ledger.py` | The former ledger key it rewrites, `baac_sha256` (U4) |
 | `scripts/tests/php/Website/PublicationTest.php`, `ui/site/tests/website.spec.ts` | The `/baac` and `/baac/` redirect, 404 and sitemap-absence assertions (U7, U8) |
 
 

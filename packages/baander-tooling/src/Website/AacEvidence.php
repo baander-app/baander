@@ -8,9 +8,9 @@ final class AacEvidence
 {
     private const array PROFILES = ['lc' => [64, 96, 128, 192, 256], 'he' => [32, 48, 64], 'hev2' => [24, 32], 'xhe' => [24, 32, 48, 64, 96]];
     private const array ENCODERS = ['lc' => ['ours', 'ffmpeg', 'fdk', 'libxaac', 'apple'], 'he' => ['ours', 'fdk', 'libxaac', 'apple'], 'hev2' => ['ours', 'fdk', 'libxaac'], 'xhe' => ['ours', 'fdk', 'libxaac']];
-    private const array LABELS = ['ours' => 'bAAC', 'ffmpeg' => 'FFmpeg', 'fdk' => 'FDK', 'libxaac' => 'libxaac', 'apple' => 'Apple'];
+    private const array LABELS = ['ours' => 'Bånder Audio Core', 'ffmpeg' => 'FFmpeg', 'fdk' => 'FDK', 'libxaac' => 'libxaac', 'apple' => 'Apple'];
     private const array SPEED_RATES = ['lc' => 128, 'he' => 48, 'hev2' => 32, 'xhe' => 64];
-    private const array LOSSLESS_ENCODERS = ['baac' => 'bAAC', 'flac' => 'flac'];
+    private const array LOSSLESS_ENCODERS = ['bac' => 'Bånder Audio Core', 'flac' => 'flac'];
     private const array LOSSLESS_REFERENCES = ['flac-ffmpeg-5' => 'FFmpeg FLAC level 5', 'flac-ffmpeg-8' => 'FFmpeg FLAC level 8', 'alac-ffmpeg' => 'FFmpeg ALAC', 'alac-apple-ref' => 'Apple ALAC (refalac)'];
     /** The harness does not time refalac, so its row has no speed figures whether it was measured or carried. */
     private const string UNTIMED_LOSSLESS = 'alac-apple-ref';
@@ -161,9 +161,9 @@ final class AacEvidence
     }
 
     /**
-     * The lossless rows in one order, whatever the file's order: every level of bAAC and flac, then the
+     * The lossless rows in one order, whatever the file's order: every level of Bånder Audio Core and flac, then the
      * other encoders. A run of the lossless stage also yields what the page states about it; the list of
-     * four references that lossless.json held before the stage measured bAAC yields rows only.
+     * four references that lossless.json held before the stage measured Bånder Audio Core yields rows only.
      *
      * @return array{rows: list<array<string, mixed>>, run: ?array<string, mixed>}
      */
@@ -187,7 +187,7 @@ final class AacEvidence
         $labels = [];
         foreach (self::LOSSLESS_ENCODERS as $encoder => $name) {
             foreach (range(0, 8) as $level) {
-                $labels["$encoder-$level"] = "$name level $level" . ($encoder === 'baac' && $level === 5 ? ' (default)' : '');
+                $labels["$encoder-$level"] = "$name level $level" . ($encoder === 'bac' && $level === 5 ? ' (default)' : '');
             }
         }
         return $labels + self::LOSSLESS_REFERENCES;
@@ -296,7 +296,7 @@ final class AacEvidence
     {
         $handle = @fopen($path, 'rb');
         if ($handle === false) {
-            throw new \RuntimeException("Cannot read bAAC evidence: $path");
+            throw new \RuntimeException("Cannot read Bånder Audio Core evidence: $path");
         }
         try {
             $header = fgetcsv($handle, 0, ',', '"', '');
@@ -321,12 +321,12 @@ final class AacEvidence
     {
         $contents = @file_get_contents($path);
         if ($contents === false) {
-            throw new \RuntimeException("Cannot read bAAC evidence: $path");
+            throw new \RuntimeException("Cannot read Bånder Audio Core evidence: $path");
         }
         try {
             $document = json_decode($contents, true, 512, JSON_THROW_ON_ERROR);
         } catch (\JsonException $error) {
-            throw new \RuntimeException("Invalid bAAC evidence JSON: $path", 0, $error);
+            throw new \RuntimeException("Invalid Bånder Audio Core evidence JSON: $path", 0, $error);
         }
         if (!is_array($document)) {
             throw new \RuntimeException("Expected a JSON object or list: $path");
@@ -398,7 +398,7 @@ final class AacEvidence
     {
         $missing = array_diff_key($expected, $selected);
         if ($missing !== []) {
-            throw new \RuntimeException("Missing selected bAAC evidence in $file: " . implode(', ', array_keys($missing)));
+            throw new \RuntimeException("Missing selected Bånder Audio Core evidence in $file: " . implode(', ', array_keys($missing)));
         }
     }
 }
