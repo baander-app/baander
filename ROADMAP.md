@@ -129,20 +129,21 @@ run `20261107-205049-41172ade` returned "Ready with fixes"; its three confirmed 
 (worker allowlist rejecting the OpenTelemetry keys, an out-of-bounds size stopping a
 running preset, the household-era upgrade path) are fixed in fa240b3d0.
 
-Merge checkpoint (2026-11-13, `master` at 28866bf56 merged into the branch at
-4512d491b, in `baander-ci-prewarm:local`): PHPStan, Deptrac, the container lint, the
-OpenAPI check, the tooling PHPStan, the tooling architecture checks and the tooling
-format check pass. The four backend suites ran 12,026 tests in 1,098 files, and one
-failed: `ScannedTrackPlaybackTest` relays the whole outbox, and
-`PasswordChangeSessionRevocationTest` had left four committed outbox rows behind
-for users it deleted. `master` fixes that test after 28866bf56.
-`PlaybackTransferPersistenceTest`'s reconnect test, which failed before the merge,
-passes; `master` corrected the test. The tooling suite ran 1,585 tests. Its 4
-failures, all in `DevelopmentBrowserCleanupTest`, come from
-`scripts/check-backend-container.php` running the command with umask 0000; the class
-passes under umask 022. The web unit suite passes 3,480 tests in 276 files, the
-qualification driver passes its 15 Node tests, and `php scripts/build-website.php`
-builds 237 manual pages.
+Merge checkpoint (2026-11-13): `master` at 28866bf56 merged into the branch at
+4512d491b as 02856b62d, then `master` at c34a8e0a1 as 5fe4deeee. On 5fe4deeee, in
+`baander-ci-prewarm:local`, the four backend suites pass 12,026 tests in 1,098 files
+(seed 188522618): unit 7,731, native 917, functional and integration 3,378. On the
+first merge, in the same image, PHPStan, Deptrac, the container lint and the OpenAPI
+check pass. The tooling suite ran 1,585 tests there with 4 failures, all in
+`DevelopmentBrowserCleanupTest`: `scripts/check-backend-container.php` runs the
+command with umask 0000, and the class passes under umask 022. On the host, the
+tooling PHPStan, the tooling architecture checks and the tooling format check pass,
+the web unit suite passes 3,480 tests in 276 files, the qualification driver passes
+its 15 Node tests, and `php scripts/build-website.php` builds 237 manual pages.
+`ScannedTrackPlaybackTest` failed on the first merge because
+`PasswordChangeSessionRevocationTest` left four committed outbox rows behind for users
+it deleted; 2b5b38b21, merged with c34a8e0a1, removes them. `PlaybackTransferPersistenceTest`'s
+reconnect test, which failed before the merge, passes; `master` corrected the test.
 
 Open items:
 
@@ -173,9 +174,6 @@ Open items:
   that host tools connecting directly still fit the four direct connections.
 - `make docs` is shadowed by the `docs/` directory and needs a running preview;
   declare it `.PHONY` or document `php scripts/build-website.php`.
-- The backend suites have not passed in full on the merge. Rerun them after merging
-  the `master` commit that cleans up `PasswordChangeSessionRevocationTest`'s outbox
-  rows.
 - The web control socket twice closed an `app:server:stats` request without answering under load (household repeats 1 and 2, 2026-11-03); the cause is unknown. The harness now retries and records such samples.
 - After a PostgreSQL crash the worker pair stops ("deployment reconciliation is required") and stays stopped until an operator intervenes.
 - Affected browser playback specs and the worker runtime container suites have not run against the new profile.
@@ -315,13 +313,12 @@ lead line and three test-fixture ready-file races.
   emulated runner. Check the `CI` run that follows them. A green run is the first
   since 2026-11-05; then write the CI-repair learning with `ce-compound`, which the
   user confirmed.
-- **Capability and size, in flight.** Worktree `/home/martin/dev/baander-capability`,
-  branch `feat/capability-and-size-deployment-settings`: `master` is merged with every
-  conflict resolved, but the merge is not committed (`MERGE_HEAD` is in place). Its
-  checks were running when the session ended. User decision, 2026-11-12: land it with
-  no host size qualified, and run the 4 GB remux qualification in the VM (its plan's
-  U9) afterwards. Next: rerun the backend, tooling, PHPStan, Deptrac and format
-  checks, commit the merge, push `master`.
+- **Capability and size, landed 2026-11-13** with no host size qualified (user
+  decision, 2026-11-12); see "Small-host household deployment" for its merge
+  checkpoint. Next: the 4 GB remux qualification in the VM (its plan's U9), after
+  rebuilding the images from `master`. The branch
+  `feat/capability-and-size-deployment-settings` and its worktree
+  `/home/martin/dev/baander-capability` can be removed.
 - **Rename to Bånder Audio Core (`bac`), in flight.** Worktree
   `/home/martin/dev/baander-rename-audio-core`, branch `rename-audio-core`, plan
   [refactor-rename-baac-to-bac](docs/plans/2026-11-12-1934-refactor-rename-baac-to-bac-plan.md)
@@ -467,6 +464,13 @@ Open: in a linked worktree the PHP tooling suite fails up to three
 marker does not appear within its window. `RepositoryConfiguration::local` reads the
 primary checkout's `dev.local.json`, which slows configuration loading there. All
 three pass in a standalone clone and with `CI=1`.
+
+Open: through `scripts/check-backend-container.php` the tooling suite fails four
+`DevelopmentBrowserCleanupTest` cases. `StaticCheck::runCheck` runs the command with
+`docker exec` under umask 0000, the test creates its `artifacts` directory with
+`mkdir()` and no mode, and `PrivateDirectory::ensure` refuses the world-writable
+result. The class passes under umask 022, which CI's `docker run` path uses. Set the
+umask in `StaticCheck::runCheck` or create the test directory with mode 0700.
 
 ## Playback investigation and evidence limits
 
