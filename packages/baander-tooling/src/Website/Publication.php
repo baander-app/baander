@@ -70,6 +70,13 @@ final class Publication
     private const string SEARCH_MOUNT = '<section id="manual-search"';
 
     /**
+     * Pages that moved, from their former URL to their current one. The former address, with or without its
+     * trailing slash, answers with a permanent redirect; nothing below it does, and the sitemap lists only
+     * the current URL.
+     */
+    private const array MOVED_PAGES = ['/baac/' => '/bac/'];
+
+    /**
      * Copies the branding and the Latin faces, and writes the site theme with the faces declared before it.
      *
      * @return array<string,string> the published path of each Latin face, by family, for pages to preload
@@ -112,6 +119,17 @@ final class Publication
             . $tone;
     }
 
+    /** The current URL of the page that used to live at $path, or null when no page moved from there. */
+    public static function movedTo(string $path): ?string
+    {
+        foreach (self::MOVED_PAGES as $from => $to) {
+            if ($path === $from || $path === rtrim($from, '/')) {
+                return $to;
+            }
+        }
+        return null;
+    }
+
     public static function package(string $staging): void
     {
         $output = $staging . '/.vercel/output';
@@ -130,6 +148,12 @@ final class Publication
             ['src' => '/(.+)/index\\.html', 'headers' => ['Location' => '/$1/'], 'status' => 308],
             ['src' => '/', 'dest' => '/index.html'],
         ];
+        foreach (self::MOVED_PAGES as $from => $to) {
+            if (isset($files[ltrim($from, '/') . 'index.html'])) {
+                throw new RuntimeException('A page is published at the moved address ' . $from);
+            }
+            $routes[] = ['src' => preg_quote(rtrim($from, '/'), '~') . '/?', 'headers' => ['Location' => $to], 'status' => 308];
+        }
         foreach ($files as $relative => $source) {
             self::copy($source, $output . '/static/' . $relative);
             if ($relative !== 'index.html' && str_ends_with($relative, '/index.html')) {

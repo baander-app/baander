@@ -10,6 +10,11 @@ final class Preview
     {
         $path = parse_url($request, PHP_URL_PATH);
         $path = is_string($path) ? rawurldecode($path) : '';
+        $moved = Publication::movedTo($path);
+        if ($moved !== null) {
+            header('Location: ' . $moved, true, 308);
+            return true;
+        }
         $root = realpath($directory);
         $file = $root !== false && !str_contains($path, "\0") ? realpath($root . '/' . ltrim($path, '/')) : false;
         if ($root === false || $file === false || !str_starts_with($path, '/') || preg_match('~(?:^|/)\.|[\\\\]~', $path)

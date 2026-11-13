@@ -61,6 +61,37 @@ final class PublicationTest extends TestCase
         self::assertDirectoryDoesNotExist($output . '/static/.vercel');
     }
 
+    public function testTheCodecPageAddressFromBeforeTheRenameRedirectsPermanently(): void
+    {
+        mkdir($this->directory . '/bac', 0700, true);
+        file_put_contents($this->directory . '/bac/index.html', 'Codec');
+        Publication::package($this->directory);
+        $routes = json_decode(file_get_contents($this->directory . '/.vercel/output/config.json'), true, flags: JSON_THROW_ON_ERROR)['routes'];
+        $matching = static fn(string $path): array => array_values(array_filter(
+            $routes,
+            static fn(array $route): bool => isset($route['src']) && preg_match('~^' . $route['src'] . '$~', $path) === 1,
+        ));
+        foreach (['/baac', '/baac/'] as $path) {
+            self::assertSame(['src' => '/baac/?', 'headers' => ['Location' => '/bac/'], 'status' => 308], $matching($path)[0], $path);
+        }
+        self::assertLessThan(array_search(['handle' => 'filesystem'], $routes, true), array_search($matching('/baac/')[0], $routes, true));
+        self::assertSame(['src' => '/.*', 'dest' => '/404.html', 'status' => 404], $matching('/baac/anything')[0]);
+        self::assertSame('/bac/index.html', $matching('/bac/')[0]['dest']);
+        self::assertSame('/bac/', Publication::movedTo('/baac'));
+        self::assertSame('/bac/', Publication::movedTo('/baac/'));
+        self::assertNull(Publication::movedTo('/baac/anything'));
+        self::assertNull(Publication::movedTo('/bac/'));
+    }
+
+    public function testAPagePublishedAtAMovedAddressIsRefused(): void
+    {
+        mkdir($this->directory . '/baac', 0700, true);
+        file_put_contents($this->directory . '/baac/index.html', 'Former codec page');
+
+        $this->expectExceptionMessage('A page is published at the moved address /baac/');
+        Publication::package($this->directory);
+    }
+
     public function testFontFilesAreCachedForAYearBecauseTheirNamesChangeWithTheirContent(): void
     {
         Publication::package($this->directory);

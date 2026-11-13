@@ -324,12 +324,18 @@ test('manual remains readable and navigable with JavaScript disabled', async ({ 
   }
 });
 
-test('the codec page is not served at its address from before the rename', async ({ page }) => {
+test('the codec page address from before the rename redirects permanently to /bac/', async ({ page }) => {
   for (const path of ['/baac', '/baac/']) {
     const response = await page.goto(path);
-    expect(response?.status(), path).toBe(404);
-    await expect(page.getByRole('heading', { name: /not found/i })).toBeVisible();
+    const redirect = await response?.request().redirectedFrom()?.response();
+    expect(redirect?.status(), path).toBe(308);
+    expect(redirect?.headers().location, path).toBe('/bac/');
+    expect(response?.status(), path).toBe(200);
+    await expect(page).toHaveURL(/\/bac\/$/);
   }
+  const below = await page.goto('/baac/anything');
+  expect(below?.status()).toBe(404);
+  await expect(page.getByRole('heading', { name: /not found/i })).toBeVisible();
 });
 
 test('unknown and private paths return 404; chapter URLs canonicalize', async ({ page }) => {
