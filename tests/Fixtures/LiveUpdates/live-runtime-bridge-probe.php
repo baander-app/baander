@@ -219,7 +219,7 @@ $registry = WebSocketConnectionRegistry::create(32, 64);
 $results = new Table(32);
 $results->column('value', Table::TYPE_INT);
 $results->create();
-foreach (['starts', 'drained', 'releases-0', 'releases-1', 'assigned-0', 'assigned-1'] as $key) {
+foreach (['starts', 'drained', 'draining', 'releases-0', 'releases-1', 'assigned-0', 'assigned-1'] as $key) {
     $results->set($key, ['value' => 0]);
 }
 $listener = stream_socket_server('tcp://127.0.0.1:0');
@@ -364,11 +364,14 @@ $server->on('WorkerStart', static function (Server $server) use (&$runtime, &$se
     $pool = new BridgeConnectionPool($connect(), $results, $worker, $schema);
     $servicePools = new ServicePoolContainer([[$pool]]);
     $wrapper = new CoWrapper($servicePools, new SwooleBridge());
-    $drain = new class implements ServerDrainStateInterface {
-        public bool $draining = false;
+    // Every server process reads one drain row, as with the product's drain state table: a
+    // worker the reload replaced keeps its timers until Swoole stops it and must see the drain.
+    $drain = new class ($results) implements ServerDrainStateInterface {
+        public bool $stopped = false;
+        public function __construct(private Table $results) {}
         public function isDraining(): bool
         {
-            return $this->draining;
+            return $this->results->get('draining', 'value') === 1;
         }
     };
     // Audience policy is fixed here; context authorization has separate integration tests.
@@ -419,8 +422,9 @@ $server->on('Close', static function (Server $server, int $fd) use (&$runtime, $
     $registry->removeConnection($fd);
 });
 $stop = static function () use (&$drain, &$runtime, $results, $server): void {
-    if (!$drain->draining) {
-        $drain->draining = true;
+    if (!$drain->stopped) {
+        $drain->stopped = true;
+        $results->set('draining', ['value' => 1]);
         $runtime->stop();
         $remaining = 0;
         foreach (Timer::list() as $timer) {
