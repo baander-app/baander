@@ -35,7 +35,9 @@ final class FaultNetworkServer
                 $listeners[$index] = $socket;
                 $ports[] = Runtime::socketPort($socket);
             }
-            file_put_contents($directory . '/fault-ready.json', json_encode($ports, JSON_THROW_ON_ERROR));
+            // The client reads the file as soon as it exists, so it appears whole.
+            file_put_contents($directory . '/fault-ready.json.tmp', json_encode($ports, JSON_THROW_ON_ERROR));
+            rename($directory . '/fault-ready.json.tmp', $directory . '/fault-ready.json');
             for (;;) {
                 $state = json_decode((string) file_get_contents($control), true, flags: JSON_THROW_ON_ERROR);
                 if ($state['generation'] !== $generation) {

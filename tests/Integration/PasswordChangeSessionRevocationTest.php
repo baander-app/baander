@@ -98,9 +98,16 @@ final class PasswordChangeSessionRevocationTest extends TestCase
     protected function tearDown(): void
     {
         foreach ($this->created as $user) {
+            $userId = $user->getId()->toString();
+            // These production-kernel writes commit independently of DAMA. Durable events
+            // have no user foreign key and must leave with the account that produced them.
+            $this->connection->executeStatement(
+                "DELETE FROM domain_event_outbox WHERE payload->>'user_id' = :userId",
+                ['userId' => $userId],
+            );
             // Refresh tokens and token metadata cascade from access tokens.
-            $this->connection->executeStatement('DELETE FROM oauth_access_tokens WHERE user_id = ?', [$user->getId()->toString()]);
-            $this->connection->executeStatement('DELETE FROM users WHERE id = ?', [$user->getId()->toString()]);
+            $this->connection->executeStatement('DELETE FROM oauth_access_tokens WHERE user_id = ?', [$userId]);
+            $this->connection->executeStatement('DELETE FROM users WHERE id = ?', [$userId]);
         }
         $this->kernel->shutdown();
         parent::tearDown();
