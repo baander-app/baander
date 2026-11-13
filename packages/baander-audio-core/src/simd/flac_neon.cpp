@@ -5,7 +5,7 @@
  * multiply-add. */
 #include "../flac_internal.h"
 
-#if defined(BAAC_AAC_NEON) && defined(__aarch64__)
+#if defined(BAC_AAC_NEON) && defined(__aarch64__)
 
 #include <arm_neon.h>
 

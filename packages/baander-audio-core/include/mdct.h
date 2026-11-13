@@ -1,5 +1,5 @@
-#ifndef BAANDER_AAC_MDCT_H
-#define BAANDER_AAC_MDCT_H
+#ifndef BAANDER_AUDIO_CORE_MDCT_H
+#define BAANDER_AUDIO_CORE_MDCT_H
 
 #include <cstdint>
 
@@ -47,4 +47,4 @@ void aac_imdct(const AacMdct* m, const float* in, float* out);
 }
 #endif
 
-#endif /* BAANDER_AAC_MDCT_H */
+#endif /* BAANDER_AUDIO_CORE_MDCT_H */

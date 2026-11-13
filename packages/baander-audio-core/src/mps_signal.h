@@ -1,5 +1,5 @@
-#ifndef BAANDER_AAC_MPS_SIGNAL_H
-#define BAANDER_AAC_MPS_SIGNAL_H
+#ifndef BAANDER_AUDIO_CORE_MPS_SIGNAL_H
+#define BAANDER_AUDIO_CORE_MPS_SIGNAL_H
 
 #include <stdint.h>
 
@@ -201,4 +201,4 @@ void aac_mps_signal_apply(AacMpsSignalState* s, const AacMpsFrameParams* p,
 }
 #endif
 
-#endif /* BAANDER_AAC_MPS_SIGNAL_H */
+#endif /* BAANDER_AUDIO_CORE_MPS_SIGNAL_H */

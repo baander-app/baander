@@ -1,5 +1,5 @@
-#ifndef BAANDER_AAC_USAC_ENC_H
-#define BAANDER_AAC_USAC_ENC_H
+#ifndef BAANDER_AUDIO_CORE_USAC_ENC_H
+#define BAANDER_AUDIO_CORE_USAC_ENC_H
 
 #include <cstdint>
 
@@ -256,4 +256,4 @@ int aac_usac_enc_write_frame(struct AacEncoderState_* s);
 }
 #endif
 
-#endif /* BAANDER_AAC_USAC_ENC_H */
+#endif /* BAANDER_AUDIO_CORE_USAC_ENC_H */

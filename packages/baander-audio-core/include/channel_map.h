@@ -1,5 +1,5 @@
-#ifndef BAANDER_AAC_CHANNEL_MAP_H
-#define BAANDER_AAC_CHANNEL_MAP_H
+#ifndef BAANDER_AUDIO_CORE_CHANNEL_MAP_H
+#define BAANDER_AUDIO_CORE_CHANNEL_MAP_H
 
 #include <cstdint>
 
@@ -133,4 +133,4 @@ void aac_layout_mix(const AacLayout* l, const float* const* in, int n, int out_c
 }
 #endif
 
-#endif /* BAANDER_AAC_CHANNEL_MAP_H */
+#endif /* BAANDER_AUDIO_CORE_CHANNEL_MAP_H */

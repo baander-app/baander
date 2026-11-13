@@ -1,5 +1,5 @@
-#ifndef BAANDER_AAC_ASC_H
-#define BAANDER_AAC_ASC_H
+#ifndef BAANDER_AUDIO_CORE_ASC_H
+#define BAANDER_AUDIO_CORE_ASC_H
 
 #include <cstdint>
 
@@ -131,4 +131,4 @@ void aac_pce_write(AacBitWriter* w, const AacLayout* layout, int rate_index, int
 }
 #endif
 
-#endif /* BAANDER_AAC_ASC_H */
+#endif /* BAANDER_AUDIO_CORE_ASC_H */

@@ -1,5 +1,5 @@
-#ifndef BAANDER_AAC_MPS_INTERNAL_H
-#define BAANDER_AAC_MPS_INTERNAL_H
+#ifndef BAANDER_AUDIO_CORE_MPS_INTERNAL_H
+#define BAANDER_AUDIO_CORE_MPS_INTERNAL_H
 
 #include <stdint.h>
 
@@ -248,4 +248,4 @@ int aac_mps_tree_properties(int tree_config, int* num_ott, int* num_ttt, int* nu
 }
 #endif
 
-#endif /* BAANDER_AAC_MPS_INTERNAL_H */
+#endif /* BAANDER_AUDIO_CORE_MPS_INTERNAL_H */

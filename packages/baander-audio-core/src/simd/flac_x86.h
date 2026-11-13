@@ -4,8 +4,8 @@
  * its own, compiled with that file's instruction set.  One copy shared
  * between them could be the one encoded for AVX2, and the SSE2 kernels
  * would then run it on a processor without AVX. */
-#ifndef BAANDER_AAC_FLAC_X86_H
-#define BAANDER_AAC_FLAC_X86_H
+#ifndef BAANDER_AUDIO_CORE_FLAC_X86_H
+#define BAANDER_AUDIO_CORE_FLAC_X86_H
 
 #include <emmintrin.h>
 
@@ -52,4 +52,4 @@ static inline void flac_x86_narrow_samples(const int32_t* x, int base, int count
   }
 }
 
-#endif /* BAANDER_AAC_FLAC_X86_H */
+#endif /* BAANDER_AUDIO_CORE_FLAC_X86_H */

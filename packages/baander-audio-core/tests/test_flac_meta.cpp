@@ -5,9 +5,9 @@
  * from them; the caller's limit on what is held; ID3 tags around a
  * stream; and the same data through metaflac, flac and FFmpeg.
  *
- *   BAAC_FLAC_REFERENCE   the path of the flac 1.4.3 binary; metaflac
+ *   BAC_FLAC_REFERENCE   the path of the flac 1.4.3 binary; metaflac
  *                         is taken from the same build
- *   BAAC_REQUIRE_ORACLES  set: a missing flac, metaflac, ffmpeg or
+ *   BAC_REQUIRE_ORACLES  set: a missing flac, metaflac, ffmpeg or
  *                         ffprobe fails the suite instead of skipping */
 
 #include <new>
@@ -91,17 +91,17 @@ struct Tags {
 
 /* The options that carry `tags`; the vectors keep what they point at. */
 struct TagOptions {
-  BaacFlacEncoderOptions options;
-  std::vector<BaacFlacComment> comments;
-  std::vector<BaacFlacPicture> pictures;
+  BacFlacEncoderOptions options;
+  std::vector<BacFlacComment> comments;
+  std::vector<BacFlacPicture> pictures;
 
   explicit TagOptions(const Tags& tags) {
-    baac_flac_encoder_options_init(&options);
+    bac_flac_encoder_options_init(&options);
     for (const std::string& c : tags.comments) {
       comments.push_back({c.data(), (uint32_t)c.size()});
     }
     for (const Picture& p : tags.pictures) {
-      BaacFlacPicture out = {};
+      BacFlacPicture out = {};
       out.type = p.type;
       out.mime_type = p.mime.c_str();
       out.description = p.description.empty() ? nullptr : p.description.c_str();
@@ -134,9 +134,9 @@ struct Read {
 static Read read_stream(const std::vector<uint8_t>& stream, bool collect, size_t cap = 0,
                         size_t chunk = 4096) {
   Read r;
-  BaacFlacDecoder* dec = baac_flac_decoder_create();
-  baac_flac_decoder_set_md5_check(dec, 1);
-  CHECK(baac_flac_decoder_set_metadata(dec, collect ? 1 : 0, cap) == AAC_OK,
+  BacFlacDecoder* dec = bac_flac_decoder_create();
+  bac_flac_decoder_set_md5_check(dec, 1);
+  CHECK(bac_flac_decoder_set_metadata(dec, collect ? 1 : 0, cap) == AAC_OK,
         "the metadata setting is taken before the first byte");
   const size_t before = g_live;
   g_peak = g_live;
@@ -144,16 +144,16 @@ static Read read_stream(const std::vector<uint8_t>& stream, bool collect, size_t
   /* What flac_decode itself holds (its sample buffer, the samples) is
    * not the decoder's; it is the same for every stream of a test. */
   r.peak = g_peak - before;
-  const BaacFlacComment* comments = nullptr;
-  BaacFlacComment vendor = {};
-  const int count = baac_flac_decoder_comments(dec, &comments, &vendor);
+  const BacFlacComment* comments = nullptr;
+  BacFlacComment vendor = {};
+  const int count = bac_flac_decoder_comments(dec, &comments, &vendor);
   r.tags.vendor.assign(vendor.text, vendor.length);
   for (int i = 0; i < count; i++) {
     r.tags.comments.emplace_back(comments[i].text, comments[i].length);
     CHECK(comments[i].text[comments[i].length] == 0, "a tag is followed by a zero byte");
   }
-  const BaacFlacPicture* pictures = nullptr;
-  const int picture_count = baac_flac_decoder_pictures(dec, &pictures);
+  const BacFlacPicture* pictures = nullptr;
+  const int picture_count = bac_flac_decoder_pictures(dec, &pictures);
   for (int i = 0; i < picture_count; i++) {
     Picture p;
     p.type = pictures[i].type;
@@ -166,9 +166,9 @@ static Read read_stream(const std::vector<uint8_t>& stream, bool collect, size_t
     p.data.assign(pictures[i].data, pictures[i].data + pictures[i].data_bytes);
     r.tags.pictures.push_back(p);
   }
-  r.skipped = baac_flac_decoder_skipped_metadata(dec);
-  r.first_frame = baac_flac_decoder_first_frame_offset(dec);
-  baac_flac_decoder_destroy(dec);
+  r.skipped = bac_flac_decoder_skipped_metadata(dec);
+  r.first_frame = bac_flac_decoder_first_frame_offset(dec);
+  bac_flac_decoder_destroy(dec);
   return r;
 }
 
@@ -276,11 +276,11 @@ static void test_roundtrip() {
 
     const Read r = read_stream(e.stream, true);
     CHECK(r.decoded.errors.empty() && r.decoded.pcm == pcm &&
-              r.decoded.verdict == BAAC_FLAC_MD5_MATCH,
+              r.decoded.verdict == BAC_FLAC_MD5_MATCH,
           "variant %d: the audio decodes with its MD5 verified", variant);
     CHECK(r.tags.comments == tags.comments, "variant %d: the tags come back in order (%zu of %zu)",
           variant, r.tags.comments.size(), tags.comments.size());
-    CHECK(r.tags.vendor == "bAAC", "variant %d: the vendor is the library's (%s)", variant,
+    CHECK(r.tags.vendor == "Baander Audio Core", "variant %d: the vendor is the library's (%s)", variant,
           r.tags.vendor.c_str());
     CHECK(same_pictures(r.tags.pictures, tags.pictures),
           "variant %d: the pictures come back with their type, text, figures and bytes", variant);
@@ -312,11 +312,11 @@ static void test_roundtrip() {
         "without tags the stream has no tag block");
 
   /* The options are copied: the caller's memory may go. */
-  BaacFlacEncoder* enc = baac_flac_encoder_create(44100, 2, 16, 5, nullptr);
+  BacFlacEncoder* enc = bac_flac_encoder_create(44100, 2, 16, 5, nullptr);
   {
     Tags gone = sample_tags();
     TagOptions scoped(gone);
-    CHECK(baac_flac_encoder_set_options(enc, &scoped.options) == AAC_OK, "tags are accepted");
+    CHECK(bac_flac_encoder_set_options(enc, &scoped.options) == AAC_OK, "tags are accepted");
     for (std::string& c : gone.comments) {
       std::fill(c.begin(), c.end(), '#');
     }
@@ -330,27 +330,27 @@ static void test_roundtrip() {
    * without tags take them away. */
   const FlacEncoded second = flac_encode(pcm, 44100, 2, 16, 5, 5000, true, nullptr, enc);
   CHECK(second.stream == kept.stream, "a second stream of the encoder is the first again");
-  BaacFlacEncoderOptions none;
-  baac_flac_encoder_options_init(&none);
+  BacFlacEncoderOptions none;
+  bac_flac_encoder_options_init(&none);
   const FlacEncoded bare = flac_encode(pcm, 44100, 2, 16, 5, 5000, true, &none, enc);
   CHECK(bare.stream == plain.stream, "options without tags give the plain stream");
-  baac_flac_encoder_destroy(enc);
+  bac_flac_encoder_destroy(enc);
 }
 
 /* Whether the encoder takes the tags. */
 static int accepts(const Tags& tags) {
-  BaacFlacEncoder* enc = baac_flac_encoder_create(44100, 2, 16, 5, nullptr);
+  BacFlacEncoder* enc = bac_flac_encoder_create(44100, 2, 16, 5, nullptr);
   TagOptions to(tags);
-  const int before = baac_flac_encoder_header_bytes(enc);
-  const int result = baac_flac_encoder_set_options(enc, &to.options);
+  const int before = bac_flac_encoder_header_bytes(enc);
+  const int result = bac_flac_encoder_set_options(enc, &to.options);
   if (result != AAC_OK) {
     /* Refused before anything changed: the header is the one before. */
-    CHECK(baac_flac_encoder_header_bytes(enc) == before, "a refusal leaves the encoder as it was");
+    CHECK(bac_flac_encoder_header_bytes(enc) == before, "a refusal leaves the encoder as it was");
     std::vector<uint8_t> header((size_t)before);
-    CHECK(baac_flac_encoder_write_header(enc, header.data(), before) == before,
+    CHECK(bac_flac_encoder_write_header(enc, header.data(), before) == before,
           "and the stream begins without the refused tags");
   }
-  baac_flac_encoder_destroy(enc);
+  bac_flac_encoder_destroy(enc);
   return result;
 }
 
@@ -397,7 +397,7 @@ static void test_refusals() {
   p.data = bytes_of(100, 1u);
   CHECK(accepts(with_picture(p)) == AAC_OK, "a plain picture is accepted");
   Picture bad = p;
-  bad.type = BAAC_FLAC_MAX_PICTURE_TYPE + 1;
+  bad.type = BAC_FLAC_MAX_PICTURE_TYPE + 1;
   CHECK(accepts(with_picture(bad)) == AAC_ERR_INVALID_ARG, "picture type 21 is refused");
   bad = p;
   bad.mime = "image/jp\x7Fg";
@@ -430,23 +430,23 @@ static void test_refusals() {
   Picture large;
   large.mime = "image/png";
   large.description = "d";
-  large.data.assign((size_t)BAAC_FLAC_MAX_PICTURE_BYTES - large.mime.size() - 1, 0x5A);
+  large.data.assign((size_t)BAC_FLAC_MAX_PICTURE_BYTES - large.mime.size() - 1, 0x5A);
   CHECK(accepts(with_picture(large)) == AAC_OK, "a picture that fills a block is accepted");
   large.data.push_back(0);
   CHECK(accepts(with_picture(large)) == AAC_ERR_INVALID_ARG,
         "a picture one byte past the block limit is refused");
   Tags lyrics;
-  lyrics.comments = {"LYRICS=" + std::string((size_t)BAAC_FLAC_MAX_METADATA_BLOCK_BYTES, 'x')};
+  lyrics.comments = {"LYRICS=" + std::string((size_t)BAC_FLAC_MAX_METADATA_BLOCK_BYTES, 'x')};
   CHECK(accepts(lyrics) == AAC_ERR_INVALID_ARG, "tags past the block limit are refused");
 
   /* While a stream runs the options are closed. */
-  BaacFlacEncoder* enc = baac_flac_encoder_create(44100, 2, 16, 5, nullptr);
-  std::vector<uint8_t> header((size_t)baac_flac_encoder_header_bytes(enc));
-  baac_flac_encoder_write_header(enc, header.data(), (int)header.size());
+  BacFlacEncoder* enc = bac_flac_encoder_create(44100, 2, 16, 5, nullptr);
+  std::vector<uint8_t> header((size_t)bac_flac_encoder_header_bytes(enc));
+  bac_flac_encoder_write_header(enc, header.data(), (int)header.size());
   TagOptions to(sample_tags());
-  CHECK(baac_flac_encoder_set_options(enc, &to.options) == AAC_ERR_STATE,
+  CHECK(bac_flac_encoder_set_options(enc, &to.options) == AAC_ERR_STATE,
         "tags cannot be set while a stream runs");
-  baac_flac_encoder_destroy(enc);
+  bac_flac_encoder_destroy(enc);
 }
 
 static void le32(std::vector<uint8_t>& v, uint32_t x) {
@@ -467,7 +467,7 @@ static std::vector<uint8_t> stream_with(const std::vector<std::vector<uint8_t>>&
                                         const std::vector<int32_t>& pcm) {
   const std::vector<uint8_t> plain =
       flac_build_stream(pcm, 44100, 2, 16, 1024, TestSubframe::fixed(2));
-  const size_t frames_at = 4 + 4 + BAAC_FLAC_STREAMINFO_BYTES;
+  const size_t frames_at = 4 + 4 + BAC_FLAC_STREAMINFO_BYTES;
   std::vector<uint8_t> out(plain.begin(), plain.begin() + (long)frames_at);
   out[4] &= 0x7F; /* STREAMINFO is no longer the last block */
   for (size_t i = 0; i < blocks.size(); i++) {
@@ -484,7 +484,7 @@ static std::vector<uint8_t> stream_with(const std::vector<std::vector<uint8_t>>&
 /* What flac_decode holds whatever the stream: a buffer for the largest
  * block there is. */
 static const size_t kHarnessBytes =
-    (size_t)BAAC_FLAC_MAX_BLOCK_SIZE * BAAC_FLAC_MAX_CHANNELS * sizeof(int32_t);
+    (size_t)BAC_FLAC_MAX_BLOCK_SIZE * BAC_FLAC_MAX_CHANNELS * sizeof(int32_t);
 
 /* Blocks whose lengths and counts do not fit them. */
 static void test_hostile_blocks() {
@@ -507,21 +507,21 @@ static void test_hostile_blocks() {
     cases.push_back({"a vendor length of 4 GiB", FLAC_BLOCK_VORBIS_COMMENT, b});
     b.clear();
     le32(b, 4);
-    text(b, "bAAC");
+    text(b, "test");
     le32(b, 0xFFFFFFFFu); /* four billion fields in a block of a few bytes */
     le32(b, 3);
     text(b, "A=b");
     cases.push_back({"a field count of 4 billion", FLAC_BLOCK_VORBIS_COMMENT, b});
     b.clear();
     le32(b, 4);
-    text(b, "bAAC");
+    text(b, "test");
     le32(b, 3); /* three fields announced, one there */
     le32(b, 3);
     text(b, "A=b");
     cases.push_back({"more fields than the block holds", FLAC_BLOCK_VORBIS_COMMENT, b});
     b.clear();
     le32(b, 4);
-    text(b, "bAAC");
+    text(b, "test");
     le32(b, 2);
     le32(b, 3);
     text(b, "A=b");
@@ -627,7 +627,7 @@ static void test_hostile_blocks() {
   /* A block that claims more than the input holds: the stream ends in
    * it, and the bytes that came were all that was ever held. */
   std::vector<uint8_t> claims = {'f', 'L', 'a', 'C'};
-  BaacFlacStreamInfo info = flac_test_info(44100, 2, 16, 1024);
+  BacFlacStreamInfo info = flac_test_info(44100, 2, 16, 1024);
   flac_append(claims,
               flac_metadata_block(FLAC_BLOCK_STREAMINFO, flac_streaminfo_bytes(info), false));
   claims.insert(claims.end(), {(uint8_t)(0x80 | FLAC_BLOCK_PICTURE), 0xFF, 0xFF, 0xFF});
@@ -660,7 +660,7 @@ static void test_limit() {
   /* Not asked: nothing held, and the FIFO never has more than its
    * smallest size. */
   const Read quiet = read_stream(e.stream, false, 0, 65536);
-  CHECK(quiet.decoded.pcm == pcm && quiet.decoded.verdict == BAAC_FLAC_MD5_MATCH,
+  CHECK(quiet.decoded.pcm == pcm && quiet.decoded.verdict == BAC_FLAC_MD5_MATCH,
         "the audio decodes past the picture");
   CHECK(quiet.decoded.max_pending <= 65536, "the FIFO held %d bytes at most",
         quiet.decoded.max_pending);
@@ -675,7 +675,7 @@ static void test_limit() {
         "a picture past the limit is skipped and reported, the others are kept (%d skipped)",
         limited.skipped);
   CHECK(limited.decoded.errors.empty() && limited.decoded.pcm == pcm &&
-            limited.decoded.verdict == BAAC_FLAC_MD5_MATCH,
+            limited.decoded.verdict == BAC_FLAC_MD5_MATCH,
         "the audio decodes all the same");
   CHECK(limited.peak < harness + (2u << 20), "with a limit of 1 MiB the decoder took %zu bytes",
         limited.peak);
@@ -734,19 +734,19 @@ static void test_limit() {
 
   /* The setting belongs before the first byte, and a reset drops what
    * was kept but not the setting. */
-  BaacFlacDecoder* dec = baac_flac_decoder_create();
-  baac_flac_decoder_set_metadata(dec, 1, 0);
+  BacFlacDecoder* dec = bac_flac_decoder_create();
+  bac_flac_decoder_set_metadata(dec, 1, 0);
   flac_decode(e.stream, 65536, dec);
-  const BaacFlacPicture* pictures = nullptr;
-  CHECK(baac_flac_decoder_pictures(dec, &pictures) == 2, "a decoder with the setting keeps both");
-  CHECK(baac_flac_decoder_set_metadata(dec, 0, 0) == AAC_ERR_STATE,
+  const BacFlacPicture* pictures = nullptr;
+  CHECK(bac_flac_decoder_pictures(dec, &pictures) == 2, "a decoder with the setting keeps both");
+  CHECK(bac_flac_decoder_set_metadata(dec, 0, 0) == AAC_ERR_STATE,
         "the setting cannot change once the stream has begun");
-  baac_flac_decoder_reset(dec);
-  CHECK(baac_flac_decoder_pictures(dec, &pictures) == 0 && pictures == nullptr,
+  bac_flac_decoder_reset(dec);
+  CHECK(bac_flac_decoder_pictures(dec, &pictures) == 0 && pictures == nullptr,
         "a reset drops the pictures");
   flac_decode(e.stream, 65536, dec);
-  CHECK(baac_flac_decoder_pictures(dec, &pictures) == 2, "and the next stream is collected again");
-  baac_flac_decoder_destroy(dec);
+  CHECK(bac_flac_decoder_pictures(dec, &pictures) == 2, "and the next stream is collected again");
+  bac_flac_decoder_destroy(dec);
 }
 
 /* ── memory that runs out, and input that is dropped ───────────── */
@@ -757,8 +757,8 @@ static void test_limit() {
  * allocation was left to fail. */
 static bool decode_with_failure(const std::vector<uint8_t>& stream, long fail_in, Tags* tags,
                                 std::vector<int32_t>* pcm, int* memory_errors) {
-  BaacFlacDecoder* dec = baac_flac_decoder_create();
-  baac_flac_decoder_set_metadata(dec, 1, 0);
+  BacFlacDecoder* dec = bac_flac_decoder_create();
+  bac_flac_decoder_set_metadata(dec, 1, 0);
   std::vector<int32_t> block((size_t)4096 * 2);
   pcm->clear();
   pcm->reserve(1 << 16);
@@ -769,7 +769,7 @@ static bool decode_with_failure(const std::vector<uint8_t>& stream, long fail_in
   size_t pos = 0;
   int guard = 0;
   while (pos < stream.size() && guard++ < 100000) {
-    const int took = baac_flac_decoder_feed(dec, stream.data() + pos,
+    const int took = bac_flac_decoder_feed(dec, stream.data() + pos,
                                             (int)std::min<size_t>(stream.size() - pos, 97));
     if (took == AAC_ERR_MEMORY) {
       (*memory_errors)++;
@@ -777,7 +777,7 @@ static bool decode_with_failure(const std::vector<uint8_t>& stream, long fail_in
     }
     pos += (size_t)std::max(took, 0);
     for (;;) {
-      const int n = baac_flac_decoder_decode_next(dec, block.data(), (int)block.size());
+      const int n = bac_flac_decoder_decode_next(dec, block.data(), (int)block.size());
       if (n == AAC_ERR_MEMORY) {
         (*memory_errors)++;
         continue;
@@ -791,17 +791,17 @@ static bool decode_with_failure(const std::vector<uint8_t>& stream, long fail_in
   const bool fired = g_failed > 0;
   g_fail_in = -1;
   g_fail_count = 0;
-  const BaacFlacComment* comments = nullptr;
-  BaacFlacComment vendor = {};
-  const int count = baac_flac_decoder_comments(dec, &comments, &vendor);
+  const BacFlacComment* comments = nullptr;
+  BacFlacComment vendor = {};
+  const int count = bac_flac_decoder_comments(dec, &comments, &vendor);
   tags->comments.clear();
   tags->pictures.clear();
   tags->vendor.assign(vendor.text, vendor.length);
   for (int i = 0; i < count; i++) {
     tags->comments.emplace_back(comments[i].text, comments[i].length);
   }
-  const BaacFlacPicture* pictures = nullptr;
-  const int picture_count = baac_flac_decoder_pictures(dec, &pictures);
+  const BacFlacPicture* pictures = nullptr;
+  const int picture_count = bac_flac_decoder_pictures(dec, &pictures);
   for (int i = 0; i < picture_count; i++) {
     Picture p;
     p.type = pictures[i].type;
@@ -814,7 +814,7 @@ static bool decode_with_failure(const std::vector<uint8_t>& stream, long fail_in
     p.data.assign(pictures[i].data, pictures[i].data + pictures[i].data_bytes);
     tags->pictures.push_back(p);
   }
-  baac_flac_decoder_destroy(dec);
+  bac_flac_decoder_destroy(dec);
   return fired;
 }
 
@@ -889,7 +889,7 @@ static void test_encoder_memory_failure() {
     return fired;
   };
   /* What an encoder that is set up writes, against the reference. */
-  const auto same_stream = [&](BaacFlacEncoder* enc) {
+  const auto same_stream = [&](BacFlacEncoder* enc) {
     return flac_encode(pcm, 44100, 2, 16, 5, 5000, true, nullptr, enc).stream == reference.stream;
   };
 
@@ -902,25 +902,25 @@ static void test_encoder_memory_failure() {
     for (long fail_in = 0; fail_in < 2000; fail_in++) {
       int error = AAC_OK;
       int result = AAC_OK;
-      BaacFlacEncoder* enc = nullptr;
+      BacFlacEncoder* enc = nullptr;
       std::vector<uint8_t> header;
       bool fired = false;
       try {
         if (call == 0) {
           failing(fail_in);
-          enc = baac_flac_encoder_create(44100, 2, 16, 5, &error);
+          enc = bac_flac_encoder_create(44100, 2, 16, 5, &error);
           fired = restored();
           result = enc ? AAC_OK : error;
         } else {
-          enc = baac_flac_encoder_create(44100, 2, 16, 5, &error);
+          enc = bac_flac_encoder_create(44100, 2, 16, 5, &error);
           if (call == 2) {
-            baac_flac_encoder_set_options(enc, &to.options);
-            header.resize((size_t)baac_flac_encoder_header_bytes(enc));
+            bac_flac_encoder_set_options(enc, &to.options);
+            header.resize((size_t)bac_flac_encoder_header_bytes(enc));
           }
           failing(fail_in);
           result = call == 1
-                       ? baac_flac_encoder_set_options(enc, &to.options)
-                       : baac_flac_encoder_write_header(enc, header.data(), (int)header.size());
+                       ? bac_flac_encoder_set_options(enc, &to.options)
+                       : bac_flac_encoder_write_header(enc, header.data(), (int)header.size());
           fired = restored();
         }
       } catch (...) {
@@ -928,7 +928,7 @@ static void test_encoder_memory_failure() {
         escaped++;
       }
       if (!fired) {
-        baac_flac_encoder_destroy(enc);
+        bac_flac_encoder_destroy(enc);
         break;
       }
       tried++;
@@ -938,17 +938,17 @@ static void test_encoder_memory_failure() {
         wrong += result == AAC_ERR_MEMORY ? 0 : 1;
         /* The same again with memory back, and the stream from there. */
         if (call == 0) {
-          enc = baac_flac_encoder_create(44100, 2, 16, 5, &error);
+          enc = bac_flac_encoder_create(44100, 2, 16, 5, &error);
         }
         const bool ready =
-            enc && (call == 2 || baac_flac_encoder_set_options(enc, &to.options) == AAC_OK);
+            enc && (call == 2 || bac_flac_encoder_set_options(enc, &to.options) == AAC_OK);
         wrong += ready && same_stream(enc) ? 0 : 1;
       } else if (call != 2) {
         /* The failure was absorbed: the encoder has to be whole. */
-        const bool ready = call == 1 || baac_flac_encoder_set_options(enc, &to.options) == AAC_OK;
+        const bool ready = call == 1 || bac_flac_encoder_set_options(enc, &to.options) == AAC_OK;
         wrong += ready && same_stream(enc) ? 0 : 1;
       }
-      baac_flac_encoder_destroy(enc);
+      bac_flac_encoder_destroy(enc);
     }
     printf("%s: allocations failed at %ld places, %d calls reported AAC_ERR_MEMORY\n", calls[call],
            tried, reported);
@@ -974,23 +974,23 @@ static void test_dropped_input() {
   TagOptions to(tags);
   const FlacEncoded e = flac_encode(pcm, 44100, 2, 16, 5, 5000, true, &to.options);
   for (int reset = 0; reset < 2; reset++) {
-    BaacFlacDecoder* dec = baac_flac_decoder_create();
-    baac_flac_decoder_set_metadata(dec, 1, 0);
+    BacFlacDecoder* dec = bac_flac_decoder_create();
+    bac_flac_decoder_set_metadata(dec, 1, 0);
     const size_t before = g_live;
     size_t pos = 0;
     while (pos < (3u << 20)) {
-      pos += (size_t)baac_flac_decoder_feed(dec, e.stream.data() + pos, 65536);
+      pos += (size_t)bac_flac_decoder_feed(dec, e.stream.data() + pos, 65536);
     }
     const size_t held = g_live - before;
     CHECK(held > (2u << 20), "three megabytes into the picture the decoder holds %zu bytes", held);
     if (reset) {
-      baac_flac_decoder_reset(dec);
+      bac_flac_decoder_reset(dec);
     } else {
-      baac_flac_decoder_seek_reset(dec);
+      bac_flac_decoder_seek_reset(dec);
     }
     CHECK(g_live - before < (1u << 20), "after a %s it holds %zu bytes", reset ? "reset" : "seek",
           g_live - before);
-    baac_flac_decoder_destroy(dec);
+    bac_flac_decoder_destroy(dec);
   }
 }
 
@@ -1000,16 +1000,16 @@ static void test_field_count() {
   const std::string field = "LYRICS=" + std::string(6u << 20, 'x');
   /* Three fields pass the limit.  The fourth points nowhere: reading it
    * would end the test. */
-  std::vector<BaacFlacComment> fields(3, BaacFlacComment{field.data(), (uint32_t)field.size()});
-  fields.push_back(BaacFlacComment{(const char*)(uintptr_t)8, 16});
-  BaacFlacEncoder* enc = baac_flac_encoder_create(44100, 2, 16, 5, nullptr);
-  BaacFlacEncoderOptions options;
-  baac_flac_encoder_options_init(&options);
+  std::vector<BacFlacComment> fields(3, BacFlacComment{field.data(), (uint32_t)field.size()});
+  fields.push_back(BacFlacComment{(const char*)(uintptr_t)8, 16});
+  BacFlacEncoder* enc = bac_flac_encoder_create(44100, 2, 16, 5, nullptr);
+  BacFlacEncoderOptions options;
+  bac_flac_encoder_options_init(&options);
   options.comments = fields.data();
   options.comment_count = INT32_MAX; /* far more than are there */
-  CHECK(baac_flac_encoder_set_options(enc, &options) == AAC_ERR_INVALID_ARG,
+  CHECK(bac_flac_encoder_set_options(enc, &options) == AAC_ERR_INVALID_ARG,
         "tags past the block limit are refused at the field that passes it");
-  baac_flac_encoder_destroy(enc);
+  bac_flac_encoder_destroy(enc);
 
   /* The counters of the decoder stop at their largest value. */
   int counter = INT32_MAX - 1;
@@ -1066,7 +1066,7 @@ static void test_id3() {
     for (size_t chunk : {(size_t)1, (size_t)4096}) {
       const Read r = read_stream(stream, true, 0, chunk);
       CHECK(r.decoded.errors.empty() && r.decoded.pcm == pcm &&
-                r.decoded.verdict == BAAC_FLAC_MD5_MATCH &&
+                r.decoded.verdict == BAC_FLAC_MD5_MATCH &&
                 r.decoded.info.total_samples == pcm.size() / 2,
             "ID3v2 variant %d: the stream behind the tag decodes with its total and MD5", variant);
       CHECK(r.tags.comments == tags.comments, "ID3v2 variant %d: its tags are read", variant);
@@ -1075,23 +1075,23 @@ static void test_id3() {
     }
     /* What was passed over is said: the bytes of the tags in front, and
      * no tag behind. */
-    BaacFlacDecoder* told = baac_flac_decoder_create();
+    BacFlacDecoder* told = bac_flac_decoder_create();
     uint64_t v2_bytes = 99;
     int v1 = 99;
-    CHECK(baac_flac_decoder_id3(told, &v2_bytes, &v1) == AAC_OK && v2_bytes == 0 && v1 == 0,
+    CHECK(bac_flac_decoder_id3(told, &v2_bytes, &v1) == AAC_OK && v2_bytes == 0 && v1 == 0,
           "a decoder that has read nothing has passed over nothing");
-    baac_flac_decoder_feed(told, stream.data(), (int)std::min<size_t>(stream.size(), 60000));
-    CHECK(baac_flac_decoder_id3(told, &v2_bytes, &v1) == AAC_OK && v2_bytes == front.size() &&
+    bac_flac_decoder_feed(told, stream.data(), (int)std::min<size_t>(stream.size(), 60000));
+    CHECK(bac_flac_decoder_id3(told, &v2_bytes, &v1) == AAC_OK && v2_bytes == front.size() &&
               v1 == 0,
           "ID3v2 variant %d: the decoder says it passed over %llu bytes of %zu", variant,
           (unsigned long long)v2_bytes, front.size());
-    CHECK(baac_flac_decoder_id3(told, nullptr, nullptr) == AAC_OK &&
-              baac_flac_decoder_id3(nullptr, &v2_bytes, &v1) == AAC_ERR_INVALID_ARG,
+    CHECK(bac_flac_decoder_id3(told, nullptr, nullptr) == AAC_OK &&
+              bac_flac_decoder_id3(nullptr, &v2_bytes, &v1) == AAC_ERR_INVALID_ARG,
           "the query takes null for what the caller does not ask, and refuses no decoder");
-    baac_flac_decoder_reset(told);
-    baac_flac_decoder_id3(told, &v2_bytes, &v1);
+    bac_flac_decoder_reset(told);
+    bac_flac_decoder_id3(told, &v2_bytes, &v1);
     CHECK(v2_bytes == 0 && v1 == 0, "a reset forgets what was passed over");
-    baac_flac_decoder_destroy(told);
+    bac_flac_decoder_destroy(told);
   }
   /* A stream that ends inside the tag is cut short. */
   std::vector<uint8_t> inside = id3v2(3000, false);
@@ -1114,31 +1114,31 @@ static void test_id3() {
   for (size_t chunk : {(size_t)1, (size_t)100, (size_t)1 << 20}) {
     const Read r = read_stream(tail, false, 0, chunk);
     CHECK(r.decoded.errors.empty() && r.decoded.finish == AAC_OK && r.decoded.lost == 0 &&
-              r.decoded.pcm == pcm && r.decoded.verdict == BAAC_FLAC_MD5_MATCH,
+              r.decoded.pcm == pcm && r.decoded.verdict == BAC_FLAC_MD5_MATCH,
           "an ID3v1 tag behind the last frame is passed over (chunks of %zu)", chunk);
   }
   /* Without the word that the input ended, the finish finds it. */
-  BaacFlacDecoder* dec = baac_flac_decoder_create();
+  BacFlacDecoder* dec = bac_flac_decoder_create();
   std::vector<int32_t> buf(4096 * 2);
   size_t decoded = 0;
   for (size_t pos = 0; pos < tail.size();) {
-    pos += (size_t)baac_flac_decoder_feed(dec, tail.data() + pos, (int)(tail.size() - pos));
+    pos += (size_t)bac_flac_decoder_feed(dec, tail.data() + pos, (int)(tail.size() - pos));
     int n;
-    while ((n = baac_flac_decoder_decode_next(dec, buf.data(), (int)buf.size())) > 0) {
+    while ((n = bac_flac_decoder_decode_next(dec, buf.data(), (int)buf.size())) > 0) {
       decoded += (size_t)n;
     }
     CHECK(n == 0, "nothing is reported while the tag may still be one (%d)", n);
   }
   int v1_dropped = 99;
-  baac_flac_decoder_id3(dec, nullptr, &v1_dropped);
+  bac_flac_decoder_id3(dec, nullptr, &v1_dropped);
   CHECK(v1_dropped == 0, "before the input has ended the tag behind the last frame is not yet one");
-  CHECK(baac_flac_decoder_finish(dec, nullptr) == AAC_OK && decoded == pcm.size() / 2 &&
-            baac_flac_decoder_lost_frames(dec) == 0,
+  CHECK(bac_flac_decoder_finish(dec, nullptr) == AAC_OK && decoded == pcm.size() / 2 &&
+            bac_flac_decoder_lost_frames(dec) == 0,
         "a finish without end_input passes the ID3v1 tag over too");
   uint64_t in_front = 99;
-  baac_flac_decoder_id3(dec, &in_front, &v1_dropped);
+  bac_flac_decoder_id3(dec, &in_front, &v1_dropped);
   CHECK(v1_dropped == 1 && in_front == 0, "and the decoder says that it passed an ID3v1 tag over");
-  baac_flac_decoder_destroy(dec);
+  bac_flac_decoder_destroy(dec);
   /* The same with the end of the input declared, and nothing of the
    * kind for a stream without a tag or with other bytes behind it. */
   for (int shape = 0; shape < 3; shape++) {
@@ -1148,20 +1148,20 @@ static void test_id3() {
     } else if (shape == 2) {
       s.insert(s.end(), 128, 0x55);
     }
-    BaacFlacDecoder* d = baac_flac_decoder_create();
+    BacFlacDecoder* d = bac_flac_decoder_create();
     for (size_t pos = 0; pos < s.size();) {
-      pos += (size_t)baac_flac_decoder_feed(d, s.data() + pos, (int)(s.size() - pos));
-      while (baac_flac_decoder_decode_next(d, buf.data(), (int)buf.size()) != 0) {
+      pos += (size_t)bac_flac_decoder_feed(d, s.data() + pos, (int)(s.size() - pos));
+      while (bac_flac_decoder_decode_next(d, buf.data(), (int)buf.size()) != 0) {
       }
     }
-    baac_flac_decoder_end_input(d);
-    while (baac_flac_decoder_decode_next(d, buf.data(), (int)buf.size()) != 0) {
+    bac_flac_decoder_end_input(d);
+    while (bac_flac_decoder_decode_next(d, buf.data(), (int)buf.size()) != 0) {
     }
-    baac_flac_decoder_id3(d, nullptr, &v1_dropped);
+    bac_flac_decoder_id3(d, nullptr, &v1_dropped);
     CHECK(v1_dropped == (shape == 0 ? 1 : 0),
           "with the input ended, shape %d: an ID3v1 tag passed over is reported as %d", shape,
           v1_dropped);
-    baac_flac_decoder_destroy(d);
+    bac_flac_decoder_destroy(d);
   }
 
   std::vector<uint8_t> longer = tail;
@@ -1232,7 +1232,7 @@ static std::vector<uint8_t> raw16(const std::vector<int32_t>& pcm) {
 static void test_oracles() {
   const bool have_reference =
       oracle_present(!g_flac.empty() && !g_metaflac.empty(),
-                     "the reference flac and metaflac (BAAC_FLAC_REFERENCE)");
+                     "the reference flac and metaflac (BAC_FLAC_REFERENCE)");
   const bool ffmpeg_tools = oracle_present(
       have_ffmpeg() && system("ffprobe -version > /dev/null 2>&1") == 0, "ffmpeg and ffprobe");
   if (!have_reference || !ffmpeg_tools) {
@@ -1271,9 +1271,9 @@ static void test_oracles() {
   /* metaflac: the tags in order, the picture's figures and its bytes. */
   r = run(metaflac + " --export-tags-to=- " + file);
   CHECK(r.status == 0 && lines_of(r.text()) == tags.comments,
-        "metaflac lists the tags bAAC wrote, in order:\n%s", r.text().c_str());
+        "metaflac lists the tags the library wrote, in order:\n%s", r.text().c_str());
   r = run(metaflac + " --list --block-type=VORBIS_COMMENT " + file);
-  CHECK(contains(r.text(), "vendor string: bAAC") && contains(r.text(), "comments: 5") &&
+  CHECK(contains(r.text(), "vendor string: Baander Audio Core") && contains(r.text(), "comments: 5") &&
             contains(r.text(), "comment[2]: GENRE=Orchestral"),
         "metaflac --list shows the vendor and the fields:\n%s", r.text().c_str());
   r = run(metaflac + " --list --block-type=PICTURE " + file);
@@ -1300,7 +1300,7 @@ static void test_oracles() {
   r = run("ffprobe -v error -show_entries format_tags -of default=nw=1 " + file);
   CHECK(contains(r.text(), "TAG:ARTIST=Ravel") && contains(r.text(), "TAG:TITLE=Boléro") &&
             contains(r.text(), "Classical") && contains(r.text(), "Orchestral"),
-        "ffprobe lists the tags bAAC wrote:\n%s%s", r.text().c_str(), r.err.c_str());
+        "ffprobe lists the tags the library wrote:\n%s%s", r.text().c_str(), r.err.c_str());
   r =
       run("ffprobe -v error -select_streams v -show_entries "
           "stream=codec_name,width,height:stream_disposition=attached_pic -of default=nw=1 " +
@@ -1326,23 +1326,23 @@ static void test_oracles() {
           shell_quote(cover_path) + " -o " + shell_quote(theirs) + " " + shell_quote(wav_raw));
   CHECK(r.status == 0, "flac writes a tagged file: %s", r.err.c_str());
   Read read = read_stream(read_file(theirs), true);
-  CHECK(read.decoded.pcm == pcm && read.decoded.verdict == BAAC_FLAC_MD5_MATCH,
-        "bAAC decodes flac's tagged file");
+  CHECK(read.decoded.pcm == pcm && read.decoded.verdict == BAC_FLAC_MD5_MATCH,
+        "the library decodes flac's tagged file");
   /* metaflac says what flac wrote (it leaves out the tag without a
-   * value), and bAAC has to read the same. */
+   * value), and the library has to read the same. */
   r = run(metaflac + " --export-tags-to=- " + shell_quote(theirs));
   const std::vector<std::string> written = lines_of(r.text());
   CHECK(written.size() >= 4 && written[0] == "ARTIST=Ravel" && written[2] == "GENRE=Orchestral" &&
             written[3] == "TITLE=Boléro",
         "flac wrote the tags it was given:\n%s", r.text().c_str());
-  CHECK(read.tags.comments == written, "bAAC reads flac's tags in order (%zu of %zu)",
+  CHECK(read.tags.comments == written, "the library reads flac's tags in order (%zu of %zu)",
         read.tags.comments.size(), written.size());
-  CHECK(contains(read.tags.vendor, "libFLAC 1.4.3"), "bAAC reads flac's vendor: %s",
+  CHECK(contains(read.tags.vendor, "libFLAC 1.4.3"), "the library reads flac's vendor: %s",
         read.tags.vendor.c_str());
   CHECK(read.tags.pictures.size() == 1 && read.tags.pictures[0].type == 3 &&
             read.tags.pictures[0].mime == "image/jpeg" && read.tags.pictures[0].width == 64 &&
             read.tags.pictures[0].height == 48 && read.tags.pictures[0].data == cover,
-        "bAAC reads flac's picture: its type, media type, size and bytes");
+        "the library reads flac's picture: its type, media type, size and bytes");
 
   /* What FFmpeg writes. */
   const std::string lavf = g_tmp + "/lavf.flac";
@@ -1359,16 +1359,16 @@ static void test_oracles() {
     artist = artist || c == "ARTIST=Ravel" || c == "artist=Ravel";
     title = title || c == "TITLE=Boléro" || c == "title=Boléro";
   }
-  CHECK(read.decoded.pcm == pcm && artist && title, "bAAC reads FFmpeg's tags (%zu fields)",
+  CHECK(read.decoded.pcm == pcm && artist && title, "the library reads FFmpeg's tags (%zu fields)",
         read.tags.comments.size());
   CHECK(read.tags.pictures.size() == 1 && read.tags.pictures[0].data == cover &&
             read.tags.pictures[0].mime == "image/jpeg",
-        "bAAC reads FFmpeg's picture");
+        "the library reads FFmpeg's picture");
 }
 
 int main() {
   g_tmp = make_temp_dir();
-  const char* reference = getenv("BAAC_FLAC_REFERENCE");
+  const char* reference = getenv("BAC_FLAC_REFERENCE");
   if (reference && *reference) {
     g_flac = reference;
     const std::string dir = g_flac.substr(0, g_flac.find_last_of('/'));

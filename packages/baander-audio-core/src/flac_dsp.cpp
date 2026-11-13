@@ -220,13 +220,13 @@ void init_scalar(FlacDSP* dsp, int) {
 
 const FlacDspLevel kLevels[] = {
     {"scalar", AAC_CPU_FLAG_NONE, init_scalar},
-#if defined(BAAC_AAC_SSE2)
+#if defined(BAC_AAC_SSE2)
     {"sse2", AAC_CPU_FLAG_SSE2, flac_dsp_init_sse2},
 #endif
-#if defined(BAAC_AAC_AVX2)
+#if defined(BAC_AAC_AVX2)
     {"avx2", AAC_CPU_FLAG_SSE2 | AAC_CPU_FLAG_AVX | AAC_CPU_FLAG_AVX2, flac_dsp_init_avx2},
 #endif
-#if defined(BAAC_AAC_NEON)
+#if defined(BAC_AAC_NEON)
     {"neon", AAC_CPU_FLAG_NEON, flac_dsp_init_neon},
 #endif
 };

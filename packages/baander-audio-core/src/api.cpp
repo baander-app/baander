@@ -8,10 +8,10 @@
 #include "aac_dsp.h"
 #include "bitstream.h"
 #include "transport.h"
-#if defined(BAAC_AAC_HAVE_DECODER)
+#if defined(BAC_AAC_HAVE_DECODER)
 #include "decoder.h"
 #endif
-#if defined(BAAC_AAC_HAVE_ENCODER)
+#if defined(BAC_AAC_HAVE_ENCODER)
 #include "encoder.h"
 #include "loudness.h"
 #include "usac.h"
@@ -21,7 +21,7 @@
 /* Every codec object dispatches through the process-wide table of
  * aac_dsp_global(), which the first use fills from the CPU flags. */
 
-#if defined(BAAC_AAC_HAVE_ENCODER)
+#if defined(BAC_AAC_HAVE_ENCODER)
 /* ── Encoder API ───────────────────────────────────────────────── */
 
 AacEncoderHandle aac_encoder_create(int sample_rate, int channels, int bitrate, AacObjectType aot,
@@ -601,9 +601,9 @@ int aac_encoder_flush(AacEncoderHandle ctx, uint8_t* out, int out_size) {
   return total;
 }
 
-#endif /* BAAC_AAC_HAVE_ENCODER */
+#endif /* BAC_AAC_HAVE_ENCODER */
 
-#if defined(BAAC_AAC_HAVE_DECODER)
+#if defined(BAC_AAC_HAVE_DECODER)
 /* ── Decoder API ───────────────────────────────────────────────── */
 
 AacDecoderHandle aac_decoder_create(int sample_rate, int channels) {
@@ -980,4 +980,4 @@ int aac_decoder_has_surround(AacDecoderHandle ctx) {
   }
   return static_cast<AacDecoderState*>(ctx)->has_surround ? 1 : 0;
 }
-#endif /* BAAC_AAC_HAVE_DECODER */
+#endif /* BAC_AAC_HAVE_DECODER */

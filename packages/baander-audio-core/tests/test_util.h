@@ -1,7 +1,7 @@
-/* Shared helpers for the baander-aac tests: signal generators, SNR, ADTS
+/* Shared helpers for the baander-audio-core tests: signal generators, SNR, ADTS
  * stream handling and encode/decode drivers over the public C API. */
-#ifndef BAANDER_AAC_TEST_UTIL_H
-#define BAANDER_AAC_TEST_UTIL_H
+#ifndef BAANDER_AUDIO_CORE_TEST_UTIL_H
+#define BAANDER_AUDIO_CORE_TEST_UTIL_H
 
 #include <algorithm>
 #include <cmath>
@@ -55,7 +55,7 @@ static float lcg_float(unsigned* seed) { return (float)(lcg_next(seed) >> 8) / 8
 
 /* The encoder streams under tests/data are compared byte for byte by
  * every reference build: a build with the options of CMakeLists.txt
- * that keep arithmetic exact (BAAC_EXACT_MATH), in any configuration,
+ * that keep arithmetic exact (BAC_EXACT_MATH), in any configuration,
  * Debug and the sanitizers included.  The library and the tests compute
  * in exact arithmetic, so the bytes are a function of the source and of
  * the C library's functions, not of the compiler or the optimisation
@@ -63,10 +63,10 @@ static float lcg_float(unsigned* seed) { return (float)(lcg_next(seed) >> 8) / 8
  * with the compiler of the linux-x64 job in
  * .github/workflows/aac-native.yml.  A build without those options
  * compares its streams with the committed ones through the decodes. */
-#if BAAC_EXACT_MATH
-#define BAAC_REFERENCE_BUILD 1
+#if BAC_EXACT_MATH
+#define BAC_REFERENCE_BUILD 1
 #else
-#define BAAC_REFERENCE_BUILD 0
+#define BAC_REFERENCE_BUILD 0
 #endif
 
 /* FNV-1a over the bit patterns of the samples. */
@@ -346,7 +346,7 @@ static double energy_db(const float* x, size_t n) {
 
 /* Committed reference streams. */
 static std::string data_path(const char* name) {
-  return std::string(BAAC_TEST_DATA_DIR) + "/" + name;
+  return std::string(BAC_TEST_DATA_DIR) + "/" + name;
 }
 
 /* ── ADTS streams ──────────────────────────────────────────────── */
@@ -483,7 +483,7 @@ static bool have_ffmpeg() { return system("ffmpeg -version > /dev/null 2>&1") ==
 
 /* Temporary directory for one test run, removed by the caller. */
 static std::string make_temp_dir() {
-  char tmpl[] = "/tmp/baander-aac-test-XXXXXX";
+  char tmpl[] = "/tmp/baander-audio-core-test-XXXXXX";
   const char* dir = mkdtemp(tmpl);
   return dir ? std::string(dir) : std::string();
 }
@@ -570,11 +570,11 @@ static std::string run_capture(const std::string& cmd, int* status = nullptr) {
 
 /* A check against a reference tool or a fetched data set cannot run
  * without it.  By default such a check is skipped with a message; with
- * BAAC_REQUIRE_ORACLES set (to anything but 0) a missing oracle is a
+ * BAC_REQUIRE_ORACLES set (to anything but 0) a missing oracle is a
  * failure, so that a run that is meant to prove something cannot pass
  * by proving nothing. */
 static bool oracles_required() {
-  const char* v = getenv("BAAC_REQUIRE_ORACLES");
+  const char* v = getenv("BAC_REQUIRE_ORACLES");
   return v && *v && strcmp(v, "0") != 0;
 }
 
@@ -585,7 +585,7 @@ static bool oracle_present(bool present, const char* what) {
     return true;
   }
   if (oracles_required()) {
-    printf("FAIL: %s is missing and BAAC_REQUIRE_ORACLES is set\n", what);
+    printf("FAIL: %s is missing and BAC_REQUIRE_ORACLES is set\n", what);
     g_failures++;
   } else {
     printf("SKIP: %s is missing\n", what);
@@ -741,4 +741,4 @@ static std::vector<uint8_t> mp4_file(const std::vector<std::vector<uint8_t>>& au
   return cat({ftyp, moov((uint32_t)offset), box("mdat", mdat_payload)});
 }
 
-#endif /* BAANDER_AAC_TEST_UTIL_H */
+#endif /* BAANDER_AUDIO_CORE_TEST_UTIL_H */

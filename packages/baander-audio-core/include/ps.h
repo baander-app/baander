@@ -1,5 +1,5 @@
-#ifndef BAANDER_AAC_PS_H
-#define BAANDER_AAC_PS_H
+#ifndef BAANDER_AUDIO_CORE_PS_H
+#define BAANDER_AUDIO_CORE_PS_H
 
 #include <cstdint>
 
@@ -124,4 +124,4 @@ void aac_ps_apply(AacPsState* ps, float L[2][38][64], float R[2][38][64], int to
 }
 #endif
 
-#endif /* BAANDER_AAC_PS_H */
+#endif /* BAANDER_AUDIO_CORE_PS_H */

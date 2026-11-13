@@ -1,5 +1,5 @@
-#ifndef BAANDER_AAC_PS_ENC_H
-#define BAANDER_AAC_PS_ENC_H
+#ifndef BAANDER_AUDIO_CORE_PS_ENC_H
+#define BAANDER_AUDIO_CORE_PS_ENC_H
 
 #include <cstdint>
 
@@ -61,4 +61,4 @@ void aac_ps_enc_write(const AacPsEncoder* ps, AacBitWriter* w);
 }
 #endif
 
-#endif /* BAANDER_AAC_PS_ENC_H */
+#endif /* BAANDER_AUDIO_CORE_PS_ENC_H */

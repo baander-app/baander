@@ -1,5 +1,5 @@
-#ifndef BAANDER_AAC_MPS_H
-#define BAANDER_AAC_MPS_H
+#ifndef BAANDER_AUDIO_CORE_MPS_H
+#define BAANDER_AUDIO_CORE_MPS_H
 
 #include <stdint.h>
 

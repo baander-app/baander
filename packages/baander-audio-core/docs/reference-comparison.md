@@ -293,7 +293,7 @@ what it was before the 960-frame work on every profile and mode checked
 Measured on 2026-10-24 with FFmpeg 6.1.1 on this machine (a 2.8 GHz
 Xeon, four cores, GCC 13, release build at the AVX2 level). That release
 build compiled with `-O3 -ffast-math -fno-math-errno`, and the
-afterburner's encode times and the `baac bench` realtime factors below
+afterburner's encode times and the `bac bench` realtime factors below
 were measured with it; Release builds have since dropped the fast-math
 rewrites ([README](README.md#native)).
 
@@ -332,7 +332,7 @@ constant bitrate:
 | 64 kbit/s | 25.3 dB | 25.9 dB | +0.6 dB | |
 | 96 kbit/s | 26.9 dB | 27.9 dB | +1.0 dB | +109 % |
 
-`baac bench` on a 60 s stereo signal at 48 kHz, realtime factors before
+`bac bench` on a 60 s stereo signal at 48 kHz, realtime factors before
 and after the performance pass (decode times are a few tenths of a
 second and vary by about 20 percent between runs):
 

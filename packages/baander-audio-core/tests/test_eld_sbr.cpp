@@ -537,7 +537,7 @@ static Encoded plain_eld(const std::vector<float>& pcm, int fl, int channels) {
 }
 
 static void plain_eld_identity(int fl, int channels) {
-#if !BAAC_REFERENCE_BUILD
+#if !BAC_REFERENCE_BUILD
   printf("plain ELD %d %d ch: identity check needs the reference build, skipped\n", fl, channels);
   return;
 #endif

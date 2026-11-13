@@ -1,4 +1,4 @@
-# Test build configuration for baander-aac.  Every test is a standalone
+# Test build configuration for baander-audio-core.  Every test is a standalone
 # executable over the public API (plus the internal headers for the unit
 # tests) and returns nonzero on failure.
 
@@ -59,9 +59,9 @@ set(TEST_SOURCES
 foreach(test_src ${TEST_SOURCES})
     get_filename_component(test_name ${test_src} NAME_WE)
     add_executable(${test_name} ${test_src} tables_at_load.cpp)
-    target_link_libraries(${test_name} PRIVATE baander-aac)
+    target_link_libraries(${test_name} PRIVATE baander-audio-core)
     target_compile_definitions(${test_name} PRIVATE
-        BAAC_TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/data")
+        BAC_TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/data")
     if(UNIX)
         target_link_libraries(${test_name} PRIVATE m)
     endif()
@@ -72,9 +72,9 @@ endforeach()
 # from several threads at once, in a program that has nothing built at
 # its start.
 add_executable(test_tables_lazy test_tables_lazy.cpp)
-target_link_libraries(test_tables_lazy PRIVATE baander-aac)
+target_link_libraries(test_tables_lazy PRIVATE baander-audio-core)
 target_compile_definitions(test_tables_lazy PRIVATE
-    BAAC_TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/data")
+    BAC_TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/data")
 find_package(Threads REQUIRED)
 target_link_libraries(test_tables_lazy PRIVATE Threads::Threads)
 if(UNIX)
@@ -92,32 +92,32 @@ add_test(NAME test_tables_lazy_both COMMAND test_tables_lazy both)
 # green with the codec.  It needs the harness targets of tools/fuzz.
 if(TARGET fuzz_decoder)
     add_executable(test_fuzz_smoke test_fuzz_smoke.cpp)
-    target_link_libraries(test_fuzz_smoke PRIVATE baander-aac)
+    target_link_libraries(test_fuzz_smoke PRIVATE baander-audio-core)
     target_compile_definitions(test_fuzz_smoke PRIVATE
-        BAAC_TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/data"
-        BAAC_FUZZ_SEEDS="$<TARGET_FILE:fuzz_seeds>"
-        BAAC_FUZZ_DECODER="$<TARGET_FILE:fuzz_decoder>"
-        BAAC_FUZZ_ASC="$<TARGET_FILE:fuzz_asc>"
-        BAAC_FUZZ_ENCODER="$<TARGET_FILE:fuzz_encoder>"
-        BAAC_FUZZ_UNIDRC="$<TARGET_FILE:fuzz_unidrc>"
-        BAAC_FUZZ_MPS="$<TARGET_FILE:fuzz_mps>"
-        BAAC_FUZZ_FLAC_DECODER="$<TARGET_FILE:fuzz_flac_decoder>"
-        BAAC_FUZZ_FLAC_ENCODER="$<TARGET_FILE:fuzz_flac_encoder>")
-    if(BAAC_FUZZ_HAVE_LIBFUZZER)
-        target_compile_definitions(test_fuzz_smoke PRIVATE BAAC_FUZZ_LIBFUZZER)
+        BAC_TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/data"
+        BAC_FUZZ_SEEDS="$<TARGET_FILE:fuzz_seeds>"
+        BAC_FUZZ_DECODER="$<TARGET_FILE:fuzz_decoder>"
+        BAC_FUZZ_ASC="$<TARGET_FILE:fuzz_asc>"
+        BAC_FUZZ_ENCODER="$<TARGET_FILE:fuzz_encoder>"
+        BAC_FUZZ_UNIDRC="$<TARGET_FILE:fuzz_unidrc>"
+        BAC_FUZZ_MPS="$<TARGET_FILE:fuzz_mps>"
+        BAC_FUZZ_FLAC_DECODER="$<TARGET_FILE:fuzz_flac_decoder>"
+        BAC_FUZZ_FLAC_ENCODER="$<TARGET_FILE:fuzz_flac_encoder>")
+    if(BAC_FUZZ_HAVE_LIBFUZZER)
+        target_compile_definitions(test_fuzz_smoke PRIVATE BAC_FUZZ_LIBFUZZER)
     endif()
     add_test(NAME test_fuzz_smoke COMMAND test_fuzz_smoke)
 endif()
 
-# The lossless commands of the baac tool, run as the built binary.  The
+# The lossless commands of the bac tool, run as the built binary.  The
 # suite starts processes and measures their memory the POSIX way.
-if(TARGET baac AND NOT WIN32)
+if(TARGET bac AND NOT WIN32)
     add_executable(test_flac_cli test_flac_cli.cpp)
-    target_link_libraries(test_flac_cli PRIVATE baander-aac)
+    target_link_libraries(test_flac_cli PRIVATE baander-audio-core)
     target_include_directories(test_flac_cli PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
     target_compile_definitions(test_flac_cli PRIVATE
-        BAAC_TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/data"
-        BAAC_TOOL="$<TARGET_FILE:baac>")
+        BAC_TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/data"
+        BAC_TOOL="$<TARGET_FILE:bac>")
     if(UNIX)
         target_link_libraries(test_flac_cli PRIVATE m)
     endif()
@@ -149,7 +149,7 @@ set_tests_properties(test_flac_encoder_plain_libm PROPERTIES
 # through the DSP dispatch table.  test_dsp compares the kernels of every
 # level the machine has with the scalar ones, bit for bit; the default run
 # of every suite takes the highest level.  The suites below run again with
-# the table capped at the scalar and the SSE2 kernels (BAAC_AAC_CPU):
+# the table capped at the scalar and the SSE2 kernels (BAC_AAC_CPU):
 # test_mdct, test_qmf and test_roundtrip check their accuracy bounds there,
 # and test_encoder_tuning compares the committed AAC-LC, HE-AAC and HE-AAC
 # v2 streams byte for byte at each level (where test_util.h compares
@@ -158,14 +158,14 @@ set_tests_properties(test_flac_encoder_plain_libm PROPERTIES
 # its suites run again the same way: the FLAC streams have to come out the
 # same at every level.
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64|i686|i386")
-    set(BAAC_DISPATCH_LEVELS scalar sse2)
+    set(BAC_DISPATCH_LEVELS scalar sse2)
 else()
-    set(BAAC_DISPATCH_LEVELS scalar)
+    set(BAC_DISPATCH_LEVELS scalar)
 endif()
-foreach(level ${BAAC_DISPATCH_LEVELS})
+foreach(level ${BAC_DISPATCH_LEVELS})
     foreach(test_name test_mdct test_qmf test_roundtrip test_encoder_tuning test_flac_decoder
             test_flac_conformance test_flac_encoder test_flac_interop)
         add_test(NAME ${test_name}_${level} COMMAND ${test_name})
-        set_tests_properties(${test_name}_${level} PROPERTIES ENVIRONMENT "BAAC_AAC_CPU=${level}")
+        set_tests_properties(${test_name}_${level} PROPERTIES ENVIRONMENT "BAC_AAC_CPU=${level}")
     endforeach()
 endforeach()

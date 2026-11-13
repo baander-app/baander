@@ -1,5 +1,5 @@
-#ifndef BAANDER_AAC_USAC_FD_H
-#define BAANDER_AAC_USAC_FD_H
+#ifndef BAANDER_AUDIO_CORE_USAC_FD_H
+#define BAANDER_AUDIO_CORE_USAC_FD_H
 
 #include "usac.h"
 
@@ -130,4 +130,4 @@ int aac_usac_lpd_fd_fac(AacUsacCoreChannel* ch, AacBitReader* r, int fac_length,
 }
 #endif
 
-#endif /* BAANDER_AAC_USAC_FD_H */
+#endif /* BAANDER_AUDIO_CORE_USAC_FD_H */

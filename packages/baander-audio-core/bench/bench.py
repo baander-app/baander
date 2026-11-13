@@ -74,15 +74,15 @@ def cfg_list():
     # AAC-LC, CBR (each encoder's constant-bitrate mode).
     for k in (64, 96, 128, 192, 256):
         b = k * 1000
-        add("lc", "ours", k, "cbr", "aac", ["baac"],
-            lambda s, f, o, b=b: [TOOLS["baac"], "enc", f, o, "48000", "2", str(b), "cbr", "0", "lc"])
+        add("lc", "ours", k, "cbr", "aac", ["bac"],
+            lambda s, f, o, b=b: [TOOLS["bac"], "enc", f, o, "48000", "2", str(b), "cbr", "0", "lc"])
         if k in BW_FDK:
             # Experiment: our encoder with the lowpass FDK's streams show.
-            add("lc", "oursbw", k, "cbr", "aac", ["baac"],
-                lambda s, f, o, b=b, k=k: [TOOLS["baac"], "enc", f, o, "48000", "2", str(b), "cbr",
+            add("lc", "oursbw", k, "cbr", "aac", ["bac"],
+                lambda s, f, o, b=b, k=k: [TOOLS["bac"], "enc", f, o, "48000", "2", str(b), "cbr",
                                            "0", "lc", "--bandwidth", str(BW_FDK[k])])
-        add("lc", "oursnoab", k, "cbr", "aac", ["baac"],
-            lambda s, f, o, b=b: [TOOLS["baac"], "enc", f, o, "48000", "2", str(b), "cbr", "0", "lc",
+        add("lc", "oursnoab", k, "cbr", "aac", ["bac"],
+            lambda s, f, o, b=b: [TOOLS["bac"], "enc", f, o, "48000", "2", str(b), "cbr", "0", "lc",
                                   "--no-afterburner"])
         add("lc", "ffmpeg", k, "cbr", "aac", ["ffmpeg"],
             lambda s, f, o, k=k: [TOOLS["ffmpeg"], "-v", "error", "-y", "-threads", "1", "-i", s,
@@ -101,8 +101,8 @@ def cfg_list():
 
     # AAC-LC, each encoder's own VBR scale (bitrate follows the material).
     for m in (2, 3, 4, 5):
-        add("lcvbr", "ours", m, "vbr", "aac", ["baac"],
-            lambda s, f, o, m=m: [TOOLS["baac"], "enc", f, o, "48000", "2", "128000", "cbr", "0",
+        add("lcvbr", "ours", m, "vbr", "aac", ["bac"],
+            lambda s, f, o, m=m: [TOOLS["bac"], "enc", f, o, "48000", "2", "128000", "cbr", "0",
                                   "lc", "--vbr-mode", str(m)])
         add("lcvbr", "fdk", m, "vbr", "aac", ["fdk_enc"],
             lambda s, f, o, m=m: [TOOLS["fdk_enc"], "-t", "2", "-v", str(m), s, o])
@@ -113,10 +113,10 @@ def cfg_list():
     # HE-AAC v1.
     for k in (32, 48, 64):
         b = k * 1000
-        add("he", "ours", k, "cbr", "aac", ["baac"],
-            lambda s, f, o, b=b: [TOOLS["baac"], "enc", f, o, "48000", "2", str(b), "cbr", "0", "he"])
-        add("he", "oursnoab", k, "cbr", "aac", ["baac"],
-            lambda s, f, o, b=b: [TOOLS["baac"], "enc", f, o, "48000", "2", str(b), "cbr", "0", "he",
+        add("he", "ours", k, "cbr", "aac", ["bac"],
+            lambda s, f, o, b=b: [TOOLS["bac"], "enc", f, o, "48000", "2", str(b), "cbr", "0", "he"])
+        add("he", "oursnoab", k, "cbr", "aac", ["bac"],
+            lambda s, f, o, b=b: [TOOLS["bac"], "enc", f, o, "48000", "2", str(b), "cbr", "0", "he",
                                   "--no-afterburner"])
         add("he", "fdk", k, "cbr", "aac", ["fdk_enc"],
             lambda s, f, o, b=b: [TOOLS["fdk_enc"], "-r", str(b), "-t", "5", s, o])
@@ -129,8 +129,8 @@ def cfg_list():
     # HE-AAC v2 (Apple's Windows encoder has no v2).
     for k in (24, 32):
         b = k * 1000
-        add("hev2", "ours", k, "cbr", "aac", ["baac"],
-            lambda s, f, o, b=b: [TOOLS["baac"], "enc", f, o, "48000", "2", str(b), "cbr", "0", "hev2"])
+        add("hev2", "ours", k, "cbr", "aac", ["bac"],
+            lambda s, f, o, b=b: [TOOLS["bac"], "enc", f, o, "48000", "2", str(b), "cbr", "0", "hev2"])
         add("hev2", "fdk", k, "cbr", "aac", ["fdk_enc"],
             lambda s, f, o, b=b: [TOOLS["fdk_enc"], "-r", str(b), "-t", "29", s, o])
         add("hev2", "libxaac", k, "cbr", "aac", ["xaac_enc"],
@@ -141,8 +141,8 @@ def cfg_list():
     # elementary stream with a side file of access-unit sizes.
     for k in (24, 32, 48, 64, 96):
         b = k * 1000
-        add("xhe", "ours", k, "cbr", "loas", ["baac"],
-            lambda s, f, o, b=b: [TOOLS["baac"], "enc", f, o, "48000", "2", str(b), "cbr", "0", "xhe"])
+        add("xhe", "ours", k, "cbr", "loas", ["bac"],
+            lambda s, f, o, b=b: [TOOLS["bac"], "enc", f, o, "48000", "2", str(b), "cbr", "0", "xhe"])
         # FDK's two-pass mode: measure the loudness, then encode with it.
         # Its one-pass mode (-l) levels the programme to the given loudness
         # inside the encoder, which changes the signal under test.
@@ -374,8 +374,8 @@ def best_of(cmd, n, tdir, tag):
 def decoders_for(family, stream, ch=2):
     """Every decoder that takes this family, as (name, command writing to out)."""
     out = []
-    if have("baac"):
-        out.append(("ours", lambda o: [TOOLS["baac"], "dec", stream, o, "48000", "0",
+    if have("bac"):
+        out.append(("ours", lambda o: [TOOLS["bac"], "dec", stream, o, "48000", "0",
                                         "--no-loudness"], "f32"))
     if family != "xhe" and have("ffmpeg"):
         out.append(("ffmpeg", lambda o: [TOOLS["ffmpeg"], "-v", "error", "-y", "-threads", "1",

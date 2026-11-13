@@ -1,7 +1,7 @@
-/* What the parts of the baac tool share (baac.cpp and the baac_flac
+/* What the parts of the bac tool share (bac.cpp and the bac_flac
  * files, which link into one program). */
-#ifndef BAANDER_AAC_TOOLS_BAAC_COMMON_H
-#define BAANDER_AAC_TOOLS_BAAC_COMMON_H
+#ifndef BAANDER_AUDIO_CORE_TOOLS_BAC_COMMON_H
+#define BAANDER_AUDIO_CORE_TOOLS_BAC_COMMON_H
 
 #include <chrono>
 #include <cstdint>
@@ -18,4 +18,4 @@ static inline double now_seconds() {
   return std::chrono::duration<double>(clock::now().time_since_epoch()).count();
 }
 
-#endif /* BAANDER_AAC_TOOLS_BAAC_COMMON_H */
+#endif /* BAANDER_AUDIO_CORE_TOOLS_BAC_COMMON_H */

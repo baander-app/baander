@@ -1,10 +1,10 @@
-/* baac: command-line encoder/decoder for baander-aac.
+/* bac: command-line encoder/decoder for baander-audio-core.
  *
- *   baac enc <in.f32le> <out.aac> <rate> <channels> [bitrate] [mode] [quality] [profile] [options]
- *   baac dec <in.aac> <out.f32le> [rate] [channels] [--no-loudness]
- *   baac loudness <in.wav | in.f32le rate channels>
- *   baac bench [--seconds N] [--dump DIR] [--only NAME] [--streams DIR]
- *   baac flac enc | dec | test | info ...   (the lossless mode: baac_flac.cpp)
+ *   bac enc <in.f32le> <out.aac> <rate> <channels> [bitrate] [mode] [quality] [profile] [options]
+ *   bac dec <in.aac> <out.f32le> [rate] [channels] [--no-loudness]
+ *   bac loudness <in.wav | in.f32le rate channels>
+ *   bac bench [--seconds N] [--dump DIR] [--only NAME] [--streams DIR]
+ *   bac flac enc | dec | test | info ...   (the lossless mode: bac_flac.cpp)
  *
  * Raw PCM is interleaved 32-bit float; the AAC side is an ADTS stream
  * (a LOAS stream for the xhe profile, which ADTS cannot carry).
@@ -45,14 +45,14 @@
 #include <vector>
 
 #include "aac.h"
-#include "baac_common.h"
-#include "baac_flac.h"
+#include "bac_common.h"
+#include "bac_flac.h"
 
 static std::vector<uint8_t> read_all(const char* path) {
   std::vector<uint8_t> data;
   FILE* f = strcmp(path, "-") == 0 ? stdin : fopen(path, "rb");
   if (!f) {
-    fprintf(stderr, "baac: cannot open %s\n", path);
+    fprintf(stderr, "bac: cannot open %s\n", path);
     exit(1);
   }
   uint8_t buf[65536];
@@ -69,7 +69,7 @@ static std::vector<uint8_t> read_all(const char* path) {
 static FILE* open_out(const char* path) {
   FILE* f = strcmp(path, "-") == 0 ? stdout : fopen(path, "wb");
   if (!f) {
-    fprintf(stderr, "baac: cannot create %s\n", path);
+    fprintf(stderr, "bac: cannot create %s\n", path);
     exit(1);
   }
   return f;
@@ -77,7 +77,7 @@ static FILE* open_out(const char* path) {
 
 static int usage() {
   fprintf(stderr,
-          "usage: baac enc <in.f32le> <out.aac> <rate> <channels> [bitrate] [cbr|abr|cvbr|tvbr] "
+          "usage: bac enc <in.f32le> <out.aac> <rate> <channels> [bitrate] [cbr|abr|cvbr|tvbr] "
           "[quality] [lc|he|hev2|xhe] [options]\n"
           "         options: --peak-bitrate N  --bandwidth HZ  --vbr-mode 1..5  --[no-]afterburner\n"
           "         xhe options: --loudness (two-pass: measure the input, write the loudness "
@@ -87,11 +87,11 @@ static int usage() {
           "                      --rap-ms N | --rap-samples N  (the independent frame interval)\n"
           "                      --rap-max-frames N  --segment-max-bytes N\n"
           "                      --drc  --drc-range LU  (MPEG-D DRC gain sets, 6 to 16 LU)\n"
-          "       baac dec <in.aac> <out.f32le> [rate] [channels: 0 = as in the stream] [--no-loudness]\n"
-          "       baac loudness <in.wav> | <in.f32le> <rate> <channels>\n"
-          "       baac bench [--seconds N] [--dump DIR] [--only NAME] [--streams DIR]\n"
+          "       bac dec <in.aac> <out.f32le> [rate] [channels: 0 = as in the stream] [--no-loudness]\n"
+          "       bac loudness <in.wav> | <in.f32le> <rate> <channels>\n"
+          "       bac bench [--seconds N] [--dump DIR] [--only NAME] [--streams DIR]\n"
           "       %s",
-          baac_flac_usage());
+          bac_flac_usage());
   return 2;
 }
 
@@ -103,7 +103,7 @@ static bool measure_loudness(const std::vector<float>& pcm, int sr, int channels
                              AacLoudnessInfo* info) {
   AacLoudnessMeter* m = aac_loudness_create(sr, channels);
   if (!m) {
-    fprintf(stderr, "baac: the loudness meter takes 1 to 6 channels at 8 to 384 kHz\n");
+    fprintf(stderr, "bac: the loudness meter takes 1 to 6 channels at 8 to 384 kHz\n");
     return false;
   }
   const size_t frames = pcm.size() / (size_t)channels;
@@ -116,7 +116,7 @@ static bool measure_loudness(const std::vector<float>& pcm, int sr, int channels
   const int ret = aac_loudness_result(m, info);
   aac_loudness_destroy(m);
   if (ret != AAC_OK) {
-    fprintf(stderr, "baac: the loudness measurement needs at least 400 ms of input\n");
+    fprintf(stderr, "bac: the loudness measurement needs at least 400 ms of input\n");
     return false;
   }
   return true;
@@ -170,13 +170,13 @@ static bool read_wav(const std::vector<uint8_t>& data, std::vector<float>* pcm, 
       }
     } else if (memcmp(chunk, "data", 4) == 0) {
       if (*channels <= 0 || *sr <= 0 || bits <= 0) {
-        fprintf(stderr, "baac: the WAV data precedes its format\n");
+        fprintf(stderr, "bac: the WAV data precedes its format\n");
         return false;
       }
       const bool is_float = format == 3 && bits == 32;
       const bool is_pcm = format == 1 && (bits == 8 || bits == 16 || bits == 24 || bits == 32);
       if (!is_float && !is_pcm) {
-        fprintf(stderr, "baac: unsupported WAV format %d at %d bits\n", format, bits);
+        fprintf(stderr, "bac: unsupported WAV format %d at %d bits\n", format, bits);
         return false;
       }
       const size_t bytes = (size_t)bits / 8;
@@ -204,7 +204,7 @@ static bool read_wav(const std::vector<uint8_t>& data, std::vector<float>* pcm, 
     }
     pos += 8 + size + (size & 1);
   }
-  fprintf(stderr, "baac: no data chunk in the WAV file\n");
+  fprintf(stderr, "bac: no data chunk in the WAV file\n");
   return false;
 }
 
@@ -256,7 +256,7 @@ static AacUsacEncoderOptions default_usac_options() {
   return o;
 }
 
-/* The --options of `baac enc`, taken out of argv before the positional
+/* The --options of `bac enc`, taken out of argv before the positional
  * arguments are read. */
 struct EncodeOptions {
   bool loudness = false;
@@ -273,7 +273,7 @@ static bool positive_option(const char* name, const char* value, int* out) {
   char* end = nullptr;
   const long v = strtol(value, &end, 10);
   if (end == value || *end != '\0' || v <= 0 || v > 1000000000L) {
-    fprintf(stderr, "baac: %s takes a positive count\n", name);
+    fprintf(stderr, "bac: %s takes a positive count\n", name);
     return false;
   }
   *out = (int)v;
@@ -358,7 +358,7 @@ static bool parse_encode_options(int* argc, char** argv, EncodeOptions* o) {
     } else if (arg == "--drc-range" && has_value) {
       const int lu = atoi(argv[i + 1]);
       if (lu < 6 || lu > 16) {
-        fprintf(stderr, "baac: --drc-range takes 6 to 16 LU\n");
+        fprintf(stderr, "bac: --drc-range takes 6 to 16 LU\n");
         return false;
       }
       o->usac = true;
@@ -367,14 +367,14 @@ static bool parse_encode_options(int* argc, char** argv, EncodeOptions* o) {
     } else if (arg == "--stream-id" && has_value) {
       const int id = atoi(argv[i + 1]);
       if (id < 0 || id > 65535) {
-        fprintf(stderr, "baac: --stream-id takes 0 to 65535\n");
+        fprintf(stderr, "bac: --stream-id takes 0 to 65535\n");
         return false;
       }
       o->usac = true;
       o->opt.stream_id = id;
       i++;
     } else if (arg.size() > 2 && arg[0] == '-' && arg[1] == '-') {
-      fprintf(stderr, "baac: unknown option %s\n", argv[i]);
+      fprintf(stderr, "bac: unknown option %s\n", argv[i]);
       return false;
     } else {
       argv[kept++] = argv[i];
@@ -401,7 +401,7 @@ static bool encode_all(AacEncoderHandle enc, const std::vector<uint8_t>& in, int
     memcpy(pcm.data(), in.data() + pos * sizeof(float), n * sizeof(float));
     const int len = aac_encoder_encode(enc, pcm.data(), frame, buf.data(), (int)buf.size());
     if (len < 0) {
-      fprintf(stderr, "baac: encode error %d at frame %d\n", len, *frames);
+      fprintf(stderr, "bac: encode error %d at frame %d\n", len, *frames);
       return false;
     }
     if (out) {
@@ -430,7 +430,7 @@ static bool measure_drc_sets(int sr, int channels, int bitrate, AacRateControl r
   if (!probe || aac_encoder_set_usac(probe, &options.opt) != AAC_OK ||
       aac_encoder_set_loudness_info(probe, &program) != AAC_OK ||
       aac_encoder_set_loudness_measurement(probe, 1) != AAC_OK) {
-    fprintf(stderr, "baac: the DRC measurement pass could not start\n");
+    fprintf(stderr, "bac: the DRC measurement pass could not start\n");
     aac_encoder_destroy(probe);
     return false;
   }
@@ -441,7 +441,7 @@ static bool measure_drc_sets(int sr, int channels, int bitrate, AacRateControl r
     AacLoudnessInfo set;
     if (aac_encoder_drc_loudness(probe, id, &set) != AAC_OK ||
         aac_encoder_set_drc_loudness_info(enc, id, &set) != AAC_OK) {
-      fprintf(stderr, "baac: DRC set %d could not be measured\n", id);
+      fprintf(stderr, "bac: DRC set %d could not be measured\n", id);
       ok = false;
       break;
     }
@@ -480,41 +480,41 @@ static int encode(int argc, char** argv) {
                               : AAC_AOT_LC;
   }
   if ((options.usac || options.loudness) && aot != AAC_AOT_USAC) {
-    fprintf(stderr, "baac: the USAC options and --loudness need the xhe profile\n");
+    fprintf(stderr, "bac: the USAC options and --loudness need the xhe profile\n");
     return usage();
   }
   AacEncoderHandle enc = aac_encoder_create(sr, channels, bitrate, aot, rc);
   if (!enc) {
-    fprintf(stderr, "baac: unsupported encoder configuration\n");
+    fprintf(stderr, "bac: unsupported encoder configuration\n");
     return 1;
   }
   if (argc > 8 && atoi(argv[8]) > 0) {
     aac_encoder_set_quality(enc, atoi(argv[8]));
   }
   if (options.usac && aac_encoder_set_usac(enc, &options.opt) != AAC_OK) {
-    fprintf(stderr, "baac: the USAC options were refused\n");
+    fprintf(stderr, "bac: the USAC options were refused\n");
     return 1;
   }
   /* the VBR mode first, so that a peak below the bitrate is taken as a
    * cap that lowers the mode rather than refused as in cbr and abr; a
    * quality given on the command line overrides the mode's */
   if (options.vbr_mode && aac_encoder_set_vbr_mode(enc, options.vbr_mode) != AAC_OK) {
-    fprintf(stderr, "baac: --vbr-mode takes 1 to 5\n");
+    fprintf(stderr, "bac: --vbr-mode takes 1 to 5\n");
     return 1;
   }
   if (options.peak_bitrate && aac_encoder_set_peak_bitrate(enc, options.peak_bitrate) != AAC_OK) {
-    fprintf(stderr, "baac: --peak-bitrate was refused (below the bitrate in cbr or abr?)\n");
+    fprintf(stderr, "bac: --peak-bitrate was refused (below the bitrate in cbr or abr?)\n");
     return 1;
   }
   if (options.vbr_mode && argc > 8 && atoi(argv[8]) > 0) {
     aac_encoder_set_quality(enc, atoi(argv[8]));
   }
   if (options.afterburner >= 0 && aac_encoder_set_afterburner(enc, options.afterburner) != AAC_OK) {
-    fprintf(stderr, "baac: --afterburner was refused for this profile\n");
+    fprintf(stderr, "bac: --afterburner was refused for this profile\n");
     return 1;
   }
   if (options.bandwidth && aac_encoder_set_bandwidth(enc, options.bandwidth) != AAC_OK) {
-    fprintf(stderr, "baac: --bandwidth takes 1000 Hz or more\n");
+    fprintf(stderr, "bac: --bandwidth takes 1000 Hz or more\n");
     return 1;
   }
   const std::vector<uint8_t> in = read_all(argv[2]);
@@ -527,7 +527,7 @@ static int encode(int argc, char** argv) {
     }
     const int ret = aac_encoder_set_loudness_info(enc, &info);
     if (ret != AAC_OK) {
-      fprintf(stderr, "baac: the loudness info set was refused (%d)\n", ret);
+      fprintf(stderr, "bac: the loudness info set was refused (%d)\n", ret);
       return 1;
     }
     print_loudness(stderr, info);
@@ -548,7 +548,7 @@ static int encode(int argc, char** argv) {
   }
   aac_encoder_destroy(enc);
   const double seconds = (double)total / channels / sr;
-  fprintf(stderr, "baac: %d frames, %ld bytes, %.1f kbit/s\n", frames, bytes,
+  fprintf(stderr, "bac: %d frames, %ld bytes, %.1f kbit/s\n", frames, bytes,
           seconds > 0 ? bytes * 8.0 / seconds / 1000.0 : 0.0);
   return 0;
 }
@@ -572,7 +572,7 @@ static int decode(int argc, char** argv) {
   const int channels = argc > 5 ? atoi(argv[5]) : 2;
   AacDecoderHandle dec = aac_decoder_create(sr, channels);
   if (!dec) {
-    fprintf(stderr, "baac: unsupported decoder configuration\n");
+    fprintf(stderr, "bac: unsupported decoder configuration\n");
     return 1;
   }
   if (!loudness) {
@@ -615,7 +615,7 @@ static int decode(int argc, char** argv) {
   if (out != stdout) {
     fclose(out);
   }
-  fprintf(stderr, "baac: %d frames, %d errors, %d Hz, %d channels (stream %d)\n", frames, errors,
+  fprintf(stderr, "bac: %d frames, %d errors, %d Hz, %d channels (stream %d)\n", frames, errors,
           aac_decoder_output_sample_rate(dec), aac_decoder_channels(dec),
           aac_decoder_stream_channels(dec));
   aac_decoder_destroy(dec);
@@ -684,7 +684,7 @@ static std::vector<float> bench_signal(int n, int sr) {
 static void write_file(const std::string& path, const void* data, size_t bytes) {
   FILE* f = fopen(path.c_str(), "wb");
   if (!f) {
-    fprintf(stderr, "baac: cannot create %s\n", path.c_str());
+    fprintf(stderr, "bac: cannot create %s\n", path.c_str());
     exit(1);
   }
   fwrite(data, 1, bytes, f);
@@ -732,7 +732,7 @@ static bool bench_encode(const BenchConfig& cfg, const std::vector<float>& pcm, 
     }
     const int len = aac_encoder_encode(enc, in, frame, buf.data(), (int)buf.size());
     if (len < 0) {
-      fprintf(stderr, "baac: %s: encode error %d\n", cfg.name, len);
+      fprintf(stderr, "bac: %s: encode error %d\n", cfg.name, len);
       aac_encoder_destroy(enc);
       return false;
     }
@@ -790,7 +790,7 @@ static bool bench_decode(const BenchConfig& cfg, const std::vector<uint8_t>& str
   *out_rate = aac_decoder_output_sample_rate(dec);
   aac_decoder_destroy(dec);
   if (errors) {
-    fprintf(stderr, "baac: %s: %d decode errors\n", cfg.name, errors);
+    fprintf(stderr, "bac: %s: %d decode errors\n", cfg.name, errors);
   }
   return errors == 0;
 }
@@ -884,7 +884,7 @@ static int bench_streams(const std::string& dir) {
   std::error_code err;
   std::filesystem::directory_iterator it(dir, err);
   if (err) {
-    fprintf(stderr, "baac: cannot read %s\n", dir.c_str());
+    fprintf(stderr, "bac: cannot read %s\n", dir.c_str());
     return 1;
   }
   std::vector<std::string> names;
@@ -952,7 +952,7 @@ static int bench(int argc, char** argv) {
   }
   const int sr = 48000;
   const std::vector<float> pcm = bench_signal(sr * seconds, sr);
-  printf("baac bench: %d s stereo at %d Hz\n\n", seconds, sr);
+  printf("bac bench: %d s stereo at %d Hz\n\n", seconds, sr);
   printf("%-22s %8s %9s %9s %9s %9s\n", "configuration", "kbit/s", "enc s", "enc x", "dec s",
          "dec x");
   int failures = 0;
@@ -985,7 +985,7 @@ static int bench(int argc, char** argv) {
       write_file(base + ".f32", out.data(), out.size() * sizeof(float));
     }
   }
-  failures += baac_flac_bench(pcm, sr, seconds, only, dump);
+  failures += bac_flac_bench(pcm, sr, seconds, only, dump);
   if (!streams.empty() && bench_streams(streams) != 0) {
     failures++;
   }
@@ -1009,7 +1009,7 @@ int main(int argc, char** argv) {
     return bench(argc, argv);
   }
   if (strcmp(argv[1], "flac") == 0) {
-    return baac_flac_main(argc - 2, argv + 2);
+    return bac_flac_main(argc - 2, argv + 2);
   }
   return usage();
 }

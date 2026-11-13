@@ -1,5 +1,5 @@
-#ifndef BAANDER_AAC_USAC_LPD_H
-#define BAANDER_AAC_USAC_LPD_H
+#ifndef BAANDER_AUDIO_CORE_USAC_LPD_H
+#define BAANDER_AUDIO_CORE_USAC_LPD_H
 
 #include "usac.h"
 
@@ -74,4 +74,4 @@ void aac_usac_lpd_conceal(AacUsacCoreChannel* ch, int frame_length, float* out);
 }
 #endif
 
-#endif /* BAANDER_AAC_USAC_LPD_H */
+#endif /* BAANDER_AUDIO_CORE_USAC_LPD_H */

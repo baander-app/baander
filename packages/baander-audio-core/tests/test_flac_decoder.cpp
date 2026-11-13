@@ -92,7 +92,7 @@ struct StreamBuilder {
     add(f, block);
   }
 
-  BaacFlacStreamInfo info() const {
+  BacFlacStreamInfo info() const {
     int max_block = 16;
     int min_block = 65535;
     for (size_t i = 0; i < blocks.size(); i++) {
@@ -101,7 +101,7 @@ struct StreamBuilder {
         min_block = std::min(min_block, blocks[i]);
       }
     }
-    BaacFlacStreamInfo info = flac_test_info(sample_rate, channels, bits, max_block, samples);
+    BacFlacStreamInfo info = flac_test_info(sample_rate, channels, bits, max_block, samples);
     info.min_block_size = std::max(16, std::min(min_block, max_block));
     flac_pcm_md5(pcm, bits, info.md5);
     return info;
@@ -124,7 +124,7 @@ static std::vector<int32_t> slice(const std::vector<int32_t>& pcm, int channels,
 
 /* A stream decoded without a complaint to exactly `pcm`. */
 static void expect_clean(const char* name, const FlacDecoded& d, const std::vector<int32_t>& pcm,
-                         BaacFlacMd5Verdict verdict = BAAC_FLAC_MD5_MATCH) {
+                         BacFlacMd5Verdict verdict = BAC_FLAC_MD5_MATCH) {
   CHECK(d.errors.empty(), "%s: %zu decode errors, the first %d after %zu frames", name,
         d.errors.size(), d.errors.empty() ? 0 : d.errors[0].code,
         d.errors.empty() ? (size_t)0 : d.errors[0].frames_before);
@@ -198,27 +198,27 @@ static void test_rfc_examples() {
   const int32_t head[12] = {0, 79, 111, 78, 8, -61, -90, -68, -13, 42, 67, 53};
   CHECK(d.pcm.size() == 24 && memcmp(d.pcm.data(), head, sizeof(head)) == 0,
         "example 3: the twelve samples of the appendix");
-  CHECK(d.errors.empty() && d.finish == AAC_OK && d.verdict == BAAC_FLAC_MD5_MATCH,
+  CHECK(d.errors.empty() && d.finish == AAC_OK && d.verdict == BAC_FLAC_MD5_MATCH,
         "example 3: the MD5 of all 24 samples matches");
 
   /* The seek table and the start of the audio of example 2, read
    * straight after the header was fed. */
   const std::vector<uint8_t> e2 = rfc9639_example_2();
-  BaacFlacDecoder* dec = baac_flac_decoder_create();
-  CHECK(baac_flac_decoder_first_frame_offset(dec) == AAC_ERR_STATE,
+  BacFlacDecoder* dec = bac_flac_decoder_create();
+  CHECK(bac_flac_decoder_first_frame_offset(dec) == AAC_ERR_STATE,
         "no audio offset before the header is read");
-  CHECK(baac_flac_decoder_feed(dec, e2.data(), 0x88) == 0x88, "the header is taken");
-  const BaacFlacSeekPoint* points = nullptr;
-  CHECK(baac_flac_decoder_seek_points(dec, &points) == 1 && points &&
+  CHECK(bac_flac_decoder_feed(dec, e2.data(), 0x88) == 0x88, "the header is taken");
+  const BacFlacSeekPoint* points = nullptr;
+  CHECK(bac_flac_decoder_seek_points(dec, &points) == 1 && points &&
             points[0].sample_position == 0 && points[0].byte_offset == 0 &&
             points[0].block_size == 16,
         "example 2: one seek point to the first frame");
-  CHECK(baac_flac_decoder_first_frame_offset(dec) == 0x88, "example 2: the audio starts at 0x88");
-  BaacFlacStreamInfo info;
-  CHECK(baac_flac_decoder_stream_info(dec, &info) == AAC_OK && info.total_samples == 19,
+  CHECK(bac_flac_decoder_first_frame_offset(dec) == 0x88, "example 2: the audio starts at 0x88");
+  BacFlacStreamInfo info;
+  CHECK(bac_flac_decoder_stream_info(dec, &info) == AAC_OK && info.total_samples == 19,
         "the stream properties are known once the header is fed");
-  CHECK(baac_flac_decoder_pending_bytes(dec) == 0, "nothing of the metadata stays in the FIFO");
-  baac_flac_decoder_destroy(dec);
+  CHECK(bac_flac_decoder_pending_bytes(dec) == 0, "nothing of the metadata stays in the FIFO");
+  bac_flac_decoder_destroy(dec);
 }
 
 /* ── every subframe type, residual form and assignment ─────────── */
@@ -767,7 +767,7 @@ static void test_damaged_frame() {
               "bit %zu of frame 3 flipped: the fourth frame reports position %llu", bit,
               (unsigned long long)d.frames[2].sample_position);
       }
-      CHECK(d.finish == AAC_OK && d.verdict == BAAC_FLAC_MD5_MISMATCH,
+      CHECK(d.finish == AAC_OK && d.verdict == BAC_FLAC_MD5_MISMATCH,
             "bit %zu of frame 3 flipped: the stream ends cleanly with an MD5 mismatch", bit);
     }
   }
@@ -821,7 +821,7 @@ static void test_damaged_frame() {
     CHECK(d.errors.empty() && d.frames.size() == frame_count - 2 &&
               d.frames[4].sample_position == 6 * (uint64_t)block,
           "a missing frame shows in the positions");
-    CHECK(d.verdict == BAAC_FLAC_MD5_MISMATCH, "and in the MD5");
+    CHECK(d.verdict == BAC_FLAC_MD5_MISMATCH, "and in the MD5");
   }
 }
 
@@ -861,7 +861,7 @@ static void test_random_damage() {
     const FlacDecoded d = flac_decode(damaged, 1 + (seed >> 8) % 3000);
     size_t value = 0;
     bool exact = true;
-    for (const BaacFlacFrameInfo& f : d.frames) {
+    for (const BacFlacFrameInfo& f : d.frames) {
       const std::vector<int32_t> source =
           slice(pcm, 2, (size_t)f.sample_position, (size_t)f.block_size);
       exact = exact && source.size() == (size_t)f.block_size * 2 &&
@@ -889,29 +889,29 @@ static void test_truncation() {
   {
     const std::vector<uint8_t> cut(stream.begin(), stream.begin() + (long)offsets[4] + 100);
     const FlacDecoded d = flac_decode(cut);
-    CHECK(d.frames.size() == 4 && d.lost == 1 && d.verdict == BAAC_FLAC_MD5_MISMATCH,
+    CHECK(d.frames.size() == 4 && d.lost == 1 && d.verdict == BAC_FLAC_MD5_MISMATCH,
           "a stream cut inside a frame: %zu frames, %d lost", d.frames.size(), d.lost);
   }
   /* Without the end of the input announced, the cut-off frame waits for
    * more and the finish reports it. */
   {
-    BaacFlacDecoder* dec = baac_flac_decoder_create();
+    BacFlacDecoder* dec = bac_flac_decoder_create();
     std::vector<int32_t> buf(4096);
-    baac_flac_decoder_feed(dec, stream.data(), (int)offsets[4] + 100);
+    bac_flac_decoder_feed(dec, stream.data(), (int)offsets[4] + 100);
     int frames = 0;
-    while (baac_flac_decoder_decode_next(dec, buf.data(), (int)buf.size()) > 0) {
+    while (bac_flac_decoder_decode_next(dec, buf.data(), (int)buf.size()) > 0) {
       frames++;
     }
-    CHECK(frames == 4 && baac_flac_decoder_lost_frames(dec) == 0,
+    CHECK(frames == 4 && bac_flac_decoder_lost_frames(dec) == 0,
           "an unfinished frame is no error while more input may come");
-    CHECK(baac_flac_decoder_finish(dec, nullptr) == AAC_ERR_DECODE &&
-              baac_flac_decoder_lost_frames(dec) == 1,
+    CHECK(bac_flac_decoder_finish(dec, nullptr) == AAC_ERR_DECODE &&
+              bac_flac_decoder_lost_frames(dec) == 1,
           "the finish reports the frame that was cut short");
-    CHECK(baac_flac_decoder_feed(dec, stream.data(), 1) == AAC_ERR_STATE &&
-              baac_flac_decoder_decode_next(dec, buf.data(), (int)buf.size()) == AAC_ERR_STATE &&
-              baac_flac_decoder_finish(dec, nullptr) == AAC_ERR_STATE,
+    CHECK(bac_flac_decoder_feed(dec, stream.data(), 1) == AAC_ERR_STATE &&
+              bac_flac_decoder_decode_next(dec, buf.data(), (int)buf.size()) == AAC_ERR_STATE &&
+              bac_flac_decoder_finish(dec, nullptr) == AAC_ERR_STATE,
           "a finished decoder takes nothing until a reset");
-    baac_flac_decoder_destroy(dec);
+    bac_flac_decoder_destroy(dec);
   }
   /* Cut inside the metadata. */
   for (size_t cut_at : {(size_t)2, (size_t)4, (size_t)6, (size_t)20, (size_t)41}) {
@@ -927,7 +927,7 @@ static void test_truncation() {
     const std::vector<uint8_t> header(stream.begin(), stream.begin() + (long)offsets[0]);
     const FlacDecoded h = flac_decode(header);
     CHECK(h.frames.empty() && h.finish == AAC_OK && h.have_info &&
-              h.verdict == BAAC_FLAC_MD5_MISMATCH,
+              h.verdict == BAC_FLAC_MD5_MISMATCH,
           "a header without its frames: nothing decoded, the MD5 does not match");
   }
 }
@@ -954,7 +954,7 @@ static void test_frame_start() {
               d.info.bits_per_sample == 16 && d.info.max_block_size == 0 &&
               d.info.total_samples == 0,
           "the stream properties come from the first frame");
-    CHECK(d.verdict == BAAC_FLAC_MD5_UNKNOWN, "there is no MD5 to compare");
+    CHECK(d.verdict == BAC_FLAC_MD5_UNKNOWN, "there is no MD5 to compare");
   }
   {
     /* The tail of another frame, sync codes included, in front. */
@@ -967,11 +967,11 @@ static void test_frame_start() {
             "unparsable bytes before the first frame are passed over silently (%zu errors)",
             d.errors.size());
     }
-    BaacFlacDecoder* dec = baac_flac_decoder_create();
-    baac_flac_decoder_feed(dec, s.data(), (int)s.size());
-    CHECK(baac_flac_decoder_first_frame_offset(dec) == AAC_ERR_STATE,
+    BacFlacDecoder* dec = bac_flac_decoder_create();
+    bac_flac_decoder_feed(dec, s.data(), (int)s.size());
+    CHECK(bac_flac_decoder_first_frame_offset(dec) == AAC_ERR_STATE,
           "a stream without a header has no audio offset");
-    baac_flac_decoder_destroy(dec);
+    bac_flac_decoder_destroy(dec);
   }
 
   /* Frames that leave the sample rate or the bit depth to a STREAMINFO
@@ -988,58 +988,58 @@ static void test_frame_start() {
       c.add(f, flac_gen_tones(block, 2, bits, 0.4, (unsigned)frame));
     }
     const char* name = what ? "bit depth" : "sample rate";
-    BaacFlacDecoder* dec = baac_flac_decoder_create();
+    BacFlacDecoder* dec = bac_flac_decoder_create();
     std::vector<int32_t> buf((size_t)block * 2);
     CHECK(
-        baac_flac_decoder_feed(dec, c.frames.data(), (int)c.frames.size()) == (int)c.frames.size(),
+        bac_flac_decoder_feed(dec, c.frames.data(), (int)c.frames.size()) == (int)c.frames.size(),
         "%s left to STREAMINFO: fed", name);
-    BaacFlacStreamInfo info;
+    BacFlacStreamInfo info;
     for (int attempt = 0; attempt < 3; attempt++) {
-      CHECK(baac_flac_decoder_decode_next(dec, buf.data(), (int)buf.size()) == AAC_ERR_UNSUPPORTED,
+      CHECK(bac_flac_decoder_decode_next(dec, buf.data(), (int)buf.size()) == AAC_ERR_UNSUPPORTED,
             "%s left to STREAMINFO: unsupported without one", name);
     }
-    CHECK(baac_flac_decoder_stream_info(dec, &info) == AAC_ERR_STATE &&
-              baac_flac_decoder_lost_frames(dec) == 0,
+    CHECK(bac_flac_decoder_stream_info(dec, &info) == AAC_ERR_STATE &&
+              bac_flac_decoder_lost_frames(dec) == 0,
           "%s left to STREAMINFO: nothing is known and nothing lost", name);
     const std::vector<uint8_t> streaminfo = flac_streaminfo_bytes(c.info());
-    CHECK(baac_flac_decoder_set_streaminfo(dec, streaminfo.data(), 33) == AAC_ERR_INVALID_ARG &&
-              baac_flac_decoder_set_streaminfo(dec, nullptr, 34) == AAC_ERR_INVALID_ARG,
+    CHECK(bac_flac_decoder_set_streaminfo(dec, streaminfo.data(), 33) == AAC_ERR_INVALID_ARG &&
+              bac_flac_decoder_set_streaminfo(dec, nullptr, 34) == AAC_ERR_INVALID_ARG,
           "a STREAMINFO of the wrong size is refused");
     std::vector<uint8_t> forbidden = streaminfo;
     forbidden[0] = 0;
     forbidden[1] = 1; /* a minimum block size of 1 */
-    CHECK(baac_flac_decoder_set_streaminfo(dec, forbidden.data(), 34) == AAC_ERR_INVALID_ARG,
+    CHECK(bac_flac_decoder_set_streaminfo(dec, forbidden.data(), 34) == AAC_ERR_INVALID_ARG,
           "a STREAMINFO with forbidden values is refused");
-    CHECK(baac_flac_decoder_set_streaminfo(dec, streaminfo.data(), 34) == AAC_OK,
+    CHECK(bac_flac_decoder_set_streaminfo(dec, streaminfo.data(), 34) == AAC_OK,
           "%s left to STREAMINFO: one is supplied", name);
     std::vector<int32_t> pcm;
     int n;
-    while ((n = baac_flac_decoder_decode_next(dec, buf.data(), (int)buf.size())) > 0) {
+    while ((n = bac_flac_decoder_decode_next(dec, buf.data(), (int)buf.size())) > 0) {
       pcm.insert(pcm.end(), buf.begin(), buf.begin() + (long)n * 2);
     }
     CHECK(n == 0 && pcm == c.pcm, "%s left to STREAMINFO: the frames decode with it", name);
-    CHECK(baac_flac_decoder_stream_info(dec, &info) == AAC_OK && info.sample_rate == rate &&
+    CHECK(bac_flac_decoder_stream_info(dec, &info) == AAC_OK && info.sample_rate == rate &&
               info.bits_per_sample == bits,
           "%s left to STREAMINFO: reported from it", name);
-    CHECK(baac_flac_decoder_set_streaminfo(dec, streaminfo.data(), 34) == AAC_ERR_STATE,
+    CHECK(bac_flac_decoder_set_streaminfo(dec, streaminfo.data(), 34) == AAC_ERR_STATE,
           "a second STREAMINFO is refused");
-    baac_flac_decoder_destroy(dec);
+    bac_flac_decoder_destroy(dec);
   }
 
   /* A STREAMINFO supplied before the stream: its limits apply. */
   {
-    BaacFlacDecoder* dec = baac_flac_decoder_create();
+    BacFlacDecoder* dec = bac_flac_decoder_create();
     const std::vector<uint8_t> streaminfo = flac_streaminfo_bytes(b.info());
-    CHECK(baac_flac_decoder_set_streaminfo(dec, streaminfo.data(), 34) == AAC_OK,
+    CHECK(bac_flac_decoder_set_streaminfo(dec, streaminfo.data(), 34) == AAC_OK,
           "a STREAMINFO out of band");
-    baac_flac_decoder_set_md5_check(dec, 1);
+    bac_flac_decoder_set_md5_check(dec, 1);
     const FlacDecoded d = flac_decode(b.frames, 500, dec);
     CHECK(d.errors.empty() && d.pcm == b.pcm && d.have_info && d.info.max_block_size == block,
           "frames decode against a STREAMINFO out of band");
     /* The stream was joined at frame 1234567, so its MD5 cannot be
      * judged. */
-    CHECK(d.verdict == BAAC_FLAC_MD5_UNKNOWN, "a stream joined in the middle has no MD5 verdict");
-    baac_flac_decoder_destroy(dec);
+    CHECK(d.verdict == BAC_FLAC_MD5_UNKNOWN, "a stream joined in the middle has no MD5 verdict");
+    bac_flac_decoder_destroy(dec);
   }
 }
 
@@ -1052,7 +1052,7 @@ static void test_frame_start() {
  * decoder has to keep what it reads in vain in proportion to what it
  * passes.  The count is of bytes read, not of time. */
 static void test_frame_search() {
-  BaacFlacStreamInfo info = {};
+  BacFlacStreamInfo info = {};
   info.min_block_size = 16;
   info.max_block_size = 65535;
   info.sample_rate = 48000;
@@ -1081,7 +1081,7 @@ static void test_frame_search() {
     }
     flac_append(s, real.frames);
 
-    BaacFlacDecoder* dec = baac_flac_decoder_create();
+    BacFlacDecoder* dec = bac_flac_decoder_create();
     std::vector<int32_t> pcm((size_t)65535 * 8);
     std::vector<int32_t> decoded;
     uint64_t most_in_a_call = 0;
@@ -1089,7 +1089,7 @@ static void test_frame_search() {
     const auto drain = [&]() {
       for (;;) {
         const uint64_t before = flac_decoder_rejected_work(dec);
-        const int n = baac_flac_decoder_decode_next(dec, pcm.data(), (int)pcm.size());
+        const int n = bac_flac_decoder_decode_next(dec, pcm.data(), (int)pcm.size());
         most_in_a_call = std::max(most_in_a_call, flac_decoder_rejected_work(dec) - before);
         if (n > 0) {
           decoded.insert(decoded.end(), pcm.begin(), pcm.begin() + (size_t)n * 8);
@@ -1102,7 +1102,7 @@ static void test_frame_search() {
       }
     };
     for (size_t pos = 0; pos < s.size();) {
-      const int took = baac_flac_decoder_feed(dec, s.data() + pos, (int)(s.size() - pos));
+      const int took = bac_flac_decoder_feed(dec, s.data() + pos, (int)(s.size() - pos));
       if (took < 0) {
         break;
       }
@@ -1112,10 +1112,10 @@ static void test_frame_search() {
         break;
       }
     }
-    baac_flac_decoder_end_input(dec);
+    bac_flac_decoder_end_input(dec);
     drain();
     const uint64_t work = flac_decoder_rejected_work(dec);
-    baac_flac_decoder_destroy(dec);
+    bac_flac_decoder_destroy(dec);
     CHECK(work <= 6 * (uint64_t)s.size() + 3 * (uint64_t)largest_frame,
           "period %d: %llu bytes were read for rejected candidates in %zu bytes of input", period,
           (unsigned long long)work, s.size());
@@ -1202,29 +1202,29 @@ static void test_frame_search() {
     std::vector<uint8_t> s(pattern, pattern + 9);
     s.insert(s.end(), (size_t)1 << 20, 0x00);
     flac_append(s, real.frames);
-    BaacFlacDecoder* dec = baac_flac_decoder_create();
+    BacFlacDecoder* dec = bac_flac_decoder_create();
     std::vector<int32_t> pcm((size_t)65535 * 8);
     size_t frames = 0;
     for (size_t pos = 0; pos < s.size();) {
       const int piece = (int)std::min<size_t>(4096, s.size() - pos);
-      const int took = baac_flac_decoder_feed(dec, s.data() + pos, piece);
+      const int took = bac_flac_decoder_feed(dec, s.data() + pos, piece);
       if (took <= 0) {
         break;
       }
       pos += (size_t)took;
-      while (baac_flac_decoder_decode_next(dec, pcm.data(), (int)pcm.size()) > 0) {
+      while (bac_flac_decoder_decode_next(dec, pcm.data(), (int)pcm.size()) > 0) {
         frames++;
       }
     }
-    baac_flac_decoder_end_input(dec);
-    for (int n; (n = baac_flac_decoder_decode_next(dec, pcm.data(), (int)pcm.size())) != 0;) {
+    bac_flac_decoder_end_input(dec);
+    for (int n; (n = bac_flac_decoder_decode_next(dec, pcm.data(), (int)pcm.size())) != 0;) {
       frames += n > 0 ? 1 : 0;
       if (n < 0 && n != AAC_ERR_DECODE) {
         break;
       }
     }
     const uint64_t work = flac_decoder_read_work(dec);
-    baac_flac_decoder_destroy(dec);
+    bac_flac_decoder_destroy(dec);
     CHECK(work <= 4 * (uint64_t)s.size(),
           "a candidate fed in pieces of 4096 bytes: %llu bytes read for %zu bytes of input",
           (unsigned long long)work, s.size());
@@ -1269,27 +1269,27 @@ static void test_property_change() {
                   d.info.bits_per_sample == 16 && d.lost == 0,
               "%s changes: the stream keeps its properties and nothing counts as lost",
               change.what);
-        CHECK(d.verdict == BAAC_FLAC_MD5_UNKNOWN, "%s changes: no MD5 verdict", change.what);
+        CHECK(d.verdict == BAC_FLAC_MD5_UNKNOWN, "%s changes: no MD5 verdict", change.what);
       }
       /* The error stays until a reset. */
-      BaacFlacDecoder* dec = baac_flac_decoder_create();
+      BacFlacDecoder* dec = bac_flac_decoder_create();
       std::vector<int32_t> buf((size_t)block * 8);
-      baac_flac_decoder_feed(dec, s.data(), (int)s.size());
+      bac_flac_decoder_feed(dec, s.data(), (int)s.size());
       int frames = 0;
       int n;
-      while ((n = baac_flac_decoder_decode_next(dec, buf.data(), (int)buf.size())) > 0) {
+      while ((n = bac_flac_decoder_decode_next(dec, buf.data(), (int)buf.size())) > 0) {
         frames++;
       }
       CHECK(frames == 3 && n == AAC_ERR_UNSUPPORTED &&
-                baac_flac_decoder_decode_next(dec, buf.data(), (int)buf.size()) ==
+                bac_flac_decoder_decode_next(dec, buf.data(), (int)buf.size()) ==
                     AAC_ERR_UNSUPPORTED,
             "%s changes: the error repeats", change.what);
-      CHECK(baac_flac_decoder_reset(dec) == AAC_OK, "reset");
+      CHECK(bac_flac_decoder_reset(dec) == AAC_OK, "reset");
       const FlacDecoded again = flac_decode(other.frames, SIZE_MAX, dec);
       CHECK(again.frames.size() == 3 && again.pcm == other.pcm && again.have_info &&
                 again.info.channels == change.channels,
             "%s: after a reset the other stream decodes", change.what);
-      baac_flac_decoder_destroy(dec);
+      bac_flac_decoder_destroy(dec);
     }
   }
 
@@ -1332,7 +1332,7 @@ static void test_metadata() {
   for (int frame = 0; frame < 5; frame++) {
     b.add(TestSubframe::fixed(2, 2), flac_gen_tones(block, 2, 16, 0.4, (unsigned)frame));
   }
-  const BaacFlacStreamInfo info = b.info();
+  const BacFlacStreamInfo info = b.info();
 
   /* A metadata block of the largest size, full of frame sync codes, is
    * passed over as it arrives: the FIFO never holds it and nothing is
@@ -1349,8 +1349,8 @@ static void test_metadata() {
     const size_t audio = s.size();
     flac_append(s, b.frames);
 
-    BaacFlacDecoder* dec = baac_flac_decoder_create();
-    baac_flac_decoder_set_md5_check(dec, 1);
+    BacFlacDecoder* dec = bac_flac_decoder_create();
+    bac_flac_decoder_set_md5_check(dec, 1);
     std::vector<int32_t> buf((size_t)block * 2);
     std::vector<int32_t> pcm;
     pcm.reserve(b.pcm.size());
@@ -1358,12 +1358,12 @@ static void test_metadata() {
     int max_pending = 0;
     int errors = 0;
     for (size_t pos = 0; pos < s.size();) {
-      const int took = baac_flac_decoder_feed(dec, s.data() + pos,
+      const int took = bac_flac_decoder_feed(dec, s.data() + pos,
                                               (int)std::min<size_t>(1 << 20, s.size() - pos));
       pos += (size_t)std::max(took, 0);
-      max_pending = std::max(max_pending, baac_flac_decoder_pending_bytes(dec));
+      max_pending = std::max(max_pending, bac_flac_decoder_pending_bytes(dec));
       int n;
-      while ((n = baac_flac_decoder_decode_next(dec, buf.data(), (int)buf.size())) != 0) {
+      while ((n = bac_flac_decoder_decode_next(dec, buf.data(), (int)buf.size())) != 0) {
         if (n < 0) {
           errors++;
           break;
@@ -1376,19 +1376,19 @@ static void test_metadata() {
       }
     }
     const size_t allocated = g_allocated_bytes - bytes_before;
-    BaacFlacMd5Verdict verdict;
-    CHECK(errors == 0 && pcm == b.pcm && baac_flac_decoder_finish(dec, &verdict) == AAC_OK &&
-              verdict == BAAC_FLAC_MD5_MATCH,
+    BacFlacMd5Verdict verdict;
+    CHECK(errors == 0 && pcm == b.pcm && bac_flac_decoder_finish(dec, &verdict) == AAC_OK &&
+              verdict == BAC_FLAC_MD5_MATCH,
           "a stream behind a 16 MB metadata block decodes");
     CHECK(max_pending <= 65536, "the FIFO held at most %d bytes of a %zu byte stream", max_pending,
           s.size());
     CHECK(allocated < 262144, "%zu bytes were allocated while a 16 MB block passed", allocated);
-    CHECK(baac_flac_decoder_first_frame_offset(dec) == (int64_t)audio,
+    CHECK(bac_flac_decoder_first_frame_offset(dec) == (int64_t)audio,
           "the audio offset counts the skipped block: %lld",
-          (long long)baac_flac_decoder_first_frame_offset(dec));
+          (long long)bac_flac_decoder_first_frame_offset(dec));
     printf("16 MB metadata block: FIFO peak %d bytes, %zu bytes allocated\n", max_pending,
            allocated);
-    baac_flac_decoder_destroy(dec);
+    bac_flac_decoder_destroy(dec);
   }
 
   /* A seek table: points in order are kept, placeholders and a point
@@ -1423,45 +1423,45 @@ static void test_metadata() {
     const size_t audio = s.size();
     flac_append(s, b.frames);
     for (size_t chunk : {SIZE_MAX, (size_t)1, (size_t)19}) {
-      BaacFlacDecoder* dec = baac_flac_decoder_create();
-      baac_flac_decoder_set_md5_check(dec, 1);
+      BacFlacDecoder* dec = bac_flac_decoder_create();
+      bac_flac_decoder_set_md5_check(dec, 1);
       const FlacDecoded d = flac_decode(s, chunk, dec);
       expect_clean("a stream with a seek table", d, b.pcm);
-      const BaacFlacSeekPoint* points = nullptr;
-      const int count = baac_flac_decoder_seek_points(dec, &points);
+      const BacFlacSeekPoint* points = nullptr;
+      const int count = bac_flac_decoder_seek_points(dec, &points);
       CHECK(count == 3 && points && points[0].sample_position == 0 &&
                 points[1].sample_position == 2304 && points[1].byte_offset == b.offsets[2] &&
                 points[1].block_size == block && points[2].sample_position == 4608,
             "the seek table has %d usable points", count);
-      CHECK(baac_flac_decoder_first_frame_offset(dec) == (int64_t)audio, "the audio offset");
-      baac_flac_decoder_destroy(dec);
+      CHECK(bac_flac_decoder_first_frame_offset(dec) == (int64_t)audio, "the audio offset");
+      bac_flac_decoder_destroy(dec);
     }
 
     /* Seeking by the table: the bytes at a point's offset decode to the
      * frame at its sample position. */
-    BaacFlacDecoder* dec = baac_flac_decoder_create();
+    BacFlacDecoder* dec = bac_flac_decoder_create();
     std::vector<int32_t> buf((size_t)block * 2);
-    baac_flac_decoder_feed(dec, s.data(), (int)audio + 10);
-    CHECK(baac_flac_decoder_decode_next(dec, buf.data(), (int)buf.size()) == 0, "header read");
-    const BaacFlacSeekPoint* points = nullptr;
-    baac_flac_decoder_seek_points(dec, &points);
+    bac_flac_decoder_feed(dec, s.data(), (int)audio + 10);
+    CHECK(bac_flac_decoder_decode_next(dec, buf.data(), (int)buf.size()) == 0, "header read");
+    const BacFlacSeekPoint* points = nullptr;
+    bac_flac_decoder_seek_points(dec, &points);
     const size_t target =
-        (size_t)baac_flac_decoder_first_frame_offset(dec) + (size_t)points[2].byte_offset;
-    CHECK(baac_flac_decoder_seek_reset(dec) == AAC_OK, "seek reset");
-    baac_flac_decoder_feed(dec, s.data() + target, (int)(s.size() - target));
-    BaacFlacFrameInfo frame;
-    CHECK(baac_flac_decoder_decode_next(dec, buf.data(), (int)buf.size()) == block &&
-              baac_flac_decoder_last_frame_info(dec, &frame) == AAC_OK &&
+        (size_t)bac_flac_decoder_first_frame_offset(dec) + (size_t)points[2].byte_offset;
+    CHECK(bac_flac_decoder_seek_reset(dec) == AAC_OK, "seek reset");
+    bac_flac_decoder_feed(dec, s.data() + target, (int)(s.size() - target));
+    BacFlacFrameInfo frame;
+    CHECK(bac_flac_decoder_decode_next(dec, buf.data(), (int)buf.size()) == block &&
+              bac_flac_decoder_last_frame_info(dec, &frame) == AAC_OK &&
               frame.sample_position == 4608 &&
               memcmp(buf.data(), b.pcm.data() + 4608 * 2, (size_t)block * 2 * sizeof(int32_t)) == 0,
           "a seek point leads to its frame");
-    baac_flac_decoder_destroy(dec);
+    bac_flac_decoder_destroy(dec);
   }
 
   /* A seek table longer than the decoder keeps: the first points are
    * kept and the rest passed over. */
   {
-    std::vector<uint8_t> table((size_t)(BAAC_FLAC_MAX_SEEK_POINTS + 1000) * FLAC_SEEK_POINT_BYTES);
+    std::vector<uint8_t> table((size_t)(BAC_FLAC_MAX_SEEK_POINTS + 1000) * FLAC_SEEK_POINT_BYTES);
     for (size_t i = 0; i < table.size() / FLAC_SEEK_POINT_BYTES; i++) {
       const uint64_t sample = (uint64_t)i * 4096;
       for (int byte = 0; byte < 8; byte++) {
@@ -1471,17 +1471,17 @@ static void test_metadata() {
     std::vector<uint8_t> s = flac_stream_start(info, true);
     flac_append(s, flac_metadata_block(FLAC_BLOCK_SEEKTABLE, table, true));
     flac_append(s, b.frames);
-    BaacFlacDecoder* dec = baac_flac_decoder_create();
-    baac_flac_decoder_set_md5_check(dec, 1);
+    BacFlacDecoder* dec = bac_flac_decoder_create();
+    bac_flac_decoder_set_md5_check(dec, 1);
     const FlacDecoded d = flac_decode(s, 50000, dec);
     expect_clean("a stream with a very long seek table", d, b.pcm);
-    const BaacFlacSeekPoint* points = nullptr;
-    CHECK(baac_flac_decoder_seek_points(dec, &points) == BAAC_FLAC_MAX_SEEK_POINTS &&
-              points[BAAC_FLAC_MAX_SEEK_POINTS - 1].sample_position ==
-                  (uint64_t)(BAAC_FLAC_MAX_SEEK_POINTS - 1) * 4096,
-          "the decoder keeps the first %d seek points", BAAC_FLAC_MAX_SEEK_POINTS);
+    const BacFlacSeekPoint* points = nullptr;
+    CHECK(bac_flac_decoder_seek_points(dec, &points) == BAC_FLAC_MAX_SEEK_POINTS &&
+              points[BAC_FLAC_MAX_SEEK_POINTS - 1].sample_position ==
+                  (uint64_t)(BAC_FLAC_MAX_SEEK_POINTS - 1) * 4096,
+          "the decoder keeps the first %d seek points", BAC_FLAC_MAX_SEEK_POINTS);
     CHECK(d.max_pending <= 65536, "and never buffers the table (%d)", d.max_pending);
-    baac_flac_decoder_destroy(dec);
+    bac_flac_decoder_destroy(dec);
   }
 
   /* Headers that are not as they should be. */
@@ -1505,13 +1505,13 @@ static void test_metadata() {
     flac_append(s, flac_metadata_block(FLAC_BLOCK_PADDING, std::vector<uint8_t>(64, 0), true));
     flac_append(s, b.frames);
     const FlacDecoded d = flac_decode(s);
-    expect_clean("no STREAMINFO", d, b.pcm, BAAC_FLAC_MD5_UNKNOWN);
+    expect_clean("no STREAMINFO", d, b.pcm, BAC_FLAC_MD5_UNKNOWN);
     CHECK(d.have_info && d.info.max_block_size == 0 && d.info.channels == 2,
           "no STREAMINFO: the properties of the first frame");
   }
   {
     /* A second STREAMINFO that disagrees is ignored. */
-    BaacFlacStreamInfo other = info;
+    BacFlacStreamInfo other = info;
     other.channels = 5;
     other.bits_per_sample = 24;
     std::vector<uint8_t> s = flac_stream_start(info, true);
@@ -1539,7 +1539,7 @@ static void test_metadata() {
       CHECK(d.errors.size() == 1 && d.errors[0].code == AAC_ERR_DECODE &&
                 d.errors[0].frames_before == 0 && d.lost == 1,
             "an unreadable STREAMINFO (%d) is reported once", kind);
-      CHECK(d.pcm == b.pcm && d.verdict == BAAC_FLAC_MD5_UNKNOWN,
+      CHECK(d.pcm == b.pcm && d.verdict == BAC_FLAC_MD5_UNKNOWN,
             "an unreadable STREAMINFO (%d): the frames still decode", kind);
     }
   }
@@ -1569,39 +1569,39 @@ static void test_md5() {
   for (int frame = 0; frame < 4; frame++) {
     b.add(TestSubframe::fixed(2, 2), flac_gen_tones(1000, 2, 24, 0.4, (unsigned)frame));
   }
-  BaacFlacStreamInfo info = b.info();
-  const auto with_info = [&](const BaacFlacStreamInfo& i) {
+  BacFlacStreamInfo info = b.info();
+  const auto with_info = [&](const BacFlacStreamInfo& i) {
     std::vector<uint8_t> s = flac_stream_start(i);
     flac_append(s, b.frames);
     return s;
   };
-  expect_clean("the right MD5", flac_decode(with_info(info)), b.pcm, BAAC_FLAC_MD5_MATCH);
-  BaacFlacStreamInfo wrong = info;
+  expect_clean("the right MD5", flac_decode(with_info(info)), b.pcm, BAC_FLAC_MD5_MATCH);
+  BacFlacStreamInfo wrong = info;
   wrong.md5[7] ^= 0x10;
-  expect_clean("a wrong MD5", flac_decode(with_info(wrong)), b.pcm, BAAC_FLAC_MD5_MISMATCH);
-  BaacFlacStreamInfo zero = info;
+  expect_clean("a wrong MD5", flac_decode(with_info(wrong)), b.pcm, BAC_FLAC_MD5_MISMATCH);
+  BacFlacStreamInfo zero = info;
   memset(zero.md5, 0, 16);
-  expect_clean("an MD5 of zero", flac_decode(with_info(zero)), b.pcm, BAAC_FLAC_MD5_UNKNOWN);
+  expect_clean("an MD5 of zero", flac_decode(with_info(zero)), b.pcm, BAC_FLAC_MD5_UNKNOWN);
 
   /* Verification is off unless asked for, and cannot be switched once
    * frames were decoded. */
-  BaacFlacDecoder* dec = baac_flac_decoder_create();
+  BacFlacDecoder* dec = bac_flac_decoder_create();
   const FlacDecoded off = flac_decode(with_info(wrong), SIZE_MAX, dec);
-  expect_clean("MD5 checking off", off, b.pcm, BAAC_FLAC_MD5_UNKNOWN);
-  baac_flac_decoder_reset(dec);
-  CHECK(baac_flac_decoder_set_md5_check(dec, 1) == AAC_OK, "MD5 checking on after a reset");
+  expect_clean("MD5 checking off", off, b.pcm, BAC_FLAC_MD5_UNKNOWN);
+  bac_flac_decoder_reset(dec);
+  CHECK(bac_flac_decoder_set_md5_check(dec, 1) == AAC_OK, "MD5 checking on after a reset");
   const std::vector<uint8_t> s = with_info(info);
   std::vector<int32_t> buf(2000);
-  baac_flac_decoder_feed(dec, s.data(), (int)s.size());
-  CHECK(baac_flac_decoder_decode_next(dec, buf.data(), (int)buf.size()) == 1000, "one frame");
-  CHECK(baac_flac_decoder_set_md5_check(dec, 0) == AAC_ERR_STATE,
+  bac_flac_decoder_feed(dec, s.data(), (int)s.size());
+  CHECK(bac_flac_decoder_decode_next(dec, buf.data(), (int)buf.size()) == 1000, "one frame");
+  CHECK(bac_flac_decoder_set_md5_check(dec, 0) == AAC_ERR_STATE,
         "the MD5 setting is fixed once a frame is decoded");
-  while (baac_flac_decoder_decode_next(dec, buf.data(), (int)buf.size()) > 0) {
+  while (bac_flac_decoder_decode_next(dec, buf.data(), (int)buf.size()) > 0) {
   }
-  BaacFlacMd5Verdict verdict;
-  CHECK(baac_flac_decoder_finish(dec, &verdict) == AAC_OK && verdict == BAAC_FLAC_MD5_MATCH,
+  BacFlacMd5Verdict verdict;
+  CHECK(bac_flac_decoder_finish(dec, &verdict) == AAC_OK && verdict == BAC_FLAC_MD5_MATCH,
         "the setting survives a reset and the verdict is a match");
-  baac_flac_decoder_destroy(dec);
+  bac_flac_decoder_destroy(dec);
 }
 
 /* ── limits and memory ─────────────────────────────────────────── */
@@ -1624,24 +1624,24 @@ static void test_limits() {
     flac_append(s, big.frames);
     s.insert(s.end(), b.frames.begin() + (long)b.offsets[3], b.frames.end());
 
-    BaacFlacDecoder* dec = baac_flac_decoder_create();
+    BacFlacDecoder* dec = bac_flac_decoder_create();
     std::vector<int32_t> buf(65535 * 2);
-    CHECK(baac_flac_decoder_feed(dec, s.data(), (int)s.size()) == (int)s.size(), "fed");
-    CHECK(baac_flac_decoder_decode_next(dec, buf.data(), (int)buf.size()) == block &&
-              baac_flac_decoder_decode_next(dec, buf.data(), (int)buf.size()) == block,
+    CHECK(bac_flac_decoder_feed(dec, s.data(), (int)s.size()) == (int)s.size(), "fed");
+    CHECK(bac_flac_decoder_decode_next(dec, buf.data(), (int)buf.size()) == block &&
+              bac_flac_decoder_decode_next(dec, buf.data(), (int)buf.size()) == block,
           "two frames before the oversized one");
     const long allocations = g_allocations;
-    const int refused = baac_flac_decoder_decode_next(dec, buf.data(), (int)buf.size());
-    CHECK(refused == AAC_ERR_DECODE && baac_flac_decoder_lost_frames(dec) == 1,
+    const int refused = bac_flac_decoder_decode_next(dec, buf.data(), (int)buf.size());
+    CHECK(refused == AAC_ERR_DECODE && bac_flac_decoder_lost_frames(dec) == 1,
           "a block of 4608 in a stream of at most %d is refused: %d", block, refused);
-    const int next = baac_flac_decoder_decode_next(dec, buf.data(), (int)buf.size());
+    const int next = bac_flac_decoder_decode_next(dec, buf.data(), (int)buf.size());
     CHECK(g_allocations == allocations, "nothing was allocated for it (%ld)",
           g_allocations - allocations);
-    BaacFlacFrameInfo frame = {};
-    baac_flac_decoder_last_frame_info(dec, &frame);
+    BacFlacFrameInfo frame = {};
+    bac_flac_decoder_last_frame_info(dec, &frame);
     CHECK(next == block && frame.sample_position == 3 * (uint64_t)block,
           "decoding resumes at the next frame of the stream's size");
-    baac_flac_decoder_destroy(dec);
+    bac_flac_decoder_destroy(dec);
   }
 
   /* A frame larger than 64 bits per sample (here: a Rice parameter of
@@ -1668,19 +1668,19 @@ static void test_limits() {
    * into a larger one. */
   {
     const std::vector<uint8_t> s = b.stream();
-    BaacFlacDecoder* dec = baac_flac_decoder_create();
+    BacFlacDecoder* dec = bac_flac_decoder_create();
     std::vector<int32_t> buf((size_t)block * 2);
-    baac_flac_decoder_feed(dec, s.data(), (int)s.size());
-    CHECK(baac_flac_decoder_decode_next(dec, buf.data(), block * 2 - 1) == AAC_ERR_OVERFLOW &&
-              baac_flac_decoder_decode_next(dec, buf.data(), 1) == AAC_ERR_OVERFLOW,
+    bac_flac_decoder_feed(dec, s.data(), (int)s.size());
+    CHECK(bac_flac_decoder_decode_next(dec, buf.data(), block * 2 - 1) == AAC_ERR_OVERFLOW &&
+              bac_flac_decoder_decode_next(dec, buf.data(), 1) == AAC_ERR_OVERFLOW,
           "an output buffer one value short is refused");
-    BaacFlacFrameInfo frame;
-    CHECK(baac_flac_decoder_last_frame_info(dec, &frame) == AAC_ERR_STATE,
+    BacFlacFrameInfo frame;
+    CHECK(bac_flac_decoder_last_frame_info(dec, &frame) == AAC_ERR_STATE,
           "no frame counts as decoded");
-    CHECK(baac_flac_decoder_decode_next(dec, buf.data(), block * 2) == block &&
+    CHECK(bac_flac_decoder_decode_next(dec, buf.data(), block * 2) == block &&
               memcmp(buf.data(), b.pcm.data(), (size_t)block * 2 * sizeof(int32_t)) == 0,
           "the frame decodes into a buffer of its size");
-    baac_flac_decoder_destroy(dec);
+    bac_flac_decoder_destroy(dec);
   }
 
   /* The FIFO: a feed larger than it is taken in part, and decoding
@@ -1691,17 +1691,17 @@ static void test_limits() {
       big.add(TestSubframe::verbatim(), flac_gen_noise(4096, 2, 16, (unsigned)frame));
     }
     const std::vector<uint8_t> s = big.stream();
-    BaacFlacDecoder* dec = baac_flac_decoder_create();
-    baac_flac_decoder_set_md5_check(dec, 1);
-    const int took = baac_flac_decoder_feed(dec, s.data(), (int)s.size());
-    CHECK(took > 0 && took < (int)s.size() && baac_flac_decoder_pending_bytes(dec) <= took,
+    BacFlacDecoder* dec = bac_flac_decoder_create();
+    bac_flac_decoder_set_md5_check(dec, 1);
+    const int took = bac_flac_decoder_feed(dec, s.data(), (int)s.size());
+    CHECK(took > 0 && took < (int)s.size() && bac_flac_decoder_pending_bytes(dec) <= took,
           "a feed of %zu bytes is taken in part: %d", s.size(), took);
-    CHECK(baac_flac_decoder_feed(dec, s.data() + took, 1) == 0, "a full FIFO takes nothing");
+    CHECK(bac_flac_decoder_feed(dec, s.data() + took, 1) == 0, "a full FIFO takes nothing");
     const FlacDecoded d =
         flac_decode(std::vector<uint8_t>(s.begin() + took, s.end()), SIZE_MAX, dec);
-    CHECK(d.errors.empty() && d.pcm == big.pcm && d.verdict == BAAC_FLAC_MD5_MATCH,
+    CHECK(d.errors.empty() && d.pcm == big.pcm && d.verdict == BAC_FLAC_MD5_MATCH,
           "the stream decodes through a FIFO smaller than it");
-    baac_flac_decoder_destroy(dec);
+    bac_flac_decoder_destroy(dec);
   }
 
   /* Frames larger than the FIFO starts out with.  A stream that comes
@@ -1748,8 +1748,8 @@ static void test_limits() {
       steady.add(f, flac_gen_tones(4096, 2, bits, 0.001, (unsigned)frame));
     }
     const std::vector<uint8_t> s = steady.stream();
-    BaacFlacDecoder* dec = baac_flac_decoder_create();
-    baac_flac_decoder_set_md5_check(dec, 1);
+    BacFlacDecoder* dec = bac_flac_decoder_create();
+    bac_flac_decoder_set_md5_check(dec, 1);
     std::vector<int32_t> buf(4096 * 2);
     std::vector<int32_t> pcm;
     pcm.reserve(steady.pcm.size());
@@ -1758,14 +1758,14 @@ static void test_limits() {
     for (size_t pos = 0; pos < s.size();) {
       long before = g_allocations;
       const int took =
-          baac_flac_decoder_feed(dec, s.data() + pos, (int)std::min<size_t>(3000, s.size() - pos));
+          bac_flac_decoder_feed(dec, s.data() + pos, (int)std::min<size_t>(3000, s.size() - pos));
       if (frames > 0) {
         steady_allocations += g_allocations - before;
       }
       pos += (size_t)took;
       for (;;) {
         before = g_allocations;
-        const int n = baac_flac_decoder_decode_next(dec, buf.data(), (int)buf.size());
+        const int n = bac_flac_decoder_decode_next(dec, buf.data(), (int)buf.size());
         if (frames > 0) {
           steady_allocations += g_allocations - before;
         }
@@ -1776,15 +1776,15 @@ static void test_limits() {
         pcm.insert(pcm.end(), buf.begin(), buf.begin() + (long)n * 2);
       }
     }
-    BaacFlacMd5Verdict verdict;
+    BacFlacMd5Verdict verdict;
     const long before = g_allocations;
-    CHECK(baac_flac_decoder_finish(dec, &verdict) == AAC_OK && verdict == BAAC_FLAC_MD5_MATCH &&
+    CHECK(bac_flac_decoder_finish(dec, &verdict) == AAC_OK && verdict == BAC_FLAC_MD5_MATCH &&
               pcm == steady.pcm && frames == 30,
           "%d bits: the steady stream decodes", bits);
     steady_allocations += g_allocations - before;
     CHECK(steady_allocations == 0, "%d bits: %ld allocations after the first frame", bits,
           steady_allocations);
-    baac_flac_decoder_destroy(dec);
+    bac_flac_decoder_destroy(dec);
   }
 }
 
@@ -1803,24 +1803,24 @@ static void test_seek() {
     }
     const std::vector<uint8_t> s = b.stream();
     const size_t header = s.size() - b.frames.size();
-    BaacFlacDecoder* dec = baac_flac_decoder_create();
-    baac_flac_decoder_set_md5_check(dec, 1);
+    BacFlacDecoder* dec = bac_flac_decoder_create();
+    bac_flac_decoder_set_md5_check(dec, 1);
     std::vector<int32_t> buf(4096 * 2);
     /* The header and three frames. */
-    baac_flac_decoder_feed(dec, s.data(), (int)(header + b.offsets[3] + 50));
+    bac_flac_decoder_feed(dec, s.data(), (int)(header + b.offsets[3] + 50));
     int frames = 0;
-    while (baac_flac_decoder_decode_next(dec, buf.data(), (int)buf.size()) > 0) {
+    while (bac_flac_decoder_decode_next(dec, buf.data(), (int)buf.size()) > 0) {
       frames++;
     }
-    CHECK(frames == 3 && baac_flac_decoder_pending_bytes(dec) == 50, "three frames, then a seek");
-    CHECK(baac_flac_decoder_seek_reset(dec) == AAC_OK && baac_flac_decoder_pending_bytes(dec) == 0,
+    CHECK(frames == 3 && bac_flac_decoder_pending_bytes(dec) == 50, "three frames, then a seek");
+    CHECK(bac_flac_decoder_seek_reset(dec) == AAC_OK && bac_flac_decoder_pending_bytes(dec) == 0,
           "the buffered input is dropped");
     /* From the middle of the eighth frame: the ninth is the next. */
     const size_t from = header + b.offsets[7] + (b.offsets[8] - b.offsets[7]) / 2;
-    baac_flac_decoder_feed(dec, s.data() + from, (int)(s.size() - from));
-    BaacFlacFrameInfo frame = {};
-    const int n = baac_flac_decoder_decode_next(dec, buf.data(), (int)buf.size());
-    baac_flac_decoder_last_frame_info(dec, &frame);
+    bac_flac_decoder_feed(dec, s.data() + from, (int)(s.size() - from));
+    BacFlacFrameInfo frame = {};
+    const int n = bac_flac_decoder_decode_next(dec, buf.data(), (int)buf.size());
+    bac_flac_decoder_last_frame_info(dec, &frame);
     CHECK(n == b.blocks[8] && frame.sample_position == positions[8] &&
               memcmp(buf.data(), b.pcm.data() + positions[8] * 2,
                      (size_t)n * 2 * sizeof(int32_t)) == 0,
@@ -1828,14 +1828,14 @@ static void test_seek() {
           variable ? "variable" : "fixed", (unsigned long long)frame.sample_position,
           (unsigned long long)positions[8]);
     frames = 1;
-    while (baac_flac_decoder_decode_next(dec, buf.data(), (int)buf.size()) > 0) {
+    while (bac_flac_decoder_decode_next(dec, buf.data(), (int)buf.size()) > 0) {
       frames++;
     }
-    BaacFlacMd5Verdict verdict;
-    CHECK(frames == 4 && baac_flac_decoder_lost_frames(dec) == 0 &&
-              baac_flac_decoder_finish(dec, &verdict) == AAC_OK && verdict == BAAC_FLAC_MD5_UNKNOWN,
+    BacFlacMd5Verdict verdict;
+    CHECK(frames == 4 && bac_flac_decoder_lost_frames(dec) == 0 &&
+              bac_flac_decoder_finish(dec, &verdict) == AAC_OK && verdict == BAC_FLAC_MD5_UNKNOWN,
           "a seek loses nothing and leaves the MD5 undecided");
-    baac_flac_decoder_destroy(dec);
+    bac_flac_decoder_destroy(dec);
   }
 }
 
@@ -1844,43 +1844,43 @@ static void test_seek() {
 static void test_arguments() {
   int32_t pcm[16];
   uint8_t byte = 0;
-  BaacFlacStreamInfo info;
-  BaacFlacFrameInfo frame;
-  CHECK(baac_flac_decoder_feed(nullptr, &byte, 1) == AAC_ERR_INVALID_ARG &&
-            baac_flac_decoder_decode_next(nullptr, pcm, 16) == AAC_ERR_INVALID_ARG &&
-            baac_flac_decoder_reset(nullptr) == AAC_ERR_INVALID_ARG &&
-            baac_flac_decoder_finish(nullptr, nullptr) == AAC_ERR_INVALID_ARG &&
-            baac_flac_decoder_seek_reset(nullptr) == AAC_ERR_INVALID_ARG &&
-            baac_flac_decoder_end_input(nullptr) == AAC_ERR_INVALID_ARG &&
-            baac_flac_decoder_pending_bytes(nullptr) == AAC_ERR_INVALID_ARG &&
-            baac_flac_decoder_lost_frames(nullptr) == AAC_ERR_INVALID_ARG &&
-            baac_flac_decoder_stream_info(nullptr, &info) == AAC_ERR_INVALID_ARG &&
-            baac_flac_decoder_last_frame_info(nullptr, &frame) == AAC_ERR_INVALID_ARG &&
-            baac_flac_decoder_seek_points(nullptr, nullptr) == AAC_ERR_INVALID_ARG &&
-            baac_flac_decoder_first_frame_offset(nullptr) == AAC_ERR_INVALID_ARG &&
-            baac_flac_decoder_set_md5_check(nullptr, 1) == AAC_ERR_INVALID_ARG,
+  BacFlacStreamInfo info;
+  BacFlacFrameInfo frame;
+  CHECK(bac_flac_decoder_feed(nullptr, &byte, 1) == AAC_ERR_INVALID_ARG &&
+            bac_flac_decoder_decode_next(nullptr, pcm, 16) == AAC_ERR_INVALID_ARG &&
+            bac_flac_decoder_reset(nullptr) == AAC_ERR_INVALID_ARG &&
+            bac_flac_decoder_finish(nullptr, nullptr) == AAC_ERR_INVALID_ARG &&
+            bac_flac_decoder_seek_reset(nullptr) == AAC_ERR_INVALID_ARG &&
+            bac_flac_decoder_end_input(nullptr) == AAC_ERR_INVALID_ARG &&
+            bac_flac_decoder_pending_bytes(nullptr) == AAC_ERR_INVALID_ARG &&
+            bac_flac_decoder_lost_frames(nullptr) == AAC_ERR_INVALID_ARG &&
+            bac_flac_decoder_stream_info(nullptr, &info) == AAC_ERR_INVALID_ARG &&
+            bac_flac_decoder_last_frame_info(nullptr, &frame) == AAC_ERR_INVALID_ARG &&
+            bac_flac_decoder_seek_points(nullptr, nullptr) == AAC_ERR_INVALID_ARG &&
+            bac_flac_decoder_first_frame_offset(nullptr) == AAC_ERR_INVALID_ARG &&
+            bac_flac_decoder_set_md5_check(nullptr, 1) == AAC_ERR_INVALID_ARG,
         "a null decoder is refused everywhere");
-  baac_flac_decoder_destroy(nullptr);
-  BaacFlacDecoder* dec = baac_flac_decoder_create();
+  bac_flac_decoder_destroy(nullptr);
+  BacFlacDecoder* dec = bac_flac_decoder_create();
   CHECK(dec != nullptr, "a decoder");
-  CHECK(baac_flac_decoder_feed(dec, nullptr, 1) == AAC_ERR_INVALID_ARG &&
-            baac_flac_decoder_feed(dec, &byte, -1) == AAC_ERR_INVALID_ARG &&
-            baac_flac_decoder_feed(dec, nullptr, 0) == 0,
+  CHECK(bac_flac_decoder_feed(dec, nullptr, 1) == AAC_ERR_INVALID_ARG &&
+            bac_flac_decoder_feed(dec, &byte, -1) == AAC_ERR_INVALID_ARG &&
+            bac_flac_decoder_feed(dec, nullptr, 0) == 0,
         "feed checks its arguments");
-  CHECK(baac_flac_decoder_decode_next(dec, nullptr, 16) == AAC_ERR_INVALID_ARG &&
-            baac_flac_decoder_decode_next(dec, pcm, 0) == AAC_ERR_INVALID_ARG &&
-            baac_flac_decoder_decode_next(dec, pcm, 16) == 0,
+  CHECK(bac_flac_decoder_decode_next(dec, nullptr, 16) == AAC_ERR_INVALID_ARG &&
+            bac_flac_decoder_decode_next(dec, pcm, 0) == AAC_ERR_INVALID_ARG &&
+            bac_flac_decoder_decode_next(dec, pcm, 16) == 0,
         "decode checks its arguments");
-  CHECK(baac_flac_decoder_stream_info(dec, &info) == AAC_ERR_STATE &&
-            baac_flac_decoder_last_frame_info(dec, &frame) == AAC_ERR_STATE &&
-            baac_flac_decoder_seek_points(dec, nullptr) == 0 &&
-            baac_flac_decoder_lost_frames(dec) == 0 && baac_flac_decoder_pending_bytes(dec) == 0,
+  CHECK(bac_flac_decoder_stream_info(dec, &info) == AAC_ERR_STATE &&
+            bac_flac_decoder_last_frame_info(dec, &frame) == AAC_ERR_STATE &&
+            bac_flac_decoder_seek_points(dec, nullptr) == 0 &&
+            bac_flac_decoder_lost_frames(dec) == 0 && bac_flac_decoder_pending_bytes(dec) == 0,
         "a fresh decoder knows nothing");
-  CHECK(baac_flac_decoder_end_input(dec) == AAC_OK &&
-            baac_flac_decoder_feed(dec, &byte, 1) == AAC_ERR_STATE &&
-            baac_flac_decoder_reset(dec) == AAC_OK && baac_flac_decoder_feed(dec, &byte, 1) == 1,
+  CHECK(bac_flac_decoder_end_input(dec) == AAC_OK &&
+            bac_flac_decoder_feed(dec, &byte, 1) == AAC_ERR_STATE &&
+            bac_flac_decoder_reset(dec) == AAC_OK && bac_flac_decoder_feed(dec, &byte, 1) == 1,
         "the end of the input holds until a reset");
-  baac_flac_decoder_destroy(dec);
+  bac_flac_decoder_destroy(dec);
 }
 
 int main() {

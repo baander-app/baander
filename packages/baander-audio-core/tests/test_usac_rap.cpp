@@ -916,7 +916,7 @@ void test_committed() {
   }
   CHECK(largest <= 3000, "%s: largest segment %zu bytes", kCommittedName, largest);
   const Encoded e = encode(pcm, 2, 64000, committed_options(), AAC_TRANSPORT_LOAS, kCommittedRequests);
-#if BAAC_REFERENCE_BUILD
+#if BAC_REFERENCE_BUILD
   /* The stream is the reference build's (test_util.h), encoded from the
    * signal with this checksum. */
   if (check_committed_signal(kCommittedName, pcm, kCommittedSignal)) {

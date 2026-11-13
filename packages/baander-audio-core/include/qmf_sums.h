@@ -1,5 +1,5 @@
-#ifndef BAANDER_AAC_QMF_SUMS_H
-#define BAANDER_AAC_QMF_SUMS_H
+#ifndef BAANDER_AUDIO_CORE_QMF_SUMS_H
+#define BAANDER_AUDIO_CORE_QMF_SUMS_H
 
 #include <cstring>
 
@@ -96,4 +96,4 @@ static inline void aac_qmf_overlap(float* out, const float* v, const float* wind
   memcpy(out, acc, (size_t)bands * sizeof(float));
 }
 
-#endif /* BAANDER_AAC_QMF_SUMS_H */
+#endif /* BAANDER_AUDIO_CORE_QMF_SUMS_H */

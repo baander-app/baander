@@ -784,7 +784,7 @@ void compare_with_fdk(const char* name, const Decoded& d, const char* ref_name, 
 
 void test_stream(const char* name, int min_frames, const char* ref_name = nullptr,
                  double min_snr = 0.0) {
-  const std::vector<uint8_t> in = read_file(std::string(BAAC_TEST_DATA_DIR) + "/" + name);
+  const std::vector<uint8_t> in = read_file(std::string(BAC_TEST_DATA_DIR) + "/" + name);
   CHECK(!in.empty(), "%s: not found", name);
   if (in.empty()) {
     return;

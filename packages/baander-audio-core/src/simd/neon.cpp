@@ -9,7 +9,7 @@
  */
 #include "aac_dsp.h"
 
-#if defined(BAAC_AAC_NEON) || defined(__ARM_NEON) || defined(__aarch64__)
+#if defined(BAC_AAC_NEON) || defined(__ARM_NEON) || defined(__aarch64__)
 
 #include <arm_neon.h>
 
@@ -221,4 +221,4 @@ void aac_dsp_init_neon(AacDSP* dsp) {
   dsp->quant_noise = aac_quant_noise_neon;
 }
 
-#endif /* BAAC_AAC_NEON || __ARM_NEON || __aarch64__ */
+#endif /* BAC_AAC_NEON || __ARM_NEON || __aarch64__ */

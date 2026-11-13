@@ -1,5 +1,5 @@
-#ifndef BAANDER_AAC_CPU_H
-#define BAANDER_AAC_CPU_H
+#ifndef BAANDER_AUDIO_CORE_CPU_H
+#define BAANDER_AUDIO_CORE_CPU_H
 
 #include <cstdint>
 
@@ -33,4 +33,4 @@ void aac_set_cpu_flags_override(int flags);
 }
 #endif
 
-#endif /* BAANDER_AAC_CPU_H */
+#endif /* BAANDER_AUDIO_CORE_CPU_H */

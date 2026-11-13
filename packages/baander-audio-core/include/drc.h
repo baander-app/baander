@@ -1,5 +1,5 @@
-#ifndef BAANDER_AAC_DRC_H
-#define BAANDER_AAC_DRC_H
+#ifndef BAANDER_AUDIO_CORE_DRC_H
+#define BAANDER_AUDIO_CORE_DRC_H
 
 #include <cstdint>
 
@@ -192,4 +192,4 @@ float aac_drc_profile_gain_db(AacDrcProfile profile, float rel_db);
 #ifdef __cplusplus
 }
 #endif
-#endif /* BAANDER_AAC_DRC_H */
+#endif /* BAANDER_AUDIO_CORE_DRC_H */

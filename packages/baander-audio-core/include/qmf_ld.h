@@ -1,5 +1,5 @@
-#ifndef BAANDER_AAC_QMF_LD_H
-#define BAANDER_AAC_QMF_LD_H
+#ifndef BAANDER_AUDIO_CORE_QMF_LD_H
+#define BAANDER_AUDIO_CORE_QMF_LD_H
 
 #ifdef __cplusplus
 extern "C" {
@@ -58,4 +58,4 @@ void aac_cldfb_synthesize(AacCldfbSynthesis* s, const float (*X)[2], float* out)
 }
 #endif
 
-#endif /* BAANDER_AAC_QMF_LD_H */
+#endif /* BAANDER_AUDIO_CORE_QMF_LD_H */

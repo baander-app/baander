@@ -590,7 +590,7 @@ static void test_gain_decoding() {
 /* ── the committed streams ─────────────────────────────────────── */
 
 static void test_stream(const char* name, float program_lufs, float expected_gain_db) {
-  const std::string path = std::string(BAAC_TEST_DATA_DIR) + "/usac_" + name + ".loas";
+  const std::string path = std::string(BAC_TEST_DATA_DIR) + "/usac_" + name + ".loas";
   const Stream s = read_loas(read_file(path));
   CHECK(s.aus.size() == 48, "%s: 48 access units, got %zu", name, s.aus.size());
   CHECK(!s.drc_config.empty() && !s.loudness.empty(), "%s: DRC config and loudness", name);

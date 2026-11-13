@@ -1,5 +1,5 @@
-#ifndef BAANDER_AAC_LOWDELAY_H
-#define BAANDER_AAC_LOWDELAY_H
+#ifndef BAANDER_AUDIO_CORE_LOWDELAY_H
+#define BAANDER_AUDIO_CORE_LOWDELAY_H
 
 #include "mdct.h"
 
@@ -55,4 +55,4 @@ void aac_eld_analysis(const AacMdct* mdct, int m, const float* in, float* spec);
 }
 #endif
 
-#endif /* BAANDER_AAC_LOWDELAY_H */
+#endif /* BAANDER_AUDIO_CORE_LOWDELAY_H */

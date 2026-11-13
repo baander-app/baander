@@ -404,7 +404,7 @@ bool decode_subframe(const FlacDSP* dsp, FlacBitReader* r, int bps, int block_si
 
 /* ── decoder state ──────────────────────────────────────────────── */
 
-struct BaacFlacDecoder_ {
+struct BacFlacDecoder_ {
   enum Stage {
     kStart,       /* nothing read yet: the marker or a frame follows */
     kBlockHeader, /* a metadata block header follows */
@@ -443,7 +443,7 @@ struct BaacFlacDecoder_ {
 
   /* The stream. */
   bool have_info = false; /* `info` is a STREAMINFO, from the stream or the caller */
-  BaacFlacStreamInfo info = {};
+  BacFlacStreamInfo info = {};
   bool have_config = false; /* the three properties every frame has to share */
   int sample_rate = 0;
   int channels = 0;
@@ -451,7 +451,7 @@ struct BaacFlacDecoder_ {
   int nominal_block = 0; /* block size of a fixed block size stream, 0 unknown */
   int64_t first_frame_offset = -1;
   bool have_seek_table = false;
-  std::vector<BaacFlacSeekPoint> seek_points;
+  std::vector<BacFlacSeekPoint> seek_points;
 
   /* Tags and pictures, kept only for a caller that asked: the content
    * of each block as it came, and what the caller is shown, which
@@ -467,9 +467,9 @@ struct BaacFlacDecoder_ {
   std::vector<uint8_t> current; /* what has arrived of it */
   std::vector<std::vector<uint8_t>> meta_blocks;
   bool have_comments = false;
-  BaacFlacComment vendor = {};
-  std::vector<BaacFlacComment> comments;
-  std::vector<BaacFlacPicture> pictures;
+  BacFlacComment vendor = {};
+  std::vector<BacFlacComment> comments;
+  std::vector<BacFlacPicture> pictures;
 
   /* One row of `block_capacity` samples per channel, and one row of
    * 64-bit samples for a 33-bit side channel. */
@@ -480,7 +480,7 @@ struct BaacFlacDecoder_ {
 
   /* Frames. */
   bool have_frame = false;
-  BaacFlacFrameInfo last = {};
+  BacFlacFrameInfo last = {};
   uint64_t next_position = 0;
   int lost = 0;
 
@@ -492,7 +492,7 @@ struct BaacFlacDecoder_ {
 
 namespace {
 
-typedef BaacFlacDecoder_ Decoder;
+typedef BacFlacDecoder_ Decoder;
 
 size_t pending(const Decoder* d) { return d->fifo.size() - d->head; }
 const uint8_t* fifo_data(const Decoder* d) { return d->fifo.data() + d->head; }
@@ -576,7 +576,7 @@ void ensure_buffers(Decoder* d, int channels, int block_size, int bits) {
 
 /* Takes a STREAMINFO as the stream's description and sizes everything
  * the stream can need from it, once. */
-void apply_info(Decoder* d, const BaacFlacStreamInfo& info) {
+void apply_info(Decoder* d, const BacFlacStreamInfo& info) {
   raise_fifo_limit(d, frame_bound(info.max_block_size, info.channels));
   ensure_buffers(d, info.channels, info.max_block_size, info.bits_per_sample);
   d->info = info;
@@ -630,7 +630,7 @@ void keep_block(Decoder* d) {
   if (tags) {
     const int count = flac_meta_count_comments(block, size);
     sound = count >= 0;
-    cost += sound ? (size_t)count * sizeof(BaacFlacComment) : 0;
+    cost += sound ? (size_t)count * sizeof(BacFlacComment) : 0;
     if (sound && cost <= room) {
       d->comments.resize((size_t)count);
     }
@@ -644,7 +644,7 @@ void keep_block(Decoder* d) {
       flac_meta_read_comments(block, &d->vendor, d->comments.data());
       d->have_comments = true;
     } else {
-      BaacFlacPicture picture;
+      BacFlacPicture picture;
       sound = flac_meta_read_picture(block, size, &picture);
       if (sound) {
         d->pictures.push_back(picture);
@@ -757,7 +757,7 @@ void process_metadata(Decoder* d) {
         d->block_left = (uint32_t)flac_load_be(p + 1, 3);
         drop(d, FLAC_BLOCK_HEADER_BYTES);
         if (type == FLAC_BLOCK_STREAMINFO && !d->have_info &&
-            d->block_left == BAAC_FLAC_STREAMINFO_BYTES) {
+            d->block_left == BAC_FLAC_STREAMINFO_BYTES) {
           d->stage = Decoder::kStreamInfo;
         } else if (type == FLAC_BLOCK_SEEKTABLE && !d->have_seek_table) {
           d->have_seek_table = true;
@@ -786,16 +786,16 @@ void process_metadata(Decoder* d) {
         break;
       }
       case Decoder::kStreamInfo: {
-        if (avail < BAAC_FLAC_STREAMINFO_BYTES) {
+        if (avail < BAC_FLAC_STREAMINFO_BYTES) {
           return;
         }
-        BaacFlacStreamInfo info;
+        BacFlacStreamInfo info;
         if (flac_streaminfo_parse(p, &info)) {
           apply_info(d, info);
         } else {
           d->pending_error = true;
         }
-        drop(d, BAAC_FLAC_STREAMINFO_BYTES);
+        drop(d, BAC_FLAC_STREAMINFO_BYTES);
         after_block(d);
         break;
       }
@@ -828,12 +828,12 @@ void process_metadata(Decoder* d) {
          * block claims.  Points have to ascend; placeholders and
          * points out of order are left out. */
         while (d->block_left >= FLAC_SEEK_POINT_BYTES &&
-               d->seek_points.size() < BAAC_FLAC_MAX_SEEK_POINTS) {
+               d->seek_points.size() < BAC_FLAC_MAX_SEEK_POINTS) {
           if (pending(d) < FLAC_SEEK_POINT_BYTES) {
             return;
           }
           const uint8_t* q = fifo_data(d);
-          BaacFlacSeekPoint point;
+          BacFlacSeekPoint point;
           point.sample_position = flac_load_be(q, 8);
           point.byte_offset = flac_load_be(q + 8, 8);
           point.block_size = (int)flac_load_be(q + 16, 2);
@@ -1060,7 +1060,7 @@ bool reject(Decoder* d) {
 
 /* ── internal interface ─────────────────────────────────────────── */
 
-BaacFlacDecoder* flac_decoder_create() {
+BacFlacDecoder* flac_decoder_create() {
   Decoder* d = new (std::nothrow) Decoder();
   if (!d) {
     return nullptr;
@@ -1075,15 +1075,15 @@ BaacFlacDecoder* flac_decoder_create() {
   return d;
 }
 
-void flac_decoder_destroy(BaacFlacDecoder* d) { delete d; }
+void flac_decoder_destroy(BacFlacDecoder* d) { delete d; }
 
-void flac_decoder_reset(BaacFlacDecoder* d) {
+void flac_decoder_reset(BacFlacDecoder* d) {
   clear_input(d);
   d->stage = Decoder::kStart;
   d->offset = 0;
   d->last_block = false;
   d->have_info = false;
-  d->info = BaacFlacStreamInfo();
+  d->info = BacFlacStreamInfo();
   d->have_config = false;
   d->sample_rate = 0;
   d->channels = 0;
@@ -1096,11 +1096,11 @@ void flac_decoder_reset(BaacFlacDecoder* d) {
   d->meta_skipped = 0;
   d->meta_blocks.clear();
   d->have_comments = false;
-  d->vendor = BaacFlacComment();
+  d->vendor = BacFlacComment();
   d->comments.clear();
   d->pictures.clear();
   d->have_frame = false;
-  d->last = BaacFlacFrameInfo();
+  d->last = BacFlacFrameInfo();
   d->next_position = 0;
   d->lost = 0;
   d->md5_valid = true;
@@ -1109,11 +1109,11 @@ void flac_decoder_reset(BaacFlacDecoder* d) {
   d->id3v1 = false;
 }
 
-int flac_decoder_set_streaminfo(BaacFlacDecoder* d, const uint8_t* data) {
+int flac_decoder_set_streaminfo(BacFlacDecoder* d, const uint8_t* data) {
   if (d->have_info || d->have_frame || d->stage == Decoder::kFinished) {
     return AAC_ERR_STATE;
   }
-  BaacFlacStreamInfo info;
+  BacFlacStreamInfo info;
   if (!flac_streaminfo_parse(data, &info)) {
     return AAC_ERR_INVALID_ARG;
   }
@@ -1121,7 +1121,7 @@ int flac_decoder_set_streaminfo(BaacFlacDecoder* d, const uint8_t* data) {
   return AAC_OK;
 }
 
-int flac_decoder_set_md5_check(BaacFlacDecoder* d, bool enabled) {
+int flac_decoder_set_md5_check(BacFlacDecoder* d, bool enabled) {
   if (d->have_frame || d->stage == Decoder::kFinished) {
     return AAC_ERR_STATE;
   }
@@ -1129,11 +1129,11 @@ int flac_decoder_set_md5_check(BaacFlacDecoder* d, bool enabled) {
   return AAC_OK;
 }
 
-uint64_t flac_decoder_rejected_work(const BaacFlacDecoder* d) { return d->rejected_work; }
+uint64_t flac_decoder_rejected_work(const BacFlacDecoder* d) { return d->rejected_work; }
 
-uint64_t flac_decoder_read_work(const BaacFlacDecoder* d) { return d->read_work; }
+uint64_t flac_decoder_read_work(const BacFlacDecoder* d) { return d->read_work; }
 
-void flac_decoder_id3(const BaacFlacDecoder* d, uint64_t* v2_bytes, int* v1_trailer) {
+void flac_decoder_id3(const BacFlacDecoder* d, uint64_t* v2_bytes, int* v1_trailer) {
   if (v2_bytes) {
     *v2_bytes = d->id3v2_bytes;
   }
@@ -1142,21 +1142,21 @@ void flac_decoder_id3(const BaacFlacDecoder* d, uint64_t* v2_bytes, int* v1_trai
   }
 }
 
-void flac_decoder_ignore_checksums(BaacFlacDecoder* d, bool ignore) {
+void flac_decoder_ignore_checksums(BacFlacDecoder* d, bool ignore) {
   d->ignore_checksums = ignore;
 }
 
-int flac_decoder_set_metadata(BaacFlacDecoder* d, bool collect, size_t max_bytes) {
+int flac_decoder_set_metadata(BacFlacDecoder* d, bool collect, size_t max_bytes) {
   if (d->stage != Decoder::kStart || d->offset || pending(d)) {
     return AAC_ERR_STATE;
   }
   d->collect = collect;
-  d->meta_cap = max_bytes ? max_bytes : (size_t)BAAC_FLAC_DEFAULT_METADATA_BYTES;
+  d->meta_cap = max_bytes ? max_bytes : (size_t)BAC_FLAC_DEFAULT_METADATA_BYTES;
   return AAC_OK;
 }
 
-int flac_decoder_comments(const BaacFlacDecoder* d, const BaacFlacComment** comments,
-                          BaacFlacComment* vendor) {
+int flac_decoder_comments(const BacFlacDecoder* d, const BacFlacComment** comments,
+                          BacFlacComment* vendor) {
   static const char kNone[1] = {0};
   *comments = d->comments.empty() ? nullptr : d->comments.data();
   if (vendor) {
@@ -1166,14 +1166,14 @@ int flac_decoder_comments(const BaacFlacDecoder* d, const BaacFlacComment** comm
   return (int)d->comments.size();
 }
 
-int flac_decoder_pictures(const BaacFlacDecoder* d, const BaacFlacPicture** pictures) {
+int flac_decoder_pictures(const BacFlacDecoder* d, const BacFlacPicture** pictures) {
   *pictures = d->pictures.empty() ? nullptr : d->pictures.data();
   return (int)d->pictures.size();
 }
 
-int flac_decoder_skipped_metadata(const BaacFlacDecoder* d) { return d->meta_skipped; }
+int flac_decoder_skipped_metadata(const BacFlacDecoder* d) { return d->meta_skipped; }
 
-int flac_decoder_feed(BaacFlacDecoder* d, const uint8_t* data, int size) {
+int flac_decoder_feed(BacFlacDecoder* d, const uint8_t* data, int size) {
   if (d->stage == Decoder::kFinished || d->ended) {
     return AAC_ERR_STATE;
   }
@@ -1215,9 +1215,9 @@ int flac_decoder_feed(BaacFlacDecoder* d, const uint8_t* data, int size) {
   return size - (int)left;
 }
 
-int flac_decoder_pending_bytes(const BaacFlacDecoder* d) { return (int)pending(d); }
+int flac_decoder_pending_bytes(const BacFlacDecoder* d) { return (int)pending(d); }
 
-int flac_decoder_decode_next(BaacFlacDecoder* d, int32_t* pcm, int pcm_size) {
+int flac_decoder_decode_next(BacFlacDecoder* d, int32_t* pcm, int pcm_size) {
   if (d->stage == Decoder::kFinished) {
     return AAC_ERR_STATE;
   }
@@ -1419,7 +1419,7 @@ int flac_decoder_decode_next(BaacFlacDecoder* d, int32_t* pcm, int pcm_size) {
   }
 }
 
-int flac_decoder_stream_info(const BaacFlacDecoder* d, BaacFlacStreamInfo* info) {
+int flac_decoder_stream_info(const BacFlacDecoder* d, BacFlacStreamInfo* info) {
   if (d->have_info) {
     *info = d->info;
     return AAC_OK;
@@ -1427,14 +1427,14 @@ int flac_decoder_stream_info(const BaacFlacDecoder* d, BaacFlacStreamInfo* info)
   if (!d->have_config) {
     return AAC_ERR_STATE;
   }
-  *info = BaacFlacStreamInfo();
+  *info = BacFlacStreamInfo();
   info->sample_rate = d->sample_rate;
   info->channels = d->channels;
   info->bits_per_sample = d->bits;
   return AAC_OK;
 }
 
-int flac_decoder_last_frame_info(const BaacFlacDecoder* d, BaacFlacFrameInfo* info) {
+int flac_decoder_last_frame_info(const BacFlacDecoder* d, BacFlacFrameInfo* info) {
   if (!d->have_frame) {
     return AAC_ERR_STATE;
   }
@@ -1442,20 +1442,20 @@ int flac_decoder_last_frame_info(const BaacFlacDecoder* d, BaacFlacFrameInfo* in
   return AAC_OK;
 }
 
-int flac_decoder_lost_frames(const BaacFlacDecoder* d) { return d->lost; }
+int flac_decoder_lost_frames(const BacFlacDecoder* d) { return d->lost; }
 
-int flac_decoder_seek_points(const BaacFlacDecoder* d, const BaacFlacSeekPoint** points) {
+int flac_decoder_seek_points(const BacFlacDecoder* d, const BacFlacSeekPoint** points) {
   if (points) {
     *points = d->seek_points.empty() ? nullptr : d->seek_points.data();
   }
   return (int)d->seek_points.size();
 }
 
-int64_t flac_decoder_first_frame_offset(const BaacFlacDecoder* d) {
+int64_t flac_decoder_first_frame_offset(const BacFlacDecoder* d) {
   return d->first_frame_offset >= 0 ? d->first_frame_offset : (int64_t)AAC_ERR_STATE;
 }
 
-int flac_decoder_seek_reset(BaacFlacDecoder* d) {
+int flac_decoder_seek_reset(BacFlacDecoder* d) {
   if (d->stage == Decoder::kFinished) {
     return AAC_ERR_STATE;
   }
@@ -1465,7 +1465,7 @@ int flac_decoder_seek_reset(BaacFlacDecoder* d) {
   return AAC_OK;
 }
 
-int flac_decoder_end_input(BaacFlacDecoder* d) {
+int flac_decoder_end_input(BacFlacDecoder* d) {
   if (d->stage == Decoder::kFinished) {
     return AAC_ERR_STATE;
   }
@@ -1474,7 +1474,7 @@ int flac_decoder_end_input(BaacFlacDecoder* d) {
   return AAC_OK;
 }
 
-int flac_decoder_finish(BaacFlacDecoder* d, BaacFlacMd5Verdict* verdict) {
+int flac_decoder_finish(BacFlacDecoder* d, BacFlacMd5Verdict* verdict) {
   if (d->stage == Decoder::kFinished) {
     return AAC_ERR_STATE;
   }
@@ -1496,13 +1496,13 @@ int flac_decoder_finish(BaacFlacDecoder* d, BaacFlacMd5Verdict* verdict) {
   }
   if (verdict) {
     static const uint8_t kNoMd5[16] = {0};
-    *verdict = BAAC_FLAC_MD5_UNKNOWN;
+    *verdict = BAC_FLAC_MD5_UNKNOWN;
     if (d->md5_enabled && d->md5_valid && d->have_info && d->stage != Decoder::kUnsupported &&
         memcmp(d->info.md5, kNoMd5, 16) != 0) {
       uint8_t digest[16];
       flac_md5_final(&d->md5, digest);
       *verdict =
-          memcmp(digest, d->info.md5, 16) == 0 ? BAAC_FLAC_MD5_MATCH : BAAC_FLAC_MD5_MISMATCH;
+          memcmp(digest, d->info.md5, 16) == 0 ? BAC_FLAC_MD5_MATCH : BAC_FLAC_MD5_MISMATCH;
     }
   }
   d->pending_error = false;

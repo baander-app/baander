@@ -1,5 +1,5 @@
-#ifndef BAANDER_AAC_ICS_H
-#define BAANDER_AAC_ICS_H
+#ifndef BAANDER_AUDIO_CORE_ICS_H
+#define BAANDER_AUDIO_CORE_ICS_H
 
 #include "aac_tables.h"
 
@@ -46,4 +46,4 @@ static inline int aac_short_length(int frame_length) {
 }
 #endif
 
-#endif /* BAANDER_AAC_ICS_H */
+#endif /* BAANDER_AUDIO_CORE_ICS_H */

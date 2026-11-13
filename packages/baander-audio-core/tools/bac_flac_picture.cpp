@@ -1,15 +1,15 @@
-/* Pictures for the lossless commands of the baac tool
- * (baac_flac_picture.h). */
-#include "baac_flac_picture.h"
+/* Pictures for the lossless commands of the bac tool
+ * (bac_flac_picture.h). */
+#include "bac_flac_picture.h"
 
 #include <algorithm>
 #include <cstdio>
 #include <cstring>
 
-#include "baac_flac_pcm.h"
+#include "bac_flac_pcm.h"
 #include "flac.h"
 
-namespace baac_flac {
+namespace bac_flac {
 
 namespace {
 
@@ -98,8 +98,8 @@ bool read_picture(const char* path, PictureFile* pic) {
   }
   const auto too_large = [path]() {
     fprintf(stderr,
-            "baac: %s is larger than a FLAC picture block holds (%d bytes with its media type)\n",
-            path, BAAC_FLAC_MAX_PICTURE_BYTES);
+            "bac: %s is larger than a FLAC picture block holds (%d bytes with its media type)\n",
+            path, BAC_FLAC_MAX_PICTURE_BYTES);
     return false;
   };
   /* A file says how long it is, and gets a buffer of that length and
@@ -107,15 +107,15 @@ bool read_picture(const char* path, PictureFile* pic) {
    * which is then read on like input of unknown length.  That is read
    * in steps that grow with it, up to one byte past what a block holds,
    * so that a small cover takes a small buffer. */
-  const size_t limit = (size_t)BAAC_FLAC_MAX_PICTURE_BYTES + 1;
+  const size_t limit = (size_t)BAC_FLAC_MAX_PICTURE_BYTES + 1;
   size_t step = 65536;
   if (in.owned && fseek(in.f, 0, SEEK_END) == 0) {
     const long length = ftell(in.f);
     if (length < 0 || fseek(in.f, 0, SEEK_SET) != 0) {
-      fprintf(stderr, "baac: cannot open %s\n", path);
+      fprintf(stderr, "bac: cannot open %s\n", path);
       return false;
     }
-    if ((unsigned long)length > (unsigned long)BAAC_FLAC_MAX_PICTURE_BYTES) {
+    if ((unsigned long)length > (unsigned long)BAC_FLAC_MAX_PICTURE_BYTES) {
       return too_large();
     }
     step = (size_t)length + 1;
@@ -133,7 +133,7 @@ bool read_picture(const char* path, PictureFile* pic) {
   if (read_failed(in)) {
     return false;
   }
-  if (got > BAAC_FLAC_MAX_PICTURE_BYTES) {
+  if (got > BAC_FLAC_MAX_PICTURE_BYTES) {
     return too_large();
   }
   pic->data.resize(got);
@@ -141,14 +141,14 @@ bool read_picture(const char* path, PictureFile* pic) {
     pic->data.shrink_to_fit();
   }
   if (!png_figures(pic) && !jpeg_figures(pic)) {
-    fprintf(stderr, "baac: %s is neither a JPEG nor a PNG file\n", path);
+    fprintf(stderr, "bac: %s is neither a JPEG nor a PNG file\n", path);
     return false;
   }
   return true;
 }
 
 const char* picture_type_name(uint32_t type) {
-  static const char* const kNames[BAAC_FLAC_MAX_PICTURE_TYPE + 1] = {
+  static const char* const kNames[BAC_FLAC_MAX_PICTURE_TYPE + 1] = {
       "other",
       "PNG file icon of 32x32 pixels",
       "general file icon",
@@ -171,7 +171,7 @@ const char* picture_type_name(uint32_t type) {
       "band or artist logotype",
       "publisher or studio logotype",
   };
-  return type <= BAAC_FLAC_MAX_PICTURE_TYPE ? kNames[type] : "reserved";
+  return type <= BAC_FLAC_MAX_PICTURE_TYPE ? kNames[type] : "reserved";
 }
 
-}  // namespace baac_flac
+}  // namespace bac_flac

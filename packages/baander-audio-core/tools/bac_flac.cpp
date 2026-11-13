@@ -1,10 +1,10 @@
-/* baac flac: the lossless mode on the command line.
+/* bac flac: the lossless mode on the command line.
  *
- *   baac flac enc [--level 0..8] [--raw RATE CHANNELS BITS] [--tag NAME=VALUE]...
+ *   bac flac enc [--level 0..8] [--raw RATE CHANNELS BITS] [--tag NAME=VALUE]...
  *                 [--picture FILE]... <in.wav | -> <out.flac | ->
- *   baac flac dec [--no-md5] [--raw] <in.flac | -> <out.wav | ->
- *   baac flac test [--no-md5] <in.flac | ->
- *   baac flac info [--export-picture FILE [--picture-number N]] <in.flac | ->
+ *   bac flac dec [--no-md5] [--raw] <in.flac | -> <out.wav | ->
+ *   bac flac test [--no-md5] <in.flac | ->
+ *   bac flac info [--export-picture FILE [--picture-number N]] <in.flac | ->
  *
  * enc reads an integer WAV file (PCM, or the extensible format with its
  * valid-bits field) or, with --raw, headerless PCM, and writes a native
@@ -32,9 +32,9 @@
  * no output file, dec leaves what could be decoded.
  *
  * This file holds the commands.  The files and the PCM they read and
- * write are in baac_flac_pcm.cpp, the picture files in
- * baac_flac_picture.cpp. */
-#include "baac_flac.h"
+ * write are in bac_flac_pcm.cpp, the picture files in
+ * bac_flac_picture.cpp. */
+#include "bac_flac.h"
 
 #include <algorithm>
 #include <cmath>
@@ -45,28 +45,28 @@
 #include <string>
 #include <vector>
 
-#include "baac_common.h"
-#include "baac_flac_pcm.h"
-#include "baac_flac_picture.h"
+#include "bac_common.h"
+#include "bac_flac_pcm.h"
+#include "bac_flac_picture.h"
 #include "flac.h"
 
-namespace baac_flac {
+namespace bac_flac {
 
 namespace {
 
 /* The samples of the largest frame there is: the largest block in the
  * most channels. */
-const size_t kLargestFrame = (size_t)BAAC_FLAC_MAX_BLOCK_SIZE * BAAC_FLAC_MAX_CHANNELS;
+const size_t kLargestFrame = (size_t)BAC_FLAC_MAX_BLOCK_SIZE * BAC_FLAC_MAX_CHANNELS;
 
 /* The codec's handles, destroyed when they go out of scope. */
 struct EncoderDestroy {
-  void operator()(BaacFlacEncoder* enc) const { baac_flac_encoder_destroy(enc); }
+  void operator()(BacFlacEncoder* enc) const { bac_flac_encoder_destroy(enc); }
 };
 struct DecoderDestroy {
-  void operator()(BaacFlacDecoder* dec) const { baac_flac_decoder_destroy(dec); }
+  void operator()(BacFlacDecoder* dec) const { bac_flac_decoder_destroy(dec); }
 };
-typedef std::unique_ptr<BaacFlacEncoder, EncoderDestroy> EncoderHandle;
-typedef std::unique_ptr<BaacFlacDecoder, DecoderDestroy> DecoderHandle;
+typedef std::unique_ptr<BacFlacEncoder, EncoderDestroy> EncoderHandle;
+typedef std::unique_ptr<BacFlacDecoder, DecoderDestroy> DecoderHandle;
 
 const int kChunkFrames = 16384; /* samples per channel enc reads at a time */
 
@@ -102,14 +102,14 @@ const char* error_name(int error) {
 }
 
 int usage() {
-  fprintf(stderr, "usage: %s", baac_flac_usage());
+  fprintf(stderr, "usage: %s", bac_flac_usage());
   return 2;
 }
 
 /* ── enc ───────────────────────────────────────────────────────── */
 
 struct EncodeArgs {
-  int level = BAAC_FLAC_LEVEL_DEFAULT;
+  int level = BAC_FLAC_LEVEL_DEFAULT;
   bool raw = false;
   int raw_rate = 0;
   int raw_channels = 0;
@@ -162,11 +162,11 @@ int encode_stream(const EncodeArgs& args, File* in, File* out, bool* created) {
     return 1;
   }
   int error = AAC_OK;
-  BaacFlacEncoder* enc = baac_flac_encoder_create(layout.sample_rate, layout.channels, layout.bits,
+  BacFlacEncoder* enc = bac_flac_encoder_create(layout.sample_rate, layout.channels, layout.bits,
                                                   args.level, &error);
   if (!enc) {
     fprintf(stderr,
-            "baac: %s: %d Hz, %d channels, %d bits cannot be coded as FLAC (%s); the encoder "
+            "bac: %s: %d Hz, %d channels, %d bits cannot be coded as FLAC (%s); the encoder "
             "takes 1 to 8 channels of 8, 12, 16, 20, 24 or 32 bits\n",
             in->name.c_str(), layout.sample_rate, layout.channels, layout.bits, error_name(error));
     return 1;
@@ -175,20 +175,20 @@ int encode_stream(const EncodeArgs& args, File* in, File* out, bool* created) {
 
   /* Tags and pictures are settled before the output exists: what the
    * format does not take is refused with nothing written. */
-  BaacFlacEncoderOptions options;
-  baac_flac_encoder_options_init(&options);
-  std::vector<BaacFlacComment> comments;
+  BacFlacEncoderOptions options;
+  bac_flac_encoder_options_init(&options);
+  std::vector<BacFlacComment> comments;
   for (const std::string& tag : args.tags) {
     comments.push_back({tag.data(), (uint32_t)tag.size()});
   }
   std::vector<PictureFile> files(args.pictures.size());
-  std::vector<BaacFlacPicture> pictures(args.pictures.size());
+  std::vector<BacFlacPicture> pictures(args.pictures.size());
   for (size_t i = 0; i < files.size(); i++) {
     if (!read_picture(args.pictures[i], &files[i])) {
       return 1;
     }
-    BaacFlacPicture& p = pictures[i];
-    p = BaacFlacPicture();
+    BacFlacPicture& p = pictures[i];
+    p = BacFlacPicture();
     p.type = 3;
     p.mime_type = files[i].mime.c_str();
     p.width = files[i].width;
@@ -202,12 +202,12 @@ int encode_stream(const EncodeArgs& args, File* in, File* out, bool* created) {
   options.comment_count = (int)comments.size();
   options.pictures = pictures.data();
   options.picture_count = (int)pictures.size();
-  if (baac_flac_encoder_set_options(enc, &options) != AAC_OK) {
+  if (bac_flac_encoder_set_options(enc, &options) != AAC_OK) {
     fprintf(stderr,
-            "baac: the tags or pictures cannot be stored: a tag is NAME=VALUE with a name of "
+            "bac: the tags or pictures cannot be stored: a tag is NAME=VALUE with a name of "
             "printable ASCII and a value in UTF-8, and tags and each picture have to fit a "
             "block of %d bytes\n",
-            BAAC_FLAC_MAX_METADATA_BLOCK_BYTES);
+            BAC_FLAC_MAX_METADATA_BLOCK_BYTES);
     return 1;
   }
 
@@ -223,25 +223,25 @@ int encode_stream(const EncodeArgs& args, File* in, File* out, bool* created) {
     options.total_samples_hint = data_bytes / frame_bytes;
     options.seek_table = 1;
   }
-  if ((error = baac_flac_encoder_set_options(enc, &options)) != AAC_OK) {
-    fprintf(stderr, "baac: encoder options: %s\n", error_name(error));
+  if ((error = bac_flac_encoder_set_options(enc, &options)) != AAC_OK) {
+    fprintf(stderr, "bac: encoder options: %s\n", error_name(error));
     return 1;
   }
 
-  std::vector<uint8_t> header((size_t)baac_flac_encoder_header_bytes(enc));
-  const int block = baac_flac_encoder_block_size(enc);
-  const int bound = baac_flac_encoder_max_output_bytes(enc, kChunkFrames + block);
+  std::vector<uint8_t> header((size_t)bac_flac_encoder_header_bytes(enc));
+  const int block = bac_flac_encoder_block_size(enc);
+  const int bound = bac_flac_encoder_max_output_bytes(enc, kChunkFrames + block);
   if (bound < 0) {
-    fprintf(stderr, "baac: encoder: %s\n", error_name(bound));
+    fprintf(stderr, "bac: encoder: %s\n", error_name(bound));
     return 1;
   }
   std::vector<uint8_t> bytes((size_t)kChunkFrames * frame_bytes);
   std::vector<int32_t> pcm((size_t)kChunkFrames * (size_t)layout.channels);
   std::vector<uint8_t> coded((size_t)bound);
 
-  int n = baac_flac_encoder_write_header(enc, header.data(), (int)header.size());
+  int n = bac_flac_encoder_write_header(enc, header.data(), (int)header.size());
   if (n < 0 || fwrite(header.data(), 1, (size_t)n, out->f) != (size_t)n) {
-    fprintf(stderr, "baac: cannot write %s\n", out->name.c_str());
+    fprintf(stderr, "bac: cannot write %s\n", out->name.c_str());
     return 1;
   }
   uint64_t left = data_bytes;
@@ -256,7 +256,7 @@ int encode_stream(const EncodeArgs& args, File* in, File* out, bool* created) {
     }
     const size_t frames = got / frame_bytes;
     if (got % frame_bytes != 0 || (got < want && data_bytes != kUnknownLength)) {
-      fprintf(stderr, "baac: %s ends inside its samples\n", in->name.c_str());
+      fprintf(stderr, "bac: %s ends inside its samples\n", in->name.c_str());
       return 1;
     }
     if (frames == 0) {
@@ -264,41 +264,41 @@ int encode_stream(const EncodeArgs& args, File* in, File* out, bool* created) {
     }
     if (!unpack(layout, bytes.data(), frames * (size_t)layout.channels, pcm.data())) {
       fprintf(stderr,
-              "baac: %s states %d-bit samples but has bits set below them; nothing is coded "
+              "bac: %s states %d-bit samples but has bits set below them; nothing is coded "
               "with loss\n",
               in->name.c_str(), layout.bits);
       return 1;
     }
-    n = baac_flac_encoder_encode(enc, pcm.data(), (int)frames, coded.data(), (int)coded.size());
+    n = bac_flac_encoder_encode(enc, pcm.data(), (int)frames, coded.data(), (int)coded.size());
     if (n < 0) {
-      fprintf(stderr, "baac: %s: %s\n", in->name.c_str(),
+      fprintf(stderr, "bac: %s: %s\n", in->name.c_str(),
               n == AAC_ERR_INVALID_ARG ? "a sample lies outside the bit depth" : error_name(n));
       return 1;
     }
     if (fwrite(coded.data(), 1, (size_t)n, out->f) != (size_t)n) {
-      fprintf(stderr, "baac: cannot write %s\n", out->name.c_str());
+      fprintf(stderr, "bac: cannot write %s\n", out->name.c_str());
       return 1;
     }
   }
-  n = baac_flac_encoder_finish(enc, coded.data(), (int)coded.size());
+  n = bac_flac_encoder_finish(enc, coded.data(), (int)coded.size());
   if (n < 0 || fwrite(coded.data(), 1, (size_t)n, out->f) != (size_t)n) {
-    fprintf(stderr, "baac: cannot finish %s\n", out->name.c_str());
+    fprintf(stderr, "bac: cannot finish %s\n", out->name.c_str());
     return 1;
   }
   if (rewrite) {
     /* The header again, now with the total, the MD5 and the seek
      * points; it has the length of the first one, and only its
      * beginning differs from it. */
-    n = baac_flac_encoder_final_header(enc, header.data(), (int)header.size());
+    n = bac_flac_encoder_final_header(enc, header.data(), (int)header.size());
     const size_t changed = n == (int)header.size() ? header_prefix(header) : 0;
     if (n != (int)header.size() || fflush(out->f) != 0 || fseek(out->f, 0, SEEK_SET) != 0 ||
         fwrite(header.data(), 1, changed, out->f) != changed) {
-      fprintf(stderr, "baac: cannot rewrite the header of %s\n", out->name.c_str());
+      fprintf(stderr, "bac: cannot rewrite the header of %s\n", out->name.c_str());
       return 1;
     }
   }
   if (!out->close()) {
-    fprintf(stderr, "baac: cannot write %s\n", out->name.c_str());
+    fprintf(stderr, "bac: cannot write %s\n", out->name.c_str());
     return 1;
   }
   return 0;
@@ -310,9 +310,9 @@ int encode(int argc, char** argv) {
   for (int i = 0; i < argc; i++) {
     const char* arg = argv[i];
     if (strcmp(arg, "--level") == 0 && i + 1 < argc) {
-      if (!parse_int(argv[++i], &args.level) || args.level < BAAC_FLAC_LEVEL_MIN ||
-          args.level > BAAC_FLAC_LEVEL_MAX) {
-        fprintf(stderr, "baac: --level takes %d to %d\n", BAAC_FLAC_LEVEL_MIN, BAAC_FLAC_LEVEL_MAX);
+      if (!parse_int(argv[++i], &args.level) || args.level < BAC_FLAC_LEVEL_MIN ||
+          args.level > BAC_FLAC_LEVEL_MAX) {
+        fprintf(stderr, "bac: --level takes %d to %d\n", BAC_FLAC_LEVEL_MIN, BAC_FLAC_LEVEL_MAX);
         return 2;
       }
     } else if (strcmp(arg, "--raw") == 0 && i + 3 < argc) {
@@ -320,14 +320,14 @@ int encode(int argc, char** argv) {
       if (!parse_int(argv[i + 1], &args.raw_rate) || !parse_int(argv[i + 2], &args.raw_channels) ||
           !parse_int(argv[i + 3], &args.raw_bits) || args.raw_bits < 1 || args.raw_bits > 32 ||
           args.raw_channels < 1) {
-        fprintf(stderr, "baac: --raw takes a sample rate, a channel count and a bit depth\n");
+        fprintf(stderr, "bac: --raw takes a sample rate, a channel count and a bit depth\n");
         return 2;
       }
       i += 3;
     } else if (strcmp(arg, "--tag") == 0 && i + 1 < argc) {
       args.tags.push_back(argv[++i]);
       if (args.tags.back().find('=') == std::string::npos) {
-        fprintf(stderr, "baac: --tag takes NAME=VALUE, and \"%s\" has no '='\n", argv[i]);
+        fprintf(stderr, "bac: --tag takes NAME=VALUE, and \"%s\" has no '='\n", argv[i]);
         return 2;
       }
     } else if (strcmp(arg, "--picture") == 0 && i + 1 < argc) {
@@ -374,17 +374,17 @@ struct DecodeArgs {
 
 int decode_stream(const DecodeArgs& args, File* in, File* out) {
   const char* name = in->name.c_str();
-  BaacFlacDecoder* dec = baac_flac_decoder_create();
+  BacFlacDecoder* dec = bac_flac_decoder_create();
   if (!dec) {
-    fprintf(stderr, "baac: out of memory\n");
+    fprintf(stderr, "bac: out of memory\n");
     return 1;
   }
   const DecoderHandle owner(dec);
-  baac_flac_decoder_set_md5_check(dec, args.md5 ? 1 : 0);
+  bac_flac_decoder_set_md5_check(dec, args.md5 ? 1 : 0);
 
   /* The sample buffer starts at a block of the usual size and grows
    * once to the largest a stream can have, when a frame asks for it. */
-  size_t pcm_size = (size_t)4096 * BAAC_FLAC_MAX_CHANNELS;
+  size_t pcm_size = (size_t)4096 * BAC_FLAC_MAX_CHANNELS;
   std::unique_ptr<int32_t[]> pcm(new int32_t[pcm_size]);
   std::unique_ptr<uint8_t[]> input(new uint8_t[kIoBuffer]);
   std::vector<uint8_t> bytes;
@@ -393,7 +393,7 @@ int decode_stream(const DecodeArgs& args, File* in, File* out) {
   bool have_layout = false;
   bool can_patch = false;
   size_t header_length = 0;
-  BaacFlacStreamInfo info = {};
+  BacFlacStreamInfo info = {};
   uint64_t decoded = 0;  /* samples per channel */
   uint64_t expected = 0; /* position the next frame should have */
   int failures = 0;
@@ -402,7 +402,7 @@ int decode_stream(const DecodeArgs& args, File* in, File* out) {
 
   /* Knows the stream's format from here on, and starts the output. */
   const auto begin_output = [&]() -> bool {
-    if (baac_flac_decoder_stream_info(dec, &info) != AAC_OK) {
+    if (bac_flac_decoder_stream_info(dec, &info) != AAC_OK) {
       return false;
     }
     layout = raw_layout(info.sample_rate, info.channels, info.bits_per_sample);
@@ -435,7 +435,7 @@ int decode_stream(const DecodeArgs& args, File* in, File* out) {
           fatal = true;
           break;
         }
-        baac_flac_decoder_end_input(dec);
+        bac_flac_decoder_end_input(dec);
         ended = true;
       }
     }
@@ -444,20 +444,20 @@ int decode_stream(const DecodeArgs& args, File* in, File* out) {
     while (!fatal && !idle) {
       int took = 0;
       if (pos < got) {
-        took = baac_flac_decoder_feed(dec, input.get() + pos, (int)(got - pos));
+        took = bac_flac_decoder_feed(dec, input.get() + pos, (int)(got - pos));
         if (took < 0) {
-          fprintf(stderr, "baac: %s: %s\n", name, error_name(took));
+          fprintf(stderr, "bac: %s: %s\n", name, error_name(took));
           fatal = true;
           break;
         }
         pos += (size_t)took;
       }
-      const int n = baac_flac_decoder_decode_next(dec, pcm.get(), (int)pcm_size);
+      const int n = bac_flac_decoder_decode_next(dec, pcm.get(), (int)pcm_size);
       if (n == 0) {
         idle = pos == got;
         if (!idle && took == 0) {
           /* A full FIFO always holds a frame; this cannot happen. */
-          fprintf(stderr, "baac: %s: the decoder takes no more input\n", name);
+          fprintf(stderr, "bac: %s: the decoder takes no more input\n", name);
           fatal = true;
         }
         continue;
@@ -468,13 +468,13 @@ int decode_stream(const DecodeArgs& args, File* in, File* out) {
         continue;
       }
       if (n == AAC_ERR_DECODE) {
-        fprintf(stderr, "baac: %s: damaged data after sample %llu\n", name,
+        fprintf(stderr, "bac: %s: damaged data after sample %llu\n", name,
                 (unsigned long long)expected);
         failures++;
         continue;
       }
       if (n < 0) {
-        fprintf(stderr, "baac: %s: %s\n", name,
+        fprintf(stderr, "bac: %s: %s\n", name,
                 n == AAC_ERR_UNSUPPORTED
                     ? "the stream changes its format or lacks its STREAMINFO, which is unsupported"
                     : error_name(n));
@@ -482,14 +482,14 @@ int decode_stream(const DecodeArgs& args, File* in, File* out) {
         break;
       }
       if (!have_layout && !begin_output()) {
-        fprintf(stderr, "baac: cannot write %s\n", out ? out->name.c_str() : name);
+        fprintf(stderr, "bac: cannot write %s\n", out ? out->name.c_str() : name);
         fatal = true;
         break;
       }
-      BaacFlacFrameInfo frame;
-      if (baac_flac_decoder_last_frame_info(dec, &frame) == AAC_OK) {
+      BacFlacFrameInfo frame;
+      if (bac_flac_decoder_last_frame_info(dec, &frame) == AAC_OK) {
         if (frame.sample_position != expected) {
-          fprintf(stderr, "baac: %s: decoding resumes at sample %llu\n", name,
+          fprintf(stderr, "bac: %s: decoding resumes at sample %llu\n", name,
                   (unsigned long long)frame.sample_position);
         }
         expected = frame.sample_position + (uint64_t)n;
@@ -501,7 +501,7 @@ int decode_stream(const DecodeArgs& args, File* in, File* out) {
         pack(layout, pcm.get(), count, bytes.data());
         if (fwrite(bytes.data(), 1, count * (size_t)layout.container, out->f) !=
             count * (size_t)layout.container) {
-          fprintf(stderr, "baac: cannot write %s\n", out->name.c_str());
+          fprintf(stderr, "bac: cannot write %s\n", out->name.c_str());
           fatal = true;
         }
       }
@@ -514,22 +514,22 @@ int decode_stream(const DecodeArgs& args, File* in, File* out) {
     return 1;
   }
 
-  BaacFlacMd5Verdict verdict = BAAC_FLAC_MD5_UNKNOWN;
-  if (baac_flac_decoder_finish(dec, &verdict) != AAC_OK) {
-    fprintf(stderr, "baac: %s ends inside a frame or a metadata block\n", name);
+  BacFlacMd5Verdict verdict = BAC_FLAC_MD5_UNKNOWN;
+  if (bac_flac_decoder_finish(dec, &verdict) != AAC_OK) {
+    fprintf(stderr, "bac: %s ends inside a frame or a metadata block\n", name);
     failures++;
   }
   if (!have_layout && !begin_output()) {
-    fprintf(stderr, "baac: %s is not a FLAC stream\n", name);
+    fprintf(stderr, "bac: %s is not a FLAC stream\n", name);
     return 1;
   }
   if (info.total_samples && info.total_samples != decoded) {
-    fprintf(stderr, "baac: %s holds %llu samples and states %llu\n", name,
+    fprintf(stderr, "bac: %s holds %llu samples and states %llu\n", name,
             (unsigned long long)decoded, (unsigned long long)info.total_samples);
     failures++;
   }
-  if (verdict == BAAC_FLAC_MD5_MISMATCH) {
-    fprintf(stderr, "baac: %s: the MD5 of the decoded samples is not the one in the header\n",
+  if (verdict == BAC_FLAC_MD5_MISMATCH) {
+    fprintf(stderr, "bac: %s: the MD5 of the decoded samples is not the one in the header\n",
             name);
     failures++;
   }
@@ -539,14 +539,14 @@ int decode_stream(const DecodeArgs& args, File* in, File* out) {
       uint8_t header[68];
       wav_header(layout, data, header);
       if (data > 0xFFFFFFFFull - header_length) {
-        fprintf(stderr, "baac: %s is too long for the length fields of a WAV file\n",
+        fprintf(stderr, "bac: %s is too long for the length fields of a WAV file\n",
                 out->name.c_str());
         failures++;
       }
       if (fflush(out->f) != 0 || fseek(out->f, 0, SEEK_SET) != 0 ||
           fwrite(header, 1, header_length, out->f) != header_length ||
           fseek(out->f, 0, SEEK_END) != 0) {
-        fprintf(stderr, "baac: cannot rewrite the header of %s\n", out->name.c_str());
+        fprintf(stderr, "bac: cannot rewrite the header of %s\n", out->name.c_str());
         failures++;
       }
     }
@@ -555,13 +555,13 @@ int decode_stream(const DecodeArgs& args, File* in, File* out) {
     }
   }
   if (out && !out->close()) {
-    fprintf(stderr, "baac: cannot write %s\n", out->name.c_str());
+    fprintf(stderr, "bac: cannot write %s\n", out->name.c_str());
     failures++;
   }
   if (!out && failures == 0) {
     printf("%s: ok, %llu samples of %d channels at %d Hz and %d bits, %s\n", name,
            (unsigned long long)decoded, info.channels, info.sample_rate, info.bits_per_sample,
-           verdict == BAAC_FLAC_MD5_MATCH ? "MD5 verified"
+           verdict == BAC_FLAC_MD5_MATCH ? "MD5 verified"
            : args.md5                     ? "no MD5 in the stream"
                                           : "MD5 not checked");
   }
@@ -570,7 +570,7 @@ int decode_stream(const DecodeArgs& args, File* in, File* out) {
    * whose standard output may be the audio, on standard error. */
   uint64_t id3v2_bytes = 0;
   int id3v1 = 0;
-  baac_flac_decoder_id3(dec, &id3v2_bytes, &id3v1);
+  bac_flac_decoder_id3(dec, &id3v2_bytes, &id3v1);
   FILE* notes = out ? stderr : stdout;
   if (id3v2_bytes) {
     fprintf(notes, "%s: an ID3v2 tag of %llu bytes in front of the stream was passed over\n", name,
@@ -639,7 +639,7 @@ int info(int argc, char** argv) {
       export_path = argv[++i];
     } else if (strcmp(arg, "--picture-number") == 0 && i + 1 < argc) {
       if (!parse_int(argv[++i], &picture_number) || picture_number < 1) {
-        fprintf(stderr, "baac: --picture-number counts from 1\n");
+        fprintf(stderr, "bac: --picture-number counts from 1\n");
         return 2;
       }
     } else if (arg[0] == '-' && arg[1] != '\0') {
@@ -658,13 +658,13 @@ int info(int argc, char** argv) {
     return 1;
   }
   const char* name = in.name.c_str();
-  BaacFlacDecoder* dec = baac_flac_decoder_create();
+  BacFlacDecoder* dec = bac_flac_decoder_create();
   if (!dec) {
-    fprintf(stderr, "baac: out of memory\n");
+    fprintf(stderr, "bac: out of memory\n");
     return 1;
   }
   const DecoderHandle owner(dec);
-  baac_flac_decoder_set_metadata(dec, 1, 0);
+  bac_flac_decoder_set_metadata(dec, 1, 0);
 
   /* The header is all that is read: the input is fed until the first
    * frame is there, and that frame only says that the header is over. */
@@ -678,20 +678,20 @@ int info(int argc, char** argv) {
       if (read_failed(in)) {
         return 1;
       }
-      baac_flac_decoder_end_input(dec);
+      bac_flac_decoder_end_input(dec);
     }
     size_t pos = 0;
     do {
       int took = 0;
       if (pos < got) {
-        took = baac_flac_decoder_feed(dec, input.get() + pos, (int)(got - pos));
+        took = bac_flac_decoder_feed(dec, input.get() + pos, (int)(got - pos));
         if (took < 0) {
-          fprintf(stderr, "baac: %s: %s\n", name, error_name(took));
+          fprintf(stderr, "bac: %s: %s\n", name, error_name(took));
           return 1;
         }
         pos += (size_t)took;
       }
-      const int n = baac_flac_decoder_decode_next(dec, pcm.get(), (int)kLargestFrame);
+      const int n = bac_flac_decoder_decode_next(dec, pcm.get(), (int)kLargestFrame);
       if (n == AAC_ERR_DECODE) {
         damaged++;
       } else if (n != 0 || (took == 0 && pos < got)) {
@@ -700,16 +700,16 @@ int info(int argc, char** argv) {
     } while (!done && pos < got);
     done = done || got == 0;
   }
-  BaacFlacStreamInfo stream;
-  if (baac_flac_decoder_stream_info(dec, &stream) != AAC_OK) {
-    fprintf(stderr, "baac: %s is not a FLAC stream\n", name);
+  BacFlacStreamInfo stream;
+  if (bac_flac_decoder_stream_info(dec, &stream) != AAC_OK) {
+    fprintf(stderr, "bac: %s is not a FLAC stream\n", name);
     return 1;
   }
-  const BaacFlacComment* comments = nullptr;
-  BaacFlacComment vendor = {};
-  const int comment_count = baac_flac_decoder_comments(dec, &comments, &vendor);
-  const BaacFlacPicture* pictures = nullptr;
-  const int picture_count = baac_flac_decoder_pictures(dec, &pictures);
+  const BacFlacComment* comments = nullptr;
+  BacFlacComment vendor = {};
+  const int comment_count = bac_flac_decoder_comments(dec, &comments, &vendor);
+  const BacFlacPicture* pictures = nullptr;
+  const int picture_count = bac_flac_decoder_pictures(dec, &pictures);
   /* A picture sent to standard output goes there alone. */
   if (!(export_path && is_dash(export_path))) {
     printf("%s: FLAC, %d Hz, %d channels, %d bits", name, stream.sample_rate, stream.channels,
@@ -724,7 +724,7 @@ int info(int argc, char** argv) {
     }
     printf("\n");
     uint64_t id3v2_bytes = 0;
-    baac_flac_decoder_id3(dec, &id3v2_bytes, nullptr);
+    bac_flac_decoder_id3(dec, &id3v2_bytes, nullptr);
     if (id3v2_bytes) {
       printf("ID3v2 tag in front of the stream: %llu bytes, passed over\n",
              (unsigned long long)id3v2_bytes);
@@ -756,8 +756,8 @@ int info(int argc, char** argv) {
         printf("\n");
       }
     }
-    const BaacFlacSeekPoint* points = nullptr;
-    const int seek_points = baac_flac_decoder_seek_points(dec, &points);
+    const BacFlacSeekPoint* points = nullptr;
+    const int seek_points = bac_flac_decoder_seek_points(dec, &points);
     if (seek_points) {
       printf("seek points: %d\n", seek_points);
     }
@@ -774,7 +774,7 @@ int info(int argc, char** argv) {
     }
     printf("pictures: %d\n", picture_count);
     for (int i = 0; i < picture_count; i++) {
-      const BaacFlacPicture& p = pictures[i];
+      const BacFlacPicture& p = pictures[i];
       printf("  %d: type %u (%s), ", i + 1, p.type, picture_type_name(p.type));
       print_text(p.mime_type, strlen(p.mime_type));
       printf(", %ux%u, %u bits", p.width, p.height, p.depth);
@@ -791,26 +791,26 @@ int info(int argc, char** argv) {
     }
   }
   int status = 0;
-  const int skipped = baac_flac_decoder_skipped_metadata(dec);
+  const int skipped = bac_flac_decoder_skipped_metadata(dec);
   if (skipped) {
-    fprintf(stderr, "baac: %s: %d tag or picture blocks beyond %d bytes in all were not read\n",
-            name, skipped, BAAC_FLAC_DEFAULT_METADATA_BYTES);
+    fprintf(stderr, "bac: %s: %d tag or picture blocks beyond %d bytes in all were not read\n",
+            name, skipped, BAC_FLAC_DEFAULT_METADATA_BYTES);
     status = 1;
   }
   if (damaged) {
-    fprintf(stderr, "baac: %s: a metadata block is damaged\n", name);
+    fprintf(stderr, "bac: %s: a metadata block is damaged\n", name);
     status = 1;
   }
   if (export_path) {
     if (picture_number > picture_count) {
-      fprintf(stderr, "baac: %s has no picture %d\n", name, picture_number);
+      fprintf(stderr, "bac: %s has no picture %d\n", name, picture_number);
       return 1;
     }
     File out;
-    const BaacFlacPicture& p = pictures[picture_number - 1];
+    const BacFlacPicture& p = pictures[picture_number - 1];
     if (!open_file(&out, export_path, true) ||
         fwrite(p.data, 1, p.data_bytes, out.f) != p.data_bytes || !out.close()) {
-      fprintf(stderr, "baac: cannot write %s\n", export_path);
+      fprintf(stderr, "bac: cannot write %s\n", export_path);
       return 1;
     }
   }
@@ -819,44 +819,44 @@ int info(int argc, char** argv) {
 
 }  // namespace
 
-}  // namespace baac_flac
+}  // namespace bac_flac
 
-const char* baac_flac_usage(void) {
-  return "baac flac enc [--level 0..8] [--raw RATE CHANNELS BITS] [--tag NAME=VALUE]...\n"
-         "                     [--picture FILE]... <in.wav | -> <out.flac | ->\n"
-         "       baac flac dec [--no-md5] [--raw] <in.flac | -> <out.wav | ->\n"
-         "       baac flac test [--no-md5] <in.flac | ->\n"
-         "       baac flac info [--export-picture FILE [--picture-number N]] <in.flac | ->\n"
+const char* bac_flac_usage(void) {
+  return "bac flac enc [--level 0..8] [--raw RATE CHANNELS BITS] [--tag NAME=VALUE]...\n"
+         "                    [--picture FILE]... <in.wav | -> <out.flac | ->\n"
+         "       bac flac dec [--no-md5] [--raw] <in.flac | -> <out.wav | ->\n"
+         "       bac flac test [--no-md5] <in.flac | ->\n"
+         "       bac flac info [--export-picture FILE [--picture-number N]] <in.flac | ->\n"
          "         integer WAV in and out (- is standard input or output); --raw is headerless\n"
          "         little-endian signed PCM, each sample in its depth rounded up to bytes;\n"
          "         --picture takes a JPEG or PNG file as a front cover\n";
 }
 
-int baac_flac_main(int argc, char** argv) {
+int bac_flac_main(int argc, char** argv) {
   if (argc < 1) {
-    return baac_flac::usage();
+    return bac_flac::usage();
   }
   if (strcmp(argv[0], "enc") == 0) {
-    return baac_flac::encode(argc - 1, argv + 1);
+    return bac_flac::encode(argc - 1, argv + 1);
   }
   if (strcmp(argv[0], "dec") == 0) {
-    return baac_flac::decode(argc - 1, argv + 1, false);
+    return bac_flac::decode(argc - 1, argv + 1, false);
   }
   if (strcmp(argv[0], "test") == 0) {
-    return baac_flac::decode(argc - 1, argv + 1, true);
+    return bac_flac::decode(argc - 1, argv + 1, true);
   }
   if (strcmp(argv[0], "info") == 0) {
-    return baac_flac::info(argc - 1, argv + 1);
+    return bac_flac::info(argc - 1, argv + 1);
   }
-  return baac_flac::usage();
+  return bac_flac::usage();
 }
 
-/* The FLAC rows of `baac bench`: the signal at 16 bits through levels 0,
+/* The FLAC rows of `bac bench`: the signal at 16 bits through levels 0,
  * 5 and 8, each decoded again with the MD5 check on and compared with
  * the input.  Returns the number of rows that failed. */
-int baac_flac_bench(const std::vector<float>& signal, int sample_rate, int seconds,
+int bac_flac_bench(const std::vector<float>& signal, int sample_rate, int seconds,
                     const std::string& only, const std::string& dump) {
-  using baac_flac::kChunkFrames;
+  using bac_flac::kChunkFrames;
   const int channels = 2;
   std::vector<int32_t> pcm(signal.size());
   for (size_t i = 0; i < signal.size(); i++) {
@@ -870,54 +870,54 @@ int baac_flac_bench(const std::vector<float>& signal, int sample_rate, int secon
     if (!only.empty() && only != name) {
       continue;
     }
-    BaacFlacEncoder* enc = baac_flac_encoder_create(sample_rate, channels, 16, level, nullptr);
+    BacFlacEncoder* enc = bac_flac_encoder_create(sample_rate, channels, 16, level, nullptr);
     if (!enc) {
       printf("%-22s unsupported\n", name.c_str());
       failures++;
       continue;
     }
-    std::vector<uint8_t> stream((size_t)baac_flac_encoder_header_bytes(enc));
+    std::vector<uint8_t> stream((size_t)bac_flac_encoder_header_bytes(enc));
     const size_t header = stream.size();
-    std::vector<uint8_t> coded((size_t)baac_flac_encoder_max_output_bytes(enc, 2 * kChunkFrames));
-    bool ok = baac_flac_encoder_write_header(enc, stream.data(), (int)header) == (int)header;
+    std::vector<uint8_t> coded((size_t)bac_flac_encoder_max_output_bytes(enc, 2 * kChunkFrames));
+    bool ok = bac_flac_encoder_write_header(enc, stream.data(), (int)header) == (int)header;
     const double enc_start = now_seconds();
     for (int pos = 0; ok && pos < frames; pos += kChunkFrames) {
-      const int n = baac_flac_encoder_encode(enc, pcm.data() + (size_t)pos * channels,
+      const int n = bac_flac_encoder_encode(enc, pcm.data() + (size_t)pos * channels,
                                              std::min(kChunkFrames, frames - pos), coded.data(),
                                              (int)coded.size());
       ok = n >= 0;
       stream.insert(stream.end(), coded.begin(), coded.begin() + std::max(n, 0));
     }
-    const int last = baac_flac_encoder_finish(enc, coded.data(), (int)coded.size());
+    const int last = bac_flac_encoder_finish(enc, coded.data(), (int)coded.size());
     const double enc_s = now_seconds() - enc_start;
     ok = ok && last >= 0 &&
-         baac_flac_encoder_final_header(enc, stream.data(), (int)header) == (int)header;
+         bac_flac_encoder_final_header(enc, stream.data(), (int)header) == (int)header;
     stream.insert(stream.end(), coded.begin(), coded.begin() + std::max(last, 0));
-    baac_flac_encoder_destroy(enc);
+    bac_flac_encoder_destroy(enc);
 
-    BaacFlacDecoder* dec = baac_flac_decoder_create();
+    BacFlacDecoder* dec = bac_flac_decoder_create();
     std::vector<int32_t> out;
     out.reserve(pcm.size());
-    std::vector<int32_t> block((size_t)BAAC_FLAC_MAX_BLOCK_SIZE * channels);
-    BaacFlacMd5Verdict verdict = BAAC_FLAC_MD5_UNKNOWN;
+    std::vector<int32_t> block((size_t)BAC_FLAC_MAX_BLOCK_SIZE * channels);
+    BacFlacMd5Verdict verdict = BAC_FLAC_MD5_UNKNOWN;
     const double dec_start = now_seconds();
-    ok = ok && dec && baac_flac_decoder_set_md5_check(dec, 1) == AAC_OK;
+    ok = ok && dec && bac_flac_decoder_set_md5_check(dec, 1) == AAC_OK;
     for (size_t pos = 0; ok && pos < stream.size();) {
-      const int took = baac_flac_decoder_feed(dec, stream.data() + pos,
+      const int took = bac_flac_decoder_feed(dec, stream.data() + pos,
                                               (int)std::min<size_t>(stream.size() - pos, 65536));
       pos += (size_t)std::max(took, 0);
       int n;
       int frames_out = 0;
-      while ((n = baac_flac_decoder_decode_next(dec, block.data(), (int)block.size())) > 0) {
+      while ((n = bac_flac_decoder_decode_next(dec, block.data(), (int)block.size())) > 0) {
         out.insert(out.end(), block.begin(), block.begin() + (size_t)n * channels);
         frames_out++;
       }
       ok = took >= 0 && n == 0 && (took > 0 || frames_out > 0);
     }
-    ok = ok && baac_flac_decoder_finish(dec, &verdict) == AAC_OK;
+    ok = ok && bac_flac_decoder_finish(dec, &verdict) == AAC_OK;
     const double dec_s = now_seconds() - dec_start;
-    baac_flac_decoder_destroy(dec);
-    ok = ok && verdict == BAAC_FLAC_MD5_MATCH && out == pcm;
+    bac_flac_decoder_destroy(dec);
+    ok = ok && verdict == BAC_FLAC_MD5_MATCH && out == pcm;
 
     printf("%-22s %8.1f %9.3f %8.1fx %9.3f %8.1fx%s\n", name.c_str(),
            (double)stream.size() * 8.0 / (double)seconds / 1000.0, enc_s, (double)seconds / enc_s,

@@ -4,7 +4,7 @@
  * the same sums in the same order. */
 #include "../flac_internal.h"
 
-#if defined(BAAC_AAC_SSE2) || defined(__SSE2__)
+#if defined(BAC_AAC_SSE2) || defined(__SSE2__)
 
 #include <emmintrin.h>
 
@@ -347,4 +347,4 @@ void flac_dsp_init_sse2(FlacDSP* dsp, int) {
   dsp->rice_sums = rice_sums_sse2;
 }
 
-#endif /* BAAC_AAC_SSE2 || __SSE2__ */
+#endif /* BAC_AAC_SSE2 || __SSE2__ */

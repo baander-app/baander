@@ -747,7 +747,7 @@ void test_committed() {
     const double low = low_band_db(low_src, stream);
     CHECK(low > s.min_low_db, "%s: low band %.1f dB against the source", s.name, low);
     const std::vector<uint8_t> fresh = committed_encode(s, pcm);
-#if BAAC_REFERENCE_BUILD
+#if BAC_REFERENCE_BUILD
     if (!check_committed_signal(s.name, pcm, kCommittedSignal)) {
       continue;
     }

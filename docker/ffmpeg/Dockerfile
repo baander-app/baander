@@ -162,21 +162,21 @@ RUN curl -sL -o libvpl.tar.gz https://github.com/intel/libvpl/archive/refs/tags/
     && cmake --build libvpl/build \
     && cmake --install libvpl/build
 
-# --- bAAC (packages/baander-audio-core, repository checkout) ---
-# Installed with the workspace prefix through DESTDIR so that libbaac.pc
+# --- Bånder Audio Core (packages/baander-audio-core, repository checkout) ---
+# Installed with the workspace prefix through DESTDIR so that bac.pc
 # points at the paths FFmpeg's configure sees after the merge below.
-FROM lib-builder AS baac-builder
+FROM lib-builder AS bac-builder
 WORKDIR /build
 COPY packages/baander-audio-core /build/baander-audio-core
 RUN cmake -S /build/baander-audio-core -B /build/baander-audio-core-build -G Ninja \
         -DCMAKE_BUILD_TYPE=Release \
         -DCMAKE_INSTALL_PREFIX=/usr/src/ffmpeg-build-script/workspace \
         -DCMAKE_INSTALL_LIBDIR=lib \
-        -DBAAC_AAC_BUILD_TESTS=OFF -DBAAC_AAC_BUILD_TOOLS=OFF -DBAAC_AAC_SHARED=OFF \
+        -DBAC_AAC_BUILD_TESTS=OFF -DBAC_AAC_BUILD_TOOLS=OFF -DBAC_AAC_SHARED=OFF \
     && cmake --build /build/baander-audio-core-build \
     && DESTDIR=/dist cmake --install /build/baander-audio-core-build \
     && PKG_CONFIG_PATH=/dist/usr/src/ffmpeg-build-script/workspace/lib/pkgconfig \
-       PKG_CONFIG_SYSROOT_DIR=/dist pkg-config --static --libs libbaac
+       PKG_CONFIG_SYSROOT_DIR=/dist pkg-config --static --libs bac
 
 # ============================================================
 # FFmpeg final: merge all library artifacts and rebuild
@@ -206,7 +206,7 @@ COPY --from=libvmaf-builder    /dist/ /usr/src/ffmpeg-build-script/workspace/
 COPY --from=libaribb24-builder /dist/ /usr/src/ffmpeg-build-script/workspace/
 COPY --from=nvcodec-builder    /dist/ /usr/src/ffmpeg-build-script/workspace/
 COPY --from=libvpl-builder     /dist/ /usr/src/ffmpeg-build-script/workspace/
-COPY --from=baac-builder       /dist/usr/src/ffmpeg-build-script/workspace/ /usr/src/ffmpeg-build-script/workspace/
+COPY --from=bac-builder        /dist/usr/src/ffmpeg-build-script/workspace/ /usr/src/ffmpeg-build-script/workspace/
 
 # The bAAC wrapper: sources copied into the FFmpeg tree, the registration
 # patch checked before it is applied so that drift fails the build.

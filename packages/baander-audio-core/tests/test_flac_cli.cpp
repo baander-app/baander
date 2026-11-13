@@ -1,15 +1,15 @@
-/* The `baac flac` commands, run as the built tool: WAV and raw PCM in
+/* The `bac flac` commands, run as the built tool: WAV and raw PCM in
  * and out, standard input and output, what is refused and what is left
  * behind then, the exit status of `test` and `dec` on streams that are
  * damaged or whose MD5 is wrong, tags and pictures written by `enc` and
  * listed by `info`, the commands the tool had before, and the memory of
  * a long encode and decode against a short one.
  *
- *   BAAC_FLAC_REFERENCE   the path of the flac 1.4.3 binary, which
+ *   BAC_FLAC_REFERENCE   the path of the flac 1.4.3 binary, which
  *                         decodes what `enc` wrote into a pipe; the
  *                         metaflac of the same build reads and writes
  *                         the tags and pictures
- *   BAAC_REQUIRE_ORACLES  set: a missing flac fails the suite instead of
+ *   BAC_REQUIRE_ORACLES  set: a missing flac fails the suite instead of
  *                         skipping that check */
 #include <signal.h>
 #include <sys/resource.h>
@@ -21,7 +21,7 @@
 
 #include "test_flac_util.h"
 
-static std::string g_tool; /* the baac binary, quoted for the shell */
+static std::string g_tool; /* the bac binary, quoted for the shell */
 static std::string g_tmp;  /* a directory for this run */
 
 /* ── running the tool ──────────────────────────────────────────── */
@@ -173,13 +173,13 @@ static void wav_roundtrip(const char* name, int rate, int channels, int bits, in
   /* The file states its total and its MD5 and has a seek table: the
    * output could seek. */
   const std::vector<uint8_t> stream = read_file(path("out.flac"));
-  BaacFlacDecoder* dec = baac_flac_decoder_create();
-  baac_flac_decoder_set_md5_check(dec, 1);
+  BacFlacDecoder* dec = bac_flac_decoder_create();
+  bac_flac_decoder_set_md5_check(dec, 1);
   const FlacDecoded d = flac_decode(stream, 8192, dec);
-  const BaacFlacSeekPoint* points = nullptr;
-  const int seek_points = baac_flac_decoder_seek_points(dec, &points);
-  baac_flac_decoder_destroy(dec);
-  CHECK(d.errors.empty() && d.pcm == pcm && d.verdict == BAAC_FLAC_MD5_MATCH &&
+  const BacFlacSeekPoint* points = nullptr;
+  const int seek_points = bac_flac_decoder_seek_points(dec, &points);
+  bac_flac_decoder_destroy(dec);
+  CHECK(d.errors.empty() && d.pcm == pcm && d.verdict == BAC_FLAC_MD5_MATCH &&
             d.info.total_samples == (uint64_t)frames && d.info.sample_rate == rate &&
             d.info.channels == channels && d.info.bits_per_sample == bits,
         "%s: the stream holds the input, its total and its MD5", name);
@@ -301,7 +301,7 @@ static void test_pipe_output() {
   r = run("cat " + quoted("open.wav") + " | " + g_tool + " flac enc - " + quoted("open.flac"));
   const FlacDecoded o = flac_decode(read_file(path("open.flac")), 4096);
   CHECK(r.status == 0 && o.pcm == pcm && o.info.total_samples == (uint64_t)frames &&
-            o.verdict == BAAC_FLAC_MD5_MATCH,
+            o.verdict == BAC_FLAC_MD5_MATCH,
         "a WAV file of unstated length from standard input is coded to its end");
 
   /* dec into a pipe states the lengths the stream announces. */
@@ -310,8 +310,8 @@ static void test_pipe_output() {
   CHECK(r.status == 0 && w.ok && w.data == data && w.data_length == data.size(),
         "dec to a pipe writes the lengths the stream states");
 
-  const char* reference = getenv("BAAC_FLAC_REFERENCE");
-  if (!oracle_present(reference && *reference, "the reference flac (BAAC_FLAC_REFERENCE)")) {
+  const char* reference = getenv("BAC_FLAC_REFERENCE");
+  if (!oracle_present(reference && *reference, "the reference flac (BAC_FLAC_REFERENCE)")) {
     return;
   }
   write_file(path("pipe.flac"), stream.data(), stream.size());
@@ -374,7 +374,7 @@ static void test_refusals() {
   CHECK(r.status == 2 && !exists(path("refused.flac")), "level 9 is a usage error (exit %d)",
         r.status);
   r = run(g_tool + " flac enc --bogus " + quoted("short.wav") + " " + quoted("refused.flac"));
-  CHECK(r.status == 2 && r.err.find("baac flac enc") != std::string::npos,
+  CHECK(r.status == 2 && r.err.find("bac flac enc") != std::string::npos,
         "an unknown option prints the usage (exit %d)", r.status);
   r = run(g_tool + " flac dec " + quoted("text.wav") + " " + quoted("refused.wav"));
   CHECK(r.status == 1, "dec of a file that is no FLAC stream exits %d", r.status);
@@ -405,10 +405,11 @@ static void test_devices_and_read_errors() {
   remove(path("unread.flac").c_str());
   r = run(g_tool + " flac enc --raw 44100 2 16 " + shell_quote(g_tmp) + " " +
           quoted("unread.flac"));
-  CHECK(r.status == 1 && r.err.find("cannot read") != std::string::npos &&
+  CHECK(r.status == 1 && r.err.rfind("bac: cannot read ", 0) == 0 &&
             !exists(path("unread.flac")),
-        "enc reports an input it cannot read and leaves no stream (exit %d): %s", r.status,
-        r.err.c_str());
+        "enc reports, under the tool's name, an input it cannot read and leaves no stream "
+        "(exit %d): %s",
+        r.status, r.err.c_str());
   for (const char* command : {"test", "dec", "info"}) {
     r = run(g_tool + " flac " + command + " " + shell_quote(g_tmp) +
             (strcmp(command, "dec") == 0 ? " " + quoted("unread.wav") : ""));
@@ -457,7 +458,7 @@ static void test_integrity() {
 
   /* A wrong MD5: the last byte of STREAMINFO. */
   std::vector<uint8_t> wrong = good;
-  wrong[4 + 4 + BAAC_FLAC_STREAMINFO_BYTES - 1] ^= 0x01;
+  wrong[4 + 4 + BAC_FLAC_STREAMINFO_BYTES - 1] ^= 0x01;
   write_file(path("md5.flac"), wrong.data(), wrong.size());
   r = run(g_tool + " flac test " + quoted("md5.flac"));
   CHECK(r.status == 1 && r.err.find("MD5") != std::string::npos,
@@ -504,35 +505,35 @@ static void test_existing_commands() {
   write_file(path("in.f32"), pcm.data(), pcm.size() * sizeof(float));
   Run r = run(g_tool + " enc " + quoted("in.f32") + " " + quoted("out.aac") + " 48000 2");
   const std::vector<uint8_t> aac = read_file(path("out.aac"));
-  CHECK(r.status == 0 && split_adts(aac).size() >= 40, "baac enc writes an ADTS stream (exit %d)",
+  CHECK(r.status == 0 && split_adts(aac).size() >= 40, "bac enc writes an ADTS stream (exit %d)",
         r.status);
   r = run(g_tool + " dec " + quoted("out.aac") + " " + quoted("out.f32"));
   const std::vector<float> back = read_f32(path("out.f32"));
-  CHECK(r.status == 0 && back.size() >= pcm.size(), "baac dec decodes it (exit %d, %zu values)",
+  CHECK(r.status == 0 && back.size() >= pcm.size(), "bac dec decodes it (exit %d, %zu values)",
         r.status, back.size());
   r = run(g_tool + " loudness " + quoted("in.f32") + " 48000 2");
   CHECK(r.status == 0 && std::string(r.out.begin(), r.out.end()).find("integrated loudness") !=
                              std::string::npos,
-        "baac loudness prints its figures (exit %d)", r.status);
+        "bac loudness prints its figures (exit %d)", r.status);
   r = run(g_tool + " bench --seconds 1 --only 'LC 128k'");
   std::string text(r.out.begin(), r.out.end());
   CHECK(r.status == 0 && text.find("LC 128k") != std::string::npos &&
             text.find("FLAC") == std::string::npos,
-        "baac bench --only runs the one configuration (exit %d)", r.status);
+        "bac bench --only runs the one configuration (exit %d)", r.status);
   r = run(g_tool + " bench --seconds 1 --only 'FLAC level 5'");
   text.assign(r.out.begin(), r.out.end());
   CHECK(r.status == 0 && text.find("FLAC level 5") != std::string::npos &&
             text.find("NOT") == std::string::npos,
-        "baac bench has the lossless rows (exit %d): %s", r.status, text.c_str());
+        "bac bench has the lossless rows (exit %d): %s", r.status, text.c_str());
   r = run(g_tool);
-  CHECK(r.status == 2 && r.err.find("baac enc ") != std::string::npos &&
-            r.err.find("baac flac enc") != std::string::npos &&
-            r.err.find("baac flac dec") != std::string::npos &&
-            r.err.find("baac flac test") != std::string::npos &&
-            r.err.find("baac flac info") != std::string::npos,
+  CHECK(r.status == 2 && r.err.find("bac enc ") != std::string::npos &&
+            r.err.find("bac flac enc") != std::string::npos &&
+            r.err.find("bac flac dec") != std::string::npos &&
+            r.err.find("bac flac test") != std::string::npos &&
+            r.err.find("bac flac info") != std::string::npos,
         "the usage lists the old and the new commands (exit %d)", r.status);
   r = run(g_tool + " flac");
-  CHECK(r.status == 2, "baac flac without a command is a usage error (exit %d)", r.status);
+  CHECK(r.status == 2, "bac flac without a command is a usage error (exit %d)", r.status);
 }
 
 /* ── tags and pictures ─────────────────────────────────────────── */
@@ -586,7 +587,7 @@ static std::vector<uint8_t> png_head(int width, int height, int bits, int color_
   return v;
 }
 
-/* The tag lines `baac flac info` prints: the indented lines between
+/* The tag lines `bac flac info` prints: the indented lines between
  * "tags:" and "pictures:". */
 static std::vector<std::string> info_tags(const std::string& text) {
   std::vector<std::string> tags;
@@ -697,11 +698,11 @@ static void test_tags_and_pictures() {
      * first one.  The file has to be what the library gives when the
      * whole final header stands in front of the frames: the seek table
      * filled, and the tags and both pictures as they were. */
-    std::vector<BaacFlacComment> comments;
+    std::vector<BacFlacComment> comments;
     for (const std::string& tag : tags) {
       comments.push_back({tag.data(), (uint32_t)tag.size()});
     }
-    BaacFlacPicture pictures[2] = {};
+    BacFlacPicture pictures[2] = {};
     pictures[0].type = 3;
     pictures[0].mime_type = "image/jpeg";
     pictures[0].width = 640;
@@ -717,33 +718,33 @@ static void test_tags_and_pictures() {
     pictures[1].colors = 13;
     pictures[1].data = png.data();
     pictures[1].data_bytes = (uint32_t)png.size();
-    BaacFlacEncoderOptions wanted;
-    baac_flac_encoder_options_init(&wanted);
+    BacFlacEncoderOptions wanted;
+    bac_flac_encoder_options_init(&wanted);
     wanted.total_samples_hint = (uint64_t)frames;
     wanted.seek_table = 1;
     wanted.comments = comments.data();
     wanted.comment_count = (int)comments.size();
     wanted.pictures = pictures;
     wanted.picture_count = 2;
-    BaacFlacEncoder* enc = baac_flac_encoder_create(44100, 2, 16, BAAC_FLAC_LEVEL_DEFAULT, nullptr);
+    BacFlacEncoder* enc = bac_flac_encoder_create(44100, 2, 16, BAC_FLAC_LEVEL_DEFAULT, nullptr);
     std::vector<uint8_t> expected;
-    bool built = enc && baac_flac_encoder_set_options(enc, &wanted) == AAC_OK;
+    bool built = enc && bac_flac_encoder_set_options(enc, &wanted) == AAC_OK;
     if (built) {
-      const int header = baac_flac_encoder_header_bytes(enc);
+      const int header = bac_flac_encoder_header_bytes(enc);
       expected.resize((size_t)header);
-      std::vector<uint8_t> coded((size_t)baac_flac_encoder_max_output_bytes(enc, frames));
-      built = baac_flac_encoder_write_header(enc, expected.data(), header) == header;
+      std::vector<uint8_t> coded((size_t)bac_flac_encoder_max_output_bytes(enc, frames));
+      built = bac_flac_encoder_write_header(enc, expected.data(), header) == header;
       int n =
-          built ? baac_flac_encoder_encode(enc, pcm.data(), frames, coded.data(), (int)coded.size())
+          built ? bac_flac_encoder_encode(enc, pcm.data(), frames, coded.data(), (int)coded.size())
                 : -1;
       built = n >= 0;
       expected.insert(expected.end(), coded.begin(), coded.begin() + std::max(n, 0));
-      n = built ? baac_flac_encoder_finish(enc, coded.data(), (int)coded.size()) : -1;
+      n = built ? bac_flac_encoder_finish(enc, coded.data(), (int)coded.size()) : -1;
       built = n >= 0;
       expected.insert(expected.end(), coded.begin(), coded.begin() + std::max(n, 0));
-      built = built && baac_flac_encoder_final_header(enc, expected.data(), header) == header;
+      built = built && bac_flac_encoder_final_header(enc, expected.data(), header) == header;
     }
-    baac_flac_encoder_destroy(enc);
+    bac_flac_encoder_destroy(enc);
     const std::vector<uint8_t> written = read_file(path("tagged.flac"));
     CHECK(built && written == expected,
           "the file with a seek table, tags and pictures is the library's stream with its "
@@ -755,7 +756,7 @@ static void test_tags_and_pictures() {
   CHECK(r.status == 0 && info_tags(text) == tags, "info lists the tags in order:\n%s",
         text.c_str());
   CHECK(has(text, "FLAC, 44100 Hz, 2 channels, 16 bits, 20000 samples") &&
-            has(text, "vendor: bAAC") && has(text, "tags: 4") && has(text, "pictures: 2") &&
+            has(text, "vendor: Baander Audio Core") && has(text, "tags: 4") && has(text, "pictures: 2") &&
             has(text, "MD5: ") && has(text, "seek points: 1"),
         "info prints the stream's properties:\n%s", text.c_str());
   CHECK(has(text, "1: type 3 (front cover), image/jpeg, 640x480, 24 bits, " +
@@ -800,7 +801,7 @@ static void test_tags_and_pictures() {
           quoted("refused.flac"));
   CHECK(r.status == 1 && !exists(path("refused.flac")),
         "a tag name that is not ASCII is refused (exit %d)", r.status);
-  r = run("bash -c " + shell_quote(BAAC_TOOL + std::string(" flac enc --tag $'A=\\xff\\xfe' ") +
+  r = run("bash -c " + shell_quote(BAC_TOOL + std::string(" flac enc --tag $'A=\\xff\\xfe' ") +
                                    quoted("in.wav") + " " + quoted("refused.flac")));
   CHECK(r.status == 1 && !exists(path("refused.flac")),
         "a tag value that is not UTF-8 is refused (exit %d)", r.status);
@@ -814,7 +815,7 @@ static void test_tags_and_pictures() {
 
   /* metaflac reads the same tags in the same order and the same
    * picture. */
-  const char* reference = getenv("BAAC_FLAC_REFERENCE");
+  const char* reference = getenv("BAC_FLAC_REFERENCE");
   std::string metaflac;
   if (reference && *reference) {
     const std::string flac = reference;
@@ -823,7 +824,7 @@ static void test_tags_and_pictures() {
       metaflac.clear();
     }
   }
-  if (!oracle_present(!metaflac.empty(), "the reference metaflac (beside BAAC_FLAC_REFERENCE)")) {
+  if (!oracle_present(!metaflac.empty(), "the reference metaflac (beside BAC_FLAC_REFERENCE)")) {
     return;
   }
   r = run(shell_quote(metaflac) + " --export-tags-to=- " + quoted("tagged.flac"));
@@ -854,7 +855,7 @@ static void test_tags_and_pictures() {
           " --set-tag=ARTIST=Ravel --set-tag=GENRE=Classical --set-tag=GENRE=Orchestral "
           "--import-picture-from=" +
           quoted("cover.jpg") + " " + quoted("meta.flac"));
-  CHECK(r.status == 0, "metaflac tags a stream bAAC wrote: %s", r.err.c_str());
+  CHECK(r.status == 0, "metaflac tags a stream bac wrote: %s", r.err.c_str());
   r = run(g_tool + " flac info --export-picture " + quoted("back.bin") + " " + quoted("meta.flac"));
   text = text_of(r.out);
   CHECK(r.status == 0 &&
@@ -948,7 +949,7 @@ static void feed_wav(int fd, int seconds) {
 /* Twenty minutes against ten seconds, encoded from a pipe and decoded
  * from a file: the tool's memory may not follow the length. */
 static void test_memory(const std::string& tool) {
-#if defined(BAAC_FUZZ_SANITIZED)
+#if defined(BAC_FUZZ_SANITIZED)
   (void)tool;
   printf("memory of a long run: not measured in a sanitized build\n");
 #else
@@ -975,7 +976,7 @@ static void test_memory(const std::string& tool) {
 
 int main() {
   signal(SIGPIPE, SIG_IGN);
-  g_tool = shell_quote(BAAC_TOOL);
+  g_tool = shell_quote(BAC_TOOL);
   g_tmp = make_temp_dir();
   CHECK(!g_tmp.empty(), "a temporary directory");
   if (g_tmp.empty()) {
@@ -990,7 +991,7 @@ int main() {
   test_existing_commands();
   test_tags_and_pictures();
   test_id3_reports();
-  test_memory(BAAC_TOOL);
+  test_memory(BAC_TOOL);
   remove_temp_dir(g_tmp);
   return test_summary("test_flac_cli");
 }

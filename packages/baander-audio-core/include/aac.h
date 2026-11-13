@@ -1,5 +1,5 @@
-#ifndef BAANDER_AAC_H
-#define BAANDER_AAC_H
+#ifndef BAANDER_AUDIO_CORE_H
+#define BAANDER_AUDIO_CORE_H
 
 #ifdef __cplusplus
 #include <cstddef>
@@ -657,4 +657,4 @@ int aac_decoder_pending_bytes(AacDecoderHandle ctx);
 }
 #endif
 
-#endif /* BAANDER_AAC_H */
+#endif /* BAANDER_AUDIO_CORE_H */

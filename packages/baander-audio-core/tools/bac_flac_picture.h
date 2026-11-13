@@ -1,14 +1,14 @@
-/* Pictures for the lossless commands of the baac tool: a cover read
+/* Pictures for the lossless commands of the bac tool: a cover read
  * from a JPEG or PNG file with the figures its own header states, and
  * the names of the picture types. */
-#ifndef BAANDER_AAC_TOOLS_BAAC_FLAC_PICTURE_H
-#define BAANDER_AAC_TOOLS_BAAC_FLAC_PICTURE_H
+#ifndef BAANDER_AUDIO_CORE_TOOLS_BAC_FLAC_PICTURE_H
+#define BAANDER_AUDIO_CORE_TOOLS_BAC_FLAC_PICTURE_H
 
 #include <cstdint>
 #include <string>
 #include <vector>
 
-namespace baac_flac {
+namespace bac_flac {
 
 struct PictureFile {
   std::string mime;
@@ -27,6 +27,6 @@ bool read_picture(const char* path, PictureFile* pic);
 /* The name of a picture type of the format (RFC 9639 section 8.8). */
 const char* picture_type_name(uint32_t type);
 
-}  // namespace baac_flac
+}  // namespace bac_flac
 
-#endif /* BAANDER_AAC_TOOLS_BAAC_FLAC_PICTURE_H */
+#endif /* BAANDER_AUDIO_CORE_TOOLS_BAC_FLAC_PICTURE_H */

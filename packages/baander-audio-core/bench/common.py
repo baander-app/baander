@@ -17,7 +17,7 @@ WORK = Path(os.environ.get("BENCH_WORK", HERE / "work"))
 os.environ["LC_ALL"] = "C"
 
 TOOLS = {
-    "baac": os.environ.get("BAAC", str(HERE.parent / "cmake-build" / "baac")),
+    "bac": os.environ.get("BAC", str(HERE.parent / "cmake-build" / "bac")),
     "ffmpeg": os.environ.get("FFMPEG", "ffmpeg"),
     "fdk_enc": os.environ.get("FDK_AAC_ENC", ""),       # fdk-aac aac-enc
     "fdk_dec": os.environ.get("FDK_AAC_DEC", ""),       # fdk-aac aac-dec

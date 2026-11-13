@@ -927,14 +927,14 @@ Bytes flac_block(int type, const Bytes& body, bool last, uint32_t claimed = 0xFF
 }
 
 Bytes flac_streaminfo(int rate, int channels, int bits, int block, uint64_t total = 0) {
-  BaacFlacStreamInfo info = {};
+  BacFlacStreamInfo info = {};
   info.min_block_size = block;
   info.max_block_size = block;
   info.sample_rate = rate;
   info.channels = channels;
   info.bits_per_sample = bits;
   info.total_samples = total;
-  Bytes body(BAAC_FLAC_STREAMINFO_BYTES);
+  Bytes body(BAC_FLAC_STREAMINFO_BYTES);
   flac_streaminfo_write(&info, body.data());
   return body;
 }
@@ -1053,20 +1053,20 @@ Bytes flac_picture(uint32_t mime_length, uint32_t description_length, uint32_t d
  * library, tags and pictures included, and returns the stream with its
  * final header. */
 Bytes flac_encoded(int rate, int channels, int bits, int level, int frames, bool tagged) {
-  BaacFlacEncoder* enc = baac_flac_encoder_create(rate, channels, bits, level, nullptr);
+  BacFlacEncoder* enc = bac_flac_encoder_create(rate, channels, bits, level, nullptr);
   if (!enc) {
     fprintf(stderr, "fuzz_seeds: no FLAC encoder for %d Hz, %d channels, %d bits\n", rate, channels,
             bits);
     exit(1);
   }
-  BaacFlacEncoderOptions options;
-  baac_flac_encoder_options_init(&options);
+  BacFlacEncoderOptions options;
+  bac_flac_encoder_options_init(&options);
   options.seek_table = 1;
   options.total_samples_hint = (uint64_t)frames;
   options.padding_bytes = tagged ? 16 : 0;
-  const BaacFlacComment comments[3] = {{"TITLE=A seed", 12}, {"GENRE=x", 7}, {"GENRE=y", 7}};
+  const BacFlacComment comments[3] = {{"TITLE=A seed", 12}, {"GENRE=x", 7}, {"GENRE=y", 7}};
   const Bytes cover(300, 0x42);
-  BaacFlacPicture picture = {};
+  BacFlacPicture picture = {};
   picture.type = 3;
   picture.mime_type = "image/jpeg";
   picture.description = "cover";
@@ -1078,7 +1078,7 @@ Bytes flac_encoded(int rate, int channels, int bits, int level, int frames, bool
     options.pictures = &picture;
     options.picture_count = 1;
   }
-  baac_flac_encoder_set_options(enc, &options);
+  bac_flac_encoder_set_options(enc, &options);
   std::vector<int32_t> pcm((size_t)frames * (size_t)channels);
   const double peak = 0.6 * (double)((1ll << (bits - 1)) - 1);
   unsigned seed = 7;
@@ -1090,16 +1090,16 @@ Bytes flac_encoded(int rate, int channels, int bits, int level, int frames, bool
       pcm[(size_t)i * (size_t)channels + (size_t)c] = (int32_t)llround(v * peak);
     }
   }
-  Bytes stream((size_t)baac_flac_encoder_header_bytes(enc));
+  Bytes stream((size_t)bac_flac_encoder_header_bytes(enc));
   const int header = (int)stream.size();
-  baac_flac_encoder_write_header(enc, stream.data(), header);
-  Bytes out((size_t)baac_flac_encoder_max_output_bytes(enc, frames + 4096));
-  int n = baac_flac_encoder_encode(enc, pcm.data(), frames, out.data(), (int)out.size());
+  bac_flac_encoder_write_header(enc, stream.data(), header);
+  Bytes out((size_t)bac_flac_encoder_max_output_bytes(enc, frames + 4096));
+  int n = bac_flac_encoder_encode(enc, pcm.data(), frames, out.data(), (int)out.size());
   stream.insert(stream.end(), out.begin(), out.begin() + std::max(n, 0));
-  n = baac_flac_encoder_finish(enc, out.data(), (int)out.size());
+  n = bac_flac_encoder_finish(enc, out.data(), (int)out.size());
   stream.insert(stream.end(), out.begin(), out.begin() + std::max(n, 0));
-  baac_flac_encoder_final_header(enc, stream.data(), header);
-  baac_flac_encoder_destroy(enc);
+  bac_flac_encoder_final_header(enc, stream.data(), header);
+  bac_flac_encoder_destroy(enc);
   return stream;
 }
 
@@ -1142,7 +1142,7 @@ void flac_decoder_seeds(const std::string& data) {
     if (s.size() > frames && frames >= 42) {
       put(h, base + "_frames.bin",
           cat({{(uint8_t)(kFlacOutOfBand | kFlacChecksums | kFlacMd5), 0x04},
-               slice(s, 8, 8 + BAAC_FLAC_STREAMINFO_BYTES),
+               slice(s, 8, 8 + BAC_FLAC_STREAMINFO_BYTES),
                slice(s, frames, frames + 6000)}));
     }
   }

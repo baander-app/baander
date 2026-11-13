@@ -1,5 +1,5 @@
-#ifndef BAANDER_AAC_DSP_H
-#define BAANDER_AAC_DSP_H
+#ifndef BAANDER_AUDIO_CORE_DSP_H
+#define BAANDER_AUDIO_CORE_DSP_H
 
 #include <cstdint>
 
@@ -83,4 +83,4 @@ void aac_dsp_init_neon(AacDSP* dsp);
 }
 #endif
 
-#endif /* BAANDER_AAC_DSP_H */
+#endif /* BAANDER_AUDIO_CORE_DSP_H */

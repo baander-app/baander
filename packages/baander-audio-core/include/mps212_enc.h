@@ -1,5 +1,5 @@
-#ifndef BAANDER_AAC_MPS212_ENC_H
-#define BAANDER_AAC_MPS212_ENC_H
+#ifndef BAANDER_AUDIO_CORE_MPS212_ENC_H
+#define BAANDER_AUDIO_CORE_MPS212_ENC_H
 
 #include <cstdint>
 
@@ -85,4 +85,4 @@ void aac_mps212_enc_write_silent(AacBitWriter* w);
 }
 #endif
 
-#endif /* BAANDER_AAC_MPS212_ENC_H */
+#endif /* BAANDER_AUDIO_CORE_MPS212_ENC_H */

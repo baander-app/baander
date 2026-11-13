@@ -46,7 +46,7 @@ static FlacEncoded roundtrip(const char* name, const std::vector<int32_t>& pcm, 
         name);
   CHECK(d.pcm == pcm, "%s: %zu values decoded of %zu, %s", name, d.pcm.size(), pcm.size(),
         d.pcm.size() == pcm.size() ? "and they differ" : "a different count");
-  CHECK(d.verdict == BAAC_FLAC_MD5_MATCH, "%s: the MD5 in the header is the input's (%d)", name,
+  CHECK(d.verdict == BAC_FLAC_MD5_MATCH, "%s: the MD5 in the header is the input's (%d)", name,
         (int)d.verdict);
   const uint64_t total = pcm.size() / (size_t)channels;
   CHECK(d.have_info && d.info.sample_rate == rate && d.info.channels == channels &&
@@ -301,7 +301,7 @@ static void test_sine() {
     }
     char name[64];
     snprintf(name, sizeof(name), "a sine at %d bits", bits);
-    const FlacEncoded e = roundtrip(name, pcm, 48000, 1, bits, BAAC_FLAC_LEVEL_DEFAULT);
+    const FlacEncoded e = roundtrip(name, pcm, 48000, 1, bits, BAC_FLAC_LEVEL_DEFAULT);
     const double ratio = (double)frame_bytes(e) * 8.0 / ((double)n * (double)bits);
     CHECK(ratio < 0.25, "%s: %.3f of its samples unencoded", name, ratio);
     const FlacEncoded fixed_only = flac_encode(pcm, 48000, 1, bits, 2);
@@ -358,47 +358,47 @@ static void test_refusals() {
   };
   for (const auto& c : cases) {
     int error = 12345;
-    BaacFlacEncoder* enc = baac_flac_encoder_create(c.rate, c.channels, c.bits, c.level, &error);
+    BacFlacEncoder* enc = bac_flac_encoder_create(c.rate, c.channels, c.bits, c.level, &error);
     CHECK(enc == nullptr && error == c.error, "%s is refused with %d (got %d)", c.what, c.error,
           error);
-    baac_flac_encoder_destroy(enc);
-    CHECK(baac_flac_encoder_create(c.rate, c.channels, c.bits, c.level, nullptr) == nullptr,
+    bac_flac_encoder_destroy(enc);
+    CHECK(bac_flac_encoder_create(c.rate, c.channels, c.bits, c.level, nullptr) == nullptr,
           "%s is refused without an error pointer", c.what);
   }
   int error = 12345;
-  BaacFlacEncoder* ok = baac_flac_encoder_create(655350, 8, 32, 8, &error);
+  BacFlacEncoder* ok = bac_flac_encoder_create(655350, 8, 32, 8, &error);
   CHECK(ok != nullptr && error == AAC_OK, "the largest format is accepted");
-  baac_flac_encoder_destroy(ok);
+  bac_flac_encoder_destroy(ok);
 
   /* A sample outside the bit depth: the call is refused and takes
    * nothing, so the stream goes on as if it had not been made. */
   for (int bits : {8, 12, 16, 20, 24}) {
     const std::vector<int32_t> pcm = flac_gen_tones(3000, 2, bits, 0.5, 6u);
     const FlacEncoded clean = flac_encode(pcm, 44100, 2, bits, 5);
-    BaacFlacEncoder* enc = baac_flac_encoder_create(44100, 2, bits, 5, nullptr);
-    std::vector<uint8_t> stream((size_t)baac_flac_encoder_header_bytes(enc));
-    baac_flac_encoder_write_header(enc, stream.data(), (int)stream.size());
-    std::vector<uint8_t> buf((size_t)baac_flac_encoder_max_output_bytes(enc, 8192) + 65536);
-    int got = baac_flac_encoder_encode(enc, pcm.data(), 1000, buf.data(), (int)buf.size());
+    BacFlacEncoder* enc = bac_flac_encoder_create(44100, 2, bits, 5, nullptr);
+    std::vector<uint8_t> stream((size_t)bac_flac_encoder_header_bytes(enc));
+    bac_flac_encoder_write_header(enc, stream.data(), (int)stream.size());
+    std::vector<uint8_t> buf((size_t)bac_flac_encoder_max_output_bytes(enc, 8192) + 65536);
+    int got = bac_flac_encoder_encode(enc, pcm.data(), 1000, buf.data(), (int)buf.size());
     stream.insert(stream.end(), buf.begin(), buf.begin() + std::max(got, 0));
     for (int64_t outside : {flac_sample_max(bits) + 1, flac_sample_min(bits) - 1,
                             (int64_t)INT32_MAX, (int64_t)INT32_MIN}) {
       std::vector<int32_t> bad(pcm.begin() + 2000, pcm.begin() + 4000);
       bad[1777] = (int32_t)outside;
-      CHECK(baac_flac_encoder_encode(enc, bad.data(), 1000, buf.data(), (int)buf.size()) ==
+      CHECK(bac_flac_encoder_encode(enc, bad.data(), 1000, buf.data(), (int)buf.size()) ==
                 AAC_ERR_INVALID_ARG,
             "%d bits: a sample of %lld is refused", bits, (long long)outside);
     }
-    got = baac_flac_encoder_encode(enc, pcm.data() + 2000, 2000, buf.data(), (int)buf.size());
+    got = bac_flac_encoder_encode(enc, pcm.data() + 2000, 2000, buf.data(), (int)buf.size());
     stream.insert(stream.end(), buf.begin(), buf.begin() + std::max(got, 0));
-    got = baac_flac_encoder_finish(enc, buf.data(), (int)buf.size());
+    got = bac_flac_encoder_finish(enc, buf.data(), (int)buf.size());
     stream.insert(stream.end(), buf.begin(), buf.begin() + std::max(got, 0));
-    baac_flac_encoder_final_header(enc, stream.data(), baac_flac_encoder_header_bytes(enc));
+    bac_flac_encoder_final_header(enc, stream.data(), bac_flac_encoder_header_bytes(enc));
     CHECK(stream == clean.stream, "%d bits: a refused call leaves the stream as it was", bits);
     CHECK(
-        baac_flac_encoder_encode(enc, pcm.data(), 1, buf.data(), (int)buf.size()) == AAC_ERR_STATE,
+        bac_flac_encoder_encode(enc, pcm.data(), 1, buf.data(), (int)buf.size()) == AAC_ERR_STATE,
         "no input after the finish");
-    baac_flac_encoder_destroy(enc);
+    bac_flac_encoder_destroy(enc);
   }
   /* At 32 bits every value is a sample. */
   const std::vector<int32_t> edge = {INT32_MIN, INT32_MAX, 0, -1};
@@ -413,46 +413,46 @@ static void test_output_bound() {
     const int block = kCeilings[level].block_size;
     const std::vector<int32_t> pcm = flac_gen_noise(block * 3, 2, 16, 8u);
     const FlacEncoded clean = flac_encode(pcm, 44100, 2, 16, level);
-    BaacFlacEncoder* enc = baac_flac_encoder_create(44100, 2, 16, level, nullptr);
-    std::vector<uint8_t> stream((size_t)baac_flac_encoder_header_bytes(enc));
-    CHECK(baac_flac_encoder_write_header(enc, stream.data(), (int)stream.size() - 1) ==
+    BacFlacEncoder* enc = bac_flac_encoder_create(44100, 2, 16, level, nullptr);
+    std::vector<uint8_t> stream((size_t)bac_flac_encoder_header_bytes(enc));
+    CHECK(bac_flac_encoder_write_header(enc, stream.data(), (int)stream.size() - 1) ==
               AAC_ERR_OVERFLOW,
           "a header buffer one byte short is refused");
-    CHECK(baac_flac_encoder_write_header(enc, stream.data(), (int)stream.size()) ==
+    CHECK(bac_flac_encoder_write_header(enc, stream.data(), (int)stream.size()) ==
               (int)stream.size(),
           "the header is written");
-    CHECK(baac_flac_encoder_block_size(enc) == block, "level %d: blocks of %d", level, block);
+    CHECK(bac_flac_encoder_block_size(enc) == block, "level %d: blocks of %d", level, block);
     /* Less than a block: nothing can come out, and no room is needed. */
-    CHECK(baac_flac_encoder_max_output_bytes(enc, block - 1) == 0 &&
-              baac_flac_encoder_encode(enc, pcm.data(), block - 1, nullptr, 0) == 0,
+    CHECK(bac_flac_encoder_max_output_bytes(enc, block - 1) == 0 &&
+              bac_flac_encoder_encode(enc, pcm.data(), block - 1, nullptr, 0) == 0,
           "a call that completes no block needs no output buffer");
     /* One more sample completes a block, and two more blocks follow. */
-    const int need = baac_flac_encoder_max_output_bytes(enc, 2 * block + 1);
+    const int need = bac_flac_encoder_max_output_bytes(enc, 2 * block + 1);
     CHECK(need == 3 * (int)frame_bound(block, 2, 16), "the bound for three frames is %d", need);
     std::vector<uint8_t> buf((size_t)need);
     const int32_t* rest = pcm.data() + (size_t)(block - 1) * 2;
-    CHECK(baac_flac_encoder_encode(enc, rest, 2 * block + 1, buf.data(), need - 1) ==
+    CHECK(bac_flac_encoder_encode(enc, rest, 2 * block + 1, buf.data(), need - 1) ==
               AAC_ERR_OVERFLOW,
           "a buffer one byte below the bound is refused");
-    const int got = baac_flac_encoder_encode(enc, rest, 2 * block + 1, buf.data(), need);
+    const int got = bac_flac_encoder_encode(enc, rest, 2 * block + 1, buf.data(), need);
     CHECK(got > 0 && got <= need, "the same call with the bound succeeds: %d", got);
     stream.insert(stream.end(), buf.begin(), buf.begin() + std::max(got, 0));
-    CHECK(baac_flac_encoder_max_output_bytes(enc, 0) == 0, "nothing is left for the finish");
-    CHECK(baac_flac_encoder_finish(enc, nullptr, 0) == 0, "the finish writes nothing");
-    baac_flac_encoder_final_header(enc, stream.data(), baac_flac_encoder_header_bytes(enc));
+    CHECK(bac_flac_encoder_max_output_bytes(enc, 0) == 0, "nothing is left for the finish");
+    CHECK(bac_flac_encoder_finish(enc, nullptr, 0) == 0, "the finish writes nothing");
+    bac_flac_encoder_final_header(enc, stream.data(), bac_flac_encoder_header_bytes(enc));
     CHECK(stream == clean.stream, "the refused call took no input: the stream is the usual one");
-    baac_flac_encoder_destroy(enc);
+    bac_flac_encoder_destroy(enc);
 
     /* The finish has its own bound: the short last frame. */
-    enc = baac_flac_encoder_create(44100, 2, 16, level, nullptr);
-    baac_flac_encoder_write_header(enc, stream.data(), (int)stream.size());
-    baac_flac_encoder_encode(enc, pcm.data(), 100, nullptr, 0);
-    const int last = baac_flac_encoder_max_output_bytes(enc, 0);
+    enc = bac_flac_encoder_create(44100, 2, 16, level, nullptr);
+    bac_flac_encoder_write_header(enc, stream.data(), (int)stream.size());
+    bac_flac_encoder_encode(enc, pcm.data(), 100, nullptr, 0);
+    const int last = bac_flac_encoder_max_output_bytes(enc, 0);
     CHECK(last == (int)frame_bound(100, 2, 16), "the bound of the last frame is %d", last);
-    CHECK(baac_flac_encoder_finish(enc, buf.data(), last - 1) == AAC_ERR_OVERFLOW,
+    CHECK(bac_flac_encoder_finish(enc, buf.data(), last - 1) == AAC_ERR_OVERFLOW,
           "a finish buffer one byte short is refused");
-    CHECK(baac_flac_encoder_finish(enc, buf.data(), last) > 0, "and the finish still succeeds");
-    baac_flac_encoder_destroy(enc);
+    CHECK(bac_flac_encoder_finish(enc, buf.data(), last) > 0, "and the finish still succeeds");
+    bac_flac_encoder_destroy(enc);
   }
 }
 
@@ -465,12 +465,12 @@ static void test_lifecycle() {
     /* A second stream after the finish is what a fresh encoder writes;
      * nothing of the first carries over. */
     const FlacEncoded fresh = flac_encode(other, 44100, 2, 16, level);
-    BaacFlacEncoder* enc = baac_flac_encoder_create(44100, 2, 16, level, nullptr);
+    BacFlacEncoder* enc = bac_flac_encoder_create(44100, 2, 16, level, nullptr);
     const FlacEncoded first = flac_encode(pcm, 44100, 2, 16, level, 777, true, nullptr, enc);
     const FlacEncoded second = flac_encode(other, 44100, 2, 16, level, 333, true, nullptr, enc);
     CHECK(first.error == AAC_OK && second.error == AAC_OK && second.stream == fresh.stream,
           "level %d: a second stream equals a fresh encoder's", level);
-    baac_flac_encoder_destroy(enc);
+    bac_flac_encoder_destroy(enc);
 
     /* However the input is cut up, the stream is the same, and two
      * encodes of one input give the same bytes. */
@@ -482,26 +482,26 @@ static void test_lifecycle() {
   }
 
   /* Calls out of order. */
-  BaacFlacEncoder* enc = baac_flac_encoder_create(48000, 2, 16, 5, nullptr);
+  BacFlacEncoder* enc = bac_flac_encoder_create(48000, 2, 16, 5, nullptr);
   std::vector<uint8_t> buf(1 << 20);
-  BaacFlacFrameInfo frame;
-  BaacFlacEncoderOptions options;
-  baac_flac_encoder_options_init(&options);
+  BacFlacFrameInfo frame;
+  BacFlacEncoderOptions options;
+  bac_flac_encoder_options_init(&options);
   CHECK(options.padding_bytes == 0 && options.total_samples_hint == 0 && options.seek_table == 0,
         "the default options");
   CHECK(
-      baac_flac_encoder_encode(enc, pcm.data(), 10, buf.data(), (int)buf.size()) == AAC_ERR_STATE &&
-          baac_flac_encoder_finish(enc, buf.data(), (int)buf.size()) == AAC_ERR_STATE &&
-          baac_flac_encoder_final_header(enc, buf.data(), (int)buf.size()) == AAC_ERR_STATE &&
-          baac_flac_encoder_last_frame_info(enc, &frame) == AAC_ERR_STATE,
+      bac_flac_encoder_encode(enc, pcm.data(), 10, buf.data(), (int)buf.size()) == AAC_ERR_STATE &&
+          bac_flac_encoder_finish(enc, buf.data(), (int)buf.size()) == AAC_ERR_STATE &&
+          bac_flac_encoder_final_header(enc, buf.data(), (int)buf.size()) == AAC_ERR_STATE &&
+          bac_flac_encoder_last_frame_info(enc, &frame) == AAC_ERR_STATE,
       "nothing but the header before the header");
-  CHECK(baac_flac_encoder_set_options(enc, &options) == AAC_OK, "options before the header");
-  CHECK(baac_flac_encoder_write_header(enc, buf.data(), (int)buf.size()) == 42,
+  CHECK(bac_flac_encoder_set_options(enc, &options) == AAC_OK, "options before the header");
+  CHECK(bac_flac_encoder_write_header(enc, buf.data(), (int)buf.size()) == 42,
         "a header of the marker and STREAMINFO: 42 bytes");
-  CHECK(baac_flac_encoder_write_header(enc, buf.data(), (int)buf.size()) == AAC_ERR_STATE &&
-            baac_flac_encoder_set_options(enc, &options) == AAC_ERR_STATE &&
-            baac_flac_encoder_final_header(enc, buf.data(), (int)buf.size()) == AAC_ERR_STATE &&
-            baac_flac_encoder_last_frame_info(enc, &frame) == AAC_ERR_STATE,
+  CHECK(bac_flac_encoder_write_header(enc, buf.data(), (int)buf.size()) == AAC_ERR_STATE &&
+            bac_flac_encoder_set_options(enc, &options) == AAC_ERR_STATE &&
+            bac_flac_encoder_final_header(enc, buf.data(), (int)buf.size()) == AAC_ERR_STATE &&
+            bac_flac_encoder_last_frame_info(enc, &frame) == AAC_ERR_STATE,
         "no second header, no options and no final header while the stream runs");
 
   /* One block per call: each call returns one frame, which the frame
@@ -510,9 +510,9 @@ static void test_lifecycle() {
   size_t offset = 0;
   bool frames_ok = true;
   for (int f = 0; f < 2; f++) {
-    const int got = baac_flac_encoder_encode(enc, pcm.data() + (size_t)f * 4096 * 2, 4096,
+    const int got = bac_flac_encoder_encode(enc, pcm.data() + (size_t)f * 4096 * 2, 4096,
                                              buf.data(), (int)buf.size());
-    frames_ok = frames_ok && got > 0 && baac_flac_encoder_last_frame_info(enc, &frame) == AAC_OK &&
+    frames_ok = frames_ok && got > 0 && bac_flac_encoder_last_frame_info(enc, &frame) == AAC_OK &&
                 frame.bytes == got && frame.block_size == 4096 && frame.sample_position == position;
     FlacFrameHeader h;
     frames_ok = frames_ok && flac_frame_header_parse(buf.data(), (size_t)got, &h) > 0 &&
@@ -520,47 +520,47 @@ static void test_lifecycle() {
     position += 4096;
     offset += (size_t)std::max(got, 0);
   }
-  CHECK(baac_flac_encoder_encode(enc, pcm.data() + 8192 * 2, 808, buf.data(), (int)buf.size()) == 0,
+  CHECK(bac_flac_encoder_encode(enc, pcm.data() + 8192 * 2, 808, buf.data(), (int)buf.size()) == 0,
         "a partial block writes nothing");
-  BaacFlacStreamInfo info;
-  CHECK(baac_flac_encoder_stream_info(enc, &info) == AAC_OK && info.total_samples == 0 &&
+  BacFlacStreamInfo info;
+  CHECK(bac_flac_encoder_stream_info(enc, &info) == AAC_OK && info.total_samples == 0 &&
             info.sample_rate == 48000 && info.channels == 2 && info.bits_per_sample == 16 &&
             info.min_block_size == 4096 && info.max_block_size == 4096,
         "the stream information before the finish has no total");
-  const int last = baac_flac_encoder_finish(enc, buf.data(), (int)buf.size());
-  frames_ok = frames_ok && last > 0 && baac_flac_encoder_last_frame_info(enc, &frame) == AAC_OK &&
+  const int last = bac_flac_encoder_finish(enc, buf.data(), (int)buf.size());
+  frames_ok = frames_ok && last > 0 && bac_flac_encoder_last_frame_info(enc, &frame) == AAC_OK &&
               frame.bytes == last && frame.block_size == 808 && frame.sample_position == 8192;
   CHECK(frames_ok, "every call that writes a frame reports its bytes, samples and position");
   uint8_t digest[16];
   flac_pcm_md5(pcm, 16, digest);
-  CHECK(baac_flac_encoder_stream_info(enc, &info) == AAC_OK && info.total_samples == 9000 &&
+  CHECK(bac_flac_encoder_stream_info(enc, &info) == AAC_OK && info.total_samples == 9000 &&
             memcmp(info.md5, digest, 16) == 0 && info.min_frame_bytes > 0 &&
             info.max_frame_bytes >= info.min_frame_bytes && info.min_frame_bytes == last,
         "after the finish it has the total, the MD5 and the frame sizes");
-  CHECK(baac_flac_encoder_finish(enc, buf.data(), (int)buf.size()) == AAC_ERR_STATE &&
-            baac_flac_encoder_encode(enc, pcm.data(), 10, buf.data(), (int)buf.size()) ==
+  CHECK(bac_flac_encoder_finish(enc, buf.data(), (int)buf.size()) == AAC_ERR_STATE &&
+            bac_flac_encoder_encode(enc, pcm.data(), 10, buf.data(), (int)buf.size()) ==
                 AAC_ERR_STATE,
         "a finished stream takes nothing");
-  CHECK(baac_flac_encoder_final_header(enc, buf.data(), 41) == AAC_ERR_OVERFLOW &&
-            baac_flac_encoder_final_header(enc, buf.data(), 42) == 42,
+  CHECK(bac_flac_encoder_final_header(enc, buf.data(), 41) == AAC_ERR_OVERFLOW &&
+            bac_flac_encoder_final_header(enc, buf.data(), 42) == 42,
         "the final header has the length of the first");
-  CHECK(baac_flac_encoder_set_options(enc, &options) == AAC_OK, "options after the finish");
-  baac_flac_encoder_destroy(enc);
+  CHECK(bac_flac_encoder_set_options(enc, &options) == AAC_OK, "options after the finish");
+  bac_flac_encoder_destroy(enc);
 
   /* Null handles and pointers. */
-  CHECK(baac_flac_encoder_encode(nullptr, pcm.data(), 1, buf.data(), 1) == AAC_ERR_INVALID_ARG &&
-            baac_flac_encoder_finish(nullptr, buf.data(), 1) == AAC_ERR_INVALID_ARG &&
-            baac_flac_encoder_write_header(nullptr, buf.data(), 1) == AAC_ERR_INVALID_ARG &&
-            baac_flac_encoder_final_header(nullptr, buf.data(), 1) == AAC_ERR_INVALID_ARG &&
-            baac_flac_encoder_header_bytes(nullptr) == AAC_ERR_INVALID_ARG &&
-            baac_flac_encoder_block_size(nullptr) == AAC_ERR_INVALID_ARG &&
-            baac_flac_encoder_max_output_bytes(nullptr, 1) == AAC_ERR_INVALID_ARG &&
-            baac_flac_encoder_set_options(nullptr, &options) == AAC_ERR_INVALID_ARG &&
-            baac_flac_encoder_last_frame_info(nullptr, &frame) == AAC_ERR_INVALID_ARG &&
-            baac_flac_encoder_stream_info(nullptr, &info) == AAC_ERR_INVALID_ARG,
+  CHECK(bac_flac_encoder_encode(nullptr, pcm.data(), 1, buf.data(), 1) == AAC_ERR_INVALID_ARG &&
+            bac_flac_encoder_finish(nullptr, buf.data(), 1) == AAC_ERR_INVALID_ARG &&
+            bac_flac_encoder_write_header(nullptr, buf.data(), 1) == AAC_ERR_INVALID_ARG &&
+            bac_flac_encoder_final_header(nullptr, buf.data(), 1) == AAC_ERR_INVALID_ARG &&
+            bac_flac_encoder_header_bytes(nullptr) == AAC_ERR_INVALID_ARG &&
+            bac_flac_encoder_block_size(nullptr) == AAC_ERR_INVALID_ARG &&
+            bac_flac_encoder_max_output_bytes(nullptr, 1) == AAC_ERR_INVALID_ARG &&
+            bac_flac_encoder_set_options(nullptr, &options) == AAC_ERR_INVALID_ARG &&
+            bac_flac_encoder_last_frame_info(nullptr, &frame) == AAC_ERR_INVALID_ARG &&
+            bac_flac_encoder_stream_info(nullptr, &info) == AAC_ERR_INVALID_ARG,
         "a null encoder is refused everywhere");
-  baac_flac_encoder_destroy(nullptr);
-  baac_flac_encoder_options_init(nullptr);
+  bac_flac_encoder_destroy(nullptr);
+  bac_flac_encoder_options_init(nullptr);
 }
 
 /* ── the header ────────────────────────────────────────────────── */
@@ -578,7 +578,7 @@ static void test_header() {
   for (int level : {0, 5}) {
     const FlacEncoded with = flac_encode(pcm, rate, 1, 16, level, 5000, true);
     const FlacEncoded without = flac_encode(pcm, rate, 1, 16, level, 5000, false);
-    BaacFlacStreamInfo info;
+    BacFlacStreamInfo info;
     CHECK(with.header_bytes == 42 && without.header_bytes == 42,
           "without options the header is the marker and STREAMINFO");
     CHECK(flac_streaminfo_parse(with.stream.data() + 8, &info) &&
@@ -594,15 +594,15 @@ static void test_header() {
                      without.stream.end()),
           "level %d: the rewrite changes the header only", level);
     const FlacDecoded d = flac_decode(without.stream);
-    CHECK(d.errors.empty() && d.pcm == pcm && d.verdict == BAAC_FLAC_MD5_UNKNOWN,
+    CHECK(d.errors.empty() && d.pcm == pcm && d.verdict == BAC_FLAC_MD5_UNKNOWN,
           "level %d: the stream without a rewrite decodes to the input", level);
   }
 
   /* A seek table: reserved from the total the caller expects, filled by
    * the final header with a point for every ten seconds, each naming a
    * real frame. */
-  BaacFlacEncoderOptions options;
-  baac_flac_encoder_options_init(&options);
+  BacFlacEncoderOptions options;
+  bac_flac_encoder_options_init(&options);
   options.total_samples_hint = (uint64_t)n;
   options.seek_table = 1;
   options.padding_bytes = 100;
@@ -612,14 +612,14 @@ static void test_header() {
     CHECK(e.error == AAC_OK && e.header_bytes == 42 + 4 + points_expected * 18 + 4 + 100,
           "level %d: a header of %d bytes with four seek points and padding", level,
           e.header_bytes);
-    BaacFlacDecoder* dec = baac_flac_decoder_create();
-    baac_flac_decoder_set_md5_check(dec, 1);
+    BacFlacDecoder* dec = bac_flac_decoder_create();
+    bac_flac_decoder_set_md5_check(dec, 1);
     const FlacDecoded d = flac_decode(e.stream, 3000, dec);
-    CHECK(d.errors.empty() && d.pcm == pcm && d.verdict == BAAC_FLAC_MD5_MATCH,
+    CHECK(d.errors.empty() && d.pcm == pcm && d.verdict == BAC_FLAC_MD5_MATCH,
           "level %d: the stream with a seek table decodes", level);
-    const BaacFlacSeekPoint* points = nullptr;
-    const int count = baac_flac_decoder_seek_points(dec, &points);
-    CHECK(count == points_expected && baac_flac_decoder_first_frame_offset(dec) == e.header_bytes,
+    const BacFlacSeekPoint* points = nullptr;
+    const int count = bac_flac_decoder_seek_points(dec, &points);
+    CHECK(count == points_expected && bac_flac_decoder_first_frame_offset(dec) == e.header_bytes,
           "level %d: %d seek points", level, count);
     const std::vector<FlacFrameShape> frames = flac_inspect(e.stream);
     const int block = kCeilings[level].block_size;
@@ -634,31 +634,31 @@ static void test_header() {
             "level %d: seek point %d names the frame at sample %llu", level, i,
             (unsigned long long)points[i].sample_position);
     }
-    baac_flac_decoder_destroy(dec);
+    bac_flac_decoder_destroy(dec);
 
     /* Not rewritten: the table holds placeholders only, which a decoder
      * passes over. */
     const FlacEncoded pipe = flac_encode(pcm, rate, 1, 16, level, 5000, false, &options);
-    dec = baac_flac_decoder_create();
+    dec = bac_flac_decoder_create();
     const FlacDecoded p = flac_decode(pipe.stream, SIZE_MAX, dec);
-    CHECK(p.errors.empty() && p.pcm == pcm && baac_flac_decoder_seek_points(dec, &points) == 0,
+    CHECK(p.errors.empty() && p.pcm == pcm && bac_flac_decoder_seek_points(dec, &points) == 0,
           "level %d: a reserved table that was never filled holds no point", level);
-    baac_flac_decoder_destroy(dec);
+    bac_flac_decoder_destroy(dec);
 
     /* A stream shorter than announced leaves placeholders at the end;
      * a longer one has points up to the announced length. */
     const std::vector<int32_t> half(pcm.begin(), pcm.begin() + n / 2);
     const FlacEncoded shorter = flac_encode(half, rate, 1, 16, level, 5000, true, &options);
-    dec = baac_flac_decoder_create();
+    dec = bac_flac_decoder_create();
     const FlacDecoded s = flac_decode(shorter.stream, SIZE_MAX, dec);
-    CHECK(s.errors.empty() && s.pcm == half && baac_flac_decoder_seek_points(dec, &points) == 2,
+    CHECK(s.errors.empty() && s.pcm == half && bac_flac_decoder_seek_points(dec, &points) == 2,
           "level %d: a shorter stream fills the points it reaches", level);
-    baac_flac_decoder_destroy(dec);
+    bac_flac_decoder_destroy(dec);
   }
 
   /* Without the total there is no table, whatever the option says; the
    * option alone reserves nothing. */
-  baac_flac_encoder_options_init(&options);
+  bac_flac_encoder_options_init(&options);
   options.seek_table = 1;
   const FlacEncoded no_hint = flac_encode(pcm, rate, 1, 16, 5, 5000, true, &options);
   CHECK(no_hint.header_bytes == 42, "no total, no seek table");
@@ -669,25 +669,25 @@ static void test_header() {
         "a total without the option reserves nothing");
 
   /* Options that cannot be. */
-  BaacFlacEncoder* enc = baac_flac_encoder_create(rate, 1, 16, 5, nullptr);
-  baac_flac_encoder_options_init(&options);
+  BacFlacEncoder* enc = bac_flac_encoder_create(rate, 1, 16, 5, nullptr);
+  bac_flac_encoder_options_init(&options);
   options.padding_bytes = -1;
-  CHECK(baac_flac_encoder_set_options(enc, &options) == AAC_ERR_INVALID_ARG, "negative padding");
+  CHECK(bac_flac_encoder_set_options(enc, &options) == AAC_ERR_INVALID_ARG, "negative padding");
   options.padding_bytes = 1 << 24;
-  CHECK(baac_flac_encoder_set_options(enc, &options) == AAC_ERR_INVALID_ARG,
+  CHECK(bac_flac_encoder_set_options(enc, &options) == AAC_ERR_INVALID_ARG,
         "padding beyond a metadata block");
   options.padding_bytes = 0;
   options.total_samples_hint = 1ull << 36;
-  CHECK(baac_flac_encoder_set_options(enc, &options) == AAC_ERR_INVALID_ARG,
+  CHECK(bac_flac_encoder_set_options(enc, &options) == AAC_ERR_INVALID_ARG,
         "a total beyond 36 bits");
   /* A very long stream gets no more points than a decoder keeps. */
   options.total_samples_hint = (1ull << 36) - 1;
   options.seek_table = 1;
-  CHECK(baac_flac_encoder_set_options(enc, &options) == AAC_OK &&
-            baac_flac_encoder_header_bytes(enc) ==
-                42 + 4 + BAAC_FLAC_MAX_SEEK_POINTS * FLAC_SEEK_POINT_BYTES,
-        "the seek table is capped at %d points", BAAC_FLAC_MAX_SEEK_POINTS);
-  baac_flac_encoder_destroy(enc);
+  CHECK(bac_flac_encoder_set_options(enc, &options) == AAC_OK &&
+            bac_flac_encoder_header_bytes(enc) ==
+                42 + 4 + BAC_FLAC_MAX_SEEK_POINTS * FLAC_SEEK_POINT_BYTES,
+        "the seek table is capped at %d points", BAC_FLAC_MAX_SEEK_POINTS);
+  bac_flac_encoder_destroy(enc);
 }
 
 /* ── the ceilings of the levels ────────────────────────────────── */

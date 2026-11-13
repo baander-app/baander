@@ -1,5 +1,5 @@
-#ifndef BAANDER_AAC_SBR_ENC_H
-#define BAANDER_AAC_SBR_ENC_H
+#ifndef BAANDER_AUDIO_CORE_SBR_ENC_H
+#define BAANDER_AUDIO_CORE_SBR_ENC_H
 
 #include <cstdint>
 
@@ -170,4 +170,4 @@ void aac_sbr_enc_usac_write_silent(const AacSbrEncoder* s, AacBitWriter* w);
 }
 #endif
 
-#endif /* BAANDER_AAC_SBR_ENC_H */
+#endif /* BAANDER_AUDIO_CORE_SBR_ENC_H */

@@ -6,7 +6,7 @@
 # there.  The testbench is about 300 MB and is never committed; a
 # directory that already verifies is left alone.
 #
-# The conformance suite reads the directory from BAAC_FLAC_TESTBENCH.
+# The conformance suite reads the directory from BAC_FLAC_TESTBENCH.
 #
 # Needs: curl, tar, sha256sum.
 set -euo pipefail

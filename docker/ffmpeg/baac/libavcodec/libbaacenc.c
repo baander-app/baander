@@ -16,7 +16,7 @@
  * AudioSpecificConfig as extradata; the adts and mp4 muxers frame them.
  */
 
-#include <baac/aac.h>
+#include <bac/aac.h>
 
 #include "libavutil/channel_layout.h"
 #include "libavutil/common.h"

@@ -1,5 +1,5 @@
-#ifndef BAANDER_AAC_LATM_H
-#define BAANDER_AAC_LATM_H
+#ifndef BAANDER_AUDIO_CORE_LATM_H
+#define BAANDER_AUDIO_CORE_LATM_H
 
 #include <cstdint>
 
@@ -99,4 +99,4 @@ int aac_loas_payload_length(const uint8_t* data);
 }
 #endif
 
-#endif /* BAANDER_AAC_LATM_H */
+#endif /* BAANDER_AUDIO_CORE_LATM_H */

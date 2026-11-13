@@ -1,5 +1,5 @@
-#ifndef BAANDER_AAC_UNIDRC_H
-#define BAANDER_AAC_UNIDRC_H
+#ifndef BAANDER_AUDIO_CORE_UNIDRC_H
+#define BAANDER_AUDIO_CORE_UNIDRC_H
 
 #include <cstdint>
 
@@ -292,4 +292,4 @@ void aac_unidrc_status(const AacUniDrc* d, int* program_loudness_x100, int* norm
 }
 #endif
 
-#endif /* BAANDER_AAC_UNIDRC_H */
+#endif /* BAANDER_AUDIO_CORE_UNIDRC_H */

@@ -13,7 +13,7 @@ namespace {
 
 /* The name the library writes as the vendor of a tag block when the
  * caller names none. */
-const char kVendor[] = "bAAC";
+const char kVendor[] = "Baander Audio Core";
 
 uint8_t* put_bytes(uint8_t* p, const void* data, size_t size) {
   if (size) {
@@ -27,7 +27,7 @@ bool printable(char c) { return (unsigned char)c >= 0x20 && (unsigned char)c <= 
 
 /* A field of a tag block: a name of printable ASCII without '=', the
  * '=', and a value in UTF-8. */
-bool comment_valid(const BaacFlacComment& c) {
+bool comment_valid(const BacFlacComment& c) {
   if (!c.text) {
     return false;
   }
@@ -52,8 +52,8 @@ bool printable_ascii(const char* s) {
 
 /* The length of the content of a PICTURE block, or 0 for a picture the
  * format does not take. */
-uint64_t picture_block_bytes(const BaacFlacPicture& p) {
-  if (p.type > BAAC_FLAC_MAX_PICTURE_TYPE || !p.mime_type || !printable_ascii(p.mime_type) ||
+uint64_t picture_block_bytes(const BacFlacPicture& p) {
+  if (p.type > BAC_FLAC_MAX_PICTURE_TYPE || !p.mime_type || !printable_ascii(p.mime_type) ||
       (p.data_bytes && !p.data)) {
     return 0;
   }
@@ -64,15 +64,15 @@ uint64_t picture_block_bytes(const BaacFlacPicture& p) {
   return 32 + (uint64_t)strlen(p.mime_type) + description + p.data_bytes;
 }
 
-const char* vendor_of(const BaacFlacEncoderOptions* o) { return o->vendor ? o->vendor : kVendor; }
+const char* vendor_of(const BacFlacEncoderOptions* o) { return o->vendor ? o->vendor : kVendor; }
 
-bool has_comment_block(const BaacFlacEncoderOptions* o) {
+bool has_comment_block(const BacFlacEncoderOptions* o) {
   return o->comment_count > 0 || o->vendor != nullptr;
 }
 
 /* The length of the content of the tag block, or 0 for tags the format
  * does not take. */
-uint64_t comment_block_bytes(const BaacFlacEncoderOptions* o) {
+uint64_t comment_block_bytes(const BacFlacEncoderOptions* o) {
   const char* vendor = vendor_of(o);
   const size_t vendor_bytes = strlen(vendor);
   if (!flac_utf8_valid(vendor, vendor_bytes) || (o->comment_count > 0 && !o->comments)) {
@@ -86,7 +86,7 @@ uint64_t comment_block_bytes(const BaacFlacEncoderOptions* o) {
     bytes += 4 + (uint64_t)o->comments[i].length;
     /* Past the limit the block is refused whatever follows: no count,
      * however large, makes this loop read on. */
-    if (bytes > BAAC_FLAC_MAX_METADATA_BLOCK_BYTES) {
+    if (bytes > BAC_FLAC_MAX_METADATA_BLOCK_BYTES) {
       break;
     }
   }
@@ -144,7 +144,7 @@ bool flac_utf8_valid(const char* text, size_t size) {
 
 /* ── writing ────────────────────────────────────────────────────── */
 
-int flac_meta_size(const BaacFlacEncoderOptions* o, size_t* bytes) {
+int flac_meta_size(const BacFlacEncoderOptions* o, size_t* bytes) {
   *bytes = 0;
   if (o->comment_count < 0 || o->picture_count < 0 || (o->picture_count > 0 && !o->pictures)) {
     return AAC_ERR_INVALID_ARG;
@@ -152,16 +152,16 @@ int flac_meta_size(const BaacFlacEncoderOptions* o, size_t* bytes) {
   uint64_t total = 0;
   if (has_comment_block(o)) {
     const uint64_t block = comment_block_bytes(o);
-    if (block == 0 || block > BAAC_FLAC_MAX_METADATA_BLOCK_BYTES) {
+    if (block == 0 || block > BAC_FLAC_MAX_METADATA_BLOCK_BYTES) {
       return AAC_ERR_INVALID_ARG;
     }
     total += FLAC_BLOCK_HEADER_BYTES + block;
   }
   int icons[3] = {0, 0, 0};
   for (int i = 0; i < o->picture_count; i++) {
-    const BaacFlacPicture& p = o->pictures[i];
+    const BacFlacPicture& p = o->pictures[i];
     const uint64_t block = picture_block_bytes(p);
-    if (block == 0 || block > BAAC_FLAC_MAX_METADATA_BLOCK_BYTES ||
+    if (block == 0 || block > BAC_FLAC_MAX_METADATA_BLOCK_BYTES ||
         ((p.type == 1 || p.type == 2) && ++icons[p.type] > 1)) {
       return AAC_ERR_INVALID_ARG;
     }
@@ -176,7 +176,7 @@ int flac_meta_size(const BaacFlacEncoderOptions* o, size_t* bytes) {
   return AAC_OK;
 }
 
-void flac_meta_write(const BaacFlacEncoderOptions* o, uint8_t* out, size_t* last_header) {
+void flac_meta_write(const BacFlacEncoderOptions* o, uint8_t* out, size_t* last_header) {
   uint8_t* p = out;
   *last_header = 0;
   if (has_comment_block(o)) {
@@ -192,7 +192,7 @@ void flac_meta_write(const BaacFlacEncoderOptions* o, uint8_t* out, size_t* last
     }
   }
   for (int i = 0; i < o->picture_count; i++) {
-    const BaacFlacPicture& pic = o->pictures[i];
+    const BacFlacPicture& pic = o->pictures[i];
     const size_t mime = strlen(pic.mime_type);
     const size_t description = pic.description ? strlen(pic.description) : 0;
     *last_header = (size_t)(p - out);
@@ -244,7 +244,7 @@ int flac_meta_count_comments(const uint8_t* block, size_t size) {
   return (int)count;
 }
 
-void flac_meta_read_comments(uint8_t* block, BaacFlacComment* vendor, BaacFlacComment* comments) {
+void flac_meta_read_comments(uint8_t* block, BacFlacComment* vendor, BacFlacComment* comments) {
   /* Each string gets its closing zero from the byte behind it, which
    * holds a length that has been read by then, or is the spare byte
    * behind the block. */
@@ -267,7 +267,7 @@ void flac_meta_read_comments(uint8_t* block, BaacFlacComment* vendor, BaacFlacCo
   }
 }
 
-bool flac_meta_read_picture(uint8_t* block, size_t size, BaacFlacPicture* picture) {
+bool flac_meta_read_picture(uint8_t* block, size_t size, BacFlacPicture* picture) {
   /* Type and media type, description, four figures and the data: every
    * length against what is left once the fixed fields behind it are
    * counted. */

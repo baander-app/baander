@@ -1,5 +1,5 @@
-#ifndef BAANDER_AAC_DRC_GEN_H
-#define BAANDER_AAC_DRC_GEN_H
+#ifndef BAANDER_AUDIO_CORE_DRC_GEN_H
+#define BAANDER_AUDIO_CORE_DRC_GEN_H
 
 #include "aac.h"
 #include "bitstream.h"
@@ -145,4 +145,4 @@ int aac_drc_gen_write_gain(AacBitWriter* w, const AacUniDrcConfig* c, const AacU
 }
 #endif
 
-#endif /* BAANDER_AAC_DRC_GEN_H */
+#endif /* BAANDER_AUDIO_CORE_DRC_GEN_H */

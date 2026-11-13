@@ -8,7 +8,7 @@
  */
 #include "aac_dsp.h"
 
-#if defined(BAAC_AAC_AVX2) || defined(__AVX2__)
+#if defined(BAC_AAC_AVX2) || defined(__AVX2__)
 
 #include <immintrin.h>
 
@@ -364,4 +364,4 @@ void aac_dsp_init_avx2(AacDSP* dsp) {
   dsp->quant_noise = aac_quant_noise_avx2;
 }
 
-#endif /* BAAC_AAC_AVX2 || __AVX2__ */
+#endif /* BAC_AAC_AVX2 || __AVX2__ */

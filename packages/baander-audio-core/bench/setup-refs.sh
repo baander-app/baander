@@ -58,9 +58,9 @@ heldout=$("$here/fetch-heldout.sh")
 lossless_exports() {
   cat <<ENV
 export FLAC=$flac METAFLAC=$(dirname "$(dirname "$flac")")/metaflac/metaflac
-export BAAC_FLAC_REFERENCE=$flac
-export BAAC_FLAC_TESTBENCH=$testbench
-export BAAC_HELDOUT=$heldout
+export BAC_FLAC_REFERENCE=$flac
+export BAC_FLAC_TESTBENCH=$testbench
+export BAC_HELDOUT=$heldout
 ENV
 }
 {
@@ -68,7 +68,7 @@ ENV
   # What an earlier run wrote for the other references stays until this
   # run has built them again.
   if [ -f env.sh ]; then
-    grep -v -E '^export (FLAC|BAAC_FLAC_REFERENCE|BAAC_FLAC_TESTBENCH|BAAC_HELDOUT)=' env.sh || true
+    grep -v -E '^export (FLAC|BAC_FLAC_REFERENCE|BAC_FLAC_TESTBENCH|BAC_HELDOUT)=' env.sh || true
   fi
 } > env.sh.new
 publish env.sh.new

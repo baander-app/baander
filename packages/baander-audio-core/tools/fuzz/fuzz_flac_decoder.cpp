@@ -4,7 +4,7 @@
  *   byte 0  bit 0 MD5 verification; bits 1-2 tags and pictures: not
  *           kept, kept up to the default limit, up to 64 bytes, up to
  *           4096 bytes; bit 3 the 34 bytes behind the options are a
- *           STREAMINFO handed to baac_flac_decoder_set_streaminfo;
+ *           STREAMINFO handed to bac_flac_decoder_set_streaminfo;
  *           bit 4 the frame checksums are verified (clear: a frame is
  *           taken whatever its CRCs say, so that mutated bytes reach
  *           the code behind them, as RFC 9639 section 11 advises);
@@ -39,10 +39,10 @@ namespace {
 const int kMaxFrames = 96;
 const size_t kMaxSamples = 4u << 20;
 
-int32_t g_pcm[(size_t)BAAC_FLAC_MAX_BLOCK_SIZE * BAAC_FLAC_MAX_CHANNELS];
+int32_t g_pcm[(size_t)BAC_FLAC_MAX_BLOCK_SIZE * BAC_FLAC_MAX_CHANNELS];
 
 struct Session {
-  BaacFlacDecoder* dec;
+  BacFlacDecoder* dec;
   size_t pcm_size;
   size_t limit; /* of tags and pictures; 0: not kept */
   int frames = 0;
@@ -53,7 +53,7 @@ struct Session {
    * for good or the budget of this input is used up. */
   bool drain() {
     for (;;) {
-      const int n = baac_flac_decoder_decode_next(dec, g_pcm, (int)pcm_size);
+      const int n = bac_flac_decoder_decode_next(dec, g_pcm, (int)pcm_size);
       if (n == 0) {
         return true;
       }
@@ -71,19 +71,19 @@ struct Session {
       if (n == AAC_ERR_DECODE) {
         continue;
       }
-      if (n < 0 || n > BAAC_FLAC_MAX_BLOCK_SIZE) {
+      if (n < 0 || n > BAC_FLAC_MAX_BLOCK_SIZE) {
         fuzz_fail("decode_next return outside the documented values", n);
       }
-      BaacFlacStreamInfo info;
-      BaacFlacFrameInfo frame;
-      if (baac_flac_decoder_stream_info(dec, &info) != AAC_OK ||
-          baac_flac_decoder_last_frame_info(dec, &frame) != AAC_OK) {
+      BacFlacStreamInfo info;
+      BacFlacFrameInfo frame;
+      if (bac_flac_decoder_stream_info(dec, &info) != AAC_OK ||
+          bac_flac_decoder_last_frame_info(dec, &frame) != AAC_OK) {
         fuzz_fail("a frame without properties", n);
       }
-      if (info.channels < 1 || info.channels > BAAC_FLAC_MAX_CHANNELS ||
-          info.bits_per_sample < BAAC_FLAC_MIN_BITS_PER_SAMPLE ||
-          info.bits_per_sample > BAAC_FLAC_MAX_BITS_PER_SAMPLE || info.sample_rate < 0 ||
-          info.sample_rate > BAAC_FLAC_MAX_SAMPLE_RATE) {
+      if (info.channels < 1 || info.channels > BAC_FLAC_MAX_CHANNELS ||
+          info.bits_per_sample < BAC_FLAC_MIN_BITS_PER_SAMPLE ||
+          info.bits_per_sample > BAC_FLAC_MAX_BITS_PER_SAMPLE || info.sample_rate < 0 ||
+          info.sample_rate > BAC_FLAC_MAX_SAMPLE_RATE) {
         fuzz_fail("stream properties outside the format", info.channels);
       }
       if (frame.block_size != n || frame.bytes <= 0 ||
@@ -110,7 +110,7 @@ struct Session {
     size_t pos = 0;
     while (pos < size) {
       const size_t want = piece < size - pos ? piece : size - pos;
-      const int took = baac_flac_decoder_feed(dec, data + pos, (int)want);
+      const int took = bac_flac_decoder_feed(dec, data + pos, (int)want);
       if (took == AAC_ERR_STATE || took == AAC_ERR_MEMORY) {
         return false;
       }
@@ -118,15 +118,15 @@ struct Session {
         fuzz_fail("feed return outside the documented values", took);
       }
       pos += (size_t)took;
-      if (baac_flac_decoder_pending_bytes(dec) < 0) {
+      if (bac_flac_decoder_pending_bytes(dec) < 0) {
         fuzz_fail("a negative count of pending bytes", 0);
       }
       const int before = frames;
-      const int lost = baac_flac_decoder_lost_frames(dec);
+      const int lost = bac_flac_decoder_lost_frames(dec);
       if (!drain()) {
         return false;
       }
-      if (took == 0 && frames == before && baac_flac_decoder_lost_frames(dec) == lost) {
+      if (took == 0 && frames == before && bac_flac_decoder_lost_frames(dec) == lost) {
         fuzz_fail("the decoder neither takes input nor produces output", (long)pos);
       }
     }
@@ -136,12 +136,12 @@ struct Session {
   /* What the decoder kept of tags and pictures: within the limit, and
    * every byte of it readable. */
   void check_metadata() {
-    const BaacFlacComment* comments = nullptr;
-    BaacFlacComment vendor = {};
-    const int count = baac_flac_decoder_comments(dec, &comments, &vendor);
-    const BaacFlacPicture* pictures = nullptr;
-    const int picture_count = baac_flac_decoder_pictures(dec, &pictures);
-    if (count < 0 || picture_count < 0 || baac_flac_decoder_skipped_metadata(dec) < 0) {
+    const BacFlacComment* comments = nullptr;
+    BacFlacComment vendor = {};
+    const int count = bac_flac_decoder_comments(dec, &comments, &vendor);
+    const BacFlacPicture* pictures = nullptr;
+    const int picture_count = bac_flac_decoder_pictures(dec, &pictures);
+    if (count < 0 || picture_count < 0 || bac_flac_decoder_skipped_metadata(dec) < 0) {
       fuzz_fail("a negative count of tags or pictures", count);
     }
     if (limit == 0 && (count || picture_count || vendor.length)) {
@@ -165,7 +165,7 @@ struct Session {
       held += comments[i].length;
     }
     for (int i = 0; i < picture_count; i++) {
-      const BaacFlacPicture& p = pictures[i];
+      const BacFlacPicture& p = pictures[i];
       sum += (uint32_t)strlen(p.mime_type) + (uint32_t)strlen(p.description);
       for (uint32_t k = 0; k < p.data_bytes; k++) {
         sum += p.data[k];
@@ -188,24 +188,24 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
   const uint8_t* streaminfo = nullptr;
   size_t streaminfo_size = 0;
   if (options & 0x08) {
-    streaminfo_size = in.take(BAAC_FLAC_STREAMINFO_BYTES, &streaminfo);
+    streaminfo_size = in.take(BAC_FLAC_STREAMINFO_BYTES, &streaminfo);
   }
 
   Session s;
-  s.dec = baac_flac_decoder_create();
+  s.dec = bac_flac_decoder_create();
   if (!s.dec) {
     return 0;
   }
-  static const size_t kLimits[4] = {0, (size_t)BAAC_FLAC_DEFAULT_METADATA_BYTES, 64, 4096};
+  static const size_t kLimits[4] = {0, (size_t)BAC_FLAC_DEFAULT_METADATA_BYTES, 64, 4096};
   s.limit = kLimits[options >> 1 & 3];
   s.pcm_size = (feeding & 0x08) ? 1024 : sizeof(g_pcm) / sizeof(g_pcm[0]);
-  if (baac_flac_decoder_set_md5_check(s.dec, options & 1) != AAC_OK ||
-      baac_flac_decoder_set_metadata(s.dec, s.limit ? 1 : 0, s.limit) != AAC_OK) {
+  if (bac_flac_decoder_set_md5_check(s.dec, options & 1) != AAC_OK ||
+      bac_flac_decoder_set_metadata(s.dec, s.limit ? 1 : 0, s.limit) != AAC_OK) {
     fuzz_fail("a fresh decoder refuses its settings", 0);
   }
   flac_decoder_ignore_checksums(s.dec, !(options & 0x10));
   if (streaminfo) {
-    const int ret = baac_flac_decoder_set_streaminfo(s.dec, streaminfo, (int)streaminfo_size);
+    const int ret = bac_flac_decoder_set_streaminfo(s.dec, streaminfo, (int)streaminfo_size);
     if (ret != AAC_OK && ret != AAC_ERR_INVALID_ARG) {
       fuzz_fail("set_streaminfo return outside the documented codes", ret);
     }
@@ -219,7 +219,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
     bool alive = true;
     if (options & 0x20) {
       alive = s.feed(stream, length / 2, piece);
-      const int ret = baac_flac_decoder_seek_reset(s.dec);
+      const int ret = bac_flac_decoder_seek_reset(s.dec);
       if (ret != AAC_OK && ret != AAC_ERR_STATE) {
         fuzz_fail("seek_reset return outside the documented codes", ret);
       }
@@ -228,26 +228,26 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
       alive = s.feed(stream, length, piece);
     }
     if (alive && !(options & 0x80)) {
-      baac_flac_decoder_end_input(s.dec);
+      bac_flac_decoder_end_input(s.dec);
       s.drain();
     }
     s.check_metadata();
-    BaacFlacMd5Verdict verdict = BAAC_FLAC_MD5_UNKNOWN;
-    const int finish = baac_flac_decoder_finish(s.dec, &verdict);
+    BacFlacMd5Verdict verdict = BAC_FLAC_MD5_UNKNOWN;
+    const int finish = bac_flac_decoder_finish(s.dec, &verdict);
     if (finish != AAC_OK && finish != AAC_ERR_DECODE) {
       fuzz_fail("finish return outside the documented codes", finish);
     }
-    if (verdict != BAAC_FLAC_MD5_UNKNOWN && verdict != BAAC_FLAC_MD5_MATCH &&
-        verdict != BAAC_FLAC_MD5_MISMATCH) {
+    if (verdict != BAC_FLAC_MD5_UNKNOWN && verdict != BAC_FLAC_MD5_MATCH &&
+        verdict != BAC_FLAC_MD5_MISMATCH) {
       fuzz_fail("an MD5 verdict outside its values", (long)verdict);
     }
-    if (baac_flac_decoder_feed(s.dec, stream, length ? 1 : 0) != AAC_ERR_STATE && length) {
+    if (bac_flac_decoder_feed(s.dec, stream, length ? 1 : 0) != AAC_ERR_STATE && length) {
       fuzz_fail("a finished decoder takes input", 0);
     }
     s.check_metadata();
-    const BaacFlacSeekPoint* points = nullptr;
-    const int seek_points = baac_flac_decoder_seek_points(s.dec, &points);
-    if (seek_points < 0 || seek_points > BAAC_FLAC_MAX_SEEK_POINTS) {
+    const BacFlacSeekPoint* points = nullptr;
+    const int seek_points = bac_flac_decoder_seek_points(s.dec, &points);
+    if (seek_points < 0 || seek_points > BAC_FLAC_MAX_SEEK_POINTS) {
       fuzz_fail("more seek points than the decoder keeps", seek_points);
     }
     for (int i = 1; i < seek_points; i++) {
@@ -255,10 +255,10 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
         fuzz_fail("seek points out of order", i);
       }
     }
-    if (baac_flac_decoder_reset(s.dec) != AAC_OK) {
+    if (bac_flac_decoder_reset(s.dec) != AAC_OK) {
       fuzz_fail("a reset that fails", 0);
     }
   }
-  baac_flac_decoder_destroy(s.dec);
+  bac_flac_decoder_destroy(s.dec);
   return 0;
 }

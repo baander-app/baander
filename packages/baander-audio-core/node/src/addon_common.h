@@ -2,8 +2,8 @@
  * named, the bytes of a binary argument, and options that have to be of
  * a kind.  The functions are inline; each source file of the addon
  * includes this header. */
-#ifndef BAANDER_AAC_ADDON_COMMON_H
-#define BAANDER_AAC_ADDON_COMMON_H
+#ifndef BAANDER_AUDIO_CORE_ADDON_COMMON_H
+#define BAANDER_AUDIO_CORE_ADDON_COMMON_H
 
 #include <napi.h>
 
@@ -114,4 +114,4 @@ inline bool option_bool(const Napi::Object& o, const char* key, bool fallback) {
 /* Adds the classes of the lossless mode to the module (flac_addon.cc). */
 void InitFlac(Napi::Env env, Napi::Object exports);
 
-#endif /* BAANDER_AAC_ADDON_COMMON_H */
+#endif /* BAANDER_AUDIO_CORE_ADDON_COMMON_H */

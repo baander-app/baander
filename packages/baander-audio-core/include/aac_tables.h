@@ -1,5 +1,5 @@
-#ifndef BAANDER_AAC_TABLES_H
-#define BAANDER_AAC_TABLES_H
+#ifndef BAANDER_AUDIO_CORE_TABLES_H
+#define BAANDER_AUDIO_CORE_TABLES_H
 
 #include <cstdint>
 
@@ -159,4 +159,4 @@ void aac_tables_init(void);
 }
 #endif
 
-#endif /* BAANDER_AAC_TABLES_H */
+#endif /* BAANDER_AUDIO_CORE_TABLES_H */

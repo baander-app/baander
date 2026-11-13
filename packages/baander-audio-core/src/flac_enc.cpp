@@ -57,7 +57,7 @@ struct Level {
  * different windows compared on them. */
 const int kScorePieces = 15;
 
-const Level kLevels[BAAC_FLAC_LEVEL_MAX + 1] = {
+const Level kLevels[BAC_FLAC_LEVEL_MAX + 1] = {
     {1152, 0, kStereoIndependent, 3, 0, 0, 0}, {1152, 0, kStereoAdaptive, 3, 0, 0, 0},
     {1152, 0, kStereoFull, 3, 0, 0, 0},        {4096, 6, kStereoIndependent, 4, 1, 6, 1},
     {4096, 8, kStereoAdaptive, 4, 1, 6, 1},    {4096, 8, kStereoFull, 5, 1, 6, 1},
@@ -336,7 +336,7 @@ bool wide_residual(const int64_t* x, int n, int order, const int32_t* coefs, int
 
 /* ── encoder state ──────────────────────────────────────────────── */
 
-struct BaacFlacEncoder_ {
+struct BacFlacEncoder_ {
   enum State { kIdle, kStreaming, kFinished };
   State state = kIdle;
   const FlacDSP* dsp = flac_dsp_global();
@@ -344,8 +344,8 @@ struct BaacFlacEncoder_ {
   int sample_rate = 0;
   int channels = 0;
   int bits = 0;
-  Level level = kLevels[BAAC_FLAC_LEVEL_DEFAULT];
-  BaacFlacEncoderOptions options = {};
+  Level level = kLevels[BAC_FLAC_LEVEL_DEFAULT];
+  BacFlacEncoderOptions options = {};
   /* The tag and picture blocks of the options as they go into a header,
    * and where the header of the last of them begins. */
   std::shared_ptr<const std::vector<uint8_t>> meta;
@@ -360,8 +360,8 @@ struct BaacFlacEncoder_ {
   FlacMd5 md5;
   uint8_t digest[16] = {0};
   bool have_frame = false;
-  BaacFlacFrameInfo last = {};
-  std::vector<BaacFlacSeekPoint> seek_points; /* those found so far */
+  BacFlacFrameInfo last = {};
+  std::vector<BacFlacSeekPoint> seek_points; /* those found so far */
   int header_size = 0;                        /* of the stream's header, first and final */
   int padding = 0;                            /* bytes of its padding block */
   std::shared_ptr<const std::vector<uint8_t>> stream_meta; /* its tags and pictures */
@@ -393,7 +393,7 @@ struct BaacFlacEncoder_ {
 
 namespace {
 
-typedef BaacFlacEncoder_ Encoder;
+typedef BacFlacEncoder_ Encoder;
 
 /* The size no frame of `n` samples exceeds: every channel unencoded. */
 size_t frame_bound(const Encoder* e, int n) {
@@ -897,7 +897,7 @@ size_t encode_block(Encoder* e, int n, uint8_t* out) {
   const int block = e->level.block_size;
   int32_t* rows = e->input.data();
   int assignment = FLAC_ASSIGN_INDEPENDENT;
-  Slot* coded[BAAC_FLAC_MAX_CHANNELS];
+  Slot* coded[BAC_FLAC_MAX_CHANNELS];
 
   if (e->channels == 2 && e->level.stereo != kStereoIndependent) {
     /* Mid and side (RFC 9639 section 4.2).  The side channel has one
@@ -1047,7 +1047,7 @@ void account_frame(Encoder* e, int n, size_t bytes) {
   e->have_frame = true;
   if (e->seek_reserved && e->seek_target < e->samples + (uint64_t)n &&
       (int)e->seek_points.size() < e->seek_reserved) {
-    BaacFlacSeekPoint point;
+    BacFlacSeekPoint point;
     point.sample_position = e->samples;
     point.byte_offset = e->audio_bytes;
     point.block_size = n;
@@ -1074,13 +1074,13 @@ int seek_point_count(const Encoder* e, uint64_t* spacing) {
   }
   uint64_t step = (uint64_t)kSeekSeconds * (uint64_t)e->sample_rate;
   step =
-      std::max<uint64_t>(step, (total + BAAC_FLAC_MAX_SEEK_POINTS - 1) / BAAC_FLAC_MAX_SEEK_POINTS);
+      std::max<uint64_t>(step, (total + BAC_FLAC_MAX_SEEK_POINTS - 1) / BAC_FLAC_MAX_SEEK_POINTS);
   *spacing = step;
   return (int)((total + step - 1) / step);
 }
 
-void stream_info(const Encoder* e, BaacFlacStreamInfo* info, bool final) {
-  *info = BaacFlacStreamInfo();
+void stream_info(const Encoder* e, BacFlacStreamInfo* info, bool final) {
+  *info = BacFlacStreamInfo();
   info->min_block_size = e->level.block_size;
   info->max_block_size = e->level.block_size;
   info->sample_rate = e->sample_rate;
@@ -1098,7 +1098,7 @@ void stream_info(const Encoder* e, BaacFlacStreamInfo* info, bool final) {
 int header_bytes(const Encoder* e) {
   uint64_t spacing;
   const int points = seek_point_count(e, &spacing);
-  return FLAC_MARKER_BYTES + FLAC_BLOCK_HEADER_BYTES + BAAC_FLAC_STREAMINFO_BYTES +
+  return FLAC_MARKER_BYTES + FLAC_BLOCK_HEADER_BYTES + BAC_FLAC_STREAMINFO_BYTES +
          (points ? FLAC_BLOCK_HEADER_BYTES + points * FLAC_SEEK_POINT_BYTES : 0) +
          (e->meta ? (int)e->meta->size() : 0) +
          (e->options.padding_bytes ? FLAC_BLOCK_HEADER_BYTES + e->options.padding_bytes : 0);
@@ -1116,17 +1116,17 @@ void write_header(const Encoder* e, uint8_t* out, bool final) {
   memcpy(p, "fLaC", FLAC_MARKER_BYTES);
   p += FLAC_MARKER_BYTES;
   p = flac_put_block_header(p, FLAC_BLOCK_STREAMINFO, !points && !meta && !padding,
-                            BAAC_FLAC_STREAMINFO_BYTES);
-  BaacFlacStreamInfo info;
+                            BAC_FLAC_STREAMINFO_BYTES);
+  BacFlacStreamInfo info;
   stream_info(e, &info, final);
   flac_streaminfo_write(&info, p);
-  p += BAAC_FLAC_STREAMINFO_BYTES;
+  p += BAC_FLAC_STREAMINFO_BYTES;
   if (points) {
     p = flac_put_block_header(p, FLAC_BLOCK_SEEKTABLE, !meta && !padding,
                               (size_t)points * FLAC_SEEK_POINT_BYTES);
     for (int i = 0; i < points; i++) {
       if (final && i < (int)e->seek_points.size()) {
-        const BaacFlacSeekPoint& point = e->seek_points[(size_t)i];
+        const BacFlacSeekPoint& point = e->seek_points[(size_t)i];
         p = flac_put_be(p, point.sample_position, 8);
         p = flac_put_be(p, point.byte_offset, 8);
         p = flac_put_be(p, (uint64_t)point.block_size, 2);
@@ -1158,9 +1158,9 @@ void write_header(const Encoder* e, uint8_t* out, bool final) {
 /* ── internal interface ─────────────────────────────────────────── */
 
 int flac_encoder_check(int sample_rate, int channels, int bits_per_sample, int level) {
-  if (sample_rate <= 0 || sample_rate > BAAC_FLAC_MAX_SAMPLE_RATE || channels < 1 ||
-      channels > BAAC_FLAC_MAX_CHANNELS || level < BAAC_FLAC_LEVEL_MIN ||
-      level > BAAC_FLAC_LEVEL_MAX) {
+  if (sample_rate <= 0 || sample_rate > BAC_FLAC_MAX_SAMPLE_RATE || channels < 1 ||
+      channels > BAC_FLAC_MAX_CHANNELS || level < BAC_FLAC_LEVEL_MIN ||
+      level > BAC_FLAC_LEVEL_MAX) {
     return AAC_ERR_INVALID_ARG;
   }
   if (bits_per_sample != 8 && bits_per_sample != 12 && bits_per_sample != 16 &&
@@ -1170,14 +1170,14 @@ int flac_encoder_check(int sample_rate, int channels, int bits_per_sample, int l
   return flac_sample_rate_is_codable(sample_rate) ? AAC_OK : AAC_ERR_UNSUPPORTED;
 }
 
-BaacFlacEncoder* flac_encoder_create(int sample_rate, int channels, int bits_per_sample,
+BacFlacEncoder* flac_encoder_create(int sample_rate, int channels, int bits_per_sample,
                                      int level) {
   Encoder* e = new Encoder();
   e->sample_rate = sample_rate;
   e->channels = channels;
   e->bits = bits_per_sample;
   e->level = kLevels[level];
-  baac_flac_encoder_options_init(&e->options);
+  bac_flac_encoder_options_init(&e->options);
   flac_md5_init(&e->md5);
   try {
     const size_t block = (size_t)e->level.block_size;
@@ -1211,9 +1211,9 @@ BaacFlacEncoder* flac_encoder_create(int sample_rate, int channels, int bits_per
   return e;
 }
 
-void flac_encoder_destroy(BaacFlacEncoder* e) { delete e; }
+void flac_encoder_destroy(BacFlacEncoder* e) { delete e; }
 
-int flac_encoder_set_options(BaacFlacEncoder* e, const BaacFlacEncoderOptions* options) {
+int flac_encoder_set_options(BacFlacEncoder* e, const BacFlacEncoderOptions* options) {
   if (e->state == Encoder::kStreaming) {
     return AAC_ERR_STATE;
   }
@@ -1245,11 +1245,11 @@ int flac_encoder_set_options(BaacFlacEncoder* e, const BaacFlacEncoderOptions* o
   return AAC_OK;
 }
 
-int flac_encoder_block_size(const BaacFlacEncoder* e) { return e->level.block_size; }
+int flac_encoder_block_size(const BacFlacEncoder* e) { return e->level.block_size; }
 
-int flac_encoder_header_bytes(const BaacFlacEncoder* e) { return header_bytes(e); }
+int flac_encoder_header_bytes(const BacFlacEncoder* e) { return header_bytes(e); }
 
-int flac_encoder_write_header(BaacFlacEncoder* e, uint8_t* out, int out_size) {
+int flac_encoder_write_header(BacFlacEncoder* e, uint8_t* out, int out_size) {
   if (e->state == Encoder::kStreaming) {
     return AAC_ERR_STATE;
   }
@@ -1280,7 +1280,7 @@ int flac_encoder_write_header(BaacFlacEncoder* e, uint8_t* out, int out_size) {
   return bytes;
 }
 
-int flac_encoder_max_output_bytes(const BaacFlacEncoder* e, int n_samples) {
+int flac_encoder_max_output_bytes(const BacFlacEncoder* e, int n_samples) {
   if (n_samples == 0) {
     return e->fill ? (int)frame_bound(e, e->fill) : 0;
   }
@@ -1289,7 +1289,7 @@ int flac_encoder_max_output_bytes(const BaacFlacEncoder* e, int n_samples) {
   return bytes > INT32_MAX ? AAC_ERR_INVALID_ARG : (int)bytes;
 }
 
-int flac_encoder_encode(BaacFlacEncoder* e, const int32_t* pcm, int n_samples, uint8_t* out,
+int flac_encoder_encode(BacFlacEncoder* e, const int32_t* pcm, int n_samples, uint8_t* out,
                         int out_size) {
   if (e->state != Encoder::kStreaming) {
     return AAC_ERR_STATE;
@@ -1364,7 +1364,7 @@ int flac_encoder_encode(BaacFlacEncoder* e, const int32_t* pcm, int n_samples, u
   return (int)written;
 }
 
-int flac_encoder_finish(BaacFlacEncoder* e, uint8_t* out, int out_size) {
+int flac_encoder_finish(BacFlacEncoder* e, uint8_t* out, int out_size) {
   if (e->state != Encoder::kStreaming) {
     return AAC_ERR_STATE;
   }
@@ -1382,7 +1382,7 @@ int flac_encoder_finish(BaacFlacEncoder* e, uint8_t* out, int out_size) {
   return (int)bytes;
 }
 
-int flac_encoder_last_frame_info(const BaacFlacEncoder* e, BaacFlacFrameInfo* info) {
+int flac_encoder_last_frame_info(const BacFlacEncoder* e, BacFlacFrameInfo* info) {
   if (e->state == Encoder::kIdle || !e->have_frame) {
     return AAC_ERR_STATE;
   }
@@ -1390,7 +1390,7 @@ int flac_encoder_last_frame_info(const BaacFlacEncoder* e, BaacFlacFrameInfo* in
   return AAC_OK;
 }
 
-int flac_encoder_final_header(const BaacFlacEncoder* e, uint8_t* out, int out_size) {
+int flac_encoder_final_header(const BacFlacEncoder* e, uint8_t* out, int out_size) {
   if (e->state != Encoder::kFinished) {
     return AAC_ERR_STATE;
   }
@@ -1401,6 +1401,6 @@ int flac_encoder_final_header(const BaacFlacEncoder* e, uint8_t* out, int out_si
   return e->header_size;
 }
 
-void flac_encoder_stream_info(const BaacFlacEncoder* e, BaacFlacStreamInfo* info) {
+void flac_encoder_stream_info(const BacFlacEncoder* e, BacFlacStreamInfo* info) {
   stream_info(e, info, e->state == Encoder::kFinished);
 }

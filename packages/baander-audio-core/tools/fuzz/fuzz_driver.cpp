@@ -32,10 +32,10 @@
 #include "fuzz_driver.h"
 
 /* ASan and UBSan call this before they exit.  It is declared only in a
- * sanitized build (BAAC_FUZZ), since Apple's linker refuses even a weak
+ * sanitized build (BAC_FUZZ), since Apple's linker refuses even a weak
  * reference that no linked library defines; without it the signal
  * handlers alone save the input. */
-#if BAAC_FUZZ_SANITIZED
+#if BAC_FUZZ_SANITIZED
 extern "C" __attribute__((weak)) void __sanitizer_set_death_callback(void (*callback)(void));
 #endif
 
@@ -390,7 +390,7 @@ int main(int argc, char** argv) {
     names.push_back("(empty)");
   }
 
-#if BAAC_FUZZ_SANITIZED
+#if BAC_FUZZ_SANITIZED
   if (__sanitizer_set_death_callback) {
     __sanitizer_set_death_callback(save_current_input);
   }

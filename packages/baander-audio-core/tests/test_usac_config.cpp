@@ -15,7 +15,7 @@
 
 namespace {
 
-std::string data_path(const char* name) { return std::string(BAAC_TEST_DATA_DIR "/") + name; }
+std::string data_path(const char* name) { return std::string(BAC_TEST_DATA_DIR "/") + name; }
 
 /* The LOAS frames of a stream, header included. */
 std::vector<std::vector<uint8_t>> split_loas(const std::vector<uint8_t>& s) {

@@ -1,5 +1,5 @@
-#ifndef BAANDER_AAC_MPS212_H
-#define BAANDER_AAC_MPS212_H
+#ifndef BAANDER_AUDIO_CORE_MPS212_H
+#define BAANDER_AUDIO_CORE_MPS212_H
 
 #include "usac.h"
 
@@ -171,4 +171,4 @@ void aac_mps212_decorrelate(AacMps212State* s, const float (*in)[2], float (*out
 }
 #endif
 
-#endif /* BAANDER_AAC_MPS212_H */
+#endif /* BAANDER_AUDIO_CORE_MPS212_H */

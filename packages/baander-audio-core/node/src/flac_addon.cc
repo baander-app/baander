@@ -107,7 +107,7 @@ struct TagStore {
   /* One picture as it was read: the figures the library will see, the
    * strings and the JavaScript value its pointers will be set to. */
   struct PictureSource {
-    BaacFlacPicture view;
+    BacFlacPicture view;
     std::string mime_type;
     std::string description;
     Napi::Value data;
@@ -117,8 +117,8 @@ struct TagStore {
   std::string vendor;
   bool have_vendor = false;
   std::vector<PictureSource> sources;
-  std::vector<BaacFlacComment> comments;
-  std::vector<BaacFlacPicture> pictures;
+  std::vector<BacFlacComment> comments;
+  std::vector<BacFlacPicture> pictures;
 
   /* Reads `tags`, `vendor` and `pictures`.  Returns false after
    * throwing, or when reading threw. */
@@ -158,7 +158,7 @@ struct TagStore {
           return false;
         }
         const Napi::Object p = item.As<Napi::Object>();
-        BaacFlacPicture picture = {};
+        BacFlacPicture picture = {};
         picture.type = 3;
         std::string mime;
         std::string description;
@@ -194,7 +194,7 @@ struct TagStore {
   /* Points the library's view of the options at the strings and at the
    * bytes of each picture as they are now.  No JavaScript may run
    * between this and the library's copy.  Returns false after throwing. */
-  bool bind(const Napi::Env& env, BaacFlacEncoderOptions* options) {
+  bool bind(const Napi::Env& env, BacFlacEncoderOptions* options) {
     comments.clear();
     for (const std::string& tag : tags) {
       comments.push_back({tag.data(), static_cast<uint32_t>(tag.size())});
@@ -207,13 +207,13 @@ struct TagStore {
         throw_error(env, "FlacEncoder: pictures[].data was detached while the options were read");
         return false;
       }
-      if (size > BAAC_FLAC_MAX_PICTURE_BYTES) {
+      if (size > BAC_FLAC_MAX_PICTURE_BYTES) {
         throw_error(env,
                     "FlacEncoder: pictures[].data is larger than a FLAC picture block "
                     "holds");
         return false;
       }
-      BaacFlacPicture picture = source.view;
+      BacFlacPicture picture = source.view;
       picture.mime_type = source.mime_type.c_str();
       picture.description = source.description.c_str();
       picture.data = bytes;
@@ -229,7 +229,7 @@ struct TagStore {
   }
 };
 
-Napi::Object stream_info_object(const Napi::Env& env, const BaacFlacStreamInfo& info) {
+Napi::Object stream_info_object(const Napi::Env& env, const BacFlacStreamInfo& info) {
   Napi::Object o = Napi::Object::New(env);
   o.Set("minBlockSize", Napi::Number::New(env, info.min_block_size));
   o.Set("maxBlockSize", Napi::Number::New(env, info.max_block_size));
@@ -243,7 +243,7 @@ Napi::Object stream_info_object(const Napi::Env& env, const BaacFlacStreamInfo& 
   return o;
 }
 
-Napi::Object frame_info_object(const Napi::Env& env, const BaacFlacFrameInfo& info) {
+Napi::Object frame_info_object(const Napi::Env& env, const BacFlacFrameInfo& info) {
   Napi::Object o = Napi::Object::New(env);
   o.Set("samplePosition", Napi::Number::New(env, static_cast<double>(info.sample_position)));
   o.Set("blockSize", Napi::Number::New(env, info.block_size));
@@ -281,13 +281,13 @@ class FlacEncoder : public Napi::ObjectWrap<FlacEncoder> {
     }
   }
 
-  ~FlacEncoder() override { baac_flac_encoder_destroy(handle_); }
+  ~FlacEncoder() override { bac_flac_encoder_destroy(handle_); }
 
  private:
   void construct(const Napi::CallbackInfo& info) {
     const Napi::Env env = info.Env();
-    BaacFlacEncoderOptions options;
-    baac_flac_encoder_options_init(&options);
+    BacFlacEncoderOptions options;
+    bac_flac_encoder_options_init(&options);
     bool seek_table = false;
     TagStore store;
     /* Every option is read first; see TagStore for why. */
@@ -307,7 +307,7 @@ class FlacEncoder : public Napi::ObjectWrap<FlacEncoder> {
       }
     }
     options.seek_table = seek_table ? 1 : 0;
-    handle_ = baac_flac_encoder_create(sample_rate_, channels_, bits_, level_, nullptr);
+    handle_ = bac_flac_encoder_create(sample_rate_, channels_, bits_, level_, nullptr);
     if (!handle_) {
       throw_error(env,
                   "FlacEncoder: unsupported configuration (1 to 8 channels; 8, 12, 16, 20, "
@@ -320,7 +320,7 @@ class FlacEncoder : public Napi::ObjectWrap<FlacEncoder> {
     if (!store.bind(env, &options)) {
       return;
     }
-    const int ret = baac_flac_encoder_set_options(handle_, &options);
+    const int ret = bac_flac_encoder_set_options(handle_, &options);
     if (ret != AAC_OK) {
       throw_error(env,
                   "FlacEncoder: options the format does not take: padding up to 16777215 "
@@ -340,7 +340,7 @@ class FlacEncoder : public Napi::ObjectWrap<FlacEncoder> {
       return true;
     }
     out->resize(static_cast<size_t>(header_bytes));
-    if (baac_flac_encoder_write_header(handle_, out->data(), header_bytes) != header_bytes) {
+    if (bac_flac_encoder_write_header(handle_, out->data(), header_bytes) != header_bytes) {
       return false;
     }
     started_ = true;
@@ -356,7 +356,7 @@ class FlacEncoder : public Napi::ObjectWrap<FlacEncoder> {
   int prepare(std::vector<uint8_t>* out, int first_bound) {
     int header_bytes = 0;
     if (!started_) {
-      header_bytes = baac_flac_encoder_header_bytes(handle_);
+      header_bytes = bac_flac_encoder_header_bytes(handle_);
       if (header_bytes < 0) {
         return header_bytes;
       }
@@ -432,7 +432,7 @@ class FlacEncoder : public Napi::ObjectWrap<FlacEncoder> {
     std::vector<uint8_t> out;
     bool coding = false; /* the encoder's state has changed: a failure now loses output */
     try {
-      const int first_bound = baac_flac_encoder_max_output_bytes(handle_, count_at(0));
+      const int first_bound = bac_flac_encoder_max_output_bytes(handle_, count_at(0));
       if (first_bound < 0) {
         return throw_error(env, std::string("FlacEncoder.encode: ") + error_name(first_bound));
       }
@@ -447,7 +447,7 @@ class FlacEncoder : public Napi::ObjectWrap<FlacEncoder> {
       }
       for (size_t pos = 0; pos < frames; pos += step) {
         const int count = count_at(pos);
-        const int bound = baac_flac_encoder_max_output_bytes(handle_, count);
+        const int bound = bac_flac_encoder_max_output_bytes(handle_, count);
         /* A step the library refuses has consumed nothing.  What the
          * call holds by then, the header or earlier frames, is lost
          * with it. */
@@ -457,7 +457,7 @@ class FlacEncoder : public Napi::ObjectWrap<FlacEncoder> {
         }
         uint8_t* const frames_out = scratch(static_cast<size_t>(bound));
         const int n =
-            baac_flac_encoder_encode(handle_, samples + pos * channels_, count, frames_out, bound);
+            bac_flac_encoder_encode(handle_, samples + pos * channels_, count, frames_out, bound);
         if (n < 0) {
           failed_ = !out.empty() || pos > 0;
           return throw_error(env, std::string("FlacEncoder.encode: ") + error_name(n));
@@ -500,7 +500,7 @@ class FlacEncoder : public Napi::ObjectWrap<FlacEncoder> {
     std::vector<uint8_t> out;
     bool coding = false;
     try {
-      const int bound = baac_flac_encoder_max_output_bytes(handle_, 0);
+      const int bound = bac_flac_encoder_max_output_bytes(handle_, 0);
       const int header_bytes = prepare(&out, bound);
       if (header_bytes < 0) {
         return throw_error(env, "FlacEncoder.finish: the stream cannot begin");
@@ -511,7 +511,7 @@ class FlacEncoder : public Napi::ObjectWrap<FlacEncoder> {
         return throw_error(env, "FlacEncoder.finish: the stream cannot begin");
       }
       uint8_t* const frames_out = scratch(static_cast<size_t>(bound > 0 ? bound : 0));
-      const int n = baac_flac_encoder_finish(handle_, frames_out, bound);
+      const int n = bac_flac_encoder_finish(handle_, frames_out, bound);
       if (n < 0) {
         failed_ = !out.empty();
         return throw_error(env, std::string("FlacEncoder.finish: ") + error_name(n));
@@ -537,14 +537,14 @@ class FlacEncoder : public Napi::ObjectWrap<FlacEncoder> {
     if (refuse_failed(env, "FlacEncoder.finalHeader")) {
       return env.Undefined();
     }
-    const int size = baac_flac_encoder_header_bytes(handle_);
+    const int size = bac_flac_encoder_header_bytes(handle_);
     std::vector<uint8_t> out;
     try {
       out.resize(static_cast<size_t>(size > 0 ? size : 0));
     } catch (const std::bad_alloc&) {
       return throw_error(env, "FlacEncoder.finalHeader: out of memory");
     }
-    const int n = baac_flac_encoder_final_header(handle_, out.data(), size);
+    const int n = bac_flac_encoder_final_header(handle_, out.data(), size);
     if (n < 0) {
       return throw_error(env,
                          std::string("FlacEncoder.finalHeader: ") +
@@ -554,13 +554,13 @@ class FlacEncoder : public Napi::ObjectWrap<FlacEncoder> {
   }
 
   Napi::Value HeaderBytes(const Napi::CallbackInfo& info) {
-    return Napi::Number::New(info.Env(), handle_ ? baac_flac_encoder_header_bytes(handle_) : 0);
+    return Napi::Number::New(info.Env(), handle_ ? bac_flac_encoder_header_bytes(handle_) : 0);
   }
 
   Napi::Value LastFrame(const Napi::CallbackInfo& info) {
     const Napi::Env env = info.Env();
-    BaacFlacFrameInfo frame;
-    if (!handle_ || baac_flac_encoder_last_frame_info(handle_, &frame) != AAC_OK) {
+    BacFlacFrameInfo frame;
+    if (!handle_ || bac_flac_encoder_last_frame_info(handle_, &frame) != AAC_OK) {
       return env.Null();
     }
     return frame_info_object(env, frame);
@@ -568,8 +568,8 @@ class FlacEncoder : public Napi::ObjectWrap<FlacEncoder> {
 
   Napi::Value StreamInfo(const Napi::CallbackInfo& info) {
     const Napi::Env env = info.Env();
-    BaacFlacStreamInfo stream;
-    if (!handle_ || baac_flac_encoder_stream_info(handle_, &stream) != AAC_OK) {
+    BacFlacStreamInfo stream;
+    if (!handle_ || bac_flac_encoder_stream_info(handle_, &stream) != AAC_OK) {
       return env.Null();
     }
     return stream_info_object(env, stream);
@@ -588,14 +588,14 @@ class FlacEncoder : public Napi::ObjectWrap<FlacEncoder> {
     return Napi::Number::New(info.Env(), level_);
   }
   Napi::Value BlockSize(const Napi::CallbackInfo& info) {
-    return Napi::Number::New(info.Env(), handle_ ? baac_flac_encoder_block_size(handle_) : 0);
+    return Napi::Number::New(info.Env(), handle_ ? bac_flac_encoder_block_size(handle_) : 0);
   }
 
-  BaacFlacEncoder* handle_ = nullptr;
+  BacFlacEncoder* handle_ = nullptr;
   int sample_rate_ = 44100;
   int channels_ = 2;
   int bits_ = 16;
-  int level_ = BAAC_FLAC_LEVEL_DEFAULT;
+  int level_ = BAC_FLAC_LEVEL_DEFAULT;
   bool started_ = false;  /* the header of the running stream is out */
   bool finished_ = false; /* finish() ended a stream and none has begun since */
   bool failed_ = false;   /* output was lost: the stream is incomplete, and nothing follows */
@@ -682,13 +682,13 @@ class FlacDecoder : public Napi::ObjectWrap<FlacDecoder> {
       }
     }
     max_output_ = static_cast<size_t>(max_output);
-    handle_ = baac_flac_decoder_create();
+    handle_ = bac_flac_decoder_create();
     if (!handle_) {
       throw_error(env, "FlacDecoder: out of memory");
       return;
     }
-    baac_flac_decoder_set_md5_check(handle_, md5 ? 1 : 0);
-    baac_flac_decoder_set_metadata(handle_, metadata ? 1 : 0, static_cast<size_t>(metadata_bytes));
+    bac_flac_decoder_set_md5_check(handle_, md5 ? 1 : 0);
+    bac_flac_decoder_set_metadata(handle_, metadata ? 1 : 0, static_cast<size_t>(metadata_bytes));
     if (have_streaminfo) {
       const uint8_t* bytes = nullptr;
       size_t size = 0;
@@ -696,7 +696,7 @@ class FlacDecoder : public Napi::ObjectWrap<FlacDecoder> {
         throw_error(env, "FlacDecoder: streamInfo must be a Buffer, Uint8Array or ArrayBuffer");
         return;
       }
-      if (baac_flac_decoder_set_streaminfo(handle_, bytes, static_cast<int>(size)) != AAC_OK) {
+      if (bac_flac_decoder_set_streaminfo(handle_, bytes, static_cast<int>(size)) != AAC_OK) {
         throw_error(env,
                     "FlacDecoder: streamInfo is not a STREAMINFO block of 34 bytes with "
                     "values the format allows");
@@ -705,21 +705,21 @@ class FlacDecoder : public Napi::ObjectWrap<FlacDecoder> {
     }
   }
 
-  ~FlacDecoder() override { baac_flac_decoder_destroy(handle_); }
+  ~FlacDecoder() override { bac_flac_decoder_destroy(handle_); }
 
  private:
   /* One frame of the largest block in the most channels: the least a
    * call has to be able to return, and so the smallest bound. */
   static constexpr uint64_t kFrameValues =
-      static_cast<uint64_t>(BAAC_FLAC_MAX_BLOCK_SIZE) * BAAC_FLAC_MAX_CHANNELS;
+      static_cast<uint64_t>(BAC_FLAC_MAX_BLOCK_SIZE) * BAC_FLAC_MAX_CHANNELS;
   static constexpr uint64_t kDefaultOutput = 1 << 20;
   static constexpr uint64_t kLargestOutput = 1 << 28;
 
   /* The values the next frame can have at most: what STREAMINFO allows
    * when the stream has one, else what the format allows. */
   size_t frame_values() const {
-    BaacFlacStreamInfo stream;
-    if (baac_flac_decoder_stream_info(handle_, &stream) == AAC_OK && stream.max_block_size > 0) {
+    BacFlacStreamInfo stream;
+    if (bac_flac_decoder_stream_info(handle_, &stream) == AAC_OK && stream.max_block_size > 0) {
       return static_cast<size_t>(stream.max_block_size) * static_cast<size_t>(stream.channels);
     }
     return static_cast<size_t>(kFrameValues);
@@ -771,7 +771,7 @@ class FlacDecoder : public Napi::ObjectWrap<FlacDecoder> {
         int taken = 0;
         if (left) {
           const size_t piece = left < (1u << 30) ? left : (1u << 30);
-          taken = baac_flac_decoder_feed(handle_, data, static_cast<int>(piece));
+          taken = bac_flac_decoder_feed(handle_, data, static_cast<int>(piece));
           if (taken < 0) {
             deferred_error_ = taken;
             break;
@@ -779,7 +779,7 @@ class FlacDecoder : public Napi::ObjectWrap<FlacDecoder> {
           data += taken;
           left -= static_cast<size_t>(taken);
         } else if (finishing_ && !ended_) {
-          baac_flac_decoder_end_input(handle_);
+          bac_flac_decoder_end_input(handle_);
           ended_ = true;
         }
         bool decoded = false;
@@ -793,7 +793,7 @@ class FlacDecoder : public Napi::ObjectWrap<FlacDecoder> {
             out_.resize(used + room);
           }
           int n =
-              baac_flac_decoder_decode_next(handle_, out_.data() + used, static_cast<int>(room));
+              bac_flac_decoder_decode_next(handle_, out_.data() + used, static_cast<int>(room));
           if (n == AAC_ERR_OVERFLOW && room < kFrameValues) {
             /* A frame larger than STREAMINFO said: the format's largest. */
             room = static_cast<size_t>(kFrameValues);
@@ -802,7 +802,7 @@ class FlacDecoder : public Napi::ObjectWrap<FlacDecoder> {
               break;
             }
             out_.resize(used + room);
-            n = baac_flac_decoder_decode_next(handle_, out_.data() + used, static_cast<int>(room));
+            n = bac_flac_decoder_decode_next(handle_, out_.data() + used, static_cast<int>(room));
           }
           if (n == 0) {
             break;
@@ -811,8 +811,8 @@ class FlacDecoder : public Napi::ObjectWrap<FlacDecoder> {
           if (n == AAC_ERR_DECODE) {
             continue; /* a damaged stretch: counted by the decoder, and on */
           }
-          BaacFlacStreamInfo stream;
-          if (n < 0 || baac_flac_decoder_stream_info(handle_, &stream) != AAC_OK) {
+          BacFlacStreamInfo stream;
+          if (n < 0 || bac_flac_decoder_stream_info(handle_, &stream) != AAC_OK) {
             deferred_error_ = n < 0 ? n : AAC_ERR_DECODE;
             break;
           }
@@ -850,7 +850,7 @@ class FlacDecoder : public Napi::ObjectWrap<FlacDecoder> {
         !finished_) {
       /* A stream that ends inside a frame is damage the library counts,
        * which `errors` shows; any other answer is an error of its own. */
-      const int ret = baac_flac_decoder_finish(handle_, &verdict_);
+      const int ret = bac_flac_decoder_finish(handle_, &verdict_);
       if (ret != AAC_OK && ret != AAC_ERR_DECODE) {
         deferred_error_ = ret;
       } else {
@@ -919,8 +919,8 @@ class FlacDecoder : public Napi::ObjectWrap<FlacDecoder> {
     if (failed_ != 0) {
       /* The stream ended in an error that decode() has thrown: there is
        * nothing more to hand out, and the stream is closed as it is. */
-      baac_flac_decoder_finish(handle_, &verdict_);
-      verdict_ = BAAC_FLAC_MD5_UNKNOWN;
+      bac_flac_decoder_finish(handle_, &verdict_);
+      verdict_ = BAC_FLAC_MD5_UNKNOWN;
       finishing_ = true;
       ended_ = true;
       finished_ = true;
@@ -938,12 +938,12 @@ class FlacDecoder : public Napi::ObjectWrap<FlacDecoder> {
     more_ = false;
     deferred_error_ = 0;
     failed_ = 0;
-    verdict_ = BAAC_FLAC_MD5_UNKNOWN;
+    verdict_ = BAC_FLAC_MD5_UNKNOWN;
   }
 
   Napi::Value Reset(const Napi::CallbackInfo& info) {
     if (handle_) {
-      baac_flac_decoder_reset(handle_);
+      bac_flac_decoder_reset(handle_);
       clear();
       finishing_ = false;
       ended_ = false;
@@ -955,7 +955,7 @@ class FlacDecoder : public Napi::ObjectWrap<FlacDecoder> {
   /* For a seek: drops the buffered bytes and the samples not yet
    * collected; the bytes given next may begin anywhere in the stream. */
   Napi::Value SeekReset(const Napi::CallbackInfo& info) {
-    if (handle_ && baac_flac_decoder_seek_reset(handle_) == AAC_OK) {
+    if (handle_ && bac_flac_decoder_seek_reset(handle_) == AAC_OK) {
       /* The library takes input again, also after finish() was called
        * and had not yet ended the stream; so does this object. */
       clear();
@@ -973,53 +973,53 @@ class FlacDecoder : public Napi::ObjectWrap<FlacDecoder> {
     return Napi::Number::New(info.Env(), static_cast<double>(max_output_));
   }
 
-  bool stream_info(BaacFlacStreamInfo* stream) const {
-    return handle_ && baac_flac_decoder_stream_info(handle_, stream) == AAC_OK;
+  bool stream_info(BacFlacStreamInfo* stream) const {
+    return handle_ && bac_flac_decoder_stream_info(handle_, stream) == AAC_OK;
   }
 
   Napi::Value StreamInfo(const Napi::CallbackInfo& info) {
-    BaacFlacStreamInfo stream;
+    BacFlacStreamInfo stream;
     return stream_info(&stream) ? Napi::Value(stream_info_object(info.Env(), stream))
                                 : info.Env().Null();
   }
 
   Napi::Value LastFrame(const Napi::CallbackInfo& info) {
     const Napi::Env env = info.Env();
-    BaacFlacFrameInfo frame;
-    if (!handle_ || baac_flac_decoder_last_frame_info(handle_, &frame) != AAC_OK) {
+    BacFlacFrameInfo frame;
+    if (!handle_ || bac_flac_decoder_last_frame_info(handle_, &frame) != AAC_OK) {
       return env.Null();
     }
     return frame_info_object(env, frame);
   }
 
   Napi::Value SampleRate(const Napi::CallbackInfo& info) {
-    BaacFlacStreamInfo stream;
+    BacFlacStreamInfo stream;
     return Napi::Number::New(info.Env(), stream_info(&stream) ? stream.sample_rate : 0);
   }
   Napi::Value Channels(const Napi::CallbackInfo& info) {
-    BaacFlacStreamInfo stream;
+    BacFlacStreamInfo stream;
     return Napi::Number::New(info.Env(), stream_info(&stream) ? stream.channels : 0);
   }
   Napi::Value BitsPerSample(const Napi::CallbackInfo& info) {
-    BaacFlacStreamInfo stream;
+    BacFlacStreamInfo stream;
     return Napi::Number::New(info.Env(), stream_info(&stream) ? stream.bits_per_sample : 0);
   }
 
   /* Damaged stretches of the stream so far. */
   Napi::Value Errors(const Napi::CallbackInfo& info) {
-    return Napi::Number::New(info.Env(), handle_ ? baac_flac_decoder_lost_frames(handle_) : 0);
+    return Napi::Number::New(info.Env(), handle_ ? bac_flac_decoder_lost_frames(handle_) : 0);
   }
 
   Napi::Value Md5(const Napi::CallbackInfo& info) {
-    return Napi::String::New(info.Env(), verdict_ == BAAC_FLAC_MD5_MATCH      ? "match"
-                                         : verdict_ == BAAC_FLAC_MD5_MISMATCH ? "mismatch"
+    return Napi::String::New(info.Env(), verdict_ == BAC_FLAC_MD5_MATCH      ? "match"
+                                         : verdict_ == BAC_FLAC_MD5_MISMATCH ? "mismatch"
                                                                               : "unknown");
   }
 
   Napi::Value SeekPoints(const Napi::CallbackInfo& info) {
     const Napi::Env env = info.Env();
-    const BaacFlacSeekPoint* points = nullptr;
-    const int count = handle_ ? baac_flac_decoder_seek_points(handle_, &points) : 0;
+    const BacFlacSeekPoint* points = nullptr;
+    const int count = handle_ ? bac_flac_decoder_seek_points(handle_, &points) : 0;
     Napi::Array result = Napi::Array::New(env, static_cast<size_t>(count > 0 ? count : 0));
     for (int i = 0; i < count; i++) {
       Napi::Object o = Napi::Object::New(env);
@@ -1034,7 +1034,7 @@ class FlacDecoder : public Napi::ObjectWrap<FlacDecoder> {
 
   Napi::Value FirstFrameOffset(const Napi::CallbackInfo& info) {
     const Napi::Env env = info.Env();
-    const int64_t offset = handle_ ? baac_flac_decoder_first_frame_offset(handle_) : -1;
+    const int64_t offset = handle_ ? bac_flac_decoder_first_frame_offset(handle_) : -1;
     return offset < 0 ? env.Null()
                       : Napi::Value(Napi::Number::New(env, static_cast<double>(offset)));
   }
@@ -1042,8 +1042,8 @@ class FlacDecoder : public Napi::ObjectWrap<FlacDecoder> {
   /* The stream's tags, in its order, each 'NAME=value'. */
   Napi::Value Tags(const Napi::CallbackInfo& info) {
     const Napi::Env env = info.Env();
-    const BaacFlacComment* comments = nullptr;
-    const int count = handle_ ? baac_flac_decoder_comments(handle_, &comments, nullptr) : 0;
+    const BacFlacComment* comments = nullptr;
+    const int count = handle_ ? bac_flac_decoder_comments(handle_, &comments, nullptr) : 0;
     Napi::Array result = Napi::Array::New(env, static_cast<size_t>(count > 0 ? count : 0));
     for (int i = 0; i < count; i++) {
       result.Set(static_cast<uint32_t>(i),
@@ -1054,9 +1054,9 @@ class FlacDecoder : public Napi::ObjectWrap<FlacDecoder> {
 
   Napi::Value Vendor(const Napi::CallbackInfo& info) {
     const Napi::Env env = info.Env();
-    const BaacFlacComment* comments = nullptr;
-    BaacFlacComment vendor = {};
-    if (!handle_ || baac_flac_decoder_comments(handle_, &comments, &vendor) < 0) {
+    const BacFlacComment* comments = nullptr;
+    BacFlacComment vendor = {};
+    if (!handle_ || bac_flac_decoder_comments(handle_, &comments, &vendor) < 0) {
       return Napi::String::New(env, "");
     }
     return Napi::String::New(env, vendor.text, vendor.length);
@@ -1064,11 +1064,11 @@ class FlacDecoder : public Napi::ObjectWrap<FlacDecoder> {
 
   Napi::Value Pictures(const Napi::CallbackInfo& info) {
     const Napi::Env env = info.Env();
-    const BaacFlacPicture* pictures = nullptr;
-    const int count = handle_ ? baac_flac_decoder_pictures(handle_, &pictures) : 0;
+    const BacFlacPicture* pictures = nullptr;
+    const int count = handle_ ? bac_flac_decoder_pictures(handle_, &pictures) : 0;
     Napi::Array result = Napi::Array::New(env, static_cast<size_t>(count > 0 ? count : 0));
     for (int i = 0; i < count; i++) {
-      const BaacFlacPicture& p = pictures[i];
+      const BacFlacPicture& p = pictures[i];
       Napi::Object o = Napi::Object::New(env);
       o.Set("type", Napi::Number::New(env, p.type));
       o.Set("mimeType", Napi::String::New(env, p.mime_type));
@@ -1084,14 +1084,14 @@ class FlacDecoder : public Napi::ObjectWrap<FlacDecoder> {
   }
 
   Napi::Value SkippedMetadata(const Napi::CallbackInfo& info) {
-    return Napi::Number::New(info.Env(), handle_ ? baac_flac_decoder_skipped_metadata(handle_) : 0);
+    return Napi::Number::New(info.Env(), handle_ ? bac_flac_decoder_skipped_metadata(handle_) : 0);
   }
 
   /* The bytes of ID3v2 tags passed over in front of the stream. */
   Napi::Value Id3v2Bytes(const Napi::CallbackInfo& info) {
     uint64_t bytes = 0;
     if (handle_) {
-      baac_flac_decoder_id3(handle_, &bytes, nullptr);
+      bac_flac_decoder_id3(handle_, &bytes, nullptr);
     }
     return Napi::Number::New(info.Env(), static_cast<double>(bytes));
   }
@@ -1100,12 +1100,12 @@ class FlacDecoder : public Napi::ObjectWrap<FlacDecoder> {
   Napi::Value Id3v1(const Napi::CallbackInfo& info) {
     int trailer = 0;
     if (handle_) {
-      baac_flac_decoder_id3(handle_, nullptr, &trailer);
+      bac_flac_decoder_id3(handle_, nullptr, &trailer);
     }
     return Napi::Boolean::New(info.Env(), trailer != 0);
   }
 
-  BaacFlacDecoder* handle_ = nullptr;
+  BacFlacDecoder* handle_ = nullptr;
   size_t max_output_ = static_cast<size_t>(kDefaultOutput); /* values one call returns at most */
   std::vector<int32_t> out_;   /* where frames are decoded, kept from call to call */
   std::vector<uint8_t> queue_; /* the last chunk, when a call could not feed all of it */
@@ -1116,7 +1116,7 @@ class FlacDecoder : public Napi::ObjectWrap<FlacDecoder> {
   bool finished_ = false;      /* the stream is finished */
   int deferred_error_ = 0;     /* an error to throw once the samples before it are out */
   int failed_ = 0;             /* the error that ended the stream, once it has been thrown */
-  BaacFlacMd5Verdict verdict_ = BAAC_FLAC_MD5_UNKNOWN;
+  BacFlacMd5Verdict verdict_ = BAC_FLAC_MD5_UNKNOWN;
 };
 
 }  // namespace

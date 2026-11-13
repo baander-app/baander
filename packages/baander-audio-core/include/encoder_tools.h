@@ -1,5 +1,5 @@
-#ifndef BAANDER_AAC_ENCODER_TOOLS_H
-#define BAANDER_AAC_ENCODER_TOOLS_H
+#ifndef BAANDER_AUDIO_CORE_ENCODER_TOOLS_H
+#define BAANDER_AUDIO_CORE_ENCODER_TOOLS_H
 
 #include "encoder.h"
 
@@ -50,4 +50,4 @@ void aac_enc_intensity(AacEncoderState* s, AacEncElement* el);
 }
 #endif
 
-#endif /* BAANDER_AAC_ENCODER_TOOLS_H */
+#endif /* BAANDER_AUDIO_CORE_ENCODER_TOOLS_H */

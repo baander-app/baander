@@ -157,8 +157,8 @@ jobs:
                 if: matrix.target == 'linux-x64'
                 uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
                 with:
-                    path: ${{ runner.temp }}/baac-oracles/flac
-                    key: baac-flac-reference-${{ runner.os }}-${{ runner.arch }}-${{ steps.oracles.outputs.flac }}
+                    path: ${{ runner.temp }}/bac-oracles/flac
+                    key: bac-flac-reference-${{ runner.os }}-${{ runner.arch }}-${{ steps.oracles.outputs.flac }}
 
             -   name: Reference flac at its pin
                 # Builds flac 1.4.3 when the cache held none.  Without this
@@ -166,24 +166,24 @@ jobs:
                 # require their oracles.
                 if: matrix.target == 'linux-x64'
                 run: |
-                    flac="$(tests/flac-reference.sh "$RUNNER_TEMP/baac-oracles")"
+                    flac="$(tests/flac-reference.sh "$RUNNER_TEMP/bac-oracles")"
                     "$flac" --version
-                    echo "BAAC_FLAC_REFERENCE=$flac" >> "$GITHUB_ENV"
+                    echo "BAC_FLAC_REFERENCE=$flac" >> "$GITHUB_ENV"
 
             -   name: Save the reference flac
                 if: matrix.target == 'linux-x64' && steps.flac-cache.outputs.cache-hit != 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
                 uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
                 with:
-                    path: ${{ runner.temp }}/baac-oracles/flac
-                    key: baac-flac-reference-${{ runner.os }}-${{ runner.arch }}-${{ steps.oracles.outputs.flac }}
+                    path: ${{ runner.temp }}/bac-oracles/flac
+                    key: bac-flac-reference-${{ runner.os }}-${{ runner.arch }}-${{ steps.oracles.outputs.flac }}
 
             -   name: Restore the decoder testbench
                 id: testbench-cache
                 if: matrix.target == 'linux-x64'
                 uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
                 with:
-                    path: ${{ runner.temp }}/baac-oracles/flac-test-files
-                    key: baac-flac-testbench-${{ steps.oracles.outputs.testbench }}-${{ hashFiles('packages/baander-audio-core/tests/flac-testbench.sha256') }}
+                    path: ${{ runner.temp }}/bac-oracles/flac-test-files
+                    key: bac-flac-testbench-${{ steps.oracles.outputs.testbench }}-${{ hashFiles('packages/baander-audio-core/tests/flac-testbench.sha256') }}
 
             -   name: Decoder testbench at its pin
                 # Fetches the testbench when the cache held none, and
@@ -191,26 +191,26 @@ jobs:
                 # way.
                 if: matrix.target == 'linux-x64'
                 run: |
-                    testbench="$(tests/flac-testbench.sh "$RUNNER_TEMP/baac-oracles/flac-test-files")"
-                    echo "BAAC_FLAC_TESTBENCH=$testbench" >> "$GITHUB_ENV"
+                    testbench="$(tests/flac-testbench.sh "$RUNNER_TEMP/bac-oracles/flac-test-files")"
+                    echo "BAC_FLAC_TESTBENCH=$testbench" >> "$GITHUB_ENV"
 
             -   name: Save the decoder testbench
                 if: matrix.target == 'linux-x64' && steps.testbench-cache.outputs.cache-hit != 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
                 uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
                 with:
-                    path: ${{ runner.temp }}/baac-oracles/flac-test-files
-                    key: baac-flac-testbench-${{ steps.oracles.outputs.testbench }}-${{ hashFiles('packages/baander-audio-core/tests/flac-testbench.sha256') }}
+                    path: ${{ runner.temp }}/bac-oracles/flac-test-files
+                    key: bac-flac-testbench-${{ steps.oracles.outputs.testbench }}-${{ hashFiles('packages/baander-audio-core/tests/flac-testbench.sha256') }}
 
             -   name: CTest suites with every oracle required
-                # BAAC_REQUIRE_ORACLES turns a missing flac, FFmpeg or
+                # BAC_REQUIRE_ORACLES turns a missing flac, FFmpeg or
                 # testbench from a skipped check into a failed one.
-                # BAAC_REQUIRE_KERNELS does the same for the lossless
+                # BAC_REQUIRE_KERNELS does the same for the lossless
                 # mode's SSE2 and AVX2 kernels, which GitHub's x64 runners
                 # can run.
                 if: matrix.target == 'linux-x64'
                 env:
-                    BAAC_REQUIRE_ORACLES: '1'
-                    BAAC_REQUIRE_KERNELS: sse2,avx2
+                    BAC_REQUIRE_ORACLES: '1'
+                    BAC_REQUIRE_KERNELS: sse2,avx2
                 run: |
                     sudo apt-get update -q
                     sudo apt-get install -y -q --no-install-recommends ffmpeg ninja-build
@@ -242,7 +242,7 @@ jobs:
                 # in test_dsp, and those of the lossless mode in
                 # test_flac_dsp, where whole streams also have to come out
                 # the same with and without them.
-                # BAAC_REQUIRE_KERNELS fails test_flac_dsp when the level it
+                # BAC_REQUIRE_KERNELS fails test_flac_dsp when the level it
                 # names did not run or installed no kernel of its own, and
                 # the step reads both suites' own account of it.
                 # The build is for this runner's architecture alone, since
@@ -252,7 +252,7 @@ jobs:
                 # the binding above.
                 if: startsWith(matrix.target, 'darwin-')
                 env:
-                    BAAC_REQUIRE_KERNELS: ${{ matrix.target == 'darwin-arm64' && 'neon' || 'sse2' }}
+                    BAC_REQUIRE_KERNELS: ${{ matrix.target == 'darwin-arm64' && 'neon' || 'sse2' }}
                     OSX_ARCHITECTURE: ${{ matrix.target == 'darwin-arm64' && 'arm64' || 'x86_64' }}
                 run: |
                     cmake -S . -B cmake-build -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="$OSX_ARCHITECTURE"
@@ -262,12 +262,12 @@ jobs:
                       -R '^(test_dsp|test_flac_(format|dsp|encoder|decoder)(_scalar|_sse2)?)$'
                     # The same proof in the log: the level ran, and each
                     # suite compared kernels of its own with the scalar ones.
-                    # test_dsp reads no BAAC_REQUIRE_KERNELS, so this check
+                    # test_dsp reads no BAC_REQUIRE_KERNELS, so this check
                     # is its only one.
                     for suite in test_dsp test_flac_dsp; do
                       cmake-build/tests/$suite | tee "$RUNNER_TEMP/$suite.log"
-                      grep -Eq "^testing $BAAC_REQUIRE_KERNELS kernels, [1-9][0-9]* of the level's own" "$RUNNER_TEMP/$suite.log" \
-                        || { echo "$suite: the $BAAC_REQUIRE_KERNELS kernels did not run"; exit 1; }
+                      grep -Eq "^testing $BAC_REQUIRE_KERNELS kernels, [1-9][0-9]* of the level's own" "$RUNNER_TEMP/$suite.log" \
+                        || { echo "$suite: the $BAC_REQUIRE_KERNELS kernels did not run"; exit 1; }
                     done
 
             -   name: Keep the prebuild

@@ -8,7 +8,7 @@
  */
 #include "aac_dsp.h"
 
-#if defined(BAAC_AAC_SSE2) || defined(__SSE2__)
+#if defined(BAC_AAC_SSE2) || defined(__SSE2__)
 
 #include <emmintrin.h>
 
@@ -295,4 +295,4 @@ void aac_dsp_init_sse2(AacDSP* dsp) {
   dsp->quant_noise = aac_quant_noise_sse2;
 }
 
-#endif /* BAAC_AAC_SSE2 || __SSE2__ */
+#endif /* BAC_AAC_SSE2 || __SSE2__ */

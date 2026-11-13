@@ -6,11 +6,11 @@
 #include <vector>
 
 #include "bitstream.h"
-#if defined(BAAC_AAC_HAVE_DECODER)
+#if defined(BAC_AAC_HAVE_DECODER)
 #include "decoder.h"
 #include "usac.h"
 #endif
-#if defined(BAAC_AAC_HAVE_ENCODER)
+#if defined(BAC_AAC_HAVE_ENCODER)
 #include "encoder.h"
 #include "usac_enc.h"
 #endif
@@ -29,7 +29,7 @@ bool is_packet_transport(AacTransport t) {
 
 }  // namespace
 
-#if defined(BAAC_AAC_HAVE_DECODER)
+#if defined(BAC_AAC_HAVE_DECODER)
 
 /* ── decoder side ──────────────────────────────────────────────── */
 
@@ -830,9 +830,9 @@ int aac_decoder_transport_decode(AacDecoderState* s, AacDecoderTransport* t, con
   return decode_frame_or_conceal(s, t, kind, data, size, pcm, pcm_size);
 }
 
-#endif /* BAAC_AAC_HAVE_DECODER */
+#endif /* BAC_AAC_HAVE_DECODER */
 
-#if defined(BAAC_AAC_HAVE_ENCODER)
+#if defined(BAC_AAC_HAVE_ENCODER)
 
 /* ── encoder side ──────────────────────────────────────────────── */
 
@@ -1038,4 +1038,4 @@ int aac_encoder_transport_wrap(AacEncoderState* s, AacEncoderTransport* t, int f
   return len;
 }
 
-#endif /* BAAC_AAC_HAVE_ENCODER */
+#endif /* BAC_AAC_HAVE_ENCODER */

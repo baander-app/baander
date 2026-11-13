@@ -1,4 +1,4 @@
-/* Node-API binding for baander-aac: streaming decoder and PCM encoder
+/* Node-API binding for baander-audio-core: streaming decoder and PCM encoder
  * objects over the public C API, and the loudness meter as a function.
  * (The classes of the lossless mode are in flac_addon.cc.)
  * PCM is interleaved 32-bit float at full scale 1.0; AAC data is an ADTS

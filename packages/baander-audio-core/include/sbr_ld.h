@@ -1,5 +1,5 @@
-#ifndef BAANDER_AAC_SBR_LD_H
-#define BAANDER_AAC_SBR_LD_H
+#ifndef BAANDER_AUDIO_CORE_SBR_LD_H
+#define BAANDER_AUDIO_CORE_SBR_LD_H
 
 #include <cstdint>
 
@@ -166,4 +166,4 @@ void aac_sbr_ld_process(AacSbrLdState* s, const float* core_left, const float* c
 }
 #endif
 
-#endif /* BAANDER_AAC_SBR_LD_H */
+#endif /* BAANDER_AUDIO_CORE_SBR_LD_H */

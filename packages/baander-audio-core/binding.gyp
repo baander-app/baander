@@ -91,8 +91,8 @@
       "defines": [
         "NAPI_DISABLE_CPP_EXCEPTIONS",
         "NAPI_VERSION=8",
-        "BAAC_AAC_HAVE_ENCODER",
-        "BAAC_AAC_HAVE_DECODER"
+        "BAC_AAC_HAVE_ENCODER",
+        "BAC_AAC_HAVE_DECODER"
       ],
       "cflags_cc": ["-std=c++17", "-O3", "-fvisibility=hidden", "-ffp-contract=off"],
       "cflags_cc!": ["-fno-exceptions", "-fno-rtti"],
@@ -112,7 +112,7 @@
         ["OS=='win'", {"defines": ["_USE_MATH_DEFINES", "NOMINMAX"]}],
         ["target_arch=='x64' or target_arch=='ia32'", {
           "sources": ["src/simd/sse2.cpp", "src/simd/flac_sse2.cpp"],
-          "defines": ["BAAC_AAC_SSE2"],
+          "defines": ["BAC_AAC_SSE2"],
           "cflags_cc": ["-msse2"]
         }],
         ["target_arch=='ia32'", {
@@ -120,7 +120,7 @@
         }],
         ["target_arch=='arm64'", {
           "sources": ["src/simd/neon.cpp", "src/simd/flac_neon.cpp"],
-          "defines": ["BAAC_AAC_NEON"]
+          "defines": ["BAC_AAC_NEON"]
         }]
       ]
     }

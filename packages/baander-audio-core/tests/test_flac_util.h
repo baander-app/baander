@@ -5,8 +5,8 @@
  * API.  The writer uses the library's internal bit writer and header
  * routines, so the tests that include this header add src/ to their
  * include path. */
-#ifndef BAANDER_AAC_TEST_FLAC_UTIL_H
-#define BAANDER_AAC_TEST_FLAC_UTIL_H
+#ifndef BAANDER_AUDIO_CORE_TEST_FLAC_UTIL_H
+#define BAANDER_AUDIO_CORE_TEST_FLAC_UTIL_H
 
 #include "flac.h"
 #include "flac_internal.h"
@@ -523,9 +523,9 @@ static std::vector<uint8_t> flac_metadata_block(int type, const std::vector<uint
   return out;
 }
 
-static BaacFlacStreamInfo flac_test_info(int sample_rate, int channels, int bits, int block_size,
+static BacFlacStreamInfo flac_test_info(int sample_rate, int channels, int bits, int block_size,
                                          uint64_t total_samples = 0) {
-  BaacFlacStreamInfo info = {};
+  BacFlacStreamInfo info = {};
   info.min_block_size = block_size;
   info.max_block_size = block_size;
   info.sample_rate = sample_rate;
@@ -535,8 +535,8 @@ static BaacFlacStreamInfo flac_test_info(int sample_rate, int channels, int bits
   return info;
 }
 
-static std::vector<uint8_t> flac_streaminfo_bytes(const BaacFlacStreamInfo& info) {
-  std::vector<uint8_t> body(BAAC_FLAC_STREAMINFO_BYTES);
+static std::vector<uint8_t> flac_streaminfo_bytes(const BacFlacStreamInfo& info) {
+  std::vector<uint8_t> body(BAC_FLAC_STREAMINFO_BYTES);
   if (!flac_streaminfo_write(&info, body.data())) {
     flac_test_fail("a STREAMINFO that cannot be written");
   }
@@ -545,7 +545,7 @@ static std::vector<uint8_t> flac_streaminfo_bytes(const BaacFlacStreamInfo& info
 
 /* The marker and a STREAMINFO block, which is the last block unless
  * `more_blocks` follow. */
-static std::vector<uint8_t> flac_stream_start(const BaacFlacStreamInfo& info,
+static std::vector<uint8_t> flac_stream_start(const BacFlacStreamInfo& info,
                                               bool more_blocks = false) {
   std::vector<uint8_t> out = {'f', 'L', 'a', 'C'};
   const std::vector<uint8_t> block =
@@ -575,7 +575,7 @@ static std::vector<uint8_t> flac_build_stream(const std::vector<int32_t>& pcm, i
                                               const TestSubframe& sf,
                                               std::vector<size_t>* frame_offsets = nullptr) {
   const size_t total = pcm.size() / (size_t)channels;
-  BaacFlacStreamInfo info = flac_test_info(sample_rate, channels, bits, block_size, total);
+  BacFlacStreamInfo info = flac_test_info(sample_rate, channels, bits, block_size, total);
   flac_pcm_md5(pcm, bits, info.md5);
   std::vector<uint8_t> stream = flac_stream_start(info);
   uint64_t number = 0;
@@ -610,21 +610,21 @@ struct FlacDecodeEvent {
 
 struct FlacDecoded {
   std::vector<int32_t> pcm; /* every decoded frame, interleaved */
-  std::vector<BaacFlacFrameInfo> frames;
+  std::vector<BacFlacFrameInfo> frames;
   std::vector<FlacDecodeEvent> errors;
   bool have_info = false;
-  BaacFlacStreamInfo info = {};
+  BacFlacStreamInfo info = {};
   int finish = AAC_OK;
-  BaacFlacMd5Verdict verdict = BAAC_FLAC_MD5_UNKNOWN;
+  BacFlacMd5Verdict verdict = BAC_FLAC_MD5_UNKNOWN;
   int lost = 0;
   int max_pending = 0; /* the most bytes the FIFO held */
 };
 
 /* Drains every frame that is ready into `out`.  Returns false when the
  * decoder stopped for good. */
-static bool flac_drain(BaacFlacDecoder* dec, std::vector<int32_t>& buf, FlacDecoded* out) {
+static bool flac_drain(BacFlacDecoder* dec, std::vector<int32_t>& buf, FlacDecoded* out) {
   for (;;) {
-    const int n = baac_flac_decoder_decode_next(dec, buf.data(), (int)buf.size());
+    const int n = bac_flac_decoder_decode_next(dec, buf.data(), (int)buf.size());
     if (n == 0) {
       return true;
     }
@@ -635,10 +635,10 @@ static bool flac_drain(BaacFlacDecoder* dec, std::vector<int32_t>& buf, FlacDeco
       }
       continue;
     }
-    BaacFlacStreamInfo info;
-    BaacFlacFrameInfo frame = {};
-    if (baac_flac_decoder_stream_info(dec, &info) != AAC_OK ||
-        baac_flac_decoder_last_frame_info(dec, &frame) != AAC_OK || frame.block_size != n) {
+    BacFlacStreamInfo info;
+    BacFlacFrameInfo frame = {};
+    if (bac_flac_decoder_stream_info(dec, &info) != AAC_OK ||
+        bac_flac_decoder_last_frame_info(dec, &frame) != AAC_OK || frame.block_size != n) {
       flac_test_fail("no frame or stream information after a decoded frame");
       return false;
     }
@@ -650,28 +650,28 @@ static bool flac_drain(BaacFlacDecoder* dec, std::vector<int32_t>& buf, FlacDeco
 /* Decodes a whole stream fed in pieces of `chunk` bytes, with MD5
  * verification on, and ends it. */
 static FlacDecoded flac_decode(const std::vector<uint8_t>& stream, size_t chunk = SIZE_MAX,
-                               BaacFlacDecoder* existing = nullptr) {
+                               BacFlacDecoder* existing = nullptr) {
   FlacDecoded out;
-  BaacFlacDecoder* dec = existing ? existing : baac_flac_decoder_create();
+  BacFlacDecoder* dec = existing ? existing : bac_flac_decoder_create();
   if (!dec) {
     flac_test_fail("no decoder");
     return out;
   }
   if (!existing) {
-    baac_flac_decoder_set_md5_check(dec, 1);
+    bac_flac_decoder_set_md5_check(dec, 1);
   }
-  std::vector<int32_t> buf((size_t)BAAC_FLAC_MAX_BLOCK_SIZE * BAAC_FLAC_MAX_CHANNELS);
+  std::vector<int32_t> buf((size_t)BAC_FLAC_MAX_BLOCK_SIZE * BAC_FLAC_MAX_CHANNELS);
   bool alive = true;
   size_t pos = 0;
   while (alive && pos < stream.size()) {
     const int want = (int)std::min(chunk, stream.size() - pos);
-    const int took = baac_flac_decoder_feed(dec, stream.data() + pos, want);
+    const int took = bac_flac_decoder_feed(dec, stream.data() + pos, want);
     if (took < 0) {
       flac_test_fail("the decoder refused input");
       break;
     }
     pos += (size_t)took;
-    out.max_pending = std::max(out.max_pending, baac_flac_decoder_pending_bytes(dec));
+    out.max_pending = std::max(out.max_pending, bac_flac_decoder_pending_bytes(dec));
     const size_t frames = out.frames.size();
     const size_t errors = out.errors.size();
     alive = flac_drain(dec, buf, &out);
@@ -681,14 +681,14 @@ static FlacDecoded flac_decode(const std::vector<uint8_t>& stream, size_t chunk 
     }
   }
   if (alive) {
-    baac_flac_decoder_end_input(dec);
+    bac_flac_decoder_end_input(dec);
     flac_drain(dec, buf, &out);
   }
-  out.have_info = baac_flac_decoder_stream_info(dec, &out.info) == AAC_OK;
-  out.finish = baac_flac_decoder_finish(dec, &out.verdict);
-  out.lost = baac_flac_decoder_lost_frames(dec);
+  out.have_info = bac_flac_decoder_stream_info(dec, &out.info) == AAC_OK;
+  out.finish = bac_flac_decoder_finish(dec, &out.verdict);
+  out.lost = bac_flac_decoder_lost_frames(dec);
   if (!existing) {
-    baac_flac_decoder_destroy(dec);
+    bac_flac_decoder_destroy(dec);
   }
   return out;
 }
@@ -698,9 +698,9 @@ static FlacDecoded flac_decode(const std::vector<uint8_t>& stream, size_t chunk 
 struct FlacEncoded {
   std::vector<uint8_t> stream; /* the header and every frame */
   int header_bytes = 0;
-  std::vector<BaacFlacFrameInfo> frames; /* the last frame of each call that wrote one */
+  std::vector<BacFlacFrameInfo> frames; /* the last frame of each call that wrote one */
   int error = AAC_OK;                    /* of creation or of the first call that failed */
-  BaacFlacStreamInfo info = {};          /* after the finish */
+  BacFlacStreamInfo info = {};          /* after the finish */
 };
 
 /* Encodes interleaved samples as one stream, fed `chunk` samples per
@@ -708,21 +708,21 @@ struct FlacEncoded {
  * first, as a caller with a seekable output does. */
 static FlacEncoded flac_encode(const std::vector<int32_t>& pcm, int sample_rate, int channels,
                                int bits, int level, size_t chunk = SIZE_MAX, bool rewrite = true,
-                               const BaacFlacEncoderOptions* options = nullptr,
-                               BaacFlacEncoder* existing = nullptr) {
+                               const BacFlacEncoderOptions* options = nullptr,
+                               BacFlacEncoder* existing = nullptr) {
   FlacEncoded out;
-  BaacFlacEncoder* enc =
+  BacFlacEncoder* enc =
       existing ? existing
-               : baac_flac_encoder_create(sample_rate, channels, bits, level, &out.error);
+               : bac_flac_encoder_create(sample_rate, channels, bits, level, &out.error);
   if (!enc) {
     return out;
   }
-  if (options && (out.error = baac_flac_encoder_set_options(enc, options)) != AAC_OK) {
+  if (options && (out.error = bac_flac_encoder_set_options(enc, options)) != AAC_OK) {
     return out;
   }
-  out.header_bytes = baac_flac_encoder_header_bytes(enc);
+  out.header_bytes = bac_flac_encoder_header_bytes(enc);
   out.stream.resize((size_t)out.header_bytes);
-  const int header = baac_flac_encoder_write_header(enc, out.stream.data(), out.header_bytes);
+  const int header = bac_flac_encoder_write_header(enc, out.stream.data(), out.header_bytes);
   if (header != out.header_bytes) {
     out.error = header < 0 ? header : AAC_ERR_ENCODE;
   }
@@ -730,42 +730,42 @@ static FlacEncoded flac_encode(const std::vector<int32_t>& pcm, int sample_rate,
   std::vector<uint8_t> buf;
   for (size_t pos = 0; pos < total && out.error == AAC_OK;) {
     const int n = (int)std::min(chunk, total - pos);
-    buf.resize((size_t)baac_flac_encoder_max_output_bytes(enc, n));
-    const int got = baac_flac_encoder_encode(enc, pcm.data() + pos * (size_t)channels, n,
+    buf.resize((size_t)bac_flac_encoder_max_output_bytes(enc, n));
+    const int got = bac_flac_encoder_encode(enc, pcm.data() + pos * (size_t)channels, n,
                                              buf.data(), (int)buf.size());
     if (got < 0) {
       out.error = got;
       break;
     }
     if (got > 0) {
-      BaacFlacFrameInfo frame;
-      baac_flac_encoder_last_frame_info(enc, &frame);
+      BacFlacFrameInfo frame;
+      bac_flac_encoder_last_frame_info(enc, &frame);
       out.frames.push_back(frame);
       out.stream.insert(out.stream.end(), buf.begin(), buf.begin() + got);
     }
     pos += (size_t)n;
   }
   if (out.error == AAC_OK) {
-    buf.resize((size_t)baac_flac_encoder_max_output_bytes(enc, 0));
-    const int got = baac_flac_encoder_finish(enc, buf.data(), (int)buf.size());
+    buf.resize((size_t)bac_flac_encoder_max_output_bytes(enc, 0));
+    const int got = bac_flac_encoder_finish(enc, buf.data(), (int)buf.size());
     if (got < 0) {
       out.error = got;
     } else {
       if (got > 0) {
-        BaacFlacFrameInfo frame;
-        baac_flac_encoder_last_frame_info(enc, &frame);
+        BacFlacFrameInfo frame;
+        bac_flac_encoder_last_frame_info(enc, &frame);
         out.frames.push_back(frame);
         out.stream.insert(out.stream.end(), buf.begin(), buf.begin() + got);
       }
-      baac_flac_encoder_stream_info(enc, &out.info);
-      if (rewrite && baac_flac_encoder_final_header(enc, out.stream.data(), out.header_bytes) !=
+      bac_flac_encoder_stream_info(enc, &out.info);
+      if (rewrite && bac_flac_encoder_final_header(enc, out.stream.data(), out.header_bytes) !=
                          out.header_bytes) {
         out.error = AAC_ERR_ENCODE;
       }
     }
   }
   if (!existing) {
-    baac_flac_encoder_destroy(enc);
+    bac_flac_encoder_destroy(enc);
   }
   return out;
 }
@@ -921,4 +921,4 @@ static std::vector<FlacFrameShape> flac_inspect(const std::vector<uint8_t>& s,
   return frames;
 }
 
-#endif /* BAANDER_AAC_TEST_FLAC_UTIL_H */
+#endif /* BAANDER_AUDIO_CORE_TEST_FLAC_UTIL_H */

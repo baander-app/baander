@@ -2,7 +2,7 @@
 
 Measured on 2026-10-30 and 2026-10-31. This note records what Apple's Core Audio AAC
 encoder does, as far as its output bitstreams show it, and which of
-those behaviours improved baander-aac. It follows the
+those behaviours improved Bånder Audio Core. It follows the
 [codec comparison](codec-comparison.md), which found Apple ahead of us
 at AAC-LC 112 kbit/s and above, in true VBR, in HE-AAC at 40 kbit/s and
 in speed.
@@ -286,7 +286,7 @@ the coarser scalefactors in place it measured:
 | HE-AAC 48k | +0.027 ± 0.009 | -0.001 ± 0.003 |
 
 It is on for AAC-LC and HE-AAC and off for AAC-LD and AAC-ELD.
-`baac enc --no-afterburner` and `afterburner: false` in the binding
+`bac enc --no-afterburner` and `afterburner: false` in the binding
 turn it off. Its limits on moves per frame, scalefactor range and donor
 window are saturated: larger values gain nothing, and fewer moves lose
 quality.

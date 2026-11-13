@@ -1,9 +1,9 @@
-/* Files and integer PCM for the lossless commands of the baac tool:
+/* Files and integer PCM for the lossless commands of the bac tool:
  * inputs and outputs, where a dash is standard input or output, the
  * header of a WAV file, and samples between their bytes in a file and
  * the codec's 32-bit integers. */
-#ifndef BAANDER_AAC_TOOLS_BAAC_FLAC_PCM_H
-#define BAANDER_AAC_TOOLS_BAAC_FLAC_PCM_H
+#ifndef BAANDER_AUDIO_CORE_TOOLS_BAC_FLAC_PCM_H
+#define BAANDER_AUDIO_CORE_TOOLS_BAC_FLAC_PCM_H
 
 #include <cstddef>
 #include <cstdint>
@@ -11,7 +11,7 @@
 #include <memory>
 #include <string>
 
-namespace baac_flac {
+namespace bac_flac {
 
 const size_t kIoBuffer = 1 << 18; /* of an output stream, and of what dec reads at a time */
 
@@ -93,6 +93,6 @@ void pack(const PcmLayout& layout, const int32_t* pcm, size_t count, uint8_t* by
 /* The layout of raw PCM of a depth: the value itself in whole bytes. */
 PcmLayout raw_layout(int sample_rate, int channels, int bits);
 
-}  // namespace baac_flac
+}  // namespace bac_flac
 
-#endif /* BAANDER_AAC_TOOLS_BAAC_FLAC_PCM_H */
+#endif /* BAANDER_AUDIO_CORE_TOOLS_BAC_FLAC_PCM_H */

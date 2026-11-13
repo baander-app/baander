@@ -1,5 +1,5 @@
-#ifndef BAANDER_AAC_QMF_H
-#define BAANDER_AAC_QMF_H
+#ifndef BAANDER_AUDIO_CORE_QMF_H
+#define BAANDER_AUDIO_CORE_QMF_H
 
 #include "aac_tables.h"
 
@@ -46,4 +46,4 @@ void aac_qmf_synthesize(AacQmfSynthesis* s, const float (*X)[2], float* out);
 }
 #endif
 
-#endif /* BAANDER_AAC_QMF_H */
+#endif /* BAANDER_AUDIO_CORE_QMF_H */

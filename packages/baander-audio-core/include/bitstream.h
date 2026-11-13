@@ -1,5 +1,5 @@
-#ifndef BAANDER_AAC_BITSTREAM_H
-#define BAANDER_AAC_BITSTREAM_H
+#ifndef BAANDER_AUDIO_CORE_BITSTREAM_H
+#define BAANDER_AUDIO_CORE_BITSTREAM_H
 
 #include <cstddef>
 #include <cstdint>
@@ -225,4 +225,4 @@ using AacElementType = enum AacElementType_ {
 }
 #endif
 
-#endif /* BAANDER_AAC_BITSTREAM_H */
+#endif /* BAANDER_AUDIO_CORE_BITSTREAM_H */

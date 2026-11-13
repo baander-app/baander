@@ -1,5 +1,5 @@
-#ifndef BAANDER_AAC_AFTERBURNER_H
-#define BAANDER_AAC_AFTERBURNER_H
+#ifndef BAANDER_AUDIO_CORE_AFTERBURNER_H
+#define BAANDER_AUDIO_CORE_AFTERBURNER_H
 
 #include "encoder.h"
 
@@ -23,4 +23,4 @@ void aac_afterburner_run(AacEncoderState* s, int bits, int budget);
 }
 #endif
 
-#endif /* BAANDER_AAC_AFTERBURNER_H */
+#endif /* BAANDER_AUDIO_CORE_AFTERBURNER_H */

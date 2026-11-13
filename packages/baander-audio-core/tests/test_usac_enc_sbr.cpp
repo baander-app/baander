@@ -685,7 +685,7 @@ void test_committed() {
           "%s: %d frames, %d errors, %.1f dB", s.name, d.frames, d.errors, snr);
     const AacUsacEncoderOptions o = options(-1, s.mps ? 1 : -1);
     const Encoded e = encode(pcm, s.channels, s.bitrate, &o);
-#if BAAC_REFERENCE_BUILD
+#if BAC_REFERENCE_BUILD
     if (!check_committed_signal(s.name, pcm, s.signal)) {
       continue;
     }

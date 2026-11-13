@@ -6,18 +6,18 @@
 #include "flac.h"
 #include "flac_internal.h"
 
-#if defined(BAAC_AAC_HAVE_DECODER)
+#if defined(BAC_AAC_HAVE_DECODER)
 /* ── Decoder API ───────────────────────────────────────────────── */
 
-BaacFlacDecoder* baac_flac_decoder_create(void) { return flac_decoder_create(); }
+BacFlacDecoder* bac_flac_decoder_create(void) { return flac_decoder_create(); }
 
-void baac_flac_decoder_destroy(BaacFlacDecoder* dec) {
+void bac_flac_decoder_destroy(BacFlacDecoder* dec) {
   if (dec) {
     flac_decoder_destroy(dec);
   }
 }
 
-int baac_flac_decoder_reset(BaacFlacDecoder* dec) {
+int bac_flac_decoder_reset(BacFlacDecoder* dec) {
   if (!dec) {
     return AAC_ERR_INVALID_ARG;
   }
@@ -25,8 +25,8 @@ int baac_flac_decoder_reset(BaacFlacDecoder* dec) {
   return AAC_OK;
 }
 
-int baac_flac_decoder_set_streaminfo(BaacFlacDecoder* dec, const uint8_t* streaminfo, int size) {
-  if (!dec || !streaminfo || size != BAAC_FLAC_STREAMINFO_BYTES) {
+int bac_flac_decoder_set_streaminfo(BacFlacDecoder* dec, const uint8_t* streaminfo, int size) {
+  if (!dec || !streaminfo || size != BAC_FLAC_STREAMINFO_BYTES) {
     return AAC_ERR_INVALID_ARG;
   }
   try {
@@ -36,43 +36,43 @@ int baac_flac_decoder_set_streaminfo(BaacFlacDecoder* dec, const uint8_t* stream
   }
 }
 
-int baac_flac_decoder_set_md5_check(BaacFlacDecoder* dec, int enabled) {
+int bac_flac_decoder_set_md5_check(BacFlacDecoder* dec, int enabled) {
   if (!dec) {
     return AAC_ERR_INVALID_ARG;
   }
   return flac_decoder_set_md5_check(dec, enabled != 0);
 }
 
-int baac_flac_decoder_set_metadata(BaacFlacDecoder* dec, int collect, size_t max_bytes) {
+int bac_flac_decoder_set_metadata(BacFlacDecoder* dec, int collect, size_t max_bytes) {
   if (!dec) {
     return AAC_ERR_INVALID_ARG;
   }
   return flac_decoder_set_metadata(dec, collect != 0, max_bytes);
 }
 
-int baac_flac_decoder_comments(BaacFlacDecoder* dec, const BaacFlacComment** comments,
-                               BaacFlacComment* vendor) {
+int bac_flac_decoder_comments(BacFlacDecoder* dec, const BacFlacComment** comments,
+                               BacFlacComment* vendor) {
   if (!dec || !comments) {
     return AAC_ERR_INVALID_ARG;
   }
   return flac_decoder_comments(dec, comments, vendor);
 }
 
-int baac_flac_decoder_pictures(BaacFlacDecoder* dec, const BaacFlacPicture** pictures) {
+int bac_flac_decoder_pictures(BacFlacDecoder* dec, const BacFlacPicture** pictures) {
   if (!dec || !pictures) {
     return AAC_ERR_INVALID_ARG;
   }
   return flac_decoder_pictures(dec, pictures);
 }
 
-int baac_flac_decoder_skipped_metadata(BaacFlacDecoder* dec) {
+int bac_flac_decoder_skipped_metadata(BacFlacDecoder* dec) {
   if (!dec) {
     return AAC_ERR_INVALID_ARG;
   }
   return flac_decoder_skipped_metadata(dec);
 }
 
-int baac_flac_decoder_id3(BaacFlacDecoder* dec, uint64_t* id3v2_bytes, int* id3v1_trailer) {
+int bac_flac_decoder_id3(BacFlacDecoder* dec, uint64_t* id3v2_bytes, int* id3v1_trailer) {
   if (!dec) {
     return AAC_ERR_INVALID_ARG;
   }
@@ -80,7 +80,7 @@ int baac_flac_decoder_id3(BaacFlacDecoder* dec, uint64_t* id3v2_bytes, int* id3v
   return AAC_OK;
 }
 
-int baac_flac_decoder_feed(BaacFlacDecoder* dec, const uint8_t* data, int size) {
+int bac_flac_decoder_feed(BacFlacDecoder* dec, const uint8_t* data, int size) {
   if (!dec || size < 0 || (!data && size > 0)) {
     return AAC_ERR_INVALID_ARG;
   }
@@ -91,7 +91,7 @@ int baac_flac_decoder_feed(BaacFlacDecoder* dec, const uint8_t* data, int size) 
   }
 }
 
-int baac_flac_decoder_decode_next(BaacFlacDecoder* dec, int32_t* pcm, int pcm_size) {
+int bac_flac_decoder_decode_next(BacFlacDecoder* dec, int32_t* pcm, int pcm_size) {
   if (!dec || !pcm || pcm_size <= 0) {
     return AAC_ERR_INVALID_ARG;
   }
@@ -102,63 +102,63 @@ int baac_flac_decoder_decode_next(BaacFlacDecoder* dec, int32_t* pcm, int pcm_si
   }
 }
 
-int baac_flac_decoder_pending_bytes(BaacFlacDecoder* dec) {
+int bac_flac_decoder_pending_bytes(BacFlacDecoder* dec) {
   if (!dec) {
     return AAC_ERR_INVALID_ARG;
   }
   return flac_decoder_pending_bytes(dec);
 }
 
-int baac_flac_decoder_stream_info(BaacFlacDecoder* dec, BaacFlacStreamInfo* info) {
+int bac_flac_decoder_stream_info(BacFlacDecoder* dec, BacFlacStreamInfo* info) {
   if (!dec || !info) {
     return AAC_ERR_INVALID_ARG;
   }
   return flac_decoder_stream_info(dec, info);
 }
 
-int baac_flac_decoder_last_frame_info(BaacFlacDecoder* dec, BaacFlacFrameInfo* info) {
+int bac_flac_decoder_last_frame_info(BacFlacDecoder* dec, BacFlacFrameInfo* info) {
   if (!dec || !info) {
     return AAC_ERR_INVALID_ARG;
   }
   return flac_decoder_last_frame_info(dec, info);
 }
 
-int baac_flac_decoder_lost_frames(BaacFlacDecoder* dec) {
+int bac_flac_decoder_lost_frames(BacFlacDecoder* dec) {
   if (!dec) {
     return AAC_ERR_INVALID_ARG;
   }
   return flac_decoder_lost_frames(dec);
 }
 
-int baac_flac_decoder_seek_points(BaacFlacDecoder* dec, const BaacFlacSeekPoint** points) {
+int bac_flac_decoder_seek_points(BacFlacDecoder* dec, const BacFlacSeekPoint** points) {
   if (!dec) {
     return AAC_ERR_INVALID_ARG;
   }
   return flac_decoder_seek_points(dec, points);
 }
 
-int64_t baac_flac_decoder_first_frame_offset(BaacFlacDecoder* dec) {
+int64_t bac_flac_decoder_first_frame_offset(BacFlacDecoder* dec) {
   if (!dec) {
     return AAC_ERR_INVALID_ARG;
   }
   return flac_decoder_first_frame_offset(dec);
 }
 
-int baac_flac_decoder_seek_reset(BaacFlacDecoder* dec) {
+int bac_flac_decoder_seek_reset(BacFlacDecoder* dec) {
   if (!dec) {
     return AAC_ERR_INVALID_ARG;
   }
   return flac_decoder_seek_reset(dec);
 }
 
-int baac_flac_decoder_end_input(BaacFlacDecoder* dec) {
+int bac_flac_decoder_end_input(BacFlacDecoder* dec) {
   if (!dec) {
     return AAC_ERR_INVALID_ARG;
   }
   return flac_decoder_end_input(dec);
 }
 
-int baac_flac_decoder_finish(BaacFlacDecoder* dec, BaacFlacMd5Verdict* verdict) {
+int bac_flac_decoder_finish(BacFlacDecoder* dec, BacFlacMd5Verdict* verdict) {
   if (!dec) {
     return AAC_ERR_INVALID_ARG;
   }
@@ -168,12 +168,12 @@ int baac_flac_decoder_finish(BaacFlacDecoder* dec, BaacFlacMd5Verdict* verdict) 
     return AAC_ERR_MEMORY;
   }
 }
-#endif /* BAAC_AAC_HAVE_DECODER */
+#endif /* BAC_AAC_HAVE_DECODER */
 
-#if defined(BAAC_AAC_HAVE_ENCODER)
+#if defined(BAC_AAC_HAVE_ENCODER)
 /* ── Encoder API ───────────────────────────────────────────────── */
 
-void baac_flac_encoder_options_init(BaacFlacEncoderOptions* options) {
+void bac_flac_encoder_options_init(BacFlacEncoderOptions* options) {
   if (!options) {
     return;
   }
@@ -187,10 +187,10 @@ void baac_flac_encoder_options_init(BaacFlacEncoderOptions* options) {
   options->picture_count = 0;
 }
 
-BaacFlacEncoder* baac_flac_encoder_create(int sample_rate, int channels, int bits_per_sample,
+BacFlacEncoder* bac_flac_encoder_create(int sample_rate, int channels, int bits_per_sample,
                                           int level, int* error) {
   int result = flac_encoder_check(sample_rate, channels, bits_per_sample, level);
-  BaacFlacEncoder* enc = nullptr;
+  BacFlacEncoder* enc = nullptr;
   if (result == AAC_OK) {
     try {
       enc = flac_encoder_create(sample_rate, channels, bits_per_sample, level);
@@ -204,13 +204,13 @@ BaacFlacEncoder* baac_flac_encoder_create(int sample_rate, int channels, int bit
   return enc;
 }
 
-void baac_flac_encoder_destroy(BaacFlacEncoder* enc) {
+void bac_flac_encoder_destroy(BacFlacEncoder* enc) {
   if (enc) {
     flac_encoder_destroy(enc);
   }
 }
 
-int baac_flac_encoder_set_options(BaacFlacEncoder* enc, const BaacFlacEncoderOptions* options) {
+int bac_flac_encoder_set_options(BacFlacEncoder* enc, const BacFlacEncoderOptions* options) {
   if (!enc || !options) {
     return AAC_ERR_INVALID_ARG;
   }
@@ -221,21 +221,21 @@ int baac_flac_encoder_set_options(BaacFlacEncoder* enc, const BaacFlacEncoderOpt
   }
 }
 
-int baac_flac_encoder_block_size(BaacFlacEncoder* enc) {
+int bac_flac_encoder_block_size(BacFlacEncoder* enc) {
   if (!enc) {
     return AAC_ERR_INVALID_ARG;
   }
   return flac_encoder_block_size(enc);
 }
 
-int baac_flac_encoder_header_bytes(BaacFlacEncoder* enc) {
+int bac_flac_encoder_header_bytes(BacFlacEncoder* enc) {
   if (!enc) {
     return AAC_ERR_INVALID_ARG;
   }
   return flac_encoder_header_bytes(enc);
 }
 
-int baac_flac_encoder_write_header(BaacFlacEncoder* enc, uint8_t* out, int out_size) {
+int bac_flac_encoder_write_header(BacFlacEncoder* enc, uint8_t* out, int out_size) {
   if (!enc || !out || out_size < 0) {
     return AAC_ERR_INVALID_ARG;
   }
@@ -246,14 +246,14 @@ int baac_flac_encoder_write_header(BaacFlacEncoder* enc, uint8_t* out, int out_s
   }
 }
 
-int baac_flac_encoder_max_output_bytes(BaacFlacEncoder* enc, int n_samples) {
+int bac_flac_encoder_max_output_bytes(BacFlacEncoder* enc, int n_samples) {
   if (!enc || n_samples < 0) {
     return AAC_ERR_INVALID_ARG;
   }
   return flac_encoder_max_output_bytes(enc, n_samples);
 }
 
-int baac_flac_encoder_encode(BaacFlacEncoder* enc, const int32_t* pcm, int n_samples, uint8_t* out,
+int bac_flac_encoder_encode(BacFlacEncoder* enc, const int32_t* pcm, int n_samples, uint8_t* out,
                              int out_size) {
   if (!enc || n_samples < 0 || (!pcm && n_samples > 0) || (!out && out_size > 0) || out_size < 0) {
     return AAC_ERR_INVALID_ARG;
@@ -261,32 +261,32 @@ int baac_flac_encoder_encode(BaacFlacEncoder* enc, const int32_t* pcm, int n_sam
   return flac_encoder_encode(enc, pcm, n_samples, out, out_size);
 }
 
-int baac_flac_encoder_finish(BaacFlacEncoder* enc, uint8_t* out, int out_size) {
+int bac_flac_encoder_finish(BacFlacEncoder* enc, uint8_t* out, int out_size) {
   if (!enc || (!out && out_size > 0) || out_size < 0) {
     return AAC_ERR_INVALID_ARG;
   }
   return flac_encoder_finish(enc, out, out_size);
 }
 
-int baac_flac_encoder_last_frame_info(BaacFlacEncoder* enc, BaacFlacFrameInfo* info) {
+int bac_flac_encoder_last_frame_info(BacFlacEncoder* enc, BacFlacFrameInfo* info) {
   if (!enc || !info) {
     return AAC_ERR_INVALID_ARG;
   }
   return flac_encoder_last_frame_info(enc, info);
 }
 
-int baac_flac_encoder_final_header(BaacFlacEncoder* enc, uint8_t* out, int out_size) {
+int bac_flac_encoder_final_header(BacFlacEncoder* enc, uint8_t* out, int out_size) {
   if (!enc || !out || out_size < 0) {
     return AAC_ERR_INVALID_ARG;
   }
   return flac_encoder_final_header(enc, out, out_size);
 }
 
-int baac_flac_encoder_stream_info(BaacFlacEncoder* enc, BaacFlacStreamInfo* info) {
+int bac_flac_encoder_stream_info(BacFlacEncoder* enc, BacFlacStreamInfo* info) {
   if (!enc || !info) {
     return AAC_ERR_INVALID_ARG;
   }
   flac_encoder_stream_info(enc, info);
   return AAC_OK;
 }
-#endif /* BAAC_AAC_HAVE_ENCODER */
+#endif /* BAC_AAC_HAVE_ENCODER */

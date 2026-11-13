@@ -932,7 +932,7 @@ void test_committed() {
         "%s: the night set applies", kCommittedName);
   check_gain_timing(stream, plain, night);
   const Encoded e = encode(pcm, 2, 64000, options(1));
-#if BAAC_REFERENCE_BUILD
+#if BAC_REFERENCE_BUILD
   /* The stream is the reference build's (test_util.h), encoded from the
    * signal with this checksum; other builds compare the decodes. */
   if (check_committed_signal(kCommittedName, pcm, kCommittedSignal)) {

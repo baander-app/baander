@@ -2,8 +2,8 @@
  * a decoder configured from option bytes, fed a byte stream or packets,
  * with every output checked finite and every return checked against the
  * documented codes. */
-#ifndef BAANDER_AAC_FUZZ_DECODE_COMMON_H
-#define BAANDER_AAC_FUZZ_DECODE_COMMON_H
+#ifndef BAANDER_AUDIO_CORE_FUZZ_DECODE_COMMON_H
+#define BAANDER_AUDIO_CORE_FUZZ_DECODE_COMMON_H
 
 #include <vector>
 
@@ -121,4 +121,4 @@ static inline int fuzz_output_channels(uint8_t options) {
   return kChannels[options >> 2 & 7];
 }
 
-#endif /* BAANDER_AAC_FUZZ_DECODE_COMMON_H */
+#endif /* BAANDER_AUDIO_CORE_FUZZ_DECODE_COMMON_H */

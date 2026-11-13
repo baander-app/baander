@@ -5,7 +5,7 @@
  * and the 64-bit forms both apply; and whole streams, which have to come
  * out the same byte for byte whatever level the process is capped at.
  *
- *   BAAC_REQUIRE_KERNELS  levels that have to run here, separated by
+ *   BAC_REQUIRE_KERNELS  levels that have to run here, separated by
  *                         commas ("neon", "sse2,avx2"): the suite fails
  *                         when the processor does not report one of
  *                         them, or when the level installed no kernel
@@ -513,7 +513,7 @@ static int print_stream_digests() {
     const FlacEncoded e = flac_encode(pcm, 48000, c.channels, c.bits, c.level, 4000);
     const FlacDecoded d = flac_decode(e.stream, 8192);
     const bool exact = e.error == AAC_OK && d.errors.empty() && d.finish == AAC_OK &&
-                       d.verdict == BAAC_FLAC_MD5_MATCH && d.pcm == pcm;
+                       d.verdict == BAC_FLAC_MD5_MATCH && d.pcm == pcm;
     failures += exact ? 0 : 1;
     FlacMd5 md5;
     uint8_t digest[16];
@@ -546,12 +546,12 @@ static void test_stream_identity(const char* self, const std::vector<const char*
   const size_t cases = sizeof(kStreamCases) / sizeof(kStreamCases[0]);
   const std::string program = shell_quote(self) + " --stream-digests";
   int status = -1;
-  const std::string uncapped = run_capture("env -u BAAC_AAC_CPU " + program, &status);
+  const std::string uncapped = run_capture("env -u BAC_AAC_CPU " + program, &status);
   CHECK(status == 0 && count_lines(uncapped) == cases,
         "the streams of the uncapped process are exact (status %d):\n%s", status, uncapped.c_str());
   for (const char* cap : caps) {
     const std::string capped =
-        run_capture(std::string("BAAC_AAC_CPU=") + cap + " " + program, &status);
+        run_capture(std::string("BAC_AAC_CPU=") + cap + " " + program, &status);
     CHECK(status == 0 && capped == uncapped,
           "capped at %s the streams are the uncapped ones (status %d):\n%s\nagainst\n%s", cap,
           status, capped.c_str(), uncapped.c_str());
@@ -615,13 +615,13 @@ int main(int argc, char** argv) {
   FlacDSP scalar;
   flac_dsp_init_for(&scalar, AAC_CPU_FLAG_NONE);
 
-  const char* required = getenv("BAAC_REQUIRE_KERNELS");
+  const char* required = getenv("BAC_REQUIRE_KERNELS");
   for (const char* p = required ? required : ""; *p;) {
     const char* end = strchr(p, ',');
     const std::string name(p, end ? (size_t)(end - p) : strlen(p));
     /* A level this build does not have cannot run here either. */
     CHECK(name == "scalar" || name == "sse2" || name == "avx2" || name == "neon",
-          "BAAC_REQUIRE_KERNELS names the level \"%s\", which the codec does not have",
+          "BAC_REQUIRE_KERNELS names the level \"%s\", which the codec does not have",
           name.c_str());
     bool built = false;
     for (int i = 0; i < level_count; i++) {

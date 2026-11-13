@@ -1,10 +1,10 @@
 # Codec comparison harness
 
 Reproduces the measurements in
-[docs/codec-comparison.md](../docs/codec-comparison.md): baander-aac
+[docs/codec-comparison.md](../docs/codec-comparison.md): Bånder Audio Core
 against FFmpeg's native `aac` encoder, Fraunhofer FDK AAC, Ittiam's
 libxaac and Apple's Core Audio AAC (through qaac under Wine); and
-bAAC's lossless mode against FLAC 1.4.3, FFmpeg's FLAC and ALAC encoders
+Bånder Audio Core's lossless mode against FLAC 1.4.3, FFmpeg's FLAC and ALAC encoders
 and Apple's `refalac`.
 
 ## Steps
@@ -12,7 +12,7 @@ and Apple's `refalac`.
 ```sh
 # our codec
 cmake -S .. -B ../cmake-build -G Ninja -DCMAKE_BUILD_TYPE=Release
-ninja -C ../cmake-build baac
+ninja -C ../cmake-build bac
 
 # reference codecs and meters into work/ext, then their paths
 ./setup-refs.sh
@@ -57,7 +57,7 @@ there is under load; use the speed stage for speed).
 ## Method
 
 - Every encoder reads the same 16-bit samples (a canonical WAV, or raw
-  float for `baac`) and writes ADTS for AAC-LC and HE-AAC. For xHE-AAC
+  float for `bac`) and writes ADTS for AAC-LC and HE-AAC. For xHE-AAC
   ours and FDK's write LOAS and libxaac a raw elementary stream.
 - Quality decodes use one decoder per family so that only the encoder
   differs: FFmpeg for AAC-LC and HE-AAC, libxaac for xHE-AAC (loudness
@@ -75,13 +75,13 @@ there is under load; use the speed stage for speed).
 
 ## Lossless stage
 
-`./bench.py lossless` measures the `baac flac` commands against the
+`./bench.py lossless` measures the `bac flac` commands against the
 references and judges the gates of the lossless mode. The stage lives in
 `lossless.py`, whose opening comment is the full statement of the
 method; `common.py` holds what every stage shares: the paths, the tools
 and the corpus items.
 
-- **Rows.** bAAC levels 0 to 8, `flac -0` to `-8`, FFmpeg's FLAC encoder
+- **Rows.** Bånder Audio Core levels 0 to 8, `flac -0` to `-8`, FFmpeg's FLAC encoder
   at levels 5 and 8 (for reference, no gate), FFmpeg ALAC, and `refalac`
   when it runs on the machine. Where it does not, its row is carried
   from the run of 2026-10-30, marked, and compared on size only.
@@ -92,17 +92,17 @@ and the corpus items.
 - **Speed.** Every timed process is pinned to one core with `taskset`
   (`--core N`; the idlest by default) and measured in CPU time. A gate
   takes five repeats or more (`--repeat`); in each, the reference and
-  bAAC run back to back in alternating order and give one paired ratio.
+  Bånder Audio Core run back to back in alternating order and give one paired ratio.
   The threshold is 1 plus the reference's own spread over the repeats.
   All ratios at or below it: passed. All above: failed. Otherwise:
   undecided, which is not a pass.
 - **What is judged.** One process over the corpus repeated until the
   fastest command takes 2 CPU seconds, encoders reading raw PCM. `flac`
-  reads raw PCM about 3 % faster than WAV and bAAC reads both alike, so
-  raw input is the case that favours bAAC least. The same measure from
+  reads raw PCM about 3 % faster than WAV and Bånder Audio Core reads both alike, so
+  raw input is the case that favours Bånder Audio Core least. The same measure from
   WAV, and with one process per corpus item (which adds each tool's
   start), is recorded beside the judged figure.
-- **Decode.** `flac`'s own `-5` and `-8` streams, decoded by bAAC,
+- **Decode.** `flac`'s own `-5` and `-8` streams, decoded by Bånder Audio Core,
   `flac -d` (MD5 verified by both) and FFmpeg (frame CRCs checked by
   both, no MD5).
 - **Exactness.** Every stream is decoded by its own decoder and by the
@@ -124,10 +124,10 @@ and the corpus items.
   1:00 to 2:00). [Held-out recordings](#held-out-recordings) states
   where they come from, how the stage keeps them unseen and what
   happened to the two sets before them.
-- **What the figures describe.** One build on one machine: `baac` as
+- **What the figures describe.** One build on one machine: `bac` as
   CMake builds it in Release, on the processor the run records. The
   judged speed figure leaves the start of a process out, and the
-  per-item figures include it; one start of `baac` costs more than one
+  per-item figures include it; one start of `bac` costs more than one
   of `flac`, because the tool loads the C++ runtime dynamically. On x86
   the AVX2 kernels run, among them a Rice writer that only GCC and Clang
   build, so an MSVC build encodes more slowly than a run here shows. The
@@ -174,7 +174,7 @@ limited run, a run without `--check` and a run that starts on a busy
 host leave them alone and say so. Before the stage decodes the first file
 it checks that every file is present and has its set's format, which it
 reads from the file's header alone. It then books the run in
-`work/heldout/runs.json`, with the date, the SHA-256 of the `baac` binary
+`work/heldout/runs.json`, with the date, the SHA-256 of the `bac` binary
 it measures and the SHA-256 of each file it reads, and the result records
 whether the run was the first on these files. A later run of the same
 binary is a repeat of the same measurement and counts. A later run of
@@ -191,7 +191,7 @@ A held-out gate that fails in the recorded run is reported as failed.
 The encoder is not tuned in answer to it.
 
 The third set's first run, recorded on 12 November 2026, failed one gate:
-on the piano recording bAAC's level 5 frames were 0.27 % larger than
+on the piano recording Bånder Audio Core's level 5 frames were 0.27 % larger than
 those of `flac -5`. Every other gate passed. The failure stands; better
 compression of such material is separate work, which a fresh set will
 judge.
@@ -216,7 +216,7 @@ it is allowed, and the second set replaced it.
 The second set was Variatio 4 of Kimiko Ishizaka's Open Goldberg
 Variations (96 kHz, 24-bit stereo), twenty seconds of the 5.1 master of
 the film Sintel (from 5:00 to 5:20) and the audio of the film's trailer.
-Five runs read it. The first four measured one build of `baac`, and the
+Five runs read it. The first four measured one build of `bac`, and the
 fourth was the recorded run, in which every gate passed. Code review then
 changed the binary. The fifth run measured the changed build, so its
 held-out gates did not count, and because an earlier build had already

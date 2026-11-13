@@ -5,7 +5,7 @@
 #include "../flac_internal.h"
 #include "aac_cpu.h"
 
-#if defined(BAAC_AAC_AVX2) || defined(__AVX2__)
+#if defined(BAC_AAC_AVX2) || defined(__AVX2__)
 
 #include <immintrin.h>
 
@@ -559,4 +559,4 @@ void flac_dsp_init_avx2(FlacDSP* dsp, int flags) {
   (void)flags;
 }
 
-#endif /* BAAC_AAC_AVX2 || __AVX2__ */
+#endif /* BAC_AAC_AVX2 || __AVX2__ */

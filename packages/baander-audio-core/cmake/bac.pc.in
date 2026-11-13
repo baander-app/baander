@@ -3,9 +3,9 @@ exec_prefix=${prefix}
 libdir=@CMAKE_INSTALL_FULL_LIBDIR@
 includedir=@CMAKE_INSTALL_FULL_INCLUDEDIR@
 
-Name: libbaac
-Description: bAAC, the Baander AAC encoder and decoder library
+Name: bac
+Description: Bånder Audio Core, the Bånder AAC and FLAC encoder and decoder library
 Version: @PROJECT_VERSION@
 Cflags: -I${includedir}
-Libs: -L${libdir} -lbaander-aac
+Libs: -L${libdir} -lbac
 Libs.private: -lstdc++ -lm

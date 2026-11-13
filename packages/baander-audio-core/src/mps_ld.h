@@ -1,5 +1,5 @@
-#ifndef BAANDER_AAC_MPS_LD_H
-#define BAANDER_AAC_MPS_LD_H
+#ifndef BAANDER_AUDIO_CORE_MPS_LD_H
+#define BAANDER_AUDIO_CORE_MPS_LD_H
 
 #include <stdint.h>
 
@@ -86,4 +86,4 @@ void aac_mps_ld_apply(AacMpsLdState* s, const AacMpsFrameParams* p, const AacUsa
 }
 #endif
 
-#endif /* BAANDER_AAC_MPS_LD_H */
+#endif /* BAANDER_AUDIO_CORE_MPS_LD_H */

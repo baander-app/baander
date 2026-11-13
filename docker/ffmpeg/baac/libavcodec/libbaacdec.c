@@ -17,7 +17,7 @@
  * and rate per frame, which change when SBR or parametric stereo appear.
  */
 
-#include <baac/aac.h>
+#include <bac/aac.h>
 
 #include "libavutil/channel_layout.h"
 #include "libavutil/common.h"

@@ -707,7 +707,7 @@ void test_committed() {
     CHECK(d.errors == 0 && d.frames > 48 && snr > 18.0, "%s: %d frames, %d errors, %.1f dB", s.name,
           d.frames, d.errors, snr);
     const Encoded e = encode(pcm, s.channels, s.bitrate, &kPlain);
-#if BAAC_REFERENCE_BUILD
+#if BAC_REFERENCE_BUILD
     if (!check_committed_signal(s.name, pcm, s.signal)) {
       continue;
     }

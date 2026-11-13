@@ -1,4 +1,4 @@
-# Baander AAC — clang-tidy configuration
+# Bånder Audio Core — clang-tidy configuration
 #
 # Run:  clang-tidy -p build src/*.cpp src/simd/*.cpp tests/*.cpp
 #

@@ -1,5 +1,5 @@
-#ifndef BAANDER_AAC_FFT_H
-#define BAANDER_AAC_FFT_H
+#ifndef BAANDER_AUDIO_CORE_FFT_H
+#define BAANDER_AUDIO_CORE_FFT_H
 
 #include <cstddef>
 
@@ -41,4 +41,4 @@ void aac_fft_forward(const AacFft* f, float* re, float* im);
 }
 #endif
 
-#endif /* BAANDER_AAC_FFT_H */
+#endif /* BAANDER_AUDIO_CORE_FFT_H */

@@ -1,5 +1,5 @@
-#ifndef BAANDER_AAC_TRANSPORT_H
-#define BAANDER_AAC_TRANSPORT_H
+#ifndef BAANDER_AUDIO_CORE_TRANSPORT_H
+#define BAANDER_AUDIO_CORE_TRANSPORT_H
 
 #include <cstdint>
 
@@ -24,7 +24,7 @@ extern "C" {
 /* Bytes the decoder FIFO holds: 64 KiB plus one largest frame. */
 #define AAC_TRANSPORT_FIFO_BYTES (65536 + AAC_TRANSPORT_MAX_FRAME_BYTES)
 
-#if defined(BAAC_AAC_HAVE_DECODER)
+#if defined(BAC_AAC_HAVE_DECODER)
 struct AacDecoderState_;
 using AacDecoderTransport = struct AacDecoderTransport_;
 
@@ -59,9 +59,9 @@ int aac_decoder_transport_decode_next(struct AacDecoderState_* s, AacDecoderTran
  * the transport is AAC_TRANSPORT_DETECT) without the FIFO. */
 int aac_decoder_transport_decode(struct AacDecoderState_* s, AacDecoderTransport* t,
                                  const uint8_t* data, int size, float* pcm, int pcm_size);
-#endif /* BAAC_AAC_HAVE_DECODER */
+#endif /* BAC_AAC_HAVE_DECODER */
 
-#if defined(BAAC_AAC_HAVE_ENCODER)
+#if defined(BAC_AAC_HAVE_ENCODER)
 struct AacEncoderState_;
 using AacEncoderTransport = struct AacEncoderTransport_;
 
@@ -91,10 +91,10 @@ int aac_encoder_transport_max_bytes(const struct AacEncoderState_* s,
  * every AAC frame, and in the xHE-AAC frames a decoder starts at. */
 int aac_encoder_transport_wrap(struct AacEncoderState_* s, AacEncoderTransport* t, int frame_len,
                                uint8_t* out, int out_size);
-#endif /* BAAC_AAC_HAVE_ENCODER */
+#endif /* BAC_AAC_HAVE_ENCODER */
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* BAANDER_AAC_TRANSPORT_H */
+#endif /* BAANDER_AUDIO_CORE_TRANSPORT_H */

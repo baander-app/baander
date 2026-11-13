@@ -14,8 +14,8 @@
  * module and the core channel contract's overlap buffer are at the FD
  * module's transform scale (32768 at full scale); the delivered frame
  * is at full scale 1.0. */
-#ifndef BAANDER_AAC_USAC_LPD_INTERNAL_H
-#define BAANDER_AAC_USAC_LPD_INTERNAL_H
+#ifndef BAANDER_AUDIO_CORE_USAC_LPD_INTERNAL_H
+#define BAANDER_AUDIO_CORE_USAC_LPD_INTERNAL_H
 
 #include <cstdint>
 
@@ -248,4 +248,4 @@ void lpd_sine_window(int n, float* w);
  * response, with w the sine slope of 2 lfac. */
 void lpd_fac_windows(int lfac, float* past_w, float* zir_w);
 
-#endif /* BAANDER_AAC_USAC_LPD_INTERNAL_H */
+#endif /* BAANDER_AUDIO_CORE_USAC_LPD_INTERNAL_H */

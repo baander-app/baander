@@ -262,9 +262,9 @@ static void check_streaminfo(const char* name, const std::vector<uint8_t>& s, in
                              uint64_t total, const char* md5) {
   CHECK(memcmp(s.data(), "fLaC", 4) == 0, "%s: marker", name);
   const BlockHeader bh = block_header(s, 4);
-  CHECK(bh.type == FLAC_BLOCK_STREAMINFO && bh.size == BAAC_FLAC_STREAMINFO_BYTES,
+  CHECK(bh.type == FLAC_BLOCK_STREAMINFO && bh.size == BAC_FLAC_STREAMINFO_BYTES,
         "%s: the first block is a STREAMINFO of 34 bytes", name);
-  BaacFlacStreamInfo info;
+  BacFlacStreamInfo info;
   CHECK(flac_streaminfo_parse(s.data() + 8, &info), "%s: STREAMINFO parses", name);
   CHECK(info.min_block_size == block_size && info.max_block_size == block_size,
         "%s: block sizes %d..%d", name, info.min_block_size, info.max_block_size);
@@ -277,7 +277,7 @@ static void check_streaminfo(const char* name, const std::vector<uint8_t>& s, in
         (unsigned long long)info.total_samples);
   CHECK(hex_string(info.md5, 16) == md5, "%s: MD5 %s", name, hex_string(info.md5, 16).c_str());
   /* Writing the parsed block gives the bytes back. */
-  uint8_t out[BAAC_FLAC_STREAMINFO_BYTES];
+  uint8_t out[BAC_FLAC_STREAMINFO_BYTES];
   CHECK(flac_streaminfo_write(&info, out) && memcmp(out, s.data() + 8, sizeof(out)) == 0,
         "%s: STREAMINFO writes back to the same bytes", name);
 }
@@ -348,53 +348,53 @@ static void test_rfc_examples() {
 }
 
 static void test_streaminfo_limits() {
-  BaacFlacStreamInfo info = {};
+  BacFlacStreamInfo info = {};
   info.min_block_size = 16;
   info.max_block_size = 65535;
   info.min_frame_bytes = 0xFFFFFF;
   info.max_frame_bytes = 0xFFFFFF;
-  info.sample_rate = BAAC_FLAC_MAX_SAMPLE_RATE;
+  info.sample_rate = BAC_FLAC_MAX_SAMPLE_RATE;
   info.channels = 8;
   info.bits_per_sample = 32;
   info.total_samples = 0xFFFFFFFFFull;
   for (int i = 0; i < 16; i++) {
     info.md5[i] = (uint8_t)(0xF0 + i);
   }
-  uint8_t out[BAAC_FLAC_STREAMINFO_BYTES];
-  BaacFlacStreamInfo back;
+  uint8_t out[BAC_FLAC_STREAMINFO_BYTES];
+  BacFlacStreamInfo back;
   CHECK(flac_streaminfo_write(&info, out) && flac_streaminfo_parse(out, &back),
         "the largest STREAMINFO values round-trip");
   CHECK(back.min_block_size == 16 && back.max_block_size == 65535 &&
             back.min_frame_bytes == 0xFFFFFF && back.max_frame_bytes == 0xFFFFFF &&
-            back.sample_rate == BAAC_FLAC_MAX_SAMPLE_RATE && back.channels == 8 &&
+            back.sample_rate == BAC_FLAC_MAX_SAMPLE_RATE && back.channels == 8 &&
             back.bits_per_sample == 32 && back.total_samples == 0xFFFFFFFFFull &&
             memcmp(back.md5, info.md5, 16) == 0,
         "every field survives at its maximum");
 
   /* What the writer refuses. */
-  const auto refused = [&](const char* what, void (*change)(BaacFlacStreamInfo*)) {
-    BaacFlacStreamInfo bad = info;
+  const auto refused = [&](const char* what, void (*change)(BacFlacStreamInfo*)) {
+    BacFlacStreamInfo bad = info;
     change(&bad);
     CHECK(!flac_streaminfo_write(&bad, out), "the writer refuses %s", what);
   };
-  refused("a block size below 16", [](BaacFlacStreamInfo* i) { i->min_block_size = 15; });
-  refused("a block size of 65536", [](BaacFlacStreamInfo* i) { i->max_block_size = 65536; });
-  refused("a minimum above the maximum", [](BaacFlacStreamInfo* i) {
+  refused("a block size below 16", [](BacFlacStreamInfo* i) { i->min_block_size = 15; });
+  refused("a block size of 65536", [](BacFlacStreamInfo* i) { i->max_block_size = 65536; });
+  refused("a minimum above the maximum", [](BacFlacStreamInfo* i) {
     i->min_block_size = 4097;
     i->max_block_size = 4096;
   });
-  refused("nine channels", [](BaacFlacStreamInfo* i) { i->channels = 9; });
-  refused("no channel", [](BaacFlacStreamInfo* i) { i->channels = 0; });
-  refused("3 bits per sample", [](BaacFlacStreamInfo* i) { i->bits_per_sample = 3; });
-  refused("33 bits per sample", [](BaacFlacStreamInfo* i) { i->bits_per_sample = 33; });
-  refused("a rate above 20 bits", [](BaacFlacStreamInfo* i) { i->sample_rate = 1048576; });
-  refused("a total above 36 bits", [](BaacFlacStreamInfo* i) { i->total_samples = 1ull << 36; });
+  refused("nine channels", [](BacFlacStreamInfo* i) { i->channels = 9; });
+  refused("no channel", [](BacFlacStreamInfo* i) { i->channels = 0; });
+  refused("3 bits per sample", [](BacFlacStreamInfo* i) { i->bits_per_sample = 3; });
+  refused("33 bits per sample", [](BacFlacStreamInfo* i) { i->bits_per_sample = 33; });
+  refused("a rate above 20 bits", [](BacFlacStreamInfo* i) { i->sample_rate = 1048576; });
+  refused("a total above 36 bits", [](BacFlacStreamInfo* i) { i->total_samples = 1ull << 36; });
   refused("a frame size above 24 bits",
-          [](BaacFlacStreamInfo* i) { i->max_frame_bytes = 1 << 24; });
+          [](BacFlacStreamInfo* i) { i->max_frame_bytes = 1 << 24; });
 
   /* What the parser refuses: values the format forbids. */
   flac_streaminfo_write(&info, out);
-  uint8_t bad[BAAC_FLAC_STREAMINFO_BYTES];
+  uint8_t bad[BAC_FLAC_STREAMINFO_BYTES];
   memcpy(bad, out, sizeof(bad));
   bad[0] = 0;
   bad[1] = 15;

@@ -1,5 +1,5 @@
-#ifndef BAANDER_AAC_CONCEAL_H
-#define BAANDER_AAC_CONCEAL_H
+#ifndef BAANDER_AUDIO_CORE_CONCEAL_H
+#define BAANDER_AUDIO_CORE_CONCEAL_H
 #include "aac.h"
 #include "ics.h"
 
@@ -45,4 +45,4 @@ void aac_conceal_spectrum(AacConcealChannel* c, int mode, int frame_length,
 #ifdef __cplusplus
 }
 #endif
-#endif /* BAANDER_AAC_CONCEAL_H */
+#endif /* BAANDER_AUDIO_CORE_CONCEAL_H */

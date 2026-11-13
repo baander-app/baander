@@ -1,5 +1,5 @@
-#ifndef BAANDER_AAC_SBR_ENC_INTERNAL_H
-#define BAANDER_AAC_SBR_ENC_INTERNAL_H
+#ifndef BAANDER_AUDIO_CORE_SBR_ENC_INTERNAL_H
+#define BAANDER_AUDIO_CORE_SBR_ENC_INTERNAL_H
 
 #include "sbr_enc.h"
 
@@ -16,4 +16,4 @@ void aac_sbr_enc_write_envelope(const AacSbrEncoder* s, AacBitWriter* w,
 void aac_sbr_enc_write_noise(const AacSbrEncoder* s, AacBitWriter* w, const AacSbrEncChannel* ch,
                              const int* prev);
 
-#endif /* BAANDER_AAC_SBR_ENC_INTERNAL_H */
+#endif /* BAANDER_AUDIO_CORE_SBR_ENC_INTERNAL_H */

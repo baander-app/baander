@@ -7,7 +7,7 @@
  * so the same inputs run on every machine; a slower build (a sanitizer
  * or debug build) stops at the time cap instead, after a prefix of the
  * same sequence.  The seven harnesses run at the same time.
- * BAAC_FUZZ_SMOKE_SECONDS in the environment changes the cap (default
+ * BAC_FUZZ_SMOKE_SECONDS in the environment changes the cap (default
  * 60). */
 #include <sys/wait.h>
 #include <unistd.h>
@@ -38,13 +38,13 @@ struct Harness {
 };
 
 static const Harness kHarnesses[] = {
-    {"fuzz_decoder", BAAC_FUZZ_DECODER, "decoder", RUNS_DECODER},
-    {"fuzz_asc", BAAC_FUZZ_ASC, "asc", RUNS_ASC},
-    {"fuzz_encoder", BAAC_FUZZ_ENCODER, "encoder", RUNS_ENCODER},
-    {"fuzz_unidrc", BAAC_FUZZ_UNIDRC, "unidrc", RUNS_UNIDRC},
-    {"fuzz_mps", BAAC_FUZZ_MPS, "mps", RUNS_MPS},
-    {"fuzz_flac_decoder", BAAC_FUZZ_FLAC_DECODER, "flac_decoder", RUNS_FLAC_DECODER},
-    {"fuzz_flac_encoder", BAAC_FUZZ_FLAC_ENCODER, "flac_encoder", RUNS_FLAC_ENCODER},
+    {"fuzz_decoder", BAC_FUZZ_DECODER, "decoder", RUNS_DECODER},
+    {"fuzz_asc", BAC_FUZZ_ASC, "asc", RUNS_ASC},
+    {"fuzz_encoder", BAC_FUZZ_ENCODER, "encoder", RUNS_ENCODER},
+    {"fuzz_unidrc", BAC_FUZZ_UNIDRC, "unidrc", RUNS_UNIDRC},
+    {"fuzz_mps", BAC_FUZZ_MPS, "mps", RUNS_MPS},
+    {"fuzz_flac_decoder", BAC_FUZZ_FLAC_DECODER, "flac_decoder", RUNS_FLAC_DECODER},
+    {"fuzz_flac_encoder", BAC_FUZZ_FLAC_ENCODER, "flac_encoder", RUNS_FLAC_ENCODER},
 };
 
 /* Starts a harness over its corpus; returns the child's pid. */
@@ -61,7 +61,7 @@ static pid_t start(const Harness& h, const std::string& dir, int seconds) {
   }
   const std::string budget = std::to_string(seconds);
   const std::string runs = std::to_string(h.runs);
-#ifdef BAAC_FUZZ_LIBFUZZER
+#ifdef BAC_FUZZ_LIBFUZZER
   const std::string time_opt = "-max_total_time=" + budget;
   const std::string runs_opt = "-runs=" + runs;
   const std::string prefix = "-artifact_prefix=" + artifacts + "/";
@@ -86,7 +86,7 @@ int main() {
   }
   const std::string findings = dir + "/findings";
   CHECK(run_command("mkdir -p '" + findings + "'"), "findings directory");
-  const std::string gen = std::string("'") + BAAC_FUZZ_SEEDS + "' '" + BAAC_TEST_DATA_DIR + "' '" +
+  const std::string gen = std::string("'") + BAC_FUZZ_SEEDS + "' '" + BAC_TEST_DATA_DIR + "' '" +
                           dir + "'";
   CHECK(run_command(gen), "seed generation: %s", gen.c_str());
   for (const Harness& h : kHarnesses) {
@@ -95,7 +95,7 @@ int main() {
   }
 
   int seconds = 60;
-  if (const char* env = getenv("BAAC_FUZZ_SMOKE_SECONDS")) {
+  if (const char* env = getenv("BAC_FUZZ_SMOKE_SECONDS")) {
     seconds = atoi(env);
   }
   const size_t count = sizeof(kHarnesses) / sizeof(kHarnesses[0]);

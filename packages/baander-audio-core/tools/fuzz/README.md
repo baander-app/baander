@@ -37,16 +37,16 @@ no such switch.
 ## Building
 
 ```sh
-cmake -S . -B cmake-build-fuzz -DCMAKE_BUILD_TYPE=Release -DBAAC_FUZZ=ON
+cmake -S . -B cmake-build-fuzz -DCMAKE_BUILD_TYPE=Release -DBAC_FUZZ=ON
 cmake --build cmake-build-fuzz -j8
 ```
 
-`BAAC_FUZZ` instruments the whole tree (library, tests and harnesses)
+`BAC_FUZZ` instruments the whole tree (library, tests and harnesses)
 with `-fsanitize=address,undefined`. When the compiler can link
 `-fsanitize=fuzzer` (clang with its compiler-rt runtimes), the harnesses
 run under libFuzzer; otherwise they link the mutation driver. A compiler
 that cannot link the sanitizers is refused at configure time. Without
-`BAAC_FUZZ` the harnesses are still built, without sanitizers, so that
+`BAC_FUZZ` the harnesses are still built, without sanitizers, so that
 the smoke test runs in every build.
 
 ## Seeds
@@ -128,5 +128,5 @@ With libFuzzer, the usual options apply:
 
 `ctest` runs `test_fuzz_smoke`. It generates the corpus into a temporary
 directory and runs the seven harnesses side by side for 20 seconds each;
-`BAAC_FUZZ_SMOKE_SECONDS` changes the budget. On a failure it keeps the
+`BAC_FUZZ_SMOKE_SECONDS` changes the budget. On a failure it keeps the
 directory with the logs and the reproducer.

@@ -99,8 +99,8 @@ QUIET_CPU = 2.0     # CPUs' worth the rest of the host may use
 QUIET_WINDOW = 60   # seconds the host is measured before a run starts
 CARRIED_REFALAC = dict(codec="alac-apple-ref", seconds=130.3173125, kbps=690.2499619918112,
                        bit_exact=True, carried="2026-10-30")
-TESTBENCH = Path(os.environ.get("BAAC_FLAC_TESTBENCH", HERE / "work" / "flac-test-files"))
-HELDOUT_DIR = Path(os.environ.get("BAAC_HELDOUT", HERE / "work" / "heldout"))
+TESTBENCH = Path(os.environ.get("BAC_FLAC_TESTBENCH", HERE / "work" / "flac-test-files"))
+HELDOUT_DIR = Path(os.environ.get("BAC_HELDOUT", HERE / "work" / "heldout"))
 # A set is (id, label, format, sources); a source is (file, skip, until),
 # the last two as `flac -d --skip` and `--until` take them, or None for
 # the whole file.
@@ -307,7 +307,7 @@ def host_info(core):
     except OSError:
         pass
     compiler = build_type = ""
-    cache = Path(TOOLS["baac"]).parent / "CMakeCache.txt"
+    cache = Path(TOOLS["bac"]).parent / "CMakeCache.txt"
     if cache.exists():
         text = cache.read_text()
         m = re.search(r"^CMAKE_CXX_COMPILER:\w+=(.*)$", text, re.M)
@@ -341,7 +341,7 @@ def raw_args(fmt):
 
 def enc_baac(level, src, out, fmt=None):
     raw = ["--raw", str(fmt["sample_rate"]), str(fmt["channels"]), str(fmt["bits"])] if fmt else []
-    return [TOOLS["baac"], "flac", "enc", "--level", str(level)] + raw + [str(src), str(out)]
+    return [TOOLS["bac"], "flac", "enc", "--level", str(level)] + raw + [str(src), str(out)]
 
 
 def enc_flac(level, src, out, fmt=None):
@@ -350,7 +350,7 @@ def enc_flac(level, src, out, fmt=None):
 
 
 def dec_baac(stream, out, md5=True, raw=False):
-    return [TOOLS["baac"], "flac", "dec"] + ([] if md5 else ["--no-md5"]) + \
+    return [TOOLS["bac"], "flac", "dec"] + ([] if md5 else ["--no-md5"]) + \
         (["--raw"] if raw else []) + [str(stream), str(out)]
 
 
@@ -600,7 +600,7 @@ def stage_lossless(args):
 
 def begin(args):
     """Checks the tools and starts a run on the idlest core."""
-    for tool in ("baac", "flac", "ffmpeg"):
+    for tool in ("bac", "flac", "ffmpeg"):
         if not have(tool):
             raise SystemExit(f"the lossless stage needs {tool} ({TOOLS[tool]})")
     flac_version = tool_version([TOOLS["flac"], "--version"])
@@ -953,7 +953,7 @@ def held_out(ctx):
     else:
         recordings = [file_sha256(path) for path in held_out_files()]
         held_run = held_out_entry(HELDOUT_DIR / "runs.json", recordings, ctx.started,
-                                  file_sha256(TOOLS["baac"]), git_state())
+                                  file_sha256(TOOLS["bac"]), git_state())
         for set_id, label, expected, sources in HELD_OUT:
             records, _ = measure_set(ctx, "held", "held-out", "held-out", HELDOUT_DIR, set_id,
                                      label, expected, sources, (5,))

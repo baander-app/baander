@@ -24,16 +24,16 @@ static std::atomic<int> g_cpu_flags_override{-1};
 /* The codec objects dispatch through the process-wide table of
  * aac_dsp_global(), which is filled once from aac_get_cpu_flags() when the
  * first encoder or decoder is created (or the first transform runs).  The
- * BAAC_AAC_CPU variable and aac_set_cpu_flags_override therefore take
+ * BAC_AAC_CPU variable and aac_set_cpu_flags_override therefore take
  * effect only before that; a later override changes what
  * aac_get_cpu_flags() reports and what aac_dsp_init() fills into a table
  * of the caller's own, not the table the codec objects use. */
 
-/* The BAAC_AAC_CPU environment variable caps the dispatch level for tests
+/* The BAC_AAC_CPU environment variable caps the dispatch level for tests
  * and comparisons: "scalar", "sse2", "avx2" or "neon".  Returns -1 when it
  * is unset or unknown. */
 static int env_cpu_cap(void) {
-  const char* v = getenv("BAAC_AAC_CPU");
+  const char* v = getenv("BAC_AAC_CPU");
   if (!v || !*v) {
     return -1;
   }

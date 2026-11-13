@@ -351,7 +351,7 @@ int flac_coded_number_read(const uint8_t* data, size_t size, uint64_t* value) {
 
 /* ── STREAMINFO ─────────────────────────────────────────────────── */
 
-bool flac_streaminfo_parse(const uint8_t* d, BaacFlacStreamInfo* info) {
+bool flac_streaminfo_parse(const uint8_t* d, BacFlacStreamInfo* info) {
   info->min_block_size = (d[0] << 8) | d[1];
   info->max_block_size = (d[2] << 8) | d[3];
   info->min_frame_bytes = (d[4] << 16) | (d[5] << 8) | d[6];
@@ -362,21 +362,21 @@ bool flac_streaminfo_parse(const uint8_t* d, BaacFlacStreamInfo* info) {
   info->total_samples = ((uint64_t)(d[13] & 0x0F) << 32) | ((uint64_t)d[14] << 24) |
                         ((uint64_t)d[15] << 16) | ((uint64_t)d[16] << 8) | (uint64_t)d[17];
   memcpy(info->md5, d + 18, 16);
-  return info->min_block_size >= BAAC_FLAC_MIN_BLOCK_SIZE &&
+  return info->min_block_size >= BAC_FLAC_MIN_BLOCK_SIZE &&
          info->max_block_size >= info->min_block_size &&
-         info->bits_per_sample >= BAAC_FLAC_MIN_BITS_PER_SAMPLE;
+         info->bits_per_sample >= BAC_FLAC_MIN_BITS_PER_SAMPLE;
 }
 
-bool flac_streaminfo_write(const BaacFlacStreamInfo* info, uint8_t* out) {
-  if (info->min_block_size < BAAC_FLAC_MIN_BLOCK_SIZE ||
-      info->max_block_size > BAAC_FLAC_MAX_BLOCK_SIZE ||
+bool flac_streaminfo_write(const BacFlacStreamInfo* info, uint8_t* out) {
+  if (info->min_block_size < BAC_FLAC_MIN_BLOCK_SIZE ||
+      info->max_block_size > BAC_FLAC_MAX_BLOCK_SIZE ||
       info->min_block_size > info->max_block_size || info->min_frame_bytes < 0 ||
       info->min_frame_bytes > 0xFFFFFF || info->max_frame_bytes < 0 ||
       info->max_frame_bytes > 0xFFFFFF || info->sample_rate < 0 ||
-      info->sample_rate > BAAC_FLAC_MAX_SAMPLE_RATE || info->channels < 1 ||
-      info->channels > BAAC_FLAC_MAX_CHANNELS ||
-      info->bits_per_sample < BAAC_FLAC_MIN_BITS_PER_SAMPLE ||
-      info->bits_per_sample > BAAC_FLAC_MAX_BITS_PER_SAMPLE || (info->total_samples >> 36)) {
+      info->sample_rate > BAC_FLAC_MAX_SAMPLE_RATE || info->channels < 1 ||
+      info->channels > BAC_FLAC_MAX_CHANNELS ||
+      info->bits_per_sample < BAC_FLAC_MIN_BITS_PER_SAMPLE ||
+      info->bits_per_sample > BAC_FLAC_MAX_BITS_PER_SAMPLE || (info->total_samples >> 36)) {
     return false;
   }
   const uint32_t rate = (uint32_t)info->sample_rate;
@@ -511,7 +511,7 @@ int flac_frame_header_parse(const uint8_t* d, size_t size, FlacFrameHeader* h, b
   } else if (block_code == 7) {
     h->block_size = ((d[pos] << 8) | d[pos + 1]) + 1;
     /* 65536 samples cannot be stated in STREAMINFO. */
-    if (h->block_size > BAAC_FLAC_MAX_BLOCK_SIZE) {
+    if (h->block_size > BAC_FLAC_MAX_BLOCK_SIZE) {
       return -1;
     }
   } else {
@@ -534,8 +534,8 @@ int flac_frame_header_parse(const uint8_t* d, size_t size, FlacFrameHeader* h, b
 }
 
 int flac_frame_header_write(const FlacFrameHeader* h, uint8_t* out) {
-  if (h->block_size < 1 || h->block_size > BAAC_FLAC_MAX_BLOCK_SIZE || h->channels < 1 ||
-      h->channels > BAAC_FLAC_MAX_CHANNELS || h->assignment < FLAC_ASSIGN_INDEPENDENT ||
+  if (h->block_size < 1 || h->block_size > BAC_FLAC_MAX_BLOCK_SIZE || h->channels < 1 ||
+      h->channels > BAC_FLAC_MAX_CHANNELS || h->assignment < FLAC_ASSIGN_INDEPENDENT ||
       h->assignment > FLAC_ASSIGN_MID_SIDE ||
       (h->assignment != FLAC_ASSIGN_INDEPENDENT && h->channels != 2) ||
       (h->number >> (h->variable_block_size ? 36 : 31))) {
@@ -601,7 +601,7 @@ int flac_frame_header_write(const FlacFrameHeader* h, uint8_t* out) {
 
 /* ── stage timers ───────────────────────────────────────────────── */
 
-#if defined(BAAC_FLAC_PROFILE)
+#if defined(BAC_FLAC_PROFILE)
 #include <chrono>
 
 namespace {

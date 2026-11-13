@@ -1,5 +1,5 @@
-#ifndef BAANDER_AAC_ENCODER_H
-#define BAANDER_AAC_ENCODER_H
+#ifndef BAANDER_AUDIO_CORE_ENCODER_H
+#define BAANDER_AUDIO_CORE_ENCODER_H
 #include <cstdint>
 
 #include "aac.h"
@@ -341,4 +341,4 @@ int aac_encode_frame_internal(AacEncoderState* s, const float* pcm);
 #ifdef __cplusplus
 }
 #endif
-#endif /* BAANDER_AAC_ENCODER_H */
+#endif /* BAANDER_AUDIO_CORE_ENCODER_H */

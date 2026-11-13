@@ -1,5 +1,5 @@
-#ifndef BAANDER_AAC_SBR_H
-#define BAANDER_AAC_SBR_H
+#ifndef BAANDER_AUDIO_CORE_SBR_H
+#define BAANDER_AUDIO_CORE_SBR_H
 
 #include <cstdint>
 
@@ -425,4 +425,4 @@ extern const float aac_sbr_noise_table[512][2];
 }
 #endif
 
-#endif /* BAANDER_AAC_SBR_H */
+#endif /* BAANDER_AUDIO_CORE_SBR_H */

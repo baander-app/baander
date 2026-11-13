@@ -1,5 +1,5 @@
-#ifndef BAANDER_AAC_LIMITER_H
-#define BAANDER_AAC_LIMITER_H
+#ifndef BAANDER_AUDIO_CORE_LIMITER_H
+#define BAANDER_AUDIO_CORE_LIMITER_H
 
 #include <cstdint>
 
@@ -68,4 +68,4 @@ long long aac_limiter_lookahead(int sample_rate, int attack_ms);
 }
 #endif
 
-#endif /* BAANDER_AAC_LIMITER_H */
+#endif /* BAANDER_AUDIO_CORE_LIMITER_H */

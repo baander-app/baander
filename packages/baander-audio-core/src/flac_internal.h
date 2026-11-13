@@ -8,8 +8,8 @@
  * which were built for Huffman codes: Rice codes are a unary run
  * followed by a few plain bits, and the unary run is read with one
  * count-leading-zeros over the cache instead of bit by bit. */
-#ifndef BAANDER_AAC_FLAC_INTERNAL_H
-#define BAANDER_AAC_FLAC_INTERNAL_H
+#ifndef BAANDER_AUDIO_CORE_FLAC_INTERNAL_H
+#define BAANDER_AUDIO_CORE_FLAC_INTERNAL_H
 
 #include <cstddef>
 #include <cstdint>
@@ -28,13 +28,13 @@
 
 /* ── stage timers ───────────────────────────────────────────────── */
 
-/* With BAAC_FLAC_PROFILE defined at compile time the codec accounts the
+/* With BAC_FLAC_PROFILE defined at compile time the codec accounts the
  * time it spends per stage, each stage without the stages it calls, and
  * flac_profile_report prints the table.  A development aid for finding
  * where an encode or a decode spends its time: the timers are process-
  * wide, not for more than one thread, and absent from a normal build,
  * where FLAC_PROFILE expands to nothing. */
-#if defined(BAAC_FLAC_PROFILE)
+#if defined(BAC_FLAC_PROFILE)
 #include <cstdio>
 enum FlacProfileStage {
   FLAC_PROF_OTHER, /* whatever no other stage claims */
@@ -157,8 +157,8 @@ int flac_coded_number_read(const uint8_t* data, size_t size, uint64_t* value);
  * returns false for values the format forbids: a block size below 16, a
  * minimum above the maximum, a bit depth below 4.  The writer returns
  * false for a field outside its range. */
-bool flac_streaminfo_parse(const uint8_t* data, BaacFlacStreamInfo* info);
-bool flac_streaminfo_write(const BaacFlacStreamInfo* info, uint8_t* out);
+bool flac_streaminfo_parse(const uint8_t* data, BacFlacStreamInfo* info);
+bool flac_streaminfo_write(const BacFlacStreamInfo* info, uint8_t* out);
 
 /* ── frame header ───────────────────────────────────────────────── */
 
@@ -199,39 +199,39 @@ bool flac_sample_rate_is_codable(int sample_rate);
  * arguments and turn an allocation failure into AAC_ERR_MEMORY before
  * and after these.  Functions that size buffers may throw
  * std::bad_alloc. */
-BaacFlacDecoder* flac_decoder_create();
-void flac_decoder_destroy(BaacFlacDecoder* d);
-void flac_decoder_reset(BaacFlacDecoder* d);
-int flac_decoder_set_streaminfo(BaacFlacDecoder* d, const uint8_t* data);
-int flac_decoder_set_md5_check(BaacFlacDecoder* d, bool enabled);
+BacFlacDecoder* flac_decoder_create();
+void flac_decoder_destroy(BacFlacDecoder* d);
+void flac_decoder_reset(BacFlacDecoder* d);
+int flac_decoder_set_streaminfo(BacFlacDecoder* d, const uint8_t* data);
+int flac_decoder_set_md5_check(BacFlacDecoder* d, bool enabled);
 /* For fuzzing only, and not reachable through the public API: a frame
  * is taken whatever its CRC-8 and CRC-16 say, so that mutated input
  * reaches the code behind the checksums (RFC 9639 section 11 advises
  * this for fuzz testing). */
-void flac_decoder_ignore_checksums(BaacFlacDecoder* d, bool ignore);
+void flac_decoder_ignore_checksums(BacFlacDecoder* d, bool ignore);
 /* For the tests: the bytes the decoder has read so far for candidates of
  * its frame search that it then rejected. */
-uint64_t flac_decoder_rejected_work(const BaacFlacDecoder* d);
+uint64_t flac_decoder_rejected_work(const BacFlacDecoder* d);
 /* For the tests: the bytes the decoder has read so far for frames and
  * candidates, a frame read again in part counted once more for that part. */
-uint64_t flac_decoder_read_work(const BaacFlacDecoder* d);
-int flac_decoder_set_metadata(BaacFlacDecoder* d, bool collect, size_t max_bytes);
-int flac_decoder_comments(const BaacFlacDecoder* d, const BaacFlacComment** comments,
-                          BaacFlacComment* vendor);
-int flac_decoder_pictures(const BaacFlacDecoder* d, const BaacFlacPicture** pictures);
-int flac_decoder_skipped_metadata(const BaacFlacDecoder* d);
-void flac_decoder_id3(const BaacFlacDecoder* d, uint64_t* v2_bytes, int* v1_trailer);
-int flac_decoder_feed(BaacFlacDecoder* d, const uint8_t* data, int size);
-int flac_decoder_decode_next(BaacFlacDecoder* d, int32_t* pcm, int pcm_size);
-int flac_decoder_pending_bytes(const BaacFlacDecoder* d);
-int flac_decoder_stream_info(const BaacFlacDecoder* d, BaacFlacStreamInfo* info);
-int flac_decoder_last_frame_info(const BaacFlacDecoder* d, BaacFlacFrameInfo* info);
-int flac_decoder_lost_frames(const BaacFlacDecoder* d);
-int flac_decoder_seek_points(const BaacFlacDecoder* d, const BaacFlacSeekPoint** points);
-int64_t flac_decoder_first_frame_offset(const BaacFlacDecoder* d);
-int flac_decoder_seek_reset(BaacFlacDecoder* d);
-int flac_decoder_end_input(BaacFlacDecoder* d);
-int flac_decoder_finish(BaacFlacDecoder* d, BaacFlacMd5Verdict* verdict);
+uint64_t flac_decoder_read_work(const BacFlacDecoder* d);
+int flac_decoder_set_metadata(BacFlacDecoder* d, bool collect, size_t max_bytes);
+int flac_decoder_comments(const BacFlacDecoder* d, const BacFlacComment** comments,
+                          BacFlacComment* vendor);
+int flac_decoder_pictures(const BacFlacDecoder* d, const BacFlacPicture** pictures);
+int flac_decoder_skipped_metadata(const BacFlacDecoder* d);
+void flac_decoder_id3(const BacFlacDecoder* d, uint64_t* v2_bytes, int* v1_trailer);
+int flac_decoder_feed(BacFlacDecoder* d, const uint8_t* data, int size);
+int flac_decoder_decode_next(BacFlacDecoder* d, int32_t* pcm, int pcm_size);
+int flac_decoder_pending_bytes(const BacFlacDecoder* d);
+int flac_decoder_stream_info(const BacFlacDecoder* d, BacFlacStreamInfo* info);
+int flac_decoder_last_frame_info(const BacFlacDecoder* d, BacFlacFrameInfo* info);
+int flac_decoder_lost_frames(const BacFlacDecoder* d);
+int flac_decoder_seek_points(const BacFlacDecoder* d, const BacFlacSeekPoint** points);
+int64_t flac_decoder_first_frame_offset(const BacFlacDecoder* d);
+int flac_decoder_seek_reset(BacFlacDecoder* d);
+int flac_decoder_end_input(BacFlacDecoder* d);
+int flac_decoder_finish(BacFlacDecoder* d, BacFlacMd5Verdict* verdict);
 
 /* ── encoder (flac_enc.cpp) ─────────────────────────────────────── */
 
@@ -240,19 +240,19 @@ int flac_decoder_finish(BaacFlacDecoder* d, BaacFlacMd5Verdict* verdict);
  * encoded (AAC_OK or the error for it); flac_encoder_create may throw
  * std::bad_alloc. */
 int flac_encoder_check(int sample_rate, int channels, int bits_per_sample, int level);
-BaacFlacEncoder* flac_encoder_create(int sample_rate, int channels, int bits_per_sample, int level);
-void flac_encoder_destroy(BaacFlacEncoder* e);
-int flac_encoder_set_options(BaacFlacEncoder* e, const BaacFlacEncoderOptions* options);
-int flac_encoder_block_size(const BaacFlacEncoder* e);
-int flac_encoder_header_bytes(const BaacFlacEncoder* e);
-int flac_encoder_write_header(BaacFlacEncoder* e, uint8_t* out, int out_size);
-int flac_encoder_max_output_bytes(const BaacFlacEncoder* e, int n_samples);
-int flac_encoder_encode(BaacFlacEncoder* e, const int32_t* pcm, int n_samples, uint8_t* out,
+BacFlacEncoder* flac_encoder_create(int sample_rate, int channels, int bits_per_sample, int level);
+void flac_encoder_destroy(BacFlacEncoder* e);
+int flac_encoder_set_options(BacFlacEncoder* e, const BacFlacEncoderOptions* options);
+int flac_encoder_block_size(const BacFlacEncoder* e);
+int flac_encoder_header_bytes(const BacFlacEncoder* e);
+int flac_encoder_write_header(BacFlacEncoder* e, uint8_t* out, int out_size);
+int flac_encoder_max_output_bytes(const BacFlacEncoder* e, int n_samples);
+int flac_encoder_encode(BacFlacEncoder* e, const int32_t* pcm, int n_samples, uint8_t* out,
                         int out_size);
-int flac_encoder_finish(BaacFlacEncoder* e, uint8_t* out, int out_size);
-int flac_encoder_last_frame_info(const BaacFlacEncoder* e, BaacFlacFrameInfo* info);
-int flac_encoder_final_header(const BaacFlacEncoder* e, uint8_t* out, int out_size);
-void flac_encoder_stream_info(const BaacFlacEncoder* e, BaacFlacStreamInfo* info);
+int flac_encoder_finish(BacFlacEncoder* e, uint8_t* out, int out_size);
+int flac_encoder_last_frame_info(const BacFlacEncoder* e, BacFlacFrameInfo* info);
+int flac_encoder_final_header(const BacFlacEncoder* e, uint8_t* out, int out_size);
+void flac_encoder_stream_info(const BacFlacEncoder* e, BacFlacStreamInfo* info);
 
 /* ── linear prediction analysis (flac_lpc.cpp) ──────────────────── */
 
@@ -319,8 +319,8 @@ bool flac_utf8_valid(const char* text, size_t size);
  * does not take.  flac_meta_write then writes those blocks, each with
  * its header and without the last-block flag, and says where the header
  * of the last one begins. */
-int flac_meta_size(const BaacFlacEncoderOptions* options, size_t* bytes);
-void flac_meta_write(const BaacFlacEncoderOptions* options, uint8_t* out, size_t* last_header);
+int flac_meta_size(const BacFlacEncoderOptions* options, size_t* bytes);
+void flac_meta_write(const BacFlacEncoderOptions* options, uint8_t* out, size_t* last_header);
 
 /* The decoder's side, on the content of a block that is there whole.
  * flac_meta_count_comments finds a VORBIS_COMMENT block sound and
@@ -331,14 +331,14 @@ void flac_meta_write(const BaacFlacEncoderOptions* options, uint8_t* out, size_t
  * `size` bytes for the last one.  flac_meta_read_picture does both for
  * a PICTURE block and returns false for one that is not sound. */
 int flac_meta_count_comments(const uint8_t* block, size_t size);
-void flac_meta_read_comments(uint8_t* block, BaacFlacComment* vendor, BaacFlacComment* comments);
-bool flac_meta_read_picture(uint8_t* block, size_t size, BaacFlacPicture* picture);
+void flac_meta_read_comments(uint8_t* block, BacFlacComment* vendor, BacFlacComment* comments);
+bool flac_meta_read_picture(uint8_t* block, size_t size, BacFlacPicture* picture);
 
 /* ── kernels (flac_dsp.cpp and src/simd/flac_*.cpp) ─────────────── */
 
 /* The hot loops of the codec behind one table of function pointers,
  * filled with the scalar kernels and then, as the processor allows, with
- * the SSE2, AVX2 or NEON ones (aac_get_cpu_flags, which BAAC_AAC_CPU
+ * the SSE2, AVX2 or NEON ones (aac_get_cpu_flags, which BAC_AAC_CPU
  * caps).  Every level computes the same values bit for bit, so that the
  * encoder writes the same stream whichever kernels run:
  *
@@ -409,7 +409,7 @@ struct FlacDSP {
   void (*stereo_out[4])(const int32_t* c0, const int32_t* c1, int n, int32_t* pcm);
 };
 
-/* One level of kernels: the name the BAAC_AAC_CPU cap and the tests
+/* One level of kernels: the name the BAC_AAC_CPU cap and the tests
  * know it by, the CPU flags a processor of the level reports, all of
  * which the level needs, and the function that puts its kernels into a
  * table.  The function is given the flags the table is made for, so a
@@ -429,7 +429,7 @@ const FlacDspLevel* flac_dsp_levels(int* count);
 /* The table for a processor that reports `flags`: the kernels of every
  * level whose flags are all among them, in the order of the levels. */
 void flac_dsp_init_for(FlacDSP* dsp, int flags);
-/* The same for the processor the program runs on, as BAAC_AAC_CPU caps
+/* The same for the processor the program runs on, as BAC_AAC_CPU caps
  * it. */
 void flac_dsp_init(FlacDSP* dsp);
 /* The process-wide table, filled once on first use. */
@@ -896,4 +896,4 @@ static FLAC_ALWAYS_INLINE void flac_rice_encode_words(FlacBitWriter* w, const in
   }
 }
 
-#endif /* BAANDER_AAC_FLAC_INTERNAL_H */
+#endif /* BAANDER_AUDIO_CORE_FLAC_INTERNAL_H */

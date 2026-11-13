@@ -57,70 +57,70 @@ void check_code(int ret, const char* what) {
 }
 
 /* Encodes one stream and decodes it again. */
-void one_stream(BaacFlacEncoder* enc, const std::vector<int32_t>& pcm, int channels, int bits,
+void one_stream(BacFlacEncoder* enc, const std::vector<int32_t>& pcm, int channels, int bits,
                 size_t chunk, bool rewrite, bool slow_feed, const Input& meta, bool meta_taken,
                 bool seek_table) {
   const size_t frames = pcm.size() / (size_t)channels;
-  const int header_bytes = baac_flac_encoder_header_bytes(enc);
-  if (header_bytes < 4 + 4 + BAAC_FLAC_STREAMINFO_BYTES) {
+  const int header_bytes = bac_flac_encoder_header_bytes(enc);
+  if (header_bytes < 4 + 4 + BAC_FLAC_STREAMINFO_BYTES) {
     fuzz_fail("a header shorter than the marker and STREAMINFO", header_bytes);
   }
   std::vector<uint8_t> stream((size_t)header_bytes);
-  if (baac_flac_encoder_write_header(enc, stream.data(), header_bytes) != header_bytes) {
+  if (bac_flac_encoder_write_header(enc, stream.data(), header_bytes) != header_bytes) {
     fuzz_fail("the header is not as long as announced", header_bytes);
   }
   std::vector<uint8_t> out;
   for (size_t pos = 0; pos < frames;) {
     const int n = (int)(chunk < frames - pos ? chunk : frames - pos);
-    const int bound = baac_flac_encoder_max_output_bytes(enc, n);
+    const int bound = bac_flac_encoder_max_output_bytes(enc, n);
     if (bound < 0) {
       fuzz_fail("no bound for a call of a few thousand samples", bound);
     }
     out.resize((size_t)bound + 1);
     const int got =
-        baac_flac_encoder_encode(enc, pcm.data() + pos * (size_t)channels, n, out.data(), bound);
+        bac_flac_encoder_encode(enc, pcm.data() + pos * (size_t)channels, n, out.data(), bound);
     if (got < 0 || got > bound) {
       fuzz_fail("encode fails on samples within the depth, or writes past its bound", got);
     }
     stream.insert(stream.end(), out.begin(), out.begin() + got);
     pos += (size_t)n;
   }
-  const int bound = baac_flac_encoder_max_output_bytes(enc, 0);
+  const int bound = bac_flac_encoder_max_output_bytes(enc, 0);
   out.resize((size_t)(bound > 0 ? bound : 0) + 1);
-  const int last = baac_flac_encoder_finish(enc, out.data(), bound);
+  const int last = bac_flac_encoder_finish(enc, out.data(), bound);
   if (last < 0 || last > bound) {
     fuzz_fail("finish fails or writes past its bound", last);
   }
   stream.insert(stream.end(), out.begin(), out.begin() + last);
-  BaacFlacStreamInfo written;
-  if (baac_flac_encoder_stream_info(enc, &written) != AAC_OK || written.total_samples != frames) {
+  BacFlacStreamInfo written;
+  if (bac_flac_encoder_stream_info(enc, &written) != AAC_OK || written.total_samples != frames) {
     fuzz_fail("the encoder's total is not the input's", (long)written.total_samples);
   }
-  if (rewrite && baac_flac_encoder_final_header(enc, stream.data(), header_bytes) != header_bytes) {
+  if (rewrite && bac_flac_encoder_final_header(enc, stream.data(), header_bytes) != header_bytes) {
     fuzz_fail("the final header is not as long as the first", header_bytes);
   }
 
   /* Our decoder on the stream. */
-  BaacFlacDecoder* dec = baac_flac_decoder_create();
+  BacFlacDecoder* dec = bac_flac_decoder_create();
   if (!dec) {
     return;
   }
-  baac_flac_decoder_set_md5_check(dec, 1);
-  baac_flac_decoder_set_metadata(dec, 1, 0);
+  bac_flac_decoder_set_md5_check(dec, 1);
+  bac_flac_decoder_set_metadata(dec, 1, 0);
   std::vector<int32_t> block((size_t)4096 * (size_t)channels);
   std::vector<int32_t> decoded;
   decoded.reserve(pcm.size());
   const size_t piece = slow_feed ? 1 : stream.size();
   for (size_t pos = 0; pos < stream.size();) {
     const size_t want = piece < stream.size() - pos ? piece : stream.size() - pos;
-    const int took = baac_flac_decoder_feed(dec, stream.data() + pos, (int)want);
+    const int took = bac_flac_decoder_feed(dec, stream.data() + pos, (int)want);
     if (took < 0) {
       fuzz_fail("our decoder refuses the encoder's stream", took);
     }
     pos += (size_t)took;
     int n;
     int produced = 0;
-    while ((n = baac_flac_decoder_decode_next(dec, block.data(), (int)block.size())) > 0) {
+    while ((n = bac_flac_decoder_decode_next(dec, block.data(), (int)block.size())) > 0) {
       decoded.insert(decoded.end(), block.begin(), block.begin() + (size_t)n * (size_t)channels);
       produced++;
     }
@@ -131,11 +131,11 @@ void one_stream(BaacFlacEncoder* enc, const std::vector<int32_t>& pcm, int chann
       fuzz_fail("our decoder stalls on the encoder's stream", (long)pos);
     }
   }
-  BaacFlacMd5Verdict verdict = BAAC_FLAC_MD5_UNKNOWN;
-  BaacFlacStreamInfo info;
-  const bool have_info = baac_flac_decoder_stream_info(dec, &info) == AAC_OK;
-  if (baac_flac_decoder_finish(dec, &verdict) != AAC_OK ||
-      baac_flac_decoder_lost_frames(dec) != 0) {
+  BacFlacMd5Verdict verdict = BAC_FLAC_MD5_UNKNOWN;
+  BacFlacStreamInfo info;
+  const bool have_info = bac_flac_decoder_stream_info(dec, &info) == AAC_OK;
+  if (bac_flac_decoder_finish(dec, &verdict) != AAC_OK ||
+      bac_flac_decoder_lost_frames(dec) != 0) {
     fuzz_fail("our decoder finds damage in the encoder's stream", 0);
   }
   if (decoded != pcm) {
@@ -147,31 +147,31 @@ void one_stream(BaacFlacEncoder* enc, const std::vector<int32_t>& pcm, int chann
   if (rewrite) {
     /* An MD5 that happens to be all zeros reads as none. */
     if (info.total_samples != frames ||
-        (verdict != BAAC_FLAC_MD5_MATCH && verdict != BAAC_FLAC_MD5_UNKNOWN)) {
+        (verdict != BAC_FLAC_MD5_MATCH && verdict != BAC_FLAC_MD5_UNKNOWN)) {
       fuzz_fail("the rewritten header's total or MD5 is not the input's", (long)verdict);
     }
     static const uint8_t kNoMd5[16] = {0};
-    if (verdict == BAAC_FLAC_MD5_UNKNOWN && memcmp(info.md5, kNoMd5, 16) != 0) {
+    if (verdict == BAC_FLAC_MD5_UNKNOWN && memcmp(info.md5, kNoMd5, 16) != 0) {
       fuzz_fail("an MD5 in the header that was not compared", 0);
     }
-  } else if (info.total_samples != 0 || verdict != BAAC_FLAC_MD5_UNKNOWN) {
+  } else if (info.total_samples != 0 || verdict != BAC_FLAC_MD5_UNKNOWN) {
     fuzz_fail("a header that was not rewritten states a total or an MD5", (long)verdict);
   }
-  if (baac_flac_decoder_first_frame_offset(dec) != header_bytes) {
+  if (bac_flac_decoder_first_frame_offset(dec) != header_bytes) {
     fuzz_fail("the first frame is not behind the header", header_bytes);
   }
-  const BaacFlacSeekPoint* points = nullptr;
-  const int seek_points = baac_flac_decoder_seek_points(dec, &points);
+  const BacFlacSeekPoint* points = nullptr;
+  const int seek_points = bac_flac_decoder_seek_points(dec, &points);
   if (!(seek_table && rewrite) && seek_points != 0) {
     fuzz_fail("seek points in a stream that should have none", seek_points);
   }
 
   /* Tags and pictures as given, or none when they were refused. */
-  const BaacFlacComment* comments = nullptr;
-  BaacFlacComment vendor = {};
-  const int count = baac_flac_decoder_comments(dec, &comments, &vendor);
-  const BaacFlacPicture* pictures = nullptr;
-  const int picture_count = baac_flac_decoder_pictures(dec, &pictures);
+  const BacFlacComment* comments = nullptr;
+  BacFlacComment vendor = {};
+  const int count = bac_flac_decoder_comments(dec, &comments, &vendor);
+  const BacFlacPicture* pictures = nullptr;
+  const int picture_count = bac_flac_decoder_pictures(dec, &pictures);
   const size_t want_tags = meta_taken ? meta.tags.size() : 0;
   const size_t want_pictures = meta_taken ? meta.pictures.size() : 0;
   if ((size_t)count != want_tags || (size_t)picture_count != want_pictures) {
@@ -194,7 +194,7 @@ void one_stream(BaacFlacEncoder* enc, const std::vector<int32_t>& pcm, int chann
       fuzz_fail("a picture came back changed", (long)i);
     }
   }
-  baac_flac_decoder_destroy(dec);
+  bac_flac_decoder_destroy(dec);
 }
 
 }  // namespace
@@ -241,7 +241,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
   }
 
   int error = 12345;
-  BaacFlacEncoder* enc = baac_flac_encoder_create(rate, channels, bits, level, &error);
+  BacFlacEncoder* enc = bac_flac_encoder_create(rate, channels, bits, level, &error);
   if (!enc) {
     if (error != AAC_ERR_INVALID_ARG && error != AAC_ERR_UNSUPPORTED && error != AAC_ERR_MEMORY) {
       fuzz_fail("create fails without a documented reason", error);
@@ -276,19 +276,19 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
     std::fill(pcm.begin(), pcm.end(), pcm[0]);
   }
 
-  BaacFlacEncoderOptions options;
-  baac_flac_encoder_options_init(&options);
+  BacFlacEncoderOptions options;
+  bac_flac_encoder_options_init(&options);
   const bool seek_table = (flags & 1) != 0;
   options.seek_table = seek_table ? 1 : 0;
   options.total_samples_hint = (flags & 2) ? ((flags & 4) ? frames / 3 : frames) : 0;
   options.padding_bytes = (flags & 8) ? 37 : 0;
-  std::vector<BaacFlacComment> comments;
+  std::vector<BacFlacComment> comments;
   for (const std::string& tag : meta.tags) {
     comments.push_back({tag.data(), (uint32_t)tag.size()});
   }
-  std::vector<BaacFlacPicture> pictures;
+  std::vector<BacFlacPicture> pictures;
   for (const Input::Picture& p : meta.pictures) {
-    BaacFlacPicture out = {};
+    BacFlacPicture out = {};
     out.type = p.type;
     out.mime_type = p.mime.c_str();
     out.description = p.description.c_str();
@@ -301,7 +301,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
   options.vendor = meta.have_vendor ? meta.vendor.c_str() : nullptr;
   options.pictures = pictures.data();
   options.picture_count = (int)pictures.size();
-  int ret = baac_flac_encoder_set_options(enc, &options);
+  int ret = bac_flac_encoder_set_options(enc, &options);
   check_code(ret, "set_options return outside the documented codes");
   bool meta_taken = ret == AAC_OK;
   if (!meta_taken) {
@@ -312,7 +312,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
     options.vendor = nullptr;
     options.pictures = nullptr;
     options.picture_count = 0;
-    ret = baac_flac_encoder_set_options(enc, &options);
+    ret = bac_flac_encoder_set_options(enc, &options);
     if (ret != AAC_OK) {
       fuzz_fail("options without tags are refused", ret);
     }
@@ -333,6 +333,6 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
     /* The encoder again: nothing of the first stream carries over. */
     one_stream(enc, pcm, channels, bits, 4096, true, false, meta, meta_taken, have_seek_table);
   }
-  baac_flac_encoder_destroy(enc);
+  bac_flac_encoder_destroy(enc);
   return 0;
 }

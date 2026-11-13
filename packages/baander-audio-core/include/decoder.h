@@ -1,5 +1,5 @@
-#ifndef BAANDER_AAC_DECODER_H
-#define BAANDER_AAC_DECODER_H
+#ifndef BAANDER_AUDIO_CORE_DECODER_H
+#define BAANDER_AUDIO_CORE_DECODER_H
 #include "aac.h"
 #include "aac_dsp.h"
 #include "aac_tables.h"
@@ -296,4 +296,4 @@ int aac_decoder_limiter_delay(const AacDecoderState* s);
 #ifdef __cplusplus
 }
 #endif
-#endif /* BAANDER_AAC_DECODER_H */
+#endif /* BAANDER_AUDIO_CORE_DECODER_H */

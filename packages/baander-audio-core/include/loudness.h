@@ -1,5 +1,5 @@
-#ifndef BAANDER_AAC_LOUDNESS_H
-#define BAANDER_AAC_LOUDNESS_H
+#ifndef BAANDER_AUDIO_CORE_LOUDNESS_H
+#define BAANDER_AUDIO_CORE_LOUDNESS_H
 
 #include "aac.h"
 #include "bitstream.h"
@@ -94,4 +94,4 @@ int aac_loudness_info_bits(const AacLoudnessInfo* info);
 }
 #endif
 
-#endif /* BAANDER_AAC_LOUDNESS_H */
+#endif /* BAANDER_AUDIO_CORE_LOUDNESS_H */

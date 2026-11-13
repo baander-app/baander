@@ -1,16 +1,16 @@
-/* Files and integer PCM for the lossless commands of the baac tool
- * (baac_flac_pcm.h). */
-#include "baac_flac_pcm.h"
+/* Files and integer PCM for the lossless commands of the bac tool
+ * (bac_flac_pcm.h). */
+#include "bac_flac_pcm.h"
 
 #include <sys/stat.h>
 
 #include <algorithm>
 #include <cstring>
 
-#include "baac_common.h"
+#include "bac_common.h"
 #include "flac.h"
 
-namespace baac_flac {
+namespace bac_flac {
 
 namespace {
 
@@ -38,7 +38,7 @@ void put_le32(uint8_t* p, uint32_t v) {
 /* The channel mask the extensible format states for FLAC's order of
  * each channel count (RFC 9639 section 9.1.3), which is the order WAV
  * lists those speakers in as well. */
-const uint32_t kChannelMask[BAAC_FLAC_MAX_CHANNELS + 1] = {0,    0x4,  0x3,   0x7,  0x33,
+const uint32_t kChannelMask[BAC_FLAC_MAX_CHANNELS + 1] = {0,    0x4,  0x3,   0x7,  0x33,
                                                            0x37, 0x3F, 0x70F, 0x63F};
 
 const uint8_t kPcmSubformat[14] = {0x00, 0x00, 0x00, 0x00, 0x10, 0x00, 0x80,
@@ -59,7 +59,7 @@ bool read_failed(const File& in) {
   if (!ferror(in.f)) {
     return false;
   }
-  fprintf(stderr, "baac: cannot read %s\n", in.name.c_str());
+  fprintf(stderr, "bac: cannot read %s\n", in.name.c_str());
   return true;
 }
 
@@ -73,7 +73,7 @@ bool open_file(File* file, const char* path, bool write) {
     file->owned = true;
   }
   if (!file->f) {
-    fprintf(stderr, "baac: cannot %s %s\n", write ? "create" : "open", path);
+    fprintf(stderr, "bac: cannot %s %s\n", write ? "create" : "open", path);
     return false;
   }
   /* Output is gathered into large writes.  Input is read in pieces as
@@ -104,20 +104,20 @@ bool read_wav_header(File* in, PcmLayout* layout, uint64_t* data_bytes) {
   uint8_t head[12];
   if (read_fully(in, head, 12) != 12 || memcmp(head, "RIFF", 4) != 0 ||
       memcmp(head + 8, "WAVE", 4) != 0) {
-    fprintf(stderr, "baac: %s is not a WAV file (use --raw for headerless PCM)\n", name);
+    fprintf(stderr, "bac: %s is not a WAV file (use --raw for headerless PCM)\n", name);
     return false;
   }
   bool have_format = false;
   for (;;) {
     uint8_t chunk[8];
     if (read_fully(in, chunk, 8) != 8) {
-      fprintf(stderr, "baac: %s has no %s chunk\n", name, have_format ? "data" : "fmt");
+      fprintf(stderr, "bac: %s has no %s chunk\n", name, have_format ? "data" : "fmt");
       return false;
     }
     const uint32_t size = le32(chunk + 4);
     if (memcmp(chunk, "data", 4) == 0) {
       if (!have_format) {
-        fprintf(stderr, "baac: %s has its samples before its format\n", name);
+        fprintf(stderr, "bac: %s has its samples before its format\n", name);
         return false;
       }
       *data_bytes = size == 0xFFFFFFFFu ? kUnknownLength : size;
@@ -125,7 +125,7 @@ bool read_wav_header(File* in, PcmLayout* layout, uint64_t* data_bytes) {
     }
     if (memcmp(chunk, "fmt ", 4) != 0) {
       if (!skip_bytes(in, (uint64_t)size + (size & 1))) {
-        fprintf(stderr, "baac: %s ends inside a chunk\n", name);
+        fprintf(stderr, "bac: %s ends inside a chunk\n", name);
         return false;
       }
       continue;
@@ -136,7 +136,7 @@ bool read_wav_header(File* in, PcmLayout* layout, uint64_t* data_bytes) {
             std::min<size_t>(size, sizeof(fmt)) ||
         (size > sizeof(fmt) && !skip_bytes(in, size - sizeof(fmt))) ||
         ((size & 1) && !skip_bytes(in, 1))) {
-      fprintf(stderr, "baac: %s has a format chunk that is too short\n", name);
+      fprintf(stderr, "bac: %s has a format chunk that is too short\n", name);
       return false;
     }
     uint32_t tag = le16(fmt);
@@ -149,7 +149,7 @@ bool read_wav_header(File* in, PcmLayout* layout, uint64_t* data_bytes) {
       /* Extensible: the valid bits of a sample, the speakers, and the
        * format proper as the first two bytes of a GUID. */
       if (size < 40 || le16(fmt + 16) < 22) {
-        fprintf(stderr, "baac: %s has an extensible format chunk that is too short\n", name);
+        fprintf(stderr, "bac: %s has an extensible format chunk that is too short\n", name);
         return false;
       }
       const uint32_t valid = le16(fmt + 18);
@@ -164,24 +164,24 @@ bool read_wav_header(File* in, PcmLayout* layout, uint64_t* data_bytes) {
     }
     if (tag == 3) {
       fprintf(stderr,
-              "baac: %s holds IEEE float samples (WAV format 3); the lossless mode takes "
+              "bac: %s holds IEEE float samples (WAV format 3); the lossless mode takes "
               "integer PCM only\n",
               name);
       return false;
     }
     if (tag != 1) {
-      fprintf(stderr, "baac: %s is WAV format 0x%04x; the lossless mode takes integer PCM only\n",
+      fprintf(stderr, "bac: %s is WAV format 0x%04x; the lossless mode takes integer PCM only\n",
               name, tag);
       return false;
     }
-    if (channels < 1 || channels > BAAC_FLAC_MAX_CHANNELS || block_align % channels != 0) {
-      fprintf(stderr, "baac: %s has %u channels; FLAC holds 1 to %d\n", name, channels,
-              BAAC_FLAC_MAX_CHANNELS);
+    if (channels < 1 || channels > BAC_FLAC_MAX_CHANNELS || block_align % channels != 0) {
+      fprintf(stderr, "bac: %s has %u channels; FLAC holds 1 to %d\n", name, channels,
+              BAC_FLAC_MAX_CHANNELS);
       return false;
     }
     const uint32_t container = block_align / channels;
     if (container < 1 || container > 4 || bits < 1 || bits > container * 8) {
-      fprintf(stderr, "baac: %s has %u-bit samples in %u bytes, which is not integer PCM\n", name,
+      fprintf(stderr, "bac: %s has %u-bit samples in %u bytes, which is not integer PCM\n", name,
               bits, container);
       return false;
     }
@@ -194,7 +194,7 @@ bool read_wav_header(File* in, PcmLayout* layout, uint64_t* data_bytes) {
     if (mask && mask != kChannelMask[channels] && !(channels == 6 && mask == 0x60F) &&
         !(channels == 5 && mask == 0x607)) {
       fprintf(stderr,
-              "baac: note: %s states the speakers 0x%x; FLAC keeps the channels in their order "
+              "bac: note: %s states the speakers 0x%x; FLAC keeps the channels in their order "
               "and not this mask\n",
               name, mask);
     }
@@ -317,4 +317,4 @@ PcmLayout raw_layout(int sample_rate, int channels, int bits) {
   return layout;
 }
 
-}  // namespace baac_flac
+}  // namespace bac_flac

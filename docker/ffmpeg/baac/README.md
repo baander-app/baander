@@ -1,7 +1,7 @@
 # bAAC in the FFmpeg image
 
 `libavcodec/` holds the libavcodec wrapper sources for the bAAC codec from
-`packages/baander-aac`, and `ffmpeg-8.1-libbaac.patch` registers them with
+`packages/baander-audio-core`, and `ffmpeg-8.1-libbaac.patch` registers them with
 FFmpeg's `configure`, `libavcodec/allcodecs.c` and `libavcodec/Makefile`.
 The `ffmpeg-final` stage of `docker/ffmpeg/Dockerfile` copies the sources into
 the FFmpeg tree the build script extracted, checks that the patch applies and
@@ -17,7 +17,7 @@ edited copy. For a new tag:
 2. In `work`, add `libbaac` to `EXTERNAL_LIBRARY_VERSION3_LIST`, the
    `--enable-libbaac` help line, the `libbaac_*_deps` and
    `libbaac_encoder_select="audio_frame_queue"` lines, and the
-   `require_pkg_config libbaac libbaac baac/aac.h aac_encoder_create` check
+   `require_pkg_config libbaac bac bac/aac.h aac_encoder_create` check
    in `configure`; the `ff_libbaac_*` externs in `libavcodec/allcodecs.c`;
    and the `OBJS-$(CONFIG_LIBBAAC_*)` lines in `libavcodec/Makefile`.
 3. `diff -ruN FFmpeg-<tag> work > ffmpeg-<tag>-libbaac.patch`, then rewrite

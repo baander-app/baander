@@ -1,5 +1,5 @@
-#ifndef BAANDER_AAC_PSYCHO_H
-#define BAANDER_AAC_PSYCHO_H
+#ifndef BAANDER_AUDIO_CORE_PSYCHO_H
+#define BAANDER_AUDIO_CORE_PSYCHO_H
 
 #include "ics.h"
 
@@ -48,4 +48,4 @@ int aac_psy_attack(const float* x, int start, int count, int sub_len);
 }
 #endif
 
-#endif /* BAANDER_AAC_PSYCHO_H */
+#endif /* BAANDER_AUDIO_CORE_PSYCHO_H */

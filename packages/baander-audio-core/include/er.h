@@ -1,5 +1,5 @@
-#ifndef BAANDER_AAC_ER_H
-#define BAANDER_AAC_ER_H
+#ifndef BAANDER_AUDIO_CORE_ER_H
+#define BAANDER_AUDIO_CORE_ER_H
 
 #include "bitstream.h"
 #include "ics.h"
@@ -118,4 +118,4 @@ int aac_er_hcr_codeword_order(const AacIcsInfo* ics, const int* band_type, int* 
 }
 #endif
 
-#endif /* BAANDER_AAC_ER_H */
+#endif /* BAANDER_AUDIO_CORE_ER_H */

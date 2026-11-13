@@ -6,11 +6,11 @@
  * stream whose header was rewritten has to pass without a word from
  * either tool.
  *
- *   BAAC_FLAC_REFERENCE   the path of the flac 1.4.3 binary
+ *   BAC_FLAC_REFERENCE   the path of the flac 1.4.3 binary
  *                         (tests/flac-reference.sh prints it)
- *   BAAC_REQUIRE_ORACLES  set: a missing flac or ffmpeg fails the suite
+ *   BAC_REQUIRE_ORACLES  set: a missing flac or ffmpeg fails the suite
  *                         instead of skipping it
- *   BAAC_FLAC_CORPUS      optional: a directory with the benchmark
+ *   BAC_FLAC_CORPUS      optional: a directory with the benchmark
  *                         corpus (bench/corpus.sh fetches it).  The
  *                         suite then encodes its ten music items at
  *                         levels 5 and 8 with this encoder and with
@@ -109,12 +109,12 @@ static void check_oracles(const char* name, const std::vector<uint8_t>& stream,
  * to return the input, then asks the oracles. */
 static FlacEncoded encode_and_check(const char* name, const std::vector<int32_t>& pcm, int rate,
                                     int channels, int bits, int level,
-                                    const BaacFlacEncoderOptions* options = nullptr) {
+                                    const BacFlacEncoderOptions* options = nullptr) {
   const FlacEncoded e = flac_encode(pcm, rate, channels, bits, level, 3001, true, options);
   CHECK(e.error == AAC_OK, "%s: encode error %d", name, e.error);
   if (e.error == AAC_OK) {
     const FlacDecoded d = flac_decode(e.stream);
-    CHECK(d.errors.empty() && d.pcm == pcm && d.verdict == BAAC_FLAC_MD5_MATCH,
+    CHECK(d.errors.empty() && d.pcm == pcm && d.verdict == BAC_FLAC_MD5_MATCH,
           "%s: the library's decoder returns the input", name);
     check_oracles(name, e.stream, pcm, bits);
   }
@@ -238,8 +238,8 @@ static void test_header() {
 
     /* A seek table and padding: flac accepts the stream, and seeks by
      * the table to the right samples. */
-    BaacFlacEncoderOptions options;
-    baac_flac_encoder_options_init(&options);
+    BacFlacEncoderOptions options;
+    bac_flac_encoder_options_init(&options);
     options.total_samples_hint = (uint64_t)n;
     options.seek_table = 1;
     options.padding_bytes = 512;
@@ -297,15 +297,15 @@ static bool read_wav16(const std::string& path, std::vector<int32_t>* pcm, int* 
  * metadata. */
 static size_t file_frame_bytes(const std::string& path) {
   const std::vector<uint8_t> s = read_file(path);
-  BaacFlacDecoder* dec = baac_flac_decoder_create();
+  BacFlacDecoder* dec = bac_flac_decoder_create();
   size_t pos = 0;
   int64_t offset = AAC_ERR_STATE;
   while (pos < s.size() && offset < 0) {
-    pos += (size_t)std::max(0, baac_flac_decoder_feed(dec, s.data() + pos,
+    pos += (size_t)std::max(0, bac_flac_decoder_feed(dec, s.data() + pos,
                                                       (int)std::min<size_t>(4096, s.size() - pos)));
-    offset = baac_flac_decoder_first_frame_offset(dec);
+    offset = bac_flac_decoder_first_frame_offset(dec);
   }
-  baac_flac_decoder_destroy(dec);
+  bac_flac_decoder_destroy(dec);
   return offset < 0 ? 0 : s.size() - (size_t)offset;
 }
 
@@ -325,8 +325,8 @@ static void test_corpus(const std::string& dir) {
   size_t total_flac[2] = {0, 0};
   const std::string raw_path = g_tmp + "/corpus.raw";
   const std::string flac_path = g_tmp + "/corpus.flac";
-  printf("corpus: frame bytes, bAAC against flac 1.4.3\n");
-  printf("%-26s %12s %12s %12s %12s\n", "item", "bAAC 5", "flac -5", "bAAC 8", "flac -8");
+  printf("corpus: frame bytes, bac against flac 1.4.3\n");
+  printf("%-26s %12s %12s %12s %12s\n", "item", "bac 5", "flac -5", "bac 8", "flac -8");
   for (int item = 0; item <= 10; item++) {
     std::vector<int32_t> pcm;
     int rate = 48000;
@@ -393,11 +393,11 @@ static void test_corpus(const std::string& dir) {
 }
 
 int main() {
-  const char* reference = getenv("BAAC_FLAC_REFERENCE");
+  const char* reference = getenv("BAC_FLAC_REFERENCE");
   if (reference && *reference) {
     const std::string version = run_capture(shell_quote(reference) + " --version 2>/dev/null");
     CHECK(version == "flac 1.4.3",
-          "BAAC_FLAC_REFERENCE (%s) reports \"%s\", expected \"flac 1.4.3\"", reference,
+          "BAC_FLAC_REFERENCE (%s) reports \"%s\", expected \"flac 1.4.3\"", reference,
           version.c_str());
     if (version == "flac 1.4.3") {
       g_reference = reference;
@@ -405,7 +405,7 @@ int main() {
   }
   const bool have_reference = oracle_present(!g_reference.empty(),
                                              "the reference flac 1.4.3 "
-                                             "(BAAC_FLAC_REFERENCE, from tests/flac-reference.sh)");
+                                             "(BAC_FLAC_REFERENCE, from tests/flac-reference.sh)");
   const bool ffmpeg = oracle_present(have_ffmpeg(), "ffmpeg");
   if (!have_reference || !ffmpeg) {
     return test_summary("test_flac_interop");
@@ -419,11 +419,11 @@ int main() {
   test_edges();
   test_header();
   printf("interop: %d streams tested by flac -t and decoded by flac and FFmpeg\n", g_checked);
-  const char* corpus = getenv("BAAC_FLAC_CORPUS");
+  const char* corpus = getenv("BAC_FLAC_CORPUS");
   if (corpus && *corpus) {
     test_corpus(corpus);
   } else {
-    printf("the corpus size reading is skipped: BAAC_FLAC_CORPUS is not set\n");
+    printf("the corpus size reading is skipped: BAC_FLAC_CORPUS is not set\n");
   }
   remove_temp_dir(g_tmp);
   return test_summary("test_flac_interop");

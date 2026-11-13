@@ -9,9 +9,9 @@
  * by tests/flac-testbench.sh and the reference decoder is built by
  * tests/flac-reference.sh; the suite takes them from the environment:
  *
- *   BAAC_FLAC_TESTBENCH   the testbench directory
- *   BAAC_FLAC_REFERENCE   the path of the flac 1.4.3 binary
- *   BAAC_REQUIRE_ORACLES  set: a missing one of the two fails the suite
+ *   BAC_FLAC_TESTBENCH   the testbench directory
+ *   BAC_FLAC_REFERENCE   the path of the flac 1.4.3 binary
+ *   BAC_REQUIRE_ORACLES  set: a missing one of the two fails the suite
  *                         instead of skipping its checks
  *
  * Every file of the testbench's `subset` and the decodable files of
@@ -22,7 +22,7 @@
  * the `faulty` files must end in an error or a clean finish.
  *
  * `test_flac_conformance --make-fixtures` regenerates the fixtures with
- * the reference encoder named by BAAC_FLAC_REFERENCE and the ffmpeg on
+ * the reference encoder named by BAC_FLAC_REFERENCE and the ffmpeg on
  * the path. */
 #include <dirent.h>
 #include <sys/stat.h>
@@ -128,10 +128,10 @@ struct Outcome {
   uint64_t samples = 0;
   std::vector<int> errors;
   int finish = AAC_OK;
-  BaacFlacMd5Verdict verdict = BAAC_FLAC_MD5_UNKNOWN;
+  BacFlacMd5Verdict verdict = BAC_FLAC_MD5_UNKNOWN;
   int lost = 0;
   bool have_info = false;
-  BaacFlacStreamInfo info = {};
+  BacFlacStreamInfo info = {};
   bool positions_run = true; /* every frame begins where the one before it ended */
   int block_sizes = 0;       /* distinct block sizes among all frames but the last */
   bool compared = false;     /* the reference decoder ran beside the decode */
@@ -151,9 +151,9 @@ static Outcome decode_file(const std::string& path, const char* reference_option
     return out;
   }
   out.opened = true;
-  BaacFlacDecoder* dec = baac_flac_decoder_create();
-  baac_flac_decoder_set_md5_check(dec, 1);
-  std::vector<int32_t> pcm((size_t)BAAC_FLAC_MAX_BLOCK_SIZE * BAAC_FLAC_MAX_CHANNELS);
+  BacFlacDecoder* dec = bac_flac_decoder_create();
+  bac_flac_decoder_set_md5_check(dec, 1);
+  std::vector<int32_t> pcm((size_t)BAC_FLAC_MAX_BLOCK_SIZE * BAC_FLAC_MAX_CHANNELS);
   std::vector<uint8_t> in(chunk);
   Reference reference;
   uint64_t expected_position = 0;
@@ -171,11 +171,11 @@ static Outcome decode_file(const std::string& path, const char* reference_option
       progress = true;
       if (have == 0) {
         eof = true;
-        baac_flac_decoder_end_input(dec);
+        bac_flac_decoder_end_input(dec);
       }
     }
     if (used < have) {
-      const int took = baac_flac_decoder_feed(dec, in.data() + used, (int)(have - used));
+      const int took = bac_flac_decoder_feed(dec, in.data() + used, (int)(have - used));
       if (took < 0) {
         out.errors.push_back(took);
         break;
@@ -184,7 +184,7 @@ static Outcome decode_file(const std::string& path, const char* reference_option
       progress = progress || took > 0;
     }
     for (;;) {
-      const int n = baac_flac_decoder_decode_next(dec, pcm.data(), (int)pcm.size());
+      const int n = bac_flac_decoder_decode_next(dec, pcm.data(), (int)pcm.size());
       if (n == 0) {
         break;
       }
@@ -197,10 +197,10 @@ static Outcome decode_file(const std::string& path, const char* reference_option
         }
         continue;
       }
-      BaacFlacStreamInfo info;
-      BaacFlacFrameInfo frame;
-      baac_flac_decoder_stream_info(dec, &info);
-      baac_flac_decoder_last_frame_info(dec, &frame);
+      BacFlacStreamInfo info;
+      BacFlacFrameInfo frame;
+      bac_flac_decoder_stream_info(dec, &info);
+      bac_flac_decoder_last_frame_info(dec, &frame);
       if (out.frames == 0) {
         expected_position = frame.sample_position;
         if (reference_options && !g_reference.empty()) {
@@ -232,10 +232,10 @@ static Outcome decode_file(const std::string& path, const char* reference_option
   }
   fclose(f);
   out.block_sizes = (int)sizes.size();
-  out.have_info = baac_flac_decoder_stream_info(dec, &out.info) == AAC_OK;
-  out.finish = baac_flac_decoder_finish(dec, &out.verdict);
-  out.lost = baac_flac_decoder_lost_frames(dec);
-  baac_flac_decoder_destroy(dec);
+  out.have_info = bac_flac_decoder_stream_info(dec, &out.info) == AAC_OK;
+  out.finish = bac_flac_decoder_finish(dec, &out.verdict);
+  out.lost = bac_flac_decoder_lost_frames(dec);
+  bac_flac_decoder_destroy(dec);
   if (out.compared) {
     reference.close();
     out.equal = reference.equal && reference.complete;
@@ -255,8 +255,8 @@ static std::string describe(const Outcome& o) {
   }
   snprintf(buf, sizeof(buf), "%ld frames, %llu samples, errors [%s], %d lost, finish %d, MD5 %s",
            o.frames, (unsigned long long)o.samples, errors.c_str(), o.lost, o.finish,
-           o.verdict == BAAC_FLAC_MD5_MATCH      ? "match"
-           : o.verdict == BAAC_FLAC_MD5_MISMATCH ? "mismatch"
+           o.verdict == BAC_FLAC_MD5_MATCH      ? "match"
+           : o.verdict == BAC_FLAC_MD5_MISMATCH ? "mismatch"
                                                  : "unknown");
   return buf;
 }
@@ -281,15 +281,15 @@ static std::vector<std::string> flac_files(const std::string& dir) {
 
 /* ── oracles ───────────────────────────────────────────────────── */
 
-/* The reference decoder is the binary BAAC_FLAC_REFERENCE names, and it
+/* The reference decoder is the binary BAC_FLAC_REFERENCE names, and it
  * has to report the pinned version. */
 static void find_reference() {
-  const char* path = getenv("BAAC_FLAC_REFERENCE");
+  const char* path = getenv("BAC_FLAC_REFERENCE");
   if (!path || !*path) {
     return;
   }
   const std::string version = run_capture(shell_quote(path) + " --version 2>/dev/null");
-  CHECK(version == "flac 1.4.3", "BAAC_FLAC_REFERENCE (%s) reports \"%s\", expected \"flac 1.4.3\"",
+  CHECK(version == "flac 1.4.3", "BAC_FLAC_REFERENCE (%s) reports \"%s\", expected \"flac 1.4.3\"",
         path, version.c_str());
   if (version == "flac 1.4.3") {
     g_reference = path;
@@ -297,7 +297,7 @@ static void find_reference() {
 }
 
 static void find_testbench() {
-  const char* path = getenv("BAAC_FLAC_TESTBENCH");
+  const char* path = getenv("BAC_FLAC_TESTBENCH");
   if (!path || !*path) {
     return;
   }
@@ -305,7 +305,7 @@ static void find_testbench() {
   const size_t uncommon = flac_files(std::string(path) + "/uncommon").size();
   const size_t faulty = flac_files(std::string(path) + "/faulty").size();
   CHECK(subset == 64 && uncommon == 11 && faulty == 11,
-        "BAAC_FLAC_TESTBENCH (%s) holds %zu, %zu and %zu files in subset, uncommon and faulty, "
+        "BAC_FLAC_TESTBENCH (%s) holds %zu, %zu and %zu files in subset, uncommon and faulty, "
         "expected 64, 11 and 11",
         path, subset, uncommon, faulty);
   if (subset == 64 && uncommon == 11 && faulty == 11) {
@@ -445,7 +445,7 @@ static void test_fixtures() {
       flac_pcm_md5(d.pcm, e.bits, digest);
       CHECK(hex_string(digest, 16) == e.md5, "fixture %s: decodes to MD5 %s, its source has %s",
             e.name.c_str(), hex_string(digest, 16).c_str(), e.md5.c_str());
-      CHECK(d.verdict == BAAC_FLAC_MD5_MATCH, "fixture %s: the MD5 in STREAMINFO matches",
+      CHECK(d.verdict == BAC_FLAC_MD5_MATCH, "fixture %s: the MD5 in STREAMINFO matches",
             e.name.c_str());
     }
     checked++;
@@ -483,7 +483,7 @@ static void test_fixtures() {
 static int make_fixtures() {
   find_reference();
   if (g_reference.empty() || !have_ffmpeg()) {
-    printf("--make-fixtures needs BAAC_FLAC_REFERENCE (flac 1.4.3) and ffmpeg\n");
+    printf("--make-fixtures needs BAC_FLAC_REFERENCE (flac 1.4.3) and ffmpeg\n");
     return 1;
   }
   const std::string dir = fixture_dir();
@@ -557,7 +557,7 @@ static bool expect_decodes(const std::string& dir, const std::string& name,
   CHECK(o.opened && o.frames > 0 && o.errors.empty() && o.lost == 0 && o.finish == AAC_OK, "%s: %s",
         name.c_str(), describe(o).c_str());
   CHECK(o.positions_run, "%s: a frame does not begin where the one before it ended", name.c_str());
-  CHECK(o.verdict == (has_md5 ? BAAC_FLAC_MD5_MATCH : BAAC_FLAC_MD5_UNKNOWN), "%s: MD5 verdict %d",
+  CHECK(o.verdict == (has_md5 ? BAC_FLAC_MD5_MATCH : BAC_FLAC_MD5_UNKNOWN), "%s: MD5 verdict %d",
         name.c_str(), (int)o.verdict);
   if (o.have_info && o.info.total_samples) {
     CHECK(o.samples == o.info.total_samples, "%s: %llu samples decoded, STREAMINFO says %llu",
@@ -578,7 +578,7 @@ static void test_subset() {
   for (const std::string& name : flac_files(dir)) {
     const Outcome o = decode_file(dir + "/" + name, "");
     const bool clean = o.opened && o.frames > 0 && o.errors.empty() && o.lost == 0 &&
-                       o.finish == AAC_OK && o.verdict == BAAC_FLAC_MD5_MATCH && o.positions_run;
+                       o.finish == AAC_OK && o.verdict == BAC_FLAC_MD5_MATCH && o.positions_run;
     CHECK(clean, "subset/%s: %s", name.c_str(), describe(o).c_str());
     if (o.have_info && o.info.total_samples) {
       CHECK(o.samples == o.info.total_samples, "subset/%s: %llu samples, STREAMINFO says %llu",
@@ -616,7 +616,7 @@ static void test_subset() {
     const int number = atoi(name.c_str());
     if (number == 29 || number == 44 || (number >= 48 && number <= 55)) {
       const Outcome o = decode_file(dir + "/" + name, nullptr, 1021);
-      CHECK(o.errors.empty() && o.finish == AAC_OK && o.verdict == BAAC_FLAC_MD5_MATCH,
+      CHECK(o.errors.empty() && o.finish == AAC_OK && o.verdict == BAC_FLAC_MD5_MATCH,
             "subset/%s in pieces of 1021 bytes: %s", name.c_str(), describe(o).c_str());
       pieces++;
     }
@@ -724,20 +724,20 @@ static void test_faulty() {
 
 /* Runs this suite's oracle checks alone in a child process without the
  * two variables that name the oracles: by default that is a skip and
- * the child succeeds, with BAAC_REQUIRE_ORACLES it has to fail. */
+ * the child succeeds, with BAC_REQUIRE_ORACLES it has to fail. */
 static void test_missing_oracles(const char* self) {
-  const std::string probe = "env -u BAAC_FLAC_TESTBENCH -u BAAC_FLAC_REFERENCE ";
+  const std::string probe = "env -u BAC_FLAC_TESTBENCH -u BAC_FLAC_REFERENCE ";
   const std::string child = " " + shell_quote(self) + " --probe-oracles > /dev/null 2>&1";
-  CHECK(system((probe + "-u BAAC_REQUIRE_ORACLES" + child).c_str()) == 0,
+  CHECK(system((probe + "-u BAC_REQUIRE_ORACLES" + child).c_str()) == 0,
         "without the oracles the checks that need them are skipped");
-  CHECK(system((probe + "BAAC_REQUIRE_ORACLES=1" + child).c_str()) != 0,
-        "with BAAC_REQUIRE_ORACLES the suite fails when the oracles are missing");
-  CHECK(system((probe + "BAAC_REQUIRE_ORACLES=0" + child).c_str()) == 0,
-        "BAAC_REQUIRE_ORACLES=0 does not require them");
-  const std::string only_testbench = "env -u BAAC_FLAC_TESTBENCH BAAC_REQUIRE_ORACLES=1";
+  CHECK(system((probe + "BAC_REQUIRE_ORACLES=1" + child).c_str()) != 0,
+        "with BAC_REQUIRE_ORACLES the suite fails when the oracles are missing");
+  CHECK(system((probe + "BAC_REQUIRE_ORACLES=0" + child).c_str()) == 0,
+        "BAC_REQUIRE_ORACLES=0 does not require them");
+  const std::string only_testbench = "env -u BAC_FLAC_TESTBENCH BAC_REQUIRE_ORACLES=1";
   if (!g_reference.empty()) {
     CHECK(system((only_testbench + child).c_str()) != 0,
-          "with BAAC_REQUIRE_ORACLES the suite fails when only the testbench is missing");
+          "with BAC_REQUIRE_ORACLES the suite fails when only the testbench is missing");
   }
 }
 
@@ -750,10 +750,10 @@ int main(int argc, char** argv) {
   find_testbench();
   const bool have_reference = oracle_present(!g_reference.empty(),
                                              "the reference flac 1.4.3 "
-                                             "(BAAC_FLAC_REFERENCE, from tests/flac-reference.sh)");
+                                             "(BAC_FLAC_REFERENCE, from tests/flac-reference.sh)");
   const bool have_testbench = oracle_present(!g_testbench.empty(),
                                              "the FLAC decoder testbench "
-                                             "(BAAC_FLAC_TESTBENCH, from tests/flac-testbench.sh)");
+                                             "(BAC_FLAC_TESTBENCH, from tests/flac-testbench.sh)");
   if (probe) {
     return test_summary("test_flac_conformance --probe-oracles");
   }

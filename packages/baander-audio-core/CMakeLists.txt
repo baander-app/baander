@@ -9,25 +9,25 @@ if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_CURRENT_BINARY_DIR)
     )
 endif()
 
-project(baander-aac VERSION 0.2.0 LANGUAGES C CXX)
+project(baander-audio-core VERSION 0.2.0 LANGUAGES C CXX)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-option(BAAC_AAC_BUILD_ENCODER "Build AAC encoder" ON)
-option(BAAC_AAC_BUILD_DECODER "Build AAC decoder" ON)
-option(BAAC_AAC_BUILD_TESTS   "Build test suite" ON)
-option(BAAC_AAC_BUILD_TOOLS   "Build the baac command-line tool" ON)
-option(BAAC_AAC_SHARED        "Build shared lib" OFF)
-option(BAAC_FUZZ              "Build the fuzz harnesses with libFuzzer (clang) and the sanitizers" OFF)
+option(BAC_AAC_BUILD_ENCODER "Build AAC encoder" ON)
+option(BAC_AAC_BUILD_DECODER "Build AAC decoder" ON)
+option(BAC_AAC_BUILD_TESTS   "Build test suite" ON)
+option(BAC_AAC_BUILD_TOOLS   "Build the bac command-line tool" ON)
+option(BAC_AAC_SHARED        "Build shared lib" OFF)
+option(BAC_FUZZ              "Build the fuzz harnesses with libFuzzer (clang) and the sanitizers" OFF)
 
 if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
-    set(BAAC_AAC_PLATFORM "ios")
+    set(BAC_AAC_PLATFORM "ios")
     set(CMAKE_OSX_ARCHITECTURES "arm64")
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Android")
-    set(BAAC_AAC_PLATFORM "android")
+    set(BAC_AAC_PLATFORM "android")
 elseif(APPLE)
-    set(BAAC_AAC_PLATFORM "macos")
+    set(BAC_AAC_PLATFORM "macos")
     # Both architectures unless the caller names its own
     # (-DCMAKE_OSX_ARCHITECTURES=arm64), as a build that runs the suites
     # on the machine it is built on does.
@@ -35,12 +35,12 @@ elseif(APPLE)
         set(CMAKE_OSX_ARCHITECTURES "x86_64;arm64")
     endif()
 elseif(WIN32)
-    set(BAAC_AAC_PLATFORM "windows")
+    set(BAC_AAC_PLATFORM "windows")
 else()
-    set(BAAC_AAC_PLATFORM "linux")
+    set(BAC_AAC_PLATFORM "linux")
 endif()
 
-set(BAAC_AAC_SOURCES
+set(BAC_AAC_SOURCES
     src/tables.cpp src/aac_cpu.cpp src/dsp.cpp src/fft.cpp src/mdct.cpp
     src/ics.cpp src/bitstream.cpp src/channel_map.cpp src/qmf.cpp src/sbr_tables.cpp src/sbr_freq.cpp src/ps_hybrid.cpp
     src/asc.cpp src/latm.cpp src/transport.cpp src/drc.cpp src/api.cpp
@@ -49,7 +49,7 @@ set(BAAC_AAC_SOURCES
     src/usac_arith_tables.cpp src/usac_arith.cpp src/usac_stereo.cpp src/usac_fd.cpp
     src/loudness.cpp src/usac_enc_config.cpp src/mps212_tables.cpp
     src/flac_format.cpp src/flac_api.cpp src/flac_dsp.cpp src/flac_meta.cpp)
-set(BAAC_AAC_DECODER_SOURCES src/decoder.cpp src/conceal.cpp src/decoder_output.cpp src/limiter.cpp src/sbr_dec.cpp src/sbr_esbr.cpp src/ps_dec.cpp
+set(BAC_AAC_DECODER_SOURCES src/decoder.cpp src/conceal.cpp src/decoder_output.cpp src/limiter.cpp src/sbr_dec.cpp src/sbr_esbr.cpp src/ps_dec.cpp
     src/er_vcb11.cpp src/er_rvlc.cpp src/er_hcr.cpp
     src/usac_frame.cpp src/mps212.cpp
     src/mps_tables.cpp src/mps_tree.cpp src/mps_dec.cpp
@@ -58,25 +58,25 @@ set(BAAC_AAC_DECODER_SOURCES src/decoder.cpp src/conceal.cpp src/decoder_output.
     src/usac_lpd.cpp src/usac_lpc.cpp src/usac_acelp.cpp src/usac_tcx.cpp src/usac_fac.cpp
     src/usac_lpd_tables.cpp
     src/flac_dec.cpp)
-set(BAAC_AAC_ENCODER_SOURCES src/psycho.cpp src/encoder_tools.cpp src/afterburner.cpp src/encoder.cpp src/sbr_enc.cpp src/ps_enc.cpp
+set(BAC_AAC_ENCODER_SOURCES src/psycho.cpp src/encoder_tools.cpp src/afterburner.cpp src/encoder.cpp src/sbr_enc.cpp src/ps_enc.cpp
     src/sbr_ld_enc.cpp src/usac_arith_enc.cpp src/usac_enc.cpp src/sbr_enc_usac.cpp
     src/mps212_enc.cpp src/drc_gen.cpp
     src/flac_enc.cpp src/flac_lpc.cpp)
 
-set(BAAC_AAC_SIMD_SOURCES)
+set(BAC_AAC_SIMD_SOURCES)
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64|i686|i386")
-    list(APPEND BAAC_AAC_SIMD_SOURCES src/simd/sse2.cpp src/simd/avx2.cpp
+    list(APPEND BAC_AAC_SIMD_SOURCES src/simd/sse2.cpp src/simd/avx2.cpp
         src/simd/flac_sse2.cpp src/simd/flac_avx2.cpp)
 elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|arm")
-    list(APPEND BAAC_AAC_SIMD_SOURCES src/simd/neon.cpp src/simd/flac_neon.cpp)
+    list(APPEND BAC_AAC_SIMD_SOURCES src/simd/neon.cpp src/simd/flac_neon.cpp)
 endif()
 
-set(ALL_SOURCES ${BAAC_AAC_SOURCES} ${BAAC_AAC_SIMD_SOURCES})
-if(BAAC_AAC_BUILD_DECODER)
-    list(APPEND ALL_SOURCES ${BAAC_AAC_DECODER_SOURCES})
+set(ALL_SOURCES ${BAC_AAC_SOURCES} ${BAC_AAC_SIMD_SOURCES})
+if(BAC_AAC_BUILD_DECODER)
+    list(APPEND ALL_SOURCES ${BAC_AAC_DECODER_SOURCES})
 endif()
-if(BAAC_AAC_BUILD_ENCODER)
-    list(APPEND ALL_SOURCES ${BAAC_AAC_ENCODER_SOURCES})
+if(BAC_AAC_BUILD_ENCODER)
+    list(APPEND ALL_SOURCES ${BAC_AAC_ENCODER_SOURCES})
 endif()
 
 # The library computes in exact arithmetic: every sum, product and
@@ -95,7 +95,7 @@ endif()
 # reach the tests as well, whose signal generators must give every build
 # the same samples.  No configuration regroups arithmetic and contraction
 # is off in all of them, so a Debug build computes what a Release build
-# does; BAAC_EXACT_MATH tells the tests that compare committed streams
+# does; BAC_EXACT_MATH tells the tests that compare committed streams
 # byte for byte that this holds for the build.
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     add_compile_options(
@@ -103,56 +103,56 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         $<$<CONFIG:Release>:-O3>
         $<$<CONFIG:Release>:-fno-math-errno>
         $<$<CONFIG:Release>:-fno-trapping-math>)
-    add_compile_definitions(BAAC_EXACT_MATH=1)
+    add_compile_definitions(BAC_EXACT_MATH=1)
 endif()
 
-# BAAC_FUZZ: the sanitizers over the whole tree and, when the compiler
+# BAC_FUZZ: the sanitizers over the whole tree and, when the compiler
 # links libFuzzer, its coverage instrumentation; the harnesses under
 # tools/fuzz then run under libFuzzer, else under their own mutation
 # driver.  An undefined-behaviour report stops the run under either, so
 # that it leaves a reproducer.  UBSan's checks include the conversion of
 # a float out of an integer's range (float-cast-overflow), which
 # -fsanitize=undefined leaves out.
-set(BAAC_FUZZ_HAVE_LIBFUZZER OFF)
-if(BAAC_FUZZ)
+set(BAC_FUZZ_HAVE_LIBFUZZER OFF)
+if(BAC_FUZZ)
     include(CheckCXXSourceCompiles)
     set(CMAKE_REQUIRED_FLAGS "-fsanitize=fuzzer,address,undefined")
     check_cxx_source_compiles("
         #include <cstddef>
         #include <cstdint>
         extern \"C\" int LLVMFuzzerTestOneInput(const uint8_t*, size_t) { return 0; }"
-        BAAC_FUZZ_LIBFUZZER_LINKS)
+        BAC_FUZZ_LIBFUZZER_LINKS)
     set(CMAKE_REQUIRED_FLAGS "-fsanitize=address,undefined")
-    check_cxx_source_compiles("int main() { return 0; }" BAAC_FUZZ_SANITIZERS_LINK)
+    check_cxx_source_compiles("int main() { return 0; }" BAC_FUZZ_SANITIZERS_LINK)
     unset(CMAKE_REQUIRED_FLAGS)
-    if(NOT BAAC_FUZZ_SANITIZERS_LINK)
-        message(FATAL_ERROR "BAAC_FUZZ: this compiler cannot link ASan and UBSan "
+    if(NOT BAC_FUZZ_SANITIZERS_LINK)
+        message(FATAL_ERROR "BAC_FUZZ: this compiler cannot link ASan and UBSan "
                             "(for clang, install its compiler-rt runtimes, or build with GCC)")
     endif()
-    if(BAAC_FUZZ_LIBFUZZER_LINKS)
-        set(BAAC_FUZZ_HAVE_LIBFUZZER ON)
+    if(BAC_FUZZ_LIBFUZZER_LINKS)
+        set(BAC_FUZZ_HAVE_LIBFUZZER ON)
         add_compile_options(-fsanitize=fuzzer-no-link,address,undefined,float-cast-overflow
                             -fno-sanitize-recover=undefined,float-cast-overflow
                             -fno-omit-frame-pointer)
         add_link_options(-fsanitize=address,undefined,float-cast-overflow
                          -fno-sanitize-recover=undefined,float-cast-overflow)
-        message(STATUS "BAAC_FUZZ: libFuzzer with ASan and UBSan")
+        message(STATUS "BAC_FUZZ: libFuzzer with ASan and UBSan")
     else()
         add_compile_options(-fsanitize=address,undefined,float-cast-overflow
                             -fno-sanitize-recover=undefined,float-cast-overflow
                             -fno-omit-frame-pointer)
         add_link_options(-fsanitize=address,undefined,float-cast-overflow
                          -fno-sanitize-recover=undefined,float-cast-overflow)
-        message(WARNING "BAAC_FUZZ: this compiler has no libFuzzer; the harnesses run their own mutation driver under ASan and UBSan")
+        message(WARNING "BAC_FUZZ: this compiler has no libFuzzer; the harnesses run their own mutation driver under ASan and UBSan")
     endif()
-    add_compile_definitions(BAAC_FUZZ_SANITIZED=1)
+    add_compile_definitions(BAC_FUZZ_SANITIZED=1)
 endif()
 
 include(CheckCXXCompilerFlag)
 check_cxx_compiler_flag("-msse2" HAS_SSE2)
 if(HAS_SSE2 AND CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64|i686|i386")
     add_compile_options(-msse2)
-    add_compile_definitions(BAAC_AAC_SSE2)
+    add_compile_definitions(BAC_AAC_SSE2)
     # On 32-bit x86, GCC computes float arithmetic on the x87 unit unless
     # told otherwise (FLT_EVAL_METHOD 2): an intermediate keeps extended
     # precision until the compiler stores it, so a result depends on
@@ -168,17 +168,17 @@ endif()
 # CPUs without it.
 check_cxx_compiler_flag("-mavx2" HAS_AVX2)
 if(HAS_AVX2 AND CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64|i686|i386")
-    add_compile_definitions(BAAC_AAC_AVX2)
+    add_compile_definitions(BAC_AAC_AVX2)
 endif()
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64")
-    add_compile_definitions(BAAC_AAC_NEON)
+    add_compile_definitions(BAC_AAC_NEON)
 endif()
 
-if(BAAC_AAC_BUILD_DECODER)
-    add_compile_definitions(BAAC_AAC_HAVE_DECODER)
+if(BAC_AAC_BUILD_DECODER)
+    add_compile_definitions(BAC_AAC_HAVE_DECODER)
 endif()
-if(BAAC_AAC_BUILD_ENCODER)
-    add_compile_definitions(BAAC_AAC_HAVE_ENCODER)
+if(BAC_AAC_BUILD_ENCODER)
+    add_compile_definitions(BAC_AAC_HAVE_ENCODER)
 endif()
 
 # Per-file compile flags for SIMD sources — must compile with ISA enabled
@@ -210,29 +210,29 @@ set_source_files_properties(src/dsp.cpp PROPERTIES COMPILE_FLAGS "-ffp-contract=
 # another compiler than GCC or Clang the options above are not in force
 # either.)
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-    set(BAAC_FLAC_STRICT_MATH
+    set(BAC_FLAC_STRICT_MATH
         "-fno-associative-math -fno-reciprocal-math -fsigned-zeros -ftrapping-math -fno-finite-math-only -ffp-contract=off")
     # On 32-bit x86 the compiler would otherwise do this arithmetic in
     # the x87 unit, whose extended precision gives other sums than the
     # SSE2 the kernels of the level above are written in.
     if(HAS_SSE2 AND CMAKE_SYSTEM_PROCESSOR MATCHES "i686|i386")
-        set(BAAC_FLAC_STRICT_MATH "${BAAC_FLAC_STRICT_MATH} -mfpmath=sse")
+        set(BAC_FLAC_STRICT_MATH "${BAC_FLAC_STRICT_MATH} -mfpmath=sse")
     endif()
     set_source_files_properties(src/flac_lpc.cpp src/flac_dsp.cpp src/flac_enc.cpp PROPERTIES
-        COMPILE_FLAGS "${BAAC_FLAC_STRICT_MATH}")
+        COMPILE_FLAGS "${BAC_FLAC_STRICT_MATH}")
     # The FLAC kernels of each SIMD level follow the same rule, with the
     # instruction set the level names and nothing beyond it.
     if(HAS_SSE2 AND CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64|i686|i386")
         set_source_files_properties(src/simd/flac_sse2.cpp PROPERTIES COMPILE_FLAGS
-            "-msse2 ${BAAC_FLAC_STRICT_MATH}")
+            "-msse2 ${BAC_FLAC_STRICT_MATH}")
     endif()
     if(HAS_AVX2 AND CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64|i686|i386")
         set_source_files_properties(src/simd/flac_avx2.cpp PROPERTIES COMPILE_FLAGS
-            "-mavx2 ${BAAC_FLAC_STRICT_MATH}")
+            "-mavx2 ${BAC_FLAC_STRICT_MATH}")
     endif()
     if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|arm")
         set_source_files_properties(src/simd/flac_neon.cpp PROPERTIES COMPILE_FLAGS
-            "${BAAC_FLAC_STRICT_MATH}")
+            "${BAC_FLAC_STRICT_MATH}")
     endif()
 endif()
 
@@ -241,22 +241,25 @@ set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 set(CMAKE_VISIBILITY_INLINES_HIDDEN ON)
 
 set(LIB_TYPE STATIC)
-if(BAAC_AAC_SHARED)
+if(BAC_AAC_SHARED)
     set(LIB_TYPE SHARED)
 endif()
-add_library(baander-aac ${LIB_TYPE} ${ALL_SOURCES})
-target_include_directories(baander-aac PUBLIC
+add_library(baander-audio-core ${LIB_TYPE} ${ALL_SOURCES})
+# The archive is libbac; the target keeps the package's name because the
+# command-line tool below owns the target name bac.
+set_target_properties(baander-audio-core PROPERTIES OUTPUT_NAME bac)
+target_include_directories(baander-audio-core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>)
 if(UNIX)
-    target_link_libraries(baander-aac PRIVATE m)
+    target_link_libraries(baander-audio-core PRIVATE m)
 endif()
 
 # ── IDE helper: index all SIMD sources regardless of platform ────
 # neon.cpp is excluded from the build on x86, so CLion won't index it.
 # This STATIC library with EXCLUDE_FROM_ALL makes every source visible
 # to the IDE without affecting the real build.
-add_library(baander-aac-simdeps STATIC
+add_library(baander-audio-core-simdeps STATIC
     EXCLUDE_FROM_ALL
     src/simd/sse2.cpp
     src/simd/avx2.cpp
@@ -264,43 +267,43 @@ add_library(baander-aac-simdeps STATIC
     src/simd/flac_sse2.cpp
     src/simd/flac_avx2.cpp
     src/simd/flac_neon.cpp)
-target_include_directories(baander-aac-simdeps PRIVATE
+target_include_directories(baander-audio-core-simdeps PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
 include(GNUInstallDirs)
-install(TARGETS baander-aac
+install(TARGETS baander-audio-core
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
-# Headers go under include/baac so that names such as bitstream.h and sbr.h
-# cannot shadow a consumer's own headers; the public API is <baac/aac.h>.
-install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/baac
+# Headers go under include/bac so that names such as bitstream.h and sbr.h
+# cannot shadow a consumer's own headers; the public API is <bac/aac.h>.
+install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/bac
     FILES_MATCHING PATTERN "*.h")
 # pkg-config file for consumers that link the static library, such as the
 # FFmpeg wrapper: Libs.private names the C++ runtime a static link needs.
-configure_file(cmake/libbaac.pc.in ${CMAKE_CURRENT_BINARY_DIR}/libbaac.pc @ONLY)
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/libbaac.pc
+configure_file(cmake/bac.pc.in ${CMAKE_CURRENT_BINARY_DIR}/bac.pc @ONLY)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/bac.pc
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig)
 
-if(BAAC_AAC_BUILD_TOOLS AND BAAC_AAC_BUILD_ENCODER AND BAAC_AAC_BUILD_DECODER)
-    add_executable(baac tools/baac.cpp tools/baac_flac.cpp tools/baac_flac_pcm.cpp
-        tools/baac_flac_picture.cpp)
-    target_link_libraries(baac PRIVATE baander-aac)
-    install(TARGETS baac RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+if(BAC_AAC_BUILD_TOOLS AND BAC_AAC_BUILD_ENCODER AND BAC_AAC_BUILD_DECODER)
+    add_executable(bac tools/bac.cpp tools/bac_flac.cpp tools/bac_flac_pcm.cpp
+        tools/bac_flac_picture.cpp)
+    target_link_libraries(bac PRIVATE baander-audio-core)
+    install(TARGETS bac RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
     # MPEG Surround test encoder: 5.1 PCM to a LOAS stream with an AAC-LC
     # downmix and a spatial payload, for conformance checks against
     # reference decoders.
     # The internal tools below read the codec's tables without always
     # creating an encoder or decoder first, so they get them built at
-    # program start (tests/tables_at_load.cpp); `baac` does not.
+    # program start (tests/tables_at_load.cpp); `bac` does not.
     add_executable(mps-enc tools/mps-enc.cpp tests/tables_at_load.cpp)
     target_include_directories(mps-enc PRIVATE src)
-    target_link_libraries(mps-enc PRIVATE baander-aac)
+    target_link_libraries(mps-enc PRIVATE baander-audio-core)
     # Bitstream probe: per-frame side information of an AAC-LC ADTS
     # stream and the quantisation it chose against the source spectrum,
     # for comparing encoders by their output.
     add_executable(aac-probe tools/aac-probe.cpp tests/tables_at_load.cpp)
-    target_link_libraries(aac-probe PRIVATE baander-aac)
+    target_link_libraries(aac-probe PRIVATE baander-audio-core)
     # The fuzz harnesses and their seed generator (tools/fuzz/README.md),
     # which use POSIX processes, signals and directories.
     if(NOT WIN32)
@@ -308,7 +311,7 @@ if(BAAC_AAC_BUILD_TOOLS AND BAAC_AAC_BUILD_ENCODER AND BAAC_AAC_BUILD_DECODER)
     endif()
 endif()
 
-if(BAAC_AAC_BUILD_TESTS)
+if(BAC_AAC_BUILD_TESTS)
     enable_testing()
     add_subdirectory(tests)
 endif()

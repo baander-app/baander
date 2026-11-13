@@ -14,11 +14,11 @@ __metadata:
 
 "@baander/aac-native@file:../../packages/baander-audio-core::locator=%40baander%2Fdesktop%40workspace%3A.":
   version: 0.2.0
-  resolution: "@baander/aac-native@file:../../packages/baander-audio-core#../../packages/baander-audio-core::hash=caf420&locator=%40baander%2Fdesktop%40workspace%3A."
+  resolution: "@baander/aac-native@file:../../packages/baander-audio-core#../../packages/baander-audio-core::hash=aa9f03&locator=%40baander%2Fdesktop%40workspace%3A."
   dependencies:
     node-addon-api: "npm:^8.9.2"
     node-gyp: "npm:^11.0.0"
-  checksum: 10c0/65dcce24ff70cbcf6689e2ac747291b97694d778c97d581f5e2131913c5814846ed2e9aad4aceceaf19e62970fe8a9bedd283a85a2a6a9177a160123287a4798
+  checksum: 10c0/548ee643a85b1497c04dd9391114a18358633ad4c5170a1a5b5f32ab3190a0eabbceda5093f801a959492f0206891e3c1e0f48f6ffdfef428136affa7507d556
   languageName: node
   linkType: hard
 

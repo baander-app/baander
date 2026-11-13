@@ -5,10 +5,10 @@
  * finite, a return outside the documented codes) with fuzz_fail, which
  * prints the message and aborts so that the driver, or libFuzzer,
  * records the input as a reproducer.  The driver is libFuzzer when the
- * harness is built with BAAC_FUZZ_LIBFUZZER, else the mutation loop of
+ * harness is built with BAC_FUZZ_LIBFUZZER, else the mutation loop of
  * fuzz_driver.cpp. */
-#ifndef BAANDER_AAC_FUZZ_DRIVER_H
-#define BAANDER_AAC_FUZZ_DRIVER_H
+#ifndef BAANDER_AUDIO_CORE_FUZZ_DRIVER_H
+#define BAANDER_AUDIO_CORE_FUZZ_DRIVER_H
 
 #include <cmath>
 #include <cstddef>
@@ -67,4 +67,4 @@ struct FuzzInput {
   }
 };
 
-#endif /* BAANDER_AAC_FUZZ_DRIVER_H */
+#endif /* BAANDER_AUDIO_CORE_FUZZ_DRIVER_H */

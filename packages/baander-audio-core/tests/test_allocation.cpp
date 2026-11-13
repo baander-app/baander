@@ -228,18 +228,18 @@ static void test_flac_decoder(const char* name, int channels, int bits) {
     flac_append(frames, flac_build_frame(frame, rows));
     source.insert(source.end(), pcm.begin(), pcm.end());
   }
-  BaacFlacStreamInfo info =
+  BacFlacStreamInfo info =
       flac_test_info(48000, channels, bits, block, (uint64_t)block * (uint64_t)total_frames);
   flac_pcm_md5(source, bits, info.md5);
   std::vector<uint8_t> stream = flac_stream_start(info);
   flac_append(stream, frames);
 
-  BaacFlacDecoder* dec = baac_flac_decoder_create();
+  BacFlacDecoder* dec = bac_flac_decoder_create();
   CHECK(dec != nullptr, "%s: decoder", name);
   if (!dec) {
     return;
   }
-  baac_flac_decoder_set_md5_check(dec, 1);
+  bac_flac_decoder_set_md5_check(dec, 1);
   std::vector<int32_t> out((size_t)block * (size_t)channels);
   std::vector<int32_t> decoded;
   decoded.reserve(source.size());
@@ -247,7 +247,7 @@ static void test_flac_decoder(const char* name, int channels, int bits) {
   int frames_decoded = 0;
   for (size_t pos = 0; pos < stream.size();) {
     g_allocations = 0;
-    const int took = baac_flac_decoder_feed(dec, stream.data() + pos,
+    const int took = bac_flac_decoder_feed(dec, stream.data() + pos,
                                             (int)std::min<size_t>(8192, stream.size() - pos));
     if (frames_decoded >= kSettleFrames) {
       steady_allocations += g_allocations;
@@ -256,7 +256,7 @@ static void test_flac_decoder(const char* name, int channels, int bits) {
     pos += (size_t)std::max(took, 0);
     for (;;) {
       g_allocations = 0;
-      const int got = baac_flac_decoder_decode_next(dec, out.data(), (int)out.size());
+      const int got = bac_flac_decoder_decode_next(dec, out.data(), (int)out.size());
       if (frames_decoded >= kSettleFrames) {
         steady_allocations += g_allocations;
       }
@@ -273,8 +273,8 @@ static void test_flac_decoder(const char* name, int channels, int bits) {
     }
   }
   g_allocations = 0;
-  BaacFlacMd5Verdict verdict = BAAC_FLAC_MD5_UNKNOWN;
-  CHECK(baac_flac_decoder_finish(dec, &verdict) == AAC_OK && verdict == BAAC_FLAC_MD5_MATCH,
+  BacFlacMd5Verdict verdict = BAC_FLAC_MD5_UNKNOWN;
+  CHECK(bac_flac_decoder_finish(dec, &verdict) == AAC_OK && verdict == BAC_FLAC_MD5_MATCH,
         "%s: the stream ends with its MD5 verified", name);
   steady_allocations += g_allocations;
   printf("%-16s decode: %ld allocations over %d steady frames (%d decoded)\n", name,
@@ -283,7 +283,7 @@ static void test_flac_decoder(const char* name, int channels, int bits) {
         frames_decoded, total_frames);
   CHECK(steady_allocations == 0, "%s: the decoder allocates in steady state (%ld)", name,
         steady_allocations);
-  baac_flac_decoder_destroy(dec);
+  bac_flac_decoder_destroy(dec);
 }
 
 /* The FLAC encoder at level 8 with a seek table, its input given in
@@ -297,24 +297,24 @@ static void test_flac_encoder(const char* name, int channels, int bits) {
   const int total = block * total_frames + 123;
   const std::vector<int32_t> pcm = flac_gen_tones(total, channels, bits, 0.4, 5u);
 
-  BaacFlacEncoder* enc = baac_flac_encoder_create(rate, channels, bits, 8, nullptr);
+  BacFlacEncoder* enc = bac_flac_encoder_create(rate, channels, bits, 8, nullptr);
   CHECK(enc != nullptr, "%s: encoder", name);
   if (!enc) {
     return;
   }
-  BaacFlacEncoderOptions options;
-  baac_flac_encoder_options_init(&options);
+  BacFlacEncoderOptions options;
+  bac_flac_encoder_options_init(&options);
   options.seek_table = 1;
   options.total_samples_hint = (uint64_t)total;
-  CHECK(baac_flac_encoder_set_options(enc, &options) == AAC_OK, "%s: options", name);
-  std::vector<uint8_t> header((size_t)baac_flac_encoder_header_bytes(enc));
+  CHECK(bac_flac_encoder_set_options(enc, &options) == AAC_OK, "%s: options", name);
+  std::vector<uint8_t> header((size_t)bac_flac_encoder_header_bytes(enc));
   /* The bound counts what the encoder holds already, which is less than
    * a block. */
-  std::vector<uint8_t> out((size_t)baac_flac_encoder_max_output_bytes(enc, piece + block));
+  std::vector<uint8_t> out((size_t)bac_flac_encoder_max_output_bytes(enc, piece + block));
   std::vector<uint8_t> stream;
   stream.reserve(header.size() + (size_t)total * (size_t)channels * 4 + 65536);
   CHECK(
-      baac_flac_encoder_write_header(enc, header.data(), (int)header.size()) == (int)header.size(),
+      bac_flac_encoder_write_header(enc, header.data(), (int)header.size()) == (int)header.size(),
       "%s: header", name);
   stream.insert(stream.end(), header.begin(), header.end());
 
@@ -323,7 +323,7 @@ static void test_flac_encoder(const char* name, int channels, int bits) {
   for (int pos = 0; pos < total; pos += piece) {
     const int count = std::min(piece, total - pos);
     g_allocations = 0;
-    const int got = baac_flac_encoder_encode(enc, pcm.data() + (size_t)pos * (size_t)channels,
+    const int got = bac_flac_encoder_encode(enc, pcm.data() + (size_t)pos * (size_t)channels,
                                              count, out.data(), (int)out.size());
     if (pos >= kSettleFrames * block) {
       steady_allocations += g_allocations;
@@ -336,8 +336,8 @@ static void test_flac_encoder(const char* name, int channels, int bits) {
     stream.insert(stream.end(), out.begin(), out.begin() + got);
   }
   g_allocations = 0;
-  const int last = baac_flac_encoder_finish(enc, out.data(), (int)out.size());
-  const int final_header = baac_flac_encoder_final_header(enc, header.data(), (int)header.size());
+  const int last = bac_flac_encoder_finish(enc, out.data(), (int)out.size());
+  const int final_header = bac_flac_encoder_final_header(enc, header.data(), (int)header.size());
   steady_allocations += g_allocations;
   CHECK(last >= 0 && final_header == (int)header.size(), "%s: finish %d, final header %d", name,
         last, final_header);
@@ -345,14 +345,14 @@ static void test_flac_encoder(const char* name, int channels, int bits) {
     stream.insert(stream.end(), out.begin(), out.begin() + last);
   }
   std::copy(header.begin(), header.end(), stream.begin());
-  baac_flac_encoder_destroy(enc);
+  bac_flac_encoder_destroy(enc);
   printf("%-16s encode: %ld allocations over %d steady calls\n", name, steady_allocations,
          steady_calls);
   CHECK(steady_allocations == 0, "%s: the encoder allocates in steady state (%ld)", name,
         steady_allocations);
 
   const FlacDecoded d = flac_decode(stream, 8192);
-  CHECK(d.errors.empty() && d.finish == AAC_OK && d.verdict == BAAC_FLAC_MD5_MATCH && d.pcm == pcm,
+  CHECK(d.errors.empty() && d.finish == AAC_OK && d.verdict == BAC_FLAC_MD5_MATCH && d.pcm == pcm,
         "%s: the stream decodes to the input with its MD5 verified", name);
 }
 

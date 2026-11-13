@@ -1,5 +1,5 @@
-#ifndef BAANDER_AAC_USAC_H
-#define BAANDER_AAC_USAC_H
+#ifndef BAANDER_AUDIO_CORE_USAC_H
+#define BAANDER_AUDIO_CORE_USAC_H
 
 #include <cstdint>
 
@@ -296,4 +296,4 @@ int aac_usac_preroll_parse(const uint8_t* data, int len, AacUsacPreroll* p);
 }
 #endif
 
-#endif /* BAANDER_AAC_USAC_H */
+#endif /* BAANDER_AUDIO_CORE_USAC_H */

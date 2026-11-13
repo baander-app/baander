@@ -123,17 +123,17 @@ void aac_dsp_init(AacDSP* dsp) {
   dsp->quant_noise = aac_quant_noise_c;
 
   int flags = aac_get_cpu_flags();
-#if defined(BAAC_AAC_SSE2)
+#if defined(BAC_AAC_SSE2)
   if (flags & AAC_CPU_FLAG_SSE2) {
     aac_dsp_init_sse2(dsp);
   }
 #endif
-#if defined(BAAC_AAC_AVX2)
+#if defined(BAC_AAC_AVX2)
   if (flags & AAC_CPU_FLAG_AVX2) {
     aac_dsp_init_avx2(dsp);
   }
 #endif
-#if defined(BAAC_AAC_NEON)
+#if defined(BAC_AAC_NEON)
   if (flags & AAC_CPU_FLAG_NEON) aac_dsp_init_neon(dsp);
 #endif
   (void)flags;
