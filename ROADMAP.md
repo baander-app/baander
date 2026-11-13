@@ -1204,6 +1204,16 @@ native 917, stack lanes 1,724 and 1,652, all passing, 2,798 s), 43 and 54 (lines
 84.96 %), and PHPStan on the final image. Steps 42 and 44 to 53 have not run in the
 emulation.
 
+The run for `c34a8e0a1` then failed in `registry-quality (sanitize)`: "Deadline
+instance did not recover". After its overall deadline the registry closes the
+uncertain database connection, so the next `/ready` must open a new one and finish
+within 75 ms (the instance's 100 ms deadline less 25 ms for the response). The
+contract checked that with one request; it now waits as startup readiness does, up to
+10 s. In a host sanitizer build on one contended CPU, the single request failed in 5
+of 6 runs at 79 to 103 ms; with the wait, 9 of 10 runs passed, the tenth under load
+that also stalled startup readiness. The check had failed once in the last 40 GitHub
+runs.
+
 Open: no complete green `CI` run on GitHub has been observed since 2026-11-05. Each
 run draws a new test-order seed, so another order-dependent test can still surface in
 step 41. The registry release job failed once on a load-smoke lookup that answered
