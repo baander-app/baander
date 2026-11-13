@@ -42,7 +42,7 @@ final class StreamControllerCopyTest extends TestCase
             $audio->expects(self::never())->method('open');
             $audio->expects(self::once())->method('openCopy')->with($id->toString(), $file, '0123456789abcdef', 3)
                 ->willReturn(AudioRendition::complete(AudioRenditionFormat::Aac, $file, 'audio/mp4'));
-            $controller = new StreamController(new MediaExecutionPolicy(new DeploymentProfile('household')), $streams, $scope, $audio, $this->createStub(SystemSettingsPortInterface::class));
+            $controller = new StreamController(new MediaExecutionPolicy(new DeploymentProfile('remux', 2, 4, 1, sharedCopySlots: 2)), $streams, $scope, $audio, $this->createStub(SystemSettingsPortInterface::class));
             $translator = $this->createStub(TranslatorInterface::class);
             $translator->method('trans')->willReturnArgument(0);
             $controller->setTranslator($translator);

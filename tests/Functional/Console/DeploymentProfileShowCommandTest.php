@@ -33,19 +33,18 @@ final class DeploymentProfileShowCommandTest extends KernelTestCase
 
         self::assertSame(Command::SUCCESS, $this->command->execute([]));
         $display = $this->command->getDisplay();
-        self::assertStringContainsString('BAANDER_DEPLOYMENT_PROFILE=' . $effective->identifier . "\n", $display);
-        self::assertStringContainsString("BAANDER_DEPLOYMENT_PROFILE_JSON='" . $effective->toJson() . "'\n", $display);
+        self::assertStringContainsString("BAANDER_DEPLOYMENT_PROFILE='" . $effective->toJson() . "'\n", $display);
         self::assertStringContainsString($effective->fingerprint(), $display);
     }
 
     public function testJsonCarriesAProfileTheWorkersAcceptAndItsDerivedLimits(): void
     {
-        self::assertSame(Command::SUCCESS, $this->command->execute(['--identifier' => 'full', '--video-slots' => '8', '--audio-slots' => '12', '--json' => true]));
+        self::assertSame(Command::SUCCESS, $this->command->execute(['--capability' => 'transcode', '--video-slots' => '8', '--audio-slots' => '12', '--json' => true]));
         $document = json_decode($this->command->getDisplay(), true, flags: JSON_THROW_ON_ERROR);
         self::assertIsArray($document);
 
         $profile = DeploymentProfile::fromJson(json_encode($document['profile'], JSON_THROW_ON_ERROR));
-        self::assertEquals(new DeploymentProfile('full', 8, 12), $profile);
+        self::assertEquals(new DeploymentProfile(videoEncoderSlots: 8, audioEncoderSlots: 12), $profile);
         self::assertSame($profile->fingerprint(), $document['fingerprint']);
         self::assertSame([
             'videoSlots' => 8, 'audioSlots' => 12, 'sharedCopySlots' => 0,
@@ -55,12 +54,12 @@ final class DeploymentProfileShowCommandTest extends KernelTestCase
         ], $document['limits']);
     }
 
-    public function testHouseholdPrintsItsFixedSharedCopyLimits(): void
+    public function testRemuxPrintsItsSharedCopyLimits(): void
     {
-        self::assertSame(Command::SUCCESS, $this->command->execute(['--identifier' => 'household', '--json' => true]));
+        self::assertSame(Command::SUCCESS, $this->command->execute(['--capability' => 'remux', '--web-workers' => '2', '--database-slots' => '4', '--ordinary-consumers' => '1', '--copy-slots' => '2', '--json' => true]));
         $document = json_decode($this->command->getDisplay(), true, flags: JSON_THROW_ON_ERROR);
 
-        self::assertEquals(new DeploymentProfile('household'), DeploymentProfile::fromJson(json_encode($document['profile'], JSON_THROW_ON_ERROR)));
+        self::assertEquals(new DeploymentProfile('remux', 2, 4, 1, sharedCopySlots: 2), DeploymentProfile::fromJson(json_encode($document['profile'], JSON_THROW_ON_ERROR)));
         self::assertSame([0, 0, 2, null, null, 5, 12, 4], [
             $document['limits']['videoSlots'], $document['limits']['audioSlots'], $document['limits']['sharedCopySlots'],
             $document['limits']['maximumVideoSlots'], $document['limits']['maximumAudioSlots'],
@@ -70,33 +69,45 @@ final class DeploymentProfileShowCommandTest extends KernelTestCase
 
     public function testSlotsBeyondTheirBoundAreRejectedAsInvalidInputNamingTheBound(): void
     {
-        self::assertSame(Command::INVALID, $this->command->execute(['--identifier' => 'full', '--video-slots' => '146'], ['capture_stderr_separately' => true]));
+        self::assertSame(Command::INVALID, $this->command->execute(['--capability' => 'transcode', '--video-slots' => '146'], ['capture_stderr_separately' => true]));
         self::assertStringContainsString('at most 145 video slots', $this->command->getErrorOutput());
         self::assertSame('', $this->command->getDisplay());
     }
 
-    public function testHouseholdRejectsSlotValues(): void
+    public function testRemuxRejectsSlotValues(): void
     {
-        self::assertSame(Command::INVALID, $this->command->execute(['--identifier' => 'household', '--audio-slots' => '1'], ['capture_stderr_separately' => true]));
-        self::assertStringContainsString('Household deployment profile', $this->command->getErrorOutput());
+        self::assertSame(Command::INVALID, $this->command->execute(['--capability' => 'remux', '--copy-slots' => '2', '--video-slots' => '1'], ['capture_stderr_separately' => true]));
+        self::assertStringContainsString('Remux deployments run no video or audio encoding slots', $this->command->getErrorOutput());
+    }
+
+    public function testRemuxWithoutCopySlotsIsRejected(): void
+    {
+        self::assertSame(Command::INVALID, $this->command->execute(['--capability' => 'remux'], ['capture_stderr_separately' => true]));
+        self::assertStringContainsString('between 1 and 8 copy slots', $this->command->getErrorOutput());
+    }
+
+    public function testSizeBeyondItsBoundIsRejectedNamingTheBound(): void
+    {
+        self::assertSame(Command::INVALID, $this->command->execute(['--web-workers' => '17'], ['capture_stderr_separately' => true]));
+        self::assertStringContainsString('between 1 and 16 web workers', $this->command->getErrorOutput());
     }
 
     public function testHardwareOptionsBuildAProfileWithTheHardwareVideoDefault(): void
     {
-        self::assertSame(Command::SUCCESS, $this->command->execute(['--identifier' => 'full', '--hardware-accelerator' => 'vaapi', '--hardware-device' => '/dev/dri/renderD128', '--json' => true]));
+        self::assertSame(Command::SUCCESS, $this->command->execute(['--capability' => 'transcode', '--hardware-accelerator' => 'vaapi', '--hardware-device' => '/dev/dri/renderD128', '--json' => true]));
         $document = json_decode($this->command->getDisplay(), true, flags: JSON_THROW_ON_ERROR);
         self::assertIsArray($document);
 
         $profile = DeploymentProfile::fromJson(json_encode($document['profile'], JSON_THROW_ON_ERROR));
-        self::assertEquals(new DeploymentProfile('full', hardware: new HardwareEncoder('vaapi', '/dev/dri/renderD128')), $profile);
+        self::assertEquals(new DeploymentProfile(hardware: new HardwareEncoder('vaapi', '/dev/dri/renderD128')), $profile);
         self::assertSame(['accelerator' => 'vaapi', 'device' => '/dev/dri/renderD128'], $document['profile']['hardware']);
         self::assertSame($profile->videoEncoderSlots, $document['limits']['videoSlots']);
-        self::assertNotSame((new DeploymentProfile('full'))->fingerprint(), $document['fingerprint']);
+        self::assertNotSame((new DeploymentProfile())->fingerprint(), $document['fingerprint']);
     }
 
     public function testTextOutputNamesTheHardwareEncoder(): void
     {
-        self::assertSame(Command::SUCCESS, $this->command->execute(['--identifier' => 'full', '--video-slots' => '6', '--hardware-accelerator' => 'vaapi', '--hardware-device' => '/dev/dri/renderD128']));
+        self::assertSame(Command::SUCCESS, $this->command->execute(['--capability' => 'transcode', '--video-slots' => '6', '--hardware-accelerator' => 'vaapi', '--hardware-device' => '/dev/dri/renderD128']));
         self::assertStringContainsString('vaapi on /dev/dri/renderD128', $this->command->getDisplay());
         self::assertStringContainsString('"hardware":{"accelerator":"vaapi","device":"\\/dev\\/dri\\/renderD128"}', $this->command->getDisplay());
     }
@@ -107,7 +118,7 @@ final class DeploymentProfileShowCommandTest extends KernelTestCase
             [['--hardware-device' => '/dev/dri/renderD128'], 'requires --hardware-accelerator'],
             [['--hardware-accelerator' => 'vaapi'], 'requires a device path'],
             [['--hardware-accelerator' => 'cuda'], 'must be one of'],
-            [['--identifier' => 'household', '--hardware-accelerator' => 'nvenc'], 'Household deployment profile'],
+            [['--capability' => 'remux', '--copy-slots' => '2', '--hardware-accelerator' => 'nvenc'], 'Remux deployments run no video or audio'],
         ] as [$options, $message]) {
             self::assertSame(Command::INVALID, $this->command->execute($options, ['capture_stderr_separately' => true]));
             self::assertStringContainsString($message, $this->command->getErrorOutput());

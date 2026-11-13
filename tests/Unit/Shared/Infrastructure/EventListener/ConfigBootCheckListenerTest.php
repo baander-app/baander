@@ -62,7 +62,7 @@ final class ConfigBootCheckListenerTest extends TestCase
                 oauthPublicKeyPath: $keyPath,
                 vapidPublicKey: '',
                 vapidPrivateKey: '',
-                workerProfileHealth: new WorkerProfileHealth($connection, new DeploymentProfile('full')),
+                workerProfileHealth: new WorkerProfileHealth($connection, new DeploymentProfile()),
                 messengerWorkerHealth: new MessengerWorkerHealth(
                     $redis,
                     new MockClock(),

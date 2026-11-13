@@ -264,7 +264,7 @@ final class HttpContract
         return $this->decode($result['result']);
     }
 
-    private function ready(int $port, float $timeout = 10): void
+    private function ready(int $port, float $timeout = 10, string $failure = 'Native TLS registry never became ready.'): void
     {
         $until = microtime(true) + $timeout;
         do {
@@ -276,7 +276,7 @@ final class HttpContract
             }
             usleep(50000);
         } while (microtime(true) < $until);
-        throw new \RuntimeException('Native TLS registry never became ready.');
+        throw new \RuntimeException($failure);
     }
 
     /**
@@ -846,7 +846,11 @@ final class HttpContract
         self::check(HttpProxy::state($this->statePath)['arrivals'] > 0, 'Deadline never reached database.');
         self::check(microtime(true) - $start < 0.8, 'Overall request deadline exceeded.');
         $this->change(['delay' => 0]);
-        self::check($this->request('GET', '/ready', port: $port)[0] === 200, 'Deadline instance did not recover.');
+        // The deadline closed the uncertain database connection. Readiness must now finish within
+        // 75 ms of accepting its connection (the 100 ms deadline less the 25 ms kept for the
+        // response), client handshake and a new database connection included. Startup readiness
+        // waited for the same cold connection, so recovery waits the same way.
+        $this->ready($port, failure: 'Deadline instance did not recover.');
         $process->signal(SIGTERM);
         self::check($process->wait(2) === 0, 'Deadline instance did not stop.');
         [$port, $process] = $this->graceful(1000, 'drain');

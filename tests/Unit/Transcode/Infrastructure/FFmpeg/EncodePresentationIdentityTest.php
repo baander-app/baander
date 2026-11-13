@@ -48,6 +48,6 @@ final class EncodePresentationIdentityTest extends TestCase
 
     private function encoder(string $codec = 'libx265'): SegmentEncoder
     {
-        return new SegmentEncoder(new MediaExecutionPolicy(new DeploymentProfile('full')), $this->createStub(FFmpegPortInterface::class), $this->createStub(TranscodeStoragePortInterface::class), EncoderProfile::software($codec));
+        return new SegmentEncoder(new MediaExecutionPolicy(new DeploymentProfile()), $this->createStub(FFmpegPortInterface::class), $this->createStub(TranscodeStoragePortInterface::class), EncoderProfile::software($codec));
     }
 }

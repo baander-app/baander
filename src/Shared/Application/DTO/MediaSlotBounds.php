@@ -7,12 +7,12 @@ namespace App\Shared\Application\DTO;
 use Symfony\Component\DependencyInjection\Attribute\Exclude;
 
 /**
- * The largest video and audio slot counts a full deployment admits.
+ * The largest video and audio slot counts a transcode deployment admits.
  *
  * The pooler's client limit is the only fixed resource bound on media work: web workers,
  * worker roles and media jobs all hold pooled client connections, and PgBouncer refuses
  * clients beyond its `max_client_conn`. The web and worker processes hold a number fixed by
- * the profile; what remains is left for media jobs, each opening its own connections. A kind's
+ * the deployment size; what remains is left for media jobs, each opening its own connections. A kind's
  * maximum is that remainder with the other kind at zero, and together the two kinds must fit
  * it as well.
  */
@@ -70,11 +70,11 @@ final readonly class MediaSlotBounds
     {
         foreach (['video' => [$videoSlots, $this->maximumVideoSlots, self::VIDEO_JOB_CONNECTIONS], 'audio' => [$audioSlots, $this->maximumAudioSlots, self::AUDIO_JOB_CONNECTIONS]] as $kind => [$slots, $maximum, $connections]) {
             if ($slots < 0) {
-                throw new \InvalidArgumentException(sprintf('Full deployment profile requires zero or more %s slots.', $kind));
+                throw new \InvalidArgumentException(sprintf('A transcode deployment requires zero or more %s slots.', $kind));
             }
             if ($slots > $maximum) {
                 throw new \InvalidArgumentException(sprintf(
-                    'Full deployment profile accepts at most %d %s slots: the pooler admits %d client connections, web and worker processes hold %d, and each %s job opens %d.',
+                    'A transcode deployment accepts at most %d %s slots: the pooler admits %d client connections, web and worker processes hold %d, and each %s job opens %d.',
                     $maximum, $kind, self::POOLER_CLIENT_LIMIT, $this->fixedClients, $kind, $connections,
                 ));
             }
@@ -82,7 +82,7 @@ final readonly class MediaSlotBounds
         $needed = $this->mediaJobConnections($videoSlots, $audioSlots);
         if ($needed > $this->mediaJobClients) {
             throw new \InvalidArgumentException(sprintf(
-                'Full deployment profile cannot run %d video and %d audio slots together: their jobs open %d pooled client connections, more than the %d the pooler\'s %d leave after web and worker processes.',
+                'A transcode deployment cannot run %d video and %d audio slots together: their jobs open %d pooled client connections, more than the %d the pooler\'s %d leave after web and worker processes.',
                 $videoSlots, $audioSlots, $needed, $this->mediaJobClients, self::POOLER_CLIENT_LIMIT,
             ));
         }

@@ -60,7 +60,7 @@ Key environment and fixture rules across all suites:
 | Guide | Coverage |
 |-------|----------|
 | [Messaging and Worker Qualification](workers-and-messaging.md) | Validated Messenger workloads, Redis fallback without Swoole (`BAANDER_TEST_DISABLE_SWOOLE=1`), worker containment/retirement/recovery/command/operator/lifecycle runners, production worker image checks, ordinary worker autoscaling qualification, and scheduler occurrence persistence |
-| [Media and Playback Qualification](media-and-playback.md) | Native FFmpeg segment encoder suites (`SegmentEncoder*MediaTest`), two-command deployment and Chromium/Firefox playback checkpoints, shared media control qualification (per-job CPU/memory cost, VAAPI hardware cost, 8 + 12 slot load proof), stream selection, sparse/delayed playback, household deployment qualification, and the playback destination specs for close reports and "Play here anyway" |
+| [Media and Playback Qualification](media-and-playback.md) | Native FFmpeg segment encoder suites (`SegmentEncoder*MediaTest`), two-command deployment and Chromium/Firefox playback checkpoints, shared media control qualification (per-job CPU/memory cost, VAAPI hardware cost, 8 + 12 slot load proof), stream selection, sparse/delayed playback, deployment qualification, and the playback destination specs for close reports and "Play here anyway" |
 | [Production Runtime Drills](runtime-drills.md) | Container startup probes, worker/outbox/producer runtime drills, Swoole `app:serve` runtime and drain verification (`test-web-shutdown-container.sh`), WebSocket ticket and proxy log security drills, and manual Safari verification on macOS and iOS |
 
 ## Frontend & Client Qualification

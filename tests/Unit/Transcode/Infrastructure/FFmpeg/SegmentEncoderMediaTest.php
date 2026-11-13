@@ -46,7 +46,7 @@ final class SegmentEncoderMediaTest extends TestCase
         array_push($input, '-t', '14', '-c:v', 'libx264', '-threads', '1', '-preset', 'ultrafast',
             '-pix_fmt', 'yuv420p', '-g', '24', '-c:a', 'aac', $source);
         $this->runMedia($input);
-        $encoder = new SegmentEncoder(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile('full')), $this->createStub(FFmpegPortInterface::class), $this->createStub(TranscodeStoragePortInterface::class), EncoderProfile::software($codec));
+        $encoder = new SegmentEncoder(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile()), $this->createStub(FFmpegPortInterface::class), $this->createStub(TranscodeStoragePortInterface::class), EncoderProfile::software($codec));
         $tier = new QualityTier('fixture', 64, 64, 100_000, 200_000, 200_000, 'hvc1', 'hvc1.1.6.L93.B0');
         $this->runMedia($encoder->buildStreamArgs($source, $tier, '', $this->directory, $start,
             audioFilters: $hasAudio ? 'aformat=channel_layouts=stereo' : '', hasAudio: $hasAudio,
@@ -173,7 +173,7 @@ final class SegmentEncoderMediaTest extends TestCase
             '-f', 'lavfi', '-i', 'testsrc2=size=64x64:rate=30',
             '-f', 'lavfi', '-i', 'sine=frequency=440:sample_rate=48000',
             '-t', '18.033334', '-c:v', 'ffv1', '-threads', '1', '-c:a', 'pcm_s16le', $source]);
-        $encoder = new SegmentEncoder(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile('full')), $this->createStub(FFmpegPortInterface::class), $this->createStub(TranscodeStoragePortInterface::class), EncoderProfile::software('libx264'));
+        $encoder = new SegmentEncoder(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile()), $this->createStub(FFmpegPortInterface::class), $this->createStub(TranscodeStoragePortInterface::class), EncoderProfile::software('libx264'));
         $tier = new QualityTier('fixture', 64, 64, 100_000, 200_000, 200_000, 'avc1', 'avc1.64001f');
         $this->runMedia($encoder->buildStreamArgs($source, $tier, '', $this->directory, 2,
             audioFilters: 'aformat=channel_layouts=stereo', sourceDuration: $this->sourceDuration($source)));
@@ -243,7 +243,7 @@ final class SegmentEncoderMediaTest extends TestCase
                 '-color_range', 'tv', '-i', $raw, '-t', $hdr ? '0.5' : '6.5', '-c:v', 'ffv1', '-threads', '1', $source]);
             $sourceProbe = $this->probeColorMedia($source);
             $probe = VideoProbeResult::fromProbeOutput($sourceProbe);
-            $encoder = new SegmentEncoder(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile('full')), $this->createStub(FFmpegPortInterface::class), $this->createStub(TranscodeStoragePortInterface::class), EncoderProfile::software($codec));
+            $encoder = new SegmentEncoder(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile()), $this->createStub(FFmpegPortInterface::class), $this->createStub(TranscodeStoragePortInterface::class), EncoderProfile::software($codec));
             $tier = new QualityTier('fixture', 64, 64, 1_000_000, 2_000_000, 2_000_000, 'avc1', 'avc1.64001f');
             $filters = $encoder->buildVideoFilters($probe, $tier);
             file_put_contents($this->directory.'/filters.txt', $filters);

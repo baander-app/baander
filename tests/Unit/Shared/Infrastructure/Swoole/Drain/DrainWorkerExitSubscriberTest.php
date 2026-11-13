@@ -184,7 +184,7 @@ final class DrainWorkerExitSubscriberTest extends TestCase
             oauthPublicKeyPath: '',
             vapidPublicKey: '',
             vapidPrivateKey: '',
-            workerProfileHealth: new WorkerProfileHealth($this->createStub(Connection::class), new DeploymentProfile('full')),
+            workerProfileHealth: new WorkerProfileHealth($this->createStub(Connection::class), new DeploymentProfile()),
             messengerWorkerHealth: new MessengerWorkerHealth($redis, new MockClock(), new HealthAlertTable()),
         );
         $alerts = new HealthAlertService(

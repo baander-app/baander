@@ -2,13 +2,13 @@
 
 Baander runs background work in a fixed pair of control and execution containers
 provisioned from the host by `bin/worker-deployment.php`. This page defines how
-the worker pair functions, the version 8 host manifest and credentials format,
+the worker pair functions, the version 9 host manifest and credentials format,
 and the host commands that create, start, inspect and recover the pair. Read
 [Background Work](background-work.md) for queue flow, observation and recovery
-procedures. The complete-stack controller, `php scripts/deploy-household.php`,
-uses this worker lifecycle for both startup profiles; its `render`, `start`,
+procedures. The complete-stack controller, `php scripts/deploy-preset.php`,
+uses this worker lifecycle for every capability and size; its `render`, `start`,
 `status` and `stop` actions manage the surrounding services too (see
-[Deployment profiles](../configuration/deployment-profiles.md#deployment-profiles)).
+[Deployment capability and size](../configuration/deployment-profiles.md#deployment-capability-and-size)).
 
 ## How workers function
 
@@ -16,7 +16,7 @@ Run `bin/worker-deployment.php` from a trusted host checkout with Composer depen
 PHP 8.5 with extensions `posix` and `pdo_pgsql`, and an absolute Docker executable connected
 to a local Unix socket. The application container receives no Docker authority.
 Provision the migrated database, Redis and a private Docker network first; use a
-locally available immutable image ID. The version 8 recipe admits a fixed pair
+locally available immutable image ID. The version 9 recipe admits a fixed pair
 of control and execution containers without CPU, memory or PID limits and without
 CPU sets. It requires explicitly authorized shared media volumes and a private
 named IPC volume. The only device it admits is the profile's hardware encoder, in
@@ -59,12 +59,12 @@ current `/var/www/html` image layout; align them with the selected image's layou
 
 ## Manifest format
 
-The manifest is a JSON object of at most 8192 bytes. Version 8 requires exactly
+The manifest is a JSON object of at most 8192 bytes. Version 9 requires exactly
 these fields, with JSON integers for `version` and `scheduledConsoleMiB`:
 
 ```json
 {
-  "version": 8,
+  "version": 9,
   "sourceMountPolicy": "production",
   "namespace": "worker.baander.app",
   "bootId": "0123456789abcdef0123456789abcdef",
@@ -75,14 +75,14 @@ these fields, with JSON integers for `version` and `scheduledConsoleMiB`:
   "dockerEndpoint": "unix:///var/run/docker.sock",
   "scheduledConsoleMiB": 320,
   "deploymentProfile": {
-    "identifier": "full",
-    "hardware": null,
+    "capability": "transcode",
     "webWorkers": 4,
     "doctrinePoolSlots": 10,
     "ordinaryConsumerLimit": 4,
     "sharedCopySlots": 0,
     "videoEncoderSlots": 8,
-    "audioEncoderSlots": 12
+    "audioEncoderSlots": 12,
+    "hardware": null
   },
   "deviceGroup": null,
   "autoscaling": {
@@ -121,14 +121,16 @@ CPU-set values.
 ### Deployment profile and media slots
 
 The `deploymentProfile` object is required. Its complete settings must form a
-valid profile and match the worker's runtime environment. `full` permits up to
-four resident ordinary consumers and the configured video and audio slots; the
-example carries the defaults of 8 and 12. `household` permits one ordinary
-consumer and two shared audio/video copy jobs; it does not permit encoding. Print
-the object for chosen slots with
-[`app:deployment:profile:show`](../commands/app-deployment-profile-show.md) instead of writing
-it by hand; [Media slots](../configuration/deployment-profiles.md#media-slots) gives the maximums.
-These settings do not establish measured memory use or a minimum host size.
+valid profile and match the worker's runtime environment. The example is the
+default profile: `transcode` at the 16 GB starting point, with four resident
+ordinary consumers and the default 8 video and 12 audio slots. A `remux` profile
+carries `sharedCopySlots` from 1 to 8, zero video and audio slots and no hardware
+encoder; it does not permit encoding.
+[Deployment capability and size](../configuration/deployment-profiles.md#deployment-capability-and-size)
+gives every setting's bounds. Print the object for a chosen capability and size
+with [`app:deployment:profile:show`](../commands/app-deployment-profile-show.md) instead of
+writing it by hand. These settings do not establish measured memory use or a
+minimum host size.
 
 ### Autoscaling and ordinary consumers
 
@@ -138,7 +140,7 @@ fingerprints, including timing and pressure thresholds. There is no compatibilit
 parser for older manifests. Changing any profile field requires retirement and a
 fresh boot; see [Upgrading](../maintenance/upgrading.md#standard-update).
 
-The `full` example recommends minimum one and maximum two for ordinary work on the
+The example recommends minimum one and maximum two for ordinary work on the
 measured envelope: an AMD Ryzen 7 5800X3D host with eight cores, sixteen threads
 and 64 GiB of physical RAM. The measurement predates the removal of container
 limits: it reserved one CPU for control, two disjoint CPUs for execution, and
@@ -163,7 +165,8 @@ for results and limits. The internal profile constructor remains conservative at
 maximum one; every production manifest must supply all fourteen fields explicitly.
 
 Concurrency bounds must satisfy `1 <= minimumConcurrency <= maximumConcurrency`,
-with a maximum of 4 for `full` and 1 for `household`. Durations are 100 through 3600000 milliseconds. Sample age must cover at least two intervals;
+and `maximumConcurrency` may not exceed the profile's `ordinaryConsumerLimit`, at
+most 4. Durations are 100 through 3600000 milliseconds. Sample age must cover at least two intervals;
 scale-up sustain and cooldown must cover an interval; scale-down sustain must
 exceed scale-up sustain. Percentages are 1 through 100, with memory/PID stop
 thresholds strictly above their growth ceilings. The units have no limits, so the
@@ -241,7 +244,7 @@ invoking user, with mode `0600`, no symlink components and at most 8192 bytes:
   "runtimeEnvironment": {
     "APP_ENV": "prod",
     "APP_DEBUG": "0",
-    "BAANDER_DEPLOYMENT_PROFILE": "full",
+    "BAANDER_DEPLOYMENT_PROFILE": "{\"capability\":\"transcode\",\"webWorkers\":4,\"doctrinePoolSlots\":10,\"ordinaryConsumerLimit\":4,\"sharedCopySlots\":0,\"videoEncoderSlots\":8,\"audioEncoderSlots\":12,\"hardware\":null}",
     "APP_SECRET": "replace-with-runtime-secret",
     "DATABASE_URL": "postgresql://worker:replace-password@db-worker.baander.app:6432/baander?serverVersion=18&charset=utf8",
     "DATABASE_CONTROL_URL": "postgresql://worker_control:replace-password@db-worker.baander.app:6432/baander_control?serverVersion=18&charset=utf8",
@@ -253,11 +256,12 @@ invoking user, with mode `0600`, no symlink components and at most 8192 bytes:
 }
 ```
 
-The runtime `BAANDER_DEPLOYMENT_PROFILE` must agree with the manifest's
-`deploymentProfile`. `BAANDER_DEPLOYMENT_PROFILE_JSON`, when supplied, must contain
-that same complete profile. The controller supplies each profile variable once,
-using the admitted environment or a generated default. Switching profiles requires
-a fresh boot after retirement, not an edit to a running container.
+The runtime `BAANDER_DEPLOYMENT_PROFILE` holds the profile as JSON and must agree
+with the manifest's `deploymentProfile`. An omitted variable means the default
+profile, so the credentials may leave it out only when the manifest carries that
+default; the controller then passes the profile to both units itself. Changing
+capability or size requires a fresh boot after retirement, not an edit to a
+running container.
 
 `DATABASE_URL` and `DATABASE_CONTROL_URL` are required and name the pooler's
 application and control aliases; see [Connection pooler](../configuration/deployment-profiles.md#connection-pooler).

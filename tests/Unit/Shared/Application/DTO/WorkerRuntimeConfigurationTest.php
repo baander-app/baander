@@ -26,19 +26,19 @@ final class WorkerRuntimeConfigurationTest extends TestCase
     public function testChildCeilingFollowsTheProfileSlots(): void
     {
         // Relay, scheduler, autoscaler, the media manager, one media child per slot, and the lease helper.
-        self::assertSame(4 + 20 + 1, $this->configuration('control', profile: new DeploymentProfile('full', 8, 12))->childProcessCeiling);
+        self::assertSame(4 + 20 + 1, $this->configuration('control', profile: new DeploymentProfile(videoEncoderSlots: 8, audioEncoderSlots: 12))->childProcessCeiling);
         self::assertSame(4 + 4 + 1, $this->configuration('control')->childProcessCeiling);
-        self::assertSame(4 + 2 + 1, $this->configuration('control', profile: new DeploymentProfile('household'))->childProcessCeiling);
+        self::assertSame(4 + 2 + 1, $this->configuration('control', profile: new DeploymentProfile('remux', 2, 4, 1, sharedCopySlots: 2))->childProcessCeiling);
         // Each consumer with one local helper, the scheduled console child, and the lease helper.
         self::assertSame(2 * 2 + 1, $this->configuration('execution')->childProcessCeiling);
         self::assertSame(2 * 2 + 1 + 1, $this->configuration('execution', 320)->childProcessCeiling);
         self::assertSame(5 * 2 + 1 + 1, $this->configuration('execution', 320, autoscaling: new WorkerAutoscalingProfile(maximumConcurrency: 4))->childProcessCeiling);
     }
 
-    public function testHouseholdRejectsMoreThanOneOrdinaryConsumer(): void
+    public function testRemuxRejectsMoreThanOneOrdinaryConsumer(): void
     {
         $this->expectException(\InvalidArgumentException::class);
-        $this->configuration('execution', profile: new DeploymentProfile('household'), autoscaling: new WorkerAutoscalingProfile(maximumConcurrency: 2));
+        $this->configuration('execution', profile: new DeploymentProfile('remux', 2, 4, 1, sharedCopySlots: 2), autoscaling: new WorkerAutoscalingProfile(maximumConcurrency: 2));
     }
 
     public function testControlCannotReserveScheduledConsole(): void
@@ -55,7 +55,7 @@ final class WorkerRuntimeConfigurationTest extends TestCase
             'namespace' => 'worker.baander.app', 'bootId' => str_repeat('a', 32), 'unit' => 'execution',
             'scheduledConsoleReservationBytes' => 0,
             'lockDirectory' => '/tmp/worker-locks', 'ipcDirectory' => '/run/baander-worker',
-            'deploymentProfile' => new DeploymentProfile('full', 3, 1),
+            'deploymentProfile' => new DeploymentProfile(videoEncoderSlots: 3, audioEncoderSlots: 1),
         ], [$field => $value]));
     }
 
@@ -80,13 +80,13 @@ final class WorkerRuntimeConfigurationTest extends TestCase
 
     public function testConsoleReservationAcceptsOnePhpProcessAndTheLargestValue(): void
     {
-        self::assertSame(320 * 1024 * 1024, $this->configuration('execution', 320, profile: new DeploymentProfile('household'))->scheduledConsoleReservationBytes);
+        self::assertSame(320 * 1024 * 1024, $this->configuration('execution', 320, profile: new DeploymentProfile('remux', 2, 4, 1, sharedCopySlots: 2))->scheduledConsoleReservationBytes);
         self::assertSame(1024 ** 4, $this->configuration('execution', 1048576)->scheduledConsoleReservationBytes);
     }
 
     private function configuration(string $unit, int $consoleMiB = 0, ?DeploymentProfile $profile = null, WorkerAutoscalingProfile $autoscaling = new WorkerAutoscalingProfile()): WorkerRuntimeConfiguration
     {
         return new WorkerRuntimeConfiguration('worker.baander.app', str_repeat('a', 32), $unit, $consoleMiB * 1024 * 1024,
-            '/tmp/worker-locks', '/run/baander-worker', $profile ?? new DeploymentProfile('full', 3, 1), $autoscaling);
+            '/tmp/worker-locks', '/run/baander-worker', $profile ?? new DeploymentProfile(videoEncoderSlots: 3, audioEncoderSlots: 1), $autoscaling);
     }
 }

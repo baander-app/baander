@@ -37,7 +37,7 @@ A stored value can stop being allowed, for example when a setting's allowed valu
 | `notifications.admin_alerts` | `true` | Alert administrators when a component's health check reads unhealthy. The web server runs the checks every 60 seconds. See [Health alerts](../administration/notifications.md#health-alerts). |
 | `notifications.push_enabled` | `true` | Deliver browser push notifications. See [Notifications](../administration/notifications.md#server-settings). |
 | `recommendations.auto_generate` | `false` | Let the daily **Generate recommendations** job generate. See [Scheduled recommendations](#scheduled-recommendations). |
-| `transcode.enabled` | `false` | Allow on-the-fly audio transcoding when the startup profile permits encoding. It cannot enable encoding in `household`. See [Audio transcoding](../media/transcoding.md#audio-transcoding). |
+| `transcode.enabled` | `false` | Allow on-the-fly audio transcoding when the startup profile permits encoding. It cannot enable encoding in a `remux` deployment. See [Audio transcoding](../media/transcoding.md#audio-transcoding). |
 | `transcode.max_bitrate` | `320` | The highest bitrate of a transcoded audio stream, in kbps: `128`, `192`, `256` or `320`. It is also the bitrate used when a client asks for none. |
 | `transcode.aac_implementation` | `bac` | The codec implementation FFmpeg uses for AAC encodes and for decoding AAC sources in them: `bac`, `fdk_aac` or `ffmpeg`. See [AAC implementation](../media/transcoding.md#aac-implementation). |
 

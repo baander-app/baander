@@ -105,14 +105,78 @@ The user confirmed the
 It defines a separate profile for 2,000 songs, 50 movies and 250 TV episodes, with 1–2 simultaneous streams alongside normal scanning and metadata updates.
 [System Requirements](docs-book/part-1-operator-guide/getting-started/system-requirements.md) publishes the measured figures and their limits.
 
-Open items for this plan:
+The profile split is delivered: the
+[capability and size deployment settings plan](docs/plans/2026-11-07-1804-feat-capability-and-size-deployment-settings-plan.md)
+(U1–U8) replaced the `full` and `household` profiles with a `transcode` or `remux`
+capability and bounded size settings, derived the pooler pools and PostgreSQL
+settings from the size, made the source installation load the rendered 16 GB
+PostgreSQL file, turned OpenTelemetry export off in the preset unless configured,
+renamed the preset to `deploy/preset/` with 4, 8 and 16 GB examples per capability,
+and extended the qualification harness for the 4 GiB, swap-off claim. The operator
+manifest is version 9.
 
-- Qualification is incomplete. No deployment finished the mixed music-and-video scenario, the household profile lacks three complete repetitions, and the restart and cleanup steps of a complete chain, profile replacement and recovery checks were not run. The smallest host size, a 4 GB fit and Raspberry Pi support remain unqualified.
+The user decided on 2026-11-12 to merge U1–U8 into `master` before the 4 GB
+qualification runs. The code lands with no host size qualified: System
+Requirements and the configuration guide say so, and the 4 GB `remux` starting
+point keeps its starting values until U9 measures it.
+
+Verification checkpoint (2026-11-07, branch `feat/capability-and-size-deployment-settings`,
+local commits only, not pushed): unit suite 8,447 tests and tooling suite 1,537 tests
+pass in `baander-ci-prewarm:local`; functional and integration suites pass except
+`PlaybackTransferPersistenceTest`'s reconnect test; phpstan, deptrac, container lint,
+OpenAPI check and the tooling format and architecture checks pass. `ce-simplify-code` ran (12b6a5755). `ce-code-review`
+run `20261107-205049-41172ade` returned "Ready with fixes"; its three confirmed findings
+(worker allowlist rejecting the OpenTelemetry keys, an out-of-bounds size stopping a
+running preset, the household-era upgrade path) are fixed in fa240b3d0.
+
+Merge checkpoint (2026-11-13): `master` at 28866bf56 merged into the branch at
+4512d491b as 02856b62d, then `master` at c34a8e0a1 as 5fe4deeee. On 5fe4deeee, in
+`baander-ci-prewarm:local`, the four backend suites pass 12,026 tests in 1,098 files
+(seed 188522618): unit 7,731, native 917, functional and integration 3,378. On the
+first merge, in the same image, PHPStan, Deptrac, the container lint and the OpenAPI
+check pass. The tooling suite ran 1,585 tests there with 4 failures, all in
+`DevelopmentBrowserCleanupTest`: `scripts/check-backend-container.php` runs the
+command with umask 0000, and the class passes under umask 022. On the host, the
+tooling PHPStan, the tooling architecture checks and the tooling format check pass,
+the web unit suite passes 3,480 tests in 276 files, the qualification driver passes
+its 15 Node tests, and `php scripts/build-website.php` builds 237 manual pages.
+`ScannedTrackPlaybackTest` failed on the first merge because
+`PasswordChangeSessionRevocationTest` left four committed outbox rows behind for users
+it deleted; 2b5b38b21, merged with c34a8e0a1, removes them. `PlaybackTransferPersistenceTest`'s
+reconnect test, which failed before the merge, passes; `master` corrected the test.
+
+Open items:
+
+- The 4 GB `remux` qualification run (U9) has not run; the user deferred it on
+  2026-11-12 so that U1–U8 could land first. A first attempt on 2026-11-07 was
+  stopped during setup. It reuses the QEMU guest in `~/.cache/baander-household-vm/`
+  (start it with `-m 4096`, no libvirtd needed). The images `baander-app:local`,
+  `baander-worker:local` and `baander-operator:local` were built from fa240b3d0,
+  before the merge with `master`; rebuild all three from the merge commit first.
+  It needs three comparable repetitions of the one-player scenarios, restart,
+  recovery and deployment replacement on 4 GiB with swap off, then the
+  insufficient-memory run on 3 GiB; KTD8 governs any size reduction. Afterwards,
+  publish the values in `deploy/preset/example-4gb-remux.json` and the measured host
+  size in System Requirements. Until then no host size is qualified, and the
+  published measurements are those of the previous household profile from
+  3 November 2026.
+- Blocker for U9: the local `baander-database:latest` image lacks the
+  `baander-pooler-credentials` executable the preset runs, so the database image must
+  be rebuilt from `docker/postgres/Dockerfile` before the preset can start.
+- The 8 and 16 GB starting points are unqualified guidance; their qualification is
+  deferred. ARM64 images and Raspberry Pi hardware are outside this plan.
+- Qualification harness follow-ups from review: the deployment-replacement scenario
+  does not check fixture borrowers; recovery fails if web or worker processes restart
+  during the PostgreSQL outage; `Qualification.php` grew to about 1,900 lines and its
+  recovery and replacement logic could move into its own class.
+- `docker-compose.yml` now loads the rendered 16 GB PostgreSQL file, so the source
+  installation's `max_connections` is 35 instead of PostgreSQL's default 100; check
+  that host tools connecting directly still fit the four direct connections.
+- `make docs` is shadowed by the `docs/` directory and needs a running preview;
+  declare it `.PHONY` or document `php scripts/build-website.php`.
 - The web control socket twice closed an `app:server:stats` request without answering under load (household repeats 1 and 2, 2026-11-03); the cause is unknown. The harness now retries and records such samples.
-- The preset inherits `OTEL_ENABLED=true` with an unreachable `host.docker.internal` endpoint from `.env`, so web workers spend time on failing span exports. The preset should disable export unless the operator configures a collector.
 - After a PostgreSQL crash the worker pair stops ("deployment reconciliation is required") and stays stopped until an operator intervenes.
-- `ce-simplify-code` ran (4c24a9bb5); its affected tooling, backend and web tests passed. Shipping gates not yet run: `ce-code-review`, the full backend suites, worker runtime container suites, affected browser playback specs and a documentation build. `baander-database:latest` has not been rebuilt, so existing instances still run PostgreSQL without the THP launcher.
-- The household profile has not been requalified since the configurable media capacity work added the connection pooler and removed its container limits; its published measurements predate both changes.
+- Affected browser playback specs and the worker runtime container suites have not run against the new profile.
 
 ## Configurable media capacity
 
@@ -237,6 +301,48 @@ that limitation is recorded for follow-up, with no runtime change in the 2026-10
 
 ## Resume here
 
+### State at the end of the session of 2026-11-12
+
+`master` is `98498798b` on GitHub and Forgejo. Landed on 2026-11-12: the session
+runner release, bAAC exact arithmetic, the CI repairs, the Firefox gate and admission
+release fixes, the bAAC lossless mode (with its failed held-out size gate disclosed,
+lossless plan KD12), the desktop lockfile hash with its tracked symlink, the `/baac`
+lead line and three test-fixture ready-file races.
+
+- **Master CI.** The `CI` run on `a97ae0058` failed at the quality gate's step 39;
+  the fixes of 2026-11-13 (see "Master CI repair") clear steps 39 to 41 in an
+  emulated runner. Check the `CI` run that follows them. A green run is the first
+  since 2026-11-05; then write the CI-repair learning with `ce-compound`, which the
+  user confirmed.
+- **Capability and size, landed 2026-11-13** with no host size qualified (user
+  decision, 2026-11-12); see "Small-host household deployment" for its merge
+  checkpoint. Next: the 4 GB remux qualification in the VM (its plan's U9), after
+  rebuilding the images from `master`. The branch
+  `feat/capability-and-size-deployment-settings` and its worktree
+  `/home/martin/dev/baander-capability` can be removed.
+- **Rename to Bånder Audio Core (`bac`), in flight.** Worktree
+  `/home/martin/dev/baander-rename-audio-core`, branch `rename-audio-core`, plan
+  [refactor-rename-baac-to-bac](docs/plans/2026-11-12-1934-refactor-rename-baac-to-bac-plan.md)
+  (on that branch). U1 is committed (`5f3fbab34`); U2, the move of the package
+  directory, was in progress and is uncommitted. User decisions of 2026-11-12: full
+  rename with no aliases, `/baac/` redirects to `/bac/`, the landing may open a draft
+  pull request, FFmpeg's long name and the FLAC vendor string use "Baander Audio
+  Core", and `make dev-up` for the persistent instance is authorized at the landing.
+  The `aac-native-v0.2.0` tag is held. Work one unit at a time, committing each. A
+  lockfile refresh must copy the package with its tracked `compile_commands.json`
+  symlink.
+- **Keep** `packages/baander-aac/bench/work/` in the worktree
+  `/home/martin/dev/baander-baac-lossless` (3.9 GB). It holds the held-out ledger
+  `heldout/runs.json`, whose third set had its first run on 2026-11-12. The rename's
+  landing moves it and rewrites its keys once.
+- **Next plans.** Better compression of material like the failed held-out recording
+  (lossless plan KD12) follows the rename; its fourth held-out set must not be read
+  before the rename lands.
+- **Cleanup once `master` is green.** The merged branch `fix-two-command-firefox`
+  (worktree `/home/martin/dev/baander-ci-repair`), the review checkout
+  `/home/martin/dev/baander-baac-review` and the merged branch `baac-lossless`, but not
+  that worktree's `bench/work`.
+
 Continue the Back-to-next-movie investigation through a newly reviewed, bounded
 scope. Capture the browser failure and the next movie's actual startup outcome,
 including its mounted/retry state, then complete authenticated cancellation and
@@ -352,6 +458,20 @@ retains the checkpoint narratives and suite counts.
 The final runtime receipt preserves the interrupted run's strict cleanup failure
 rather than claiming an uninterrupted pass. Seven older anonymous volumes remain
 untouched; six could not be attributed to a deleted container.
+
+Open: in a linked worktree the PHP tooling suite fails up to three
+`ApplicationInventoryTest` cases (the two `testInterruptedCollection…` cases always,
+`testShellRecoversUncertainCreationWhenCollectorIsInterrupted` sometimes) because a
+marker does not appear within its window. `RepositoryConfiguration::local` reads the
+primary checkout's `dev.local.json`, which slows configuration loading there. All
+three pass in a standalone clone and with `CI=1`.
+
+Open: through `scripts/check-backend-container.php` the tooling suite fails four
+`DevelopmentBrowserCleanupTest` cases. `StaticCheck::runCheck` runs the command with
+`docker exec` under umask 0000, the test creates its `artifacts` directory with
+`mkdir()` and no mode, and `PrivateDirectory::ensure` refuses the world-writable
+result. The class passes under umask 022, which CI's `docker run` path uses. Set the
+umask in `StaticCheck::runCheck` or create the test directory with mode 0700.
 
 ## Playback investigation and evidence limits
 
@@ -1055,9 +1175,50 @@ from `json_decode`. The DNS and echo fixtures wrote that file in place; they now
 write it whole through a temporary file and a rename. Locally `HttpFixtureTest`
 passes 33 of 33, and the truncation case passed five runs in a row.
 
-Open: no complete green `CI` run on GitHub has been observed since 2026-11-05. The
-registry release job failed once on a load-smoke lookup that answered 503; it had
-passed on the two runs before.
+The run for `a97ae0058` reached the quality gate's step 39, "Development instance
+safety", for the first time since the port, and failed there with "Install Composer
+dependencies first". Fixed 2026-11-13, reproduced in the runner image as a job
+container with the Docker socket and the checkout mounted at a path the daemon host
+does not have, as on GitHub:
+
+- **Step 39:** its nested worker-source drill packed the runner's checkout, which has
+  no `vendor`. The step now sets `BAANDER_TEST_CHECKOUT_IN_IMAGE=1`, like the other
+  drill steps, and the drill copies the checkout out of the CI image. It passed
+  ("component safety and source admission") in 1,434 s.
+- **Step 41, outbox leak:** `PasswordChangeSessionRevocationTest` commits through a
+  production kernel, so its four `user.password_changed` events stayed in the outbox
+  after it deleted their users. A later test that relays the whole outbox then failed
+  with "Outbox relay failed for 4 event(s)" (a `notifications.user_id` foreign-key
+  violation). Running the two tests in that order fails before the change and passes
+  after it; the test now deletes its users' outbox rows. Nineteen other leftover rows
+  (`token.revoked`, `library.scan_completed`, `playlist.created`) relay without
+  failure and are left alone.
+- **Step 41, drain probe:** in `live-runtime-bridge-probe.php` each server process
+  kept its own drain flag, so the worker that the probe's reload replaced kept
+  projecting, through its 250 ms timer, until Swoole stopped it three seconds later. A
+  trace showed that worker still releasing connections after the drain. The flag now
+  lives in the probe's shared Swoole table, as the product's drain state does; the
+  trace then shows no releases after the drain.
+
+Verified in the emulated runner: steps 39, 40 (20 checks), 41 (ordinary 7,715,
+native 917, stack lanes 1,724 and 1,652, all passing, 2,798 s), 43 and 54 (lines
+84.96 %), and PHPStan on the final image. Steps 42 and 44 to 53 have not run in the
+emulation.
+
+The run for `c34a8e0a1` then failed in `registry-quality (sanitize)`: "Deadline
+instance did not recover". After its overall deadline the registry closes the
+uncertain database connection, so the next `/ready` must open a new one and finish
+within 75 ms (the instance's 100 ms deadline less 25 ms for the response). The
+contract checked that with one request; it now waits as startup readiness does, up to
+10 s. In a host sanitizer build on one contended CPU, the single request failed in 5
+of 6 runs at 79 to 103 ms; with the wait, 9 of 10 runs passed, the tenth under load
+that also stalled startup readiness. The check had failed once in the last 40 GitHub
+runs.
+
+Open: no complete green `CI` run on GitHub has been observed since 2026-11-05. Each
+run draws a new test-order seed, so another order-dependent test can still surface in
+step 41. The registry release job failed once on a load-smoke lookup that answered
+503; it had passed on the two runs before.
 
 ### Playback session entities
 

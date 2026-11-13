@@ -135,7 +135,7 @@ by its user, and it reaches PostgreSQL on a separate controller network with
 no published database port. The controller verifies that its socket reaches the
 same daemon before issuing an operator action. The worker keeps its private
 network and receives only its admitted named media volumes, with no Docker
-authority. Version 8 manifests require complete deployment and autoscaling
+authority. Version 9 manifests require complete deployment and autoscaling
 profiles, read-only source and writable derived volumes, and a private IPC volume.
 Both units run without CPU, memory or PID limits and without CPU sets; the fixture
 checks that Docker reports no limit on either unit and that each unit starts at
@@ -266,7 +266,7 @@ BAANDER_TEST_IMAGE=baander-worker:test BAANDER_TEST_OPERATOR_IN_CONTAINER=1 \
   bash scripts/test-worker-control-capacity-container.sh
 ```
 
-It uses disposable services and a version 8 paired deployment whose units carry
+It uses disposable services and a version 9 paired deployment whose units carry
 no limits or CPU sets, with 320 MiB for scheduled console execution. Its host
 preflight requires four CPUs and 15 GiB. The drill runs two phases:
 

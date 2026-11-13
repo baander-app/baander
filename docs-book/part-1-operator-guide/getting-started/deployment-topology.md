@@ -102,10 +102,11 @@ Compose knows nothing about the pair: `docker-compose.yml` declares nginx, the
 web application, PostgreSQL, the pooler and Redis, and starting the web stack
 starts no worker. The dotted edges in the diagram mark that difference.
 
-Web and the pair start under the same deployment profile. The small-host
-household profile, for example, fixes two shared copy slots and permits stream
-copy but no re-encoding; see [Deployment profiles](../configuration/deployment-profiles.md#deployment-profiles) in
-Configuration. The pair's admission, lifecycle and recovery are explained in
+Web and the pair start under the same deployment profile, which carries the
+deployment's capability and size. A `remux` deployment, for example, runs shared
+copy slots and permits stream copy but no re-encoding; see
+[Deployment capability and size](../configuration/deployment-profiles.md#deployment-capability-and-size)
+in Configuration. The pair's admission, lifecycle and recovery are explained in
 [The worker deployment pair](../workers/background-work.md#the-worker-deployment-pair).
 
 ## Shared storage
@@ -174,6 +175,6 @@ guide.
 - [Understanding Baander](understanding-baander.md) — the components and what each owns when work stops
 - [Background Work](../workers/background-work.md) — the worker deployment pair, admission and recovery
 - [Storage and Data](storage-and-data.md) — every store, its writers and its preservation meaning
-- [Configuration](../configuration/README.md) — deployment profiles, the pooler, Redis and proxy trust
+- [Configuration](../configuration/README.md) — deployment capability and size, the pooler, Redis and proxy trust
 - [Getting Started](installation.md) — the source-installation recipe step by step
 - [Registry](../administration/registry.md) — the separately operated discovery service

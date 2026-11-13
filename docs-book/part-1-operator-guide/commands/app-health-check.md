@@ -26,8 +26,10 @@ is making progress. See [Monitoring](../operations/health-and-metrics.md#health-
 [Background work](../workers/background-work.md#observe-background-work) for those checks.
 
 The `worker_profile` row compares this process's deployment profile with the one
-the active worker boot was started with. It reads `FAIL` when they differ, for
-example when web was configured for 8 video slots and the workers for 4, and lists
+the active worker boot was started with, including its capability and size. It
+reads `FAIL` when they differ, for example when web was configured for 8 video
+slots and the workers for 4, or web for `transcode` and the workers for `remux`,
+and lists
 each disagreeing boot with its profile fingerprint. It reads `OK` when they match,
 and `N/A` when no worker boot holds the deployment lease or the boot did not record
 its profile. [app:deployment:profile:show](app-deployment-profile-show.md) prints a

@@ -51,25 +51,25 @@ final class WorkerLifecycleTest extends TestCase
     private function configuration(array $overrides = []): WorkerConfiguration
     {
         $profile = ImageProfile::fromArray([
-            'version' => 1,
-            'deployment' => ['identifier' => 'household', 'hardware' => null, 'webWorkers' => 2, 'doctrinePoolSlots' => 4],
+            'version' => 2,
+            'deployment' => json_decode(new \App\Shared\Application\DTO\DeploymentProfile('remux', 2, 4, 1, sharedCopySlots: 2)->toJson(), true, flags: JSON_THROW_ON_ERROR),
             'autoscaling' => ['minimumConcurrency' => 1, 'maximumConcurrency' => 1],
             'runtime' => ['phpHeapMiB' => 256, 'scheduledConsoleMiB' => 320],
         ]);
         return new WorkerConfiguration(...array_replace([
-            'namespace' => 'household-proof',
+            'namespace' => 'preset-proof',
             'target' => DevelopmentCommandExecutor::target($this->directory . '/docker'),
-            'network' => 'household-network',
+            'network' => 'preset-network',
             'workerImage' => 'sha256:' . str_repeat('a', 64),
             'operatorImage' => 'sha256:' . str_repeat('b', 64),
             'layout' => ApplicationLayout::fromArray(['version' => 1, 'root' => '/srv/baander']),
             'runtimeEnvironment' => ['APP_ENV' => 'prod', 'DATABASE_URL' => 'postgresql://baander@postgres/baander'],
             'sourceMountPolicy' => 'production',
             'mediaMounts' => [
-                ['volume' => 'household-media', 'target' => '/storage/media', 'role' => 'source', 'readOnly' => true],
-                ['volume' => 'household-derived', 'target' => '/srv/baander/storage', 'role' => 'derived', 'readOnly' => false],
+                ['volume' => 'preset-media', 'target' => '/storage/media', 'role' => 'source', 'readOnly' => true],
+                ['volume' => 'preset-derived', 'target' => '/srv/baander/storage', 'role' => 'derived', 'readOnly' => false],
             ],
-            'resourceLabels' => ['app.baander.household.owner' => 'household-proof'],
+            'resourceLabels' => ['app.baander.preset.owner' => 'preset-proof'],
             'profile' => $profile,
         ], $overrides));
     }
@@ -97,7 +97,7 @@ final class WorkerLifecycleTest extends TestCase
         self::assertSame('prepared', $record['phase']);
         self::assertSame($record, $this->store->load());
         self::assertSame($configuration->target, $record['target']);
-        self::assertSame('household-network', $record['network']);
+        self::assertSame('preset-network', $record['network']);
         self::assertArrayNotHasKey('operator_memory_mib', $record);
         $manifest = AtomicFile::readJson($record['directory'] . '/manifest.json');
         $fields = ['version', 'sourceMountPolicy', 'namespace', 'bootId', 'daemonId', 'imageId', 'network', 'dockerBinary', 'dockerEndpoint',
@@ -106,7 +106,7 @@ final class WorkerLifecycleTest extends TestCase
         sort($fields);
         sort($saved);
         self::assertSame($fields, $saved);
-        self::assertSame(8, $manifest['version']);
+        self::assertSame(9, $manifest['version']);
         self::assertNull($manifest['deviceGroup']);
         self::assertSame('production', $manifest['sourceMountPolicy']);
         self::assertSame(320, $manifest['scheduledConsoleMiB']);
@@ -131,20 +131,20 @@ final class WorkerLifecycleTest extends TestCase
             return in_array('info', $arguments, true) ? '{"ID":"daemon"}' : '';
         });
         $deployment = AtomicFile::readJson(dirname(__DIR__, 3) . '/tests/Fixtures/Worker/deployment-profile.json');
-        $profile = ImageProfile::fromArray(['version' => 1, 'deployment' => $deployment,
+        $profile = ImageProfile::fromArray(['version' => 2, 'deployment' => $deployment,
             'autoscaling' => AtomicFile::readJson(dirname(__DIR__, 3) . '/tests/Fixtures/Worker/autoscaling-profile.json'),
             'runtime' => ['phpHeapMiB' => 256, 'scheduledConsoleMiB' => 320]]);
         $record = null;
         new WorkerLifecycle($this->store, $runner, getenv())->prepare($record, $this->configuration(['profile' => $profile, 'mediaMounts' => [
-            ['volume' => 'household-media', 'target' => '/storage/media', 'role' => 'source', 'readOnly' => true],
-            ['volume' => 'household-derived', 'target' => '/srv/baander/storage', 'role' => 'derived', 'readOnly' => false],
-            ['volume' => 'household-state', 'target' => '/srv/baander/var/transcode_state', 'role' => 'derived', 'readOnly' => false],
+            ['volume' => 'preset-media', 'target' => '/storage/media', 'role' => 'source', 'readOnly' => true],
+            ['volume' => 'preset-derived', 'target' => '/srv/baander/storage', 'role' => 'derived', 'readOnly' => false],
+            ['volume' => 'preset-state', 'target' => '/srv/baander/var/transcode_state', 'role' => 'derived', 'readOnly' => false],
         ]]));
         $contents = file_get_contents($record['directory'] . '/manifest.json');
         self::assertIsString($contents);
         $manifest = DeploymentOperatorManifest::fromJson($contents, '/srv/baander');
         self::assertSame(320 * 1024 ** 2, $manifest->scheduledConsoleBytes);
-        self::assertSame('full', $manifest->deploymentProfile->identifier);
+        self::assertSame('transcode', $manifest->deploymentProfile->capability);
     }
 
     public function testHardwareManifestMapsTheDeviceAndItsHostGroupIntoExecutionOnly(): void
@@ -156,14 +156,14 @@ final class WorkerLifecycleTest extends TestCase
             return in_array('info', $arguments, true) ? '{"ID":"daemon"}' : '';
         });
         // /dev/null stands in for the render node: a character device whose group the host reports.
-        $deployment = new \App\Shared\Application\DTO\DeploymentProfile('full', hardware: new \App\Shared\Application\DTO\HardwareEncoder('vaapi', '/dev/null'));
-        $profile = ImageProfile::fromArray(['version' => 1, 'deployment' => json_decode($deployment->toJson(), true, flags: JSON_THROW_ON_ERROR),
+        $deployment = new \App\Shared\Application\DTO\DeploymentProfile(hardware: new \App\Shared\Application\DTO\HardwareEncoder('vaapi', '/dev/null'));
+        $profile = ImageProfile::fromArray(['version' => 2, 'deployment' => json_decode($deployment->toJson(), true, flags: JSON_THROW_ON_ERROR),
             'autoscaling' => AtomicFile::readJson(dirname(__DIR__, 3) . '/tests/Fixtures/Worker/autoscaling-profile.json'),
             'runtime' => ['phpHeapMiB' => 256, 'scheduledConsoleMiB' => 320]]);
         $mounts = [
-            ['volume' => 'household-media', 'target' => '/storage/media', 'role' => 'source', 'readOnly' => true],
-            ['volume' => 'household-derived', 'target' => '/srv/baander/storage', 'role' => 'derived', 'readOnly' => false],
-            ['volume' => 'household-state', 'target' => '/srv/baander/var/transcode_state', 'role' => 'derived', 'readOnly' => false],
+            ['volume' => 'preset-media', 'target' => '/storage/media', 'role' => 'source', 'readOnly' => true],
+            ['volume' => 'preset-derived', 'target' => '/srv/baander/storage', 'role' => 'derived', 'readOnly' => false],
+            ['volume' => 'preset-state', 'target' => '/srv/baander/var/transcode_state', 'role' => 'derived', 'readOnly' => false],
         ];
         $record = null;
         new WorkerLifecycle($this->store, $runner, getenv())->prepare($record, $this->configuration(['profile' => $profile, 'mediaMounts' => $mounts]));
@@ -172,7 +172,7 @@ final class WorkerLifecycleTest extends TestCase
         $manifest = DeploymentOperatorManifest::fromJson($contents, '/srv/baander');
         self::assertSame(stat('/dev/null')['gid'], $manifest->deviceGroup);
         self::assertEquals($deployment, $manifest->deploymentProfile);
-        $environment = new \App\Shared\Infrastructure\Worker\DeploymentRuntimeEnvironment(['BAANDER_DEPLOYMENT_PROFILE' => 'full', 'BAANDER_DEPLOYMENT_PROFILE_JSON' => $deployment->toJson()]);
+        $environment = new \App\Shared\Infrastructure\Worker\DeploymentRuntimeEnvironment(['BAANDER_DEPLOYMENT_PROFILE' => $deployment->toJson()]);
         $execution = $manifest->recipe(\App\Shared\Application\DTO\DeploymentUnit::Execution, $environment);
         $control = $manifest->recipe(\App\Shared\Application\DTO\DeploymentUnit::Control, $environment);
         self::assertSame([['/dev/null'], [stat('/dev/null')['gid']]], [$execution->devices, $execution->groups]);
@@ -185,11 +185,11 @@ final class WorkerLifecycleTest extends TestCase
 
     public function testHardwareDeviceThatIsNotADeviceNodeIsRefusedBeforePreparation(): void
     {
-        $deployment = new \App\Shared\Application\DTO\DeploymentProfile('full', hardware: new \App\Shared\Application\DTO\HardwareEncoder('vaapi', '/dev/dri/baander-missing-render-node'));
-        $profile = ImageProfile::fromArray(['version' => 1, 'deployment' => json_decode($deployment->toJson(), true, flags: JSON_THROW_ON_ERROR),
+        $deployment = new \App\Shared\Application\DTO\DeploymentProfile(hardware: new \App\Shared\Application\DTO\HardwareEncoder('vaapi', '/dev/dri/baander-missing-render-node'));
+        $profile = ImageProfile::fromArray(['version' => 2, 'deployment' => json_decode($deployment->toJson(), true, flags: JSON_THROW_ON_ERROR),
             'autoscaling' => ['minimumConcurrency' => 1, 'maximumConcurrency' => 1], 'runtime' => ['phpHeapMiB' => 256, 'scheduledConsoleMiB' => 320]]);
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('set media.hardware.group');
+        $this->expectExceptionMessage('set hardware.group');
         $this->configuration(['profile' => $profile])->deviceGroup();
     }
 
@@ -289,8 +289,8 @@ final class WorkerLifecycleTest extends TestCase
      */
     private function measuredOperator(bool $marker = true, bool $oom = false, string $cgroupNamespace = 'private', array $limits = []): array
     {
-        $record = ['directory' => $this->directory . '/boot', 'namespace' => 'household-proof', 'boot_id' => str_repeat('a', 32),
-            'network' => 'household-network', 'socket' => '/var/run/docker.sock', 'operator_image' => 'sha256:' . str_repeat('b', 64),
+        $record = ['directory' => $this->directory . '/boot', 'namespace' => 'preset-proof', 'boot_id' => str_repeat('a', 32),
+            'network' => 'preset-network', 'socket' => '/var/run/docker.sock', 'operator_image' => 'sha256:' . str_repeat('b', 64),
             'layout' => ['version' => 1, 'root' => '/srv/baander'],
             'target' => DevelopmentCommandExecutor::target($this->directory . '/docker')];
         AtomicFile::writeJson($record['directory'] . '/manifest.json', ['mediaMounts' => []]);
@@ -405,7 +405,7 @@ final class WorkerLifecycleTest extends TestCase
     {
         $record = $this->retiredRecord();
         unset($record['controller_tag']);
-        $tag = 'baander-worker-controller:household-proof-' . $record['boot_id'];
+        $tag = 'baander-worker-controller:preset-proof-' . $record['boot_id'];
         $runner = new DevDataRunner(static fn(array $arguments): string|\Baander\Tooling\Process\ProcessResult => in_array('info', $arguments, true)
             ? '{"ID":"daemon"}' : (in_array('inspect', $arguments, true)
                 ? new \Baander\Tooling\Process\ProcessResult(1, null, false, false, '', 'Error response from daemon: No such image: ' . $tag, 0) : ''));
@@ -417,10 +417,10 @@ final class WorkerLifecycleTest extends TestCase
     /** @return array<string,mixed> */
     private function retiredRecord(): array
     {
-        return ['phase' => 'retired', 'namespace' => 'household-proof', 'boot_id' => str_repeat('a', 32),
+        return ['phase' => 'retired', 'namespace' => 'preset-proof', 'boot_id' => str_repeat('a', 32),
             'operator_image' => 'sha256:' . str_repeat('b', 64),
             'target' => DevelopmentCommandExecutor::target($this->directory . '/docker'),
-            'controller_tag' => 'baander-worker-controller:household-proof-' . str_repeat('a', 32)];
+            'controller_tag' => 'baander-worker-controller:preset-proof-' . str_repeat('a', 32)];
     }
 
     public function testUncertainCreationIsSavedWithoutDevelopmentInstanceState(): void
@@ -431,7 +431,7 @@ final class WorkerLifecycleTest extends TestCase
                 throw new \RuntimeException('create transport interrupted');
             }
         };
-        $record = ['phase' => 'prepared', 'namespace' => 'household-proof'];
+        $record = ['phase' => 'prepared', 'namespace' => 'preset-proof'];
         try {
             $lifecycle->start($record);
             self::fail('Unconfirmed creation accepted.');

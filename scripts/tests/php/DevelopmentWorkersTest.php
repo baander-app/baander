@@ -656,7 +656,7 @@ final class DevelopmentWorkersTest extends DevDataTestCase
                 return $arguments[array_key_last($arguments)];
             }
             return json_encode([
-                'version' => 1,
+                'version' => 2,
                 'runtime' => ['phpHeapMiB' => 256, 'scheduledConsoleMiB' => 320],
                 'autoscaling' => AtomicFile::readJson(dirname(__DIR__, 3) . '/tests/Fixtures/Worker/autoscaling-profile.json'),
                 'deployment' => AtomicFile::readJson(dirname(__DIR__, 3) . '/tests/Fixtures/Worker/deployment-profile.json'),

@@ -70,7 +70,7 @@ $storage = $stub(App\Transcode\Application\Port\TranscodeStoragePortInterface::c
 $tier = QualityTier::p1080();
 $audioProfile = AudioProfile::streamingStereo();
 $command = static function (string $encoder, string $output) use ($device, $ffmpeg, $storage, $probe, $tier, $audioProfile, $source): array {
-    $segments = new SegmentEncoder(new MediaExecutionPolicy(new DeploymentProfile('full')), $ffmpeg, $storage, EncoderProfile::fromEncoderName($encoder, $device));
+    $segments = new SegmentEncoder(new MediaExecutionPolicy(new DeploymentProfile()), $ffmpeg, $storage, EncoderProfile::fromEncoderName($encoder, $device));
     return $segments->buildStreamArgs(
         $source,
         $tier,

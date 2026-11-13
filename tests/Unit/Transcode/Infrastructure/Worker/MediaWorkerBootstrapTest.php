@@ -109,10 +109,9 @@ PHP);
     #[DataProvider('launchFenceClients')]
     public function testLaunchFenceAdmitsOnlyTheProfilesSlotClients(string $kind, string $clientId, bool $admitted): void
     {
-        $profile = new \App\Shared\Application\DTO\DeploymentProfile('full', 8, 1);
+        $profile = new \App\Shared\Application\DTO\DeploymentProfile(videoEncoderSlots: 8, audioEncoderSlots: 1);
         $environment = [
-            'BAANDER_DEPLOYMENT_PROFILE' => 'full',
-            'BAANDER_DEPLOYMENT_PROFILE_JSON' => $profile->toJson(),
+            'BAANDER_DEPLOYMENT_PROFILE' => $profile->toJson(),
             'BAANDER_WORKER_NAMESPACE' => 'test.baander.app',
             'BAANDER_WORKER_BOOT_ID' => str_repeat('a', 32),
             'BAANDER_WORKER_ID' => 'media',
@@ -146,7 +145,7 @@ PHP);
         yield 'audio slot' => ['audio', 'media-audio-0', true];
         yield 'audio slot beyond the profile' => ['audio', 'media-audio-1', false];
         yield 'audio client for a video job' => ['video', 'media-audio-0', false];
-        yield 'shared copy client in a full profile' => ['video', 'media-copy-0', false];
+        yield 'shared copy client in a transcode deployment' => ['video', 'media-copy-0', false];
     }
 
     /** @return iterable<string, array{string, list<string>, bool}> */

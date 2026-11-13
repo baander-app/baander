@@ -9,7 +9,7 @@ Behavior that an administrator may want to change while the server runs, such as
 
 | Guide | Scope |
 |-------|-------|
-| [Deployment Profiles and Runtime](deployment-profiles.md) | `full` and `household` profiles, media slots, PgBouncer connection pooler, Swoole server drain budget, coroutine file I/O, and PHP memory limits |
+| [Deployment Capability, Size and Runtime](deployment-profiles.md) | `transcode` and `remux` capabilities, size settings and starting points, media slots, PgBouncer connection pooler, Swoole server drain budget, coroutine file I/O, and PHP memory limits |
 | [Environment Variables](environment-variables.md) | Application, PostgreSQL, Redis, Messenger, Web Push, mail, external APIs, scanner security, discovery, media storage, stream authentication, CORS, and job monitoring |
 | [Authentication and Rate Limiting](authentication-and-limits.md) | OAuth 2.0 keys, token lifetimes, authorization server parameters, rate limiters, trusted proxies, passkeys, Argon2id, password reset, email verification, and token binding |
 | [Server and User Settings](server-settings.md) | Live `system_settings` via Admin UI/CLI/API, settings reference, scheduled recommendations, email language selection, and per-user settings |

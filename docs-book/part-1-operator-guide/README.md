@@ -16,8 +16,8 @@ before carrying a command between environments.
 | Chapter | Coverage |
 | --- | --- |
 | [Getting Started](getting-started/README.md) | Component overview, deployment topology, storage requirements, host sizing, and source installation |
-| [Configuration](configuration/README.md) | Deployment profiles, media slots, PgBouncer pooler, environment variables, authentication limits, and live server/user settings |
-| [Workers and Background Work](workers/README.md) | Control/execution worker pair, queue and outbox flow, version 8 manifest, credentials, and host lifecycle controller |
+| [Configuration](configuration/README.md) | Deployment capability and size, media slots, PgBouncer pooler, environment variables, authentication limits, and live server/user settings |
+| [Workers and Background Work](workers/README.md) | Control/execution worker pair, queue and outbox flow, version 9 manifest, credentials, and host lifecycle controller |
 | [Media and Playback](media/README.md) | Library management, file watching, external metadata/lyrics APIs, video/audio transcoding, and watch parties |
 | [Administration](administration/README.md) | User accounts, roles, passkeys, OAuth clients, notifications, and the optional server-discovery registry |
 | [Monitoring and Troubleshooting](operations/README.md) | Health probes, Prometheus metrics, Swoole stats, job and transport monitoring, logs, and symptom-led diagnostics |
@@ -27,7 +27,7 @@ before carrying a command between environments.
 ## Reading path
 
 1. **Understand the instance.** [Understanding Baander](getting-started/understanding-baander.md) introduces the journey from files to playback. [Deployment Topology](getting-started/deployment-topology.md) shows the components in one diagram and what PostgreSQL and Redis hold. [Storage and Data](getting-started/storage-and-data.md) identifies the stores, their writers and what must be preserved.
-2. **Set it up.** Check [System Requirements](getting-started/system-requirements.md) for your profile, follow [Source Installation](getting-started/installation.md), then use [Configuration](configuration/README.md) for settings, [Worker Deployment](workers/worker-deployment.md) for the worker manifest, credentials and host controller, and [Background Work](workers/background-work.md) for queue flow and operating limits.
+2. **Set it up.** Check [System Requirements](getting-started/system-requirements.md) to choose a capability and size, follow [Source Installation](getting-started/installation.md), then use [Configuration](configuration/README.md) for settings, [Worker Deployment](workers/worker-deployment.md) for the worker manifest, credentials and host controller, and [Background Work](workers/background-work.md) for queue flow and operating limits.
 3. **Run it day to day.** Use [Library Management](media/library-management.md), [User Management](administration/user-management.md), [External APIs](media/external-apis.md), [Transcoding](media/transcoding.md), [Notifications](administration/notifications.md) and [Watch Parties](media/watch-parties.md) for the work your instance supports.
 4. **Observe and diagnose.** [Monitoring and Troubleshooting](operations/README.md) connects [Health Checks, Metrics, and Logs](operations/health-and-metrics.md) and [Job and Transport Monitoring](operations/job-monitoring.md) to stage-by-stage evidence. [Troubleshooting](operations/troubleshooting.md) starts from symptoms and connects them to the responsible stage.
 5. **Maintain and recover.** Read [Backup and Recovery](maintenance/backup-and-recovery.md) before [Upgrading](maintenance/upgrading.md) or a recovery action. [Security](maintenance/security.md) covers credential changes and account/session effects. The optional [Registry](administration/registry.md) has separate storage and recovery requirements.
@@ -37,7 +37,7 @@ before carrying a command between environments.
 | I need to… | Start here |
 | --- | --- |
 | See how the pieces fit together | [Deployment Topology](getting-started/deployment-topology.md) |
-| Size a host or choose a deployment profile | [System Requirements](getting-started/system-requirements.md) and [Deployment Profiles and Runtime](configuration/deployment-profiles.md) |
+| Size a host or choose a deployment capability | [System Requirements](getting-started/system-requirements.md) and [Deployment Capability, Size and Runtime](configuration/deployment-profiles.md) |
 | Install an instance and scan its first library | [Source Installation](getting-started/installation.md) |
 | Change an environment variable or server setting | [Environment Variables](configuration/environment-variables.md) and [Server and User Settings](configuration/server-settings.md) |
 | Configure OAuth lifetimes, rate limits or passkeys | [Authentication and Rate Limiting](configuration/authentication-and-limits.md) |

@@ -25,7 +25,7 @@ $connection->executeStatement('SET search_path TO ' . $schema . ', public');
 $runtime = new AudioRenditionRuntime($connection);
 // Pace real input and flush packets so the reader can observe an unfinished encode.
 $profile = \App\Shared\Application\DTO\DeploymentProfile::fromEnvironment();
-$client = new class(NativeExecutionClient::fromEnvironment($profile->sharedCopySlots > 0 ? 'media-copy-0' : 'media-audio-0'), 3 / (float) $delay) implements NativeExecutionClientInterface {
+$client = new class(NativeExecutionClient::fromEnvironment($profile->capability === 'remux' ? 'media-copy-0' : 'media-audio-0'), 3 / (float) $delay) implements NativeExecutionClientInterface {
     public function __construct(private NativeExecutionClientInterface $inner, private float $readRate) {}
     public function handshake(): array { return $this->inner->handshake(); }
     public function submit(array $argv, float $executionTimeoutSeconds = 600, ?int $attempt = null): NativeExecutionHandle

@@ -192,7 +192,7 @@ class Runtime
         ];
         if ($pooler !== null) {
             $services[Pooler::SERVICE] = [
-                ...Pooler::service($pooler, Pooler::environment('full', $database[0], $database[2], 'database'), 'pooler_credentials', 'postgres'),
+                ...Pooler::service($pooler, Pooler::environment(Pooler::defaultPools(), $database[0], $database[2], 'database'), 'pooler_credentials', 'postgres'),
                 'networks' => ['private' => new \stdClass()],
             ];
             $services[Pooler::SERVICE]['depends_on'][self::POOLER_CREDENTIALS] = ['condition' => 'service_completed_successfully'];

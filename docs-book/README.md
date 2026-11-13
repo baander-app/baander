@@ -12,9 +12,9 @@ an instance, or the developer guide to work on its code.
 
 - [Deployment Topology](part-1-operator-guide/getting-started/deployment-topology.md) — how web, workers, storage and the optional registry fit together
 - [Understanding Baander](part-1-operator-guide/getting-started/understanding-baander.md) — the journey from files to playback and what a health result tells you
-- [System Requirements](part-1-operator-guide/getting-started/system-requirements.md) — host software, deployment profiles and measured memory
+- [System Requirements](part-1-operator-guide/getting-started/system-requirements.md) — host software, deployment capability and size starting points, and measured memory
 - [Source Installation](part-1-operator-guide/getting-started/installation.md) — source installation, worker deployment and your first library
-- [Configuration](part-1-operator-guide/configuration/README.md) — deployment profiles, environment variables and runtime settings
+- [Configuration](part-1-operator-guide/configuration/README.md) — deployment capability and size, environment variables and runtime settings
 - [Monitoring and Troubleshooting](part-1-operator-guide/operations/README.md) — find evidence for a stalled or failing task
 - [Backup and Recovery](part-1-operator-guide/maintenance/backup-and-recovery.md) — preserve the application data and assess recovery limits
 - [CLI Reference](part-1-operator-guide/commands/README.md) — console commands by area

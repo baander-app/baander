@@ -21,7 +21,7 @@ before changing targets. Paths used by a console command are container paths.
 
 ## Worker deployment
 
-Application console commands run inside `app`, while the control/execution worker pair is provisioned and operated from the host through `bin/worker-deployment.php` (or `scripts/deploy-household.php`). See [Worker Deployment](../workers/worker-deployment.md) for how the worker pair functions, the version 8 manifest and credentials format, and the host lifecycle commands, and [Background Work](../workers/background-work.md) for queue flow, observation and recovery.
+Application console commands run inside `app`, while the control/execution worker pair is provisioned and operated from the host through `bin/worker-deployment.php` (or `scripts/deploy-preset.php`). See [Worker Deployment](../workers/worker-deployment.md) for how the worker pair functions, the version 9 manifest and credentials format, and the host lifecycle commands, and [Background Work](../workers/background-work.md) for queue flow, observation and recovery.
 
 ## Auth & Users
 

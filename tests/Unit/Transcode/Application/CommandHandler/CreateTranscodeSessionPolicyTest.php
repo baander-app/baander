@@ -23,7 +23,7 @@ use PHPUnit\Framework\TestCase;
 
 final class CreateTranscodeSessionPolicyTest extends TestCase
 {
-    public function testHouseholdRefusesFreshEncodingBeforeDurableAdmission(): void
+    public function testRemuxRefusesFreshEncodingBeforeDurableAdmission(): void
     {
         $jobs = $this->createMock(TranscodeJobPortInterface::class);
         $jobs->expects(self::never())->method('getOrCreateJob');
@@ -37,7 +37,7 @@ final class CreateTranscodeSessionPolicyTest extends TestCase
         $storage->expects(self::never())->method('resolveJobDirectory');
         $presentations = $this->createMock(EncodePresentationPort::class);
         $presentations->expects(self::never())->method('select');
-        $handler = new CreateTranscodeSessionHandler(new MediaExecutionPolicy(new DeploymentProfile('household')), $jobs, $sessions, $storage, $ownership, $transaction, $this->createStub(SleeperInterface::class), $presentations, $this->settings());
+        $handler = new CreateTranscodeSessionHandler(new MediaExecutionPolicy(new DeploymentProfile('remux', 2, 4, 1, sharedCopySlots: 2)), $jobs, $sessions, $storage, $ownership, $transaction, $this->createStub(SleeperInterface::class), $presentations, $this->settings());
         $this->expectException(MediaEncodingProhibitedException::class);
         $handler(new CreateTranscodeSessionCommand(Uuid::generate(), Uuid::generate(), QualityTier::p720(), AudioProfile::streamingStereo()));
     }

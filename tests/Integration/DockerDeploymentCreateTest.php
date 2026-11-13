@@ -214,7 +214,7 @@ final class DockerDeploymentCreateTest extends TestCase
 
     public function testHardwareExecutionRegistersOnlyWithItsAdmittedDeviceAndGroup(): void
     {
-        $profile = new \App\Shared\Application\DTO\DeploymentProfile('full', 8, 12, new \App\Shared\Application\DTO\HardwareEncoder('vaapi', '/dev/dri/renderD128'));
+        $profile = new \App\Shared\Application\DTO\DeploymentProfile(videoEncoderSlots: 8, audioEncoderSlots: 12, hardware: new \App\Shared\Application\DTO\HardwareEncoder('vaapi', '/dev/dri/renderD128'));
         $recipe = static fn (DeploymentUnit $unit): DeploymentContainerRecipe => new DeploymentContainerRecipe('baander.app:create', str_repeat('a', 32), 'baander.app-daemon', 'sha256:' . str_repeat('f', 64),
             ['/usr/local/bin/php', '/app/bin/worker.php'], 'none', $unit, 'worker-ipc', '/app', $profile, deviceGroup: 485);
         $execution = $recipe(DeploymentUnit::Execution);
@@ -382,7 +382,7 @@ final class DockerDeploymentCreateTest extends TestCase
     /** @param array<string, string> $environment */
     private function recipe(array $environment = [], DeploymentUnit $unit = DeploymentUnit::Control): DeploymentContainerRecipe
     {
-        return new DeploymentContainerRecipe('baander.app:create', str_repeat('a', 32), 'baander.app-daemon', 'sha256:' . str_repeat('f', 64), ['/usr/local/bin/php', '/app/bin/worker.php'], 'none', $unit, 'worker-ipc', '/app', new \App\Shared\Application\DTO\DeploymentProfile('full'), new DeploymentRuntimeEnvironment($environment));
+        return new DeploymentContainerRecipe('baander.app:create', str_repeat('a', 32), 'baander.app-daemon', 'sha256:' . str_repeat('f', 64), ['/usr/local/bin/php', '/app/bin/worker.php'], 'none', $unit, 'worker-ipc', '/app', new \App\Shared\Application\DTO\DeploymentProfile(), new DeploymentRuntimeEnvironment($environment));
     }
 
     private function reserve(DeploymentContainerRecipe $recipe): void

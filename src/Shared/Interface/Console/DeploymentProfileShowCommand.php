@@ -18,11 +18,14 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 /**
  * Prints a deployment profile and the limits Baander derives from it, so a source install can
  * set the web environment and the worker manifest's profile without writing the JSON by hand.
- * Without a profile, slot or hardware option it prints the profile this process runs; those options build another one.
+ * Without options it prints the profile this process runs. Options build another one: settings
+ * left out keep the effective profile's values when the capability stays the same, and take the
+ * transcode defaults or require a value when it changes. A hardware option resets unset slot
+ * counts to the defaults for that encoder.
  */
 #[AsCommand(
     name: 'app:deployment:profile:show',
-    description: 'Print a deployment profile and the limits derived from its media slots.',
+    description: 'Print a deployment profile and the limits derived from its capability and size.',
 )]
 final class DeploymentProfileShowCommand extends Command
 {
@@ -35,10 +38,14 @@ final class DeploymentProfileShowCommand extends Command
     protected function configure(): void
     {
         $this
-            ->addOption('identifier', null, InputOption::VALUE_REQUIRED, 'Profile to build instead of the effective one: full or household')
-            ->addOption('video-slots', null, InputOption::VALUE_REQUIRED, 'Concurrent video jobs of the full profile; 0 disables video conversion and copy')
-            ->addOption('audio-slots', null, InputOption::VALUE_REQUIRED, 'Concurrent audio jobs of the full profile; 0 disables audio conversion and copy')
-            ->addOption('hardware-accelerator', null, InputOption::VALUE_REQUIRED, 'Hardware encoder of the full profile: ' . implode(', ', HardwareEncoder::ACCELERATORS))
+            ->addOption('capability', null, InputOption::VALUE_REQUIRED, 'Media work the deployment runs: transcode or remux')
+            ->addOption('web-workers', null, InputOption::VALUE_REQUIRED, sprintf('Web worker processes, 1 to %d', DeploymentProfile::MAXIMUM_WEB_WORKERS))
+            ->addOption('database-slots', null, InputOption::VALUE_REQUIRED, sprintf('Database connection slots per web worker, 1 to %d', DeploymentProfile::MAXIMUM_DOCTRINE_POOL_SLOTS))
+            ->addOption('ordinary-consumers', null, InputOption::VALUE_REQUIRED, sprintf('Resident ordinary background consumers, 1 to %d', DeploymentProfile::MAXIMUM_ORDINARY_CONSUMERS))
+            ->addOption('copy-slots', null, InputOption::VALUE_REQUIRED, sprintf('Concurrent stream copy jobs of a remux deployment, 1 to %d', DeploymentProfile::MAXIMUM_COPY_SLOTS))
+            ->addOption('video-slots', null, InputOption::VALUE_REQUIRED, 'Concurrent video jobs of a transcode deployment; 0 disables video conversion and copy')
+            ->addOption('audio-slots', null, InputOption::VALUE_REQUIRED, 'Concurrent audio jobs of a transcode deployment; 0 disables audio conversion and copy')
+            ->addOption('hardware-accelerator', null, InputOption::VALUE_REQUIRED, 'Hardware encoder of a transcode deployment: ' . implode(', ', HardwareEncoder::ACCELERATORS))
             ->addOption('hardware-device', null, InputOption::VALUE_REQUIRED, 'Device path the hardware encoder opens, such as /dev/dri/renderD128; nvenc takes none')
             ->addOption(AdminCommandSupport::JSON_OPTION, null, InputOption::VALUE_NONE, 'Print the profile, its fingerprint and its limits as JSON');
     }
@@ -60,15 +67,17 @@ final class DeploymentProfileShowCommand extends Command
             ]);
         }
 
-        $io->writeln('BAANDER_DEPLOYMENT_PROFILE=' . $profile->identifier, OutputInterface::OUTPUT_RAW);
-        $io->writeln("BAANDER_DEPLOYMENT_PROFILE_JSON='" . $profile->toJson() . "'", OutputInterface::OUTPUT_RAW);
+        $io->writeln("BAANDER_DEPLOYMENT_PROFILE='" . $profile->toJson() . "'", OutputInterface::OUTPUT_RAW);
         $io->newLine();
         $io->definitionList(
             ['Fingerprint' => $profile->fingerprint()],
+            ['Capability' => $profile->capability],
+            ['Web workers' => sprintf('%d, each with %d database connection slots', $profile->webWorkers, $profile->doctrinePoolSlots)],
+            ['Ordinary consumers' => (string) $profile->ordinaryConsumerLimit],
             ['Hardware encoder' => $profile->hardware === null ? 'none (software)' : $profile->hardware->accelerator . ($profile->hardware->device === null ? '' : ' on ' . $profile->hardware->device)],
             ['Video slots' => self::slots($limits['videoSlots'], $limits['maximumVideoSlots'])],
             ['Audio slots' => self::slots($limits['audioSlots'], $limits['maximumAudioSlots'])],
-            ['Shared copy slots' => (string) $limits['sharedCopySlots']],
+            ['Copy slots' => (string) $limits['sharedCopySlots']],
             ['Native commands' => (string) $limits['nativeCommandLimit']],
             ['Native results' => (string) $limits['nativeResultLimit']],
             ['Native clients' => (string) $limits['nativeClientLimit']],
@@ -83,20 +92,37 @@ final class DeploymentProfileShowCommand extends Command
     /** @throws InvalidInputException when the options do not form a valid profile */
     private function profile(InputInterface $input): DeploymentProfile
     {
-        $identifier = AdminCommandSupport::stringOption($input, 'identifier');
-        $video = AdminCommandSupport::integerOption($input, 'video-slots');
-        $audio = AdminCommandSupport::integerOption($input, 'audio-slots');
+        $capability = AdminCommandSupport::stringOption($input, 'capability');
+        $settings = [
+            'webWorkers' => AdminCommandSupport::integerOption($input, 'web-workers'),
+            'doctrinePoolSlots' => AdminCommandSupport::integerOption($input, 'database-slots'),
+            'ordinaryConsumerLimit' => AdminCommandSupport::integerOption($input, 'ordinary-consumers'),
+            'sharedCopySlots' => AdminCommandSupport::integerOption($input, 'copy-slots'),
+            'videoEncoderSlots' => AdminCommandSupport::integerOption($input, 'video-slots'),
+            'audioEncoderSlots' => AdminCommandSupport::integerOption($input, 'audio-slots'),
+        ];
         $accelerator = AdminCommandSupport::stringOption($input, 'hardware-accelerator');
         $device = AdminCommandSupport::stringOption($input, 'hardware-device');
-        if ($identifier === null && $video === null && $audio === null && $accelerator === null && $device === null) {
+        if ($capability === null && $accelerator === null && $device === null && array_filter($settings, static fn (?int $value): bool => $value !== null) === []) {
             return $this->effective;
         }
+        $capability ??= $this->effective->capability;
+        $base = $capability === $this->effective->capability ? $this->effective : null;
         try {
             if ($accelerator === null && $device !== null) {
                 throw new \InvalidArgumentException('A hardware device requires --hardware-accelerator.');
             }
-            $hardware = $accelerator === null ? null : new HardwareEncoder($accelerator, $device);
-            return new DeploymentProfile($identifier ?? $this->effective->identifier, $video, $audio, $hardware);
+            $hardware = $accelerator === null ? $base?->hardware : new HardwareEncoder($accelerator, $device);
+            // A new hardware encoder brings its own video default instead of the effective slot count.
+            $inherited = $accelerator === null ? array_keys($settings) : ['webWorkers', 'doctrinePoolSlots', 'ordinaryConsumerLimit', 'sharedCopySlots'];
+            foreach ($inherited as $name) {
+                $settings[$name] ??= $base?->{$name};
+            }
+
+            return new DeploymentProfile(
+                $capability,
+                ...array_filter(['hardware' => $hardware] + $settings, static fn (mixed $value): bool => $value !== null),
+            );
         } catch (\InvalidArgumentException $error) {
             throw new InvalidInputException($error->getMessage(), previous: $error);
         }
@@ -133,6 +159,6 @@ final class DeploymentProfileShowCommand extends Command
 
     private static function slots(int $slots, ?int $maximum): string
     {
-        return $maximum === null ? $slots . ' (fixed)' : sprintf('%d (at most %d)', $slots, $maximum);
+        return $maximum === null ? $slots . ' (remux runs copy slots)' : sprintf('%d (at most %d)', $slots, $maximum);
     }
 }

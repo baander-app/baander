@@ -119,8 +119,7 @@ final class WorkerReadinessObservation
             $expected = ['BAANDER_WORKER_NAMESPACE' => $lease->namespace, 'BAANDER_WORKER_BOOT_ID' => $lease->bootId,
                 'BAANDER_WORKER_LEASE_EPOCH' => (string) $lease->epoch, 'BAANDER_WORKER_UNIT' => $unit,
                 'BAANDER_WORKER_ID' => $role, 'BAANDER_WORKER_AUTOSCALING_PROFILE' => $profile->toJson(),
-                'BAANDER_DEPLOYMENT_PROFILE' => $deploymentProfile->identifier,
-                'BAANDER_DEPLOYMENT_PROFILE_JSON' => $deploymentProfile->toJson()];
+                'BAANDER_DEPLOYMENT_PROFILE' => $deploymentProfile->toJson()];
             if ($role !== 'native') {
                 $expected['MESSENGER_CONSUMER_NAME'] = self::consumerName($lease, $role, (int) $generation);
             }

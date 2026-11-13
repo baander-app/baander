@@ -23,9 +23,9 @@ use Symfony\Component\Serializer\Encoder\JsonEncoder;
 final class MediaExecutionBoundaryTest extends TestCase
 {
     #[DataProvider('adapterOperations')]
-    public function testHouseholdRejectsEveryTypedAdapterEncoderBeforeSourceOrOutputAccess(string $operation): void
+    public function testRemuxRejectsEveryTypedAdapterEncoderBeforeSourceOrOutputAccess(string $operation): void
     {
-        $policy = new MediaExecutionPolicy(new DeploymentProfile('household'));
+        $policy = new MediaExecutionPolicy(new DeploymentProfile('remux', 2, 4, 1, sharedCopySlots: 2));
         $adapter = new FFmpegAdapter($policy, new NullLogger(), new FFprobeAdapter(new JsonEncoder()), new FMP4SegmentWriter($policy), new JsonEncoder(), $this->createStub(SystemSettingsPortInterface::class));
         $this->expectException(MediaEncodingProhibitedException::class);
         match ($operation) {
@@ -45,9 +45,9 @@ final class MediaExecutionBoundaryTest extends TestCase
         }
     }
 
-    public function testHouseholdCannotBuildExecutableEncodedStreamArguments(): void
+    public function testRemuxCannotBuildExecutableEncodedStreamArguments(): void
     {
-        $encoder = new SegmentEncoder(new MediaExecutionPolicy(new DeploymentProfile('household')), $this->createStub(FFmpegPortInterface::class), $this->createStub(TranscodeStoragePortInterface::class));
+        $encoder = new SegmentEncoder(new MediaExecutionPolicy(new DeploymentProfile('remux', 2, 4, 1, sharedCopySlots: 2)), $this->createStub(FFmpegPortInterface::class), $this->createStub(TranscodeStoragePortInterface::class));
         $this->expectException(MediaEncodingProhibitedException::class);
         $encoder->buildStreamArgs('/source', QualityTier::p720(), '', '/output');
     }

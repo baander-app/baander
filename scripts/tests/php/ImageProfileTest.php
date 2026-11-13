@@ -9,21 +9,46 @@ use Baander\Tooling\Deployment\{ContainerMeasurement, ImageProfile};
 use Baander\Tooling\Docker\{Client, Target};
 use Baander\Tooling\Filesystem\AtomicFile;
 use Baander\Tooling\Inventory\Collector;
-use Baander\Tooling\Process\{CompletionPolicy, EngineExecutor, ExecutionContext, ProcessSpec};
+use Baander\Tooling\Process\{CompletionPolicy, EngineExecutor, ExecutionContext, ProcessResult, ProcessSpec};
+use App\Shared\Application\DTO\{DeploymentProfile, HardwareEncoder};
 use PHPUnit\Framework\TestCase;
 
 final class ImageProfileTest extends TestCase
 {
-    /** @return array<string,mixed> */
+    /** @return array<string,mixed> The profile a remux image reports for two web workers and two copy slots. */
     private function document(): array
     {
         return [
-            'version' => 1,
-            'deployment' => ['identifier' => 'household', 'webWorkers' => 2, 'doctrinePoolSlots' => 4, 'ordinaryConsumerLimit' => 1, 'sharedCopySlots' => 2, 'videoEncoderSlots' => 0, 'audioEncoderSlots' => 0, 'hardware' => null],
+            'version' => 2,
+            'deployment' => ['capability' => 'remux', 'webWorkers' => 2, 'doctrinePoolSlots' => 4, 'ordinaryConsumerLimit' => 1, 'sharedCopySlots' => 2, 'videoEncoderSlots' => 0, 'audioEncoderSlots' => 0, 'hardware' => null],
             'autoscaling' => ['minimumConcurrency' => 1, 'maximumConcurrency' => 1],
             'runtime' => ['phpHeapMiB' => 256, 'phpProcessMemoryMiB' => 320, 'nativeManagerHeapMiB' => 128, 'nativeCommandLimit' => 5,
                 'nativeResultLimit' => 12, 'nativeClientLimit' => 4, 'mediaHelperLimit' => 1, 'scheduledConsoleMiB' => 320],
         ];
+    }
+
+    /**
+     * Settings for the remux deployment the fixture image reports, with overrides.
+     *
+     * @param array<string,mixed> $overrides
+     * @return array{capability:string,webWorkers:int,doctrinePoolSlots:int,ordinaryConsumerLimit:int,sharedCopySlots:int,videoEncoderSlots:?int,audioEncoderSlots:?int,hardware:array{accelerator:string,device:?string}|null}
+     */
+    private static function remuxSettings(array $overrides = []): array
+    {
+        /** @var array{capability:string,webWorkers:int,doctrinePoolSlots:int,ordinaryConsumerLimit:int,sharedCopySlots:int,videoEncoderSlots:?int,audioEncoderSlots:?int,hardware:array{accelerator:string,device:?string}|null} */
+        return array_replace(['capability' => 'remux', 'webWorkers' => 2, 'doctrinePoolSlots' => 4, 'ordinaryConsumerLimit' => 1,
+            'sharedCopySlots' => 2, 'videoEncoderSlots' => null, 'audioEncoderSlots' => null, 'hardware' => null], $overrides);
+    }
+
+    /**
+     * The default transcode settings with overrides.
+     *
+     * @param array<string,mixed> $overrides
+     * @return array<string,mixed>
+     */
+    private static function transcodeSettings(array $overrides = []): array
+    {
+        return array_replace(ImageProfile::DEFAULT_SETTINGS, $overrides);
     }
 
     public function testImageValuesSurvivePersistenceWithoutRecalculation(): void
@@ -35,6 +60,7 @@ final class ImageProfileTest extends TestCase
         self::assertSame(2, $profile->webWorkers);
         self::assertSame(4, $profile->doctrinePoolSlots);
         self::assertSame(256, $profile->phpHeapMiB);
+        self::assertSame('remux', $profile->deployment['capability']);
         self::assertSame($profile->fingerprint(), ImageProfile::fromArray($profile->toArray())->fingerprint());
     }
 
@@ -48,7 +74,7 @@ final class ImageProfileTest extends TestCase
         self::assertNotSame($fingerprint, ImageProfile::fromArray($document)->fingerprint());
     }
 
-    public function testMissingRuntimeValueCannotFallBackToFullDefaults(): void
+    public function testMissingRuntimeValueCannotFallBackToTranscodeDefaults(): void
     {
         foreach (['phpHeapMiB', 'scheduledConsoleMiB'] as $key) {
             $document = $this->document();
@@ -70,19 +96,32 @@ final class ImageProfileTest extends TestCase
         ImageProfile::fromArray($document);
     }
 
+    public function testEarlierProfileDocumentsCannotBeHydrated(): void
+    {
+        $document = $this->document();
+        $document['version'] = 1;
+        $this->expectException(\InvalidArgumentException::class);
+        ImageProfile::fromArray($document);
+    }
+
     public function testInImageProgramReportsTheApplicationProfile(): void
     {
         $program = new \ReflectionClassConstant(ImageProfile::class, 'PROGRAM')->getValue();
         self::assertIsString($program);
         $root = dirname(__DIR__, 3);
-        foreach (['household', 'full'] as $identifier) {
-            $document = $this->runProgram($program, [$identifier, $root, '', '', '', '']);
+        foreach ([
+            'remux' => [self::remuxSettings(), new DeploymentProfile('remux', 2, 4, 1, sharedCopySlots: 2)],
+            'transcode' => [self::transcodeSettings(), new DeploymentProfile()],
+        ] as $capability => [$settings, $expected]) {
+            $document = $this->runProgram($program, [json_encode($settings, JSON_THROW_ON_ERROR), $root]);
             self::assertSame(['version', 'deployment', 'autoscaling', 'runtime'], array_keys($document));
+            self::assertSame(2, $document['version']);
             self::assertSame(['phpHeapMiB', 'phpProcessMemoryMiB', 'nativeManagerHeapMiB', 'nativeCommandLimit', 'nativeResultLimit', 'nativeClientLimit', 'mediaHelperLimit', 'scheduledConsoleMiB'], array_keys($document['runtime']));
             self::assertSame($document['runtime']['phpProcessMemoryMiB'], $document['runtime']['scheduledConsoleMiB']);
             $profile = ImageProfile::fromArray($document);
-            self::assertSame($identifier, $profile->deployment['identifier']);
-            self::assertSame(new \App\Shared\Application\DTO\DeploymentProfile($identifier)->webWorkers, $profile->webWorkers);
+            self::assertSame($capability, $profile->deployment['capability']);
+            self::assertSame($expected->webWorkers, $profile->webWorkers);
+            self::assertEquals($expected, DeploymentProfile::fromJson(json_encode($document['deployment'], JSON_THROW_ON_ERROR)));
         }
     }
 
@@ -92,31 +131,32 @@ final class ImageProfileTest extends TestCase
         self::assertIsString($program);
         $root = dirname(__DIR__, 3);
 
-        $configured = ImageProfile::fromArray($this->runProgram($program, ['full', $root, '4', '0', '', '']));
+        $configured = ImageProfile::fromArray($this->runProgram($program, [json_encode(self::transcodeSettings(['videoEncoderSlots' => 4, 'audioEncoderSlots' => 0]), JSON_THROW_ON_ERROR), $root]));
         self::assertSame([4, 0], [$configured->deployment['videoEncoderSlots'], $configured->deployment['audioEncoderSlots']]);
-        $expected = new \App\Shared\Application\DTO\DeploymentProfile('full', 4, 0);
+        $expected = new DeploymentProfile(videoEncoderSlots: 4, audioEncoderSlots: 0);
         self::assertSame(
             [$expected->nativeCommandLimit(), $expected->nativeResultLimit(), $expected->nativeClientLimit()],
             [$configured->runtime['nativeCommandLimit'], $configured->runtime['nativeResultLimit'], $configured->runtime['nativeClientLimit']],
         );
 
-        $defaults = ImageProfile::fromArray($this->runProgram($program, ['full', $root, '', '', '', '']));
+        $defaults = ImageProfile::fromArray($this->runProgram($program, [json_encode(self::transcodeSettings(), JSON_THROW_ON_ERROR), $root]));
         self::assertSame([8, 12], [$defaults->deployment['videoEncoderSlots'], $defaults->deployment['audioEncoderSlots']]);
         self::assertNotSame($defaults->fingerprint(), $configured->fingerprint());
     }
 
-    public function testInImageProgramRejectsSlotsBeyondTheirBoundWithTheReason(): void
+    public function testInImageProgramRejectsSettingsBeyondTheirBoundWithTheReason(): void
     {
         $program = new \ReflectionClassConstant(ImageProfile::class, 'PROGRAM')->getValue();
         self::assertIsString($program);
-        $executor = new EngineExecutor(ExecutionContext::bounded(30, getenv()));
-        try {
-            $result = $executor->run(new ProcessSpec([PHP_BINARY, '-r', $program, 'full', dirname(__DIR__, 3), '146', '', '', '']), new CompletionPolicy([2]));
-        } finally {
-            $executor->close();
+        foreach ([
+            [self::transcodeSettings(['videoEncoderSlots' => 146]), 'at most 145 video slots'],
+            [self::transcodeSettings(['webWorkers' => 17]), 'between 1 and 16 web workers'],
+            [self::remuxSettings(['sharedCopySlots' => 9]), 'between 1 and 8 copy slots'],
+        ] as [$settings, $reason]) {
+            $result = $this->runFailingProgram($program, [json_encode($settings, JSON_THROW_ON_ERROR), dirname(__DIR__, 3)]);
+            self::assertSame('', $result->stdout);
+            self::assertStringContainsString($reason, $result->stderr);
         }
-        self::assertSame('', $result->stdout);
-        self::assertStringContainsString('at most 145 video slots', $result->stderr);
     }
 
     public function testInImageProgramCarriesTheHardwareEncoderAndItsVideoDefault(): void
@@ -124,24 +164,22 @@ final class ImageProfileTest extends TestCase
         $program = new \ReflectionClassConstant(ImageProfile::class, 'PROGRAM')->getValue();
         self::assertIsString($program);
         $root = dirname(__DIR__, 3);
+        $vaapi = ['accelerator' => 'vaapi', 'device' => '/dev/dri/renderD128'];
 
-        $hardware = ImageProfile::fromArray($this->runProgram($program, ['full', $root, '', '', 'vaapi', '/dev/dri/renderD128']));
-        $expected = new \App\Shared\Application\DTO\DeploymentProfile('full', hardware: new \App\Shared\Application\DTO\HardwareEncoder('vaapi', '/dev/dri/renderD128'));
-        self::assertSame(['accelerator' => 'vaapi', 'device' => '/dev/dri/renderD128'], $hardware->deployment['hardware']);
+        $hardware = ImageProfile::fromArray($this->runProgram($program, [json_encode(self::transcodeSettings(['hardware' => $vaapi]), JSON_THROW_ON_ERROR), $root]));
+        $expected = new DeploymentProfile(hardware: new HardwareEncoder('vaapi', '/dev/dri/renderD128'));
+        self::assertSame($vaapi, $hardware->deployment['hardware']);
         self::assertSame($expected->videoEncoderSlots, $hardware->deployment['videoEncoderSlots']);
-        self::assertEquals($expected, \App\Shared\Application\DTO\DeploymentProfile::fromJson(json_encode($hardware->deployment, JSON_THROW_ON_ERROR)));
-        self::assertNotSame(ImageProfile::fromArray($this->runProgram($program, ['full', $root, '', '', '', '']))->fingerprint(), $hardware->fingerprint());
+        self::assertEquals($expected, DeploymentProfile::fromJson(json_encode($hardware->deployment, JSON_THROW_ON_ERROR)));
+        self::assertNotSame(ImageProfile::fromArray($this->runProgram($program, [json_encode(self::transcodeSettings(), JSON_THROW_ON_ERROR), $root]))->fingerprint(), $hardware->fingerprint());
 
-        $nvenc = ImageProfile::fromArray($this->runProgram($program, ['full', $root, '4', '12', 'nvenc', '']));
+        $nvenc = ImageProfile::fromArray($this->runProgram($program, [json_encode(self::transcodeSettings(['videoEncoderSlots' => 4, 'audioEncoderSlots' => 12, 'hardware' => ['accelerator' => 'nvenc', 'device' => null]]), JSON_THROW_ON_ERROR), $root]));
         self::assertSame(['accelerator' => 'nvenc', 'device' => null], $nvenc->deployment['hardware']);
 
-        $executor = new EngineExecutor(ExecutionContext::bounded(30, getenv()));
-        try {
-            $result = $executor->run(new ProcessSpec([PHP_BINARY, '-r', $program, 'full', $root, '', '', 'vaapi', '']), new CompletionPolicy([2]));
-        } finally {
-            $executor->close();
-        }
-        self::assertStringContainsString('requires a device path', $result->stderr);
+        $missingDevice = $this->runFailingProgram($program, [json_encode(self::transcodeSettings(['hardware' => ['accelerator' => 'vaapi', 'device' => null]]), JSON_THROW_ON_ERROR), $root]);
+        self::assertStringContainsString('requires a device path', $missingDevice->stderr);
+        $remux = $this->runFailingProgram($program, [json_encode(self::remuxSettings(['hardware' => $vaapi]), JSON_THROW_ON_ERROR), $root]);
+        self::assertStringContainsString('no hardware encoder', $remux->stderr);
     }
 
     public function testHydrationRequiresAWellFormedHardwareEncoder(): void
@@ -178,10 +216,21 @@ final class ImageProfileTest extends TestCase
         return $document;
     }
 
-    public function testUnknownProfileCannotBeHydrated(): void
+    /** @param list<string> $arguments */
+    private function runFailingProgram(string $program, array $arguments): ProcessResult
+    {
+        $executor = new EngineExecutor(ExecutionContext::bounded(30, getenv()));
+        try {
+            return $executor->run(new ProcessSpec([PHP_BINARY, '-r', $program, ...$arguments]), new CompletionPolicy([2]));
+        } finally {
+            $executor->close();
+        }
+    }
+
+    public function testUnknownCapabilityCannotBeHydrated(): void
     {
         $document = $this->document();
-        $document['deployment']['identifier'] = 'unknown';
+        $document['deployment']['capability'] = 'unknown';
         $this->expectException(\InvalidArgumentException::class);
         ImageProfile::fromArray($document);
     }
@@ -192,18 +241,9 @@ final class ImageProfileTest extends TestCase
             $image = 'sha256:' . str_repeat('a', 64);
             $layout = ApplicationLayout::fromArray(['version' => 1, 'root' => '/srv/baander']);
             $measurement = ContainerMeasurement::prepare(['directory' => $directory . '/measurements', 'namespace' => 'fixture', 'boot_id' => 'owner'], 'profile-application', $image);
-            $profile = ImageProfile::resolve($docker, $image, $layout, 'household', $directory . '/resources.json', getenv(), 5, measurement: $measurement);
+            $profile = ImageProfile::resolve($docker, $image, $layout, self::remuxSettings(), $directory . '/resources.json', getenv(), 5, measurement: $measurement);
             self::assertSame(320, $profile->scheduledConsoleMiB);
-            $calls = file($directory . '/calls.jsonl', FILE_IGNORE_NEW_LINES);
-            self::assertIsArray($calls);
-            $created = null;
-            foreach ($calls as $line) {
-                $arguments = json_decode($line, true, flags: JSON_THROW_ON_ERROR);
-                if ($arguments[0] === 'create') {
-                    $created = $arguments;
-                }
-            }
-            self::assertIsArray($created);
+            $created = $this->created($directory);
             self::assertContains($image, $created);
             self::assertSame('none', $created[array_search('--network', $created, true) + 1]);
             self::assertContains('--read-only', $created);
@@ -214,47 +254,57 @@ final class ImageProfileTest extends TestCase
                 self::assertNotContains($limit, $created);
             }
             self::assertSame('/srv/baander', $created[array_search('--workdir', $created, true) + 1]);
-            self::assertSame(['household', '/srv/baander', '', '', '', ''], array_slice($created, -6));
+            self::assertSame([json_encode(self::remuxSettings(), JSON_THROW_ON_ERROR), '/srv/baander'], array_slice($created, -2));
             self::assertFileDoesNotExist($directory . '/resources.json');
             self::assertSame([], glob($directory . '/resource-*.json'));
         });
     }
 
-    public function testResolvePassesConfiguredSlotsAndRejectsAnImageThatIgnoresThem(): void
+    public function testResolveRejectsAnImageThatEchoesOtherSettings(): void
+    {
+        foreach ([
+            'copy slots' => self::remuxSettings(['sharedCopySlots' => 3]),
+            'web workers' => self::remuxSettings(['webWorkers' => 3]),
+            'video slots' => self::remuxSettings(['videoEncoderSlots' => 1]),
+            'capability' => self::transcodeSettings(['webWorkers' => 2, 'doctrinePoolSlots' => 4, 'ordinaryConsumerLimit' => 1]),
+            'hardware' => self::transcodeSettings(['hardware' => ['accelerator' => 'vaapi', 'device' => '/dev/dri/renderD128']]),
+        ] as $case => $settings) {
+            $this->withDocker(function (Client $docker, string $directory) use ($case, $settings): void {
+                try {
+                    ImageProfile::resolve($docker, 'sha256:' . str_repeat('a', 64), ApplicationLayout::fromArray(['version' => 1, 'root' => '/srv/baander']), $settings, $directory . '/resources.json', getenv(), 5);
+                    self::fail('Accepted an image profile with other ' . $case . '.');
+                } catch (\RuntimeException $error) {
+                    self::assertSame('The image returned a different deployment profile.', $error->getMessage(), $case);
+                }
+                self::assertSame(json_encode($settings, JSON_THROW_ON_ERROR), array_slice($this->created($directory), -2)[0], $case);
+            });
+        }
+    }
+
+    public function testResolveRejectsAnUnknownCapabilityBeforeRunningTheImage(): void
     {
         $this->withDocker(function (Client $docker, string $directory): void {
             try {
-                ImageProfile::resolve($docker, 'sha256:' . str_repeat('a', 64), ApplicationLayout::fromArray(['version' => 1, 'root' => '/srv/baander']), 'household', $directory . '/resources.json', getenv(), 5, videoSlots: 3, audioSlots: 0);
-                self::fail('Accepted a profile without the requested slots.');
-            } catch (\RuntimeException $error) {
-                self::assertSame('The image returned a different deployment profile.', $error->getMessage());
+                ImageProfile::resolve($docker, 'sha256:' . str_repeat('a', 64), ApplicationLayout::load(), self::remuxSettings(['capability' => 'unknown']), $directory . '/resources.json', getenv(), 5);
+                self::fail('Resolved an unknown capability.');
+            } catch (\InvalidArgumentException) {
+                self::assertFileDoesNotExist($directory . '/calls.jsonl');
             }
-            $created = null;
-            foreach (file($directory . '/calls.jsonl', FILE_IGNORE_NEW_LINES) ?: [] as $line) {
-                $arguments = json_decode($line, true, flags: JSON_THROW_ON_ERROR);
-                if ($arguments[0] === 'create') {
-                    $created = $arguments;
-                }
-            }
-            self::assertIsArray($created);
-            self::assertSame(['household', '/srv/baander', '3', '0', '', ''], array_slice($created, -6));
         });
     }
 
-    public function testResolveRejectsNegativeSlotsBeforeRunningTheImage(): void
+    /** @return list<string> The arguments of the fixture daemon's container creation. */
+    private function created(string $directory): array
     {
-        $this->withDocker(function (Client $docker, string $directory): void {
-            $this->expectException(\InvalidArgumentException::class);
-            ImageProfile::resolve($docker, 'sha256:' . str_repeat('a', 64), ApplicationLayout::load(), 'full', $directory . '/resources.json', getenv(), 5, audioSlots: -1);
-        });
-    }
-
-    public function testResolveRejectsAnImageReturningAnotherProfile(): void
-    {
-        $this->withDocker(function (Client $docker, string $directory): void {
-            $this->expectException(\RuntimeException::class);
-            ImageProfile::resolve($docker, 'sha256:' . str_repeat('a', 64), ApplicationLayout::load(), 'full', $directory . '/resources.json', getenv(), 5);
-        });
+        $created = null;
+        foreach (file($directory . '/calls.jsonl', FILE_IGNORE_NEW_LINES) ?: [] as $line) {
+            $arguments = json_decode($line, true, flags: JSON_THROW_ON_ERROR);
+            if ($arguments[0] === 'create') {
+                $created = $arguments;
+            }
+        }
+        self::assertIsArray($created);
+        return $created;
     }
 
     private function withDocker(\Closure $test): void

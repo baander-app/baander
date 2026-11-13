@@ -55,7 +55,7 @@ final readonly class WorkerConfiguration
         clearstatcache(true, $device);
         $status = @stat($device);
         if ($status === false || !in_array(@filetype($device), ['char', 'block'], true)) {
-            throw new \RuntimeException('The hardware encoder device ' . $device . ' is not a device node on this host; set media.hardware.group to override its group.');
+            throw new \RuntimeException('The hardware encoder device ' . $device . ' is not a device node on this host; set hardware.group to override its group.');
         }
         return $status['gid'];
     }

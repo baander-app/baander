@@ -177,14 +177,8 @@ final readonly class DeploymentContainerRecipe
             || ($environmentFile !== null && (!str_starts_with($environmentFile, '/') || str_contains($environmentFile, "\0")))) {
             throw new InvalidArgumentException('Runtime configuration requires an absolute private environment file.');
         }
-        $profileArguments = [];
-        foreach (['BAANDER_DEPLOYMENT_PROFILE' => $this->deploymentProfile->identifier,
-            'BAANDER_DEPLOYMENT_PROFILE_JSON' => $this->deploymentProfile->toJson()] as $key => $value) {
-            if (!array_key_exists($key, $this->runtimeEnvironment->variables)) {
-                $profileArguments[] = '--env';
-                $profileArguments[] = $key . '=' . $value;
-            }
-        }
+        $profileArguments = array_key_exists('BAANDER_DEPLOYMENT_PROFILE', $this->runtimeEnvironment->variables)
+            ? [] : ['--env', 'BAANDER_DEPLOYMENT_PROFILE=' . $this->deploymentProfile->toJson()];
 
         return [
             'container', 'create', '--pull=never', '--name', RegisteredDeploymentStart::containerName($this->namespace, $this->bootId, $this->unit),

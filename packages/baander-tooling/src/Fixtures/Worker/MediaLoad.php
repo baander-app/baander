@@ -25,7 +25,6 @@ final class MediaLoad
     public const float LEASE_DEADLINE_SECONDS = 1.5;
     /** A media child's native request fails once the daemon has not answered within this many seconds. */
     public const float NATIVE_RPC_DEADLINE_SECONDS = 1.0;
-    public const int SUPERUSER_SLOTS = 3;
     private const string DIRECT_URL = 'postgresql://baander:test-only@postgres:5432/worker_operator_test?serverVersion=18&charset=utf8';
     /** Clients beyond the application pool that keep every server connection busy in short transactions. */
     private const int SATURATING_EXTRA_CLIENTS = 2;
@@ -92,7 +91,7 @@ final class MediaLoad
             // pooled request, the web's included, queues for one.
             $saturator = $docker->start(
                 ['exec', $checkpoint->postgres, 'env', 'PGPASSWORD=test-only', 'sh', '-ec', self::SATURATOR, 'sh',
-                    (string) (Pooler::POOLS['full']['application'] + self::SATURATING_EXTRA_CLIENTS), (string) self::SAMPLER_SECONDS],
+                    (string) (Pooler::defaultPools()['application'] + self::SATURATING_EXTRA_CLIENTS), (string) self::SAMPLER_SECONDS],
                 timeout: self::SAMPLER_SECONDS,
                 logPath: $artifacts . '/saturator.log',
                 stderrLogPath: $artifacts . '/saturator.log.stderr',
@@ -475,9 +474,9 @@ final class MediaLoad
         }
         Reports::require(is_string($pooler) && $pooler !== '', 'The pooler address is missing');
         $samples = self::databaseSamples(Reports::text($artifacts . '/database-samples.txt'), $pooler, $wallOffset);
-        $pools = Pooler::POOLS['full'];
+        $pools = Pooler::defaultPools();
         $limits = ['application' => $pools['application'], 'control' => $pools['control'], 'direct' => $pools['direct'],
-            'total' => $pools['application'] + $pools['control'] + $pools['direct'], 'maxConnections' => Pooler::maxConnections($pools, self::SUPERUSER_SLOTS)];
+            'total' => $pools['application'] + $pools['control'] + $pools['direct'], 'maxConnections' => Pooler::maxConnections($pools)];
         $peak = static fn(array $samples, string $key): int => $samples === [] ? 0 : max(array_map(static fn(array $sample): int => $sample['backends'][$key], $samples));
         $run = array_values(array_filter($samples, static fn(array $sample): bool => $start <= $sample['monotonic'] && $sample['monotonic'] <= $end));
         $poolPeak = static function (array $samples, string $database, string $field): int {

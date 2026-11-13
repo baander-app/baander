@@ -52,17 +52,17 @@ final class AudioRenditionExecutorTest extends TestCase
         rmdir($this->root);
     }
 
-    public function testHouseholdRejectsRecoveredEncodeWithoutStartingOrDeferringIt(): void
+    public function testRemuxRejectsRecoveredEncodeWithoutStartingOrDeferringIt(): void
     {
         $runtime = $this->createMock(AudioRenditionRuntimePort::class);
         $runtime->expects(self::never())->method('start');
         $runtime->expects(self::never())->method('defer');
         $runtime->expects(self::never())->method('complete');
-        $runtime->expects(self::once())->method('fail')->with($this->claim, 'Audio and video encoding is unavailable in the household deployment profile.')->willReturn(true);
+        $runtime->expects(self::once())->method('fail')->with($this->claim, 'Audio and video encoding is unavailable in a remux deployment.')->willReturn(true);
         $client = $this->createMock(NativeExecutionClientInterface::class);
         $client->expects(self::never())->method('submit');
         ProcessExecutor::configureNativeExecution($client);
-        $policy = new MediaExecutionPolicy(new DeploymentProfile('household'));
+        $policy = new MediaExecutionPolicy(new DeploymentProfile('remux', 2, 4, 1, sharedCopySlots: 2));
         (new AudioRenditionExecutor($policy, $runtime, new NullLogger(), $this->settings(), new StubAacImplementationProbe(), $this->encoder))->run($this->claim, static fn (): bool => false);
         self::assertDirectoryDoesNotExist($this->claim->runtime->generationDirectory());
     }
@@ -75,7 +75,7 @@ final class AudioRenditionExecutorTest extends TestCase
         $runtime->method('start')->willReturn(true);
         $runtime->expects(self::once())->method('fail')->with($this->claim, 'Native execution is unavailable.')->willReturn(true);
         $runtime->expects(self::never())->method('complete');
-        (new AudioRenditionExecutor(new MediaExecutionPolicy(new DeploymentProfile('full')), $runtime, new NullLogger(), $this->settings(), new StubAacImplementationProbe(), $this->encoder))->run($this->claim, static fn (): bool => false);
+        (new AudioRenditionExecutor(new MediaExecutionPolicy(new DeploymentProfile()), $runtime, new NullLogger(), $this->settings(), new StubAacImplementationProbe(), $this->encoder))->run($this->claim, static fn (): bool => false);
         self::assertFileDoesNotExist($this->root . '/ran');
     }
 
@@ -117,11 +117,11 @@ final class AudioRenditionExecutorTest extends TestCase
         $runtime->expects(self::once())->method('complete')->willReturn(true);
         $runtime->expects(self::never())->method('fail');
         ProcessExecutor::configureNativeExecution($client);
-        (new AudioRenditionExecutor(new MediaExecutionPolicy(new DeploymentProfile('full')), $runtime, new NullLogger(), $this->settings(), new StubAacImplementationProbe(), '/usr/bin/ffmpeg'))->run($this->claim, static fn (): bool => false);
+        (new AudioRenditionExecutor(new MediaExecutionPolicy(new DeploymentProfile()), $runtime, new NullLogger(), $this->settings(), new StubAacImplementationProbe(), '/usr/bin/ffmpeg'))->run($this->claim, static fn (): bool => false);
         self::assertSame('remote audio', file_get_contents($this->final()));
     }
 
-    public function testHouseholdCopiesVerifiedSelectedAacIntoCompletedMp4(): void
+    public function testRemuxCopiesVerifiedSelectedAacIntoCompletedMp4(): void
     {
         $source = $this->claim->runtime->input->sourcePath;
         $sourceHash = hash_file('xxh3', $source);
@@ -153,7 +153,7 @@ final class AudioRenditionExecutorTest extends TestCase
         $runtime->method('withOwnership')->willReturnCallback(static function (AudioRenditionClaim $claim, callable $publish): bool { $publish(); return true; });
         $runtime->expects(self::once())->method('complete')->willReturn(true);
         $runtime->expects(self::never())->method('fail');
-        $policy = new MediaExecutionPolicy(new DeploymentProfile('household'));
+        $policy = new MediaExecutionPolicy(new DeploymentProfile('remux', 2, 4, 1, sharedCopySlots: 2));
         (new AudioRenditionExecutor($policy, $runtime, new NullLogger(), $this->settings(), new StubAacImplementationProbe(), '/usr/bin/ffmpeg'))->run($this->claim, static fn (): bool => false);
         self::assertCount(2, $commands);
         self::assertContains('0:3', $commands[1]);
@@ -177,7 +177,7 @@ final class AudioRenditionExecutorTest extends TestCase
         $runtime->method('renew')->willReturn(true);
         $runtime->expects(self::once())->method('fail')->with($this->claim, 'The admitted audio source changed before copying.')->willReturn(true);
         $runtime->expects(self::never())->method('complete');
-        $policy = new MediaExecutionPolicy(new DeploymentProfile('household'));
+        $policy = new MediaExecutionPolicy(new DeploymentProfile('remux', 2, 4, 1, sharedCopySlots: 2));
         (new AudioRenditionExecutor($policy, $runtime, new NullLogger(), $this->settings(), new StubAacImplementationProbe(), '/usr/bin/ffmpeg'))->run($this->claim, static fn (): bool => false);
         self::assertFileDoesNotExist($this->final());
     }
@@ -197,7 +197,7 @@ final class AudioRenditionExecutorTest extends TestCase
         $runtime->method('renew')->willReturn(true);
         $runtime->expects(self::once())->method('fail')->with($this->claim, 'The selected source stream is not AAC audio.')->willReturn(true);
         $runtime->expects(self::never())->method('complete');
-        $policy = new MediaExecutionPolicy(new DeploymentProfile('household'));
+        $policy = new MediaExecutionPolicy(new DeploymentProfile('remux', 2, 4, 1, sharedCopySlots: 2));
         (new AudioRenditionExecutor($policy, $runtime, new NullLogger(), $this->settings(), new StubAacImplementationProbe(), '/usr/bin/ffmpeg'))->run($this->claim, static fn (): bool => false);
         self::assertFileDoesNotExist($this->final());
     }
@@ -225,7 +225,7 @@ final class AudioRenditionExecutorTest extends TestCase
         $runtime->expects(self::once())->method('fail')->with($this->claim, 'Audio rendition worker lost ownership.')->willReturn(true);
         $runtime->expects(self::never())->method('complete');
         ProcessExecutor::configureNativeExecution($client);
-        (new AudioRenditionExecutor(new MediaExecutionPolicy(new DeploymentProfile('full')), $runtime, new NullLogger(), $this->settings(), new StubAacImplementationProbe(), '/usr/bin/ffmpeg'))->run($this->claim, static fn (): bool => false);
+        (new AudioRenditionExecutor(new MediaExecutionPolicy(new DeploymentProfile()), $runtime, new NullLogger(), $this->settings(), new StubAacImplementationProbe(), '/usr/bin/ffmpeg'))->run($this->claim, static fn (): bool => false);
         self::assertFileDoesNotExist($this->final());
     }
 
@@ -239,7 +239,7 @@ final class AudioRenditionExecutorTest extends TestCase
         $runtime->expects(self::never())->method('complete');
         ProcessExecutor::configureNativeExecution($client);
         $this->expectException(NativeExecutionException::class);
-        (new AudioRenditionExecutor(new MediaExecutionPolicy(new DeploymentProfile('full')), $runtime, new NullLogger(), $this->settings(), new StubAacImplementationProbe(), '/usr/bin/ffmpeg'))->run($this->claim, static fn (): bool => false);
+        (new AudioRenditionExecutor(new MediaExecutionPolicy(new DeploymentProfile()), $runtime, new NullLogger(), $this->settings(), new StubAacImplementationProbe(), '/usr/bin/ffmpeg'))->run($this->claim, static fn (): bool => false);
     }
 
     public function testSuccessfulEncodePublishesOnlyInsideTheOwnershipFence(): void
@@ -258,7 +258,7 @@ final class AudioRenditionExecutorTest extends TestCase
             return true;
         });
         $runtime->expects(self::never())->method('fail');
-        (new AudioRenditionExecutor(new MediaExecutionPolicy(new DeploymentProfile('full')), $runtime, new NullLogger(), $this->settings(), new StubAacImplementationProbe(), $this->encoder))->run($this->claim, static fn (): bool => false);
+        (new AudioRenditionExecutor(new MediaExecutionPolicy(new DeploymentProfile()), $runtime, new NullLogger(), $this->settings(), new StubAacImplementationProbe(), $this->encoder))->run($this->claim, static fn (): bool => false);
         self::assertFileDoesNotExist($this->final() . '.part');
     }
 
@@ -272,7 +272,7 @@ final class AudioRenditionExecutorTest extends TestCase
             $runtime = $this->createMock(AudioRenditionRuntimePort::class);
             $runtime->expects(self::once())->method('defer')->willReturn(true);
             $runtime->expects(self::never())->method('start');
-            (new AudioRenditionExecutor(new MediaExecutionPolicy(new DeploymentProfile('full')), $runtime, new NullLogger(), $this->settings(), new StubAacImplementationProbe(), $this->encoder))->run($this->claim, static fn (): bool => false);
+            (new AudioRenditionExecutor(new MediaExecutionPolicy(new DeploymentProfile()), $runtime, new NullLogger(), $this->settings(), new StubAacImplementationProbe(), $this->encoder))->run($this->claim, static fn (): bool => false);
             self::assertFileDoesNotExist($this->root . '/ran');
         } finally {
             flock($lock, LOCK_UN);
@@ -289,7 +289,7 @@ final class AudioRenditionExecutorTest extends TestCase
         $runtime->method('withOwnership')->willReturn(false);
         $runtime->expects(self::never())->method('complete');
         $runtime->method('fail')->willReturn(false);
-        (new AudioRenditionExecutor(new MediaExecutionPolicy(new DeploymentProfile('full')), $runtime, new NullLogger(), $this->settings(), new StubAacImplementationProbe(), $this->encoder))->run($this->claim, static fn (): bool => false);
+        (new AudioRenditionExecutor(new MediaExecutionPolicy(new DeploymentProfile()), $runtime, new NullLogger(), $this->settings(), new StubAacImplementationProbe(), $this->encoder))->run($this->claim, static fn (): bool => false);
         self::assertFileDoesNotExist($this->final());
     }
 
@@ -299,7 +299,7 @@ final class AudioRenditionExecutorTest extends TestCase
         $runtime = $this->createMock(AudioRenditionRuntimePort::class);
         $runtime->expects(self::once())->method('fail')->with($this->claim, self::stringContains('source changed'))->willReturn(true);
         $runtime->expects(self::never())->method('start');
-        (new AudioRenditionExecutor(new MediaExecutionPolicy(new DeploymentProfile('full')), $runtime, new NullLogger(), $this->settings(), new StubAacImplementationProbe(), $this->encoder))->run($this->claim, static fn (): bool => false);
+        (new AudioRenditionExecutor(new MediaExecutionPolicy(new DeploymentProfile()), $runtime, new NullLogger(), $this->settings(), new StubAacImplementationProbe(), $this->encoder))->run($this->claim, static fn (): bool => false);
     }
 
     public function testStopKillsAndReapsTheRemoteEncoderAttempt(): void
@@ -311,7 +311,7 @@ final class AudioRenditionExecutorTest extends TestCase
         $runtime->expects(self::once())->method('defer')->willReturn(true);
         $runtime->expects(self::never())->method('complete');
         $start = microtime(true);
-        (new AudioRenditionExecutor(new MediaExecutionPolicy(new DeploymentProfile('full')), $runtime, new NullLogger(), $this->settings(), new StubAacImplementationProbe(), $this->encoder))->run($this->claim, fn (): bool => is_file($this->root . '/pid'));
+        (new AudioRenditionExecutor(new MediaExecutionPolicy(new DeploymentProfile()), $runtime, new NullLogger(), $this->settings(), new StubAacImplementationProbe(), $this->encoder))->run($this->claim, fn (): bool => is_file($this->root . '/pid'));
         self::assertLessThan(3, microtime(true) - $start);
         $pid = (int) file_get_contents($this->root . '/pid');
         self::assertDirectoryDoesNotExist('/proc/' . $pid);
@@ -325,7 +325,7 @@ final class AudioRenditionExecutorTest extends TestCase
         $runtime->method('renew')->willReturn(true);
         $runtime->expects(self::once())->method('fail')->with($this->claim, self::stringContains('code 7: invalid input'))->willReturn(true);
         $runtime->expects(self::never())->method('complete');
-        (new AudioRenditionExecutor(new MediaExecutionPolicy(new DeploymentProfile('full')), $runtime, new NullLogger(), $this->settings(), new StubAacImplementationProbe(), $this->encoder))->run($this->claim, static fn (): bool => false);
+        (new AudioRenditionExecutor(new MediaExecutionPolicy(new DeploymentProfile()), $runtime, new NullLogger(), $this->settings(), new StubAacImplementationProbe(), $this->encoder))->run($this->claim, static fn (): bool => false);
         self::assertFileDoesNotExist($this->final());
         self::assertFileDoesNotExist($this->final() . '.part');
     }
@@ -338,7 +338,7 @@ final class AudioRenditionExecutorTest extends TestCase
         $runtime->method('renew')->willReturn(true);
         $runtime->expects(self::once())->method('fail')->willReturn(true);
         $runtime->expects(self::never())->method('complete');
-        (new AudioRenditionExecutor(new MediaExecutionPolicy(new DeploymentProfile('full')), $runtime, new NullLogger(), $this->settings(), new StubAacImplementationProbe(), $this->encoder))->run($this->claim, static fn (): bool => false);
+        (new AudioRenditionExecutor(new MediaExecutionPolicy(new DeploymentProfile()), $runtime, new NullLogger(), $this->settings(), new StubAacImplementationProbe(), $this->encoder))->run($this->claim, static fn (): bool => false);
         self::assertFileDoesNotExist($this->final());
     }
 
@@ -373,7 +373,7 @@ final class AudioRenditionExecutorTest extends TestCase
         $runtime->method('withOwnership')->willReturnCallback(static function (AudioRenditionClaim $claim, callable $publish): bool { $publish(); return true; });
         $runtime->expects(self::once())->method('complete')->willReturn(true);
         $runtime->expects(self::never())->method('fail');
-        (new AudioRenditionExecutor(new MediaExecutionPolicy(new DeploymentProfile('full')), $runtime, new NullLogger(), $this->settings($implementation), new StubAacImplementationProbe(), '/usr/bin/ffmpeg'))->run($this->claim, static fn (): bool => false);
+        (new AudioRenditionExecutor(new MediaExecutionPolicy(new DeploymentProfile()), $runtime, new NullLogger(), $this->settings($implementation), new StubAacImplementationProbe(), '/usr/bin/ffmpeg'))->run($this->claim, static fn (): bool => false);
         self::assertCount(2, $commands);
         self::assertSame('/usr/bin/ffprobe', $commands[0][0]);
         self::assertContains('a:0', $commands[0]);
@@ -433,7 +433,7 @@ final class AudioRenditionExecutorTest extends TestCase
         $runtime->expects(self::once())->method('fail')->with($this->claim, 'AAC implementation "Bånder Audio Core" is not available in this FFmpeg build', AacImplementation::Bac)->willReturn(true);
         $runtime->expects(self::never())->method('complete');
         $probe = new StubAacImplementationProbe(['libfdk_aac', 'aac'], ['libfdk_aac', 'aac']);
-        (new AudioRenditionExecutor(new MediaExecutionPolicy(new DeploymentProfile('full')), $runtime, new NullLogger(), $this->settings(), $probe, '/usr/bin/ffmpeg'))->run($this->claim, static fn (): bool => false);
+        (new AudioRenditionExecutor(new MediaExecutionPolicy(new DeploymentProfile()), $runtime, new NullLogger(), $this->settings(), $probe, '/usr/bin/ffmpeg'))->run($this->claim, static fn (): bool => false);
         self::assertCount(1, $commands, 'only the source probe ran');
         self::assertSame('/usr/bin/ffprobe', $commands[0][0]);
         self::assertFileDoesNotExist($this->final());
@@ -461,7 +461,7 @@ final class AudioRenditionExecutorTest extends TestCase
         });
         $copyClient->method('release')->willReturn(true);
         ProcessExecutor::configureNativeExecution($copyClient);
-        (new AudioRenditionExecutor(new MediaExecutionPolicy(new DeploymentProfile('full')), $runtime, new NullLogger(), $this->settings(), $probe, '/usr/bin/ffmpeg'))->run($this->claim, static fn (): bool => false);
+        (new AudioRenditionExecutor(new MediaExecutionPolicy(new DeploymentProfile()), $runtime, new NullLogger(), $this->settings(), $probe, '/usr/bin/ffmpeg'))->run($this->claim, static fn (): bool => false);
         self::assertSame('copied AAC', file_get_contents($this->final()));
     }
 

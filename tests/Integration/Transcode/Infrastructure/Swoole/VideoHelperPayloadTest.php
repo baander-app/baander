@@ -27,7 +27,7 @@ final class VideoHelperPayloadTest extends TestCase
         });
         $client->method('inspect')->willReturn(['state' => 'exited', 'exitCode' => 0, 'stdout' => '{}']);
         $client->method('release')->willReturn(true);
-        $facade = new TranscodeProcessPool($client, new NullLogger(), new JsonEncoder(), new \App\Shared\Application\DTO\DeploymentProfile('full'));
+        $facade = new TranscodeProcessPool($client, new NullLogger(), new JsonEncoder(), new \App\Shared\Application\DTO\DeploymentProfile());
         $job = TranscodeJob::create(Uuid::generate(), QualityTier::p720(), '/cache', Uuid::generate());
         $first = $facade->probeVideo($job, '/media/source with spaces.mkv', 1);
         $replacement = $facade->probeVideo($job, '/media/source with spaces.mkv', 2);
@@ -57,7 +57,7 @@ final class VideoHelperPayloadTest extends TestCase
         $client->method('submit')->willReturn(new NativeExecutionHandle(str_repeat('b', 64), 1));
         $client->method('inspect')->willReturn(['state' => 'unknown']);
         $client->expects(self::never())->method('release');
-        $facade = new TranscodeProcessPool($client, new NullLogger(), new JsonEncoder(), new \App\Shared\Application\DTO\DeploymentProfile('full'));
+        $facade = new TranscodeProcessPool($client, new NullLogger(), new JsonEncoder(), new \App\Shared\Application\DTO\DeploymentProfile());
         $job = TranscodeJob::create(Uuid::generate(), QualityTier::p720(), '/cache', Uuid::generate());
         $key = $facade->probeVideo($job, '/media/source.mkv', 1);
         $this->expectException(NativeExecutionException::class);

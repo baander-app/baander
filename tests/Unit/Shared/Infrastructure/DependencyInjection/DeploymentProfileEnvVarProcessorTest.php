@@ -12,14 +12,12 @@ use PHPUnit\Framework\TestCase;
 final class DeploymentProfileEnvVarProcessorTest extends TestCase
 {
     #[DataProvider('profileSettings')]
-    public function testWebCapacityUsesTheSelectedProfile(string $identifier, int $workers, int $connections): void
+    public function testWebCapacityUsesTheConfiguredSize(string $serialized, int $workers, int $connections): void
     {
         $processor = new DeploymentProfileEnvVarProcessor();
-        $environment = static fn (string $name): string => match ($name) {
-            'BAANDER_DEPLOYMENT_PROFILE' => $identifier,
-            'BAANDER_DEPLOYMENT_PROFILE_JSON' => '',
-            default => throw new \LogicException('Unexpected environment lookup.'),
-        };
+        $environment = static fn (string $name): string => $name === 'BAANDER_DEPLOYMENT_PROFILE'
+            ? $serialized
+            : throw new \LogicException('Unexpected environment lookup.');
 
         self::assertSame($workers, $processor->getEnv('baander_web_workers', 'BAANDER_DEPLOYMENT_PROFILE', $environment));
         self::assertSame($connections, $processor->getEnv('baander_doctrine_slots', 'BAANDER_DEPLOYMENT_PROFILE', $environment));
@@ -28,23 +26,15 @@ final class DeploymentProfileEnvVarProcessorTest extends TestCase
     /** @return iterable<string, array{string, int, int}> */
     public static function profileSettings(): iterable
     {
-        yield 'full' => ['full', 4, 10];
-        yield 'household' => ['household', 2, 4];
+        yield 'unset default' => ['', 4, 10];
+        yield 'remux at four gigabytes' => [new DeploymentProfile('remux', 2, 4, 1, sharedCopySlots: 2)->toJson(), 2, 4];
+        yield 'one web worker' => [new DeploymentProfile(webWorkers: 1, doctrinePoolSlots: 3)->toJson(), 1, 3];
     }
 
-    public function testUnknownProfileCannotStartWebWorkers(): void
+    public function testRetiredProfileNameCannotStartWebWorkers(): void
     {
         $processor = new DeploymentProfileEnvVarProcessor();
         $this->expectException(\InvalidArgumentException::class);
-        $processor->getEnv('baander_web_workers', 'BAANDER_DEPLOYMENT_PROFILE', static fn (string $name): string => $name === 'BAANDER_DEPLOYMENT_PROFILE' ? 'unknown' : '');
-    }
-
-    public function testWebCapacityRejectsConflictingInheritedSettings(): void
-    {
-        $serialized = new DeploymentProfile('full')->toJson();
-        $environment = static fn (string $name): string => $name === 'BAANDER_DEPLOYMENT_PROFILE' ? 'household' : $serialized;
-
-        $this->expectException(\InvalidArgumentException::class);
-        new DeploymentProfileEnvVarProcessor()->getEnv('baander_web_workers', 'BAANDER_DEPLOYMENT_PROFILE', $environment);
+        $processor->getEnv('baander_web_workers', 'BAANDER_DEPLOYMENT_PROFILE', static fn (string $name): string => 'full');
     }
 }

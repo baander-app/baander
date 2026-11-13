@@ -17,9 +17,9 @@ use Symfony\Component\Serializer\Encoder\JsonEncoder;
 
 final class TranscodeProcessPoolTest extends TestCase
 {
-    #[\PHPUnit\Framework\Attributes\TestWith(['household'])]
-    #[\PHPUnit\Framework\Attributes\TestWith(['full'])]
-    public function testHelpersQueueUntilThePreviousNativeAttemptIsReleased(string $profile): void
+    #[\PHPUnit\Framework\Attributes\TestWith(['remux'])]
+    #[\PHPUnit\Framework\Attributes\TestWith(['transcode'])]
+    public function testHelpersQueueUntilThePreviousNativeAttemptIsReleased(string $capability): void
     {
         $submitted = [];
         $released = [];
@@ -33,7 +33,7 @@ final class TranscodeProcessPoolTest extends TestCase
             $released[] = $handle->attempt;
             return true;
         });
-        $pool = new TranscodeProcessPool($client, new NullLogger(), new JsonEncoder(), new DeploymentProfile($profile));
+        $pool = new TranscodeProcessPool($client, new NullLogger(), new JsonEncoder(), $capability === 'remux' ? new DeploymentProfile('remux', 2, 4, 1, sharedCopySlots: 2) : new DeploymentProfile());
         $job = TranscodeJob::create(Uuid::generate(), QualityTier::p720(), '/cache', Uuid::generate());
         $first = $pool->probeVideo($job, '/media/first.mkv', 1);
         $second = $pool->probeVideo($job, '/media/second.mkv', 2);
@@ -54,7 +54,7 @@ final class TranscodeProcessPoolTest extends TestCase
         $client->expects(self::once())->method('signal')->willReturn(['state' => 'exited']);
         $client->method('inspect')->willReturn(['state' => 'exited', 'stdout' => '', 'stderr' => '', 'exitCode' => 0, 'cpuSeconds' => 0.0]);
         $client->expects(self::once())->method('release')->willReturn(true);
-        $pool = new TranscodeProcessPool($client, new NullLogger(), new JsonEncoder(), new DeploymentProfile('household'));
+        $pool = new TranscodeProcessPool($client, new NullLogger(), new JsonEncoder(), new DeploymentProfile('remux', 2, 4, 1, sharedCopySlots: 2));
         $job = TranscodeJob::create(Uuid::generate(), QualityTier::p720(), '/cache', Uuid::generate());
         $pool->probeVideo($job, '/media/first.mkv', 1);
         $pool->probeVideo($job, '/media/second.mkv', 2);

@@ -185,7 +185,7 @@ final class HealthCheckServiceTest extends TestCase
         $connection->method('executeQuery')->willReturn($result);
         $connection->method('fetchAllAssociative')->willReturn([[
             'namespace' => 'workers.baander.app', 'boot_id' => str_repeat('a', 32),
-            'deployment_profile_fingerprint' => (new DeploymentProfile('full', 4, 12))->fingerprint(),
+            'deployment_profile_fingerprint' => (new DeploymentProfile(videoEncoderSlots: 4, audioEncoderSlots: 12))->fingerprint(),
         ]]);
         ini_set('memory_limit', '1G');
         $table = $this->memoryTable();
@@ -251,7 +251,7 @@ final class HealthCheckServiceTest extends TestCase
             vapidPublicKey: '',
             vapidPrivateKey: '',
             messengerWorkerHealth: $messenger ?? new MessengerWorkerHealth($redis, new MockClock(), new HealthAlertTable()),
-            workerProfileHealth: new WorkerProfileHealth($connection, new DeploymentProfile('full')),
+            workerProfileHealth: new WorkerProfileHealth($connection, new DeploymentProfile()),
             workerMemory: $workerMemory ?? new WorkerMemoryTable(),
             apiKeys: $apiKeys,
         );

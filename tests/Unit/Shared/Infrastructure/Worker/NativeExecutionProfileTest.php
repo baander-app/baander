@@ -11,7 +11,7 @@ use PHPUnit\Framework\TestCase;
 
 final class NativeExecutionProfileTest extends TestCase
 {
-    public function testHouseholdHandshakeReportsItsEnforcedLimits(): void
+    public function testRemuxHandshakeReportsItsEnforcedLimits(): void
     {
         $reply = $this->handshake();
         self::assertTrue($reply['ok']);
@@ -22,6 +22,13 @@ final class NativeExecutionProfileTest extends TestCase
     public function testContradictoryLimitsFailBeforeClientAdmission(): void
     {
         $reply = $this->handshake(['limits' => ['commands' => 8, 'results' => 32, 'clients' => 64]]);
+        self::assertFalse($reply['ok']);
+        self::assertStringContainsString('authority mismatch', $reply['error']);
+    }
+
+    public function testPeerWithOtherDeploymentSettingsIsRefused(): void
+    {
+        $reply = $this->handshake(['deploymentProfile' => new DeploymentProfile('remux', 3, 4, 1, sharedCopySlots: 2)->toJson()]);
         self::assertFalse($reply['ok']);
         self::assertStringContainsString('authority mismatch', $reply['error']);
     }
@@ -39,7 +46,7 @@ final class NativeExecutionProfileTest extends TestCase
      */
     private function handshake(array $overrides = []): array
     {
-        $profile = new DeploymentProfile('household');
+        $profile = new DeploymentProfile('remux', 2, 4, 1, sharedCopySlots: 2);
         $daemon = new NativeExecutionDaemon('baander.app:workers', str_repeat('a', 32), 1, $profile);
         $request = array_replace(['id' => str_repeat('b', 32), 'namespace' => 'baander.app:workers', 'bootId' => str_repeat('a', 32),
             'epoch' => 1, 'clientId' => 'media-copy-0', 'generation' => 1, 'operation' => 'handshake',

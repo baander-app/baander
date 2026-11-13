@@ -29,7 +29,7 @@ final class WorkerAutoscalingProfileTest extends TestCase
     {
         $this->expectException(\InvalidArgumentException::class);
         new WorkerRuntimeConfiguration('worker.baander.app', str_repeat('a', 32), 'execution', 0, '/tmp/worker-locks', '/run/baander-worker',
-            new \App\Shared\Application\DTO\DeploymentProfile('household'), new WorkerAutoscalingProfile(maximumConcurrency: 2));
+            new \App\Shared\Application\DTO\DeploymentProfile('remux', 2, 4, 1, sharedCopySlots: 2), new WorkerAutoscalingProfile(maximumConcurrency: 2));
     }
 
     public function testPolicyRejectsInvalidBoundsAndInconsistentTiming(): void

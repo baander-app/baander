@@ -375,7 +375,7 @@ final class TranscodeSessionOwnershipPersistenceTest extends TestCase
         $settings = $this->createStub(\App\Shared\Application\Port\SystemSettingsPortInterface::class);
         $settings->method('get')->willReturn('fdk_aac');
         $handler = new \App\Transcode\Application\CommandHandler\CreateTranscodeSessionHandler(
-            new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile('full')),
+            new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile()),
             $jobService, $sessionService, $storage, $runtime, $transaction, $sleeper, $presentations, $settings,
         );
         $security = $this->createStub(\Symfony\Bundle\SecurityBundle\Security::class);

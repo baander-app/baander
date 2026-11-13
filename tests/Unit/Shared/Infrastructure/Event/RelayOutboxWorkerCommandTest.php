@@ -31,7 +31,7 @@ final class RelayOutboxWorkerCommandTest extends TestCase
     #[DataProvider('profiles')]
     #[RunInSeparateProcess]
     #[PreserveGlobalState(false)]
-    public function testBatchRecyclingUsesTheDeploymentHeap(string $profile, int $expectedBatches): void
+    public function testBatchRecyclingUsesTheDeploymentHeap(string $capability, int $expectedBatches): void
     {
         ini_set('memory_limit', '512M');
         $allocation = str_repeat('x', 196 * 1024 * 1024);
@@ -48,7 +48,8 @@ final class RelayOutboxWorkerCommandTest extends TestCase
         $manager = $this->createMock(ObjectManager::class);
         $registry = $this->createStub(ManagerRegistry::class);
         $registry->method('getManager')->willReturn($manager);
-        $command = new RelayOutboxWorkerCommand($events, $deliveries, $registry, new NullLogger(), new DeploymentProfile($profile));
+        $command = new RelayOutboxWorkerCommand($events, $deliveries, $registry, new NullLogger(),
+            $capability === 'remux' ? new DeploymentProfile('remux', 2, 4, 1, sharedCopySlots: 2) : new DeploymentProfile());
         $batches = 0;
         $manager->expects($this->exactly($expectedBatches))->method('clear')->willReturnCallback(static function () use (&$batches, $command): void {
             if (++$batches === 2) {
@@ -64,7 +65,7 @@ final class RelayOutboxWorkerCommandTest extends TestCase
     /** @return iterable<string, array{string, int}> */
     public static function profiles(): iterable
     {
-        yield 'household continues below 256 MiB' => ['household', 2];
-        yield 'full continues below 256 MiB' => ['full', 2];
+        yield 'remux continues below 256 MiB' => ['remux', 2];
+        yield 'transcode continues below 256 MiB' => ['transcode', 2];
     }
 }

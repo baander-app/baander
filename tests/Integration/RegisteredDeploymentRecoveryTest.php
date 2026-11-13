@@ -330,7 +330,7 @@ final class RegisteredDeploymentRecoveryTest extends TestCase
 
     private function recipe(DeploymentUnit $unit, string $ipcVolume = 'worker-ipc'): \App\Shared\Infrastructure\Worker\DeploymentContainerRecipe
     {
-        return new \App\Shared\Infrastructure\Worker\DeploymentContainerRecipe(self::NAMESPACE, self::BOOT, self::DAEMON, 'sha256:' . str_repeat('f', 64), ['/usr/local/bin/php', '/app/bin/worker.php'], 'none', $unit, $ipcVolume, '/app', new \App\Shared\Application\DTO\DeploymentProfile('full'));
+        return new \App\Shared\Infrastructure\Worker\DeploymentContainerRecipe(self::NAMESPACE, self::BOOT, self::DAEMON, 'sha256:' . str_repeat('f', 64), ['/usr/local/bin/php', '/app/bin/worker.php'], 'none', $unit, $ipcVolume, '/app', new \App\Shared\Application\DTO\DeploymentProfile());
     }
 
     /** @return array{control:\App\Shared\Infrastructure\Worker\DeploymentContainerRecipe,execution:\App\Shared\Infrastructure\Worker\DeploymentContainerRecipe} */

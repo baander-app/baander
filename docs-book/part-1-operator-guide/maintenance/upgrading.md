@@ -15,24 +15,32 @@ lease expiry is insufficient. Resolve these through the old controller while its
 schema is still installed. Preserve the database, pending work and media; no reset
 is required or authorized by this upgrade.
 
-Version 8 manifests require `sourceMountPolicy`, the complete startup
+Version 9 manifests require `sourceMountPolicy`, the complete startup
 `deploymentProfile`, the ordinary autoscaling profile and `deviceGroup`. They carry
-no per-unit memory, CPU, PID or CPU-set fields. The selected startup profile must
-agree with web and the worker runtime environment. The new controller refuses
+no per-unit memory, CPU, PID or CPU-set fields. The profile names its `capability`,
+`transcode` or `remux`, in place of the former profile identifier. The selected
+startup profile must agree with web and the worker runtime environment, which
+carry it as JSON in the single `BAANDER_DEPLOYMENT_PROFILE` variable. The new controller refuses
 earlier manifest versions, including recovery actions. Keep the old checkout,
 controller, manifest and credentials to retire an existing pair before switching
 code. Confirm both units' retirement and the joint reservation release, then create
-a version 8 manifest with a fresh boot ID, the new image and
+a version 9 manifest with a fresh boot ID, the new image and
 `sourceMountPolicy: production` for the named-volume recipe. Lease expiry or a
 stopped container is insufficient. Preserve the database, pending work and media.
 This manifest change requires no data reset and provides no compatibility path.
 
 The source-installation procedure below uses the `dc` shell function. For the
 managed complete-stack preset, keep its private state directory and use
-`scripts/deploy-household.php` to replace the deployment. Select `full` or
-`household` in its configuration; a later `start` retires the old pair and stops the
-saved services before starting the selected release. `stop` retains named data
-volumes. See [Deployment profiles](../configuration/deployment-profiles.md#deployment-profiles).
+`scripts/deploy-preset.php` to replace the deployment. Set the capability and size
+in its configuration; a later `start` retires the old pair and stops the saved
+services before starting the selected release. `stop` retains named data volumes.
+See [Deployment capability and size](../configuration/deployment-profiles.md#deployment-capability-and-size).
+
+A preset started with the earlier household tooling cannot be replaced this way.
+Its state directory, configuration format and volume ownership labels belong to that
+tooling, and `scripts/deploy-preset.php` refuses them. Stop it with the checkout
+that started it, then start the new preset under a fresh name and state directory;
+move data only through [backup and recovery](backup-and-recovery.md).
 
 Use the `dc` function and private environment file defined in
 [Getting Started](../getting-started/installation.md#1-prepare-configuration-and-the-browser-address).
@@ -145,7 +153,7 @@ playback owners without rewriting the initial migration or existing histories.
 the control/execution journals and joint retirement barrier. It is irreversible.
 `Version20261021120000` retains the last observed availability of indexed source
 files and is also irreversible.
-New deployments require a version 8 manifest with a private IPC volume and
+New deployments require a version 9 manifest with a private IPC volume and
 complete deployment and autoscaling profiles, and with no unit limits or CPU sets;
 earlier manifest versions are refused. Every profile field is fingerprinted in
 both recipes. Changing thresholds, concurrency or the startup profile requires

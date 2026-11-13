@@ -14,30 +14,49 @@ use PHPUnit\Framework\TestCase;
 final class MediaExecutionPolicyTest extends TestCase
 {
     #[DataProvider('operations')]
-    public function testFullProfilePermitsAllOperations(MediaOperation $operation): void
+    public function testTranscodeDeploymentPermitsAllOperations(MediaOperation $operation): void
     {
-        $policy = new MediaExecutionPolicy(new DeploymentProfile('full'));
+        $policy = new MediaExecutionPolicy(new DeploymentProfile());
         $policy->assertAllowed($operation);
         self::assertTrue($policy->permits($operation));
     }
 
     #[DataProvider('operations')]
-    public function testHouseholdSharedCopyPoolPermitsBothCopiesButNoEncoding(MediaOperation $operation): void
+    public function testRemuxDeploymentCopiesBothKindsButRefusesEncoding(MediaOperation $operation): void
     {
-        $policy = new MediaExecutionPolicy(new DeploymentProfile('household'));
+        $policy = new MediaExecutionPolicy(new DeploymentProfile('remux', 2, 4, 1, sharedCopySlots: 8));
         if ($operation === MediaOperation::AudioEncode || $operation === MediaOperation::VideoEncode) {
             self::assertFalse($policy->permits($operation));
             $this->expectException(MediaEncodingProhibitedException::class);
-            $this->expectExceptionMessage('Audio and video encoding is unavailable in the household deployment profile.');
+            $this->expectExceptionMessage('Audio and video encoding is unavailable in a remux deployment.');
         } else {
             self::assertTrue($policy->permits($operation));
         }
         $policy->assertAllowed($operation);
     }
 
-    public function testFullProfileWithZeroAudioSlotsRefusesAudioEncodesAndCopiesOnly(): void
+    public function testRemuxRefusalCarriesTheEncodingProhibitedReason(): void
     {
-        $policy = new MediaExecutionPolicy(new DeploymentProfile('full', 2, 0));
+        try {
+            (new MediaExecutionPolicy(new DeploymentProfile('remux', sharedCopySlots: 1)))->assertAllowed(MediaOperation::VideoEncode);
+            self::fail('A remux deployment must refuse video encoding.');
+        } catch (MediaEncodingProhibitedException $exception) {
+            self::assertSame(['reason' => 'encoding_prohibited'], $exception->details);
+        }
+    }
+
+    public function testTranscodeDeploymentAtTheSmallestSizeAdmitsVideoEncoding(): void
+    {
+        $policy = new MediaExecutionPolicy(new DeploymentProfile(webWorkers: 2, doctrinePoolSlots: 4, ordinaryConsumerLimit: 1, videoEncoderSlots: 1, audioEncoderSlots: 2));
+
+        $policy->assertAllowed(MediaOperation::VideoEncode);
+        self::assertTrue($policy->permits(MediaOperation::VideoEncode));
+        self::assertTrue($policy->permits(MediaOperation::AudioEncode));
+    }
+
+    public function testTranscodeDeploymentWithZeroAudioSlotsRefusesAudioEncodesAndCopiesOnly(): void
+    {
+        $policy = new MediaExecutionPolicy(new DeploymentProfile(videoEncoderSlots: 2, audioEncoderSlots: 0));
 
         self::assertFalse($policy->permits(MediaOperation::AudioEncode));
         self::assertFalse($policy->permits(MediaOperation::AudioStreamCopy));
@@ -48,9 +67,18 @@ final class MediaExecutionPolicyTest extends TestCase
         $policy->assertAllowed(MediaOperation::AudioStreamCopy);
     }
 
-    public function testFullProfileWithZeroVideoSlotsRefusesVideoEncodesAndCopiesOnly(): void
+    public function testTranscodeDeploymentWithZeroAudioSlotsNamesTheMissingKindForAudioEncodes(): void
     {
-        $policy = new MediaExecutionPolicy(new DeploymentProfile('full', 0, 4));
+        $policy = new MediaExecutionPolicy(new DeploymentProfile(videoEncoderSlots: 2, audioEncoderSlots: 0));
+
+        $this->expectException(MediaEncodingProhibitedException::class);
+        $this->expectExceptionMessage('Audio encoding and stream copy are unavailable because the deployment runs no audio slots.');
+        $policy->assertAllowed(MediaOperation::AudioEncode);
+    }
+
+    public function testTranscodeDeploymentWithZeroVideoSlotsRefusesVideoEncodesAndCopiesOnly(): void
+    {
+        $policy = new MediaExecutionPolicy(new DeploymentProfile(videoEncoderSlots: 0, audioEncoderSlots: 4));
 
         self::assertFalse($policy->permits(MediaOperation::VideoEncode));
         self::assertFalse($policy->permits(MediaOperation::VideoStreamCopy));

@@ -188,23 +188,23 @@ deptrac:
           type: directory
           value: /packages/baander-tooling/src/Fixtures/Startup/
     -
-      name: FixturesHousehold
+      name: FixturesQualification
       collectors:
         -
           type: classLike
-          value: ^Baander\\Tooling\\Fixtures\\Household\\
+          value: ^Baander\\Tooling\\Fixtures\\Qualification\\
         -
           type: directory
-          value: /packages/baander-tooling/src/Fixtures/Household/
+          value: /packages/baander-tooling/src/Fixtures/Qualification/
     -
       name: Fixtures
       collectors:
         -
           type: classLike
-          value: '^Baander\\Tooling\\Fixtures\\(?!Http\\|Web\\|Worker\\|Messaging\\|Startup\\|Household\\)'
+          value: '^Baander\\Tooling\\Fixtures\\(?!Http\\|Web\\|Worker\\|Messaging\\|Startup\\|Qualification\\)'
         -
           type: directory
-          value: '/packages/baander-tooling/src/Fixtures/(?!Http/|Web/|Worker/|Messaging/|Startup/|Household/)'
+          value: '/packages/baander-tooling/src/Fixtures/(?!Http/|Web/|Worker/|Messaging/|Startup/|Qualification/)'
     -
       name: Registry
       collectors:
@@ -381,7 +381,7 @@ deptrac:
       - Configuration
       - Filesystem
       - Fixtures
-    FixturesHousehold:
+    FixturesQualification:
       - Build
       - Configuration
       - Deployment
@@ -433,7 +433,7 @@ deptrac:
       - Filesystem
       - Fixtures
       - FixturesHttp
-      - FixturesHousehold
+      - FixturesQualification
       - FixturesMessaging
       - FixturesStartup
       - FixturesWeb
@@ -459,7 +459,7 @@ deptrac:
       - Filesystem
       - Fixtures
       - FixturesHttp
-      - FixturesHousehold
+      - FixturesQualification
       - FixturesMessaging
       - FixturesWeb
       - FixturesWorker

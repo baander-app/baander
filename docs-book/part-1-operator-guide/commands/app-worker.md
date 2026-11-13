@@ -6,7 +6,7 @@ coordination. Execution runs resident ordinary `async` consumers, one separate
 `scheduler` consumer and the native execution daemon.
 Native probes, encoders, CPU helpers and scheduled console children run in
 execution. The host `bin/worker-deployment.php` supplies the options from a version
-8 manifest; see [Worker deployment](../workers/worker-deployment.md).
+9 manifest; see [Worker deployment](../workers/worker-deployment.md).
 
 ## Quick start
 
@@ -25,8 +25,8 @@ start, stop, replacement and uncertain outcomes.
 | `--boot-id` | `BAANDER_WORKER_BOOT_ID` | Fresh 32-character hexadecimal boot identity |
 | `--unit` | `BAANDER_WORKER_UNIT` | Required unit identity: `control` or `execution` |
 | `--scheduled-console-mib` | `0` | Execution reservation for one synchronous scheduled console child; `0` disables it, otherwise at least 320 MiB; control requires `0` |
-| `--deployment-profile` | — | Required complete startup profile JSON; it must agree with the runtime environment and version 8 manifest |
-| `--autoscaling-profile` | — | Required complete ordinary-admission profile JSON from the version 8 manifest; all fields bind both unit recipes |
+| `--deployment-profile` | — | Required complete startup profile JSON; it must agree with the runtime environment and version 9 manifest |
+| `--autoscaling-profile` | — | Required complete ordinary-admission profile JSON from the version 9 manifest; all fields bind both unit recipes |
 | `--lock-dir` | `/tmp/baander-worker-locks` | Private unit lock directory |
 | `--ipc-dir` | `/run/baander-worker` | Private IPC directory shared by the pair |
 
@@ -34,10 +34,11 @@ start, stop, replacement and uncertain outcomes.
 
 When the environment sets `BAANDER_WORKER_NAMESPACE`, `BAANDER_WORKER_BOOT_ID` or `BAANDER_WORKER_UNIT`, the matching option must be absent or equal to it. The scheduled console value is whole MiB up to 1048576. The command has no memory or PID options: the worker units run without Docker memory, CPU or PID limits and without CPU sets, and the supervisor admits no work against a memory or PID budget. Its child ceiling follows from the profile: the fixed roles, the media manager with one child per slot, one local helper per consumer, the scheduled console child and the lease helper. The command refuses to start when PostgreSQL's default time zone is not UTC.
 
-The deployment profile is fixed at startup. `full` allows up to four ordinary
-consumers and encoding in its configured video and audio slots; `household` allows one ordinary consumer and two shared
-copy jobs, with no audio or video encoding. Web and workers must select the same
-profile. Profile replacement requires retirement and a new admitted boot.
+The deployment profile is fixed at startup. It carries the capability and the
+size: up to four ordinary consumers, and either `transcode` encoding in the
+configured video and audio slots or `remux` stream copy in the configured shared
+copy slots, with no audio or video encoding. Web and workers must run the same
+profile. Changing capability or size requires retirement and a new admitted boot.
 
 Execution starts `consumer-0` through `consumer-(maximumConcurrency - 1)` for
 `async`, plus one separate `scheduler` consumer. Every ordinary slot remains
@@ -50,7 +51,7 @@ limits, and updates admission through boot/epoch-fenced IPC; it does not consume
 ordinary work.
 
 The [manifest reference](../workers/worker-deployment.md#autoscaling-and-ordinary-consumers) defines profile bounds and
-the measured `full` maximum-two example and its workload limits. Missing
+the measured maximum-two example and its workload limits. Missing
 measurements prevent growth and reduce ordinary admission to at most one. Severe memory/PID pressure closes admission;
 recovery needs fresh samples. Status exposes slot counts, decision reason and
 freshness without treating missing consumers as idle.
@@ -79,9 +80,9 @@ peer failure and the 35-second drain deadline; the
 startup admission deadline. A `worker_supervisor_stopped` log entry is neither
 a readiness result nor a containment receipt.
 
-The `full` media coordinator admits at most the profile's video and audio slots,
-8 and 12 by default; see [Media slots](../configuration/deployment-profiles.md#media-slots). In
-`household`, audio and video copy jobs share two slots. Completed artifacts can
+Under `transcode`, the media coordinator admits at most the profile's video and
+audio slots, 8 and 12 by default; see [Media slots](../configuration/deployment-profiles.md#media-slots).
+Under `remux`, audio and video copy jobs share the configured copy slots. Completed artifacts can
 be delivered without a producer, but their reuse never authorizes re-encoding.
 Each job uses a fresh kernel in control and sends bounded native requests over
 the private Unix socket to execution. Hardware probing, FFmpeg, video CPU helpers

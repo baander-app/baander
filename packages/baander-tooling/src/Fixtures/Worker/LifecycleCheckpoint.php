@@ -126,9 +126,9 @@ final readonly class LifecycleCheckpoint
             static fn(int|string $field): bool => preg_match('/\A(control|execution)(MemoryMiB|NanoCpus|PidsLimit|CpuSet)\z/D', (string) $field) === 1,
         );
         $this->qualification->expect(
-            ($manifest['version'] ?? null) === 8 && ($manifest['autoscaling']['maximumConcurrency'] ?? null) === 2
-            && ($expected['identifier'] ?? null) === 'full' && $profile === $expected && $limits === [],
-            'Lifecycle requires the two-slot full-profile worker pair without container limits',
+            ($manifest['version'] ?? null) === 9 && ($manifest['autoscaling']['maximumConcurrency'] ?? null) === 2
+            && ($expected['capability'] ?? null) === 'transcode' && $profile === $expected && $limits === [],
+            'Lifecycle requires the two-slot transcode worker pair without container limits',
         );
     }
 

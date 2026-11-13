@@ -69,7 +69,7 @@ final class VideoCopyPresentationTest extends TestCase
                 '-force_key_frames', '0,2.92,8.20,11.16,14.76', '-vf', 'setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709',
                 '-c:a', 'aac', '-output_ts_offset', '3.25', $source]);
             $fixture->mustRun();
-            $profile = new DeploymentProfile('household');
+            $profile = new DeploymentProfile('remux', 2, 4, 1, sharedCopySlots: 2);
             $native = new NativeExecutionFixture('baander.app:test', str_repeat('c', 32), profile: $profile);
             $video = Video::create($source, hash_file('xxh3', $source));
             $selection = new PresentationSelection('copy', $video->getHash(), 0, $hasAudio ? 1 : null, 'mp4');
@@ -97,7 +97,7 @@ final class VideoCopyPresentationTest extends TestCase
             $logger = new NullLogger();
             $manager = new TranscodeStreamManager($this->createStub(SegmentAvailabilityInterface::class), $storage, $encoder, $logger, new NativeProcessSpawner($native->client));
             $worker = new TranscodeSessionSubscriber(new MediaExecutionPolicy($profile), $jobs, $sessions, $storage,
-                new TranscodeProcessPool($native->client, $logger, new JsonEncoder(), new DeploymentProfile('full')), $encoder, $videos, $logger, $ownership, $ownership, $manager, new \App\Tests\Support\StubAacImplementationProbe(), $timer);
+                new TranscodeProcessPool($native->client, $logger, new JsonEncoder(), new DeploymentProfile()), $encoder, $videos, $logger, $ownership, $ownership, $manager, new \App\Tests\Support\StubAacImplementationProbe(), $timer);
             $worker->run($claim, static fn(): bool => false);
             self::assertSame(TranscodeStatus::Completed, $job->getStatus(), json_encode([$outcomes, $job->getFailReason()]));
             self::assertContains('ready', $outcomes);

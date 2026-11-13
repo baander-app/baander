@@ -88,7 +88,7 @@ final class CopyPresentationServiceTest extends TestCase
         $sleeper = $this->createMock(SleeperInterface::class);
         $sleeper->expects(self::exactly(50))->method('sleep')->with(0.1);
         $service = new CopyPresentationService(
-            new MediaExecutionPolicy(new DeploymentProfile('household')),
+            new MediaExecutionPolicy(new DeploymentProfile('remux', 2, 4, 1, sharedCopySlots: 2)),
             $jobs,
             $sessions,
             $storage,

@@ -17,7 +17,7 @@ final class WorkerProfileHealthTest extends TestCase
     public function testHealthReportsAWorkerBootStartedWithAnotherProfile(): void
     {
         $web = $this->webProfile();
-        $workers = new DeploymentProfile('full', 4, 12);
+        $workers = new DeploymentProfile(videoEncoderSlots: 4, audioEncoderSlots: 12);
         self::assertNotSame($web->fingerprint(), $workers->fingerprint());
         $this->activeBoot($workers->fingerprint());
 

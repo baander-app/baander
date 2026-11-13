@@ -336,18 +336,18 @@ final class AudioRenditionCacheTest extends TestCase
         file_put_contents($this->source, 'changed source');
     }
 
-    public function testHouseholdMissingArtifactIsTerminalWithoutAdmission(): void
+    public function testRemuxMissingArtifactIsTerminalWithoutAdmission(): void
     {
         $runtime = $this->createMock(AudioRenditionRuntimePort::class);
         $runtime->expects(self::never())->method('admit');
         $runtime->expects(self::never())->method('resetCompleted');
         $runtime->method('find')->willReturn(null);
-        $cache = new AudioRenditionCache(new MediaExecutionPolicy(new DeploymentProfile('household')), new SegmentFileResolver($this->root), $runtime, new NullLogger(), $this->settings());
+        $cache = new AudioRenditionCache(new MediaExecutionPolicy(new DeploymentProfile('remux', 2, 4, 1, sharedCopySlots: 2)), new SegmentFileResolver($this->root), $runtime, new NullLogger(), $this->settings());
         $this->expectException(\App\Transcode\Application\Exception\MediaEncodingProhibitedException::class);
         $cache->open('track', $this->source, AudioRenditionFormat::Mp3, 192000);
     }
 
-    public function testHouseholdServesCompletedArtifactWithoutAdmission(): void
+    public function testRemuxServesCompletedArtifactWithoutAdmission(): void
     {
         $format = AudioRenditionFormat::Mp3;
         $signature = $format->sourceSignature($this->source, 192000, filemtime($this->source), filesize($this->source));
@@ -357,7 +357,7 @@ final class AudioRenditionCacheTest extends TestCase
         $runtime->expects(self::never())->method('admit');
         $runtime->expects(self::never())->method('resetCompleted');
         $runtime->method('find')->willReturnCallback(fn (): AudioRenditionRuntimeSnapshot => $this->snapshot('complete'));
-        $cache = new AudioRenditionCache(new MediaExecutionPolicy(new DeploymentProfile('household')), new SegmentFileResolver($this->root), $runtime, new NullLogger(), $this->settings());
+        $cache = new AudioRenditionCache(new MediaExecutionPolicy(new DeploymentProfile('remux', 2, 4, 1, sharedCopySlots: 2)), new SegmentFileResolver($this->root), $runtime, new NullLogger(), $this->settings());
         self::assertSame('finished', file_get_contents($cache->open('track', $this->source, $format, 192000)->path));
     }
 
@@ -373,7 +373,7 @@ final class AudioRenditionCacheTest extends TestCase
 
     private function cache(float $startTimeoutSeconds = .01, string $aacImplementation = 'bac', ?AudioRenditionRuntimePort $runtime = null): AudioRenditionCache
     {
-        return new AudioRenditionCache(new MediaExecutionPolicy(new DeploymentProfile('full')), new SegmentFileResolver($this->root), $runtime ?? $this->runtime, new NullLogger(), $this->settings($aacImplementation), pollIntervalSeconds: .001, startTimeoutSeconds: $startTimeoutSeconds);
+        return new AudioRenditionCache(new MediaExecutionPolicy(new DeploymentProfile()), new SegmentFileResolver($this->root), $runtime ?? $this->runtime, new NullLogger(), $this->settings($aacImplementation), pollIntervalSeconds: .001, startTimeoutSeconds: $startTimeoutSeconds);
     }
 
     private function settings(string $aacImplementation = 'bac'): SystemSettingsPortInterface

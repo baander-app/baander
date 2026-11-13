@@ -21,8 +21,9 @@ evidence, environment adaptations and verification limits.
 - Git, Docker with Compose and Buildx, and OpenSSL for generating secrets.
 - A Linux Docker host with cgroup v2, a rootful Docker daemon with a local Unix
   socket, and enough CPU and memory for web, PostgreSQL, Redis, the worker pair and
-  the media jobs you run at once. Containers carry no resource limits; the full
-  profile's media slots, 8 video and 12 audio by default, bound media work.
+  the media jobs you run at once. Containers carry no resource limits; the media
+  slots bound media work, 8 video and 12 audio by default in a `transcode`
+  deployment.
   [System Requirements](system-requirements.md) gives the measured cost of each job
   and how to choose the slots for your host.
 - Host PHP 8.5 with Swoole for image-build tooling, Composer, and `posix` and
@@ -36,17 +37,22 @@ FFmpeg, Node and Corepack are supplied by the app image. The web frontend select
 its Yarn version from the repository's `packageManager` field.
 
 Read [Worker deployment](../workers/worker-deployment.md) before provisioning
-storage or choosing host resources. Its version 8 procedure is authoritative for
+storage or choosing host resources. Its version 9 procedure is authoritative for
 the worker manifest, credentials, volume ownership and admission checks.
 
-The separate [household deployment preset](../../../deploy/household/README.md)
-starts the complete stack with two web workers, one ordinary background consumer
-and two shared remux slots. It permits original playback and remuxing but prohibits
-audio and video re-encoding. A receiver that needs an incompatible codec converted
-cannot play that item through this profile; see [Transcoding](../media/transcoding.md).
+The separate [deployment preset](../../../deploy/preset/README.md) starts the
+complete stack from one private configuration that sets the
+[capability and size](../configuration/deployment-profiles.md#deployment-capability-and-size). It ships
+example configurations for 4, 8 and 16 GB hosts, each as `transcode` and as
+`remux`. A `remux` deployment permits original playback and stream copy but
+prohibits audio and video re-encoding, so a receiver that needs an incompatible
+codec converted cannot play that item; see [Transcoding](../media/transcoding.md).
 [System Requirements](system-requirements.md) lists the measured consumption and
-the per-job costs for choosing media slots. A 4 GB host and Raspberry Pi remain
-unqualified. The source installation below uses the full profile.
+the per-job costs for choosing media slots. No starting point is qualified yet:
+the 4 GB `remux` qualification is pending, the 8 and 16 GB starting points are
+unqualified guidance, and ARM hosts and the Raspberry Pi remain unqualified. The
+source installation below runs the default profile, `transcode` at the 16 GB
+starting point.
 
 ## Command context
 
@@ -334,7 +340,7 @@ proxy trust setting.
 
 Follow [Worker deployment](../workers/worker-deployment.md) to build the worker
 image, prepare its private IPC volume and credentials, and create and start the
-version 8 deployment from the host. First export the application layout selected by
+version 9 deployment from the host. First export the application layout selected by
 the builder in that host shell; the controller requires it when interpreting the
 manifest:
 

@@ -9,14 +9,14 @@ final class SourceExceptions
     /** @var list<array{path:string,rule:string,anchor:string,count:int,reason:string}> */
     private const array CALLSITES = [
         [
-            'path' => 'packages/baander-tooling/src/Fixtures/Household/NativeAudit.php',
+            'path' => 'packages/baander-tooling/src/Fixtures/Qualification/NativeAudit.php',
             'rule' => 'process-engine',
             'anchor' => 'pcntl_exec(REAL_EXECUTABLE, array_slice($argv, 1));',
             'count' => 1,
             'reason' => 'The fixture-only native shim replaces itself with the audited binary, preserving the worker-owned PID, signals and cgroup without starting another supervisor.',
         ],
         [
-            'path' => 'scripts/tests/php/HouseholdDeploymentTest.php',
+            'path' => 'scripts/tests/php/PresetDeploymentTest.php',
             'rule' => 'manual-loader',
             'anchor' => 'file_put_contents($console, \'<?php $_SERVER["APP_RUNTIME"] = "Symfony\\\\Component\\\\Runtime\\\\GenericRuntime"; require_once \'',
             'count' => 1,

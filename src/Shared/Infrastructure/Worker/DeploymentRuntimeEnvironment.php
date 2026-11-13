@@ -23,7 +23,7 @@ use Symfony\Component\DependencyInjection\Attribute\Exclude;
 final readonly class DeploymentRuntimeEnvironment implements JsonSerializable
 {
     private const array ALLOWED_KEYS = [
-        'BAANDER_DEPLOYMENT_PROFILE', 'BAANDER_DEPLOYMENT_PROFILE_JSON',
+        'BAANDER_DEPLOYMENT_PROFILE',
         'APP_ENV', 'APP_DEBUG', 'APP_SECRET', 'DATABASE_URL', 'DATABASE_CONTROL_URL', 'REDIS_URL',
         'REDIS_PASSWORD', 'MESSENGER_TRANSPORT_DSN', 'MAILER_DSN',
         'CONVERT_STORAGE_PATH', 'MEDIA_STORAGE_PATH',
@@ -32,6 +32,8 @@ final readonly class DeploymentRuntimeEnvironment implements JsonSerializable
         'MAIL_FROM_ADDRESS', 'MAIL_FROM_NAME',
         'VAPID_PRIVATE_KEY', 'VAPID_PUBLIC_KEY', 'STREAM_URL_HMAC_SECRET',
         'APP_URL', 'DEFAULT_URI',
+        // The managed preset turns OpenTelemetry export off unless the operator sets a collector.
+        'OTEL_ENABLED', 'OTEL_EXPORTER_OTLP_ENDPOINT',
     ];
 
     /** @var array<string,string> */

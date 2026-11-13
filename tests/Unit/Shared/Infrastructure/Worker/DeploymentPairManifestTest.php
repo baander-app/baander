@@ -48,7 +48,7 @@ final class DeploymentPairManifestTest extends TestCase
         $fields = self::fields();
         $fields['autoscaling']['maximumConcurrency'] = 4;
         self::assertSame(4, DeploymentOperatorManifest::fromJson(json_encode($fields, JSON_THROW_ON_ERROR), '/var/www/html')->autoscaling->maximumConcurrency);
-        $fields['deploymentProfile'] = json_decode((new \App\Shared\Application\DTO\DeploymentProfile('household'))->toJson(), true, flags: JSON_THROW_ON_ERROR);
+        $fields['deploymentProfile'] = json_decode((new \App\Shared\Application\DTO\DeploymentProfile('remux', 2, 4, 1, sharedCopySlots: 2))->toJson(), true, flags: JSON_THROW_ON_ERROR);
         $this->expectException(\InvalidArgumentException::class);
         DeploymentOperatorManifest::fromJson(json_encode($fields, JSON_THROW_ON_ERROR), '/var/www/html');
     }
@@ -56,22 +56,33 @@ final class DeploymentPairManifestTest extends TestCase
     public function testDeploymentProfileChangesBothRecipeFingerprints(): void
     {
         $fields = self::fields();
-        $full = DeploymentOperatorManifest::fromJson(json_encode($fields, JSON_THROW_ON_ERROR), '/var/www/html');
-        $fields['deploymentProfile'] = json_decode((new \App\Shared\Application\DTO\DeploymentProfile('household'))->toJson(), true, flags: JSON_THROW_ON_ERROR);
-        $household = DeploymentOperatorManifest::fromJson(json_encode($fields, JSON_THROW_ON_ERROR), '/var/www/html');
+        $transcode = DeploymentOperatorManifest::fromJson(json_encode($fields, JSON_THROW_ON_ERROR), '/var/www/html');
+        $profile = new \App\Shared\Application\DTO\DeploymentProfile('remux', 2, 4, 1, sharedCopySlots: 2);
+        $fields['deploymentProfile'] = json_decode($profile->toJson(), true, flags: JSON_THROW_ON_ERROR);
+        $remux = DeploymentOperatorManifest::fromJson(json_encode($fields, JSON_THROW_ON_ERROR), '/var/www/html');
         $environment = new DeploymentRuntimeEnvironment();
         foreach (DeploymentUnit::cases() as $unit) {
-            self::assertNotSame($full->recipe($unit, $environment)->fingerprint(), $household->recipe($unit, new DeploymentRuntimeEnvironment(['BAANDER_DEPLOYMENT_PROFILE' => 'household']))->fingerprint());
+            self::assertNotSame($transcode->recipe($unit, $environment)->fingerprint(),
+                $remux->recipe($unit, new DeploymentRuntimeEnvironment(['BAANDER_DEPLOYMENT_PROFILE' => $profile->toJson()]))->fingerprint());
         }
+    }
+
+    public function testWebEnvironmentWithAnotherCapabilityIsRefused(): void
+    {
+        $fields = self::fields();
+        $fields['deploymentProfile'] = json_decode((new \App\Shared\Application\DTO\DeploymentProfile('remux', 2, 4, 1, sharedCopySlots: 2))->toJson(), true, flags: JSON_THROW_ON_ERROR);
+        $remux = DeploymentOperatorManifest::fromJson(json_encode($fields, JSON_THROW_ON_ERROR), '/var/www/html');
         $this->expectException(\InvalidArgumentException::class);
-        $household->recipe(DeploymentUnit::Control, new DeploymentRuntimeEnvironment(['BAANDER_DEPLOYMENT_PROFILE' => 'full']));
+        $this->expectExceptionMessage('profiles must agree');
+        $remux->recipe(DeploymentUnit::Control, new DeploymentRuntimeEnvironment(['BAANDER_DEPLOYMENT_PROFILE' => (new \App\Shared\Application\DTO\DeploymentProfile())->toJson()]));
     }
 
     public function testPreviousManifestVersionIsRejected(): void
     {
         $fields = self::fields();
-        $fields['version'] = 6;
+        $fields['version'] = 8;
         $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('version must be 9');
         DeploymentOperatorManifest::fromJson(json_encode($fields, JSON_THROW_ON_ERROR), '/var/www/html');
     }
 
@@ -79,10 +90,10 @@ final class DeploymentPairManifestTest extends TestCase
     public static function fields(): array
     {
         return [
-            'version' => 8, 'sourceMountPolicy' => 'production', 'namespace' => 'operator.baander.app', 'bootId' => str_repeat('a', 32),
+            'version' => 9, 'sourceMountPolicy' => 'production', 'namespace' => 'operator.baander.app', 'bootId' => str_repeat('a', 32),
             'daemonId' => 'docker-daemon', 'imageId' => 'sha256:' . str_repeat('b', 64), 'network' => 'none',
             'dockerBinary' => '/usr/bin/docker', 'dockerEndpoint' => 'unix:///var/run/docker.sock',
-            'deploymentProfile' => json_decode((new \App\Shared\Application\DTO\DeploymentProfile('full'))->toJson(), true, flags: JSON_THROW_ON_ERROR),
+            'deploymentProfile' => json_decode((new \App\Shared\Application\DTO\DeploymentProfile())->toJson(), true, flags: JSON_THROW_ON_ERROR),
             'autoscaling' => json_decode((new \App\Shared\Application\DTO\WorkerAutoscalingProfile())->toJson(), true, flags: JSON_THROW_ON_ERROR),
             'deviceGroup' => null, 'scheduledConsoleMiB' => 320, 'ipcVolume' => 'worker-ipc',
             'mediaMounts' => [
