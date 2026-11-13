@@ -581,7 +581,10 @@ final class PresetDeploymentTest extends TestCase
         copy(__DIR__ . '/Fixtures/development-lifecycle-docker.php', $directory . '/docker');
         chmod($directory . '/docker', 0700);
         AtomicFile::writeJson($directory . '/daemon.json', ['daemonId' => 'owned-daemon']);
-        $actual = new EngineExecutor(ExecutionContext::bounded(10, getenv()));
+        // The two disposable runs make 24 process-group Docker calls. Each holds its group for
+        // the 250 ms descendant grace after exit and starts the fake Docker's own PHP, so the
+        // test needs about 10 s on a developer host; the budget allows three times that.
+        $actual = new EngineExecutor(ExecutionContext::bounded(30, getenv()));
         $executor = $this->createStub(CommandExecutor::class);
         $created = null;
         $executor->method('run')->willReturnCallback(static function (ProcessSpec $command, CompletionPolicy $policy) use ($actual, &$created): ProcessResult {
