@@ -16,7 +16,7 @@ through dnsmasq, mkcert, and a working systemd user manager. Docker must provide
 cgroup v2 and publish loopback port 443 for the invoking user. Each worker pair
 requires at least two daemon CPUs and 8448 MiB of daemon RAM; allow additional
 resources for web, dependencies and concurrent instances. Use Yarn for `ui/`
-workspaces; never run npm there (`tests/e2e` and `packages/baander-aac` use npm).
+workspaces; never run npm there (`tests/e2e` and `packages/baander-audio-core` use npm).
 
 The selected image stack uses PHP 8.5.12, Swoole 6.2.4 and Composer 2.11.1.
 The PHP ZTS application base, the Node tooling stage, the PostgreSQL 18

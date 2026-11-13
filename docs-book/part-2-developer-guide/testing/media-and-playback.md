@@ -909,10 +909,10 @@ databases, Redis and original media are outside the fixture.
 
 ### AAC implementation in the suites
 
-The CI image runs the project's FFmpeg build, which carries bAAC, fdk-aac and
+The CI image runs the project's FFmpeg build, which carries Bånder Audio Core, fdk-aac and
 FFmpeg's built-in AAC codec. The functional audio stream tests run the real
 rendition encoder with the `transcode.aac_implementation` setting at its
-default, so their AAC renditions encode with bAAC and AAC sources decode with
+default, so their AAC renditions encode with Bånder Audio Core and AAC sources decode with
 it. Unit tests
 stub the setting and the codec listing to cover each position and a binary
 that lacks one. To run the media suites under another position, set it in the
@@ -922,7 +922,7 @@ the backend suites. The adaptive browser check takes
 `BAANDER_TEST_AAC_IMPLEMENTATION` (`bac` by default, `fdk_aac` or `ffmpeg`)
 and encodes its DASH audio with that implementation. The image build itself
 checks every implementation: its smoke encodes and decodes
-with bAAC, and the capability gate requires each implementation as encoder and
+with Bånder Audio Core, and the capability gate requires each implementation as encoder and
 as decoder.
 
 ### Sparse movie playback

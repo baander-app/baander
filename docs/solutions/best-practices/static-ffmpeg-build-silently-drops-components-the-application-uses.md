@@ -146,6 +146,6 @@ catches a later script bump or configure change that drops them again.
 - [Moving the images to Debian 13](debian-13-base-images-change-collation-time-zone-links-and-vaapi-limits.md):
   other silent changes when an image's base packages change, including the VAAPI
   test frame.
-- `ROADMAP.md`, section "bAAC in the server transcoder": the checkpoint that
+- `ROADMAP.md`, section "Bånder Audio Core in the server transcoder": the checkpoint that
   recorded these gaps, and the NVENC HDR path's `tonemap_cuda`, a filter that
   neither build has.

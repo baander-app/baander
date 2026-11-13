@@ -2,7 +2,7 @@
 title: Codec output that must be identical everywhere needs exact arithmetic and ordered sums
 date: 2026-11-12
 category: best-practices
-module: bAAC codec build flags and floating-point code (packages/baander-aac)
+module: Bånder Audio Core build flags and floating-point code (packages/baander-audio-core)
 problem_type: test_failure
 component: infrastructure
 related_components: [testing_framework, development_workflow]
@@ -13,16 +13,17 @@ symptoms:
 root_cause: config_error
 resolution_type: code_fix
 severity: high
-tags: [baac, aac, flac, fast-math, floating-point, reproducibility, compiler, libm, glibc, vectorisation, reference-streams, sanitizer]
+tags: [bac, audio-core, aac, flac, fast-math, floating-point, reproducibility, compiler, libm, glibc, vectorisation, reference-streams, sanitizer]
 ---
 
 # Codec output that must be identical everywhere needs exact arithmetic and ordered sums
 
 ## Problem
 
-The bAAC package compares freshly encoded streams with committed reference streams byte
-for byte, and its README promised that every build reproduces them. The promise held
-only for the compiler that wrote the references. Its Release build put
+The Bånder Audio Core package (named bAAC at the time) compares freshly encoded
+streams with committed reference streams byte for byte, and its README promised that
+every build reproduces them. The promise held only for the compiler that wrote the
+references. Its Release build put
 `-fassociative-math`, `-freciprocal-math`, `-fno-signed-zeros` and
 `-ffinite-math-only` on every file, tests included, so each compiler version regrouped
 and vectorised floating-point sums its own way. The FFmpeg image builds the package with
@@ -155,7 +156,7 @@ compiler must follow.
 
 - `docs/solutions/best-practices/static-ffmpeg-build-silently-drops-components-the-application-uses.md`:
   another way the FFmpeg image's build differs from what was tested.
-- Since 2026-11-12 the arm64 job of `aac-native.yml` compares the NEON kernels with
-  scalar, 8 of the AAC table and 6 of the lossless mode, and checks that they are the
-  level's own. Open, recorded in `ROADMAP.md`: MSVC and toolchains other than GCC and
-  Clang get none of the options.
+- Since 2026-11-12 the arm64 job of `audio-core.yml` (then `aac-native.yml`) compares
+  the NEON kernels with scalar, 8 of the AAC table and 6 of the lossless mode, and
+  checks that they are the level's own. Open, recorded in `ROADMAP.md`: MSVC and
+  toolchains other than GCC and Clang get none of the options.

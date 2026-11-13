@@ -4,4 +4,3 @@ export * from './fft2048/wasm-spectrum';
 export * from './partitioned_convolver/partitioned_convolver';
 export * from './resampler_hq/resampler_hq';
 export * from './spectral_features/spectral_features';
-export * from './baander-aac/baander-aac';

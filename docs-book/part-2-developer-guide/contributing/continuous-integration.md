@@ -22,8 +22,8 @@ store. The workflows select them at run time; nothing is edited per forge.
 | `runner.yaml` | Build Runner Image | Pushes to `master` that touch `docker/runner/**`, and dispatch | Publishes `baander-runner` |
 | `postgres.yaml` | Build PostgreSQL Image | Pushes to `master` that touch `docker/postgres/**`, and dispatch | Publishes `baander-postgres` |
 | `nginx.yaml` | Build Nginx Image | Pushes to `master` that touch `docker/nginx/**`, and dispatch | Publishes `baander-nginx` |
-| `ffmpeg.yaml` | Build FFmpeg Image | Pushes to `master` that touch `packages/baander-aac/**`, `docker/ffmpeg/**` or the capability gate script, and dispatch | Publishes `ffmpeg-baander-static` |
-| `aac-native.yml` | AAC native addon | Pushes, tags and pull requests that touch `packages/baander-aac/**` | GitHub only; builds the prebuilt binding and tests the codec, see below |
+| `ffmpeg.yaml` | Build FFmpeg Image | Pushes to `master` that touch `packages/baander-audio-core/**`, `docker/ffmpeg/**` or the capability gate script, and dispatch | Publishes `ffmpeg-baander-static` |
+| `audio-core.yml` | Audio Core binding | Pushes, tags and pull requests that touch `packages/baander-audio-core/**` | GitHub only; builds the prebuilt binding and tests the codec, see below |
 
 A workflow with path filters lists its own file among them, so editing the
 workflow runs it. The README's badges show GitHub's status for CI, Frontend CI,
@@ -38,7 +38,7 @@ directory that exists among `.forgejo/workflows`, `.gitea/workflows` and
 `.github/workflows`, and never merges them. Do not create either of the first two:
 Forgejo would then run that directory and ignore every shared workflow.
 
-The AAC native addon workflow is the one exception. It needs GitHub's hosted macOS
+The Audio Core binding workflow is the one exception. It needs GitHub's hosted macOS
 and Windows runners, so its jobs carry `if: github.server_url == 'https://github.com'`.
 On Forgejo the same jobs resolve `runs-on` to `docker-cli` and skip there. Forgejo
 evaluates a job's `if:` only after a matching runner picks the job up, so a macOS or
@@ -47,12 +47,12 @@ Windows label would leave the skipped job queued.
 That workflow also tests the codec the binding carries. Every runner builds the
 binding and runs its smoke test under Node and under Electron, which covers the AAC
 and the FLAC classes. The Linux runner then builds the package with CMake and runs
-every CTest suite with `BAAC_REQUIRE_ORACLES` set. The lossless suites compare
+every CTest suite with `BAC_REQUIRE_ORACLES` set. The lossless suites compare
 against three oracles: the reference `flac` 1.4.3, FFmpeg and the FLAC decoder
 testbench. With the variable set, a suite fails when its oracle is missing; without
 it the suite skips that comparison, prints a line that begins with `SKIP:` and
 passes. The job also fails when the test log holds such a line. Two scripts under
-`packages/baander-aac/tests` provide the oracles: `flac-reference.sh` builds `flac`
+`packages/baander-audio-core/tests` provide the oracles: `flac-reference.sh` builds `flac`
 at its pinned commit, and `flac-testbench.sh` fetches the testbench at its pinned
 commit and checks it against the committed manifest. Each sits behind an
 `actions/cache` entry keyed on its pin, so a run builds or fetches only after a pin
@@ -64,7 +64,7 @@ for their own architecture and run them. The AAC transforms and the lossless mod
 pick their kernels for the processor they run on, so the arm64 runner is the only
 place where the NEON kernels execute: `test_dsp` compares those of the AAC table, the
 encoder's noise sum among them, with the scalar ones, and `test_flac_dsp` those of
-the lossless mode. `BAAC_REQUIRE_KERNELS`
+the lossless mode. `BAC_REQUIRE_KERNELS`
 names the kernel levels a runner has to exercise (`neon` on arm64, `sse2,avx2` on
 Linux, `sse2` on the Intel Mac): `test_flac_dsp` fails when a named level did not
 run or installed no kernel of its own, and the step checks the output of both suites
@@ -97,13 +97,13 @@ resolves its runner label.
 
 ### The desktop lockfile and the codec package
 
-The desktop app depends on `packages/baander-aac` through a `file:` dependency, and
+The desktop app depends on `packages/baander-audio-core` through a `file:` dependency, and
 Yarn records a hash of that whole folder in `ui/electron/yarn.lock`. Any change under
-`packages/baander-aac`, a documentation edit included, moves the hash, and the
+`packages/baander-audio-core`, a documentation edit included, moves the hash, and the
 immutable install in Frontend CI's desktop checks then refuses the stale lockfile.
 Commit such a change together with the lockfile it produces: run
 `corepack yarn install --mode=update-lockfile` in `ui/electron`. Frontend CI runs on
-changes to `packages/baander-aac/**` so a missed refresh fails on the commit that
+changes to `packages/baander-audio-core/**` so a missed refresh fails on the commit that
 caused it.
 
 ### What differs per forge
@@ -135,7 +135,7 @@ it would delete real directories.
 ### Checkout
 
 Every job in the shared workflows checks out with a shell script instead of
-`actions/checkout`; only the GitHub-only AAC native addon workflow uses the action.
+`actions/checkout`; only the GitHub-only Audio Core binding workflow uses the action.
 The script first marks the workspace as a safe directory in the container's global
 Git configuration, as `actions/checkout` does. On GitHub the job container runs as
 root while the hosted runner's user owns the workspace, and Git refuses a repository
@@ -261,9 +261,9 @@ Both forges keep the same artifacts for 14 days:
 | `public-website-<sha>` | `website.yaml` | After a successful build; the archive and its SHA-256 sum |
 | `registry-nightly-<run-id>-<attempt>` | `registry-nightly.yaml` | Always; the nightly evidence directory |
 
-The GitHub-only `aac-native.yml` workflow separately uploads `baander_aac-<target>`
-prebuilt addon artifacts (`linux-x64`, `win32-x64`, `darwin-x64`, `darwin-arm64`)
-with 30-day retention and attaches them to GitHub releases on `aac-native-v*` tags.
+The GitHub-only `audio-core.yml` workflow separately uploads `baander_audio_core-<target>`
+prebuilt binding artifacts (`linux-x64`, `win32-x64`, `darwin-x64`, `darwin-arm64`)
+with 30-day retention and attaches them to GitHub releases on `audio-core-v*` tags.
 
 GitHub uploads with `actions/upload-artifact`. Forgejo uploads through the
 `.github/actions/forgejo-upload-artifact` composite action, which wraps Forgejo's
@@ -290,9 +290,9 @@ through the `ffmpeg` role of the tooling image catalog
 the application image only when that digest is updated. On Forgejo, `ci.yaml` sets
 `BAANDER_FFMPEG_IMAGE` to the copy in the Forgejo registry, which `ffmpeg.yaml`
 publishes there; a developer host sets the same variable to a local build. The
-FFmpeg image carries bAAC from `packages/baander-aac`, fdk-aac and FFmpeg's built-in
+FFmpeg image carries Bånder Audio Core from `packages/baander-audio-core`, fdk-aac and FFmpeg's built-in
 AAC codec, enables VAAPI, NVENC and QSV explicitly, and proves itself at build time:
-a smoke encodes and decodes with bAAC, and `scripts/ffmpeg-capability-gate.sh`
+a smoke encodes and decodes with Bånder Audio Core, and `scripts/ffmpeg-capability-gate.sh`
 checks that the binary lists every accelerator, hardware encoder and AAC
 implementation the application can select, and that its shared objects resolve. The
 same gate runs when the application image is built.

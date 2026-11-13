@@ -358,11 +358,11 @@ Renditions are admitted through durable PostgreSQL runtime state. Under `full`, 
 
 ### AAC implementation
 
-The FFmpeg in the application image carries three AAC codecs: bAAC, the codec
-Bånder develops in `packages/baander-aac`; Fraunhofer's fdk-aac; and FFmpeg's
+The FFmpeg in the application image carries three AAC codecs: Bånder Audio Core, the codec
+library Bånder develops in `packages/baander-audio-core`; Fraunhofer's fdk-aac; and FFmpeg's
 own. The `transcode.aac_implementation` setting selects which one encodes AAC
 renditions and the audio track of DASH video sessions, and which one decodes an
-AAC source for those encodes. bAAC is the default so that real playback
+AAC source for those encodes. Bånder Audio Core is the default so that real playback
 exercises the codec before the desktop app depends on it; the other two
 positions are the operator's way back if a stream sounds wrong.
 

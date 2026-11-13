@@ -183,10 +183,10 @@ Follow-up: the separate retry path can retain a pending control after a network
 failure followed by a rejected retry. Initial rejected requests are cleared; the
 retry-after-network-failure case remains outside this recovery check.
 
-## bAAC in the server transcoder
+## Bånder Audio Core in the server transcoder
 
 Delivered and merged on 2026-11-07: the project's static FFmpeg 8.1 build carries
-bAAC as the `libbaac` encoder and decoder beside fdk-aac and FFmpeg's built-in AAC
+Bånder Audio Core as the `libbaac` encoder and decoder beside fdk-aac and FFmpeg's built-in AAC
 codec, and the application image runs it at `/usr/bin`. The
 `transcode.aac_implementation` setting selects the implementation (see the
 [transcoding guide](docs-book/part-1-operator-guide/media/transcoding.md#aac-implementation)).
@@ -216,7 +216,7 @@ Open items:
 - Found and not fixed: the NVENC HDR path emits `tonemap_cuda`, a filter neither
   Debian's FFmpeg nor this build has;
   `PlaybackTransferPersistenceTest::testReconnectUsesExplicitOldEndpointStopProofWithoutInheritingItsAuthority`
-  fails on master code on both FFmpeg builds; `packages/baander-aac`'s
+  fails on master code on both FFmpeg builds; `packages/baander-audio-core`'s
   `test_usac_enc` byte-identical fixture failed on this host's compiler (fixed
   2026-11-11; see [bAAC exact arithmetic](#baac-exact-arithmetic));
   `MediaWorkerRunnerTest::testSerialAudioJobsReuseOneSlotWithIncreasingLaunchGenerations`

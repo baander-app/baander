@@ -40,7 +40,7 @@ Understand the architecture, write code following project conventions, and contr
 | [Adding a New Feature](development/adding-a-feature.md) | Step-by-step walkthrough for adding an API endpoint |
 | [API Reference](development/api-reference.md) | OpenAPI spec, REST patterns, pagination, and resource serialization |
 | [API Authentication and OAuth 2.0](development/api-authentication.md) | DPoP proofs, password/passkey login, refresh grace, and OAuth 2.0 PKCE and device flows |
-| [Frontend Development](development/frontend-development.md) | React + TypeScript + Vite + styled-components, TanStack Query, Zustand, Electron, and bAAC |
+| [Frontend Development](development/frontend-development.md) | React + TypeScript + Vite + styled-components, TanStack Query, Zustand, Electron, and Bånder Audio Core |
 
 ## Testing & Bounded Contexts
 

@@ -67,5 +67,5 @@ Key environment and fixture rules across all suites:
 
 | Guide | Coverage |
 |-------|----------|
-| [Frontend, Browser, and Audio Testing](frontend-and-browser.md) | Web Vitest and Playwright E2E suites, 32-combination mood × accent styling and recessed-footer checks, Web audio graph and spectrum/EQ calibration, browser authentication transport, web typography, store isolation and debugging, Electron Node tests, and `baander-aac` CTest/binding suites |
+| [Frontend, Browser, and Audio Testing](frontend-and-browser.md) | Web Vitest and Playwright E2E suites, 32-combination mood × accent styling and recessed-footer checks, Web audio graph and spectrum/EQ calibration, browser authentication transport, web typography, store isolation and debugging, Electron Node tests, and Bånder Audio Core CTest and binding suites |
 | [Live-Update Qualification](live-updates.md) | End-to-end browser verification and production-mode capacity qualification for committed change capture, revision projection, and WebSocket `live.changed` hint delivery |

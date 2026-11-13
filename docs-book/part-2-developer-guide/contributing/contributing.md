@@ -111,7 +111,7 @@ own independent Yarn locks; `tests/e2e` owns its npm lock. The DPoP and BlurHash
 library manifests have no independent installs, and design tokens use Node
 builtins. Discovery reports unclassified manifests within those source trees;
 `ui/electron/package.json`, `ui/rn/package.json`, and
-`packages/baander-aac/package.json` sit outside `scopeDirectories`. Local
+`packages/baander-audio-core/package.json` sit outside `scopeDirectories`. Local
 inspection checks lock presence, npm root requirements, browser versions,
 resolutions and authored patch hashes. It leaves Yarn lock semantics and
 resolved versions to the package manager in online mode.

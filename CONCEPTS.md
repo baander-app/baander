@@ -583,21 +583,22 @@ It reports whether the results match or the comparison is unavailable and leaves
 
 ## Audio codec
 
-### bAAC
+### Bånder Audio Core
 
-The public name of Bånder's audio codec library: its AAC encoder and decoder, and the FLAC encoder and decoder of its lossless mode.
+The public name of Bånder's audio codec library, `bac` for short: its AAC encoder and decoder, which cover AAC-LC, HE-AAC v1 and v2, the low-delay profiles and xHE-AAC, and the FLAC encoder and decoder of its lossless mode.
+*Avoid: bAAC, the library's name until 2026-11-12, which named its AAC codec only.*
 
 ### Lossless mode
 
-The bAAC mode that codes integer PCM as a FLAC stream and returns the identical samples on decode.
+The Bånder Audio Core mode that codes integer PCM as a FLAC stream and returns the identical samples on decode.
 *Avoid: lossless AAC; the mode writes FLAC, which is not an AAC profile.*
 
 Its streams keep a fixed block size inside FLAC's streamable subset, so that other FLAC decoders read them.
 
 ### AAC implementation setting
 
-The system setting that selects which codec implementation FFmpeg uses for AAC encoding and decoding across the server's transcodes: bAAC by default, Fraunhofer's fdk-aac, or FFmpeg's built-in codec.
-*Avoid: kill switch, which names only the act of moving off bAAC.*
+The system setting that selects which codec implementation FFmpeg uses for AAC encoding and decoding across the server's transcodes: Bånder Audio Core (`bac`) by default, Fraunhofer's fdk-aac, or FFmpeg's built-in codec.
+*Avoid: kill switch, which names only the act of moving off Bånder Audio Core.*
 
 A change applies to transcodes started afterwards; running sessions and cached renditions keep the implementation that produced them. A rendition that failed while encoding or decoding AAC through one implementation is encoded again on its next request once another implementation is selected.
 
@@ -682,7 +683,7 @@ The listener controls the applied boost, cut and optional normalization; the DVB
 Unified Speech and Audio Coding as constrained by the xHE-AAC profile, whose core channels can switch between frequency-domain and linear-prediction coding and whose extensions provide Enhanced SBR, MPS 212 and MPEG-D DRC.
 *Avoid: xHE-AAC as a separate codec; it is the profile of USAC the codec targets.*
 
-Its configuration fixes the element list rather than repeating element identities in each frame. It travels in LOAS, LATM or raw access units; ADTS cannot carry it. bAAC decodes both core forms and encodes the frequency-domain form through its xHE-AAC encoder.
+Its configuration fixes the element list rather than repeating element identities in each frame. It travels in LOAS, LATM or raw access units; ADTS cannot carry it. Bånder Audio Core decodes both core forms and encodes the frequency-domain form through its xHE-AAC encoder.
 
 ### Enhanced SBR
 
@@ -731,7 +732,7 @@ A dual-mode box uses different reconstruction modes below and above a band bound
 
 ### xHE-AAC encoder
 
-The bAAC encoder for the xHE-AAC profile of USAC, using a frequency-domain core with arithmetic coding, noise filling and independent access points with audio pre-roll.
+The Bånder Audio Core encoder for the xHE-AAC profile of USAC, using a frequency-domain core with arithmetic coding, noise filling and independent access points with audio pre-roll.
 *Avoid: USAC encoder alone, which also names the linear prediction core the codec does not write.*
 
 It produces stream or packet transports suitable for playback and muxing, with optional Enhanced SBR, MPS 212 and loudness metadata. ADTS cannot carry its output.
@@ -779,7 +780,7 @@ Flush emits the retained samples and then resets playback state. Seek reset drop
 
 ### Prebuilt binding
 
-A distributed native bAAC addon built for a target platform and architecture that can be installed without compiling from source.
+A distributed native Bånder Audio Core binding built for a target platform and architecture that can be installed without compiling from source.
 *Avoid: native module alone, which also names a build from source.*
 
 Its stable runtime interface allows a compatible binary to serve both Node and Electron; a local source build remains a separate installation path.

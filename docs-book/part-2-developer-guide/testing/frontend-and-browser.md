@@ -1,6 +1,6 @@
 # Frontend, Browser, and Audio Testing
 
-Unit, browser, audio-graph, authentication-transport, typography, store-debugger, Electron, and native bAAC codec verification across the client workspaces.
+Unit, browser, audio-graph, authentication-transport, typography, store-debugger, Electron, and native Bånder Audio Core codec verification across the client workspaces.
 
 ## Frontend Testing
 
@@ -80,7 +80,7 @@ It covers the preload bridges, IPC validation and renderer trust, the
 discovery and deep-link services, DSP asset regeneration and the native AAC
 codec service (decoding, encoding in every profile including xHE-AAC with
 its loudness metadata, and the loudness meter). The codec tests use the
-compiled `@baander/aac-native` binding from `node_modules` or from a build in
+compiled `@baander/audio-core` binding from `node_modules` or from a build in
 the codec directory, and skip the binding-dependent cases when neither
 exists. Without `tsx` the service test also runs under Node's own type
 stripping (`node --experimental-strip-types --experimental-test-module-mocks
@@ -90,7 +90,7 @@ import modules without extensions.
 The codec itself has CTest suites and a binding smoke test:
 
 ```bash
-cd packages/baander-aac
+cd packages/baander-audio-core
 mkdir -p cmake-build && cd cmake-build && cmake .. -DCMAKE_BUILD_TYPE=Release && make && ctest
 cd .. && npm install && npm test
 ```

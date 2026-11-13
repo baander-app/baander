@@ -22,7 +22,7 @@ async function fixture(t: TestContext) {
     await mkdir(join(root, directory), { recursive: true });
   }
   // Dormant packages exist so accidentally building them cannot mask another failure.
-  for (const name of [...modules, 'resampler_hq', 'baander-aac']) {
+  for (const name of [...modules, 'resampler_hq']) {
     await mkdir(join(root, 'packages/dsp', name), { recursive: true });
     await writeFile(join(root, 'packages/dsp', name, `${name}.wasm`), `tracked ${name}`);
     for (const destination of destinations) {

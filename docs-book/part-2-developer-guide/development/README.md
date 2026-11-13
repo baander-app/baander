@@ -23,4 +23,4 @@ Write backend domain logic, CQRS handlers, Doctrine mappings, PGroonga search qu
 
 | Guide | Scope |
 |-------|-------|
-| [Frontend Development](frontend-development.md) | React 19, TypeScript, Vite, styled-components, TanStack Query, Orval client generation, Zustand stores, Electron native bAAC, and UI primitives |
+| [Frontend Development](frontend-development.md) | React 19, TypeScript, Vite, styled-components, TanStack Query, Orval client generation, Zustand stores, Electron's native Bånder Audio Core binding, and UI primitives |

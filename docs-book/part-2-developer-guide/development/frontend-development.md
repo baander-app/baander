@@ -265,15 +265,15 @@ lint, Vitest, build, and build-verification checks.
 
 ## Desktop native codec
 
-The Electron app ships the AAC codec from `packages/baander-aac` as a
-native Node-API module, `@baander/aac-native`, declared as a `file:`
+The Electron app ships the AAC codec of Bånder Audio Core, from `packages/baander-audio-core`,
+as a native Node-API module, `@baander/audio-core`, declared as a `file:`
 dependency in `ui/electron/package.json`. On `yarn install` the package's
 install script fetches the prebuilt binding for the platform from the newest
-`aac-native-v*` GitHub release (built by `.github/workflows/aac-native.yml`)
+`audio-core-v*` GitHub release (built by `.github/workflows/audio-core.yml`)
 into `prebuilds/<platform>-<arch>/`, and builds it with node-gyp from the C++
 sources when that is not possible; `yarn electron-rebuild` builds it for the
 Electron ABI into `build/Release/`, which the loader tries after `prebuilds/`
-(set `BAANDER_AAC_NATIVE_BINDING` to a file to make a local build win).
+(set `BAANDER_AUDIO_CORE_BINDING` to a file to make a local build win).
 electron-builder (`ui/electron/electron-builder.yml`, the only packaging
 configuration) bundles only its ESM entry, types and the binding, prebuilt or
 local, unpacked from the asar archive. The package is ESM-only and targets
