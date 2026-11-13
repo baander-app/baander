@@ -24,8 +24,8 @@ class AacImplementationTest extends TestCase
 
     public function testCodecNamesAndLabels(): void
     {
-        $this->assertSame('libbaac', AacImplementation::Bac->encoderName());
-        $this->assertSame('libbaac', AacImplementation::Bac->decoderName());
+        $this->assertSame('libbac', AacImplementation::Bac->encoderName());
+        $this->assertSame('libbac', AacImplementation::Bac->decoderName());
         $this->assertSame('libfdk_aac', AacImplementation::FdkAac->encoderName());
         $this->assertSame('libfdk_aac', AacImplementation::FdkAac->decoderName());
         $this->assertSame('aac', AacImplementation::Ffmpeg->encoderName());

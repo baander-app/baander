@@ -524,7 +524,7 @@ These are the planner's readings, not confirmed by the user.
   - Docs: `docs-book/part-2-developer-guide/getting-started/quick-start.md` and `getting-started/development-environment.md`. Both tell a host to build `ffmpeg-baander-static:local` once; they gain that a local build must be rebuilt when the codec names change, since the gate compares it with the tree's list. `development-environment.md` also gains that automatic updates keep the image selection captured at `make dev-up` (KTD6 step 4).
   - Pin, added after the dispatch: `packages/baander-tooling/resources/tooling-defaults.json`, `scripts/tests/php/ImageCatalogTest.php`, `packages/baander-tooling/src/Architecture/SourceExceptions.php`.
 - **Approach:**
-  - Wrapper: the codec, class and wrapper names become `libbac`; the contexts become `BacEncContext` and `BacDecContext`; the statics take `bac_`; `BAAC_DEC_MAX_CHANNELS` becomes `BAC_DEC_MAX_CHANNELS`; the long name becomes "Bånder Audio Core".
+  - Wrapper: the codec, class and wrapper names become `libbac`; the contexts become `BacEncContext` and `BacDecContext`; the statics take `bac_`; `BAAC_DEC_MAX_CHANNELS` becomes `BAC_DEC_MAX_CHANNELS`; the long name becomes "Baander Audio Core", in ASCII per OQ3, and the wrapper's comments say "Bånder Audio Core".
   - Patch: the help line `--enable-libbac` (keep its column alignment), `libbac` in `EXTERNAL_LIBRARY_VERSION3_LIST`, `libbac_*_deps`, `libbac_encoder_select`, `require_pkg_config libbac bac bac/aac.h aac_encoder_create`, `ff_libbac_*`, `CONFIG_LIBBAC_*`, and `libbacdec.o` and `libbacenc.o`. Only names inside added lines change, so hunk line counts stay.
   - Build the FFmpeg image locally from the tree, commit without the pin, then follow KTD5.
 - **Test scenarios:**

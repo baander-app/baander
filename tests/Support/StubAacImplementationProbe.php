@@ -13,7 +13,7 @@ final class StubAacImplementationProbe extends AacImplementationProbe
      * @param list<string> $encoders
      * @param list<string> $decoders
      */
-    public function __construct(private readonly array $encoders = ['libbaac', 'libfdk_aac', 'aac'], private readonly array $decoders = ['libbaac', 'libfdk_aac', 'aac'])
+    public function __construct(private readonly array $encoders = ['libbac', 'libfdk_aac', 'aac'], private readonly array $decoders = ['libbac', 'libfdk_aac', 'aac'])
     {
         parent::__construct('/usr/bin/ffmpeg');
     }

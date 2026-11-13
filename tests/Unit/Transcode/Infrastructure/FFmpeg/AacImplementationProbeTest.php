@@ -33,7 +33,7 @@ final class AacImplementationProbeTest extends TestCase
 
     public function testAnImplementationNeedsBothDirections(): void
     {
-        $probe = new StubAacImplementationProbe(['libbaac', 'aac'], ['aac']);
+        $probe = new StubAacImplementationProbe(['libbac', 'aac'], ['aac']);
         self::assertFalse($probe->isAvailable(AacImplementation::Bac), 'an encoder without its decoder is unavailable');
         self::assertTrue($probe->offersEncoder(AacImplementation::Bac));
         self::assertFalse($probe->offersDecoder(AacImplementation::Bac));
@@ -54,7 +54,7 @@ final class AacImplementationProbeTest extends TestCase
             {
                 ++$this->runs;
 
-                return $this->runs === 1 ? '' : " A....D libbaac               bAAC (codec aac)\n";
+                return $this->runs === 1 ? '' : " A....D libbac                Baander Audio Core (codec aac)\n";
             }
         };
         try {

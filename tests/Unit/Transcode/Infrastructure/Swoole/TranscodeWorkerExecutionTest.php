@@ -230,7 +230,7 @@ final class TranscodeWorkerExecutionTest extends TestCase
     {
         $this->copyWorker();
         $this->current = $this->claim(1, 1, implementation: AacImplementation::Bac);
-        $worker = ($this->workerForPolicy)(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile('household')), $this->probeWithout('libbaac'));
+        $worker = ($this->workerForPolicy)(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile('household')), $this->probeWithout('libbac'));
         $worker->run($this->current, static fn(): bool => false);
         self::assertSame(['accepted', 'ready', 'complete'], $this->observed);
     }
@@ -239,7 +239,7 @@ final class TranscodeWorkerExecutionTest extends TestCase
     {
         $this->sourceHasAudio = false;
         $this->current = $this->claim(1, 1, implementation: AacImplementation::Bac);
-        ($this->workerForPolicy)(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile('full')), $this->probeWithout('libbaac'))->run($this->current, static fn(): bool => false);
+        ($this->workerForPolicy)(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile('full')), $this->probeWithout('libbac'))->run($this->current, static fn(): bool => false);
         self::assertNotContains('failed', $this->observed);
         self::assertNotSame([], $this->spawner->commands);
     }
@@ -247,7 +247,7 @@ final class TranscodeWorkerExecutionTest extends TestCase
     public function testAnOpusSessionFromAnAacSourceNeedsTheSelectedImplementationAsDecoder(): void
     {
         $this->current = $this->claim(1, 1, profile: AudioProfile::opusStereo(), implementation: AacImplementation::Bac);
-        ($this->workerForPolicy)(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile('full')), $this->probeWithout('libbaac'))->run($this->current, static fn(): bool => false);
+        ($this->workerForPolicy)(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile('full')), $this->probeWithout('libbac'))->run($this->current, static fn(): bool => false);
         self::assertContains('failed', $this->observed);
         self::assertSame([], $this->spawner->commands, 'no encoder was spawned');
         self::assertSame('AAC implementation "Bånder Audio Core" is not available in this FFmpeg build', $this->job->getFailReason());
@@ -257,15 +257,15 @@ final class TranscodeWorkerExecutionTest extends TestCase
     {
         $this->sourceAudioStreams = [['index' => 1, 'codec_type' => 'audio', 'codec_name' => 'flac', 'channels' => 2, 'sample_rate' => '48000']];
         $this->current = $this->claim(1, 1, profile: AudioProfile::opusStereo(), implementation: AacImplementation::Bac);
-        ($this->workerForPolicy)(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile('full')), $this->probeWithout('libbaac'))->run($this->current, static fn(): bool => false);
+        ($this->workerForPolicy)(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile('full')), $this->probeWithout('libbac'))->run($this->current, static fn(): bool => false);
         self::assertNotContains('failed', $this->observed);
         self::assertNotSame([], $this->spawner->commands);
-        self::assertNotContains('libbaac', $this->spawner->commands[0]);
+        self::assertNotContains('libbac', $this->spawner->commands[0]);
     }
 
     private function probeWithout(string $codec): \App\Tests\Support\StubAacImplementationProbe
     {
-        $all = ['libbaac', 'libfdk_aac', 'aac'];
+        $all = ['libbac', 'libfdk_aac', 'aac'];
         $present = array_values(array_diff($all, [$codec]));
 
         return new \App\Tests\Support\StubAacImplementationProbe($present, $present);

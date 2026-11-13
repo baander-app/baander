@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Proves that an FFmpeg binary carries the bAAC codec and that the codec works
+# Proves that an FFmpeg binary carries the Bånder Audio Core codec and that the codec works
 # end to end. Runs inside the FFmpeg image build and against a local build.
 #
 #   smoke.sh <ffmpeg-binary> <ffprobe-binary> [work-dir]
@@ -24,11 +24,11 @@ case "$version" in
 esac
 
 encoders=$("$FFMPEG" -hide_banner -encoders)
-echo "$encoders" | grep -q ' libbaac ' || fail "libbaac encoder missing"
-step "libbaac encoder present"
+echo "$encoders" | grep -q ' libbac ' || fail "libbac encoder missing"
+step "libbac encoder present"
 decoders=$("$FFMPEG" -hide_banner -decoders)
-echo "$decoders" | grep -q ' libbaac ' || fail "libbaac decoder missing"
-step "libbaac decoder present"
+echo "$decoders" | grep -q ' libbac ' || fail "libbac decoder missing"
+step "libbac decoder present"
 if [ "${SMOKE_EXPECT_FDK:-0}" = 1 ]; then
   echo "$encoders" | grep -q ' libfdk_aac ' || fail "libfdk_aac encoder missing"
   echo "$decoders" | grep -q ' libfdk_aac ' || fail "libfdk_aac decoder missing"
@@ -42,10 +42,10 @@ fi
   -i "aevalsrc=0.1*sin(2*PI*440*t)|0.2*sin(2*PI*440*t)|0.3*sin(2*PI*440*t)|0.4*sin(2*PI*60*t)|0.5*sin(2*PI*440*t)|0.6*sin(2*PI*440*t):s=48000:d=2:c=5.1,aformat=sample_fmts=flt" \
   -c:a pcm_f32le -f f32le "$WORK/six.f32le"
 
-step "encode stereo to ADTS and fMP4 with libbaac"
-"$FFMPEG" -hide_banner -v error -y -f f32le -ar 48000 -ac 2 -i "$WORK/tone.f32le" -c:a libbaac -b:a 128k -f adts "$WORK/tone.aac"
-"$FFMPEG" -hide_banner -v error -y -f f32le -ar 48000 -ac 2 -i "$WORK/tone.f32le" -c:a libbaac -b:a 128k -f mp4 "$WORK/tone.m4a"
-"$FFMPEG" -hide_banner -v error -y -f f32le -ar 48000 -ac 6 -channel_layout 5.1 -i "$WORK/six.f32le" -c:a libbaac -b:a 320k -f mp4 "$WORK/six.m4a"
+step "encode stereo to ADTS and fMP4 with libbac"
+"$FFMPEG" -hide_banner -v error -y -f f32le -ar 48000 -ac 2 -i "$WORK/tone.f32le" -c:a libbac -b:a 128k -f adts "$WORK/tone.aac"
+"$FFMPEG" -hide_banner -v error -y -f f32le -ar 48000 -ac 2 -i "$WORK/tone.f32le" -c:a libbac -b:a 128k -f mp4 "$WORK/tone.m4a"
+"$FFMPEG" -hide_banner -v error -y -f f32le -ar 48000 -ac 6 -channel_layout 5.1 -i "$WORK/six.f32le" -c:a libbac -b:a 320k -f mp4 "$WORK/six.m4a"
 
 probe=$("$FFPROBE" -hide_banner -v error -show_entries stream=codec_name,profile,sample_rate,channels -of csv=p=0 "$WORK/tone.m4a")
 [ "$probe" = "aac,LC,48000,2" ] || fail "ffprobe on the fMP4 output reported '$probe', expected 'aac,LC,48000,2'"
@@ -96,20 +96,20 @@ decode_and_compare() {
 stereo_notch="bandreject=f=1000:width_type=h:width=100,"
 six_notch="bandreject=f=440:width_type=h:width=60,bandreject=f=60:width_type=h:width=20,"
 
-step "decode the libbaac output with FFmpeg's built-in decoder"
+step "decode the libbac output with FFmpeg's built-in decoder"
 decode_and_compare aac "$WORK/tone.aac" 2 adts-via-aac "$stereo_notch"
 decode_and_compare aac "$WORK/tone.m4a" 2 mp4-via-aac "$stereo_notch"
 decode_and_compare aac "$WORK/six.m4a" 6 six-via-aac "$six_notch"
 
-step "decode the libbaac output with libbaac"
-decode_and_compare libbaac "$WORK/tone.aac" 2 adts-via-libbaac "$stereo_notch"
-decode_and_compare libbaac "$WORK/tone.m4a" 2 mp4-via-libbaac "$stereo_notch"
-decode_and_compare libbaac "$WORK/six.m4a" 6 six-via-libbaac "$six_notch"
+step "decode the libbac output with libbac"
+decode_and_compare libbac "$WORK/tone.aac" 2 adts-via-libbac "$stereo_notch"
+decode_and_compare libbac "$WORK/tone.m4a" 2 mp4-via-libbac "$stereo_notch"
+decode_and_compare libbac "$WORK/six.m4a" 6 six-via-libbac "$six_notch"
 # A damaged ADTS frame decodes through concealment without aborting.
 # Zero part of a frame's payload in the middle of the stream, past its sync word.
 cp "$WORK/tone.aac" "$WORK/damaged.aac"
 dd if=/dev/zero of="$WORK/damaged.aac" bs=1 seek=$(( $(stat -c %s "$WORK/tone.aac") / 2 + 10 )) count=50 conv=notrunc status=none
-"$FFMPEG" -hide_banner -v error -y -c:a:0 libbaac -i "$WORK/damaged.aac" -f null - || fail "libbaac aborted on a damaged ADTS frame"
+"$FFMPEG" -hide_banner -v error -y -c:a:0 libbac -i "$WORK/damaged.aac" -f null - || fail "libbac aborted on a damaged ADTS frame"
 step "damaged ADTS frame decoded with concealment"
 
 echo "smoke: OK"

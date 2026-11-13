@@ -19,7 +19,7 @@ enum AacImplementation: string
     public function encoderName(): string
     {
         return match ($this) {
-            self::Bac => 'libbaac',
+            self::Bac => 'libbac',
             self::FdkAac => 'libfdk_aac',
             self::Ffmpeg => 'aac',
         };

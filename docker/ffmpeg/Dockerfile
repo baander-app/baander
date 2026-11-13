@@ -208,9 +208,9 @@ COPY --from=nvcodec-builder    /dist/ /usr/src/ffmpeg-build-script/workspace/
 COPY --from=libvpl-builder     /dist/ /usr/src/ffmpeg-build-script/workspace/
 COPY --from=bac-builder        /dist/usr/src/ffmpeg-build-script/workspace/ /usr/src/ffmpeg-build-script/workspace/
 
-# The bAAC wrapper: sources copied into the FFmpeg tree, the registration
+# The Bånder Audio Core wrapper: sources copied into the FFmpeg tree, the registration
 # patch checked before it is applied so that drift fails the build.
-COPY docker/ffmpeg/baac /usr/src/baac
+COPY docker/ffmpeg/bac /usr/src/bac
 COPY docker/ffmpeg/smoke.sh /usr/src/smoke.sh
 
 FROM ffmpeg-prepared AS ffmpeg-final
@@ -221,13 +221,13 @@ RUN set -xe \
     && FFMPEG_SRC="$(ls -d /usr/src/ffmpeg-build-script/packages/FFmpeg-* | head -1)" \
     && cd "$FFMPEG_SRC" \
     && printf '%s\n' "${FFMPEG_SRC##*-}" > VERSION \
-    && cp /usr/src/baac/libavcodec/*.c libavcodec/ \
-    && git apply --check -p1 /usr/src/baac/ffmpeg-8.1-libbaac.patch \
-    && git apply -p1 /usr/src/baac/ffmpeg-8.1-libbaac.patch \
+    && cp /usr/src/bac/libavcodec/*.c libavcodec/ \
+    && git apply --check -p1 /usr/src/bac/ffmpeg-8.1-libbac.patch \
+    && git apply -p1 /usr/src/bac/ffmpeg-8.1-libbac.patch \
     && FFMPEG_CONFIGURATION="$(grep '^FFMPEG_CONFIGURATION=' ffbuild/config.mak | cut -d= -f2-)" \
     && { make distclean || true; } \
     && eval "./configure $FFMPEG_CONFIGURATION \
-        --enable-libbaac \
+        --enable-libbac \
         --extra-libs=-lstdc++ \
         --enable-vaapi \
         --enable-libdrm \

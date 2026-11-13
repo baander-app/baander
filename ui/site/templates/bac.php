@@ -56,7 +56,7 @@ $speed = static fn (?float $value): string => $value === null ? 'Not measured' :
     </div>
     <div class="bac-note">
       <h3>Server transcoding through FFmpeg</h3>
-      <p>Bånder's own FFmpeg build carries Bånder Audio Core as the <code>libbaac</code> encoder and decoder, beside Fraunhofer's fdk-aac and FFmpeg's built-in AAC codec. In FFmpeg, Bånder Audio Core encodes AAC-LC in mono, stereo and 5.1. The server transcoder uses it by default to encode AAC audio renditions and the audio of DASH video sessions, and to decode AAC sources for those encodes. Stream copies and probes keep FFmpeg's own handling.</p>
+      <p>Bånder's own FFmpeg build carries Bånder Audio Core as the <code>libbac</code> encoder and decoder, beside Fraunhofer's fdk-aac and FFmpeg's built-in AAC codec. In FFmpeg, Bånder Audio Core encodes AAC-LC in mono, stereo and 5.1. The server transcoder uses it by default to encode AAC audio renditions and the audio of DASH video sessions, and to decode AAC sources for those encodes. Stream copies and probes keep FFmpeg's own handling.</p>
       <p>An operator can move the server to fdk-aac or the built-in codec with the <code>transcode.aac_implementation</code> setting, from the admin settings or the console. A DASH session keeps the implementation it started with, and a switch re-encodes no cached rendition. The operator guide's <a href="/docs/operator-guide/media/transcoding/#aac-implementation">AAC implementation</a> section describes the setting.</p>
     </div>
   </section>

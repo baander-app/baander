@@ -1395,9 +1395,9 @@ the tests. Options: `BAC_AAC_BUILD_ENCODER`, `BAC_AAC_BUILD_DECODER`,
 `cmake --install .` installs the library, the public headers under
 `include/bac/` and a pkg-config file, `bac.pc`, whose `Libs.private`
 names the C++ runtime, so a C program linking the static library resolves
-it. FFmpeg's `--enable-libbaac` finds the codec through that file; the
+it. FFmpeg's `--enable-libbac` finds the codec through that file; the
 project's FFmpeg image builds it this way
-([`docker/ffmpeg/baac/README.md`](../../../docker/ffmpeg/baac/README.md)).
+([`docker/ffmpeg/bac/README.md`](../../../docker/ffmpeg/bac/README.md)).
 
 SIMD: the vector operations, the radix-2 FFT stages, the MDCT twiddles
 and the AAC-LC encoder's quantisation noise sum dispatch at runtime

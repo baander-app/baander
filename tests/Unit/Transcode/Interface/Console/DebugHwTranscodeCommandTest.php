@@ -33,7 +33,7 @@ final class DebugHwTranscodeCommandTest extends TestCase
             sourceDecoders: $hardware ? ['h264' => 'h264_cuvid', 'unknown' => ''] : [],
             sampleCommands: ['720p' => '/usr/local/bin/ffmpeg -y -i source.mkv'],
             acceleratorReference: [['none', 'libx265', 'libx264', '(none)', 'No', 'No']],
-            aacImplementations: [['bac', 'libbaac', 'Yes', 'Yes'], ['fdk_aac', 'libfdk_aac', 'Yes', 'Yes'], ['ffmpeg', 'aac', 'Yes', 'Yes']],
+            aacImplementations: [['bac', 'libbac', 'Yes', 'Yes'], ['fdk_aac', 'libfdk_aac', 'Yes', 'Yes'], ['ffmpeg', 'aac', 'Yes', 'Yes']],
         );
         $diagnostics = $this->createMock(HardwareTranscodeDiagnosticsInterface::class);
         $diagnostics->expects(self::once())->method('inspect')->willReturn($report);

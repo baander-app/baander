@@ -767,7 +767,7 @@ final class SegmentEncoderStreamArgsTest extends TestCase
 
     public function testTheSelectedAacImplementationNamesTheEncoderAndDecodesOnlyAacSources(): void
     {
-        foreach ([[AacImplementation::Bac, 'libbaac'], [AacImplementation::FdkAac, 'libfdk_aac'], [AacImplementation::Ffmpeg, 'aac']] as [$implementation, $codec]) {
+        foreach ([[AacImplementation::Bac, 'libbac'], [AacImplementation::FdkAac, 'libfdk_aac'], [AacImplementation::Ffmpeg, 'aac']] as [$implementation, $codec]) {
             $args = $this->encoder()->buildStreamArgs('/source.mkv', QualityTier::p720(), '', '/output',
                 audioStreamIndex: 2, audioProfile: AudioProfile::streamingStereo(), aacImplementation: $implementation, sourceAudioCodec: 'aac');
             $decoder = array_search('-c:a:2', $args, true);
@@ -787,7 +787,7 @@ final class SegmentEncoderStreamArgsTest extends TestCase
         $args = $this->encoder()->buildStreamArgs('/source.mkv', QualityTier::p720(), '', '/output',
             audioProfile: AudioProfile::streamingStereo(), aacImplementation: AacImplementation::Bac, sourceAudioCodec: $sourceCodec);
         self::assertNotContains('-c:a:0', $args);
-        self::assertSame('libbaac', $args[array_search('-c:a', $args, true) + 1]);
+        self::assertSame('libbac', $args[array_search('-c:a', $args, true) + 1]);
     }
 
     /** @return iterable<string, array{?string}> */
@@ -824,6 +824,6 @@ final class SegmentEncoderStreamArgsTest extends TestCase
         $args = $this->encoder()->buildStreamArgs('/source.mkv', QualityTier::p720(), '', '/output',
             audioProfile: AudioProfile::opusStereo(), aacImplementation: AacImplementation::Bac, sourceAudioCodec: 'aac');
         self::assertSame('libopus', $args[array_search('-c:a', $args, true) + 1]);
-        self::assertSame('libbaac', $args[array_search('-c:a:0', $args, true) + 1], 'an AAC source is still decoded by the selected implementation');
+        self::assertSame('libbac', $args[array_search('-c:a:0', $args, true) + 1], 'an AAC source is still decoded by the selected implementation');
     }
 }

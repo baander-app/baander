@@ -90,6 +90,10 @@ docker buildx build -f docker/ffmpeg/Dockerfile -t ffmpeg-baander-static:local -
 export BAANDER_FFMPEG_IMAGE=ffmpeg-baander-static:local
 ```
 
+Build it again when the codec names in `docker/ffmpeg/expected-capabilities.txt`
+change: the application image checks its FFmpeg against that list from your
+checkout, so an older local build fails the check.
+
 Start the preview for this checkout and print its URL:
 
 ```bash

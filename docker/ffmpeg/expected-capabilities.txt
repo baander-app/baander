@@ -22,8 +22,8 @@ encoder vp9_vaapi
 encoder vp9_qsv
 # The AAC implementations the transcode.aac_implementation setting can select,
 # each needed as encoder and as decoder.
-encoder libbaac
-decoder libbaac
+encoder libbac
+decoder libbac
 encoder libfdk_aac
 decoder libfdk_aac
 encoder aac

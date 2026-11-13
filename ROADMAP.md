@@ -186,8 +186,9 @@ retry-after-network-failure case remains outside this recovery check.
 ## Bånder Audio Core in the server transcoder
 
 Delivered and merged on 2026-11-07: the project's static FFmpeg 8.1 build carries
-Bånder Audio Core as the `libbaac` encoder and decoder beside fdk-aac and FFmpeg's built-in AAC
-codec, and the application image runs it at `/usr/bin`. The
+Bånder Audio Core as the `libbac` encoder and decoder (`libbaac` until the rename)
+beside fdk-aac and FFmpeg's built-in AAC codec, and the application image runs it
+at `/usr/bin`. The
 `transcode.aac_implementation` setting selects the implementation (see the
 [transcoding guide](docs-book/part-1-operator-guide/media/transcoding.md#aac-implementation)).
 The `ffmpeg` role of the tooling image catalog pins the published image by digest.
@@ -224,7 +225,7 @@ Open items:
   on the default branch (3 critical, 78 high).
 - Review advisories left for a decision: a rendition whose source codec ffprobe
   cannot report decodes with FFmpeg's default decoder instead of the selected one;
-  the libbaac decoder labels 7- and 8-channel output with an unspecified layout unless
+  the libbac decoder labels 7- and 8-channel output with an unspecified layout unless
   the container gives one; it neither trims nor drains decoder delay, which matters
   only for MPEG Surround sources; the unused `FFmpegAdapter` per-segment encoders read
   the live setting rather than a session's.

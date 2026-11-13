@@ -1,5 +1,5 @@
 /*
- * bAAC encoder wrapper for libavcodec
+ * Bånder Audio Core encoder wrapper for libavcodec
  * Copyright (c) 2026 Baander
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may
@@ -29,7 +29,7 @@
 #include "encode.h"
 #include "profiles.h"
 
-typedef struct BaacEncContext {
+typedef struct BacEncContext {
     const AVClass *class;
     AacEncoderHandle enc;
     int afterburner;
@@ -40,11 +40,11 @@ typedef struct BaacEncContext {
     int max_frame_bytes;
     int delay_sent;
     AudioFrameQueue afq;
-} BaacEncContext;
+} BacEncContext;
 
-#define OFFSET(x) offsetof(BaacEncContext, x)
+#define OFFSET(x) offsetof(BacEncContext, x)
 #define AE AV_OPT_FLAG_AUDIO_PARAM | AV_OPT_FLAG_ENCODING_PARAM
-static const AVOption baac_enc_options[] = {
+static const AVOption bac_enc_options[] = {
     { "afterburner", "Second quantisation pass (library default when unset)", OFFSET(afterburner), AV_OPT_TYPE_INT, { .i64 = -1 }, -1, 1, AE },
     { "quality", "Quality override for the rate control (library default when unset)", OFFSET(quality), AV_OPT_TYPE_INT, { .i64 = -1 }, -1, 100, AE },
     { "rc", "Rate control mode", OFFSET(rc), AV_OPT_TYPE_INT, { .i64 = AAC_RC_CBR }, 0, 3, AE, .unit = "rc" },
@@ -56,14 +56,14 @@ static const AVOption baac_enc_options[] = {
     { NULL }
 };
 
-static const AVClass baac_enc_class = {
-    .class_name = "libbaac",
+static const AVClass bac_enc_class = {
+    .class_name = "libbac",
     .item_name  = av_default_item_name,
-    .option     = baac_enc_options,
+    .option     = bac_enc_options,
     .version    = LIBAVUTIL_VERSION_INT,
 };
 
-static const char *baac_error(int err)
+static const char *bac_error(int err)
 {
     switch (err) {
     case AAC_ERR_INVALID_ARG:  return "invalid argument";
@@ -77,9 +77,9 @@ static const char *baac_error(int err)
     }
 }
 
-static av_cold int baac_encode_close(AVCodecContext *avctx)
+static av_cold int bac_encode_close(AVCodecContext *avctx)
 {
-    BaacEncContext *s = avctx->priv_data;
+    BacEncContext *s = avctx->priv_data;
 
     if (s->enc)
         aac_encoder_destroy(s->enc);
@@ -92,9 +92,9 @@ static av_cold int baac_encode_close(AVCodecContext *avctx)
 
 /* Drains the encoder so that the next frame opens a clean stream; used
  * for a seek, where the queued frames are discarded. */
-static av_cold void baac_encode_flush(AVCodecContext *avctx)
+static av_cold void bac_encode_flush(AVCodecContext *avctx)
 {
-    BaacEncContext *s = avctx->priv_data;
+    BacEncContext *s = avctx->priv_data;
     int64_t pts, duration;
     uint8_t *scratch;
     int len;
@@ -111,16 +111,16 @@ static av_cold void baac_encode_flush(AVCodecContext *avctx)
     av_free(scratch);
 }
 
-static av_cold int baac_encode_init(AVCodecContext *avctx)
+static av_cold int bac_encode_init(AVCodecContext *avctx)
 {
-    BaacEncContext *s = avctx->priv_data;
+    BacEncContext *s = avctx->priv_data;
     AVCPBProperties *cpb_props;
     uint8_t asc[64];
     int channels = avctx->ch_layout.nb_channels;
     int sce, cpe, ret, asc_size;
 
     if (avctx->profile != AV_PROFILE_UNKNOWN && avctx->profile != AV_PROFILE_AAC_LOW) {
-        av_log(avctx, AV_LOG_ERROR, "libbaac encodes the AAC-LC profile only\n");
+        av_log(avctx, AV_LOG_ERROR, "libbac encodes the AAC-LC profile only\n");
         return AVERROR(EINVAL);
     }
 
@@ -143,27 +143,27 @@ static av_cold int baac_encode_init(AVCodecContext *avctx)
     s->enc = aac_encoder_create(avctx->sample_rate, channels, (int)avctx->bit_rate,
                                 AAC_AOT_LC, (AacRateControl)s->rc);
     if (!s->enc) {
-        av_log(avctx, AV_LOG_ERROR, "Unable to create the bAAC encoder for %d Hz, %d channels, %"PRId64" bit/s\n",
+        av_log(avctx, AV_LOG_ERROR, "Unable to create the Baander Audio Core encoder for %d Hz, %d channels, %"PRId64" bit/s\n",
                avctx->sample_rate, channels, avctx->bit_rate);
         return AVERROR(EINVAL);
     }
 
     ret = aac_encoder_set_transport(s->enc, AAC_TRANSPORT_RAW);
     if (ret != AAC_OK) {
-        av_log(avctx, AV_LOG_ERROR, "Unable to select raw access units: %s\n", baac_error(ret));
+        av_log(avctx, AV_LOG_ERROR, "Unable to select raw access units: %s\n", bac_error(ret));
         goto error;
     }
     if (s->afterburner >= 0) {
         ret = aac_encoder_set_afterburner(s->enc, s->afterburner);
         if (ret != AAC_OK) {
-            av_log(avctx, AV_LOG_ERROR, "Unable to set the afterburner: %s\n", baac_error(ret));
+            av_log(avctx, AV_LOG_ERROR, "Unable to set the afterburner: %s\n", bac_error(ret));
             goto error;
         }
     }
     if (s->quality >= 0) {
         ret = aac_encoder_set_quality(s->enc, s->quality);
         if (ret != AAC_OK) {
-            av_log(avctx, AV_LOG_ERROR, "Unable to set the quality: %s\n", baac_error(ret));
+            av_log(avctx, AV_LOG_ERROR, "Unable to set the quality: %s\n", bac_error(ret));
             goto error;
         }
     }
@@ -171,7 +171,7 @@ static av_cold int baac_encode_init(AVCodecContext *avctx)
         ret = aac_encoder_set_bandwidth(s->enc, avctx->cutoff);
         if (ret != AAC_OK) {
             av_log(avctx, AV_LOG_ERROR, "Unable to set the bandwidth to %d Hz: %s\n",
-                   avctx->cutoff, baac_error(ret));
+                   avctx->cutoff, bac_error(ret));
             goto error;
         }
     }
@@ -190,7 +190,7 @@ static av_cold int baac_encode_init(AVCodecContext *avctx)
     asc_size = aac_encoder_config(s->enc, asc, sizeof(asc));
     if (asc_size <= 0) {
         av_log(avctx, AV_LOG_ERROR, "Unable to write the AudioSpecificConfig: %s\n",
-               baac_error(asc_size));
+               bac_error(asc_size));
         ret = asc_size;
         goto error;
     }
@@ -215,14 +215,14 @@ static av_cold int baac_encode_init(AVCodecContext *avctx)
 error:
     ret = AVERROR(EINVAL);
 fail:
-    baac_encode_close(avctx);
+    bac_encode_close(avctx);
     return ret;
 }
 
-static int baac_encode_frame(AVCodecContext *avctx, AVPacket *avpkt,
+static int bac_encode_frame(AVCodecContext *avctx, AVPacket *avpkt,
                              const AVFrame *frame, int *got_packet_ptr)
 {
-    BaacEncContext *s = avctx->priv_data;
+    BacEncContext *s = avctx->priv_data;
     int channels = avctx->ch_layout.nb_channels;
     int ret, len, discard_padding;
 
@@ -242,7 +242,7 @@ static int baac_encode_frame(AVCodecContext *avctx, AVPacket *avpkt,
         len = aac_encoder_flush(s->enc, avpkt->data, avpkt->size);
     }
     if (len < 0) {
-        av_log(avctx, AV_LOG_ERROR, "Unable to encode frame: %s\n", baac_error(len));
+        av_log(avctx, AV_LOG_ERROR, "Unable to encode frame: %s\n", bac_error(len));
         return AVERROR(EINVAL);
     }
     if (len == 0)
@@ -277,42 +277,42 @@ static const AVProfile profiles[] = {
     { AV_PROFILE_UNKNOWN },
 };
 
-static const FFCodecDefault baac_encode_defaults[] = {
+static const FFCodecDefault bac_encode_defaults[] = {
     { "b", "0" },
     { NULL }
 };
 
-static const AVChannelLayout baac_ch_layouts[] = {
+static const AVChannelLayout bac_ch_layouts[] = {
     AV_CHANNEL_LAYOUT_MONO,
     AV_CHANNEL_LAYOUT_STEREO,
     AV_CHANNEL_LAYOUT_5POINT1_BACK,
     { 0 },
 };
 
-static const int baac_sample_rates[] = {
+static const int bac_sample_rates[] = {
     96000, 88200, 64000, 48000, 44100, 32000,
     24000, 22050, 16000, 12000, 11025, 8000, 0
 };
 
-const FFCodec ff_libbaac_encoder = {
-    .p.name                = "libbaac",
-    CODEC_LONG_NAME("bAAC (Baander AAC)"),
+const FFCodec ff_libbac_encoder = {
+    .p.name                = "libbac",
+    CODEC_LONG_NAME("Baander Audio Core"),
     .p.type                = AVMEDIA_TYPE_AUDIO,
     .p.id                  = AV_CODEC_ID_AAC,
     .p.capabilities        = AV_CODEC_CAP_DR1 | AV_CODEC_CAP_DELAY |
                              AV_CODEC_CAP_ENCODER_FLUSH |
                              AV_CODEC_CAP_SMALL_LAST_FRAME,
     .caps_internal         = FF_CODEC_CAP_NOT_INIT_THREADSAFE,
-    .priv_data_size        = sizeof(BaacEncContext),
-    .init                  = baac_encode_init,
-    FF_CODEC_ENCODE_CB(baac_encode_frame),
-    .flush                 = baac_encode_flush,
-    .close                 = baac_encode_close,
+    .priv_data_size        = sizeof(BacEncContext),
+    .init                  = bac_encode_init,
+    FF_CODEC_ENCODE_CB(bac_encode_frame),
+    .flush                 = bac_encode_flush,
+    .close                 = bac_encode_close,
     CODEC_SAMPLEFMTS(AV_SAMPLE_FMT_FLT),
-    .p.priv_class          = &baac_enc_class,
-    .defaults              = baac_encode_defaults,
+    .p.priv_class          = &bac_enc_class,
+    .defaults              = bac_encode_defaults,
     .p.profiles            = profiles,
-    CODEC_SAMPLERATES_ARRAY(baac_sample_rates),
-    .p.wrapper_name        = "libbaac",
-    CODEC_CH_LAYOUTS_ARRAY(baac_ch_layouts),
+    CODEC_SAMPLERATES_ARRAY(bac_sample_rates),
+    .p.wrapper_name        = "libbac",
+    CODEC_CH_LAYOUTS_ARRAY(bac_ch_layouts),
 };

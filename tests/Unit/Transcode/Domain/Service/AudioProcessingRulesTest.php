@@ -131,7 +131,7 @@ class AudioProcessingRulesTest extends TestCase
     {
         $profile = AudioProfile::streamingStereo();
 
-        $this->assertStringContainsString('-c:a libbaac -b:a 128k', AudioProcessingRules::codecOptions($profile, AacImplementation::Bac));
+        $this->assertStringContainsString('-c:a libbac -b:a 128k', AudioProcessingRules::codecOptions($profile, AacImplementation::Bac));
         $this->assertStringContainsString('-c:a libfdk_aac -b:a 128k', AudioProcessingRules::codecOptions($profile, AacImplementation::FdkAac));
         $this->assertStringContainsString('-c:a aac -b:a 128k', AudioProcessingRules::codecOptions($profile, AacImplementation::Ffmpeg));
         // -q:a is a no-op when -b:a is already set; no longer emitted

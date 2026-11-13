@@ -110,6 +110,13 @@ the workflow does not enable login lingering. A stopped instance stays stopped
 until `make dev-up` enables it again. If the daemon stops a ready instance, the
 enabled timer can restore its retained release and admit a fresh worker boot.
 
+Automatic updates build with the image selection that the last `make dev-up`
+captured, the FFmpeg image reference included. When `master` moves an image pin, for
+example to an FFmpeg image with new codec names, an automatic update can fail the
+application image's FFmpeg check and leave the instance on its current release. Run
+`make dev-up` again from a checkout that holds the new pin; it replaces the captured
+selection and keeps the instance's own checkout.
+
 Updates prepare immutable images before stopping writers. Migration checks run
 before advancing the instance, and readiness includes the worker pair. A blocked
 migration or uncertain worker retirement requires inspection; repeated timer ticks
@@ -147,6 +154,9 @@ the `ffmpeg` image role pins by digest to the public package on GHCR. A host tha
 cannot pull it sets `BAANDER_FFMPEG_IMAGE` to a locally built copy, such as the
 output of
 `docker buildx build -f docker/ffmpeg/Dockerfile -t ffmpeg-baander-static:local --load .`.
+Rebuild that copy when the codec names in `docker/ffmpeg/expected-capabilities.txt`
+change: the application image build checks the FFmpeg binary against that list from
+the checkout, so a copy built before the change fails the check.
 
 Use the URL returned by `make preview-url` for browser work. For Playwright:
 

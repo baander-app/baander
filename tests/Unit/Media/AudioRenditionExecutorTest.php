@@ -382,7 +382,7 @@ final class AudioRenditionExecutorTest extends TestCase
 
     public function testAacRenditionsUseTheSelectedEncoderAndDecodeAacSourcesWithIt(): void
     {
-        foreach (['bac' => 'libbaac', 'fdk_aac' => 'libfdk_aac', 'ffmpeg' => 'aac'] as $implementation => $codec) {
+        foreach (['bac' => 'libbac', 'fdk_aac' => 'libfdk_aac', 'ffmpeg' => 'aac'] as $implementation => $codec) {
             $this->setUp();
             $commands = $this->runEncode('aac', AudioRenditionFormat::Aac, $implementation);
             $encode = $commands[1];
@@ -398,7 +398,7 @@ final class AudioRenditionExecutorTest extends TestCase
     public function testAnAacSourceToOpusIsDecodedBySelectedImplementation(): void
     {
         $encode = $this->runEncode('aac', AudioRenditionFormat::Opus, 'bac')[1];
-        self::assertSame('libbaac', $encode[array_search('-c:a:0', $encode, true) + 1]);
+        self::assertSame('libbac', $encode[array_search('-c:a:0', $encode, true) + 1]);
         self::assertSame('libopus', $encode[array_search('-c:a', $encode, true) + 1]);
     }
 
@@ -406,7 +406,7 @@ final class AudioRenditionExecutorTest extends TestCase
     {
         $encode = $this->runEncode('flac', AudioRenditionFormat::Mp3, 'bac')[1];
         self::assertNotContains('-c:a:0', $encode);
-        foreach (['libbaac', 'libfdk_aac', 'aac'] as $token) {
+        foreach (['libbac', 'libfdk_aac', 'aac'] as $token) {
             self::assertNotContains($token, $encode);
         }
         self::assertSame('libmp3lame', $encode[array_search('-c:a', $encode, true) + 1]);
