@@ -594,7 +594,7 @@ minute before it. Three things differ elsewhere.
   the AVX2 kernel, which GCC and Clang build. Its streams are the same;
   its encoding is slower than these figures say.
 - The NEON kernels were not run on this machine. The arm64 job of
-  `.github/workflows/aac-native.yml` runs them against the scalar
+  `.github/workflows/audio-core.yml` runs them against the scalar
   kernels; no speed was measured on ARM.
 - One start of `bac` costs more than one start of `flac`, because the
   tool loads the C++ runtime dynamically, as every build of the package

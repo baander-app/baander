@@ -1,4 +1,4 @@
-name: AAC native addon
+name: Audio Core binding
 
 # Builds the Node-API binding of packages/baander-audio-core for the Electron
 # version the desktop app locks, proves it loads under Node and under
@@ -7,7 +7,7 @@ name: AAC native addon
 # pin, FFmpeg and the decoder testbench), runs the lossless suites on the
 # macOS runners against the kernels of their processors, keeps one
 # prebuild per platform as a workflow artifact and, on an
-# `aac-native-v<version>` tag, attaches them to a GitHub release, where the
+# `audio-core-v<version>` tag, attaches them to a GitHub release, where the
 # package's install script fetches them.  Nothing is committed.
 
 on:
@@ -15,26 +15,26 @@ on:
         branches:
             - master
         tags:
-            - 'aac-native-v*'
+            - 'audio-core-v*'
         paths:
             - 'packages/baander-audio-core/**'
             - 'ui/electron/package.json'
             - 'ui/electron/yarn.lock'
-            - '.github/workflows/aac-native.yml'
+            - '.github/workflows/audio-core.yml'
     pull_request:
         types: [ opened, synchronize, reopened ]
         paths:
             - 'packages/baander-audio-core/**'
             - 'ui/electron/package.json'
             - 'ui/electron/yarn.lock'
-            - '.github/workflows/aac-native.yml'
+            - '.github/workflows/audio-core.yml'
     workflow_dispatch:
 
 permissions:
     contents: read
 
 concurrency:
-    group: aac-native-${{ github.ref }}
+    group: audio-core-${{ github.ref }}
     cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
@@ -100,14 +100,14 @@ jobs:
                 run: |
                     npx node-gyp rebuild --runtime=electron --target="$ELECTRON_VERSION" \
                       --dist-url=https://electronjs.org/headers
-                    ls -l build/Release/baander_aac.node
+                    ls -l build/Release/baander_audio_core.node
 
             -   name: Stage the prebuild
                 # The loader prefers prebuilds/<platform>-<arch>/, so the rest
                 # of the job exercises the file the release will carry.
                 run: |
                     mkdir -p "prebuilds/${{ matrix.target }}"
-                    cp build/Release/baander_aac.node "prebuilds/${{ matrix.target }}/"
+                    cp build/Release/baander_audio_core.node "prebuilds/${{ matrix.target }}/"
                     rm -rf build
 
             -   name: Smoke test under Node
@@ -273,14 +273,14 @@ jobs:
             -   name: Keep the prebuild
                 uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
                 with:
-                    name: baander_aac-${{ matrix.target }}
-                    path: packages/baander-audio-core/prebuilds/${{ matrix.target }}/baander_aac.node
+                    name: baander_audio_core-${{ matrix.target }}
+                    path: packages/baander-audio-core/prebuilds/${{ matrix.target }}/baander_audio_core.node
                     if-no-files-found: error
                     retention-days: 30
 
     release:
         name: Release assets
-        if: github.server_url == 'https://github.com' && startsWith(github.ref, 'refs/tags/aac-native-v')
+        if: github.server_url == 'https://github.com' && startsWith(github.ref, 'refs/tags/audio-core-v')
         needs: build
         runs-on: ${{ github.server_url == 'https://github.com' && 'ubuntu-latest' || 'docker-cli' }}
         timeout-minutes: 15
@@ -293,27 +293,27 @@ jobs:
             -   name: Tag matches the package version
                 run: |
                     version="$(node -p 'require("./packages/baander-audio-core/package.json").version')"
-                    test "$GITHUB_REF_NAME" = "aac-native-v$version" \
+                    test "$GITHUB_REF_NAME" = "audio-core-v$version" \
                       || { echo "tag $GITHUB_REF_NAME does not match package version $version"; exit 1; }
                     echo "VERSION=$version" >> "$GITHUB_ENV"
 
             -   name: Collect the prebuilds
                 uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
                 with:
-                    pattern: baander_aac-*
+                    pattern: baander_audio_core-*
                     path: prebuilds
 
             -   name: Name the assets and write SHA256SUMS
                 # One asset per platform, named after the artifact
-                # (baander_aac-<platform>-<arch>.node), which is what the
+                # (baander_audio_core-<platform>-<arch>.node), which is what the
                 # install script asks the release for.
                 run: |
                     mkdir -p assets
-                    for dir in prebuilds/baander_aac-*; do
-                      cp "$dir/baander_aac.node" "assets/$(basename "$dir").node"
+                    for dir in prebuilds/baander_audio_core-*; do
+                      cp "$dir/baander_audio_core.node" "assets/$(basename "$dir").node"
                     done
                     test "$(ls assets/*.node | wc -l)" -eq 4 || { echo "expected four prebuilds"; ls -l assets; exit 1; }
-                    (cd assets && sha256sum baander_aac-*.node > SHA256SUMS)
+                    (cd assets && sha256sum baander_audio_core-*.node > SHA256SUMS)
                     cat assets/SHA256SUMS
 
             -   name: Attach the assets to the release
@@ -324,6 +324,6 @@ jobs:
                       gh release upload "$GITHUB_REF_NAME" assets/* --repo "$GITHUB_REPOSITORY" --clobber
                     else
                       gh release create "$GITHUB_REF_NAME" assets/* --repo "$GITHUB_REPOSITORY" --verify-tag \
-                        --title "@baander/aac-native $VERSION" \
-                        --notes "Prebuilt Node-API binding of @baander/aac-native $VERSION for Electron $(node -p 'require("./ui/electron/package.json").devDependencies.electron'), one asset per platform; the package's install script fetches the one for the running platform."
+                        --title "@baander/audio-core $VERSION" \
+                        --notes "Prebuilt Node-API binding of @baander/audio-core $VERSION for Electron $(node -p 'require("./ui/electron/package.json").devDependencies.electron'), one asset per platform; the package's install script fetches the one for the running platform."
                     fi

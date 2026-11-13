@@ -61,7 +61,7 @@ static float lcg_float(unsigned* seed) { return (float)(lcg_next(seed) >> 8) / 8
  * the C library's functions, not of the compiler or the optimisation
  * level.  The streams are written with --write-streams by a Release build
  * with the compiler of the linux-x64 job in
- * .github/workflows/aac-native.yml.  A build without those options
+ * .github/workflows/audio-core.yml.  A build without those options
  * compares its streams with the committed ones through the decodes. */
 #if BAC_EXACT_MATH
 #define BAC_REFERENCE_BUILD 1

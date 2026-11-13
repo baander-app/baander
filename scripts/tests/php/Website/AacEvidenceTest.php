@@ -35,7 +35,7 @@ final class AacEvidenceTest extends TestCase
         $this->root = sys_get_temp_dir() . '/baander-audio-core-evidence-' . bin2hex(random_bytes(6));
         $this->directory = $this->root . '/packages/baander-audio-core/bench/results/';
         mkdir($this->directory, 0700, true);
-        file_put_contents($this->root . '/packages/baander-audio-core/package.json', json_encode(['name' => '@baander/aac-native', 'version' => '0.2.0'], JSON_THROW_ON_ERROR));
+        file_put_contents($this->root . '/packages/baander-audio-core/package.json', json_encode(['name' => '@baander/audio-core', 'version' => '0.2.0'], JSON_THROW_ON_ERROR));
         $profiles = ['lc' => [[64, 96, 128, 192, 256], ['ours', 'ffmpeg', 'fdk', 'libxaac', 'apple']], 'he' => [[32, 48, 64], ['ours', 'fdk', 'libxaac', 'apple']], 'hev2' => [[24, 32], ['ours', 'fdk', 'libxaac']], 'xhe' => [[24, 32, 48, 64, 96], ['ours', 'fdk', 'libxaac']]];
         foreach ($profiles as $family => [$rates, $encoders]) {
             foreach ($encoders as $encoder) {

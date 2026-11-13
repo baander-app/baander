@@ -1,7 +1,7 @@
 {
   "targets": [
     {
-      "target_name": "baander_aac",
+      "target_name": "baander_audio_core",
       "sources": [
         "node/src/addon.cc",
         "node/src/flac_addon.cc",

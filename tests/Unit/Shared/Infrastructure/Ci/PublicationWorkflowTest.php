@@ -387,7 +387,7 @@ SH;
     {
         $root = dirname(__DIR__, 5);
         self::assertDirectoryDoesNotExist($root . '/.forgejo/workflows');
-        foreach ([...self::GATE_WORKFLOWS, 'runner.yaml', 'postgres.yaml', 'nginx.yaml', 'ffmpeg.yaml', 'aac-native.yml'] as $file) {
+        foreach ([...self::GATE_WORKFLOWS, 'runner.yaml', 'postgres.yaml', 'nginx.yaml', 'ffmpeg.yaml', 'audio-core.yml'] as $file) {
             self::assertFileExists($root . '/.github/workflows/' . $file);
         }
         $documents = self::documents($root);
@@ -784,9 +784,9 @@ SH;
         }
     }
 
-    public function testAacNativeJobsSkipOnForgejoAndKeepTheirHostedLabelsOnGitHub(): void
+    public function testAudioCoreJobsSkipOnForgejoAndKeepTheirHostedLabelsOnGitHub(): void
     {
-        $jobs = $this->workflow('aac-native.yml')['jobs'];
+        $jobs = $this->workflow('audio-core.yml')['jobs'];
         $labels = [];
         foreach ($jobs['build']['strategy']['matrix']['include'] as $entry) {
             self::assertSame('docker-cli', self::interpolate($jobs['build']['runs-on'], self::context(self::FORGEJO, matrix: $entry)));
@@ -795,8 +795,10 @@ SH;
         self::assertSame(['ubuntu-latest', 'windows-2022', 'macos-15-intel', 'macos-latest'], $labels);
         self::assertSame('ubuntu-latest', self::interpolate($jobs['release']['runs-on'], self::context(self::GITHUB)));
         $tag = self::context(self::GITHUB);
-        $tag['github']['ref'] = 'refs/tags/aac-native-v1.0.0';
+        $tag['github']['ref'] = 'refs/tags/audio-core-v1.0.0';
         self::assertTrue(self::condition($jobs['release']['if'], $tag));
+        $tag['github']['ref'] = 'refs/tags/aac-native-v1.0.0';
+        self::assertFalse(self::condition($jobs['release']['if'], $tag), 'the tag prefix from before the rename releases nothing');
         foreach ($jobs as $name => $job) {
             self::assertStringContainsString(self::FORGE, $job['if'], $name);
             self::assertSame('docker-cli', self::interpolate($job['runs-on'], self::context(self::FORGEJO, matrix: ['os' => 'macos-latest'])), $name);

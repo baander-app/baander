@@ -51,7 +51,7 @@ $speed = static fn (?float $value): string => $value === null ? 'Not measured' :
       <div>
         <h3>Electron integration</h3>
         <p>Electron's main-process <code>AacService</code> exposes the native binding through registered IPC handlers and a preload bridge. The packaging configuration includes native files. This integration does not establish bAAC as the default playback path in the web application.</p>
-        <p>Start with the <a href="<?= $source('docs/README.md#building') ?>">source-build guide</a>, <a href="<?= $source('docs/README.md#api') ?>">C API</a> and <a href="<?= $source('docs/README.md#node-api-binding-baanderaac-native') ?>">Node-API binding</a>. Public package availability and release binaries are not established by these measurements.</p>
+        <p>Start with the <a href="<?= $source('docs/README.md#building') ?>">source-build guide</a>, <a href="<?= $source('docs/README.md#api') ?>">C API</a> and <a href="<?= $source('docs/README.md#node-api-binding-baanderaudio-core') ?>">Node-API binding</a>. Public package availability and release binaries are not established by these measurements.</p>
       </div>
     </div>
     <div class="baac-note">

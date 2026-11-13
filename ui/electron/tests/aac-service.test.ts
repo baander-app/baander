@@ -7,11 +7,11 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 // The binding comes from node_modules when installed, else from the source
 // package when it has been built there (npm install in the codec directory).
 const codec = resolve(dirname(fileURLToPath(import.meta.url)), '../../../packages/baander-audio-core');
-if (!process.env.BAANDER_AAC_NATIVE_MODULE && existsSync(join(codec, 'build/Release/baander_aac.node'))) {
-  process.env.BAANDER_AAC_NATIVE_MODULE = pathToFileURL(join(codec, 'node/index.js')).href;
+if (!process.env.BAANDER_AUDIO_CORE_MODULE && existsSync(join(codec, 'build/Release/baander_audio_core.node'))) {
+  process.env.BAANDER_AUDIO_CORE_MODULE = pathToFileURL(join(codec, 'node/index.js')).href;
 }
-const { AacService, loadAacNative } = await import('../src/main/services/aac.service.ts');
-const available = (await loadAacNative()).native !== null;
+const { AacService, loadAudioCore } = await import('../src/main/services/aac.service.ts');
+const available = (await loadAudioCore()).native !== null;
 
 function tones(samples: number, sampleRate: number, channels: number): Float32Array {
   const pcm = new Float32Array(samples * channels);

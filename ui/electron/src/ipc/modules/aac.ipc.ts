@@ -15,7 +15,7 @@ import type {
   AacTransport,
   AacUsacOptions,
   AacUsacTool,
-} from '@baander/aac-native';
+} from '@baander/audio-core';
 
 const SAMPLE_RATES = new Set([8000, 11025, 12000, 16000, 22050, 24000, 32000, 44100, 48000, 64000, 88200, 96000]);
 const MODES = new Set<AacRateControlMode>(['cbr', 'abr', 'cvbr', 'tvbr']);

@@ -1,8 +1,12 @@
 /* Encode a synthetic signal, decode it, and check the reconstruction:
  * exercises both classes, chunked input, and the declared delay. */
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { copyFileSync, mkdtempSync, readFileSync, realpathSync, rmSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { tmpdir } from 'node:os';
+import { basename, join } from 'node:path';
 import { test } from 'node:test';
 
 import { AacDecoder, AacEncoder, FlacDecoder, FlacEncoder, measureLoudness, version } from '../index.js';
@@ -33,6 +37,39 @@ function snrDb(ref, out, offset) {
 
 test('reports a version', () => {
   assert.equal(typeof version, 'string');
+});
+
+/* The compiled bindings a process has loaded, from the module cache that
+ * the loader's createRequire shares with every other. */
+function loadedBindings() {
+  return Object.keys(createRequire(import.meta.url).cache).filter((path) => path.endsWith('.node'));
+}
+
+test('loads baander_audio_core.node, or the file BAANDER_AUDIO_CORE_BINDING names', () => {
+  const loaded = loadedBindings();
+  assert.equal(loaded.length, 1);
+  assert.equal(basename(loaded[0]), 'baander_audio_core.node');
+  const directory = mkdtempSync(join(tmpdir(), 'baander-audio-core-binding-'));
+  try {
+    const copy = join(directory, 'named.node');
+    copyFileSync(loaded[0], copy);
+    const entry = new URL('../index.js', import.meta.url).href;
+    const child = [
+      "import { createRequire } from 'node:module';",
+      `await import(${JSON.stringify(entry)});`,
+      `const cache = createRequire(${JSON.stringify(entry)}).cache;`,
+      "console.log(JSON.stringify(Object.keys(cache).filter((path) => path.endsWith('.node'))));",
+    ].join('\n');
+    const output = execFileSync(process.execPath, ['--input-type=module', '-e', child], {
+      env: { ...process.env, BAANDER_AUDIO_CORE_BINDING: copy },
+      encoding: 'utf8',
+    });
+    // The module cache keys a file by its real path (macOS's temporary
+    // directory is behind a symbolic link).
+    assert.deepEqual(JSON.parse(output.trim().split('\n').pop()), [realpathSync(copy)]);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
 });
 
 test('reports the version of the package', () => {

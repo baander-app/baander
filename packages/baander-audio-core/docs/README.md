@@ -837,7 +837,7 @@ Two limits of the kernel set are worth knowing:
   32-bit residual and the Rice fold and sums. They are compiled for
   arm64 only
   and are not exercised on the x86 host the codec was developed on; the
-  arm64 runner of `.github/workflows/aac-native.yml` runs them against
+  arm64 runner of `.github/workflows/audio-core.yml` runs them against
   the scalar kernels and fails when they did not run.
 
 ### Tags and pictures
@@ -978,7 +978,7 @@ classes. Samples are `Int32Array`, interleaved, at the stream's bit
 depth.
 
 ```js
-import { FlacDecoder, FlacEncoder } from '@baander/aac-native';
+import { FlacDecoder, FlacEncoder } from '@baander/audio-core';
 
 const encoder = new FlacEncoder({ sampleRate: 44100, channels: 2, bitsPerSample: 16, level: 5 });
 const stream = Buffer.concat([encoder.encode(pcm), encoder.finish()]);
@@ -1491,7 +1491,7 @@ Raw PCM is interleaved 32-bit float. With ffmpeg:
 ffmpeg -i song.flac -f f32le -ac 2 -ar 44100 - | bac enc - song.aac 44100 2 128000
 ```
 
-### Node-API binding (`@baander/aac-native`)
+### Node-API binding (`@baander/audio-core`)
 
 The package root is this directory (`package.json`, `binding.gyp`); the
 entry is `node/index.js`, ESM only, for Node 26 and Electron. `npm install`
@@ -1502,7 +1502,7 @@ ABI with `yarn electron-rebuild`; electron-builder ships the entry, the
 types and the compiled binding only.
 
 ```js
-import { AacDecoder, AacEncoder } from '@baander/aac-native';
+import { AacDecoder, AacEncoder } from '@baander/audio-core';
 
 const encoder = new AacEncoder({ sampleRate: 44100, channels: 2, bitrate: 128000, mode: 'cbr' });
 const stream = Buffer.concat([encoder.encode(pcm), encoder.flush()]);
@@ -1569,12 +1569,12 @@ release it was compiled against, so one binary per platform and
 architecture serves Node 26 and Electron 45 alike. `node/index.js`
 resolves it in this order and lists every path it tried when none loads:
 
-1. the file named in `BAANDER_AAC_NATIVE_BINDING`, when that is set (a
+1. the file named in `BAANDER_AUDIO_CORE_BINDING`, when that is set (a
    build elsewhere);
-2. `build/Release/baander_aac.node`, then `build/Debug/`, where node-gyp
+2. `build/Release/baander_audio_core.node`, then `build/Debug/`, where node-gyp
    and `@electron/rebuild` put a local build, so a build a developer
    just made wins over a binary fetched earlier;
-3. `prebuilds/<process.platform>-<process.arch>/baander_aac.node`, the
+3. `prebuilds/<process.platform>-<process.arch>/baander_audio_core.node`, the
    prebuilt release asset (`linux-x64`, `win32-x64`, `darwin-x64`,
    `darwin-arm64`).
 
@@ -1582,20 +1582,20 @@ The package's `install` script (`node/scripts/fetch-prebuilds.mjs
 --install`) runs on every `npm install` and `yarn install`, including the
 copy the Electron app makes of this `file:` dependency. It asks the GitHub
 API of the repository in `package.json` for the release
-`aac-native-v<version>` of the package's own version, downloads
-`baander_aac-<platform>-<arch>.node` into `prebuilds/`, checks it against
+`audio-core-v<version>` of the package's own version, downloads
+`baander_audio_core-<platform>-<arch>.node` into `prebuilds/`, checks it against
 the release's `SHA256SUMS` and loads it once in a child process, which
 must report the same version. When any of that fails (offline, a proxy,
 no release yet) it builds from source with `node-gyp rebuild` instead, so
 a machine with a toolchain never depends on the network and a machine
 without one needs only the release. The script never fails the install:
 when neither route works it prints what to run later
-(`npm rebuild @baander/aac-native` or `yarn electron-rebuild`) and the
+(`npm rebuild @baander/audio-core` or `yarn electron-rebuild`) and the
 loader reports the missing binding at first use. An existing prebuild is kept; `npm run prebuild:download
--- --force` replaces it, and `BAANDER_AAC_NATIVE_BUILD_FROM_SOURCE=1` (or
+-- --force` replaces it, and `BAANDER_AUDIO_CORE_BUILD_FROM_SOURCE=1` (or
 npm's `--build-from-source`) skips the download. `GITHUB_TOKEN` is
-optional for a public repository; `BAANDER_AAC_PREBUILD_REPO`,
-`BAANDER_AAC_PREBUILD_TAG` and `BAANDER_AAC_PREBUILD_API` pin the
+optional for a public repository; `BAANDER_AUDIO_CORE_PREBUILD_REPO`,
+`BAANDER_AUDIO_CORE_PREBUILD_TAG` and `BAANDER_AUDIO_CORE_PREBUILD_API` pin the
 repository, the release and the API host. Naming the script `install`
 (not `postinstall`) matters: npm and Yarn run an implicit `node-gyp
 rebuild` for a package with a `binding.gyp` only when it has no `install`
@@ -1612,10 +1612,10 @@ loads in Electron as well:
 ```sh
 npx node-gyp rebuild --runtime=electron --target=45.0.0 --dist-url=https://electronjs.org/headers
 mkdir -p prebuilds/$(node -p 'process.platform + "-" + process.arch')
-cp build/Release/baander_aac.node prebuilds/$(node -p 'process.platform + "-" + process.arch')/
+cp build/Release/baander_audio_core.node prebuilds/$(node -p 'process.platform + "-" + process.arch')/
 ```
 
-`.github/workflows/aac-native.yml` does the same on Linux x64, Windows
+`.github/workflows/audio-core.yml` does the same on Linux x64, Windows
 x64, macOS x64 and macOS arm64 for every push to `master` and pull
 request that touches the package, the desktop app's Electron version or
 the workflow: it builds against the headers of the locked Electron, runs
@@ -1624,7 +1624,7 @@ no display needed) with the binary in `prebuilds/`, runs the CTest
 suites on Linux with FFmpeg, the reference `flac` and the FLAC decoder
 testbench required, runs `test_dsp` and the lossless suites on the two
 macOS runners against the kernels of their processors, and keeps each
-binary as a workflow artifact. Pushing a tag `aac-native-v<version>` (the version in
+binary as a workflow artifact. Pushing a tag `audio-core-v<version>` (the version in
 `package.json`; the workflow refuses a mismatch) attaches the four
 binaries and `SHA256SUMS` to the GitHub release of that tag, creating
 the release when needed; nothing is committed. The desktop app's
@@ -1793,7 +1793,7 @@ sanitizer build included; a build with another compiler compares the
 decodes instead. `--write-streams tests/data` on each suite regenerates
 its own streams, and the committed ones come from a Release build with
 the compiler of the `linux-x64` job in
-`.github/workflows/aac-native.yml` (`ubuntu-latest`, today Ubuntu 26.04
+`.github/workflows/audio-core.yml` (`ubuntu-latest`, today Ubuntu 26.04
 with GCC 15.2). The other USAC
 data under `tests/data` is the FDK xHE-AAC encoder's output
 (`usac_*.loas`, 48 access units each, mono and stereo at 12 to

@@ -21,7 +21,7 @@ export const IPC_CHANNELS = {
   DISCOVERY_SCAN_STOPPED: 'baander:discovery:scan-stopped',
   DISCOVERY_SCAN_STARTED: 'baander:discovery:scan-started',
 
-  // AAC codec channels (native baander-aac binding in the main process)
+  // AAC codec channels (the Bånder Audio Core binding in the main process)
   AAC_INFO: 'baander:aac:info',
   AAC_DECODE: 'baander:aac:decode',
   AAC_ENCODE: 'baander:aac:encode',

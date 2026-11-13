@@ -1,5 +1,5 @@
 /**
- * AAC codec service: the native baander-aac binding (@baander/aac-native)
+ * AAC codec service: the Bånder Audio Core binding (@baander/audio-core)
  * loaded in the main process, offered as one-shot calls and as streaming
  * sessions for the renderer.  The binding is optional at runtime: when it
  * is missing or fails to load, the service reports itself unavailable and
@@ -18,7 +18,7 @@ import type {
   AacEncoderOptions,
   AacProfile,
   measureLoudness,
-} from '@baander/aac-native';
+} from '@baander/audio-core';
 
 type Native = {
   AacDecoder: typeof AacDecoder;
@@ -97,13 +97,13 @@ type Loaded = { native: Native | null; error: string | null };
 let loading: Promise<Loaded> | null = null;
 
 /**
- * Loads the binding once.  BAANDER_AAC_NATIVE_MODULE names the module to
+ * Loads the binding once.  BAANDER_AUDIO_CORE_MODULE names the module to
  * import instead of the installed package (a path or file URL of its
  * entry), for development and tests.
  */
-export function loadAacNative(): Promise<Loaded> {
+export function loadAudioCore(): Promise<Loaded> {
   if (!loading) {
-    const specifier = process.env.BAANDER_AAC_NATIVE_MODULE || '@baander/aac-native';
+    const specifier = process.env.BAANDER_AUDIO_CORE_MODULE || '@baander/audio-core';
     loading = import(specifier).then(
       (module: Native) => ({ native: module, error: null }),
       (error: unknown) => ({ native: null, error: error instanceof Error ? error.message : String(error) }),
@@ -113,7 +113,7 @@ export function loadAacNative(): Promise<Loaded> {
 }
 
 /** For tests: forget the cached binding so the next call loads again. */
-export function resetAacNativeForTests(): void {
+export function resetAudioCoreForTests(): void {
   loading = null;
 }
 
@@ -123,16 +123,16 @@ export class AacService {
   private nextId = 1;
 
   async info(): Promise<AacInfo> {
-    const { native, error } = await loadAacNative();
+    const { native, error } = await loadAudioCore();
     return { available: native !== null, version: native?.version ?? null, error };
   }
 
   async isAvailable(): Promise<boolean> {
-    return (await loadAacNative()).native !== null;
+    return (await loadAudioCore()).native !== null;
   }
 
   private async native(): Promise<Native> {
-    const { native, error } = await loadAacNative();
+    const { native, error } = await loadAudioCore();
     if (!native) throw new Error(`AAC codec unavailable: ${error}`);
     return native;
   }

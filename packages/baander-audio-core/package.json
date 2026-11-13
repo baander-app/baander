@@ -1,7 +1,7 @@
 {
-  "name": "@baander/aac-native",
+  "name": "@baander/audio-core",
   "version": "0.2.0",
-  "description": "baander-aac: an AAC encoder and decoder (AAC-LC, HE-AAC, the low-delay profiles and xHE-AAC) and a lossless FLAC encoder and decoder, with a native Node-API binding",
+  "description": "Bånder Audio Core: an AAC encoder and decoder (AAC-LC, HE-AAC, the low-delay profiles and xHE-AAC) and a lossless FLAC encoder and decoder, with a native Node-API binding",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",

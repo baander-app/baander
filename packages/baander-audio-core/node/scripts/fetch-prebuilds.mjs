@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /* Fetches the prebuilt binding for this platform and architecture from the
- * GitHub release `aac-native-v<version>` of this package's version in the
+ * GitHub release `audio-core-v<version>` of this package's version in the
  * repository named in package.json into
- * prebuilds/<platform>-<arch>/baander_aac.node, checks it against the
+ * prebuilds/<platform>-<arch>/baander_audio_core.node, checks it against the
  * release's SHA256SUMS when the release carries one, and loads it once in
  * a child process to prove it is the right binary and version.
  *
@@ -20,10 +20,10 @@
  *
  * Environment: GITHUB_TOKEN or GH_TOKEN authenticates the API calls (needed
  * for a private repository and for busy CI machines, optional otherwise),
- * BAANDER_AAC_PREBUILD_REPO (owner/name) and BAANDER_AAC_PREBUILD_TAG pin
- * the release, BAANDER_AAC_PREBUILD_API replaces https://api.github.com (a
+ * BAANDER_AUDIO_CORE_PREBUILD_REPO (owner/name) and BAANDER_AUDIO_CORE_PREBUILD_TAG pin
+ * the release, BAANDER_AUDIO_CORE_PREBUILD_API replaces https://api.github.com (a
  * GitHub Enterprise host, or a local stand-in under test) and
- * BAANDER_AAC_NATIVE_BUILD_FROM_SOURCE=1 (or npm's --build-from-source)
+ * BAANDER_AUDIO_CORE_BUILD_FROM_SOURCE=1 (or npm's --build-from-source)
  * skips the download in install mode. */
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -37,9 +37,9 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
 const target = `${process.platform}-${process.arch}`;
 const directory = join(root, 'prebuilds', target);
-const binding = join(directory, 'baander_aac.node');
-const assetName = `baander_aac-${target}.node`;
-const tagPrefix = 'aac-native-v';
+const binding = join(directory, 'baander_audio_core.node');
+const assetName = `baander_audio_core-${target}.node`;
+const tagPrefix = 'audio-core-v';
 
 const args = new Set(process.argv.slice(2));
 const installing = args.has('--install');
@@ -47,11 +47,11 @@ const force = args.has('--force');
 const env = process.env;
 
 function log(message) {
-  console.error(`@baander/aac-native: ${message}`);
+  console.error(`@baander/audio-core: ${message}`);
 }
 
 function repository() {
-  const pinned = env.BAANDER_AAC_PREBUILD_REPO;
+  const pinned = env.BAANDER_AUDIO_CORE_PREBUILD_REPO;
   if (pinned) return pinned;
   const url = typeof pkg.repository === 'string' ? pkg.repository : pkg.repository && pkg.repository.url;
   const match = /github\.com[/:]([^/]+\/[^/]+?)(?:\.git)?\/?$/.exec(url || '');
@@ -73,8 +73,8 @@ async function github(url, accept, timeoutMs) {
 }
 
 async function findRelease(repo) {
-  const api = `${(env.BAANDER_AAC_PREBUILD_API || 'https://api.github.com').replace(/\/$/, '')}/repos/${repo}/releases`;
-  const pinnedTag = env.BAANDER_AAC_PREBUILD_TAG;
+  const api = `${(env.BAANDER_AUDIO_CORE_PREBUILD_API || 'https://api.github.com').replace(/\/$/, '')}/repos/${repo}/releases`;
+  const pinnedTag = env.BAANDER_AUDIO_CORE_PREBUILD_TAG;
   if (pinnedTag) {
     return (await github(`${api}/tags/${encodeURIComponent(pinnedTag)}`, 'application/vnd.github+json', 20000)).json();
   }
@@ -171,7 +171,7 @@ async function main() {
     log(`keeping the existing ${binding} (pass --force to replace it)`);
     return 0;
   }
-  const fromSource = installing && (env.BAANDER_AAC_NATIVE_BUILD_FROM_SOURCE === '1' || env.npm_config_build_from_source === 'true');
+  const fromSource = installing && (env.BAANDER_AUDIO_CORE_BUILD_FROM_SOURCE === '1' || env.npm_config_build_from_source === 'true');
   if (!fromSource) {
     try {
       await download();
@@ -189,7 +189,7 @@ async function main() {
   }
   const status = buildFromSource();
   if (status !== 0 && installing) {
-    log('the binding could not be fetched or built; run "npm rebuild @baander/aac-native" or "yarn electron-rebuild" before using it');
+    log('the binding could not be fetched or built; run "npm rebuild @baander/audio-core" or "yarn electron-rebuild" before using it');
     return 0;
   }
   return status;

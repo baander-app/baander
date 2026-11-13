@@ -1,5 +1,5 @@
 /**
- * Native binding of the baander-aac codec (AAC-LC, HE-AAC v1/v2, AAC-LD,
+ * Native binding of Bånder Audio Core (AAC-LC, HE-AAC v1/v2, AAC-LD,
  * AAC-ELD and USAC / xHE-AAC encoder and decoder, and the BS.1770-4
  * loudness meter).
  *

@@ -1,6 +1,6 @@
-/* ESM entry of @baander/aac-native.  A Node-API addon has no ESM import
+/* ESM entry of @baander/audio-core.  A Node-API addon has no ESM import
  * form, so the compiled binding is loaded through createRequire.  It is
- * looked for, in this order, at the path in BAANDER_AAC_NATIVE_BINDING when
+ * looked for, in this order, at the path in BAANDER_AUDIO_CORE_BINDING when
  * that is set, in build/Release and build/Debug, where node-gyp,
  * @electron/rebuild and electron-builder put a local build (a deliberate
  * local build wins over a fetched binary), and in prebuilds/<platform>-<arch>/
@@ -17,11 +17,11 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 function candidates() {
   const paths = [
-    join(root, 'build', 'Release', 'baander_aac.node'),
-    join(root, 'build', 'Debug', 'baander_aac.node'),
-    join(root, 'prebuilds', `${process.platform}-${process.arch}`, 'baander_aac.node'),
+    join(root, 'build', 'Release', 'baander_audio_core.node'),
+    join(root, 'build', 'Debug', 'baander_audio_core.node'),
+    join(root, 'prebuilds', `${process.platform}-${process.arch}`, 'baander_audio_core.node'),
   ];
-  const override = process.env.BAANDER_AAC_NATIVE_BINDING;
+  const override = process.env.BAANDER_AUDIO_CORE_BINDING;
   return override ? [override, ...paths] : paths;
 }
 
@@ -39,8 +39,8 @@ function load() {
     }
   }
   throw new Error(
-    '@baander/aac-native: no loadable binding (run "npm run prebuild:download" in the package, ' +
-      '"npm rebuild @baander/aac-native" or "yarn electron-rebuild"); tried:\n  ' +
+    '@baander/audio-core: no loadable binding (run "npm run prebuild:download" in the package, ' +
+      '"npm rebuild @baander/audio-core" or "yarn electron-rebuild"); tried:\n  ' +
       failures.join('\n  '),
   );
 }

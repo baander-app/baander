@@ -93,7 +93,7 @@ export default defineConfig(({mode}) => {
               emptyOutDir: true,
               // sourcemap: false,
               rollupOptions: {
-                external: ['electron', '@napi-rs/keyring', '@baander/aac-native'],
+                external: ['electron', '@napi-rs/keyring', '@baander/audio-core'],
               },
             },
             define: {
@@ -115,7 +115,7 @@ export default defineConfig(({mode}) => {
               sourcemap: false,
               // Build preload as CommonJS and name it preload.cjs
               rollupOptions: {
-                external: ['electron', '@napi-rs/keyring', '@baander/aac-native'],
+                external: ['electron', '@napi-rs/keyring', '@baander/audio-core'],
                 output: {
                   format: 'cjs',
                   entryFileNames: 'preload.cjs',

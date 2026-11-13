@@ -1077,4 +1077,4 @@ Napi::Object InitModule(Napi::Env env, Napi::Object exports) {
 
 }  // namespace
 
-NODE_API_MODULE(baander_aac, InitModule)
+NODE_API_MODULE(baander_audio_core, InitModule)

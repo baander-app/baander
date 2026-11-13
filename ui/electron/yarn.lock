@@ -12,13 +12,13 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@baander/aac-native@file:../../packages/baander-audio-core::locator=%40baander%2Fdesktop%40workspace%3A.":
+"@baander/audio-core@file:../../packages/baander-audio-core::locator=%40baander%2Fdesktop%40workspace%3A.":
   version: 0.2.0
-  resolution: "@baander/aac-native@file:../../packages/baander-audio-core#../../packages/baander-audio-core::hash=c047e6&locator=%40baander%2Fdesktop%40workspace%3A."
+  resolution: "@baander/audio-core@file:../../packages/baander-audio-core#../../packages/baander-audio-core::hash=31261d&locator=%40baander%2Fdesktop%40workspace%3A."
   dependencies:
     node-addon-api: "npm:^8.9.2"
     node-gyp: "npm:^11.0.0"
-  checksum: 10c0/b5e3cd1ac700f774edc190ca45cadaadabead71e1f198308729aaf524c91a612e3f3505ef2eb089c0ffa2c6a736f7a2867b4d0b3c944bec59e8251e5f57b9f48
+  checksum: 10c0/02ef56cd147077ad542a4d1fe8abfc4e6ce18c8c29eafac3a1d265a3b3d3d9b9e1ded671bdcddcefc889b17304f8714874664847f083f382a337662609401755
   languageName: node
   linkType: hard
 
@@ -26,7 +26,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@baander/desktop@workspace:."
   dependencies:
-    "@baander/aac-native": "file:../../packages/baander-audio-core"
+    "@baander/audio-core": "file:../../packages/baander-audio-core"
     "@electron/fuses": "npm:^2.1.1"
     "@electron/rebuild": "npm:^4.0.4"
     "@fontsource-variable/geist": "npm:^5.3.0"

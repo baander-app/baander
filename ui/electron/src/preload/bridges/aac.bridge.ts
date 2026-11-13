@@ -54,7 +54,7 @@ export interface AacLimiterOptions {
   releaseMs?: number;
 }
 
-/** Options of the native AAC decoder; see @baander/aac-native. */
+/** Options of the native AAC decoder; see @baander/audio-core. */
 export interface AacDecoderOptions {
   sampleRate?: number;
   /** 0 for the stream's own channels, 1 or 2 for a downmix, up to 8. */
@@ -168,7 +168,7 @@ export interface AacEncoderFrameInfo {
   samplePosition: number;
 }
 
-/** Options of the native AAC encoder; see @baander/aac-native. */
+/** Options of the native AAC encoder; see @baander/audio-core. */
 export interface AacEncoderOptions {
   sampleRate?: number;
   /** 1 to 8 in the canonical order; 'hev2' takes exactly 2. */
@@ -268,7 +268,7 @@ export interface AacEncoderSession {
 }
 
 /**
- * AAC codec bridge to the native baander-aac binding in the main process.
+ * AAC codec bridge to the Bånder Audio Core binding in the main process.
  * One-shot calls take a whole stream or signal; sessions decode or encode
  * chunk by chunk and must be closed when done.
  */
