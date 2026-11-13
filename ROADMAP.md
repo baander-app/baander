@@ -303,29 +303,42 @@ that limitation is recorded for follow-up, with no runtime change in the 2026-10
 
 ### State on 2026-11-13
 
-`master` is the rename's landing on GitHub and Forgejo. Landed on 2026-11-13: the
+`master` is `ca4f71103` or later on GitHub and Forgejo. Landed on 2026-11-13: the
 quality-gate tail fixes, the capability and size deployment settings, the registry
-deadline-readiness fix and the rename to Bånder Audio Core (`bac`), whose FFmpeg image
-pin follows as its own commit.
+deadline-readiness fix, the rename to Bånder Audio Core (`bac`) and its FFmpeg image
+pin. The website is published from `cbc5540f4`, and the persistent instance runs
+`ca4f71103`.
 
-- **Master CI.** The `CI` run on `c34a8e0a1` reached the quality gate's steps 42 to 53
-  for the first time; its registry jobs failed on the deadline-readiness race that
-  `e1a850a85` fixes. Check the runs from `e1a850a85` on. A green run is the first since
-  2026-11-05; then write the CI-repair learning with `ce-compound`, which the user
-  confirmed.
-- **Rename landing, remaining steps.** Done: `master`, the FFmpeg pin, the website
-  and the tag `audio-core-v0.2.0`. Remaining:
-  1. Check the `audio-core-v0.2.0` release: four prebuilds and `SHA256SUMS`, and a
-     clean desktop install that fetches its prebuild.
-  2. Confirm the persistent instance is ready on the pinned `master` after
-     `make dev-recover` and `make dev-up` (see the open item in "Local development
-     workflow").
-  3. Move `bench/work/` from `/home/martin/dev/baander-baac-lossless` into
+- **Master CI, set aside by the user on 2026-11-13.** The `CI` run on `c34a8e0a1`
+  (run 43445479040) passed the quality gate's steps 39 to 44 for the first time, then
+  failed step 45, "Worker command lifecycle and delivery"
+  (`scripts/test-worker-command-container.sh`), with "Invalid topology diagnostics
+  leaked credentials or launched worker". The check that prints it,
+  `invalidTopology()` in `packages/baander-tooling/src/Fixtures/Worker/Command.php`,
+  expects the worker's logs to name the rejected Redis setting. The likely cause,
+  reproduced on the host without containers: the drill passes `--deployment-profile`,
+  but its containers do not set `BAANDER_DEPLOYMENT_PROFILE`, so
+  `WorkerCommand::deploymentProfile()` exits with "Worker profile must match the web
+  deployment profile." before it checks the Redis settings. Proposed fix, not yet run
+  in containers: add `BAANDER_DEPLOYMENT_PROFILE` to the drill's common container
+  environment in `Command.php`. The same run's registry jobs failed on the
+  deadline-readiness race that `e1a850a85` fixes. Nobody waited for the run on
+  `ca4f71103`. The first green run since 2026-11-05 is the point to write the
+  CI-repair learning with `ce-compound`, which the user confirmed.
+- **Rename landing, remaining steps.** Done: `master`, the FFmpeg pin, the website,
+  the tag `audio-core-v0.2.0` and the persistent instance. Remaining:
+  1. The `audio-core-v0.2.0` release has no assets yet. In its run (43478502093) the
+     Linux x64, Windows x64 and macOS x64 prebuilds passed three times, and GitHub
+     never assigned a macOS arm64 runner ("The job was not acquired by Runner of type
+     hosted even after multiple attempts"), so the release job was skipped. Re-run the
+     failed job, then check the four prebuilds, `SHA256SUMS` and a clean desktop
+     install that fetches its prebuild.
+  2. Move `bench/work/` from `/home/martin/dev/baander-baac-lossless` into
      `packages/baander-audio-core/bench/`. Copy `work/heldout/runs.json` first, then
      run `./rename_ledger.py work/heldout/runs.json` and `./setup-refs.sh` without
      `--lossless-only`, so `env.sh` loses the old absolute paths.
-  4. Delete the GitHub branch `rename-audio-core` and record the landing results.
-  5. Forgejo CI is set aside by the user; re-run its `ci.yaml` once Forgejo's FFmpeg
+  3. Delete the GitHub branch `rename-audio-core`.
+  4. Forgejo CI is set aside by the user; re-run its `ci.yaml` once Forgejo's FFmpeg
      image carries `libbac`.
 
   Not run before `master`: the draft pull request CI (the user chose not to wait for
@@ -487,7 +500,11 @@ constructor's old argument order, and the image rejected them ("Argument #2
 The instance stayed blocked, refusing every later update, until `make dev-recover`
 and `make dev-up` ran from a current checkout. A contract change between the tooling
 and the image needs either a controller generation that updates with `master` or a
-versioned profile request the image can refuse with a reason.
+versioned profile request the image can refuse with a reason. The same day
+`make dev-recover` from `cbc5540f4` activated the retained `60fc26b63` release, and
+`make dev-up` from `ca4f71103` installed a new controller generation and brought the
+instance to `ca4f71103` with web and workers ready. `transcode.aac_implementation`
+reads `bac` there, and `debug:hw-transcode` maps it to `libbac` for encode and decode.
 
 ## Playback investigation and evidence limits
 
