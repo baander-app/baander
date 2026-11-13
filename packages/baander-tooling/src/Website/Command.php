@@ -83,7 +83,7 @@ final class Command
                     'template' => 'baac',
                     'url' => '/baac/',
                     'title' => 'bAAC',
-                    'description' => 'Bånder’s AAC codec library: Electron integration, planned transcoder and FFmpeg support, and recorded quality and speed comparisons.',
+                    'description' => 'Bånder’s AAC and lossless FLAC codec library: the server transcoder’s FFmpeg encoder, Electron integration, and recorded quality, size and speed comparisons.',
                     'stylesheet' => 'baac.css',
                     'script' => 'baac-charts.js',
                     'sources' => ['ui/site/templates/baac.php', 'packages/baander-aac/bench/results'],

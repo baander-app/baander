@@ -1,0 +1,372 @@
+# Development Environment
+
+Use `baander.test` for the persistent instance and a worktree preview for changes.
+The persistent instance follows remote `master` in its own checkout. A preview runs
+this worktree's PHP and Vite source with a separate database, Redis, keys and
+writable storage. Changing an agent branch does not change the persistent checkout.
+
+For the fastest default setup without configuration options, start with
+[Quick Start](quick-start.md).
+
+## Prerequisites and host setup
+
+The controller requires Linux, PHP 8.5+ with Swoole, Composer, Bash, GNU coreutils,
+`setsid`, Git, OpenSSL, Docker with Compose and Buildx, NetworkManager managing DNS
+through dnsmasq, mkcert, and a working systemd user manager. Docker must provide
+cgroup v2 and publish loopback port 443 for the invoking user. Each worker pair
+requires at least two daemon CPUs and 8448 MiB of daemon RAM; allow additional
+resources for web, dependencies and concurrent instances. Use Yarn for `ui/`
+workspaces; never run npm there (`tests/e2e` and `packages/baander-aac` use npm).
+
+The selected image stack uses PHP 8.5.12, Swoole 6.2.4 and Composer 2.11.1.
+The PHP ZTS application base, the Node tooling stage, the PostgreSQL 18
+database image and the runner image build on Debian 13 (trixie).
+Dependency maintenance needs PHP 8.5 or newer with the Swoole extension loaded
+(`Baander\Tooling\Runtime\Requirements::check()`) and exactly Composer 2.11.1 on
+`PATH`. See
+[PHP dependency maintenance](php-dependencies.md) for the seven projects, local
+and online checks, retained fixes and recorded upgrade blockers.
+
+Host setup uses the Composer project under `scripts/`, which installs the local
+`baander/tooling` library from `packages/baander-tooling/`; application
+dependencies and the application kernel are not prerequisites. It checks the PHP
+runtime before writing state. Bash entrypoints forward to PHP; the application
+console keeps its application commands. The root command `composer tooling:autoload`
+installs both the `scripts/` and `relay/` Composer projects for development and test
+work. For host setup, use the `scripts/` installation shown below.
+
+Generate the host instructions before starting an instance:
+
+```bash
+composer --working-dir=scripts install --no-dev
+make dev-host-setup
+```
+
+Read the generated `host-setup/README.md` and configuration files under
+`${XDG_STATE_HOME:-$HOME/.local/state}/baander/development`. They describe installing
+the NetworkManager dnsmasq configuration with administrator permission and
+reloading NetworkManager. Verify that `baander.test` and a subdomain both resolve
+to `127.0.0.1`. This DNS change can briefly interrupt network access.
+
+Install the local certificate trust explicitly, after inspecting those instructions:
+
+```bash
+make dev-host-setup OPTIONS=--install-trust
+```
+
+This invokes `mkcert -install`, which can request administrator permission, and
+creates the gateway leaf certificate for `baander.test` and `*.baander.test`.
+The private CA stays in host state. `make dev-host-setup OPTIONS=--inspect` checks
+DNS ownership, mkcert availability and whether loopback port 443 is free before
+first gateway startup. Host setup writes inspectable files; it does not install DNS
+configuration for you.
+
+The Docker daemon must see every source and state bind path. On SELinux hosts,
+prepare the selected worktree and media directories explicitly:
+
+```bash
+make dev-host-setup OPTIONS="--share-path /absolute/path/to/worktree --share-path /absolute/path/to/media"
+```
+
+This applies shared container labels to those directories and the managed runtime
+mounts. It preserves the private CA's separate label and rejects paths that would
+expose it. Root-owned generated files can require an administrator to apply the
+same `chcon -R --no-dereference -t container_file_t -l s0` command to the selected
+worktree. Do not relabel the home directory as a whole. Ordinary startup does not
+relabel user directories or disable SELinux. A remote daemon cannot read a
+client-only checkout path.
+
+## Everyday commands
+
+Run these commands from the repository root:
+
+| Command | Result |
+|---------|--------|
+| `make dev-up` | Start or resume `https://baander.test` and enable automatic remote-master updates |
+| `make dev-down` | Disable automatic updates and stop the persistent instance, retaining data |
+| `make dev-status` | Inspect persistent revisions, readiness, updater state and failures |
+| `make preview-up` | Start this worktree's preview and refresh its worker snapshot |
+| `make preview-down` | Stop this worktree's preview, retaining data |
+
+On first startup, the controller creates private configuration, initializes an empty
+database, creates OAuth keys and clients, and seeds development accounts. Subsequent
+starts reuse that identity and data. Lifecycle commands do not reset databases.
+Development credentials are `admin@baander.test` / `admin` and
+`user@baander.test` / `user`; keep these instances local.
+
+The persistent updater is a systemd user timer named
+`baander-development-<state-root-hash>.timer`. The state-root hash keeps separate
+controller state directories from sharing a timer. Inspect installed timers with
+`systemctl --user list-timers 'baander-development-*'`.
+It checks remote `master` every 60 seconds while enabled. Its controller and clone
+live outside worktrees. Publication installs a complete controller generation,
+atomically selects it and records its absolute PHP executable, preserving updater
+intent. Invocations lease
+the selected generation until they finish, so an update retains code still in use.
+The service retains the absolute executable search paths
+from `dev-up`, including Docker credential helpers; remote access must work without
+an interactive prompt. The user manager must remain available for checks to run;
+the workflow does not enable login lingering. A stopped instance stays stopped
+until `make dev-up` enables it again. If the daemon stops a ready instance, the
+enabled timer can restore its retained release and admit a fresh worker boot.
+
+Updates prepare immutable images before stopping writers. Migration checks run
+before advancing the instance, and readiness includes the worker pair. A blocked
+migration or uncertain worker retirement requires inspection; repeated timer ticks
+do not authorize a reset or database rollback.
+
+## Previews and browser verification
+
+A preview has a stable worktree-specific hostname below `baander.test`. PHP and
+Vite read the live worktree. PHP's development watcher reloads included files on
+close-write events; atomic saves and configuration changes can require
+`make restart-app` or `make preview-up`. Workers run immutable code captured by the most recent
+`make preview-up`; run that command again after worker changes. Preview PostgreSQL,
+Redis, secrets, caches and generated media are separate from the persistent instance.
+Startup creates empty mount directories in the checkout; dependencies and runtime
+contents live in the preview volumes.
+
+```bash
+make preview-up
+make preview-status
+make preview-url
+```
+
+A new linked worktree (`git worktree add`) lacks two host-side prerequisites,
+because neither is tracked. Run `composer --working-dir=scripts install --no-dev`
+in it first; without that, every lifecycle command stops with "Install workflow
+tooling first". On an SELinux host, also pass the new directory to `--share-path`
+as shown under host setup; otherwise preflight reports "Preview checkout is
+unavailable to the selected Docker daemon". The new preview inherits the
+persistent instance's media mount declarations, as described under media mounts,
+but starts with an empty catalog. Scan a library from the administration page, or
+with `make exec cmd="php bin/console app:library:scan <slug>"`.
+
+The application image copies FFmpeg from the project's static FFmpeg image, which
+the `ffmpeg` image role pins by digest to the public package on GHCR. A host that
+cannot pull it sets `BAANDER_FFMPEG_IMAGE` to a locally built copy, such as the
+output of
+`docker buildx build -f docker/ffmpeg/Dockerfile -t ffmpeg-baander-static:local --load .`.
+
+Use the URL returned by `make preview-url` for browser work. For Playwright:
+
+```bash
+E2E_BASE_URL="$(make preview-url)" yarn --cwd ui/web e2e:headless
+```
+
+The browser runner requires an explicit isolated preview URL. It does not provision
+an app or fall back to the persistent instance. See [Testing](../testing/README.md) for the
+separate disposable backend coordinator and frontend suites.
+
+## Local tooling settings
+
+The optional `tooling` object in `dev.local.json` selects role image references,
+Docker transport and finite workflow budgets alongside `libraries`. See the
+[tooling package reference](../../../packages/baander-tooling/README.md#configuration-and-image-roles)
+for supported keys, environment names and browser compatibility metadata.
+Invocation settings take precedence over captured environment settings, local
+settings and tracked defaults. For example:
+
+```bash
+make preview-up OPTIONS="--docker-context desktop-linux"
+```
+
+Use `--docker-host` for an endpoint or `--docker-executable` for a different CLI.
+A host and context cannot be supplied together. Startup validates new settings
+before changing instance state. Recovery uses the saved release's target, layout,
+images and generated inputs, even if today's local settings are invalid. Existing
+PostgreSQL and Redis data keep their recorded image identities; an image override
+does not upgrade those data stores. Preserve saved state when conversion or
+ownership checks refuse recovery. Lifecycle commands do not authorize a reset.
+
+An instance can lose its release images while it is stopped, most often to
+`docker system prune -a`. Startup then applies three rules. A recorded PostgreSQL or
+Redis identity is kept only while the daemon still holds that image; when the daemon
+answers "No such image", the role's image is built or pulled as for a new instance and
+the retained data is started on it. The preflight runs from the newly prepared release
+when the previous release's images are gone. A worker boot whose operator image is gone
+is recorded as retired when none of its containers exists. Startup refuses before
+anything starts while containers of that boot survive or the database still registers
+it, because only the lost operator image could have retired it; that case, and a
+database whose applied migrations were later rewritten, need a repair or a data reset,
+which the instance's owner approves.
+
+## Media mounts
+
+To create libraries automatically during startup, copy `dev.local.example.json`
+to `dev.local.json` in the checkout root and set each host directory:
+
+```json
+{
+    "libraries": [
+        {
+            "slug": "movies",
+            "name": "Movies",
+            "type": "movie",
+            "path": "/absolute/path/to/movies"
+        }
+    ]
+}
+```
+
+Each entry requires a unique slug, a nonempty name, a supported type and an
+absolute path to an existing readable directory. Types are `music`, `podcast`,
+`audiobook`, `movie` and `tv_show`. Slugs use lowercase letters, digits and hyphens
+between words; surrounding whitespace and uppercase letters are normalized.
+Unknown fields and invalid definitions fail before instance state is created.
+
+The controller reads the current worktree's file first. A linked worktree without
+that file uses the primary checkout's file from the same Git repository. Files
+are not merged. With a separate Git directory, fallback requires `core.worktree`
+to identify the primary checkout; otherwise put the file in the linked worktree.
+Git ignores the local file, and Docker builds and preview source snapshots exclude
+it even if accidentally tracked. The example remains versioned. Preview web
+containers can still see the local file through their live checkout bind.
+
+Startup mounts each directory read-only at `/media/<slug>`, waits for application
+readiness, then creates any missing library. An existing library with the same
+slug must match the configured name, type, container path and local filesystem.
+A conflict or failed command stops activation with an error. Startup never scans
+the directory; start a scan from the library administration page when wanted.
+
+Stop an existing preview before adding, removing or changing mounted paths:
+
+```bash
+make preview-down
+# Edit dev.local.json.
+make preview-up
+```
+
+Changing the host path keeps the library's container path and existing catalog.
+Removing a definition removes its configured mount but does not delete the
+application library or its catalog. An empty `libraries` array removes all
+configured library mounts and provisioning while retaining unrelated manual
+mounts. A missing file or omitted `libraries` field preserves saved settings;
+new previews can inherit saved settings from this repository's persistent instance.
+Saved definitions also let the persistent updater run without the local file.
+
+Add a host media directory when starting the persistent instance:
+
+```bash
+make dev-up MEDIA=/absolute/path/to/media
+make dev-up MEDIA=/absolute/path/to/media=/media/library
+```
+
+The optional target preserves a path expected by an existing library. New previews
+inherit persistent media mount declarations and mount source media read-only.
+An explicit `MEDIA` mapping to a configured library target overrides its host
+source for that invocation and saves the effective source with the instance.
+Their generated conversions and other writable state remain separate. Stop an
+instance before changing its mount declarations. Directory visibility and SELinux
+permissions must work on the selected Docker daemon. Media directories must not
+contain the private controller state directory or sit inside it.
+
+## Commands and diagnostics
+
+Generic Make commands select this worktree's preview. Select the persistent
+instance explicitly with `INSTANCE=persistent`:
+
+```bash
+make exec cmd="php bin/console about"
+make logs
+make exec INSTANCE=persistent cmd="php bin/console about"
+make dev-update
+make dev-update OPTIONS=--retry
+```
+
+`make exec` splits `cmd` into arguments with shell-style quoting, preserving quoted
+values as single arguments. Use `make exec-bash` when the command needs shell
+operations such as pipes, redirection or variable expansion.
+
+`make dev-update` requests an immediate remote-master check. `--retry` retries a
+failed build after its cause has been corrected. Inspect `make dev-status` before
+using `make dev-recover`; recovery reconciles a blocked attempt after database
+history has been checked. It does not reverse a migration. `make restart` refreshes
+the selected instance. `make ssh`, `make logs`, and dependency or migration commands
+use the same explicit instance selection.
+
+State defaults to `${XDG_STATE_HOME:-$HOME/.local/state}/baander/development`.
+For an isolated controller test or another state directory, use the dispatcher's
+`--state-root` option before its subcommand:
+
+```bash
+php scripts/dev-environment.php --state-root /absolute/private/state status --instance persistent
+```
+
+There is no implicit state-root environment override. Keep state private: it holds
+credentials, certificates, manifests and recorded Docker identities. The state
+root must be outside the checkout.
+
+## Adopting an existing instance
+
+Inspect existing resources before selecting adoption. Do not run a fresh setup or
+reset to make adoption pass. Supply two explicit JSON files through the dispatcher:
+
+```bash
+make dev-up OPTIONS="--adopt /absolute/private/adoption.json --environment-file /absolute/private/environment.json"
+```
+
+The adoption inventory's `containers` object records full immutable Docker IDs for
+`postgres`, `redis`, `app`, and optionally `nginx`. Its `worker_manifests` array
+records each existing deployment as an object with `directory`, `operator_image`,
+`socket`, and `network`. Retain its old controller, manifest and credentials so it
+can retire the old workers through their admitted deployment protocol.
+The environment file records the existing database identity, application and stream
+secrets, VAPID keys, OAuth client configuration and media paths. Protect both files.
+
+Adoption requires `MEDIA_STORAGE_PATH` and `CONVERT_STORAGE_PATH` to be disjoint
+from the writable storage root at `/var/www/html/storage`. Legacy paths such as
+`/var/www/html/storage/media` overlap that root and are refused before configuration
+is saved or writers stop. Keep the original deployment intact until its owner
+explicitly relocates those paths; adoption does not relocate them automatically.
+
+The selected PostgreSQL container must have recorded persistent PGDATA. Existing
+Redis data, OAuth keys and writable application mounts must also be discoverable.
+Missing Redis persistence, incompatible migration history, ambiguous mounts or
+mismatched identity cause refusal. Adoption does not make an incompatible database
+compatible. Inspect the reported failure and preserve its resources; any manual
+data reset requires separate owner approval. An origin change can also require
+re-enrolling passkeys.
+
+## Runtime qualification
+
+Run the integrated acceptance harness on a host that has completed DNS, trust and
+SELinux setup. It needs unused loopback port 443, enough Docker capacity for three
+instances, host FFmpeg/ffprobe, the PHP OpenSSL extension, and the web
+workspace's installed Playwright package and Chromium browser.
+
+Select a new workspace and a separate state directory outside the checkout:
+
+```bash
+BAANDER_TEST_IMAGE=baander-ci-qualified:local \
+BAANDER_TEST_POSTGRES_IMAGE=baander-database:latest \
+BAANDER_QUALIFICATION_WORKSPACE=/absolute/private/qualification/workspace \
+BAANDER_QUALIFICATION_STATE_ROOT=/absolute/private/qualification/state \
+bash scripts/test-dev-environment-container.sh
+```
+
+Select locally built CI and extension-capable PostgreSQL images for the first two
+variables. The integrated scenarios build their application releases from a
+throwaway Git remote seeded from the current committed revision. The controller
+runs from the current checkout. The harness copies the trusted leaf certificate
+and public CA from the default host state; it never copies the CA private key.
+Use `BAANDER_QUALIFICATION_HOST_STATE_ROOT` when host setup used another state root.
+
+The harness checks repeated startup, unattended master updates, build and schema
+failures, two simultaneous previews, stop/resume races, queued ingestion and
+complete original/transcoded playback. It enables audio transcoding only on its
+disposable instances. Browser checks follow UI links, use normal certificate
+verification and require the preview's HTTPS HMR connection. A successful run removes
+its owned runtime resources and retains evidence in the workspace. A failed run
+disables its timer, preserves resources and writes `failure-context.json` for
+inspection. Source media hashes and unrelated Docker inventories are checked.
+
+CI runs `bash scripts/test-dev-environment-container.sh --components-only` for
+component safety and worker source-admission checks. Those checks do not qualify
+the host or replace the integrated run. Current delivery evidence is recorded in
+[ROADMAP.md](../../../ROADMAP.md#local-development-workflow).
+
+## Agent instructions
+
+[AGENTS.md](../../../AGENTS.md) gives agents repository instructions and links to
+canonical rules in `.agents/rules/`. Update affected guidance when conventions change.

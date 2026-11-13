@@ -102,6 +102,11 @@ final readonly class ReleaseContract
         foreach (self::IMAGE_KEYS as $key) {
             unset($release[$key]);
         }
+        // The data images an activation records for the instance: the instance's own identity,
+        // unless this release selected another image because that identity was gone.
+        $dataImage = static fn(string $key): string => ($release['image_selections'][$key]['retained'] ?? null) === false
+            ? $release['images'][$key]['resolvedId']
+            : $instance[$key] ?? $release['images'][$key]['resolvedId'];
         $release['effective'] = [
             'media' => $instance['media'] ?? [],
             'libraries' => $instance['libraries'] ?? [],
@@ -109,8 +114,8 @@ final readonly class ReleaseContract
             'provenance' => $provenance,
             'state_mounts' => $instance['state_mounts'] ?? [],
             'volumes' => $instance['volumes'] ?? [],
-            'postgres_image' => $instance['postgres_image'] ?? $release['images']['postgres_image']['resolvedId'],
-            'redis_image' => $instance['redis_image'] ?? $release['images']['redis_image']['resolvedId'],
+            'postgres_image' => $dataImage('postgres_image'),
+            'redis_image' => $dataImage('redis_image'),
         ];
         $release['environmentFile'] = $store->directory($instance['id']) . '/env.json';
         $release['sourceIdentity'] = self::sourceIdentity($release['source']);

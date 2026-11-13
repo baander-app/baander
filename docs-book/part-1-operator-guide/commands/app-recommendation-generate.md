@@ -40,7 +40,7 @@ When the run finishes, the command prints the recommendation job's public ID, th
 
 Cancelling the job with `app:recommendation:job:cancel` or from the admin page stops the run before its next strategy starts. The strategies that already ran keep their recommendations, and the command exits with 1. A cancellation that arrives as the last strategy finishes is kept too: the job stays `cancelled` rather than `completed`. If the job completes first, the cancellation is refused. If generation throws, the job is marked `failed` with the error as its reason, unless it was cancelled meanwhile, and the command prints the error and exits with 1.
 
-The command always generates, whatever the `recommendations.auto_generate` [server setting](../configuration.md#server-settings) says. That setting governs only the daily **Generate recommendations** scheduled job; see [Scheduled recommendations](../configuration.md#scheduled-recommendations).
+The command always generates, whatever the `recommendations.auto_generate` [server setting](../configuration/server-settings.md#server-settings) says. That setting governs only the daily **Generate recommendations** scheduled job; see [Scheduled recommendations](../configuration/server-settings.md#scheduled-recommendations).
 
 A full run loads every song and every user's listening history, so on a large library it can take long and use a lot of memory.
 

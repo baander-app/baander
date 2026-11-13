@@ -1,3 +1,5 @@
+#include <cmath>
+#include <cstddef>
 #include <cstring>
 
 #include "aac_cpu.h"
@@ -78,6 +80,34 @@ static void aac_mdct_post_twiddle_c(float* out, const float* re, const float* im
   }
 }
 
+/* ── Scalar encoder kernels ───────────────────────────────────────── */
+
+/* The quantized magnitude of v: v clamped to [0, 8191] the way MINPS and
+ * MAXPS clamp it (a NaN gives 8191), then truncated. */
+static inline int quant_index(float v) {
+  const float top = 8191.0f;
+  v = v < top ? v : top;
+  v = v > 0.0f ? v : 0.0f;
+  return (int)v;
+}
+
+/* Eight lanes accumulate in the order of the vector kernels: line i of
+ * every span into lane i % 8, the lanes then combined pairwise. */
+static float aac_quant_noise_c(const float* coef, const float* x34, int len, int windows,
+                               int stride, float scale, float round, float gain,
+                               const float* pow43) {
+  float acc[8] = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
+  for (int w = 0; w < windows; w++) {
+    const float* cw = coef + (ptrdiff_t)w * stride;
+    const float* xw = x34 + (ptrdiff_t)w * stride;
+    for (int i = 0; i < len; i++) {
+      const float d = fabsf(cw[i]) - pow43[quant_index(xw[i] * scale + round)] * gain;
+      acc[i & 7] += d * d;
+    }
+  }
+  return ((acc[0] + acc[4]) + (acc[2] + acc[6])) + ((acc[1] + acc[5]) + (acc[3] + acc[7]));
+}
+
 /* ── DSP Init: wire all scalar defaults + platform overrides ────── */
 
 void aac_dsp_init(AacDSP* dsp) {
@@ -90,6 +120,7 @@ void aac_dsp_init(AacDSP* dsp) {
   dsp->fft_radix2_stage = aac_fft_radix2_stage_c;
   dsp->mdct_pre_twiddle = aac_mdct_pre_twiddle_c;
   dsp->mdct_post_twiddle = aac_mdct_post_twiddle_c;
+  dsp->quant_noise = aac_quant_noise_c;
 
   int flags = aac_get_cpu_flags();
 #if defined(BAAC_AAC_SSE2)

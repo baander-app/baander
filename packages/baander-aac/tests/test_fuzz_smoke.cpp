@@ -6,7 +6,7 @@
  * named).  The run counts fill about 20 seconds of an optimised build,
  * so the same inputs run on every machine; a slower build (a sanitizer
  * or debug build) stops at the time cap instead, after a prefix of the
- * same sequence.  The five harnesses run at the same time.
+ * same sequence.  The seven harnesses run at the same time.
  * BAAC_FUZZ_SMOKE_SECONDS in the environment changes the cap (default
  * 60). */
 #include <sys/wait.h>
@@ -21,12 +21,14 @@
 #include "test_util.h"
 
 /* Mutated runs per harness: about 10 to 20 seconds each in a Release
- * build with the five side by side. */
+ * build with the seven side by side. */
 #define RUNS_DECODER 2500L
 #define RUNS_ASC 60000L
 #define RUNS_ENCODER 1500L
 #define RUNS_UNIDRC 200000L
 #define RUNS_MPS 1250L
+#define RUNS_FLAC_DECODER 100000L
+#define RUNS_FLAC_ENCODER 40000L
 
 struct Harness {
   const char* name;
@@ -41,6 +43,8 @@ static const Harness kHarnesses[] = {
     {"fuzz_encoder", BAAC_FUZZ_ENCODER, "encoder", RUNS_ENCODER},
     {"fuzz_unidrc", BAAC_FUZZ_UNIDRC, "unidrc", RUNS_UNIDRC},
     {"fuzz_mps", BAAC_FUZZ_MPS, "mps", RUNS_MPS},
+    {"fuzz_flac_decoder", BAAC_FUZZ_FLAC_DECODER, "flac_decoder", RUNS_FLAC_DECODER},
+    {"fuzz_flac_encoder", BAAC_FUZZ_FLAC_ENCODER, "flac_encoder", RUNS_FLAC_ENCODER},
 };
 
 /* Starts a harness over its corpus; returns the child's pid. */

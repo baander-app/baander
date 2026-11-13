@@ -8,7 +8,7 @@ manifest's `deploymentProfile` object without writing the JSON by hand.
 
 The Make examples below target the checkout's development preview. For an
 installed instance, use the `dc` function from
-[Getting started](../getting-started.md#command-context) and replace
+[Getting started](../getting-started/installation.md#command-context) and replace
 `make exec cmd="php bin/console …"` with `dc exec app php bin/console …`.
 
 ```bash
@@ -48,7 +48,7 @@ unset video and audio slots take the hardware defaults instead of the effective
 counts: 12 video slots, measured on the reference GPU, against 8 for software
 encoding, and 12 audio slots. `--hardware-device` requires
 `--hardware-accelerator`. See
-[Hardware acceleration](../transcoding.md#hardware-acceleration) for what the
+[Hardware acceleration](../media/transcoding.md#hardware-acceleration) for what the
 hardware encoder changes.
 
 The text output starts with the `BAANDER_DEPLOYMENT_PROFILE` line for web and the

@@ -10,11 +10,16 @@ final class AacEvidence
     private const array ENCODERS = ['lc' => ['ours', 'ffmpeg', 'fdk', 'libxaac', 'apple'], 'he' => ['ours', 'fdk', 'libxaac', 'apple'], 'hev2' => ['ours', 'fdk', 'libxaac'], 'xhe' => ['ours', 'fdk', 'libxaac']];
     private const array LABELS = ['ours' => 'bAAC', 'ffmpeg' => 'FFmpeg', 'fdk' => 'FDK', 'libxaac' => 'libxaac', 'apple' => 'Apple'];
     private const array SPEED_RATES = ['lc' => 128, 'he' => 48, 'hev2' => 32, 'xhe' => 64];
+    private const array LOSSLESS_ENCODERS = ['baac' => 'bAAC', 'flac' => 'flac'];
+    private const array LOSSLESS_REFERENCES = ['flac-ffmpeg-5' => 'FFmpeg FLAC level 5', 'flac-ffmpeg-8' => 'FFmpeg FLAC level 8', 'alac-ffmpeg' => 'FFmpeg ALAC', 'alac-apple-ref' => 'Apple ALAC (refalac)'];
+    /** The harness does not time refalac, so its row has no speed figures whether it was measured or carried. */
+    private const string UNTIMED_LOSSLESS = 'alac-apple-ref';
 
-    /** @return array{quality: array<string, list<array<string, mixed>>>, speed: array<string, array<string, list<array<string, mixed>>>>, lossless: list<array<string, mixed>>} */
+    /** @return array{quality: array<string, list<array<string, mixed>>>, speed: array<string, array<string, list<array<string, mixed>>>>, lossless: array{rows: list<array<string, mixed>>, run: ?array<string, mixed>}, version: string} */
     public function load(string $root): array
     {
-        $directory = rtrim($root, '/') . '/packages/baander-aac/bench/results/';
+        $package = rtrim($root, '/') . '/packages/baander-aac/';
+        $directory = $package . 'bench/results/';
         $expected = [];
         foreach (self::PROFILES as $family => $rates) {
             foreach (self::ENCODERS[$family] as $encoder) {
@@ -85,7 +90,16 @@ final class AacEvidence
             }
             $quality[$family][] = $selected[$config];
         }
-        return ['quality' => $quality, 'speed' => $this->speed($directory), 'lossless' => $this->lossless($directory)];
+        return ['quality' => $quality, 'speed' => $this->speed($directory), 'lossless' => $this->lossless($directory), 'version' => $this->version($package . 'package.json')];
+    }
+
+    private function version(string $path): string
+    {
+        $version = $this->document($path)['version'] ?? null;
+        if (!is_string($version) || !preg_match('/^\d+\.\d+\.\d+$/', $version)) {
+            throw new \RuntimeException("Missing package version: $path");
+        }
+        return $version;
     }
 
     /** @return array<string, array<string, list<array<string, mixed>>>> */
@@ -101,7 +115,8 @@ final class AacEvidence
             }
         }
         $selected = [];
-        foreach ($this->json($directory . 'speed.json') as $row) {
+        $path = $directory . 'speed.json';
+        foreach ($this->records($this->document($path), $path) as $row) {
             $kind = $this->string($row, 'kind', 'speed.json');
             if ($kind === 'baseline') {
                 continue;
@@ -145,31 +160,135 @@ final class AacEvidence
         return $speed;
     }
 
-    /** @return list<array<string, mixed>> */
+    /**
+     * The lossless rows in one order, whatever the file's order: every level of bAAC and flac, then the
+     * other encoders. A run of the lossless stage also yields what the page states about it; the list of
+     * four references that lossless.json held before the stage measured bAAC yields rows only.
+     *
+     * @return array{rows: list<array<string, mixed>>, run: ?array<string, mixed>}
+     */
     private function lossless(string $directory): array
     {
-        $labels = ['alac-ffmpeg' => 'FFmpeg ALAC', 'alac-apple-ref' => 'refalac ALAC', 'flac-5' => 'FLAC level 5', 'flac-8' => 'FLAC level 8'];
+        $path = $directory . 'lossless.json';
+        $result = $this->document($path);
+        if (array_is_list($result)) {
+            $references = array_intersect_key(self::losslessLabels(), array_flip(['flac-5', 'flac-8', 'alac-ffmpeg', 'alac-apple-ref']));
+            return ['rows' => $this->losslessRows($this->records($result, $path), $references, false), 'run' => null];
+        }
+        if (($result['schema'] ?? null) !== 2) {
+            throw new \RuntimeException("Unsupported lossless result schema: $path");
+        }
+        return ['rows' => $this->losslessRows($this->records($result['rows'] ?? null, $path), self::losslessLabels(), true), 'run' => $this->losslessRun($result)];
+    }
+
+    /** @return array<string, string> */
+    private static function losslessLabels(): array
+    {
+        $labels = [];
+        foreach (self::LOSSLESS_ENCODERS as $encoder => $name) {
+            foreach (range(0, 8) as $level) {
+                $labels["$encoder-$level"] = "$name level $level" . ($encoder === 'baac' && $level === 5 ? ' (default)' : '');
+            }
+        }
+        return $labels + self::LOSSLESS_REFERENCES;
+    }
+
+    /**
+     * @param list<array<string, mixed>> $rows
+     * @param array<string, string> $labels
+     * @return list<array<string, mixed>>
+     */
+    private function losslessRows(array $rows, array $labels, bool $frames): array
+    {
         $selected = [];
-        foreach ($this->json($directory . 'lossless.json') as $row) {
+        foreach ($rows as $row) {
             $codec = $this->string($row, 'codec', 'lossless.json');
-            if (!isset($labels[$codec]) || isset($selected[$codec])) {
-                throw new \RuntimeException("Unexpected or duplicate lossless codec: $codec");
+            if (!isset($labels[$codec])) {
+                throw new \RuntimeException("Unexpected lossless codec: $codec");
             }
-            $record = ['codec' => $codec, 'label' => $labels[$codec]];
-            foreach (['seconds', 'kbps', 'enc_cpu', 'dec_cpu'] as $field) {
-                $record[$field] = $this->number($row, $field, $codec);
-                if ($record[$field] <= 0) {
-                    throw new \RuntimeException("Non-positive lossless $field: $codec");
-                }
+            if (isset($selected[$codec])) {
+                throw new \RuntimeException("Duplicate lossless codec: $codec");
             }
-            if (!isset($row['bit_exact']) || !is_bool($row['bit_exact'])) {
-                throw new \RuntimeException("Missing boolean bit_exact: $codec");
-            }
-            $record['bit_exact'] = $row['bit_exact'];
-            $selected[$codec] = $record;
+            $selected[$codec] = $this->losslessRow($row, $codec, $labels[$codec], $frames);
         }
         $this->complete($labels, $selected, 'lossless.json');
-        return array_values($selected);
+        return array_map(static fn(string $codec): array => $selected[$codec], array_keys($labels));
+    }
+
+    /**
+     * Speeds are audio seconds per CPU second. Frame bytes, the file without its metadata blocks, belong
+     * to FLAC streams only, and a carried row names the date of the run it comes from.
+     *
+     * @param array<string, mixed> $row
+     * @return array<string, mixed>
+     */
+    private function losslessRow(array $row, string $codec, string $label, bool $frames): array
+    {
+        $seconds = $this->positive($row, 'seconds', $codec);
+        $timed = $codec !== self::UNTIMED_LOSSLESS || isset($row['enc_cpu']) || isset($row['dec_cpu']);
+        if (!is_bool($row['bit_exact'] ?? null)) {
+            throw new \RuntimeException("Missing boolean bit_exact: $codec");
+        }
+        return [
+            'codec' => $codec,
+            'label' => $label,
+            'kbps' => $this->positive($row, 'kbps', $codec),
+            'frame_bytes' => $frames && !str_starts_with($codec, 'alac-') ? (int) $this->positive($row, 'frame_bytes', $codec) : null,
+            'encode' => $timed ? $seconds / $this->positive($row, 'enc_cpu', $codec) : null,
+            'decode' => $timed ? $seconds / $this->positive($row, 'dec_cpu', $codec) : null,
+            'bit_exact' => $row['bit_exact'],
+            'carried' => isset($row['carried']) ? $this->day($this->string($row, 'carried', $codec), 'Y-m-d', $codec) : null,
+        ];
+    }
+
+    /**
+     * What the page states about the run: its date, the processor and compiler, the reference versions,
+     * how often each timed input repeats the corpus, and whether the run was the first to read the
+     * held-out recordings.
+     *
+     * @param array<array-key, mixed> $result
+     * @return array<string, mixed>
+     */
+    private function losslessRun(array $result): array
+    {
+        $host = $this->section($result, 'host');
+        $tools = $this->section($result, 'tools');
+        $heldOut = $result['held_out_run'] ?? null;
+        if (!preg_match('/^ffmpeg version (\S+)/', $this->string($tools, 'ffmpeg', 'lossless.json tools'), $ffmpeg)) {
+            throw new \RuntimeException('Unrecognized FFmpeg version in lossless.json tools');
+        }
+        return [
+            'date' => $this->day($this->string($result, 'date', 'lossless.json'), DATE_ATOM, 'lossless.json'),
+            'processor' => $this->string($host, 'cpu', 'lossless.json host'),
+            'compiler' => is_string($host['compiler'] ?? null) ? trim($host['compiler']) : '',
+            'flac' => $this->string($tools, 'flac', 'lossless.json tools'),
+            'ffmpeg' => 'FFmpeg ' . $ffmpeg[1],
+            'repetitions' => (int) $this->positive($this->section($result, 'method'), 'corpus_repetitions', 'lossless.json method'),
+            'heldOutFirstRun' => is_array($heldOut) && ($heldOut['touched'] ?? null) === true && ($heldOut['first_run'] ?? null) === true,
+        ];
+    }
+
+    /**
+     * @param array<array-key, mixed> $result
+     * @return array<string, mixed>
+     */
+    private function section(array $result, string $field): array
+    {
+        $section = $result[$field] ?? null;
+        if (!is_array($section) || array_is_list($section)) {
+            throw new \RuntimeException("Missing $field in lossless.json");
+        }
+        return $section;
+    }
+
+    /** A date in the given format, as the page writes it; one that does not exist is refused. */
+    private function day(string $value, string $format, string $context): string
+    {
+        $date = \DateTimeImmutable::createFromFormat('!' . $format, $value);
+        if ($date === false || $date->format($format) !== $value) {
+            throw new \RuntimeException("Invalid date $value in $context");
+        }
+        return $date->format('j F Y');
     }
 
     /** @return list<array<string, mixed>> */
@@ -197,18 +316,27 @@ final class AacEvidence
         }
     }
 
-    /** @return list<array<string, mixed>> */
-    private function json(string $path): array
+    /** @return array<array-key, mixed> */
+    private function document(string $path): array
     {
         $contents = @file_get_contents($path);
         if ($contents === false) {
             throw new \RuntimeException("Cannot read bAAC evidence: $path");
         }
         try {
-            $rows = json_decode($contents, true, 512, JSON_THROW_ON_ERROR);
+            $document = json_decode($contents, true, 512, JSON_THROW_ON_ERROR);
         } catch (\JsonException $error) {
             throw new \RuntimeException("Invalid bAAC evidence JSON: $path", 0, $error);
         }
+        if (!is_array($document)) {
+            throw new \RuntimeException("Expected a JSON object or list: $path");
+        }
+        return $document;
+    }
+
+    /** @return list<array<string, mixed>> */
+    private function records(mixed $rows, string $path): array
+    {
         if (!is_array($rows) || !array_is_list($rows)) {
             throw new \RuntimeException("Expected JSON record list: $path");
         }
@@ -237,6 +365,16 @@ final class AacEvidence
             throw new \RuntimeException("Missing or non-finite $field in $context");
         }
         return (float) $value;
+    }
+
+    /** @param array<string, mixed> $row */
+    private function positive(array $row, string $field, string $context): float
+    {
+        $value = $this->number($row, $field, $context);
+        if ($value <= 0) {
+            throw new \RuntimeException("Non-positive $field in $context");
+        }
+        return $value;
     }
 
     /**

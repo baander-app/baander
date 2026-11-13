@@ -151,9 +151,9 @@ the immutable application, worker and operator images, checks their agreement,
 and uses the shared worker lifecycle. Application paths come from image metadata.
 The application does not receive the Docker socket.
 
-Prepare a private configuration from
-[`deploy/preset/example.json`](../../deploy/preset/example.json), following
-the [deployment instructions](../../deploy/preset/README.md). Then run:
+Prepare a private configuration from the starting-point example nearest the host,
+such as [`deploy/preset/example-4gb-remux.json`](../../deploy/preset/example-4gb-remux.json),
+following the [deployment instructions](../../deploy/preset/README.md). Then run:
 
 ```bash
 php scripts/deploy-preset.php start --config /path/to/preset.json --state /path/to/preset-state
@@ -174,7 +174,7 @@ fixture-only provider responses and native launch logging to the production
 images. `prepare --from` copies an unchanged fixture dataset into a new owned
 volume and borrows its exact images for another run. Run the invoking machine
 and browser outside the measured host. See the
-[qualification procedure](../../docs-book/part-2-developer-guide/testing.md#deployment-qualification)
+[qualification procedure](../../docs-book/part-2-developer-guide/testing/media-and-playback.md#deployment-qualification)
 for the configuration and evidence required.
 
 Qualification `stop` retains data for a restart check. Its `--cleanup` option
@@ -324,7 +324,7 @@ Online assessment is an explicit maintenance action; it is not a scheduled CI ga
 On Forgejo, CI keeps its caches and coverage baselines in the Forgejo generic
 package registry through `scripts/ci-package-store.php`, which wraps
 `Ci\PackageStore`. GitHub uses `actions/cache` for the same data; the
-[CI guide](../../docs-book/part-2-developer-guide/continuous-integration.md#caches-and-coverage-baselines)
+[CI guide](../../docs-book/part-2-developer-guide/contributing/continuous-integration.md#caches-and-coverage-baselines)
 lists the packages and keys. The command takes an operation, a package, a file and
 a path:
 

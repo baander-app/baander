@@ -6,7 +6,7 @@ The preference subsystems do not use CQRS: their controllers call port interface
 
 ## Subsystems
 
-The context is organized into seven preference subsystems, each with its own controller, port, and persistence entity, and the user settings store:
+The context is organized into seven preference subsystems, each with its own controller, port, and persistence entity, plus the user settings store:
 
 | Subsystem | Purpose | Versioned |
 |-----------|---------|-----------|
@@ -116,7 +116,7 @@ Every port method takes the user's ID along with the profile ID. A profile that 
 
 An unknown key is `404`. A key that names a system setting, or a user setting whose `editRole` is not `ROLE_USER`, is `403`. An invalid value is `422` with the violation under the key, and nothing is stored. The controller identifies the user through Auth's `AuthenticatedUserIdentityInterface`; the older controllers cast to `SecurityUser`.
 
-Administrators reach the same store through Auth's endpoints under `/api/admin/users/{id}/settings` and `app:user:setting`, which call the settings contract (see [Auth](auth.md#admin--user-settings)).
+Administrators reach the same store through Auth's endpoints under `/api/admin/users/{publicId}/settings` and `app:user:setting`, which call the settings contract (see [Auth](auth.md#admin--user-settings)).
 
 ## Versioned Save Pattern
 
@@ -179,17 +179,20 @@ The preference subsystems predate the settings mechanism. Each has its own port,
 
 ### SidebarConfig
 
-Per-media-type sidebar configuration.
+Per-media-type sidebar configuration (`SidebarConfigState`).
 
-| Property | Description |
-|----------|-------------|
-| `userId` | The user who owns this configuration |
-| `items` | Ordered collection of `SidebarItem` entries |
-| `updatedAt` | Last modification timestamp |
+| Property | Type | Description |
+|----------|------|-------------|
+| `id` | `Uuid` | Configuration identifier |
+| `userId` | `Uuid` | The user who owns this configuration |
+| `mediaType` | `string` | Media type (`music`, `movies`, `tv`, `podcasts`, `concerts`, `ebooks`) |
+| `items` | `SidebarItem[]` | Ordered collection of `SidebarItem` entries |
+| `createdAt` | `DateTimeImmutable` | Creation timestamp |
+| `updatedAt` | `DateTimeImmutable` | Last modification timestamp |
 
 ### SidebarItem
 
-An individual sidebar entry with `label`, `icon`, `route`, `order`, and `visible` properties.
+An individual sidebar entry (`SidebarItem`) with `id` (`string`), `type` (`SidebarItemType`), `label` (`string`), `icon` (`string`), and `config` (`array`) properties. `SidebarItemType` (`Domain/ValueObject/SidebarItemType.php`) is an enum of `page_link`, `smart_filter`, and `panel_action`.
 
 ### Other models
 

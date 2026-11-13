@@ -49,7 +49,7 @@ Queueing takes seconds even for a large catalog, while the fetches can run for h
 
 Either way, the fetches the run queued are skipped when they come due, without calling LRCLIB, and their songs can be queued again by the next run. Fetches that already ran keep the lyrics they stored.
 
-The `lyrics.auto_fetch` [server setting](../configuration.md#server-settings) does not affect this command. That setting fetches lyrics automatically for new tracks as a scan adds them; this command backfills songs already in the catalog.
+The `lyrics.auto_fetch` [server setting](../configuration/server-settings.md#server-settings) does not affect this command. That setting fetches lyrics automatically for new tracks as a scan adds them; this command backfills songs already in the catalog.
 
 With `--json` the command prints only `{"jobsEnqueued": 500, "jobId": "..."}`. `jobsEnqueued` is the API's `data` payload, the number of songs queued. `jobId` is the job-monitor ID of the bulk fetch run, which the API does not return; pass it to [app:monitor:job:show](app-monitor-job-show.md).
 

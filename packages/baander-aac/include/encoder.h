@@ -231,6 +231,9 @@ using AacEncoderState = struct AacEncoderState_ {
   int ext_payload_bits;
   float sbr_in[AAC_MAX_CHANNELS][2 * AAC_FRAME_SIZE_LONG]; /* full-rate input */
   float core_in[AAC_MAX_CHANNELS][AAC_FRAME_SIZE_LONG];    /* half-rate core signal */
+  /* An input block with samples out of range, brought into range by the
+   * API layer before it is coded (interleaved, frame_size frames). */
+  float input_copy[AAC_MAX_CHANNELS * 2 * AAC_FRAME_SIZE_LONG];
   AacMdct mdct_long, mdct_short;
   const AacDSP* dsp;
   uint8_t output_buf[AAC_ENCODER_OUTPUT_BUF_BYTES];
@@ -323,6 +326,12 @@ int aac_encoder_state_extension_budget_bits(const AacEncoderState* s);
  * range covers max_mag; 1 << 28 for the others and for book 0. */
 void aac_enc_band_book_bits(const AacIcsInfo* ics, const int* quant, int g, int w0, int b,
                             int max_mag, int* cost);
+
+/* Quantization noise of band b of group g (first window w0) at
+ * scalefactor sf: dsp->quant_noise over the group's windows with the
+ * scalefactor's step and gain.  The rate loop and the afterburner both
+ * measure a band with it, so they agree on every band to the last bit. */
+float aac_enc_band_noise(const AacDSP* dsp, const AacEncChannel* c, int g, int w0, int b, int sf);
 
 /* Consumes one block of frame_size interleaved input samples (NULL for silence)
  * and writes the next ADTS frame to s->output_buf.  Returns its length in

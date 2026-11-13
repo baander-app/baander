@@ -56,6 +56,7 @@ final class ReferentialIntegrityTest extends TestCase
         'playback_commands.attempt_id' => 'coordinator-generated attempt identity shared by related commands, with no attempt table',
         'playback_commands.request_id' => 'caller-generated command replay identity scoped to its listening session',
         'playback_destination_incarnations.tab_id' => 'browser-generated tab identity retained for local recovery, not a database row',
+        'playback_destination_incarnations.page_id' => 'browser-generated identity of one loaded document, never stored by the page, with no page table',
         'playback_destinations.device_id' => 'browser-generated device token scoped to its user, distinct from the device primary key',
         'playback_destinations.endpoint_id' => 'browser-generated endpoint identity scoped to its device, with no endpoint table',
         'playback_transfers.request_id' => 'caller-generated transfer replay identity scoped to its listening session',

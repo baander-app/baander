@@ -96,7 +96,7 @@ final class AdaptiveBrowserFixture
         });
         $ownership = $generator->testDouble(TranscodeExecutionOwnershipPort::class, false);
         assert($ownership instanceof TranscodeExecutionOwnershipPort);
-        $ownership->method('find')->willReturnCallback(static function (Uuid $id) use ($state): ?TranscodeRuntimeSnapshot {
+        $find = static function (Uuid $id) use ($state): ?TranscodeRuntimeSnapshot {
             foreach ($state['jobs'] as $entry) {
                 if ($entry['job']->getId()->equals($id)) {
                     $presentation = (new PublishedPresentationReader())->read($entry['directory']);
@@ -106,6 +106,17 @@ final class AdaptiveBrowserFixture
                 }
             }
             return null;
+        };
+        $ownership->method('find')->willReturnCallback($find);
+        $ownership->method('findGroup')->willReturnCallback(static function (array $ids) use ($find): array {
+            $runtimes = [];
+            foreach ($ids as $id) {
+                $runtime = $find($id);
+                if ($runtime !== null) {
+                    $runtimes[$id->toString()] = $runtime;
+                }
+            }
+            return $runtimes;
         });
         $auth = new HmacStreamAuthAdapter('disposable-baander-adaptive-fixture', $state['origin']);
         $streaming = new TranscodeStreamingService($repository, new TranscodeFileStorage(new SegmentFileResolver(self::directory())),

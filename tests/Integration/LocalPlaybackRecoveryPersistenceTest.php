@@ -289,7 +289,7 @@ final class LocalPlaybackRecoveryPersistenceTest extends TestCase
         self::assertSame('preparing', $replacement['transfer']['state']);
     }
 
-    public function testRecoveringBothRunnersAfterUnacknowledgedQuiescenceAllowsReplacement(): void
+    public function testAnUnacknowledgedQuiescenceFailsTheTransferAtExpiryAndRecoveringBothRunnersAllowsReplacement(): void
     {
         $owner = $this->createUser();
         $service = $this->coordinator();
@@ -307,9 +307,58 @@ final class LocalPlaybackRecoveryPersistenceTest extends TestCase
         $connection->executeStatement("UPDATE playback_transfers SET expires_at=CURRENT_TIMESTAMP-INTERVAL '1 second' WHERE id=:id", [
             'id' => $quiescing['transfer']['attemptId'],
         ]);
+        // The target only prepared and was never sent a start, so nothing new can be playing.
+        $failed = $service->execute($owner, PlaybackOperation::Snapshot, []);
+        self::assertNull($failed['transfer']);
+        self::assertSame($source['incarnationId'], $failed['activeIncarnationId']);
+        self::assertSame('failed', $connection->fetchOne('SELECT state FROM playback_transfers WHERE id=:id', ['id' => $quiescing['transfer']['attemptId']]));
+        self::assertSame('superseded', $connection->fetchOne('SELECT outcome FROM playback_commands WHERE id=:id', ['id' => $unacknowledged['id']]));
+        self::assertSame([], $this->pending($service, $owner, $target)['commands']);
+
+        $sourceRecovered = $this->recover($service, $owner, $source);
+        self::assertSame($failed['revision'] + 1, $sourceRecovered['revision']);
+        self::assertNull($sourceRecovered['transfer']);
+        self::assertNull($sourceRecovered['activeIncarnationId']);
+        $sourceRecord = $connection->fetchAssociative('SELECT retired_at,observed_state,recovery_result FROM playback_destination_incarnations WHERE id=:id', [
+            'id' => $source['incarnationId'],
+        ]);
+        self::assertIsArray($sourceRecord);
+        self::assertNotNull($sourceRecord['retired_at']);
+        self::assertSame('stopped', $sourceRecord['observed_state']);
+        self::assertEquals($sourceRecovered['recoveryResult'], json_decode($sourceRecord['recovery_result'], true, flags: JSON_THROW_ON_ERROR));
+
+        $service = $this->coordinator();
+        $targetRecovered = $this->recover($service, $owner, $target);
+        self::assertNull($targetRecovered['transfer']);
+        self::assertSame('paused', $targetRecovered['desiredState']);
+        self::assertSame([], $this->pending($service, $owner, $source)['commands']);
+        self::assertSame([], $this->pending($service, $owner, $target)['commands']);
+        $this->assertReplacementStartsWithoutASource($service, $owner, $targetRecovered['revision']);
+    }
+
+    public function testRecoveringBothRunnersAfterAnUnansweredStartAllowsReplacement(): void
+    {
+        $owner = $this->createUser();
+        $service = $this->coordinator();
+        $source = $this->endpoint($service, $owner);
+        $target = $this->endpoint($service, $owner);
+        $snapshot = $this->activate($service, $owner, $source);
+        $service->execute($owner, PlaybackOperation::Transfer, [
+            'requestId' => new Uuid()->toString(), 'expectedRevision' => $snapshot['revision'],
+            'targetIncarnationId' => $target['incarnationId'],
+        ]);
+        $this->ack($service, $owner, $target, $this->pending($service, $owner, $target)['commands'][0], 'prepared');
+        $starting = $this->ack($service, $owner, $source, $this->pending($service, $owner, $source)['commands'][0], 'quiesced', 12.5);
+        // The target is shown its start and never answers: it may be playing.
+        $unanswered = $this->pending($service, $owner, $target)['commands'][0];
+        self::assertSame('start', $unanswered['type']);
+        $connection = $this->manager->getConnection();
+        $connection->executeStatement("UPDATE playback_transfers SET expires_at=CURRENT_TIMESTAMP-INTERVAL '1 second' WHERE id=:id", [
+            'id' => $starting['transfer']['attemptId'],
+        ]);
         $uncertain = $service->execute($owner, PlaybackOperation::Snapshot, []);
         self::assertSame('uncertain', $uncertain['transfer']['state']);
-        self::assertSame('superseded', $connection->fetchOne('SELECT outcome FROM playback_commands WHERE id=:id', ['id' => $unacknowledged['id']]));
+        self::assertSame('superseded', $connection->fetchOne('SELECT outcome FROM playback_commands WHERE id=:id', ['id' => $unanswered['id']]));
         $targetStop = $this->pending($service, $owner, $target)['commands'][0];
         self::assertSame('stop', $targetStop['type']);
 
@@ -331,9 +380,43 @@ final class LocalPlaybackRecoveryPersistenceTest extends TestCase
         self::assertSame('paused', $targetRecovered['desiredState']);
         self::assertSame([], $this->pending($service, $owner, $source)['commands']);
         self::assertSame([], $this->pending($service, $owner, $target)['commands']);
+        $this->assertReplacementStartsWithoutASource($service, $owner, $targetRecovered['revision']);
+    }
+
+    public function testALocalRecoveryAndARegistrationFromAnotherPageDoNotRepeatEachOther(): void
+    {
+        $service = $this->coordinator();
+        foreach (['the registration comes first', 'the recovery comes first'] as $case) {
+            $owner = $this->createUser();
+            $device = new Uuid();
+            (new DeviceDoctrineRepository($this->manager))->save(Device::create($owner, $device, 'Reloading browser'));
+            $registration = ['deviceId' => $device->toString(), 'endpointId' => new Uuid()->toString(), 'localRecoveryEligible' => true, 'tabId' => new Uuid()->toString()];
+            $runner = $service->execute($owner, PlaybackOperation::Endpoint, ['pageId' => new Uuid()->toString()] + $registration)['endpoint'];
+            $active = $this->activate($service, $owner, $runner);
+            $service->execute($owner, PlaybackOperation::Control, ['requestId' => new Uuid()->toString(), 'expectedRevision' => $active['revision'], 'action' => 'play']);
+            $this->ack($service, $owner, $runner, $this->pending($service, $owner, $runner)['commands'][0], 'playing', 42.5);
+            $reload = fn(): array => $service->execute($owner, PlaybackOperation::Endpoint, ['pageId' => new Uuid()->toString()] + $registration);
+
+            $first = $case === 'the registration comes first' ? $reload() : $this->recover($service, $owner, $runner);
+            self::assertNull($first['activeIncarnationId'], $case);
+            self::assertSame('paused', $first['desiredState'], $case);
+            $second = $case === 'the registration comes first' ? $this->recover($service, $owner, $runner) : $reload();
+
+            self::assertNull($second['activeIncarnationId'], $case);
+            self::assertSame($first['revision'], $second['revision'], $case);
+            self::assertSame($first['position'], $second['position'], $case);
+            if ($case === 'the registration comes first') {
+                self::assertSame(['incarnationId' => $runner['incarnationId'], 'outcome' => 'recovered', 'revision' => $first['revision']], $second['recoveryResult']);
+            }
+            self::assertSame('stopped', $this->observer->fetchOne('SELECT observed_state FROM playback_destination_incarnations WHERE id=?', [$runner['incarnationId']]), $case);
+        }
+    }
+
+    private function assertReplacementStartsWithoutASource(PlaybackCoordinator $service, Uuid $owner, int $revision): void
+    {
         $replacement = $this->endpoint($service, $owner);
         $next = $service->execute($owner, PlaybackOperation::Transfer, [
-            'requestId' => new Uuid()->toString(), 'expectedRevision' => $targetRecovered['revision'],
+            'requestId' => new Uuid()->toString(), 'expectedRevision' => $revision,
             'targetIncarnationId' => $replacement['incarnationId'],
         ]);
         self::assertNull($next['transfer']['sourceIncarnationId']);

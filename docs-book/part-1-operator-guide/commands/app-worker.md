@@ -6,15 +6,15 @@ coordination. Execution runs resident ordinary `async` consumers, one separate
 `scheduler` consumer and the native execution daemon.
 Native probes, encoders, CPU helpers and scheduled console children run in
 execution. The host `bin/worker-deployment.php` supplies the options from a version
-7 manifest; see [Worker deployment](README.md#worker-deployment).
+9 manifest; see [Worker deployment](../workers/worker-deployment.md).
 
 ## Quick start
 
 The host deployment controller constructs this command and runs it as PID 1 in
 each admitted worker container. Do not launch it with `dc exec` or as an
 additional web-container process. Use the host
-[manifest reference](README.md#worker-deployment) to provision the pair, and
-[Background work](../background-work.md#stop-replace-or-recover-workers) for
+[manifest reference](../workers/worker-deployment.md#manifest-format) to provision the pair, and
+[Background work](../workers/background-work.md#stop-replace-or-recover-workers) for
 start, stop, replacement and uncertain outcomes.
 
 ## Options
@@ -50,7 +50,7 @@ execution cgroup evidence, measured against the host because the cgroup has no
 limits, and updates admission through boot/epoch-fenced IPC; it does not consume
 ordinary work.
 
-The [manifest reference](README.md#worker-deployment) defines profile bounds and
+The [manifest reference](../workers/worker-deployment.md#autoscaling-and-ordinary-consumers) defines profile bounds and
 the measured maximum-two example and its workload limits. Missing
 measurements prevent growth and reduce ordinary admission to at most one. Severe memory/PID pressure closes admission;
 recovery needs fresh samples. Status exposes slot counts, decision reason and
@@ -67,21 +67,21 @@ The supervisor checks `REDIS_URL` and `MESSENGER_TRANSPORT_DSN` before launching
 children. Accepted forms preserve the configured streams and `baander` group;
 consumer overrides are rejected. Each admitted consumer receives an identity
 derived from the deployment, boot, worker role and launch generation, replacing
-an inherited `MESSENGER_CONSUMER_NAME`. See [Messenger configuration](../configuration.md#messenger)
+an inherited `MESSENGER_CONSUMER_NAME`. See [Messenger configuration](../configuration/environment-variables.md#messenger)
 for URL forms. Invalid configuration exits without child launch, and errors omit
 credential-bearing values. The host deployment controller applies the same URL
 checks before container creation.
 
 Control owns the deployment lease; execution observes it. Both units require
 matching boot/epoch peer evidence before business admission.
-[Background work](../background-work.md#stop-replace-or-recover-workers) defines
+[Background work](../workers/background-work.md#stop-replace-or-recover-workers) defines
 peer failure and the 35-second drain deadline; the
-[worker pair](../background-work.md#the-worker-deployment-pair) has a 30-second
+[worker pair](../workers/background-work.md#the-worker-deployment-pair) has a 30-second
 startup admission deadline. A `worker_supervisor_stopped` log entry is neither
 a readiness result nor a containment receipt.
 
 Under `transcode`, the media coordinator admits at most the profile's video and
-audio slots, 8 and 12 by default; see [Media slots](../configuration.md#media-slots).
+audio slots, 8 and 12 by default; see [Media slots](../configuration/deployment-profiles.md#media-slots).
 Under `remux`, audio and video copy jobs share the configured copy slots. Completed artifacts can
 be delivered without a producer, but their reuse never authorizes re-encoding.
 Each job uses a fresh kernel in control and sends bounded native requests over

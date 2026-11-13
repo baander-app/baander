@@ -22,6 +22,15 @@ interface TranscodeExecutionOwnershipPort
     public function control(Uuid $jobId, Uuid $sessionId, string $requestId, ?string $status = null, ?AudioProfile $audioProfile = null, ?float $position = null, ?int $segmentIndex = null, bool $seek = true): TranscodeControlResult;
     /** @phpstan-impure Runtime ownership may change between consecutive reads. */
     public function find(Uuid $jobId): ?TranscodeRuntimeSnapshot;
+    /**
+     * Reads the runtimes of several jobs in one statement, so every snapshot belongs to the same
+     * committed state: a control that updates sibling jobs together is seen for all of them or none.
+     *
+     * @phpstan-impure Runtime ownership may change between consecutive reads.
+     * @param list<Uuid> $jobIds
+     * @return array<string, TranscodeRuntimeSnapshot> Keyed by job id; jobs without a runtime are absent.
+     */
+    public function findGroup(array $jobIds): array;
     /** @return list<TranscodeRuntimeSnapshot> */
     public function pending(int $limit = 100): array;
     public function claim(Uuid $jobId, MediaWorkerIdentity $worker, int $leaseSeconds = 15): ?TranscodeExecutionClaim;

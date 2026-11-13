@@ -22,7 +22,7 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844
     test(`${viewport.width}px ${colorScheme}: homepage and wide manual remain contained`, async ({ page }) => {
       await page.setViewportSize(viewport);
       await page.emulateMedia({ colorScheme });
-      for (const path of ['/', '/docs/operator-guide/getting-started/', '/docs/developer-guide/database-naming/']) {
+      for (const path of ['/', '/docs/operator-guide/getting-started/', '/docs/developer-guide/development/database-naming/']) {
         const response = await page.goto(path);
         expect(response?.status()).toBe(200);
         await expect(page.locator('main h1')).toBeVisible();
@@ -72,25 +72,36 @@ test('visitor reaches operating model and source-based installation', async ({ p
   await expect(page.locator('main')).toContainText(/development-oriented/);
   await expect(page.locator('main')).toContainText(/workers/);
   const chapters = page.getByRole('navigation', { name: 'Manual chapters', exact: true });
-  await chapters.getByRole('link', { name: 'Library Management', exact: true }).click();
-  await expect(page.locator('main h1')).toContainText('Library Management');
+  await chapters.getByRole('link', { name: 'Source Installation', exact: true }).click();
+  await expect(page.locator('main h1')).toContainText('Source Installation');
   const section = page.locator('main h2[id]').first();
   const id = await section.getAttribute('id');
-  await page.goto(`/docs/operator-guide/library-management/#${id}`);
+  await page.goto(`/docs/operator-guide/getting-started/installation/#${id}`);
   await expect(section).toBeInViewport();
 });
 
-test('bounded contexts fold out as their own chapter in the developer navigation', async ({ page }) => {
+test('chapters fold out as collapsible categories in the manual navigation', async ({ page }) => {
   const chapters = page.getByRole('navigation', { name: 'Manual chapters' });
   const fold = chapters.locator('.chapter-fold details').filter({ has: page.locator('summary', { hasText: 'Bounded Contexts' }) });
+  const testingFold = chapters.locator('.chapter-fold details').filter({ has: page.locator('summary', { hasText: 'Testing' }) });
+  const archFold = chapters.locator('.chapter-fold details').filter({ has: page.locator('summary', { hasText: 'System Architecture' }) });
   await page.goto('/docs/developer-guide/contexts/auth/');
   await expect(fold).toHaveAttribute('open', '');
+  await expect(testingFold).not.toHaveAttribute('open', '');
+  await expect(archFold).not.toHaveAttribute('open', '');
   await expect(fold.getByRole('link', { name: 'Auth', exact: true })).toHaveAttribute('aria-current', 'page');
   await expect(fold.getByRole('link', { name: 'Overview', exact: true })).toHaveAttribute('href', '/docs/developer-guide/contexts/');
   expect(await fold.getByRole('link').count()).toBe(23);
   await page.goto('/docs/developer-guide/testing/');
   await expect(fold).not.toHaveAttribute('open', '');
-  await expect(chapters.getByRole('link', { name: 'Testing', exact: true })).toHaveAttribute('aria-current', 'page');
+  await expect(testingFold).toHaveAttribute('open', '');
+  await expect(testingFold.getByRole('link', { name: 'Overview', exact: true })).toHaveAttribute('aria-current', 'page');
+  expect(await testingFold.getByRole('link').count()).toBe(10);
+  await page.goto('/docs/developer-guide/architecture/overview/');
+  await expect(fold).not.toHaveAttribute('open', '');
+  await expect(testingFold).not.toHaveAttribute('open', '');
+  await expect(archFold).toHaveAttribute('open', '');
+  await expect(archFold.getByRole('link', { name: 'Architecture Overview', exact: true })).toHaveAttribute('aria-current', 'page');
   await expect(chapters.locator('.chapter-group > ul > li > a[href^="/docs/developer-guide/contexts/"]')).toHaveCount(0);
   const summary = fold.locator('summary');
   await summary.focus();
@@ -165,7 +176,7 @@ for (const width of [1440, 390]) {
     await page.goto('/docs/operator-guide/getting-started/');
     const targets = [
       page.getByRole('searchbox', { name: 'Search manuals' }),
-      page.getByRole('navigation', { name: 'Manual chapters' }).getByRole('link', { name: 'Getting Started', exact: true }),
+      page.getByRole('navigation', { name: 'Manual chapters' }).getByRole('link', { name: 'Source Installation', exact: true }),
     ];
     for (const target of targets) {
       await target.focus();
@@ -266,8 +277,8 @@ test('unavailable search leaves chapter navigation usable', async ({ page }) => 
   await page.goto('/docs/');
   await page.getByRole('searchbox', { name: 'Search manuals' }).fill('scanning');
   await expect(page.getByRole('status')).toContainText('Search is unavailable');
-  await page.getByRole('navigation', { name: 'Manual chapters', exact: true }).getByRole('link', { name: 'Library Management', exact: true }).click();
-  await expect(page.locator('main h1')).toContainText('Library Management');
+  await page.getByRole('navigation', { name: 'Manual chapters', exact: true }).getByRole('link', { name: "Part I — Operator's Guide", exact: true }).click();
+  await expect(page.locator('main h1')).toContainText("Operator's Guide");
 });
 
 test('late real index load cannot restore results after query is cleared', async ({ page }) => {
@@ -305,8 +316,8 @@ test('manual remains readable and navigable with JavaScript disabled', async ({ 
     await expect(page.locator('#manual-search-status')).toBeHidden();
     await expect(page.locator('#manual-search noscript')).toBeVisible();
     expect(await page.locator('#manual-search noscript').evaluate((element) => element.textContent)).toContain('Search needs JavaScript.');
-    await page.getByRole('navigation', { name: 'Manual chapters', exact: true }).getByRole('link', { name: 'Library Management', exact: true }).click();
-    await expect(page.locator('main h1')).toContainText('Library Management');
+    await page.getByRole('navigation', { name: 'Manual chapters', exact: true }).getByRole('link', { name: 'Source Installation', exact: true }).click();
+    await expect(page.locator('main h1')).toContainText('Source Installation');
   } finally {
     await context.close();
   }

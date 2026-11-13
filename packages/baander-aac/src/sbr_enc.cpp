@@ -366,35 +366,58 @@ namespace {
 /* ── tonality (4.6.18.6.2 prediction, as the detector of TS 26.404) ── */
 
 /* Ratio of the energy a second-order predictor explains to the residual
- * of a band over slots [t0, t1), with two slots of history. */
+ * of a band over slots [t0, t1), with two slots of history.  Every sum
+ * over the slots is the sum of two partial sums, one of the first, third,
+ * fifth ... term and one of the others.  The order is written out, so
+ * every compiler computes the same sums, and the two partial sums do not
+ * depend on each other.  The band's values are copied to separate arrays
+ * of real and imaginary parts, so the two read neighbouring values. */
 float tonality(const AacSbrEncChannel* ch, int band, int t0, int t1) {
   const int n = t1 - t0;
   if (n < 2) {
     return 0.0f;
   }
-  float x[kSlots + 8][2];
+  double re[kSlots + 8], im[kSlots + 8];
   for (int i = 0; i < n + 2; i++) {
     const float (*w)[2] = slot(ch, t0 - 2 + i);
-    x[i][0] = w[band][0];
-    x[i][1] = w[band][1];
+    re[i] = w[band][0];
+    im[i] = w[band][1];
   }
-  /* normal equations of the predictor x_t ~ -a0 x_{t-1} - a1 x_{t-2} */
-  double r00 = 0, r11 = 0, r22 = 0;
-  double r01r = 0, r01i = 0, r02r = 0, r02i = 0, r12r = 0, r12i = 0;
-  for (int i = 2; i < n + 2; i++) {
-    const double xr = x[i][0], xi = x[i][1];
-    const double ar = x[i - 1][0], ai = x[i - 1][1];
-    const double br = x[i - 2][0], bi = x[i - 2][1];
-    r00 += xr * xr + xi * xi;
-    r11 += ar * ar + ai * ai;
-    r22 += br * br + bi * bi;
-    r01r += xr * ar + xi * ai;
-    r01i += xi * ar - xr * ai;
-    r02r += xr * br + xi * bi;
-    r02i += xi * br - xr * bi;
-    r12r += ar * br + ai * bi;
-    r12i += ai * br - ar * bi;
+  /* normal equations of the predictor x_t ~ -a0 x_{t-1} - a1 x_{t-2},
+   * in two lanes */
+  double s00[2] = {}, s11[2] = {}, s22[2] = {};
+  double s01r[2] = {}, s01i[2] = {}, s02r[2] = {}, s02i[2] = {}, s12r[2] = {}, s12i[2] = {};
+  const auto add_slot = [&](int l, int i) {
+    const double xr = re[i], xi = im[i];
+    const double ar = re[i - 1], ai = im[i - 1];
+    const double br = re[i - 2], bi = im[i - 2];
+    s00[l] += xr * xr + xi * xi;
+    s11[l] += ar * ar + ai * ai;
+    s22[l] += br * br + bi * bi;
+    s01r[l] += xr * ar + xi * ai;
+    s01i[l] += xi * ar - xr * ai;
+    s02r[l] += xr * br + xi * bi;
+    s02i[l] += xi * br - xr * bi;
+    s12r[l] += ar * br + ai * bi;
+    s12i[l] += ai * br - ar * bi;
+  };
+  int i = 2;
+  for (; i + 1 < n + 2; i += 2) {
+    add_slot(0, i);
+    add_slot(1, i + 1);
   }
+  if (i < n + 2) {
+    add_slot(0, i);
+  }
+  const double r00 = s00[0] + s00[1];
+  const double r11 = s11[0] + s11[1];
+  const double r22 = s22[0] + s22[1];
+  const double r01r = s01r[0] + s01r[1];
+  const double r01i = s01i[0] + s01i[1];
+  const double r02r = s02r[0] + s02r[1];
+  const double r02i = s02i[0] + s02i[1];
+  const double r12r = s12r[0] + s12r[1];
+  const double r12i = s12i[0] + s12i[1];
   if (r00 <= 0.0) {
     return 0.0f;
   }
@@ -416,14 +439,22 @@ float tonality(const AacSbrEncChannel* ch, int band, int t0, int t1) {
     c0r = (r01r - (r12r * c1r + r12i * c1i)) / r11;
     c0i = (r01i - (r12r * c1i - r12i * c1r)) / r11;
   }
-  double residual = 0.0;
-  for (int i = 2; i < n + 2; i++) {
-    const double pr = c0r * x[i - 1][0] - c0i * x[i - 1][1] + c1r * x[i - 2][0] - c1i * x[i - 2][1];
-    const double pi = c0r * x[i - 1][1] + c0i * x[i - 1][0] + c1r * x[i - 2][1] + c1i * x[i - 2][0];
-    const double er = x[i][0] - pr;
-    const double ei = x[i][1] - pi;
-    residual += er * er + ei * ei;
+  double err[2] = {};
+  const auto add_error = [&](int l, int k) {
+    const double pr = c0r * re[k - 1] - c0i * im[k - 1] + c1r * re[k - 2] - c1i * im[k - 2];
+    const double pi = c0r * im[k - 1] + c0i * re[k - 1] + c1r * im[k - 2] + c1i * re[k - 2];
+    const double er = re[k] - pr;
+    const double ei = im[k] - pi;
+    err[l] += er * er + ei * ei;
+  };
+  for (i = 2; i + 1 < n + 2; i += 2) {
+    add_error(0, i);
+    add_error(1, i + 1);
   }
+  if (i < n + 2) {
+    add_error(0, i);
+  }
+  const double residual = err[0] + err[1];
   const double explained = std::max(r00 - residual, 0.0);
   const double q = explained / std::max(residual, 1e-6 * r00);
   return (float)std::min(q, 1.0e4);

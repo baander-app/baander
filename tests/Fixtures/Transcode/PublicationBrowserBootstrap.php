@@ -28,8 +28,8 @@ $run = static function (array $arguments): string {
     return $process->getOutput();
 };
 $version = strtok($run(['/usr/bin/ffmpeg', '-version']), "\n");
-if (!is_string($version) || !str_starts_with($version, 'ffmpeg version 7.')) {
-    throw new RuntimeException('This qualification requires the real FFmpeg 7 producer: ' . (string) $version);
+if (!is_string($version) || !str_starts_with($version, 'ffmpeg version 8.')) {
+    throw new RuntimeException('This qualification requires the application image\'s FFmpeg 8 producer: ' . (string) $version);
 }
 $source = $directory . '/source.mp4';
 $run(['/usr/bin/ffmpeg', '-nostdin', '-v', 'error', '-y', '-filter_threads', '1', '-filter_complex_threads', '1',

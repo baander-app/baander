@@ -185,7 +185,7 @@ It connects the listener's home receivers to playback controlled through Bånder
 ### Playback endpoint
 
 A live player instance that can execute and report playback for a destination, such as one browser tab, a companion process or a Cast receiver application.
-Its incarnation identifies that instance's current connection lifetime, separately from the saved browser device token or destination identity.
+Its incarnation identifies that instance's current connection lifetime, separately from the saved browser device token or destination identity. When the same browser page registers again, as after a replaced socket, its next incarnation succeeds the earlier one: it takes the earlier one's place as runner or transfer participant and its unanswered commands, and the session revision does not change.
 
 ### Playback client-session identity
 
@@ -198,9 +198,30 @@ Admission and signing carry this identity as `requestId`; individual playback co
 A playback handoff whose target may have started but has not confirmed its state.
 The source retains its media and cursor while paused until reconciliation establishes whether it can resume without overlapping the target.
 
+### Disclosed command
+
+A playback command that was included in a snapshot built for the endpoint incarnation it addresses. That snapshot is the only way a command leaves the server, and the command records the first time it happened.
+A command that expires undisclosed cannot have had an effect. On a browser runner whose last report was stopped or paused it settles as never effective, and the session keeps its confirmed state. A disclosed command able to start playback that goes unanswered leaves the session unknown. No timer ends that state: the runner's answer, a local recovery, a close report from its page, a registration of its tab from another page or a playback override does.
+
+### Playback page identity
+
+A random value a browser document creates once, keeps in memory and sends as `pageId` with every registration of its playback endpoint. It is never stored, so a reload, a duplicated tab and a restored session each get a new one, while a document restored from the back/forward cache keeps its own. The server keeps it with the incarnation and never returns it.
+With the tab's identity it tells a new page from a live one. A registration from another page of the same tab proves the earlier page gone, and the session is released from that page's incarnation in the registration's own transaction. One from the same page is that page's own reconnect, and its new incarnation succeeds the earlier one. A registration without a page identity, or against an earlier incarnation that has none, proves nothing.
+
+### Close report
+
+A playback endpoint's own statement, made with its capability, that this incarnation has stopped. The web client sends it at `pagehide`, from a request prepared ahead, and after a disconnect that silenced its players, before it registers again. The server retires the incarnation, records it stopped at the reported cursor and releases the session from it in the same request; a report for an incarnation the session no longer names changes only that incarnation, and a repeated report changes nothing. While the session still stands at the revision the report describes, the report also speaks for the successor the same page has registered since.
+A tab that is only hidden sends none. A crash, a killed browser or a dead network sends none either; the playback override is then the way back.
+
+### Playback override
+
+The listener's explicit decision, made in a registered browser tab, to end the hold of a browser destination that is no longer registered and has not confirmed that it is silent: the session's runner, or the target of an uncertain transfer. The web client offers it as "Play here anyway" in the playback destination menu.
+The server retires that destination's incarnation without recording it as stopped, and the session continues paused at its cursor, without a runner unless a registered source of the failed transfer keeps it. No timer performs an override, and the server refuses it while the destination is still registered. A destination that is still playing when it is overridden keeps playing until a snapshot reaches it or its socket closes.
+
 ### Browser execution lock
 
 An exclusive Web Lock held while one browser tab owns eligible local playback execution. Its name includes the server, account and nonsecret tab identity. A free lock proves the old holder released it; media fencing is a separate recovery condition.
+A page claims a tab identity only while it holds that tab's lock, and gives the lock up only by ending or by entering the back/forward cache after fencing its players, so two live pages do not share a tab identity; without Web Locks, every page load uses a new one. The playback page identity tells the server whether a registration of the tab comes from the page it already knows or from a later one.
 
 ### Local recovery credential
 
@@ -223,6 +244,15 @@ A listener chooses a preset or a custom target. The target controls playback gai
 ### Transcode session
 
 A user's playback lifecycle for a video transcode job, carrying its preparation, playback controls, position and completion state.
+
+### Stale transcode session
+
+A transcode session that no playback report and no stream signing has touched for
+the longest lifetime of a signed stream URL, 24 hours, and whose presentation is not
+finished. No client can still be playing it. Stale session expiry, part of job
+cleanup, cancels the execution its worker still holds, ends the session and
+releases its job, so the job becomes orphaned and cleanup removes it with its
+output. A paused player renews its stream URL and is never stale.
 
 ### Transcode execution generation
 
@@ -276,6 +306,11 @@ A copy is bound by disk rather than an encoder, so its producer reads the source
 ### Lead throttle
 
 The bound the session subscriber keeps on how far a producer's published media runs ahead of the playhead: the producer's process is stopped once its lead reaches the pause mark and continued once the lead has shrunk to the resume mark. It applies to every producer, encode or copy, and a seek restarts the producer rather than repositioning it.
+
+### Join lead
+
+The lead a growing sibling rendition's published media must hold over the playback cursor before a signing adds it to the rendition set: three segments, capped by the remaining duration. A sibling the player has attached stays until its lead shrinks to one segment and is then withdrawn once, so a rendition encoding near real time does not leave and rejoin as the cursor moves.
+The session's primary rendition is offered as soon as it covers the cursor and alone decides readiness. The join lead is below the lead throttle's resume mark, so a throttled healthy encoder always qualifies; a sibling that encodes slower than playback does not join while the cursor advances.
 
 ### Sparse source
 
@@ -567,7 +602,14 @@ It reports whether the results match or the comparison is unavailable and leaves
 
 ### bAAC
 
-The public name of Bånder's AAC encoder and decoder library.
+The public name of Bånder's audio codec library: its AAC encoder and decoder, and the FLAC encoder and decoder of its lossless mode.
+
+### Lossless mode
+
+The bAAC mode that codes integer PCM as a FLAC stream and returns the identical samples on decode.
+*Avoid: lossless AAC; the mode writes FLAC, which is not an AAC profile.*
+
+Its streams keep a fixed block size inside FLAC's streamable subset, so that other FLAC decoders read them.
 
 ### AAC implementation setting
 

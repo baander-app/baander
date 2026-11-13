@@ -2,8 +2,16 @@
  * every frame, the bandwidth override sets the decoded lowpass, the VBR
  * modes order their bitrates and follow a peak bitrate, a 5.1 HE-AAC
  * frame carries each element's SBR data right after that element and
- * FFmpeg decodes it channel for channel, and HE-AAC v2 drains a short
- * last block and a single-sample input correctly. */
+ * FFmpeg decodes it channel for channel, HE-AAC v2 drains a short
+ * last block and a single-sample input correctly, NaN, infinite and huge
+ * input samples are coded as their documented replacements, and the
+ * committed AAC-LC, HE-AAC and HE-AAC v2 streams.
+ *
+ * With arguments the program writes the committed streams instead:
+ *   test_encoder_tuning --write-streams <dir>
+ */
+#include <cfloat>
+
 #include "bitstream.h"
 #include "encoder.h"
 #include "test_util.h"
@@ -566,9 +574,203 @@ void test_ps_single_sample() {
   }
 }
 
+/* ── input out of range ────────────────────────────────────────── */
+
+/* Decodes a stream of any transport through the FIFO, concealment off;
+ * returns whether every frame decoded and every sample is finite. */
+bool decodes_finite(const std::vector<uint8_t>& stream) {
+  AacDecoderHandle dec = aac_decoder_create(48000, 0);
+  if (!dec) {
+    return false;
+  }
+  aac_decoder_set_concealment(dec, AAC_CONCEAL_OFF);
+  std::vector<float> out((size_t)AAC_DECODER_MAX_OUTPUT * 8);
+  bool ok = true;
+  int frames = 0;
+  size_t pos = 0;
+  for (;;) {
+    pos += (size_t)aac_decoder_feed(dec, stream.data() + pos, (int)(stream.size() - pos));
+    const int got = aac_decoder_decode_next(dec, out.data(), (int)out.size());
+    if (got == 0 && pos == stream.size()) {
+      break;
+    }
+    ok = ok && got >= 0;
+    for (int i = 0; i < got * aac_decoder_channels(dec); i++) {
+      ok = ok && std::isfinite(out[(size_t)i]);
+    }
+    frames += got > 0;
+  }
+  aac_decoder_destroy(dec);
+  return ok && frames > 0;
+}
+
+/* A NaN is coded as silence and a sample beyond 65536 in magnitude as
+ * 65536 of its sign: a stream with NaN, infinities or huge values is
+ * byte for byte the stream of the signal with those replacements, in
+ * every profile, and decodes to finite samples.  Single samples and a
+ * run longer than a block are replaced. */
+void test_out_of_range_input() {
+  struct Profile {
+    const char* name;
+    AacObjectType aot;
+    int bitrate;
+    AacRateControl rc;
+  };
+  const Profile profiles[] = {{"AAC-LC", AAC_AOT_LC, 128000, AAC_RC_CBR},
+                              {"AAC-LC TVBR", AAC_AOT_LC, 128000, AAC_RC_TVBR},
+                              {"HE-AAC", AAC_AOT_SBR, 48000, AAC_RC_CBR},
+                              {"HE-AAC v2", AAC_AOT_PS, 32000, AAC_RC_CBR},
+                              {"xHE-AAC", AAC_AOT_USAC, 64000, AAC_RC_CBR},
+                              {"AAC-ELD", AAC_AOT_ER_ELD, 128000, AAC_RC_CBR}};
+  std::vector<float> signal = gen_he_signal(2);
+  signal.resize(2 * 36000);
+  std::vector<float> nans = signal, silenced = signal;
+  std::vector<float> infinite = signal, huge = signal, limited = signal;
+  for (size_t k : {1001u, 12346u, 20001u, 33333u}) {
+    const float sign = k & 1 ? 1.0f : -1.0f;
+    nans[k] = NAN;
+    silenced[k] = 0.0f;
+    infinite[k] = sign * INFINITY;
+    huge[k] = sign * (k < 20000 ? 1e30f : FLT_MAX);
+    limited[k] = sign * 65536.0f;
+  }
+  for (size_t k = 2 * 30000; k < 2 * 32048; k++) { /* a whole block and more */
+    nans[k] = NAN;
+    silenced[k] = 0.0f;
+    infinite[k] = -INFINITY;
+    huge[k] = -1e20f;
+    limited[k] = -65536.0f;
+  }
+  const auto none = [](AacEncoderHandle) {};
+  for (const Profile& p : profiles) {
+    const auto encode = [&](const std::vector<float>& pcm) {
+      return encode_with(pcm, 48000, 2, p.bitrate, p.aot, p.rc, none).stream;
+    };
+    const std::vector<uint8_t> want_silence = encode(silenced);
+    const std::vector<uint8_t> want_limit = encode(limited);
+    CHECK(encode(nans) == want_silence, "%s: NaN codes as silence", p.name);
+    CHECK(encode(infinite) == want_limit, "%s: an infinity codes as 65536", p.name);
+    CHECK(encode(huge) == want_limit, "%s: a huge sample codes as 65536", p.name);
+    CHECK(decodes_finite(want_silence) && decodes_finite(want_limit),
+          "%s: the streams decode to finite samples", p.name);
+  }
+}
+
+/* ── the committed streams ─────────────────────────────────────── */
+
+/* One stream per encoder the xHE-AAC suites do not reach: AAC-LC with
+ * the afterburner, its default, which is what a transcode writes; the
+ * SBR encoder over it; and parametric stereo over both. */
+struct Committed {
+  const char* name;
+  AacObjectType aot;
+  int bitrate;
+  double min_low_db; /* of the decode's low band against the source's */
+};
+const Committed kCommitted[3] = {{"lc_enc_cpe_128k.aac", AAC_AOT_LC, 128000, 20.0},
+                                 {"he_enc_cpe_48k.aac", AAC_AOT_SBR, 48000, 16.0},
+                                 {"hev2_enc_cpe_32k.aac", AAC_AOT_PS, 32000, 13.0}};
+constexpr uint32_t kCommittedSignal = 0xe5ee8187u; /* signal_checksum of committed_signal() */
+
+/* The committed streams' signal: the HE-AAC suite's tones, noise and
+ * clicks at half level, as in the xHE-AAC suites. */
+std::vector<float> committed_signal() {
+  std::vector<float> pcm = gen_he_signal(2);
+  for (float& v : pcm) {
+    v *= 0.5f;
+  }
+  return pcm;
+}
+
+std::vector<uint8_t> committed_encode(const Committed& s, const std::vector<float>& pcm) {
+  int error = 0;
+  const std::vector<uint8_t> stream =
+      encode_stream(pcm, 48000, 2, s.bitrate, AAC_RC_CBR, 0, &error, s.aot);
+  CHECK(error == 0 && !stream.empty(), "%s: encode error %d", s.name, error);
+  return stream;
+}
+
+/* The mono downmix below 3 kHz, where every one of the three profiles
+ * codes the waveform. */
+std::vector<float> low_band(const std::vector<float>& stereo) {
+  std::vector<float> mono(stereo.size() / 2);
+  for (size_t i = 0; i < mono.size(); i++) {
+    mono[i] = 0.5f * (stereo[2 * i] + stereo[2 * i + 1]);
+  }
+  return lowpass_channel(mono, 1, 0, 3000.0f, 48000);
+}
+
+/* SNR of a stream's decoded low band against the source's, at the best
+ * delay; -100 when a frame fails or the output is not stereo. */
+double low_band_db(const std::vector<float>& low_src, const std::vector<uint8_t>& stream) {
+  int errors = 0;
+  AacDecoderHandle dec = aac_decoder_create(48000, 0);
+  const std::vector<float> out = decode_stream(stream, 48000, 0, &errors, dec);
+  const int channels = dec ? aac_decoder_channels(dec) : 0;
+  aac_decoder_destroy(dec);
+  if (errors != 0 || channels != 2 || out.empty()) {
+    return -100.0;
+  }
+  return best_aligned_snr_db(low_src, low_band(out), 1024, 7000, nullptr);
+}
+
+int write_streams(const char* dir) {
+  const std::vector<float> pcm = committed_signal();
+  for (const Committed& s : kCommitted) {
+    const std::vector<uint8_t> stream = committed_encode(s, pcm);
+    const std::string path = std::string(dir) + "/" + s.name;
+    if (g_failures || !write_file(path, stream.data(), stream.size())) {
+      fprintf(stderr, "%s: not written\n", path.c_str());
+      return 1;
+    }
+    printf("%s: %zu frames, %zu bytes\n", path.c_str(), split_adts(stream).size(), stream.size());
+  }
+  return 0;
+}
+
+/* The streams under tests/data decode without error and match the
+ * generator's signal in the low band; a fresh encode of that signal is
+ * byte identical, so a change of the encoder's output shows up here and
+ * the streams are regenerated with --write-streams on purpose.  The
+ * streams were written by the reference build (test_util.h) from the
+ * signal whose checksum is given with them; other builds compare the
+ * decodes instead. */
+void test_committed() {
+  const std::vector<float> pcm = committed_signal();
+  const std::vector<float> low_src = low_band(pcm);
+  for (const Committed& s : kCommitted) {
+    const std::vector<uint8_t> stream = read_file(data_path(s.name));
+    CHECK(!stream.empty(), "%s present", s.name);
+    if (stream.empty()) {
+      continue;
+    }
+    const double low = low_band_db(low_src, stream);
+    CHECK(low > s.min_low_db, "%s: low band %.1f dB against the source", s.name, low);
+    const std::vector<uint8_t> fresh = committed_encode(s, pcm);
+#if BAAC_REFERENCE_BUILD
+    if (!check_committed_signal(s.name, pcm, kCommittedSignal)) {
+      continue;
+    }
+    CHECK(fresh == stream, "%s: a fresh encode is byte identical (%zu vs %zu bytes)", s.name,
+          fresh.size(), stream.size());
+#else
+    const double again = low_band_db(low_src, fresh);
+    CHECK(fabs(again - low) < 1.5,
+          "%s: a fresh encode of this build decodes like the committed stream (%.1f against "
+          "%.1f dB; the byte identity check needs the reference build)",
+          s.name, again, low);
+#endif
+    printf("  %s: low band %.1f dB\n", s.name, low);
+  }
+}
+
 }  // namespace
 
-int main() {
+int main(int argc, char** argv) {
+  if (const char* dir = write_streams_dir(argc, argv)) {
+    return write_streams(dir);
+  }
+  test_committed();
   test_peak_bitrate();
   test_bandwidth();
   test_vbr_modes();
@@ -576,5 +778,6 @@ int main() {
   test_he51_ffmpeg();
   test_ps_short_last_block();
   test_ps_single_sample();
+  test_out_of_range_input();
   return test_summary("test_encoder_tuning");
 }

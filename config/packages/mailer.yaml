@@ -1,5 +1,5 @@
 parameters:
-    # Defaults match docs-book/part-1-operator-guide/configuration.md.
+    # Defaults match docs-book/part-1-operator-guide/configuration/environment-variables.md.
     env(MAIL_FROM_ADDRESS): 'noreply@localhost'
 
 framework:

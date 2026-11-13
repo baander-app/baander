@@ -5,7 +5,7 @@ Create a new user account. The command runs the same use case as creating a user
 ## Quick start
 
 Run from the installed-instance host shell with the `dc` function from
-[Getting started](../getting-started.md#command-context). Password files in these
+[Getting started](../getting-started/installation.md#command-context). Password files in these
 examples are protected files on that host. Use `-T` for redirected input.
 
 Create a regular user:

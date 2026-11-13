@@ -9,7 +9,7 @@ use Doctrine\ORM\Tools\SchemaTool;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Index and constraint names follow docs-book/part-2-developer-guide/database-naming.md.
+ * Index and constraint names follow docs-book/part-2-developer-guide/development/database-naming.md.
  *
  * Reads the catalog of the fully migrated disposable PostgreSQL database.
  */

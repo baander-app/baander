@@ -1,9 +1,9 @@
 # Encrypted Registry backups
 
 For the registry's place in the installation and its separate recovery boundary,
-see the [operator manual](../../docs-book/part-1-operator-guide/registry.md#backups-and-recovery).
+see the [operator manual](../../docs-book/part-1-operator-guide/administration/registry.md#backups-and-recovery).
 Application database and media recovery are covered by
-[Backup and Recovery](../../docs-book/part-1-operator-guide/backup-and-recovery.md).
+[Backup and Recovery](../../docs-book/part-1-operator-guide/maintenance/backup-and-recovery.md).
 
 The backup worker captures an authenticated rqlite snapshot at startup and every
 300 seconds. It streams plaintext into age, uploads only completed ciphertext,

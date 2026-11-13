@@ -169,6 +169,7 @@ const progressOutages = []
 const statusOutages = []
 const seekOutages = []
 const movieCompletions = []
+const cursorAuthority = []
 let movieEndpointProof = null
 const signingRequests = new WeakMap()
 const attachedCapabilities = new Map()
@@ -183,7 +184,10 @@ const requestAttachments = new WeakMap()
 let attachmentNumber = 0
 let attachedRenditionSet = null
 function currentSource(state) {
-  return state.source?.startsWith('blob:')
+  // The player empties the element before every new attachment, so a sample can find no
+  // source at all. That is not the signed rendition set yet, and the wait goes on.
+  if (!state.source) return false
+  return state.source.startsWith('blob:')
     ? attachedRenditionSet === snapshot.renditionSet
     : new URL(state.source).searchParams.get('set') === snapshot.renditionSet
 }
@@ -273,7 +277,7 @@ async function savePlaybackTimeline() {
   try {
     const mediaEvents = await page.evaluate(() => window.__twoCommandMediaEvents ?? [])
     await writeFile(`${evidence}/playback-timeline.json`, JSON.stringify({
-      playbackSnapshots, playbackControls, clientControls, subtitleObservations, networkInterruptions, manifestEvidence, mediaRequestOrder, capabilityRenewals, progressOutages, statusOutages, seekOutages, movieCompletions, mediaEvents: [...previousMediaEvents, ...mediaEvents],
+      playbackSnapshots, playbackControls, clientControls, subtitleObservations, networkInterruptions, manifestEvidence, mediaRequestOrder, capabilityRenewals, progressOutages, statusOutages, seekOutages, movieCompletions, cursorAuthority, mediaEvents: [...previousMediaEvents, ...mediaEvents],
     }, null, 2))
   } finally {
     savingTimeline = false
@@ -310,7 +314,16 @@ page.on('request', request => {
 page.on('response', async response => {
   const url = new URL(response.url())
   if (url.pathname.startsWith('/api/')) {
-    appendBounded(apiResponses, { at: Date.now(), path: url.pathname, status: response.status() })
+    // A refused resume is explained by the session requests before it, so those keep what
+    // they asked or reported. No identifier or capability is kept.
+    let sessionRequest = {}
+    if (url.pathname.startsWith('/api/session/') && response.request().method() === 'POST') {
+      try {
+        const body = response.request().postDataJSON()
+        sessionRequest = { action: body?.action, outcome: body?.outcome, observedState: body?.observedState }
+      } catch { /* A body that is not JSON carries nothing to keep. */ }
+    }
+    appendBounded(apiResponses, { at: Date.now(), path: url.pathname, status: response.status(), ...sessionRequest })
   }
   if (url.pathname === '/api/stream/sign' && response.ok()) {
     const receivedAt = Date.now()
@@ -516,6 +529,91 @@ function dialogueCueAt(position) {
   return null
 }
 
+// The final paused seek is a pointer press on the source timeline. A press inside the thumb
+// starts a drag without changing the value, so it commits no seek, and where the thumb
+// rests depends on how long the earlier phases played. The target therefore lies ten
+// seconds behind the paused thumb, far outside the thumb. It lies four seconds further
+// back where it would otherwise meet the operator's seek position, so the browser's and
+// the operator's cursors stay distinguishable, and it never passes five seconds beyond
+// that position, which keeps it on the 15-40 s dialogue cue the next phase's subtitle
+// proof requires.
+function finalSeekTarget(pausedThumb, operatorPosition) {
+  return [10, 14].map(distance => Math.min(Math.round(pausedThumb) - distance, operatorPosition + 5))
+    .find(target => Math.abs(target - operatorPosition) >= 2)
+}
+
+// A page registers its playback endpoint over a newly opened WebSocket, and the server
+// answers with the session snapshot that carries the registration. This resolves with that
+// first answer: its revision, the runner it names as active, and how long after the
+// registration it arrived. The frames are only observed, so the page receives them
+// unchanged; the capability in the answer is not kept. The listeners are removed once the
+// answer is seen or the time is up, and without an answer in time it resolves with null.
+function observeRegistrationAnswer(milliseconds = 45000) {
+  return new Promise(resolve => {
+    const observed = new Map()
+    const finish = answer => {
+      clearTimeout(timer)
+      page.off('websocket', observe)
+      for (const [socket, listeners] of observed) {
+        socket.off('framesent', listeners.sent)
+        socket.off('framereceived', listeners.received)
+      }
+      observed.clear()
+      resolve(answer)
+    }
+    const observe = socket => {
+      let registeredAt = null
+      const sent = ({ payload }) => {
+        if (registeredAt === null && typeof payload === 'string' && payload.includes('"session.endpoint"')) registeredAt = Date.now()
+      }
+      const received = ({ payload }) => {
+        if (typeof payload !== 'string' || !payload.includes('"session.snapshot"')) return
+        let message
+        try { message = JSON.parse(payload) } catch { return }
+        if (message?.type !== 'session.snapshot' || !message.data?.endpoint) return
+        const at = Date.now()
+        finish({ at, sinceRegistrationMs: registeredAt === null ? null : at - registeredAt,
+          revision: message.data.revision, activeIncarnationId: message.data.activeIncarnationId })
+      }
+      observed.set(socket, { sent, received })
+      socket.on('framesent', sent)
+      socket.on('framereceived', received)
+    }
+    const timer = setTimeout(() => finish(null), milliseconds)
+    page.on('websocket', observe)
+  })
+}
+
+// The source position of paused, decoded media the element can seek within.
+async function seekablePausedPosition(label) {
+  let position
+  await until(async () => {
+    const state = await mediaState()
+    const usable = state.connected && state.paused && state.ready >= 2 && hasDecodedFrame(state)
+      && !state.seeking && state.error === null && snapshot?.ready && snapshot.status === 'paused'
+      && currentSource(state) && state.seekable.some(([start, end]) => state.time >= start && state.time <= end)
+    if (usable) position = snapshot.startTime + state.time
+    return usable
+  }, `decoded seekable paused media matching the signed rendition set ${label}`)
+  return position
+}
+
+// Which session requests a page sends around a reload tells which rule released its runner: a
+// close report as the page goes away, a local recovery before the next page registers, or
+// neither, in which case the registration from another page of the same tab did it. Requests are
+// only observed. An unloading page's request may escape the driver, so "not seen" is weaker
+// evidence than "seen".
+function observeReleaseRequests() {
+  const seen = { closeReport: false, localRecovery: false }
+  const observe = request => {
+    const path = new URL(request.url()).pathname
+    if (path === '/api/session/close') seen.closeReport = true
+    if (path === '/api/session/recover-local') seen.localRecovery = true
+  }
+  context.on('request', observe)
+  return { seen, stop: () => { context.off('request', observe) } }
+}
+
 async function restingCursorNow() {
   const state = await mediaState()
   assert(snapshot?.ready, 'The browser must hold a ready owned session before the operator phases')
@@ -528,8 +626,22 @@ async function restingCursorNow() {
 // resumes playback locally from the recovered cursor. The signed playback snapshot only
 // arrives once a local player attaches again, so the paused position is read from the
 // overlay's timeline.
-async function resumeReleasedPlayback(owner, position, label, started) {
-  if (await seekSlider().count() === 0) await page.getByRole('button', { name: 'Play', exact: true }).click()
+//
+// While the page is still recovering it shows no Play button, or only the overlay's
+// disabled one. Which Play button is on screen is read once one is enabled: beside the seek
+// slider it is the overlay's, which resumes playback; without the slider it is the page's,
+// which reopens the overlay. A reopen click chosen earlier would wait through the recovery
+// and land on the overlay's Play, queueing a second play behind the resume click.
+async function resumeReleasedPlayback(owner, position, label, started, beforeResume = async () => {}) {
+  const enabledPlay = page.getByRole('button', { name: 'Play', exact: true, disabled: false })
+  let overlayOpen
+  await until(async () => {
+    await enabledPlay.waitFor({ timeout: 45000 })
+    overlayOpen = await seekSlider().count() > 0
+    // The reading stands only while that one enabled Play button is still on screen.
+    return await enabledPlay.count() === 1
+  }, `one enabled Play button after ${label}`)
+  if (!overlayOpen) await enabledPlay.click()
   let reopenedPosition
   try {
     await until(async () => {
@@ -542,6 +654,7 @@ async function resumeReleasedPlayback(owner, position, label, started) {
   }
   assert.equal(await page.locator('video').count(), 0, `Playback must not mount a video after ${label} before it resumes locally`)
   clientControls.push({ action: `${label}-released-paused`, at: Date.now(), elapsedMs: Date.now() - started, position, reopenedPosition, playback: null })
+  await beforeResume()
   const resumeStarted = Date.now()
   await page.getByRole('button', { name: 'Play', exact: true }).click()
   video = await page.locator('video').elementHandle()
@@ -1580,6 +1693,147 @@ async function proveMovieCompletion() {
     page.off('requestfailed', failed)
     await savePlaybackTimeline()
   }
+  return proof
+}
+
+function renditionExecutions(renditionSet) {
+  return renditionSet.split(',').map(item => {
+    const separator = item.lastIndexOf('.')
+    return [item.slice(0, separator), item.slice(separator + 1)]
+  })
+}
+
+// A movie's playlists grow while its encoders run ahead of playback, so the published
+// edge moves away from the playhead. That edge is a delivery window, never a playback
+// target: the playhead may wait at it, but only a committed seek may move the clock
+// faster than the wall clock or restart the encoders into a new generation. The given
+// committed seek restarted the encoders; this window observes the playback that follows.
+async function proveCursorAuthority(seek) {
+  const windowMs = 24000
+  // Slower production never leaves the playhead behind, and the proof would pass idly.
+  const requiredProducerRate = 1.5
+  // The media clock and the wall clock are sampled in one page task, so the bound absorbs
+  // only clock granularity and the player's stall nudges, which total at most 0.6 s. It
+  // stays far below one six-second segment, the smallest step toward the published edge.
+  const toleranceSeconds = 1
+  // The player corrects buffer gaps and stalls by assigning the media clock itself. Whether
+  // it does so in a given run depends on timing, so the window makes one such assignment.
+  const correctionSeconds = 0.5
+  const owner = ownedPlayback()
+  const executions = new Map(renditionExecutions(snapshot.renditionSet))
+  const proof = { startedAt: Date.now(), windowSeconds: windowMs / 1000, requiredProducerRate, toleranceSeconds,
+    seek: { at: seek.submission.at, position: seek.submission.position, requestId: seek.submission.requestId,
+      acceptedGeneration: seek.acknowledgement.acceptedGeneration },
+    jobId: owner.jobId, sessionId: owner.sessionId, generation: owner.generation, startTime: snapshot.startTime,
+    renditionSet: snapshot.renditionSet, samples: [], corrections: [], publications: [], marks: [] }
+  cursorAuthority.push(proof)
+  const round = value => Math.round(value * 1000) / 1000
+  const seekMarks = () => page.evaluate(since => performance.getEntriesByType('mark')
+    .filter(entry => /^baander:(?:native-seek|seek-)/.test(entry.name) && performance.timeOrigin + entry.startTime >= since)
+    .map(entry => ({ name: entry.name, at: Math.round(performance.timeOrigin + entry.startTime), ...entry.detail })), seek.submission.at)
+  const assertExecution = () => {
+    const uncommitted = playbackControls.filter(control => control.action === 'seek'
+      && control.at >= seek.submission.at && control.requestId !== seek.submission.requestId)
+    assert.equal(uncommitted.length, 0,
+      `Only a committed seek may reach the server; the player sent ${uncommitted.length} without one, the first to ${uncommitted[0]?.position}`)
+    assert.equal(snapshot.jobId, owner.jobId, 'Playback against a growing presentation must retain the owned job')
+    assert.equal(snapshot.sessionId, owner.sessionId, 'Playback against a growing presentation must retain the owned session')
+    const observed = [...playbackSnapshots.filter(item => item.accepted && item.at >= proof.startedAt
+      && item.jobId === owner.jobId && typeof item.renditionSet === 'string'), snapshot]
+    for (const item of observed) {
+      assert.equal(item.generation, owner.generation, 'No execution generation may advance without a committed seek')
+      for (const [job, generation] of renditionExecutions(item.renditionSet)) {
+        const known = executions.get(job)
+        assert(known === undefined || known === generation,
+          `A rendition restarted from generation ${known} into ${generation} without a committed seek`)
+        executions.set(job, generation)
+      }
+    }
+  }
+  // The clock may never gain on the wall clock since any earlier observation, starting
+  // with the committed seek itself: its position at the moment it was sent.
+  let wallOffsetFloor = seek.submission.position - seek.submission.at / 1000
+  let corrected = 0
+  let first = null
+  let last = null
+  let furthest = -Infinity
+  try {
+    while (Date.now() < proof.startedAt + windowMs) {
+      assertExecution()
+      const attachment = attachmentNumber
+      const state = await mediaState()
+      if (attachment === attachmentNumber) {
+        assert.equal(state.error, null, 'Playback against a growing presentation must stay free of media errors')
+        assert.equal(state.playbackRate, 1, 'The window must play at normal speed for the wall clock to bound it')
+        const clock = snapshot.startTime + state.time
+        const wallOffset = clock - state.at / 1000 - corrected
+        const ahead = wallOffset - wallOffsetFloor
+        last = { at: state.at, attachment, clock: round(clock), aheadOfWall: round(ahead), paused: state.paused,
+          seeking: state.seeking, ready: state.ready, decodedFrames: state.decodedFrames }
+        proof.samples.push(last)
+        assert(ahead <= toleranceSeconds,
+          `The player clock at ${clock.toFixed(2)} s ran ${ahead.toFixed(2)} s ahead of wall-clock playback plus committed seeks`)
+        wallOffsetFloor = Math.min(wallOffsetFloor, wallOffset)
+        if (!state.paused && !state.seeking && state.ready >= 3) {
+          first ??= last
+          furthest = Math.max(furthest, clock)
+        }
+        const pending = proof.corrections.at(-1)
+        if (pending && !pending.recorded) {
+          pending.recorded = (await seekMarks()).find(mark => mark.name === 'baander:native-seek'
+            && mark.at >= pending.at - 50 && Math.abs(mark.currentTime - pending.to) <= 0.05) ?? null
+        }
+        if (Date.now() >= proof.startedAt + windowMs / 2 && proof.corrections.length < 3
+          && (!pending || (!pending.recorded && Date.now() >= pending.at + 2000))) {
+          const correction = await video.evaluate((element, offset) => {
+            const from = element.currentTime
+            const buffered = Array.from({ length: element.buffered.length }, (_, index) => [element.buffered.start(index), element.buffered.end(index)])
+            if (element.paused || element.seeking || element.readyState < 3
+              || !buffered.some(([start, end]) => from >= start && from + offset + 1 <= end)) return null
+            element.currentTime = from + offset
+            return { at: Date.now(), from, to: element.currentTime }
+          }, correctionSeconds)
+          if (correction) {
+            corrected += correction.to - correction.from
+            proof.corrections.push({ ...correction, attachment: attachmentNumber, recorded: null })
+          }
+        }
+      }
+      await new Promise(resolve => setTimeout(resolve, 200))
+    }
+    assertExecution()
+    proof.marks = await seekMarks()
+    const sent = proof.marks.filter(mark => mark.name === 'baander:seek-send' && mark.at >= proof.startedAt)
+    assert.equal(sent.length, 0, 'The player must not send a seek during a window without a committed seek')
+    const correction = proof.corrections.find(item => item.recorded)
+    assert(correction, 'The window must apply one player-internal correction that the player records as a native seek')
+    assert(first && last.decodedFrames > first.decodedFrames && furthest - first.clock >= windowMs / 2000,
+      `Playback must advance through at least half the window (from ${first?.clock} to ${furthest})`)
+    proof.playedSeconds = round(furthest - first.clock)
+    proof.publications = manifestEvidence.filter(item => item.at >= seek.submission.at && item.path.includes('/tracks/video/')
+      && executions.get(/^\/api\/transcode\/([^/]+)\//.exec(item.path)?.[1]) === item.generation).map(item => {
+      const publishedSeconds = item.body.split('\n').filter(line => line.startsWith('#EXTINF:'))
+        .reduce((total, line) => total + Number(line.slice(8).split(',')[0]), 0)
+      const elapsedSeconds = (item.at - seek.submission.at) / 1000
+      return { at: item.at, attachment: item.attachment, path: item.path, generation: item.generation,
+        publishedSeconds: round(publishedSeconds), elapsedSeconds: round(elapsedSeconds), rate: round(publishedSeconds / elapsedSeconds) }
+    })
+    // Publication trails encoding, so no observation overstates the rate since the restart.
+    const fastest = proof.publications.reduce((best, item) => !best || item.rate > best.rate ? item : best, null)
+    proof.producerRate = fastest?.rate ?? null
+    assert(fastest && fastest.rate >= requiredProducerRate,
+      `The producer must outrun playback at least ${requiredProducerRate} times to qualify this window; it published at most ${fastest?.publishedSeconds ?? 0} s in ${fastest?.elapsedSeconds ?? 0} s`)
+    const publishedSeconds = Math.max(...proof.publications.map(item => item.publishedSeconds))
+    proof.leadSeconds = round(proof.startTime + publishedSeconds - last.clock)
+    assert(proof.leadSeconds > 0, 'The published edge must lead the playhead at the end of the window')
+    proof.finishedAt = Date.now()
+  } catch (error) {
+    proof.failure = error.message
+    proof.marks = await seekMarks().catch(() => proof.marks)
+    throw error
+  } finally {
+    await savePlaybackTimeline()
+  }
 }
 
 async function proveSeekOutages(owner, expectedPosition) {
@@ -2177,27 +2431,118 @@ async function checkpoint({ phase, baseUrl, credentials }) {
       'the overlay pause to commit and be acknowledged to the playback session')
     samePlayback(owner)
     await recordClientControl('pause-before-remount', pauseStarted)
-    let pausedPosition
-    await until(async () => {
-      const state = await mediaState()
-      const usable = state.connected && state.paused && state.ready >= 2 && hasDecodedFrame(state)
-        && !state.seeking && state.error === null && snapshot?.ready && snapshot.status === 'paused'
-        && currentSource(state) && state.seekable.some(([start, end]) => state.time >= start && state.time <= end)
-      if (usable) pausedPosition = snapshot.startTime + state.time
-      return usable
-    }, 'decoded seekable paused media matching the signed rendition set before reload')
+    const pausedPosition = await seekablePausedPosition('before reload')
     samePlayback(owner)
 
     const remountStarted = Date.now()
     previousMediaEvents.push(...await page.evaluate(() => window.__twoCommandMediaEvents ?? []))
     const previousVideo = video
     snapshot = undefined
+    // The reload leaves a runner whose pause the session confirmed, and the reloaded page
+    // registers a new endpoint for the same tab. The answer to that registration must
+    // already show the session without an active runner, in every engine: an immediate
+    // Play is otherwise refused until a later snapshot releases the runner. The answer is
+    // kept as evidence whether or not the phase gets as far as checking it.
+    const registration = observeRegistrationAnswer().then(answer => {
+      const at = answer?.at ?? Date.now()
+      clientControls.push({ action: 'remount-registration', at, elapsedMs: at - remountStarted, answered: answer !== null,
+        sinceRegistrationMs: answer?.sinceRegistrationMs ?? null, revision: answer?.revision ?? null,
+        activeIncarnationId: answer ? answer.activeIncarnationId : undefined, playback: null })
+      return answer
+    })
     await page.reload()
     await previousVideo.dispose()
-    await resumeReleasedPlayback(owner, pausedPosition, 'remount', remountStarted)
+    // The overlay's Play is enabled only after the page has handled the registration answer,
+    // so reading that answer here does not delay the resume click that follows.
+    await resumeReleasedPlayback(owner, pausedPosition, 'remount', remountStarted, async () => {
+      const answer = await registration
+      assert(answer, 'The reloaded page must receive an answer to its endpoint registration')
+      assert.equal(answer.activeIncarnationId, null, 'The registration answer after a reload must already show the confirmed paused runner released')
+    })
+
+    // A second reload, this time with a start pending: the session shows the page a play, and
+    // the page goes away before the session hears its answer. No acknowledged pause stands
+    // behind such a runner any more, so only the reload itself can release it: the page's close
+    // report, or its next page registering for the same tab. The pause that precedes it goes
+    // through the overlay and is acknowledged, so the session has a recorded cursor to fall back to.
+    await until(async () => await pauseButton.count() > 0, 'the playback session to observe the playback resumed after the reload', 20000)
+    const acksBeforePendingStart = sessionAcks()
+    const pendingStartPause = Date.now()
+    // The page takes its next control only once it has read the outcome of this one, so the
+    // Play below waits for the pause's own result, not just for its acknowledgement.
+    const pauseSettled = page.waitForResponse(async response => {
+      if (new URL(response.url()).pathname !== '/api/session/control' || response.request().postDataJSON()?.action !== 'pause') return false
+      const body = await response.json().catch(() => null)
+      return body?.data?.requestResult?.outcome === 'paused'
+    }, { timeout: 45000 })
+    // Awaited below; a failure of the step before it must not leave this one unhandled.
+    pauseSettled.catch(() => {})
+    await pauseButton.click()
+    await until(async () => (await mediaState()).paused && snapshot?.status === 'paused' && sessionAcks() > acksBeforePendingStart,
+      'the overlay pause before the pending start to commit and be acknowledged to the playback session')
+    await pauseSettled
+    samePlayback(owner)
+    await recordClientControl('pause-before-pending-start', pendingStartPause)
+    await seekablePausedPosition('before the pending start')
+    samePlayback(owner)
+    // The page's answers are held back and never forwarded: the session must not learn that
+    // the play it showed was carried out.
+    const answerRoute = '**/api/session/ack'
+    const heldAnswers = []
+    const holdAnswer = route => { heldAnswers.push(route) }
+    const releaseRequests = observeReleaseRequests()
+    let pendingStartPosition
+    let pendingStartReload
+    let pendingStartRegistration
+    await page.route(answerRoute, holdAnswer)
+    try {
+      const playShown = Date.now()
+      await page.getByRole('button', { name: 'Play', exact: true }).click()
+      await until(() => heldAnswers.length > 0, 'the page to answer the play the session showed it', 20000)
+      const heldAnswer = heldAnswers[0].request().postDataJSON()
+      assert.equal(heldAnswer?.outcome, 'playing', 'The answer held back before the reload must be the page\'s answer to a play')
+      // The page played from the acknowledged pause until now; a close report carries this cursor.
+      const playing = await mediaState()
+      assert(snapshot?.ready, 'The page must hold its playback when it reloads with the start pending')
+      pendingStartPosition = snapshot.startTime + playing.time
+      clientControls.push({ action: 'pending-start-shown', at: Date.now(), elapsedMs: Date.now() - playShown, position: pendingStartPosition,
+        commandId: heldAnswer.commandId ?? null, revision: heldAnswer.revision ?? null, playback: safePlayback(snapshot) })
+
+      pendingStartReload = Date.now()
+      previousMediaEvents.push(...await page.evaluate(() => window.__twoCommandMediaEvents ?? []))
+      const pendingStartVideo = video
+      snapshot = undefined
+      pendingStartRegistration = observeRegistrationAnswer().then(answer => {
+        const at = answer?.at ?? Date.now()
+        clientControls.push({ action: 'pending-start-registration', at, elapsedMs: at - pendingStartReload, answered: answer !== null,
+          sinceRegistrationMs: answer?.sinceRegistrationMs ?? null, revision: answer?.revision ?? null,
+          activeIncarnationId: answer ? answer.activeIncarnationId : undefined,
+          closeReportRequested: releaseRequests.seen.closeReport, localRecoveryRequested: releaseRequests.seen.localRecovery, playback: null })
+        return answer
+      })
+      await page.reload()
+      await pendingStartVideo.dispose()
+    } finally {
+      await page.unroute(answerRoute, holdAnswer)
+      // The reload has already cancelled a held request; aborting it again is expected to fail.
+      await Promise.all(heldAnswers.map(route => route.abort().catch(() => {})))
+    }
+    try {
+      await resumeReleasedPlayback(owner, pendingStartPosition, 'pending-start', pendingStartReload, async () => {
+        const answer = await pendingStartRegistration
+        assert(answer, 'The page reloaded with a start pending must receive an answer to its endpoint registration')
+        assert.equal(answer.activeIncarnationId, null, 'The registration answer after a reload with a shown play unanswered must already show the runner released')
+      })
+    } finally {
+      releaseRequests.stop()
+    }
     await pausePlayback(owner, 'final-pause')
-    // Leave a different paused cursor so the following operator seek changes position.
-    await seekSourceAndDecode(owner, credentials.expectedSeekPosition + 5, 'final-seek-paused', true)
+    // Leave a paused cursor that differs from the operator's seek position of the next phase.
+    const pausedThumb = await sliderValue()
+    const finalTarget = finalSeekTarget(pausedThumb, credentials.expectedSeekPosition)
+    assert(finalTarget >= 0 && pausedThumb - finalTarget >= 9.5 && dialogueCueAt(finalTarget) !== null,
+      `The final seek target ${finalTarget} must lie on a dialogue cue, clear of the paused thumb at ${pausedThumb}`)
+    await seekSourceAndDecode(owner, finalTarget, 'final-seek-paused', true)
     restingCursor = await restingCursorNow()
   } else if (phase === 'sought-paused') {
     // Video admission belongs to a client session: the operator's pause and seek act on
@@ -2244,15 +2589,18 @@ async function checkpoint({ phase, baseUrl, credentials }) {
           && snapshot.renditionSet.split(',').includes(`${match[1]}.${item.generation}`)
       }), `Recovered playback must receive ${track} from the current signed rendition set`)
     }
-    await proveMovieCompletion()
+    const completion = await proveMovieCompletion()
+    await proveCursorAuthority(completion.replaySeek)
   } else if (phase === 'complete') {
     assert.deepEqual(phases, ['authenticated', 'attached', ...(phases.includes('client-controls') ? ['client-controls'] : []), 'sought-paused', 'web-restarted', 'worker-contained', 'worker-recovered'])
+    assert(cursorAuthority.length === 1 && cursorAuthority[0].finishedAt,
+      'The drill must retain one completed proof that the playhead keeps its own clock under an outrunning producer')
   } else {
     throw new Error(`Unexpected browser checkpoint: ${phase}`)
   }
   phases.push(phase)
   // No credentials or signed URLs are written to the evidence artifact.
-  await writeFile(`${evidence}/result.json`, JSON.stringify({ browser: browserInfo, phases, generation: snapshot?.generation, mediaResponses, nativeResponseEvidence, clientControls, subtitleObservations, networkInterruptions, manifestEvidence, mediaRequestOrder, capabilityRenewals, progressOutages, statusOutages, seekOutages, movieCompletions }, null, 2))
+  await writeFile(`${evidence}/result.json`, JSON.stringify({ browser: browserInfo, phases, generation: snapshot?.generation, mediaResponses, nativeResponseEvidence, clientControls, subtitleObservations, networkInterruptions, manifestEvidence, mediaRequestOrder, capabilityRenewals, progressOutages, statusOutages, seekOutages, movieCompletions, cursorAuthority }, null, 2))
   return { phase, passed: true }
 }
 
@@ -2272,7 +2620,7 @@ const server = createServer(async (request, response) => {
     const alertsAtFailure = await page.getByRole('alert').allTextContents().catch(() => null)
     const statusAtFailure = await page.getByRole('status').allTextContents().catch(() => null)
     await writeFile(`${evidence}/failure.json`, JSON.stringify({
-      browser: browserInfo, error: error.message, state, playback, playbackSnapshots, clientControls, subtitleObservations, networkInterruptions, mediaEvents: [...previousMediaEvents, ...mediaEvents], mediaResponses, apiResponses, nativeResponseEvidence, manifestEvidence, mediaRequestOrder, capabilityRenewals, progressOutages, statusOutages, seekOutages, movieCompletions, marks: marksAtFailure,
+      browser: browserInfo, error: error.message, state, playback, playbackSnapshots, clientControls, subtitleObservations, networkInterruptions, mediaEvents: [...previousMediaEvents, ...mediaEvents], mediaResponses, apiResponses, nativeResponseEvidence, manifestEvidence, mediaRequestOrder, capabilityRenewals, progressOutages, statusOutages, seekOutages, movieCompletions, cursorAuthority, marks: marksAtFailure,
       alerts: alertsAtFailure, statuses: statusAtFailure, pageErrors,
     }, null, 2))
     await page.screenshot({ path: `${evidence}/failure.png` }).catch(() => {})

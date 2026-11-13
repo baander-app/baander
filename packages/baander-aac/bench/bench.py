@@ -12,18 +12,23 @@ be re-run after a tool or a configuration changes by deleting its cache):
            with every encoder and decoder, single-threaded, best of N
   compat   decode our streams with every decoder and other encoders'
            streams with ours, and compare the decodes
-  lossless ALAC and FLAC on the same corpus: size and speed
-  report   write the CSV files and the Markdown tables under results/
+  lossless bAAC's lossless mode against FLAC and ALAC on the same corpus
+           and on held-out recordings: size, speed and bit-exactness,
+           with the gates of the lossless mode (see lossless.py)
+  check    print every lossless gate of the cached run as passed, failed
+           or undecided, and exit non-zero unless all of them passed
+  report   write the CSV files and the Markdown tables under results/;
+           only the sections and files whose stage has a cache change
+  selftest check the harness's own logic on made-up figures
 
-Tool paths come from environment variables (see TOOLS below); a missing
-tool skips the configurations that need it and says so.
+Tool paths come from environment variables (see TOOLS in common.py); a
+missing tool skips the configurations that need it and says so.
 """
 import argparse
 import csv
 import json
 import os
 import re
-import shlex
 import shutil
 import subprocess
 import sys
@@ -32,49 +37,21 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import numpy as np
-import soundfile as sf
-from scipy import signal
 
-HERE = Path(__file__).resolve().parent
-WORK = Path(os.environ.get("BENCH_WORK", HERE / "work"))
+try:
+    import soundfile as sf
+    from scipy import signal
+except ImportError:  # the lossless, check and report stages do not need them
+    sf = signal = None
+
+from common import HERE, MUSIC, TOOLS, WORK, have, run, wine
+from lossless import (QUIET_CPU, alac_rows, busy_seconds, check_held_out_format, check_lossless,
+                      expected_gates, held_out_entry, lossless_section, other_cpu, quiet_verdict,
+                      same_bytes, size_verdict, speed_verdict, stage_check, stage_lossless)
+
 RESULTS = Path(os.environ.get("BENCH_RESULTS", HERE / "results"))
 
-TOOLS = {
-    "baac": os.environ.get("BAAC", str(HERE.parent / "cmake-build" / "baac")),
-    "ffmpeg": os.environ.get("FFMPEG", "ffmpeg"),
-    "fdk_enc": os.environ.get("FDK_AAC_ENC", ""),       # fdk-aac aac-enc
-    "fdk_dec": os.environ.get("FDK_AAC_DEC", ""),       # fdk-aac aac-dec
-    "fdk_xhe": os.environ.get("FDK_XHE_ENC", ""),       # fdk-aac xhe-aac-enc
-    "xaac_enc": os.environ.get("XAAC_ENC", ""),         # libxaac xaacenc
-    "xaac_dec": os.environ.get("XAAC_DEC", ""),         # libxaac xaacdec
-    "qaac": os.environ.get("QAAC", ""),                 # qaac64.exe, run with wine
-    "refalac": os.environ.get("REFALAC", ""),           # refalac64.exe, run with wine
-    "flac": os.environ.get("FLAC", "flac"),
-    "peaq": os.environ.get("PEAQ", ""),                 # GstPEAQ's peaq
-    "visqol": os.environ.get("VISQOL", ""),             # ViSQOL v3 binary
-    "visqol_model": os.environ.get("VISQOL_MODEL", ""),  # libsvm model file
-    "wine": os.environ.get("WINE", "wine"),
-}
-
-MUSIC = ["strauss48_stereo", "sopr48_stereo", "contrabassoon48_stereo",
-         "guitar48_stereo", "glock48_stereo", "castanets48_stereo",
-         "harpsichord48_stereo", "steely48_stereo", "ravel48_stereo",
-         "moonlight48_stereo"]
 SPEECH = ["CA01_01"]
-
-
-def have(tool):
-    path = TOOLS[tool]
-    if not path:
-        return False
-    if tool in ("qaac", "refalac"):
-        return Path(path).is_file() and shutil.which(TOOLS["wine"]) is not None
-    return shutil.which(path) is not None or Path(path).is_file()
-
-
-def wine(tool):
-    return [TOOLS["wine"], TOOLS[tool]]
-
 
 # ---------------------------------------------------------------- configs
 #
@@ -194,17 +171,6 @@ def decode_cmd(cfg, stream, wav):
 
 
 # ---------------------------------------------------------------- helpers
-
-def run(cmd, timed=None, **kw):
-    """Run cmd; with timed=path, record wall, user, sys seconds and max RSS."""
-    if timed:
-        cmd = ["/usr/bin/time", "-f", "%e %U %S %M", "-o", timed] + cmd
-    p = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, **kw)
-    if p.returncode != 0:
-        raise RuntimeError(f"{shlex.join(cmd)} failed ({p.returncode}): "
-                           f"{p.stderr.decode(errors='replace')[-600:]}")
-    return p
-
 
 def read_time(path):
     wall, user, sys_, rss = Path(path).read_text().split()[-4:]
@@ -540,39 +506,6 @@ def stage_compat(args):
     (WORK / "compat.json").write_text(json.dumps(rows, indent=1))
 
 
-# ---------------------------------------------------------------- lossless
-
-def stage_lossless(args):
-    pcm = prepare_corpus()
-    wav, secs = concat_corpus(pcm)
-    d = WORK / "lossless"
-    d.mkdir(parents=True, exist_ok=True)
-    ff = TOOLS["ffmpeg"]
-    encs = [
-        ("alac-ffmpeg", "m4a", lambda o: [ff, "-v", "error", "-y", "-threads", "1", "-i", str(wav),
-                                         "-c:a", "alac", o]),
-        ("flac-5", "flac", lambda o: [TOOLS["flac"], "-s", "-f", "-5", "-o", o, str(wav)]),
-        ("flac-8", "flac", lambda o: [TOOLS["flac"], "-s", "-f", "-8", "-o", o, str(wav)]),
-    ]
-    if have("refalac"):
-        encs.append(("alac-apple-ref", "m4a", lambda o: wine("refalac") + ["--silent", "-o", o, str(wav)]))
-    ref = sf.read(str(wav), dtype="int16")[0]
-    rows = []
-    for name, ext, mk in encs:
-        o = str(d / f"{name}.{ext}")
-        e = best_of(mk(o), args.repeat, d, f"enc-{name}")
-        dec = str(d / f"{name}.dec.wav")
-        dcmd = [ff, "-v", "error", "-y", "-threads", "1", "-i", o, "-c:a", "pcm_s16le", dec]
-        r = best_of(dcmd, args.repeat, d, f"dec-{name}")
-        exact = bool(np.array_equal(sf.read(dec, dtype="int16")[0], ref))
-        os.remove(dec)
-        rows.append(dict(codec=name, seconds=secs, kbps=os.path.getsize(o) * 8 / secs / 1000,
-                         enc_cpu=e["cpu"], enc_rss_kb=e["rss_kb"], dec_cpu=r["cpu"],
-                         dec_rss_kb=r["rss_kb"], bit_exact=exact))
-        print(rows[-1], file=sys.stderr)
-    (WORK / "lossless.json").write_text(json.dumps(rows, indent=1))
-
-
 # ---------------------------------------------------------------- report
 
 T95 = {9: 2.262, 8: 2.306, 7: 2.365, 6: 2.447, 5: 2.571, 4: 2.776}
@@ -592,9 +525,36 @@ def fmt(v, nd=2):
     return "-" if v is None or (isinstance(v, float) and np.isnan(v)) else f"{v:.{nd}f}"
 
 
+SECTIONS = ["Quality", "Speed and memory", "Decoder agreement", "Lossless"]
+
+
+def split_sections(text):
+    """The generated sections of tables.md, by title, each without the
+    blank lines around it."""
+    out = {}
+    starts = [m.start() for m in re.finditer(r"(?m)^## ", text)] + [len(text)]
+    for a, b in zip(starts, starts[1:]):
+        chunk = text[a:b].strip("\n")
+        title = chunk.split("\n", 1)[0][3:].replace(" (generated)", "").strip()
+        out[title] = chunk
+    return out
+
+
+def merge_sections(old_text, new):
+    """tables.md with the sections in `new` replaced and every other
+    section as it was, byte for byte."""
+    sections = split_sections(old_text)
+    sections.update({title: "\n".join(lines).strip("\n") for title, lines in new.items()})
+    order = [t for t in SECTIONS if t in sections] + [t for t in sections if t not in SECTIONS]
+    return "\n\n".join(sections[t] for t in order) + "\n"
+
+
 def stage_report(args):
+    """Writes the results of every stage that has a cache; a stage without
+    one keeps its results files and its section of tables.md as they are."""
     RESULTS.mkdir(parents=True, exist_ok=True)
     rows = [json.loads(p.read_text()) for p in sorted((WORK / "quality").glob("*/*.json"))]
+    new = {}
     md = []
     if rows:
         keys = ["config", "family", "encoder", "mode", "nominal", "item", "seconds", "bytes",
@@ -715,11 +675,12 @@ def stage_report(args):
                 r = next((x for x in by[c] if x["item"] == item), None)
                 cells.append("-" if r is None else f"{r['peaq_basic']:.2f} / {fmt(r.get('visqol'))}")
             md.append(f"| {item.replace('48_stereo', '')} | " + " | ".join(cells) + " |")
+        new["Quality"] = md
     sp = WORK / "speed.json"
     if sp.exists():
         srows = json.loads(sp.read_text())
         (RESULTS / "speed.json").write_text(json.dumps(srows, indent=1))
-        md.append("\n## Speed and memory (generated)\n")
+        md = new["Speed and memory"] = ["## Speed and memory (generated)\n"]
         md.append("CPU seconds (user + system, best of the runs) over the "
                   f"{srows[-1]['seconds']:.0f} s corpus concatenation; × realtime = audio "
                   "seconds per CPU second; RSS = peak resident set of the process.\n")
@@ -736,7 +697,7 @@ def stage_report(args):
     if cp.exists():
         crows = json.loads(cp.read_text())
         (RESULTS / "compat.json").write_text(json.dumps(crows, indent=1))
-        md.append("\n## Decoder agreement (generated)\n")
+        md = new["Decoder agreement"] = ["## Decoder agreement (generated)\n"]
         md.append("Each decode aligned to the source; SNR of every decoder's output against "
                   "our decoder's (higher = closer; about 130 dB is float rounding). Min over the "
                   "ten items.\n")
@@ -754,32 +715,234 @@ def stage_report(args):
                       f"{fmt(float(np.median(v)), 1) if v else '-'} |")
     lp = WORK / "lossless.json"
     if lp.exists():
-        lrows = json.loads(lp.read_text())
-        (RESULTS / "lossless.json").write_text(json.dumps(lrows, indent=1))
-        md.append("\n## Lossless (generated)\n")
-        md.append("| Codec | kbit/s | Enc × realtime | Dec × realtime | Dec RSS MiB | Bit-exact |")
-        md.append("|---|--:|--:|--:|--:|---|")
-        for r in lrows:
-            md.append(f"| {r['codec']} | {r['kbps']:.0f} | {r['seconds'] / r['enc_cpu']:.0f} | "
-                      f"{r['seconds'] / r['dec_cpu']:.0f} | {r['dec_rss_kb'] / 1024:.1f} | {r['bit_exact']} |")
-    (RESULTS / "tables.md").write_text("\n".join(md) + "\n")
-    print(f"wrote {RESULTS}", file=sys.stderr)
+        result = json.loads(lp.read_text())
+        (RESULTS / "lossless.json").write_text(json.dumps(result, indent=1) + "\n")
+        new["Lossless"] = lossless_section(result)
+    tables = RESULTS / "tables.md"
+    tables.write_text(merge_sections(tables.read_text() if tables.exists() else "", new))
+    print(f"wrote {', '.join(new) or 'nothing'} under {RESULTS}", file=sys.stderr)
+
+
+def stage_selftest(args):
+    """The harness's own logic on made-up figures: no codec runs."""
+    failures = []
+
+    def expect(cond, what):
+        print(("ok    " if cond else "FAIL  ") + what)
+        if not cond:
+            failures.append(what)
+
+    # The statistic.  A reference spread of 1 % makes the threshold 1.01.
+    refs = [3.000, 3.030, 3.015, 3.000, 3.006]
+    below = speed_verdict([(r * x, r) for r, x in zip(refs, (0.97, 0.98, 0.99, 1.00, 0.985))])
+    straddle = speed_verdict([(r * x, r) for r, x in zip(refs, (0.99, 1.03, 1.00, 1.02, 0.995))])
+    above = speed_verdict([(r * x, r) for r, x in zip(refs, (1.02, 1.05, 1.03, 1.04, 1.025))])
+    expect(abs(below["threshold"] - 1.00998) < 1e-4, "a reference spread of 1 % gives a threshold of 1.01")
+    expect(below["verdict"] == "passed", "paired ratios of 0.97 to 1.00 pass")
+    expect(straddle["verdict"] == "undecided", "paired ratios of 0.99 to 1.03 are undecided")
+    expect(above["verdict"] == "failed", "paired ratios of 1.02 to 1.05 fail")
+    short = speed_verdict([(r * x / 2, r / 2) for r, x in zip(refs, (0.97, 0.98, 0.99, 1.00, 0.985))])
+    expect(short["verdict"] == "undecided", "the same ratios from runs under 2 CPU seconds are undecided")
+    expect(size_verdict(1000, 1000)["verdict"] == "passed", "a size equal to the reference passes")
+    expect(size_verdict(1001, 1000)["verdict"] == "failed", "one byte more than the reference fails")
+
+    # The check mode on a whole made-up run.
+    def made_up(speed, size=(1000, 1000), other=(0.2, 0.3), exact=True, held=None):
+        host = dict(cpu="test", core=0, other_cpu_start=other[0], other_cpu_run=other[1],
+                    quiet_cpu=QUIET_CPU, load_start=[2.5], load_end=[2.5])
+        host["quiet"] = quiet_verdict(host)[0]
+        return dict(date="test", complete=True, host=host, held_out=[],
+                    held_out_run=held or dict(touched=True, run=1, first_run=True,
+                                              same_build_as_first=True, first_date="test"),
+                    rows=[dict(codec="baac-5", encoder="baac", level=5, frame_bytes=10,
+                               bit_exact=exact)],
+                    gates=[dict(id="size-5", group="flac", description="size", kind="size",
+                                **size_verdict(*size)),
+                           dict(id="enc-5", group="flac", description="speed", kind="speed",
+                                **speed)]
+                    + [dict(id=gid, group="test", description="made up", kind="size",
+                            **size_verdict(1000, 1000))
+                       for gid in expected_gates() if gid not in ("size-5", "enc-5")])
+    sink = open(os.devnull, "w")
+    expect(check_lossless(made_up(below), sink), "the check passes a run whose gates all passed")
+    expect(not check_lossless(made_up(straddle), sink), "the check does not pass an undecided gate")
+    expect(not check_lossless(made_up(above), sink), "the check does not pass a failed gate")
+    expect(not check_lossless(made_up(below, size=(1001, 1000)), sink),
+           "the check does not pass a row one byte larger than its reference")
+    expect(not check_lossless(made_up(below, other=(0.2, 2.5)), sink),
+           "the check does not pass a run during which the rest of the host used 2.5 CPUs")
+    expect(not check_lossless(made_up(below, other=(2.5, 0.3)), sink),
+           "the check does not pass a run that began while the rest of the host used 2.5 CPUs")
+    expect(check_lossless(made_up(below, other=(2.0, 2.0)), sink),
+           "the check passes a run with the rest of the host at 2.0 CPUs, whatever the load average")
+    unmeasured = made_up(below)
+    for key in ("other_cpu_start", "other_cpu_run"):
+        del unmeasured["host"][key]
+    expect(not check_lossless(unmeasured, sink),
+           "the check does not pass a result that does not measure the rest of the host")
+
+    # The share of the rest of the host.  At 100 ticks a second, 4,200
+    # busy ticks are 42 CPU seconds; the run used 12 of them over 20 s, so
+    # the rest of the host used 1.5 CPUs.  Idle and iowait are not busy.
+    stat_a = "cpu  1000 0 500 90000 300 0 0 0 0 0\ncpu0 1 2 3 4\n"
+    stat_b = "cpu  3900 0 1500 99000 900 100 100 100 0 0\ncpu0 1 2 3 4\n"
+    a = dict(busy=busy_seconds(stat_a, 100), own=3.0, clock=100.0)
+    b = dict(busy=busy_seconds(stat_b, 100), own=15.0, clock=120.0)
+    expect(abs(busy_seconds(stat_b, 100) - busy_seconds(stat_a, 100) - 42.0) < 1e-9,
+           "the busy time of /proc/stat counts user, nice, system, irq, softirq and steal")
+    expect(abs(other_cpu(a, b) - 1.5) < 1e-9, "the rest of the host used 1.5 CPUs")
+    expect(quiet_verdict(dict(other_cpu_start=0.4, other_cpu_run=other_cpu(a, b)))[0],
+           "1.5 CPUs is quiet")
+    busier = dict(b, busy=b["busy"] + 20.0)
+    expect(abs(other_cpu(a, busier) - 2.5) < 1e-9 and
+           not quiet_verdict(dict(other_cpu_start=0.4, other_cpu_run=other_cpu(a, busier)))[0],
+           "20 busy CPU seconds more make 2.5 CPUs, which is not quiet")
+    expect(not check_lossless(made_up(below, exact=False), sink),
+           "the check does not pass a row that is not bit-exact")
+    expect(not check_lossless(made_up(below, held=dict(touched=False, reason="test")), sink),
+           "the check does not pass a run that did not read the held-out recordings")
+    for lost in ("dec-8-ffmpeg", "held-surround-enc", "size-8-enlarged"):
+        short = made_up(below)
+        short["gates"] = [g for g in short["gates"] if g["id"] != lost]
+        expect(not check_lossless(short, sink),
+               f"the check does not pass a complete run without the gate {lost}")
+
+    # The ledger of the held-out recordings: a run of an earlier set
+    # booked without its files' digests, then on one set the first run, a
+    # second run of the same build and a run of another build, a run on a
+    # new set, and a run on a set that shares a file with the first.
+    with tempfile.TemporaryDirectory() as tmp:
+        ledger = Path(tmp) / "heldout" / "runs.json"
+        ledger.parent.mkdir()
+        ledger.write_text(json.dumps(dict(runs=[dict(date="day 0", baac_sha256="0000",
+                                                     git="rev0")])))
+        first = held_out_entry(ledger, ["a1", "a2"], "day 1", "aaaa", "rev1")
+        again = held_out_entry(ledger, ["a2", "a1"], "day 2", "aaaa", "rev1")
+        other = held_out_entry(ledger, ["a1", "a2"], "day 3", "bbbb", "rev2")
+        fresh = held_out_entry(ledger, ["b1", "b2"], "day 4", "bbbb", "rev2")
+        shared = held_out_entry(ledger, ["a2", "c1"], "day 5", "bbbb", "rev2")
+        expect(first["first_run"] and first["run"] == 1,
+               "the ledger books a first run as the first, whatever runs an earlier set had")
+        expect(not again["first_run"] and again["same_build_as_first"] and again["run"] == 2
+               and again["first_date"] == "day 1",
+               "a second run of the same build is booked as a repeat")
+        expect(not other["first_run"] and not other["same_build_as_first"] and other["run"] == 3,
+               "a run of another build is booked as such")
+        expect(fresh["first_run"] and fresh["run"] == 1 and fresh["first_date"] == "day 4",
+               "a run on a new set of recordings is booked as that set's first")
+        expect(not shared["first_run"] and not shared["same_build_as_first"]
+               and shared["first_date"] == "day 1",
+               "a set that shares a file with an earlier set is not booked as a first run")
+        expect(len(json.loads(ledger.read_text())["runs"]) == 6, "the ledger keeps every run")
+        expect(check_lossless(made_up(below, held=again), sink),
+               "the check passes a repeat on the build the first run measured")
+        expect(not check_lossless(made_up(below, held=other), sink),
+               "the check does not pass the held-out gates of another build's later run")
+
+    # Exactness: one sample altered is not the same decode.
+    pcm = bytes(range(256)) * 16
+    altered = bytearray(pcm)
+    altered[1000] ^= 1
+    expect(same_bytes(pcm, bytes(pcm)) and not same_bytes(pcm, bytes(altered)),
+           "a decode altered by one sample is not bit-exact")
+
+    # The locale every tool inherits.
+    child = subprocess.run([sys.executable, "-c", "import os; print(os.environ.get('LC_ALL'))"],
+                           stdout=subprocess.PIPE).stdout.decode().strip()
+    expect(child == "C", "a tool the harness starts runs in the C locale")
+
+    # The carried refalac row.
+    measured = [dict(codec="alac-ffmpeg", kbps=697.0, seconds=130.3, bit_exact=True)]
+    carried = alac_rows(False, measured)
+    expect(len(carried) == 2 and carried[1].get("carried") == "2026-10-30" and
+           "enc_cpu" not in carried[1],
+           "without refalac its row is the carried one, marked and without speed")
+    own = alac_rows(True, measured + [dict(codec="alac-apple-ref", kbps=690.0, seconds=130.3,
+                                           bit_exact=True)])
+    expect(len(own) == 2 and "carried" not in own[1], "with refalac its measured row is used")
+
+    # A held-out file of another format.
+    try:
+        check_held_out_format("28 - high resolution audio",
+                              dict(sample_rate=48000, channels=2, bits=24),
+                              dict(sample_rate=96000, channels=2, bits=24))
+        expect(False, "a held-out file of another format stops the stage")
+    except SystemExit as e:
+        expect("28 - high resolution audio" in str(e) and "48000" in str(e),
+               "a held-out file of another format stops the stage with a message naming it")
+
+    # The report: only the sections that have a cache change.
+    committed = (HERE / "results" / "tables.md").read_text()
+    expect(merge_sections(committed, {}) == committed,
+           "tables.md comes back byte for byte when no section is replaced")
+    global WORK, RESULTS
+    keep = WORK, RESULTS
+    with tempfile.TemporaryDirectory() as tmp:
+        WORK, RESULTS = Path(tmp) / "work", Path(tmp) / "results"
+        WORK.mkdir()
+        shutil.copytree(HERE / "results", RESULTS)
+        before = {p.name: p.read_bytes() for p in RESULTS.iterdir()}
+        run_of = made_up(below)
+        run_of.update(tools=dict(baac="x", flac="flac 1.4.3", ffmpeg="ffmpeg", refalac="carried"),
+                      method=dict(corpus_seconds=130.3, corpus_repetitions=25, pinned="taskset -c 0",
+                                  repeats=5, judged="long run"), figures=[])
+        run_of["host"].update(compiler="c++")
+        run_of["rows"][0].update(seconds=130.3, kbps=600.0, enc_cpu=0.2, dec_cpu=0.1)
+        for g in run_of["gates"]:
+            g.setdefault("ours_median", 1.0)
+        (WORK / "lossless.json").write_text(json.dumps(run_of))
+        stage_report(args)
+        after = {p.name: p.read_bytes() for p in RESULTS.iterdir()}
+        old, new = split_sections(before["tables.md"].decode()), split_sections(after["tables.md"].decode())
+        expect(all(old[t] == new[t] for t in ("Quality", "Speed and memory", "Decoder agreement")),
+               "with only the lossless cache, the other sections of tables.md are unchanged")
+        expect(old.get("Lossless") != new["Lossless"] and "baac-5" in new["Lossless"] and
+               list(new) == [t for t in SECTIONS if t in new],
+               "and the Lossless section is the new one, in its place")
+        expect(all(before[n] == after[n] for n in before if n not in ("tables.md", "lossless.json")),
+               "and the other results files are byte-identical")
+    WORK, RESULTS = keep
+    print(f"selftest: {len(failures)} failure(s)")
+    sys.exit(1 if failures else 0)
 
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("stage", choices=["quality", "speed", "compat", "lossless", "report", "list"])
-    ap.add_argument("--only", help="regular expression over configuration ids")
+    ap.add_argument("stage", choices=["quality", "speed", "compat", "lossless", "check", "report",
+                                      "selftest", "list"])
+    ap.add_argument("--only", help="regular expression over configuration ids (lossless: over "
+                                   "gate ids; a limited run is not a gate result)")
     ap.add_argument("--jobs", type=int, default=os.cpu_count() or 1)
-    ap.add_argument("--repeat", type=int, default=3)
+    ap.add_argument("--repeat", type=int, default=None,
+                    help="timing repeats (lossless: at least 5, the default; other stages 3)")
+    ap.add_argument("--check", action="store_true",
+                    help="lossless: print the gates after the run and exit by them")
+    ap.add_argument("--core", type=int, default=None,
+                    help="lossless: the core to pin to (default: the idlest)")
+    ap.add_argument("--reps", type=int, default=None,
+                    help="lossless: corpus repetitions of a timed run (default: enough for "
+                         "2 CPU seconds)")
+    ap.add_argument("--gates-only", action="store_true",
+                    help="lossless: skip the speed of the rows that carry no gate")
+    ap.add_argument("--any-flac", action="store_true",
+                    help="lossless: take a flac that is not the pinned 1.4.3")
+    ap.add_argument("--quiet-cpu", type=float, default=QUIET_CPU,
+                    help="lossless: the CPUs' worth the rest of the host may use, in the minute "
+                         "before a run and over it, for the host to count as quiet")
+    ap.add_argument("--results", help="check: a lossless.json other than the work cache")
     args = ap.parse_args()
     if args.stage == "list":
         for c in cfg_list():
             print(c["id"], "needs", ",".join(c["needs"]), "" if all(map(have, c["needs"])) else "(missing)")
         return
+    if args.stage in ("quality", "speed", "compat") and sf is None:
+        raise SystemExit(f"the {args.stage} stage needs the Python modules scipy and soundfile")
+    if args.repeat is None:
+        args.repeat = 5 if args.stage == "lossless" else 3
     {"quality": stage_quality, "speed": stage_speed, "compat": stage_compat,
-     "lossless": stage_lossless, "report": stage_report}[args.stage](args)
+     "lossless": stage_lossless, "check": stage_check, "report": stage_report,
+     "selftest": stage_selftest}[args.stage](args)
 
 
 if __name__ == "__main__":

@@ -13,6 +13,7 @@
 #include <immintrin.h>
 
 #include <cmath>
+#include <cstddef>
 #include <cstring>
 
 /* ── Vector Operations ───────────────────────────────────────── */
@@ -251,6 +252,104 @@ static void aac_vector_fmul_accumulate_avx2(float* dst, const float* a, const fl
   }
 }
 
+/* ── Encoder kernels ─────────────────────────────────────────── */
+
+namespace {
+
+struct QuantNoiseArgs {
+  __m256 scale, round, gain;
+  const float* pow43;
+};
+
+/* d^2 of lines from their quantized magnitudes' table values p (see the
+ * scalar kernel). */
+inline __m256 noise_sq8(__m256 coef, __m256 p, const QuantNoiseArgs& a) {
+  const __m256 d =
+      _mm256_sub_ps(_mm256_andnot_ps(_mm256_set1_ps(-0.0f), coef), _mm256_mul_ps(p, a.gain));
+  return _mm256_mul_ps(d, d);
+}
+
+inline __m128 noise_sq4(__m128 coef, __m128 p, const QuantNoiseArgs& a) {
+  const __m128 d = _mm_sub_ps(_mm_andnot_ps(_mm_set1_ps(-0.0f), coef),
+                              _mm_mul_ps(p, _mm256_castps256_ps128(a.gain)));
+  return _mm_mul_ps(d, d);
+}
+
+/* The quantized magnitudes of eight or four lines: v clamped to [0, 8191]
+ * (MINPS gives its second operand for a NaN, so a NaN quantizes to 8191 as
+ * in the scalar kernel), which keeps every index inside the table. */
+inline __m256i quant_index8(__m256 x34, const QuantNoiseArgs& a) {
+  const __m256 v = _mm256_add_ps(_mm256_mul_ps(x34, a.scale), a.round);
+  return _mm256_cvttps_epi32(
+      _mm256_max_ps(_mm256_min_ps(v, _mm256_set1_ps(8191.0f)), _mm256_setzero_ps()));
+}
+
+inline __m128i quant_index4(__m128 x34, const QuantNoiseArgs& a) {
+  const __m128 v =
+      _mm_add_ps(_mm_mul_ps(x34, _mm256_castps256_ps128(a.scale)), _mm256_castps256_ps128(a.round));
+  return _mm_cvttps_epi32(_mm_max_ps(_mm_min_ps(v, _mm_set1_ps(8191.0f)), _mm_setzero_ps()));
+}
+
+inline __m256 quant_noise8(const float* coef, const float* x34, const QuantNoiseArgs& a) {
+  const __m256 p = _mm256_i32gather_ps(a.pow43, quant_index8(_mm256_loadu_ps(x34), a), 4);
+  return noise_sq8(_mm256_loadu_ps(coef), p, a);
+}
+
+inline __m128 quant_noise4(const float* coef, const float* x34, const QuantNoiseArgs& a) {
+  const __m128 p = _mm_i32gather_ps(a.pow43, quant_index4(_mm_loadu_ps(x34), a), 4);
+  return noise_sq4(_mm_loadu_ps(coef), p, a);
+}
+
+/* The last n < 4 lines of a span in lanes 0..n-1 and +0 in the others.
+ * The masked loads read nothing past the span; the lanes they leave at
+ * zero still quantize to an index inside the table. */
+inline __m128 quant_noise_part(const float* coef, const float* x34, int n,
+                               const QuantNoiseArgs& a) {
+  const __m128i live = _mm_cmpgt_epi32(_mm_set1_epi32(n), _mm_setr_epi32(0, 1, 2, 3));
+  const __m128 p = _mm_i32gather_ps(a.pow43, quant_index4(_mm_maskload_ps(x34, live), a), 4);
+  return _mm_and_ps(noise_sq4(_mm_maskload_ps(coef, live), p, a), _mm_castsi128_ps(live));
+}
+
+/* acc + v in lanes 0..3 (high false) or 4..7 (high true) and + +0 in the
+ * other four, which leaves those unchanged: an accumulator's lanes are
+ * never -0. */
+inline __m256 add_half(__m256 acc, __m128 v, bool high) {
+  const __m256 z = _mm256_setzero_ps();
+  return _mm256_add_ps(acc, high ? _mm256_insertf128_ps(z, v, 1) : _mm256_insertf128_ps(z, v, 0));
+}
+
+}  // namespace
+
+/* The scalar kernel's eight accumulators in one register.  The bands of
+ * the codec are multiples of four lines, so a span ends with at most one
+ * group of four, which takes a four-lane gather into lanes 0..3; one to
+ * three lines left (other callers) go through masked loads. */
+static float aac_quant_noise_avx2(const float* coef, const float* x34, int len, int windows,
+                                  int stride, float scale, float round, float gain,
+                                  const float* pow43) {
+  const QuantNoiseArgs a{_mm256_set1_ps(scale), _mm256_set1_ps(round), _mm256_set1_ps(gain), pow43};
+  __m256 acc = _mm256_setzero_ps();
+  for (int w = 0; w < windows; w++) {
+    const float* cw = coef + (ptrdiff_t)w * stride;
+    const float* xw = x34 + (ptrdiff_t)w * stride;
+    int i = 0;
+    for (; i + 8 <= len; i += 8) {
+      acc = _mm256_add_ps(acc, quant_noise8(cw + i, xw + i, a));
+    }
+    if (i + 4 <= len) {
+      acc = add_half(acc, quant_noise4(cw + i, xw + i, a), false);
+      i += 4;
+    }
+    if (i < len) {
+      acc = add_half(acc, quant_noise_part(cw + i, xw + i, len - i, a), (i & 4) != 0);
+    }
+  }
+  /* ((a0 + a4) + (a2 + a6)) + ((a1 + a5) + (a3 + a7)) */
+  const __m128 s = _mm_add_ps(_mm256_castps256_ps128(acc), _mm256_extractf128_ps(acc, 1));
+  const __m128 t = _mm_add_ps(s, _mm_movehl_ps(s, s));
+  return _mm_cvtss_f32(_mm_add_ss(t, _mm_shuffle_ps(t, t, _MM_SHUFFLE(1, 1, 1, 1))));
+}
+
 void aac_dsp_init_avx2(AacDSP* dsp) {
   /* AVX2 supersedes SSE2 — override all function pointers */
   dsp->vector_fmul = aac_vector_fmul_avx2;
@@ -262,6 +361,7 @@ void aac_dsp_init_avx2(AacDSP* dsp) {
   dsp->fft_radix2_stage = aac_fft_radix2_stage_avx2;
   dsp->mdct_pre_twiddle = aac_mdct_pre_twiddle_avx2;
   dsp->mdct_post_twiddle = aac_mdct_post_twiddle_avx2;
+  dsp->quant_noise = aac_quant_noise_avx2;
 }
 
 #endif /* BAAC_AAC_AVX2 || __AVX2__ */

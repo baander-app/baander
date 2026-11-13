@@ -4,6 +4,7 @@
       "target_name": "baander_aac",
       "sources": [
         "node/src/addon.cc",
+        "node/src/flac_addon.cc",
         "src/tables.cpp",
         "src/aac_cpu.cpp",
         "src/dsp.cpp",
@@ -74,7 +75,14 @@
         "src/usac_enc.cpp",
         "src/sbr_enc_usac.cpp",
         "src/mps212_enc.cpp",
-        "src/drc_gen.cpp"
+        "src/drc_gen.cpp",
+        "src/flac_format.cpp",
+        "src/flac_dec.cpp",
+        "src/flac_api.cpp",
+        "src/flac_enc.cpp",
+        "src/flac_lpc.cpp",
+        "src/flac_dsp.cpp",
+        "src/flac_meta.cpp"
       ],
       "include_dirs": [
         "<!@(node -p \"require('node-addon-api').include\")",
@@ -103,12 +111,15 @@
       "conditions": [
         ["OS=='win'", {"defines": ["_USE_MATH_DEFINES", "NOMINMAX"]}],
         ["target_arch=='x64' or target_arch=='ia32'", {
-          "sources": ["src/simd/sse2.cpp"],
+          "sources": ["src/simd/sse2.cpp", "src/simd/flac_sse2.cpp"],
           "defines": ["BAAC_AAC_SSE2"],
           "cflags_cc": ["-msse2"]
         }],
+        ["target_arch=='ia32'", {
+          "cflags_cc": ["-mfpmath=sse"]
+        }],
         ["target_arch=='arm64'", {
-          "sources": ["src/simd/neon.cpp"],
+          "sources": ["src/simd/neon.cpp", "src/simd/flac_neon.cpp"],
           "defines": ["BAAC_AAC_NEON"]
         }]
       ]

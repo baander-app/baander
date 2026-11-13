@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")/.."
-: "${BAANDER_TEST_IMAGE:?Set BAANDER_TEST_IMAGE to the CI image with PHP, FFmpeg 7 and test dependencies.}"
+: "${BAANDER_TEST_IMAGE:?Set BAANDER_TEST_IMAGE to the CI image with PHP, FFmpeg 8 and test dependencies.}"
 artifacts="${BAANDER_TEST_ARTIFACTS:-$PWD/var/test-runs/transcode-publication-browser-$(date +%s)-$$}"
 mkdir -p "$artifacts"
 chmod 700 "$artifacts"
@@ -78,7 +78,11 @@ for attempt in $(seq 1 100); do
     if [ "$(docker inspect --format '{{.State.Running}}' "$fixture")" != true ]; then break; fi
     sleep 0.2
 done
-if [ "$ready" != 1 ]; then echo 'The real publication fixture did not become ready.' >&2; exit 1; fi
+if [ "$ready" != 1 ]; then
+    echo 'The real publication fixture did not become ready. Its last output:' >&2
+    timeout 10s docker logs --tail 20 "$fixture" >&2 2>&1 || true
+    exit 1
+fi
 docker cp "$fixture:/tmp/baander-publication/ready.json" "$workspace/browser/ready.json"
 timeout 30s docker create --name "$browser" --network "container:$fixture" --memory=1g --pids-limit=256 \
     --entrypoint node "$browser_image" /work/browser.mjs >/dev/null

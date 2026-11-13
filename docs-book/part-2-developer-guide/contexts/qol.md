@@ -26,7 +26,9 @@ The QoL ("quality of life") context is a stream-governance layer over the Transc
 
 | Port | Purpose |
 |------|---------|
+| `AlgorithmProfileStoreInterface` | Domain contract storing the active `AlgorithmProfile` across workers (`AlgorithmProfileTable`) |
 | `QoLAdminPortInterface` | Admin read/write surface over `StreamGovernor`: status, active streams, profile switching, learning reset |
+| `QoLJobIdentityInterface` | Maps internal transcode job UUIDs to 21-character public IDs (`QoLJobIdentity`) |
 | `QualityLadderPortInterface` | Domain contract for the default quality ladder as primitives; consumed by `StreamGovernor`, implemented by Transcode |
 | `StreamAdmissionPortInterface` | Synchronous stream admission (budget veto), observation of the running stream's `EncoderWork`, and completion (learning sample and stream release) |
 | `AllowedQualityTiersPortInterface` | Tier names the budget currently allows, used for manifest filtering |
@@ -44,23 +46,37 @@ All endpoints are prefixed with `/api/admin/qol` and require admin roles.
 | PATCH | `/api/admin/qol/profile` | `ROLE_SUPER_ADMIN` | Switch algorithm profile (`conservative` / `balanced` / `aggressive`) |
 | POST | `/api/admin/qol/reset` | `ROLE_SUPER_ADMIN` | Clear learning data and return to `Learning` state |
 
+### Console Commands
+
+| Command | Purpose |
+|---------|---------|
+| `app:qol:status` (`QoLStatusCommand`) | Show the stream governor status of every web server worker |
+| `app:qol:streams` (`QoLStreamsCommand`) | List the streams every web server worker has admitted, with their predicted cost |
+| `app:qol:profile` (`QoLProfileCommand`) | Set the stream governor's algorithm profile in every web server worker |
+| `app:qol:reset` (`QoLResetCommand`) | Discard the stream governor's learning data in every web server worker and return each to the `Learning` state |
+
 ## Cross-Context Relationships
 
 | Direction | Context | Details |
 |-----------|---------|---------|
-| Depends on | Shared | `Uuid`, `PublicId` |
+| Depends on | Shared | `Uuid`, `PublicId`, `ServerControlPortInterface` |
 | Depended on by | Transcode | Transcode Infrastructure implements the quality-ladder and encoder-profile contracts and calls the stream-admission and allowed-tier contracts. QoL references no Transcode class. |
 
 ## Infrastructure
 
 | Component | Type | Purpose |
 |-----------|------|---------|
-| `QoLAdminService` | Port implementation | Backs `QoLAdminPortInterface`, delegates to the `StreamGovernor` singleton |
+| `QoLAdminService` | Port implementation | Backs `QoLAdminPortInterface` by fanning out control operations across HTTP workers' `StreamGovernor` instances via `ServerControlPortInterface` (`QoLStatusOperation`, `QoLStreamsOperation`, `QoLProfileSetOperation`, `QoLLearningResetOperation`) |
+| `QoLJobIdentity` | Port implementation | Backs `QoLJobIdentityInterface`, resolving internal `transcode_jobs` UUIDs to `PublicId` values |
 | `StreamAdmissionService` | Port implementation | Backs `StreamAdmissionPortInterface`: evaluates the budget and allocates the stream (throws `StreamBudgetExhausted` to veto), records completion samples and releases streams |
 | `AllowedQualityTiersService` | Port implementation | Backs `AllowedQualityTiersPortInterface` from the governor's allowed tiers |
+| `AlgorithmProfileTable` | Swoole bootable | Backs `AlgorithmProfileStoreInterface` with a pre-fork `Swoole\Table` and atomic file persistence (`algorithm_profile.json`) |
 | `LearningDataPersister` | Persister | Persists governor learning state to JSON files (dual-throttled writes) |
-| `CpuGpuSampler` | Swoole bootable | Samples CPU/GPU utilization every second into a `Swoole\Table` (no pooled services in timer) |
-| `MidStreamMonitor` | Swoole timer | Polls utilization every 5s; triggers emergency stream release on sustained over-budget |
+| `QoLWorkerStartupSubscriber` | Event subscriber | Restores saved learning state on HTTP worker startup, starts `MidStreamMonitor` in worker 0, and saves state on worker drain |
+| `WorkerQoLLifecycle` | Worker lifecycle | Starts and stops `AlgorithmProfileTable`, `LearningDataPersister`, and `MidStreamMonitor` for an admitted video encode child |
+| `MidStreamMonitor` | Swoole timer | Polls `$this->governor->observedLoad()` (measured encoder CPU seconds per output second against `HostCpus`) every 5s; triggers emergency stream release on sustained over-budget |
+| `HostCpus` | Infrastructure helper | Resolves the count of online host CPUs via `posix_sysconf(POSIX_SC_NPROCESSORS_ONLN)` |
 | `BudgetGuard` | Port implementation | Mid-stream capacity check against sampled CPU (implements `BudgetGuardInterface`) |
+| `StreamBudgetExceptionListener` | Exception listener | Converts `StreamBudgetExhausted` into a structured HTTP 503 JSON response |
 
-See the [Architecture](../architecture.md#communication-between-contexts) page for details on cross-context event flow, and the [Anti-Corruption Layer](../architecture.md#anti-corruption-layer) page for the streaming-decorator chain.
+See the [Architecture](../architecture/overview.md#communication-between-contexts) page for details on cross-context event flow, and the [Anti-Corruption Layer](../architecture/overview.md#anti-corruption-layer) page for the streaming-decorator chain.

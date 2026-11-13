@@ -22,7 +22,16 @@ The Notification context handles in-app notifications, push notifications (Web P
 | Service | Purpose |
 |---------|---------|
 | `EventCategoryResolver` | Maps domain events to notification categories |
-| `NotificationContentResolver` | Builds notification content from domain events |
+
+## Application Services
+
+Services in `src/Notification/Application/Service/`:
+
+| Service | Purpose |
+|---------|---------|
+| `NotificationContentResolver` | Builds notification translation keys and parameters from domain events |
+| `NotificationCategoryFilter` | Validates a webhook category filter (`null` or a list of supported `NotificationCategory` values) |
+| `WebhookInput` | Validates webhook public IDs, destination URLs, and category filters |
 
 ## Commands and Handlers
 
@@ -41,7 +50,7 @@ The Notification context handles in-app notifications, push notifications (Web P
 
 ## Webhook Administration
 
-`WebhookController` and the `app:webhook:*` commands dispatch the same commands and query, so the API and the shell share one use case for each action. The commands carry the input as the client sent it; the handlers validate it with `WebhookInput`. An ID that is not a UUID, a missing URL, a destination that `WebhookDestinationPortInterface` does not resolve to an allowed address, or a category filter that is neither null nor a list of supported categories raises `InvalidInputException` (HTTP 422, console exit `INVALID`). An unknown webhook raises `NotFoundException` (HTTP 404). `UpdateWebhookCommand` changes a field only when its `changes*` flag is set. A null category filter with the flag set clears the filter; without the flag, the filter stays as it is.
+`WebhookController` and the `app:webhook:*` commands dispatch the same commands and query, so the API and the shell share one use case for each action. The commands carry the input as the client sent it; the handlers validate it with `WebhookInput`. An ID that is not a public ID, a missing URL, a destination that `WebhookDestinationPortInterface` does not resolve to an allowed address, or a category filter that is neither null nor a list of supported categories raises `InvalidInputException` (HTTP 422, console exit `INVALID`). An unknown webhook raises `NotFoundException` (HTTP 404). `UpdateWebhookCommand` changes a field only when its `changes*` flag is set. A null category filter with the flag set clears the filter; without the flag, the filter stays as it is.
 
 Create and rotate each generate a secret of 64 hex characters from `random_bytes(32)`, store it encrypted through `WebhookSecretPortInterface`, and return the plain secret once in an `IssuedWebhookSecret`. `WebhookRepositoryInterface` takes the encrypted secret and returns `WebhookView`, which never carries it, so list and update cannot return a secret.
 
@@ -49,6 +58,8 @@ Create and rotate each generate a secret of 64 hex characters from `random_bytes
 
 | Port | Purpose | Implemented By |
 |------|---------|----------------|
+| `NotificationRepositoryInterface` | Domain repository contract for `Notification` persistence and queries | `NotificationRepository` |
+| `NotificationPreferenceRepositoryInterface` | Domain repository contract for per-user `NotificationPreference` persistence and queries | `NotificationPreferenceRepository` |
 | `WebhookRepositoryInterface` | Store webhook configuration; takes the encrypted secret and returns `WebhookView` without it | `WebhookRepository` |
 | `WebhookSecretPortInterface` | Encrypt and decrypt webhook signing secrets | `WebhookSecretCodec` |
 | `WebhookDestinationPortInterface` | Resolve a webhook URL to its host and allowed IP addresses, or null | `WebhookDestinationPolicy` |
@@ -71,7 +82,7 @@ In-app notifications, push and webhook text stay in English. `CreateNotification
 
 `notifications.admin_alerts` (default `true`) is defined in Shared's `SharedSettingDefinitions`, because the health monitor that reads it lives in Shared. While it is off, `HealthAlertService` logs a health degradation without alerting administrators. Other admin alerts, such as new user registrations, are always sent.
 
-The web server runs the health monitor. `HealthMonitorSubscriber` starts a Swoole timer in HTTP worker 0 that calls `HealthAlertService::checkAndAlert()` every `HEALTH_MONITOR_INTERVAL_SECONDS` (default 60). Each component's alert state (healthy, pending or acknowledged, with the outage window) lives in `HealthAlertTable`, a `Swoole\Table` created before the server forks its workers, so worker reloads keep it; `HealthAlertTransition` holds the rules as pure functions. A component that reads unhealthy owes one alert until it is delivered, also after the component recovers. Delivery reads the setting and saves the notifications through `AdminAlertPortInterface` inside one error boundary per component: a failure is logged, and the next tick retries. No delivery is tried while PostgreSQL reads unhealthy. The initial migration seeds no health-check schedule. See [Health alerts](../../part-1-operator-guide/notifications.md#health-alerts) for what operators see.
+The web server runs the health monitor. `HealthMonitorSubscriber` starts a Swoole timer in HTTP worker 0 that calls `HealthAlertService::checkAndAlert()` every `HEALTH_MONITOR_INTERVAL_SECONDS` (default 60). Each component's alert state (healthy, pending or acknowledged, with the outage window) lives in `HealthAlertTable`, a `Swoole\Table` created before the server forks its workers, so worker reloads keep it; `HealthAlertTransition` holds the rules as pure functions. A component that reads unhealthy owes one alert until it is delivered, also after the component recovers. Delivery reads the setting and saves the notifications through `AdminAlertPortInterface` inside one error boundary per component: a failure is logged, and the next tick retries. No delivery is tried while PostgreSQL reads unhealthy. The initial migration seeds no health-check schedule. See [Health alerts](../../part-1-operator-guide/administration/notifications.md#health-alerts) for what operators see.
 
 `SendPushHandler` reads its setting for every message and `HealthAlertService` reads its setting for every alert it delivers, so a change applies without a restart. See [Settings](shared.md#settings) for the mechanism.
 
@@ -122,10 +133,10 @@ The entire controller is gated with `#[IsGranted('ROLE_ADMIN')]` — only admins
 
 | Direction | Context | Relationship |
 |-----------|---------|-------------|
-| Depends on | Shared | Uses `Uuid`, `PublicId`, `CursorPaginatedResponse` |
+| Depends on | Shared | Uses `Uuid`, `PublicId`, `CursorPaginatedResponse`, and `SystemSettingsPortInterface` for `notifications.push_enabled` |
 | Depends on | Auth | User identification and authentication |
+| Depends on | Library | `LibraryMembershipQueryPort` for scoping media-change notification recipients |
 | Depends on | UserPreference | `SendEmailHandler` resolves the email language through `UserSettingsContractInterface` (the `UserPreference Settings Contract` Deptrac layer) |
-| Depends on | Shared | `SystemSettingsPortInterface` for `notifications.push_enabled` |
 | Depended on by | All contexts | Any context that emits domain events can trigger notifications |
 
 ## Infrastructure
@@ -146,8 +157,8 @@ The entire controller is gated with `#[IsGranted('ROLE_ADMIN')]` — only admins
 
 | Component | Purpose |
 |-----------|---------|
-| `DiscordAdapter` | Formats and delivers payloads to Discord |
-| `SlackAdapter` | Formats and delivers payloads to Slack |
+| `DiscordWebhookAdapter` | Formats and delivers payloads to Discord |
+| `SlackWebhookAdapter` | Formats and delivers payloads to Slack |
 | `HmacSigner` | Signs webhook payloads with HMAC for verification |
 | `WebhookDeliveryService` | Orchestrates webhook delivery and retry logic |
 

@@ -16795,6 +16795,166 @@
                 }
             }
         },
+        "/api/session/close": {
+            "post": {
+                "tags": [
+                    "Session"
+                ],
+                "summary": "Report that an endpoint is going away and its players have stopped",
+                "operationId": "post_playback_close",
+                "parameters": [
+                    {
+                        "name": "X-Baander-Playback-Endpoint",
+                        "in": "header",
+                        "description": "The capability of the incarnation that reports its close.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ClosePlaybackEndpointRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Complete playback snapshot without commands. The same for a repeated report and for an incarnation the session no longer names.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "required": [
+                                        "data"
+                                    ],
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/PlaybackSnapshotResource"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Invalid playback request",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Not authenticated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Endpoint capability missing or invalid",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/session/override": {
+            "post": {
+                "tags": [
+                    "Session"
+                ],
+                "summary": "End the hold of a destination that is no longer registered",
+                "operationId": "post_playback_override",
+                "parameters": [
+                    {
+                        "name": "X-Baander-Playback-Endpoint",
+                        "in": "header",
+                        "description": "The capability of the registered endpoint that asks.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/OverridePlaybackRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Complete playback snapshot with the recorded result of the request. A repeated request returns the same result.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "required": [
+                                        "data"
+                                    ],
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/PlaybackSnapshotResource"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Invalid playback request",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Not authenticated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Playback authority or revision conflict, a destination that is still registered, or nothing to override",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/session/snapshot": {
             "get": {
                 "tags": [
@@ -19739,6 +19899,11 @@
                                         "maxItems": 3,
                                         "minItems": 1,
                                         "uniqueItems": true
+                                    },
+                                    "attachedSet": {
+                                        "description": "Rendition set the player has attached, as returned in renditionSet; refresh only. A rendition named here stays in the signed set on a smaller published lead than one that still has to join",
+                                        "type": "string",
+                                        "example": "0123456789abABCD_-xyz.3"
                                     }
                                 },
                                 "type": "object"
@@ -19814,6 +19979,33 @@
                     },
                     "400": {
                         "description": "Invalid request"
+                    },
+                    "410": {
+                        "description": "A refresh named only sessions that have ended. Sessions that expired may be started again; failed or cancelled ones may not",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "required": [
+                                        "error",
+                                        "reason"
+                                    ],
+                                    "properties": {
+                                        "error": {
+                                            "type": "string"
+                                        },
+                                        "reason": {
+                                            "type": "string",
+                                            "enum": [
+                                                "expired",
+                                                "failed",
+                                                "cancelled"
+                                            ]
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
                     },
                     "503": {
                         "description": "Transcode startup is temporarily unavailable",
@@ -19939,7 +20131,7 @@
                 "tags": [
                     "Transcode"
                 ],
-                "summary": "Clean up orphaned transcode jobs (no active sessions)",
+                "summary": "Expire stale transcode sessions and clean up orphaned transcode jobs (no active sessions)",
                 "operationId": "post_transcode_job_cleanup",
                 "responses": {
                     "200": {
@@ -19948,11 +20140,29 @@
                             "application/json": {
                                 "schema": {
                                     "properties": {
-                                        "cleaned": {
-                                            "type": "integer"
+                                        "data": {
+                                            "properties": {
+                                                "expired": {
+                                                    "type": "integer"
+                                                },
+                                                "cleaned": {
+                                                    "type": "integer"
+                                                }
+                                            },
+                                            "type": "object"
                                         }
                                     },
                                     "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "The run removed every job it could and left at least one behind; `details` holds the `expired`, `cleaned` and `failed` counts, and the server log names each job that failed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
                                 }
                             }
                         }
@@ -24224,6 +24434,11 @@
                     "localRecoveryEligible": {
                         "type": "boolean",
                         "default": false
+                    },
+                    "pageId": {
+                        "type": "string",
+                        "nullable": true,
+                        "default": null
                     }
                 },
                 "type": "object"
@@ -24508,6 +24723,65 @@
                                 }
                             ]
                         }
+                    }
+                },
+                "type": "object"
+            },
+            "ClosePlaybackEndpointRequest": {
+                "required": [
+                    "incarnationId",
+                    "checkpoint"
+                ],
+                "properties": {
+                    "incarnationId": {
+                        "type": "string"
+                    },
+                    "checkpoint": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "oneOf": [
+                                {
+                                    "type": "object",
+                                    "additionalProperties": {
+                                        "type": "string"
+                                    }
+                                },
+                                {
+                                    "type": "number",
+                                    "format": "float"
+                                },
+                                {
+                                    "type": "integer"
+                                },
+                                {
+                                    "type": "object",
+                                    "nullable": true,
+                                    "enum": [
+                                        null
+                                    ]
+                                }
+                            ]
+                        }
+                    }
+                },
+                "type": "object"
+            },
+            "OverridePlaybackRequest": {
+                "required": [
+                    "requestId",
+                    "expectedRevision",
+                    "incarnationId"
+                ],
+                "properties": {
+                    "requestId": {
+                        "type": "string"
+                    },
+                    "expectedRevision": {
+                        "type": "integer",
+                        "minimum": 0
+                    },
+                    "incarnationId": {
+                        "type": "string"
                     }
                 },
                 "type": "object"

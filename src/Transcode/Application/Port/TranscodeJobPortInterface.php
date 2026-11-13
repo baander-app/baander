@@ -6,6 +6,7 @@ namespace App\Transcode\Application\Port;
 
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
+use App\Transcode\Application\Exception\TranscodeCleanupIncompleteException;
 use App\Transcode\Domain\Model\TranscodeJob;
 use App\Transcode\Domain\ValueObject\QualityTier;
 use App\Transcode\Domain\ValueObject\PresentationSelection;
@@ -51,6 +52,13 @@ interface TranscodeJobPortInterface
     /** @return TranscodeJob[] */
     public function findActiveByVideo(Uuid $videoId): array;
 
+    /**
+     * Removes every orphaned job whose worker has let go, with its output.
+     *
+     * @return int The number of jobs removed
+     *
+     * @throws TranscodeCleanupIncompleteException When the run reached every job and could not remove some
+     */
     public function cleanupOrphanedJobs(): int;
 
     public function save(TranscodeJob $job): void;

@@ -4,7 +4,11 @@
  * size and output rate; the SBR CRC; concealment of a damaged unit;
  * the config's round trip with its headers; the settings of the public
  * API; and the byte identity of plain ELD streams with the committed
- * references.  FFmpeg has no ELD decoder, so there is no interop. */
+ * references.  FFmpeg has no ELD decoder, so there is no interop.
+ *
+ * With arguments the program writes the committed references instead:
+ *   test_eld_sbr --write-streams <dir>
+ */
 #include "asc.h"
 #include "encoder.h"
 #include "qmf_ld.h"
@@ -510,28 +514,64 @@ static void worst_case_payload() {
 
 /* ── plain ELD stays byte for byte the same ────────────────────── */
 
-/* The references were written by the release build before LD-SBR was
- * wired in; the signal and the encoder's arithmetic only reproduce them
- * under the same optimisation and Release math flags, so other builds skip
- * the comparison. */
-static void plain_eld_identity(int fl, int channels) {
-#if !defined(__OPTIMIZE__) || !BAAC_RELEASE_MATH
-  printf("plain ELD %d %d ch: identity check needs the release build's flags, skipped\n", fl,
-         channels);
-  return;
-#endif
-  const int sr = 48000;
-  const std::vector<float> pcm = gen_wideband(sr / 2, sr, channels);
-  const Encoded e = encode(pcm, sr, channels, 64000 * channels, fl, 0, 0, AAC_TRANSPORT_LOAS);
+/* The references are the plain ELD streams of the reference build
+ * (test_util.h): half a second of the wideband signal at 64 kbit/s per
+ * channel.  They pin the encoder without LD-SBR, which the LD-SBR path
+ * must leave alone.  Other builds skip the comparison. */
+constexpr int kPlainRate = 48000;
+/* signal_checksum of plain_eld_signal(1) and plain_eld_signal(2) */
+constexpr uint32_t kPlainSignal[2] = {0x44820848u, 0xa1865ecfu};
+
+static std::vector<float> plain_eld_signal(int channels) {
+  return gen_wideband(kPlainRate / 2, kPlainRate, channels);
+}
+
+static std::string plain_eld_name(int fl, int channels) {
   char name[64];
   snprintf(name, sizeof(name), "eld_%d_%dch_ref.loas", fl, channels);
-  const std::vector<uint8_t> ref = read_file(data_path(name));
-  CHECK(!ref.empty(), "reference %s", name);
+  return name;
+}
+
+static Encoded plain_eld(const std::vector<float>& pcm, int fl, int channels) {
+  return encode(pcm, kPlainRate, channels, 64000 * channels, fl, 0, 0, AAC_TRANSPORT_LOAS);
+}
+
+static void plain_eld_identity(int fl, int channels) {
+#if !BAAC_REFERENCE_BUILD
+  printf("plain ELD %d %d ch: identity check needs the reference build, skipped\n", fl, channels);
+  return;
+#endif
+  const std::string name = plain_eld_name(fl, channels);
+  const std::vector<float> pcm = plain_eld_signal(channels);
+  const std::vector<uint8_t> ref = read_file(data_path(name.c_str()));
+  CHECK(!ref.empty(), "reference %s", name.c_str());
+  if (!check_committed_signal(name.c_str(), pcm, kPlainSignal[channels - 1])) {
+    return;
+  }
+  const Encoded e = plain_eld(pcm, fl, channels);
   CHECK(e.stream == ref, "plain ELD %d %d ch: %zu bytes differ from the reference's %zu", fl,
         channels, e.stream.size(), ref.size());
 }
 
-int main() {
+static int write_streams(const char* dir) {
+  for (int fl : {512, 480}) {
+    for (int ch : {1, 2}) {
+      const Encoded e = plain_eld(plain_eld_signal(ch), fl, ch);
+      const std::string path = std::string(dir) + "/" + plain_eld_name(fl, ch);
+      if (g_failures || !write_file(path, e.stream.data(), e.stream.size())) {
+        fprintf(stderr, "%s: not written\n", path.c_str());
+        return 1;
+      }
+      printf("%s: %zu bytes\n", path.c_str(), e.stream.size());
+    }
+  }
+  return 0;
+}
+
+int main(int argc, char** argv) {
+  if (const char* dir = write_streams_dir(argc, argv)) {
+    return write_streams(dir);
+  }
   test_api();
   for (int ch : {1, 2}) {
     for (int dual : {1, 0}) {

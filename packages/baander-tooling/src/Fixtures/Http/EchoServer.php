@@ -20,12 +20,7 @@ final class EchoServer
         $signals = new SignalScope();
         /** @var array<int,array{stream:resource,buffer:string,deadline:float}> $clients */
         $clients = [];
-        file_put_contents(
-            $readyFile,
-            json_encode([
-                'port' => (int) substr($address, (int) strrpos($address, ':') + 1),
-            ], JSON_THROW_ON_ERROR) . "\n",
-        );
+        ReadyFile::publish($readyFile, ['port' => (int) substr($address, (int) strrpos($address, ':') + 1)]);
         try {
             while (true) {
                 $signals->dispatch();

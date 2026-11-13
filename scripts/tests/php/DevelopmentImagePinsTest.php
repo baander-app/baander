@@ -10,6 +10,7 @@ use Baander\Tooling\Tests\DevelopmentCommandExecutor;
 use Baander\Tooling\Development\StateStore;
 use Baander\Tooling\Development\WorkflowError;
 use Baander\Tooling\Process\ProcessResult;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class DevelopmentImagePinsTest extends TestCase
@@ -85,6 +86,22 @@ final class DevelopmentImagePinsTest extends TestCase
         self::assertNotContains([$this->docker, '--host', 'unix:///var/run/docker.sock', 'pull', 'baander-database:latest'], $this->runner->calls);
     }
 
+    public function testDefaultPostgresIsBuiltOnceForDatabaseAndPoolerRoles(): void
+    {
+        $release = $this->builder->prepare($this->instance);
+        $builds = array_values(array_filter(
+            $this->runner->calls,
+            static fn(array $args): bool => in_array('build', $args, true) && in_array($release['source'] . '/docker/postgres/Dockerfile', $args, true),
+        ));
+        // One export must serve both database roles: every docker build export receives a
+        // fresh attestation index digest, so a second build of the shared tag would orphan
+        // the identity recorded for the first role before it can be pinned.
+        self::assertCount(1, $builds);
+        self::assertSame($release['images']['postgres_image']['resolvedId'], $release['images']['pooler_image']['resolvedId']);
+        self::assertFalse($release['image_selections']['postgres_image']['retained']);
+        self::assertFalse($release['image_selections']['pooler_image']['retained']);
+    }
+
     public function testExplicitPostgresPreferencePullsTheSelectedSource(): void
     {
         $builder = new Builder(new StateStore($this->root . '/state'), $this->runner, ToolingConfiguration::resolve([
@@ -114,6 +131,66 @@ final class DevelopmentImagePinsTest extends TestCase
         $release = $this->builder->prepare($this->instance);
         self::assertSame('adopted-postgres', $release['images']['postgres_image']['resolvedId']);
         self::assertSame('adopted-redis', $release['images']['redis_image']['resolvedId']);
+        // Both identities were looked up in the daemon before being kept.
+        foreach (['adopted-postgres', 'adopted-redis'] as $image) {
+            self::assertContains([$this->docker, '--host', 'unix:///var/run/docker.sock', 'image', 'inspect', '--format', '{{.Id}}', $image], $this->runner->calls);
+        }
+        self::assertTrue($release['image_selections']['postgres_image']['retained']);
+        self::assertTrue($release['image_selections']['redis_image']['retained']);
+        self::assertSame('adopted-postgres', $release['effective']['postgres_image']);
+        self::assertSame('adopted-redis', $release['effective']['redis_image']);
+    }
+
+    /** @return iterable<string,array{bool}> */
+    public static function lostStorageIdentities(): iterable
+    {
+        yield 'recorded on the instance' => [true];
+        yield 'recorded only on the previous release' => [false];
+    }
+
+    #[DataProvider('lostStorageIdentities')]
+    public function testStorageImagesTheDaemonLostAreReplacedByTheReleaseImages(bool $onInstance): void
+    {
+        $this->instance['release'] = DevelopmentCommandExecutor::release(['postgres_image' => 'lost-postgres', 'redis_image' => 'lost-redis'], $this->instance);
+        if ($onInstance) {
+            $this->instance['postgres_image'] = 'lost-postgres';
+            $this->instance['redis_image'] = 'lost-redis';
+        }
+        // A stopped instance holds no container on its images, so the daemon can lose them.
+        $this->runner->missing = ['lost-postgres', 'lost-redis'];
+        $release = $this->builder->prepare($this->instance);
+
+        // PostgreSQL continues on the database image this release builds for the pooler.
+        self::assertSame($release['images']['pooler_image']['resolvedId'], $release['images']['postgres_image']['resolvedId']);
+        self::assertCount(1, array_filter(
+            $this->runner->calls,
+            static fn(array $args): bool => in_array('build', $args, true) && in_array($release['source'] . '/docker/postgres/Dockerfile', $args, true),
+        ));
+        // Redis continues on the configured image, pulled as for an instance without data.
+        self::assertContains([$this->docker, '--host', 'unix:///var/run/docker.sock', 'pull', 'registry.baander.app/redis:new'], $this->runner->calls);
+        self::assertSame('registry.baander.app/redis:new', $release['images']['redis_image']['reference']);
+        foreach (['postgres_image' => 'lost-postgres', 'redis_image' => 'lost-redis'] as $key => $lost) {
+            self::assertNotSame($lost, $release['images'][$key]['resolvedId']);
+            self::assertFalse($release['image_selections'][$key]['retained']);
+            self::assertSame($release['images'][$key]['resolvedId'], $release['image_selections'][$key]['id']);
+            // Activation records the effective identity on the instance.
+            self::assertSame($release['images'][$key]['resolvedId'], $release['effective'][$key]);
+            self::assertContains([$this->docker, '--host', 'unix:///var/run/docker.sock', 'image', 'tag', $release['images'][$key]['resolvedId'], $release['image_pins'][$key]], $this->runner->calls);
+        }
+    }
+
+    public function testOnlyTheStorageImageTheDaemonLostIsReplaced(): void
+    {
+        $this->instance['postgres_image'] = 'kept-postgres';
+        $this->instance['redis_image'] = 'lost-redis';
+        $this->runner->missing = ['lost-redis'];
+        $release = $this->builder->prepare($this->instance);
+        self::assertSame('kept-postgres', $release['images']['postgres_image']['resolvedId']);
+        self::assertTrue($release['image_selections']['postgres_image']['retained']);
+        self::assertSame('kept-postgres', $release['effective']['postgres_image']);
+        self::assertNotSame('lost-redis', $release['images']['redis_image']['resolvedId']);
+        self::assertFalse($release['image_selections']['redis_image']['retained']);
+        self::assertSame($release['images']['redis_image']['resolvedId'], $release['effective']['redis_image']);
     }
 
     public function testFailedFrontendIsRemovedAndNeverStartsAppBuild(): void
@@ -182,6 +259,8 @@ final class ImageRecordingRunner extends DevelopmentCommandExecutor
     public array $calls = [];
     public string $frontendExit = '0';
     public bool $interruptCreate = false;
+    /** @var list<string> Images the daemon no longer holds. */
+    public array $missing = [];
     public function __construct(private readonly string $docker) {}
     public function execute(
         array $arguments,
@@ -202,6 +281,10 @@ final class ImageRecordingRunner extends DevelopmentCommandExecutor
         }
         if (in_array('create', $arguments, true) || in_array('info', $arguments, true)) {
             return parent::execute($arguments, $cwd, $env, $input, $timeout, $check, $logPath, $interactive);
+        }
+        $lost = array_find($this->missing, static fn(string $image): bool => in_array($image, $arguments, true));
+        if ($lost !== null && in_array('image', $arguments, true)) {
+            return new ProcessResult(1, null, false, false, '', 'Error response from daemon: No such image: ' . $lost, 0);
         }
         if (in_array('image', $arguments, true) && in_array('inspect', $arguments, true) && !in_array('--format', $arguments, true)) {
             return new ProcessResult(0, null, false, false, json_encode([[

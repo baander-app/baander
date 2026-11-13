@@ -5,13 +5,15 @@
 #include <mutex>
 
 #include "fft.h"
+#include "qmf_sums.h"
 
 /* Complex QMF banks (ISO/IEC 14496-3 4.6.18.4 and 4.6.18.8, 4.B.18.2).
  * The decoder's banks (32-band analysis, 64-band synthesis) run their
  * modulation through a complex FFT with a twiddle before and after; the
  * encoder's banks (64-band analysis, 32-band synthesis) keep the direct
  * sums over the modulation tables, so that the encoder's output does not
- * depend on the transform's rounding.
+ * depend on the transform's rounding.  The direct sums and the layout of
+ * their modulation tables are those of qmf_sums.h.
  *
  * Analysis with B bands: the window of 10 B taps (the prototype, or every
  * second tap for 32 bands) weights the newest 10 B input samples, the
@@ -42,8 +44,8 @@
 
 namespace {
 
-float g_ana_cos64[64][128], g_ana_sin64[64][128];
-float g_syn_cos32[64][32], g_syn_sin32[64][32];
+float g_ana_cos64[128][64], g_ana_sin64[128][64];
+float g_syn_cos32[32][64], g_syn_sin32[32][64];
 /* The 32-band banks read every second prototype tap. */
 float g_window32[320];
 /* Decoder banks: transforms and twiddles. */
@@ -57,8 +59,8 @@ float g_syn64_post_re[128], g_syn64_post_im[128];
  * modulation tables (64 / B) cos and sin of pi / (2 B) (k + 1/2)
  * (2 n - B / 64). */
 float g_window16[160], g_window24[240];
-float g_ana_cos16[16][32], g_ana_sin16[16][32];
-float g_ana_cos24[24][48], g_ana_sin24[24][48];
+float g_ana_cos16[32][16], g_ana_sin16[32][16];
+float g_ana_cos24[48][24], g_ana_sin24[48][24];
 
 /* The prototype at a fractional tap position by four-point Lagrange
  * interpolation; the window is zero beyond its ends. */
@@ -84,8 +86,8 @@ void build_small_bank(int B, float* window, float* cos_tab, float* sin_tab) {
   for (int k = 0; k < B; k++) {
     for (int n = 0; n < 2 * B; n++) {
       const double a = M_PI / (2.0 * B) * (k + 0.5) * (2.0 * n - B / 64.0);
-      cos_tab[k * 2 * B + n] = (float)(64.0 / B * cos(a));
-      sin_tab[k * 2 * B + n] = (float)(64.0 / B * sin(a));
+      cos_tab[n * B + k] = (float)(64.0 / B * cos(a));
+      sin_tab[n * B + k] = (float)(64.0 / B * sin(a));
     }
   }
 }
@@ -96,15 +98,15 @@ void build_tables(void) {
   for (int k = 0; k < 64; k++) {
     for (int n = 0; n < 128; n++) {
       const double a = M_PI / 128.0 * (k + 0.5) * (2.0 * n - 1.0);
-      g_ana_cos64[k][n] = (float)cos(a);
-      g_ana_sin64[k][n] = (float)sin(a);
+      g_ana_cos64[n][k] = (float)cos(a);
+      g_ana_sin64[n][k] = (float)sin(a);
     }
   }
   for (int n = 0; n < 64; n++) {
     for (int k = 0; k < 32; k++) {
       const double a = M_PI / 64.0 * (k + 0.5) * (2.0 * n - 127.5);
-      g_syn_cos32[n][k] = (float)(cos(a) / 64.0);
-      g_syn_sin32[n][k] = (float)(sin(a) / 64.0);
+      g_syn_cos32[k][n] = (float)(cos(a) / 64.0);
+      g_syn_sin32[k][n] = (float)(sin(a) / 64.0);
     }
   }
   for (int i = 0; i < 320; i++) {
@@ -163,38 +165,13 @@ void aac_qmf_analyze(AacQmfAnalysis* a, const float* in, float (*W)[2]) {
     const float* cos_tab = B == 16 ? &g_ana_cos16[0][0] : &g_ana_cos24[0][0];
     const float* sin_tab = B == 16 ? &g_ana_sin16[0][0] : &g_ana_sin24[0][0];
     float u[48];
-    for (int n = 0; n < 2 * B; n++) {
-      float sum = 0.0f;
-      for (int j = 0; j < 5; j++) {
-        const int idx = n + 2 * B * j;
-        sum += x[idx] * window[idx];
-      }
-      u[n] = sum;
-    }
-    for (int k = 0; k < B; k++) {
-      const float* c = cos_tab + k * 2 * B;
-      const float* sn = sin_tab + k * 2 * B;
-      float re = 0.0f;
-      float im = 0.0f;
-      for (int n = 0; n < 2 * B; n++) {
-        re += u[n] * c[n];
-        im += u[n] * sn[n];
-      }
-      W[k][0] = re;
-      W[k][1] = im;
-    }
+    aac_qmf_fold(u, x, window, 2 * B);
+    aac_qmf_modulate(W, u, cos_tab, sin_tab, B, 2 * B);
     return;
   }
   const float* window = step == 2 ? g_window32 : aac_sbr_qmf_window;
   float u[128];
-  for (int n = 0; n < 2 * B; n++) {
-    float sum = 0.0f;
-    for (int j = 0; j < 5; j++) {
-      const int idx = n + 2 * B * j;
-      sum += x[idx] * window[idx];
-    }
-    u[n] = sum;
-  }
+  aac_qmf_fold(u, x, window, 2 * B);
   if (B == 32) {
     /* The conjugate of the twiddled input through the forward transform
      * gives the conjugate of the positive-exponent sum. */
@@ -211,18 +188,7 @@ void aac_qmf_analyze(AacQmfAnalysis* a, const float* in, float (*W)[2]) {
       W[k][1] = g_ana32_post_re[k] * si + g_ana32_post_im[k] * sr;
     }
   } else {
-    for (int k = 0; k < 64; k++) {
-      float re = 0.0f;
-      float im = 0.0f;
-      const float* c = g_ana_cos64[k];
-      const float* s = g_ana_sin64[k];
-      for (int n = 0; n < 128; n++) {
-        re += u[n] * c[n];
-        im += u[n] * s[n];
-      }
-      W[k][0] = re;
-      W[k][1] = im;
-    }
+    aac_qmf_modulate(W, u, &g_ana_cos64[0][0], &g_ana_sin64[0][0], 64, 128);
   }
 }
 
@@ -265,26 +231,10 @@ void aac_qmf_synthesize(AacQmfSynthesis* s, const float (*X)[2], float* out) {
       v[n] = g_syn64_post_re[n] * re[n] - g_syn64_post_im[n] * (-im[n]);
     }
   } else {
-    for (int n = 0; n < 64; n++) {
-      const float* c = g_syn_cos32[n];
-      const float* sn = g_syn_sin32[n];
-      float acc = 0.0f;
-      for (int k = 0; k < 32; k++) {
-        acc += X[k][0] * c[k] - X[k][1] * sn[k];
-      }
-      v[n] = acc;
-    }
+    aac_qmf_demodulate(v, X, &g_syn_cos32[0][0], &g_syn_sin32[0][0], 32, 64);
   }
   /* g takes the first half of even blocks and the second half of odd
    * ones; w = g * c; the output sums the ten windowed segments. */
   const float* window = step == 2 ? g_window32 : aac_sbr_qmf_window;
-  for (int k = 0; k < B; k++) {
-    float acc = 0.0f;
-    for (int j = 0; j < 5; j++) {
-      const int g0 = 2 * block * j + k;         /* g(2 B (2 j) + k) */
-      const int g1 = 2 * block * j + 3 * B + k; /* g(2 B (2 j + 1) + k) */
-      acc += v[g0] * window[2 * j * B + k] + v[g1] * window[(2 * j + 1) * B + k];
-    }
-    out[k] = acc;
-  }
+  aac_qmf_overlap(out, v, window, B);
 }

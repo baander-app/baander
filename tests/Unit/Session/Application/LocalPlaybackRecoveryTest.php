@@ -92,6 +92,49 @@ final class LocalPlaybackRecoveryTest extends TestCase
         self::assertSame($stopRequired ? 'unknown' : (($advance && !($role === 'target' && $phase === 'preparing')) ? 'paused' : 'playing'), $session->observedState()->value);
     }
 
+    /** @return iterable<string,array{string,bool}> The transfer's state, and whether its source ever quiesced. */
+    public static function transfersWhoseSourceIsGone(): iterable
+    {
+        yield 'quiescing' => ['quiescing', false];
+        yield 'starting' => ['starting', true];
+        yield 'uncertain' => ['uncertain', true];
+    }
+
+    #[DataProvider('transfersWhoseSourceIsGone')]
+    public function testARecoveredTargetDoesNotHandTheSessionBackToASourceRecordedGoneAndStopped(string $phase, bool $quiesced): void
+    {
+        $owner = new Uuid();
+        $source = new Uuid();
+        $target = new Uuid();
+        $session = ListeningSession::create($owner, [], 0, 4);
+        $session->commitDestination($source, new Uuid(), PlaybackState::Playing, 4);
+        $store = $this->createMock(PlaybackStoreInterface::class);
+        $store->method('lockSession')->willReturn($session);
+        $store->method('localRecovery')->willReturn(['recovery_result' => null]);
+        $store->method('currentTransfer')->willReturn(['id' => new Uuid()->toString(), 'source_incarnation_id' => $source->toString(),
+            'target_incarnation_id' => $target->toString(), 'state' => $phase]);
+        $store->method('sourceQuiesced')->willReturn($quiesced);
+        $store->method('endpoint')->willReturn(['destination_id' => new Uuid()->toString(), 'retired_at' => '2026-11-11 12:00:00.000000+00:00',
+            'observed_state' => 'stopped', 'recovery_result' => null, 'epoch' => 1]);
+        $store->expects(self::once())->method('saveTransfer')->with(self::callback(static fn(array $saved): bool => $saved['state'] === 'failed'));
+        $store->expects(self::once())->method('saveSession')->with($session);
+        // The source is silent by its own record, so no stop is owed to it.
+        $store->expects(self::never())->method('insertCommand');
+        $store->method('snapshot')->willReturn([]);
+
+        $this->coordinator($store)->execute($owner, PlaybackOperation::RecoverLocal, [
+            'incarnationId' => $target->toString(), 'tabId' => new Uuid()->toString(), 'recoveryCredential' => str_repeat('a', 64),
+            'checkpoint' => ['revision' => 5, 'media' => null, 'currentTrackIndex' => 0, 'position' => 8],
+        ]);
+
+        self::assertNull($session->activeIncarnationId());
+        self::assertNull($session->selectedDestinationId());
+        self::assertSame(PlaybackState::Paused, $session->desiredState());
+        self::assertSame('paused', $session->observedState()->value);
+        self::assertSame(4.0, $session->getPosition());
+        self::assertSame(1, $session->revision());
+    }
+
     public function testConsumedCredentialSkipsExpirationAndAllMutationEvenForANewAttempt(): void
     {
         $owner = new Uuid();
@@ -120,12 +163,14 @@ final class LocalPlaybackRecoveryTest extends TestCase
         $session = ListeningSession::create($owner, [], 0, 0);
         $session->control('pause', null, null, null, null, null);
         $session->commitDestination($source, new Uuid(), PlaybackState::Paused, 0);
+        // A recovery leaves a source it could not prove stopped unknown, with this stop owed.
+        $session->retainUncertainRunner();
         $store = $this->createMock(PlaybackStoreInterface::class);
         $store->method('lockSession')->willReturn($session);
         $store->method('currentTransfer')->willReturn(null);
         $store->method('pendingControl')->willReturn(['type' => 'stop', 'expires_at' => '2000-01-01T00:00:00+00:00',
             'attempt_id' => new Uuid()->toString(), 'request_id' => new Uuid()->toString(),
-            'incarnation_id' => $source->toString(), 'request_digest' => 'digest']);
+            'incarnation_id' => $source->toString(), 'request_digest' => 'digest', 'disclosed_at' => null]);
         $store->method('endpoint')->willReturn(['epoch' => 1]);
         $store->expects(self::once())->method('insertCommand')->with(self::callback(
             static fn(array $command): bool

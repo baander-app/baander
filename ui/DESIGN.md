@@ -482,6 +482,8 @@ View mode preference persists across sessions (Zustand + localStorage).
 | Inline "Add to playlist"/"Add to queue" buttons on list rows | Play button replacing index number on hover; other actions in context menu |
 
 Native fetch exceptions are limited to service-worker request forwarding and
-streaming interception, and binary/static asset loading such as WASM. They do
-not relax origin, client, credential, redirect, or authentication requirements.
+streaming interception, binary/static asset loading such as WASM, and the
+playback close report an unloading page sends with `keepalive` from
+`ui/web/src/shared/api-client/keepalive-request.ts`. They do not relax origin,
+client, credential, redirect, or authentication requirements.
 See `.agents/rules/frontend.md` for the implementation boundary.

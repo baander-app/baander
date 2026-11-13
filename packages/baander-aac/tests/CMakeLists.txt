@@ -42,11 +42,23 @@ set(TEST_SOURCES
     test_playback.cpp
     test_encoder_tuning.cpp
     test_drc_gen.cpp
+    test_flac_format.cpp
+    test_flac_decoder.cpp
+    test_flac_conformance.cpp
+    test_flac_encoder.cpp
+    test_flac_interop.cpp
+    test_flac_dsp.cpp
+    test_flac_meta.cpp
 )
 
+# The library builds its computed tables when the first encoder or
+# decoder is created.  The unit tests also read tables and call table
+# routines directly, so each of them gets the tables at program start
+# (tables_at_load.cpp).  test_tables_lazy, below, is the one suite
+# without that file.
 foreach(test_src ${TEST_SOURCES})
     get_filename_component(test_name ${test_src} NAME_WE)
-    add_executable(${test_name} ${test_src})
+    add_executable(${test_name} ${test_src} tables_at_load.cpp)
     target_link_libraries(${test_name} PRIVATE baander-aac)
     target_compile_definitions(${test_name} PRIVATE
         BAAC_TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/data")
@@ -55,6 +67,24 @@ foreach(test_src ${TEST_SOURCES})
     endif()
     add_test(NAME ${test_name} COMMAND ${test_name})
 endforeach()
+
+# The tables built on first use: every profile through the public API
+# from several threads at once, in a program that has nothing built at
+# its start.
+add_executable(test_tables_lazy test_tables_lazy.cpp)
+target_link_libraries(test_tables_lazy PRIVATE baander-aac)
+target_compile_definitions(test_tables_lazy PRIVATE
+    BAAC_TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/data")
+find_package(Threads REQUIRED)
+target_link_libraries(test_tables_lazy PRIVATE Threads::Threads)
+if(UNIX)
+    target_link_libraries(test_tables_lazy PRIVATE m)
+endif()
+add_test(NAME test_tables_lazy COMMAND test_tables_lazy)
+# The same with decoders, and with decoders and encoders together, as
+# the first users of the tables: each start needs a process of its own.
+add_test(NAME test_tables_lazy_decoders COMMAND test_tables_lazy decoders)
+add_test(NAME test_tables_lazy_both COMMAND test_tables_lazy both)
 
 # The fuzz smoke test generates the seed corpus and runs every harness
 # over it for a few seconds of mutations (in parallel; a libFuzzer build
@@ -70,28 +100,71 @@ if(TARGET fuzz_decoder)
         BAAC_FUZZ_ASC="$<TARGET_FILE:fuzz_asc>"
         BAAC_FUZZ_ENCODER="$<TARGET_FILE:fuzz_encoder>"
         BAAC_FUZZ_UNIDRC="$<TARGET_FILE:fuzz_unidrc>"
-        BAAC_FUZZ_MPS="$<TARGET_FILE:fuzz_mps>")
+        BAAC_FUZZ_MPS="$<TARGET_FILE:fuzz_mps>"
+        BAAC_FUZZ_FLAC_DECODER="$<TARGET_FILE:fuzz_flac_decoder>"
+        BAAC_FUZZ_FLAC_ENCODER="$<TARGET_FILE:fuzz_flac_encoder>")
     if(BAAC_FUZZ_HAVE_LIBFUZZER)
         target_compile_definitions(test_fuzz_smoke PRIVATE BAAC_FUZZ_LIBFUZZER)
     endif()
     add_test(NAME test_fuzz_smoke COMMAND test_fuzz_smoke)
 endif()
 
+# The lossless commands of the baac tool, run as the built binary.  The
+# suite starts processes and measures their memory the POSIX way.
+if(TARGET baac AND NOT WIN32)
+    add_executable(test_flac_cli test_flac_cli.cpp)
+    target_link_libraries(test_flac_cli PRIVATE baander-aac)
+    target_include_directories(test_flac_cli PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
+    target_compile_definitions(test_flac_cli PRIVATE
+        BAAC_TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/data"
+        BAAC_TOOL="$<TARGET_FILE:baac>")
+    if(UNIX)
+        target_link_libraries(test_flac_cli PRIVATE m)
+    endif()
+    add_test(NAME test_flac_cli COMMAND test_flac_cli)
+endif()
+
 # The MPEG Surround syntax test compiles the test encoder tool in as its
 # writer, which includes the internal headers by their bare names.
 target_include_directories(test_mps PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
 
-# The transforms and filterbanks go through the DSP dispatch table; the
-# same suites run again with the table capped at the scalar and the SSE2
-# kernels (BAAC_AAC_CPU), so that every level this machine can run is
-# exercised end to end, not only in the kernel comparison of test_dsp.
+# The lossless-mode tests check the internal bit reader, checksums and
+# header routines against known answers, and write the FLAC streams they
+# decode by hand with the internal bit writer.
+foreach(test_name test_flac_format test_flac_decoder test_flac_conformance test_flac_encoder
+        test_flac_interop test_flac_dsp test_flac_meta test_allocation)
+    target_include_directories(${test_name} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
+endforeach()
+
+# The pinned streams of the FLAC encoder once more with the C library
+# told to use its routines for a processor without FMA and AVX2, which
+# return other last bits for some arguments.  The encoder's analysis
+# calls none of them, so the streams have to be the same; on a C library
+# that does not know the variable the run repeats the plain one.
+add_test(NAME test_flac_encoder_plain_libm COMMAND test_flac_encoder)
+set_tests_properties(test_flac_encoder_plain_libm PROPERTIES
+    ENVIRONMENT "GLIBC_TUNABLES=glibc.cpu.hwcaps=-FMA,-AVX2,-AVX")
+
+# The transforms, the filterbanks and the encoder's quantization noise go
+# through the DSP dispatch table.  test_dsp compares the kernels of every
+# level the machine has with the scalar ones, bit for bit; the default run
+# of every suite takes the highest level.  The suites below run again with
+# the table capped at the scalar and the SSE2 kernels (BAAC_AAC_CPU):
+# test_mdct, test_qmf and test_roundtrip check their accuracy bounds there,
+# and test_encoder_tuning compares the committed AAC-LC, HE-AAC and HE-AAC
+# v2 streams byte for byte at each level (where test_util.h compares
+# bytes), so an encoder that writes other bytes at a lower level fails.
+# The lossless mode has a kernel table of its own under the same cap, and
+# its suites run again the same way: the FLAC streams have to come out the
+# same at every level.
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64|i686|i386")
     set(BAAC_DISPATCH_LEVELS scalar sse2)
 else()
     set(BAAC_DISPATCH_LEVELS scalar)
 endif()
 foreach(level ${BAAC_DISPATCH_LEVELS})
-    foreach(test_name test_mdct test_qmf test_roundtrip)
+    foreach(test_name test_mdct test_qmf test_roundtrip test_encoder_tuning test_flac_decoder
+            test_flac_conformance test_flac_encoder test_flac_interop)
         add_test(NAME ${test_name}_${level} COMMAND ${test_name})
         set_tests_properties(${test_name}_${level} PROPERTIES ENVIRONMENT "BAAC_AAC_CPU=${level}")
     endforeach()

@@ -1,6 +1,6 @@
 # Library
 
-The Library context manages media libraries -- collections of media files organized by type (music, movies, video). It handles library creation, file scanning for new or changed media, and membership tracking (which users belong to which libraries). When a scan completes, it dispatches domain events that the Metadata context picks up for enrichment.
+The Library context manages media libraries — collections of media files organized by type (`music`, `podcast`, `audiobook`, `movie`, `tv_show`). It handles library creation, file scanning for new or changed media, and user library access tracking. During a scan, each indexed directory is recorded in the transactional outbox as `LibraryDirectoryIndexed` and relayed to Catalog as a `FilesDiscovered` message on the `async` transport; when the scan finishes, `LibraryScanCompleted` is dispatched for Notification.
 
 ## Domain Models
 
@@ -8,7 +8,7 @@ The Library context manages media libraries -- collections of media files organi
 
 | Model | Key Properties | Purpose |
 |-------|---------------|---------|
-| `Library` | name, type, path, slug, owner | Represents a media library tied to a filesystem path |
+| `Library` | `id`, `publicId`, `name`, `slug`, `path`, `type`, `filesystemType`, `sortOrder`, `lastScan`, `discoveryStatus`, `createdAt`, `updatedAt` | Represents a media library tied to a filesystem path (`LibraryState`) |
 
 ### Value Objects
 
@@ -16,26 +16,48 @@ The Library context manages media libraries -- collections of media files organi
 |-------|---------|
 | `LibraryPath` | Filesystem path with validation (must exist, must be readable) |
 | `LibrarySlug` | URL-safe identifier derived from the library name |
-| `LibraryType` | Enum: `Music`, `Movie`, `Video` |
+| `LibraryType` | Enum: `Music` (`music`), `Podcast` (`podcast`), `Audiobook` (`audiobook`), `Movie` (`movie`), `TvShow` (`tv_show`) |
+| `LibraryClaimKind` | Enum identifying what holds a library's exclusive lease: `Scan` (`scan`) or `Delete` (`delete`) |
+| `LibraryClaimAttempt` | Outcome of claiming a library: claimed, held by a live `LibraryClaimKind`, or no such library |
+| `LibraryClaimRelease` | Outcome of releasing a library's claim on an operator's request: released kind, no claim, or blocked by a live claim |
 
 ## Commands
 
-| Command | Handler | Purpose |
+| Command / Query | Handler | Purpose |
 |---------|---------|---------|
-| `CreateLibraryCommand` | `CreateLibraryHandler` | Creates a new library with a name, type, and filesystem path. Validates the path and generates a slug. |
-| `ScanLibraryCommand` | `ScanLibraryHandler` | Walks the library's filesystem path to discover new, changed, or removed media files, and publishes `FilesDiscovered` for each directory with new or changed files. Dispatches `LibraryScanCompleted` when finished. A cancelled job stops before its next directory and marks the scan `failed`. |
+| `CreateLibraryCommand` | `CreateLibraryHandler` | Creates a new library with a name, type, and filesystem path, validates the path, generates a slug, and optionally grants access to the creating user. |
+| `UpdateLibraryCommand` | `UpdateLibraryHandler` | Updates a library's `name` and/or `sortOrder`. |
+| `DeleteLibraryCommand` | `DeleteLibraryHandler` | Deletes a library by public ID or slug. |
+| `StartLibraryScanCommand` | `StartLibraryScanHandler` | Claims a library for scanning and dispatches `ScanLibraryCommand` with that claim ID. |
+| `ScanAllLibrariesCommand` | `ScanAllLibrariesHandler` | Claims every library not currently held by a live claim and dispatches `ScanLibraryCommand` for each. |
+| `ClaimLibraryScanCommand` | `ClaimLibraryScanHandler` | Claims a single library for an inline scan run (`app:library:scan`). |
+| `ClaimAllLibraryScansCommand` | `ClaimAllLibraryScansHandler` | Claims all unheld libraries for an inline `app:library:scan --all` run. |
+| `ReleaseLibraryScanClaimCommand` | `ReleaseLibraryScanClaimHandler` | Releases a lapsed library claim (or a live one with `force`), marking a scan claim `failed` (`app:library:scan --release`). |
+| `EndLibraryScanClaimCommand` | `EndLibraryScanClaimHandler` | Ends a specific scan claim by claim ID when an inline or unstarted scan cannot finish. |
+| `ScanLibraryCommand` | `ScanLibraryHandler` | Walks the library's filesystem path via `LibraryDiscovery` (`MusicScanner` or `MovieScanner`) to discover new, changed, or removed media files. For each directory with new or changed files, commits the `library_file_index` upserts and dispatches `LibraryDirectoryIndexed` into the outbox in the same transaction (`LibraryDirectoryOutboxEventDispatcher` relays committed events as `FilesDiscovered` messages on the `async` transport). Dispatches `LibraryScanCompleted` when finished. A cancelled job stops before its next directory and marks the scan `failed`. |
+| `GrantLibraryAccessCommand` | `GrantLibraryAccessHandler` | Grants a user access to a library (idempotent). |
+| `RevokeLibraryAccessCommand` | `RevokeLibraryAccessHandler` | Revokes a user's access to a library (idempotent). |
+| `ListLibrariesQuery` | `ListLibrariesHandler` | Lists libraries visible in a `LibraryReadScope`, optionally filtered by `LibraryType`. |
+| `GetLibraryQuery` | `GetLibraryHandler` | Looks up a single visible library by public ID or slug. |
+| `GetLibraryStatsQuery` | `GetLibraryStatsHandler` | Returns song, album, artist, genre, size, and duration totals for a visible library. |
+| `ListLibraryAccessQuery` | `ListLibraryAccessHandler` | Lists all libraries in display order with whether a given user has access to each. |
 
 ## Ports
 
 | Port | Purpose | Implemented By |
 |------|---------|----------------|
-| `LibraryPortInterface` | Library CRUD operations (create, read, update, delete, list) | Doctrine repository |
+| `LibraryPortInterface` | Library CRUD operations (create, read, update, delete, list) | `LibraryService` |
+| `LibraryAccessPortInterface` | Grants, revokes, and queries user access to libraries | `LibraryAccessRepository` |
+| `LibraryReadScopeProviderInterface` | Builds the `LibraryReadScope` for a user UUID or the current authenticated principal | `LibraryReadScopeProvider` (published as the Library Read Scope Contract) |
+| `LibraryAudienceReader` | Lists library IDs readable by a principal for live-update snapshot scoping | `DoctrineLibraryAudienceReader` (published as the Library Live Audience Contract) |
 | `DirectoryScannerPortInterface` | Walks a filesystem directory tree and returns discovered media files | `DirectoryScanner` |
-| `CoverArtExtractorPortInterface` | Extracts embedded cover art from media files (e.g., ID3 tags in MP3s) | `CoverArtExtractor` |
-| `LibraryMembershipQueryPort` | Queries which users belong to which libraries | Doctrine repository |
+| `LibraryMembershipQueryPort` | Queries which users belong to which libraries | `LibraryMembershipQuery` |
+| `LibraryStatsQueryPort` | Per-library content statistics query port inside Library | `LibraryStatsQuery` |
 | `LibraryContentStatsInterface` | Per-library song, album, artist, genre, size and duration totals | Catalog `CatalogStatsQuery` (published as the Library Content Stats Contract) |
 | `LibraryProvisioningInterface` | Finds or creates a local movie library, scans it synchronously and returns `FilesDiscovered` messages for worker-free developer ingest | `LibraryProvisioner` (published as the Library Provisioning Contract; used by Catalog's `app:e2e:ingest-video`) |
 | `LibraryMediaFilesInterface` | Checks and deletes the audio files of catalog entries being deleted, confined to their library's root | `LibraryMediaFiles` (published with its `LibraryMediaFile*` result types as the Library Media Files Contract; used by Catalog's album and song deletes and their previews) |
+| `LibraryMediaFileResolverInterface` | Resolves an absolute catalog path to an existing file inside its owning library root | `LibraryMediaFileResolver` (part of the Library Media Files Contract; used by Media's `StreamService`) |
+| `LibraryFileAvailabilityInterface` | Reads last-observed source file availability from `library_file_index` without filesystem checks | `LibraryFileAvailability` (published as the Library File Availability Contract) |
 
 ## Media File Deletion
 
@@ -82,20 +104,43 @@ Each path gets a `LibraryMediaFileVerdict`: `deletable`, `missing` (nothing at t
 
 | Event | When Emitted | Consumers |
 |-------|-------------|------------|
+| `LibraryDirectoryIndexed` | Captured in the transactional outbox when a scanner commits a directory's `library_file_index` upserts | Relayed by `LibraryDirectoryOutboxEventDispatcher` as `FilesDiscovered` on the `async` transport for Catalog (`FilesDiscoveredHandler`) |
 | `LibraryScanCompleted` | After a library scan finishes discovering files | Notification (BackgroundJobs category) |
 
 ## API Endpoints
 
-All endpoints are prefixed with `/api` and served by `LibraryController`.
+All endpoints are prefixed with `/api`. Routes under `/api/libraries` are served by `LibraryController`; user library access routes under `/api/admin/users/{userId}/libraries` are served by `AdminUserLibraryAccessController`.
 
 | Method | Path | Purpose |
 |--------|------|---------|
 | `GET` | `/api/libraries` | List libraries the authenticated user has access to |
 | `POST` | `/api/libraries` | Create a new library (administrators only) |
 | `POST` | `/api/libraries/validate-path` | Check that a server path exists and is readable (administrators only) |
+| `POST` | `/api/libraries/scan-all` | Claim all unheld libraries and queue a background scan for each (administrators only) |
 | `GET` | `/api/libraries/{id}` | Get a single library by ID |
-| `PATCH` | `/api/libraries/{id}` | Update library metadata (name, path) |
-| `DELETE` | `/api/libraries/{id}` | Delete a library and its membership records |
+| `PATCH` | `/api/libraries/{id}` | Update library metadata (`name`, `sortOrder` via `UpdateLibraryRequest`; administrators only) |
+| `DELETE` | `/api/libraries/{id}` | Delete a library and its membership records (administrators only) |
+| `POST` | `/api/libraries/{id}/scan` | Claim a library and queue an asynchronous scan job, with optional `rescan` flag (administrators only) |
+| `GET` | `/api/libraries/{id}/stats` | Get song, album, artist, genre, size, and duration totals for a visible library |
+| `GET` | `/api/admin/users/{userId}/libraries` | List every library in display order with whether the user has access (`ROLE_ADMIN` + `USER_MANAGEMENT_LIST`) |
+| `PUT` | `/api/admin/users/{userId}/libraries/{libraryId}` | Grant the user access to a library (`ROLE_SUPER_ADMIN`) |
+| `DELETE` | `/api/admin/users/{userId}/libraries/{libraryId}` | Revoke the user's access to a library (`ROLE_SUPER_ADMIN`) |
+
+### Console Commands
+
+| Command | Class | Purpose |
+|---------|-------|---------|
+| `app:library:list` | `LibraryListCommand` | List every media library, optionally filtered by `--type` |
+| `app:library:show` | `LibraryShowCommand` | Show details for one media library by public ID or slug |
+| `app:library:create` | `CreateLibraryCommand` | Create a new media library |
+| `app:library:update` | `LibraryUpdateCommand` | Rename a media library (`--name`) or change its sort order (`--sort-order`) |
+| `app:library:delete` | `LibraryDeleteCommand` | Delete a media library |
+| `app:library:scan` | `ScanLibraryCommand` | Scan one library or `--all` inline in the CLI process (with optional `--rescan`), or release a claim with `--release` (`--force`) |
+| `app:library:stats` | `LibraryStatsCommand` | Show content counts, size, and duration for a media library |
+| `app:library:validate-path` | `LibraryValidatePathCommand` | Check that a directory path exists, is readable, and does not overlap another library |
+| `app:library:member:list` | `LibraryMemberListCommand` | List every library with whether a user (by email or UUID) has access |
+| `app:library:member:grant` | `LibraryMemberGrantCommand` | Grant a user access to a library |
+| `app:library:member:revoke` | `LibraryMemberRevokeCommand` | Revoke a user's access to a library |
 
 ## Infrastructure
 
@@ -104,15 +149,26 @@ All endpoints are prefixed with `/api` and served by `LibraryController`.
 | `DirectoryScanner` | Recursively walks a filesystem path, filtering for media file extensions. Returns a collection of `MediaFile` objects. |
 | `MediaFile` | Value object representing a discovered file (path, size, MIME type, modification time). |
 | `LibraryMediaFiles` | Implements `LibraryMediaFilesInterface`: loads the library, takes, renews and releases the delete claim through the repository, and delegates the file system checks to `MediaFileGuard`. |
+| `LibraryMediaFileResolver` | Implements `LibraryMediaFileResolverInterface`: verifies a catalog path against its owning library root using `MediaFileGuard`. |
 | `MediaFileGuard` | The file system rules of media file deletion: resolves symlinks in parent directories, checks that the entry and a symlink's target lie under the root's real path, and checks again immediately before each unlink. |
 | `PathSecurityService` | Validates filesystem paths to prevent directory traversal attacks. Ensures resolved paths stay within allowed boundaries. |
+| `LibraryService` | Implements `LibraryPortInterface` via `LibraryRepositoryInterface`. |
+| `LibraryReadScopeProvider` | Implements `LibraryReadScopeProviderInterface` using `AuthenticatedUserIdentityInterface`, `CurrentUserAuthorityReader`, and `LibraryAccessPortInterface`. |
+| `DoctrineLibraryAudienceReader` | Implements `LibraryAudienceReader` for live-update audience resolution. |
+| `LibraryFileAvailability` | Implements `LibraryFileAvailabilityInterface` via `LibraryFileIndexRepositoryInterface`. |
+| `LibraryDirectoryOutboxEventDispatcher` | Outbox event dispatcher decorator that converts committed `LibraryDirectoryIndexed` events into `FilesDiscovered` messages on the `async` transport. |
+| `LibraryMessagePayloadCodec` | Encodes `ScanLibraryCommand` and `FilesDiscovered` for the `async` transport and job monitor. |
 | `LibraryEntity` | Doctrine ORM entity for the `libraries` table. |
-| `UserLibraryEntity` | Doctrine ORM entity for the `user_libraries` junction table (many-to-many relationship between users and libraries). |
+| `LibraryFileIndexEntity` | Doctrine ORM entity for the `library_file_index` table. |
+| `UserLibraryAccessEntity` | Doctrine ORM entity for the `user_library_access` table (user-to-library access grants). |
+| `LibraryAccessRepository` | Implements `LibraryAccessPortInterface` against `user_library_access`. |
+| `LibraryMembershipQuery`, `LibraryStatsQuery` | Implement `LibraryMembershipQueryPort` and `LibraryStatsQueryPort`. |
 
 ## Cross-Context Dependencies
 
 | Direction | Context | Relationship |
 |-----------|---------|--------------|
-| Depends on | Shared | Uses `Uuid` and `PublicId` for entity identification |
-| Depends on | Filesystem | Uses `MimeDetectorPortInterface` during scans and `FileWatcher` to detect filesystem changes |
-| Depended on by | Catalog | Album and song deletes and their previews use `LibraryMediaFilesInterface`; `FilesDiscoveredHandler` uses it to wait for a delete and skip missing files |
+| Depends on | Shared | Uses `Uuid`, `PublicId`, `FilesystemType`, `LibraryReadScope`, transactional outbox, and job-monitor ports |
+| Depends on | Auth | Uses `AuthenticatedUserIdentityInterface`, `CurrentUserAuthorityReader`, and `UserIdentifierResolverInterface` for read-scope resolution and member access commands |
+| Depended on by | Catalog | Consumes `FilesDiscovered`; implements `LibraryContentStatsInterface`; uses `LibraryProvisioningInterface`, `LibraryFileAvailabilityInterface`, `LibraryReadScopeProviderInterface`, and `LibraryMediaFilesInterface` (album and song deletes and their previews, and `FilesDiscoveredHandler` to wait for a delete and skip missing files) |
+| Depended on by | Activity, Lyrics, Media, Metadata, Notification, Playlist, Shared | Use `LibraryReadScopeProviderInterface`, `LibraryMediaFileResolverInterface` (Media), `LibraryPortInterface` (Metadata), `LibraryMembershipQueryPort` (Notification), and `LibraryAudienceReader` (Shared live snapshots) |

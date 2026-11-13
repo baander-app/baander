@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace App\Transcode\Infrastructure\Transcode;
 
+use App\Shared\Application\Port\TransactionPortInterface;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
+use App\Transcode\Application\Exception\TranscodeCleanupIncompleteException;
+use App\Transcode\Application\Port\TranscodeExecutionOwnershipPort;
 use App\Transcode\Application\Port\TranscodeJobPortInterface;
 use App\Transcode\Application\Port\TranscodeStoragePortInterface;
 use App\Transcode\Domain\Event\TranscodeJobCreated;
@@ -13,6 +16,7 @@ use App\Transcode\Domain\Model\TranscodeJob;
 use App\Transcode\Domain\Repository\TranscodeJobRepositoryInterface;
 use App\Transcode\Domain\ValueObject\QualityTier;
 use App\Transcode\Domain\ValueObject\PresentationSelection;
+use Psr\Log\LoggerInterface;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 
 final class TranscodeJobService implements TranscodeJobPortInterface
@@ -21,6 +25,9 @@ final class TranscodeJobService implements TranscodeJobPortInterface
         private readonly TranscodeJobRepositoryInterface $jobRepository,
         private readonly TranscodeStoragePortInterface $storage,
         private readonly EventDispatcherInterface $eventDispatcher,
+        private readonly TranscodeExecutionOwnershipPort $ownership,
+        private readonly TransactionPortInterface $transaction,
+        private readonly LoggerInterface $logger,
     ) {
     }
 
@@ -113,23 +120,43 @@ final class TranscodeJobService implements TranscodeJobPortInterface
 
     public function cleanupOrphanedJobs(): int
     {
-        $orphans = $this->jobRepository->findOrphanedJobs();
-        $count = 0;
+        $removed = 0;
+        $failed = 0;
 
-        foreach ($orphans as $job) {
+        foreach ($this->jobRepository->findOrphanedJobs() as $job) {
+            $step = 'lease check';
             try {
+                // A worker that still owns the execution may be writing this output;
+                // a later run removes the job once the worker has let go.
+                if ($this->ownership->find($job->getId())?->ownershipLive === true) {
+                    continue;
+                }
+                // The record goes only after its output has: a record is how a later run
+                // finds output that could not be deleted this time.
+                $step = 'output deletion';
                 if (!$this->storage->deleteIfUnretained($job->getOutputDirectory())) {
                     continue;
                 }
-            } catch (\Throwable) {
-                continue;
+                // A transaction of its own: a failed removal is rolled back and takes the
+                // entities it had scheduled with it, so the next job starts from a clean manager.
+                $step = 'record removal';
+                $this->transaction->run(fn () => $this->jobRepository->delete($job));
+                ++$removed;
+            } catch (\Throwable $failure) {
+                // One job that cannot be removed must not keep the others; the next run tries it again.
+                ++$failed;
+                $this->logger->error('An orphaned transcode job could not be removed.', [
+                    'job' => $job->getId()->toString(),
+                    'step' => $step,
+                    'exception' => $failure,
+                ]);
             }
-
-            $this->jobRepository->delete($job);
-            ++$count;
+        }
+        if ($failed > 0) {
+            throw new TranscodeCleanupIncompleteException($removed, $failed);
         }
 
-        return $count;
+        return $removed;
     }
 
     public function save(TranscodeJob $job): void

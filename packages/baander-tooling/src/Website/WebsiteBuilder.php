@@ -46,7 +46,22 @@ final class WebsiteBuilder
         'developer' => ['name' => 'Developer guide', 'url' => '/docs/developer-guide/'],
     ];
     /** Chapter indexes whose linked pages fold out under the chapter in the manual navigation. */
-    private const array FOLD_OUT_CHAPTERS = ['part-1-operator-guide/commands/README.md', 'part-2-developer-guide/contexts/README.md'];
+    private const array FOLD_OUT_CHAPTERS = [
+        'part-1-operator-guide/getting-started/README.md',
+        'part-1-operator-guide/configuration/README.md',
+        'part-1-operator-guide/workers/README.md',
+        'part-1-operator-guide/media/README.md',
+        'part-1-operator-guide/administration/README.md',
+        'part-1-operator-guide/operations/README.md',
+        'part-1-operator-guide/maintenance/README.md',
+        'part-1-operator-guide/commands/README.md',
+        'part-2-developer-guide/getting-started/README.md',
+        'part-2-developer-guide/architecture/README.md',
+        'part-2-developer-guide/development/README.md',
+        'part-2-developer-guide/testing/README.md',
+        'part-2-developer-guide/contexts/README.md',
+        'part-2-developer-guide/contributing/README.md',
+    ];
     /** @var array<string,list<array{url:string,title:string,children?:list<array{url:string,title:string,group?:string}>}>> */
     private array $navigation = ['operator' => [], 'developer' => []];
 
@@ -358,7 +373,7 @@ final class WebsiteBuilder
             foreach ($this->linkedPages($index, $guide, $seen) as ['page' => $page]) {
                 $entry = ['url' => $page['url'], 'title' => $page['title']];
                 if (in_array($page['source'], self::FOLD_OUT_CHAPTERS, true)) {
-                    $entry['children'] = $this->linkedPages($page['source'], $guide, $seen)
+                    $entry['children'] = $this->linkedPages($page['source'], $guide, $seen, dirname($page['source']))
                         |> (static fn(array $linked): array => array_map(self::foldOutEntry(...), $linked));
                 }
                 $this->navigation[$guide][] = $entry;
@@ -426,7 +441,7 @@ final class WebsiteBuilder
      * @param array<string,true> $seen
      * @return list<array{page:array{source:string,url:string,title:string,guide:?string,html:string,headings:list<array{id:string,title:string,level:int}>},group:?string}>
      */
-    private function linkedPages(string $source, string $guide, array &$seen): array
+    private function linkedPages(string $source, string $guide, array &$seen, ?string $directory = null): array
     {
         $linked = [];
         $group = null;
@@ -440,10 +455,18 @@ final class WebsiteBuilder
             }
             $url = explode('#', $node->getUrl(), 2)[0];
             foreach ($this->pages as $page) {
-                if ($page['url'] === $url && $page['guide'] === $guide && !isset($seen[$url])) {
-                    $linked[] = ['page' => $page, 'group' => $group];
-                    $seen[$url] = true;
+                if ($page['url'] !== $url || $page['guide'] !== $guide || isset($seen[$url])) {
+                    continue;
                 }
+                $chapterIndex = dirname($page['source']) . '/README.md';
+                if ($directory !== null && dirname($page['source']) !== $directory) {
+                    continue;
+                }
+                if ($directory === null && $page['source'] !== $chapterIndex && in_array($chapterIndex, self::FOLD_OUT_CHAPTERS, true)) {
+                    continue;
+                }
+                $linked[] = ['page' => $page, 'group' => $group];
+                $seen[$url] = true;
             }
         }
         return $linked;

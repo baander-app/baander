@@ -20,11 +20,11 @@ execution: code
 
 **Product Contract preservation:** Clarified, no scope change: R3 and the Summary name database connection slots per web worker as part of web worker sizing; AE4 names the reductions KTD8 performs; F1, AE1 and AE6 say starting point instead of size point. Planning questions are resolved by KTD1–KTD9.
 
-**Execution profile:** One branch named after this plan, nine dependency-ordered units landing as local commits. U1–U8 are code and documentation; U9 is the measured qualification on VMs and sets the final 4 GB values. The lead integrates delegated work, runs the authoritative gates and commits; push only when asked.
+**Execution profile:** One branch named after this plan, nine dependency-ordered units landing as local commits. U1–U8 are code and documentation; U9 is the measured qualification on VMs and sets the final 4 GB values. The lead integrates delegated work, runs the authoritative gates and commits; push only when asked. On 2026-11-12 the user decided to merge U1–U8 into `master` before U9 runs: the code lands with no host size qualified, and U9 stays open as a recorded item.
 
 **Stop conditions:** Stop affected work if it would weaken ownership, media access or encoding-prohibition checks, discard local data without authorization, or change product scope. A 4 GiB failure at the floor settings is handled by KTD8 and does not block U1–U8.
 
-**Open blockers:** None for U1–U8. U9 needs libvirtd running on the workstation; it was unreachable on 2026-11-07.
+**Open blockers:** None for U1–U8, which land without U9. U9 is deferred by the user's decision of 2026-11-12. It no longer needs libvirtd: a QEMU guest started with 4,096 MiB serves as the VM. Before it runs, the application, worker and operator images must be rebuilt from the landed code, and the database image from `docker/postgres/Dockerfile`, because the local `baander-database:latest` lacks the `baander-pooler-credentials` executable the preset runs.
 
 ---
 
@@ -160,7 +160,7 @@ None block planning. Size bounds and the operator-set versus derived split are r
 
 - KTD1. **The profile carries an explicit capability and no identifier.** `DeploymentProfile` gains a `capability` field with the values `transcode` and `remux` and loses `identifier`. Capability is authoritative: `MediaExecutionPolicy` admits encode operations only under `transcode`, and stream copy under either. A `remux` profile takes copy slots and refuses video slots, audio slots and a hardware encoder. A `transcode` profile takes video and audio slots and refuses copy slots. The existing exact-JSON and fingerprint comparisons at every seam (manifest, recipe, supervisor environment, readiness, native handshake, admission ledger, boot row, web health) carry the new fields through `toJson()` unchanged. The two environment variables collapse into one, `BAANDER_DEPLOYMENT_PROFILE`, holding the profile JSON. Governs R1, R2, R4, R5, R7.
 - KTD2. **Size is five process settings on the profile, each bounded.** The size settings are web workers, Doctrine slots per web worker, the resident ordinary consumer limit, copy slots (remux) and video and audio slots (transcode). Bounds: web workers 1–16, Doctrine slots 1–16, ordinary consumers 1–4 (the autoscaling ceiling), copy slots 1–8. Video and audio slots keep their pooler-derived `MediaSlotBounds`, which already takes web workers, Doctrine slots and ordinary consumers as inputs; its messages stop naming a profile. Values out of bounds throw `InvalidArgumentException` naming the setting and its bound. Governs R3, R4, AE2.
-- KTD3. **Pooler pools and `max_connections` are derived from the size.** `Pooler` derives the application, control and direct pool sizes from web workers, Doctrine slots, ordinary consumers and media slots instead of indexing a table by profile name, and `max_connections` stays their sum plus the superuser reserve. The derivation must reproduce the two measured points (remux at 2/4/1 with 2 copy slots gives 10/4/3; transcode at 4/10/4 with 8 + 12 slots gives 20/8/4). Directional shape: application grows with web workers, control with media slots and has a floor of four. A tooling test pins both points and the source-install compose values. Governs R3.
+- KTD3. **Pooler pools and `max_connections` are derived from the size.** `Pooler` derives the application, control and direct pool sizes from web workers, Doctrine slots, ordinary consumers and media slots instead of indexing a table by profile name, and `max_connections` stays their sum plus the superuser reserve. The derivation must reproduce the transcode point (4/10/4 with 8 + 12 slots gives 20/8/4) and the measured remux application and control pools (2/4/1 with 2 copy slots gives 10/4). Directional shape: application grows with web workers, control with media slots and has a floor of four. The direct reserve is four connections at every size, so the remux point is 10/4/4 with `max_connections` 21, where the household file had 10/4/3 and 20. A tooling test pins both points and the source-install compose values. Governs R3.
 - KTD4. **PostgreSQL memory is two operator settings in the preset; the rest is derived.** The preset configuration's size takes `sharedBuffersMiB` (32–16,384) and `workMemMiB` (1–1,024). `maintenance_work_mem` is half of shared buffers capped at 256 MiB, and `autovacuum_work_mem` is half of that; the remux 4 GB starting point reproduces today's household file (128/4/64/32). The renderer writes `postgresql.conf` from these values, and `PostgresSettings::verify` checks the effective settings, including the derived ones. The template keeps the non-memory settings of both current files (`max_parallel_workers_per_gather = 0`, the connection reserves, WAL and checkpoint settings) for every size; the source install's statement logging moves to `-c` flags in its compose file. The 16 GB point therefore lowers `maintenance_work_mem` from today's 256 MB to 128 MB on purpose. PostgreSQL settings stay out of `DeploymentProfile`, because no PHP process reads them. Governs R3, R8.
 - KTD5. **One code default, used only by dev and the source install.** An unset `BAANDER_DEPLOYMENT_PROFILE` resolves to `transcode` at the 16 GB starting point. The preset, worker controller and qualification harness always write the profile explicitly. The source install's compose mounts `docker/postgres/conf/postgresql.conf`, which becomes the rendered 16 GB conf, fixing today's initdb-default PostgreSQL. Governs R5, R8.
 - KTD6. **Starting points are example configuration files, not names in code.** `deploy/preset/` ships one example per starting point and capability. Process and PostgreSQL values are shared by both capabilities of a point; media values differ by capability.
@@ -366,7 +366,7 @@ U1 defines the profile; U2 and U3 depend on it and can proceed in parallel. U4 d
 **Patterns to follow:** The existing renderer, `PostgresSettings` strict parser and the tooling tests that pin cross-file invariants.
 
 **Test scenarios:**
-- The remux 2/4/1, 2 copy slot size derives pools 10/4/3 and `max_connections` 20.
+- The remux 2/4/1, 2 copy slot size derives pools 10/4/4 and `max_connections` 21.
 - The transcode 4/10/4, 8 + 12 size derives pools 20/8/4 and `max_connections` 35.
 - Shared buffers of 128 MiB render `maintenance_work_mem` 64 MB and `autovacuum_work_mem` 32 MB; 1,024 MiB renders 256 MB and 128 MB.
 - Shared buffers of 16 MiB, and work memory of 2,048 MiB, are refused.
@@ -492,7 +492,9 @@ U1 defines the profile; U2 and U3 depend on it and can proceed in parallel. U4 d
 
 **Requirements:** R9, R10, R11, R13, R14, AE3, AE4; KTD7, KTD8.
 
-**Dependencies:** U1–U8; libvirtd running on the workstation.
+**Dependencies:** U1–U8; a 4,096 MiB VM with swap off, which a QEMU guest provides without libvirtd; images rebuilt from the landed code.
+
+**Status:** Deferred. The user decided on 2026-11-12 to land U1–U8 first; until U9 passes, no host size is qualified and the 4 GB example keeps its starting values.
 
 **Files:**
 - `deploy/preset/example-4gb-remux.json` (final values)
@@ -539,7 +541,7 @@ Mount the tree into the CI image per the project's gate recipe (including `packa
 
 - Every unit's verification holds and the gates above pass on the final branch head.
 - No source, test, fixture, preset or operator page refers to a `full` or `household` profile.
-- The 4 GB claim is either published from three passing reports and a recorded insufficient-memory failure, or withheld per KTD8 with the measured result published.
+- The 4 GB claim is either published from three passing reports and a recorded insufficient-memory failure, or withheld per KTD8 with the measured result published. U1–U8 land before this item by the user's decision of 2026-11-12; until U9 runs, the guide states that no host size is qualified.
 - `ROADMAP.md` records the delivered items, the open household items this plan closes, and the remaining surrounding work (ARM64, Raspberry Pi, 8 and 16 GB qualification).
 - `ce-simplify-code` ran at the end of U1–U3 and U4–U7, and `ce-code-review` findings were applied before shipping.
 - Abandoned-attempt code and unused helpers are removed from the diff.

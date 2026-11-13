@@ -12,9 +12,11 @@ use Baander\Tooling\Development\StateStore;
 use Baander\Tooling\Development\Updater;
 use Baander\Tooling\Development\Workers;
 use Baander\Tooling\Development\WorkflowError;
+use Baander\Tooling\Process\ProcessResult;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 #[AllowMockObjectsWithoutExpectations]
 final class DevelopmentUpdatesTest extends TestCase
@@ -25,6 +27,7 @@ final class DevelopmentUpdatesTest extends TestCase
     private Builder&MockObject $builder;
     private Runtime&MockObject $runtime;
     private Workers&MockObject $workers;
+    private DaemonImagesExecutor $daemon;
     /** @var array<string,mixed> */
     private array $instance;
 
@@ -45,7 +48,7 @@ final class DevelopmentUpdatesTest extends TestCase
         $this->instance['release'] = DevelopmentCommandExecutor::release($this->instance['release'], $this->instance);
         $this->store->save('persistent', $this->instance);
         $this->store->setEnabled('persistent', true);
-        $this->updater = $this->getMockBuilder(Updater::class)->setConstructorArgs([$this->store, new DevelopmentCommandExecutor()])->onlyMethods(['head', 'activate'])->getMock();
+        $this->updater = $this->getMockBuilder(Updater::class)->setConstructorArgs([$this->store, $this->daemon = new DaemonImagesExecutor()])->onlyMethods(['head', 'activate'])->getMock();
         $this->updater->builder = $this->builder = $this->createMock(Builder::class);
         $this->updater->runtime = $this->runtime = $this->createMock(Runtime::class);
         $this->updater->workers = $this->workers = $this->createMock(Workers::class);
@@ -193,5 +196,63 @@ final class DevelopmentUpdatesTest extends TestCase
             self::assertNull($saved['failed_revision']);
             self::assertNotSame('ready', $saved['phase']);
         }
+        // Every image of the saved release was looked up in the daemon before it was reused.
+        self::assertEqualsCanonicalizing(
+            array_values(array_unique(array_column($this->instance['release']['images'], 'resolvedId'))),
+            $this->daemon->inspected,
+        );
+    }
+
+    /** @return iterable<string,array{string}> */
+    public static function savedReleaseImages(): iterable
+    {
+        yield 'postgres' => ['postgres_image'];
+        yield 'redis' => ['redis_image'];
+        yield 'application' => ['app_image'];
+    }
+
+    #[DataProvider('savedReleaseImages')]
+    public function testStoppedSameRevisionPreparesAReleaseWhenASavedImageLeftTheDaemon(string $key): void
+    {
+        $this->updater->runtime = $this->runtime = $this->createMock(Runtime::class);
+        $this->runtime->method('running')->willReturn(false);
+        $this->updater->method('head')->willReturn('old');
+        // A stopped instance holds no container on its images, so the daemon can lose them.
+        $this->daemon->missing = [$this->instance['release']['images'][$key]['resolvedId']];
+        $prepared = ['revision' => 'old', 'source' => 'rebuilt'];
+        $this->builder->expects(self::once())->method('prepare')->willReturn($prepared);
+        $this->updater->expects(self::once())->method('activate')->willReturnCallback(static function (array &$instance, array $release) use ($prepared): void {
+            self::assertSame($prepared, $release);
+        });
+        $this->updater->update('persistent', automatic: true);
+        self::assertSame($prepared, $this->store->load('persistent')['prepared_release']);
+    }
+}
+
+/** Answers the daemon's image lookups, so no test reaches a real Docker daemon. */
+final class DaemonImagesExecutor extends DevelopmentCommandExecutor
+{
+    /** @var list<string> Images the daemon no longer holds. */
+    public array $missing = [];
+    /** @var list<string> */
+    public array $inspected = [];
+
+    public function execute(
+        array $arguments,
+        ?string $cwd = null,
+        ?array $env = null,
+        ?string $input = null,
+        ?float $timeout = 120,
+        bool $check = true,
+        ?string $logPath = null,
+        bool $interactive = false,
+    ): ProcessResult {
+        if (array_slice($arguments, 3, 2) !== ['image', 'inspect']) {
+            return parent::execute($arguments, $cwd, $env, $input, $timeout, $check, $logPath, $interactive);
+        }
+        $this->inspected[] = $image = end($arguments);
+        return in_array($image, $this->missing, true)
+            ? new ProcessResult(1, null, false, false, '', 'Error response from daemon: No such image: ' . $image, 0)
+            : new ProcessResult(0, null, false, false, $image, '', 0);
     }
 }

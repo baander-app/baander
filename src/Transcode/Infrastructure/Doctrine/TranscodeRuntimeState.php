@@ -16,6 +16,7 @@ use App\Transcode\Domain\ValueObject\AacImplementation;
 use App\Transcode\Domain\ValueObject\AudioProfile;
 use App\Transcode\Domain\ValueObject\PresentationSelection;
 use App\Transcode\Domain\ValueObject\LoudnessStandard;
+use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Connection;
 
 final class TranscodeRuntimeState implements TranscodeExecutionOwnershipPort
@@ -57,7 +58,10 @@ final class TranscodeRuntimeState implements TranscodeExecutionOwnershipPort
         if ($row !== null && $row['session_id'] === $sessionId->toString()) {
             return $this->snapshot($row);
         }
-        if ($row !== null && !in_array($row['outcome'], ['complete', 'failed', 'cancelled', 'refused'], true)) {
+        // A running execution stays with the session that holds it. One whose session was cancelled
+        // or has failed is held by nobody, so the new session takes the job over in a new generation.
+        if ($row !== null && !in_array($row['outcome'], ['complete', 'failed', 'cancelled', 'refused'], true)
+            && $this->connection->fetchOne("SELECT 1 FROM transcode_sessions WHERE id = ? AND state NOT IN ('cancelled', 'failed')", [$row['session_id']])) {
             return $this->snapshot($row);
         }
         $generation = $row === null ? 1 : (int) $row['generation'] + 1;
@@ -111,6 +115,23 @@ SQL, ['job' => $jobId->toString(), 'session' => $sessionId->toString(), 'request
     {
         $row = $this->connection->fetchAssociative('SELECT *, (claim_token IS NOT NULL AND lease_expires_at > clock_timestamp()) AS ownership_live FROM transcode_runtime_state WHERE job_id = ?', [$jobId->toString()]);
         return $row === false ? null : $this->snapshot($row);
+    }
+
+    public function findGroup(array $jobIds): array
+    {
+        if ($jobIds === []) {
+            return [];
+        }
+        $rows = $this->connection->fetchAllAssociative(
+            'SELECT *, (claim_token IS NOT NULL AND lease_expires_at > clock_timestamp()) AS ownership_live FROM transcode_runtime_state WHERE job_id IN (?)',
+            [array_map(static fn (Uuid $id): string => $id->toString(), $jobIds)],
+            [ArrayParameterType::STRING],
+        );
+        $snapshots = [];
+        foreach ($rows as $row) {
+            $snapshots[$row['job_id']] = $this->snapshot($row);
+        }
+        return $snapshots;
     }
 
     public function pending(int $limit = 100): array

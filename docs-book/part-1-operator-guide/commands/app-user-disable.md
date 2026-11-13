@@ -6,7 +6,7 @@ Disable a user account and end its sessions. The user cannot sign in until the a
 
 The Make examples below target the checkout's development preview. For an
 installed instance, use the `dc` function from
-[Getting started](../getting-started.md#command-context) and replace
+[Getting started](../getting-started/installation.md#command-context) and replace
 `make exec cmd="php bin/console …"` with `dc exec app php bin/console …`.
 
 ```bash
@@ -40,7 +40,7 @@ After the disable is saved, the web server closes the user's open WebSocket conn
 Two kinds of media access do not end at once:
 
 - A media response that is already being sent finishes. A track file, or a transcode that is still encoding, keeps streaming until that response ends. The next request is refused, including a byte-range request for the same track.
-- Signed video stream URLs (HLS and DASH) are not tied to a user, so disabling the account does not revoke them. A manifest URL works for the lifetime requested when it was signed, at most 24 hours. Each manifest signs the URLs it lists for another 24 hours when the player fetches it. A player that keeps fetching can therefore stream that video for up to 72 hours after the URL was signed with HLS (master playlist, media playlist, segments), and up to 48 hours with DASH (manifest, segments). The user cannot sign new stream URLs once the account is disabled. To end the signed URLs sooner, see [Disabled accounts](../security.md#disabled-accounts).
+- Signed video stream URLs (HLS and DASH) are not tied to a user, so disabling the account does not revoke them. A manifest URL works for the lifetime requested when it was signed, at most 24 hours. Each manifest signs the URLs it lists for another 24 hours when the player fetches it. A player that keeps fetching can therefore stream that video for up to 72 hours after the URL was signed with HLS (master playlist, media playlist, segments), and up to 48 hours with DASH (manifest, segments). The user cannot sign new stream URLs once the account is disabled. To end the signed URLs sooner, see [Disabled accounts](../maintenance/security.md#disabled-accounts).
 
 Disabling an account that is already disabled leaves the account unchanged and closes any WebSocket connection of the user that is still open.
 

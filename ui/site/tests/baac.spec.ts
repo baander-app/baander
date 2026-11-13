@@ -1,4 +1,7 @@
 import { test as base, expect } from '@playwright/test';
+import { readFileSync } from 'node:fs';
+
+const packageVersion = JSON.parse(readFileSync(new URL('../../../packages/baander-aac/package.json', import.meta.url), 'utf8')).version as string;
 
 const test = base.extend<{ localRequests: void }>({
   localRequests: [async ({ context, baseURL }, use) => {
@@ -27,7 +30,7 @@ test('visitors discover bAAC and its direct route has one canonical URL', async 
   await expect(page.getByRole('heading', { name: 'Server transcoding through FFmpeg' })).toBeVisible();
   await expect(page.locator('#integration')).toContainText('libbaac');
   await expect(page.locator('#integration').getByRole('link', { name: 'AAC implementation' }))
-    .toHaveAttribute('href', '/docs/operator-guide/transcoding/#aac-implementation');
+    .toHaveAttribute('href', '/docs/operator-guide/media/transcoding/#aac-implementation');
   await expect(page.getByRole('navigation', { name: 'Main navigation' }).getByRole('link', { name: 'bAAC', exact: true }))
     .toHaveAttribute('aria-current', 'page');
   await expect(page.getByRole('navigation', { name: 'Footer navigation' }).getByRole('link', { name: 'bAAC', exact: true }))
@@ -74,8 +77,37 @@ test('all sixteen charts reproduce their adjacent tables and complete recorded p
   await expect(page.locator('#quality [id$="-peaq_basic"] svg [data-value]')).toHaveCount(55);
   await expect(page.locator('#quality [id$="-visqol"] svg [data-value]')).toHaveCount(55);
   await expect(page.locator('#throughput svg [data-value]')).toHaveCount(33);
-  await expect(page.locator('#lossless tbody tr')).toHaveCount(4);
-  await expect(page.locator('#lossless tbody tr td:last-child')).toHaveText(['Passed', 'Passed', 'Passed', 'Passed']);
+});
+
+test('the lossless table sets bAAC level 5 and level 8 beside the references, every row bit-exact', async ({ page }) => {
+  await page.goto('/baac/');
+  await expect(page.locator('.release-note')).toContainText(`Version ${packageVersion} `);
+  const section = page.locator('#lossless');
+  await expect(section.getByRole('heading', { level: 2 })).toHaveText('Standard FLAC, measured level for level.');
+  await expect(section).not.toContainText('does not imply a bAAC lossless mode');
+  await expect(section.locator('.baac-dateline'))
+    .toHaveText(/^Recorded \d{1,2} [A-Z][a-z]+ \d{4} on .+\. The references were flac 1\.4\.3 and FFmpeg \S+\. /);
+  await expect(section.locator('tbody th')).toHaveText([
+    'bAAC level 5 (default)',
+    'bAAC level 8',
+    'flac level 5',
+    'flac level 8',
+    'FFmpeg FLAC level 5',
+    'FFmpeg FLAC level 8',
+    'FFmpeg ALAC',
+    /^Apple ALAC \(refalac\)(, carried from \d{1,2} [A-Z][a-z]+ \d{4})?$/,
+  ]);
+  await expect(section.locator('tbody td:last-child')).toHaveText(Array(8).fill('Passed'));
+  for (const codec of ['baac-5', 'baac-8', 'flac-5', 'flac-8', 'flac-ffmpeg-5', 'flac-ffmpeg-8', 'alac-ffmpeg']) {
+    const cells = section.locator(`tr[data-codec="${codec}"] td`);
+    await expect(cells.nth(1)).toHaveText(/^\d{3}\.\d{2}$/);
+    await expect(cells.nth(2)).toHaveText(/^[\d,]+×$/);
+    await expect(cells.nth(3)).toHaveText(/^[\d,]+×$/);
+    if (codec !== 'alac-ffmpeg') await expect(cells.nth(0)).toHaveText(/^\d{1,3}(,\d{3})+$/);
+  }
+  await expect(section.locator('tr[data-codec="alac-ffmpeg"] td').nth(0)).toHaveText('Not recorded');
+  const refalac = section.locator('tr[data-codec="alac-apple-ref"] td');
+  await expect(refalac).toHaveText(['Not recorded', /^\d{3}\.\d{2}$/, 'Not measured', 'Not measured', 'Passed']);
 });
 
 test('charts show readouts on hover and keyboard focus, and legend buttons toggle encoders', async ({ page }) => {
@@ -190,6 +222,13 @@ for (const width of [1440, 390]) {
           }
           await region.evaluate((element) => { element.scrollLeft = 0; });
           await disclosure.locator('summary').press('Enter');
+        }
+        const lossless = page.getByRole('region', { name: 'Lossless measurements' });
+        await lossless.focus();
+        await expect(lossless).toBeFocused();
+        if (await lossless.evaluate((element) => element.scrollWidth > element.clientWidth)) {
+          await lossless.press('ArrowRight');
+          await expect.poll(() => lossless.evaluate((element) => element.scrollLeft)).toBeGreaterThan(0);
         }
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
         const first = panels.first();

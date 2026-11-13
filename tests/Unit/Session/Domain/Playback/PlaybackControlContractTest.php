@@ -18,9 +18,9 @@ final class PlaybackControlContractTest extends TestCase
     {
         $first = new PublicId();
         $second = new PublicId();
-        $session = ListeningSession::create(new Uuid(), [$first->toString()], 0, 42.5);
+        $session = ListeningSession::create(new Uuid(), [$first->toString()], 0, 0);
         $media = new PlaybackMedia('song', $first);
-        $session->control('load', $media, null, null, null, PlaybackState::Playing);
+        $session->control('load', $media, null, null, 42.5, PlaybackState::Playing);
 
         $session->control('queue', null, [$first->toString(), $second->toString()], 0, null, null);
 

@@ -12,6 +12,11 @@
 #include <string>
 #include <vector>
 
+#if !defined(_WIN32)
+#include <sys/wait.h>
+#include <unistd.h> /* mkdtemp: Apple's C library declares it here only */
+#endif
+
 #include "aac.h"
 
 static int g_failures = 0;
@@ -29,6 +34,71 @@ static int g_failures = 0;
 static int test_summary(const char* name) {
   printf("%s: %d failure(s)\n", name, g_failures);
   return g_failures ? 1 : 0;
+}
+
+/* The directory of `--write-streams <dir>`, or NULL: a suite with
+ * committed streams then writes them there instead of testing. */
+static const char* write_streams_dir(int argc, char** argv) {
+  return argc >= 3 && strcmp(argv[1], "--write-streams") == 0 ? argv[2] : nullptr;
+}
+
+/* The tests' linear congruential generator: the next state of *seed, and
+ * a value in [-1, 1) from the top 24 bits of the next state. */
+static unsigned lcg_next(unsigned* seed) {
+  *seed = *seed * 1664525u + 1013904223u;
+  return *seed;
+}
+
+static float lcg_float(unsigned* seed) { return (float)(lcg_next(seed) >> 8) / 8388608.0f - 1.0f; }
+
+/* ── the reference build ───────────────────────────────────────── */
+
+/* The encoder streams under tests/data are compared byte for byte by
+ * every reference build: a build with the options of CMakeLists.txt
+ * that keep arithmetic exact (BAAC_EXACT_MATH), in any configuration,
+ * Debug and the sanitizers included.  The library and the tests compute
+ * in exact arithmetic, so the bytes are a function of the source and of
+ * the C library's functions, not of the compiler or the optimisation
+ * level.  The streams are written with --write-streams by a Release build
+ * with the compiler of the linux-x64 job in
+ * .github/workflows/aac-native.yml.  A build without those options
+ * compares its streams with the committed ones through the decodes. */
+#if BAAC_EXACT_MATH
+#define BAAC_REFERENCE_BUILD 1
+#else
+#define BAAC_REFERENCE_BUILD 0
+#endif
+
+/* FNV-1a over the bit patterns of the samples. */
+static uint32_t signal_checksum(const std::vector<float>& pcm) {
+  uint32_t h = 2166136261u;
+  for (float v : pcm) {
+    uint32_t bits;
+    memcpy(&bits, &v, sizeof(bits));
+    for (int shift = 0; shift < 32; shift += 8) {
+      h = (h ^ ((bits >> shift) & 0xFFu)) * 16777619u;
+    }
+  }
+  return h;
+}
+
+/* A committed stream is reproduced only from the signal it was encoded
+ * from, to the last bit.  The generators below are a function of their
+ * source, since the tests compute in exact arithmetic like the library,
+ * and of the C library's sinf, cosf, expf and powf.  This check names a
+ * signal that came out different, so that the stream which then differs
+ * is not read as a change of the encoder; it returns whether the signal
+ * is the committed one. */
+static bool check_committed_signal(const char* name, const std::vector<float>& pcm,
+                                   uint32_t expected) {
+  const uint32_t got = signal_checksum(pcm);
+  CHECK(got == expected,
+        "%s: the generated signal has checksum 0x%08x, the committed stream was encoded from "
+        "0x%08x.  The stream is the output of exact arithmetic, which every compiler reproduces "
+        "from the same signal; a different signal comes from the C library's sinf, cosf, expf or "
+        "powf, or from options that let the compiler regroup arithmetic",
+        name, (unsigned)got, (unsigned)expected);
+  return got == expected;
 }
 
 /* ── signals (interleaved float, full scale 1.0) ────────────────── */
@@ -427,6 +497,100 @@ static void remove_temp_dir(const std::string& dir) {
 
 static bool run_command(const std::string& cmd) {
   return system((cmd + " > /dev/null 2>&1").c_str()) == 0;
+}
+
+/* A path or other word as one shell argument. */
+static std::string shell_quote(const std::string& word) {
+  std::string out = "'";
+  for (char c : word) {
+    if (c == '\'') {
+      out += "'\\''";
+    } else {
+      out += c;
+    }
+  }
+  return out + "'";
+}
+
+/* A command run through the shell with what it wrote. */
+struct CommandRun {
+  int status = -1;          /* the exit status; -1 when the command did not exit */
+  std::vector<uint8_t> out; /* standard output */
+  std::string err;          /* standard error */
+  std::string text() const { return std::string(out.begin(), out.end()); }
+};
+
+/* Runs `cmd` with its standard output and standard error captured in
+ * files of the directory `dir`, which the caller owns. */
+static CommandRun run_command(const std::string& cmd, const std::string& dir) {
+  CommandRun r;
+  const std::string out_path = dir + "/stdout";
+  const std::string err_path = dir + "/stderr";
+  const int status =
+      system((cmd + " > " + shell_quote(out_path) + " 2> " + shell_quote(err_path)).c_str());
+#if defined(_WIN32)
+  r.status = status;
+#else
+  r.status = WIFEXITED(status) ? WEXITSTATUS(status) : -1;
+#endif
+  r.out = read_file(out_path);
+  const std::vector<uint8_t> err = read_file(err_path);
+  r.err.assign(err.begin(), err.end());
+  return r;
+}
+
+/* Standard output of a command without its trailing newlines; empty
+ * when the command cannot be run.  `status`, when given, receives what
+ * pclose returns. */
+static std::string run_capture(const std::string& cmd, int* status = nullptr) {
+  std::string out;
+  FILE* pipe = popen(cmd.c_str(), "r");
+  if (!pipe) {
+    if (status) {
+      *status = -1;
+    }
+    return out;
+  }
+  char buf[4096];
+  size_t n;
+  while ((n = fread(buf, 1, sizeof(buf), pipe)) > 0) {
+    out.append(buf, n);
+  }
+  const int result = pclose(pipe);
+  if (status) {
+    *status = result;
+  }
+  while (!out.empty() && (out.back() == '\n' || out.back() == '\r')) {
+    out.pop_back();
+  }
+  return out;
+}
+
+/* ── external oracles ──────────────────────────────────────────── */
+
+/* A check against a reference tool or a fetched data set cannot run
+ * without it.  By default such a check is skipped with a message; with
+ * BAAC_REQUIRE_ORACLES set (to anything but 0) a missing oracle is a
+ * failure, so that a run that is meant to prove something cannot pass
+ * by proving nothing. */
+static bool oracles_required() {
+  const char* v = getenv("BAAC_REQUIRE_ORACLES");
+  return v && *v && strcmp(v, "0") != 0;
+}
+
+/* Reports a missing oracle as a skip or a failure and returns whether
+ * it is there. */
+static bool oracle_present(bool present, const char* what) {
+  if (present) {
+    return true;
+  }
+  if (oracles_required()) {
+    printf("FAIL: %s is missing and BAAC_REQUIRE_ORACLES is set\n", what);
+    g_failures++;
+  } else {
+    printf("SKIP: %s is missing\n", what);
+  }
+  return false;
 }
 
 /* ── a minimal MP4 file ────────────────────────────────────────── */

@@ -103,6 +103,20 @@ final class CreateTranscodeSessionHandlerLockTest extends TestCase
         self::assertSame([], $this->sleeps);
     }
 
+    public function testEndedSessionOfARunningExecutionIsNotHandedBack(): void
+    {
+        $ended = $this->snapshot('accepted');
+        $this->session->markCancelled();
+        $replacement = TranscodeSession::create($this->session->getUserId(), $this->job->getId(), $this->session->getVideoId(), $this->command->getAudioProfile());
+        $admitted = new TranscodeRuntimeSnapshot($this->job->getId(), $replacement->getId(), $this->command->requestId, $ended->desired, 2, 0, 2, 'accepted', null, null, true);
+        $this->ownership->method('find')->willReturnOnConsecutiveCalls($ended, $ended, $admitted);
+        $this->sessions->expects(self::once())->method('findByUuid')->with($this->session->getId())->willReturn($this->session);
+        $this->sessions->expects(self::once())->method('createSession')->willReturn($replacement);
+        $this->jobs->expects(self::once())->method('save');
+        $this->ownership->expects(self::once())->method('admit')->with($this->job->getId(), $replacement->getId(), $this->command->requestId, self::anything())->willReturn($admitted);
+        self::assertSame($replacement, ($this->handler)($this->command));
+    }
+
     public function testAnotherClientRuntimeIsNeverReused(): void
     {
         $accepted = $this->snapshot('accepted');

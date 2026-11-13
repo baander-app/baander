@@ -102,7 +102,7 @@ final class DnsServer
         $clients = [];
         /** @var list<array{stream:resource,peer:?string,packet:string,due:float}> $pending */
         $pending = [];
-        file_put_contents($readyFile, json_encode(['port' => $actualPort], JSON_THROW_ON_ERROR) . "\n");
+        ReadyFile::publish($readyFile, ['port' => $actualPort]);
         try {
             while (true) {
                 $signals->dispatch();

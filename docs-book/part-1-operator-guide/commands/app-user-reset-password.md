@@ -5,7 +5,7 @@ Set a new password for a user and sign them out of every session. Use it when a 
 ## Quick start
 
 Run from the installed-instance host shell with the `dc` function from
-[Getting started](../getting-started.md#command-context). Password files in these
+[Getting started](../getting-started/installation.md#command-context). Password files in these
 examples are protected files on that host. Use `-T` for redirected input.
 
 The command asks for the new password without echoing it:

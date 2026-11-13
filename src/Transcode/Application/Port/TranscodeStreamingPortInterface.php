@@ -11,10 +11,15 @@ use App\Transcode\Application\DTO\MediaTrack;
 interface TranscodeStreamingPortInterface
 {
     /**
+     * The renditions the client already has attached are a hint: an attached sibling stays in the
+     * signed set on a smaller published lead than one that still has to join. The hint is trusted
+     * only for the allowed jobs and only while it names their current generation.
+     *
      * @param list<string> $allowedJobPublicIds
+     * @param list<array{jobId: string, generation: int}> $attachedRenditions
      * @return array{jobId: string, generation: int, revision: int, ready: bool, position: float, status: string, startTime: ?float, duration: ?float, renditionSet: string}|null
      */
-    public function getPlaybackState(Uuid $videoId, array $allowedJobPublicIds): ?array;
+    public function getPlaybackState(Uuid $videoId, array $allowedJobPublicIds, array $attachedRenditions = []): ?array;
 
     /** @param list<array{jobId: string, generation: int}> $renditions */
     public function getMasterManifest(Uuid $videoId, array $renditions, int $expiresAt): string;

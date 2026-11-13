@@ -2,9 +2,9 @@
  *
  *   fuzz_seeds <tests/data> <out>
  *
- * creates <out>/decoder, <out>/asc, <out>/encoder, <out>/unidrc and
- * <out>/mps, each in its harness's input layout (see the harness
- * sources).  The seeds come from every committed stream under
+ * creates <out>/decoder, <out>/asc, <out>/encoder, <out>/unidrc,
+ * <out>/mps, <out>/flac_decoder and <out>/flac_encoder, each in its
+ * harness's input layout (see the harness sources).  The seeds come from every committed stream under
  * tests/data (its first frames, a truncated copy, its access units with
  * their configuration, its configuration on its own, the DRC
  * configuration and gain payloads of the USAC streams), from encoder
@@ -13,7 +13,16 @@
  * codeword, the HCR lengths, the ascLen of a StreamMuxConfig, the
  * element counts of a program config element, sampling frequencies
  * above 96 kHz, the extension lengths of an ELD and a surround
- * configuration, and configurations larger than any the codec writes. */
+ * configuration, and configurations larger than any the codec writes.
+ *
+ * The FLAC seeds come from the committed streams under tests/data/flac
+ * (whole, cut short, in small pieces, and as frames with their
+ * STREAMINFO out of band), from streams the library's encoder writes
+ * with tags and pictures, and from frames and metadata blocks built by
+ * hand at the format's bounds: the largest block, the highest partition
+ * order, a predictor of order 32, a side channel of 33 bits, a metadata
+ * block longer than the input, tag and picture blocks whose inner
+ * lengths lie, and ID3 tags around a stream. */
 #include <dirent.h>
 #include <sys/stat.h>
 
@@ -27,6 +36,8 @@
 #include "aac_tables.h"
 #include "asc.h"
 #include "bitstream.h"
+#include "flac.h"
+#include "flac_internal.h"
 #include "latm.h"
 #include "usac.h"
 
@@ -898,7 +909,502 @@ void unidrc_bound_seeds() {
   put("unidrc", "bound_gain_lengths_module.bin", cat({{0x03, 0x01, 0x01, 0x1f}, gains}));
 }
 
+/* ── FLAC ──────────────────────────────────────────────────────── */
+
+/* The option bytes of the FLAC decoder harness. */
+const uint8_t kFlacMd5 = 0x01;
+const uint8_t kFlacKeepTags = 0x02;
+const uint8_t kFlacSmallLimit = 0x04;
+const uint8_t kFlacOutOfBand = 0x08;
+const uint8_t kFlacChecksums = 0x10;
+
+Bytes flac_block(int type, const Bytes& body, bool last, uint32_t claimed = 0xFFFFFFFFu) {
+  const uint32_t length = claimed == 0xFFFFFFFFu ? (uint32_t)body.size() : claimed;
+  Bytes out = {(uint8_t)((last ? 0x80 : 0) | type), (uint8_t)(length >> 16), (uint8_t)(length >> 8),
+               (uint8_t)length};
+  out.insert(out.end(), body.begin(), body.end());
+  return out;
+}
+
+Bytes flac_streaminfo(int rate, int channels, int bits, int block, uint64_t total = 0) {
+  BaacFlacStreamInfo info = {};
+  info.min_block_size = block;
+  info.max_block_size = block;
+  info.sample_rate = rate;
+  info.channels = channels;
+  info.bits_per_sample = bits;
+  info.total_samples = total;
+  Bytes body(BAAC_FLAC_STREAMINFO_BYTES);
+  flac_streaminfo_write(&info, body.data());
+  return body;
+}
+
+/* The marker, STREAMINFO and `blocks`, the last of which closes the
+ * metadata. */
+Bytes flac_head(const Bytes& streaminfo, const std::vector<Bytes>& blocks = {}) {
+  Bytes out = {'f', 'L', 'a', 'C'};
+  const Bytes first = flac_block(FLAC_BLOCK_STREAMINFO, streaminfo, blocks.empty());
+  out.insert(out.end(), first.begin(), first.end());
+  for (size_t i = 0; i < blocks.size(); i++) {
+    Bytes block = blocks[i];
+    if (i + 1 == blocks.size()) {
+      block[0] |= 0x80;
+    }
+    out.insert(out.end(), block.begin(), block.end());
+  }
+  return out;
+}
+
+/* One frame: its header, the subframes `body` writes, the padding to a
+ * byte and the CRC-16. */
+template <typename Body>
+Bytes flac_frame(int block, int rate, int channels, int assignment, int bits, uint64_t number,
+                 Body body) {
+  FlacFrameHeader h = {};
+  h.variable_block_size = false;
+  h.block_size = block;
+  h.sample_rate = rate;
+  h.channels = channels;
+  h.assignment = assignment;
+  h.bits_per_sample = bits;
+  h.number = number;
+  Bytes out(FLAC_MAX_FRAME_HEADER_BYTES + (size_t)block * (size_t)channels * 9 + 4096);
+  const int header = flac_frame_header_write(&h, out.data());
+  if (header < 0) {
+    fprintf(stderr, "fuzz_seeds: a FLAC frame header that cannot be written\n");
+    exit(1);
+  }
+  FlacBitWriter w;
+  flac_bitwriter_init(&w, out.data() + header, out.size() - (size_t)header - 2);
+  body(&w);
+  const size_t size = (size_t)header + flac_bitwriter_flush(&w);
+  const uint16_t crc = flac_crc16(out.data(), size);
+  out[size] = (uint8_t)(crc >> 8);
+  out[size + 1] = (uint8_t)crc;
+  out.resize(size + 2);
+  return out;
+}
+
+/* Subframe headers: a zero bit, the type and the wasted-bits flag. */
+void flac_constant(FlacBitWriter* w, int64_t value, int bps) {
+  flac_bitwriter_write(w, 0x00, 8);
+  flac_bitwriter_write_signed(w, value, bps);
+}
+
+/* A fixed predictor of order 0 whose residual is all zeros, in
+ * 2^partition_order partitions of Rice parameter 0. */
+void flac_zero_residual(FlacBitWriter* w, int block, int partition_order) {
+  flac_bitwriter_write(w, 8 << 1, 8);
+  flac_bitwriter_write(w, 0, 2);
+  flac_bitwriter_write(w, (uint32_t)partition_order, 4);
+  const int parts = 1 << partition_order;
+  for (int p = 0; p < parts; p++) {
+    flac_bitwriter_write(w, 0, 4);
+    for (int i = 0; i < block / parts; i++) {
+      flac_bitwriter_write(w, 1, 1);
+    }
+  }
+}
+
+/* A linear predictor of order 32 with the widest coefficients, on warm-up
+ * samples at the ends of the range, and a small residual. */
+void flac_order_32(FlacBitWriter* w, int block, int bps) {
+  const int order = 32;
+  flac_bitwriter_write(w, (uint32_t)(31 + order) << 1, 8);
+  for (int i = 0; i < order; i++) {
+    const int64_t top = (int64_t)1 << (bps - 1);
+    flac_bitwriter_write_signed(w, (i & 1) ? top - 1 : -top, bps);
+  }
+  flac_bitwriter_write(w, 14, 4); /* a precision of 15 bits */
+  flac_bitwriter_write(w, 14, 5);
+  for (int i = 0; i < order; i++) {
+    flac_bitwriter_write_signed(w, (i & 1) ? 16383 : -16384, 15);
+  }
+  flac_bitwriter_write(w, 0, 2);
+  flac_bitwriter_write(w, 0, 4);
+  flac_bitwriter_write(w, 3, 4);
+  for (int i = order; i < block; i++) {
+    flac_bitwriter_write(w, 0x8 | (uint32_t)(i & 7), 4); /* quotient 0, three low bits */
+  }
+}
+
+Bytes le32_bytes(uint32_t v) {
+  return {(uint8_t)v, (uint8_t)(v >> 8), (uint8_t)(v >> 16), (uint8_t)(v >> 24)};
+}
+Bytes be32_bytes(uint32_t v) {
+  return {(uint8_t)(v >> 24), (uint8_t)(v >> 16), (uint8_t)(v >> 8), (uint8_t)v};
+}
+Bytes text_bytes(const char* s) { return Bytes(s, s + strlen(s)); }
+
+/* A tag block and a picture block, each with one inner length to
+ * choose. */
+Bytes flac_tags(uint32_t vendor_length, uint32_t count, uint32_t field_length) {
+  return cat({le32_bytes(vendor_length), text_bytes("seed"), le32_bytes(count),
+              le32_bytes(field_length), text_bytes("TITLE=A seed"), le32_bytes(4),
+              text_bytes("A=b")});
+}
+Bytes flac_picture(uint32_t mime_length, uint32_t description_length, uint32_t data_length) {
+  return cat({be32_bytes(3), be32_bytes(mime_length), text_bytes("image/png"),
+              be32_bytes(description_length), text_bytes("cover"), be32_bytes(32), be32_bytes(32),
+              be32_bytes(24), be32_bytes(0), be32_bytes(data_length), Bytes(64, 0x89)});
+}
+
+/* Encodes `frames` samples per channel of a generated signal with the
+ * library, tags and pictures included, and returns the stream with its
+ * final header. */
+Bytes flac_encoded(int rate, int channels, int bits, int level, int frames, bool tagged) {
+  BaacFlacEncoder* enc = baac_flac_encoder_create(rate, channels, bits, level, nullptr);
+  if (!enc) {
+    fprintf(stderr, "fuzz_seeds: no FLAC encoder for %d Hz, %d channels, %d bits\n", rate, channels,
+            bits);
+    exit(1);
+  }
+  BaacFlacEncoderOptions options;
+  baac_flac_encoder_options_init(&options);
+  options.seek_table = 1;
+  options.total_samples_hint = (uint64_t)frames;
+  options.padding_bytes = tagged ? 16 : 0;
+  const BaacFlacComment comments[3] = {{"TITLE=A seed", 12}, {"GENRE=x", 7}, {"GENRE=y", 7}};
+  const Bytes cover(300, 0x42);
+  BaacFlacPicture picture = {};
+  picture.type = 3;
+  picture.mime_type = "image/jpeg";
+  picture.description = "cover";
+  picture.data = cover.data();
+  picture.data_bytes = (uint32_t)cover.size();
+  if (tagged) {
+    options.comments = comments;
+    options.comment_count = 3;
+    options.pictures = &picture;
+    options.picture_count = 1;
+  }
+  baac_flac_encoder_set_options(enc, &options);
+  std::vector<int32_t> pcm((size_t)frames * (size_t)channels);
+  const double peak = 0.6 * (double)((1ll << (bits - 1)) - 1);
+  unsigned seed = 7;
+  for (int i = 0; i < frames; i++) {
+    for (int c = 0; c < channels; c++) {
+      seed = seed * 1664525u + 1013904223u;
+      const double v =
+          sin(i * (0.03 + 0.01 * c)) * 0.9 + ((double)(seed >> 8) / 8388608.0 - 1.0) * 0.05;
+      pcm[(size_t)i * (size_t)channels + (size_t)c] = (int32_t)llround(v * peak);
+    }
+  }
+  Bytes stream((size_t)baac_flac_encoder_header_bytes(enc));
+  const int header = (int)stream.size();
+  baac_flac_encoder_write_header(enc, stream.data(), header);
+  Bytes out((size_t)baac_flac_encoder_max_output_bytes(enc, frames + 4096));
+  int n = baac_flac_encoder_encode(enc, pcm.data(), frames, out.data(), (int)out.size());
+  stream.insert(stream.end(), out.begin(), out.begin() + std::max(n, 0));
+  n = baac_flac_encoder_finish(enc, out.data(), (int)out.size());
+  stream.insert(stream.end(), out.begin(), out.begin() + std::max(n, 0));
+  baac_flac_encoder_final_header(enc, stream.data(), header);
+  baac_flac_encoder_destroy(enc);
+  return stream;
+}
+
+/* Where the frames of a stream begin: behind the marker and the blocks. */
+size_t flac_frames_at(const Bytes& s) {
+  size_t pos = 4;
+  while (pos + 4 <= s.size()) {
+    const bool last = (s[pos] & 0x80) != 0;
+    pos += 4 + ((size_t)s[pos + 1] << 16 | (size_t)s[pos + 2] << 8 | s[pos + 3]);
+    if (last) {
+      break;
+    }
+  }
+  return std::min(pos, s.size());
+}
+
+void flac_decoder_seeds(const std::string& data) {
+  const char* h = "flac_decoder";
+  const uint8_t checked = kFlacMd5 | kFlacKeepTags | kFlacChecksums;
+  /* The committed streams. */
+  std::vector<std::string> names;
+  if (DIR* d = opendir((data + "/flac").c_str())) {
+    while (dirent* e = readdir(d)) {
+      const std::string n = e->d_name;
+      if (n.size() > 5 && n.compare(n.size() - 5, 5, ".flac") == 0) {
+        names.push_back(n);
+      }
+    }
+    closedir(d);
+  }
+  std::sort(names.begin(), names.end());
+  for (const std::string& n : names) {
+    const Bytes s = read_file(data + "/flac/" + n);
+    const std::string base = n.substr(0, n.size() - 5);
+    const Bytes head = slice(s, 0, 9000);
+    put(h, base + "_whole.bin", cat({{checked, 0x07}, head}));
+    put(h, base + "_pieces.bin", cat({{kFlacKeepTags, 0x02}, slice(s, 0, 3000)}));
+    put(h, base + "_cut.bin", cat({{checked, 0x05}, slice(head, 0, head.size() * 2 / 3)}));
+    const size_t frames = flac_frames_at(s);
+    if (s.size() > frames && frames >= 42) {
+      put(h, base + "_frames.bin",
+          cat({{(uint8_t)(kFlacOutOfBand | kFlacChecksums | kFlacMd5), 0x04},
+               slice(s, 8, 8 + BAAC_FLAC_STREAMINFO_BYTES),
+               slice(s, frames, frames + 6000)}));
+    }
+  }
+  /* The library's own streams, with tags and a picture. */
+  for (int level : {0, 5, 8}) {
+    const Bytes s = flac_encoded(44100, 2, 16, level, 9000, true);
+    put(h, "enc_tagged_l" + std::to_string(level) + ".bin", cat({{checked, 0x05}, s}));
+    put(h, "enc_tagged_small_limit_l" + std::to_string(level) + ".bin",
+        cat({{(uint8_t)(kFlacKeepTags | kFlacSmallLimit | kFlacChecksums), 0x03}, s}));
+  }
+  put(h, "enc_32_bits.bin", cat({{checked, 0x06}, flac_encoded(96000, 2, 32, 5, 5000, false)}));
+  put(h, "enc_8_channels.bin", cat({{checked, 0x06}, flac_encoded(48000, 8, 24, 8, 4500, false)}));
+
+  /* The largest block there is: 65535 samples of eight channels at 32
+   * bits, in constant subframes: 50 bytes for two megabytes of samples. */
+  {
+    const Bytes frame =
+        flac_frame(65535, 0, 8, FLAC_ASSIGN_INDEPENDENT, 32, 0, [](FlacBitWriter* w) {
+          for (int c = 0; c < 8; c++) {
+            flac_constant(w, (c & 1) ? INT32_MIN : INT32_MAX, 32);
+          }
+        });
+    const Bytes info = flac_streaminfo(1048575, 8, 32, 65535);
+    put(h, "bound_largest_block.bin", cat({{checked, 0x07}, flac_head(info), frame, frame}));
+    put(h, "bound_largest_block_small_buffer.bin", cat({{checked, 0x0F}, flac_head(info), frame}));
+    /* The same frame against a STREAMINFO that allows less. */
+    put(h, "bound_block_past_streaminfo.bin",
+        cat({{checked, 0x07}, flac_head(flac_streaminfo(48000, 8, 32, 4096)), frame}));
+  }
+  /* Sync codes with headers that hold and claim the largest frame, one
+   * every nine or eleven bytes and none of them a frame: the search for
+   * a frame has to pass them without reading each to its end. */
+  for (int period : {9, 11}) {
+    uint8_t pattern[11] = {0xFF, 0xF8, 0x7A, 0x7E, 0x00, 0xFF, 0xFE, 0x00, 0x02, 0x00, 0x00};
+    pattern[7] = flac_crc8(pattern, 7);
+    Bytes crafted;
+    for (int i = 0; i < 9000; i++) {
+      crafted.push_back(pattern[i % period]);
+    }
+    put(h, "search_false_headers_" + std::to_string(period) + ".bin",
+        cat({{checked, 0x07}, flac_head(flac_streaminfo(48000, 8, 32, 65535)), crafted}));
+  }
+  /* A stream without STREAMINFO: a header that holds and leaves its bit
+   * depth to one, with no frame behind it, and then real frames. */
+  {
+    Bytes false_header;
+    for (uint8_t b : {0xFF, 0xF8, 0x19, 0x10, 0x00}) {
+      false_header.push_back(b);
+    }
+    false_header.push_back(flac_crc8(false_header.data(), false_header.size()));
+    false_header.insert(false_header.end(), 64, 0x00);
+    const Bytes s = flac_encoded(44100, 2, 16, 5, 6000, false);
+    const size_t frames = flac_frames_at(s);
+    put(h, "search_depth_left_to_streaminfo.bin",
+        cat({{kFlacChecksums, 0x05}, false_header, slice(s, frames, frames + 6000)}));
+  }
+  /* The highest partition order: 32768 partitions of one sample. */
+  {
+    const Bytes frame = flac_frame(32768, 44100, 1, FLAC_ASSIGN_INDEPENDENT, 16, 0,
+                                   [](FlacBitWriter* w) { flac_zero_residual(w, 32768, 15); });
+    put(h, "bound_partition_order_15.bin",
+        cat({{checked, 0x07}, flac_head(flac_streaminfo(44100, 1, 16, 32768)), frame}));
+    /* An order the block size does not divide into. */
+    const Bytes odd = flac_frame(4097, 44100, 1, FLAC_ASSIGN_INDEPENDENT, 16, 0,
+                                 [](FlacBitWriter* w) { flac_zero_residual(w, 4096, 12); });
+    put(h, "bound_partition_order_odd_block.bin",
+        cat({{checked, 0x07}, flac_head(flac_streaminfo(44100, 1, 16, 4097)), odd}));
+  }
+  /* A predictor of order 32 with the widest coefficients: at 16 bits
+   * and, beyond a 32-bit sum, at 32. */
+  for (int bits : {16, 32}) {
+    const Bytes frame =
+        flac_frame(256, 0, 2, FLAC_ASSIGN_INDEPENDENT, bits, 0, [bits](FlacBitWriter* w) {
+          flac_order_32(w, 256, bits);
+          flac_order_32(w, 256, bits);
+        });
+    put(h, "bound_order_32_" + std::to_string(bits) + "_bits.bin",
+        cat({{checked, 0x06}, flac_head(flac_streaminfo(96000, 2, bits, 256)), frame}));
+  }
+  /* A side channel of 33 bits at both ends of its range, in each of the
+   * three stereo forms. */
+  for (int assignment : {FLAC_ASSIGN_LEFT_SIDE, FLAC_ASSIGN_SIDE_RIGHT, FLAC_ASSIGN_MID_SIDE}) {
+    const Bytes frame = flac_frame(4096, 0, 2, assignment, 32, 0, [assignment](FlacBitWriter* w) {
+      const int64_t side = assignment == FLAC_ASSIGN_MID_SIDE ? -4294967295ll : 4294967295ll;
+      if (assignment == FLAC_ASSIGN_SIDE_RIGHT) {
+        flac_constant(w, side, 33);
+        flac_constant(w, INT32_MIN, 32);
+      } else {
+        flac_constant(w, assignment == FLAC_ASSIGN_MID_SIDE ? -1 : INT32_MAX, 32);
+        flac_constant(w, side, 33);
+      }
+    });
+    put(h, "bound_side_33_bits_" + std::to_string(assignment) + ".bin",
+        cat({{checked, 0x06}, flac_head(flac_streaminfo(192000, 2, 32, 4096)), frame}));
+  }
+  /* Metadata: a block longer than the input, and tag and picture
+   * blocks whose inner lengths and counts reach past them, with the
+   * decoder keeping tags and without. */
+  const Bytes info = flac_streaminfo(44100, 2, 16, 1152);
+  const Bytes plain = flac_encoded(44100, 2, 16, 3, 3000, false);
+  const Bytes frames = slice(plain, flac_frames_at(plain), plain.size());
+  put(h, "bound_block_past_input.bin",
+      cat({{checked, 0x05},
+           flac_head(info, {flac_block(FLAC_BLOCK_PICTURE, Bytes(200, 1), true, 0xFFFFFF)})}));
+  put(h, "bound_padding_past_input.bin",
+      cat({{checked, 0x05},
+           flac_head(info, {flac_block(FLAC_BLOCK_PADDING, Bytes(10, 0), true, 0x800000)}),
+           frames}));
+  struct Lie {
+    const char* name;
+    int type;
+    Bytes body;
+  };
+  const Lie lies[] = {
+      {"tags_vendor", FLAC_BLOCK_VORBIS_COMMENT, flac_tags(0xFFFFFFFFu, 2, 12)},
+      {"tags_vendor_past_block", FLAC_BLOCK_VORBIS_COMMENT, flac_tags(4000, 2, 12)},
+      {"tags_count", FLAC_BLOCK_VORBIS_COMMENT, flac_tags(4, 0xFFFFFFFFu, 12)},
+      {"tags_count_one_more", FLAC_BLOCK_VORBIS_COMMENT, flac_tags(4, 3, 12)},
+      {"tags_field", FLAC_BLOCK_VORBIS_COMMENT, flac_tags(4, 2, 0x00FFFFFFu)},
+      {"tags_sound", FLAC_BLOCK_VORBIS_COMMENT, flac_tags(4, 2, 12)},
+      {"picture_mime", FLAC_BLOCK_PICTURE, flac_picture(0xFFFFFFFFu, 5, 64)},
+      {"picture_description", FLAC_BLOCK_PICTURE, flac_picture(9, 0x7FFFFFFFu, 64)},
+      {"picture_data", FLAC_BLOCK_PICTURE, flac_picture(9, 5, 0x00FFFFFFu)},
+      {"picture_data_short", FLAC_BLOCK_PICTURE, flac_picture(9, 5, 3)},
+      {"picture_sound", FLAC_BLOCK_PICTURE, flac_picture(9, 5, 64)},
+  };
+  for (const Lie& lie : lies) {
+    const Bytes stream = cat({flac_head(info, {flac_block(lie.type, lie.body, false),
+                                               flac_block(FLAC_BLOCK_PADDING, Bytes(8, 0), true)}),
+                              frames});
+    put(h, std::string("bound_") + lie.name + ".bin", cat({{checked, 0x05}, stream}));
+    put(h, std::string("bound_") + lie.name + "_bytewise.bin",
+        cat({{(uint8_t)(kFlacKeepTags | kFlacSmallLimit), 0x00}, stream}));
+    put(h, std::string("bound_") + lie.name + "_skipped.bin",
+        cat({{kFlacChecksums, 0x05}, stream}));
+  }
+  /* ID3 tags around a stream, and a stream without its marker. */
+  const Bytes id3v2 = cat({{'I', 'D', '3', 4, 0, 0, 0, 0, 0x02, 0x00}, Bytes(256, 0xFF)});
+  Bytes id3v1(128, 0);
+  memcpy(id3v1.data(), "TAG", 3);
+  put(h, "id3v2_front.bin", cat({{checked, 0x05}, id3v2, plain}));
+  put(h, "id3v1_behind.bin", cat({{checked, 0x04}, plain, id3v1}));
+  put(h, "id3v2_length_past_input.bin",
+      cat({{checked, 0x05}, {'I', 'D', '3', 4, 0, 0x10, 0x7F, 0x7F, 0x7F, 0x7F}, plain}));
+  put(h, "frames_only.bin", cat({{checked, 0x05}, frames}));
+  put(h, "seek_reset.bin", cat({{(uint8_t)(checked | 0x20), 0x05}, plain}));
+  put(h, "two_passes.bin", cat({{(uint8_t)(checked | 0x40), 0x03}, plain}));
+  put(h, "no_end_of_input.bin", cat({{(uint8_t)(checked | 0x80), 0x04}, plain}));
+}
+
+void flac_encoder_seeds() {
+  const char* h = "flac_encoder";
+  struct Case {
+    const char* name;
+    uint8_t level, channels, bits, rate, flags, shape;
+    int frames;
+  };
+  /* bits: 0 8, 1 12, 2 16, 3 20, 4 24, 5 32; rate: an index into the
+   * harness's table. */
+  const Case cases[] = {
+      {"l0_stereo_16", 0, 2, 2, 0, 0x13, 0x07, 3000},
+      {"l1_stereo_16", 1, 2, 2, 0, 0x10, 0x04, 3000},
+      {"l2_stereo_24", 2, 2, 4, 1, 0x13, 0x05, 3000},
+      {"l3_mono_8", 3, 1, 0, 4, 0x13, 0x02, 5000},
+      {"l4_stereo_12", 4, 2, 1, 5, 0x10, 0x06, 9000},
+      {"l5_stereo_16", 5, 2, 2, 0, 0x13, 0x05, 9000},
+      {"l6_stereo_20", 6, 2, 3, 2, 0x1B, 0x05, 9000},
+      {"l7_6ch_24", 7, 6, 4, 1, 0x13, 0x06, 5000},
+      {"l8_stereo_32", 8, 2, 5, 3, 0x13, 0x05, 9000},
+      {"l8_8ch_16", 8, 8, 2, 1, 0x13, 0x07, 4500},
+      {"l5_wasted_bits", 5, 2, 4, 1, 0x13, 0x1D, 5000},
+      {"l5_same_channels", 5, 2, 2, 0, 0x13, 0x45, 5000},
+      {"l8_constant", 8, 2, 2, 0, 0x13, 0x85, 5000},
+      {"l5_piped", 5, 2, 2, 0, 0x00, 0x05, 5000},
+      {"l5_hint_too_small", 5, 2, 2, 0, 0x17, 0x05, 9000},
+      {"l5_two_streams", 5, 2, 2, 0, 0x53, 0x03, 2000},
+      {"l5_bytewise_decode", 5, 2, 2, 0, 0x33, 0x00, 1500},
+      {"l5_rate_655350", 5, 1, 2, 6, 0x13, 0x05, 3000},
+      {"l5_rate_1", 5, 1, 2, 7, 0x13, 0x05, 3000},
+      {"level_9", 9, 2, 2, 0, 0x13, 0x05, 100},
+      {"nine_channels", 5, 9, 2, 0, 0x13, 0x05, 100},
+      {"seventeen_bits", 5, 2, 6, 0, 0x13, 0x05, 100},
+      {"rate_700000", 5, 2, 2, 10, 0x13, 0x05, 100},
+      {"empty_input", 5, 2, 2, 0, 0x13, 0x05, 0},
+      {"one_sample", 8, 2, 2, 0, 0x13, 0x05, 1},
+  };
+  static const int kWidth[8] = {1, 2, 2, 3, 3, 4, 3, 1};
+  for (const Case& c : cases) {
+    Bytes in;
+    for (uint8_t option : {c.level, c.channels, c.bits, c.rate, c.flags, c.shape}) {
+      in.push_back(option);
+    }
+    in.push_back(0); /* no tags */
+    in.push_back(0); /* no pictures */
+    unsigned seed = 3;
+    for (int i = 0; i < c.frames * c.channels; i++) {
+      seed = seed * 1664525u + 1013904223u;
+      const double v = sin(i * 0.011) * 0.7 + ((double)(seed >> 8) / 8388608.0 - 1.0) * 0.1;
+      const int32_t s = (int32_t)llround(v * 2147483000.0) >> (32 - 8 * kWidth[c.bits & 7]);
+      for (int b = 0; b < kWidth[c.bits & 7]; b++) {
+        in.push_back((uint8_t)((uint32_t)s >> (8 * b)));
+      }
+    }
+    put(h, std::string(c.name) + ".bin", in);
+  }
+  /* Tags and pictures: sound ones, and each kind the format refuses. */
+  struct Tagged {
+    const char* name;
+    std::vector<std::string> tags;
+    uint8_t picture_type;
+    const char* mime;
+    const char* description;
+    int pictures;
+  };
+  const Tagged tagged[] = {
+      {"sound", {"TITLE=A seed", "GENRE=x", "GENRE=y"}, 3, "image/jpeg", "cover", 1},
+      {"two_pictures", {"A=b"}, 4, "image/png", "", 2},
+      {"no_equals", {"TITLE"}, 3, "image/jpeg", "", 0},
+      {"empty_name", {"=x"}, 3, "image/jpeg", "", 0},
+      {"name_not_ascii", {"T\xC3\xA4G=x"}, 3, "image/jpeg", "", 0},
+      {"value_not_utf8", {"A=\xFF\xFE"}, 3, "image/jpeg", "", 0},
+      {"value_utf8", {"A=\xE2\x99\xAB \xF0\x9F\x8E\xBB"}, 3, "image/jpeg", "", 0},
+      {"picture_type_21", {}, 21, "image/jpeg", "", 1},
+      {"two_icons", {}, 1, "image/png", "", 2},
+      {"mime_not_ascii", {}, 3, "image/\xC3\xA9", "", 1},
+      {"description_not_utf8", {}, 3, "image/png", "\xC3", 1},
+  };
+  for (const Tagged& t : tagged) {
+    Bytes in;
+    for (int option : {5, 2, 2, 0, 0x93, 0x05}) {
+      in.push_back((uint8_t)option);
+    }
+    in.push_back((uint8_t)t.tags.size());
+    for (const std::string& tag : t.tags) {
+      in.push_back((uint8_t)tag.size());
+      in.insert(in.end(), tag.begin(), tag.end());
+    }
+    in.push_back((uint8_t)t.pictures);
+    for (int i = 0; i < t.pictures; i++) {
+      in.push_back(t.picture_type);
+      in.push_back((uint8_t)strlen(t.mime));
+      in.insert(in.end(), t.mime, t.mime + strlen(t.mime));
+      in.push_back((uint8_t)strlen(t.description));
+      in.insert(in.end(), t.description, t.description + strlen(t.description));
+      in.push_back(0);
+      in.push_back(40);
+      in.insert(in.end(), 40, (uint8_t)(0x30 + i));
+    }
+    for (int i = 0; i < 2500 * 2; i++) {
+      const int32_t s = (int32_t)llround(sin(i * 0.02) * 20000.0);
+      in.push_back((uint8_t)s);
+      in.push_back((uint8_t)(s >> 8));
+    }
+    put(h, std::string("tags_") + t.name + ".bin", in);
+  }
+}
+
 }  // namespace
+
+/* The corpus directory of each harness. */
+static const char* const kHarnesses[] = {"decoder", "asc",          "encoder",     "unidrc",
+                                         "mps",     "flac_decoder", "flac_encoder"};
 
 int main(int argc, char** argv) {
   if (argc != 3) {
@@ -908,7 +1414,7 @@ int main(int argc, char** argv) {
   const std::string data = argv[1];
   g_out = argv[2];
   mkdir(g_out.c_str(), 0755);
-  for (const char* h : {"decoder", "asc", "encoder", "unidrc", "mps"}) {
+  for (const char* h : kHarnesses) {
     mkdir((g_out + "/" + h).c_str(), 0755);
   }
   DIR* d = opendir(data.c_str());
@@ -949,10 +1455,12 @@ int main(int argc, char** argv) {
   usac_extension_seeds();
   adts_variant_seeds(first_lc_au);
   unidrc_bound_seeds();
+  flac_decoder_seeds(data);
+  flac_encoder_seeds();
   /* Empty and minimal inputs, so that the mutator starts from the
    * option bytes alone as well, and the reproducers of past findings
    * (tests/data/fuzz/<harness>/), so that every run replays them. */
-  for (const char* h : {"decoder", "asc", "encoder", "unidrc", "mps"}) {
+  for (const char* h : kHarnesses) {
     if (DIR* past = opendir((data + "/fuzz/" + h).c_str())) {
       std::vector<std::string> found;
       while (dirent* e = readdir(past)) {

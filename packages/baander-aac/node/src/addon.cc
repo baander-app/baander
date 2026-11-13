@@ -1,5 +1,6 @@
 /* Node-API binding for baander-aac: streaming decoder and PCM encoder
  * objects over the public C API, and the loudness meter as a function.
+ * (The classes of the lossless mode are in flac_addon.cc.)
  * PCM is interleaved 32-bit float at full scale 1.0; AAC data is an ADTS
  * or LOAS stream, LATM elements or raw access units.  Both classes accept
  * input in arbitrary chunk sizes and keep partial frames between calls. */
@@ -12,53 +13,9 @@
 #include <vector>
 
 #include "aac.h"
+#include "addon_common.h"
 
 namespace {
-
-Napi::Value throw_error(const Napi::Env& env, const std::string& message) {
-  Napi::Error::New(env, message).ThrowAsJavaScriptException();
-  return env.Undefined();
-}
-
-const char* error_name(int code) {
-  switch (code) {
-    case AAC_ERR_INVALID_ARG:
-      return "invalid argument";
-    case AAC_ERR_MEMORY:
-      return "out of memory";
-    case AAC_ERR_INIT:
-      return "initialization failed";
-    case AAC_ERR_ENCODE:
-      return "encoding failed";
-    case AAC_ERR_DECODE:
-      return "decoding failed";
-    case AAC_ERR_UNSUPPORTED:
-      return "unsupported stream";
-    case AAC_ERR_OVERFLOW:
-      return "buffer too small";
-    case AAC_ERR_STATE:
-      return "invalid state";
-    default:
-      return "unknown error";
-  }
-}
-
-/* Bytes of a Buffer, Uint8Array or ArrayBuffer argument. */
-bool bytes_of(const Napi::Value& v, const uint8_t** data, size_t* size) {
-  if (v.IsArrayBuffer()) {
-    Napi::ArrayBuffer ab = v.As<Napi::ArrayBuffer>();
-    *data = static_cast<const uint8_t*>(ab.Data());
-    *size = ab.ByteLength();
-    return true;
-  }
-  if (v.IsTypedArray()) {
-    Napi::TypedArray ta = v.As<Napi::TypedArray>();
-    *data = static_cast<const uint8_t*>(ta.ArrayBuffer().Data()) + ta.ByteOffset();
-    *size = ta.ByteLength();
-    return true;
-  }
-  return false;
-}
 
 /* Whether the option is given (present and not undefined). */
 bool option_given(const Napi::Object& o, const char* key) {
@@ -76,40 +33,11 @@ int option_int(const Napi::Object& o, const char* key, int fallback) {
   return o.Get(key).ToNumber().Int32Value();
 }
 
-/* An integer option that, when given, has to be a number: a boolean or an
- * object is refused with the option's name (`what`, as the message names
- * it) instead of being read as 0 or 1, and so is a number outside the
- * 32-bit range.  `*out` keeps its value when the
- * option is absent.  Returns false after throwing. */
-bool option_number(const Napi::Env& env, const Napi::Object& o, const char* key, const char* what,
-                   int* out) {
-  if (!o.Has(key) || o.Get(key).IsUndefined()) {
-    return true;
-  }
-  const Napi::Value v = o.Get(key);
-  /* a value outside the 32-bit range is refused rather than wrapped, so
-   * that 2^32 cannot turn into 0 (an option's "off") */
-  const double d = v.IsNumber() ? v.As<Napi::Number>().DoubleValue() : 0.0;
-  if (!v.IsNumber() || !(d >= -2147483648.0 && d <= 2147483647.0)) {
-    throw_error(env, std::string(what) + " must be a number in the 32-bit integer range");
-    return false;
-  }
-  *out = static_cast<int32_t>(d);
-  return true;
-}
-
 std::string option_string(const Napi::Object& o, const char* key, const char* fallback) {
   if (!o.Has(key) || !o.Get(key).IsString()) {
     return fallback;
   }
   return o.Get(key).As<Napi::String>();
-}
-
-bool option_bool(const Napi::Object& o, const char* key, bool fallback) {
-  if (!o.Has(key) || o.Get(key).IsUndefined()) {
-    return fallback;
-  }
-  return o.Get(key).ToBoolean().Value();
 }
 
 /* Transport names shared by both classes; "detect" is the decoder's only. */
@@ -1142,7 +1070,8 @@ Napi::Object InitModule(Napi::Env env, Napi::Object exports) {
   exports.Set("AacDecoder", Decoder::Init(env));
   exports.Set("AacEncoder", Encoder::Init(env));
   exports.Set("measureLoudness", Napi::Function::New(env, MeasureLoudness));
-  exports.Set("version", Napi::String::New(env, "0.1.0"));
+  InitFlac(env, exports);
+  exports.Set("version", Napi::String::New(env, "0.2.0"));
   return exports;
 }
 

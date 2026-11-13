@@ -157,29 +157,28 @@ int lookup_decode(const HuffLookup* t, const HuffTree* tree, AacBitReader* r) {
   return tree_decode(tree, r);
 }
 
-struct TreeInit {
-  TreeInit() {
-    aac_tables_init();
-    for (int cb = 1; cb <= AAC_NUM_CODEBOOKS; cb++) {
-      tree_build(&g_spec_trees[cb], aac_huff_code[cb], nullptr, aac_huff_len[cb],
+}  // namespace
+
+/* Builds the decoding trees and lookup tables of every codebook from
+ * the code tables.  Called once, by aac_tables_init. */
+void aac_huffman_trees_build(void) {
+  for (int cb = 1; cb <= AAC_NUM_CODEBOOKS; cb++) {
+    tree_build(&g_spec_trees[cb], aac_huff_code[cb], nullptr, aac_huff_len[cb], aac_huff_count[cb]);
+    lookup_build(&g_spec_lookup[cb], aac_huff_code[cb], nullptr, aac_huff_len[cb],
                  aac_huff_count[cb]);
-      lookup_build(&g_spec_lookup[cb], aac_huff_code[cb], nullptr, aac_huff_len[cb],
-                   aac_huff_count[cb]);
-      const AacCodebookInfo* info = &aac_codebook_info[cb];
-      const int mod = info->is_unsigned ? info->max_val + 1 : 2 * info->max_val + 1;
-      for (int idx = 0; idx < aac_huff_count[cb]; idx++) {
-        int t = idx;
-        for (int k = info->dim - 1; k >= 0; k--) {
-          g_spec_values[cb][idx][k] = (int8_t)(t % mod - (info->is_unsigned ? 0 : info->max_val));
-          t /= mod;
-        }
+    const AacCodebookInfo* info = &aac_codebook_info[cb];
+    const int mod = info->is_unsigned ? info->max_val + 1 : 2 * info->max_val + 1;
+    for (int idx = 0; idx < aac_huff_count[cb]; idx++) {
+      int t = idx;
+      for (int k = info->dim - 1; k >= 0; k--) {
+        g_spec_values[cb][idx][k] = (int8_t)(t % mod - (info->is_unsigned ? 0 : info->max_val));
+        t /= mod;
       }
     }
-    tree_build(&g_sf_tree, nullptr, aac_scalefactor_code, aac_scalefactor_bits, 121);
-    lookup_build(&g_sf_lookup, nullptr, aac_scalefactor_code, aac_scalefactor_bits, 121);
   }
-} g_tree_init;  // NOLINT(bugprone-throwing-static-initialization)
-}  // namespace
+  tree_build(&g_sf_tree, nullptr, aac_scalefactor_code, aac_scalefactor_bits, 121);
+  lookup_build(&g_sf_lookup, nullptr, aac_scalefactor_code, aac_scalefactor_bits, 121);
+}
 
 int aac_bitreader_read_huffman(AacBitReader* r, int cb, int* out) {
   if (cb < 1 || cb > AAC_NUM_CODEBOOKS) {

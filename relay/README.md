@@ -1,6 +1,6 @@
 # Baander registry
 
-Operators can start with the book's [Registry chapter](../docs-book/part-1-operator-guide/registry.md)
+Operators can start with the book's [Registry chapter](../docs-book/part-1-operator-guide/administration/registry.md)
 for component roles, readiness, maintenance and recovery. This page retains the
 service contract, deployment inventory and qualification evidence.
 
@@ -14,7 +14,7 @@ infrastructure and deployment remain separate acceptance gates. The opt-in
 [encrypted backup worker](backup/README.md) stores historical snapshots in
 S3-compatible storage; real-destination recovery qualification remains open.
 
-The [registry threat model](../docs-book/part-2-developer-guide/registry-threat-model.md)
+The [registry threat model](../docs-book/part-2-developer-guide/architecture/registry-threat-model.md)
 describes credential ownership, replay limits, parser and transport boundaries, and
 the distinction between local contract evidence and deployment qualification.
 
@@ -297,7 +297,7 @@ manual recovery. This worker adds resource limits beyond the API/voter budget.
 The [nightly workflow](../.github/workflows/registry-nightly.yaml) runs at 02:17 UTC
 (`17 2 * * *`) and supports manual dispatch through the same job. Forgejo and GitHub
 both run it from the shared workflow tree described in
-[Continuous Integration](../docs-book/part-2-developer-guide/continuous-integration.md).
+[Continuous Integration](../docs-book/part-2-developer-guide/contributing/continuous-integration.md).
 It runs the existing `fuzz` recipe with five voters for both partition/failover and
 isolated binary restore, then the parser fuzzer and its ASan negative control. The
 job has a 45-minute timeout on both forges. Each forge activates schedules from its

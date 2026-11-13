@@ -297,3 +297,135 @@ Each decode aligned to the source; SNR of every decoder's output against our dec
 | xhe-fdk-cbr64 | libxaac | 10/10 | 19.2 | 65.4 |
 | xhe-ours-cbr96 | fdk | 10/10 | 62.0 | 71.3 |
 | xhe-ours-cbr96 | libxaac | 10/10 | 31.6 | 64.6 |
+
+## Lossless (generated)
+
+Run of 2026-11-12T19:33:58+01:00 on AMD Ryzen 7 5800X3D 8-Core Processor (core 15, c++ (SUSE Linux) 16.2.1 20260929). The rest of the host used 0.82 CPUs on average during the run and 0.49 in the minute before it (load average 0.76 at the start and 1.76 at the end). bAAC 50568561c, flac 1.4.3, ffmpeg version 8.1.3; refalac carried from 2026-10-30. The corpus is 130.3 s; timed runs repeat it 36 times in one process pinned with `taskset -c 15`, 5 repeats with the reference and bAAC alternated.
+
+| Codec | kbit/s | Frame bytes | Enc × realtime | Dec × realtime | Bit-exact |
+|---|--:|--:|--:|--:|---|
+| baac-0 | 690.49 | 11247512 | 1847 | 1408 | True |
+| baac-1 | 685.79 | 11171070 | 1455 | 1394 | True |
+| baac-2 | 685.77 | 11170675 | 1454 | 1394 | True |
+| baac-3 | 641.59 | 10450934 | 1424 | 1192 | True |
+| baac-4 | 628.61 | 10239564 | 916 | 1151 | True |
+| baac-5 | 628.17 | 10232449 | 845 | 1151 | True |
+| baac-6 | 625.03 | 10181162 | 475 | 1144 | True |
+| baac-7 | 614.34 | 10007032 | 402 | 1076 | True |
+| baac-8 | 613.83 | 9998768 | 284 | 1079 | True |
+| flac-0 | 691.11 | 11249468 | 885 | 1006 | True |
+| flac-1 | 688.04 | 11199433 | 859 | 979 | True |
+| flac-2 | 686.40 | 11172677 | 696 | 981 | True |
+| flac-3 | 642.86 | 10463401 | 908 | 990 | True |
+| flac-4 | 630.99 | 10270049 | 812 | 908 | True |
+| flac-5 | 629.68 | 10248681 | 659 | 908 | True |
+| flac-6 | 626.37 | 10194843 | 463 | 905 | True |
+| flac-7 | 615.55 | 10018540 | 374 | 847 | True |
+| flac-8 | 615.06 | 10010621 | 244 | 845 | True |
+| flac-ffmpeg-5 | 645.61 | 10508471 | 496 | 687 | True |
+| flac-ffmpeg-8 | 634.19 | 10322400 | 241 | 677 | True |
+| alac-ffmpeg | 697.02 | - | 215 | 263 | True |
+| alac-apple-ref (carried from 2026-10-30) | 690.25 | - | - | - | True |
+
+### Gates
+
+A speed ratio is bAAC's CPU time over the reference's, the median of the paired repeats with their range; the threshold is 1 plus the reference's own spread. Judged on: long run (one process over the repeated input); encode from raw PCM, which flac reads about 3 % faster than WAV.
+
+| Gate | Group | bAAC | Reference | Ratio (range) | Threshold | Verdict |
+|---|---|--:|--:|--:|--:|---|
+| size-5: bAAC level 5 frame bytes against flac -5 | flac | 10232449 | 10248681 | | | passed |
+| size-8: bAAC level 8 frame bytes against flac -8 | flac | 9998768 | 10010621 | | | passed |
+| enc-5: encode at level 5 against flac -5 | flac | 5.544 s | 6.824 s | 0.814 (0.803 to 0.817) | 1.008 | passed |
+| enc-8: encode at level 8 against flac -8 | flac | 16.461 s | 18.936 s | 0.870 (0.864 to 0.871) | 1.007 | passed |
+| dec-5-flac: decode of flac -5 streams against flac (MD5 verified by both) | decode | 4.094 s | 5.155 s | 0.794 (0.793 to 0.796) | 1.002 | passed |
+| dec-5-ffmpeg: decode of flac -5 streams against ffmpeg (frame CRCs checked by both, no MD5) | decode | 2.757 s | 6.785 s | 0.406 (0.406 to 0.408) | 1.005 | passed |
+| dec-8-flac: decode of flac -8 streams against flac (MD5 verified by both) | decode | 4.498 s | 5.572 s | 0.809 (0.803 to 0.814) | 1.009 | passed |
+| dec-8-ffmpeg: decode of flac -8 streams against ffmpeg (frame CRCs checked by both, no MD5) | decode | 3.118 s | 6.887 s | 0.453 (0.451 to 0.453) | 1.003 | passed |
+| alac-size-ffmpeg: bAAC level 5 stream against alac-ffmpeg | alac | 10232747 | 11354157 | | | passed |
+| alac-size-refalac: bAAC level 5 stream against alac-apple-ref (row carried from 2026-10-30, size only) | alac | 10232747 | 11243940 | | | passed |
+| alac-enc: encode at level 5 against FFmpeg ALAC | alac | 5.699 s | 21.870 s | 0.260 (0.259 to 0.262) | 1.006 | passed |
+| alac-dec: decode of its own level 5 stream against FFmpeg decoding ALAC | alac | 4.087 s | 17.821 s | 0.229 (0.228 to 0.238) | 1.028 | passed |
+| added-hires-size: corpus addition 96 kHz, 24-bit stereo: level 5 frame bytes against flac -5 | corpus | 16448740 | 16457780 | | | passed |
+| added-hires-enc: corpus addition 96 kHz, 24-bit stereo: encode at level 5 against flac -5 | corpus | 6.118 s | 6.671 s | 0.925 (0.907 to 0.938) | 1.018 | passed |
+| added-hires-dec-flac: corpus addition 96 kHz, 24-bit stereo: decode of the flac -5 stream against flac (MD5 verified by both) | corpus | 4.519 s | 5.627 s | 0.802 (0.801 to 0.803) | 1.007 | passed |
+| added-hires-dec-ffmpeg: corpus addition 96 kHz, 24-bit stereo: decode of the flac -5 stream against FFmpeg (frame CRCs checked by both, no MD5) | corpus | 2.806 s | 5.774 s | 0.484 (0.471 to 0.493) | 1.037 | passed |
+| added-surround-size: corpus addition 5.1, 44.1 kHz, 16-bit: level 5 frame bytes against flac -5 | corpus | 164138 | 167275 | | | passed |
+| added-surround-enc: corpus addition 5.1, 44.1 kHz, 16-bit: encode at level 5 against flac -5 | corpus | 10.034 s | 12.683 s | 0.791 (0.787 to 0.793) | 1.007 | passed |
+| added-surround-dec-flac: corpus addition 5.1, 44.1 kHz, 16-bit: decode of the flac -5 stream against flac (MD5 verified by both) | corpus | 8.469 s | 10.558 s | 0.803 (0.800 to 0.805) | 1.007 | passed |
+| added-surround-dec-ffmpeg: corpus addition 5.1, 44.1 kHz, 16-bit: decode of the flac -5 stream against FFmpeg (frame CRCs checked by both, no MD5) | corpus | 2.753 s | 6.240 s | 0.450 (0.440 to 0.456) | 1.038 | passed |
+| added-stereo16-size: corpus addition 44.1 kHz, 16-bit stereo: level 5 frame bytes against flac -5 | corpus | 541106 | 541445 | | | passed |
+| added-stereo16-enc: corpus addition 44.1 kHz, 16-bit stereo: encode at level 5 against flac -5 | corpus | 6.066 s | 6.798 s | 0.891 (0.889 to 0.907) | 1.025 | passed |
+| added-stereo16-dec-flac: corpus addition 44.1 kHz, 16-bit stereo: decode of the flac -5 stream against flac (MD5 verified by both) | corpus | 4.190 s | 5.268 s | 0.795 (0.785 to 0.803) | 1.017 | passed |
+| added-stereo16-dec-ffmpeg: corpus addition 44.1 kHz, 16-bit stereo: decode of the flac -5 stream against FFmpeg (frame CRCs checked by both, no MD5) | corpus | 2.775 s | 7.163 s | 0.388 (0.386 to 0.389) | 1.003 | passed |
+| size-5-enlarged: bAAC level 5 frame bytes against flac -5 on the enlarged corpus | corpus | 27386433 | 27415181 | | | passed |
+| size-8-enlarged: bAAC level 8 frame bytes against flac -8 on the enlarged corpus | corpus | 27084711 | 27111090 | | | passed |
+| held-hires-size: held-out 96 kHz, 24-bit stereo: level 5 frame bytes against flac -5 | held-out | 9821712 | 9795735 | | | failed |
+| held-hires-enc: held-out 96 kHz, 24-bit stereo: encode at level 5 against flac -5 | held-out | 6.504 s | 7.399 s | 0.879 (0.869 to 0.888) | 1.020 | passed |
+| held-hires-dec-flac: held-out 96 kHz, 24-bit stereo: decode of the flac -5 stream against flac (MD5 verified by both) | held-out | 4.707 s | 5.924 s | 0.795 (0.792 to 0.797) | 1.005 | passed |
+| held-hires-dec-ffmpeg: held-out 96 kHz, 24-bit stereo: decode of the flac -5 stream against FFmpeg (frame CRCs checked by both, no MD5) | held-out | 2.742 s | 6.405 s | 0.430 (0.427 to 0.430) | 1.006 | passed |
+| held-surround-size: held-out 5.1, 48 kHz, 24-bit: level 5 frame bytes against flac -5 | held-out | 8887203 | 8936904 | | | passed |
+| held-surround-enc: held-out 5.1, 48 kHz, 24-bit: encode at level 5 against flac -5 | held-out | 4.773 s | 4.963 s | 0.962 (0.957 to 0.966) | 1.007 | passed |
+| held-surround-dec-flac: held-out 5.1, 48 kHz, 24-bit: decode of the flac -5 stream against flac (MD5 verified by both) | held-out | 4.382 s | 5.160 s | 0.850 (0.846 to 0.852) | 1.008 | passed |
+| held-surround-dec-ffmpeg: held-out 5.1, 48 kHz, 24-bit: decode of the flac -5 stream against FFmpeg (frame CRCs checked by both, no MD5) | held-out | 2.632 s | 4.764 s | 0.552 (0.552 to 0.554) | 1.004 | passed |
+| held-stereo16-size: held-out 44.1 kHz, 16-bit stereo: level 5 frame bytes against flac -5 | held-out | 7324872 | 7328139 | | | passed |
+| held-stereo16-enc: held-out 44.1 kHz, 16-bit stereo: encode at level 5 against flac -5 | held-out | 5.293 s | 5.986 s | 0.885 (0.879 to 0.887) | 1.005 | passed |
+| held-stereo16-dec-flac: held-out 44.1 kHz, 16-bit stereo: decode of the flac -5 stream against flac (MD5 verified by both) | held-out | 3.860 s | 4.689 s | 0.823 (0.820 to 0.824) | 1.006 | passed |
+| held-stereo16-dec-ffmpeg: held-out 44.1 kHz, 16-bit stereo: decode of the flac -5 stream against FFmpeg (frame CRCs checked by both, no MD5) | held-out | 2.703 s | 6.373 s | 0.422 (0.417 to 0.430) | 1.023 | passed |
+
+### Every figure of the speed gates
+
+Long: one process over the repeated corpus. Per file: one process per corpus item, which adds each tool's start. The judged figure is marked.
+
+| Measure | Variant | bAAC s | Reference s | Ratio (range) | Threshold | Reads as |
+|---|---|--:|--:|--:|--:|---|
+| enc-5 | long-raw (judged) | 5.544 | 6.824 | 0.814 (0.803 to 0.817) | 1.008 | passed |
+| enc-5 | long-wav | 5.583 | 7.118 | 0.785 (0.776 to 0.788) | 1.029 | passed |
+| enc-5 | per-file-raw | 6.485 | 7.396 | 0.877 (0.875 to 0.880) | 1.002 | passed |
+| enc-5 | per-file-wav | 6.501 | 7.659 | 0.849 (0.843 to 0.851) | 1.009 | passed |
+| enc-8 | long-raw (judged) | 16.461 | 18.936 | 0.870 (0.864 to 0.871) | 1.007 | passed |
+| enc-8 | long-wav | 16.584 | 19.233 | 0.859 (0.852 to 0.875) | 1.017 | passed |
+| enc-8 | per-file-raw | 17.602 | 19.528 | 0.902 (0.895 to 0.903) | 1.012 | passed |
+| enc-8 | per-file-wav | 17.517 | 19.759 | 0.887 (0.883 to 0.895) | 1.005 | passed |
+| dec-5-flac | long (judged) | 4.094 | 5.155 | 0.794 (0.793 to 0.796) | 1.002 | passed |
+| dec-5-flac | per-file | 5.058 | 5.731 | 0.883 (0.874 to 0.886) | 1.020 | passed |
+| dec-5-ffmpeg | long (judged) | 2.757 | 6.785 | 0.406 (0.406 to 0.408) | 1.005 | passed |
+| dec-5-ffmpeg | per-file | 3.604 | 43.402 | 0.083 (0.082 to 0.084) | 1.028 | passed |
+| dec-8-flac | long (judged) | 4.498 | 5.572 | 0.809 (0.803 to 0.814) | 1.009 | passed |
+| dec-8-flac | per-file | 5.325 | 5.981 | 0.886 (0.884 to 0.892) | 1.012 | passed |
+| dec-8-ffmpeg | long (judged) | 3.118 | 6.887 | 0.453 (0.451 to 0.453) | 1.003 | passed |
+| dec-8-ffmpeg | per-file | 4.014 | 43.884 | 0.091 (0.090 to 0.095) | 1.032 | passed |
+| alac-enc | long-wav (judged) | 5.699 | 21.870 | 0.260 (0.259 to 0.262) | 1.006 | passed |
+| alac-dec | long (judged) | 4.087 | 17.821 | 0.229 (0.228 to 0.238) | 1.028 | passed |
+
+### Corpus totals, frame bytes
+
+The original corpus is the ten items back to back. The enlarged corpus adds the recordings of the first held-out set, which are listed below.
+
+| Corpus | Level | bAAC | flac |
+|---|--:|--:|--:|
+| original | 5 | 10232449 | 10248681 |
+| original | 8 | 9998768 | 10010621 |
+| enlarged | 5 | 27386433 | 27415181 |
+| enlarged | 8 | 27084711 | 27111090 |
+
+### Corpus additions
+
+| Set | File | Seconds | bAAC level 5 | flac -5 | bAAC level 8 | flac -8 | Bit-exact |
+|---|---|--:|--:|--:|--:|--:|---|
+| hires | 28 - high resolution audio, default settings | 8.7 | 3466569 | 3468596 | 3428727 | 3431322 | True |
+| hires | 29 - high resolution audio, blocksize 16384 | 8.0 | 3258760 | 3260512 | 3254972 | 3257122 | True |
+| hires | 30 - high resolution audio, blocksize 13456 | 8.0 | 3239483 | 3241266 | 3231665 | 3233982 | True |
+| hires | 31 - high resolution audio, using only 32nd order predictors | 8.0 | 3233550 | 3235312 | 3227374 | 3229567 | True |
+| hires | 32 - high resolution audio, partition order 8 containing escaped partitions | 8.0 | 3250378 | 3252094 | 3246663 | 3248758 | True |
+| surround | 41 - 6 channels (5.1) | 8.1 | 164138 | 167275 | 157746 | 160625 | True |
+| stereo16 | 01 - blocksize 4096 | 7.0 | 541106 | 541445 | 538796 | 539093 | True |
+
+### Held-out recordings, level 5
+
+This was the first run on these recordings.
+
+| Set | File | Span | Seconds | bAAC frame bytes | flac -5 frame bytes | Bit-exact |
+|---|---|---|--:|--:|--:|---|
+| hires | avon-chang-cello-suite-6 | whole | 62.5 | 9821712 | 9795735 | True |
+| surround | tearsofsteel-surround | 5:00.00 to 5:20.00 | 20.0 | 8887203 | 8936904 | True |
+| stereo16 | cloudkicker-let-yourself-be-huge | 1:00.00 to 2:00.00 | 60.0 | 7324872 | 7328139 | True |

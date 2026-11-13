@@ -156,6 +156,16 @@ final readonly class Client
         return $this->run(['compose', '--project-name', $project, '--file', $file, ...$arguments], $cwd, $env, $input, $timeout, $check, $logPath, $interactive, appendLog: $appendLog);
     }
 
+    /**
+     * Whether the daemon holds the image. Only the daemon's own "No such image" answer counts
+     * as absent; any other outcome leaves the image to the command that needs it.
+     */
+    public function holdsImage(string $image): bool
+    {
+        $result = $this->run(['image', 'inspect', '--format', '{{.Id}}', $image], check: false);
+        return !($result->exitCode === 1 && str_contains($result->stderr, 'No such image'));
+    }
+
     /** @return array<string,mixed> */
     public function validateIdentity(): array
     {

@@ -7,9 +7,9 @@ limit or a CPU set; Redis keeps only its own dataset limit,
 `size` bound the work instead: web workers, background consumers, media slots and
 PostgreSQL memory. Each service gets an out-of-memory score so that web and
 media work are killed before Redis, PostgreSQL, the pooler and the control worker.
-[Deployment capability and size](../../docs-book/part-1-operator-guide/configuration.md#deployment-capability-and-size)
+[Deployment capability and size](../../docs-book/part-1-operator-guide/configuration/deployment-profiles.md#deployment-capability-and-size)
 lists the settings, their bounds and the starting points;
-[System Requirements](../../docs-book/part-1-operator-guide/system-requirements.md)
+[System Requirements](../../docs-book/part-1-operator-guide/getting-started/system-requirements.md)
 states which starting points are qualified. ARM builds and Raspberry Pi hardware
 remain unqualified.
 
@@ -22,7 +22,7 @@ are local build tags. Set all six references to images available on the selected
 Docker daemon. The deployment command resolves each reference to an immutable
 image ID; it does not build or pull images.
 The application image must include the compiled web assets in `public/`. From a
-clean source checkout, first [build the frontend](../../docs-book/part-1-operator-guide/getting-started.md#6-install-and-build-the-web-frontend),
+clean source checkout, first [build the frontend](../../docs-book/part-1-operator-guide/getting-started/installation.md#6-install-and-build-the-web-frontend),
 then build the three application images with the same revision:
 
 ```sh
@@ -53,7 +53,7 @@ rendering refuses a rootless daemon, which cannot apply the negative
 out-of-memory scores. The web container has no Docker socket.
 The account bootstrap commands documented in the operator guide remain applicable;
 this preset creates no default account. After first startup, run `app:auth:setup-clients`
-and [create an administrator](../../docs-book/part-1-operator-guide/user-management.md)
+and [create an administrator](../../docs-book/part-1-operator-guide/administration/user-management.md)
 in the web container. OAuth key
 generation is automatic for an empty secrets volume and preserves an existing pair.
 
@@ -76,7 +76,7 @@ configuration, gives the database
 role and the pooler's auth file one SCRAM verifier, runs pending schema
 migrations through the pooler, initializes a missing OAuth key pair, verifies
 effective database settings, starts web services and launches the worker pair.
-See [Connection pooler](../../docs-book/part-1-operator-guide/configuration.md#connection-pooler)
+See [Connection pooler](../../docs-book/part-1-operator-guide/configuration/deployment-profiles.md#connection-pooler)
 for the pooler's aliases and pools.
 
 The `remux` capability permits original media delivery and stream copy from its
@@ -84,7 +84,7 @@ The `remux` capability permits original media delivery and stream copy from its
 `audioSlots` and a `hardware` encoder. The `transcode` capability runs `videoSlots`
 and `audioSlots`, which take the application's defaults when unset, and accepts an
 optional top-level `hardware` encoder; see
-[Media slots](../../docs-book/part-1-operator-guide/configuration.md#media-slots).
+[Media slots](../../docs-book/part-1-operator-guide/configuration/deployment-profiles.md#media-slots).
 OpenTelemetry export stays off unless the configuration's `environment` sets
 `OTEL_ENABLED` and `OTEL_EXPORTER_OTLP_ENDPOINT`. Changing the capability or size
 takes effect when the deployment starts again, which retires the old worker pair

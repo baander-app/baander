@@ -13,8 +13,12 @@ When you need a primitive type, async utility, or shared controller, look here f
 | `Uuid` | UUID value object; generates v7 by default |
 | `PublicId` | 21-character NanoID, distinct from UUID identity |
 | `Email` | Typed email value object with validation |
+| `SystemSetting` | Stored server-wide setting (`key`, `value`, and `updatedAt`) |
+| `LibraryReadScope` | Unrestricted, restricted, or empty set of library UUIDs a caller may read |
+| `MediaReadScope` | Combines an optional authenticated actor UUID with a `LibraryReadScope` |
+| `FilesystemType` | Filesystem backend type (`Local`) |
 
-`PublicId` uses 21 characters matching `^[0-9a-zA-Z_-]{21}$`, for example `V1StGXR8_Z5jdHi6B-myT`. Identifier types remain endpoint-specific; see [PublicId](../shared-kernel.md#publicid) for UUID and protocol identifier exceptions.
+`PublicId` uses 21 characters matching `^[0-9a-zA-Z_-]{21}$`, for example `V1StGXR8_Z5jdHi6B-myT`. Identifier types remain endpoint-specific; see [PublicId](../architecture/shared-kernel.md#publicid) for UUID and protocol identifier exceptions.
 
 ### Pagination
 
@@ -37,6 +41,10 @@ When you need a primitive type, async utility, or shared controller, look here f
 |-------|---------|
 | `AbstractDomainEvent` | Base class for all domain events across contexts |
 | `DomainEventInterface` | Contract that all domain events must implement |
+| `OutboxSubscriber` | Appends serializable domain events (`toPayload()`) to `domain_event_outbox` (`Domain/Event/Outbox/`) |
+| `OutboxSubscriberPass` | Compiler pass that registers domain event classes on `OutboxSubscriber` |
+| `OutboxRepository` | Claims, renews leases on, marks relayed, and records retry/dead-letter state for `domain_event_outbox` rows |
+| `RelayOutboxCommand` / `RelayOutboxHandler` | Relays leased outbox rows through `OutboxEventDispatcherInterface` with exponential backoff and dead-lettering (`OutboxRelayException` on failure) |
 
 ### Jobs
 
@@ -58,7 +66,7 @@ Use `App\Shared\Infrastructure\Swoole\Async::sleep()` for all sleeping. It auto-
 
 ### Process Pool
 
-`Swoole\ProcessPool` provides isolated worker processes for CPU-bound work. Workers communicate via Unix sockets (`SWOOLE_IPC_UNIXSOCK`). The Transcode context uses this for FFmpeg encoding.
+`Swoole\ProcessPool` provides isolated worker processes for CPU-bound work inside Swoole, communicating via Unix sockets (`SWOOLE_IPC_UNIXSOCK`). Media encoding and probing do not use `CpuProcessPool`; they run in the worker deployment pair via `NativeExecutionClientInterface` (`bin/worker-native.php`).
 
 ### WebSocket
 
@@ -79,14 +87,18 @@ Async jobs dispatched via Symfony Messenger are tracked, and can be cancelled, t
 | `JobCancellationCheckpointInterface` | Application port that handlers call between items; `check()` throws `JobCancelledException` once the job was cancelled |
 | `JobMonitorService` | Queries job status and history |
 
-See the [CQRS and Messaging](../cqrs-and-messaging.md) page for dispatching patterns.
+See the [CQRS and Messaging](../development/cqrs-and-messaging.md) page for dispatching patterns.
 
 ## Messenger
 
 | Component | Purpose |
 |-----------|---------|
-| `SwooleTaskDispatcherInterface` | Contract for dispatching tasks to Swoole workers |
-| `HttpServerTaskDispatcher` | Implementation that dispatches via Swoole HTTP server task workers |
+| `OrdinaryAdmissionTransport` | Wraps the single-delivery Redis transport with worker admission ledger permits (`OrdinaryAdmissionStamp`) |
+| `ValidatedSendersLocator` | Verifies outgoing messages against `AsyncWorkloadCatalog` before routing to transport senders |
+| `JsonMessageCodec` | Versioned JSON wire codec backed by per-context `MessagePayloadCodecInterface` implementations |
+| `AsyncWorkloadCatalog` | Validates admitted asynchronous message classes, their permitted transport (`async` or `scheduler`), resource class, and retry policies |
+| `FailureTransportAdministration` | Inspects, retries, and removes failed messages in the Doctrine failure transport |
+| `RedisTransportStatus` | Probes the `async` Redis stream depth, consumer liveness, and failure queue depth |
 
 ## Doctrine
 
@@ -94,6 +106,8 @@ See the [CQRS and Messaging](../cqrs-and-messaging.md) page for dispatching patt
 |-----------|---------|
 | `UuidType` | Custom Doctrine column type for `Uuid` |
 | `PublicIdType` | Custom Doctrine column type for `PublicId` |
+| `CitextType` | Custom Doctrine column type for PostgreSQL `citext` columns |
+| `JobStatusType` | Custom Doctrine column type for the `JobStatus` enum |
 | `GeneratePublicIdListener` | Doctrine event listener that auto-generates `PublicId` values on persist |
 | `InstantType` | Replaces Doctrine's `datetime_immutable` and `datetimetz_immutable`: a `timestamptz` instant written and read in UTC with microseconds |
 | `DedicatedConnectionFactory` | Builds a DBAL connection outside DoctrineBundle with the same driver middleware |
@@ -101,7 +115,7 @@ See the [CQRS and Messaging](../cqrs-and-messaging.md) page for dispatching patt
 
 Instants follow one convention. Every instant column is `timestamptz` with no explicit precision, mapped as `datetime_immutable`; `InstantColumnConventionTest` fails on a zone-less or fixed-precision instant column. The only zone-less column is Doctrine Migrations' own `doctrine_migration_versions.executed_at`, which that library parses as `Y-m-d H:i:s`.
 
-`InstantType` writes the UTC instant as `Y-m-d H:i:s.uP`, so neither PHP's time zone nor the session's can shift it, and it reads values back in UTC. `BaanderDriverMiddleware` sets every PostgreSQL session's `TimeZone` to UTC, so zone-dependent SQL such as `::date` and `date_trunc` gives the same answer on every server. A connection built outside DoctrineBundle gets the middleware from `DedicatedConnectionFactory`, or sets the zone itself as the recommendation pool's PDO connection does. SQL written by hand binds an instant through the type (`Types::DATETIME_IMMUTABLE`) or as a UTC `Y-m-d H:i:s.uP` string, and compares ranges half-open; `InstantBindConventionTest` fails on a zone-less or whole-second format in database code.
+`InstantType` writes the UTC instant as `Y-m-d H:i:s.uP`, so neither PHP's time zone nor the session's can shift it, and it reads values back in UTC. `BaanderDriverMiddleware` sets every PostgreSQL session's `TimeZone` to UTC, so zone-dependent SQL such as `::date` and `date_trunc` gives the same answer on every server. A connection built outside DoctrineBundle gets the middleware from `DedicatedConnectionFactory`. SQL written by hand binds an instant through the type (`Types::DATETIME_IMMUTABLE`) or as a UTC `Y-m-d H:i:s.uP` string, and compares ranges half-open; `InstantBindConventionTest` fails on a zone-less or whole-second format in database code.
 
 API output keeps whole seconds (`Y-m-d\TH:i:sP`); cursors keep the microseconds.
 
@@ -123,8 +137,11 @@ Connection management and configuration for all Redis-backed features: caching, 
 
 | Component | Purpose |
 |-----------|---------|
-| `BoundedContextLogger` | Creates loggers scoped to a bounded context |
+| `BoundedContextLoggerPass` | Compiler pass that binds each bounded context's `LoggerInterface $logger` parameter to its Monolog channel |
 | `CorrelationIdProcessor` | Monolog processor that attaches a correlation ID to log entries |
+| `StreamSignatureRedactionProcessor` | Monolog processor that redacts `sig`, `token`, and `ticket` query parameters from log records |
+| `MonologLoggerResetter` | Closes Monolog logger handlers when Swoole workers reload |
+| `MonologHandlerResetterPass` | Compiler pass that tags Monolog logger channels with `MonologLoggerResetter` |
 
 ## Settings
 
@@ -167,11 +184,11 @@ System settings live in `system_settings` (`key text` primary key, `value jsonb`
 | Endpoint | Command | Purpose |
 |----------|---------|---------|
 | `GET /api/admin/settings` | `app:settings:list`, `app:settings:get` | System settings with effective value, stored value and validity |
-| `GET /api/admin/settings/definitions` | — | Every definition, system and user, as the admin page renders them |
+| `GET /api/admin/settings/definitions` | `app:settings:definitions` (`SettingsDefinitionsCommand`) | Every definition, system and user, as the admin page renders them |
 | `PATCH /api/admin/settings` | `app:settings:set` | Validate all, then write; `422` with per-key messages |
 | `DELETE /api/admin/settings/{key}` | `app:settings:reset` | Reset to the default; `404` for an unknown key |
 
-The user settings endpoints are in [UserPreference](user-preference.md#user-settings), and the administrator's view of a user's settings is in [Auth](auth.md#admin--user-settings). The operator reference is [Server settings](../../part-1-operator-guide/configuration.md#server-settings).
+The user settings endpoints are in [UserPreference](user-preference.md#user-settings), and the administrator's view of a user's settings is in [Auth](auth.md#admin--user-settings). The operator reference is [Server settings](../../part-1-operator-guide/configuration/server-settings.md#server-settings).
 
 ### Adding a setting
 
@@ -198,7 +215,10 @@ Removing a language reverses the steps. A stored choice of the removed language 
 | `SystemSettingsController` | `/api/admin/settings` | Server settings and every setting definition (see [Settings](#settings)) |
 | `HealthCheckController` | `/health`, `/ready`, `/live` | Health and readiness probes |
 | `ServerStatsControllerWithCoroutines` | `/api/debug/stats` | Server diagnostics and statistics |
-| `JobMonitorController` | `/api/monitor/jobs` | Job status and management |
+| `WorkerStatsController` | `/api/debug/workers` | Server HTTP and user worker statistics (CLI: `app:server:workers`) |
+| `CoroutineStatsController` | `/api/debug/coroutines` | Swoole coroutine and channel statistics per HTTP worker (CLI: `app:server:coroutines`) |
+| `SpanDebugController` | `/api/debug/spans` | Recent server HTTP request spans and buffer clearing (CLI: `app:server:spans`) |
+| `JobMonitorController` | `/api/monitor` | Job status, listing, detail, pruning, retry, and cancellation (`/status`, `/jobs`, `/prune`) |
 | `JobAnalyticsController` | `/api/monitor/analytics/*` | Job analytics and metrics |
 | `PrometheusMetricsController` | `/metrics` | Prometheus metrics endpoint |
 | `TransportController` | `/api/monitor/transport/*` | Messenger transport status |
@@ -230,6 +250,6 @@ Shared response types used across contexts:
 
 ## See Also
 
-- [Shared Kernel (detailed)](../shared-kernel.md) — UUID v7 usage, cursor pagination, and Redis configuration
-- [Real-Time Patterns](../real-time-patterns.md) — WebSocket architecture
-- [CQRS and Messaging](../cqrs-and-messaging.md) — Job monitoring and task dispatching
+- [Shared Kernel (detailed)](../architecture/shared-kernel.md) — UUID v7 usage, cursor pagination, and Redis configuration
+- [Real-Time Patterns](../architecture/real-time-patterns.md) — WebSocket architecture
+- [CQRS and Messaging](../development/cqrs-and-messaging.md) — Job monitoring and task dispatching

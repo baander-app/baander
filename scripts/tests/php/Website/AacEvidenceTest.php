@@ -11,6 +11,14 @@ use PHPUnit\Framework\TestCase;
 
 final class AacEvidenceTest extends TestCase
 {
+    /** A made-up run in the shape the benchmark harness's lossless stage writes, generated from its own helpers. */
+    private const string LOSSLESS_FIXTURE = __DIR__ . '/../Fixtures/aac-lossless-result.json';
+    private const array LOSSLESS_ORDER = [
+        'baac-0', 'baac-1', 'baac-2', 'baac-3', 'baac-4', 'baac-5', 'baac-6', 'baac-7', 'baac-8',
+        'flac-0', 'flac-1', 'flac-2', 'flac-3', 'flac-4', 'flac-5', 'flac-6', 'flac-7', 'flac-8',
+        'flac-ffmpeg-5', 'flac-ffmpeg-8', 'alac-ffmpeg', 'alac-apple-ref',
+    ];
+
     private string $root;
     private string $directory;
     /** @var list<array<string, mixed>> */
@@ -19,7 +27,7 @@ final class AacEvidenceTest extends TestCase
     private array $raw = [];
     /** @var list<array<string, mixed>> */
     private array $speed = [];
-    /** @var list<array<string, mixed>> */
+    /** @var array<array-key, mixed> */
     private array $lossless = [];
 
     protected function setUp(): void
@@ -27,6 +35,7 @@ final class AacEvidenceTest extends TestCase
         $this->root = sys_get_temp_dir() . '/baander-aac-evidence-' . bin2hex(random_bytes(6));
         $this->directory = $this->root . '/packages/baander-aac/bench/results/';
         mkdir($this->directory, 0700, true);
+        file_put_contents($this->root . '/packages/baander-aac/package.json', json_encode(['name' => '@baander/aac-native', 'version' => '0.2.0'], JSON_THROW_ON_ERROR));
         $profiles = ['lc' => [[64, 96, 128, 192, 256], ['ours', 'ffmpeg', 'fdk', 'libxaac', 'apple']], 'he' => [[32, 48, 64], ['ours', 'fdk', 'libxaac', 'apple']], 'hev2' => [[24, 32], ['ours', 'fdk', 'libxaac']], 'xhe' => [[24, 32, 48, 64, 96], ['ours', 'fdk', 'libxaac']]];
         foreach ($profiles as $family => [$rates, $encoders]) {
             foreach ($encoders as $encoder) {
@@ -58,9 +67,7 @@ final class AacEvidenceTest extends TestCase
         $this->raw[] = $extra;
         $this->speed[] = ['kind' => 'baseline', 'family' => '', 'codec' => 'apple', 'seconds' => 0, 'cpu' => 0.1];
         $this->speed[] = ['kind' => 'encode', 'family' => 'lc', 'codec' => 'oursnoab', 'seconds' => 130, 'cpu' => 1];
-        foreach (['alac-ffmpeg', 'flac-5', 'flac-8', 'alac-apple-ref'] as $codec) {
-            $this->lossless[] = ['codec' => $codec, 'seconds' => 130, 'kbps' => 650, 'enc_cpu' => 1, 'dec_cpu' => 0.5, 'bit_exact' => true];
-        }
+        $this->lossless = json_decode((string) file_get_contents(self::LOSSLESS_FIXTURE), true, 512, JSON_THROW_ON_ERROR);
         $this->write();
     }
 
@@ -77,7 +84,7 @@ final class AacEvidenceTest extends TestCase
     {
         $evidence = new AacEvidence()->load($this->root);
         self::assertSame(['lc' => 25, 'he' => 12, 'hev2' => 6, 'xhe' => 12], array_map('count', $evidence['quality']));
-        self::assertCount(4, $evidence['lossless']);
+        self::assertSame('0.2.0', $evidence['version']);
         self::assertSame(['lc' => [5, 5], 'he' => [4, 5], 'hev2' => [3, 5], 'xhe' => [3, 3]], array_map(static fn(array $rows): array => [count($rows['encode']), count($rows['decode'])], $evidence['speed']));
         $row = $evidence['quality']['lc'][0];
         self::assertSame('bAAC', $row['label']);
@@ -131,8 +138,11 @@ final class AacEvidenceTest extends TestCase
             'speed-identity' => $this->speed[0]['config'] = 'lc-ours-cbr64',
             'speed-duplicate' => $this->speed[] = $this->speed[0],
             'speed-missing' => array_shift($this->speed),
-            'lossless-flag' => $this->lossless[0]['bit_exact'] = 'true',
-            'lossless-missing' => array_pop($this->lossless),
+            'lossless-schema' => $this->lossless['schema'] = 3,
+            'lossless-rows' => $this->lossless['rows'] = ['baac-5'],
+            'lossless-date' => $this->lossless['date'] = '2026-11-31T23:40:12+01:00',
+            'lossless-tools' => $this->lossless['tools']['ffmpeg'] = 'avconv 12',
+            'version' => file_put_contents($this->root . '/packages/baander-aac/package.json', '{"version":"next"}'),
             default => throw new \InvalidArgumentException($case),
         };
         $this->write();
@@ -143,9 +153,108 @@ final class AacEvidenceTest extends TestCase
     /** @return iterable<string, array{string}> */
     public static function invalidEvidence(): iterable
     {
-        foreach (['blank', 'nan', 'infinity', 'identity', 'nominal', 'duplicate-summary', 'missing-summary', 'duplicate-raw', 'missing-raw', 'raw-corpus', 'raw-mean', 'speed-zero-cpu', 'speed-zero-audio', 'speed-infinite', 'speed-identity', 'speed-duplicate', 'speed-missing', 'lossless-flag', 'lossless-missing'] as $case) {
+        foreach (['blank', 'nan', 'infinity', 'identity', 'nominal', 'duplicate-summary', 'missing-summary', 'duplicate-raw', 'missing-raw', 'raw-corpus', 'raw-mean', 'speed-zero-cpu', 'speed-zero-audio', 'speed-infinite', 'speed-identity', 'speed-duplicate', 'speed-missing', 'lossless-schema', 'lossless-rows', 'lossless-date', 'lossless-tools', 'version'] as $case) {
             yield $case => [$case];
         }
+    }
+
+    public function testReadsEveryRowOfTheLosslessRunInOneOrderWhateverTheFileOrder(): void
+    {
+        $lossless = new AacEvidence()->load($this->root)['lossless'];
+        self::assertSame(self::LOSSLESS_ORDER, array_column($lossless['rows'], 'codec'));
+        $this->lossless['rows'] = array_reverse($this->lossless['rows']);
+        $this->write();
+        self::assertSame($lossless, new AacEvidence()->load($this->root)['lossless']);
+
+        $rows = array_column($lossless['rows'], null, 'codec');
+        self::assertSame(['bAAC level 5 (default)', 'bAAC level 8', 'flac level 5', 'FFmpeg FLAC level 8', 'FFmpeg ALAC'], array_map(static fn(string $codec): string => $rows[$codec]['label'], ['baac-5', 'baac-8', 'flac-5', 'flac-ffmpeg-8', 'alac-ffmpeg']));
+        self::assertSame(10232449, $rows['baac-5']['frame_bytes']);
+        self::assertSame(10248681, $rows['flac-5']['frame_bytes']);
+        self::assertSame(629.6765212987337, $rows['flac-5']['kbps']);
+        self::assertEqualsWithDelta(560.0, $rows['baac-5']['encode'], 1e-9);
+        self::assertEqualsWithDelta(436.0, $rows['baac-5']['decode'], 1e-9);
+        self::assertEqualsWithDelta(195.0, $rows['flac-8']['encode'], 1e-9);
+        self::assertNull($rows['alac-ffmpeg']['frame_bytes']);
+        self::assertTrue($rows['baac-8']['bit_exact']);
+        self::assertSame([
+            'date' => '11 November 2026',
+            'processor' => 'Fixture processor, not a measurement',
+            'compiler' => 'g++ (GCC) 16.2.1 (fixture)',
+            'flac' => 'flac 1.4.3',
+            'ffmpeg' => 'FFmpeg 8.1.3',
+            'repetitions' => 24,
+            'heldOutFirstRun' => true,
+        ], $lossless['run']);
+    }
+
+    public function testAcceptsTheCarriedReferenceRowWithoutSpeedFigures(): void
+    {
+        $rows = array_column(new AacEvidence()->load($this->root)['lossless']['rows'], null, 'codec');
+        self::assertSame([
+            'codec' => 'alac-apple-ref',
+            'label' => 'Apple ALAC (refalac)',
+            'kbps' => 690.2499619918112,
+            'frame_bytes' => null,
+            'encode' => null,
+            'decode' => null,
+            'bit_exact' => true,
+            'carried' => '30 October 2026',
+        ], $rows['alac-apple-ref']);
+    }
+
+    #[DataProvider('invalidLosslessRows')]
+    public function testRejectsALosslessRowWithAMessageNamingIt(string $case, string $codec): void
+    {
+        $index = array_search($codec, array_column($this->lossless['rows'], 'codec'), true);
+        match ($case) {
+            'unknown-codec' => $this->lossless['rows'][] = ['codec' => $codec] + $this->lossless['rows'][array_search('flac-ffmpeg-5', array_column($this->lossless['rows'], 'codec'), true)],
+            'duplicate' => $this->lossless['rows'][] = $this->lossless['rows'][$index],
+            'missing-level' => array_splice($this->lossless['rows'], $index, 1),
+            'zero-rate' => $this->lossless['rows'][$index]['kbps'] = 0,
+            'negative-frame-bytes' => $this->lossless['rows'][$index]['frame_bytes'] = -1,
+            'zero-encode-time' => $this->lossless['rows'][$index]['enc_cpu'] = 0,
+            'missing-decode-time' => $this->lossless['rows'][$index]['dec_cpu'] = null,
+            'bit-exact-string' => $this->lossless['rows'][$index]['bit_exact'] = 'true',
+            'carried-date' => $this->lossless['rows'][$index]['carried'] = 'last October',
+            default => throw new \InvalidArgumentException($case),
+        };
+        $this->write();
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessageMatches('/(?<![\w-])' . preg_quote($codec, '/') . '(?![\w-])/');
+        new AacEvidence()->load($this->root);
+    }
+
+    /** @return iterable<string, array{string, string}> */
+    public static function invalidLosslessRows(): iterable
+    {
+        yield 'unknown codec id' => ['unknown-codec', 'flac-ffmpeg-6'];
+        yield 'duplicate row' => ['duplicate', 'baac-5'];
+        yield 'missing bAAC level' => ['missing-level', 'baac-3'];
+        yield 'zero bitrate' => ['zero-rate', 'flac-8'];
+        yield 'negative frame bytes' => ['negative-frame-bytes', 'baac-8'];
+        yield 'zero encode time' => ['zero-encode-time', 'alac-ffmpeg'];
+        yield 'missing decode time' => ['missing-decode-time', 'flac-ffmpeg-8'];
+        yield 'bit-exact verdict as text' => ['bit-exact-string', 'baac-0'];
+        yield 'carried date not a date' => ['carried-date', 'alac-apple-ref'];
+    }
+
+    public function testReadsTheEarlierListOfFourLosslessReferences(): void
+    {
+        $this->lossless = [];
+        foreach (['alac-ffmpeg', 'flac-5', 'flac-8', 'alac-apple-ref'] as $codec) {
+            $this->lossless[] = ['codec' => $codec, 'seconds' => 130, 'kbps' => 650, 'enc_cpu' => 1, 'dec_cpu' => 0.5, 'bit_exact' => true];
+        }
+        $this->write();
+        $lossless = new AacEvidence()->load($this->root)['lossless'];
+        self::assertNull($lossless['run']);
+        self::assertSame(['flac-5', 'flac-8', 'alac-ffmpeg', 'alac-apple-ref'], array_column($lossless['rows'], 'codec'));
+        self::assertSame(['codec' => 'flac-5', 'label' => 'flac level 5', 'kbps' => 650.0, 'frame_bytes' => null, 'encode' => 130.0, 'decode' => 260.0, 'bit_exact' => true, 'carried' => null], $lossless['rows'][0]);
+
+        $this->lossless[0]['bit_exact'] = 'true';
+        $this->write();
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessageMatches('/alac-ffmpeg/');
+        new AacEvidence()->load($this->root);
     }
 
     public function testChartsExposeMatchingValuesAccessibleLabelsAndZeroBasedBars(): void

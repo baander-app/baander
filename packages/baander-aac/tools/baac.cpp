@@ -4,6 +4,7 @@
  *   baac dec <in.aac> <out.f32le> [rate] [channels] [--no-loudness]
  *   baac loudness <in.wav | in.f32le rate channels>
  *   baac bench [--seconds N] [--dump DIR] [--only NAME] [--streams DIR]
+ *   baac flac enc | dec | test | info ...   (the lossless mode: baac_flac.cpp)
  *
  * Raw PCM is interleaved 32-bit float; the AAC side is an ADTS stream
  * (a LOAS stream for the xhe profile, which ADTS cannot carry).
@@ -31,9 +32,9 @@
  * factors; --dump writes each stream and its decode to DIR for
  * comparisons between builds; --streams decodes every .aac and .loas
  * stream in DIR (the committed test streams) and prints the realtime
- * factor of each and of each profile. */
+ * factor of each and of each profile.  Its last rows are the lossless
+ * mode at levels 0, 5 and 8 on the same signal at 16 bits. */
 #include <algorithm>
-#include <chrono>
 #include <filesystem>
 #include <map>
 #include <cmath>
@@ -44,6 +45,8 @@
 #include <vector>
 
 #include "aac.h"
+#include "baac_common.h"
+#include "baac_flac.h"
 
 static std::vector<uint8_t> read_all(const char* path) {
   std::vector<uint8_t> data;
@@ -86,7 +89,9 @@ static int usage() {
           "                      --drc  --drc-range LU  (MPEG-D DRC gain sets, 6 to 16 LU)\n"
           "       baac dec <in.aac> <out.f32le> [rate] [channels: 0 = as in the stream] [--no-loudness]\n"
           "       baac loudness <in.wav> | <in.f32le> <rate> <channels>\n"
-          "       baac bench [--seconds N] [--dump DIR] [--only NAME] [--streams DIR]\n");
+          "       baac bench [--seconds N] [--dump DIR] [--only NAME] [--streams DIR]\n"
+          "       %s",
+          baac_flac_usage());
   return 2;
 }
 
@@ -137,11 +142,6 @@ static void print_loudness(FILE* f, const AacLoudnessInfo& info) {
     fprintf(f, "max short-term        needs 3 s of input\n");
   }
 }
-
-static uint32_t le32(const uint8_t* p) {
-  return (uint32_t)p[0] | (uint32_t)p[1] << 8 | (uint32_t)p[2] << 16 | (uint32_t)p[3] << 24;
-}
-static uint32_t le16(const uint8_t* p) { return (uint32_t)p[0] | (uint32_t)p[1] << 8; }
 
 /* Reads a RIFF/WAVE file with integer PCM of 8 to 32 bits or 32-bit
  * float samples (plain or WAVE_FORMAT_EXTENSIBLE) into interleaved
@@ -681,11 +681,6 @@ static std::vector<float> bench_signal(int n, int sr) {
   return pcm;
 }
 
-static double now_seconds() {
-  using clock = std::chrono::steady_clock;
-  return std::chrono::duration<double>(clock::now().time_since_epoch()).count();
-}
-
 static void write_file(const std::string& path, const void* data, size_t bytes) {
   FILE* f = fopen(path.c_str(), "wb");
   if (!f) {
@@ -990,6 +985,7 @@ static int bench(int argc, char** argv) {
       write_file(base + ".f32", out.data(), out.size() * sizeof(float));
     }
   }
+  failures += baac_flac_bench(pcm, sr, seconds, only, dump);
   if (!streams.empty() && bench_streams(streams) != 0) {
     failures++;
   }
@@ -1011,6 +1007,9 @@ int main(int argc, char** argv) {
   }
   if (strcmp(argv[1], "bench") == 0) {
     return bench(argc, argv);
+  }
+  if (strcmp(argv[1], "flac") == 0) {
+    return baac_flac_main(argc - 2, argv + 2);
   }
   return usage();
 }

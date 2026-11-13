@@ -51,7 +51,7 @@ final class GenerationDeliveryTest extends TestCase
         PublishedPresentationFixture::write($this->directory, 2, audio: true);
         $this->runtime = $this->snapshot();
         $ownership = $this->createStub(TranscodeExecutionOwnershipPort::class);
-        $ownership->method('find')->willReturnCallback(function (): TranscodeRuntimeSnapshot {
+        $find = function (): TranscodeRuntimeSnapshot {
             ++$this->runtimeReads;
             if ($this->advancedRuntime !== null && $this->runtimeReads > 1) {
                 return $this->advancedRuntime;
@@ -64,7 +64,10 @@ final class GenerationDeliveryTest extends TestCase
                 return $this->snapshot(live: false);
             }
             return $this->runtime;
-        });
+        };
+        $ownership->method('find')->willReturnCallback($find);
+        // A group read is one statement: it counts as one read whatever the number of jobs.
+        $ownership->method('findGroup')->willReturnCallback(fn (array $ids): array => [$this->job->getId()->toString() => $find()]);
         $jobs = $this->createStub(TranscodeJobRepositoryInterface::class);
         $jobs->method('findByPublicId')->willReturn($this->job);
         $jobs->method('findActiveByVideo')->willReturn([$this->job]);

@@ -32,7 +32,7 @@ final class OwnedTranscodeJobTest extends TestCase
     public function testTwoUsersAdmitIndependentJobsForTheSameVideoAndTier(): void
     {
         $repository = new OwnedJobRepository();
-        $service = new TranscodeJobService($repository, new TranscodeFileStorage(new SegmentFileResolver('/cache')), new EventDispatcher());
+        $service = new TranscodeJobService($repository, new TranscodeFileStorage(new SegmentFileResolver('/cache')), new EventDispatcher(), $this->createStub(\App\Transcode\Application\Port\TranscodeExecutionOwnershipPort::class), $this->createStub(\App\Shared\Application\Port\TransactionPortInterface::class), new \Psr\Log\NullLogger());
         $video = Uuid::generate();
         $alice = Uuid::generate();
         $bob = Uuid::generate();
@@ -57,7 +57,7 @@ final class OwnedTranscodeJobTest extends TestCase
     public function testLogicalRequestsKeepIndependentMutableJobs(): void
     {
         $repository = new OwnedJobRepository();
-        $service = new TranscodeJobService($repository, new TranscodeFileStorage(new SegmentFileResolver('/cache')), new EventDispatcher());
+        $service = new TranscodeJobService($repository, new TranscodeFileStorage(new SegmentFileResolver('/cache')), new EventDispatcher(), $this->createStub(\App\Transcode\Application\Port\TranscodeExecutionOwnershipPort::class), $this->createStub(\App\Shared\Application\Port\TransactionPortInterface::class), new \Psr\Log\NullLogger());
         $video = Uuid::generate();
         $owner = Uuid::generate();
         $selection = new PresentationSelection('copy', 'source-hash', 2, 4, 'mp4');
@@ -77,7 +77,7 @@ final class OwnedTranscodeJobTest extends TestCase
     public function testCopyReuseRequiresTheSameOwnerSourceAndSelectedStreams(): void
     {
         $repository = new OwnedJobRepository();
-        $service = new TranscodeJobService($repository, new TranscodeFileStorage(new SegmentFileResolver('/cache')), new EventDispatcher());
+        $service = new TranscodeJobService($repository, new TranscodeFileStorage(new SegmentFileResolver('/cache')), new EventDispatcher(), $this->createStub(\App\Transcode\Application\Port\TranscodeExecutionOwnershipPort::class), $this->createStub(\App\Shared\Application\Port\TransactionPortInterface::class), new \Psr\Log\NullLogger());
         $video = Uuid::generate();
         $owner = Uuid::generate();
         $selection = new PresentationSelection('copy', 'source-hash', 2, 4, 'mp4');
@@ -98,7 +98,7 @@ final class OwnedTranscodeJobTest extends TestCase
     {
         $repository = new OwnedJobRepository();
         $storage = new TranscodeFileStorage(new SegmentFileResolver('/cache'));
-        $jobs = new TranscodeJobService($repository, $storage, new EventDispatcher());
+        $jobs = new TranscodeJobService($repository, $storage, new EventDispatcher(), $this->createStub(\App\Transcode\Application\Port\TranscodeExecutionOwnershipPort::class), $this->createStub(\App\Shared\Application\Port\TransactionPortInterface::class), new \Psr\Log\NullLogger());
         $rows = new OwnedAdmissionRows();
         $sessions = $this->createStub(TranscodeSessionPortInterface::class);
         $sessions->method('createSession')->willReturnCallback(static function (Uuid $user, Uuid $job, Uuid $video, AudioProfile $profile) use ($rows): TranscodeSession {

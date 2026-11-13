@@ -58,9 +58,10 @@ RUN /opt/php/bin/php -r 'if (PHP_VERSION !== $argv[1] || PHP_ZTS || phpversion("
 
 FROM debian:trixie-slim AS tooling
 
+# The CI package store transfers archives with curl and packs them with `tar --zstd`.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        bash ca-certificates git make openssl libffi8 libonig5 libsqlite3-0 libssl3t64 libstdc++6 libxml2 \
-        libyaml-0-2 libzip5 util-linux zlib1g \
+        bash ca-certificates curl git make openssl libffi8 libonig5 libsqlite3-0 libssl3t64 libstdc++6 libxml2 \
+        libyaml-0-2 libzip5 util-linux zlib1g zstd \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=tooling-build /opt/php /opt/php

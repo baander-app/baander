@@ -97,6 +97,29 @@ describe('browser-local recovery', () => {
     expect(context.getState().status).toBe('recovered')
   })
 
+  it('leaves its own tab\'s record alone when asked to, and still recovers a closed tab', async () => {
+    const context = new PlaybackLocalRecovery(record.server, record.account, memory())
+    released.push(() => context.dispose())
+    await context.initialize(vi.fn())
+    const own = { ...record, tabId: context.tabId, incarnationId: 'own-incarnation' }
+    const storage = memory([own, record])
+    const live = new PlaybackLocalRecovery(record.server, record.account, storage)
+    released.push(() => live.dispose())
+    context.dispose()
+    const recover = vi.fn(async () => {})
+
+    await live.initialize(recover, 'keep')
+
+    expect(live.tabId).toBe(own.tabId)
+    expect(recover).toHaveBeenCalledExactlyOnceWith(record)
+    expect(await storage.list(record.server, record.account)).toEqual([own])
+    expect(live.wasRecovered(own.incarnationId)).toBe(false)
+
+    await live.initialize(recover)
+    expect(recover).toHaveBeenLastCalledWith(own)
+    expect(await storage.list(record.server, record.account)).toEqual([])
+  })
+
   it('awaits the recovery record commit before registration can enable execution', async () => {
     let commit!: () => void
     const storage = memory()
@@ -306,4 +329,90 @@ it('holds execution until its registration record commits, then fences pagehide 
   listener.onMessage?.({ type: 'session.snapshot', data: { ...recovered, endpoint: { ...endpoint, incarnationId: 'replacement', epoch: 2, recoveryCredential: 'replacement-secret' } } })
   await vi.waitFor(() => expect(rearm).toHaveBeenCalledTimes(2))
   expect(execute).toHaveBeenCalledTimes(1)
+})
+
+describe('a live page and the recovery record of its own tab', () => {
+  const media = { kind: 'song' as const, publicId: 'song' }
+  const registered = { destinationId: 'destination', incarnationId: 'registered', epoch: 1, capability: 'execution-secret',
+    recoveryCredential: 'recovery-secret', recoveryExpiresAt: record.recoveryExpiresAt }
+  const paths = () => vi.mocked(AXIOS_INSTANCE.post).mock.calls.map(([path]) => path)
+
+  /** A registered page that plays a song and has stored the recovery record of its incarnation. */
+  async function playingPage(stoppable: boolean) {
+    let listener: LiveTransportListener = {}
+    let connected = true
+    const send = vi.fn()
+    const transport = { subscribe: (value: LiveTransportListener) => { listener = value; return () => {} }, retain: () => () => {}, isConnected: () => connected, send }
+    const storage = memory()
+    const context = new PlaybackLocalRecovery(record.server, record.account, storage)
+    let observedState: 'playing' | 'paused' | 'stopped' = 'stopped'
+    const silence = () => { if (stoppable && observedState === 'playing') observedState = 'paused' }
+    const unregister = registerPlaybackAdapter({ kind: 'song', supportsVolume: true, prepare: vi.fn(async () => {}),
+      execute: vi.fn(async command => {
+        if (command.type !== 'stop') observedState = 'playing'
+        else if (stoppable) observedState = 'stopped'
+        else throw new Error('The element is gone.')
+        return { observedState, position: 12 }
+      }),
+      quiesce: vi.fn(async () => { silence(); return { observedState, position: 12 } }),
+      observe: () => ({ observedState, position: 12 }),
+      localRecovery: { eligible: true, rearmAfterRegistration: vi.fn(),
+        fence: () => { silence(); return stoppable ? { observedState: 'stopped' as const, position: 12 } : null } } })
+    const playing = state({ media, queue: ['song'], position: 12, desiredState: 'playing', observedState: 'playing', activeIncarnationId: registered.incarnationId })
+    vi.mocked(AXIOS_INSTANCE.post).mockImplementation(async (path, body) => ({ data: { data: path === '/api/session/recover-local'
+      ? { ...playing, recoveryResult: { incarnationId: (body as { incarnationId: string }).incarnationId, outcome: 'recovered', revision: 1 } } : playing } }))
+    const runtime = new PlaybackSessionCoordinator(new QueryClient(), transport as unknown as SharedLiveTransport, context)
+    const stop = runtime.start()
+    released.push(() => { stop(); context.dispose(); unregister() })
+    await vi.waitFor(() => expect(send).toHaveBeenCalledOnce())
+    const start = { id: 'start', attemptId: 'attempt', revision: 1, incarnationId: registered.incarnationId, epoch: 1, type: 'start' as const,
+      expiresAt: new Date(Date.now() + 60_000).toISOString(), payload: { media, queue: ['song'], currentTrackIndex: 0, position: 12, desiredState: 'playing' as const } }
+    listener.onMessage?.({ type: 'session.snapshot', data: { ...playing, endpoint: { ...registered, recoveryTabId: context.tabId }, commands: [start] } })
+    await vi.waitFor(() => expect(paths()).toContain('/api/session/observe'))
+    expect(await storage.list(record.server, record.account)).toEqual([expect.objectContaining({ incarnationId: registered.incarnationId, tabId: context.tabId })])
+    vi.mocked(AXIOS_INSTANCE.post).mockClear()
+    return { send, storage, observed: () => observedState,
+      close: () => { connected = false; listener.onClose?.() },
+      open: () => { connected = true; listener.onOpen?.() } }
+  }
+
+  it('recovers nothing of its own while it plays through a socket that was replaced without a close', async () => {
+    const page = await playingPage(true)
+
+    page.open()
+    await vi.waitFor(() => expect(page.send).toHaveBeenCalledTimes(2))
+
+    expect(page.observed()).toBe('playing')
+    expect(paths()).not.toContain('/api/session/recover-local')
+    expect(paths()).not.toContain('/api/session/close')
+    expect(await page.storage.list(record.server, record.account)).toEqual([expect.objectContaining({ incarnationId: registered.incarnationId })])
+  })
+
+  it('reports its close and then recovers its own record once a socket close has silenced its players', async () => {
+    const page = await playingPage(true)
+
+    page.close()
+    page.open()
+    await vi.waitFor(() => expect(page.send).toHaveBeenCalledTimes(2))
+
+    expect(page.observed()).not.toBe('playing')
+    expect(paths().filter(path => path === '/api/session/close' || path === '/api/session/recover-local'))
+      .toEqual(['/api/session/close', '/api/session/recover-local'])
+    const recovery = vi.mocked(AXIOS_INSTANCE.post).mock.calls.find(([path]) => path === '/api/session/recover-local')
+    expect(recovery?.[1]).toMatchObject({ incarnationId: registered.incarnationId, recoveryCredential: 'recovery-secret' })
+    expect(await page.storage.list(record.server, record.account)).toEqual([])
+  })
+
+  it('neither reports its close nor recovers its own record while a player survived the socket close', async () => {
+    const page = await playingPage(false)
+
+    page.close()
+    page.open()
+    await vi.waitFor(() => expect(page.send).toHaveBeenCalledTimes(2))
+
+    expect(page.observed()).toBe('playing')
+    expect(paths()).not.toContain('/api/session/recover-local')
+    expect(paths()).not.toContain('/api/session/close')
+    expect(await page.storage.list(record.server, record.account)).toEqual([expect.objectContaining({ incarnationId: registered.incarnationId })])
+  })
 })

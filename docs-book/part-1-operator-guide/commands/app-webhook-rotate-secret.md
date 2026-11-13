@@ -6,7 +6,7 @@ Replace a webhook's signing secret and print the new one. The command does what 
 
 The Make examples below target the checkout's development preview. For an
 installed instance, use the `dc` function from
-[Getting started](../getting-started.md#command-context) and replace
+[Getting started](../getting-started/installation.md#command-context) and replace
 `make exec cmd="php bin/console …"` with `dc exec app php bin/console …`.
 
 ```bash
@@ -36,7 +36,7 @@ make exec cmd="php bin/console app:webhook:rotate-secret aB3dE5fG7hJ9kL1mN3pQr -
 
 The old secret stops working at once: every delivery after the rotation is signed with the new secret, so the receiver rejects them until it has the new one. On a terminal the command asks first. Without a terminal and without `--force` it changes nothing and exits with code 2.
 
-The command prints the new secret once; store it with the receiver. It also prints the webhook's signing version, which rotation keeps. Rotate when a secret is lost or exposed, or after `APP_SECRET` changes and the stored secrets can no longer be decrypted; see [Notifications](../notifications.md).
+The command prints the new secret once; store it with the receiver. It also prints the webhook's signing version, which rotation keeps. Rotate when a secret is lost or exposed, or after `APP_SECRET` changes and the stored secrets can no longer be decrypted; see [Notifications](../administration/notifications.md).
 
 With `--json` the command prints the API's `data` object: `publicId`, `secret` and `signing_version`.
 

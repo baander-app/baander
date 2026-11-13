@@ -28,6 +28,7 @@ export class PlaybackCommandRunner {
   private revision = 0
   private pending = new Map<string, Promise<PlaybackAcknowledgement | null>>()
   private effects = new Set<AbortController>()
+  private dropping: Promise<void> | null = null
 
   private readonly beforeExecute: (command: PlaybackCommandResource, signal: AbortSignal) => Promise<void>
   private readonly acknowledge: (ack: PlaybackAcknowledgement) => Promise<void>
@@ -59,7 +60,12 @@ export class PlaybackCommandRunner {
       this.pending.set(command.id, effect)
     }
     const ack = await effect
-    if (ack && this.endpoint === endpoint && this.revision === command.revision) await this.acknowledge(ack)
+    // A page that registers again keeps its unanswered commands: one comes again under the same
+    // identity for the next incarnation, and the effect it already had answers it. The answer
+    // names the delivery it answers, not the one that started the effect.
+    if (ack && this.endpoint === endpoint && this.revision === command.revision) {
+      await this.acknowledge({ ...ack, incarnationId: command.incarnationId, epoch: command.epoch })
+    }
   }
 
   private async execute(command: PlaybackCommandResource): Promise<PlaybackAcknowledgement | null> {
@@ -73,6 +79,8 @@ export class PlaybackCommandRunner {
       incarnationId: command.incarnationId, epoch: command.epoch, outcome: 'rejected',
     }
     try {
+      // A player being let go is still owned; the next command waits for it.
+      if (this.dropping) await this.dropping
       await this.beforeExecute(command, effect.signal)
       if (!current()) return null
       const kind = command.payload.media?.kind
@@ -128,6 +136,59 @@ export class PlaybackCommandRunner {
     }
   }
 
+  /**
+   * Drops media this runner only prepared, once the transfer it was prepared for is gone.
+   * Nothing was started, so nothing is acknowledged; a prepared player left in place would
+   * keep its stream alive unseen. Media a later command started is not a preparation.
+   */
+  dropPreparation(): Promise<void> {
+    const adapter = this.adapter
+    const command = this.lastCommand
+    if (!adapter || command?.type !== 'prepare') return this.dropping ?? Promise.resolve()
+    return this.letGo(async signal => {
+      let observation = await adapter.quiesce(signal)
+      if (observation.observedState !== 'stopped') observation = await adapter.execute({ ...command, type: 'stop' }, signal)
+      return { ...observation, observedState: 'stopped' }
+    })
+  }
+
+  /**
+   * Silences media this runner still plays although the session no longer names this tab, and
+   * lets go of the player. The session did not ask, so nothing is acknowledged. Only playing
+   * media is touched: a paused or stopped player keeps its place, because the session may have
+   * released a paused tab that is still open, and a stop would close its video.
+   */
+  silenceLostPlayback(): Promise<void> {
+    const adapter = this.adapter
+    const command = this.lastCommand
+    if (!adapter || !command || command.type === 'prepare' || adapter.observe().observedState !== 'playing') {
+      return this.dropping ?? Promise.resolve()
+    }
+    return this.letGo(async signal => {
+      const observation = await adapter.quiesce(signal)
+      return observation.observedState === 'playing' ? adapter.execute({ ...command, type: 'stop' }, signal) : observation
+    })
+  }
+
+  /**
+   * Gives up the bound player and settles it in the background. Each such settlement runs after
+   * the one before it, and the next command waits for all of them, so a command never meets a
+   * player that is still being let go.
+   */
+  private letGo(settle: (signal: AbortSignal) => Promise<PlaybackObservation>): Promise<void> {
+    this.adapter = undefined
+    this.lastCommand = undefined
+    const released = (this.dropping ?? Promise.resolve()).then(async () => {
+      const observation = await settle(new AbortController().signal)
+      if (!this.adapter) this.idleObservation = observation
+    })
+    const settled = released.catch(() => {}).then(() => {
+      if (this.dropping === settled) this.dropping = null
+    })
+    this.dropping = settled
+    return released
+  }
+
   fenceLocalExecution(): boolean {
     this.generation++
     for (const effect of this.effects) effect.abort()
@@ -141,6 +202,21 @@ export class PlaybackCommandRunner {
 
   observe(): PlaybackObservation | null {
     return this.adapter?.observe() ?? this.idleObservation
+  }
+
+  /**
+   * Silences what this runner plays without a command from the session, so nothing is
+   * acknowledged. The adapter stays bound: a later command still finds its player.
+   */
+  async silence(): Promise<PlaybackObservation | null> {
+    const adapter = this.adapter
+    const command = this.lastCommand
+    if (!adapter) return this.idleObservation
+    const signal = new AbortController().signal
+    const observation = await adapter.quiesce(signal)
+    return observation.observedState === 'playing' && command
+      ? adapter.execute({ ...command, type: 'stop' }, signal)
+      : observation
   }
 
   async disconnect(): Promise<PlaybackObservation | null> {
@@ -158,8 +234,15 @@ export class PlaybackCommandRunner {
     if (!adapter) return idle ? { ...idle, observedState: 'stopped' } : null
     const signal = new AbortController().signal
     const observation = await adapter.quiesce(signal)
-    return observation.observedState !== 'stopped' && command
-      ? adapter.execute({ ...command, type: 'stop' }, signal)
-      : observation
+    if (observation.observedState === 'stopped' || !command) return observation
+    try {
+      return await adapter.execute({ ...command, type: 'stop' }, signal)
+    } catch (error) {
+      // An adapter the page has fenced refuses every command, the stop included. Its quiesce has
+      // silenced it by then, and the cursor it gave is the one to report. Only a player that
+      // still plays makes the refused stop a failure.
+      if (observation.observedState === 'playing') throw error
+      return observation
+    }
   }
 }

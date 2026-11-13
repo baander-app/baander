@@ -40,7 +40,13 @@ export class PlaybackLocalRecovery {
 
   private update(status: LocalRecoveryState['status'], message: string | null): void { this.state = { status, message } }
 
-  async initialize(recover: (record: PlaybackRecoveryRecord) => Promise<void>): Promise<void> {
+  /**
+   * Takes the tab's lock and recovers the records of pages that have gone. `ownRecord` says what
+   * to do with the record of this very tab: a new page recovers the one its predecessor left,
+   * while a live page that still plays keeps its own, because a recovery would tell the server
+   * that a playing tab had stopped.
+   */
+  async initialize(recover: (record: PlaybackRecoveryRecord) => Promise<void>, ownRecord: 'recover' | 'keep' = 'recover'): Promise<void> {
     const generation = ++this.generation
     const check = () => { if (generation !== this.generation) throw new Error('Playback recovery ownership changed.') }
     this.update('recovering', 'Checking previous local playback…')
@@ -78,6 +84,7 @@ export class PlaybackLocalRecovery {
       for (const record of records) {
         check()
         if (record.server !== this.server || record.account !== this.account || record.eligible !== true) continue
+        if (ownRecord === 'keep' && record.tabId === this.tabId) continue
         if (!this.locks.has(record.tabId)) {
           const lock = await acquirePlaybackLock(this.server, this.account, record.tabId)
           if (generation !== this.generation) { lock?.release(); check() }

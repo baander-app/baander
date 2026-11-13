@@ -37,14 +37,20 @@ All aggregates follow the State-object pattern, with `*State` classes (`CountryS
 
 ## Ports
 
-| Port | Purpose |
-|------|---------|
-| `CountrySubscriptionPortInterface` | Country subscription lifecycle (subscribe, unsubscribe, query) |
-| `RadioStationPortInterface` | Station lookup and listing |
-| `RadioSourcePortInterface` | Radio source CRUD |
-| `RadioSessionPortInterface` | Playback session lifecycle (start, stop, query) |
-| `StarredStationPortInterface` | Starred-station operations |
-| `StationSyncPortInterface` | Contract for station sync adapters (IPRD, TuneIn, etc.) |
+| Port | Purpose | Implemented By |
+|------|---------|----------------|
+| `CountrySubscriptionRepositoryInterface` | Domain repository contract for `CountrySubscription` persistence and queries | `CountrySubscriptionDoctrineRepository` |
+| `RadioStationRepositoryInterface` | Domain repository contract for `RadioStation` persistence and queries | `RadioStationDoctrineRepository` |
+| `RadioSourceRepositoryInterface` | Domain repository contract for `RadioSource` persistence and queries | `RadioSourceDoctrineRepository` |
+| `RadioSessionRepositoryInterface` | Domain repository contract for `RadioSession` persistence and queries | `RadioSessionDoctrineRepository` |
+| `StarredStationRepositoryInterface` | Domain repository contract for `StarredStation` persistence and queries | `StarredStationDoctrineRepository` |
+| `CountrySubscriptionPortInterface` | Country subscription lifecycle (subscribe, unsubscribe, query) | `CountrySubscriptionService` |
+| `RadioStationPortInterface` | Station lookup and listing | `RadioStationService` |
+| `RadioSourcePortInterface` | Radio source CRUD | `RadioSourceService` |
+| `RadioSessionPortInterface` | Playback session lifecycle (start, stop, query) | `RadioSessionService` |
+| `StarredStationPortInterface` | Starred-station operations | `StarredStationService` |
+| `RadioPublicIdentityInterface` | Resolves a user's `PublicId` from their internal `Uuid` | `RadioPublicIdentity` |
+| `StationSyncPortInterface` | Contract for station sync adapters (IPRD, TuneIn, etc.) | `IprdStationSyncAdapter` |
 
 ## Domain Events
 
@@ -104,23 +110,28 @@ All endpoints are prefixed with `/api`.
 
 | Direction | Context | Details |
 |-----------|---------|---------|
-| Depends on | Shared | `Uuid`, `AbstractDomainEvent`, `ApiResponsesTrait` |
-| Depends on | Auth | `SecurityUser` for authenticated user resolution |
-| Depended on by | Activity | Radio session events feed listening activity |
+| Depends on | Shared | `Uuid`, `PublicId`, `AbstractDomainEvent`, `ApiResponsesTrait` |
+| Depends on | Auth | `AuthenticatedUserIdentityInterface` for authenticated user resolution |
+| Depended on by | Activity | `ActivityIdentityProjection` resolves user public IDs through `RadioPublicIdentityInterface` |
+| Depended on by | Shared | `WebSocketIdentityLookup` resolves user public IDs through `RadioPublicIdentityInterface` |
 
 ## Infrastructure
 
 | Component | Type | Purpose |
 |-----------|------|---------|
 | `IprdStationSyncAdapter` | Sync adapter | `StationSyncPortInterface` implementation backed by the IPRD directory |
+| `RadioPublicIdentity` | Port implementation | `RadioPublicIdentityInterface` implementation resolving user `PublicId` values |
 | Doctrine entities | ORM | Persistence for all five aggregates (`CountrySubscriptionEntity`, `RadioStationEntity`, `RadioSourceEntity`, `RadioSessionEntity`, `StarredStationEntity`) |
-| Doctrine repositories | ORM | Repository implementations for all five aggregates |
+| Doctrine repositories | ORM | Repository implementations for all five aggregates (`CountrySubscriptionDoctrineRepository`, `RadioStationDoctrineRepository`, `RadioSourceDoctrineRepository`, `RadioSessionDoctrineRepository`, `StarredStationDoctrineRepository`) |
 | Per-aggregate infrastructure services | Application service | `CountrySubscriptionService`, `RadioStationService`, `RadioSourceService`, `RadioSessionService`, `StarredStationService` |
 
 ### Console Commands
 
 | Command | Purpose |
 |---------|---------|
+| `app:radio:country:list` (`RadioCountryListCommand`) | List the countries the radio station directory offers, with their station counts |
+| `app:radio:source:create` (`RadioSourceCreateCommand`) | Create a radio source that station data is synced from |
+| `app:radio:station:list` (`RadioStationListCommand`) | List the synced radio stations, optionally filtered by country or search text |
 | `app:radio:sync` (`SyncSubscribedCountriesCommand`) | Sync stations for all subscribed countries |
 
-See the [Architecture](../architecture.md#anti-corruption-layer) page for details on the station sync anti-corruption layer.
+See the [Architecture](../architecture/overview.md#anti-corruption-layer) page for details on the station sync anti-corruption layer.

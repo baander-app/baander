@@ -66,7 +66,7 @@ final class TranscodeSiblingControlRollbackTest extends TestCase
         $jobs = new TranscodeJobRepository($manager);
         $sessions = new TranscodeSessionRepository($manager);
         $sessionService = new TranscodeSessionService($sessions);
-        $jobService = new TranscodeJobService($jobs, $this->createStub(TranscodeStoragePortInterface::class), new EventDispatcher());
+        $jobService = new TranscodeJobService($jobs, $this->createStub(TranscodeStoragePortInterface::class), new EventDispatcher(), $this->createStub(\App\Transcode\Application\Port\TranscodeExecutionOwnershipPort::class), $transaction, new \Psr\Log\NullLogger());
         $tierSessions = [];
         $clientId = 'start';
         foreach ([QualityTier::p1080(), QualityTier::p360(), QualityTier::p720()] as $index => $tier) {

@@ -10,25 +10,30 @@ $familyNotes = [
     'hev2' => 'Three encoders at nominal 24 and 32 kbit/s. Apple and FFmpeg have no observations in this profile.',
     'xhe' => 'bAAC and FDK at nominal 24, 32, 48, 64 and 96 kbit/s; libxaac at 64 and 96 only. Other combinations are unavailable.',
 ];
+$lossless = $aac['charts']['lossless'];
+$losslessShown = ['baac-5', 'baac-8', 'flac-5', 'flac-8', 'flac-ffmpeg-5', 'flac-ffmpeg-8', 'alac-ffmpeg', 'alac-apple-ref'];
+$losslessRows = array_values(array_filter($lossless['rows'], static fn (array $row): bool => in_array($row['codec'], $losslessShown, true)));
+$losslessRun = $lossless['run'];
+$speed = static fn (?float $value): string => $value === null ? 'Not measured' : $number($value, 0) . '×';
 ?>
 <main id="main" class="baac-page">
   <section class="baac-intro" aria-labelledby="baac-title">
     <p class="eyebrow">The codec library</p>
     <h1 id="baac-title">bAAC</h1>
-    <p class="baac-lead">AAC encoding and decoding for Bånder.</p>
-    <p>bAAC is a C++17 codec library with a C API, a command-line tool, a Node/Electron binding and an FFmpeg codec that Bånder's server transcoder uses by default. Explore what it implements and how its recorded measurements compare with other AAC codecs.</p>
+    <p class="baac-lead">AAC and lossless FLAC encoding and decoding for Bånder.</p>
+    <p>bAAC is a C++17 codec library with a C API, a command-line tool, a Node/Electron binding and an FFmpeg codec that Bånder's server transcoder uses by default. Its lossless mode writes and reads standard FLAC through the C API, the command-line tool and the binding. Explore what it implements and how its recorded measurements compare with other AAC, FLAC and ALAC encoders.</p>
     <div class="actions">
       <a class="button" href="<?= $source('docs/README.md') ?>">Read the source guide <span class="arrow" aria-hidden="true">↗</span></a>
       <a class="text-action" href="#quality">Compare the measurements <span class="arrow" aria-hidden="true">↓</span></a>
     </div>
-    <p class="release-note">Pre-release · Version 0.1.0 · Source-build and API guidance</p>
+    <p class="release-note">Pre-release · Version <?= $escape($aac['evidence']['version']) ?> · Source-build and API guidance</p>
   </section>
 
   <nav class="baac-navigation" aria-label="On this page">
     <a href="#integration">Integration</a>
     <a href="#quality">Quality</a>
     <a href="#throughput">Throughput</a>
-    <a href="#lossless">Lossless context</a>
+    <a href="#lossless">Lossless</a>
     <a href="#methodology">Method and sources</a>
   </nav>
 
@@ -52,7 +57,7 @@ $familyNotes = [
     <div class="baac-note">
       <h3>Server transcoding through FFmpeg</h3>
       <p>Bånder's own FFmpeg build carries bAAC as the <code>libbaac</code> encoder and decoder, beside Fraunhofer's fdk-aac and FFmpeg's built-in AAC codec. In FFmpeg, bAAC encodes AAC-LC in mono, stereo and 5.1. The server transcoder uses it by default to encode AAC audio renditions and the audio of DASH video sessions, and to decode AAC sources for those encodes. Stream copies and probes keep FFmpeg's own handling.</p>
-      <p>An operator can move the server to fdk-aac or the built-in codec with the <code>transcode.aac_implementation</code> setting, from the admin settings or the console. A DASH session keeps the implementation it started with, and a switch re-encodes no cached rendition. The operator guide's <a href="/docs/operator-guide/transcoding/#aac-implementation">AAC implementation</a> section describes the setting.</p>
+      <p>An operator can move the server to fdk-aac or the built-in codec with the <code>transcode.aac_implementation</code> setting, from the admin settings or the console. A DASH session keeps the implementation it started with, and a switch re-encodes no cached rendition. The operator guide's <a href="/docs/operator-guide/media/transcoding/#aac-implementation">AAC implementation</a> section describes the setting.</p>
     </div>
   </section>
 
@@ -146,22 +151,35 @@ $familyNotes = [
 
   <section class="baac-section" id="lossless" aria-labelledby="lossless-title">
     <div class="baac-section-heading">
-      <p class="eyebrow">Separate reference context</p>
-      <h2 id="lossless-title">What lossless needs on this corpus.</h2>
-      <p>ALAC and FLAC preserve the decoded samples exactly in these recorded checks. Their measured rates provide storage context for the same music corpus. They have no AAC quality score here, and this table does not imply a bAAC lossless mode.</p>
+      <p class="eyebrow">Lossless mode</p>
+      <h2 id="lossless-title">Standard FLAC, measured level for level.</h2>
+      <p>The lossless mode encodes PCM as standard FLAC (RFC 9639), and decoding the stream returns every sample bit for bit. Its encoder and decoder are bAAC's own, written from the RFC. Levels run from 0 to 8, and level 5 is the default; each level stays within the limits of the same-numbered preset of <code>flac</code>, the reference encoder. Every level is measured against <code>flac</code> at the same level. At levels 5 and 8 that comparison is a gate: bAAC's frame bytes may not exceed <code>flac</code>'s, and its speed may trail <code>flac</code>'s by no more than <code>flac</code>'s own run-to-run spread.</p>
     </div>
-    <div class="baac-table-scroll" role="region" tabindex="0" aria-label="Lossless reference data">
+    <div class="baac-copy-grid">
+      <div>
+        <h3>Streams and files</h3>
+        <p>The encoder writes and the decoder reads tags and pictures. <code>flac</code> and FFmpeg decode the encoder's streams to the input samples. The decoder passes over an ID3v2 tag in front of a stream and an ID3v1 tag behind its last frame, verifies every sample between them and reports both tags; the reference decoder reports the second as lost sync. Encoded bytes do not depend on the compiler, the optimization level, the processor or the C library: every CI runner has to reproduce fifteen streams pinned by their digests.</p>
+      </div>
+      <div>
+        <h3>Held-out recordings</h3>
+        <p>The gates also run on held-out recordings, which the encoder is never tuned on. The first held-out set, seven recordings from the FLAC decoder testbench, ran once before the encoder was final, and two of its encode gates failed. Four speed changes to the encoder followed. They were measured on the corpus and left every encoded byte as it was, but the failures had prompted them, so the seven recordings moved into the corpus, where they keep gates of their own. A second set of three recordings followed, and it was replaced in turn after code review changed the encoder binary, because an earlier build had already read it. The held-out gates are now judged on a third set: Avon Chang's piano recording of Bach's Cello Suite No. 6 (96 kHz, 24-bit), twenty seconds of the 5.1 mix of the film Tears of Steel and a minute of Cloudkicker's "Let Yourself Be Huge", fetched against pinned checksums.<?= $losslessRun !== null && $losslessRun['heldOutFirstRun'] ? ' The recorded run was the first to read them.' : '' ?> In that run one held-out gate failed: on the piano recording bAAC's level 5 frames were 0.27 % larger than those of <code>flac -5</code>. The failure stands, and the encoder is not tuned in answer to it.</p>
+      </div>
+    </div>
+    <?php if ($losslessRun !== null): ?>
+      <p class="baac-dateline">Recorded <?= $escape($losslessRun['date']) ?> on <?= $escape($losslessRun['processor']) ?>.<?= $losslessRun['compiler'] === '' ? '' : ' bAAC was built with ' . $escape($losslessRun['compiler']) . '.' ?> The references were <?= $escape($losslessRun['flac']) ?> and <?= $escape($losslessRun['ffmpeg']) ?>. Each timed run is one process on one pinned core over the corpus repeated <?= $number($losslessRun['repetitions'], 0) ?> times. Compare speeds within this run only.</p>
+    <?php endif; ?>
+    <div class="baac-table-scroll" role="region" tabindex="0" aria-label="Lossless measurements">
       <table>
-      <caption>Recorded lossless references · TCDAudio14 music, 48 kHz, 16-bit stereo</caption>
-        <thead><tr><th scope="col">Reference</th><th scope="col">Measured kbit/s</th><th scope="col">Bit-exact check</th></tr></thead>
+        <caption>Recorded lossless measurements · TCDAudio14 music, 48 kHz, 16-bit stereo · speed in audio seconds per CPU second</caption>
+        <thead><tr><th scope="col">Encoder</th><th scope="col">FLAC frame bytes</th><th scope="col">kbit/s</th><th scope="col">Encode speed</th><th scope="col">Decode speed</th><th scope="col">Bit-exact check</th></tr></thead>
         <tbody>
-          <?php foreach ($aac['charts']['lossless'] as $row): ?>
-            <tr><th scope="row"><?= $escape($row['label']) ?></th><td><?= $number($row['kbps']) ?></td><td><?= $row['bit_exact'] ? 'Passed' : 'Failed' ?></td></tr>
+          <?php foreach ($losslessRows as $row): ?>
+            <tr data-codec="<?= $escape($row['codec']) ?>"><th scope="row"><?= $escape($row['label']) ?><?= $row['carried'] === null ? '' : ', carried from ' . $escape($row['carried']) ?></th><td><?= $row['frame_bytes'] === null ? 'Not recorded' : $number($row['frame_bytes'], 0) ?></td><td><?= $number($row['kbps'], 2) ?></td><td><?= $speed($row['encode']) ?></td><td><?= $speed($row['decode']) ?></td><td><?= $row['bit_exact'] ? 'Passed' : 'Failed' ?></td></tr>
           <?php endforeach; ?>
         </tbody>
       </table>
     </div>
-    <p class="baac-source-note">Four reference configurations from <a href="<?= $source('bench/results/lossless.json') ?>">lossless.json</a>: FFmpeg ALAC, refalac 2.85 and FLAC 1.4.3 at levels 5 and 8.</p>
+    <p class="baac-source-note">The table shows <?= count($losslessRows) ?> of the <?= count($lossless['rows']) ?> rows in <a href="<?= $source('bench/results/lossless.json') ?>">lossless.json</a>. Frame bytes count a file without its metadata blocks; the size gates compare frame bytes because <code>flac</code> writes padding and seek points by default. Apple's encoder, refalac, runs under Wine and is compared on size only. A carried row comes from the earlier run it names. The <a href="<?= $source('docs/codec-comparison.md#lossless') ?>">codec comparison</a> gives the size at every level and each gate's figures and verdict.</p>
   </section>
 
   <section class="baac-section baac-method" id="methodology" aria-labelledby="methodology-title">
@@ -201,7 +219,7 @@ $familyNotes = [
       <h3>Inspect the recorded evidence</h3>
       <ul>
         <li><a href="<?= $source('docs/codec-comparison.md') ?>">Comparison method and interpretation</a></li>
-        <li><a href="<?= $source('bench/results/tables.md') ?>">Detailed quality and paired-difference tables</a></li>
+        <li><a href="<?= $source('bench/results/tables.md') ?>">Detailed quality, paired-difference and lossless gate tables</a></li>
         <li><a href="<?= $source('bench/results/compat.json') ?>">Compatibility attempts</a></li>
         <li><a href="<?= $source('bench/README.md') ?>">Benchmark protocol</a>, <a href="<?= $source('bench/bench.py') ?>">harness</a>, <a href="<?= $source('bench/corpus.sh') ?>">corpus setup</a> and <a href="<?= $source('bench/setup-refs.sh') ?>">reference setup</a></li>
       </ul>

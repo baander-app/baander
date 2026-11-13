@@ -1044,11 +1044,16 @@ const float aac_sbr_qmf_window[AAC_SBR_QMF_FILTER_LENGTH] = {0.0f,
                                                              -0.00056176925738f,
                                                              -0.00055252865047f};
 
-void aac_tables_init(void) {
-  static bool done = false;
-  if (done) {
-    return;
-  }
+/* The Huffman decoding trees of bitstream.cpp, built from the code
+ * tables.  It has one caller, build_tables below, which runs once; it
+ * is declared here and in no header, because a second call would
+ * rewrite the trees under the decoders that read them. */
+void aac_huffman_trees_build(void);
+
+/* Fills every table that is computed and not written out: the Huffman
+ * code pointers and bit costs, the windows, the |q|^(4/3) table and the
+ * Huffman decoding trees of bitstream.cpp. */
+static bool build_tables() {
   for (int cb = 1; cb <= AAC_NUM_CODEBOOKS; cb++) {
     aac_huff_code[cb] = huff_code_ptrs[cb];
     aac_huff_len[cb] = huff_len_ptrs[cb];
@@ -1101,11 +1106,16 @@ void aac_tables_init(void) {
   for (int i = 0; i < AAC_POW43_SIZE; i++) {
     aac_pow43[i] = (float)pow((double)i, 4.0 / 3.0);
   }
-  done = true;
+  aac_huffman_trees_build();
+  return true;
 }
 
-namespace {
-struct TablesInit {
-  TablesInit() { aac_tables_init(); }
-} g_tables_init;  // NOLINT(bugprone-throwing-static-initialization)
-}  // namespace
+void aac_tables_init(void) {
+  /* The tables are built on the first call, by whichever thread makes
+   * it; the language has every other caller wait until the static is
+   * initialised, and later calls cost one check.  Nothing is built when
+   * the library is loaded: a process that never creates an AAC encoder
+   * or decoder does not pay for the tables. */
+  static const bool built = build_tables();
+  (void)built;
+}

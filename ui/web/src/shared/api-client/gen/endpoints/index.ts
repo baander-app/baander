@@ -899,6 +899,8 @@ export interface RegisterPlaybackEndpointRequest {
   /** @nullable */
   tabId?: string | null;
   localRecoveryEligible?: boolean;
+  /** @nullable */
+  pageId?: string | null;
 }
 
 export interface TransferPlaybackRequest {
@@ -1071,6 +1073,20 @@ export interface RecoverLocalPlaybackRequest {
   tabId: string;
   recoveryCredential: string;
   checkpoint: RecoverLocalPlaybackRequestCheckpoint;
+}
+
+export type ClosePlaybackEndpointRequestCheckpoint = {[key: string]: {[key: string]: string} | number | null};
+
+export interface ClosePlaybackEndpointRequest {
+  incarnationId: string;
+  checkpoint: ClosePlaybackEndpointRequestCheckpoint;
+}
+
+export interface OverridePlaybackRequest {
+  requestId: string;
+  /** @minimum 0 */
+  expectedRevision: number;
+  incarnationId: string;
 }
 
 /**
@@ -6771,6 +6787,14 @@ export type PostPlaybackRecoverLocal200 = {
   data?: PlaybackSnapshotResource;
 };
 
+export type PostPlaybackClose200 = {
+  data: PlaybackSnapshotResource;
+};
+
+export type PostPlaybackOverride200 = {
+  data: PlaybackSnapshotResource;
+};
+
 export type GetPlaybackSnapshotParams = {
   incarnationId?: string;
 };
@@ -7481,6 +7505,8 @@ export type PostStreamSigningSignBody = {
      * @maxItems 3
      */
   jobIds?: string[];
+  /** Rendition set the player has attached, as returned in renditionSet; refresh only. A rendition named here stays in the signed set on a smaller published lead than one that still has to join */
+  attachedSet?: string;
 };
 
 export type PostStreamSigningSign200 = {
@@ -7505,6 +7531,20 @@ export type PostStreamSigningSign200 = {
   renditionSet?: string;
 };
 
+export type PostStreamSigningSign410Reason = typeof PostStreamSigningSign410Reason[keyof typeof PostStreamSigningSign410Reason];
+
+
+export const PostStreamSigningSign410Reason = {
+  expired: 'expired',
+  failed: 'failed',
+  cancelled: 'cancelled',
+} as const;
+
+export type PostStreamSigningSign410 = {
+  error: string;
+  reason: PostStreamSigningSign410Reason;
+};
+
 export type GetTranscodeJobIndex200DataItem = {
   publicId?: string;
   status?: string;
@@ -7525,8 +7565,13 @@ export type GetTranscodeJobShow200 = {
   data?: GetTranscodeJobShow200Data;
 };
 
-export type PostTranscodeJobCleanup200 = {
+export type PostTranscodeJobCleanup200Data = {
+  expired?: number;
   cleaned?: number;
+};
+
+export type PostTranscodeJobCleanup200 = {
+  data?: PostTranscodeJobCleanup200Data;
 };
 
 export type GetTranscodeSessionIndex200DataItem = {
@@ -30244,6 +30289,182 @@ export const usePostPlaybackRecoverLocal = <TError = ErrorType<void>,
       return useMutation(getPostPlaybackRecoverLocalMutationOptions(options), queryClient);
     }
 
+export const getPostPlaybackCloseUrl = () => {
+
+
+
+
+  return `/api/session/close`
+}
+
+/**
+ * @summary Report that an endpoint is going away and its players have stopped
+ */
+export const postPlaybackClose = async (closePlaybackEndpointRequest: ClosePlaybackEndpointRequest, options?: Parameters<typeof customInstance>[1]): Promise<PostPlaybackClose200> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customInstance<PostPlaybackClose200>(getPostPlaybackCloseUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(closePlaybackEndpointRequest)
+  }
+);}
+
+
+
+
+
+export const getPostPlaybackCloseMutationKey = () => ['postPlaybackClose'] as const;
+
+export const getPostPlaybackCloseMutationOptions = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPlaybackClose>>, TError,PostPlaybackCloseMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof postPlaybackClose>>, TError,PostPlaybackCloseMutationVariables, TContext> => {
+
+const mutationKey = getPostPlaybackCloseMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postPlaybackClose>>, PostPlaybackCloseMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  postPlaybackClose(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostPlaybackCloseMutationResult = NonNullable<Awaited<ReturnType<typeof postPlaybackClose>>>
+    export type PostPlaybackCloseMutationBody = BodyType<ClosePlaybackEndpointRequest>
+    export type PostPlaybackCloseMutationError = ErrorType<ApiError>
+    export type PostPlaybackCloseMutationVariables = {data: BodyType<ClosePlaybackEndpointRequest>}
+
+    /**
+ * @summary Report that an endpoint is going away and its players have stopped
+ */
+export const usePostPlaybackClose = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPlaybackClose>>, TError,PostPlaybackCloseMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof postPlaybackClose>>,
+        TError,
+        PostPlaybackCloseMutationVariables,
+        TContext
+      > => {
+      return useMutation(getPostPlaybackCloseMutationOptions(options), queryClient);
+    }
+
+export const getPostPlaybackOverrideUrl = () => {
+
+
+
+
+  return `/api/session/override`
+}
+
+/**
+ * @summary End the hold of a destination that is no longer registered
+ */
+export const postPlaybackOverride = async (overridePlaybackRequest: OverridePlaybackRequest, options?: Parameters<typeof customInstance>[1]): Promise<PostPlaybackOverride200> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customInstance<PostPlaybackOverride200>(getPostPlaybackOverrideUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(overridePlaybackRequest)
+  }
+);}
+
+
+
+
+
+export const getPostPlaybackOverrideMutationKey = () => ['postPlaybackOverride'] as const;
+
+export const getPostPlaybackOverrideMutationOptions = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPlaybackOverride>>, TError,PostPlaybackOverrideMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof postPlaybackOverride>>, TError,PostPlaybackOverrideMutationVariables, TContext> => {
+
+const mutationKey = getPostPlaybackOverrideMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postPlaybackOverride>>, PostPlaybackOverrideMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  postPlaybackOverride(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostPlaybackOverrideMutationResult = NonNullable<Awaited<ReturnType<typeof postPlaybackOverride>>>
+    export type PostPlaybackOverrideMutationBody = BodyType<OverridePlaybackRequest>
+    export type PostPlaybackOverrideMutationError = ErrorType<ApiError>
+    export type PostPlaybackOverrideMutationVariables = {data: BodyType<OverridePlaybackRequest>}
+
+    /**
+ * @summary End the hold of a destination that is no longer registered
+ */
+export const usePostPlaybackOverride = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPlaybackOverride>>, TError,PostPlaybackOverrideMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof postPlaybackOverride>>,
+        TError,
+        PostPlaybackOverrideMutationVariables,
+        TContext
+      > => {
+      return useMutation(getPostPlaybackOverrideMutationOptions(options), queryClient);
+    }
+
 export const getGetPlaybackSnapshotUrl = (params?: GetPlaybackSnapshotParams,) => {
   const normalizedParams = new URLSearchParams();
 
@@ -34493,7 +34714,7 @@ return customInstance<PostStreamSigningSign200>(getPostStreamSigningSignUrl(),
 
 export const getPostStreamSigningSignMutationKey = () => ['postStreamSigningSign'] as const;
 
-export const getPostStreamSigningSignMutationOptions = <TError = ErrorType<void | ApiError>,
+export const getPostStreamSigningSignMutationOptions = <TError = ErrorType<void | PostStreamSigningSign410 | ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postStreamSigningSign>>, TError,PostStreamSigningSignMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
 ): UseMutationOptions<Awaited<ReturnType<typeof postStreamSigningSign>>, TError,PostStreamSigningSignMutationVariables, TContext> => {
 
@@ -34522,13 +34743,13 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type PostStreamSigningSignMutationResult = NonNullable<Awaited<ReturnType<typeof postStreamSigningSign>>>
     export type PostStreamSigningSignMutationBody = BodyType<PostStreamSigningSignBody>
-    export type PostStreamSigningSignMutationError = ErrorType<void | ApiError>
+    export type PostStreamSigningSignMutationError = ErrorType<void | PostStreamSigningSign410 | ApiError>
     export type PostStreamSigningSignMutationVariables = {data: BodyType<PostStreamSigningSignBody>}
 
     /**
  * @summary Generate a signed URL for a stream resource
  */
-export const usePostStreamSigningSign = <TError = ErrorType<void | ApiError>,
+export const usePostStreamSigningSign = <TError = ErrorType<void | PostStreamSigningSign410 | ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postStreamSigningSign>>, TError,PostStreamSigningSignMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof postStreamSigningSign>>,
@@ -34750,7 +34971,7 @@ export const getPostTranscodeJobCleanupUrl = () => {
 }
 
 /**
- * @summary Clean up orphaned transcode jobs (no active sessions)
+ * @summary Expire stale transcode sessions and clean up orphaned transcode jobs (no active sessions)
  */
 export const postTranscodeJobCleanup = async ( options?: Parameters<typeof customInstance>[1]): Promise<PostTranscodeJobCleanup200> => {
 
@@ -34769,7 +34990,7 @@ export const postTranscodeJobCleanup = async ( options?: Parameters<typeof custo
 
 export const getPostTranscodeJobCleanupMutationKey = () => ['postTranscodeJobCleanup'] as const;
 
-export const getPostTranscodeJobCleanupMutationOptions = <TError = ErrorType<unknown>,
+export const getPostTranscodeJobCleanupMutationOptions = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postTranscodeJobCleanup>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
 ): UseMutationOptions<Awaited<ReturnType<typeof postTranscodeJobCleanup>>, TError,void, TContext> => {
 
@@ -34798,13 +35019,13 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type PostTranscodeJobCleanupMutationResult = NonNullable<Awaited<ReturnType<typeof postTranscodeJobCleanup>>>
 
-    export type PostTranscodeJobCleanupMutationError = ErrorType<unknown>
+    export type PostTranscodeJobCleanupMutationError = ErrorType<ApiError>
 
 
     /**
- * @summary Clean up orphaned transcode jobs (no active sessions)
+ * @summary Expire stale transcode sessions and clean up orphaned transcode jobs (no active sessions)
  */
-export const usePostTranscodeJobCleanup = <TError = ErrorType<unknown>,
+export const usePostTranscodeJobCleanup = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postTranscodeJobCleanup>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof postTranscodeJobCleanup>>,

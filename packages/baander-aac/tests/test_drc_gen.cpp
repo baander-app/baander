@@ -26,24 +26,12 @@
 #include "unidrc.h"
 #include "usac.h"
 
-/* The committed stream is the release build's bytes; a sanitizer build
- * compares its decode instead. */
-#if defined(__SANITIZE_ADDRESS__) || defined(__SANITIZE_UNDEFINED__)
-#define BAAC_SANITIZED 1
-#elif defined(__has_feature)
-#if __has_feature(address_sanitizer) || __has_feature(undefined_behavior_sanitizer)
-#define BAAC_SANITIZED 1
-#endif
-#endif
-#ifndef BAAC_SANITIZED
-#define BAAC_SANITIZED 0
-#endif
-
 namespace {
 
 constexpr int kRate = 48000;
 constexpr int kSbrFrame = 2048;
 constexpr const char* kCommittedName = "usac_enc_drc_cpe_64k.loas";
+constexpr uint32_t kCommittedSignal = 0x078dd8f7u; /* signal_checksum of committed_signal() */
 
 /* ── signals ───────────────────────────────────────────────────── */
 
@@ -944,16 +932,20 @@ void test_committed() {
         "%s: the night set applies", kCommittedName);
   check_gain_timing(stream, plain, night);
   const Encoded e = encode(pcm, 2, 64000, options(1));
-#if defined(__OPTIMIZE__) && BAAC_RELEASE_MATH && !BAAC_SANITIZED
-  CHECK(e.stream == stream, "%s: a fresh encode is byte identical (%zu vs %zu bytes)",
-        kCommittedName, e.stream.size(), stream.size());
+#if BAAC_REFERENCE_BUILD
+  /* The stream is the reference build's (test_util.h), encoded from the
+   * signal with this checksum; other builds compare the decodes. */
+  if (check_committed_signal(kCommittedName, pcm, kCommittedSignal)) {
+    CHECK(e.stream == stream, "%s: a fresh encode is byte identical (%zu vs %zu bytes)",
+          kCommittedName, e.stream.size(), stream.size());
+  }
 #else
   int again_errors = 0;
   const std::vector<float> again = decode(e.stream, 2, AAC_DRC_EFFECT_OFF, &again_errors);
   const double fresh = aligned_snr_db(pcm, again, 2, AAC_ENCODER_SBR_DELAY);
   CHECK(again_errors == 0 && fabs(fresh - snr) < 1.5,
         "%s: a fresh encode of this build decodes like the committed stream (%.1f against %.1f dB; "
-        "the byte identity check needs the release build's flags)",
+        "the byte identity check needs the reference build)",
         kCommittedName, fresh, snr);
 #endif
   printf("  %s: %.1f dB\n", kCommittedName, snr);
@@ -963,8 +955,8 @@ void test_committed() {
 
 int main(int argc, char** argv) {
   aac_tables_init();
-  if (argc >= 3 && strcmp(argv[1], "--write-streams") == 0) {
-    return write_streams(argv[2]);
+  if (const char* dir = write_streams_dir(argc, argv)) {
+    return write_streams(dir);
   }
   test_config_round_trip();
   test_gain_round_trip();

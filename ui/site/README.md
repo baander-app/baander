@@ -69,10 +69,26 @@ CSS.
 
 The bAAC page at `/baac/` reads the recorded CSV and JSON results under
 `packages/baander-aac/bench/results/`. Its charts and tables share the same
-validated records: 55 quality configurations, 33 throughput observations and four
-separate lossless references. The build checks the quality summaries against
+validated records: 55 quality configurations, 33 throughput observations and the
+22 rows of the lossless run. The build checks the quality summaries against
 their 550 selected per-item observations. It does not run codecs or download a
-corpus. Capability and methodology text belongs in `ui/site/templates/baac.php`;
+corpus.
+
+The lossless table shows bAAC at its default level 5 and at level 8 beside `flac`
+at the same levels, FFmpeg's FLAC encoder at levels 5 and 8, and the FFmpeg and
+Apple ALAC encoders. The build accepts exactly the rows the benchmark harness
+writes: bAAC and `flac` at levels 0 to 8 and the four other encoders, each once.
+It refuses an unknown, missing or repeated row and a figure that is not positive,
+with a message that names the row. Only the refalac row may lack speed figures,
+because the harness does not time it. The run's date,
+processor, compiler and reference versions come from the same file, and the
+package version comes from `packages/baander-aac/package.json`. The build also
+accepts the list of four references that `lossless.json` held before the harness
+measured bAAC; that list has no bAAC rows and no run record. The tooling tests
+read a made-up run in the harness's shape,
+`scripts/tests/php/Fixtures/aac-lossless-result.json`.
+
+Capability and methodology text belongs in `ui/site/templates/baac.php`;
 review it against the linked package documentation when the codec changes.
 bAAC source links identify the latest commit affecting the codec package in the
 checkout, so website-only commits do not break those links in a local preview.
@@ -124,7 +140,7 @@ Run the rendering fixtures and dedicated site browser suite after building:
 The suite starts its own disposable static server. It uses a locally routed
 `website.baander.app` origin and does not require the application preview. Real
 application screenshot capture uses the separate worktree preview described in
-the [development environment guide](../../docs-book/part-2-developer-guide/development-environment.md).
+the [development environment guide](../../docs-book/part-2-developer-guide/getting-started/development-environment.md).
 
 ## CI artifact
 

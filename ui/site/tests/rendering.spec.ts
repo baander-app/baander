@@ -26,14 +26,15 @@ function fences(file: string): { language: string; source: string }[] {
 // `fits` asserts the diagram lays out inside its column at desktop width, so a
 // page meant to be read without horizontal scrolling fails when a redraw widens it.
 const diagramPages = [
-  { chapter: 'operator-guide', directory: 'part-1-operator-guide', path: 'deployment-topology', fits: true },
-  { chapter: 'developer-guide', directory: 'part-2-developer-guide', path: 'communication-map', fits: true },
-  { chapter: 'developer-guide', directory: 'part-2-developer-guide', path: 'live-updates', fits: true },
-  { chapter: 'developer-guide', directory: 'part-2-developer-guide', path: 'application-threat-model', fits: false },
-  { chapter: 'developer-guide', directory: 'part-2-developer-guide', path: 'registry-threat-model', fits: false },
-  { chapter: 'developer-guide', directory: 'part-2-developer-guide', path: 'cqrs-and-messaging', fits: true },
+  { chapter: 'operator-guide', directory: 'part-1-operator-guide', path: 'getting-started/deployment-topology', fits: true },
+  { chapter: 'developer-guide', directory: 'part-2-developer-guide', path: 'architecture/communication-map', fits: true },
+  { chapter: 'developer-guide', directory: 'part-2-developer-guide', path: 'architecture/live-updates', fits: true },
+  { chapter: 'developer-guide', directory: 'part-2-developer-guide', path: 'architecture/application-threat-model', fits: false },
+  { chapter: 'developer-guide', directory: 'part-2-developer-guide', path: 'architecture/registry-threat-model', fits: false },
+  { chapter: 'developer-guide', directory: 'part-2-developer-guide', path: 'development/cqrs-and-messaging', fits: true },
   { chapter: 'developer-guide', directory: 'part-2-developer-guide', path: 'contexts/transcode', fits: true },
-  { chapter: 'developer-guide', directory: 'part-2-developer-guide', path: 'api-reference', fits: true },
+  { chapter: 'developer-guide', directory: 'part-2-developer-guide', path: 'development/api-authentication', fits: true },
+  { chapter: 'developer-guide', directory: 'part-2-developer-guide', path: 'testing/testing-pyramid', fits: true },
 ];
 
 async function visibleVariant(figure: Locator, appearance: 'light' | 'dark'): Promise<void> {
@@ -116,7 +117,7 @@ async function visibleInteractive(figure: Locator, appearance: 'light' | 'dark')
 for (const colorScheme of ['light', 'dark'] as const) {
   test(`${colorScheme} preference: manual choice selects one diagram variant after reload`, async ({ page }) => {
     await page.emulateMedia({ colorScheme });
-    await page.goto('/docs/developer-guide/live-updates/');
+    await page.goto('/docs/developer-guide/architecture/live-updates/');
     const opposite = colorScheme === 'light' ? 'dark' : 'light';
     await visibleInteractive(page.locator('figure.diagram'), colorScheme);
     await page.getByRole('button', { name: `Switch to ${opposite} mode` }).click();
@@ -159,7 +160,7 @@ test.describe('interactive diagrams', () => {
   test.use({ viewport: { width: 1440, height: 1000 }, colorScheme: 'light' });
 
   test('a node emphasizes its connections and recedes the rest', async ({ page }) => {
-    await page.goto('/docs/developer-guide/communication-map/');
+    await page.goto('/docs/developer-guide/architecture/communication-map/');
     const figure = page.locator('figure.diagram');
     const svg = await visibleInteractive(figure, 'light');
     await svg.locator('g.node[data-node="execution"]').hover();
@@ -179,7 +180,7 @@ test.describe('interactive diagrams', () => {
   });
 
   test('an edge emphasizes itself, its label and both endpoints', async ({ page }) => {
-    await page.goto('/docs/developer-guide/communication-map/');
+    await page.goto('/docs/developer-guide/architecture/communication-map/');
     const svg = await visibleInteractive(page.locator('figure.diagram'), 'light');
     const edge = svg.locator('path[data-et="edge"][data-from="outbox"][data-to="async"]');
     const label = svg.locator('g.edgeLabel[data-from="outbox"][data-to="async"]');
@@ -204,7 +205,7 @@ test.describe('interactive diagrams', () => {
   });
 
   test('a sequence message emphasizes its text and lifelines', async ({ page }) => {
-    await page.goto('/docs/developer-guide/api-reference/');
+    await page.goto('/docs/developer-guide/development/api-authentication/');
     const svg = await visibleInteractive(page.locator('figure.diagram'), 'light');
     const text = svg.locator('text.messageText', { hasText: 'Proof with nonce' });
     await text.hover();
@@ -225,7 +226,7 @@ test.describe('interactive diagrams', () => {
   });
 
   test('a sequence diagram steps through its messages', async ({ page }) => {
-    await page.goto('/docs/developer-guide/api-reference/');
+    await page.goto('/docs/developer-guide/development/api-authentication/');
     const figure = page.locator('figure.diagram');
     const svg = await visibleInteractive(figure, 'light');
     const region = figure.getByRole('region');
@@ -244,7 +245,7 @@ test.describe('interactive diagrams', () => {
   });
 
   test('Enter steps through nodes with announcements and Escape restores scrolling', async ({ page }) => {
-    await page.goto('/docs/developer-guide/application-threat-model/');
+    await page.goto('/docs/developer-guide/architecture/application-threat-model/');
     const figure = page.locator('figure.diagram');
     const svg = await visibleInteractive(figure, 'light');
     const region = figure.getByRole('region');
@@ -281,7 +282,7 @@ test.describe('interactive diagrams', () => {
   });
 
   test('Home, End and the arrows move between nodes and around a node\'s edges', async ({ page }) => {
-    await page.goto('/docs/developer-guide/application-threat-model/');
+    await page.goto('/docs/developer-guide/architecture/application-threat-model/');
     const figure = page.locator('figure.diagram');
     const svg = await visibleInteractive(figure, 'light');
     const region = figure.getByRole('region');
@@ -320,7 +321,7 @@ test.describe('interactive diagrams', () => {
   });
 
   test('Enter starts stepping at a pinned edge', async ({ page }) => {
-    await page.goto('/docs/developer-guide/communication-map/');
+    await page.goto('/docs/developer-guide/architecture/communication-map/');
     const figure = page.locator('figure.diagram');
     const svg = await visibleInteractive(figure, 'light');
     const edge = svg.locator('path[data-et="edge"][data-from="outbox"][data-to="async"]');
@@ -336,7 +337,7 @@ test.describe('interactive diagrams', () => {
   });
 
   test('a click on plain content releases a pin and a click on a control keeps it', async ({ page }) => {
-    await page.goto('/docs/developer-guide/communication-map/');
+    await page.goto('/docs/developer-guide/architecture/communication-map/');
     const figure = page.locator('figure.diagram');
     const svg = await visibleInteractive(figure, 'light');
     const node = svg.locator('g.node[data-node="execution"]');
@@ -349,7 +350,7 @@ test.describe('interactive diagrams', () => {
   });
 
   test('a pinned node survives a theme switch with its scroll position', async ({ page }) => {
-    await page.goto('/docs/developer-guide/application-threat-model/');
+    await page.goto('/docs/developer-guide/architecture/application-threat-model/');
     const figure = page.locator('figure.diagram');
     const light = await visibleInteractive(figure, 'light');
     const region = figure.getByRole('region');
@@ -367,7 +368,7 @@ test.describe('interactive diagrams', () => {
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
     await page.route('**/assets/diagrams/*-light.svg', (route) => route.fulfill({ status: 200, contentType: 'text/html', body: '<p>not a diagram</p>' }));
-    await page.goto('/docs/developer-guide/live-updates/');
+    await page.goto('/docs/developer-guide/architecture/live-updates/');
     const figure = page.locator('figure.diagram');
     await expect(figure.locator('img.diagram-light')).toBeVisible();
     await expect(figure.locator('svg.diagram-interactive')).toHaveCount(0);
@@ -390,7 +391,7 @@ test.describe('interactive diagrams', () => {
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
     await page.route('**/assets/diagrams/*-dark.svg', (route) => route.fulfill({ status: 404 }));
-    await page.goto('/docs/developer-guide/live-updates/');
+    await page.goto('/docs/developer-guide/architecture/live-updates/');
     const figure = page.locator('figure.diagram');
     await visibleInteractive(figure, 'light');
     await page.getByRole('button', { name: 'Switch to dark mode' }).click();
@@ -405,7 +406,7 @@ test.describe('interactive diagrams on touch', () => {
   test.use({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 844 }, colorScheme: 'light' });
 
   test('a tap highlights and a tap elsewhere clears', async ({ page }) => {
-    await page.goto('/docs/developer-guide/communication-map/');
+    await page.goto('/docs/developer-guide/architecture/communication-map/');
     const figure = page.locator('figure.diagram');
     const svg = await visibleInteractive(figure, 'light');
     const node = svg.locator('g.node[data-node="execution"]');
@@ -438,12 +439,12 @@ test.describe('interactive diagrams on touch', () => {
 });
 
 const codePages = [
-  { chapter: 'developer-guide', directory: 'part-2-developer-guide', slug: 'adding-a-feature', languages: ['php', 'yaml', 'bash'] },
-  { chapter: 'developer-guide', directory: 'part-2-developer-guide', slug: 'frontend-development', languages: ['tsx'] },
-  { chapter: 'developer-guide', directory: 'part-2-developer-guide', slug: 'development-environment', languages: ['json'] },
-  { chapter: 'developer-guide', directory: 'part-2-developer-guide', slug: 'search', languages: ['sql'] },
-  { chapter: 'developer-guide', directory: 'part-2-developer-guide', slug: 'live-updates', languages: ['ts'] },
-  { chapter: 'operator-guide', directory: 'part-1-operator-guide', slug: 'security', languages: ['env'] },
+  { chapter: 'developer-guide', directory: 'part-2-developer-guide', slug: 'development/adding-a-feature', languages: ['php', 'yaml', 'bash'] },
+  { chapter: 'developer-guide', directory: 'part-2-developer-guide', slug: 'development/frontend-development', languages: ['tsx'] },
+  { chapter: 'developer-guide', directory: 'part-2-developer-guide', slug: 'getting-started/development-environment', languages: ['json'] },
+  { chapter: 'developer-guide', directory: 'part-2-developer-guide', slug: 'development/search', languages: ['sql'] },
+  { chapter: 'developer-guide', directory: 'part-2-developer-guide', slug: 'architecture/live-updates', languages: ['ts'] },
+  { chapter: 'operator-guide', directory: 'part-1-operator-guide', slug: 'maintenance/security', languages: ['env'] },
 ];
 
 test.describe('code without JavaScript', () => {
@@ -464,7 +465,7 @@ test.describe('code without JavaScript', () => {
           await expect(code.locator('[class^="tok-"]').first()).toBeAttached();
         }
       }
-      await page.goto('/docs/developer-guide/adding-a-feature/');
+      await page.goto('/docs/developer-guide/development/adding-a-feature/');
       const code = page.locator('code.language-php').first();
       const label = await code.evaluate((element) => getComputedStyle(element.closest('pre')!, '::before').content);
       expect(label, 'Named languages show a label outside the code text').toBe('"PHP"');
@@ -493,7 +494,7 @@ test.describe('code without JavaScript', () => {
         const values = [luminance(foreground), luminance(colors.background)].sort((a, b) => a - b);
         expect((values[1] + 0.05) / (values[0] + 0.05)).toBeGreaterThanOrEqual(4.5);
       }
-      const original = fences('part-2-developer-guide/adding-a-feature.md').find((block) => block.language === 'php')!;
+      const original = fences('part-2-developer-guide/development/adding-a-feature.md').find((block) => block.language === 'php')!;
       const selection = await code.evaluate((element) => {
         const selection = window.getSelection()!;
         const range = document.createRange();
