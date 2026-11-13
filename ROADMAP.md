@@ -301,47 +301,55 @@ that limitation is recorded for follow-up, with no runtime change in the 2026-10
 
 ## Resume here
 
-### State at the end of the session of 2026-11-12
+### State on 2026-11-13
 
-`master` is `98498798b` on GitHub and Forgejo. Landed on 2026-11-12: the session
-runner release, bAAC exact arithmetic, the CI repairs, the Firefox gate and admission
-release fixes, the bAAC lossless mode (with its failed held-out size gate disclosed,
-lossless plan KD12), the desktop lockfile hash with its tracked symlink, the `/baac`
-lead line and three test-fixture ready-file races.
+`master` is the rename's landing on GitHub and Forgejo. Landed on 2026-11-13: the
+quality-gate tail fixes, the capability and size deployment settings, the registry
+deadline-readiness fix and the rename to Bånder Audio Core (`bac`), whose FFmpeg image
+pin follows as its own commit.
 
-- **Master CI.** The `CI` run on `a97ae0058` failed at the quality gate's step 39;
-  the fixes of 2026-11-13 (see "Master CI repair") clear steps 39 to 41 in an
-  emulated runner. Check the `CI` run that follows them. A green run is the first
-  since 2026-11-05; then write the CI-repair learning with `ce-compound`, which the
-  user confirmed.
-- **Capability and size, landed 2026-11-13** with no host size qualified (user
-  decision, 2026-11-12); see "Small-host household deployment" for its merge
-  checkpoint. Next: the 4 GB remux qualification in the VM (its plan's U9), after
-  rebuilding the images from `master`. The branch
-  `feat/capability-and-size-deployment-settings` and its worktree
-  `/home/martin/dev/baander-capability` can be removed.
-- **Rename to Bånder Audio Core (`bac`), in flight.** Worktree
-  `/home/martin/dev/baander-rename-audio-core`, branch `rename-audio-core`, plan
-  [refactor-rename-baac-to-bac](docs/plans/2026-11-12-1934-refactor-rename-baac-to-bac-plan.md)
-  (on that branch). U1 is committed (`5f3fbab34`); U2, the move of the package
-  directory, was in progress and is uncommitted. User decisions of 2026-11-12: full
-  rename with no aliases, `/baac/` redirects to `/bac/`, the landing may open a draft
-  pull request, FFmpeg's long name and the FLAC vendor string use "Baander Audio
-  Core", and `make dev-up` for the persistent instance is authorized at the landing.
-  The `aac-native-v0.2.0` tag is held. Work one unit at a time, committing each. A
-  lockfile refresh must copy the package with its tracked `compile_commands.json`
-  symlink.
-- **Keep** `packages/baander-aac/bench/work/` in the worktree
-  `/home/martin/dev/baander-baac-lossless` (3.9 GB). It holds the held-out ledger
-  `heldout/runs.json`, whose third set had its first run on 2026-11-12. The rename's
-  landing moves it and rewrites its keys once.
+- **Master CI.** The `CI` run on `c34a8e0a1` reached the quality gate's steps 42 to 53
+  for the first time; its registry jobs failed on the deadline-readiness race that
+  `e1a850a85` fixes. Check the runs from `e1a850a85` on. A green run is the first since
+  2026-11-05; then write the CI-repair learning with `ce-compound`, which the user
+  confirmed.
+- **Rename landing, remaining steps** (the plan's KTD6, in order):
+  1. Pin the image of the `ffmpeg.yaml` dispatch on `rename-audio-core` (run
+     43473213860) in `tooling-defaults.json`, `ImageCatalogTest` and
+     `SourceExceptions`, and record its digest under "Bånder Audio Core rename".
+  2. Run `make dev-up` for the persistent instance from a checkout of `master` that
+     holds the pin. Its automatic update keeps the FFmpeg image saved at its last
+     `make dev-up`, so it stays on its old release until then. The user authorized
+     this on 2026-11-12.
+  3. Dispatch `audio-core.yml` on `master`; the user cuts `audio-core-v0.2.0`.
+  4. Publish the website (Vercel preview, then production, per `ui/site/README.md`)
+     and check `/bac/` and `/baac/`.
+  5. Re-run Forgejo's `ci.yaml` after Forgejo's own FFmpeg image publishes, about
+     1.5 h after the push.
+  6. Move `bench/work/` from `/home/martin/dev/baander-baac-lossless` into
+     `packages/baander-audio-core/bench/`. Copy `work/heldout/runs.json` first, then
+     run `./rename_ledger.py work/heldout/runs.json` and `./setup-refs.sh` without
+     `--lossless-only`, so `env.sh` loses the old absolute paths.
+  7. Delete the GitHub branch `rename-audio-core` and record the landing results.
+
+  Not run before `master`: the draft pull request CI (the user chose not to wait for
+  CI), the full backend suite on the merge with `master` and `test:tooling` after
+  `491009232`.
+- **Capability and size.** No host size is qualified yet (user decision,
+  2026-11-12). Next: the 4 GB remux qualification in the VM (its plan's U9), after
+  rebuilding the images from `master`.
 - **Next plans.** Better compression of material like the failed held-out recording
-  (lossless plan KD12) follows the rename; its fourth held-out set must not be read
-  before the rename lands.
-- **Cleanup once `master` is green.** The merged branch `fix-two-command-firefox`
-  (worktree `/home/martin/dev/baander-ci-repair`), the review checkout
-  `/home/martin/dev/baander-baac-review` and the merged branch `baac-lossless`, but not
-  that worktree's `bench/work`.
+  (lossless plan KD12) follows the rename. Its fourth held-out set may be read only
+  after the benchmark data has moved and its ledger is rewritten.
+- **Cleanup once `master` is green.** The merged branches `fix-two-command-firefox`,
+  `baac-lossless`, `feat/capability-and-size-deployment-settings`,
+  `fix-ci-quality-gate-tail` and `rename-audio-core`; the worktrees
+  `/home/martin/dev/baander-ci-repair`, `/home/martin/dev/baander-baac-review`,
+  `/home/martin/dev/baander-capability`, `/home/martin/dev/baander-ci-gate` (its
+  root-owned build output needs a `chown` from a container first),
+  `/home/martin/dev/baander-rename-review` and
+  `/home/martin/dev/baander-rename-audio-core`; and
+  `/home/martin/dev/baander-baac-lossless` once its `bench/work/` has moved.
 
 Continue the Back-to-next-movie investigation through a newly reviewed, bounded
 scope. Capture the browser failure and the next movie's actual startup outcome,
@@ -1454,13 +1462,150 @@ Open:
 - FLAC in fragmented MP4, the Electron bridge and a browser playback matrix belong to
   the feature that delivers FLAC to clients.
 - The harness selftest runs in no CI job; it needs numpy on the runner.
-- The library is renamed to Bånder Audio Core (`bac`) next, by the user's decision
-  of 2026-11-12: it has grown from one codec into an audio component. The rename is
-  full (package, library, CLI, headers, the `baac_*` prefix, the Node package, the
-  FFmpeg codec names, the server setting and the website page, with `/baac/`
-  redirected) and its plan is ready on the branch `rename-audio-core` (KD13). The
-  `aac-native-v0.2.0` tag is held, so the first release carries the new name; until
-  then installs build the binding from source.
+- The library was renamed to Bånder Audio Core (`bac`) by the user's decision of
+  2026-11-12 (KD13); "Bånder Audio Core rename" below records it. The
+  `aac-native-v0.2.0` tag stayed held: the first release is `audio-core-v0.2.0`, and
+  until it is published installs build the binding from source.
+
+### Bånder Audio Core rename
+
+Delivered from the [plan](docs/plans/2026-11-12-1934-refactor-rename-baac-to-bac-plan.md)
+on the branch `rename-audio-core`, by the user's decision of 2026-11-12. bAAC is now
+Bånder Audio Core, short name `bac`, with no aliases. The package lives at
+`packages/baander-audio-core` and builds `libbac.a`, the `bac` command-line tool, the
+headers under `include/bac`, the pkg-config module `bac` and the lossless API
+`bac_flac_*`. The Node package is `@baander/audio-core`, released by `audio-core.yml`
+under `audio-core-v*` tags. FFmpeg's codec is `libbac`, the server setting's value is
+`bac`, and the website serves the codec page at `/bac/` with `/baac/` redirected.
+The FFmpeg long codec name and the FLAC vendor string are ASCII, "Baander Audio
+Core". The `aac-native-v0.2.0` tag stayed held, so the first release is
+`audio-core-v0.2.0`.
+
+- **Package and library (U2, U3):** the move changed no content, and the desktop
+  lockfile's folder hash stayed `caf420`. The CMake options, the compile definitions
+  and the test variables take the `BAC_` prefix. Tagged FLAC streams change only in
+  the vendor field, and untagged streams are byte-identical.
+- **Benchmark ids (U4):** the lossless harness writes `bac`, `bac-0` to `bac-8` and
+  `bac_sha256`. The committed results and the website fixture were rewritten by the
+  harness's own writer with every measured value unchanged.
+  `bench/rename_ledger.py` rewrites a held-out ledger booked under the old key once,
+  and the lossless stage refuses a ledger that was not rewritten.
+- **Binding and desktop (U5, U12):** the loader reads `BAANDER_AUDIO_CORE_*`. U5's
+  packaging check found that `electron-builder` could not package the desktop app
+  under any package name: the lockfile's `node-abi` 4.31.0 stops at Electron 43.
+  U12 re-resolves it to 4.40.0 inside the declared range.
+- **Setting (U6):** `transcode.aac_implementation` offers `bac` (label "Bånder Audio
+  Core"), `fdk_aac` and `ffmpeg`, and defaults to `bac`. `Version20261113120000`
+  rewrites stored `baac` in the setting, in failed audio renditions and in the
+  desired state of transcode runtime rows, and re-adds the failed-implementation
+  constraint. The console and the API refuse `baac`.
+- **Website and docs (U7 to U9):** the codec page is `/bac/`, titled "Bånder Audio
+  Core". `/baac` and `/baac/` answer 308 to `/bac/` on Vercel and in the local
+  preview router, and the sitemap lists `/bac/` only. `CONCEPTS.md`, the operator and
+  developer guides and the open ROADMAP items use the new names. Completed records
+  keep the old ones.
+- **FFmpeg (U10):** the wrapper, the patch, `--enable-libbac`, the smoke and the
+  capability list name `libbac`. `AacImplementation::Bac` maps to `libbac`.
+
+Commits: `dbae02463` (U2), `b6e0c66df` (U3), `530b1622e` (U4), `9c9c82663` (U5),
+`2a64efcec` (U12), `df37c38d4` (U6), `860d04a3a` (U7), `d7fa6a0d8` (U8), `fa395c70d`
+(U9), `bf19b3baf` (U10), merged with `master` in `489926f68`, then
+`491009232` (the test budget below). The final desktop lockfile hash is `ecd85e`.
+The user chose to land before the dispatched FFmpeg image was ready, so `master`
+moved without the pin and the pin follows as its own commit; until then the
+application image built from `master` fails its FFmpeg capability gate.
+
+Verification Contract, row by row (2026-11-13, AMD Ryzen 7 5800X3D, GCC 16.2.1,
+Node 24.15.0):
+
+- **Residue gate, path gate:** run at `bf19b3baf` and at `489926f68`. The residue
+  gate prints nothing. The path gate prints only the three plans under `docs/plans/`
+  whose file names carry the old name.
+- **Native suites:** CTest 68 of 68 with every oracle required and no `SKIP:` line
+  (U2, U3); in U3 only the `BAC_` variables were set.
+- **Fail-closed variables:** run in U3. With the oracles required and missing, all 8
+  oracle suites fail. With only the old `BAAC_*` names set, the suites write 6
+  `SKIP:` lines, so the old names are no longer read. Run again in U5: the loader
+  ignores the old `BAANDER_AAC_NATIVE_BINDING` and reads the new variable.
+- **Compile flags:** run in U3. The 207 compile-database entries match U2's apart
+  from the renamed tokens, `BAC_EXACT_MATH=1` and the strict-math flags included.
+  `binding.gyp` changed only its definitions.
+- **Binding:** `npx node-gyp rebuild` and `npm test` 31 of 31 (U3), then 32 of 32
+  under Node and under Electron 45 (U5, which adds the loader test).
+- **Benchmark harness:** `./bench.py selftest` 41 checks, 0 failures (U3). After U4,
+  which adds 5 checks, it reports 46 checks and 0 failures.
+- **Desktop:** in clean copies, the immutable install, `tsc` and the tests passed,
+  75 of 75 with none skipped (U2 to U5, U12). The packaging check passed after U12 without
+  skipping the native rebuild. `@baander/audio-core` is rebuilt for Electron 45, sits
+  under `app.asar.unpacked` and loads there under Electron 45. After U10, only the
+  immutable install was rerun.
+- **Backend suites:** on the CI image `baander-ci:u10` (`0a57754ca7b0`), built on the
+  local FFmpeg image `ffmpeg-baander-static:u10-local` (`6ab9c94566b2`) at
+  `8ce3e60f4`, the full backend suite passed 12,018 of 12,018 in four lanes
+  (ordinary 7,716, native 917, stack-1 1,964, stack-2 1,421) in 27:05. That run
+  includes the real-FFmpeg suites `AudioTranscodeStreamTest` 6,
+  `AudioTranscodeToggleTest` 4, `AudioRenditionWorkerHandoffTest` 6 and
+  `VideoCopyPresentationTest` 2. The migration and settings run passed 62 of 62 on
+  its second attempt. The first attempt failed 5 cases on one SQL error in the new
+  migration test, `ORDER BY 1 COLLATE "C"` inside a `UNION`, fixed in the test
+  before U6 was committed. `scripts/test-transcode-adaptive-browser.sh` passed,
+  with producer commands encoding AAC with `-c:a libbac`. On the merge with `master`
+  (`491009232`), the six transcode and media test files the merge combined and the
+  five U6 classes passed 256 of 256 on `baander-ci:u10` with the merged checkout
+  copied in (ordinary 175, native 19, stack-1 31, stack-2 31). Not run on the merge:
+  the full backend suite, which the user dropped to land sooner.
+- **Static gates:** PHPStan reports no errors on the changed source and test files
+  of each unit. `analyse:tooling` reports no errors, `check:tooling-architecture` 0
+  violations and `check:tooling-format` 0 of 502 files. `.php-cs-fixer.tooling.php`
+  finds nothing to fix on the touched tooling and script files.
+  `composer run-script test:tooling` ran 1,571 tests at `8ce3e60f4`:
+  3 failures and 1 error. The 3 failures are `ApplicationInventoryTest` cases that
+  fail only in a linked worktree and pass with `CI=1`. The error was
+  `testMigrationsTransferGeneratedCredentialsThroughTheRealDisposableWrapper`,
+  "php timed out" at its 10-second budget, which failed the same way on
+  `5f3fbab34`, before the first unit. Its 24 grouped process calls needed 9.7 to
+  9.96 s on this host; `491009232` raised the budget to 30 s. `test:tooling` was not
+  rerun after that commit. Not run: `make ci` as one command. Its PHPUnit part is
+  the backend suite above; full-tree PHPStan, Deptrac and `composer validate` and
+  `normalize` did not run.
+- **Website:** build (237 pages), node tests 11 of 11 and the Chromium suite 93 of
+  93 after U9. In U8 the suite passed 93 of 93 on its third full run. The first two
+  runs each failed one font-loading wait while CI drills loaded the host, and both
+  specs passed on repeat. The website tooling tests passed 105 of 105 (U8).
+- **FFmpeg image:** built locally at `f36930c9c` as `ffmpeg-baander-static:u10-local`
+  (`6ab9c94566b2`). The renamed patch applies, `configure --enable-libbac` passes,
+  the smoke passes (stereo and 5.1 through `libbac`, the damaged frame) and so does
+  the gate (40 capabilities). The encoder and decoder listings differ from the
+  pinned `dbec52eb` by one line each: `libbaac`, "bAAC (Baander AAC)", became
+  `libbac`, "Baander Audio Core". A full image at U3 matched `dbec52eb` exactly.
+- **Application image:** the CI target built on `u10-local`, and its runtime layer
+  passed the capability gate against the tree's `libbac` list.
+- **Preview upgrade:** a preview at `98498798b` stored `transcode.aac_implementation`
+  as `baac`. After `make preview-up` on `rename-audio-core` with the local FFmpeg
+  image, `Version20261113120000` ran, the stored setting reads `bac`,
+  `debug:hw-transcode` maps `bac` to `libbac`, and an AAC rendition ran in the
+  preview's execution worker as `ffmpeg … -c:a libbac -f adts`, 473,323 bytes of AAC
+  LC, with its runtime row complete.
+- **Workflows:** `PublicationWorkflowTest` 116 of 116 (U3, U5), including the case
+  that an `aac-native-v1.0.0` tag no longer releases, and the edited workflow YAML
+  parses.
+- **Remote, before `master`:** the `ffmpeg.yaml` dispatch on `rename-audio-core` at
+  `489926f68` (run 43473213860) was still building when `master` moved; the pin
+  commit records its result and digest. The image inputs (`docker/ffmpeg/`,
+  `packages/baander-audio-core/`, `scripts/ffmpeg-capability-gate.sh`) are identical
+  at `bf19b3baf`, `489926f68` and the landed tip. Not run: the draft pull request
+  runs of `ci.yaml`, `frontend.yaml`, `website.yaml` and `audio-core.yml`. The user
+  chose to land without waiting for CI, so those workflows first run on `master`.
+- **Remote, after `master`, and website publication:** open at the push. GitHub CI,
+  Forgejo `ci.yaml` after Forgejo's FFmpeg image publishes, `audio-core.yml` on
+  `master`, the `audio-core-v0.2.0` release with four prebuilds and `SHA256SUMS`, a
+  clean desktop install that fetches its prebuild, and the Vercel preview and
+  production checks of `/bac/` (200) and `/baac/` (308) are recorded here when they
+  run.
+
+Not run anywhere before the landing: the macOS and NEON kernel step, the Windows
+MSVC binding and the first CI run after the cache keys changed. Only the binding
+workflow covers them, and it first runs on `master`.
 
 ## Roadmap maintenance
 
