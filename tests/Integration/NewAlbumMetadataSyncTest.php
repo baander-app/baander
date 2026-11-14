@@ -60,7 +60,9 @@ use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\Filesystem\Filesystem;
+use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\Stamp\DelayStamp;
+use Symfony\Component\Messenger\Stamp\TransportMessageIdStamp;
 use Symfony\Component\Messenger\Transport\InMemory\InMemoryTransport;
 
 /**
@@ -286,16 +288,15 @@ final class NewAlbumMetadataSyncTest extends KernelTestCase
         self::assertSame(Command::SUCCESS, $exitCode, $tester->getDisplay());
 
         static::getContainer()->get(RelayOutboxHandler::class)(new RelayOutboxCommand());
-        $async = $this->async();
         $ingest = static::getContainer()->get(FilesDiscoveredHandler::class);
         $discoveries = [];
-        foreach ($async->get() as $envelope) {
+        foreach ($this->queued() as $envelope) {
             $message = $envelope->getMessage();
             if ($message instanceof FilesDiscovered && $message->libraryId->equals($library->getId())) {
                 $ingest($message);
                 $discoveries[] = $message;
+                $this->async()->ack($envelope);
             }
-            $async->ack($envelope);
         }
 
         return $discoveries;
@@ -309,14 +310,34 @@ final class NewAlbumMetadataSyncTest extends KernelTestCase
      */
     private function handleQueued(string $messageClass, string $handlerClass): void
     {
-        $async = $this->async();
         $handler = static::getContainer()->get($handlerClass);
-        foreach ($async->get() as $envelope) {
+        foreach ($this->queued() as $envelope) {
             if ($envelope->getMessage() instanceof $messageClass) {
                 $handler($envelope->getMessage());
-                $async->ack($envelope);
+                $this->async()->ack($envelope);
             }
         }
+    }
+
+    /**
+     * Every message waiting on the async transport, oldest first. A fetch from the transport hands
+     * out one message only, as a worker takes them, so the waiting ones are those sent and neither
+     * acknowledged nor rejected yet.
+     *
+     * @return list<Envelope>
+     */
+    private function queued(): array
+    {
+        $async = $this->async();
+        $done = array_map(self::transportId(...), [...$async->getAcknowledged(), ...$async->getRejected()]);
+
+        return array_filter($async->getSent(), static fn (Envelope $envelope): bool => !in_array(self::transportId($envelope), $done, true))
+            |> array_values(...);
+    }
+
+    private static function transportId(Envelope $envelope): mixed
+    {
+        return $envelope->last(TransportMessageIdStamp::class)?->getId();
     }
 
     private function onlyAlbum(Library $library): Uuid
