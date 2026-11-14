@@ -19,11 +19,6 @@ Open items:
 - Dual-forge acceptance is partial: no `master` commit has yet run every gate green
   on both forges, the gate workflows have not run through a pull request on each,
   and no scheduled nightly has run on each.
-- The two-command drill passes locally in Chromium and Firefox, but no hosted run has
-  executed its proofs since the owned-copy path landed. The gate's "Selected video
-  endpoint through movie completion and replay" step failed locally at its exact-end
-  seek from 2026-11-06; it passes on the branch `movie-playback-growing-presentations`
-  (see "Movie playback on growing presentations") and on `master` once that merges.
 - Forgejo acceptance is deferred (user decision, 2026-11-05). Every job of the oldest
   queued run that ran inside the Forgejo registry's `baander-runner:latest` (built
   2026-10-15) failed within a minute, and Forgejo 15's API serves no job logs or
@@ -105,45 +100,13 @@ The user confirmed the
 It defines a separate profile for 2,000 songs, 50 movies and 250 TV episodes, with 1–2 simultaneous streams alongside normal scanning and metadata updates.
 [System Requirements](docs-book/part-1-operator-guide/getting-started/system-requirements.md) publishes the measured figures and their limits.
 
-The profile split is delivered: the
+The profile split is delivered and on `master`: the
 [capability and size deployment settings plan](docs/plans/2026-11-07-1804-feat-capability-and-size-deployment-settings-plan.md)
 (U1–U8) replaced the `full` and `household` profiles with a `transcode` or `remux`
-capability and bounded size settings, derived the pooler pools and PostgreSQL
-settings from the size, made the source installation load the rendered 16 GB
-PostgreSQL file, turned OpenTelemetry export off in the preset unless configured,
-renamed the preset to `deploy/preset/` with 4, 8 and 16 GB examples per capability,
-and extended the qualification harness for the 4 GiB, swap-off claim. The operator
-manifest is version 9.
-
-The user decided on 2026-11-12 to merge U1–U8 into `master` before the 4 GB
-qualification runs. The code lands with no host size qualified: System
-Requirements and the configuration guide say so, and the 4 GB `remux` starting
-point keeps its starting values until U9 measures it.
-
-Verification checkpoint (2026-11-07, branch `feat/capability-and-size-deployment-settings`,
-local commits only, not pushed): unit suite 8,447 tests and tooling suite 1,537 tests
-pass in `baander-ci-prewarm:local`; functional and integration suites pass except
-`PlaybackTransferPersistenceTest`'s reconnect test; phpstan, deptrac, container lint,
-OpenAPI check and the tooling format and architecture checks pass. `ce-simplify-code` ran (12b6a5755). `ce-code-review`
-run `20261107-205049-41172ade` returned "Ready with fixes"; its three confirmed findings
-(worker allowlist rejecting the OpenTelemetry keys, an out-of-bounds size stopping a
-running preset, the household-era upgrade path) are fixed in fa240b3d0.
-
-Merge checkpoint (2026-11-13): `master` at 28866bf56 merged into the branch at
-4512d491b as 02856b62d, then `master` at c34a8e0a1 as 5fe4deeee. On 5fe4deeee, in
-`baander-ci-prewarm:local`, the four backend suites pass 12,026 tests in 1,098 files
-(seed 188522618): unit 7,731, native 917, functional and integration 3,378. On the
-first merge, in the same image, PHPStan, Deptrac, the container lint and the OpenAPI
-check pass. The tooling suite ran 1,585 tests there with 4 failures, all in
-`DevelopmentBrowserCleanupTest`: `scripts/check-backend-container.php` runs the
-command with umask 0000, and the class passes under umask 022. On the host, the
-tooling PHPStan, the tooling architecture checks and the tooling format check pass,
-the web unit suite passes 3,480 tests in 276 files, the qualification driver passes
-its 15 Node tests, and `php scripts/build-website.php` builds 237 manual pages.
-`ScannedTrackPlaybackTest` failed on the first merge because
-`PasswordChangeSessionRevocationTest` left four committed outbox rows behind for users
-it deleted; 2b5b38b21, merged with c34a8e0a1, removes them. `PlaybackTransferPersistenceTest`'s
-reconnect test, which failed before the merge, passes; `master` corrected the test.
+capability and bounded size settings, and the operator manifest is version 9. By the
+user's decision of 2026-11-12 it landed before the 4 GB qualification, so no host size
+is qualified: System Requirements and the configuration guide say so, and the 4 GB
+`remux` starting point keeps its starting values until U9 measures it.
 
 Open items:
 
@@ -260,9 +223,6 @@ VAAPI is qualified on the RX 9070 XT.
 
 Open items:
 
-- Confirm that master's CI passes on `7cf6db42b`, the first run with the pinned
-  FFmpeg image; the two runs before it failed at "Build CI image" because no FFmpeg
-  image was published yet.
 - Decide whether `ffmpeg-baander-static` stays public. The image is built with
   fdk-aac under `--enable-nonfree`, which FFmpeg marks as not redistributable, and
   GHCR serves it anonymously. The user allowed the public package (2026-11-07) before
@@ -280,10 +240,6 @@ Open items:
   buffers up to ten seconds is unverified on FFmpeg 8.
 - Found and not fixed: the NVENC HDR path emits `tonemap_cuda`, a filter neither
   Debian's FFmpeg nor this build has;
-  `PlaybackTransferPersistenceTest::testReconnectUsesExplicitOldEndpointStopProofWithoutInheritingItsAuthority`
-  fails on master code on both FFmpeg builds; `packages/baander-audio-core`'s
-  `test_usac_enc` byte-identical fixture failed on this host's compiler (fixed
-  2026-11-11; see [bAAC exact arithmetic](#baac-exact-arithmetic));
   `MediaWorkerRunnerTest::testSerialAudioJobsReuseOneSlotWithIncreasingLaunchGenerations`
   failed once under CPU load and passes alone; GitHub reports 178 Dependabot alerts
   on the default branch (3 critical, 78 high).
@@ -491,11 +447,7 @@ constructor's old argument order, and the image rejected them ("Argument #2
 The instance stayed blocked, refusing every later update, until `make dev-recover`
 and `make dev-up` ran from a current checkout. A contract change between the tooling
 and the image needs either a controller generation that updates with `master` or a
-versioned profile request the image can refuse with a reason. The same day
-`make dev-recover` from `cbc5540f4` activated the retained `60fc26b63` release, and
-`make dev-up` from `ca4f71103` installed a new controller generation and brought the
-instance to `ca4f71103` with web and workers ready. `transcode.aac_implementation`
-reads `bac` there, and `debug:hw-transcode` maps it to `libbac` for encode and decode.
+versioned profile request the image can refuse with a reason.
 
 ## Playback investigation and evidence limits
 
@@ -645,6 +597,13 @@ pages, interactive diagrams, configurable media capacity, bAAC and the website
 typography work with `git show b9a67726f:ROADMAP.md`, and the plans retired then with
 `git show b9a67726f:docs/plans/<file>`.
 
+The roadmap before the 2026-11-15 cleanup is preserved at `d4a938b74`. Read the
+delivered checkpoints of the capability and size settings, the development controller
+image identities, movie playback on growing presentations, the browser runner release,
+bAAC exact arithmetic and lossless mode, the master CI repair, the playback session
+entities, the Bånder Audio Core rename, scan artist credits, MusicBrainz matching and
+the web fixes of 2026-11-14 with `git show d4a938b74:ROADMAP.md`.
+
 The entries below preserve the installation guides' linked checkpoint and the
 open items left by delivered work.
 
@@ -751,66 +710,22 @@ Figures and limits are in the
 
 ### Development controller image identities
 
-Two image-identity defects are fixed and verified on the branch
-`fix/database-image-double-export`; both trace to the pooler change
-(`d13b4ba77`, 2026-11-03) combined with the daemon's containerd image store,
-which gives every `docker build` export a fresh attestation index digest.
-Preparations failed from 2026-11-07: the worktree preview stayed in
-`preparation_failed` and the persistent instance's first start failed the same
-way. The persistent instance reached readiness at `https://baander.test` on
-2026-11-09 (web and workers ready, revision
-`4ef7de4a3d0581f4e970e433ec6c3768b5edeaa8`, gateway answering HTTP 200).
-
-- The postgres and pooler roles built the shared database tag twice; the second
-  export re-pointed the tag and orphaned the identity recorded first. One
-  export now serves both roles (`788bc012d`).
-- The shared gateway reused its recorded nginx digest after the daemon lost it,
-  because a later preparation pulled the floating `nginx:stable-alpine` tag
-  newer. The gateway re-pins to the release image when the recorded identity no
-  longer resolves (`bd7c8f926`).
-
-Each fix has a regression test that failed before and passes after. The
-affected tooling suites pass: 102 tests/679 assertions (build, activation,
-retained state, database, release-input integrity, libraries) and 52
-tests/436 assertions (host gateway, activation, topology, retained state,
-image pins).
+Two image-identity defects are fixed on the branch `fix/database-image-double-export`
+(`788bc012d`, `bd7c8f926`); both trace to the pooler change (`d13b4ba77`, 2026-11-03)
+combined with the daemon's containerd image store. The persistent instance reached
+readiness at `https://baander.test` on 2026-11-09. The rules for retained identities
+were delivered with the movie playback merge (`5957de556`), and the rules for a pruned
+release were accepted by the user on 2026-11-11.
 
 Open:
 
-- The full tooling suite completed green on 2026-11-09 (1525 tests, 13,063
-  assertions, 9 environment skips, 50 minutes) with the gateway fix landing
-  mid-run; a clean full re-run on the merged master remains pending.
-- **Retained identities, delivered with the movie playback merge (`5957de556`):** a retained postgres or redis identity is kept only while the daemon
-  holds it; otherwise the role is built or pulled as for a new instance. A stopped
-  instance restarts from its saved release only while all its images resolve. Only the
-  daemon's own "No such image" answer counts as absent.
-- **Correction to the account above:** the 2026-11-07 failures were two defects. The
-  persistent instance failed on the double export. The worktree preview
-  `preview-fd790a887b6899cb` failed while pinning a postgres identity the daemon no
-  longer held: between 2026-11-02 and 2026-11-07 every image without a container was
-  removed from the daemon from outside, with the footprint of `docker system prune -a`.
-  The tooling has no path that removes release pins.
-- **Rules added for a pruned release, accepted by the user on 2026-11-11:** the
-  preflight runs from the prepared release when the previous release's images are gone;
-  a worker boot whose operator image is gone is recorded retired without the operator
-  when none of its containers exists, and refused before anything starts while
-  containers of it survive or the database still registers it.
-- **Verified live, 2026-11-10:** with the fix, `make preview-up` on
-  `preview-fd790a887b6899cb` prepared its release (postgres, pooler, redis and nginx
-  recorded as not retained), started postgres healthy on the retained volume and
-  stopped at the preflight's next guard, "An applied migration changed; reconcile the
-  saved release before continuing." `make preview-down` then stopped it, which it
-  could not do before because the worker's operator image was gone.
-- **Still blocked:** that preview's database applied five migrations that `de7942d73`
-  later rewrote, and the preflight refuses a changed applied migration. An instance
-  that was running when its release was pruned also stops at a named refusal, because
-  only the lost operator image could retire its worker registration. Both need a data
-  reset, which needs the owner's approval.
-- **Reset, 2026-11-11, approved by the owner:** the preview's 14 volumes, its private
-  network and its saved state (21 GB, 17 GB of it checkpoints) were removed after
-  checking that no container used them. `make preview-status` answers "No configured
-  instance", so the next `make preview-up` initializes a new instance. The tooling has
-  no reset command; this was done with `docker volume rm`, `docker network rm` and by
+- **Instances that need a data reset:** the preflight refuses a changed applied
+  migration; the preview `preview-fd790a887b6899cb` had applied five migrations that
+  `de7942d73` later rewrote. An instance that was running when its release was pruned
+  also stops at a named refusal, because only the lost operator image could retire
+  its worker registration. Both need a data reset, which needs the owner's approval.
+- **No reset command:** the tooling has none. The preview's reset on 2026-11-11,
+  approved by the owner, was done with `docker volume rm`, `docker network rm` and by
   removing the instance's directory under the controller's state root.
 
 ### Movie playback on growing presentations
@@ -818,148 +733,11 @@ Open:
 Delivered from the
 [plan](docs/plans/2026-11-09-1635-fix-movie-playback-growing-presentations-plan.md)
 on the branch `movie-playback-growing-presentations`, merged to `master` as
-`5957de556` on 2026-11-10 and pushed to both remotes. The website was built from
-that revision and published to `baander.app` the same day: 237 manual pages; on
-the live site the home page, the Session context page, the media and playback
-testing page, the continuous integration page, `sitemap.xml` and
-`pagefind/pagefind.js` answered 200 with the expected content and an unknown path
-answered 404. The visual checks were not repeated. On the persistent instance a 1080p movie cut forward every few
-seconds while its encode ladder ran ahead of playback, wedged after a failed
-transfer and left eight sessions holding jobs, slots and 361 MB of output.
-
-- **Clock (U1, U3):** the hls.js live-edge disable is pinned by a test of the
-  constructed configuration (`7723c16b9`), and a player-internal seek is
-  recorded as a `baander:native-seek` mark and no longer sent to the server,
-  where it restarted every encoder (`99ad11a3e`).
-- **Session cursor (U2):** no code. The server already reported the session
-  cursor; the drift came from the client's own edge seeks. The plan's decision
-  is corrected (`76b4b1e6b`).
-- **Transfers (U4):** a rejected transfer command settles the transfer as
-  failed under its own fence, and the coordinator's refusals raise an error
-  and a mark instead of returning silently (`dee8bdea4`).
-- **Stopped runner:** a browser that acknowledged an explicit Stop kept its
-  place after it had gone, so every other tab was refused with "Previous
-  playback is unconfirmed" for good; reproduced on a preview in Chromium. A
-  snapshot now releases it once its registration has expired or been retired
-  (`056ba961d`). The cause was `7cf695486`, which also left
-  `PlaybackTransferPersistenceTest`'s reconnect test failing on `master`; the
-  test now asserts the real sequence.
-- **Overlay (U5):** the volume slider is bounded at 5 rem, so the seek slider
-  is the only full-width slider (`f2cd12d83`).
-- **Stale sessions (U6):** a session that no playback report and no stream
-  signing has touched for 24 hours expires at the start of job cleanup, unless
-  its presentation is finished. Expiry cancels the execution so the worker
-  frees its slot, and cleanup removes the job once the worker has let go
-  (`adf06fedb`). The plan's condition "no runnable job" could never be met and
-  was dropped: all eight stale jobs on the instance still had a worker
-  renewing its lease 20 hours later. The cleanup endpoint and
-  `app:transcode:job:cleanup --json` now return `{expired, cleaned}`. After
-  review, a signing renews a session only when its last write is over an hour
-  old, and one failing expiry no longer blocks the rest (`b26455a68`).
-- **Gate (U7):** the two-command checkpoint ends with a 24-second window on
-  the replay after movie completion: the media clock may gain at most one
-  second on the wall clock, no generation may change and no seek may reach
-  the server, and the producer must publish at least 1.5 times real time
-  (`0a76ee3a2`). The drill's outer bound moves from 600 to the documented 900
-  seconds.
-
-Follow-up, 2026-11-10. The first phase's verification left defects open; each was
-diagnosed from a run or a PostgreSQL test and fixed on the same branch (units U8–U17
-of the plan).
-
-- **Rendition set (U8):** the signed set was rebuilt on every signing from "the
-  sibling covers the cursor", so a sibling encoding near real time left and rejoined
-  as the cursor moved, and every change replaced the player's attachment: 35
-  attachments and 100 seconds of starvation in one cold play on a loaded preview. A
-  growing sibling now joins with an 18-second lead and an attached one stays until its
-  lead shrinks to one segment; the primary alone decides readiness; the group's
-  runtime rows are read together (`602c10412`, `c422a05ff`, `d74134856`).
-- **Gone runners (U9):** `playback_commands` records when a command was first shown
-  to its endpoint. A control the runner was never shown settles as never effective;
-  a shown play, load or seek keeps the unknown path. The release of a confirmed
-  paused or stopped browser runner runs from the snapshot, the registration, a
-  control and a transfer. A transfer whose target was never shown its start fails at
-  expiry, and the overlay closes during an uncertain transfer (`ddac83bbe`,
-  `f47131281`). A tab that took over a paused session is released on its `started`
-  answer when the start asked for paused (`4d14e32f5`).
-- **Finished movie, closed tab:** the final preview run found that letting a movie
-  finish, closing the tab and opening the movie elsewhere refused Play. At a natural
-  end the player had paused only its transcode session; the playback session saw a
-  `paused` observation while it still wanted playing, which is no proof of silence for
-  a tab that has gone. The player now pauses through the session at its end, as music
-  playback does, and the acknowledged pause lets the release work (`79a7cf3c4`).
-- **Ended sessions (U10):** a refresh signing that names only ended sessions answers
-  410 with its reason. After an expiry the player continues at its position on a new
-  session, paused if it was paused; after a failed or cancelled job it shows the
-  error (`602c10412`, `d74134856`).
-- **Cursor and replay (U14, U15):** a different movie starts at zero instead of the
-  previous movie's cursor. Play at the source end starts from zero on any player. A
-  restore into a presentation's last second lands one second early first, because
-  hls.js ends the media source only after the element has settled and the tail
-  decodes only after the source has ended (`ddac83bbe`, `602c10412`, `7cc63771c`).
-- **Gate (U13):** the checkpoint asserts that the registration answer after a reload
-  already shows the runner released, and two of its steps no longer depend on
-  reconnect timing or on where the paused cursor stands (`c27da2847`).
-- **Tooling and cleanup result (U11, U12):** see "Development controller image
-  identities" (`cb103bed1`, `4706716e2`); the cleanup counts are a typed result
-  (`602c10412`).
-- **Correction:** the Firefox failure recorded here earlier as "a second `pause`
-  command" was wrong. The second request re-reads the result of the same request. The
-  cause was the release running only on the relay's one-second tick, so the gate
-  passed about one run in six.
-
-Verification, 2026-11-10, in `baander-ci-prewarm:local` at the final code `79a7cf3c4`,
-each gate run alone on a quiet host.
-
-- The Transcode and Session unit suites pass 1,609 tests with 33,344 assertions. Twelve
-  PostgreSQL integration files for the session and transcode contexts pass 354 tests
-  with 11,480 assertions.
-- PHPStan, Deptrac, `lint:container` and the OpenAPI check pass. The web typecheck
-  passes, and the session and catalog suites pass 493 tests.
-- The tooling files touched pass on host PHP 8.5.12: 26 files with 416 tests after the
-  fallbacks, then `DevelopmentWorkersTest` 63 tests, `WorkerLifecycleTest` 16,
-  `DevelopmentActivationTest` 23 and `DevelopmentUpdatesTest` 12 after the review
-  follow-ups; `phpstan-tooling` and `deptrac-tooling` report nothing.
-- The two-command gate with client controls passes all eight phases in Firefox 157 and
-  Chromium 156. The registration answer after the reload arrived 37 ms and 39 ms after
-  registration with no active runner; the producer ran at 17.0 and 19.1 times real
-  time. With the seek forwarding that `99ad11a3e` removed restored in the image, the
-  gate fails in `worker-recovered`: "Only a committed seek may reach the server; the
-  player sent 1 without one".
-- The movie-endpoint step passes: after the exact-end seek the element stands at 24 of
-  24 with `ended` true, `readyState` 4 and not seeking; the natural end sends exactly
-  one ending pause, and replay sends one seek to zero. It had failed since 2026-11-06.
-- The media-control gate passes. Run beside image builds earlier in the day it failed
-  with exit 137; it is a CPU pressure drill.
-- The adaptive gate passes in Chromium 156.
-- The reported movie (1920x1080 H.264/Opus, 223.59 s) played from a cold start to its
-  end on a fresh preview at `7cc63771c`, before the two last session fixes, in Chromium
-  with host load 2.3 at the start. The
-  player attached twice (360p, then 360p with 720p at 65 s, when 720p led by 19.8 s),
-  against 35 attachments before; no rendition left and rejoined, against 17 times
-  before. It spent 2.0 s not ready after the first frame, against 100 s, and took
-  225.7 s of wall time, against 331.6 s. The media clock never gained more than
-  0.017 s on the wall clock between samples and never moved back; no native seek was
-  recorded and no seek was sent; one generation, three jobs and three sessions served
-  the play. The encoders ran at 4.51, 1.30 and 0.65 times real time for 360p, 720p and
-  1080p, so 1080p was never offered on this host. A second movie then started at
-  zero, and Play after a reload of the finished movie played from zero in 1.6 s; that
-  replay was served as a cached delivery without a transcode session. The seek slider
-  measured 1,408 px and the volume slider 80 px at a 1,440 px viewport.
-- Reviews: `ce-doc-review` of the follow-up plan with four reviewers, findings applied;
-  `ce-simplify-code`, three findings applied; `ce-code-review` over the follow-up with
-  eleven reviewers returned two confirmed P2 findings on the paused-runner release
-  proof, both fixed in `f47131281`, and one P1 claim that validation rejected. The first
-  phase's review returned two confirmed P2 findings, fixed in `b26455a68`. The
-  cross-model pass is disabled by the checkout configuration.
-
-The two user decisions of 2026-11-11 about a runner that went away (a same-tab
-registration as proof, "Play here anyway", no timer; queue edits and volume changes
-passing the release proof) are delivered; see
-[Releasing a browser runner that went away](#releasing-a-browser-runner-that-went-away).
-
-The two tooling rules named under "Development controller image identities" were
-accepted by the user on 2026-11-11.
+`5957de556` on 2026-11-10 and pushed to both remotes. The defect: on the persistent
+instance a 1080p movie cut forward every few seconds while its encode ladder ran ahead
+of playback, wedged after a failed transfer and left eight sessions holding jobs,
+slots and 361 MB of output. The website was built from that revision and published to
+`baander.app` the same day; the visual checks were not repeated.
 
 Open, known limits:
 
@@ -986,91 +764,18 @@ Open, known limits:
   resets about twenty closure variables by hand.
 - **Finished presentations:** these keep their sessions and are reclaimed by the
   cache sweep's 24-hour TTL, not by job cleanup.
-- **Not run:** the gate on a hosted runner (the 1.5 rate is unproven on a slower
-  host), the full tooling suite, and the persistent instance's cleanup run, which
-  needs the branch on `master`.
-- **Planned next:** Doctrine entities for the four SQL-owned playback tables, on
-  their own plan and branch. Delivered since; see
-  [Playback session entities](#playback-session-entities).
 
 ### Releasing a browser runner that went away
 
 Delivered on the branch `session-runner-fence-release` from the
-[plan](docs/plans/2026-11-11-1737-feat-session-runner-fence-release-plan.md). A tab
-that was the runner and then reloaded, closed or lost its network left the session
-unknown, and every other tab was refused with "Previous playback is unconfirmed"
-until it came back. Nothing is released on a timer.
-
-- **Queue edits and volume changes (`d6ead4875`):** the paused-runner proof passes
-  over them, still in one SQL statement; a queue edit's answer records cursor and
-  presence only. The store keeps five SQL statements; the statement ceilings stay 6,
-  9, 10 and 21.
-- **Page identity and succession (`4e06eff9a`, `d6ead4875`):** every registration
-  carries one identity per loaded document (column
-  `playback_destination_incarnations.page_id`, migration `Version20261111180000`).
-  Another page of the same tab releases the earlier incarnation in the registration's
-  own transaction; the same page succeeds it and keeps playing through a silent socket
-  replacement. A duplicated tab gets a new tab identity through its Web Lock, so it is
-  never taken for a reload.
-- **Close report (`4e06eff9a`, `ac718191a`):** `POST /api/session/close`, sent at
-  `pagehide` from a request prepared ahead (a DPoP proof cannot be signed while the
-  page goes away) and after a socket close when nothing plays.
-- **"Play here anyway" (`8c7252fb2`, `ac718191a`):** `POST /api/session/override`,
-  accepted only when the runner, or an uncertain transfer's target, is a browser
-  whose registration lapsed; idempotent by request identity. An accepted override
-  re-issues the refused play or song selection only when the refusal is at most two
-  minutes old.
-- **Beside it:** a stopped video player keeps a volume change for its next load; a
-  disconnected playing music runner no longer rejects with "Playback execution was
-  cancelled."; the runtime test under `ui/web/tests` that had failed since
-  `79a7cf3c4` runs again.
-- **Simplification and documentation (`83b8dc307`, `d20d17ecc`).**
-
-Code review, 2026-11-11, six reviewers against `c643dcb4f`: no P0 or P1, and nothing
-against the property that two devices never play at once unless a user chose the
-override. Confirmed: this entry was missing, and the repeated-close test could not
-see a cursor rewrite. Fixed after review, each with a test that failed first:
-
-- A returning overridden tab is silenced by its own registration answer; before, it
-  could play on for up to one 10-second presence interval.
-- A close report that crosses its page's re-registration also releases the
-  successor while the session still stands at the reported revision; before, the
-  successor stayed runner of a session nothing played.
-- A transfer source succeeded after answering its quiesce keeps that proof; before,
-  a target's close then left the session unknown and owed a stop to a paused
-  player.
-- A close report on an incarnation already retired as stopped changes nothing.
-- "Play here anyway" is offered only for browser destinations; an override from
-  another account is refused (tested); the offline-return browser case can no
-  longer pass when the song ends by itself.
-
-Fixed during the gates:
-
-- **A resume that seeks (`7a650b42f`):** in Chromium the reloaded page's local
-  recovery gave a cursor 0.2 seconds off, so the resume sought; the old
-  generation's subtitle segment then answered 404, hls.js treats that as fatal, and
-  in the 13 ms before the new generation was signed the player gave up the resume.
-  A failing attachment is now retiring once its seek was accepted into another
-  generation. This is older player code that the new gate step exposed.
-- **Play right after a page load (`6b5644f83`):** every control was refused until
-  the registration was answered, so a press within about half a second of loading
-  showed "Playback connection is unavailable." (also on master). A control issued
-  while a registration is in flight now waits for the answer, for at most 15
-  seconds.
-- **Specs:** the two new specs had four test defects (a layout-preference conflict
-  between two tabs of one account, a check that counted the helper's own recovery,
-  an ambiguous locator, a following tab that offers Pause); the video transfer spec
-  now asserts the close report's cursor, which is more recent than the recovery
-  checkpoint.
-
-Checkpoint, 2026-11-12, at `956ddaa3c` (the merge with master's AAC and CI work;
-one later commit makes a player test independent of host load): the two-command gate
-passes all phases in Firefox 157 and Chromium 156 with client controls, including the
-new reload while a shown play is held unanswered; the movie-endpoint step passes; the
-`playback-destinations` browser specs pass 14 of 14 in Chromium; the complete web
-suite passes 3,480 tests; at `6db645330` the whole unit directory passed 8,593 tests,
-fourteen PostgreSQL integration files 246 tests, and PHPStan, Deptrac, the container
-lint and the OpenAPI check were clean. The statement ceilings stay 6, 9, 10 and 21.
+[plan](docs/plans/2026-11-11-1737-feat-session-runner-fence-release-plan.md), with its
+checkpoint on 2026-11-12 at `956ddaa3c`. A tab that was the runner and then reloaded,
+closed or lost its network left the session unknown, and every other tab was refused
+with "Previous playback is unconfirmed" until it came back. The delivery adds one
+identity per loaded document, a close report (`POST /api/session/close`) and "Play
+here anyway" (`POST /api/session/override`), accepted only when the runner, or an
+uncertain transfer's target, is a browser whose registration lapsed. Nothing is
+released on a timer.
 
 Open, known limits:
 
@@ -1092,48 +797,20 @@ Open, known limits:
   account gets a 409 and a "Settings conflict" dialog when the first plays. The new
   specs answer those writes themselves; `browser-transfer.spec.ts` does not and can
   fail on it.
+
 ### bAAC exact arithmetic
 
 Delivered from the [plan](docs/plans/2026-11-11-1916-fix-baac-exact-arithmetic-plan.md)
 on the branch `fix-usac-encoder-vector`, by the user's decision of 2026-11-11: every
-compiler writes the same bytes, and nothing on the transcoder's path gets slower.
-The Release build had put `-fassociative-math`, `-freciprocal-math`,
-`-fno-signed-zeros` and `-ffinite-math-only` on every file, so each compiler
-regrouped sums its own way: CI's GCC 13.3 passed 46 of 46, GCC 16 failed
-`test_usac_enc`, and when GitHub's `ubuntu-latest` moved to GCC 15.2 the AAC native
-addon workflow failed on master. Swapping object files between compilers located two
-causes, the tests' signal generator and the QMF reductions.
-
-- **Flags (`bd175794f`):** Release keeps `-O3 -fno-math-errno -fno-trapping-math`;
-  `-ffp-contract=off` applies in every configuration; 32-bit x86 builds with GCC add
-  `-mfpmath=sse`. The stored-vector suites check their generated signal's checksum
-  first, so a different signal is named as such.
-- **Speed remedies (`bd175794f`, `4039dff18`, `768802054`):** the QMF loops are
-  interchanged over transposed tables; `fmaxf` and `fminf` became inline
-  comparisons; the AAC-LC noise sum is a DSP kernel with identical scalar, SSE2,
-  AVX2 and NEON bits; the LPD synthesis filter, `lpd_dct4`, SBR tonality and the TNS
-  autocorrelation use fixed-order partial sums.
-- **Review fixes (`5210f3e7c`):** the afterburner measures noise with the same
-  kernel; NaN or huge input is coded from a cleaned copy (it had made `bit_demand`
-  convert a NaN to an integer); sort ties break by channel then band, so every C++
-  library orders them alike.
-
-Measured, 2026-11-11: 48 of 48 on GCC 14.2 (the FFmpeg image's compiler), 15.2
-(CI), 16.2, clang 23, the sanitizer build and a Debug build, and 46 of 46 earlier on
-GCC 13.3, 14.3, 15.3 and clang 18 and 21; every build writes the fourteen committed
-streams at the default, scalar, SSE2 and AVX2 levels; 41 committed streams decode to
-identical samples across builds; glibc's non-FMA libm variants change no byte.
-Against the old flags on GCC 14.2 and 16.2 (alternating pairs on one core) no
-workload is slower: encodes 0.90 to 0.98, decodes 0.70 to 1.01, xHE-AAC speech
-decode 0.99 (it was 1.06 and 1.08 before the fixed-order sums). The six LPD streams
-decode differently from before by at most 3.2e-6 of full scale, 112 to 141 dB below
-the signal.
+compiler writes the same bytes, and nothing on the transcoder's path gets slower
+(`bd175794f`, `4039dff18`, `768802054`, `5210f3e7c`). The Release build had put
+`-fassociative-math`, `-freciprocal-math`, `-fno-signed-zeros` and
+`-ffinite-math-only` on every file; it now keeps
+`-O3 -fno-math-errno -fno-trapping-math`, `-ffp-contract=off` applies in every
+configuration, and 32-bit x86 builds with GCC add `-mfpmath=sse`.
 
 Open:
 
-- Closed 2026-11-12: the arm64 job of `aac-native.yml` runs `test_dsp`, which compares
-  the 8 NEON kernels of the AAC table, the noise kernel among them, with scalar bit for
-  bit and checks that they are the level's own; the lossless suites do the same for 6.
 - CI writes the committed streams and checks against them with the same compiler; a
   second compiler in the Linux job is the requirement that catches a regression.
 - The published speed tables and per-stream decoder figures in the package's
@@ -1144,245 +821,36 @@ Open:
 
 ### Master CI repair
 
-`master` had failed every `CI` run since 2026-11-05 and, after the movie playback
-merge, Frontend CI too. Fixed 2026-11-11 (`dfa6e4967`, `76474e24f`, `c643dcb4f`,
-`4a4133ffd`, `72cc1ab49`):
+No `CI` run on `master` has been green on GitHub since 2026-11-05. The fixes up to
+2026-11-13 are on `master`. Those of 2026-11-14, for the defects found at steps 28,
+37, 45 and 53 of the quality gate, are local commits `d1504daa3` to `77bb3c8e4` on the
+branch `chore/roadmap-current`; the pinned revision above gives each cause and its
+evidence.
 
-- 24 player cases in `ui/web/tests/features/catalog/hooks` still asserted behaviour
-  that the movie playback commits changed on purpose; the branch's checkpoints had
-  run only the co-located tests.
-- The desktop lockfile records a hash of the whole `packages/baander-aac` folder, so
-  every change there moved it; Frontend CI now runs on that folder, and the CI guide
-  states the rule.
-- The DASH publication fixture required FFmpeg 7, and the image has shipped 8.1
-  since `537f20336`; it now requires 8 and prints the fixture's output on failure.
-  Locally it passes on 8.1.
-- ThreadSanitizer cannot disable address randomization on the Ubuntu 26.04 runner,
-  so the registry thread job runs on 24.04.
-- The worker cleanup regression ran PHPUnit on the runner, where no `vendor` exists;
-  it runs in the CI image.
+Open:
 
-Fixed 2026-11-12 (`424184a6b`, `dd8d463b5`, `ee25b6456`): the reviewed local change
-to two swoole-bundle files is recorded, the CI image installs `zstd` for the package
-store's tests, and the Python-free tooling step passes.
-
-The run for `ee25b6456` then failed twice in the Firefox two-command gate, with a
-different error each time; the Chromium gate passed both times. Fixed on the branch
-`fix-two-command-firefox`:
-
-- **Gate defect, shown and fixed:** the checkpoint parsed the player's source with
-  `new URL()` while the player had emptied the element between two attachments,
-  and threw "Invalid URL". Firefox leaves the element empty for 9 to 26 ms (median
-  18 ms over 12 attachments in the failed run's receipts), Chromium for 5 to 7 ms.
-  An empty source is now treated as not yet the expected one.
-- **Worker drain, likely cause:** in the second attempt an empty Messenger poll ended
-  with "Ordinary delivery ownership is uncertain" and both worker units drained, so
-  the subtitle wait that was running timed out. Returning an empty receive's permit
-  now retries for up to two seconds when the admission lock is contended, and the
-  error names its fault code. The run recorded no code, so contention is the likely
-  cause, not an established one; a unit test with another process holding the lock
-  for 200 ms reproduces the failure and fails without the change. A checkpoint that
-  fails now prints which worker units were not running.
-
-Verified locally: unit suite 8,594 of 8,594 (7,704 ordinary, 890 native); the four
-Messenger integration files, 24 of 24; PHPStan, Deptrac, the tooling analysis and its
-format check; the two-command gates in Firefox and Chromium with client controls,
-the movie-endpoint gate and the media-control gate. The Firefox gate had also passed
-locally before the change, so the proof of the fix is GitHub: in the run for
-`715eeb86e` the Firefox two-command gate passed. Not run: the 8 + 12 load proof,
-whose source and profile are not recorded.
-
-That run then failed in the PHP tooling suite, 1 error in 1,553 tests:
-`HttpFixtureTest::testDnsUdpTruncationFallsBackToCompleteTcpAnswers` read the DNS
-fixture's ready file while the fixture was still writing it and got "Syntax error"
-from `json_decode`. The DNS and echo fixtures wrote that file in place; they now
-write it whole through a temporary file and a rename. Locally `HttpFixtureTest`
-passes 33 of 33, and the truncation case passed five runs in a row.
-
-The run for `a97ae0058` reached the quality gate's step 39, "Development instance
-safety", for the first time since the port, and failed there with "Install Composer
-dependencies first". Fixed 2026-11-13, reproduced in the runner image as a job
-container with the Docker socket and the checkout mounted at a path the daemon host
-does not have, as on GitHub:
-
-- **Step 39:** its nested worker-source drill packed the runner's checkout, which has
-  no `vendor`. The step now sets `BAANDER_TEST_CHECKOUT_IN_IMAGE=1`, like the other
-  drill steps, and the drill copies the checkout out of the CI image. It passed
-  ("component safety and source admission") in 1,434 s.
-- **Step 41, outbox leak:** `PasswordChangeSessionRevocationTest` commits through a
-  production kernel, so its four `user.password_changed` events stayed in the outbox
-  after it deleted their users. A later test that relays the whole outbox then failed
-  with "Outbox relay failed for 4 event(s)" (a `notifications.user_id` foreign-key
-  violation). Running the two tests in that order fails before the change and passes
-  after it; the test now deletes its users' outbox rows. Nineteen other leftover rows
-  (`token.revoked`, `library.scan_completed`, `playlist.created`) relay without
-  failure and are left alone.
-- **Step 41, drain probe:** in `live-runtime-bridge-probe.php` each server process
-  kept its own drain flag, so the worker that the probe's reload replaced kept
-  projecting, through its 250 ms timer, until Swoole stopped it three seconds later. A
-  trace showed that worker still releasing connections after the drain. The flag now
-  lives in the probe's shared Swoole table, as the product's drain state does; the
-  trace then shows no releases after the drain.
-
-Verified in the emulated runner: steps 39, 40 (20 checks), 41 (ordinary 7,715,
-native 917, stack lanes 1,724 and 1,652, all passing, 2,798 s), 43 and 54 (lines
-84.96 %), and PHPStan on the final image. Steps 42 and 44 to 53 have not run in the
-emulation.
-
-The run for `c34a8e0a1` then failed in `registry-quality (sanitize)`: "Deadline
-instance did not recover". After its overall deadline the registry closes the
-uncertain database connection, so the next `/ready` must open a new one and finish
-within 75 ms (the instance's 100 ms deadline less 25 ms for the response). The
-contract checked that with one request; it now waits as startup readiness does, up to
-10 s. In a host sanitizer build on one contended CPU, the single request failed in 5
-of 6 runs at 79 to 103 ms; with the wait, 9 of 10 runs passed, the tenth under load
-that also stalled startup readiness. The check had failed once in the last 40 GitHub
-runs.
-
-The runs for `a67ed57e4` (43584904626), `c8feae182` (43587064305) and `435a11639`
-(43638221630) then failed at steps 45, 28 and 37. Fixed 2026-11-14 in local commits
-`d1504daa3` to `77bb3c8e4` on `6912eaaf6`, on the branch `chore/roadmap-current`; they
-are not pushed:
-
-- **Step 45, deployment profile (`d1504daa3`):** the worker command drill passes
-  `--deployment-profile` and its containers set no `BAANDER_DEPLOYMENT_PROFILE`, so
-  every worker compared the drill's 3 + 1 profile with the default 8 + 12 and stopped
-  with "Worker profile must match the web deployment profile." before it read the
-  Redis settings. The default left the drill's 3 + 1 in `69b7b45e6` (2026-11-03); no
-  run reached the step until `c34a8e0a1`. The drill's containers now carry the
-  profile. In an image built from `6912eaaf6`, a worker with a rejected stream setting
-  then names it ("MESSENGER_TRANSPORT_DSN query must use unique scalar connection
-  options or the configured stream and group.").
-- **Step 45, installed schedules (`894f39250`):** with the profile fixed, the drill
-  failed whenever a worker pair ran across a ten-minute mark, with "Manual request
-  must remain durable and undispatched before lease admission." The migration
-  `Version20261115110000`, from MusicBrainz matching, installs the album match queue's
-  recovery every ten minutes, and the drill's scheduler checks count every occurrence,
-  stream entry and execution. A run from 21:16:00 to 21:21:44 UTC failed with the
-  recovery's occurrence, dispatched at 21:20:49, beside the fixture's; a run from
-  21:02:30 to 21:08:55 passed. The drill's setup now pauses the installed schedules.
-- **Step 28, rapid seeks (`fb3ea85a3`):** the Chromium two-command gate failed once
-  with "Source seeking must span the full source duration" (180 !== null). The
-  rapid-scrub check compared each gesture's slider with the playback snapshot's
-  duration. The first seek starts a new generation, whose signing answers carry no
-  duration until it is ready, and in the failed run one arrived before the second
-  gesture (generation 9, `ready: false`, 206 ms after the last ready answer). The
-  slider showed 180 s throughout. The loop now passes the duration read before the
-  first seek. The step passed on the three runs before and on the run after.
-- **Step 53, start without PostgreSQL (`51988b869`, `77bb3c8e4`):** the web shutdown
-  drill's last scenario started `app:serve` with PostgreSQL stopped and expected one
-  logged cleanup failure. Since `336d60ff4` (2026-11-03) the start checks the
-  database's default time zone and refuses an unreachable database, so the drill
-  failed with "app:serve did not answer /live." after 27 passing checks. On 2026-11-14
-  the user chose to keep the refusal. The drill now stops PostgreSQL under a running
-  server and requires one drain and exit 0, then requires the next start to exit
-  non-zero over a database connection failure without logging a credential. The
-  deployment profiles, `app:worker` and runtime drill pages say that an unreachable
-  database refuses the start.
-- **Step 37, qualification transport (`841db23a7`):** with matching,
-  `MusicBrainzAdapter` gained two constructor arguments and Lucene escaping, and
-  `QualificationMetadataTransportTest` still built it with three arguments: 1 error in
-  1,588 tests in the run for `435a11639`. The recorded transport looked titles up by
-  the raw query, so with "-" escaped it answered every search as unmatched. The test
-  builds the adapter with a no-limit limiter, and the transport reads the query's
-  escapes before the lookup.
-- **Step 37, controller payload race (`a51392298`):** in the run for `57fc9e1e3`
-  (43487231897),
-  `ControllerPayloadTest::testConcurrentConverterRefusesTheBarrierWhileHoldingAnOldLease`
-  read its child's `report.json` between creation and write: JSON "Syntax error", 1
-  error in 1,588 tests. A reader polling for the file saw an incomplete in-place write
-  once in 3,000 rounds and never with a write through a temporary file and a rename,
-  which the child now uses.
-
-Verified locally on 2026-11-14, on the host with each step's workflow environment,
-against images built from the branch: step 28 in Chromium passes, its rapid-scrub
-control committing 22, 26 and 30 s; step 45 passes across the 21:30 UTC mark with the
-fixtures taken from the image (21:26:02 to 21:34:07); steps 46 to 52 pass (236, 540, 52,
-50, 98, 98 and 110 s); step 53 passes 29 checks, the server draining in 5.7 s with
-PostgreSQL gone and the refused start exiting 7. Step 37 passes in the CI image: at
-`841db23a7`, its four dependency, architecture and format checks, PHPUnit with 1,588
-tests and 13,452 assertions (7 skipped), the two Python-subject tests and PHPStan; at
-`052e8684d`, the architecture and format checks, PHPStan, and `ControllerPayloadTest`
-with `QualificationMetadataTransportTest` (21 tests). `ce-code-review` (one independent
-adversarial read beside the lead's; cross-model pass off by checkout config) said "Ready
-with fixes"; its one finding, the lost drain check, is fixed in `77bb3c8e4`. Not run:
-the Firefox two-command gate, steps 38 to 44 and 54 onward, and the gate as one job in
-the runner container.
-
-Open: no complete green `CI` run on GitHub has been observed since 2026-11-05. Each
-run draws a new test-order seed, so another order-dependent test can still surface in
-step 41. The registry release job failed once on a load-smoke lookup that answered
-503; it had passed on the two runs before.
+- Push the branch and watch its run. Locally, on the host against images built from
+  the branch, steps 28 (Chromium), 37, 45 and 46 to 53 pass. Not run with the fixes:
+  the Firefox two-command gate, steps 38 to 44 and 54 onward, and the gate as one job
+  in the runner container.
+- Steps 46 to 53 have not run on GitHub since the port.
+- Each run draws a new test-order seed, so another order-dependent test can still
+  surface in step 41.
+- The registry release job failed once on a load-smoke lookup that answered 503; it
+  had passed on the two runs before.
+- The first green run is the point to write the CI-repair learning with `ce-compound`,
+  which the user confirmed on 2026-11-13.
 
 ### Playback session entities
 
 Delivered from the
 [plan](docs/plans/2026-11-10-2252-refactor-playback-session-entities-plan.md) on the
-branch `playback-session-entities` and merged to `master` on 2026-11-11.
-The four playback coordination tables had no entities, the ORM `schema_filter` hid
-them from schema comparison, and `PlaybackStore` read and wrote them with 38
-hand-written statements.
-
-- **Contract and baseline (U1, `772f5a085`):** `PlaybackStoreContractTest` pins what
-  the coordinator's suites do not: how a repeated write resolves, which clock
-  stamps a row, and the keys and scalar types of every returned row.
-  `PlaybackSnapshotCostTest` counts the statements of a relayed snapshot and of a
-  control that issues a command.
-- **Entities (U2, `deb220984`):** four `readOnly` entities match the migrated
-  catalog, the tables left `schema_filter`, and schema comparison is clean with no
-  migration changed. `PlaybackSessionSchemaListener` declares eight composite
-  foreign keys.
-- **Reads (U3, `0be4eaafd`):** every read is DQL that returns plain rows.
-- **Writes (U4, `715c37523`):** an insert goes through the unit of work, flushed and
-  detached in its method; an update is one DQL statement with its predicate. Five
-  statements stay SQL: the account advisory lock, the insert of a missing session
-  row, the two retire proofs and the recovery expiry check against
-  `clock_timestamp()`.
-- **Cost (U5, `eb9c4c7bf`):** measured against the SQL store with the same program
-  on the same host, 2,000 iterations after 200 warm-up, PostgreSQL 18.4, four runs
-  before and five after, load average between 2 and 7.
-- **Documentation and rule (U6, `e937e01de`):** the Session context page, the Session README,
-  the database naming page and the Doctrine reference describe the mapping, and
-  `.agents/rules/ddd-repositories.md` states when a table or a statement may stay
-  outside the ORM.
-
-Measured:
-
-| Scenario | Statements, before | Statements, now | Median before | Median now | Ratio | Bound |
-|---|---|---|---|---|---|---|
-| Snapshot, unbound socket, runner playing | 9 | 6 | 2.29 ms | 2.31 ms | 0.96 | 1.15 |
-| Snapshot, bound socket, runner resting paused | 12 | 9 | 4.07 ms | 3.91 ms | 0.96 | 1.15 |
-| Snapshot that first shows a command | 12 | 10 | not timed | not timed | | |
-| Control that issues one command | 19 | 21 | 6.45 ms | 8.25 ms | 1.26 | 1.5 |
-
-The medians are from the pass with `synchronous_commit` off for the session, which
-is the pass the bounds are judged on. With commits waiting for the flush every
-snapshot stays at about 17 ms before and after, because the flush outweighs the
-statements. Serving 50 accounts in turn through one entity manager costs 3.87 ms
-per snapshot against 3.91 ms for one account, with the same number of statements
-and an empty unit of work after each round. No fallback to SQL was applied.
-
-These figures are from the second measurement, six alternating pairs against the SQL
-store after a simplification pass (`7c93212ca`) resolved the snapshot's selected
-destination and active incarnation from rows it had already read; the ratio is the
-median of the six paired ratios, and the medians shown are from the pair run on a
-quiet host. The first measurement, before that change, gave 8, 11, 12 and 23
-statements and ratios of 1.13, 1.10 and 1.27.
-
-Checkpoint, 2026-11-11: the Session unit suite passes with 143 tests, unchanged;
-ten PostgreSQL integration files pass with 157 tests, the six playback files among
-them with no changed assertion; PHPStan, Deptrac, the container lint and the
-OpenAPI drift check are clean.
-
-Accepted differences:
-
-- A number in a stored JSON document keeps a zero fraction (`30.0` where the SQL
-  store wrote `30`).
-- A session without media stores SQL NULL where the SQL store wrote the JSON value
-  `null`. Both read back as no media.
-- A control that issues a command sends four more statements: one read that carries
-  the transaction clock and the replay-key check, a savepoint and its release
-  around the insert, and the mark that the control's own answer shows the command.
+branch `playback-session-entities` and merged to `master` on 2026-11-11. Four
+`readOnly` entities map the four playback coordination tables, which left the ORM
+`schema_filter`; `PlaybackStore` reads with DQL, and five statements stay SQL.
+`.agents/rules/ddd-repositories.md` states when a table or a statement may stay
+outside the ORM. The same branch fixed job cleanup after an expiry (`e7420b119`,
+`101cc31e4`, `3ef843e27`, `b364cd7f3`).
 
 Open:
 
@@ -1411,8 +879,7 @@ Open:
     their own account already holds managed token entities, so any write added after
     the delete in that request would fail.
   Not covered: `tests/`, and the long-lived runners were not traced line by line.
-- **Not run:** the gate on a hosted runner, and the adaptive and media-control gates,
-  whose code this branch does not touch.
+- **Not run:** the media-control gate, whose code this branch does not touch.
 - **Store preconditions:** `register()`, `saveTransfer()` and `insertCommand()` look
   a row up and then insert it, which is safe only under the account lock that
   `lockSession()` takes inside the transaction port. The coordinator is their only
@@ -1422,119 +889,23 @@ Open:
 - **A job another run removed:** when two cleanup runs overlap and the other one
   deleted a whole job first, this run still counts that job as cleaned.
 
-Gates, 2026-11-11, on an image built from the branch, client controls on: the
-two-command gate passes all eight phases in Chromium 156 and in Firefox 157 (two of
-three Firefox runs; see the drill fix below), and the movie-endpoint step passes. The
-Transcode and Session unit suites pass 1,615 tests, sixteen PostgreSQL integration
-files pass 402 tests, PHPStan, Deptrac, `lint:container` and the OpenAPI check are
-clean, and the web typecheck and 493 session and catalog tests pass.
-
-Code review, 2026-11-11, eight reviewers over the branch against `e839b7986`: no
-defect in the store, one confirmed P2 in the cleanup fix and one unproven risk that a
-test then proved, both fixed in `b364cd7f3`. The tests the review asked for are in
-`d8a39c6cc` (two connections registering one endpoint, a refused insert, a
-token-level check of the five SQL statements) and `02b8fa12a` (a worker delivery test
-that raced its own timeout). The cross-model pass is disabled by the checkout
-configuration.
-
-Final checkpoint, 2026-11-11, at `975e8ca51` (the image was built at `b364cd7f3`; the
-one later source change renames a bind type that maps to the same instant type):
-the two-command gate passes all eight phases in Firefox 157 and in Chromium 156 on
-the first run of each, client controls on, and the movie-endpoint step passes. The
-whole unit directory passes 8,551 tests in 803 files, eighteen PostgreSQL integration
-files pass 409 tests, PHPStan, Deptrac, `lint:container` and the OpenAPI check are
-clean, and the web typecheck and 493 session and catalog tests pass. The full unit
-run was the first on this line of work since the movie playback branch: it found
-`InstantBindConventionTest` failing on a bind that `b26455a68` introduced and that
-reached `master` with the movie playback merge, fixed in `975e8ca51`. Earlier
-checkpoints ran the Transcode and Session unit directories only.
-
-Fixed on the same branch, found on the persistent instance after the movie playback
-merge:
-
-- **Cleanup after an expiry (`e7420b119`, `101cc31e4`, `3ef843e27`):** the first job
-  cleanup on the instance expired eight stale sessions and then failed with Doctrine's
-  "a new entity was found through the relationship `TranscodeSessionEntity#job`"; a
-  second run removed seven jobs. The expiry keeps the sessions managed, and each job
-  was removed with its own flush, so the second removal walked a session whose job
-  was gone. Deleting a job now removes its sessions in the same flush. Each job is
-  removed in its own transaction, a failure is logged with the job and the step, and a
-  run that could not remove every job exits 1, or answers 503 from the admin endpoint,
-  with the expired, removed and failed counts. A test runs the real command over eight
-  stale sessions, two with a live lease: eight expire, six jobs go, two stay.
-  After code review (`b364cd7f3`) the removal no longer looks the sessions up with a
-  query. It detaches the ones the unit of work holds, read from its identity map,
-  because a second cleanup run can delete a session row this run still manages; a
-  two-connection test failed against the query in both variants with "removed 2
-  orphaned jobs and could not remove 1". The incomplete outcome is a
-  `ServiceUnavailableException`, so the exception subscriber builds the 503 and the
-  controller no longer catches it. The learning is in
-  `docs/solutions/runtime-errors/doctrine-refuses-a-flush-after-the-database-cascaded-a-delete-under-managed-children.md`.
-- **Two-command audio step (`c4f169142`):** one Firefox run failed in `attach` because
-  the drill waited 55 seconds for a single-thread MP3 encode of a 30-minute track that
-  takes about 48 seconds here, while the host was under heavy concurrent load. The
-  session store answered on its cadence throughout and the database log was clean. The
-  wait is 110 seconds, a timeout names bytes received and seconds elapsed, and every
-  phase receipt records load average and CPU pressure. A hosted runner slower than
-  about 0.87 of this host on one thread would have failed the old wait every time;
-  hosted results were not checked for that.
-
-
 ### bAAC lossless mode
 
 Delivered from the [plan](docs/plans/2026-11-10-2313-feat-baac-lossless-flac-plan.md)
-on the branch `baac-lossless`, by the user's request of 2026-11-10: "baac does not
-support lossless, it should so we are on par with the other codecs (or better). It
-should be efficient with good performance." bAAC writes and reads standard FLAC with
-its own encoder and decoder, written from RFC 9639; the package version is 0.2.0.
+on the branch `baac-lossless`, by the user's request of 2026-11-10. bAAC writes and
+reads standard FLAC with its own encoder and decoder, written from RFC 9639; the
+package version is 0.2.0.
 
-- **Codec (U1 to U6):** a decoder for every valid native FLAC stream (1 to 8
-  channels, 4 to 32 bits, fixed and variable block sizes), an encoder at levels 0 to
-  8 in the streamable subset, and SSE2, AVX2 and NEON kernels with the scalar
-  kernels' bits. The analysis uses its own cosine and base-2 logarithm, so encoded
-  bytes do not depend on the C library (KD8).
-- **Surfaces (U7, U8, U15):** `baac flac enc`, `dec`, `test` and `info`; Node
-  `FlacEncoder` and `FlacDecoder`; Vorbis comments and pictures; ID3 tags passed over
-  and reported (KD7).
-- **Hardening (U9):** fuzz harnesses for the decoder and the encoder; a work budget
-  for the frame search behind damage, which on input crafted to overdraw it may pass
-  over a frame right behind the damage (KD10).
-- **Measurement (U10, U11):** the harness's lossless stage, its gates and the
-  recorded run below. The held-out set was replaced twice: the first after a run
-  under load had failed two encode gates (KD6), the second after the code review
-  changed the binary that had first read it (KD11).
-- **Documentation, website and CI (U12 to U14):** the package README, the codec
-  comparison, `CONCEPTS.md`, the `/baac` page with its evidence validator, and
-  `aac-native.yml` on four platforms, which runs the lossless suites with the
-  reference `flac`, FFmpeg and the decoder testbench required.
+Known limits:
 
-Reviews: the first code review (`5957de556..3131bba38`) was closed in `5e3f4b9c2`. The
-second, of the work after it, confirmed two decoder defects in the frame search (a
-frame that leaves its depth to a missing STREAMINFO vanished or stalled the decoder
-when fed in pieces), an incomplete candidate read again outside the budget, and a
-website claim that Windows reproduced fifteen pinned streams when it checked six. All
-four were fixed in `7f95ce809` and `54d5484e3`, with tests that fail without the fix.
-The addon workflow had failed on three platforms (`mkdtemp` undeclared on macOS; the
-tool sized a raw input from a directory's seek offset on ext4); fixed in `7a936746f`.
-
-Recorded run (run 6, 2026-11-12, AMD Ryzen 7 5800X3D, GCC 16.2.1, `flac` 1.4.3,
-FFmpeg 8.1.3; the rest of the host used 0.49 CPUs in the minute before and 0.82
-during the run): 37 of 38 gates passed and every stream is bit-exact. bAAC's frames
-are smaller than `flac`'s at every level on the corpus (level 5: 10,232,449 against
-10,248,681 bytes; level 8: 9,998,768 against 10,010,621). Judged speed, bAAC's CPU
-time over the reference's: encode 0.814 and 0.870 at levels 5 and 8; decode of
-`flac`'s streams 0.794 and 0.809 of `flac -d`, 0.406 and 0.453 of FFmpeg; ALAC encode
-0.260, decode 0.229. The failed gate is the held-out size gate on the 96 kHz 24-bit
-piano recording: 9,821,712 bytes against 9,795,735 for `flac -5`, 0.27 % larger. By
-the user's decision of 2026-11-12 the mode lands with the failure disclosed in the
-results, the comparison and the website (KD12).
-
-Verification (no code under `packages/baander-aac` changed after `8248b0cdb`): Release and sanitizer suites 68 of 68 with every oracle
-required; Node binding 31 of 31; ten minutes each of the FLAC decoder and encoder fuzz
-harnesses, no finding; `aac-native.yml` on all four platforms at `8248b0cdb`, with the
-arm64 runner comparing 8 AAC and 6 lossless NEON kernels with scalar; the FFmpeg
-image's `baac-builder` stage builds with GCC 14.2; the evidence test 40 of 40, the
-website build and the `/baac` browser test 10 of 10.
+- **Failed gate:** in the recorded run (run 6, 2026-11-12, AMD Ryzen 7 5800X3D, GCC
+  16.2.1, `flac` 1.4.3, FFmpeg 8.1.3) 37 of 38 gates passed and every stream is
+  bit-exact. The failed gate is the held-out size gate on the 96 kHz 24-bit piano
+  recording: 9,821,712 bytes against 9,795,735 for `flac -5`, 0.27 % larger. By the
+  user's decision of 2026-11-12 the mode lands with the failure disclosed in the
+  results, the comparison and the website (KD12).
+- **Frame search behind damage:** the decoder's search has a work budget, which on
+  input crafted to overdraw it may pass over a frame right behind the damage (KD10).
 
 Open:
 
@@ -1556,265 +927,45 @@ Open:
 ### Bånder Audio Core rename
 
 Delivered from the [plan](docs/plans/2026-11-12-1934-refactor-rename-baac-to-bac-plan.md)
-on the branch `rename-audio-core`, by the user's decision of 2026-11-12. bAAC is now
-Bånder Audio Core, short name `bac`, with no aliases. The package lives at
-`packages/baander-audio-core` and builds `libbac.a`, the `bac` command-line tool, the
-headers under `include/bac`, the pkg-config module `bac` and the lossless API
-`bac_flac_*`. The Node package is `@baander/audio-core`, released by `audio-core.yml`
-under `audio-core-v*` tags. FFmpeg's codec is `libbac`, the server setting's value is
-`bac`, and the website serves the codec page at `/bac/` with `/baac/` redirected.
-The FFmpeg long codec name and the FLAC vendor string are ASCII, "Baander Audio
-Core". The `aac-native-v0.2.0` tag stayed held, so the first release is
-`audio-core-v0.2.0`.
-
-- **Package and library (U2, U3):** the move changed no content, and the desktop
-  lockfile's folder hash stayed `caf420`. The CMake options, the compile definitions
-  and the test variables take the `BAC_` prefix. Tagged FLAC streams change only in
-  the vendor field, and untagged streams are byte-identical.
-- **Benchmark ids (U4):** the lossless harness writes `bac`, `bac-0` to `bac-8` and
-  `bac_sha256`. The committed results and the website fixture were rewritten by the
-  harness's own writer with every measured value unchanged.
-  `bench/rename_ledger.py` rewrites a held-out ledger booked under the old key once,
-  and the lossless stage refuses a ledger that was not rewritten.
-- **Binding and desktop (U5, U12):** the loader reads `BAANDER_AUDIO_CORE_*`. U5's
-  packaging check found that `electron-builder` could not package the desktop app
-  under any package name: the lockfile's `node-abi` 4.31.0 stops at Electron 43.
-  U12 re-resolves it to 4.40.0 inside the declared range.
-- **Setting (U6):** `transcode.aac_implementation` offers `bac` (label "Bånder Audio
-  Core"), `fdk_aac` and `ffmpeg`, and defaults to `bac`. `Version20261113120000`
-  rewrites stored `baac` in the setting, in failed audio renditions and in the
-  desired state of transcode runtime rows, and re-adds the failed-implementation
-  constraint. The console and the API refuse `baac`.
-- **Website and docs (U7 to U9):** the codec page is `/bac/`, titled "Bånder Audio
-  Core". `/baac` and `/baac/` answer 308 to `/bac/` on Vercel and in the local
-  preview router, and the sitemap lists `/bac/` only. `CONCEPTS.md`, the operator and
-  developer guides and the open ROADMAP items use the new names. Completed records
-  keep the old ones.
-- **FFmpeg (U10):** the wrapper, the patch, `--enable-libbac`, the smoke and the
-  capability list name `libbac`. `AacImplementation::Bac` maps to `libbac`.
-
-Commits: `dbae02463` (U2), `b6e0c66df` (U3), `530b1622e` (U4), `9c9c82663` (U5),
-`2a64efcec` (U12), `df37c38d4` (U6), `860d04a3a` (U7), `d7fa6a0d8` (U8), `fa395c70d`
-(U9), `bf19b3baf` (U10), merged with `master` in `489926f68`, then
-`491009232` (the test budget below). The final desktop lockfile hash is `ecd85e`.
-The user chose to land before the dispatched FFmpeg image was ready, so `master`
-moved without the pin at `cbc5540f4`, and the next commit pins
-`ghcr.io/baander-app/ffmpeg-baander-static@sha256:4537b06f3e58f7bdf0c6c11d9ad494bf3cc851bcd23a7f7fd6f21c4b282a724a`. Between the two, the
-application image built from `master` failed its FFmpeg capability gate.
-
-Verification Contract, row by row (2026-11-13, AMD Ryzen 7 5800X3D, GCC 16.2.1,
-Node 24.15.0):
-
-- **Residue gate, path gate:** run at `bf19b3baf` and at `489926f68`. The residue
-  gate prints nothing. The path gate prints only the three plans under `docs/plans/`
-  whose file names carry the old name.
-- **Native suites:** CTest 68 of 68 with every oracle required and no `SKIP:` line
-  (U2, U3); in U3 only the `BAC_` variables were set.
-- **Fail-closed variables:** run in U3. With the oracles required and missing, all 8
-  oracle suites fail. With only the old `BAAC_*` names set, the suites write 6
-  `SKIP:` lines, so the old names are no longer read. Run again in U5: the loader
-  ignores the old `BAANDER_AAC_NATIVE_BINDING` and reads the new variable.
-- **Compile flags:** run in U3. The 207 compile-database entries match U2's apart
-  from the renamed tokens, `BAC_EXACT_MATH=1` and the strict-math flags included.
-  `binding.gyp` changed only its definitions.
-- **Binding:** `npx node-gyp rebuild` and `npm test` 31 of 31 (U3), then 32 of 32
-  under Node and under Electron 45 (U5, which adds the loader test).
-- **Benchmark harness:** `./bench.py selftest` 41 checks, 0 failures (U3). After U4,
-  which adds 5 checks, it reports 46 checks and 0 failures.
-- **Desktop:** in clean copies, the immutable install, `tsc` and the tests passed,
-  75 of 75 with none skipped (U2 to U5, U12). The packaging check passed after U12 without
-  skipping the native rebuild. `@baander/audio-core` is rebuilt for Electron 45, sits
-  under `app.asar.unpacked` and loads there under Electron 45. After U10, only the
-  immutable install was rerun.
-- **Backend suites:** on the CI image `baander-ci:u10` (`0a57754ca7b0`), built on the
-  local FFmpeg image `ffmpeg-baander-static:u10-local` (`6ab9c94566b2`) at
-  `8ce3e60f4`, the full backend suite passed 12,018 of 12,018 in four lanes
-  (ordinary 7,716, native 917, stack-1 1,964, stack-2 1,421) in 27:05. That run
-  includes the real-FFmpeg suites `AudioTranscodeStreamTest` 6,
-  `AudioTranscodeToggleTest` 4, `AudioRenditionWorkerHandoffTest` 6 and
-  `VideoCopyPresentationTest` 2. The migration and settings run passed 62 of 62 on
-  its second attempt. The first attempt failed 5 cases on one SQL error in the new
-  migration test, `ORDER BY 1 COLLATE "C"` inside a `UNION`, fixed in the test
-  before U6 was committed. `scripts/test-transcode-adaptive-browser.sh` passed,
-  with producer commands encoding AAC with `-c:a libbac`. On the merge with `master`
-  (`491009232`), the six transcode and media test files the merge combined and the
-  five U6 classes passed 256 of 256 on `baander-ci:u10` with the merged checkout
-  copied in (ordinary 175, native 19, stack-1 31, stack-2 31). Not run on the merge:
-  the full backend suite, which the user dropped to land sooner.
-- **Static gates:** PHPStan reports no errors on the changed source and test files
-  of each unit. `analyse:tooling` reports no errors, `check:tooling-architecture` 0
-  violations and `check:tooling-format` 0 of 502 files. `.php-cs-fixer.tooling.php`
-  finds nothing to fix on the touched tooling and script files.
-  `composer run-script test:tooling` ran 1,571 tests at `8ce3e60f4`:
-  3 failures and 1 error. The 3 failures are `ApplicationInventoryTest` cases that
-  fail only in a linked worktree and pass with `CI=1`. The error was
-  `testMigrationsTransferGeneratedCredentialsThroughTheRealDisposableWrapper`,
-  "php timed out" at its 10-second budget, which failed the same way on
-  `5f3fbab34`, before the first unit. Its 24 grouped process calls needed 9.7 to
-  9.96 s on this host; `491009232` raised the budget to 30 s. `test:tooling` was not
-  rerun after that commit. Not run: `make ci` as one command. Its PHPUnit part is
-  the backend suite above; full-tree PHPStan, Deptrac and `composer validate` and
-  `normalize` did not run.
-- **Website:** build (237 pages), node tests 11 of 11 and the Chromium suite 93 of
-  93 after U9. In U8 the suite passed 93 of 93 on its third full run. The first two
-  runs each failed one font-loading wait while CI drills loaded the host, and both
-  specs passed on repeat. The website tooling tests passed 105 of 105 (U8).
-- **FFmpeg image:** built locally at `f36930c9c` as `ffmpeg-baander-static:u10-local`
-  (`6ab9c94566b2`). The renamed patch applies, `configure --enable-libbac` passes,
-  the smoke passes (stereo and 5.1 through `libbac`, the damaged frame) and so does
-  the gate (40 capabilities). The encoder and decoder listings differ from the
-  pinned `dbec52eb` by one line each: `libbaac`, "bAAC (Baander AAC)", became
-  `libbac`, "Baander Audio Core". A full image at U3 matched `dbec52eb` exactly.
-- **Application image:** the CI target built on `u10-local`, and its runtime layer
-  passed the capability gate against the tree's `libbac` list.
-- **Preview upgrade:** a preview at `98498798b` stored `transcode.aac_implementation`
-  as `baac`. After `make preview-up` on `rename-audio-core` with the local FFmpeg
-  image, `Version20261113120000` ran, the stored setting reads `bac`,
-  `debug:hw-transcode` maps `bac` to `libbac`, and an AAC rendition ran in the
-  preview's execution worker as `ffmpeg … -c:a libbac -f adts`, 473,323 bytes of AAC
-  LC, with its runtime row complete.
-- **Workflows:** `PublicationWorkflowTest` 116 of 116 (U3, U5), including the case
-  that an `aac-native-v1.0.0` tag no longer releases, and the edited workflow YAML
-  parses.
-- **Remote, before `master`:** the `ffmpeg.yaml` dispatch on `rename-audio-core` at
-  `489926f68` (run 43473213860) passed the image's own smoke and gate and published
-  `sha256:4537b06f3e58f7bdf0c6c11d9ad494bf3cc851bcd23a7f7fd6f21c4b282a724a`, which the commit after the landing pins. The image inputs (`docker/ffmpeg/`,
-  `packages/baander-audio-core/`, `scripts/ffmpeg-capability-gate.sh`) are identical
-  at `bf19b3baf`, `489926f68` and the landed tip. Not run: the draft pull request
-  runs of `ci.yaml`, `frontend.yaml`, `website.yaml` and `audio-core.yml`. The user
-  chose to land without waiting for CI, so those workflows first run on `master`.
-- **Remote, after `master`:** on `cbc5540f4`, `audio-core.yml`, `frontend.yaml` and
-  `website.yaml` passed on GitHub. The tag `audio-core-v0.2.0` points at `cbc5540f4`.
-  Open: GitHub CI on the pinned tip, Forgejo `ci.yaml` after Forgejo's FFmpeg image
-  publishes (the user set Forgejo CI aside), the release's four prebuilds and
-  `SHA256SUMS`, and a clean desktop install that fetches its prebuild.
-- **Website publication (2026-11-13):** the verified `website.yaml` artifact of
-  `cbc5540f4` was deployed as a Vercel preview, then to production
-  (`baander-qvq151xaq`, aliased to `https://baander.app`). Preview and production
-  answered `/` 200, `/bac/` 200 with the title "Bånder Audio Core — Bånder" and the
-  canonical `https://baander.app/bac/`, `/baac` and `/baac/` 308 to `/bac/`, a nested
-  manual page 200, the search index 200 and an unknown path 404, with valid HTTPS.
-  The sitemap lists 240 pages and no old name.
-- **Website republication (2026-11-13):** a local build of `57fc9e1e3` (237 manual
-  pages, node tests 11 of 11, Chromium suite 93 of 93) was deployed as a Vercel
-  preview, then to production (`baander-nl52trcat`, aliased to
-  `https://baander.app`). No site source changed between `cbc5540f4` and
-  `57fc9e1e3`: that range changes only `ROADMAP.md` and the FFmpeg image pin.
-  Compared with the previous production deployment, the home page,
-  `/bac/` and `sitemap.xml` are byte-identical, and a nested manual page differs only
-  in its source link, which now names `57fc9e1e3`. Both `https://baander.app` and
-  `https://baander.vercel.app` answered 200 for `/`, `/docs/`, `/bac/`, a nested
-  manual page, `sitemap.xml`, `robots.txt` and the search index, and 404 for an
-  unknown path. They redirected `/baac/` and `/bac` to `/bac/` and `/index.html` to
-  `/` with 308. All responses used valid HTTPS. The live home page, `/bac/` and
-  `sitemap.xml` match the local build byte for byte. The visual checks were not
-  repeated on the live site.
-- **Held-out recordings disclosure (2026-11-13):** on `/bac/`, the long "Held-out
-  recordings" text in the lossless section now sits in a disclosure that starts
-  closed. Its summary matches the "Streams and files" heading beside it, and the
-  text itself is unchanged. The lossless browser test checks that the disclosure
-  starts closed and shows the text once opened. Website build (237 pages), site
-  typecheck and the Chromium suite 93 of 93 passed; screenshots at 1280px and 390px,
-  closed and open, showed no layout problem. Not yet published.
-
-Not run anywhere before the landing: the macOS and NEON kernel step, the Windows
-MSVC binding and the first CI run after the cache keys changed. Only the binding
-workflow covers them, and it first runs on `master`.
-
-### Scan artist credits, song lengths and lyrics outcomes
-
-Lyrics fetches found nothing, and metadata lookups did nothing, because the library
-scan created no artists: a song without an artist ended as "not found" before any
-LRCLIB request. Separately, MP3 lengths came from TLEN tags that were missing or wrong,
-and LRCLIB refused the Suspekt songs' near-zero lengths with HTTP 400. URL allowlisting
-was not involved.
-Branch `fix/scan-artist-credits` implements
-`docs/plans/2026-11-13-2034-fix-scan-artist-credits-plan.md` (U1 to U14, R1 to R22)
-in local commits `b00560a2b` to `5a15f1186` on `e1abc7da1`; it is not pushed.
-
-- **U1, tag readers:** ID3 text is clean UTF-8 without terminators, multi-value frames
-  are split, and `TXXX` MusicBrainz artist and album-artist IDs are read; FLAC and Ogg
-  return every artist value and ID; text that is not UTF-8 is scrubbed. Metadata unit
-  tests 272/272 at `5024680ff`; reader tests 110/110 at `90da34158`.
-- **U2, schema:** `credited_name` on both credit tables with backfill, NOT NULL and a
-  not-blank CHECK, `uniq_artists_mbid`, `idx_songs_path`, capture triggers replaced.
-  ArtistCreditedNameMigrationTest 9/9, InitialSchemaMigrationTest 23/23,
-  CommittedCaptureTest 21/21.
-- **U3, U4, U5, import identities:** artists and genres are found or created under
-  sorted transaction-scoped advisory locks, and artist sync assigns a MusicBrainz ID
-  only under the same locks. ArtistImportIdentityRaceTest 14/14, GenreImportRaceTest
-  4/4, EnrichmentFreshStateTest 9/9.
-- **U6, song length:** taken from the audio probe (stream duration, else container
-  duration minus start time), never from tags. AudioProbeDurationTest 2/2 in the CI
-  image.
-- **U7, U8, credits on import:** new songs are credited to their tagged artist under the
-  tagged name; each touched album is credited after the last batch, under a
-  `FOR NO KEY UPDATE` album lock. AlbumCreditRaceTest 12/12, album-credit unit tests
-  11/11.
-- **U9, U14, rescan and retag:** a rescan repairs known songs in place (missing
-  credits, length, technical fields) and creates no album from the old tag of a renamed
-  album; a retagged file updates its song in place and its credits follow the tags.
-  RenamedAlbumRescanTest 1/1, RetaggedFileScanTest 3/3.
-- **U10, readers:** the artist names of songs and albums, the lyric signature, the
-  artist sort key and its cursor read credited names. SongCursorPaginationTest 20/20,
-  AlbumDuplicateControllerTest 14/14.
-- **U11, U12, lyrics outcomes:** a missing artist, a missing length and an LRCLIB
-  rejection each answer 409 with its own code; each bulk run's tally lives in Redis and
-  shows in `app:lyrics:status` and the admin lyrics page. LyricsControllerTest 27/27,
-  LyricsAdminControllerTest 19/19, RedisLyricsRunTallyTest 7/7.
-- **U13, end to end:** ScannedArtistCreditsTest 5/5 (180 assertions) scans real tagged
-  FLAC and MP3 files in the CI image.
-
-Verification checkpoint, 2026-11-14:
-
-- Full backend suite (`scripts/test-backend-container.sh`, `baander-ci:u10`) at
-  `22a9e1d77`: 12,264 tests, 135,935 assertions, no failures (ordinary 7,875, native
-  917, stack-1 1,858, stack-2 1,614), 1,628.7 s.
-- After the simplify pass and the review follow-ups: at `90da34158`, the Catalog,
-  Metadata and Lyrics unit suites ran 1,022 tests on the host with one environmental
-  error (`finfo` missing in VideoServiceTest), and in the CI image
-  ScannedArtistCredits, RenamedAlbumRescan, RetaggedFileScan, the three race tests,
-  LyricsAdminController and the Lyrics functional suites passed 103/103. At
-  `5a15f1186`, the Catalog CommandHandler unit tests passed 170/170, and in the CI
-  image LibraryDirectoryPublication, LibraryDiscoveryObservation,
-  NewAlbumMetadataSync, ScannedTrackPlayback and CapacityFixture passed 63/63.
-- Static gates at `5a15f1186`: PHPStan no errors, Deptrac 0 violations (CI image),
-  `lint:container` clean, `app:export-openapi-spec` unchanged. `make ci` stops at
-  `composer normalize`, which fails the same way on `master` (`composer.json` is
-  unchanged by the branch).
-- Web: typecheck, lint and `generate:check` pass; vitest passes 3,493 tests in 276 files.
-- `ce-code-review` (full depth, ten reviewers, cross-model pass off by checkout
-  config): Ready to merge, no actionable findings. Three of its residual risks were
-  defects and are fixed in `90da34158` with tests that fail without the fix: two
-  copies of a renamed file credited their song twice and failed the message on every
-  retry; two imports of one directory could credit one song twice; tag text that is
-  not UTF-8 failed its batch.
-- Preview (`make preview-up`, its own catalog, the music library mounted read-only):
-  77 files in 6 directories became 77 songs, 5 albums and 19 artists; every song has a
-  primary credit and a length, and every album a credit. "Amore Infelice" (MP3) is
-  238.8 s long, where TLEN made it 0.238; "Rescue Me" is credited to Headhunterz as
-  "Headhunterz; Sound Rush; Eurielle". `app:song:lyrics:fetch` for "Amore Infelice"
-  returned synced LRCLIB lyrics.
-- Persistent instance, after the merge to `master` at `a67ed57e4` (2026-11-14): the
-  updater applied the migration; `app:library:scan music --rescan` repaired the 77
-  songs in place (0 to 19 artists, 0 to 77 credited songs, 0 to 5 credited albums, 26
-  to 0 songs with a missing or near-zero length, no new song or album, no failed
-  message). Two `app:lyrics:fetch` runs then left 63 of 77 songs with lyrics; LRCLIB
-  has no match for the other 14 (11 Bulldogg, 3 Suspekt).
-- Learnings: `docs/solutions/architecture-patterns/concurrent-imports-find-or-create-identities-under-sorted-advisory-locks.md`
-  and
-  `docs/solutions/developer-experience/pgroonga-indexes-in-throwaway-test-schemas-break-later-suites.md`.
+on the branch `rename-audio-core`, by the user's decision of 2026-11-12, and landed
+on `master` on 2026-11-13. bAAC is now Bånder Audio Core, short name `bac`, with no
+aliases; the package lives at `packages/baander-audio-core`. The user chose to land
+before the dispatched FFmpeg image was ready, so `master` moved without the pin at
+`cbc5540f4`, and the next commit pins the image that the `ffmpeg.yaml` dispatch
+published from `489926f68`. The `aac-native-v0.2.0` tag stayed held, so the first
+release is `audio-core-v0.2.0`; the tag points at `cbc5540f4`.
 
 Open:
 
-- The MusicBrainz lookup button, the splitting of a single artist value that names
-  several artists, the extract and match access gap, and merging artists that share a
-  MusicBrainz ID are delivered on `master` at `435a11639` ([MusicBrainz
-  matching](#musicbrainz-matching)). R7 keeps such a value whole, so "Post Malone, Luke
-  Combs" (album artist "Post Malone", no MusicBrainz IDs) became its own artist, one of
-  14 "Post Malone, X" artists on the persistent instance; matching the album there on
-  2026-11-14 merged all 14 into Post Malone. On 2026-11-14 the user chose matching over
-  splitting on an album-artist prefix in the scan.
+- **Remote:** the release's four prebuilds and `SHA256SUMS`, a clean desktop install
+  that fetches its prebuild, and Forgejo `ci.yaml` after Forgejo's FFmpeg image
+  publishes (the user set Forgejo CI aside).
+- **Not run anywhere before the landing:** the macOS and NEON kernel step, the
+  Windows MSVC binding and the first CI run after the cache keys changed. Only the
+  binding workflow covers them, and it first runs on `master`.
+- **Desktop:** in clean copies, the immutable install, `tsc` and the tests passed
+  (U2 to U5, U12), and the packaging check passed after U12. After U10, only the
+  immutable install was rerun.
+- **Website:** a local build of `57fc9e1e3` was deployed to production on 2026-11-13
+  (`baander-nl52trcat`, aliased to `https://baander.app`). The visual checks were not
+  repeated on the live site.
+- **Held-out recordings disclosure (2026-11-13):** on `/bac/`, the long "Held-out
+  recordings" text in the lossless section now sits in a disclosure that starts
+  closed. Not yet published.
+
+### Scan artist credits, song lengths and lyrics outcomes
+
+Delivered from the [plan](docs/plans/2026-11-13-2034-fix-scan-artist-credits-plan.md)
+and on `master` since `a67ed57e4` (2026-11-14): the library scan credits songs and
+albums to their tagged artists, song lengths come from the audio probe, and a lyrics
+fetch reports a missing artist, a missing length and an LRCLIB rejection each as its
+own outcome.
+
+Open:
+
+- A single artist value that names several artists stays whole in the scan (R7);
+  matching the album splits it. On 2026-11-14 the user chose matching over splitting
+  on an album-artist prefix in the scan.
 - At its default 500 ms spacing, `app:lyrics:fetch` drew HTTP 429 from LRCLIB for 34
   of 77 songs on the persistent instance, reported as unavailable; a second run with
   `--delay=4000` finished the other 40 without a 429. A larger default or a back-off
@@ -1845,162 +996,11 @@ Open:
 
 ### MusicBrainz matching
 
-The "Sync from MusicBrainz" button in the album and song panels did nothing. Tags such
-as "Post Malone, Luke Combs" (album artist "Post Malone", no MusicBrainz IDs) had become
-14 artists of their own on the persistent instance. `POST /api/metadata/extract` and
-`/api/metadata/match` required only a signed-in user. Branch `feat/musicbrainz-matching`
-implements `docs/plans/2026-11-14-1219-feat-musicbrainz-matching-plan.md` (U1 to U14, R1
-to R30) in local commits `3c6b10f60` to `ff68e09f2` on `c8feae182`, fast-forwarded into
-the local `master`; it is not pushed. The plan's "Implementation Amendments" section
-records where the build departs from the plan text.
-
-- **U1, MusicBrainz port and shared limit:** one Metadata port searches and looks up
-  releases, recordings and artists, fetches front covers, and tells "not found" from
-  "unavailable". Every MusicBrainz and Cover Art Archive request, from any process,
-  takes a turn under one Redis token bucket that starts each turn at least a second
-  after the previous one; a request answered with 503 is sent again after 1 and then 3
-  seconds. The open search and browse routes get a per-user limit.
-  MusicBrainzAdapterTest 66/66, CoverArtArchiveAdapterTest 7/7,
-  MusicBrainzLimiterSpacingTest 1/1, MusicBrainzRateLimitTest 3/3,
-  MetadataMusicBrainzUserLimitTest 3/3.
-- **U2, schema:** `albums.release_mbid` and `matched_at`, `songs.matched_fields` and
-  `songs.match_checked_at`, and `album_match_states` with its CHECKs.
-  MusicBrainzMatchMigrationTest 22/22, SongMatchCheckMigrationTest 4/4,
-  MusicBrainzMatchPersistenceTest 4/4, InitialSchemaMigrationTest 23/23,
-  CommittedCaptureTest 21/21.
-- **U3, scan credits by ID:** a file whose artist values carry MusicBrainz IDs credits
-  each artist by ID, the first as primary under the tagged text and the rest as
-  featured. Opus files were scanned without tags because the Ogg parser expected a
-  packet-type byte before `OpusTags`; fixed in `e9c1763e3`, so a rescan fills their
-  tags. FlacReaderTest 16/16, Id3ReaderTest 13/13, OggReaderTest 13/13,
-  FilesDiscoveredArtistCreditTest 14/14, ScannedArtistCreditsTest 7/7.
-- **U4, rescans keep a match:** a rescan or retag keeps each field a match wrote unless
-  the tags carry MusicBrainz artist IDs or a value for that field, and takes its locks
-  in the apply's order. A hand edit of a matched field or of a song's credits drops that
-  matched mark (`e0c8ccf57`). RetaggedFileScanTest 5/5, MatchedSongRetagRaceTest 2/2,
-  RetagLockOrderTest 2/2, FilesDiscoveredRetagTest 13/13, SongTest 63/63,
-  ArtistCreditHandlersTest 21/21.
-- **U5, scoring:** one service scores a release, recording or artist against the local
-  item, pairs tracks and decides whether an album match is confident. Editions that
-  agree on every track's title, credit and length in track order count as one candidate,
-  however their discs split the tracks (`ff68e09f2`). CandidateScorerTest 7/7,
-  TrackPairingTest 7/7, MatchConfidenceTest 12/12 at `bc10bbe05`, 14/14 at `ff68e09f2`.
-- **U6, artist merge and removal:** credits, favorites, play history, recommendations
-  and the cover move to the surviving artist; an artist left without credits is removed.
-  ArtistMergeTest 7/7, ArtistMergeRaceTest 3/3, DeleteArtistHandlerTest 4/4.
-- **U7, candidates and comparison:** a scored candidate list (albums: releases ranked
-  locally, the best five looked up) and a per-field, per-track comparison with its
-  artist merges and removals. SearchMatchCandidatesHandlerTest 13/13,
-  CompareMatchHandlerTest 13/13, MatchCatalogReadQueryTest 8/8.
-- **U8, apply:** writes exactly the ticked rows or nothing, under locks taken in this
-  order: album rows, one sorted identity lock, artist rows, song rows in ID order.
-  Before writing, it rechecks the values the admin saw and answers 409 `match_stale` on
-  a difference. A database deadlock surfaces as a retryable error.
-  ApplyMatchHandlerTest 18/18, MusicBrainzMatchApplyTest 6/6,
-  MusicBrainzMatchApplyRaceTest 2/2.
-- **U9, routes and commands:** admin-only candidates, comparison and apply routes with
-  `app:metadata:match:search`, `compare` and `apply`; extract and match become
-  admin-only with console counterparts. MusicBrainzMatchControllerTest 8/8,
-  MusicBrainzMatchCliParityTest 10/10, MusicBrainzMatchFirewallTest 16/16,
-  MetadataFileCliParityTest 5/5, MetadataSyncControllerAccessTest 3/3.
-- **U10, automatic matching:** every album sync requests a match, and so does ingest
-  when "Automatic MusicBrainz matching" is on. The queue claims the oldest due request
-  with `FOR UPDATE SKIP LOCKED`, and one chain of runs holds the queue; the scheduled
-  job "Recover the album match queue" runs every ten minutes and restarts a lost chain.
-  A confident album is matched fill-only; the rest wait for review. An outage pauses
-  the queue; a conflict or a refusal holds back only that album.
-  AutomaticAlbumMatcherTest 18/18,
-  DrainAlbumMatchesHandlerTest 14/14, RequestAlbumMatchHandlerTest 13/13,
-  RecoverAlbumMatchQueueHandlerTest 3/3, AlbumMatchQueueStatementsTest 8/8,
-  NewAlbumMetadataSyncTest 6/6.
-- **U11, review list:** `GET /api/admin/metadata/match/reviews` and
-  `app:metadata:match:reviews`. ListMatchReviewsHandlerTest 3/3,
-  MusicBrainzMatchReviewsTest 3/3, MusicBrainzMatchReviewsCommandTest 4/4.
-- **U12, U13, web:** the button opens a dialog to pick a candidate, review the
-  comparison and apply it; the admin library page gains a "Matching" tab.
-  MusicBrainzMatchDialog 14/14, MatchComparisonStep 17/17, MatchCandidateStep 9/9,
-  match-ticks 8/8, match-error-message 5/5, MatchReviewTable 7/7, InfoPanel 11/11,
-  use-musicbrainz-match 2/2.
-- **U14, documentation:** operator pages (external APIs, authentication and limits,
-  automatic matching), command pages, the Catalog and Metadata context guides and
-  READMEs, and the "MusicBrainz match" and "album match queue" entries in `CONCEPTS.md`.
-
-Verification checkpoint, 2026-11-14:
-
-- Full backend suite (`scripts/test-backend-container.sh`, `baander-ci:u10`) at
-  `bc10bbe05`: 12,700 tests, 139,179 assertions, no failures (ordinary 8,191, native
-  921, stack-1 1,567, stack-2 2,021), 1,938.3 s.
-- At `ff68e09f2` (the twin rule, after the full suite): in the CI image the Catalog
-  matching and Metadata unit suites, MusicBrainzMatchApplyTest,
-  MusicBrainzMatchApplyRaceTest, MatchedSongRetagRaceTest, NewAlbumMetadataSyncTest,
-  MessengerJsonDeliveryTest and the match controller and console parity tests passed,
-  501 tests in 46 files; PHPStan on the changed files reports no errors. The two new
-  MatchConfidenceTest cases fail with the earlier rule.
-- The run before it, at `4d63c92cf` (12,692 tests), failed five guard tests that the
-  targeted runs had not selected. The recovery job's seed reused the retired health
-  check job's ID (`HealthCheckJobRemovalTest`); the messenger routing, async workload
-  and mutation route inventories did not yet list `DrainAlbumMatchesMessage` and
-  `admin_metadata_match_apply`. Fixed in `83ea8153c` and `1f581ee04`.
-- Static gates at `bc10bbe05`: PHPStan over the whole project on the host reports only
-  `tests/Fixtures/Worker/media-control-ffmpeg.php`, whose `require` names the container
-  path `/var/www/html` (on `master` since `0062b4e7e`); in the CI image, Deptrac reports
-  0 violations, `lint:container` passes and `app:export-openapi-spec` leaves
-  `openapi.json` unchanged. PHPStan had also found a dead catch in the OAuth refresh
-  handler, caused by the transaction port's new `@throws`; fixed in `d286eaf9a`.
-- Web at `bc10bbe05`: typecheck, lint and `generate:check` pass; vitest passes 3,561
-  tests in 284 files.
-- Two `ce-code-review` runs (cross-model pass off by checkout config). The first, over
-  `c8feae182..2b74b352b`, found five defects, fixed in `5b3134688`: songs imported while
-  a match ran were never matched (now `songs.match_checked_at`), a lost queue run left
-  requests waiting (now the chain token and the recovery job), one album's conflict
-  paused the whole queue (now per-album retries), a failed apply left its stored cover
-  file behind, and the match state entity was not mapped read-only. The second, over
-  `2b74b352b..4d63c92cf`, said "Ready with fixes": an album parked for a retry held back
-  later requests for up to 6 hours, fixed in `bc10bbe05`. Its testing gaps and
-  maintainability notes are fixed in `83ea8153c`, `95220802d` and `a92ffbf25`; the
-  dialog race it reported cannot occur, because going back cancels the pending reload,
-  and `09ba9d65c` pins that.
-- Preview at `ca6b7d5c4` (`make preview-up`, its own catalog, the music library mounted
-  read-only), against MusicBrainz itself (AE1): `app:metadata:match:search` for "F-1
-  Trillion: Long Bed" listed five releases, three scoring 100; `compare` against
-  `fef8b229-ee77-4e63-a07f-222c1ad56c97` listed 14 ticked merges; `apply --force` merged
-  the 14 "Post Malone, X" artists into Post Malone. Afterwards all 27 songs credit Post
-  Malone as primary, 15 keep their tagged text such as "Post Malone, Luke Combs" and
-  credit their guest as featured (14 new artists with MusicBrainz IDs, Luke Combs on two
-  songs), every song has a recording ID, the album has its release and release group
-  IDs, and the three songs given LRCLIB lyrics before the apply kept them. Before the
-  adapter asked again after a 503, most searches on the preview failed: MusicBrainz
-  answered the same well-spaced lookup with 503, then 200, then 200.
-- The automatic leg of AE1, on the same preview after a data reset the user approved, at
-  `d3e6ee149`: the comparisons had shown that the two Japanese editions
-  (`1be7f9af-f4bb-45fe-912c-39e46a305df2`, `61ad5d47-7517-47f6-9b0a-fe691041de5a`) hold
-  the same 27 tracks on one disc and score 94, so the twin rule of `bc10bbe05`, which
-  also required the same disc split, would have left the album for review as a close
-  runner-up. On 2026-11-14 the user chose to count such editions as twins (`ff68e09f2`).
-  A fresh catalog then scanned the music library with `metadata.auto_sync` on, and the
-  queue matched "F-1 Trillion: Long Bed" on its own about five minutes later: release
-  `8e5281b4-1ffc-4c6f-a8ef-36d2459bce9e` (the earliest of the tied two-disc editions, by
-  release ID), all 27 songs credited to Post Malone as primary, 15 keeping their tagged
-  text and crediting 14 guests with MusicBrainz IDs as featured, no "Post Malone, X"
-  artist, and 22 of 27 recording IDs written; the explicit and clean editions disagree
-  on the other 5. Of the library's other four albums, three matched; "Ten Thousand Fists
-  [Reprise Records,9362-49433-2,EU]" waits for review with no candidates.
-- Persistent instance, after `master` (`435a11639`) was pushed to both remotes on
-  2026-11-14: the updater ran the revision with web and workers ready and applied the
-  three migrations, and the recovery job exists under its own ID. With the user's
-  go-ahead, `app:metadata:match:apply --force` applied the explicit release
-  `fef8b229-ee77-4e63-a07f-222c1ad56c97` to "F-1 Trillion: Long Bed": 14 to 0 "Post
-  Malone, X" artists, 12 to 27 songs credited to Post Malone as primary, 0 to 15
-  featured credits (14 guests with MusicBrainz IDs), 15 duets keeping their tagged text,
-  27 of 27 songs keeping their lyrics, and 0 to 27 recording IDs.
-- The worktree preview was reset with the user's approval after `83ea8153c` changed the
-  recovery job's ID: its 12 Docker volumes were removed, and its earlier controller
-  state was deleted.
-- Learnings:
-  `docs/solutions/runtime-errors/doctrine-cannot-update-a-loaded-entity-keyed-by-its-association-under-the-strict-uuid-type.md`,
-  `docs/solutions/developer-experience/in-memory-transport-get-hands-out-one-message-per-call.md`,
-  and the lock-order test section of
-  `docs/solutions/architecture-patterns/concurrent-imports-find-or-create-identities-under-sorted-advisory-locks.md`.
+Delivered from the [plan](docs/plans/2026-11-14-1219-feat-musicbrainz-matching-plan.md)
+and on `master` since `435a11639` (2026-11-14): an admin matches an album, song or
+artist to MusicBrainz from a dialog or the console, and a queue matches confident
+albums on its own. The plan's "Implementation Amendments" section records where the
+build departs from the plan text.
 
 Open:
 
@@ -2031,34 +1031,33 @@ Open:
 
 ### Lyrics effect toggle and song browser panes
 
-Two reported web defects, fixed 2026-11-14 in local commits `9ecf84a3d` and
-`052e8684d` on the branch `chore/roadmap-current`; they are not pushed.
-
-- **Lyrics effects (`9ecf84a3d`):** in the fullscreen lyrics view, a click on the
-  active effect did nothing. It now turns effects off: the shared visualizer mode
-  returns to `spectrum`, which is not an engine mode, so the view shows the album
-  background and no effect is pressed.
-- **Song browser panes (`052e8684d`):** in the songs view, each of the genre, artist
-  and album columns grew to its full list inside a pane of fixed height, and the pane
-  clipped it without a scrollbar: the artist list was 960 px tall in a 163 px pane.
-  The column now fills its pane, and its list (131 px) scrolls inside it.
-
-Verification checkpoint, 2026-11-14:
-
-- `LyricsFullscreenOverlay.test.tsx` passes 2/2; its toggle case fails without the
-  change ("expected [ 'Enhanced' ] to deeply equal []"). `BrowserColumn.test.tsx` passes
-  2/2. `yarn typecheck` passes, `yarn lint` reports no error (10 warnings), and vitest
-  passes 3,563 tests in 285 files.
-- Preview (`make preview-url`, Chrome): all three panes showed a scrollbar, and the
-  artist pane scrolled to its end (offset 829 of 829, "Yamamoto" in view). In the
-  fullscreen lyrics view a click on "Enhanced" pressed it and drew the visualizer; a
-  second click left no effect pressed and removed the canvas.
-- Not run: `yarn build`, and Firefox or Safari.
+Fixed 2026-11-14 in local commits `9ecf84a3d` and `052e8684d` on the branch
+`chore/roadmap-current`: in the fullscreen lyrics view a click on the active effect
+turns effects off, and the songs view's genre, artist and album panes scroll.
 
 Open: the pane fix has no automated test, because jsdom computes no layout; a
-Playwright check of the songs view would cover it.
+Playwright check of the songs view would cover it. Not run: `yarn build`, and Firefox
+or Safari.
 
 ## Roadmap maintenance
+
+Cleanup, 2026-11-15: removed the delivered checkpoints and resolved items of the
+small-host deployment, the development controller image identities, movie playback,
+the browser runner release, bAAC exact arithmetic and lossless mode, the master CI
+repair, the playback session entities, the Bånder Audio Core rename, scan artist
+credits, MusicBrainz matching and the web fixes of 2026-11-14, reducing the roadmap
+from 2,098 to 1,097 lines; open items, limits and release gates stay. Later evidence
+closed these items, which went with the rest: the hosted runs of the movie and
+two-command gates, full-tree PHPStan and Deptrac (GitHub run 43638221630 passed the
+quality gate's steps 14 to 36 on `435a11639`), the full tooling suite on `master`
+(step 37 passed in run 43584904626 on `a67ed57e4`), the full backend suite after the
+rename merge (12,700 tests at `bc10bbe05`), and the two tests the Audio Core section
+listed as failing. The note that a review ran without a cross-model pass went from
+each section, because the checkout configuration sets that. No plan was retired. The
+roadmap before this cleanup is preserved at `d4a938b74`. All 51 local links resolve,
+and the four incoming anchors (`#application-release-acceptance`,
+`#completed-work-and-evidence`, `#local-development-workflow`,
+`#source-installation-documentation`) are kept.
 
 Cleanup, 2026-11-07: removed the delivered checkpoints and resolved items of
 forge-neutral CI, the system overview pages, interactive diagrams, configurable media
