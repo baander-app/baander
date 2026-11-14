@@ -191,6 +191,15 @@ final class Song
     }
 
     /**
+     * Replace the length measured from the audio; null clears a length the audio no longer yields.
+     */
+    public function updateLength(?float $length): void
+    {
+        $this->state->length = $length;
+        $this->state->updatedAt = new DateTimeImmutable();
+    }
+
+    /**
      * Update audio analysis features.
      */
     public function updateAudioFeatures(

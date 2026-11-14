@@ -38,6 +38,62 @@ final class AudioProbeResultTest extends TestCase
         self::assertNull($probe->duration);
     }
 
+    public function testContainerTimingIsKeptBesideTheStreamDuration(): void
+    {
+        $probe = AudioProbeResult::fromProbeOutput(['format' => ['format_name' => 'aac', 'duration' => '20.5', 'start_time' => '3'], 'streams' => [
+            ['index' => 3, 'codec_type' => 'audio', 'codec_name' => 'aac'],
+        ]]);
+
+        self::assertNull($probe->duration);
+        self::assertSame(20.5, $probe->containerDuration);
+        self::assertSame(3.0, $probe->containerStartTime);
+        self::assertSame(17.5, $probe->length());
+    }
+
+    public function testLengthIsTheStreamDurationWhenTheStreamStatesOne(): void
+    {
+        $probe = AudioProbeResult::fromProbeOutput(['format' => ['format_name' => 'mp3', 'duration' => '180.0', 'start_time' => '0.025'], 'streams' => [
+            ['index' => 0, 'codec_type' => 'audio', 'codec_name' => 'mp3', 'duration' => '176.657'],
+        ]]);
+
+        self::assertSame(176.657, $probe->duration);
+        self::assertSame(176.657, $probe->length());
+    }
+
+    public function testLengthIsTheContainerDurationMinusItsStartTimeWithoutAStreamDuration(): void
+    {
+        $probe = AudioProbeResult::fromProbeOutput(['format' => ['format_name' => 'matroska,webm', 'duration' => '200.5', 'start_time' => '0.025'], 'streams' => [
+            ['index' => 0, 'codec_type' => 'audio', 'codec_name' => 'flac'],
+        ]]);
+
+        self::assertNull($probe->duration);
+        self::assertEqualsWithDelta(200.475, $probe->length(), 1e-9);
+    }
+
+    public function testLengthIsTheContainerDurationWhenTheContainerStatesNoStartTime(): void
+    {
+        $probe = AudioProbeResult::fromProbeOutput(['format' => ['format_name' => 'matroska,webm', 'duration' => '200.5'], 'streams' => [
+            ['index' => 0, 'codec_type' => 'audio', 'codec_name' => 'flac'],
+        ]]);
+
+        self::assertNull($probe->containerStartTime);
+        self::assertSame(200.5, $probe->length());
+    }
+
+    public function testLengthIsUnknownWithoutAPositiveDuration(): void
+    {
+        $withoutDurations = AudioProbeResult::fromProbeOutput(['format' => ['format_name' => 'mp3', 'start_time' => '0.025'], 'streams' => [
+            ['index' => 0, 'codec_type' => 'audio', 'codec_name' => 'mp3'],
+        ]]);
+        $emptySpan = AudioProbeResult::fromProbeOutput(['format' => ['format_name' => 'matroska,webm', 'duration' => '1.0', 'start_time' => '1.0'], 'streams' => [
+            ['index' => 0, 'codec_type' => 'audio', 'codec_name' => 'flac'],
+        ]]);
+
+        self::assertNull($withoutDurations->containerDuration);
+        self::assertNull($withoutDurations->length());
+        self::assertNull($emptySpan->length());
+    }
+
     public function testMissingAbsoluteIndexIsRejected(): void
     {
         $this->expectException(\UnexpectedValueException::class);

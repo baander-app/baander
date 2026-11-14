@@ -351,6 +351,24 @@ final class SongTest extends TestCase
         $this->assertNotEquals($before, $song->getUpdatedAt());
     }
 
+    public function testUpdateLengthReplacesTheStoredLength(): void
+    {
+        $song = Song::create($this->albumId, 'Title', '/path.mp3', 1024, 'audio/mpeg', length: 0.238);
+
+        $song->updateLength(238.4);
+
+        $this->assertSame(238.4, $song->getLength());
+    }
+
+    public function testUpdateLengthClearsTheStoredLength(): void
+    {
+        $song = Song::create($this->albumId, 'Title', '/path.mp3', 1024, 'audio/mpeg', length: 0.238);
+
+        $song->updateLength(null);
+
+        $this->assertNull($song->getLength());
+    }
+
     public function testUpdateAudioFeatures(): void
     {
         $song = Song::create($this->albumId, 'Title', '/path.mp3', 1024, 'audio/mpeg');
