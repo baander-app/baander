@@ -1708,16 +1708,29 @@ Verification checkpoint, 2026-11-14:
   238.8 s long, where TLEN made it 0.238; "Rescue Me" is credited to Headhunterz as
   "Headhunterz; Sound Rush; Eurielle". `app:song:lyrics:fetch` for "Amore Infelice"
   returned synced LRCLIB lyrics.
+- Persistent instance, after the merge to `master` at `a67ed57e4` (2026-11-14): the
+  updater applied the migration; `app:library:scan music --rescan` repaired the 77
+  songs in place (0 to 19 artists, 0 to 77 credited songs, 0 to 5 credited albums, 26
+  to 0 songs with a missing or near-zero length, no new song or album, no failed
+  message). Two `app:lyrics:fetch` runs then left 63 of 77 songs with lyrics; LRCLIB
+  has no match for the other 14 (11 Bulldogg, 3 Suspekt).
 - Learnings: `docs/solutions/architecture-patterns/concurrent-imports-find-or-create-identities-under-sorted-advisory-locks.md`
   and
   `docs/solutions/developer-experience/pgroonga-indexes-in-throwaway-test-schemas-break-later-suites.md`.
 
 Open:
 
-- After merge, with the user's go-ahead: run `app:library:scan <slug> --rescan` on the
-  persistent instance, wait for the import queue to drain, then run `app:lyrics:fetch`.
 - The MusicBrainz lookup button in the album and song panels is an unwired
   placeholder; it gets its own brainstorm, building on the artists this branch creates.
+  It also owns splitting a single artist value that names several artists: R7 keeps
+  such a value whole, so "Post Malone, Luke Combs" (album artist "Post Malone", no
+  MusicBrainz IDs) became its own artist, 14 "Post Malone, X" artists on the
+  persistent instance. On 2026-11-14 the user chose this over splitting on an
+  album-artist prefix in the scan.
+- At its default 500 ms spacing, `app:lyrics:fetch` drew HTTP 429 from LRCLIB for 34
+  of 77 songs on the persistent instance, reported as unavailable; a second run with
+  `--delay=4000` finished the other 40 without a 429. A larger default or a back-off
+  on 429 would let one run finish.
 - Deferred, each separate work:
   - album identity across directories: albums have no uniqueness on title, and
     duplicate detection with `app:album:merge` covers the outcome until album identity
