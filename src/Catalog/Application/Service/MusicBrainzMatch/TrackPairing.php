@@ -30,7 +30,7 @@ final class TrackPairing
     {
         $releaseTracks = self::releaseTracks($release);
         $byPosition = array_column(
-            array_map(static fn (ReleaseTrack $track): array => [self::key($track->disc, $track->track->position), $track], $releaseTracks),
+            array_map(static fn (ReleaseTrack $track): array => [$track->key(), $track], $releaseTracks),
             1,
             0,
         );
@@ -50,15 +50,15 @@ final class TrackPairing
 
         $freeRelease = array_filter(
             $releaseTracks,
-            static fn (ReleaseTrack $track): bool => !isset($pairs[self::key($track->disc, $track->track->position)]),
+            static fn (ReleaseTrack $track): bool => !isset($pairs[$track->key()]),
         ) |> array_values(...);
         foreach (self::pairByLength($freeLocal, $freeRelease) as $pair) {
-            $pairs[self::key($pair->release->disc, $pair->release->track->position)] = $pair;
+            $pairs[$pair->release->key()] = $pair;
         }
 
         return new TrackPairs(
             pairs: array_map(
-                static fn (ReleaseTrack $track): ?TrackPair => $pairs[self::key($track->disc, $track->track->position)] ?? null,
+                static fn (ReleaseTrack $track): ?TrackPair => $pairs[$track->key()] ?? null,
                 $releaseTracks,
             ) |> array_filter(...) |> array_values(...),
             unpairedLocal: array_filter(
@@ -67,7 +67,7 @@ final class TrackPairing
             ) |> array_values(...),
             unpairedRelease: array_filter(
                 $releaseTracks,
-                static fn (ReleaseTrack $track): bool => !isset($pairs[self::key($track->disc, $track->track->position)]),
+                static fn (ReleaseTrack $track): bool => !isset($pairs[$track->key()]),
             ) |> array_values(...),
         );
     }
@@ -131,11 +131,6 @@ final class TrackPairing
 
     private static function localKey(LocalTrack $track): ?string
     {
-        return $track->position === null ? null : self::key($track->disc ?? 1, $track->position);
-    }
-
-    private static function key(int $disc, int $position): string
-    {
-        return $disc . '-' . $position;
+        return $track->position === null ? null : ReleaseTrack::keyOf($track->disc ?? 1, $track->position);
     }
 }

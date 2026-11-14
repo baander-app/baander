@@ -19,4 +19,16 @@ final readonly class ReleaseTrack
         public MusicBrainzTrack $track,
     ) {
     }
+
+    /** The track's place on the release, as the pairing and the comparison look it up. */
+    public function key(): string
+    {
+        return self::keyOf($this->disc, $this->track->position);
+    }
+
+    /** The key of the place at this disc and position, for a local track as for a release track. */
+    public static function keyOf(int $disc, int $position): string
+    {
+        return $disc . '-' . $position;
+    }
 }

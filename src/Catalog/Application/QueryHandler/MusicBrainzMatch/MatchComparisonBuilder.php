@@ -60,6 +60,8 @@ use Closure;
  * local artist, or a new one, each credit would go to. An artist the ticked credit rows would leave
  * without any credit merges into the artist that takes over most of its primary credits (the first
  * of them on a tie), or is removed when it held none.
+ *
+ * @phpstan-type CreditPlan array{song: Song|null, credits: list<CatalogCredit>, credit: MusicBrainzArtistCredit}
  */
 final readonly class MatchComparisonBuilder
 {
@@ -189,7 +191,7 @@ final readonly class MatchComparisonBuilder
     private static function tracks(AlbumSnapshot $snapshot, MatchCandidate $candidate, ?int $year, array $songRows): array
     {
         $pairs = array_column(
-            array_map(static fn (TrackPair $pair): array => [self::trackKey($pair->release), $pair], $candidate->pairs->pairs),
+            array_map(static fn (TrackPair $pair): array => [$pair->release->key(), $pair], $candidate->pairs->pairs),
             1,
             0,
         );
@@ -202,7 +204,7 @@ final readonly class MatchComparisonBuilder
         $track = static function (ReleaseTrack $releaseTrack) use ($snapshot, $candidate, $year, $songRows, $pairs): MatchTrack {
             $recordingId = $candidate->recordingId($releaseTrack);
             $compared = ComparedReleaseTrack::of($releaseTrack, $recordingId);
-            $pair = $pairs[self::trackKey($releaseTrack)] ?? null;
+            $pair = $pairs[$releaseTrack->key()] ?? null;
             $song = $pair === null ? null : $snapshot->song($pair->local->id);
             if ($song === null) {
                 return new MatchTrack(null, $compared);
@@ -247,7 +249,7 @@ final readonly class MatchComparisonBuilder
      *
      * @param list<CatalogCredit> $credits
      *
-     * @return array{song: Song|null, credits: list<CatalogCredit>, credit: MusicBrainzArtistCredit}
+     * @return CreditPlan
      */
     private static function plan(?Song $song, array $credits, MusicBrainzArtistCredit $credit): array
     {
@@ -258,7 +260,7 @@ final readonly class MatchComparisonBuilder
      * One credit row per plan, in order. The credited artists of every plan are resolved together,
      * in plan order, as one apply resolves them.
      *
-     * @param list<array{song: Song|null, credits: list<CatalogCredit>, credit: MusicBrainzArtistCredit}> $plans
+     * @param list<CreditPlan> $plans
      *
      * @return list<MatchCreditsRow>
      */
@@ -302,7 +304,7 @@ final readonly class MatchComparisonBuilder
      * rows hold every credit it has: no row keeps it as a proposed artist, no unchanged row or
      * credit of another role keeps it, and it holds no credit on a song or album outside the rows.
      *
-     * @param list<array{song: Song|null, credits: list<CatalogCredit>, credit: MusicBrainzArtistCredit}> $plans
+     * @param list<CreditPlan> $plans
      * @param list<MatchCreditsRow> $rows   one per plan
      * @param list<Uuid>            $albumIds the albums whose own credits the rows cover
      *
@@ -341,7 +343,7 @@ final readonly class MatchComparisonBuilder
      * proposes, every credit of an unchanged row, and every credit of another role than primary or
      * featured, which no match replaces.
      *
-     * @param list<array{song: Song|null, credits: list<CatalogCredit>, credit: MusicBrainzArtistCredit}> $plans
+     * @param list<CreditPlan> $plans
      * @param list<MatchCreditsRow>      $rows     one per plan
      * @param array<int, MatchCreditsRow> $changing the rows that change, by plan index
      *
@@ -401,11 +403,6 @@ final readonly class MatchComparisonBuilder
         $index = array_search(array_key_first($counts), $keys, true);
 
         return $index === false ? null : $takers[$index]->artist;
-    }
-
-    private static function trackKey(ReleaseTrack $track): string
-    {
-        return $track->disc . '-' . $track->track->position;
     }
 
     private static function identity(MusicBrainzCreditedArtist $artist): ArtistIdentity

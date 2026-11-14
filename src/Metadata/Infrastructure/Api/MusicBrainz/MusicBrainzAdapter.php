@@ -145,7 +145,7 @@ final readonly class MusicBrainzAdapter implements MusicBrainzLookupInterface
         int $offset = 0,
         MusicBrainzSlotWait $wait = MusicBrainzSlotWait::Unbounded,
     ): MusicBrainzSearchResultDto {
-        $data = $this->olderRequest('/artist', ['query' => self::escape($query), 'limit' => $limit, 'offset' => $offset], $wait);
+        $data = $this->requestOrEmpty('/artist', ['query' => self::escape($query), 'limit' => $limit, 'offset' => $offset], $wait);
 
         return new MusicBrainzSearchResultDto(
             artists: array_map($this->artistDto(...), self::objects($data['artists'] ?? null)),
@@ -164,7 +164,7 @@ final readonly class MusicBrainzAdapter implements MusicBrainzLookupInterface
         int $limit = 25,
         MusicBrainzSlotWait $wait = MusicBrainzSlotWait::Unbounded,
     ): MusicBrainzSearchResultDto {
-        $data = $this->olderRequest('/release-group', ['query' => self::textQuery($query, $artist), 'limit' => $limit], $wait);
+        $data = $this->requestOrEmpty('/release-group', ['query' => self::textQuery($query, $artist), 'limit' => $limit], $wait);
 
         return new MusicBrainzSearchResultDto(
             releaseGroups: array_map($this->releaseGroupDto(...), self::objects($data['release-groups'] ?? null)),
@@ -183,7 +183,7 @@ final readonly class MusicBrainzAdapter implements MusicBrainzLookupInterface
         int $limit = 25,
         MusicBrainzSlotWait $wait = MusicBrainzSlotWait::Unbounded,
     ): MusicBrainzSearchResultDto {
-        $data = $this->olderRequest('/recording', ['query' => self::textQuery($query, $artist), 'limit' => $limit], $wait);
+        $data = $this->requestOrEmpty('/recording', ['query' => self::textQuery($query, $artist), 'limit' => $limit], $wait);
 
         return new MusicBrainzSearchResultDto(
             recordings: array_map($this->recordingDto(...), self::objects($data['recordings'] ?? null)),
@@ -198,7 +198,7 @@ final readonly class MusicBrainzAdapter implements MusicBrainzLookupInterface
      */
     public function lookupArtist(string $mbid, MusicBrainzSlotWait $wait = MusicBrainzSlotWait::Unbounded): ?MusicBrainzArtistDto
     {
-        $data = $this->olderRequest('/artist/' . rawurlencode($mbid), ['inc' => 'url-rels+tags+artist-rels'], $wait);
+        $data = $this->requestOrEmpty('/artist/' . rawurlencode($mbid), ['inc' => 'url-rels+tags+artist-rels'], $wait);
 
         return isset($data['id']) ? $this->artistDto([...$data, 'score' => 0]) : null;
     }
@@ -210,7 +210,7 @@ final readonly class MusicBrainzAdapter implements MusicBrainzLookupInterface
      */
     public function lookupReleaseGroup(string $mbid, MusicBrainzSlotWait $wait = MusicBrainzSlotWait::Unbounded): ?MusicBrainzReleaseGroupDto
     {
-        $data = $this->olderRequest('/release-group/' . rawurlencode($mbid), ['inc' => 'releases+artist-credits+tags'], $wait);
+        $data = $this->requestOrEmpty('/release-group/' . rawurlencode($mbid), ['inc' => 'releases+artist-credits+tags'], $wait);
 
         return isset($data['id']) ? $this->releaseGroupDto([...$data, 'score' => 0]) : null;
     }
@@ -265,8 +265,8 @@ final readonly class MusicBrainzAdapter implements MusicBrainzLookupInterface
     }
 
     /**
-     * The older methods' request: a turn under the shared limit, then an empty array for any
-     * answer other than a decoded JSON object.
+     * A request for the search and lookup methods that answer with arrays: a turn under the shared
+     * limit, then an empty array for any answer other than a decoded JSON object.
      *
      * @param array<string, string|int> $params
      *
@@ -274,7 +274,7 @@ final readonly class MusicBrainzAdapter implements MusicBrainzLookupInterface
      *
      * @throws ServiceUnavailableException when no turn comes within the wait
      */
-    private function olderRequest(string $endpoint, array $params, MusicBrainzSlotWait $wait): array
+    private function requestOrEmpty(string $endpoint, array $params, MusicBrainzSlotWait $wait): array
     {
         $noTurn = $this->takeTurn($wait);
         if ($noTurn !== null) {
