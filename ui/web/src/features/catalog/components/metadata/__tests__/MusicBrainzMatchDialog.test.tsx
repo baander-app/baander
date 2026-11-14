@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AxiosError, AxiosHeaders } from 'axios'
 import { ThemeProvider } from 'styled-components'
@@ -19,6 +19,7 @@ vi.mock('sonner', () => ({
 const request = vi.mocked(customInstance)
 const CANDIDATES_URL = `/api/admin/metadata/match/album/${ALBUM_ID}/candidates`
 const COMPARISON_URL = `/api/admin/metadata/match/album/${ALBUM_ID}/comparison?candidate=release-digital`
+const OTHER_COMPARISON_URL = `/api/admin/metadata/match/album/${ALBUM_ID}/comparison?candidate=release-cd`
 const APPLY_URL = `/api/admin/metadata/match/album/${ALBUM_ID}/apply`
 const MERGE_LINE = 'Merge “Post Malone, Luke Combs” into Post Malone'
 
@@ -290,6 +291,38 @@ describe('MusicBrainzMatchDialog', () => {
     expect(notice).toHaveTextContent('Changed since then: Year.')
     expect(screen.getByRole('checkbox', { name: 'Year' })).not.toBeChecked()
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('cancels a pending reload on going back, so its late answer leaves the next candidate’s ticks alone', async () => {
+    answer(APPLY_URL, () => Promise.reject(httpError(409, 'match_stale')))
+    await openComparison()
+    fireEvent.click(screen.getByRole('button', { name: 'Apply' }))
+    await screen.findByRole('alert')
+
+    const before = albumComparison()
+    let answerReload: (() => void) | undefined
+    answer(COMPARISON_URL, () => new Promise((resolve) => {
+      answerReload = () => resolve({
+        data: albumComparison({
+          fields: before.fields.map((row) => (row.key === 'year' ? fieldRow({ field: 'year', current: 2022, proposed: 2024 }) : row)),
+        }),
+      })
+    }))
+    answer(OTHER_COMPARISON_URL, async () => ({ data: albumComparison({ candidateId: 'release-cd' }) }))
+    fireEvent.click(screen.getByRole('button', { name: 'Reload comparison' }))
+    await waitFor(() => expect(answerReload).toBeDefined())
+    const reload = request.mock.calls.findLast(([url]) => url === COMPARISON_URL)?.[1]
+
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }))
+
+    expect(reload?.signal?.aborted).toBe(true)
+
+    fireEvent.click(within(candidateItems()[1]).getByRole('button', { name: /Compare/ }))
+    fireEvent.click(await screen.findByRole('checkbox', { name: 'Year' }))
+    await act(async () => answerReload?.())
+
+    expect(screen.getByRole('checkbox', { name: 'Year' })).toBeChecked()
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
   })
 
   it('says MusicBrainz is unavailable when the apply answers 503, and keeps the comparison open', async () => {
