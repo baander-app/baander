@@ -10,8 +10,9 @@ use Psr\Log\LoggerInterface;
  * Low-level ID3v2/v1 tag parser.
  *
  * Reads ID3 metadata directly from the binary file:
- * - ID3v2: frame-based structure with text frames (T*), the MusicBrainz
- *   artist ID user text frames (TXXX), comments and APIC picture frames
+ * - ID3v2: frame-based structure with text frames (T*), the individual
+ *   artists and MusicBrainz artist ID user text frames (TXXX), comments and
+ *   APIC picture frames
  * - ID3v1: fixed-width 128-byte footer with basic fields
  *
  * Tag values come back as UTF-8 without terminators, byte-order marks or
@@ -43,6 +44,7 @@ final class Id3Parser
 
     /** User text frames kept, by lowercase description, as Picard names them. */
     private const array USER_TEXT_FRAMES = [
+        'artists' => 'ARTISTS',
         'musicbrainz artist id' => 'MUSICBRAINZ_ARTISTID',
         'musicbrainz album artist id' => 'MUSICBRAINZ_ALBUMARTISTID',
     ];
@@ -221,10 +223,14 @@ final class Id3Parser
         }
 
         $values = self::values($strings, $majorVersion);
-        // Picard joins several IDs with "/" in ID3v2.3; a MusicBrainz ID never contains one.
-        $ids = explode('/', implode('/', $values));
+        // Picard joins several values with "/" in ID3v2.3. A MusicBrainz ID never contains one, so
+        // IDs split in any version; names split in ID3v2.3 only, where a name such as "AC/DC" splits
+        // as well.
+        if ($tagName !== 'ARTISTS' || $majorVersion < 4) {
+            $values = self::splitOnSlashes($values);
+        }
 
-        $this->addTag($tagName, array_map(trim(...), $ids) |> self::nonEmpty(...));
+        $this->addTag($tagName, array_map(trim(...), $values) |> self::nonEmpty(...));
     }
 
     /**
@@ -411,6 +417,16 @@ final class Id3Parser
     private static function nonEmpty(array $strings): array
     {
         return array_values(array_filter($strings, static fn (string $value): bool => $value !== ''));
+    }
+
+    /**
+     * @param list<string> $values
+     *
+     * @return non-empty-list<string> the parts of the values between slashes, in order
+     */
+    private static function splitOnSlashes(array $values): array
+    {
+        return explode('/', implode('/', $values));
     }
 
     private function syncSafeToInt(string $bytes): int

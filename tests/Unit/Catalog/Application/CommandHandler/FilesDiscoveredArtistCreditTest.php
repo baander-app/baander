@@ -36,7 +36,8 @@ use Symfony\Component\Serializer\Encoder\JsonEncoder;
 /**
  * A batch resolves the artists of all its new songs in one call inside its transaction, before it
  * writes any song or genre, and credits each song to the artist resolved for its own tags under the
- * name it was tagged with.
+ * name it was tagged with. A file that names its artists one by one, with one MusicBrainz ID each,
+ * also credits every artist after the first as featured.
  */
 final class FilesDiscoveredArtistCreditTest extends TestCase
 {
@@ -44,6 +45,9 @@ final class FilesDiscoveredArtistCreditTest extends TestCase
 
     private const string DIRECTORY = '/music/Credit Album';
     private const string HEADHUNTERZ_ID = '7e8ee8b1-5a3b-4e64-9a0c-1d2e3f4a5b6c';
+    private const string KREWELLA_ID = '2c4e6a8b-0d1f-4a3c-8e5b-7d9f1a2c3e4b';
+    private const string POST_MALONE_ID = '5b7d9f1a-3c5e-4b7d-9f1a-3c5e7b9d1f3a';
+    private const string LUKE_COMBS_ID = '8a0c2e4f-6b8d-4f0a-a2c4-6e8a0c2e4f6b';
 
     private \stdClass $state;
     private PassThroughTransaction $transaction;
@@ -131,6 +135,87 @@ final class FilesDiscoveredArtistCreditTest extends TestCase
         ], $this->creditsBySong());
     }
 
+    public function testAFileThatNamesEachArtistWithItsOwnIdCreditsTheFirstAsPrimaryAndTheOthersAsFeatured(): void
+    {
+        $tags = [
+            '01 Guy for That' => [
+                'artists' => ['Post Malone feat. Luke Combs'],
+                'individualArtists' => ['Post Malone', 'Luke Combs'],
+                'ids' => [self::POST_MALONE_ID, self::LUKE_COMBS_ID],
+            ],
+            '02 Ten Thousand Fists' => ['artists' => ['Disturbed']],
+        ];
+
+        $this->handler($tags)($this->message('01 Guy for That', '02 Ten Thousand Fists'));
+
+        self::assertSame(
+            [['Post Malone', self::POST_MALONE_ID], ['Luke Combs', self::LUKE_COMBS_ID], ['Disturbed', null]],
+            $this->resolvedIdentities(),
+            'Every artist of the batch reaches the one resolver call, each by its own ID, in file order.',
+        );
+        $postMalone = $this->state->artists[new ArtistIdentity('Post Malone', [self::POST_MALONE_ID])->key()]->toString();
+        $lukeCombs = $this->state->artists[new ArtistIdentity('Luke Combs', [self::LUKE_COMBS_ID])->key()]->toString();
+        $disturbed = $this->state->artists[new ArtistIdentity('Disturbed')->key()]->toString();
+        self::assertSame([
+            '01 Guy for That' => [[$postMalone, 'primary', 'Post Malone feat. Luke Combs'], [$lukeCombs, 'featured', 'Luke Combs']],
+            '02 Ten Thousand Fists' => [[$disturbed, 'primary', 'Disturbed']],
+        ], $this->creditsBySong());
+    }
+
+    public function testSeparateArtistValuesWithAnIdEachCreditEveryArtistByItsId(): void
+    {
+        $tags = ['03 Feel Alive' => ['artists' => ['Headhunterz', 'Krewella'], 'ids' => [self::HEADHUNTERZ_ID, self::KREWELLA_ID]]];
+
+        $this->handler($tags)($this->message('03 Feel Alive'));
+
+        self::assertSame([['Headhunterz', self::HEADHUNTERZ_ID], ['Krewella', self::KREWELLA_ID]], $this->resolvedIdentities());
+        $headhunterz = $this->state->artists[new ArtistIdentity('Headhunterz', [self::HEADHUNTERZ_ID])->key()]->toString();
+        $krewella = $this->state->artists[new ArtistIdentity('Krewella', [self::KREWELLA_ID])->key()]->toString();
+        self::assertSame(
+            ['03 Feel Alive' => [[$headhunterz, 'primary', 'Headhunterz; Krewella'], [$krewella, 'featured', 'Krewella']]],
+            $this->creditsBySong(),
+        );
+    }
+
+    /**
+     * @param array{artists: list<string>, individualArtists?: list<string>, ids: list<string>} $tags
+     * @param array{string, string|null}                                                       $identity the name and ID the one primary credit resolves by
+     */
+    #[DataProvider('namesThatDoNotPairWithTheIds')]
+    public function testArtistNamesThatDoNotPairOneToOneWithTheValidIdsKeepASinglePrimaryCredit(array $tags, array $identity, string $creditedName): void
+    {
+        $this->handler(['04 Song' => $tags])($this->message('04 Song'));
+
+        self::assertSame([$identity], $this->resolvedIdentities());
+        $artist = $this->state->artists[new ArtistIdentity($identity[0], $identity[1] === null ? [] : [$identity[1]])->key()]->toString();
+        self::assertSame(['04 Song' => [[$artist, 'primary', $creditedName]]], $this->creditsBySong());
+    }
+
+    /** @return iterable<string, array{array{artists: list<string>, individualArtists?: list<string>, ids: list<string>}, array{string, string|null}, string}> */
+    public static function namesThatDoNotPairWithTheIds(): iterable
+    {
+        yield 'two artist values with one ID' => [
+            ['artists' => ['Headhunterz', 'Sound Rush'], 'ids' => [self::HEADHUNTERZ_ID]],
+            ['Headhunterz', self::HEADHUNTERZ_ID],
+            'Headhunterz; Sound Rush',
+        ];
+        yield 'one artist value with two IDs' => [
+            ['artists' => ['Headhunterz feat. Krewella'], 'ids' => [self::HEADHUNTERZ_ID, self::KREWELLA_ID]],
+            ['Headhunterz feat. Krewella', null],
+            'Headhunterz feat. Krewella',
+        ];
+        yield 'two individual artists with one valid ID and one malformed' => [
+            ['artists' => ['Headhunterz feat. Krewella'], 'individualArtists' => ['Headhunterz', 'Krewella'], 'ids' => [self::HEADHUNTERZ_ID, 'krewella']],
+            ['Headhunterz feat. Krewella', self::HEADHUNTERZ_ID],
+            'Headhunterz feat. Krewella',
+        ];
+        yield 'two artist values with one ID repeated in another letter case' => [
+            ['artists' => ['Headhunterz', 'HeadHunterz'], 'ids' => [self::HEADHUNTERZ_ID, strtoupper(self::HEADHUNTERZ_ID)]],
+            ['Headhunterz', self::HEADHUNTERZ_ID],
+            'Headhunterz; HeadHunterz',
+        ];
+    }
+
     public function testAFileWithoutAnArtistIsImportedWithoutACredit(): void
     {
         $tags = ['01 Named' => ['artists' => ['Suspekt']], '02 Untagged' => [], '03 Blank' => ['artists' => ['', "\0"]]];
@@ -175,9 +260,9 @@ final class FilesDiscoveredArtistCreditTest extends TestCase
     }
 
     /**
-     * @param array<string, array{artists?: list<string>, ids?: list<string>, genres?: list<string>}> $tags     the tags of each file, by file name
-     * @param (\Closure(ArtistIdentity): string)|null                                                 $artistOf which identities the fake resolver gives one artist; by default, those with one key
-     * @param string|null                                                                             $replaced a file that changes on disk while its tags are read
+     * @param array<string, array{artists?: list<string>, individualArtists?: list<string>, ids?: list<string>, genres?: list<string>}> $tags     the tags of each file, by file name
+     * @param (\Closure(ArtistIdentity): string)|null                                                                                   $artistOf which identities the fake resolver gives one artist; by default, those with one key
+     * @param string|null                                                                                                               $replaced a file that changes on disk while its tags are read
      */
     private function handler(array $tags, ?\Closure $artistOf = null, ?string $replaced = null): FilesDiscoveredHandler
     {
@@ -243,6 +328,7 @@ final class FilesDiscoveredArtistCreditTest extends TestCase
                 ->setTitle($name)
                 ->setAlbum('Credit Album')
                 ->setArtists($tags[$name]['artists'] ?? [])
+                ->setIndividualArtists($tags[$name]['individualArtists'] ?? [])
                 ->setMbArtistIds($tags[$name]['ids'] ?? [])
                 ->setGenre($tags[$name]['genres'] ?? []);
         });

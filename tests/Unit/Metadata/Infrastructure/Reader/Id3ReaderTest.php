@@ -126,6 +126,17 @@ final class Id3ReaderTest extends TestCase
         $this->assertSame(self::ARTIST_ID, $metadata->getMbArtistId());
     }
 
+    public function testReadReturnsEachIndividualArtistOfTheArtistsUserTextFrame(): void
+    {
+        $frames = $this->buildFrame('TPE1', "\x00Post Malone feat. Luke Combs")
+               . $this->buildFrame('TXXX', "\x00ARTISTS\x00Post Malone/Luke Combs");
+
+        $metadata = $this->reader->read($this->buildId3v2File($frames));
+
+        $this->assertSame(['Post Malone feat. Luke Combs'], $metadata->getArtists());
+        $this->assertSame(['Post Malone', 'Luke Combs'], $metadata->getIndividualArtists());
+    }
+
     public function testReadReturnsEmptyForNonExistentFile(): void
     {
         $metadata = $this->reader->read('/nonexistent/file.mp3');

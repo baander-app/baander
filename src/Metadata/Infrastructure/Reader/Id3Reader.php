@@ -49,6 +49,7 @@ final class Id3Reader
 
         $metadata->setTitle($this->first($tags, 'TITLE'));
         $metadata->setArtists($tags['ARTIST'] ?? []);
+        $metadata->setIndividualArtists($tags['ARTISTS'] ?? []);
         $metadata->setAlbum($this->first($tags, 'ALBUM'));
         $metadata->setAlbumArtists($tags['ALBUMARTIST'] ?? []);
         $metadata->setMbArtistIds($tags['MUSICBRAINZ_ARTISTID'] ?? []);

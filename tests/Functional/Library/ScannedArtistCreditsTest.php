@@ -37,12 +37,16 @@ use Symfony\Component\Messenger\Transport\InMemory\InMemoryTransport;
  * through the console scan, the outbox relay and the import handler, against PostgreSQL with the
  * real tag readers and the real audio probe. It checks the artists, the song and album credits
  * with their credited names and the song lengths a scan leaves, how a rescan repairs them, how a
- * retagged file updates its song, and what a lyrics fetch then sends to LRCLIB.
+ * retagged file updates its song, how files that give an ID per artist credit every artist, and
+ * what a lyrics fetch then sends to LRCLIB.
  */
 final class ScannedArtistCreditsTest extends TestCase
 {
     private const string HEADHUNTERZ_ID = '4d1e2a3b-5c6f-4a7b-8c9d-0e1f2a3b4c5d';
     private const string KREWELLA_ID = '7f8e9d0c-1b2a-4c3d-9e4f-5a6b7c8d9e0f';
+    private const string POST_MALONE_ID = '5b7d9f1a-3c5e-4b7d-9f1a-3c5e7b9d1f3a';
+    private const string LUKE_COMBS_ID = '8a0c2e4f-6b8d-4f0a-a2c4-6e8a0c2e4f6b';
+    private const string BLAKE_SHELTON_ID = '3e5a7c9e-1f3b-4d5f-b7a9-1c3e5a7c9e1f';
     /** The start of an ID3 TXXX frame that holds MusicBrainz artist IDs, as Picard writes it. */
     private const string ID3_ARTIST_IDS = "MusicBrainz Artist Id\0";
 
@@ -207,6 +211,84 @@ final class ScannedArtistCreditsTest extends TestCase
             static fn (array $request): mixed => $request['query']['artist_name'] ?? null,
             $this->lrclibRequests,
         ));
+    }
+
+    /**
+     * Files Picard tagged with one MusicBrainz ID per artist: a FLAC whose ARTISTS field repeats,
+     * and an ID3v2.3 MP3 whose ARTISTS and artist ID frames join their values with "/". Each song
+     * credits its first artist as primary under the whole artist text and the other as featured,
+     * each by its ID, and a rescan restores those credits once they were removed by hand.
+     */
+    public function testAFileWithAnIdPerArtistCreditsEveryArtistByItsId(): void
+    {
+        $flac = 'F-1 Trillion/01 - Guy for That.flac';
+        $mp3 = 'F-1 Trillion/02 - Pour Me a Drink.mp3';
+        $this->flac($flac, 1.0, [
+            ['TITLE', 'Guy for That'], ['ALBUM', 'F-1 Trillion'], ['TRACKNUMBER', '1'],
+            ['ARTIST', 'Post Malone feat. Luke Combs'], ['ARTISTS', 'Post Malone'], ['ARTISTS', 'Luke Combs'],
+            ['MUSICBRAINZ_ARTISTID', self::POST_MALONE_ID], ['MUSICBRAINZ_ARTISTID', self::LUKE_COMBS_ID],
+            ['ALBUMARTIST', 'Post Malone'], ['MUSICBRAINZ_ALBUMARTISTID', self::POST_MALONE_ID],
+        ]);
+        $this->mp3($mp3, 1.5, [
+            ['TIT2', 'Pour Me a Drink'], ['TALB', 'F-1 Trillion'], ['TRCK', '2'],
+            ['TPE1', 'Post Malone feat. Blake Shelton'], ['TXXX', "ARTISTS\0Post Malone/Blake Shelton"],
+            ['TXXX', self::ID3_ARTIST_IDS . self::POST_MALONE_ID . '/' . self::BLAKE_SHELTON_ID],
+            ['TPE2', 'Post Malone'], ['TXXX', "MusicBrainz Album Artist Id\0" . self::POST_MALONE_ID],
+        ]);
+        $this->scan();
+
+        $credits = [
+            $flac => [['Luke Combs', 'featured', 'Luke Combs'], ['Post Malone', 'primary', 'Post Malone feat. Luke Combs']],
+            $mp3 => [['Blake Shelton', 'featured', 'Blake Shelton'], ['Post Malone', 'primary', 'Post Malone feat. Blake Shelton']],
+        ];
+        self::assertSame($credits, $this->songCredits());
+        self::assertSame(['F-1 Trillion' => [['Post Malone', 'primary', 'Post Malone']]], $this->albumCredits());
+        self::assertSame([
+            ['Blake Shelton', self::BLAKE_SHELTON_ID],
+            ['Luke Combs', self::LUKE_COMBS_ID],
+            ['Post Malone', self::POST_MALONE_ID],
+        ], $this->creditedArtists());
+        self::assertSame([], $this->artistsNamed('Post Malone feat. Luke Combs', 'Post Malone feat. Blake Shelton'));
+
+        $this->console('app:artist:song:remove', ['public-id' => $this->artistPublicId('Post Malone'), 'song-id' => $this->songPublicId($flac)]);
+        $this->console('app:artist:song:remove', ['public-id' => $this->artistPublicId('Luke Combs'), 'song-id' => $this->songPublicId($flac)]);
+        self::assertSame([], $this->songCredits()[$flac], 'The song starts out without credits.');
+
+        $this->scan(rescan: true);
+
+        self::assertSame($credits, $this->songCredits(), 'The rescan restores both credits of the uncredited song and leaves the other as it is.');
+    }
+
+    /**
+     * A song scanned before Picard tagged its file is credited under its whole artist text. Once
+     * the file carries an ID per artist, the next scan replaces that credit with one per artist.
+     */
+    public function testARetagWithAnIdPerArtistCreditsEveryArtistOfTheSong(): void
+    {
+        $file = 'F-1 Trillion/01 - Guy for That.flac';
+        $tags = [['TITLE', 'Guy for That'], ['ALBUM', 'F-1 Trillion'], ['TRACKNUMBER', '1'], ['ARTIST', 'Post Malone feat. Luke Combs']];
+        $this->flac($file, 1.0, $tags);
+        $this->scan();
+        $rows = $this->songRows($file);
+        self::assertSame([$file => [['Post Malone feat. Luke Combs', 'primary', 'Post Malone feat. Luke Combs']]], $this->songCredits());
+
+        $this->flac($file, 1.0, [
+            ...$tags, ['ARTISTS', 'Post Malone'], ['ARTISTS', 'Luke Combs'],
+            ['MUSICBRAINZ_ARTISTID', self::POST_MALONE_ID], ['MUSICBRAINZ_ARTISTID', self::LUKE_COMBS_ID],
+        ]);
+        $this->scan();
+
+        self::assertSame($rows, $this->songRows($file), 'The retag updates the same song.');
+        self::assertSame(
+            [$file => [['Luke Combs', 'featured', 'Luke Combs'], ['Post Malone', 'primary', 'Post Malone feat. Luke Combs']]],
+            $this->songCredits(),
+        );
+        self::assertSame(['F-1 Trillion' => [['Post Malone feat. Luke Combs', 'primary', 'Post Malone feat. Luke Combs']]], $this->albumCredits(), 'A retag leaves the album credit as it is.');
+        self::assertSame([
+            ['Luke Combs', self::LUKE_COMBS_ID],
+            ['Post Malone', self::POST_MALONE_ID],
+            ['Post Malone feat. Luke Combs', null],
+        ], $this->creditedArtists());
     }
 
     /**

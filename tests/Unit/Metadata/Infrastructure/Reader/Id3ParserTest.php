@@ -288,6 +288,24 @@ final class Id3ParserTest extends TestCase
         $this->assertSame([self::ARTIST_ID, self::OTHER_ARTIST_ID], $parser->getTags()['MUSICBRAINZ_ALBUMARTISTID']);
     }
 
+    public function testSplitsTheSlashJoinedArtistsOfAnId3v23Tag(): void
+    {
+        $frame = "\x00ARTISTS\x00Post Malone/ Luke Combs";
+
+        $parser = $this->parse($this->buildId3v2File($this->buildFrame('TXXX', $frame)));
+
+        $this->assertSame(['Post Malone', 'Luke Combs'], $parser->getTags()['ARTISTS']);
+    }
+
+    public function testKeepsASlashInsideAnArtistsValueOfAnId3v24Tag(): void
+    {
+        $frame = "\x03ARTISTS\x00AC/DC\x00Bon Jovi";
+
+        $parser = $this->parse($this->buildId3v24File($this->buildSyncsafeFrame('TXXX', $frame)));
+
+        $this->assertSame(['AC/DC', 'Bon Jovi'], $parser->getTags()['ARTISTS']);
+    }
+
     public function testIgnoresUserTextFramesWithAnotherDescription(): void
     {
         $frames = $this->buildFrame('TXXX', "\x00MusicBrainz Album Id\x00" . self::ARTIST_ID)

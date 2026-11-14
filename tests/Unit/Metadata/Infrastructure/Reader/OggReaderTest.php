@@ -76,6 +76,19 @@ final class OggReaderTest extends TestCase
         $this->assertNull($metadata->getMbArtistId());
     }
 
+    public function testReadReturnsEachIndividualArtistOfTheArtistsFieldInFileOrder(): void
+    {
+        $file = $this->buildOggFile([
+            'ARTIST' => ['Post Malone feat. Luke Combs'],
+            'ARTISTS' => ['Post Malone', ' Luke Combs ', ''],
+        ]);
+
+        $metadata = $this->reader->read($file);
+
+        $this->assertSame(['Post Malone feat. Luke Combs'], $metadata->getArtists());
+        $this->assertSame(['Post Malone', 'Luke Combs'], $metadata->getIndividualArtists());
+    }
+
     public function testReadReturnsTheMusicBrainzAlbumArtistId(): void
     {
         $file = $this->buildOggFile([

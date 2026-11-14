@@ -70,6 +70,19 @@ final class FlacReaderTest extends TestCase
         $this->assertSame('Headhunterz', $metadata->getArtist());
     }
 
+    public function testReadReturnsEachIndividualArtistOfTheArtistsFieldInFileOrder(): void
+    {
+        $file = $this->buildFlacFile([
+            'ARTIST' => ['Post Malone feat. Luke Combs'],
+            'ARTISTS' => ['Post Malone', ' Luke Combs ', ''],
+        ]);
+
+        $metadata = $this->reader->read($file);
+
+        $this->assertSame(['Post Malone feat. Luke Combs'], $metadata->getArtists());
+        $this->assertSame(['Post Malone', 'Luke Combs'], $metadata->getIndividualArtists());
+    }
+
     public function testReadReturnsEveryMusicBrainzArtistIdAndNoSingleIdWhenThereAreTwo(): void
     {
         $file = $this->buildFlacFile(['MUSICBRAINZ_ARTISTID' => ['mb-artist-1', 'mb-artist-2']]);

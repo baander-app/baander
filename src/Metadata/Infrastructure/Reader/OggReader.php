@@ -57,6 +57,7 @@ final class OggReader
             $metadata->setTitle($this->first($comments, 'TITLE'));
             $metadata->setAlbum($this->first($comments, 'ALBUM'));
             $metadata->setArtists($this->values($comments, 'ARTIST'));
+            $metadata->setIndividualArtists($this->values($comments, 'ARTISTS'));
             $metadata->setAlbumArtists($this->values($comments, 'ALBUMARTIST'));
             $metadata->setComposer($this->first($comments, 'COMPOSER'));
             $metadata->setComment($this->first($comments, 'DESCRIPTION') ?? $this->first($comments, 'COMMENT'));

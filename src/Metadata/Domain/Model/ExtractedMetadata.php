@@ -11,6 +11,8 @@ final class ExtractedMetadata
     /** @var list<string> */
     private array $artists = [];
     /** @var list<string> */
+    private array $individualArtists = [];
+    /** @var list<string> */
     private array $albumArtists = [];
     /** @var list<string> */
     private array $mbArtistIds = [];
@@ -75,6 +77,13 @@ final class ExtractedMetadata
     public function setArtists(array $artists): self
     {
         $this->artists = $artists;
+        return $this;
+    }
+
+    /** @param list<string> $individualArtists each artist named on its own, as the ARTISTS tag lists them, in tag order */
+    public function setIndividualArtists(array $individualArtists): self
+    {
+        $this->individualArtists = $individualArtists;
         return $this;
     }
 
@@ -216,6 +225,12 @@ final class ExtractedMetadata
     public function getArtists(): array
     {
         return $this->artists;
+    }
+
+    /** @return list<string> */
+    public function getIndividualArtists(): array
+    {
+        return $this->individualArtists;
     }
 
     /** The first album-artist value. */

@@ -18,6 +18,7 @@ use App\Catalog\Domain\Model\Video;
 use App\Catalog\Domain\Repository\VideoRepositoryInterface;
 use App\Catalog\Domain\ValueObject\AlbumType;
 use App\Catalog\Domain\ValueObject\ArtistRole;
+use App\Catalog\Domain\ValueObject\MusicbrainzId;
 use App\Library\Application\Message\DiscoveredFile;
 use App\Library\Application\Message\FilesDiscovered;
 use App\Library\Application\Port\LibraryMediaFilesInterface;
@@ -38,10 +39,11 @@ use Symfony\Component\Messenger\Stamp\TransportNamesStamp;
 
 /**
  * @phpstan-type TaggedCredit array{identity: ArtistIdentity, creditedName: string}
+ * @phpstan-type SongCredit array{identity: ArtistIdentity, creditedName: string, featured: list<ArtistIdentity>}
  * @phpstan-type TagFields array{title: string, track: int|null, disc: int|null, year: int|null, comment: string|null}
- * @phpstan-type FileTags array{fields: TagFields, credit: TaggedCredit|null, albumArtist: TaggedCredit|null, genres: list<string>}
+ * @phpstan-type FileTags array{fields: TagFields, credit: SongCredit|null, albumArtist: TaggedCredit|null, genres: list<string>}
  * @phpstan-type Retag array{fields: TagFields, probe: AudioProbeResult}
- * @phpstan-type PreparedSong array{file: DiscoveredFile, song: Song, credit: TaggedCredit|null, albumArtist: TaggedCredit|null, genres: list<string>, known: bool, previousPath?: string, probe?: AudioProbeResult|null, retag?: Retag, repaired?: bool}
+ * @phpstan-type PreparedSong array{file: DiscoveredFile, song: Song, credit: SongCredit|null, albumArtist: TaggedCredit|null, genres: list<string>, known: bool, previousPath?: string, probe?: AudioProbeResult|null, retag?: Retag, repaired?: bool}
  */
 final class FilesDiscoveredHandler
 {
@@ -289,7 +291,7 @@ final class FilesDiscoveredHandler
         $song = [
             'file' => $file,
             'song' => $stored,
-            'credit' => $metadata === null ? null : $this->taggedCredit($metadata->getArtists(), $metadata->getMbArtistIds()),
+            'credit' => $metadata === null ? null : $this->songCredit($metadata->getArtists(), $metadata->getIndividualArtists(), $metadata->getMbArtistIds()),
             'albumArtist' => $metadata === null ? null : $this->taggedCredit($metadata->getAlbumArtists(), $metadata->getMbAlbumArtistIds()),
             'genres' => [],
             'known' => true,
@@ -410,13 +412,49 @@ final class FilesDiscoveredHandler
                 'year' => $metadata->getYear(),
                 'comment' => $metadata->getComment(),
             ],
-            'credit' => $this->taggedCredit($metadata->getArtists(), $metadata->getMbArtistIds()),
+            'credit' => $this->songCredit($metadata->getArtists(), $metadata->getIndividualArtists(), $metadata->getMbArtistIds()),
             'albumArtist' => $this->taggedCredit($metadata->getAlbumArtists(), $metadata->getMbAlbumArtistIds()),
             'genres' => array_values(array_filter(
                 array_map(trim(...), $metadata->getGenre()),
                 static fn (string $genre): bool => $genre !== '',
             )),
         ];
+    }
+
+    /**
+     * The credits a file's artist tags give its song. When the file names its artists one by one,
+     * in its individual-artists values or else its artist values, and gives exactly one valid
+     * MusicBrainz ID per name, each name is credited by the ID in the same position: the first as
+     * primary under the artist values joined with "; ", every other one as featured under its own
+     * name. Any other file gives the one primary credit of {@see taggedCredit()}. Null when the file
+     * has no artist value.
+     *
+     * @param list<string> $artists           every artist value, in tag order
+     * @param list<string> $individualArtists each artist named on its own, in tag order
+     * @param list<string> $musicbrainzIds    every MusicBrainz artist ID the file gives, in tag order
+     *
+     * @return SongCredit|null
+     */
+    private function songCredit(array $artists, array $individualArtists, array $musicbrainzIds): ?array
+    {
+        $credit = $this->taggedCredit($artists, $musicbrainzIds);
+        if ($credit === null) {
+            return null;
+        }
+
+        $names = self::names($individualArtists) ?: self::names($artists);
+        $ids = self::validIds($musicbrainzIds);
+        if (count($names) !== count($ids)) {
+            return [...$credit, 'featured' => []];
+        }
+
+        $identities = array_map(
+            static fn (string $name, MusicbrainzId $id): ArtistIdentity => new ArtistIdentity($name, [$id->toString()]),
+            $names,
+            $ids,
+        );
+
+        return ['identity' => array_shift($identities), 'creditedName' => $credit['creditedName'], 'featured' => $identities];
     }
 
     /**
@@ -431,13 +469,7 @@ final class FilesDiscoveredHandler
      */
     private function taggedCredit(array $artists, array $musicbrainzIds): ?array
     {
-        $names = [];
-        foreach ($artists as $value) {
-            $name = str_replace("\0", '', $value) |> trim(...);
-            if ($name !== '') {
-                $names[] = $name;
-            }
-        }
+        $names = self::names($artists);
         if ($names === []) {
             return null;
         }
@@ -446,6 +478,36 @@ final class FilesDiscoveredHandler
             'identity' => new ArtistIdentity($names[0], $musicbrainzIds),
             'creditedName' => implode('; ', $names),
         ];
+    }
+
+    /**
+     * The tagged names without NUL bytes or surrounding whitespace, blank ones left out.
+     *
+     * @param list<string> $values
+     *
+     * @return list<string>
+     */
+    private static function names(array $values): array
+    {
+        $names = array_map(static fn (string $value): string => str_replace("\0", '', $value) |> trim(...), $values);
+
+        return array_filter($names, static fn (string $name): bool => $name !== '') |> array_values(...);
+    }
+
+    /**
+     * The valid MusicBrainz IDs among the tagged ones, in tag order, an ID repeated in another letter
+     * case counted once, as {@see ArtistIdentity} counts them: an ID's text is its lowercase form.
+     *
+     * @param list<string> $values
+     *
+     * @return list<MusicbrainzId>
+     */
+    private static function validIds(array $values): array
+    {
+        return array_map(MusicbrainzId::tryFromString(...), $values)
+            |> array_filter(...)
+            |> array_unique(...)
+            |> array_values(...);
     }
 
     /**
@@ -667,7 +729,7 @@ final class FilesDiscoveredHandler
     /**
      * Repairs a known song from its file: moves it to the file's path when the file was renamed,
      * takes its length from the audio, fills technical fields it lacks, and credits its tagged
-     * artist when it kept its tagged credit. The song is written only when something changed.
+     * artists when it kept its tagged credit. The song is written only when something changed.
      *
      * @param PreparedSong        $song
      * @param array<string, Uuid> $artistIds the artist of each identity, by its key
@@ -702,15 +764,15 @@ final class FilesDiscoveredHandler
         if ($song['credit'] === null) {
             return $gainedLength;
         }
-        $this->creditPrimary($stored->getId(), $song['credit'], $artistIds);
+        $this->creditArtists($stored->getId(), $song['credit'], $artistIds);
 
         return true;
     }
 
     /**
      * Updates the song stored at a retagged file's path from the file. The song takes the file's hash,
-     * size and technical fields, the length of its audio and its unlocked tag fields, and the credit
-     * its tags give replaces every credit it held, hand-made ones too; tags that name no artist leave
+     * size and technical fields, the length of its audio and its unlocked tag fields, and the credits
+     * its tags give replace every credit it held, hand-made ones too; tags that name no artist leave
      * it without credits. The song keeps its ID, album, lyrics and genres.
      *
      * @param PreparedSong        $song
@@ -735,7 +797,7 @@ final class FilesDiscoveredHandler
         if ($song['credit'] === null) {
             return $gainedLength;
         }
-        $this->creditPrimary($stored->getId(), $song['credit'], $artistIds);
+        $this->creditArtists($stored->getId(), $song['credit'], $artistIds);
 
         return true;
     }
@@ -760,7 +822,7 @@ final class FilesDiscoveredHandler
         $identities = [];
         foreach ($songs as $song) {
             if ($song['credit'] !== null) {
-                $identities[] = $song['credit']['identity'];
+                array_push($identities, $song['credit']['identity'], ...$song['credit']['featured']);
             }
         }
 
@@ -786,7 +848,7 @@ final class FilesDiscoveredHandler
     }
 
     /**
-     * @param TaggedCredit|null   $credit
+     * @param SongCredit|null     $credit
      * @param array<string, Uuid> $artistIds the artist of each identity, by its key
      * @param list<Uuid>          $genreIds
      */
@@ -795,7 +857,7 @@ final class FilesDiscoveredHandler
         $this->songService->persist($song);
 
         if ($credit !== null) {
-            $this->creditPrimary($song->getId(), $credit, $artistIds);
+            $this->creditArtists($song->getId(), $credit, $artistIds);
         }
 
         foreach ($genreIds as $genreId) {
@@ -804,14 +866,18 @@ final class FilesDiscoveredHandler
     }
 
     /**
-     * Credits the song to its tagged artist as primary artist, under the name its tags give.
+     * Credits the song to its tagged artist as primary artist, under the name its tags give, and to
+     * each featured artist under that artist's tagged name.
      *
-     * @param TaggedCredit        $credit
+     * @param SongCredit          $credit
      * @param array<string, Uuid> $artistIds the artist of each identity, by its key
      */
-    private function creditPrimary(Uuid $songId, array $credit, array $artistIds): void
+    private function creditArtists(Uuid $songId, array $credit, array $artistIds): void
     {
         $this->songService->addArtistCredit($songId, $artistIds[$credit['identity']->key()], ArtistRole::Primary->value, $credit['creditedName']);
+        foreach ($credit['featured'] as $featured) {
+            $this->songService->addArtistCredit($songId, $artistIds[$featured->key()], ArtistRole::Featured->value, $featured->name);
+        }
     }
 
     /** @return array{path: string, error: string} */
