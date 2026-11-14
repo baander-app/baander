@@ -17,8 +17,11 @@ export interface BrowserItem {
   blurhash?: string
 }
 
+// Fills the pane the column browser sizes, so the list scrolls inside it instead of
+// growing past the pane and being clipped.
 const ColumnContainer = styled.div<{ $className?: string }>`
   display: flex;
+  height: 100%;
   flex-direction: column;
   border-right: 1px solid var(--color-border);
   ${({ $className }) => $className}
