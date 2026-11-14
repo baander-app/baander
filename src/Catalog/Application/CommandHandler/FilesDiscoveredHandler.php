@@ -94,7 +94,9 @@ final class FilesDiscoveredHandler
      * Reads the metadata of each batch of files first, then writes the batch's songs, artist
      * credits and genres in one transaction during which no delete with files can claim the
      * library. When a delete claimed it before that transaction, the import stops and the files
-     * whose songs no transaction committed go back to the queue, as a held import does.
+     * whose songs no transaction committed go back to the queue, as a held import does. After the
+     * last batch, and before the import requeues or reports a failed file, an album without an
+     * artist credit is given one.
      *
      * @param list<DiscoveredFile> $files the message's files that still exist
      */
@@ -124,6 +126,9 @@ final class FilesDiscoveredHandler
             $this->requestAlbumSync($album);
         }
 
+        // The album-artist credit of each file whose tags were read, by path.
+        $albumArtists = [];
+        $heldRemainder = null;
         $audioFiles = array_values(array_filter($files, static fn (DiscoveredFile $file): bool => $file->isAudio()));
         foreach (array_chunk($audioFiles, self::BATCH_SIZE) as $batch) {
             $songs = [];
@@ -132,6 +137,9 @@ final class FilesDiscoveredHandler
                     $song = $this->readSong($album, $file);
                     if ($song !== null) {
                         $songs[] = $song;
+                        if (array_key_exists('albumArtist', $song)) {
+                            $albumArtists[$file->absolutePath] = $song['albumArtist'];
+                        }
                     }
                 } catch (\Throwable $e) {
                     $failures[] = $this->fileFailed($file, $e);
@@ -145,14 +153,13 @@ final class FilesDiscoveredHandler
             if ($written === null) {
                 // A delete with files claimed the library since the import began. The songs
                 // committed so far stay; the requeued import skips them by hash.
-                $this->requeueWhileHeld(new FilesDiscovered(
+                $heldRemainder = new FilesDiscovered(
                     $libraryId,
                     $message->libraryType,
                     $message->directory,
                     array_values(array_filter($files, static fn (DiscoveredFile $file): bool => !isset($committedPaths[$file->absolutePath]))),
-                ));
-
-                return;
+                );
+                break;
             }
 
             foreach ($written as $song) {
@@ -164,6 +171,16 @@ final class FilesDiscoveredHandler
             // A retry skips the committed songs as duplicates, so request their lyrics now,
             // before any failed file is reported.
             $this->requestLyricsFetch($songsAwaitingLyrics);
+        }
+
+        // A message may carry only part of the album, such as one disc, so the credit is decided
+        // from the songs committed so far.
+        $this->creditAlbum($album->getId(), $albumArtists);
+
+        if ($heldRemainder !== null) {
+            $this->requeueWhileHeld($heldRemainder);
+
+            return;
         }
 
         if ($failures !== []) {
@@ -178,7 +195,8 @@ final class FilesDiscoveredHandler
     }
 
     /**
-     * @return array{file: DiscoveredFile, song: Song, credit: TaggedCredit|null, genres: list<string>, previousPath?: string, expectedAlbum?: Uuid, probe?: AudioProbeResult, technicalOnly?: bool}|null
+     * @return array{file: DiscoveredFile, song: Song, credit: TaggedCredit|null, albumArtist?: TaggedCredit|null, genres: list<string>, previousPath?: string, expectedAlbum?: Uuid, probe?: AudioProbeResult, technicalOnly?: bool}|null
+     *         a new song carries the album-artist credit its tags give
      */
     private function readSong(Album $album, DiscoveredFile $file): ?array
     {
@@ -251,16 +269,22 @@ final class FilesDiscoveredHandler
             static fn (string $genre): bool => $genre !== '',
         ));
 
-        return ['file' => $file, 'song' => $song, 'credit' => $this->taggedCredit($metadata->getArtists(), $metadata->getMbArtistIds()), 'genres' => $genres];
+        return [
+            'file' => $file,
+            'song' => $song,
+            'credit' => $this->taggedCredit($metadata->getArtists(), $metadata->getMbArtistIds()),
+            'albumArtist' => $this->taggedCredit($metadata->getAlbumArtists(), $metadata->getMbAlbumArtistIds()),
+            'genres' => $genres,
+        ];
     }
 
     /**
-     * The credit a file's artist values give its song: the first value names the artist, and the
-     * credited name joins every value with "; ". A single value such as "Artist A, Artist B" stays
-     * whole. Null when the file names no artist.
+     * The credit a file's artist values give its song, or its album-artist values give its album:
+     * the first value names the artist, and the credited name joins every value with "; ". A single
+     * value such as "Artist A, Artist B" stays whole. Null when the file names no artist.
      *
      * @param list<string> $artists        every artist value, in tag order
-     * @param list<string> $musicbrainzIds every MusicBrainz artist ID the file gives
+     * @param list<string> $musicbrainzIds every MusicBrainz ID the file gives for those artists
      *
      * @return TaggedCredit|null
      */
@@ -284,14 +308,60 @@ final class FilesDiscoveredHandler
     }
 
     /**
+     * Gives the album an artist credit when it has none: from the first album-artist tag among the
+     * message's files in path order, else among the files of the album's stored songs, else to the
+     * artist every song of the album is credited to. The album service decides under a lock on the
+     * album, so the tags are read before it is called.
+     *
+     * @param array<string, TaggedCredit|null> $albumArtists the album-artist credit of each message file whose tags were read, by path
+     */
+    private function creditAlbum(Uuid $albumId, array $albumArtists): void
+    {
+        if ($this->albumService->getArtistNamesForAlbum($albumId) !== []) {
+            return;
+        }
+
+        ksort($albumArtists, SORT_STRING);
+        $albumArtist = array_find($albumArtists, static fn (?array $credit): bool => $credit !== null)
+            ?? $this->storedAlbumArtist($albumId, $albumArtists);
+        $this->albumService->creditArtistIfUncredited($albumId, $albumArtist['identity'] ?? null, $albumArtist['creditedName'] ?? null);
+    }
+
+    /**
+     * The album-artist credit of the first file, in path order, among the album's stored songs that
+     * carries one. Files whose tags the message has read already are skipped.
+     *
+     * @param array<string, mixed> $read the paths whose tags were read already, as keys
+     *
+     * @return TaggedCredit|null
+     */
+    private function storedAlbumArtist(Uuid $albumId, array $read): ?array
+    {
+        $paths = array_map(static fn (Song $song): string => $song->getPath(), $this->songService->findByAlbumSortedByTrack($albumId));
+        sort($paths, SORT_STRING);
+        foreach ($paths as $path) {
+            if (array_key_exists($path, $read)) {
+                continue;
+            }
+            $metadata = $this->metadataReader->readMetadata($path);
+            $credit = $metadata === null ? null : $this->taggedCredit($metadata->getAlbumArtists(), $metadata->getMbAlbumArtistIds());
+            if ($credit !== null) {
+                return $credit;
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Writes the songs and their links in one transaction, unless a delete with files holds the
      * library. A song that fails is added to $failures and the others are written; a failed
      * statement fails the transaction and with it the message.
      *
-     * @param list<array{file: DiscoveredFile, song: Song, credit: TaggedCredit|null, genres: list<string>, previousPath?: string, expectedAlbum?: Uuid, probe?: AudioProbeResult, technicalOnly?: bool}> $songs
+     * @param list<array{file: DiscoveredFile, song: Song, credit: TaggedCredit|null, albumArtist?: TaggedCredit|null, genres: list<string>, previousPath?: string, expectedAlbum?: Uuid, probe?: AudioProbeResult, technicalOnly?: bool}> $songs
      * @param list<array{path: string, error: string}>                                            $failures
      *
-     * @return list<array{file: DiscoveredFile, song: Song, credit: TaggedCredit|null, genres: list<string>, previousPath?: string, expectedAlbum?: Uuid, probe?: AudioProbeResult, technicalOnly?: bool}>|null
+     * @return list<array{file: DiscoveredFile, song: Song, credit: TaggedCredit|null, albumArtist?: TaggedCredit|null, genres: list<string>, previousPath?: string, expectedAlbum?: Uuid, probe?: AudioProbeResult, technicalOnly?: bool}>|null
      *         the songs the transaction committed; null when a delete holds the library and nothing was written
      */
     private function writeSongs(Uuid $libraryId, array $songs, array &$failures): ?array
@@ -615,11 +685,6 @@ final class FilesDiscoveredHandler
                 $album = Album::create($libraryId, $title, AlbumType::Studio->value, year: $metadata?->getYear());
                 $this->albumService->persist($album);
                 $this->albumService->flush();
-                $artist = $metadata?->getAlbumArtist();
-                if ($artist !== null && trim($artist) !== '') {
-                    $this->albumService->linkArtistToAlbum($album->getId(), trim($artist), ArtistRole::Primary->value);
-                    $this->albumService->flush();
-                }
 
                 return [$album, true];
             });

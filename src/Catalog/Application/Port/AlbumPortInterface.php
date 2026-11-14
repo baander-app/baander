@@ -77,7 +77,20 @@ interface AlbumPortInterface
      */
     public function delete(Album $album, bool $deleteCover = true): void;
 
-    public function linkArtistToAlbum(Uuid $albumId, string $artistName, string $role): void;
+    /**
+     * Gives the album one primary artist credit when it has songs and no artist credit of any
+     * role, in a transaction of its own that locks the album's row, so imports deciding the same
+     * album at once leave one credit. An existing credit is never replaced or removed.
+     *
+     * The tagged album artist, when given, resolves to an artist as a song's tagged artist does and
+     * is credited under $creditedName, or under its tagged name when that is null. Without one, the
+     * album takes the artist every one of its songs has a primary credit for, under the credited
+     * name all those credits share, else under the artist's own name. An album with a song that has
+     * no primary credit, or whose songs credit more than one artist, gets no credit.
+     *
+     * Read the tags before calling it: the album's row stays locked until the credit is written.
+     */
+    public function creditArtistIfUncredited(Uuid $albumId, ?ArtistIdentity $albumArtist = null, ?string $creditedName = null): void;
 
     /**
      * @return array<int, array{name: string, role: string|null}>

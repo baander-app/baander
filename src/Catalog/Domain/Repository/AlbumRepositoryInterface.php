@@ -88,7 +88,20 @@ interface AlbumRepositoryInterface extends Searchable
 
     public function delete(Album $album): void;
 
-    public function linkArtistToAlbum(Uuid $albumId, string $artistName, string $role): void;
+    /**
+     * Locks the album's row until the transaction ends, so the writers deciding its artist credit
+     * take turns, then reads what the decision needs as committed when the lock was granted. Songs
+     * and credits added to the album meanwhile do not wait for the lock. Call it inside a
+     * transaction.
+     *
+     * @return array<string, list<array{artistId: Uuid, artistName: string, creditedName: string}>>|null
+     *         every song of the album, by song ID, with its primary credits, an empty list for a song
+     *         without one; null when the album no longer exists or has an artist credit of any role
+     */
+    public function lockForArtistCredit(Uuid $albumId): ?array;
+
+    /** Adds a credit of the album to the artist; the next flush writes it. */
+    public function addArtistCredit(Uuid $albumId, Uuid $artistId, string $role, string $creditedName): void;
 
     /**
      * @return array<int, array{name: string, role: string|null}>

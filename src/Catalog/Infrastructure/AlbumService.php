@@ -6,9 +6,13 @@ namespace App\Catalog\Infrastructure;
 
 use App\Catalog\Application\Service\CoverImageDiscarder;
 use App\Catalog\Application\Port\AlbumPortInterface;
+use App\Catalog\Application\Port\ArtistIdentity;
+use App\Catalog\Application\Port\ArtistIdentityResolverInterface;
 use App\Catalog\Domain\Model\Album;
 use App\Catalog\Domain\Repository\AlbumRepositoryInterface;
+use App\Catalog\Domain\ValueObject\ArtistRole;
 use App\Catalog\Domain\ValueObject\MusicbrainzId;
+use App\Shared\Application\Port\TransactionPortInterface;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\SearchOptions;
 use App\Shared\Domain\Model\SearchResult;
@@ -20,6 +24,8 @@ final class AlbumService implements AlbumPortInterface
     public function __construct(
         private readonly AlbumRepositoryInterface $albumRepository,
         private readonly CoverImageDiscarder $covers,
+        private readonly TransactionPortInterface $transaction,
+        private readonly ArtistIdentityResolverInterface $artistIdentities,
     ) {
     }
 
@@ -150,9 +156,28 @@ final class AlbumService implements AlbumPortInterface
         }
     }
 
-    public function linkArtistToAlbum(Uuid $albumId, string $artistName, string $role): void
+    public function creditArtistIfUncredited(Uuid $albumId, ?ArtistIdentity $albumArtist = null, ?string $creditedName = null): void
     {
-        $this->albumRepository->linkArtistToAlbum($albumId, $artistName, $role);
+        $this->transaction->run(function () use ($albumId, $albumArtist, $creditedName): void {
+            $songCredits = $this->albumRepository->lockForArtistCredit($albumId);
+            if ($songCredits === null || $songCredits === []) {
+                return;
+            }
+
+            // Resolved only once the album is known to need a credit, so a credited album creates no artist.
+            $credit = $albumArtist === null
+                ? self::sharedArtist($songCredits)
+                : [
+                    'artistId' => $this->artistIdentities->resolve([$albumArtist])[$albumArtist->key()],
+                    'creditedName' => $creditedName ?? $albumArtist->name,
+                ];
+            if ($credit === null) {
+                return;
+            }
+
+            $this->albumRepository->addArtistCredit($albumId, $credit['artistId'], ArtistRole::Primary->value, $credit['creditedName']);
+            $this->albumRepository->flush();
+        });
     }
 
     /**
@@ -171,5 +196,37 @@ final class AlbumService implements AlbumPortInterface
     public function findByUuids(array $uuids): array
     {
         return $this->albumRepository->findByUuids($uuids);
+    }
+
+    /**
+     * The artist every song is credited to, under the credited name all those credits share, else
+     * under the artist's own name. Null when a song has no primary credit or the songs credit more
+     * than one artist.
+     *
+     * @param non-empty-array<string, list<array{artistId: Uuid, artistName: string, creditedName: string}>> $songCredits each song's primary credits
+     *
+     * @return array{artistId: Uuid, creditedName: string}|null
+     */
+    private static function sharedArtist(array $songCredits): ?array
+    {
+        $artist = null;
+        $creditedNames = [];
+        foreach ($songCredits as $credits) {
+            if ($credits === []) {
+                return null;
+            }
+            foreach ($credits as $credit) {
+                if ($artist !== null && !$artist['artistId']->equals($credit['artistId'])) {
+                    return null;
+                }
+                $artist ??= $credit;
+                $creditedNames[$credit['creditedName']] = true;
+            }
+        }
+
+        return [
+            'artistId' => $artist['artistId'],
+            'creditedName' => count($creditedNames) === 1 ? (string) array_key_first($creditedNames) : $artist['artistName'],
+        ];
     }
 }

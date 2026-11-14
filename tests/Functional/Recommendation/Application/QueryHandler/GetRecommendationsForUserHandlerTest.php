@@ -72,7 +72,7 @@ final class GetRecommendationsForUserHandlerTest extends TestCase
         $coverImageId = Uuid::v7();
         $coverPublicId = new PublicId();
 
-        // Create artist first (required for linkArtistToAlbum to work)
+        // Create artist first (required for addAlbumToArtist to work)
         $artist = Artist::reconstitute(new ArtistState(
             id: $artistId,
             publicId: new PublicId(),
@@ -123,7 +123,7 @@ final class GetRecommendationsForUserHandlerTest extends TestCase
         $this->albumRepository->save($album);
 
         // Link artist to album
-        $this->albumRepository->linkArtistToAlbum($albumId, $artistName, 'main');
+        $this->artistRepository->addAlbumToArtist($artistId, $albumId, 'main');
 
         // Create recommendation
         $recommendation = Recommendation::reconstitute(
@@ -350,7 +350,7 @@ final class GetRecommendationsForUserHandlerTest extends TestCase
         $this->albumRepository->save($album);
 
         // Link artist to album
-        $this->albumRepository->linkArtistToAlbum($albumId, $artistName, 'main');
+        $this->artistRepository->addAlbumToArtist($artistId, $albumId, 'main');
 
         $recommendation = Recommendation::reconstitute(
             id: Uuid::v7(),
@@ -466,7 +466,7 @@ final class GetRecommendationsForUserHandlerTest extends TestCase
         // Create image in database first
         $this->createImageFixture($coverImageId, $coverPublicId, '/covers/cover.jpg', 'image/jpeg');
 
-        // Create artist first (required for linkArtistToAlbum)
+        // Create artist first (required for addAlbumToArtist)
         $artist = Artist::reconstitute(new ArtistState(
             id: $artistId,
             publicId: new PublicId(),
@@ -512,7 +512,7 @@ final class GetRecommendationsForUserHandlerTest extends TestCase
             mergedFrom: [],
         ));
         $this->albumRepository->save($album);
-        $this->albumRepository->linkArtistToAlbum($albumId, $artistName, 'main');
+        $this->artistRepository->addAlbumToArtist($artistId, $albumId, 'main');
 
         // Create album recommendation
         $albumRec = Recommendation::reconstitute(
@@ -660,7 +660,7 @@ final class GetRecommendationsForUserHandlerTest extends TestCase
         $this->albumRepository->save($sourceAlbum);
 
         // Link artist to source album
-        $this->albumRepository->linkArtistToAlbum($sourceAlbum->getId(), $sourceArtistName, 'main');
+        $this->artistRepository->addAlbumToArtist($sourceArtistId, $sourceAlbum->getId(), 'main');
 
         // Create target album for recommendations
         $targetAlbumId = Uuid::v7();

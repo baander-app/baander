@@ -8,6 +8,7 @@ use App\Catalog\Domain\Model\Album;
 use App\Catalog\Domain\Model\AlbumState;
 use App\Catalog\Domain\Model\Song;
 use App\Catalog\Domain\Repository\AlbumRepositoryInterface;
+use App\Catalog\Domain\ValueObject\ArtistRole;
 use App\Catalog\Domain\ValueObject\MusicbrainzId;
 use App\Catalog\Infrastructure\Doctrine\Entity\AlbumEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\ArtistAlbumEntity;
@@ -438,39 +439,41 @@ final class AlbumRepository implements AlbumRepositoryInterface
         }
     }
 
-    public function linkArtistToAlbum(Uuid $albumId, string $artistName, string $role): void
+    public function lockForArtistCredit(Uuid $albumId): ?array
     {
-        $albumEntity = $this->entityManager
-            ->getRepository(AlbumEntity::class)
-            ->find($albumId);
-
-        if ($albumEntity === null) {
-            return;
+        // SQL because DQL locks rows only FOR UPDATE or FOR SHARE. FOR UPDATE would make every
+        // song and credit insert into the album wait, since their foreign keys take FOR KEY SHARE
+        // on the album's row; FOR NO KEY UPDATE makes only the deciders of its credit take turns.
+        $locked = $this->entityManager->getConnection()->fetchOne(
+            'SELECT id FROM albums WHERE id = :id FOR NO KEY UPDATE',
+            ['id' => $albumId->toString()],
+        );
+        if ($locked === false) {
+            return null;
         }
 
-        $artistEntity = $this->entityManager
-            ->getRepository(ArtistEntity::class)
-            ->findOneBy(['name' => $artistName]);
-
-        if ($artistEntity === null) {
-            return;
+        // Statements of their own after the lock, so under READ COMMITTED they read what a decider
+        // that held the lock first committed.
+        $credits = (int) $this->entityManager->createQuery(
+            'SELECT COUNT(credit.id) FROM ' . ArtistAlbumEntity::class . ' credit WHERE credit.album = :albumId',
+        )
+            ->setParameter('albumId', $albumId)
+            ->getSingleScalarResult();
+        if ($credits > 0) {
+            return null;
         }
 
-        // Check for existing link to avoid unique constraint violation
-        $existing = $this->entityManager
-            ->getRepository(ArtistAlbumEntity::class)
-            ->findOneBy([
-                'artist' => $artistEntity->getId(),
-                'album' => $albumEntity->getId(),
-                'role' => $role,
-            ]);
+        return $this->primaryCreditsBySong($albumId);
+    }
 
-        if ($existing !== null) {
-            return;
-        }
+    public function addArtistCredit(Uuid $albumId, Uuid $artistId, string $role, string $creditedName): void
+    {
+        $albumEntity = $this->entityManager->find(AlbumEntity::class, $albumId)
+            ?? throw new \RuntimeException(sprintf('Album not found: %s', $albumId->toString()));
+        $artistEntity = $this->entityManager->find(ArtistEntity::class, $artistId)
+            ?? throw new \RuntimeException(sprintf('Artist not found: %s', $artistId->toString()));
 
-        $artistAlbum = new ArtistAlbumEntity($artistEntity, $albumEntity, $role, $artistEntity->getName());
-        $this->entityManager->persist($artistAlbum);
+        $this->entityManager->persist(new ArtistAlbumEntity($artistEntity, $albumEntity, $role, $creditedName));
     }
 
     /**
@@ -498,6 +501,38 @@ final class AlbumRepository implements AlbumRepositoryInterface
     }
 
     // --- Internal ---
+
+    /**
+     * Every song of the album with its primary credits, an empty list for a song without one.
+     *
+     * @return array<string, list<array{artistId: Uuid, artistName: string, creditedName: string}>> by song ID
+     */
+    private function primaryCreditsBySong(Uuid $albumId): array
+    {
+        $rows = $this->entityManager->createQuery(
+            <<<'DQL'
+                SELECT song.id AS songId, artist.id AS artistId, artist.name AS artistName, credit.creditedName AS creditedName
+                FROM App\Catalog\Infrastructure\Doctrine\Entity\SongEntity song
+                LEFT JOIN App\Catalog\Infrastructure\Doctrine\Entity\ArtistSongEntity credit WITH credit.song = song AND credit.role = :primary
+                LEFT JOIN credit.artist artist
+                WHERE song.album = :albumId
+                DQL,
+        )
+            ->setParameter('albumId', $albumId)
+            ->setParameter('primary', ArtistRole::Primary->value)
+            ->getResult();
+
+        $credits = [];
+        foreach ($rows as $row) {
+            $songId = $row['songId']->toString();
+            $credits[$songId] ??= [];
+            if ($row['artistId'] !== null) {
+                $credits[$songId][] = ['artistId' => $row['artistId'], 'artistName' => $row['artistName'], 'creditedName' => $row['creditedName']];
+            }
+        }
+
+        return $credits;
+    }
 
     /**
      * @param list<array{field: string, operator: string, value: mixed}> $filters

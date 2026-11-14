@@ -50,7 +50,7 @@ final class FilesDiscoveredAlbumSyncRequestTest extends TestCase
         $this->handler($state, $sync)($this->message($this->file('01 One.mp3', 'hash-one')));
 
         self::assertSame(
-            ['album persisted', 'album flushed', 'album artist linked', 'album flushed', 'album sync requested', 'song persisted', 'songs flushed'],
+            ['album persisted', 'album flushed', 'album sync requested', 'song persisted', 'songs flushed', 'album credit decided'],
             $state->events,
         );
         self::assertCount(1, $state->visibleAlbums);
@@ -119,7 +119,7 @@ final class FilesDiscoveredAlbumSyncRequestTest extends TestCase
         $this->handler($state, $sync, $logger)($this->message($this->file('01 One.mp3', 'hash-one'), $this->file('02 Two.mp3', 'hash-two')));
 
         self::assertSame(
-            ['album persisted', 'album flushed', 'album artist linked', 'album flushed', 'song persisted', 'song persisted', 'songs flushed'],
+            ['album persisted', 'album flushed', 'song persisted', 'song persisted', 'songs flushed', 'album credit decided'],
             $state->events,
         );
     }
@@ -149,8 +149,8 @@ final class FilesDiscoveredAlbumSyncRequestTest extends TestCase
             $state->pendingAlbums = [];
             $state->events[] = 'album flushed';
         });
-        $albums->method('linkArtistToAlbum')->willReturnCallback(static function () use ($state): void {
-            $state->events[] = 'album artist linked';
+        $albums->method('creditArtistIfUncredited')->willReturnCallback(static function () use ($state): void {
+            $state->events[] = 'album credit decided';
         });
 
         $songs = $this->createStub(SongPortInterface::class);
