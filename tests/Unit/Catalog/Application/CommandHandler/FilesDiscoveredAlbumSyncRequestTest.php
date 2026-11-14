@@ -114,6 +114,27 @@ final class FilesDiscoveredAlbumSyncRequestTest extends TestCase
         self::assertSame(1, array_count_values($this->events)['album match queue run']);
     }
 
+    public function testANewAlbumQueuesItsOwnRunWhileTheOnlyOtherRequestWaitsForALaterRetry(): void
+    {
+        // MusicBrainz refused a request about another album, which is tried again in six hours.
+        $this->states->has(new AlbumMatchState(Uuid::v7(), AlbumMatchStatus::Requested, AlbumMatchSource::Ingest, new DateTimeImmutable(self::NOW . ' +6 hours')));
+
+        $this->handler()($this->message($this->file('01 One.mp3', 'hash-one')));
+
+        self::assertSame(AlbumMatchStatus::Requested, $this->states->stateOf($this->albums[0]->getId())?->status);
+        self::assertEquals([[new DrainAlbumMatchesMessage(), 300_000]], $this->queueRuns());
+    }
+
+    public function testANewAlbumQueuesNoRunWhileAnotherRequestFallsDueBeforeIt(): void
+    {
+        $this->states->has(new AlbumMatchState(Uuid::v7(), AlbumMatchStatus::Requested, AlbumMatchSource::Ingest, new DateTimeImmutable(self::NOW . ' +1 minute')));
+
+        $this->handler()($this->message($this->file('01 One.mp3', 'hash-one')));
+
+        self::assertSame(AlbumMatchStatus::Requested, $this->states->stateOf($this->albums[0]->getId())?->status);
+        self::assertSame([], $this->queueRuns(), 'The run that waits for the earlier request takes this one.');
+    }
+
     public function testASecondDiscForAnAlbumLeftForReviewRequestsAMatchAgain(): void
     {
         $album = $this->storedAlbum(storedSongs: 13);
@@ -286,6 +307,12 @@ final class FilesDiscoveredAlbumSyncRequestTest extends TestCase
         $checkedAt = new DateTimeImmutable(self::NOW . ' -1 day');
 
         return new AlbumMatchState($album->getId(), AlbumMatchStatus::NeedsReview, AlbumMatchSource::Ingest, $checkedAt, AlbumMatchReviewReason::TrackCountDiffers, $checkedSongCount, $checkedAt, 95);
+    }
+
+    /** @return list<array{object, int|null}> each queued album match queue run and its delay in milliseconds */
+    private function queueRuns(): array
+    {
+        return array_filter($this->dispatched, static fn (array $sent): bool => $sent[0] instanceof DrainAlbumMatchesMessage) |> array_values(...);
     }
 
     /** @return list<Song> */

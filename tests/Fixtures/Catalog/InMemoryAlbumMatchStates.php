@@ -66,17 +66,17 @@ final class InMemoryAlbumMatchStates implements AlbumMatchStateRepositoryInterfa
             dueAt: $waiting ? min($existing->dueAt, $dueAt) : $dueAt,
         ));
 
-        return !$waiting;
+        return !$waiting || $dueAt < $existing->dueAt;
     }
 
     #[\Override]
-    public function hasRequestsOtherThan(Uuid ...$albumIds): bool
+    public function hasRequestsDueBy(DateTimeImmutable $dueAt, Uuid ...$albumIds): bool
     {
         $excluded = array_map(static fn (Uuid $id): string => $id->toString(), $albumIds);
 
         return array_any(
             $this->requests(),
-            static fn (AlbumMatchState $state): bool => !in_array($state->albumId->toString(), $excluded, true),
+            static fn (AlbumMatchState $state): bool => $state->dueAt <= $dueAt && !in_array($state->albumId->toString(), $excluded, true),
         );
     }
 

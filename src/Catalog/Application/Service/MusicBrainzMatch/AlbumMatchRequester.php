@@ -20,13 +20,15 @@ use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Stamp\DelayStamp;
 
 /**
- * Records album match requests and keeps one album match queue run in flight while requests wait.
+ * Records album match requests and makes sure an album match queue run is on its way to each.
  *
- * The queue's run queues the next run itself while any request waits, so a request queues a run
- * only when it is the first to wait: it writes its request first and then looks for others, and
- * the run removes or marks its album first and then looks for what is left. Of a request and a
- * finishing run that overlap, at least one therefore sees the other's write and the queue keeps
- * its run.
+ * While requests wait, each queue run queues the next one for when the earliest of them falls due.
+ * A request that brings an album's due time forward therefore queues a run only when no other
+ * request falls due at or before its own; a request that falls due later, such as an album to try
+ * again in hours, brings no run in time. The request writes itself first and then looks for others,
+ * and the run removes or marks its album first and then looks for what is left. Of a request and a
+ * finishing run that overlap, at least one therefore sees the other's write and the queue keeps its
+ * run.
  */
 final readonly class AlbumMatchRequester implements AlbumMatchRequestInterface
 {
@@ -65,8 +67,11 @@ final readonly class AlbumMatchRequester implements AlbumMatchRequestInterface
     private function request(AlbumMatchSource $source, int $delaySeconds, Uuid ...$albumIds): void
     {
         $dueAt = $this->clock->now()->add(new \DateInterval('PT' . $delaySeconds . 'S'));
-        $queued = array_filter($albumIds, fn (Uuid $albumId): bool => $this->states->request($albumId, $source, $dueAt));
-        if ($queued === [] || $this->states->hasRequestsOtherThan(...$queued)) {
+        $dueSooner = array_filter($albumIds, fn (Uuid $albumId): bool => $this->states->request($albumId, $source, $dueAt));
+        // A request due at or before these leads a run to them: its own run, or the chain waiting
+        // for the earliest due time. An album here that already waited for an earlier time counts
+        // too. A request due later, such as one parked for a retry, would leave these waiting.
+        if ($dueSooner === [] || $this->states->hasRequestsDueBy($dueAt, ...$dueSooner)) {
             return;
         }
 

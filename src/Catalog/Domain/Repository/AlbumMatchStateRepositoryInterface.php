@@ -41,12 +41,16 @@ interface AlbumMatchStateRepositoryInterface
      * Any other album, including one marked for review, waits for a match from $dueAt on with this
      * request's source, and the review's reason, score, song count and time are cleared.
      *
-     * @return bool true when the album was not waiting for a match before
+     * @return bool true when the request brought the album's due time forward: the album was not
+     *              waiting for a match before, or waited until later, which also ends any claim on it
      */
     public function request(Uuid $albumId, AlbumMatchSource $source, DateTimeImmutable $dueAt): bool;
 
-    /** Whether any album other than these waits for a match, due or not. */
-    public function hasRequestsOtherThan(Uuid ...$albumIds): bool;
+    /**
+     * Whether any album other than these waits for a match due at or before $dueAt. A claimed
+     * request counts from the end of its claim, which is its due time while the claim lasts.
+     */
+    public function hasRequestsDueBy(DateTimeImmutable $dueAt, Uuid ...$albumIds): bool;
 
     /** The earliest due time of the albums waiting for a match, claimed ones included; null when none waits. */
     public function nextRequestDueAt(): ?DateTimeImmutable;

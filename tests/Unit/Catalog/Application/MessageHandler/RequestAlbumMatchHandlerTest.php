@@ -64,28 +64,59 @@ final class RequestAlbumMatchHandlerTest extends TestCase
         self::assertEquals([[new DrainAlbumMatchesMessage(), 0]], $this->queued);
     }
 
-    public function testAnAlbumAnImportAlreadyRequestedBecomesAnAdminRequestDueAtOnceWithoutAnotherRun(): void
+    /**
+     * The album waits for a later time: an import's request still settling, or a request given back
+     * after MusicBrainz refused one about the album. No run comes for it before then.
+     */
+    #[TestWith(['+4 minutes'])]
+    #[TestWith(['+6 hours'])]
+    public function testAnAlbumThatWaitsForALaterTimeBecomesAnAdminRequestDueAtOnceWithItsOwnRun(string $waitingUntil): void
     {
         $album = $this->album();
-        $this->states->has(new AlbumMatchState($album->getId(), AlbumMatchStatus::Requested, AlbumMatchSource::Ingest, new DateTimeImmutable(self::NOW . ' +4 minutes')));
+        $this->states->has(new AlbumMatchState($album->getId(), AlbumMatchStatus::Requested, AlbumMatchSource::Ingest, new DateTimeImmutable(self::NOW . ' ' . $waitingUntil)));
 
         $this->handle(new SyncAlbumMessage($album->getId()));
 
         $state = $this->states->stateOf($album->getId());
         self::assertSame(AlbumMatchSource::Admin, $state?->source);
         self::assertEquals(new DateTimeImmutable(self::NOW), $state->dueAt);
-        self::assertSame([], $this->queued, 'The run that waits for the import request takes this one.');
+        self::assertEquals([[new DrainAlbumMatchesMessage(), 0]], $this->queued);
     }
 
-    public function testAnAlbumQueuedBehindOthersQueuesNoFurtherRun(): void
+    public function testAnAlbumThatAlreadyWaitsForAnEarlierTimeQueuesNoFurtherRun(): void
     {
-        $this->states->has(new AlbumMatchState(Uuid::v7(), AlbumMatchStatus::Requested, AlbumMatchSource::Admin, new DateTimeImmutable(self::NOW)));
+        $album = $this->album();
+        $this->states->has(new AlbumMatchState($album->getId(), AlbumMatchStatus::Requested, AlbumMatchSource::Admin, new DateTimeImmutable(self::NOW . ' -1 minute')));
+
+        $this->handle(new SyncAlbumMessage($album->getId()));
+
+        self::assertEquals(new DateTimeImmutable(self::NOW . ' -1 minute'), $this->states->stateOf($album->getId())?->dueAt);
+        self::assertSame([], $this->queued, 'The run that waits for the earlier request takes this one.');
+    }
+
+    #[TestWith(['-1 minute'])]
+    #[TestWith(['+0 minutes'])]
+    public function testAnAlbumQueuedBehindOthersQueuesNoFurtherRun(string $otherDue): void
+    {
+        $this->states->has(new AlbumMatchState(Uuid::v7(), AlbumMatchStatus::Requested, AlbumMatchSource::Admin, new DateTimeImmutable(self::NOW . ' ' . $otherDue)));
         $album = $this->album();
 
         $this->handle(new SyncAlbumMessage($album->getId()));
 
         self::assertSame(AlbumMatchStatus::Requested, $this->states->stateOf($album->getId())?->status);
         self::assertSame([], $this->queued);
+    }
+
+    public function testAnAlbumQueuesItsOwnRunWhileTheOnlyOtherRequestWaitsForALaterRetry(): void
+    {
+        // MusicBrainz refused a request about another album, which is tried again in six hours.
+        $this->states->has(new AlbumMatchState(Uuid::v7(), AlbumMatchStatus::Requested, AlbumMatchSource::Admin, new DateTimeImmutable(self::NOW . ' +6 hours')));
+        $album = $this->album();
+
+        $this->handle(new SyncAlbumMessage($album->getId()));
+
+        self::assertSame(AlbumMatchStatus::Requested, $this->states->stateOf($album->getId())?->status);
+        self::assertEquals([[new DrainAlbumMatchesMessage(), 0]], $this->queued);
     }
 
     public function testAMatchedAlbumWhoseSongsAMatchComparedIsNotRequested(): void

@@ -90,9 +90,10 @@ final readonly class AlbumMatchStateRepository implements AlbumMatchStateReposit
     #[\Override]
     public function request(Uuid $albumId, AlbumMatchSource $source, DateTimeImmutable $dueAt): bool
     {
-        // RETURNING old (PostgreSQL 18) names the state the album was in before this request:
-        // none for a new row, so the caller learns whether the queue gained an album.
-        $previous = $this->connection->fetchAssociative(
+        // RETURNING old (PostgreSQL 18) compares the row with what it was before this request: a new
+        // row has no old state, and an album that waited keeps the earlier due time, so its due time
+        // moved forward only when the stored one is now earlier than before.
+        return $this->connection->fetchOne(
             <<<'SQL'
                 INSERT INTO album_match_states AS existing (album_id, state, source, due_at)
                 VALUES (:albumId, :requested, :source, :dueAt)
@@ -104,7 +105,7 @@ final readonly class AlbumMatchStateRepository implements AlbumMatchStateReposit
                        checked_song_count = NULL,
                        checked_at = NULL,
                        best_score = NULL
-                RETURNING old.state AS previous_state
+                RETURNING old.state IS DISTINCT FROM :requested OR new.due_at < old.due_at AS due_sooner
                 SQL,
             [
                 'albumId' => $albumId->toString(),
@@ -114,21 +115,21 @@ final readonly class AlbumMatchStateRepository implements AlbumMatchStateReposit
                 'dueAt' => $dueAt,
             ],
             self::TYPES,
-        );
-
-        return ($previous['previous_state'] ?? null) !== AlbumMatchStatus::Requested->value;
+        ) === true;
     }
 
     #[\Override]
-    public function hasRequestsOtherThan(Uuid ...$albumIds): bool
+    public function hasRequestsDueBy(DateTimeImmutable $dueAt, Uuid ...$albumIds): bool
     {
-        return (bool) $this->connection->fetchOne(
-            'SELECT EXISTS (SELECT 1 FROM album_match_states WHERE state = :requested AND album_id <> ALL (CAST(:albumIds AS uuid[])))',
+        return $this->connection->fetchOne(
+            'SELECT EXISTS (SELECT 1 FROM album_match_states WHERE state = :requested AND due_at <= :dueAt AND album_id <> ALL (CAST(:albumIds AS uuid[])))',
             [
                 'requested' => AlbumMatchStatus::Requested->value,
+                'dueAt' => $dueAt,
                 'albumIds' => '{' . implode(',', array_map(static fn (Uuid $id): string => $id->toString(), $albumIds)) . '}',
             ],
-        );
+            self::TYPES,
+        ) === true;
     }
 
     #[\Override]

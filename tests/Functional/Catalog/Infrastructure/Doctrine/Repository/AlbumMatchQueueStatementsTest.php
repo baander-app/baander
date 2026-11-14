@@ -42,6 +42,7 @@ final class AlbumMatchQueueStatementsTest extends TestCase
 
         self::assertTrue($this->states->request($album, AlbumMatchSource::Admin, self::at('+0 minutes')), 'The album was not waiting before.');
         self::assertFalse($this->states->request($album, AlbumMatchSource::Ingest, self::at('+5 minutes')));
+        self::assertFalse($this->states->request($album, AlbumMatchSource::Admin, self::at('+0 minutes')), 'The same due time comes no sooner.');
         self::assertEquals(
             new AlbumMatchState($album, AlbumMatchStatus::Requested, AlbumMatchSource::Admin, self::at('+0 minutes')),
             $this->states->findByAlbum($album),
@@ -49,7 +50,7 @@ final class AlbumMatchQueueStatementsTest extends TestCase
 
         $imported = $this->album()->getId();
         $this->states->request($imported, AlbumMatchSource::Ingest, self::at('+5 minutes'));
-        $this->states->request($imported, AlbumMatchSource::Admin, self::at('+1 minute'));
+        self::assertTrue($this->states->request($imported, AlbumMatchSource::Admin, self::at('+1 minute')), 'The request brought the due time forward.');
         self::assertEquals(
             new AlbumMatchState($imported, AlbumMatchStatus::Requested, AlbumMatchSource::Admin, self::at('+1 minute')),
             $this->states->findByAlbum($imported),
@@ -71,7 +72,7 @@ final class AlbumMatchQueueStatementsTest extends TestCase
         );
     }
 
-    public function testTheQueueKnowsWhetherOtherAlbumsWaitAndWhenTheNextFallsDue(): void
+    public function testTheQueueKnowsWhetherOtherAlbumsFallDueByATimeAndWhenTheNextFallsDue(): void
     {
         $first = $this->album()->getId();
         $second = $this->album()->getId();
@@ -82,13 +83,16 @@ final class AlbumMatchQueueStatementsTest extends TestCase
             AlbumMatchReviewReason::LowScore, 3, self::at('-1 day'), 70,
         ));
 
+        self::assertFalse($this->states->hasRequestsDueBy(self::at('+1 day')), 'A review is no request.');
         $this->states->request($first, AlbumMatchSource::Ingest, self::at('+5 minutes'));
 
-        self::assertFalse($this->states->hasRequestsOtherThan($first), 'A review is no request.');
-        self::assertTrue($this->states->hasRequestsOtherThan($second));
-        self::assertTrue($this->states->hasRequestsOtherThan());
+        self::assertFalse($this->states->hasRequestsDueBy(self::at('+4 minutes'), $second), 'A request due later does not count.');
+        self::assertTrue($this->states->hasRequestsDueBy(self::at('+5 minutes'), $second), 'A request due at that time counts.');
+        self::assertTrue($this->states->hasRequestsDueBy(self::at('+6 minutes')), 'With no albums named, every request counts.');
+        self::assertFalse($this->states->hasRequestsDueBy(self::at('+6 minutes'), $first), 'The named albums do not count.');
         $this->states->request($second, AlbumMatchSource::Admin, self::at('+1 minute'));
-        self::assertFalse($this->states->hasRequestsOtherThan($first, $second));
+        self::assertTrue($this->states->hasRequestsDueBy(self::at('+5 minutes'), $first), 'A request due earlier counts.');
+        self::assertFalse($this->states->hasRequestsDueBy(self::at('+1 day'), $first, $second));
         self::assertEquals(self::at('+1 minute'), $this->states->nextRequestDueAt());
     }
 
@@ -106,6 +110,8 @@ final class AlbumMatchQueueStatementsTest extends TestCase
 
         self::assertEquals(new AlbumMatchState($older, AlbumMatchStatus::Requested, AlbumMatchSource::Admin, self::at('-2 minutes')), $claimed);
         self::assertEquals($claimEnd, $this->states->findByAlbum($older)?->dueAt);
+        self::assertFalse($this->states->hasRequestsDueBy(self::at('+0 minutes'), $newer), 'A claimed request falls due when its claim ends.');
+        self::assertTrue($this->states->hasRequestsDueBy($claimEnd, $newer, $later));
         self::assertSame($newer->toString(), $this->states->claimOldestDueRequest(self::at('+0 minutes'), $claimEnd)?->albumId->toString());
         self::assertNull($this->states->claimOldestDueRequest(self::at('+0 minutes'), $claimEnd), 'The claimed requests and the one not due yet are not taken.');
     }
@@ -169,7 +175,7 @@ final class AlbumMatchQueueStatementsTest extends TestCase
 
         // The albums' second discs land while MusicBrainz is asked about the first.
         foreach ([$removed, $reviewed, $postponed] as $album) {
-            self::assertFalse($this->states->request($album, AlbumMatchSource::Ingest, self::at('+5 minutes')));
+            self::assertTrue($this->states->request($album, AlbumMatchSource::Ingest, self::at('+5 minutes')), 'The request ends the claim and comes before its end.');
         }
         $this->states->removeClaimedRequest($removed, $claimEnd);
         $marked = $this->states->markClaimedForReview($reviewed, $claimEnd, AlbumMatchReviewReason::TrackCountDiffers, 96, 13, self::at('+1 minute'));
