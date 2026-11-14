@@ -1784,9 +1784,9 @@ as "Post Malone, Luke Combs" (album artist "Post Malone", no MusicBrainz IDs) ha
 14 artists of their own on the persistent instance. `POST /api/metadata/extract` and
 `/api/metadata/match` required only a signed-in user. Branch `feat/musicbrainz-matching`
 implements `docs/plans/2026-11-14-1219-feat-musicbrainz-matching-plan.md` (U1 to U14, R1
-to R30) in local commits `3c6b10f60` to `ff68e09f2` on `c8feae182`; it is not pushed.
-The plan's "Implementation Amendments" section records where the build departs from the
-plan text.
+to R30) in local commits `3c6b10f60` to `ff68e09f2` on `c8feae182`, fast-forwarded into
+the local `master`; it is not pushed. The plan's "Implementation Amendments" section
+records where the build departs from the plan text.
 
 - **U1, MusicBrainz port and shared limit:** one Metadata port searches and looks up
   releases, recordings and artists, fetches front covers, and tells "not found" from
@@ -1905,17 +1905,20 @@ Verification checkpoint, 2026-11-14:
   IDs, and the three songs given LRCLIB lyrics before the apply kept them. Before the
   adapter asked again after a 503, most searches on the preview failed: MusicBrainz
   answered the same well-spaced lookup with 503, then 200, then 200.
-- The automatic leg of AE1 was checked from the comparisons, read-only: the two Japanese
-  editions (`1be7f9af-f4bb-45fe-912c-39e46a305df2`,
-  `61ad5d47-7517-47f6-9b0a-fe691041de5a`) hold the same 27 tracks on one disc and scored
-  94, so the twin rule of `bc10bbe05`, which also required the same disc split, would
-  have left the album for review as a close runner-up. The two clean editions differ
-  from the explicit ones by at most a second per track. On 2026-11-14 the user chose to
-  count editions that split their discs differently as twins (`ff68e09f2`); with that
-  rule the five editions agree on every title, credited name and length the comparisons
-  show (they do not show artist IDs or join phrases), so the album should match on its
-  own. The preview could not replay the automatic path, because its migration state is
-  blocked (see Open).
+- The automatic leg of AE1, on the same preview after a data reset the user approved, at
+  `d3e6ee149`: the comparisons had shown that the two Japanese editions
+  (`1be7f9af-f4bb-45fe-912c-39e46a305df2`, `61ad5d47-7517-47f6-9b0a-fe691041de5a`) hold
+  the same 27 tracks on one disc and score 94, so the twin rule of `bc10bbe05`, which
+  also required the same disc split, would have left the album for review as a close
+  runner-up. On 2026-11-14 the user chose to count such editions as twins (`ff68e09f2`).
+  A fresh catalog then scanned the music library with `metadata.auto_sync` on, and the
+  queue matched "F-1 Trillion: Long Bed" on its own about five minutes later: release
+  `8e5281b4-1ffc-4c6f-a8ef-36d2459bce9e` (the earliest of the tied two-disc editions, by
+  release ID), all 27 songs credited to Post Malone as primary, 15 keeping their tagged
+  text and crediting 14 guests with MusicBrainz IDs as featured, no "Post Malone, X"
+  artist, and 22 of 27 recording IDs written; the explicit and clean editions disagree
+  on the other 5. Of the library's other four albums, three matched; "Ten Thousand Fists
+  [Reprise Records,9362-49433-2,EU]" waits for review with no candidates.
 - Learnings:
   `docs/solutions/runtime-errors/doctrine-cannot-update-a-loaded-entity-keyed-by-its-association-under-the-strict-uuid-type.md`,
   `docs/solutions/developer-experience/in-memory-transport-get-hands-out-one-message-per-call.md`,
@@ -1927,11 +1930,15 @@ Open:
 - Persistent instance, after the merge to `master`: the updater applies the three
   migrations; then, as an operator step with the user's go-ahead, match
   "F-1 Trillion: Long Bed" from the dialog or turn automatic matching on.
-- The preview applied the recovery job's seed before `83ea8153c` changed the job's ID,
-  so the preview's next refresh refuses with "An applied migration changed" until the
-  user approves reconciling its saved release or resetting its data. Once it runs again,
-  an automatic match of "F-1 Trillion: Long Bed" on a fresh catalog confirms that the
-  album matches on its own.
+- The worktree preview was reset with the user's approval after `83ea8153c` changed the
+  recovery job's ID: its 12 Docker volumes were removed and its controller state moved
+  to
+  `~/.local/state/baander/development-reset-backups/preview-fd790a887b6899cb-2026-11-14`.
+  Remove that directory once nothing in it is needed.
+- "Ten Thousand Fists [Reprise Records,9362-49433-2,EU]" finds no MusicBrainz
+  candidates, probably because its title carries the label, catalogue number and
+  country; an admin can refine the search in the dialog. Removing such text from the
+  search title is separate work.
 - From review, not fixed:
   - a request for an album while a run matches it ends the claim and can start a second
     run on the same album. The apply's row lock and recheck keep a second write out, but
