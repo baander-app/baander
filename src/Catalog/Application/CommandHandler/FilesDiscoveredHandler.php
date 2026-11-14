@@ -18,6 +18,7 @@ use App\Catalog\Domain\Model\Video;
 use App\Catalog\Domain\Repository\VideoRepositoryInterface;
 use App\Catalog\Domain\ValueObject\AlbumType;
 use App\Catalog\Domain\ValueObject\ArtistRole;
+use App\Catalog\Domain\ValueObject\MatchedSongField;
 use App\Catalog\Domain\ValueObject\MusicbrainzId;
 use App\Library\Application\Message\DiscoveredFile;
 use App\Library\Application\Message\FilesDiscovered;
@@ -41,8 +42,8 @@ use Symfony\Component\Messenger\Stamp\TransportNamesStamp;
  * @phpstan-type TaggedCredit array{identity: ArtistIdentity, creditedName: string}
  * @phpstan-type SongCredit array{identity: ArtistIdentity, creditedName: string, featured: list<ArtistIdentity>}
  * @phpstan-type TagFields array{title: string, track: int|null, disc: int|null, year: int|null, comment: string|null}
- * @phpstan-type FileTags array{fields: TagFields, credit: SongCredit|null, albumArtist: TaggedCredit|null, genres: list<string>}
- * @phpstan-type Retag array{fields: TagFields, probe: AudioProbeResult}
+ * @phpstan-type FileTags array{fields: TagFields, tagged: list<MatchedSongField>, credit: SongCredit|null, albumArtist: TaggedCredit|null, genres: list<string>}
+ * @phpstan-type Retag array{fields: TagFields, tagged: list<MatchedSongField>, probe: AudioProbeResult, keepsCredits?: bool}
  * @phpstan-type PreparedSong array{file: DiscoveredFile, song: Song, credit: SongCredit|null, albumArtist: TaggedCredit|null, genres: list<string>, known: bool, previousPath?: string, probe?: AudioProbeResult|null, retag?: Retag, repaired?: bool}
  */
 final class FilesDiscoveredHandler
@@ -341,7 +342,7 @@ final class FilesDiscoveredHandler
             'albumArtist' => $tags['albumArtist'],
             'genres' => [],
             'known' => true,
-            'retag' => ['fields' => $tags['fields'], 'probe' => $this->audioProbe->probeAudio($file->absolutePath)],
+            'retag' => ['fields' => $tags['fields'], 'tagged' => $tags['tagged'], 'probe' => $this->audioProbe->probeAudio($file->absolutePath)],
         ];
     }
 
@@ -389,7 +390,8 @@ final class FilesDiscoveredHandler
     /**
      * What a file's tags give its song, or null when the file has no readable metadata: the song
      * fields, with the title falling back to the file name and the track number to the one the file
-     * name starts with; the song's and the album's tagged credits; and the genres.
+     * name starts with; which of those fields the tags carry themselves; the song's and the album's
+     * tagged credits; and the genres.
      *
      * @return FileTags|null
      */
@@ -412,6 +414,7 @@ final class FilesDiscoveredHandler
                 'year' => $metadata->getYear(),
                 'comment' => $metadata->getComment(),
             ],
+            'tagged' => self::taggedFields($title, $metadata->getTrackNumber(), $metadata->getDiscNumber(), $metadata->getYear()),
             'credit' => $this->songCredit($metadata->getArtists(), $metadata->getIndividualArtists(), $metadata->getMbArtistIds()),
             'albumArtist' => $this->taggedCredit($metadata->getAlbumArtists(), $metadata->getMbAlbumArtistIds()),
             'genres' => array_values(array_filter(
@@ -419,6 +422,25 @@ final class FilesDiscoveredHandler
                 static fn (string $genre): bool => $genre !== '',
             )),
         ];
+    }
+
+    /**
+     * The song fields a file's tags carry themselves: a title that is not blank, a track number, a
+     * disc number and a year. A title or track number read from the file name is not among them.
+     *
+     * @return list<MatchedSongField>
+     */
+    private static function taggedFields(string $title, ?int $track, ?int $disc, ?int $year): array
+    {
+        return [
+            MatchedSongField::Title->value => trim($title) !== '',
+            MatchedSongField::Track->value => $track !== null,
+            MatchedSongField::Disc->value => $disc !== null,
+            MatchedSongField::Year->value => $year !== null,
+        ]
+            |> array_filter(...)
+            |> array_keys(...)
+            |> (static fn (array $fields): array => array_map(MatchedSongField::from(...), $fields));
     }
 
     /**
@@ -559,10 +581,12 @@ final class FilesDiscoveredHandler
     /**
      * Writes the songs and their links in one transaction, unless a delete with files holds the
      * library. The transaction first reads each known song again and keeps the tagged credit only of a
-     * song without any artist credit or with a retagged file, then resolves the artists and genres it
-     * writes, then writes. Several copies of one song's file in the batch repair that song once, from
-     * the first copy. A song that fails is added to $failures and the others are written; a failed
-     * statement fails the transaction and with it the message.
+     * song without any artist credit or with a retagged file. When the batch holds retagged songs, it
+     * then locks every artist and genre the batch may write and the rows of those songs, and reads
+     * them again. Then it resolves the artists and genres it writes, and writes. Several copies of one
+     * song's file in the batch repair that song once, from the first copy. A song that fails is added
+     * to $failures and the others are written; a failed statement fails the transaction and with it
+     * the message.
      *
      * @param list<PreparedSong>                       $songs
      * @param list<array{path: string, error: string}> $failures
@@ -588,7 +612,8 @@ final class FilesDiscoveredHandler
                 }
                 try {
                     $prepared = match (true) {
-                        isset($song['retag']) => $this->freshRetaggedSong($song),
+                        // Read again once its row is locked.
+                        isset($song['retag']) => $song,
                         $song['known'] => $this->freshKnownSong($libraryId, $song),
                         default => $song,
                     };
@@ -602,6 +627,7 @@ final class FilesDiscoveredHandler
                 }
             }
             $current = $this->withTagCreditsOfUncreditedSongsOnly(array_values($current));
+            $current = $this->withRetaggedSongsLocked($current, $songFailures);
             // Artist keys sort before genre keys, so the artists are locked first.
             $artistIds = $this->resolveArtists($current);
             // Read again under the artist locks: an import of the same file that held them first may
@@ -658,6 +684,69 @@ final class FilesDiscoveredHandler
             return null;
         }
         $song['song'] = $fresh;
+
+        return $song;
+    }
+
+    /**
+     * Locks what the batch's retags decide on, in the order every catalog writer takes its locks:
+     * first every artist and genre the batch may find or create, then the retagged songs' rows in ID
+     * order. Then reads each retagged song again as committed meanwhile and keeps the credits a match
+     * gave it where its tags allow. A song that changed since its file was read is left out, and one
+     * whose read fails is added to $failures. The batch's songs keep their order.
+     *
+     * @param list<PreparedSong>                       $songs
+     * @param list<array{path: string, error: string}> $failures
+     *
+     * @return list<PreparedSong>
+     */
+    private function withRetaggedSongsLocked(array $songs, array &$failures): array
+    {
+        $retagged = array_filter($songs, static fn (array $song): bool => isset($song['retag']));
+        if ($retagged === []) {
+            return $songs;
+        }
+
+        $this->songService->lockForRetag(
+            self::creditedIdentities($songs),
+            self::genreNames($songs),
+            array_map(static fn (array $song): Uuid => $song['song']->getId(), $retagged) |> array_values(...),
+        );
+        foreach ($retagged as $index => $song) {
+            try {
+                $fresh = $this->freshRetaggedSong($song);
+            } catch (\Throwable $e) {
+                $failures[] = $this->fileFailed($song['file'], $e);
+                $fresh = null;
+            }
+            if ($fresh === null) {
+                unset($songs[$index]);
+            } else {
+                $songs[$index] = self::withMatchedCreditsKept($fresh);
+            }
+        }
+
+        return array_values($songs);
+    }
+
+    /**
+     * Keeps the credits a match gave a retagged song, unless its tags credit their artists by
+     * MusicBrainz ID, since such tags give the credits a match would. The song's tagged credit is
+     * dropped then, so the batch neither finds nor creates the tagged artist, such as one named after
+     * the two artists the match credited.
+     *
+     * @param PreparedSong $song
+     *
+     * @return PreparedSong
+     */
+    private static function withMatchedCreditsKept(array $song): array
+    {
+        $creditedById = ($song['credit']['identity'] ?? null)?->musicbrainzId !== null;
+        if (!isset($song['retag']) || $creditedById || !$song['song']->isFieldMatched(MatchedSongField::Credits)) {
+            return $song;
+        }
+        $song['credit'] = null;
+        $song['retag']['keepsCredits'] = true;
 
         return $song;
     }
@@ -771,9 +860,11 @@ final class FilesDiscoveredHandler
 
     /**
      * Updates the song stored at a retagged file's path from the file. The song takes the file's hash,
-     * size and technical fields, the length of its audio and its unlocked tag fields, and the credits
-     * its tags give replace every credit it held, hand-made ones too; tags that name no artist leave
-     * it without credits. The song keeps its ID, album, lyrics and genres.
+     * size and technical fields, the length of its audio and its unlocked tag fields, though a field a
+     * match set changes only when the tags carry a value for it. The credits its tags give replace
+     * every credit it held, hand-made ones and a match's too; tags that name no artist leave it
+     * without credits. Credits a match gave stay instead when the batch kept them. The song keeps its
+     * ID, album, MusicBrainz ID, lyrics and genres.
      *
      * @param PreparedSong        $song
      * @param Retag               $retag
@@ -785,14 +876,21 @@ final class FilesDiscoveredHandler
     {
         $stored = $song['song'];
         $fields = $retag['fields'];
-        $stored->updateFromTags(title: $fields['title'], track: $fields['track'], disc: $fields['disc'], year: $fields['year'], comment: $fields['comment']);
+        $stored->updateFromTags(title: $fields['title'], track: $fields['track'], disc: $fields['disc'], year: $fields['year'], comment: $fields['comment'], tagged: $retag['tagged']);
         $stored->updateAudioMetadata(size: $song['file']->size, hash: $song['file']->hash);
         $this->applyAudioProbe($stored, $retag['probe']);
         $length = $retag['probe']->length();
         $gainedLength = $length !== null && $stored->getLength() !== $length;
         $stored->updateLength($length);
+        $keepsCredits = $retag['keepsCredits'] ?? false;
+        if (!$keepsCredits) {
+            $stored->forgetMatchedFields(MatchedSongField::Credits);
+        }
         $this->songService->persist($stored);
 
+        if ($keepsCredits) {
+            return $gainedLength;
+        }
         $this->songService->removeArtistCredits($stored->getId());
         if ($song['credit'] === null) {
             return $gainedLength;
@@ -819,6 +917,20 @@ final class FilesDiscoveredHandler
      */
     private function resolveArtists(array $songs): array
     {
+        $identities = self::creditedIdentities($songs);
+
+        return $identities === [] ? [] : $this->artistIdentities->resolve($identities);
+    }
+
+    /**
+     * The artist of each tagged credit of the songs, primary and featured, in song order.
+     *
+     * @param list<PreparedSong> $songs
+     *
+     * @return list<ArtistIdentity>
+     */
+    private static function creditedIdentities(array $songs): array
+    {
         $identities = [];
         foreach ($songs as $song) {
             if ($song['credit'] !== null) {
@@ -826,7 +938,7 @@ final class FilesDiscoveredHandler
             }
         }
 
-        return $identities === [] ? [] : $this->artistIdentities->resolve($identities);
+        return $identities;
     }
 
     /**
@@ -839,12 +951,24 @@ final class FilesDiscoveredHandler
      */
     private function findOrCreateGenres(array $songs): array
     {
-        $names = [];
-        foreach ($songs as $song) {
-            array_push($names, ...$song['genres']);
-        }
+        $names = self::genreNames($songs);
 
-        return $names === [] ? [] : $this->genreService->findOrCreateForImport(array_values(array_unique($names)));
+        return $names === [] ? [] : $this->genreService->findOrCreateForImport($names);
+    }
+
+    /**
+     * Every genre the songs' tags name, each name once.
+     *
+     * @param list<PreparedSong> $songs
+     *
+     * @return list<string>
+     */
+    private static function genreNames(array $songs): array
+    {
+        return array_column($songs, 'genres')
+            |> (static fn (array $genres): array => array_merge(...$genres))
+            |> array_unique(...)
+            |> array_values(...);
     }
 
     /**

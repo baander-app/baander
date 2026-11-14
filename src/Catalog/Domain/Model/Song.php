@@ -17,6 +17,9 @@ final class Song
         'title', 'track', 'disc', 'year', 'comment', 'lyrics', 'explicit',
     ];
 
+    /** The fields a retag takes from the file's tags that a match can set too; each case's value names the lockable field. */
+    private const array TAG_FIELDS = [MatchedSongField::Title, MatchedSongField::Track, MatchedSongField::Disc, MatchedSongField::Year];
+
     private function __construct(
         private SongState $state,
     ) {
@@ -145,34 +148,52 @@ final class Song
 
     /**
      * Take the tag fields of the song's file after the file was retagged. A locked field keeps its
-     * value; every other field takes the tag's value, and a field the tags no longer carry is
-     * cleared. Lyrics and the explicit flag do not come from these tags and stay as they are.
+     * value. A field a match set keeps its value unless the tags carry one; that value replaces it,
+     * and the field is no longer matched. Every other field takes the given value, so a field the
+     * tags no longer carry is cleared, or takes the title or track number the caller read from the
+     * file name instead. Lyrics and the explicit flag do not come from these tags and stay as they are.
+     *
+     * @param list<MatchedSongField> $tagged the fields the tags carry themselves, rather than the caller taking them from the file name
      *
      * @throws InvalidArgumentException when the title is empty; nothing changes then
      */
-    public function updateFromTags(string $title, ?int $track, ?int $disc, ?int $year, ?string $comment): void
+    public function updateFromTags(string $title, ?int $track, ?int $disc, ?int $year, ?string $comment, array $tagged): void
     {
         if (trim($title) === '') {
             throw new InvalidArgumentException('Song title cannot be empty.');
         }
 
-        if (!$this->isFieldLocked('title')) {
+        $taken = array_filter(self::TAG_FIELDS, fn (MatchedSongField $field): bool => $this->takesTag($field, $tagged));
+        $takes = static fn (MatchedSongField $field): bool => in_array($field, $taken, true);
+        if ($takes(MatchedSongField::Title)) {
             $this->state->title = trim($title);
         }
-        if (!$this->isFieldLocked('track')) {
+        if ($takes(MatchedSongField::Track)) {
             $this->state->track = $track;
         }
-        if (!$this->isFieldLocked('disc')) {
+        if ($takes(MatchedSongField::Disc)) {
             $this->state->disc = $disc;
         }
-        if (!$this->isFieldLocked('year')) {
+        if ($takes(MatchedSongField::Year)) {
             $this->state->year = $year;
         }
         if (!$this->isFieldLocked('comment')) {
             $this->state->comment = $comment;
         }
 
-        $this->state->updatedAt = new DateTimeImmutable();
+        $this->forgetMatchedFields(...$taken);
+    }
+
+    /**
+     * Whether a retag sets the field: it is unlocked, and either no match set it or the tags carry
+     * a value for it.
+     *
+     * @param list<MatchedSongField> $tagged
+     */
+    private function takesTag(MatchedSongField $field, array $tagged): bool
+    {
+        return !$this->isFieldLocked($field->value)
+            && (!$this->isFieldMatched($field) || in_array($field, $tagged, true));
     }
 
     public function updateSourcePath(string $path): void

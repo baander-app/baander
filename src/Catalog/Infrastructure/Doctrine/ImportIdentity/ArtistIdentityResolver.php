@@ -55,15 +55,9 @@ final readonly class ArtistIdentityResolver implements ArtistIdentityResolverInt
      */
     private static function lockKeys(array $identities): array
     {
-        $keys = [];
-        foreach ($identities as $identity) {
-            $keys[] = ImportIdentityLock::artistNameKey($identity->name);
-            if ($identity->musicbrainzId !== null) {
-                $keys[] = ImportIdentityLock::artistMusicbrainzIdKey($identity->musicbrainzId);
-            }
-        }
-
-        return $keys;
+        return array_map(ImportIdentityLock::artistKeys(...), $identities)
+            |> array_values(...)
+            |> (static fn (array $keys): array => array_merge(...$keys));
     }
 
     /**

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Catalog\Infrastructure\Doctrine\ImportIdentity;
 
+use App\Catalog\Application\Port\ArtistIdentity;
 use App\Catalog\Domain\ValueObject\MusicbrainzId;
 use Doctrine\DBAL\Connection;
 use LogicException;
@@ -28,7 +29,8 @@ final class ImportIdentityLock
      * Takes the lock of every key, waiting while another transaction holds one. Each key is taken
      * once and in byte order, so transactions that lock overlapping keys cannot deadlock. That
      * holds across calls in one transaction only when each call's keys sort after every key an
-     * earlier call took: pass all keys at once, or lock in order of key prefix.
+     * earlier call took: pass all keys at once, or lock in order of key prefix. A key the
+     * transaction holds already is granted again at once, so a later call may take any of those.
      *
      * @param list<string> $keys
      *
@@ -51,6 +53,19 @@ final class ImportIdentityLock
         }
     }
 
+    /**
+     * The keys an import takes for an artist identity: its tagged name, and its MusicBrainz ID when
+     * it has one.
+     *
+     * @return list<string>
+     */
+    public static function artistKeys(ArtistIdentity $identity): array
+    {
+        return $identity->musicbrainzId === null
+            ? [self::artistNameKey($identity->name)]
+            : [self::artistNameKey($identity->name), self::artistMusicbrainzIdKey($identity->musicbrainzId)];
+    }
+
     /** The key of the artists whose name equals the tagged name exactly. */
     public static function artistNameKey(string $name): string
     {
@@ -70,6 +85,21 @@ final class ImportIdentityLock
     public static function genreKey(string $slug): string
     {
         return 'genre:' . $slug;
+    }
+
+    /**
+     * The slug a tagged genre name is stored and locked under: its lowercase letters and digits,
+     * every other run of characters one hyphen, and "genre" when nothing is left.
+     */
+    public static function genreSlug(string $name): string
+    {
+        $slug = $name
+            |> trim(...)
+            |> strtolower(...)
+            |> (static fn (string $text): string => (string) preg_replace('/[^a-z0-9]+/', '-', $text))
+            |> (static fn (string $text): string => trim($text, '-'));
+
+        return $slug !== '' ? $slug : 'genre';
     }
 
     /**

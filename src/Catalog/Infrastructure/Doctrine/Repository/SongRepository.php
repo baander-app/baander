@@ -24,6 +24,7 @@ use App\Shared\Infrastructure\Doctrine\Repository\PgroongaSearchTrait;
 use App\Shared\Infrastructure\Doctrine\Type\InstantType;
 use App\Shared\Infrastructure\Pagination\CursorCodec;
 use App\Shared\Infrastructure\Pagination\CursorPaginator;
+use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\NoResultException;
 use Doctrine\ORM\NonUniqueResultException;
@@ -160,6 +161,23 @@ final class SongRepository implements SongRepositoryInterface
             ->findOneBy(['publicId' => $publicId]);
 
         return $entity !== null ? $this->toDomain($entity) : null;
+    }
+
+    public function lockInIdOrder(array $songIds): void
+    {
+        if ($songIds === []) {
+            return;
+        }
+
+        // SQL because DQL locks rows only FOR UPDATE or FOR SHARE. FOR UPDATE would also make the
+        // foreign keys of plays, favorites and credits wait, which lock the row FOR KEY SHARE. The
+        // rows are locked in the order the sort returns them, so writers of the same songs never
+        // wait on each other in a cycle.
+        $this->entityManager->getConnection()->executeQuery(
+            'SELECT id FROM songs WHERE id IN (:ids) ORDER BY id FOR NO KEY UPDATE',
+            ['ids' => array_map(static fn (Uuid $id): string => $id->toString(), $songIds)],
+            ['ids' => ArrayParameterType::STRING],
+        )->free();
     }
 
     public function getLibraryIdByPublicId(PublicId $publicId): ?Uuid

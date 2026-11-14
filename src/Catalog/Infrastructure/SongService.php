@@ -7,17 +7,20 @@ namespace App\Catalog\Infrastructure;
 use App\Catalog\Application\Port\SongPortInterface;
 use App\Catalog\Domain\Model\Song;
 use App\Catalog\Domain\Repository\SongRepositoryInterface;
+use App\Catalog\Infrastructure\Doctrine\ImportIdentity\ImportIdentityLock;
 use App\Shared\Domain\Model\CursorPage;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\SearchOptions;
 use App\Shared\Domain\Model\SearchResult;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Domain\ValueObject\LibraryReadScope;
+use Doctrine\DBAL\Connection;
 
 final class SongService implements SongPortInterface
 {
     public function __construct(
         private readonly SongRepositoryInterface $songRepository,
+        private readonly Connection $connection,
     ) {
     }
 
@@ -78,6 +81,17 @@ final class SongService implements SongPortInterface
     public function findFreshByUuid(Uuid $uuid): ?Song
     {
         return $this->songRepository->findFreshByUuid($uuid);
+    }
+
+    public function lockForRetag(array $artists, array $genres, array $songIds): void
+    {
+        $artistKeys = array_map(ImportIdentityLock::artistKeys(...), $artists)
+            |> (static fn (array $keys): array => array_merge(...$keys));
+        $genreKeys = array_map(static fn (string $genre): string => ImportIdentityLock::genreSlug($genre) |> ImportIdentityLock::genreKey(...), $genres);
+        // Artist keys sort before genre keys, so this pass takes them in the order the artist
+        // resolver and the genre lookup take theirs.
+        ImportIdentityLock::acquire($this->connection, [...$artistKeys, ...$genreKeys]);
+        $this->songRepository->lockInIdOrder($songIds);
     }
 
     public function findByPathsInLibrary(Uuid $libraryId, array $paths): array

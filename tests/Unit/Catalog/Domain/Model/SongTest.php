@@ -14,6 +14,8 @@ use PHPUnit\Framework\TestCase;
 
 final class SongTest extends TestCase
 {
+    private const array EVERY_TAG_FIELD = [MatchedSongField::Title, MatchedSongField::Track, MatchedSongField::Disc, MatchedSongField::Year];
+
     private Uuid $albumId;
 
     protected function setUp(): void
@@ -550,7 +552,7 @@ final class SongTest extends TestCase
     {
         $song = Song::create($this->albumId, 'Old Title', '/path.flac', 1024, 'audio/flac', track: 1, disc: 1, year: 2000, comment: 'old');
 
-        $song->updateFromTags(title: 'New Title', track: 2, disc: null, year: 2005, comment: null);
+        $song->updateFromTags(title: 'New Title', track: 2, disc: null, year: 2005, comment: null, tagged: [MatchedSongField::Title, MatchedSongField::Track, MatchedSongField::Year]);
 
         $this->assertSame('New Title', $song->getTitle());
         $this->assertSame(2, $song->getTrack());
@@ -576,7 +578,7 @@ final class SongTest extends TestCase
         $song = Song::create($this->albumId, 'Old Title', '/path.flac', 1024, 'audio/flac', track: 1, disc: 1, year: 2000, comment: 'old');
         $song->lockField($field);
 
-        $song->updateFromTags(title: 'New Title', track: 2, disc: 2, year: 2005, comment: 'new');
+        $song->updateFromTags(title: 'New Title', track: 2, disc: 2, year: 2005, comment: 'new', tagged: self::EVERY_TAG_FIELD);
 
         $this->assertSame($kept, $read($song));
         $taken = ['title' => 'New Title', 'track' => 2, 'disc' => 2, 'year' => 2005, 'comment' => 'new'];
@@ -594,7 +596,7 @@ final class SongTest extends TestCase
     {
         $song = Song::create($this->albumId, 'Old Title', '/path.flac', 1024, 'audio/flac', lyrics: "[00:01.00]Line\n", explicit: true);
 
-        $song->updateFromTags(title: 'New Title', track: null, disc: null, year: null, comment: null);
+        $song->updateFromTags(title: 'New Title', track: null, disc: null, year: null, comment: null, tagged: [MatchedSongField::Title]);
 
         $this->assertSame("[00:01.00]Line\n", $song->getLyrics());
         $this->assertTrue($song->isExplicit());
@@ -607,7 +609,40 @@ final class SongTest extends TestCase
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Song title cannot be empty.');
 
-        $song->updateFromTags(title: '  ', track: null, disc: null, year: null, comment: null);
+        $song->updateFromTags(title: '  ', track: null, disc: null, year: null, comment: null, tagged: []);
+    }
+
+    public function testUpdateFromTagsKeepsEachMatchedFieldTheTagsDoNotCarry(): void
+    {
+        $song = $this->matchedSong();
+
+        // A ReplayGain pass rewrote a file whose tags carry no title, disc or year; the title and
+        // track number given are the file name's.
+        $song->updateFromTags(title: '03 Track', track: 3, disc: null, year: null, comment: null, tagged: []);
+
+        self::assertSame(['Pour Me A Drink', 3, 1, 2024], [$song->getTitle(), $song->getTrack(), $song->getDisc(), $song->getYear()]);
+        self::assertSame(['title', 'track', 'disc', 'year', 'credits'], $song->getState()->matchedFields);
+    }
+
+    public function testATagValueReplacesAMatchedFieldAndTheFieldIsNoLongerMatched(): void
+    {
+        $song = $this->matchedSong();
+
+        $song->updateFromTags(title: 'Pour Me a Drink', track: 3, disc: null, year: 2025, comment: null, tagged: [MatchedSongField::Title, MatchedSongField::Track, MatchedSongField::Year]);
+
+        self::assertSame(['Pour Me a Drink', 3, 1, 2025], [$song->getTitle(), $song->getTrack(), $song->getDisc(), $song->getYear()]);
+        self::assertSame(['disc', 'credits'], $song->getState()->matchedFields, 'A tag value equal to the matched one replaces it all the same.');
+    }
+
+    public function testALockedMatchedFieldKeepsItsValueAndStaysMatchedWhenTheTagsCarryOne(): void
+    {
+        $song = $this->matchedSong();
+        $song->lockField('year');
+
+        $song->updateFromTags(title: 'Pour Me A Drink', track: 3, disc: 1, year: 2025, comment: null, tagged: self::EVERY_TAG_FIELD);
+
+        self::assertSame(2024, $song->getYear());
+        self::assertSame(['year', 'credits'], $song->getState()->matchedFields);
     }
 
     public function testGettersReturnExpectedTypes(): void
@@ -674,5 +709,14 @@ final class SongTest extends TestCase
 
         self::assertSame([MatchedSongField::Title, MatchedSongField::Credits], $song->getMatchedFields());
         self::assertTrue($song->isFieldMatched(MatchedSongField::Credits));
+    }
+
+    /** A song whose title, track, disc, year and credits a MusicBrainz match set. */
+    private function matchedSong(): Song
+    {
+        $song = Song::create($this->albumId, 'Pour Me A Drink', '/music/F-1 Trillion/03 Track.flac', 1024, 'audio/flac', track: 3, disc: 1, year: 2024, comment: 'old');
+        $song->recordMatchedFields(MatchedSongField::Title, MatchedSongField::Track, MatchedSongField::Disc, MatchedSongField::Year, MatchedSongField::Credits);
+
+        return $song;
     }
 }

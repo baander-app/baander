@@ -64,7 +64,9 @@ interface GenrePortInterface
      *
      * Call it once per transaction, with every genre the transaction writes, after the artist
      * identities: genre keys sort after artist keys, and a second call could take a key that sorts
-     * before one already held and deadlock with a transaction taking both in order.
+     * before one already held and deadlock with a transaction taking both in order. A key the
+     * transaction already holds, as after a retag locked the batch's keys up front, is taken again
+     * at once.
      *
      * @param list<string> $names
      *

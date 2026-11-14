@@ -383,11 +383,8 @@ final class GenreRepository implements GenreRepositoryInterface
 
     private function generateSlug(string $name): string
     {
-        $slug = strtolower(trim($name));
-        $slug = preg_replace('/[^a-z0-9]+/', '-', $slug);
-        $slug = trim($slug, '-');
-
-        return $slug !== '' ? $slug : 'genre';
+        // One rule for the stored slug and the import lock key, so they never drift apart.
+        return ImportIdentityLock::genreSlug($name);
     }
 
     // --- Internal ---

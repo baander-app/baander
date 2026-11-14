@@ -60,6 +60,24 @@ interface SongPortInterface
     public function findFreshByUuid(Uuid $uuid): ?Song;
 
     /**
+     * Locks what a retag of these songs decides on, inside the caller's transaction and in the
+     * order every catalog writer takes its locks: first the import locks of every artist identity
+     * and genre the transaction may find or create, in one sorted pass, then the rows of the songs
+     * in ID order. A play, favorite or credit recorded for one of the songs meanwhile does not wait.
+     * Read the songs again after this call to see what a writer that held a lock first committed.
+     *
+     * The artist and genre lookups that run later in the transaction then take only locks it holds
+     * already, so they never wait while it holds a song row.
+     *
+     * @param list<ArtistIdentity> $artists every artist identity the transaction may resolve
+     * @param list<string>         $genres  every tagged genre name the transaction may find or create
+     * @param list<Uuid>           $songIds
+     *
+     * @throws \LogicException outside a transaction, before taking any lock
+     */
+    public function lockForRetag(array $artists, array $genres, array $songIds): void;
+
+    /**
      * The songs of the library stored at these paths, whatever the availability of their files.
      * Where several songs share a path, the oldest is returned.
      *

@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Catalog\Infrastructure\Doctrine\ImportIdentity;
 
+use App\Catalog\Application\Port\ArtistIdentity;
 use App\Catalog\Domain\ValueObject\MusicbrainzId;
 use App\Catalog\Infrastructure\Doctrine\ImportIdentity\ImportIdentityLock;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Result;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class ImportIdentityLockTest extends TestCase
@@ -52,5 +54,33 @@ final class ImportIdentityLockTest extends TestCase
 
         self::assertSame('artist-name:Post Malone', ImportIdentityLock::artistNameKey('Post Malone'));
         self::assertSame('artist-mbid:9a709693-b4f8-4da9-8cc1-038c911a61be', ImportIdentityLock::artistMusicbrainzIdKey($id));
+    }
+
+    public function testAnIdentityIsLockedByItsNameAndByItsIdWhenItHasOne(): void
+    {
+        self::assertSame(['artist-name:Post Malone, Luke Combs'], ImportIdentityLock::artistKeys(new ArtistIdentity('Post Malone, Luke Combs')));
+        self::assertSame(
+            ['artist-name:Post Malone', 'artist-mbid:9a709693-b4f8-4da9-8cc1-038c911a61be'],
+            ImportIdentityLock::artistKeys(new ArtistIdentity('Post Malone', ['9A709693-B4F8-4DA9-8CC1-038C911A61BE'])),
+        );
+    }
+
+    /**
+     * The genre import stores and locks a tagged genre under this slug, so a transaction that locks
+     * the genres it may write ahead of that import takes the same keys.
+     */
+    #[DataProvider('genreNames')]
+    public function testAGenreNameIsLockedUnderItsSlug(string $name, string $key): void
+    {
+        self::assertSame($key, ImportIdentityLock::genreSlug($name) |> ImportIdentityLock::genreKey(...));
+    }
+
+    /** @return iterable<string, array{string, string}> */
+    public static function genreNames(): iterable
+    {
+        yield 'hyphenated' => ['Hip-Hop', 'genre:hip-hop'];
+        yield 'spaced, sharing the hyphenated slug' => ['  Hip Hop ', 'genre:hip-hop'];
+        yield 'punctuation runs' => ['R&B / Soul!', 'genre:r-b-soul'];
+        yield 'nothing left' => ['???', 'genre:genre'];
     }
 }

@@ -26,7 +26,8 @@ interface ArtistIdentityResolverInterface
      * batch's song artists and its album artist together. Its locks are taken in one sorted pass;
      * a second call could take a key that sorts before one already held and deadlock with a
      * transaction taking both in order. Other import identity keys, such as genres, sort after
-     * artist keys and may be locked after this call.
+     * artist keys and may be locked after this call. A key the transaction already holds, as after
+     * a retag locked the batch's keys up front, is taken again at once.
      *
      * @param list<ArtistIdentity> $identities
      *

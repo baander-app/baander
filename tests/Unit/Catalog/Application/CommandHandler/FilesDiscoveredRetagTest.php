@@ -15,6 +15,7 @@ use App\Catalog\Application\Port\SongPortInterface;
 use App\Catalog\Domain\Model\Album;
 use App\Catalog\Domain\Model\Song;
 use App\Catalog\Domain\Repository\VideoRepositoryInterface;
+use App\Catalog\Domain\ValueObject\MatchedSongField;
 use App\Library\Application\Message\DiscoveredFile;
 use App\Library\Application\Message\FilesDiscovered;
 use App\Library\Application\Port\LibraryMediaFilesInterface;
@@ -42,8 +43,9 @@ use Symfony\Component\Messenger\MessageBusInterface;
  * A file whose content changed at the path of a stored song was retagged: the scan updates that song
  * in place instead of creating a second one. The song keeps its ID, album and lyrics, and takes its
  * unlocked tag fields, its technical fields, its length and all its artist credits from the file.
- * The handler runs over fakes that keep albums, songs, credits, artists, file tags and probe results
- * in memory.
+ * What a MusicBrainz match set stays, unless the new tags carry a value for that field or credit their
+ * artists by MusicBrainz ID. The handler runs over fakes that keep albums, songs, credits, artists,
+ * genres, file tags and probe results in memory.
  */
 final class FilesDiscoveredRetagTest extends TestCase
 {
@@ -51,6 +53,10 @@ final class FilesDiscoveredRetagTest extends TestCase
 
     private const string DIRECTORY = '/music/Disturbed/Ten Thousand Fists';
     private const string PATH = self::DIRECTORY . '/03 Track.flac';
+    private const string POST_MALONE_ID = '5b7d9f1a-3c5e-4b7d-9f1a-3c5e7b9d1f3a';
+    private const string LUKE_COMBS_ID = '8a0c2e4f-6b8d-4f0a-a2c4-6e8a0c2e4f6b';
+    private const string RECORDING_ID = '0c9e5a4b-2d7f-4e1a-8b3c-6f5d4e3c2b1a';
+    private const string GODSMACK_ID = '6e0c5c4b-8d1a-4f2b-9c3d-7a6b5c4d3e2f';
 
     private \stdClass $state;
     private PassThroughTransaction $transaction;
@@ -71,6 +77,10 @@ final class FilesDiscoveredRetagTest extends TestCase
             'probeFailures' => [],
             'autoFetch' => false,
             'lyricsRequests' => [],
+            'genres' => [],
+            'resolvedNames' => [],
+            'locks' => [],
+            'calls' => [],
         ];
     }
 
@@ -138,6 +148,107 @@ final class FilesDiscoveredRetagTest extends TestCase
         $this->handler()($this->retaggedFile($song));
 
         self::assertSame([$song->getId()->toString() => [[$disturbed->toString(), 'primary', 'Disturbed']]], $this->state->credits);
+        self::assertSame('Stricken', $this->storedSongById($song)->getTitle());
+    }
+
+    /**
+     * A ReplayGain pass rewrites the file of a song a match credited. The tags still name both
+     * artists in one value and carry no year.
+     */
+    public function testAMatchedSongRetaggedByAReplayGainPassKeepsItsCreditsAndItsMatchedYear(): void
+    {
+        $song = $this->matchedSong();
+        $credits = $this->state->credits;
+        $this->state->tags[self::PATH] = ['title' => 'Pour Me A Drink', 'track' => 3, 'album' => 'F-1 Trillion', 'artists' => ['Post Malone, Luke Combs']];
+
+        $this->handler()($this->retaggedFile($song));
+
+        $stored = $this->storedSongById($song);
+        self::assertSame($credits, $this->state->credits, 'The primary and featured credits the match set stay.');
+        self::assertSame([2024, 'hash-retagged', self::RECORDING_ID], [$stored->getYear(), $stored->getHash(), $stored->getMbid()]);
+        self::assertSame([MatchedSongField::Year, MatchedSongField::Credits], $stored->getMatchedFields(), 'The title tag replaced the matched title.');
+    }
+
+    public function testARetagOfAMatchedSongCreatesNoArtistForTheNameItsTagsGive(): void
+    {
+        $song = $this->matchedSong();
+        $this->state->tags[self::PATH] = ['title' => 'Pour Me A Drink', 'album' => 'F-1 Trillion', 'artists' => ['Post Malone, Luke Combs']];
+
+        $this->handler()($this->retaggedFile($song));
+
+        self::assertSame([], $this->state->resolvedNames, 'The tagged artist is neither found nor created.');
+        self::assertArrayNotHasKey('Post Malone, Luke Combs', $this->state->artists);
+    }
+
+    /**
+     * Picard rewrites the file of a song a match credited, with one MusicBrainz ID per artist. Those
+     * tags give the credits a match would, so they replace the match's.
+     */
+    public function testAMatchedSongRetaggedWithMusicBrainzArtistIdsTakesTheCreditsThoseTagsGive(): void
+    {
+        $song = $this->matchedSong();
+        $this->state->tags[self::PATH] = [
+            'title' => 'Pour Me A Drink',
+            'album' => 'F-1 Trillion',
+            'artists' => ['Post Malone feat. Luke Combs'],
+            'individualArtists' => ['Post Malone', 'Luke Combs'],
+            'artistIds' => [self::POST_MALONE_ID, self::LUKE_COMBS_ID],
+        ];
+
+        $this->handler()($this->retaggedFile($song));
+
+        self::assertSame([$song->getId()->toString() => [
+            [$this->artist('Post Malone'), 'primary', 'Post Malone feat. Luke Combs'],
+            [$this->artist('Luke Combs'), 'featured', 'Luke Combs'],
+        ]], $this->state->credits);
+        self::assertSame([MatchedSongField::Year], $this->storedSongById($song)->getMatchedFields(), 'The credits are the tags\' now; the year is still the match\'s.');
+    }
+
+    public function testAMatchedSongWhoseRetagAddsAYearTakesItAndKeepsItsMatchedTitleWithoutATitleTag(): void
+    {
+        $song = $this->matchedSong();
+        $this->state->tags[self::PATH] = ['year' => 2023, 'album' => 'F-1 Trillion', 'artists' => ['Post Malone, Luke Combs']];
+
+        $this->handler()($this->retaggedFile($song));
+
+        $stored = $this->storedSongById($song);
+        self::assertSame(['Pour Me A Drink', 3, 2023], [$stored->getTitle(), $stored->getTrack(), $stored->getYear()], 'The title is the match\'s, not the file name.');
+        self::assertSame([MatchedSongField::Title, MatchedSongField::Credits], $stored->getMatchedFields());
+    }
+
+    public function testAnUnmatchedSongRetaggedWithoutTitleOrYearTagsTakesTheFileNameAndLosesItsYear(): void
+    {
+        $song = $this->storedSong($this->storedAlbum('Ten Thousand Fists'), title: 'Stricken', year: 2005);
+        $this->state->tags[self::PATH] = ['album' => 'Ten Thousand Fists', 'artists' => ['Disturbed']];
+
+        $this->handler()($this->retaggedFile($song));
+
+        $stored = $this->storedSongById($song);
+        self::assertSame(['03 Track', 3, null], [$stored->getTitle(), $stored->getTrack(), $stored->getYear()]);
+        self::assertSame([$song->getId()->toString() => [[$this->artist('Disturbed'), 'primary', 'Disturbed']]], $this->state->credits);
+    }
+
+    /**
+     * A batch of a retagged file and a new one locks every artist and genre the batch may write,
+     * then the retagged song's row, before it reads that song again and resolves any artist.
+     */
+    public function testARetagLocksTheBatchsArtistsAndGenresAndThenItsSongBeforeReadingItAgain(): void
+    {
+        $song = $this->storedAlbum('Ten Thousand Fists') |> $this->storedSong(...);
+        $newPath = self::DIRECTORY . '/04 Guarded.flac';
+        $this->state->tags[self::PATH] = ['title' => 'Stricken', 'album' => 'Ten Thousand Fists', 'artists' => ['Disturbed']];
+        $this->state->tags[$newPath] = ['title' => 'Guarded', 'album' => 'Ten Thousand Fists', 'artists' => ['Godsmack'], 'artistIds' => [self::GODSMACK_ID], 'genres' => ['Metal']];
+
+        $this->handler()(new FilesDiscovered($this->libraryId, 'music', self::DIRECTORY, [
+            $this->observedFile(new DiscoveredFile(self::PATH, ltrim(self::PATH, '/'), 'flac', 1_000_500, 1_700_000_000, 'hash-retagged')),
+            $this->observedFile(new DiscoveredFile($newPath, ltrim($newPath, '/'), 'flac', 900_000, 1_700_000_000, 'hash-new')),
+        ]));
+
+        self::assertSame(
+            [['artists' => ['Disturbed', 'Godsmack #' . self::GODSMACK_ID], 'genres' => ['Metal'], 'songs' => [$song->getId()->toString()]]],
+            $this->state->locks,
+        );
+        self::assertSame(['lock', 'read ' . $song->getId()->toString(), 'resolve', 'genres'], $this->state->calls);
         self::assertSame('Stricken', $this->storedSongById($song)->getTitle());
     }
 
@@ -214,6 +325,7 @@ final class FilesDiscoveredRetagTest extends TestCase
         });
         $songs->method('findFreshByUuid')->willReturnCallback(static function (Uuid $id) use ($state, $transaction): ?Song {
             self::assertTrue($transaction->active, 'A stored song is read again inside the transaction that updates it.');
+            $state->calls[] = 'read ' . $id->toString();
             $song = $state->songs[$id->toString()] ?? null;
 
             return $song === null ? null : Song::reconstitute(clone $song->getState());
@@ -224,6 +336,15 @@ final class FilesDiscoveredRetagTest extends TestCase
         )));
         $songs->method('persist')->willReturnCallback(static function (Song $song) use ($state): void {
             $state->songs[$song->getId()->toString()] = Song::reconstitute(clone $song->getState());
+        });
+        $songs->method('lockForRetag')->willReturnCallback(static function (array $artists, array $genres, array $songIds) use ($state, $transaction): void {
+            self::assertTrue($transaction->active, 'The locks are taken inside the transaction that updates the songs.');
+            $state->calls[] = 'lock';
+            $state->locks[] = [
+                'artists' => array_map(static fn (ArtistIdentity $identity): string => $identity->name . ($identity->musicbrainzId === null ? '' : ' #' . $identity->musicbrainzId->toString()), $artists),
+                'genres' => $genres,
+                'songs' => array_map(static fn (Uuid $id): string => $id->toString(), $songIds),
+            ];
         });
         $songs->method('findCreditedSongIds')->willReturnCallback(static fn (array $songIds): array => array_values(array_filter(
             array_map(static fn (Uuid $id): string => $id->toString(), $songIds),
@@ -244,9 +365,11 @@ final class FilesDiscoveredRetagTest extends TestCase
 
         $resolver = $this->createStub(ArtistIdentityResolverInterface::class);
         $resolver->method('resolve')->willReturnCallback(static function (array $identities) use ($state): array {
+            $state->calls[] = 'resolve';
             $resolved = [];
             foreach ($identities as $identity) {
                 \assert($identity instanceof ArtistIdentity);
+                $state->resolvedNames[] = $identity->name;
                 $resolved[$identity->key()] = $state->artists[$identity->name] ??= Uuid::v7();
             }
 
@@ -259,11 +382,14 @@ final class FilesDiscoveredRetagTest extends TestCase
             $tags = $state->tags[$path] ?? [];
 
             return (new ExtractedMetadata())
-                ->setTitle($tags['title'] ?? pathinfo($path, PATHINFO_FILENAME))
+                ->setTitle($tags['title'] ?? null)
                 ->setTrackNumber($tags['track'] ?? null)
                 ->setYear($tags['year'] ?? null)
                 ->setAlbum($tags['album'] ?? null)
-                ->setArtists($tags['artists'] ?? []);
+                ->setArtists($tags['artists'] ?? [])
+                ->setIndividualArtists($tags['individualArtists'] ?? [])
+                ->setMbArtistIds($tags['artistIds'] ?? [])
+                ->setGenre($tags['genres'] ?? []);
         });
 
         $probe = $this->createStub(AudioProbePortInterface::class);
@@ -290,9 +416,20 @@ final class FilesDiscoveredRetagTest extends TestCase
         $bus = $this->createStub(MessageBusInterface::class);
         $bus->method('dispatch')->willReturnCallback(static fn (object $message): Envelope => new Envelope($message));
 
+        $genres = $this->createStub(GenrePortInterface::class);
+        $genres->method('findOrCreateForImport')->willReturnCallback(static function (array $names) use ($state): array {
+            $state->calls[] = 'genres';
+            $found = [];
+            foreach ($names as $name) {
+                $found[$name] = $state->genres[$name] ??= Uuid::v7();
+            }
+
+            return $found;
+        });
+
         return new FilesDiscoveredHandler(
             $albums,
-            $this->createStub(GenrePortInterface::class),
+            $genres,
             $songs,
             $this->createStub(MoviePortInterface::class),
             $this->createStub(VideoRepositoryInterface::class),
@@ -321,9 +458,10 @@ final class FilesDiscoveredRetagTest extends TestCase
     /**
      * A song an earlier scan stored from the file at the test path, before the file was retagged.
      *
-     * @param list<string> $lockedFields
+     * @param list<string>           $lockedFields
+     * @param list<MatchedSongField> $matchedFields the fields a MusicBrainz match set
      */
-    private function storedSong(Album $album, string $title = '03 Track', ?string $lyrics = null, array $lockedFields = []): Song
+    private function storedSong(Album $album, string $title = '03 Track', ?string $lyrics = null, array $lockedFields = [], ?int $year = null, array $matchedFields = [], ?string $mbid = null): Song
     {
         $song = Song::create(
             album: $album->getId(),
@@ -334,6 +472,7 @@ final class FilesDiscoveredRetagTest extends TestCase
             length: 213.4,
             lyrics: $lyrics,
             track: 3,
+            year: $year,
             hash: 'hash-before-retag',
             bitrate: 320000,
             sampleRate: 44100,
@@ -345,7 +484,32 @@ final class FilesDiscoveredRetagTest extends TestCase
         foreach ($lockedFields as $field) {
             $song->lockField($field);
         }
+        $song->recordMatchedFields(...$matchedFields);
+        $song->updateExternalIds(mbid: $mbid);
         $this->state->songs[$song->getId()->toString()] = Song::reconstitute(clone $song->getState());
+
+        return $song;
+    }
+
+    /**
+     * A song of "F-1 Trillion" whose title, year and credits a MusicBrainz match set: Post Malone as
+     * primary artist under the song's artist text, and Luke Combs as featured artist.
+     */
+    private function matchedSong(): Song
+    {
+        $song = $this->storedSong(
+            $this->storedAlbum('F-1 Trillion'),
+            title: 'Pour Me A Drink',
+            year: 2024,
+            matchedFields: [MatchedSongField::Title, MatchedSongField::Year, MatchedSongField::Credits],
+            mbid: self::RECORDING_ID,
+        );
+        $postMalone = $this->state->artists['Post Malone'] = Uuid::v7();
+        $lukeCombs = $this->state->artists['Luke Combs'] = Uuid::v7();
+        $this->state->credits[$song->getId()->toString()] = [
+            [$postMalone->toString(), 'primary', 'Post Malone, Luke Combs'],
+            [$lukeCombs->toString(), 'featured', 'Luke Combs'],
+        ];
 
         return $song;
     }

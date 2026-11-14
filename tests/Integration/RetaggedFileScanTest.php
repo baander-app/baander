@@ -21,6 +21,7 @@ use App\Transcode\Application\DTO\AudioProbeResult;
 use App\Transcode\Application\Port\AudioProbePortInterface;
 use App\Transcode\Application\Port\VideoProbePortInterface;
 use Doctrine\DBAL\Connection;
+use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 use Symfony\Component\Console\Command\Command;
@@ -32,12 +33,17 @@ use Symfony\Component\Messenger\Transport\InMemory\InMemoryTransport;
 /**
  * Scans a tagged FLAC file through the console, retags the file on disk and scans again, all against
  * PostgreSQL. The changed file updates the song stored at its path: the song keeps its ID and so its
- * play history, takes the new tags, and the new tag's credit replaces every credit it held.
+ * play history, takes the new tags, and the new tag's credit replaces every credit it held. What a
+ * MusicBrainz match set stays, unless the new tags carry a value for the field or credit their
+ * artists by MusicBrainz ID.
  */
 final class RetaggedFileScanTest extends KernelTestCase
 {
     private const string ALBUM = 'Ten Thousand Fists';
     private const string FILE = '03 Track.flac';
+    private const string POST_MALONE_ID = '5b7d9f1a-3c5e-4b7d-9f1a-3c5e7b9d1f3a';
+    private const string LUKE_COMBS_ID = '8a0c2e4f-6b8d-4f0a-a2c4-6e8a0c2e4f6b';
+    private const string RECORDING_ID = '0c9e5a4b-2d7f-4e1a-8b3c-6f5d4e3c2b1a';
 
     private string $libraryDirectory;
     private string $path;
@@ -129,6 +135,68 @@ final class RetaggedFileScanTest extends KernelTestCase
         self::assertSame($file['hash'], $this->connection()->fetchOne('SELECT hash FROM songs WHERE id = ?', [$songId]));
     }
 
+    /**
+     * A ReplayGain pass rewrites the file of a song a match credited to Post Malone and Luke Combs.
+     * Its artist tag still names both in one value, and it carries no year.
+     */
+    public function testAMatchedSongKeepsItsCreditsAndItsMatchedYearThroughAReplayGainPass(): void
+    {
+        $library = $this->createLibrary();
+        $tags = ['TITLE' => 'Pour Me A Drink', 'ALBUM' => self::ALBUM, 'ARTIST' => 'Post Malone, Luke Combs'];
+        $this->writeFile($tags);
+        $this->scanAndIngest($library);
+        [$songId] = $this->onlySong();
+        $this->match($songId);
+
+        $this->writeFile([...$tags, 'REPLAYGAIN_TRACK_GAIN' => '-7.85 dB']);
+        $this->scanAndIngest($library);
+
+        self::assertSame([$songId], array_slice($this->onlySong(), 0, 1));
+        self::assertSame(
+            [[self::FILE, 'Luke Combs', 'featured', 'Luke Combs'], [self::FILE, 'Post Malone', 'primary', 'Post Malone, Luke Combs']],
+            $this->credits(),
+            'The primary and featured credits the match set stay.',
+        );
+        self::assertSame(
+            ['year' => 2024, 'mbid' => self::RECORDING_ID, 'matched_fields' => ['year', 'credits']],
+            $this->matchedSong($songId),
+        );
+        self::assertSame(0, (int) $this->connection()->fetchOne("SELECT count(*) FROM artists WHERE name = 'Post Malone, Luke Combs'"), 'The retag creates no artist for the tagged name.');
+    }
+
+    /**
+     * Picard rewrites the file of a song a match credited, naming each artist with its MusicBrainz ID.
+     * Those tags give the credits a match would, so they replace the match's.
+     */
+    public function testARetagWithAnIdPerArtistReplacesTheCreditsOfAMatchedSong(): void
+    {
+        $library = $this->createLibrary();
+        $tags = ['TITLE' => 'Pour Me A Drink', 'ALBUM' => self::ALBUM, 'ARTIST' => 'Post Malone, Luke Combs'];
+        $this->writeFile($tags);
+        $this->scanAndIngest($library);
+        [$songId] = $this->onlySong();
+        $this->match($songId);
+
+        $this->writeFile([
+            ...$tags,
+            'ARTIST' => 'Post Malone feat. Luke Combs',
+            'ARTISTS' => ['Post Malone', 'Luke Combs'],
+            'MUSICBRAINZ_ARTISTID' => [self::POST_MALONE_ID, self::LUKE_COMBS_ID],
+        ]);
+        $this->scanAndIngest($library);
+
+        self::assertSame(
+            [[self::FILE, 'Luke Combs', 'featured', 'Luke Combs'], [self::FILE, 'Post Malone', 'primary', 'Post Malone feat. Luke Combs']],
+            $this->credits(),
+        );
+        self::assertSame(
+            ['year' => 2024, 'mbid' => self::RECORDING_ID, 'matched_fields' => ['year']],
+            $this->matchedSong($songId),
+            'The credits are the tags\' now; the year, which the tags do not carry, is still the match\'s.',
+        );
+        self::assertSame(1, (int) $this->connection()->fetchOne("SELECT count(*) FROM artists WHERE name = 'Post Malone'"), 'The tags\' IDs name the artists the match credited.');
+    }
+
     private function createLibrary(): Library
     {
         $library = Library::create(
@@ -143,10 +211,66 @@ final class RetaggedFileScanTest extends KernelTestCase
         return $library;
     }
 
-    /** @param array<string, string> $comments */
+    /** @param array<string, string|list<string>> $comments */
     private function writeFile(array $comments): void
     {
         file_put_contents($this->path, self::taggedFlac($comments));
+    }
+
+    /**
+     * Gives the song what a MusicBrainz match would: Post Malone as primary artist under the song's
+     * artist text and Luke Combs as featured artist, both by ID, a year and a recording ID. The artist
+     * the scan created for the joined name is merged into Post Malone, as the match would merge it.
+     */
+    private function match(string $songId): void
+    {
+        $connection = $this->connection();
+        $joined = (string) $connection->fetchOne("SELECT id FROM artists WHERE name = 'Post Malone, Luke Combs'");
+        $postMalone = $this->storeArtist('Post Malone', self::POST_MALONE_ID);
+        $lukeCombs = $this->storeArtist('Luke Combs', self::LUKE_COMBS_ID);
+        $connection->executeStatement('DELETE FROM artist_song WHERE song_id = ?', [$songId]);
+        foreach ([[$postMalone, 'primary', 'Post Malone, Luke Combs'], [$lukeCombs, 'featured', 'Luke Combs']] as [$artistId, $role, $creditedName]) {
+            $connection->executeStatement(
+                'INSERT INTO artist_song (id, artist_id, song_id, role, credited_name) VALUES (?, ?, ?, ?, ?)',
+                [Uuid::v7()->toString(), $artistId, $songId, $role, $creditedName],
+            );
+        }
+        $connection->executeStatement('UPDATE artist_album SET artist_id = ? WHERE artist_id = ?', [$postMalone, $joined]);
+        $connection->executeStatement('DELETE FROM artists WHERE id = ?', [$joined]);
+        $connection->executeStatement(
+            "UPDATE songs SET year = 2024, mbid = ?, matched_fields = CAST(? AS jsonb) WHERE id = ?",
+            [self::RECORDING_ID, json_encode(['year', 'credits'], JSON_THROW_ON_ERROR), $songId],
+        );
+        // The first scan's artist, credits and song are still managed; the next scan reads them as stored.
+        static::getContainer()->get(EntityManagerInterface::class)->clear();
+        self::assertSame(
+            [[self::FILE, 'Luke Combs', 'featured', 'Luke Combs'], [self::FILE, 'Post Malone', 'primary', 'Post Malone, Luke Combs']],
+            $this->credits(),
+        );
+    }
+
+    private function storeArtist(string $name, string $musicbrainzId): string
+    {
+        $id = Uuid::v7()->toString();
+        $this->connection()->executeStatement(
+            'INSERT INTO artists (id, public_id, name, mbid, created_at, updated_at) VALUES (?, ?, ?, ?, clock_timestamp(), clock_timestamp())',
+            [$id, (new PublicId())->toString(), $name, $musicbrainzId],
+        );
+
+        return $id;
+    }
+
+    /** @return array{year: int|null, mbid: string|null, matched_fields: list<string>} what a match may have set on the song */
+    private function matchedSong(string $songId): array
+    {
+        $row = $this->connection()->fetchAssociative('SELECT year, mbid, matched_fields FROM songs WHERE id = ?', [$songId]);
+        self::assertIsArray($row);
+
+        return [
+            'year' => $row['year'] === null ? null : (int) $row['year'],
+            'mbid' => $row['mbid'] === null ? null : (string) $row['mbid'],
+            'matched_fields' => json_decode((string) $row['matched_fields'], true, flags: JSON_THROW_ON_ERROR),
+        ];
     }
 
     /**
@@ -245,17 +369,23 @@ final class RetaggedFileScanTest extends KernelTestCase
     }
 
     /**
-     * A FLAC file of a STREAMINFO block and a VORBIS_COMMENT block, enough for the tag reader.
+     * A FLAC file of a STREAMINFO block and a VORBIS_COMMENT block, enough for the tag reader. A field
+     * given a list of values is written once per value.
      *
-     * @param array<string, string> $comments
+     * @param array<string, string|list<string>> $comments
      */
     private static function taggedFlac(array $comments): string
     {
         $streamInfo = pack('nn', 4096, 4096) . "\x00\x00\x00\x00\x00\x00" . pack('NN', 0x0AC442F0, 0x0006BAA8) . str_repeat("\x00", 16);
         $vendor = 'Baander test';
-        $tags = pack('V', strlen($vendor)) . $vendor . pack('V', count($comments));
-        foreach ($comments as $key => $value) {
-            $entry = $key . '=' . $value;
+        $entries = [];
+        foreach ($comments as $key => $values) {
+            foreach ((array) $values as $value) {
+                $entries[] = $key . '=' . $value;
+            }
+        }
+        $tags = pack('V', strlen($vendor)) . $vendor . pack('V', count($entries));
+        foreach ($entries as $entry) {
             $tags .= pack('V', strlen($entry)) . $entry;
         }
         $block = static fn (int $type, string $data, bool $last): string => chr(($last ? 0x80 : 0x00) | $type) . substr(pack('N', strlen($data)), 1) . $data;

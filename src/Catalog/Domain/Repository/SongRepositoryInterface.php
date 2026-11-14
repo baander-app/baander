@@ -65,6 +65,17 @@ interface SongRepositoryInterface extends Searchable
 
     public function findByPublicId(PublicId $publicId): ?Song;
 
+    /**
+     * Locks the rows of these songs, inside the caller's transaction and in ID order, against every
+     * other writer of a song until that transaction ends. A play, favorite or credit recorded for
+     * one of the songs meanwhile does not wait. Songs that no longer exist are skipped. Read the
+     * songs after this call, in statements of their own, to see what a writer that held a lock
+     * first committed.
+     *
+     * @param list<Uuid> $songIds
+     */
+    public function lockInIdOrder(array $songIds): void;
+
     public function getLibraryIdByPublicId(PublicId $publicId): ?Uuid;
 
     /**
