@@ -158,7 +158,8 @@ final class MusicBrainzMatchMigrationTest extends TestCase
         $this->seedCatalog();
         $this->migrate();
         $combinations = [
-            ...array_map(static fn (AlbumMatchStatus $status): array => [$status->value, AlbumMatchSource::Admin->value, null], AlbumMatchStatus::cases()),
+            // A review always names its reason.
+            ...array_map(static fn (AlbumMatchStatus $status): array => [$status->value, AlbumMatchSource::Admin->value, $status === AlbumMatchStatus::NeedsReview ? AlbumMatchReviewReason::LowScore->value : null], AlbumMatchStatus::cases()),
             ...array_map(static fn (AlbumMatchSource $source): array => [AlbumMatchStatus::Requested->value, $source->value, null], AlbumMatchSource::cases()),
             ...array_map(static fn (AlbumMatchReviewReason $reason): array => [AlbumMatchStatus::NeedsReview->value, AlbumMatchSource::Ingest->value, $reason->value], AlbumMatchReviewReason::cases()),
         ];
