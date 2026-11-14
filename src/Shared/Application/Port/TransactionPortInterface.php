@@ -19,6 +19,7 @@ interface TransactionPortInterface
      *
      * @template T
      * @param callable(): T $operation
+     * @param-immediately-invoked-callable $operation
      * @return T
      *
      * @throws TransactionDeadlockException when the database ended this transaction to break a deadlock or a serialization conflict
