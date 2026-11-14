@@ -13,6 +13,7 @@ use App\Catalog\Application\CommandHandler\Artist\ChangeArtistCreditRoleHandler;
 use App\Catalog\Application\CommandHandler\Artist\RemoveArtistCreditHandler;
 use App\Catalog\Application\Port\ArtistPortInterface;
 use App\Catalog\Domain\Model\Artist;
+use App\Catalog\Domain\ValueObject\MatchedSongField;
 use App\Shared\Application\Exception\InvalidInputException;
 use App\Shared\Application\Exception\NotFoundException;
 use App\Shared\Domain\Model\PublicId;
@@ -38,6 +39,9 @@ final class ArtistCreditHandlersTest extends TestCase
     private \App\Catalog\Application\Port\AlbumPortInterface $albums;
     private string $songPublicId;
     private string $albumPublicId;
+    private \App\Catalog\Domain\Model\Song $songModel;
+    /** @var list<string> the public IDs of the songs saved */
+    private array $savedSongs = [];
 
     protected function setUp(): void
     {
@@ -50,6 +54,11 @@ final class ArtistCreditHandlersTest extends TestCase
         $this->albumPublicId = $album->getPublicId()->toString();
         $this->songs = $this->createStub(\App\Catalog\Application\Port\SongPortInterface::class);
         $this->songs->method('findByPublicId')->willReturnCallback(fn (PublicId $id) => $id->equals($song->getPublicId()) ? $song : null);
+        $this->songs->method('findByUuid')->willReturnCallback(fn (Uuid $id) => $id->equals($song->getId()) ? $song : null);
+        $this->songs->method('save')->willReturnCallback(function (\App\Catalog\Domain\Model\Song $saved): void {
+            $this->savedSongs[] = $saved->getPublicId()->toString();
+        });
+        $this->songModel = $song;
         $this->albums = $this->createStub(\App\Catalog\Application\Port\AlbumPortInterface::class);
         $this->albums->method('findByPublicId')->willReturnCallback(fn (PublicId $id) => $id->equals($album->getPublicId()) ? $album : null);
         $artists = $this->createStub(ArtistPortInterface::class);
@@ -198,6 +207,48 @@ final class ArtistCreditHandlersTest extends TestCase
         (new ChangeArtistCreditRoleHandler($this->artists, $this->songs, $this->albums))(
             new ChangeArtistCreditRoleCommand($this->publicId(), CreditTarget::Song, $this->songPublicId, $role, $current),
         );
+    }
+
+    /** @return iterable<string, array{object}> one hand-made change of each kind to the song's credits */
+    public static function songCreditChanges(): iterable
+    {
+        yield 'a new credit' => [static fn (self $test): object => new AddArtistCreditCommand($test->publicId(), CreditTarget::Song, $test->songPublicId, 'featured')];
+        yield 'a removed credit' => [static fn (self $test): object => new RemoveArtistCreditCommand($test->publicId(), CreditTarget::Song, $test->songPublicId)];
+        yield 'a changed role' => [static fn (self $test): object => new ChangeArtistCreditRoleCommand($test->publicId(), CreditTarget::Song, $test->songPublicId, 'featured')];
+    }
+
+    /** @param \Closure(self): object $command */
+    #[DataProvider('songCreditChanges')]
+    public function testAHandMadeChangeToASongsCreditsForgetsThatAMatchSetThem(\Closure $command): void
+    {
+        $this->credits['song|' . $this->song->toString()] = ['primary'];
+        $this->songModel->recordMatchedFields(MatchedSongField::Title, MatchedSongField::Credits);
+
+        $this->handle($command($this));
+
+        self::assertSame([MatchedSongField::Title], $this->songModel->getMatchedFields());
+        self::assertSame([$this->songPublicId], $this->savedSongs);
+    }
+
+    public function testCreditingASongWithACreditItHoldsKeepsTheMatchedCredits(): void
+    {
+        $this->credits['song|' . $this->song->toString()] = ['primary'];
+        $this->songModel->recordMatchedFields(MatchedSongField::Credits);
+
+        $this->handle(new AddArtistCreditCommand($this->publicId(), CreditTarget::Song, $this->songPublicId, 'primary'));
+
+        self::assertSame([MatchedSongField::Credits], $this->songModel->getMatchedFields());
+        self::assertSame([], $this->savedSongs);
+    }
+
+    public function testChangingAnAlbumsCreditsLeavesItsSongsMatchedCredits(): void
+    {
+        $this->songModel->recordMatchedFields(MatchedSongField::Credits);
+
+        $this->handle(new AddArtistCreditCommand($this->publicId(), CreditTarget::Album, $this->albumPublicId, 'primary'));
+
+        self::assertSame([MatchedSongField::Credits], $this->songModel->getMatchedFields());
+        self::assertSame([], $this->savedSongs);
     }
 
     private function handle(object $command): void

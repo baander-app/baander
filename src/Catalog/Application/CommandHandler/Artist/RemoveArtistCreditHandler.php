@@ -16,7 +16,8 @@ use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 use App\Catalog\Application\Service\ArtistCreditInput;
 
 /**
- * Removes every credit an artist has on a song or an album.
+ * Removes every credit an artist has on a song or an album. On a song this is a hand-made change to
+ * its credits, which no longer count as set by a match.
  */
 final readonly class RemoveArtistCreditHandler
 {
@@ -46,5 +47,6 @@ final readonly class RemoveArtistCreditHandler
         if (!$removed) {
             throw ArtistCreditInput::noCredit($command->artistPublicId, $command->target, $command->targetId);
         }
+        ArtistCreditInput::creditsChangedByHand($command->target, $targetId, $this->songs);
     }
 }

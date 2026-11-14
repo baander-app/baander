@@ -17,6 +17,8 @@ use App\Catalog\Application\Service\ArtistCreditInput;
 
 /**
  * Credits an artist on a song or an album. A credit the artist already has stays a single credit.
+ * A new credit on a song is a hand-made change to its credits, which no longer count as set by a
+ * match.
  */
 final readonly class AddArtistCreditHandler
 {
@@ -40,12 +42,17 @@ final readonly class AddArtistCreditHandler
         $artistId = ArtistCreditInput::artist($this->artists, $publicId)->getId();
         $targetId = ArtistCreditInput::targetId($command->target, $targetPublicId, $this->songs, $this->albums);
 
+        // Adding a credit the song holds already changes nothing a match set.
+        $held = $command->target === CreditTarget::Song && in_array($role, $this->artists->songCreditRoles($artistId, $targetId), true);
         $added = match ($command->target) {
             CreditTarget::Song => $this->artists->addSongToArtist($artistId, $targetId, $role),
             CreditTarget::Album => $this->artists->addAlbumToArtist($artistId, $targetId, $role),
         };
         if (!$added) {
             throw new NotFoundException(sprintf('%s "%s" not found.', $command->target->label(), $command->targetId));
+        }
+        if (!$held) {
+            ArtistCreditInput::creditsChangedByHand($command->target, $targetId, $this->songs);
         }
     }
 }

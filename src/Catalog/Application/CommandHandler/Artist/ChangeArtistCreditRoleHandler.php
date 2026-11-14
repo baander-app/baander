@@ -18,7 +18,8 @@ use App\Catalog\Application\Service\ArtistCreditInput;
 /**
  * Changes the role of the artist's credit on a song or an album that the current role names, or
  * of its only credit there. Changing a credit to a role the artist already holds on the target
- * leaves the credit with that role and removes the changed one.
+ * leaves the credit with that role and removes the changed one. On a song this is a hand-made change
+ * to its credits, which no longer count as set by a match.
  */
 final readonly class ChangeArtistCreditRoleHandler
 {
@@ -76,5 +77,6 @@ final readonly class ChangeArtistCreditRoleHandler
         if (!$changed) {
             throw ArtistCreditInput::noCredit($command->artistPublicId, $command->target, $command->targetId, $current);
         }
+        ArtistCreditInput::creditsChangedByHand($command->target, $targetId, $this->songs);
     }
 }

@@ -103,7 +103,9 @@ final class Song
     }
 
     /**
-     * Update song metadata fields. A null field stays as it is.
+     * Update song metadata fields. A null field stays as it is. A field a match set that this edit
+     * gives another value is no longer matched: the edit replaced the match's value, so a later
+     * retag treats the field as it treats any other.
      *
      * @throws InvalidArgumentException when a given field is locked or the title is empty; nothing changes then
      */
@@ -126,10 +128,17 @@ final class Song
             'explicit' => $explicit,
         ]);
 
+        if ($title !== null && trim($title) === '') {
+            throw new InvalidArgumentException('Song title cannot be empty.');
+        }
+        $replaced = array_filter([
+            MatchedSongField::Title->value => $title !== null && trim($title) !== $this->state->title,
+            MatchedSongField::Track->value => $track !== null && $track !== $this->state->track,
+            MatchedSongField::Disc->value => $disc !== null && $disc !== $this->state->disc,
+            MatchedSongField::Year->value => $year !== null && $year !== $this->state->year,
+        ]) |> array_keys(...) |> (static fn (array $fields): array => array_map(MatchedSongField::from(...), $fields));
+
         if ($title !== null) {
-            if (trim($title) === '') {
-                throw new InvalidArgumentException('Song title cannot be empty.');
-            }
             $this->state->title = trim($title);
         }
 
@@ -143,7 +152,24 @@ final class Song
             $this->state->explicit = $explicit;
         }
 
-        $this->state->updatedAt = new DateTimeImmutable();
+        $this->forgetMatchedFields(...$replaced);
+    }
+
+    /**
+     * Record that the song's artist credits were changed by hand. Credits a match set are no longer
+     * matched then, so a later retag replaces them with the credits its tags give, as it replaces
+     * any hand-made credits.
+     *
+     * @return bool whether the song changed: its credits were matched until now
+     */
+    public function creditsChangedByHand(): bool
+    {
+        if (!$this->isFieldMatched(MatchedSongField::Credits)) {
+            return false;
+        }
+        $this->forgetMatchedFields(MatchedSongField::Credits);
+
+        return true;
     }
 
     /**

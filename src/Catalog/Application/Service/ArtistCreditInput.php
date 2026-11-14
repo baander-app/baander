@@ -74,6 +74,18 @@ final class ArtistCreditInput
             ?? throw new NotFoundException(sprintf('Artist "%s" not found.', $publicId->toString()));
     }
 
+    /**
+     * Records on a song whose credits a hand-made change touched that its credits are no longer the
+     * ones a match set. An album keeps no such record.
+     */
+    public static function creditsChangedByHand(CreditTarget $target, Uuid $targetId, SongPortInterface $songs): void
+    {
+        $song = $target === CreditTarget::Song ? $songs->findByUuid($targetId) : null;
+        if ($song?->creditsChangedByHand() === true) {
+            $songs->save($song);
+        }
+    }
+
     public static function noCredit(string $publicId, CreditTarget $target, string $targetId, ?string $role = null): NotFoundException
     {
         return new NotFoundException($role === null

@@ -230,6 +230,30 @@ final class SongTest extends TestCase
         $this->assertSame(2024, $song->getYear());
     }
 
+    public function testAnEditThatGivesAMatchedFieldAnotherValueForgetsThatAMatchSetIt(): void
+    {
+        $song = Song::create($this->albumId, 'Pour Me A Drink', '/path.flac', 1024, 'audio/flac', track: 2, year: 2024);
+        $song->recordMatchedFields(MatchedSongField::Title, MatchedSongField::Track, MatchedSongField::Year, MatchedSongField::Credits);
+
+        $song->updateMetadata(title: ' Pour Me A Drink ', track: 2, year: 2023, comment: 'Live take');
+
+        $this->assertSame(
+            [MatchedSongField::Title, MatchedSongField::Track, MatchedSongField::Credits],
+            $song->getMatchedFields(),
+            'The year took the edit\'s value; the title and track were given the values they held.',
+        );
+    }
+
+    public function testCreditsChangedByHandAreNoLongerMatched(): void
+    {
+        $song = Song::create($this->albumId, 'Pour Me A Drink', '/path.flac', 1024, 'audio/flac');
+        $song->recordMatchedFields(MatchedSongField::Title, MatchedSongField::Credits);
+
+        $this->assertTrue($song->creditsChangedByHand());
+        $this->assertSame([MatchedSongField::Title], $song->getMatchedFields());
+        $this->assertFalse($song->creditsChangedByHand(), 'Credits that were not matched leave the song as it is.');
+    }
+
     public function testUpdateMetadataUpdatesCommentAndLyrics(): void
     {
         $song = Song::create($this->albumId, 'Title', '/path.mp3', 1024, 'audio/mpeg');
