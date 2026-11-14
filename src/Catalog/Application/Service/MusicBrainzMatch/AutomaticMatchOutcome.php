@@ -8,8 +8,8 @@ use App\Catalog\Domain\ValueObject\AlbumMatchReviewReason;
 use Symfony\Component\DependencyInjection\Attribute\Exclude;
 
 /**
- * How matching one album without an admin ended, and for an album that needs review, what the
- * matcher checked.
+ * How matching one album without an admin ended: for an album that needs review, what the matcher
+ * checked, and for an album to be matched again later, how much later.
  *
  * The album match queue acts on each kind:
  * - matched: removes the request it took, unless a request made while the album was matched ended
@@ -17,6 +17,8 @@ use Symfony\Component\DependencyInjection\Attribute\Exclude;
  * - needs review: marks the album for review with the reason, best score, checked song count and
  *   the time of the check, unless a request made while the album was matched ended the claim, in
  *   which case that request stays and the album is matched again;
+ * - retry later: gives the request back due after the outcome's delay, unless a request made while
+ *   the album was matched ended the claim, and goes on with the next album;
  * - unavailable: gives the request back with its due time and waits 5, 15 and 60 minutes, then
  *   hourly, before it matches anything again;
  * - album gone: removes the request, as for matched.
@@ -28,12 +30,14 @@ final readonly class AutomaticMatchOutcome
      * @param AlbumMatchReviewReason|null $reviewReason     why the album needs review; set exactly when it does
      * @param int<0, 100>|null            $bestScore        the best candidate's fit score; null without a candidate
      * @param int<0, max>|null            $checkedSongCount the album's song count the matcher checked the candidates against; set exactly when the album needs review
+     * @param int<1, max>|null            $retryAfterSeconds how long the album waits before it is matched again; set exactly when it is to be retried later
      */
     private function __construct(
         public AutomaticMatchOutcomeKind $kind,
         public ?AlbumMatchReviewReason $reviewReason = null,
         public ?int $bestScore = null,
         public ?int $checkedSongCount = null,
+        public ?int $retryAfterSeconds = null,
     ) {
     }
 
@@ -49,6 +53,12 @@ final readonly class AutomaticMatchOutcome
     public static function needsReview(AlbumMatchReviewReason $reason, ?int $bestScore, int $checkedSongCount): self
     {
         return new self(AutomaticMatchOutcomeKind::NeedsReview, $reason, $bestScore, $checkedSongCount);
+    }
+
+    /** @param int<1, max> $seconds how long this album waits before it is matched again */
+    public static function retryLater(int $seconds): self
+    {
+        return new self(AutomaticMatchOutcomeKind::RetryLater, retryAfterSeconds: $seconds);
     }
 
     public static function unavailable(): self

@@ -142,6 +142,9 @@ final class FilesDiscoveredAlbumSyncRequestTest extends TestCase
     {
         $album = $this->storedAlbum(storedSongs: 1);
         $album->recordReleaseMatch(MusicbrainzId::fromString(self::RELEASE_ID), new DateTimeImmutable('+1 second'));
+        foreach ($this->songsOf($album->getId()) as $song) {
+            $song->markMatchChecked(new DateTimeImmutable());
+        }
 
         $this->handler()($this->message($this->file('0 Stored.mp3', 'hash-stored-0')));
 

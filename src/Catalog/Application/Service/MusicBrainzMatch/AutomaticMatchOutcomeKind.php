@@ -17,9 +17,15 @@ enum AutomaticMatchOutcomeKind: string
     case NeedsReview = 'needs_review';
 
     /**
-     * Nothing was written and the album is to be matched again later: MusicBrainz or the Cover Art
-     * Archive gave no usable answer, refused the request or throttled it, or the apply met rows
-     * that changed while it waited for its locks, or a deadlock.
+     * Nothing was written, and this album alone is matched again after a delay: the apply met rows
+     * that changed while it waited for its locks or a deadlock, or MusicBrainz refused a request
+     * about the album. The other albums go on being matched.
+     */
+    case RetryLater = 'retry_later';
+
+    /**
+     * Nothing was written because MusicBrainz or the Cover Art Archive gave no usable answer or
+     * throttled the request, which holds for every album: matching pauses for all of them.
      */
     case Unavailable = 'unavailable';
 

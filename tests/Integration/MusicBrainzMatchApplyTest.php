@@ -7,12 +7,15 @@ namespace App\Tests\Integration;
 use App\Catalog\Application\Command\MusicBrainzMatch\ApplyMatchCommand;
 use App\Catalog\Application\Command\MusicBrainzMatch\MatchApplyResult;
 use App\Catalog\Application\CommandHandler\MusicBrainzMatch\ApplyMatchHandler;
+use App\Catalog\Application\Port\AlbumMatchRequestInterface;
 use App\Catalog\Application\Query\MusicBrainzMatch\CompareMatchQuery;
 use App\Catalog\Application\Query\MusicBrainzMatch\MatchComparison;
 use App\Catalog\Application\Query\MusicBrainzMatch\MatchField;
 use App\Catalog\Application\Query\MusicBrainzMatch\MatchItemType;
 use App\Catalog\Application\QueryHandler\MusicBrainzMatch\CompareMatchHandler;
 use App\Catalog\Application\QueryHandler\MusicBrainzMatch\MatchSnapshots;
+use App\Catalog\Application\Service\MusicBrainzMatch\AutomaticAlbumMatcherInterface;
+use App\Catalog\Application\Service\MusicBrainzMatch\AutomaticMatchOutcomeKind;
 use App\Catalog\Application\Service\MusicBrainzMatch\CandidateScorer;
 use App\Catalog\Application\Service\MusicBrainzMatch\MatchCandidate;
 use App\Media\Application\Port\StoragePortInterface;
@@ -106,9 +109,10 @@ final class MusicBrainzMatchApplyTest extends KernelTestCase
         self::assertSame([$postMalone], $this->artistsNamedLike('Post Malone'), 'The ID-less Post Malone took on the ID.');
         self::assertSame(self::artistId('Post Malone'), $this->connection()->fetchOne('SELECT mbid FROM artists WHERE id = ?', [$postMalone]));
         foreach ($longBed['songs'] as $position => $song) {
-            $row = $this->connection()->fetchAssociative('SELECT mbid, matched_fields FROM songs WHERE id = ?', [$song]);
+            $row = $this->connection()->fetchAssociative('SELECT mbid, matched_fields, match_checked_at FROM songs WHERE id = ?', [$song]);
             self::assertSame(self::recordingId(1, $position + 1), $row['mbid'] ?? null);
             self::assertContains('credits', json_decode((string) ($row['matched_fields'] ?? '[]'), true, flags: JSON_THROW_ON_ERROR));
+            self::assertNotNull($row['match_checked_at'] ?? null, 'The match compared the song.');
         }
         self::assertSame(3, (int) $this->connection()->fetchOne('SELECT count(*) FROM lyrics'), 'Every song keeps its lyrics.');
         $album = $this->connection()->fetchAssociative('SELECT release_mbid, matched_at, cover_image_id::text AS cover FROM albums WHERE id = ?', [$longBed['album']]);
@@ -209,6 +213,40 @@ final class MusicBrainzMatchApplyTest extends KernelTestCase
             $this->connection()->fetchOne('SELECT artist_id::text FROM images WHERE id = ?', [$cover]),
             'The cover names its new owner, so the image resource reports the artist it belongs to.',
         );
+    }
+
+    /**
+     * The matcher read the album with one song; the second was imported before the apply took its
+     * locks. The apply leaves the second unchecked, so the album is requested again and the next match
+     * pairs it against the stored release, though it is older than the album's match time.
+     */
+    public function testASongImportedWhileAMatchRanIsRequestedAndPairedByTheNextMatch(): void
+    {
+        [$album, $albumPublicId] = $this->storeAlbum();
+        $release = self::release(self::releaseId(1), discs: [2]);
+        $this->musicBrainz->releases[$release->id] = $release;
+        [$first] = $this->storeSong($album, $release, 1, []);
+        $candidate = $this->candidate($albumPublicId, $release);
+        [$imported] = $this->storeSong($album, $release, 2, []);
+
+        $result = ApplyMatchCommand::automatic(Uuid::fromString($album), $candidate) |> $this->apply(...);
+
+        self::assertTrue($result->isApplied());
+        self::assertNotNull($this->connection()->fetchOne('SELECT match_checked_at FROM songs WHERE id = ?', [$first]));
+        self::assertSame(
+            ['mbid' => null, 'match_checked_at' => null],
+            $this->connection()->fetchAssociative('SELECT mbid, match_checked_at FROM songs WHERE id = ?', [$imported]),
+            'The match did not compare the imported song.',
+        );
+
+        static::getContainer()->get(AlbumMatchRequestInterface::class)->requestForAdmin(Uuid::fromString($album));
+        self::assertSame('requested', $this->connection()->fetchOne('SELECT state FROM album_match_states WHERE album_id = ?', [$album]));
+        $outcome = static::getContainer()->get(AutomaticAlbumMatcherInterface::class)->match(Uuid::fromString($album));
+
+        self::assertSame(AutomaticMatchOutcomeKind::Matched, $outcome->kind);
+        $row = $this->connection()->fetchAssociative('SELECT mbid, match_checked_at FROM songs WHERE id = ?', [$imported]);
+        self::assertSame(self::recordingId(1, 2), $row['mbid'] ?? null);
+        self::assertNotNull($row['match_checked_at'] ?? null);
     }
 
     /**

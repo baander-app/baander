@@ -88,10 +88,12 @@ final class RequestAlbumMatchHandlerTest extends TestCase
         self::assertSame([], $this->queued);
     }
 
-    public function testAMatchedAlbumWithoutNewSongsIsNotRequested(): void
+    public function testAMatchedAlbumWhoseSongsAMatchComparedIsNotRequested(): void
     {
         $album = $this->album();
-        $this->songs[$album->getId()->toString()] = [$this->song($album)];
+        $song = $this->song($album);
+        $song->markMatchChecked(new DateTimeImmutable());
+        $this->songs[$album->getId()->toString()] = [$song];
         $album->recordReleaseMatch(MusicbrainzId::fromString('6d1c3e5a-0b2f-4a7e-9c1d-3f5e7a9b1c2d'), new DateTimeImmutable('+1 second'));
 
         $this->handle(new SyncAlbumMessage($album->getId(), true));
@@ -105,6 +107,18 @@ final class RequestAlbumMatchHandlerTest extends TestCase
         $album = $this->album();
         $album->recordReleaseMatch(MusicbrainzId::fromString('6d1c3e5a-0b2f-4a7e-9c1d-3f5e7a9b1c2d'), new DateTimeImmutable('-1 hour'));
         $this->songs[$album->getId()->toString()] = [$this->song($album)];
+
+        $this->handle(new SyncAlbumMessage($album->getId()));
+
+        self::assertSame(AlbumMatchStatus::Requested, $this->states->stateOf($album->getId())?->status);
+    }
+
+    /** A song imported while the match ran is older than the match time, but no match compared it. */
+    public function testAMatchedAlbumWithASongNoMatchComparedIsRequestedThoughTheSongIsOlder(): void
+    {
+        $album = $this->album();
+        $this->songs[$album->getId()->toString()] = [$this->song($album)];
+        $album->recordReleaseMatch(MusicbrainzId::fromString('6d1c3e5a-0b2f-4a7e-9c1d-3f5e7a9b1c2d'), new DateTimeImmutable('+1 hour'));
 
         $this->handle(new SyncAlbumMessage($album->getId()));
 

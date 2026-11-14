@@ -30,7 +30,9 @@ use App\Catalog\Application\QueryHandler\MusicBrainzMatch\MatchSnapshots;
 use App\Catalog\Application\QueryHandler\MusicBrainzMatch\MusicBrainzAnswer;
 use App\Catalog\Application\Service\CoverImageDiscarder;
 use App\Catalog\Application\Service\MusicBrainzMatch\CandidateScorer;
+use App\Catalog\Application\Service\MusicBrainzMatch\LocalTrack;
 use App\Catalog\Application\Service\MusicBrainzMatch\MatchCandidate;
+use App\Catalog\Application\Service\MusicBrainzMatch\TrackPair;
 use App\Catalog\Domain\Model\Album;
 use App\Catalog\Domain\Model\Artist;
 use App\Catalog\Domain\Model\Song;
@@ -203,12 +205,13 @@ final readonly class ApplyMatchHandler
 
         $albumId = $snapshot->album->getId();
         $plan = $this->albumPlan($command, $this->comparisons->album($snapshot, $candidate), $snapshot, $candidate);
-        $locks = $plan->artistIds() |> $this->storedIdentities(...) |> $plan->locks(...);
+        $compared = self::comparedSongIds($candidate);
+        $locks = ($plan->artistIds() |> $this->storedIdentities(...) |> $plan->locks(...))->withSongs($compared);
         $cover = $plan->ticks->field(MatchField::Cover) === null ? null : $this->covers->fetch($albumId, $candidate->release->id, $wait);
 
         $coverSaved = false;
         try {
-            [$applied, $discard] = $this->transaction->run(function () use ($command, $albumId, $candidate, $locks, $cover, &$coverSaved): array {
+            [$applied, $discard] = $this->transaction->run(function () use ($command, $albumId, $candidate, $compared, $locks, $cover, &$coverSaved): array {
                 $this->albums->lockInIdOrder([$albumId]);
                 $this->lock($locks);
                 $album = $this->albums->findFreshByUuid($albumId) ?? throw self::gone(MatchItemType::Album);
@@ -223,12 +226,10 @@ final readonly class ApplyMatchHandler
                     throw MatchTicks::stale('The album changed since the comparison.');
                 }
 
-                return $this->writeAlbum($album, $snapshot, $plan, $candidate, $command->isAutomatic(), $cover, $coverSaved);
+                return $this->writeAlbum($album, $snapshot, $plan, $candidate, $compared, $command->isAutomatic(), $cover, $coverSaved);
             });
         } catch (Throwable $exception) {
-            // Once the image was saved only the commit can have failed, and a failed commit may have
-            // succeeded on the server: keep the file rather than break a committed cover.
-            if ($cover !== null && !$coverSaved) {
+            if ($cover !== null && !$this->coverCommitted($cover)) {
                 $this->covers->discard($cover);
             }
 
@@ -253,8 +254,7 @@ final readonly class ApplyMatchHandler
 
         $songId = $snapshot->song->getId();
         $plan = $this->songPlan($selection, $this->comparisons->song($snapshot, $recording), $snapshot, $recording->artistCredit);
-        $locks = $plan->artistIds() |> $this->storedIdentities(...) |> $plan->locks(...);
-        $locks = new MatchLocks($locks->identities, $locks->artistIds, [$songId]);
+        $locks = ($plan->artistIds() |> $this->storedIdentities(...) |> $plan->locks(...))->withSongs([$songId]);
 
         [$applied, $discard] = $this->transaction->run(function () use ($selection, $songId, $recording, $locks): array {
             $this->lock($locks);
@@ -267,6 +267,7 @@ final readonly class ApplyMatchHandler
 
             $resolved = $this->resolve($plan);
             $publicId = $song->getPublicId()->toString();
+            $song->markMatchChecked($this->now());
             $creditsChanged = $this->writeSong($song, $plan->ticks->fields, $plan->ticks->creditsOf($publicId), $plan, $resolved);
             $this->songs->flush();
             [$merged, $removed, $discard] = $this->applyArtistActions($plan, $resolved);
@@ -336,18 +337,23 @@ final readonly class ApplyMatchHandler
     /**
      * Writes an album match under the locks: resolves the credited artists, writes the album's
      * fields, genres, cover and credits and its songs' fields and credits, then merges or removes
-     * the artists the new credits left without any. A manual apply removes the album's match state;
-     * an automatic one leaves it to the queue, which removes the request it claimed.
+     * the artists the new credits left without any. Every song the candidate compared is marked as
+     * checked, paired or not, so a later match of the album leaves it alone. A manual apply removes
+     * the album's match state; an automatic one leaves it to the queue, which removes the request it
+     * claimed.
+     *
+     * @param list<Uuid> $compared the songs the candidate was compared with, all locked
      *
      * @param-out bool $coverSaved
      *
      * @return array{MatchApplyResult, list<Uuid>} what the apply wrote, and the images to discard after the commit
      */
-    private function writeAlbum(Album $album, AlbumSnapshot $snapshot, MatchPlan $plan, MatchCandidate $candidate, bool $automatic, ?Image $cover, bool &$coverSaved): array
+    private function writeAlbum(Album $album, AlbumSnapshot $snapshot, MatchPlan $plan, MatchCandidate $candidate, array $compared, bool $automatic, ?Image $cover, bool &$coverSaved): array
     {
         $ticks = $plan->ticks;
         $resolved = $this->resolve($plan);
         $discard = [];
+        $now = $this->now();
 
         $album->updateMetadata(
             title: self::text($ticks->field(MatchField::Title)),
@@ -361,7 +367,7 @@ final readonly class ApplyMatchHandler
         $album->updateExternalIds(mbid: self::text($ticks->field(MatchField::Mbid)));
         // An album applied again to the release it holds is matched anew: its songs count as matched from now on.
         if ($ticks->field(MatchField::ReleaseMbid) !== null || $album->getReleaseMbid() === $candidate->release->id) {
-            $album->recordReleaseMatch(MusicbrainzId::fromString($candidate->release->id) ?? throw new \LogicException('A release has an ID.'), $this->now());
+            $album->recordReleaseMatch(MusicbrainzId::fromString($candidate->release->id) ?? throw new \LogicException('A release has an ID.'), $now);
         }
         $genres = $plan->genres();
         if ($genres !== []) {
@@ -380,6 +386,14 @@ final readonly class ApplyMatchHandler
         $albumCredits = $ticks->creditsOf(null);
         $creditsChanged = $albumCredits !== null && $this->albums->replacePerformerCredits($album->getId(), $this->credits($albumCredits, $plan, $resolved));
 
+        $written = array_map(static fn (Uuid $songId): string => $songId->toString(), $plan->songIds);
+        foreach ($compared as $songId) {
+            $song = $snapshot->song($songId->toString());
+            $song?->markMatchChecked($now);
+            if ($song !== null && !in_array($songId->toString(), $written, true)) {
+                $this->songs->persist($song);
+            }
+        }
         $songsChanged = 0;
         foreach ($plan->songIds as $publicId => $songId) {
             $song = $snapshot->song($songId->toString()) ?? throw new \LogicException('A locked song is missing from the album.');
@@ -457,6 +471,37 @@ final readonly class ApplyMatchHandler
         );
         $artist->updateExternalIds(mbid: self::text($field(MatchField::Mbid)));
         $this->artists->save($artist);
+    }
+
+    /**
+     * The songs a candidate was compared with: every local track it paired, and every one it paired
+     * with no track of the release.
+     *
+     * @return list<Uuid>
+     */
+    private static function comparedSongIds(MatchCandidate $candidate): array
+    {
+        $paired = array_map(static fn (TrackPair $pair): string => $pair->local->id, $candidate->pairs->pairs);
+        $unpaired = array_map(static fn (LocalTrack $track): string => $track->id, $candidate->pairs->unpairedLocal);
+
+        return [...$paired, ...$unpaired]
+            |> array_unique(...)
+            |> (static fn (array $ids): array => array_map(Uuid::fromString(...), $ids))
+            |> array_values(...);
+    }
+
+    /**
+     * Whether a cover the failed apply stored a file for was committed after all: a failed commit may
+     * have succeeded on the server. When that cannot be told, the file stays rather than break a
+     * committed cover.
+     */
+    private function coverCommitted(Image $cover): bool
+    {
+        try {
+            return $this->images->findByUuid($cover->getId()) !== null;
+        } catch (Throwable) {
+            return true;
+        }
     }
 
     /**

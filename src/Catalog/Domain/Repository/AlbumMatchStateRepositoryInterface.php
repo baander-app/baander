@@ -59,8 +59,11 @@ interface AlbumMatchStateRepositoryInterface
      */
     public function claimOldestDueRequest(DateTimeImmutable $now, DateTimeImmutable $claimedUntil): ?AlbumMatchState;
 
-    /** Give a claimed request back with the due time it had, unless the claim has ended. */
-    public function releaseClaim(AlbumMatchState $request, DateTimeImmutable $claimedUntil): void;
+    /**
+     * Give a claimed request back, due at $dueAt, unless the claim has ended: with the due time it
+     * had, so it keeps its place, or a later one, so other albums go first.
+     */
+    public function releaseClaim(Uuid $albumId, DateTimeImmutable $claimedUntil, DateTimeImmutable $dueAt): void;
 
     /** Remove a claimed request, unless the claim has ended. */
     public function removeClaimedRequest(Uuid $albumId, DateTimeImmutable $claimedUntil): void;

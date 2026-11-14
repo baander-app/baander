@@ -33,6 +33,21 @@ final readonly class MatchLocks
     ) {
     }
 
+    /**
+     * These locks with the rows of these songs as well.
+     *
+     * @param list<Uuid> $songIds
+     */
+    public function withSongs(array $songIds): self
+    {
+        $songs = [];
+        foreach ([...$this->songIds, ...$songIds] as $songId) {
+            $songs[$songId->toString() |> strtolower(...)] = $songId;
+        }
+
+        return clone($this, ['songIds' => array_values($songs)]);
+    }
+
     /** Whether these locks hold every key and row the needed set names. */
     public function covers(self $needed): bool
     {

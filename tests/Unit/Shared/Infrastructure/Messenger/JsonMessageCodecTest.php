@@ -55,7 +55,7 @@ final class JsonMessageCodecTest extends TestCase
         $id = Uuid::fromString('00000000-0000-4000-8000-000000000001');
         yield [new BatchExtractCoversCommand()];
         yield [new DrainAlbumMatchesMessage()];
-        yield [new DrainAlbumMatchesMessage(2)];
+        yield [new DrainAlbumMatchesMessage('0199bf3c-8a00-7000-8000-c4a1d0000001', 2)];
         yield [new ScanLibraryCommand(new LibrarySlug('music'), true)];
         yield [new FilesDiscovered($id, 'music', '/music', [new DiscoveredFile('/music/a.flac', 'a.flac', 'flac', 100, 12345, 'abc')])];
         yield [new ExtractAlbumCoverCommand($id)];

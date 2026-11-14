@@ -79,6 +79,26 @@ final class MusicBrainzMatchPersistenceTest extends TestCase
         );
     }
 
+    public function testASongKeepsWhenAMatchLastComparedIt(): void
+    {
+        $album = $this->album();
+        $song = Song::create($album->getId(), 'Pour Me A Drink', '/country/pour-me-a-drink.flac', 1024, 'audio/flac');
+        $this->songs->save($song);
+        $this->entityManager->clear();
+        self::assertNull($this->songs->findByUuid($song->getId())?->getMatchCheckedAt(), 'A new song is unchecked.');
+
+        $checkedAt = new \DateTimeImmutable('2026-11-14 12:00:00.123456+00:00');
+        $song->markMatchChecked($checkedAt);
+        $this->songs->save($song);
+        $this->entityManager->clear();
+
+        self::assertEquals($checkedAt, $this->songs->findByUuid($song->getId())?->getMatchCheckedAt());
+        self::assertEquals(
+            $checkedAt,
+            $this->songs->findVisibleByUuids([$song->getId()], LibraryReadScope::unrestricted())[$song->getId()->toString()]->getMatchCheckedAt(),
+        );
+    }
+
     public function testAnAlbumMatchStateIsStoredReplacedAndRemoved(): void
     {
         $album = $this->album();

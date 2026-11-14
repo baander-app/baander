@@ -324,6 +324,22 @@ final class Song
         return array_map(MatchedSongField::from(...), $this->state->matchedFields);
     }
 
+    /**
+     * Record that a match compared the song with its album's release, paired or not. A matched
+     * album's later matches pair only the songs no match has compared yet.
+     */
+    public function markMatchChecked(DateTimeImmutable $checkedAt): void
+    {
+        $this->state->matchCheckedAt = $checkedAt;
+        $this->state->updatedAt = new DateTimeImmutable();
+    }
+
+    /** When a match last compared the song with its album's release; null while none has. */
+    public function getMatchCheckedAt(): ?DateTimeImmutable
+    {
+        return $this->state->matchCheckedAt;
+    }
+
     public function lockField(string $field): void
     {
         LockedFields::assertLockable(self::LOCKABLE_FIELDS, $field, 'lock');

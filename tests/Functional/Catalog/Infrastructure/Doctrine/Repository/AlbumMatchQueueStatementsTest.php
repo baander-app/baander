@@ -122,7 +122,7 @@ final class AlbumMatchQueueStatementsTest extends TestCase
         $this->states->claimOldestDueRequest(self::at('+0 minutes'), $claimEnd);
         self::assertNotNull($released);
 
-        $this->states->releaseClaim($released, $claimEnd);
+        $this->states->releaseClaim($released->albumId, $claimEnd, $released->dueAt);
         $this->states->removeClaimedRequest($matched, $claimEnd);
         $marked = $this->states->markClaimedForReview($reviewed, $claimEnd, AlbumMatchReviewReason::TrackCountDiffers, 96, 26, self::at('+2 minutes'));
 
@@ -138,23 +138,45 @@ final class AlbumMatchQueueStatementsTest extends TestCase
         );
     }
 
-    public function testARequestMadeDuringAClaimSurvivesTheClaimantsWrites(): void
+    public function testAClaimedRequestGivenBackLaterWaitsItsTurnBehindTheOthers(): void
     {
-        [$removed, $reviewed] = [$this->album()->getId(), $this->album()->getId()];
-        $this->states->request($removed, AlbumMatchSource::Ingest, self::at('-2 minutes'));
-        $this->states->request($reviewed, AlbumMatchSource::Ingest, self::at('-1 minute'));
+        [$conflicted, $next] = [$this->album()->getId(), $this->album()->getId()];
+        $this->states->request($conflicted, AlbumMatchSource::Ingest, self::at('-2 minutes'));
+        $this->states->request($next, AlbumMatchSource::Ingest, self::at('-1 minute'));
         $claimEnd = self::at('+1 hour');
         $this->states->claimOldestDueRequest(self::at('+0 minutes'), $claimEnd);
-        $this->states->claimOldestDueRequest(self::at('+0 minutes'), $claimEnd);
+
+        $this->states->releaseClaim($conflicted, $claimEnd, self::at('+15 minutes'));
+
+        self::assertEquals(
+            new AlbumMatchState($conflicted, AlbumMatchStatus::Requested, AlbumMatchSource::Ingest, self::at('+15 minutes')),
+            $this->states->findByAlbum($conflicted),
+        );
+        self::assertSame($next->toString(), $this->states->claimOldestDueRequest(self::at('+0 minutes'), $claimEnd)?->albumId->toString());
+        self::assertSame($conflicted->toString(), $this->states->claimOldestDueRequest(self::at('+15 minutes'), self::at('+75 minutes'))?->albumId->toString());
+    }
+
+    public function testARequestMadeDuringAClaimSurvivesTheClaimantsWrites(): void
+    {
+        [$removed, $reviewed, $postponed] = [$this->album()->getId(), $this->album()->getId(), $this->album()->getId()];
+        foreach ([$removed, $reviewed, $postponed] as $minutes => $album) {
+            $this->states->request($album, AlbumMatchSource::Ingest, self::at('-' . (3 - $minutes) . ' minutes'));
+        }
+        $claimEnd = self::at('+1 hour');
+        foreach ([$removed, $reviewed, $postponed] as $album) {
+            $this->states->claimOldestDueRequest(self::at('+0 minutes'), $claimEnd);
+        }
 
         // The albums' second discs land while MusicBrainz is asked about the first.
-        self::assertFalse($this->states->request($removed, AlbumMatchSource::Ingest, self::at('+5 minutes')));
-        self::assertFalse($this->states->request($reviewed, AlbumMatchSource::Ingest, self::at('+5 minutes')));
+        foreach ([$removed, $reviewed, $postponed] as $album) {
+            self::assertFalse($this->states->request($album, AlbumMatchSource::Ingest, self::at('+5 minutes')));
+        }
         $this->states->removeClaimedRequest($removed, $claimEnd);
         $marked = $this->states->markClaimedForReview($reviewed, $claimEnd, AlbumMatchReviewReason::TrackCountDiffers, 96, 13, self::at('+1 minute'));
+        $this->states->releaseClaim($postponed, $claimEnd, self::at('+15 minutes'));
 
         self::assertFalse($marked);
-        foreach ([$removed, $reviewed] as $album) {
+        foreach ([$removed, $reviewed, $postponed] as $album) {
             self::assertEquals(
                 new AlbumMatchState($album, AlbumMatchStatus::Requested, AlbumMatchSource::Ingest, self::at('+5 minutes')),
                 $this->states->findByAlbum($album),

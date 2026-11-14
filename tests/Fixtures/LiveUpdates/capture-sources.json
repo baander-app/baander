@@ -1519,7 +1519,7 @@
       "classification": "capture",
       "operations": ["INSERT", "UPDATE", "DELETE"],
       "relevant_columns": ["id", "public_id", "album_id", "title", "path", "size", "mime_type", "length", "lyrics", "track", "disc", "year", "comment", "hash", "bitrate", "sample_rate", "channels", "codec", "explicit", "energy", "danceability", "valence", "acousticness", "instrumentalness", "liveness", "spechiness", "loudness", "mbid", "discogs_id", "spotify_id", "locked_fields", "created_at", "container_format", "stream_index", "matched_fields"],
-      "excluded_columns": ["updated_at"],
+      "excluded_columns": ["updated_at", "match_checked_at"],
       "families": ["catalog", "libraries", "activity", "playlists", "recommendations", "admin-metadata"],
       "scope_routes": ["album"],
       "readers": ["src/Catalog/Infrastructure/Doctrine/Query/CatalogStatsQuery.php", "src/Catalog/Infrastructure/Doctrine/Repository/SongRepository.php", "src/Activity/Infrastructure/ActivityEnrichmentService.php"],

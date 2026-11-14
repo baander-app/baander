@@ -172,13 +172,13 @@ final readonly class AlbumMatchStateRepository implements AlbumMatchStateReposit
     }
 
     #[\Override]
-    public function releaseClaim(AlbumMatchState $request, DateTimeImmutable $claimedUntil): void
+    public function releaseClaim(Uuid $albumId, DateTimeImmutable $claimedUntil, DateTimeImmutable $dueAt): void
     {
         $this->connection->executeStatement(
             'UPDATE album_match_states SET due_at = :dueAt WHERE album_id = :albumId AND state = :requested AND due_at = :claimedUntil',
             [
-                'dueAt' => $request->dueAt,
-                'albumId' => $request->albumId->toString(),
+                'dueAt' => $dueAt,
+                'albumId' => $albumId->toString(),
                 'requested' => AlbumMatchStatus::Requested->value,
                 'claimedUntil' => $claimedUntil,
             ],

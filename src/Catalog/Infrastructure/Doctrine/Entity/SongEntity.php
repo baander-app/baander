@@ -132,6 +132,10 @@ class SongEntity
     #[ORM\Column(type: 'json', options: ['jsonb' => true, 'default' => '[]'])]
     private array $matchedFields = [];
 
+    /** When an album match last compared the song with its release; null while none has. */
+    #[ORM\Column(type: 'datetime_immutable', nullable: true)]
+    private ?\DateTimeImmutable $matchCheckedAt = null;
+
     #[ORM\Column(type: 'datetime_immutable')]
     private \DateTimeImmutable $createdAt;
 
@@ -537,6 +541,16 @@ class SongEntity
     {
         $this->matchedFields = $matchedFields;
         $this->updatedAt = new \DateTimeImmutable();
+    }
+
+    public function getMatchCheckedAt(): ?\DateTimeImmutable
+    {
+        return $this->matchCheckedAt;
+    }
+
+    public function setMatchCheckedAt(?\DateTimeImmutable $matchCheckedAt): void
+    {
+        $this->matchCheckedAt = $matchCheckedAt;
     }
 
     public function getCreatedAt(): \DateTimeImmutable

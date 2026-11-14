@@ -98,6 +98,9 @@ final class ApplyMatchHandlerTest extends TestCase
     /** Fails the apply's transaction instead of running it. */
     private ?Throwable $transactionFailure = null;
 
+    /** Fails every artist merge, after the apply wrote everything else. */
+    private ?Throwable $mergeFailure = null;
+
     protected function setUp(): void
     {
         $this->setUpLibrary();
@@ -311,6 +314,40 @@ final class ApplyMatchHandlerTest extends TestCase
         self::assertSame(1, $this->savedImages[$coverId]->getWidth());
         self::assertSame($release->id, $album->getReleaseMbid());
         self::assertEqualsCanonicalizing(['releaseMbid', 'mbid', 'country', 'genres', 'cover'], $applied->fields);
+    }
+
+    public function testTheFileOfACoverSavedBeforeTheApplyFailedIsRemovedWithTheRolledBackImage(): void
+    {
+        $album = $this->addAlbum();
+        [$release] = $this->longBed($album);
+        $release = self::releaseWith($release, hasFrontCover: true);
+        $this->lookup->covers[$release->id] = new MusicBrainzCoverImage(base64_decode(self::PIXEL), 'image/png');
+        $this->mergeFailure = new \RuntimeException('The merge failed after the cover was saved.');
+
+        try {
+            ApplyMatchCommand::automatic($album->getId(), $this->candidate($album, $release)) |> $this->apply(...);
+            self::fail('The failed merge fails the apply.');
+        } catch (\RuntimeException $failure) {
+            self::assertSame($this->mergeFailure, $failure);
+        }
+
+        self::assertSame([], $this->savedImages, 'The image row was rolled back.');
+        self::assertContains('delete file', $this->calls, 'Its stored file is removed as well.');
+    }
+
+    public function testAMatchMarksEverySongItComparedAndLeavesASongAddedMeanwhileForTheNextMatch(): void
+    {
+        $album = $this->addAlbum();
+        $release = self::release(self::releaseId(1));
+        $songs = $this->addSongsOf($album, $release, missing: ['2-9']);
+        $candidate = $this->candidate($album, $release);
+        [$added] = $this->addSongsOf($album, $release, missing: array_map(static fn (Song $song): string => $song->getDisc() . '-' . $song->getTrack(), $songs));
+
+        ApplyMatchCommand::automatic($album->getId(), $candidate) |> $this->apply(...);
+
+        self::assertTrue(array_all($songs, static fn (Song $song): bool => $song->getMatchCheckedAt() == new \DateTimeImmutable('2026-11-14 12:00:00')), 'Every song the candidate compared is checked.');
+        self::assertNull($added->getMatchCheckedAt(), 'A song imported after the matcher read the album is left for the next match.');
+        self::assertNull($added->getMbid());
     }
 
     public function testAMatchWithoutAnAdminWritesNothingWhenTheAlbumTookAReleaseMeanwhile(): void
@@ -655,6 +692,9 @@ final class ApplyMatchHandlerTest extends TestCase
             return $credited;
         });
         $merges->method('merge')->willReturnCallback(function (Uuid $sourceId, Uuid $targetId): ArtistRemoval {
+            if ($this->mergeFailure !== null) {
+                throw $this->mergeFailure;
+            }
             $source = $this->catalogArtist($sourceId) ?? throw new \LogicException('No source.');
             $target = $this->catalogArtist($targetId) ?? throw new \LogicException('No target.');
             $this->calls[] = 'merge ' . $source->getName() . ' into ' . $target->getName();
@@ -697,6 +737,7 @@ final class ApplyMatchHandlerTest extends TestCase
         $images->method('save')->willReturnCallback(function (Image $image): void {
             $this->savedImages[$image->getId()->toString()] = $image;
         });
+        $images->method('findByUuid')->willReturnCallback(fn (Uuid $id): ?Image => $this->savedImages[$id->toString()] ?? null);
         $images->method('assignArtistOwner')->willReturnCallback(function (Uuid $imageId, Uuid $artistId): bool {
             $this->calls[] = 'assign owner ' . $imageId->toString() . ' to ' . $this->catalogArtist($artistId)?->getName();
 
@@ -719,10 +760,22 @@ final class ApplyMatchHandlerTest extends TestCase
         return $storage;
     }
 
+    /** Runs the operation; when it fails, the images it saved are rolled back with it. */
     private function transaction(): TransactionPortInterface
     {
         $transaction = $this->createStub(TransactionPortInterface::class);
-        $transaction->method('run')->willReturnCallback(fn (callable $operation): mixed => $this->transactionFailure === null ? $operation() : throw $this->transactionFailure);
+        $transaction->method('run')->willReturnCallback(function (callable $operation): mixed {
+            if ($this->transactionFailure !== null) {
+                throw $this->transactionFailure;
+            }
+            $images = $this->savedImages;
+            try {
+                return $operation();
+            } catch (Throwable $failure) {
+                $this->savedImages = $images;
+                throw $failure;
+            }
+        });
 
         return $transaction;
     }

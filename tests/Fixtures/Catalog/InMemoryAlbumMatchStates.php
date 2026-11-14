@@ -102,11 +102,11 @@ final class InMemoryAlbumMatchStates implements AlbumMatchStateRepositoryInterfa
     }
 
     #[\Override]
-    public function releaseClaim(AlbumMatchState $request, DateTimeImmutable $claimedUntil): void
+    public function releaseClaim(Uuid $albumId, DateTimeImmutable $claimedUntil, DateTimeImmutable $dueAt): void
     {
-        $claimed = $this->claimed($request->albumId, $claimedUntil);
+        $claimed = $this->claimed($albumId, $claimedUntil);
         if ($claimed !== null) {
-            $this->has(self::changed($claimed, ['dueAt' => $request->dueAt]));
+            $this->has(self::changed($claimed, ['dueAt' => $dueAt]));
         }
     }
 

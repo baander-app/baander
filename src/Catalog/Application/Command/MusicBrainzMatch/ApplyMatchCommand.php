@@ -19,7 +19,9 @@ use Symfony\Component\DependencyInjection\Attribute\Exclude;
  * credits and the merges and removals they cause, empty fields and a missing cover, and never a
  * field that holds a value or is locked. Either kind moves an album's match time to the apply when
  * it records the release, or when the album holds that release already, as when the matcher pairs
- * a matched album's new songs against its stored release.
+ * a matched album's new songs against its stored release. An album apply also marks every song the
+ * candidate was compared with as checked, paired or not; a song imported while the match ran is not
+ * among them, and the next match of the album pairs it.
  */
 #[Exclude]
 final readonly class ApplyMatchCommand
@@ -52,7 +54,7 @@ final readonly class ApplyMatchCommand
 
     /**
      * @param MatchCandidate $candidate     the release the matcher decided on, with its twin editions and the songs it pairs:
-     *                                      for a matched album, its stored release and the songs created since its match time
+     *                                      for a matched album, its stored release and the songs no match has compared yet
      * @param string|null    $releaseIdSeen the release ID the album held when the matcher read it, null for an unmatched album;
      *                                      the apply writes nothing when the album holds another one by then
      */

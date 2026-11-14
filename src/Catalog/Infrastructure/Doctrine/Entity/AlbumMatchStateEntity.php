@@ -10,8 +10,11 @@ use Doctrine\ORM\Mapping as ORM;
  * An album's place in automatic MusicBrainz matching: a match it waits for, or the review an admin
  * owes it. It lives beside the album rather than in it, so that its live updates reach admins only.
  * The row is deleted with its album (fk_album_match_states_album_id).
+ *
+ * Read-only for the unit of work: AlbumMatchStateRepository writes every row with guarded single
+ * statements, and the mapping only declares the table to the schema tooling.
  */
-#[ORM\Entity]
+#[ORM\Entity(readOnly: true)]
 #[ORM\Table(name: 'album_match_states')]
 #[ORM\Index(name: 'idx_album_match_states_state_due_at', columns: ['state', 'due_at'])]
 class AlbumMatchStateEntity
@@ -60,19 +63,9 @@ class AlbumMatchStateEntity
         return $this->state;
     }
 
-    public function setState(string $state): void
-    {
-        $this->state = $state;
-    }
-
     public function getSource(): string
     {
         return $this->source;
-    }
-
-    public function setSource(string $source): void
-    {
-        $this->source = $source;
     }
 
     public function getDueAt(): \DateTimeImmutable
@@ -80,19 +73,9 @@ class AlbumMatchStateEntity
         return $this->dueAt;
     }
 
-    public function setDueAt(\DateTimeImmutable $dueAt): void
-    {
-        $this->dueAt = $dueAt;
-    }
-
     public function getReason(): ?string
     {
         return $this->reason;
-    }
-
-    public function setReason(?string $reason): void
-    {
-        $this->reason = $reason;
     }
 
     public function getCheckedSongCount(): ?int
@@ -100,28 +83,13 @@ class AlbumMatchStateEntity
         return $this->checkedSongCount;
     }
 
-    public function setCheckedSongCount(?int $checkedSongCount): void
-    {
-        $this->checkedSongCount = $checkedSongCount;
-    }
-
     public function getCheckedAt(): ?\DateTimeImmutable
     {
         return $this->checkedAt;
     }
 
-    public function setCheckedAt(?\DateTimeImmutable $checkedAt): void
-    {
-        $this->checkedAt = $checkedAt;
-    }
-
     public function getBestScore(): ?int
     {
         return $this->bestScore;
-    }
-
-    public function setBestScore(?int $bestScore): void
-    {
-        $this->bestScore = $bestScore;
     }
 }

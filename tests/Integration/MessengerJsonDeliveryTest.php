@@ -11,6 +11,7 @@ use App\Catalog\Application\MessageHandler\DrainAlbumMatchesHandler;
 use App\Catalog\Application\MessageHandler\RequestAlbumMatchHandler;
 use App\Catalog\Application\Port\AlbumMatchRequestInterface;
 use App\Catalog\Application\Port\AlbumPortInterface;
+use App\Catalog\Application\Service\MusicBrainzMatch\AlbumMatchQueueChain;
 use App\Catalog\Application\Service\MusicBrainzMatch\AutomaticAlbumMatcherInterface;
 use App\Catalog\Application\Service\MusicBrainzMatch\AutomaticMatchOutcome;
 use App\Catalog\Domain\ValueObject\AlbumMatchSource;
@@ -38,6 +39,7 @@ use App\Shared\Infrastructure\Messenger\JsonTransportSerializer;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
+use Symfony\Component\Cache\Adapter\ArrayAdapter;
 use Symfony\Component\Clock\MockClock;
 use Symfony\Component\DependencyInjection\ServiceLocator;
 use Symfony\Component\EventDispatcher\EventDispatcher;
@@ -251,7 +253,7 @@ final class MessengerJsonDeliveryTest extends TestCase
                 ->willReturnCallback(static function () use (&$effects): void { ++$effects; });
             $handler = new RequestAlbumMatchHandler($requests);
         } elseif ($messageType === DrainAlbumMatchesMessage::class) {
-            $message = new DrainAlbumMatchesMessage(1);
+            $message = new DrainAlbumMatchesMessage(outages: 1);
             $clock = new MockClock('2026-11-14 12:00:00 UTC');
             // One admin request is due; matching it empties the queue, so no further run is queued.
             $states = new InMemoryAlbumMatchStates()->has(new AlbumMatchState($id, AlbumMatchStatus::Requested, AlbumMatchSource::Admin, $clock->now()));
@@ -260,7 +262,7 @@ final class MessengerJsonDeliveryTest extends TestCase
                 ->willReturnCallback(static function () use (&$effects): AutomaticMatchOutcome { ++$effects; return AutomaticMatchOutcome::matched(); });
             $nestedBus = $this->createMock(MessageBusInterface::class);
             $nestedBus->expects($this->never())->method('dispatch');
-            $handler = new DrainAlbumMatchesHandler($states, $matcher, $this->createStub(SystemSettingsPortInterface::class), $nestedBus, $clock, $logger);
+            $handler = new DrainAlbumMatchesHandler($states, $matcher, new AlbumMatchQueueChain(new ArrayAdapter()), $this->createStub(SystemSettingsPortInterface::class), $nestedBus, $clock, $logger);
         } elseif ($messageType === SyncLibraryMessage::class) {
             $message = new SyncLibraryMessage($id, true, true, true);
             $albums = $this->createMock(AlbumPortInterface::class);

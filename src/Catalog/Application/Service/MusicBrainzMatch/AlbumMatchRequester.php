@@ -75,7 +75,8 @@ final readonly class AlbumMatchRequester implements AlbumMatchRequestInterface
 
     /**
      * Whether a match has something to do for the album: it has no release yet and is not left for
-     * review with the song count the matcher checked, or it is matched and gained songs since.
+     * review with the song count the matcher checked, or it is matched and has a song no match has
+     * compared yet.
      */
     private function wantsMatch(Uuid $albumId): bool
     {
@@ -84,11 +85,10 @@ final readonly class AlbumMatchRequester implements AlbumMatchRequestInterface
             return false;
         }
 
-        $matchedAt = $album->getMatchedAt();
-        if ($album->getReleaseMbid() !== null && $matchedAt !== null) {
+        if ($album->getReleaseMbid() !== null) {
             return array_any(
                 $this->songs->findByAlbumSortedByTrack($albumId),
-                static fn (Song $song): bool => $song->getCreatedAt() > $matchedAt,
+                static fn (Song $song): bool => $song->getMatchCheckedAt() === null,
             );
         }
 

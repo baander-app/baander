@@ -31,7 +31,7 @@ final class MessagingCodecWiringTest extends KernelTestCase
         $id = Uuid::generate();
         $messages = [
             new BatchExtractCoversCommand(),
-            new \App\Catalog\Application\Message\DrainAlbumMatchesMessage(2),
+            new \App\Catalog\Application\Message\DrainAlbumMatchesMessage('0199bf3c-8a00-7000-8000-c4a1d0000001', 2),
             new ScanLibraryCommand(new LibrarySlug('music'), true),
             new PruneMissingImagesCommand(),
             new \App\Media\Application\Command\GenerateImageDerivativeCommand('image.png', 'thumb'),

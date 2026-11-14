@@ -10,7 +10,7 @@ use App\Shared\Domain\Model\Uuid;
  * Asks for automatic MusicBrainz matches of albums through the album match queue.
  *
  * An album is requested only when a match has something to do: it has no release yet, or it is
- * matched and holds songs created after its last apply. An album marked for review whose song
+ * matched and holds a song no match has compared yet. An album marked for review whose song
  * count is still the one the matcher checked is not requested again. Call it only after the
  * album's songs are committed.
  */

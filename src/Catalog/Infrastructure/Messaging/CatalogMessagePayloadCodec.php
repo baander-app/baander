@@ -15,7 +15,7 @@ final readonly class CatalogMessagePayloadCodec implements MessagePayloadCodecIn
 
     private const array FIELDS = [
         self::BATCH_EXTRACT_COVERS => [],
-        self::DRAIN_ALBUM_MATCHES => ['outages'],
+        self::DRAIN_ALBUM_MATCHES => ['chain', 'outages'],
     ];
 
     public static function types(): array
@@ -35,7 +35,7 @@ final readonly class CatalogMessagePayloadCodec implements MessagePayloadCodecIn
     {
         return match (true) {
             $message instanceof BatchExtractCoversCommand => [],
-            $message instanceof DrainAlbumMatchesMessage => [$message->outages],
+            $message instanceof DrainAlbumMatchesMessage => [$message->chain, $message->outages],
             default => throw new \InvalidArgumentException('Unsupported message type.'),
         };
     }
@@ -44,8 +44,19 @@ final readonly class CatalogMessagePayloadCodec implements MessagePayloadCodecIn
     {
         return match (true) {
             $type === self::BATCH_EXTRACT_COVERS && $payload === [] => new BatchExtractCoversCommand(),
-            $type === self::DRAIN_ALBUM_MATCHES && is_int($payload['outages'] ?? null) && $payload['outages'] >= 0 => new DrainAlbumMatchesMessage($payload['outages']),
+            $type === self::DRAIN_ALBUM_MATCHES && self::isDrain($payload) => new DrainAlbumMatchesMessage($payload['chain'], $payload['outages']),
             default => throw new \InvalidArgumentException('Unsupported message type or payload.'),
         };
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     *
+     * @phpstan-assert-if-true array{chain: string|null, outages: int<0, max>} $payload
+     */
+    private static function isDrain(array $payload): bool
+    {
+        return array_key_exists('chain', $payload) && ($payload['chain'] === null || is_string($payload['chain']))
+            && is_int($payload['outages'] ?? null) && $payload['outages'] >= 0;
     }
 }

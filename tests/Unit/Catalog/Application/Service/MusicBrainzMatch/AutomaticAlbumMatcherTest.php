@@ -15,8 +15,6 @@ use App\Catalog\Application\Service\MusicBrainzMatch\AutomaticMatchOutcomeKind;
 use App\Catalog\Application\Service\MusicBrainzMatch\MatchConfidence;
 use App\Catalog\Application\Service\MusicBrainzMatch\TrackPair;
 use App\Catalog\Domain\Model\Album;
-use App\Catalog\Domain\Model\Song;
-use App\Catalog\Domain\Model\SongState;
 use App\Catalog\Domain\ValueObject\AlbumMatchReviewReason;
 use App\Catalog\Domain\ValueObject\ArtistRole;
 use App\Catalog\Domain\ValueObject\MusicbrainzId;
@@ -128,20 +126,21 @@ final class AutomaticAlbumMatcherTest extends TestCase
         self::assertSame([self::SEARCH], $this->searches());
     }
 
-    /** @return iterable<string, array{MusicBrainzUnavailable|MusicBrainzRejected}> */
-    public static function refusals(): iterable
-    {
-        yield 'an outage' => [new MusicBrainzUnavailable('HTTP 503')];
-        yield 'a refusal' => [new MusicBrainzRejected(400)];
-    }
-
-    #[DataProvider('refusals')]
-    public function testASearchMusicBrainzDoesNotAnswerIsUnavailableAndAppliesNothing(MusicBrainzUnavailable|MusicBrainzRejected $answer): void
+    public function testASearchMusicBrainzDoesNotAnswerIsUnavailableAndAppliesNothing(): void
     {
         $album = $this->longBed();
-        $this->musicBrainz->releaseSearches[self::SEARCH] = $answer;
+        $this->musicBrainz->releaseSearches[self::SEARCH] = new MusicBrainzUnavailable('HTTP 503');
 
         self::assertSame(AutomaticMatchOutcomeKind::Unavailable, $this->match($album)->kind);
+        self::assertSame([], $this->applied);
+    }
+
+    public function testASearchMusicBrainzRefusesRetriesThisAlbumAfterSixHours(): void
+    {
+        $album = $this->longBed();
+        $this->musicBrainz->releaseSearches[self::SEARCH] = new MusicBrainzRejected(400);
+
+        self::assertEquals(AutomaticMatchOutcome::retryLater(21_600), $this->match($album));
         self::assertSame([], $this->applied);
     }
 
@@ -156,12 +155,12 @@ final class AutomaticAlbumMatcherTest extends TestCase
         self::assertSame([], $this->applied);
     }
 
-    public function testAMatchedAlbumPairsOnlyTheSongsCreatedSinceItsApplyAgainstItsStoredRelease(): void
+    public function testAMatchedAlbumPairsOnlyTheSongsNoMatchComparedAgainstItsStoredRelease(): void
     {
         $release = self::release(self::releaseId(1));
         $album = $this->longBed(missing: ['2-9']);
-        $this->songs = array_map(static fn (Song $song): Song => self::createdAt($song, '-2 hours'), $this->songs);
         $album->recordReleaseMatch(MusicbrainzId::fromString($release->id) ?? throw new \LogicException(), new DateTimeImmutable('-1 hour'));
+        $this->checkAll();
         $this->addSongsOf($album, $release, missing: [
             ...array_map(static fn (int $position): string => '1-' . $position, range(1, 18)),
             ...array_map(static fn (int $position): string => '2-' . $position, range(1, 8)),
@@ -185,11 +184,36 @@ final class AutomaticAlbumMatcherTest extends TestCase
     {
         $release = self::release(self::releaseId(1));
         $album = $this->longBed();
-        $album->recordReleaseMatch(MusicbrainzId::fromString($release->id) ?? throw new \LogicException(), new DateTimeImmutable('+1 hour'));
+        $album->recordReleaseMatch(MusicbrainzId::fromString($release->id) ?? throw new \LogicException(), new DateTimeImmutable('-1 hour'));
+        $this->checkAll();
         $this->musicBrainz->releases[$release->id] = $release;
 
         self::assertSame(AutomaticMatchOutcomeKind::Matched, $this->match($album)->kind);
         self::assertSame([], $this->applied[0]->candidate->pairs->pairs);
+    }
+
+    /**
+     * A song imported while a match ran is older than the album's match time, but the match never
+     * compared it, so the next match pairs it.
+     */
+    public function testASongTheLastMatchDidNotCompareIsPairedThoughItIsOlderThanTheMatch(): void
+    {
+        $release = self::release(self::releaseId(1));
+        $album = $this->longBed(missing: ['2-9']);
+        $this->checkAll();
+        $this->addSongsOf($album, $release, missing: [
+            ...array_map(static fn (int $position): string => '1-' . $position, range(1, 18)),
+            ...array_map(static fn (int $position): string => '2-' . $position, range(1, 8)),
+        ]);
+        $missed = array_last($this->songs);
+        $album->recordReleaseMatch(MusicbrainzId::fromString($release->id) ?? throw new \LogicException(), new DateTimeImmutable('+1 hour'));
+        $this->musicBrainz->releases[$release->id] = $release;
+
+        self::assertSame(AutomaticMatchOutcomeKind::Matched, $this->match($album)->kind);
+        self::assertSame(
+            [[$missed?->getId()->toString(), '2-9']],
+            array_map(static fn (TrackPair $pair): array => [$pair->local->id, $pair->release->key()], $this->applied[0]->candidate->pairs->pairs),
+        );
     }
 
     public function testAMatchedAlbumWhoseReleaseMusicBrainzNoLongerHasIsLeftForReview(): void
@@ -210,26 +234,26 @@ final class AutomaticAlbumMatcherTest extends TestCase
         self::assertSame([], $this->musicBrainz->calls);
     }
 
-    /** @return iterable<string, array{MatchApplyOutcome, AutomaticMatchOutcomeKind}> */
+    /** @return iterable<string, array{MatchApplyOutcome, AutomaticMatchOutcome}> */
     public static function applyOutcomes(): iterable
     {
-        yield 'gone during the lookups' => [MatchApplyOutcome::AlbumGone, AutomaticMatchOutcomeKind::AlbumGone];
-        yield 'matched by an admin meanwhile' => [MatchApplyOutcome::AlbumMatchedMeanwhile, AutomaticMatchOutcomeKind::Matched];
-        yield 'changed while the apply waited' => [MatchApplyOutcome::Stale, AutomaticMatchOutcomeKind::Unavailable];
-        yield 'no cover from the Cover Art Archive' => [MatchApplyOutcome::Unavailable, AutomaticMatchOutcomeKind::Unavailable];
+        yield 'gone during the lookups' => [MatchApplyOutcome::AlbumGone, AutomaticMatchOutcome::albumGone()];
+        yield 'matched by an admin meanwhile' => [MatchApplyOutcome::AlbumMatchedMeanwhile, AutomaticMatchOutcome::matched()];
+        yield 'changed while the apply waited' => [MatchApplyOutcome::Stale, AutomaticMatchOutcome::retryLater(900)];
+        yield 'no cover from the Cover Art Archive' => [MatchApplyOutcome::Unavailable, AutomaticMatchOutcome::unavailable()];
     }
 
     #[DataProvider('applyOutcomes')]
-    public function testAnApplyThatWritesNothingEndsAsItsOutcomeSays(MatchApplyOutcome $applied, AutomaticMatchOutcomeKind $expected): void
+    public function testAnApplyThatWritesNothingEndsAsItsOutcomeSays(MatchApplyOutcome $applied, AutomaticMatchOutcome $expected): void
     {
         $album = $this->longBed();
         $this->found(self::release(self::releaseId(1)));
         $this->applyResult = static fn (ApplyMatchCommand $command): MatchApplyResult => MatchApplyResult::notApplied($applied, null, $command->candidateId);
 
-        self::assertSame($expected, $this->match($album)->kind);
+        self::assertEquals($expected, $this->match($album));
     }
 
-    public function testADeadlockedApplyIsUnavailableSoTheAlbumIsMatchedAgainLater(): void
+    public function testADeadlockedApplyRetriesThisAlbumAfterAQuarterHour(): void
     {
         $album = $this->longBed();
         $this->found(self::release(self::releaseId(1)));
@@ -239,7 +263,7 @@ final class AutomaticAlbumMatcherTest extends TestCase
             throw new HandlerFailedException(new Envelope($command), [$deadlock]);
         };
 
-        self::assertSame(AutomaticMatchOutcomeKind::Unavailable, $this->match($album)->kind);
+        self::assertEquals(AutomaticMatchOutcome::retryLater(900), $this->match($album));
     }
 
     /** @param list<string> $missing "<disc>-<position>" of tracks the album has no song for */
@@ -300,8 +324,11 @@ final class AutomaticAlbumMatcherTest extends TestCase
         return $bus;
     }
 
-    private static function createdAt(Song $song, string $when): Song
+    /** Marks every song the album has now as compared by a match, as an apply does. */
+    private function checkAll(): void
     {
-        return Song::reconstitute(new SongState(...[...get_object_vars($song->getState()), 'createdAt' => new DateTimeImmutable($when)]));
+        foreach ($this->songs as $song) {
+            $song->markMatchChecked(new DateTimeImmutable('-1 hour'));
+        }
     }
 }

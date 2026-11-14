@@ -33,16 +33,23 @@ use Symfony\Component\Messenger\Stamp\HandledStamp;
  * title and primary artist, the hits ranked by title, artist and track count, the best five looked
  * up and scored by their tracks too. MatchConfidence decides; a confident candidate is applied in
  * fill-only automatic mode. A matched album looks up its stored release only and pairs the songs
- * created since its last apply, the album's other songs holding the tracks they pair with.
+ * no match has compared yet, the album's other songs holding the tracks they pair with.
  *
- * Every MusicBrainz call waits for its turn as long as the queue ahead of it needs. A MusicBrainz
- * outage or refusal, and an apply that met changed rows or a deadlock, write nothing and come back
- * as unavailable, so the album is matched again later.
+ * Every MusicBrainz call waits for its turn as long as the queue ahead of it needs. Nothing is
+ * written when something stands in the way, and the outcome says who waits: a MusicBrainz outage
+ * is unavailable, so every album waits; an apply that met changed rows or a deadlock retries this
+ * album after a quarter of an hour, and a request MusicBrainz refused retries it after six hours.
  */
 final readonly class AutomaticAlbumMatcher implements AutomaticAlbumMatcherInterface
 {
     /** How many release search hits are looked up, as for an admin's candidate list. */
     private const int LOOKUP_LIMIT = 5;
+
+    /** How long an album waits after its apply met changed rows or a deadlock. */
+    private const int RETRY_AFTER_CONFLICT_SECONDS = 900;
+
+    /** How long an album waits after MusicBrainz refused a request about it. */
+    private const int RETRY_AFTER_REFUSAL_SECONDS = 21_600;
 
     public function __construct(
         private AlbumPortInterface $albums,
@@ -70,7 +77,7 @@ final readonly class AutomaticAlbumMatcher implements AutomaticAlbumMatcherInter
             return AutomaticMatchOutcome::unavailable();
         } catch (ConflictException $refused) {
             return ($refused->details['reason'] ?? null) === MusicBrainzAnswer::REJECTED_REASON
-                ? AutomaticMatchOutcome::unavailable()
+                ? AutomaticMatchOutcome::retryLater(self::RETRY_AFTER_REFUSAL_SECONDS)
                 : throw $refused;
         }
 
@@ -104,8 +111,8 @@ final readonly class AutomaticAlbumMatcher implements AutomaticAlbumMatcherInter
     }
 
     /**
-     * Pairs the songs a matched album gained since its last apply against its stored release. The
-     * album's other songs pair first, so a new song takes only a track no older song holds. When
+     * Pairs the songs of a matched album that no match has compared yet against its stored release.
+     * The album's other songs pair first, so a new song takes only a track no older song holds. When
      * MusicBrainz no longer has the release, the album is left for review without candidates.
      */
     private function newSongs(AlbumSnapshot $snapshot, string $releaseId): MatchDecision
@@ -115,8 +122,8 @@ final readonly class AutomaticAlbumMatcher implements AutomaticAlbumMatcherInter
             return MatchDecision::needsReview(AlbumMatchReviewReason::NoCandidates, null);
         }
 
-        $matchedAt = $snapshot->album->getMatchedAt();
-        $new = array_filter($snapshot->songs, static fn (Song $song): bool => $matchedAt === null || $song->getCreatedAt() > $matchedAt)
+        // A song imported while a match ran was not compared by it, whenever it was created.
+        $new = array_filter($snapshot->songs, static fn (Song $song): bool => $song->getMatchCheckedAt() === null)
             |> (static fn (array $songs): array => array_map(static fn (Song $song): string => $song->getId()->toString(), $songs))
             |> array_flip(...);
         $isNew = static fn (LocalTrack $track): bool => isset($new[$track->id]);
@@ -145,7 +152,7 @@ final readonly class AutomaticAlbumMatcher implements AutomaticAlbumMatcherInter
             $cause = HandlerFailure::cause($failed);
 
             // The apply wrote nothing; another writer held the same rows.
-            return $cause instanceof TransactionDeadlockException ? AutomaticMatchOutcome::unavailable() : throw $cause;
+            return $cause instanceof TransactionDeadlockException ? AutomaticMatchOutcome::retryLater(self::RETRY_AFTER_CONFLICT_SECONDS) : throw $cause;
         }
         if (!$result instanceof MatchApplyResult) {
             throw new \LogicException('Applying a match returns its result.');
@@ -155,7 +162,8 @@ final readonly class AutomaticAlbumMatcher implements AutomaticAlbumMatcherInter
             // An admin matched the album while MusicBrainz was asked; nothing is left to do.
             MatchApplyOutcome::Applied, MatchApplyOutcome::AlbumMatchedMeanwhile => AutomaticMatchOutcome::matched(),
             MatchApplyOutcome::AlbumGone => AutomaticMatchOutcome::albumGone(),
-            MatchApplyOutcome::Stale, MatchApplyOutcome::Unavailable => AutomaticMatchOutcome::unavailable(),
+            MatchApplyOutcome::Stale => AutomaticMatchOutcome::retryLater(self::RETRY_AFTER_CONFLICT_SECONDS),
+            MatchApplyOutcome::Unavailable => AutomaticMatchOutcome::unavailable(),
         };
     }
 }

@@ -19,6 +19,7 @@ final class SongState
     /**
      * @param string[] $lockedFields
      * @param list<string> $matchedFields the fields a match set, and `credits` when it set the artist credits
+     * @param DateTimeImmutable|null $matchCheckedAt when an album match last compared the song with its release; null while none has
      */
     public function __construct(
         public readonly Uuid $id,
@@ -58,6 +59,7 @@ final class SongState
         public ?string $containerFormat = null,
         public ?int $streamIndex = null,
         public array $matchedFields = [],
+        public ?DateTimeImmutable $matchCheckedAt = null,
     ) {
     }
 }
