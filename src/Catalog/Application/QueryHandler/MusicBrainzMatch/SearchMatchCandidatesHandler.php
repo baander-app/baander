@@ -73,8 +73,8 @@ final readonly class SearchMatchCandidatesHandler
     {
         $snapshot = $this->snapshots->album($query->publicId);
         $title = self::edited($query->title) ?? $snapshot->album->getTitle();
-        $artist = self::edited($query->artist) ?? $snapshot->primaryArtistName();
-        $album = $snapshot->localAlbum($title, $artist);
+        $artist = self::searchedArtist($query->artist, $snapshot->primaryArtistName());
+        $album = $snapshot->localAlbum($title, self::edited($query->artist));
 
         $hits = $this->musicBrainz->findReleases($title, $artist) |> MusicBrainzAnswer::unwrap(...);
         $candidates = self::best($hits, fn (MusicBrainzReleaseSummary $hit): int => $this->scorer->scoreReleaseSummary($hit, $album))
@@ -91,9 +91,8 @@ final readonly class SearchMatchCandidatesHandler
     {
         $snapshot = $this->snapshots->song($query->publicId);
         $title = self::edited($query->title) ?? $snapshot->song->getTitle();
-        $editedArtist = self::edited($query->artist);
-        $artist = $editedArtist ?? $snapshot->primaryArtistName();
-        $song = $snapshot->localSong($title, $editedArtist);
+        $artist = self::searchedArtist($query->artist, $snapshot->primaryArtistName());
+        $song = $snapshot->localSong($title, self::edited($query->artist));
 
         $candidates = $this->musicBrainz->findRecordings($title, $artist)
             |> MusicBrainzAnswer::unwrap(...)
@@ -151,6 +150,18 @@ final readonly class SearchMatchCandidatesHandler
 
         return array_slice($order, 0, self::CANDIDATE_LIMIT)
             |> (static fn (array $indexes): array => array_map(static fn (int $index): mixed => $items[$index], $indexes));
+    }
+
+    /**
+     * The artist to search: the item's own when the admin left the artist alone, none when the
+     * admin blanked it, else the admin's edit. The fit score compares candidates with the edit, or
+     * with the item's own artist when there is none.
+     *
+     * @param string|null $own the item's primary artist
+     */
+    private static function searchedArtist(?string $edit, ?string $own): ?string
+    {
+        return $edit === null ? $own : self::edited($edit);
     }
 
     /** The admin's edit, trimmed; null when there is none or it is blank. */

@@ -7327,6 +7327,239 @@
                 }
             }
         },
+        "/api/admin/metadata/match/{type}/{publicId}/candidates": {
+            "get": {
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "List MusicBrainz candidates for an album, song or artist",
+                "description": "Searches MusicBrainz for the item's title (an artist's name) and primary artist, or for the edited `title` and `artist`, and lists at most five candidates with a fit score from 0 to 100, best first: releases for an album, recordings for a song, artists for an artist. A blank `title` counts as none; an empty `artist` searches by the title alone, while the score still compares each candidate with the item's own artist.",
+                "operationId": "get_admin_metadata_match_candidates",
+                "parameters": [
+                    {
+                        "name": "type",
+                        "in": "path",
+                        "description": "What to match",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "pattern": "album|song|artist",
+                            "enum": [
+                                "album",
+                                "song",
+                                "artist"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "publicId",
+                        "in": "path",
+                        "description": "The album's, song's or artist's public ID",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "title",
+                        "in": "query",
+                        "description": "Search this title, or for an artist this name, instead of the item's own",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "artist",
+                        "in": "query",
+                        "description": "Search this artist instead of the item's primary artist. Present but empty, the search goes by the title alone; absent, it takes the item's own artist. Ignored for an artist.",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "What was searched, and the candidates found; an empty list when MusicBrainz has none",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/MatchCandidatesResource"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Administrator role required",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "No album, song or artist has the public ID",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "MusicBrainz rejected the request; `details.reason` is `musicbrainz_rejected`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "The public ID is malformed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "MusicBrainz did not answer, or no turn of the shared rate limit came free in time; `details.reason` is `musicbrainz_unavailable`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/metadata/match/{type}/{publicId}/comparison": {
+            "get": {
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Compare an album, song or artist with a MusicBrainz candidate",
+                "description": "Looks the candidate up in MusicBrainz and shows, field by field and, for an album, track by track, the value the item holds and the value a match would set, with the default tick of each row and the artists the ticked credits would merge or remove. Each row has a key an apply names it by.",
+                "operationId": "get_admin_metadata_match_comparison",
+                "parameters": [
+                    {
+                        "name": "type",
+                        "in": "path",
+                        "description": "What to match",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "pattern": "album|song|artist",
+                            "enum": [
+                                "album",
+                                "song",
+                                "artist"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "publicId",
+                        "in": "path",
+                        "description": "The album's, song's or artist's public ID",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "candidate",
+                        "in": "query",
+                        "description": "The candidate's MusicBrainz ID: a release for an album, a recording for a song, an artist for an artist",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "What a match with the candidate would set",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/MatchComparisonResource"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Administrator role required",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "No album, song or artist has the public ID, or MusicBrainz has no such candidate",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "MusicBrainz rejected the request; `details.reason` is `musicbrainz_rejected`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "The public ID or the candidate's MusicBrainz ID is malformed or missing",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "MusicBrainz did not answer, or no turn of the shared rate limit came free in time; `details.reason` is `musicbrainz_unavailable`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/songs/": {
             "get": {
                 "tags": [
@@ -26991,6 +27224,800 @@
                         "description": "Update timestamp",
                         "type": "string",
                         "format": "date-time"
+                    }
+                },
+                "type": "object"
+            },
+            "MatchReleaseCandidateResource": {
+                "description": "A MusicBrainz release (one edition of an album) an album may match",
+                "required": [
+                    "id",
+                    "score",
+                    "title",
+                    "artistCredit",
+                    "date",
+                    "country",
+                    "status",
+                    "disambiguation",
+                    "barcode",
+                    "labels",
+                    "catalogNumbers",
+                    "formats",
+                    "trackCount",
+                    "mediumCount",
+                    "releaseGroupId",
+                    "releaseGroupType",
+                    "hasFrontCover"
+                ],
+                "properties": {
+                    "id": {
+                        "description": "The release's MusicBrainz ID, which the comparison takes as its candidate",
+                        "type": "string"
+                    },
+                    "score": {
+                        "description": "How well the release fits the album, by title, artist, track count and track lengths",
+                        "type": "integer",
+                        "maximum": 100,
+                        "minimum": 0
+                    },
+                    "title": {
+                        "type": "string"
+                    },
+                    "artistCredit": {
+                        "description": "The release's artist credit as printed, such as \"Post Malone\"",
+                        "type": "string"
+                    },
+                    "date": {
+                        "description": "The release date: YYYY, YYYY-MM or YYYY-MM-DD",
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "country": {
+                        "description": "An ISO 3166-1 code, or XW for worldwide",
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "status": {
+                        "description": "Such as Official or Promotion",
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "disambiguation": {
+                        "description": "MusicBrainz's comment that tells the edition apart, such as \"clean\"",
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "barcode": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "labels": {
+                        "description": "The label names, each once",
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "catalogNumbers": {
+                        "description": "The catalogue numbers on those labels, each once",
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "formats": {
+                        "description": "The media formats, such as \"CD\" or \"Digital Media\", each once",
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "trackCount": {
+                        "description": "The tracks on all media together",
+                        "type": "integer"
+                    },
+                    "mediumCount": {
+                        "description": "The media (discs) of the release",
+                        "type": "integer"
+                    },
+                    "releaseGroupId": {
+                        "description": "The MusicBrainz ID of the release group, which an album stores as its mbid",
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "releaseGroupType": {
+                        "description": "Such as Album, Single or EP",
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "hasFrontCover": {
+                        "description": "Whether the Cover Art Archive holds a front cover for the release",
+                        "type": "boolean"
+                    }
+                },
+                "type": "object"
+            },
+            "MatchRecordingCandidateResource": {
+                "description": "A MusicBrainz recording a song may match, with the releases it appears on",
+                "required": [
+                    "id",
+                    "score",
+                    "title",
+                    "artistCredit",
+                    "lengthMs",
+                    "disambiguation",
+                    "releases"
+                ],
+                "properties": {
+                    "id": {
+                        "description": "The recording's MusicBrainz ID, which the comparison takes as its candidate",
+                        "type": "string"
+                    },
+                    "score": {
+                        "description": "How well the recording fits the song, by title, artist and length",
+                        "type": "integer",
+                        "maximum": 100,
+                        "minimum": 0
+                    },
+                    "title": {
+                        "type": "string"
+                    },
+                    "artistCredit": {
+                        "description": "The recording's artist credit as printed, such as \"Post Malone feat. Luke Combs\"",
+                        "type": "string"
+                    },
+                    "lengthMs": {
+                        "description": "The length in milliseconds; null when MusicBrainz does not know it",
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "disambiguation": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "releases": {
+                        "description": "The releases the recording appears on, at most 25",
+                        "type": "array",
+                        "items": {
+                            "required": [
+                                "id",
+                                "title",
+                                "date",
+                                "country",
+                                "status",
+                                "trackCount"
+                            ],
+                            "properties": {
+                                "id": {
+                                    "description": "The release's MusicBrainz ID",
+                                    "type": "string"
+                                },
+                                "title": {
+                                    "type": "string"
+                                },
+                                "date": {
+                                    "description": "The release date: YYYY, YYYY-MM or YYYY-MM-DD",
+                                    "type": "string",
+                                    "nullable": true
+                                },
+                                "country": {
+                                    "description": "An ISO 3166-1 code, or XW for worldwide",
+                                    "type": "string",
+                                    "nullable": true
+                                },
+                                "status": {
+                                    "description": "Such as Official or Promotion",
+                                    "type": "string",
+                                    "nullable": true
+                                },
+                                "trackCount": {
+                                    "description": "The tracks on the whole release, when MusicBrainz lists them",
+                                    "type": "integer",
+                                    "nullable": true
+                                }
+                            },
+                            "type": "object"
+                        }
+                    }
+                },
+                "type": "object"
+            },
+            "MatchArtistCandidateResource": {
+                "description": "A MusicBrainz artist a library artist may match",
+                "required": [
+                    "id",
+                    "score",
+                    "name",
+                    "sortName",
+                    "disambiguation",
+                    "type",
+                    "country",
+                    "lifeSpanBegin",
+                    "lifeSpanEnd",
+                    "ended"
+                ],
+                "properties": {
+                    "id": {
+                        "description": "The artist's MusicBrainz ID, which the comparison takes as its candidate",
+                        "type": "string"
+                    },
+                    "score": {
+                        "description": "How well the artist fits, by name and, when the library artist has one, disambiguation",
+                        "type": "integer",
+                        "maximum": 100,
+                        "minimum": 0
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "sortName": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "disambiguation": {
+                        "description": "MusicBrainz's comment that tells the artist apart, such as \"Dutch hardstyle DJ\"",
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "type": {
+                        "description": "Such as Person or Group",
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "country": {
+                        "description": "An ISO 3166-1 code",
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "lifeSpanBegin": {
+                        "description": "When the artist was born or began: YYYY, YYYY-MM or YYYY-MM-DD",
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "lifeSpanEnd": {
+                        "description": "When the artist died or ended: YYYY, YYYY-MM or YYYY-MM-DD",
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "ended": {
+                        "description": "Whether the artist has ended, even when the end date is unknown",
+                        "type": "boolean"
+                    }
+                },
+                "type": "object"
+            },
+            "MatchCandidatesResource": {
+                "required": [
+                    "type",
+                    "publicId",
+                    "title",
+                    "artist",
+                    "candidates"
+                ],
+                "properties": {
+                    "type": {
+                        "description": "What was searched for: an album matches a release, a song a recording, an artist an artist",
+                        "type": "string",
+                        "enum": [
+                            "album",
+                            "song",
+                            "artist"
+                        ]
+                    },
+                    "publicId": {
+                        "description": "The album's, song's or artist's public ID",
+                        "type": "string",
+                        "pattern": "^[0-9a-zA-Z_-]{21}$",
+                        "maxLength": 21,
+                        "minLength": 21
+                    },
+                    "title": {
+                        "description": "The title searched, or for an artist the name: the item's own unless the request edited it",
+                        "type": "string"
+                    },
+                    "artist": {
+                        "description": "The artist searched; null for an artist search, or when the item has no primary artist and the request named none",
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "candidates": {
+                        "description": "At most five candidates, best fit first: releases for an album, recordings for a song, artists for an artist",
+                        "type": "array",
+                        "items": {
+                            "oneOf": [
+                                {
+                                    "$ref": "#/components/schemas/MatchReleaseCandidateResource"
+                                },
+                                {
+                                    "$ref": "#/components/schemas/MatchRecordingCandidateResource"
+                                },
+                                {
+                                    "$ref": "#/components/schemas/MatchArtistCandidateResource"
+                                }
+                            ]
+                        }
+                    }
+                },
+                "type": "object"
+            },
+            "MatchFieldRowResource": {
+                "description": "A field a match can set: the value the item holds, the value MusicBrainz gives, and whether the row is ticked by default",
+                "required": [
+                    "key",
+                    "field",
+                    "songPublicId",
+                    "current",
+                    "proposed",
+                    "ticked",
+                    "locked",
+                    "changes"
+                ],
+                "properties": {
+                    "key": {
+                        "description": "The row's key, which an apply names the row by: the field for a row of the item itself, \"<song public ID>:<field>\" for a row of one of an album's songs",
+                        "type": "string"
+                    },
+                    "field": {
+                        "description": "The field the row sets",
+                        "type": "string",
+                        "enum": [
+                            "mbid",
+                            "releaseMbid",
+                            "title",
+                            "year",
+                            "label",
+                            "catalogNumber",
+                            "barcode",
+                            "country",
+                            "disambiguation",
+                            "genres",
+                            "cover",
+                            "track",
+                            "disc",
+                            "name",
+                            "sortName",
+                            "type",
+                            "lifeSpanBegin",
+                            "lifeSpanEnd"
+                        ]
+                    },
+                    "songPublicId": {
+                        "description": "The album's song the row belongs to; null for a row of the item itself",
+                        "type": "string",
+                        "pattern": "^[0-9a-zA-Z_-]{21}$",
+                        "nullable": true,
+                        "maxLength": 21,
+                        "minLength": 21
+                    },
+                    "current": {
+                        "description": "The value the item holds now, which an apply rechecks before it writes the row; null when the field is empty. The cover row holds true when the album has a cover.",
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "integer"
+                            },
+                            {
+                                "type": "boolean"
+                            },
+                            {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            },
+                            {
+                                "type": "object",
+                                "nullable": true,
+                                "enum": [
+                                    null
+                                ]
+                            }
+                        ]
+                    },
+                    "proposed": {
+                        "description": "The value MusicBrainz gives. The cover row holds the MusicBrainz ID of the release whose front cover the match would store.",
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "integer"
+                            },
+                            {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            }
+                        ]
+                    },
+                    "ticked": {
+                        "description": "Whether the row is ticked by default: MusicBrainz IDs and empty fields are, a field holding another value is not, and a locked field never is",
+                        "type": "boolean"
+                    },
+                    "locked": {
+                        "description": "Whether the field is locked; a locked row cannot be ticked",
+                        "type": "boolean"
+                    },
+                    "changes": {
+                        "description": "Whether applying the row would change the field; genre names compare ignoring case and order",
+                        "type": "boolean"
+                    }
+                },
+                "type": "object"
+            },
+            "MatchPredictedArtistResource": {
+                "description": "The library artist a MusicBrainz credit would go to if the match were applied now, or the artist the match would create",
+                "required": [
+                    "publicId",
+                    "name",
+                    "takesId"
+                ],
+                "properties": {
+                    "publicId": {
+                        "description": "The artist's public ID; null for an artist the match would create",
+                        "type": "string",
+                        "pattern": "^[0-9a-zA-Z_-]{21}$",
+                        "nullable": true,
+                        "maxLength": 21,
+                        "minLength": 21
+                    },
+                    "name": {
+                        "description": "The artist's name, or the name a new artist would get",
+                        "type": "string"
+                    },
+                    "takesId": {
+                        "description": "Whether a library artist without a MusicBrainz ID would take on the credit's ID",
+                        "type": "boolean"
+                    }
+                },
+                "type": "object"
+            },
+            "MatchCreditsRowResource": {
+                "description": "The primary and featured artist credits of an album or song now and as a match would set them; credits of other roles stay",
+                "required": [
+                    "key",
+                    "songPublicId",
+                    "current",
+                    "proposed",
+                    "ticked",
+                    "changes"
+                ],
+                "properties": {
+                    "key": {
+                        "description": "The row's key, which an apply names the row by: \"credits\" for the item's own credits, \"<song public ID>:credits\" for one of an album's songs",
+                        "type": "string"
+                    },
+                    "songPublicId": {
+                        "description": "The song the credits belong to; null for an album's own credits",
+                        "type": "string",
+                        "pattern": "^[0-9a-zA-Z_-]{21}$",
+                        "nullable": true,
+                        "maxLength": 21,
+                        "minLength": 21
+                    },
+                    "current": {
+                        "description": "The primary and featured credits now, which an apply rechecks before it writes the row",
+                        "type": "array",
+                        "items": {
+                            "required": [
+                                "artistPublicId",
+                                "artistName",
+                                "role",
+                                "creditedName"
+                            ],
+                            "properties": {
+                                "artistPublicId": {
+                                    "type": "string",
+                                    "pattern": "^[0-9a-zA-Z_-]{21}$",
+                                    "maxLength": 21,
+                                    "minLength": 21
+                                },
+                                "artistName": {
+                                    "type": "string"
+                                },
+                                "role": {
+                                    "type": "string",
+                                    "enum": [
+                                        "primary",
+                                        "featured"
+                                    ]
+                                },
+                                "creditedName": {
+                                    "description": "The name the item is credited under, such as \"Post Malone, Luke Combs\"",
+                                    "type": "string"
+                                }
+                            },
+                            "type": "object"
+                        }
+                    },
+                    "proposed": {
+                        "description": "The credits a match would set, in MusicBrainz's order: the first artist primary, the rest featured",
+                        "type": "array",
+                        "items": {
+                            "required": [
+                                "role",
+                                "creditedName",
+                                "musicbrainzArtistId",
+                                "artist"
+                            ],
+                            "properties": {
+                                "role": {
+                                    "type": "string",
+                                    "enum": [
+                                        "primary",
+                                        "featured"
+                                    ]
+                                },
+                                "creditedName": {
+                                    "description": "The name the credit would show: the item's own credited name for the primary artist when it has one, else the name MusicBrainz credits",
+                                    "type": "string"
+                                },
+                                "musicbrainzArtistId": {
+                                    "description": "The credited artist's MusicBrainz ID",
+                                    "type": "string"
+                                },
+                                "artist": {
+                                    "$ref": "#/components/schemas/MatchPredictedArtistResource"
+                                }
+                            },
+                            "type": "object"
+                        }
+                    },
+                    "ticked": {
+                        "description": "Whether the row is ticked by default: it is when applying it would change the credits or give a library artist its MusicBrainz ID",
+                        "type": "boolean"
+                    },
+                    "changes": {
+                        "description": "Whether applying the row would change anything",
+                        "type": "boolean"
+                    }
+                },
+                "type": "object"
+            },
+            "MatchTrackResource": {
+                "description": "A local song paired with a track of the release, with the song's rows, or a track or song no pair was found for. An apply writes paired songs only.",
+                "required": [
+                    "song",
+                    "release",
+                    "fields",
+                    "credits"
+                ],
+                "properties": {
+                    "song": {
+                        "description": "The local song; null for a release track no song pairs with",
+                        "required": [
+                            "publicId",
+                            "title",
+                            "disc",
+                            "track",
+                            "lengthSeconds"
+                        ],
+                        "properties": {
+                            "publicId": {
+                                "type": "string",
+                                "pattern": "^[0-9a-zA-Z_-]{21}$",
+                                "maxLength": 21,
+                                "minLength": 21
+                            },
+                            "title": {
+                                "type": "string"
+                            },
+                            "disc": {
+                                "description": "The tagged disc number",
+                                "type": "integer",
+                                "nullable": true
+                            },
+                            "track": {
+                                "description": "The tagged track number",
+                                "type": "integer",
+                                "nullable": true
+                            },
+                            "lengthSeconds": {
+                                "description": "The length measured from the audio",
+                                "type": "number",
+                                "nullable": true
+                            }
+                        },
+                        "type": "object",
+                        "nullable": true
+                    },
+                    "release": {
+                        "description": "The release track; null for a song that pairs with no track",
+                        "required": [
+                            "disc",
+                            "position",
+                            "number",
+                            "title",
+                            "lengthMs",
+                            "artistCredit",
+                            "recordingId"
+                        ],
+                        "properties": {
+                            "disc": {
+                                "description": "The position of the track's medium in the release, from 1",
+                                "type": "integer"
+                            },
+                            "position": {
+                                "description": "The track's position on its medium, from 1",
+                                "type": "integer"
+                            },
+                            "number": {
+                                "description": "The track number as printed, such as \"A2\"",
+                                "type": "string"
+                            },
+                            "title": {
+                                "type": "string"
+                            },
+                            "lengthMs": {
+                                "description": "The length in milliseconds; null when MusicBrainz knows none",
+                                "type": "integer",
+                                "nullable": true
+                            },
+                            "artistCredit": {
+                                "description": "The track's artist credit as printed",
+                                "type": "string"
+                            },
+                            "recordingId": {
+                                "description": "The recording on the track; null when the editions the candidate stands for disagree on it",
+                                "type": "string",
+                                "nullable": true
+                            }
+                        },
+                        "type": "object",
+                        "nullable": true
+                    },
+                    "fields": {
+                        "description": "The paired song's field rows; empty unless paired",
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/MatchFieldRowResource"
+                        }
+                    },
+                    "credits": {
+                        "description": "The paired song's credits row; null unless paired",
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/MatchCreditsRowResource"
+                            },
+                            {
+                                "type": "object",
+                                "nullable": true,
+                                "enum": [
+                                    null
+                                ]
+                            }
+                        ]
+                    }
+                },
+                "type": "object"
+            },
+            "MatchArtistActionResource": {
+                "description": "An artist a match would merge into another artist or remove. It stands only while every row in requiredRows is ticked; unticking it keeps the artist as it is.",
+                "required": [
+                    "kind",
+                    "artistPublicId",
+                    "artistName",
+                    "target",
+                    "requiredRows",
+                    "ticked"
+                ],
+                "properties": {
+                    "kind": {
+                        "description": "merge moves the artist's credits, favorites and play history to the target and removes it; remove deletes it with its favorites",
+                        "type": "string",
+                        "enum": [
+                            "merge",
+                            "remove"
+                        ]
+                    },
+                    "artistPublicId": {
+                        "description": "The artist merged or removed, which an apply names the action by",
+                        "type": "string",
+                        "pattern": "^[0-9a-zA-Z_-]{21}$",
+                        "maxLength": 21,
+                        "minLength": 21
+                    },
+                    "artistName": {
+                        "type": "string"
+                    },
+                    "target": {
+                        "description": "The artist a merge goes into, which may be one the match creates; null for a removal",
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/MatchPredictedArtistResource"
+                            },
+                            {
+                                "type": "object",
+                                "nullable": true,
+                                "enum": [
+                                    null
+                                ]
+                            }
+                        ]
+                    },
+                    "requiredRows": {
+                        "description": "The keys of the credits rows that must all be ticked for the action to stand; empty for the merge an artist comparison applies its ID by",
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "ticked": {
+                        "description": "Whether the action is ticked by default",
+                        "type": "boolean"
+                    }
+                },
+                "type": "object"
+            },
+            "MatchComparisonResource": {
+                "required": [
+                    "type",
+                    "publicId",
+                    "candidateId",
+                    "fields",
+                    "credits",
+                    "tracks",
+                    "artistActions"
+                ],
+                "properties": {
+                    "type": {
+                        "description": "What is compared: an album with a release, a song with a recording, an artist with an artist",
+                        "type": "string",
+                        "enum": [
+                            "album",
+                            "song",
+                            "artist"
+                        ]
+                    },
+                    "publicId": {
+                        "description": "The album's, song's or artist's public ID",
+                        "type": "string",
+                        "pattern": "^[0-9a-zA-Z_-]{21}$",
+                        "maxLength": 21,
+                        "minLength": 21
+                    },
+                    "candidateId": {
+                        "description": "The MusicBrainz ID compared: a release, recording or artist",
+                        "type": "string"
+                    },
+                    "fields": {
+                        "description": "The item's own field rows; a field MusicBrainz gives no value for has no row",
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/MatchFieldRowResource"
+                        }
+                    },
+                    "credits": {
+                        "description": "The album's or song's own credits row; null for an artist, or when MusicBrainz credits no artist",
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/MatchCreditsRowResource"
+                            },
+                            {
+                                "type": "object",
+                                "nullable": true,
+                                "enum": [
+                                    null
+                                ]
+                            }
+                        ]
+                    },
+                    "tracks": {
+                        "description": "For an album, its songs and the release's tracks: in release order, then the songs that pair with no track; empty for a song or artist",
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/MatchTrackResource"
+                        }
+                    },
+                    "artistActions": {
+                        "description": "The artists the match would merge or remove",
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/MatchArtistActionResource"
+                        }
                     }
                 },
                 "type": "object"

@@ -2251,6 +2251,473 @@ export interface MovieResource {
   updatedAt: string;
 }
 
+/**
+ * A MusicBrainz release (one edition of an album) an album may match
+ */
+export interface MatchReleaseCandidateResource {
+  /** The release's MusicBrainz ID, which the comparison takes as its candidate */
+  id: string;
+  /**
+     * How well the release fits the album, by title, artist, track count and track lengths
+     * @minimum 0
+     * @maximum 100
+     */
+  score: number;
+  title: string;
+  /** The release's artist credit as printed, such as "Post Malone" */
+  artistCredit: string;
+  /**
+     * The release date: YYYY, YYYY-MM or YYYY-MM-DD
+     * @nullable
+     */
+  date: string | null;
+  /**
+     * An ISO 3166-1 code, or XW for worldwide
+     * @nullable
+     */
+  country: string | null;
+  /**
+     * Such as Official or Promotion
+     * @nullable
+     */
+  status: string | null;
+  /**
+     * MusicBrainz's comment that tells the edition apart, such as "clean"
+     * @nullable
+     */
+  disambiguation: string | null;
+  /** @nullable */
+  barcode: string | null;
+  /** The label names, each once */
+  labels: string[];
+  /** The catalogue numbers on those labels, each once */
+  catalogNumbers: string[];
+  /** The media formats, such as "CD" or "Digital Media", each once */
+  formats: string[];
+  /** The tracks on all media together */
+  trackCount: number;
+  /** The media (discs) of the release */
+  mediumCount: number;
+  /**
+     * The MusicBrainz ID of the release group, which an album stores as its mbid
+     * @nullable
+     */
+  releaseGroupId: string | null;
+  /**
+     * Such as Album, Single or EP
+     * @nullable
+     */
+  releaseGroupType: string | null;
+  /** Whether the Cover Art Archive holds a front cover for the release */
+  hasFrontCover: boolean;
+}
+
+export type MatchRecordingCandidateResourceReleasesItem = {
+  /** The release's MusicBrainz ID */
+  id: string;
+  title: string;
+  /**
+     * The release date: YYYY, YYYY-MM or YYYY-MM-DD
+     * @nullable
+     */
+  date: string | null;
+  /**
+     * An ISO 3166-1 code, or XW for worldwide
+     * @nullable
+     */
+  country: string | null;
+  /**
+     * Such as Official or Promotion
+     * @nullable
+     */
+  status: string | null;
+  /**
+     * The tracks on the whole release, when MusicBrainz lists them
+     * @nullable
+     */
+  trackCount: number | null;
+};
+
+/**
+ * A MusicBrainz recording a song may match, with the releases it appears on
+ */
+export interface MatchRecordingCandidateResource {
+  /** The recording's MusicBrainz ID, which the comparison takes as its candidate */
+  id: string;
+  /**
+     * How well the recording fits the song, by title, artist and length
+     * @minimum 0
+     * @maximum 100
+     */
+  score: number;
+  title: string;
+  /** The recording's artist credit as printed, such as "Post Malone feat. Luke Combs" */
+  artistCredit: string;
+  /**
+     * The length in milliseconds; null when MusicBrainz does not know it
+     * @nullable
+     */
+  lengthMs: number | null;
+  /** @nullable */
+  disambiguation: string | null;
+  /** The releases the recording appears on, at most 25 */
+  releases: MatchRecordingCandidateResourceReleasesItem[];
+}
+
+/**
+ * A MusicBrainz artist a library artist may match
+ */
+export interface MatchArtistCandidateResource {
+  /** The artist's MusicBrainz ID, which the comparison takes as its candidate */
+  id: string;
+  /**
+     * How well the artist fits, by name and, when the library artist has one, disambiguation
+     * @minimum 0
+     * @maximum 100
+     */
+  score: number;
+  name: string;
+  /** @nullable */
+  sortName: string | null;
+  /**
+     * MusicBrainz's comment that tells the artist apart, such as "Dutch hardstyle DJ"
+     * @nullable
+     */
+  disambiguation: string | null;
+  /**
+     * Such as Person or Group
+     * @nullable
+     */
+  type: string | null;
+  /**
+     * An ISO 3166-1 code
+     * @nullable
+     */
+  country: string | null;
+  /**
+     * When the artist was born or began: YYYY, YYYY-MM or YYYY-MM-DD
+     * @nullable
+     */
+  lifeSpanBegin: string | null;
+  /**
+     * When the artist died or ended: YYYY, YYYY-MM or YYYY-MM-DD
+     * @nullable
+     */
+  lifeSpanEnd: string | null;
+  /** Whether the artist has ended, even when the end date is unknown */
+  ended: boolean;
+}
+
+/**
+ * What was searched for: an album matches a release, a song a recording, an artist an artist
+ */
+export type MatchCandidatesResourceType = typeof MatchCandidatesResourceType[keyof typeof MatchCandidatesResourceType];
+
+
+export const MatchCandidatesResourceType = {
+  album: 'album',
+  song: 'song',
+  artist: 'artist',
+} as const;
+
+export interface MatchCandidatesResource {
+  /** What was searched for: an album matches a release, a song a recording, an artist an artist */
+  type: MatchCandidatesResourceType;
+  /**
+     * The album's, song's or artist's public ID
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
+  publicId: string;
+  /** The title searched, or for an artist the name: the item's own unless the request edited it */
+  title: string;
+  /**
+     * The artist searched; null for an artist search, or when the item has no primary artist and the request named none
+     * @nullable
+     */
+  artist: string | null;
+  /** At most five candidates, best fit first: releases for an album, recordings for a song, artists for an artist */
+  candidates: (MatchReleaseCandidateResource | MatchRecordingCandidateResource | MatchArtistCandidateResource)[];
+}
+
+/**
+ * The field the row sets
+ */
+export type MatchFieldRowResourceField = typeof MatchFieldRowResourceField[keyof typeof MatchFieldRowResourceField];
+
+
+export const MatchFieldRowResourceField = {
+  mbid: 'mbid',
+  releaseMbid: 'releaseMbid',
+  title: 'title',
+  year: 'year',
+  label: 'label',
+  catalogNumber: 'catalogNumber',
+  barcode: 'barcode',
+  country: 'country',
+  disambiguation: 'disambiguation',
+  genres: 'genres',
+  cover: 'cover',
+  track: 'track',
+  disc: 'disc',
+  name: 'name',
+  sortName: 'sortName',
+  type: 'type',
+  lifeSpanBegin: 'lifeSpanBegin',
+  lifeSpanEnd: 'lifeSpanEnd',
+} as const;
+
+/**
+ * A field a match can set: the value the item holds, the value MusicBrainz gives, and whether the row is ticked by default
+ */
+export interface MatchFieldRowResource {
+  /** The row's key, which an apply names the row by: the field for a row of the item itself, "<song public ID>:<field>" for a row of one of an album's songs */
+  key: string;
+  /** The field the row sets */
+  field: MatchFieldRowResourceField;
+  /**
+     * The album's song the row belongs to; null for a row of the item itself
+     * @minLength 21
+     * @maxLength 21
+     * @nullable
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
+  songPublicId: string | null;
+  /** The value the item holds now, which an apply rechecks before it writes the row; null when the field is empty. The cover row holds true when the album has a cover. */
+  current: string | number | boolean | string[] | null;
+  /** The value MusicBrainz gives. The cover row holds the MusicBrainz ID of the release whose front cover the match would store. */
+  proposed: string | number | string[];
+  /** Whether the row is ticked by default: MusicBrainz IDs and empty fields are, a field holding another value is not, and a locked field never is */
+  ticked: boolean;
+  /** Whether the field is locked; a locked row cannot be ticked */
+  locked: boolean;
+  /** Whether applying the row would change the field; genre names compare ignoring case and order */
+  changes: boolean;
+}
+
+/**
+ * The library artist a MusicBrainz credit would go to if the match were applied now, or the artist the match would create
+ */
+export interface MatchPredictedArtistResource {
+  /**
+     * The artist's public ID; null for an artist the match would create
+     * @minLength 21
+     * @maxLength 21
+     * @nullable
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
+  publicId: string | null;
+  /** The artist's name, or the name a new artist would get */
+  name: string;
+  /** Whether a library artist without a MusicBrainz ID would take on the credit's ID */
+  takesId: boolean;
+}
+
+export type MatchCreditsRowResourceCurrentItemRole = typeof MatchCreditsRowResourceCurrentItemRole[keyof typeof MatchCreditsRowResourceCurrentItemRole];
+
+
+export const MatchCreditsRowResourceCurrentItemRole = {
+  primary: 'primary',
+  featured: 'featured',
+} as const;
+
+export type MatchCreditsRowResourceCurrentItem = {
+  /**
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
+  artistPublicId: string;
+  artistName: string;
+  role: MatchCreditsRowResourceCurrentItemRole;
+  /** The name the item is credited under, such as "Post Malone, Luke Combs" */
+  creditedName: string;
+};
+
+export type MatchCreditsRowResourceProposedItemRole = typeof MatchCreditsRowResourceProposedItemRole[keyof typeof MatchCreditsRowResourceProposedItemRole];
+
+
+export const MatchCreditsRowResourceProposedItemRole = {
+  primary: 'primary',
+  featured: 'featured',
+} as const;
+
+export type MatchCreditsRowResourceProposedItem = {
+  role: MatchCreditsRowResourceProposedItemRole;
+  /** The name the credit would show: the item's own credited name for the primary artist when it has one, else the name MusicBrainz credits */
+  creditedName: string;
+  /** The credited artist's MusicBrainz ID */
+  musicbrainzArtistId: string;
+  artist: MatchPredictedArtistResource;
+};
+
+/**
+ * The primary and featured artist credits of an album or song now and as a match would set them; credits of other roles stay
+ */
+export interface MatchCreditsRowResource {
+  /** The row's key, which an apply names the row by: "credits" for the item's own credits, "<song public ID>:credits" for one of an album's songs */
+  key: string;
+  /**
+     * The song the credits belong to; null for an album's own credits
+     * @minLength 21
+     * @maxLength 21
+     * @nullable
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
+  songPublicId: string | null;
+  /** The primary and featured credits now, which an apply rechecks before it writes the row */
+  current: MatchCreditsRowResourceCurrentItem[];
+  /** The credits a match would set, in MusicBrainz's order: the first artist primary, the rest featured */
+  proposed: MatchCreditsRowResourceProposedItem[];
+  /** Whether the row is ticked by default: it is when applying it would change the credits or give a library artist its MusicBrainz ID */
+  ticked: boolean;
+  /** Whether applying the row would change anything */
+  changes: boolean;
+}
+
+/**
+ * The local song; null for a release track no song pairs with
+ * @nullable
+ */
+export type MatchTrackResourceSong = {
+  /**
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
+  publicId: string;
+  title: string;
+  /**
+     * The tagged disc number
+     * @nullable
+     */
+  disc: number | null;
+  /**
+     * The tagged track number
+     * @nullable
+     */
+  track: number | null;
+  /**
+     * The length measured from the audio
+     * @nullable
+     */
+  lengthSeconds: number | null;
+} | null;
+
+/**
+ * The release track; null for a song that pairs with no track
+ * @nullable
+ */
+export type MatchTrackResourceRelease = {
+  /** The position of the track's medium in the release, from 1 */
+  disc: number;
+  /** The track's position on its medium, from 1 */
+  position: number;
+  /** The track number as printed, such as "A2" */
+  number: string;
+  title: string;
+  /**
+     * The length in milliseconds; null when MusicBrainz knows none
+     * @nullable
+     */
+  lengthMs: number | null;
+  /** The track's artist credit as printed */
+  artistCredit: string;
+  /**
+     * The recording on the track; null when the editions the candidate stands for disagree on it
+     * @nullable
+     */
+  recordingId: string | null;
+} | null;
+
+/**
+ * A local song paired with a track of the release, with the song's rows, or a track or song no pair was found for. An apply writes paired songs only.
+ */
+export interface MatchTrackResource {
+  /**
+     * The local song; null for a release track no song pairs with
+     * @nullable
+     */
+  song: MatchTrackResourceSong;
+  /**
+     * The release track; null for a song that pairs with no track
+     * @nullable
+     */
+  release: MatchTrackResourceRelease;
+  /** The paired song's field rows; empty unless paired */
+  fields: MatchFieldRowResource[];
+  /** The paired song's credits row; null unless paired */
+  credits: MatchCreditsRowResource | null;
+}
+
+/**
+ * merge moves the artist's credits, favorites and play history to the target and removes it; remove deletes it with its favorites
+ */
+export type MatchArtistActionResourceKind = typeof MatchArtistActionResourceKind[keyof typeof MatchArtistActionResourceKind];
+
+
+export const MatchArtistActionResourceKind = {
+  merge: 'merge',
+  remove: 'remove',
+} as const;
+
+/**
+ * An artist a match would merge into another artist or remove. It stands only while every row in requiredRows is ticked; unticking it keeps the artist as it is.
+ */
+export interface MatchArtistActionResource {
+  /** merge moves the artist's credits, favorites and play history to the target and removes it; remove deletes it with its favorites */
+  kind: MatchArtistActionResourceKind;
+  /**
+     * The artist merged or removed, which an apply names the action by
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
+  artistPublicId: string;
+  artistName: string;
+  /** The artist a merge goes into, which may be one the match creates; null for a removal */
+  target: MatchPredictedArtistResource | null;
+  /** The keys of the credits rows that must all be ticked for the action to stand; empty for the merge an artist comparison applies its ID by */
+  requiredRows: string[];
+  /** Whether the action is ticked by default */
+  ticked: boolean;
+}
+
+/**
+ * What is compared: an album with a release, a song with a recording, an artist with an artist
+ */
+export type MatchComparisonResourceType = typeof MatchComparisonResourceType[keyof typeof MatchComparisonResourceType];
+
+
+export const MatchComparisonResourceType = {
+  album: 'album',
+  song: 'song',
+  artist: 'artist',
+} as const;
+
+export interface MatchComparisonResource {
+  /** What is compared: an album with a release, a song with a recording, an artist with an artist */
+  type: MatchComparisonResourceType;
+  /**
+     * The album's, song's or artist's public ID
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
+  publicId: string;
+  /** The MusicBrainz ID compared: a release, recording or artist */
+  candidateId: string;
+  /** The item's own field rows; a field MusicBrainz gives no value for has no row */
+  fields: MatchFieldRowResource[];
+  /** The album's or song's own credits row; null for an artist, or when MusicBrainz credits no artist */
+  credits: MatchCreditsRowResource | null;
+  /** For an album, its songs and the release's tracks: in release order, then the songs that pair with no track; empty for a song or artist */
+  tracks: MatchTrackResource[];
+  /** The artists the match would merge or remove */
+  artistActions: MatchArtistActionResource[];
+}
+
 export type CursorPaginatedResponseMeta = {
   /** @nullable */
   next_cursor: string | null;
@@ -4965,6 +5432,26 @@ export type GetAdminMetadataMatchReviews200Data = {
 
 export type GetAdminMetadataMatchReviews200 = {
   data?: GetAdminMetadataMatchReviews200Data;
+};
+
+export type GetAdminMetadataMatchCandidatesParams = {
+  /** Search this title, or for an artist this name, instead of the item's own */
+  title?: string;
+  /** Search this artist instead of the item's primary artist. Present but empty, the search goes by the title alone; absent, it takes the item's own artist. Ignored for an artist. */
+  artist?: string;
+};
+
+export type GetAdminMetadataMatchCandidates200 = {
+  data?: MatchCandidatesResource;
+};
+
+export type GetAdminMetadataMatchComparisonParams = {
+  /** The candidate's MusicBrainz ID: a release for an album, a recording for a song, an artist for an artist */
+  candidate: string;
+};
+
+export type GetAdminMetadataMatchComparison200 = {
+  data?: MatchComparisonResource;
 };
 
 export type GetSongIndexParams = {
@@ -17623,6 +18110,256 @@ export function useGetAdminMetadataMatchReviews<TData = Awaited<ReturnType<typeo
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getGetAdminMetadataMatchReviewsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetAdminMetadataMatchCandidatesUrl = (type: 'album' | 'song' | 'artist',
+    publicId: string,
+    params?: GetAdminMetadataMatchCandidatesParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/admin/metadata/match/${type}/${publicId}/candidates?${stringifiedParams}` : `/api/admin/metadata/match/${type}/${publicId}/candidates`
+}
+
+/**
+ * Searches MusicBrainz for the item's title (an artist's name) and primary artist, or for the edited `title` and `artist`, and lists at most five candidates with a fit score from 0 to 100, best first: releases for an album, recordings for a song, artists for an artist. A blank `title` counts as none; an empty `artist` searches by the title alone, while the score still compares each candidate with the item's own artist.
+ * @summary List MusicBrainz candidates for an album, song or artist
+ */
+export const getAdminMetadataMatchCandidates = async (type: 'album' | 'song' | 'artist',
+    publicId: string,
+    params?: GetAdminMetadataMatchCandidatesParams, options?: Parameters<typeof customInstance>[1]): Promise<GetAdminMetadataMatchCandidates200> => {
+
+  return customInstance<GetAdminMetadataMatchCandidates200>(getGetAdminMetadataMatchCandidatesUrl(type,publicId,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAdminMetadataMatchCandidatesQueryKey = (type: 'album' | 'song' | 'artist',
+    publicId: string,
+    params?: GetAdminMetadataMatchCandidatesParams,) => {
+    return [
+    `/api/admin/metadata/match/${type}/${publicId}/candidates`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetAdminMetadataMatchCandidatesQueryOptions = <TData = Awaited<ReturnType<typeof getAdminMetadataMatchCandidates>>, TError = ErrorType<ApiError>>(type: 'album' | 'song' | 'artist',
+    publicId: string,
+    params?: GetAdminMetadataMatchCandidatesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminMetadataMatchCandidates>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAdminMetadataMatchCandidatesQueryKey(type,publicId,params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminMetadataMatchCandidates>>> = ({ signal }) => getAdminMetadataMatchCandidates(type,publicId,params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: type !== null && type !== undefined && publicId !== null && publicId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAdminMetadataMatchCandidates>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetAdminMetadataMatchCandidatesQueryResult = NonNullable<Awaited<ReturnType<typeof getAdminMetadataMatchCandidates>>>
+export type GetAdminMetadataMatchCandidatesQueryError = ErrorType<ApiError>
+
+
+export function useGetAdminMetadataMatchCandidates<TData = Awaited<ReturnType<typeof getAdminMetadataMatchCandidates>>, TError = ErrorType<ApiError>>(
+ type: 'album' | 'song' | 'artist',
+    publicId: string,
+    params: undefined |  GetAdminMetadataMatchCandidatesParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminMetadataMatchCandidates>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getAdminMetadataMatchCandidates>>,
+          TError,
+          Awaited<ReturnType<typeof getAdminMetadataMatchCandidates>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetAdminMetadataMatchCandidates<TData = Awaited<ReturnType<typeof getAdminMetadataMatchCandidates>>, TError = ErrorType<ApiError>>(
+ type: 'album' | 'song' | 'artist',
+    publicId: string,
+    params?: GetAdminMetadataMatchCandidatesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminMetadataMatchCandidates>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getAdminMetadataMatchCandidates>>,
+          TError,
+          Awaited<ReturnType<typeof getAdminMetadataMatchCandidates>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetAdminMetadataMatchCandidates<TData = Awaited<ReturnType<typeof getAdminMetadataMatchCandidates>>, TError = ErrorType<ApiError>>(
+ type: 'album' | 'song' | 'artist',
+    publicId: string,
+    params?: GetAdminMetadataMatchCandidatesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminMetadataMatchCandidates>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary List MusicBrainz candidates for an album, song or artist
+ */
+
+export function useGetAdminMetadataMatchCandidates<TData = Awaited<ReturnType<typeof getAdminMetadataMatchCandidates>>, TError = ErrorType<ApiError>>(
+ type: 'album' | 'song' | 'artist',
+    publicId: string,
+    params?: GetAdminMetadataMatchCandidatesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminMetadataMatchCandidates>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetAdminMetadataMatchCandidatesQueryOptions(type,publicId,params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetAdminMetadataMatchComparisonUrl = (type: 'album' | 'song' | 'artist',
+    publicId: string,
+    params: GetAdminMetadataMatchComparisonParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/admin/metadata/match/${type}/${publicId}/comparison?${stringifiedParams}` : `/api/admin/metadata/match/${type}/${publicId}/comparison`
+}
+
+/**
+ * Looks the candidate up in MusicBrainz and shows, field by field and, for an album, track by track, the value the item holds and the value a match would set, with the default tick of each row and the artists the ticked credits would merge or remove. Each row has a key an apply names it by.
+ * @summary Compare an album, song or artist with a MusicBrainz candidate
+ */
+export const getAdminMetadataMatchComparison = async (type: 'album' | 'song' | 'artist',
+    publicId: string,
+    params: GetAdminMetadataMatchComparisonParams, options?: Parameters<typeof customInstance>[1]): Promise<GetAdminMetadataMatchComparison200> => {
+
+  return customInstance<GetAdminMetadataMatchComparison200>(getGetAdminMetadataMatchComparisonUrl(type,publicId,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAdminMetadataMatchComparisonQueryKey = (type: 'album' | 'song' | 'artist',
+    publicId: string,
+    params?: GetAdminMetadataMatchComparisonParams,) => {
+    return [
+    `/api/admin/metadata/match/${type}/${publicId}/comparison`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetAdminMetadataMatchComparisonQueryOptions = <TData = Awaited<ReturnType<typeof getAdminMetadataMatchComparison>>, TError = ErrorType<ApiError>>(type: 'album' | 'song' | 'artist',
+    publicId: string,
+    params: GetAdminMetadataMatchComparisonParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminMetadataMatchComparison>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAdminMetadataMatchComparisonQueryKey(type,publicId,params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminMetadataMatchComparison>>> = ({ signal }) => getAdminMetadataMatchComparison(type,publicId,params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: type !== null && type !== undefined && publicId !== null && publicId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAdminMetadataMatchComparison>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetAdminMetadataMatchComparisonQueryResult = NonNullable<Awaited<ReturnType<typeof getAdminMetadataMatchComparison>>>
+export type GetAdminMetadataMatchComparisonQueryError = ErrorType<ApiError>
+
+
+export function useGetAdminMetadataMatchComparison<TData = Awaited<ReturnType<typeof getAdminMetadataMatchComparison>>, TError = ErrorType<ApiError>>(
+ type: 'album' | 'song' | 'artist',
+    publicId: string,
+    params: GetAdminMetadataMatchComparisonParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminMetadataMatchComparison>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getAdminMetadataMatchComparison>>,
+          TError,
+          Awaited<ReturnType<typeof getAdminMetadataMatchComparison>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetAdminMetadataMatchComparison<TData = Awaited<ReturnType<typeof getAdminMetadataMatchComparison>>, TError = ErrorType<ApiError>>(
+ type: 'album' | 'song' | 'artist',
+    publicId: string,
+    params: GetAdminMetadataMatchComparisonParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminMetadataMatchComparison>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getAdminMetadataMatchComparison>>,
+          TError,
+          Awaited<ReturnType<typeof getAdminMetadataMatchComparison>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetAdminMetadataMatchComparison<TData = Awaited<ReturnType<typeof getAdminMetadataMatchComparison>>, TError = ErrorType<ApiError>>(
+ type: 'album' | 'song' | 'artist',
+    publicId: string,
+    params: GetAdminMetadataMatchComparisonParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminMetadataMatchComparison>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Compare an album, song or artist with a MusicBrainz candidate
+ */
+
+export function useGetAdminMetadataMatchComparison<TData = Awaited<ReturnType<typeof getAdminMetadataMatchComparison>>, TError = ErrorType<ApiError>>(
+ type: 'album' | 'song' | 'artist',
+    publicId: string,
+    params: GetAdminMetadataMatchComparisonParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminMetadataMatchComparison>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetAdminMetadataMatchComparisonQueryOptions(type,publicId,params,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 

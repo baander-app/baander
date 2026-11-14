@@ -121,6 +121,41 @@ final class SearchMatchCandidatesHandlerTest extends TestCase
         self::assertSame([$refined->id], self::ids($result->candidates));
     }
 
+    /**
+     * For a compilation or a wrongly tagged album, the admin searches by the title alone. The fit
+     * score still compares each candidate with the album's own artist.
+     */
+    public function testABlankArtistSearchesByTheTitleAloneWhileNoEditSearchesTheItemsOwnArtist(): void
+    {
+        $album = $this->longBed();
+        $release = self::release(self::releaseId(1));
+        $this->musicBrainz->releaseSearches[self::ALBUM_TITLE . '|'] = [self::summary($release)];
+        $this->musicBrainz->releaseSearches[self::SEARCH] = [self::summary($release)];
+        $this->musicBrainz->releases[$release->id] = $release;
+
+        $titleAlone = $this->search($album, artist: ' ');
+        $ownArtist = $this->search($album);
+
+        self::assertNull($titleAlone->artist);
+        self::assertSame(self::ALBUM_ARTIST, $ownArtist->artist);
+        self::assertSame(['findReleases:' . self::ALBUM_TITLE . '|', 'fetchRelease:' . $release->id, 'findReleases:' . self::SEARCH, 'fetchRelease:' . $release->id], $this->musicBrainz->calls);
+        self::assertSame(array_column($ownArtist->candidates, 'score'), array_column($titleAlone->candidates, 'score'), 'Both score against the album\'s own artist.');
+    }
+
+    public function testABlankArtistSearchesASongsRecordingsByTheTitleAlone(): void
+    {
+        $album = $this->addAlbum();
+        $song = $this->addSongsOf($album, self::release(self::releaseId(1), [4]))[3];
+        $this->catalog->creditSong($song, $this->catalog->artist('Post Malone, Luke Combs'), ArtistRole::Primary);
+
+        $result = new SearchMatchCandidatesHandler($this->musicBrainz, $this->scorer(), $this->snapshots())(
+            new SearchMatchCandidatesQuery(MatchItemType::Song, $song->getPublicId()->toString(), artist: ''),
+        );
+
+        self::assertNull($result->artist);
+        self::assertSame(['findRecordings:Track 1-4|'], $this->musicBrainz->calls);
+    }
+
     public function testAnAlbumWithoutAPrimaryCreditIsSearchedByItsTitleAlone(): void
     {
         $album = $this->addAlbum('Now 100');

@@ -1,6 +1,6 @@
 # app:metadata:match:reviews
 
-List the albums that the automatic MusicBrainz matcher could not match with confidence and left for an admin to match. The most recently checked album comes first, and the list is what `GET /api/admin/metadata/match/reviews` returns in the admin API.
+List the albums that the automatic MusicBrainz matcher could not match with confidence and left for an admin to match. The most recently checked album comes first, and the list is what `GET /api/admin/metadata/match/reviews` returns in the admin API. Pass an album's ID to [app:metadata:match:search](app-metadata-match-search.md) to list its MusicBrainz candidates.
 
 ## Quick start
 
