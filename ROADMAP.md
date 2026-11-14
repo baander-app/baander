@@ -1743,11 +1743,11 @@ Open:
 
 - The MusicBrainz lookup button, the splitting of a single artist value that names
   several artists, the extract and match access gap, and merging artists that share a
-  MusicBrainz ID are delivered on `feat/musicbrainz-matching` but not yet merged
-  ([MusicBrainz matching](#musicbrainz-matching)). R7 keeps such a value whole, so
-  "Post Malone, Luke Combs" (album artist "Post Malone", no MusicBrainz IDs) became its
-  own artist, one of 14 "Post Malone, X" artists on the persistent instance; they stay
-  until the album is matched there. On 2026-11-14 the user chose matching over
+  MusicBrainz ID are delivered on `master` at `435a11639` ([MusicBrainz
+  matching](#musicbrainz-matching)). R7 keeps such a value whole, so "Post Malone, Luke
+  Combs" (album artist "Post Malone", no MusicBrainz IDs) became its own artist, one of
+  14 "Post Malone, X" artists on the persistent instance; matching the album there on
+  2026-11-14 merged all 14 into Post Malone. On 2026-11-14 the user chose matching over
   splitting on an album-artist prefix in the scan.
 - At its default 500 ms spacing, `app:lyrics:fetch` drew HTTP 429 from LRCLIB for 34
   of 77 songs on the persistent instance, reported as unavailable; a second run with
@@ -1919,6 +1919,17 @@ Verification checkpoint, 2026-11-14:
   artist, and 22 of 27 recording IDs written; the explicit and clean editions disagree
   on the other 5. Of the library's other four albums, three matched; "Ten Thousand Fists
   [Reprise Records,9362-49433-2,EU]" waits for review with no candidates.
+- Persistent instance, after `master` (`435a11639`) was pushed to both remotes on
+  2026-11-14: the updater ran the revision with web and workers ready and applied the
+  three migrations, and the recovery job exists under its own ID. With the user's
+  go-ahead, `app:metadata:match:apply --force` applied the explicit release
+  `fef8b229-ee77-4e63-a07f-222c1ad56c97` to "F-1 Trillion: Long Bed": 14 to 0 "Post
+  Malone, X" artists, 12 to 27 songs credited to Post Malone as primary, 0 to 15
+  featured credits (14 guests with MusicBrainz IDs), 15 duets keeping their tagged text,
+  27 of 27 songs keeping their lyrics, and 0 to 27 recording IDs.
+- The worktree preview was reset with the user's approval after `83ea8153c` changed the
+  recovery job's ID: its 12 Docker volumes were removed, and its earlier controller
+  state was deleted.
 - Learnings:
   `docs/solutions/runtime-errors/doctrine-cannot-update-a-loaded-entity-keyed-by-its-association-under-the-strict-uuid-type.md`,
   `docs/solutions/developer-experience/in-memory-transport-get-hands-out-one-message-per-call.md`,
@@ -1927,14 +1938,6 @@ Verification checkpoint, 2026-11-14:
 
 Open:
 
-- Persistent instance, after the merge to `master`: the updater applies the three
-  migrations; then, as an operator step with the user's go-ahead, match
-  "F-1 Trillion: Long Bed" from the dialog or turn automatic matching on.
-- The worktree preview was reset with the user's approval after `83ea8153c` changed the
-  recovery job's ID: its 12 Docker volumes were removed and its controller state moved
-  to
-  `~/.local/state/baander/development-reset-backups/preview-fd790a887b6899cb-2026-11-14`.
-  Remove that directory once nothing in it is needed.
 - "Ten Thousand Fists [Reprise Records,9362-49433-2,EU]" finds no MusicBrainz
   candidates, probably because its title carries the label, catalogue number and
   country; an admin can refine the search in the dialog. Removing such text from the
