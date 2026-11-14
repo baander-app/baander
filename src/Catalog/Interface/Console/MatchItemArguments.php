@@ -23,11 +23,11 @@ final class MatchItemArguments
     public static function add(Command $command): void
     {
         $command
-            ->addArgument(self::TYPE, InputArgument::REQUIRED, 'What to match: album, song or artist')
+            ->addArgument(self::TYPE, InputArgument::REQUIRED, 'What to match: ' . MatchItemType::names())
             ->addArgument(self::PUBLIC_ID, InputArgument::REQUIRED, 'The public ID of the album, song or artist');
     }
 
-    /** @throws InvalidInputException when the type is not album, song or artist */
+    /** @throws InvalidInputException when the argument names no match type */
     public static function type(InputInterface $input): MatchItemType
     {
         $type = $input->getArgument(self::TYPE);

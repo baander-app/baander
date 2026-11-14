@@ -35,17 +35,9 @@ final readonly class ContinuousTokenBucketLimiter implements LimiterInterface
     /** @param array<string, mixed> $config a validated `token_bucket` configuration */
     public static function fromConfig(array $config, string $id, StorageInterface $storage): self
     {
-        $seconds = self::seconds($config['rate']['interval']) / ($config['rate']['amount'] ?? 1);
+        $seconds = RateLimiterInterval::seconds($config['rate']['interval']) / ($config['rate']['amount'] ?? 1);
 
         return new self($id, $config['limit'], $seconds, $storage);
-    }
-
-    /** Whole seconds in a configured interval such as `1 second`. */
-    private static function seconds(string $interval): int
-    {
-        $now = new \DateTimeImmutable('@' . time());
-
-        return $now->modify('+' . $interval)->getTimestamp() - $now->getTimestamp();
     }
 
     #[\Override]

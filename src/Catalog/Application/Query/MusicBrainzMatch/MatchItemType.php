@@ -47,7 +47,7 @@ enum MatchItemType: string
     }
 
     /** The types in words: "album, song or artist". */
-    private static function names(): string
+    public static function names(): string
     {
         $names = array_column(self::cases(), 'value');
         $last = array_pop($names);

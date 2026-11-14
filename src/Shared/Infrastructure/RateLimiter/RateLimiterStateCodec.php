@@ -30,10 +30,9 @@ final readonly class RateLimiterStateCodec
             default => throw new \InvalidArgumentException('Unsupported atomic rate limiter policy.'),
         };
         $this->limit = $config['limit'];
-        $now = new \DateTimeImmutable('@' . time());
         $this->interval = $this->class === ContinuousTokenBucket::class
             ? null
-            : $now->modify('+' . $config['interval'])->getTimestamp() - $now->getTimestamp();
+            : RateLimiterInterval::seconds($config['interval']);
     }
 
     public function encode(LimiterStateInterface $state): string
