@@ -24,7 +24,6 @@ use App\Library\Application\Port\LibraryMediaFilesInterface;
 use App\Library\Application\Port\LibraryMediaFileVerdict;
 use App\Lyrics\Application\Port\LyricsFetchRequestInterface;
 use App\Metadata\Application\Port\AlbumMetadataSyncRequestInterface;
-use App\Metadata\Domain\Model\ExtractedMetadata;
 use App\Shared\Application\Port\TransactionPortInterface;
 use App\Shared\Domain\Model\Uuid;
 use App\Transcode\Application\Port\VideoProbePortInterface;
@@ -290,8 +289,8 @@ final class FilesDiscoveredHandler
         $song = [
             'file' => $file,
             'song' => $stored,
-            'credit' => $this->songCredit($metadata),
-            'albumArtist' => $this->albumArtistCredit($metadata),
+            'credit' => $metadata === null ? null : $this->taggedCredit($metadata->getArtists(), $metadata->getMbArtistIds()),
+            'albumArtist' => $metadata === null ? null : $this->taggedCredit($metadata->getAlbumArtists(), $metadata->getMbAlbumArtistIds()),
             'genres' => [],
             'known' => true,
             'probe' => $this->probeKnownFile($file),
@@ -411,25 +410,13 @@ final class FilesDiscoveredHandler
                 'year' => $metadata->getYear(),
                 'comment' => $metadata->getComment(),
             ],
-            'credit' => $this->songCredit($metadata),
-            'albumArtist' => $this->albumArtistCredit($metadata),
+            'credit' => $this->taggedCredit($metadata->getArtists(), $metadata->getMbArtistIds()),
+            'albumArtist' => $this->taggedCredit($metadata->getAlbumArtists(), $metadata->getMbAlbumArtistIds()),
             'genres' => array_values(array_filter(
                 array_map(trim(...), $metadata->getGenre()),
                 static fn (string $genre): bool => $genre !== '',
             )),
         ];
-    }
-
-    /** @return TaggedCredit|null the credit a file's artist values give its song */
-    private function songCredit(?ExtractedMetadata $metadata): ?array
-    {
-        return $metadata === null ? null : $this->taggedCredit($metadata->getArtists(), $metadata->getMbArtistIds());
-    }
-
-    /** @return TaggedCredit|null the credit a file's album-artist values give its album */
-    private function albumArtistCredit(?ExtractedMetadata $metadata): ?array
-    {
-        return $metadata === null ? null : $this->taggedCredit($metadata->getAlbumArtists(), $metadata->getMbAlbumArtistIds());
     }
 
     /**
@@ -497,7 +484,8 @@ final class FilesDiscoveredHandler
             if (array_key_exists($path, $read)) {
                 continue;
             }
-            $credit = $this->metadataReader->readMetadata($path) |> $this->albumArtistCredit(...);
+            $metadata = $this->metadataReader->readMetadata($path);
+            $credit = $metadata === null ? null : $this->taggedCredit($metadata->getAlbumArtists(), $metadata->getMbAlbumArtistIds());
             if ($credit !== null) {
                 return $credit;
             }
