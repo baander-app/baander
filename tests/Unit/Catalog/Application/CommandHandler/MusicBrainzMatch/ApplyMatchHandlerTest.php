@@ -173,6 +173,45 @@ final class ApplyMatchHandlerTest extends TestCase
         self::assertNotContains('resolve', $this->calls);
     }
 
+    /** The cover row shows only whether the album has a cover, and the apply rechecks just that. */
+    public function testACoverTickedWhileTheAlbumHadNoneAnswersStaleOnceTheAlbumTookOne(): void
+    {
+        $album = $this->addAlbum();
+        $release = self::releaseWith($this->countryRelease(), hasFrontCover: true);
+        $this->musicBrainz->releases[$release->id] = $release;
+        $this->addSongsOf($album, $release);
+        $this->lookup->covers[$release->id] = new MusicBrainzCoverImage(base64_decode(self::PIXEL), 'image/png');
+        $comparison = $this->compare(MatchItemType::Album, $album->getPublicId()->toString(), $release->id);
+        self::assertSame([null, true], [$comparison->field(MatchField::Cover)?->current, $comparison->field(MatchField::Cover)?->ticked]);
+        $taken = new Uuid();
+        $this->whileWaitingForTheAlbum = static fn () => $album->setCoverImage($taken);
+
+        $conflict = $this->expectConflict(fn () => ApplyMatchCommand::manual(MatchItemType::Album, $album->getPublicId()->toString(), $release->id, MatchSelections::defaults($comparison)) |> $this->apply(...));
+
+        self::assertSame('match_stale', $conflict->details['reason'] ?? null);
+        self::assertSame($taken->toString(), $album->getCoverImageId()?->toString());
+        self::assertNull($album->getReleaseMbid());
+    }
+
+    public function testReplacingACoverTheAdminSawStoresTheReleasesFrontCover(): void
+    {
+        $album = $this->addAlbum();
+        $old = new Uuid();
+        $album->setCoverImage($old);
+        $release = self::releaseWith($this->countryRelease(), hasFrontCover: true);
+        $this->musicBrainz->releases[$release->id] = $release;
+        $this->addSongsOf($album, $release);
+        $this->lookup->covers[$release->id] = new MusicBrainzCoverImage(base64_decode(self::PIXEL), 'image/png');
+        $comparison = $this->compare(MatchItemType::Album, $album->getPublicId()->toString(), $release->id);
+        self::assertSame([true, false, true], [$comparison->field(MatchField::Cover)?->current, $comparison->field(MatchField::Cover)?->ticked, $comparison->field(MatchField::Cover)?->changes()]);
+
+        $applied = ApplyMatchCommand::manual(MatchItemType::Album, $album->getPublicId()->toString(), $release->id, MatchSelections::defaults($comparison, [MatchField::Cover])) |> $this->apply(...);
+
+        self::assertContains('cover', $applied->fields);
+        self::assertNotNull($album->getCoverImageId());
+        self::assertNotSame($old->toString(), $album->getCoverImageId()->toString());
+    }
+
     public function testAMergeTheAdminWasNotShownAnswersStale(): void
     {
         $album = $this->addAlbum();

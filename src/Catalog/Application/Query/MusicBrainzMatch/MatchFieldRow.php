@@ -11,18 +11,22 @@ use Symfony\Component\DependencyInjection\Attribute\Exclude;
  * the row is ticked by default. MusicBrainz IDs and empty fields are ticked; a field that holds a
  * different value is not. A locked field shows the MusicBrainz value but is never ticked, and the
  * admin cannot tick it. A field MusicBrainz gives no value for has no row.
+ *
+ * The cover row's current value is true when the album has a cover and null when it has none: an
+ * image's ID is internal, and whether a cover is there is what the admin decides on.
  */
 #[Exclude]
 final readonly class MatchFieldRow
 {
     /**
-     * @param string|int|list<string>|null $current  the value the item holds, as the admin saw it; null when empty.
-     *                                               An apply rechecks it before writing the row.
-     * @param string|int|list<string>      $proposed the value MusicBrainz gives
+     * @param string|int|bool|list<string>|null $current  the value the item holds, as the admin saw it; null when empty,
+     *                                                    true for an album that has a cover. An apply rechecks it
+     *                                                    before writing the row.
+     * @param string|int|list<string>           $proposed the value MusicBrainz gives
      */
     public function __construct(
         public MatchField $field,
-        public string|int|array|null $current,
+        public string|int|bool|array|null $current,
         public string|int|array $proposed,
         public bool $ticked,
         public bool $locked,
@@ -30,10 +34,10 @@ final readonly class MatchFieldRow
     }
 
     /**
-     * @param string|int|list<string>|null $current
-     * @param string|int|list<string>      $proposed
+     * @param string|int|bool|list<string>|null $current
+     * @param string|int|list<string>           $proposed
      */
-    public static function compare(MatchField $field, string|int|array|null $current, string|int|array $proposed, bool $locked): self
+    public static function compare(MatchField $field, string|int|bool|array|null $current, string|int|array $proposed, bool $locked): self
     {
         $current = self::isEmpty($current) ? null : $current;
         $ticked = !$locked
@@ -56,10 +60,10 @@ final readonly class MatchFieldRow
     }
 
     /**
-     * @param string|int|list<string>|null $current
-     * @param string|int|list<string>      $proposed
+     * @param string|int|bool|list<string>|null $current
+     * @param string|int|list<string>           $proposed
      */
-    private static function differ(string|int|array|null $current, string|int|array $proposed): bool
+    private static function differ(string|int|bool|array|null $current, string|int|array $proposed): bool
     {
         if (is_array($current) && is_array($proposed)) {
             return self::folded($current) !== self::folded($proposed);
@@ -81,8 +85,8 @@ final readonly class MatchFieldRow
         return $folded;
     }
 
-    /** @param string|int|list<string>|null $value */
-    private static function isEmpty(string|int|array|null $value): bool
+    /** @param string|int|bool|list<string>|null $value */
+    private static function isEmpty(string|int|bool|array|null $value): bool
     {
         return $value === null || $value === [] || (is_string($value) && trim($value) === '');
     }

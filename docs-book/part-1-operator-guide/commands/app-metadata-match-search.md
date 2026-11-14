@@ -57,7 +57,7 @@ The ID column holds the candidate's MusicBrainz ID. A title is followed by Music
 
 An album search asks MusicBrainz for 25 releases, ranks them by title, artist and track count, and looks up the five best with their tracks. Every process shares one budget of one MusicBrainz request per second, so an album search takes several seconds. A blank `--title` counts as not given. `--no-artist`, or a blank `--artist`, searches by the title alone, as the API does for an empty `artist` parameter; the score still compares each candidate with the item's own artist.
 
-When MusicBrainz has no candidate, the command says so and exits with 0, as the API answers 200 with an empty list.
+When MusicBrainz has no candidate, the command says so and exits with 0, as the API answers 200 with an empty list. A type other than `album`, `song` or `artist` exits with 2, and the API answers 422 with the same message.
 
 When MusicBrainz cannot be reached, answers a server error, or no turn of the shared budget comes free within 10 seconds, the command reports that MusicBrainz is unavailable and exits with 1. The API answers 503 with the reason `musicbrainz_unavailable`. When MusicBrainz refuses the request, the API answers 409 with the reason `musicbrainz_rejected`, and the command exits with 1.
 

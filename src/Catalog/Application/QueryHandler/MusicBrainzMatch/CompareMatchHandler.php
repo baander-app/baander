@@ -55,7 +55,7 @@ final readonly class CompareMatchHandler
     {
         $snapshot = $this->snapshots->album($publicId);
         $release = ($this->musicBrainz->fetchRelease($releaseId) |> MusicBrainzAnswer::unwrap(...))
-            ?? throw self::unknownCandidate('release', $releaseId);
+            ?? throw MusicBrainzAnswer::unknownCandidate(MatchItemType::Album);
         $scored = $this->scorer->scoreRelease($release, $snapshot->localAlbum());
 
         return $this->comparisons->album($snapshot, new MatchCandidate($release, $scored->score, $scored->pairs, [$release]));
@@ -65,7 +65,7 @@ final readonly class CompareMatchHandler
     {
         $snapshot = $this->snapshots->song($publicId);
         $recording = ($this->musicBrainz->fetchRecording($recordingId) |> MusicBrainzAnswer::unwrap(...))
-            ?? throw self::unknownCandidate('recording', $recordingId);
+            ?? throw MusicBrainzAnswer::unknownCandidate(MatchItemType::Song);
 
         return $this->comparisons->song($snapshot, $recording);
     }
@@ -74,13 +74,8 @@ final readonly class CompareMatchHandler
     {
         $artist = $this->snapshots->artist($publicId);
         $candidate = ($this->musicBrainz->fetchArtist($artistId) |> MusicBrainzAnswer::unwrap(...))
-            ?? throw self::unknownCandidate('artist', $artistId);
+            ?? throw MusicBrainzAnswer::unknownCandidate(MatchItemType::Artist);
 
         return $this->comparisons->artist($artist, $candidate);
-    }
-
-    private static function unknownCandidate(string $entity, string $id): NotFoundException
-    {
-        return new NotFoundException(sprintf('MusicBrainz has no %s "%s".', $entity, $id));
     }
 }

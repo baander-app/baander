@@ -93,7 +93,7 @@ final readonly class MatchComparisonBuilder
             self::row(MatchField::Country, $album->getCountry(), self::agreed($candidate, static fn (MusicBrainzRelease $edition): ?string => $edition->country), $locked),
             self::row(MatchField::Disambiguation, $album->getDisambiguation(), self::agreed($candidate, static fn (MusicBrainzRelease $edition): ?string => $edition->disambiguation), $locked),
             self::row(MatchField::Genres, $snapshot->genres, self::agreed($candidate, self::genres(...)), $locked),
-            self::row(MatchField::Cover, $album->getCoverImageId()?->toString(), $release->hasFrontCover ? $release->id : null, $locked),
+            self::row(MatchField::Cover, $album->getCoverImageId() === null ? null : true, $release->hasFrontCover ? $release->id : null, $locked),
         ] |> array_filter(...) |> array_values(...);
 
         $albumCredit = self::agreed($candidate, static fn (MusicBrainzRelease $edition): MusicBrainzArtistCredit => $edition->artistCredit);
@@ -419,11 +419,11 @@ final readonly class MatchComparisonBuilder
     /**
      * A row for a field MusicBrainz gives a value for; null when it gives none.
      *
-     * @param string|int|list<string>|null $current
-     * @param string|int|list<string>|null $proposed
-     * @param array<string>                $lockedFields
+     * @param string|int|bool|list<string>|null $current
+     * @param string|int|list<string>|null      $proposed
+     * @param array<string>                     $lockedFields
      */
-    private static function row(MatchField $field, string|int|array|null $current, string|int|array|null $proposed, array $lockedFields): ?MatchFieldRow
+    private static function row(MatchField $field, string|int|bool|array|null $current, string|int|array|null $proposed, array $lockedFields): ?MatchFieldRow
     {
         if ($proposed === null || $proposed === [] || (is_string($proposed) && trim($proposed) === '')) {
             return null;

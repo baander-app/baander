@@ -16,9 +16,9 @@ use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * app:metadata:match:search and app:metadata:match:compare reach the queries the candidates and
- * comparison routes reach, print the routes' data with --json, and report the routes' failures
- * with the same messages.
+ * app:metadata:match:search, app:metadata:match:compare and app:metadata:match:apply reach the
+ * use cases the candidates, comparison and apply routes reach, print the routes' data with --json,
+ * and report the routes' failures with the same messages and the matching exit codes.
  */
 final class MusicBrainzMatchCliParityTest extends TestCase
 {
@@ -120,6 +120,7 @@ final class MusicBrainzMatchCliParityTest extends TestCase
         $unknown = self::releaseId(9);
 
         $notFound = $this->assertJsonResponse($this->get($this->albumPath('comparison') . '?candidate=' . $unknown), 404);
+        self::assertSame('MusicBrainz has no such release.', $notFound['error']['message'], 'The message names no ID, which the API would mask.');
         $compare = $this->command('app:metadata:match:compare');
         self::assertSame(Command::FAILURE, $compare->execute(['type' => 'album', 'public-id' => $publicId, 'candidate' => $unknown]));
         self::assertStringContainsString($notFound['error']['message'], $compare->getDisplay() |> $this->flatten(...));
@@ -128,6 +129,91 @@ final class MusicBrainzMatchCliParityTest extends TestCase
         $malformed = $this->command('app:metadata:match:compare');
         self::assertSame(Command::INVALID, $malformed->execute(['type' => 'album', 'public-id' => $publicId, 'candidate' => 'not-an-id']));
         self::assertStringContainsString($invalid['error']['message'], $malformed->getDisplay() |> $this->flatten(...));
+    }
+
+    public function testApplyWithoutASelectionAppliesTheDefaultTicksAndPrintsTheApiData(): void
+    {
+        // The apply merges and deletes an artist the fixture left managed in the shared entity manager.
+        $this->entityManager->clear();
+        $apply = $this->command('app:metadata:match:apply');
+
+        self::assertSame(Command::SUCCESS, $apply->execute([
+            'type' => 'album',
+            'public-id' => $this->album->getPublicId()->toString(),
+            'candidate' => $this->release->id,
+            '--force' => true,
+            '--json' => true,
+        ]), $apply->getDisplay());
+
+        $data = $this->json($apply);
+        self::assertSame(['album', $this->album->getPublicId()->toString(), $this->release->id], [$data['type'], $data['publicId'], $data['candidateId']]);
+        self::assertEqualsCanonicalizing(['releaseMbid', 'country'], $data['fields']);
+        self::assertSame([3, [$this->duetArtist->getPublicId()->toString()], []], [$data['songsChanged'], $data['mergedArtists'], $data['removedArtists']]);
+        self::assertSame($this->release->id, $this->releaseOfAlbum());
+        self::assertSame([['Post Malone', 'primary', 'Post Malone, Luke Combs'], ['Luke Combs', 'featured', 'Luke Combs']], $this->creditsOf($this->longBedSongs[1]));
+        self::assertSame(0, $this->artistCount('Post Malone, Luke Combs'));
+    }
+
+    public function testAStaleSelectionAnswers409AndExits1WithTheSameMessage(): void
+    {
+        $comparison = $this->assertJsonResponse($this->get($this->albumPath('comparison') . '?candidate=' . $this->release->id), 200, 'data')['data'];
+        $body = self::defaultTicks($comparison);
+        $body['fields'][] = ['key' => 'year', 'current' => 2022];
+
+        $this->entityManager->clear();
+        $error = $this->assertJsonResponse($this->authenticatedRequest('POST', $this->albumPath('apply'), $this->admin, $body), 409);
+        self::assertSame('match_stale', $error['error']['details']['reason'] ?? null);
+
+        $apply = $this->command('app:metadata:match:apply');
+        self::assertSame(Command::FAILURE, $apply->execute([
+            'type' => 'album',
+            'public-id' => $this->album->getPublicId()->toString(),
+            'candidate' => $this->release->id,
+            '--selection' => json_encode($body, JSON_THROW_ON_ERROR),
+            '--force' => true,
+        ]));
+        self::assertStringContainsString($error['error']['message'], $apply->getDisplay() |> $this->flatten(...));
+        self::assertNull($this->releaseOfAlbum());
+        self::assertSame(1, $this->artistCount('Post Malone, Luke Combs'));
+    }
+
+    public function testAMalformedSelectionAnswers422AndExits2WithTheSameMessages(): void
+    {
+        $body = ['fields' => [['key' => 'colour', 'current' => 'red']]];
+
+        $error = $this->assertJsonResponse($this->authenticatedRequest('POST', $this->albumPath('apply'), $this->admin, ['candidate' => $this->release->id, ...$body]), 422);
+
+        $apply = $this->command('app:metadata:match:apply');
+        self::assertSame(Command::INVALID, $apply->execute([
+            'type' => 'album',
+            'public-id' => $this->album->getPublicId()->toString(),
+            'candidate' => $this->release->id,
+            '--selection' => json_encode($body, JSON_THROW_ON_ERROR),
+            '--force' => true,
+        ]));
+        $display = $apply->getDisplay() |> $this->flatten(...);
+        self::assertStringContainsString($error['error']['message'], $display);
+        self::assertStringContainsString('fields[0].key: ' . $error['error']['details']['fields[0].key'][0], $display);
+        self::assertSame([], $this->musicBrainz->calls);
+    }
+
+    public function testAnUnknownTypeAnswers422AndExits2WithTheSameMessage(): void
+    {
+        $publicId = $this->album->getPublicId()->toString();
+        $error = $this->assertJsonResponse($this->get('/api/admin/metadata/match/release/' . $publicId . '/candidates'), 422);
+        $applyError = $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/admin/metadata/match/release/' . $publicId . '/apply', $this->admin, ['candidate' => $this->release->id]), 422);
+        self::assertSame($error['error']['message'], $applyError['error']['message']);
+
+        foreach ([
+            'app:metadata:match:search' => [],
+            'app:metadata:match:compare' => ['candidate' => $this->release->id],
+            'app:metadata:match:apply' => ['candidate' => $this->release->id, '--force' => true],
+        ] as $name => $arguments) {
+            $command = $this->command($name);
+            self::assertSame(Command::INVALID, $command->execute(['type' => 'release', 'public-id' => $publicId, ...$arguments]), $name);
+            self::assertStringContainsString($error['error']['message'], $command->getDisplay() |> $this->flatten(...), $name);
+        }
+        self::assertSame([], $this->musicBrainz->calls);
     }
 
     private function get(string $path): Response

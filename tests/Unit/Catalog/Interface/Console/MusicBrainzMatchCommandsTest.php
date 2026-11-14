@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Catalog\Interface\Console;
 
 use App\Catalog\Application\Query\MusicBrainzMatch\CompareMatchQuery;
-use App\Catalog\Application\Query\MusicBrainzMatch\MatchItemType;
 use App\Catalog\Application\Query\MusicBrainzMatch\SearchMatchCandidatesQuery;
 use App\Catalog\Application\QueryHandler\MusicBrainzMatch\CompareMatchHandler;
 use App\Catalog\Application\QueryHandler\MusicBrainzMatch\MatchComparisonBuilder;
@@ -20,6 +19,7 @@ use App\Catalog\Interface\Controller\MusicBrainzMatchController;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzArtist;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzRelease;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzUnavailable;
+use App\Shared\Application\Exception\InvalidInputException;
 use App\Shared\Interface\Console\AdminCommandSupport;
 use App\Tests\Unit\Catalog\Application\QueryHandler\MusicBrainzMatch\MatchQueryFixtures;
 use PHPUnit\Framework\TestCase;
@@ -56,7 +56,7 @@ final class MusicBrainzMatchCommandsTest extends TestCase
         $publicId = $album->getPublicId()->toString();
 
         $endpoint = $this->controller()->candidates(
-            MatchItemType::Album,
+            'album',
             $publicId,
             Request::create('/api/admin/metadata/match/album/' . $publicId . '/candidates', 'GET', ['title' => 'F-1 Trillion', 'artist' => 'Post Malone']),
         ) |> self::data(...);
@@ -78,7 +78,7 @@ final class MusicBrainzMatchCommandsTest extends TestCase
         $publicId = $album->getPublicId()->toString();
 
         $endpoint = $this->controller()->candidates(
-            MatchItemType::Album,
+            'album',
             $publicId,
             Request::create('/api/admin/metadata/match/album/' . $publicId . '/candidates', 'GET', ['artist' => '']),
         ) |> self::data(...);
@@ -134,7 +134,7 @@ final class MusicBrainzMatchCommandsTest extends TestCase
         $publicId = $album->getPublicId()->toString();
 
         $endpoint = $this->controller()->comparison(
-            MatchItemType::Album,
+            'album',
             $publicId,
             Request::create('/api/admin/metadata/match/album/' . $publicId . '/comparison', 'GET', ['candidate' => $release->id]),
         ) |> self::data(...);
@@ -155,7 +155,7 @@ final class MusicBrainzMatchCommandsTest extends TestCase
         $publicId = $album->getPublicId()->toString();
 
         $endpoint = $this->controller()->comparison(
-            MatchItemType::Album,
+            'album',
             $publicId,
             Request::create('/api/admin/metadata/match/album/' . $publicId . '/comparison', 'GET', ['candidate' => $release->id]),
         ) |> self::data(...);
@@ -194,15 +194,27 @@ final class MusicBrainzMatchCommandsTest extends TestCase
         );
     }
 
-    public function testATypeThatIsNotAlbumSongOrArtistIsInvalidInput(): void
+    /** The routes take any type segment and answer it as invalid input, as the commands do. */
+    public function testATypeThatIsNotAlbumSongOrArtistIsInvalidInputOnBothPaths(): void
     {
         $search = $this->search();
         $compare = $this->compare();
 
         self::assertSame(Command::INVALID, $search->execute(['type' => 'release', 'public-id' => 'longBedAlbumPublicId1']));
         self::assertSame(Command::INVALID, $compare->execute(['type' => 'albums', 'public-id' => 'longBedAlbumPublicId1', 'candidate' => self::releaseId(1)]));
-
         self::assertStringContainsString('The type must be album, song or artist.', $search->getDisplay());
+
+        foreach ([
+            fn (): mixed => $this->controller()->candidates('release', 'longBedAlbumPublicId1', Request::create('/')),
+            fn (): mixed => $this->controller()->comparison('albums', 'longBedAlbumPublicId1', Request::create('/', 'GET', ['candidate' => self::releaseId(1)])),
+        ] as $route) {
+            try {
+                $route();
+                self::fail('The route accepted a type that is not album, song or artist.');
+            } catch (InvalidInputException $invalid) {
+                self::assertSame('The type must be album, song or artist.', $invalid->getMessage());
+            }
+        }
         self::assertSame([], $this->musicBrainz->calls);
     }
 
@@ -224,7 +236,7 @@ final class MusicBrainzMatchCommandsTest extends TestCase
         $compare = $this->compare();
 
         self::assertSame(Command::FAILURE, $compare->execute(['type' => 'album', 'public-id' => $publicId, 'candidate' => self::releaseId(9)]));
-        self::assertStringContainsString(sprintf('MusicBrainz has no release "%s".', self::releaseId(9)), $compare->getDisplay());
+        self::assertStringContainsString('MusicBrainz has no such release.', $compare->getDisplay());
 
         self::assertSame(Command::INVALID, $compare->execute(['type' => 'album', 'public-id' => $publicId, 'candidate' => 'not-an-id']));
     }

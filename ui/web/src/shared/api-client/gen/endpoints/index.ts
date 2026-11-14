@@ -491,6 +491,44 @@ export interface UpdateMovieRequest {
   summary?: string | null;
 }
 
+export type ApplyMatchRequestFieldsItem = {
+  /** The row's key: the field, or "<song public ID>:<field>" for a row of one of an album's songs */
+  key: string;
+  /** The current value the row showed; null when it showed none */
+  current: string | number | boolean | string[] | null;
+};
+
+export type ApplyMatchRequestCreditsItemCurrentItem = {
+  /**
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
+  artistPublicId: string;
+  /** @nullable */
+  role: string | null;
+  creditedName: string;
+};
+
+export type ApplyMatchRequestCreditsItem = {
+  /** The row's key: "credits", or "<song public ID>:credits" for one of an album's songs */
+  key: string;
+  current: ApplyMatchRequestCreditsItemCurrentItem[];
+};
+
+export interface ApplyMatchRequest {
+  /** The MusicBrainz ID compared: a release for an album, a recording for a song, an artist for an artist */
+  candidate: string;
+  /** The ticked field rows, each by its key with the current value the comparison showed */
+  fields?: ApplyMatchRequestFieldsItem[];
+  /** The ticked credits rows, each by its key with the credits the comparison showed as current */
+  credits?: ApplyMatchRequestCreditsItem[];
+  /** The public IDs of the artists whose listed merge or removal stays ticked */
+  artistActions?: string[];
+  /** The public IDs of the artists whose listed merge or removal was unticked */
+  keptArtists?: string[];
+}
+
 export interface UpdateSongRequest {
   /** @nullable */
   title?: string | null;
@@ -2716,6 +2754,45 @@ export interface MatchComparisonResource {
   tracks: MatchTrackResource[];
   /** The artists the match would merge or remove */
   artistActions: MatchArtistActionResource[];
+}
+
+/**
+ * What was matched
+ */
+export type MatchApplyResultResourceType = typeof MatchApplyResultResourceType[keyof typeof MatchApplyResultResourceType];
+
+
+export const MatchApplyResultResourceType = {
+  album: 'album',
+  song: 'song',
+  artist: 'artist',
+} as const;
+
+export interface MatchApplyResultResource {
+  /** What was matched */
+  type: MatchApplyResultResourceType;
+  /**
+     * The album's, song's or artist's public ID
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
+  publicId: string;
+  /** The MusicBrainz ID applied: a release, recording or artist */
+  candidateId: string;
+  /** The item's own fields the match wrote, by field name */
+  fields: string[];
+  /** Whether the item's own artist credits changed */
+  creditsChanged: boolean;
+  /**
+     * How many of an album's songs took fields or credits
+     * @minimum 0
+     */
+  songsChanged: number;
+  /** The public IDs of the artists merged into another artist */
+  mergedArtists: string[];
+  /** The public IDs of the artists removed */
+  removedArtists: string[];
 }
 
 export type CursorPaginatedResponseMeta = {
@@ -5452,6 +5529,10 @@ export type GetAdminMetadataMatchComparisonParams = {
 
 export type GetAdminMetadataMatchComparison200 = {
   data?: MatchComparisonResource;
+};
+
+export type PostAdminMetadataMatchApply200 = {
+  data?: MatchApplyResultResource;
 };
 
 export type GetSongIndexParams = {
@@ -18371,6 +18452,98 @@ export function useGetAdminMetadataMatchComparison<TData = Awaited<ReturnType<ty
 
 
 
+
+export const getPostAdminMetadataMatchApplyUrl = (type: 'album' | 'song' | 'artist',
+    publicId: string,) => {
+
+
+
+
+  return `/api/admin/metadata/match/${type}/${publicId}/apply`
+}
+
+/**
+ * Writes the ticked rows of the comparison of the item with the candidate, named by the keys the comparison gave them, each with the current value it showed. Every merge or removal the comparison lists must appear in `artistActions` (applied) or `keptArtists` (left as it is). A row that no longer shows what the admin saw, a merge or removal the request does not name, or a deadlock with another writer answers 409 and writes nothing.
+ * @summary Apply a MusicBrainz match to an album, song or artist
+ */
+export const postAdminMetadataMatchApply = async (type: 'album' | 'song' | 'artist',
+    publicId: string,
+    applyMatchRequest: ApplyMatchRequest, options?: Parameters<typeof customInstance>[1]): Promise<PostAdminMetadataMatchApply200> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customInstance<PostAdminMetadataMatchApply200>(getPostAdminMetadataMatchApplyUrl(type,publicId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(applyMatchRequest)
+  }
+);}
+
+
+
+
+
+export const getPostAdminMetadataMatchApplyMutationKey = () => ['postAdminMetadataMatchApply'] as const;
+
+export const getPostAdminMetadataMatchApplyMutationOptions = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAdminMetadataMatchApply>>, TError,PostAdminMetadataMatchApplyMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof postAdminMetadataMatchApply>>, TError,PostAdminMetadataMatchApplyMutationVariables, TContext> => {
+
+const mutationKey = getPostAdminMetadataMatchApplyMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postAdminMetadataMatchApply>>, PostAdminMetadataMatchApplyMutationVariables> = (props) => {
+          const {type,publicId,data} = props ?? {};
+
+          return  postAdminMetadataMatchApply(type,publicId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostAdminMetadataMatchApplyMutationResult = NonNullable<Awaited<ReturnType<typeof postAdminMetadataMatchApply>>>
+    export type PostAdminMetadataMatchApplyMutationBody = BodyType<ApplyMatchRequest>
+    export type PostAdminMetadataMatchApplyMutationError = ErrorType<ApiError>
+    export type PostAdminMetadataMatchApplyMutationVariables = {type: 'album' | 'song' | 'artist';publicId: string;data: BodyType<ApplyMatchRequest>}
+
+    /**
+ * @summary Apply a MusicBrainz match to an album, song or artist
+ */
+export const usePostAdminMetadataMatchApply = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAdminMetadataMatchApply>>, TError,PostAdminMetadataMatchApplyMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof postAdminMetadataMatchApply>>,
+        TError,
+        PostAdminMetadataMatchApplyMutationVariables,
+        TContext
+      > => {
+      return useMutation(getPostAdminMetadataMatchApplyMutationOptions(options), queryClient);
+    }
 
 export const getGetSongIndexUrl = (params?: GetSongIndexParams,) => {
   const normalizedParams = new URLSearchParams();

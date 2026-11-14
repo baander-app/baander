@@ -57,7 +57,7 @@ final class MatchSelections
     /**
      * The selection as plain arrays, for a child process.
      *
-     * @return array{fields: list<array{field: string, current: string|int|list<string>|null, song: string|null}>, credits: list<array{song: string|null, current: list<array{string, string|null, string}>}>, artistActions: list<string>, keptArtists: list<string>}
+     * @return array{fields: list<array{field: string, current: string|int|bool|list<string>|null, song: string|null}>, credits: list<array{song: string|null, current: list<array{string, string|null, string}>}>, artistActions: list<string>, keptArtists: list<string>}
      */
     public static function toArray(MatchSelection $selection): array
     {
@@ -75,7 +75,7 @@ final class MatchSelections
         ];
     }
 
-    /** @param array{fields: list<array{field: string, current: string|int|list<string>|null, song: string|null}>, credits: list<array{song: string|null, current: list<array{string, string|null, string}>}>, artistActions: list<string>, keptArtists: list<string>} $selection */
+    /** @param array{fields: list<array{field: string, current: string|int|bool|list<string>|null, song: string|null}>, credits: list<array{song: string|null, current: list<array{string, string|null, string}>}>, artistActions: list<string>, keptArtists: list<string>} $selection */
     public static function fromArray(array $selection): MatchSelection
     {
         return new MatchSelection(

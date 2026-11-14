@@ -10,16 +10,20 @@ use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 
-/** The arguments the MusicBrainz match commands name their item by: its type and public ID, as the match routes' path does. */
+/**
+ * The arguments the MusicBrainz match commands name their item by, its type and public ID as the
+ * match routes' path does, and the candidate a comparison or apply takes.
+ */
 final class MatchItemArguments
 {
     private const string TYPE = 'type';
     private const string PUBLIC_ID = 'public-id';
+    private const string CANDIDATE = 'candidate';
 
     public static function add(Command $command): void
     {
         $command
-            ->addArgument(self::TYPE, InputArgument::REQUIRED, 'What to match: ' . self::types())
+            ->addArgument(self::TYPE, InputArgument::REQUIRED, 'What to match: album, song or artist')
             ->addArgument(self::PUBLIC_ID, InputArgument::REQUIRED, 'The public ID of the album, song or artist');
     }
 
@@ -28,8 +32,7 @@ final class MatchItemArguments
     {
         $type = $input->getArgument(self::TYPE);
 
-        return (is_string($type) ? MatchItemType::tryFrom($type) : null)
-            ?? throw new InvalidInputException(sprintf('The type must be %s.', self::types()));
+        return MatchItemType::fromInput(is_string($type) ? $type : '');
     }
 
     public static function publicId(InputInterface $input): string
@@ -39,12 +42,15 @@ final class MatchItemArguments
         return is_string($publicId) ? $publicId : '';
     }
 
-    /** The types in words, such as "album, song or artist". */
-    private static function types(): string
+    public static function addCandidate(Command $command): void
     {
-        $types = array_column(MatchItemType::cases(), 'value');
-        $last = array_pop($types);
+        $command->addArgument(self::CANDIDATE, InputArgument::REQUIRED, 'The candidate\'s MusicBrainz ID, as app:metadata:match:search lists it');
+    }
 
-        return implode(', ', $types) . ' or ' . $last;
+    public static function candidate(InputInterface $input): string
+    {
+        $candidate = $input->getArgument(self::CANDIDATE);
+
+        return is_string($candidate) ? $candidate : '';
     }
 }

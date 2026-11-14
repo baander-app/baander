@@ -117,8 +117,7 @@ final class MatchComparisonResourceTest extends TestCase
 
     public function testTheDataHoldsNoInternalIdAndShowsTheCoverOnlyAsPresent(): void
     {
-        $cover = new Uuid();
-        $comparison = $this->albumComparison([MatchFieldRow::compare(MatchField::Cover, $cover->toString(), self::RELEASE, false)]);
+        $comparison = $this->albumComparison([MatchFieldRow::compare(MatchField::Cover, true, self::RELEASE, false)]);
 
         $data = MatchComparisonResource::from($comparison);
         $json = json_encode($data, JSON_THROW_ON_ERROR);

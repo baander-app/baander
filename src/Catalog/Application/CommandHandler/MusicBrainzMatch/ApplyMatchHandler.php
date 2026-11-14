@@ -195,7 +195,7 @@ final readonly class ApplyMatchHandler
             $releaseId = self::musicbrainzId($command->candidateId);
             $snapshot = $this->snapshots->album($command->publicId);
             $release = ($this->musicBrainz->fetchRelease($releaseId) |> MusicBrainzAnswer::unwrap(...))
-                ?? throw self::unknownCandidate('release', $releaseId);
+                ?? throw MusicBrainzAnswer::unknownCandidate(MatchItemType::Album);
             $scored = $this->scorer->scoreRelease($release, $snapshot->localAlbum());
             $candidate = new MatchCandidate($release, $scored->score, $scored->pairs, [$release]);
             $wait = MusicBrainzSlotWait::Bounded;
@@ -211,7 +211,7 @@ final readonly class ApplyMatchHandler
             [$applied, $discard] = $this->transaction->run(function () use ($command, $albumId, $candidate, $locks, $cover, &$coverSaved): array {
                 $this->albums->lockInIdOrder([$albumId]);
                 $this->lock($locks);
-                $album = $this->albums->findFreshByUuid($albumId) ?? throw self::gone(MatchItemType::Album, $albumId);
+                $album = $this->albums->findFreshByUuid($albumId) ?? throw self::gone(MatchItemType::Album);
                 self::assertReleaseUnchanged($command, $album);
                 // The songs read before the transaction are held by this process as they were then.
                 foreach ($locks->songIds as $songId) {
@@ -249,7 +249,7 @@ final readonly class ApplyMatchHandler
         $recordingId = self::musicbrainzId($command->candidateId);
         $snapshot = $this->snapshots->song($command->publicId ?? '');
         $recording = ($this->musicBrainz->fetchRecording($recordingId) |> MusicBrainzAnswer::unwrap(...))
-            ?? throw self::unknownCandidate('recording', $recordingId);
+            ?? throw MusicBrainzAnswer::unknownCandidate(MatchItemType::Song);
 
         $songId = $snapshot->song->getId();
         $plan = $this->songPlan($selection, $this->comparisons->song($snapshot, $recording), $snapshot, $recording->artistCredit);
@@ -258,7 +258,7 @@ final readonly class ApplyMatchHandler
 
         [$applied, $discard] = $this->transaction->run(function () use ($selection, $songId, $recording, $locks): array {
             $this->lock($locks);
-            $song = $this->songs->findFreshByUuid($songId) ?? throw self::gone(MatchItemType::Song, $songId);
+            $song = $this->songs->findFreshByUuid($songId) ?? throw self::gone(MatchItemType::Song);
             $snapshot = $this->snapshots->ofSong($song);
             $plan = $this->songPlan($selection, $this->comparisons->song($snapshot, $recording), $snapshot, $recording->artistCredit);
             if (!$locks->covers($plan->locks())) {
@@ -300,7 +300,7 @@ final readonly class ApplyMatchHandler
         $artistMbid = self::musicbrainzId($command->candidateId);
         $artist = $this->snapshots->artist($command->publicId ?? '');
         $candidate = ($this->musicBrainz->fetchArtist($artistMbid) |> MusicBrainzAnswer::unwrap(...))
-            ?? throw self::unknownCandidate('artist', $artistMbid);
+            ?? throw MusicBrainzAnswer::unknownCandidate(MatchItemType::Artist);
 
         $artistId = $artist->getId();
         $locks = self::artistLocks($artist, $candidate, MatchTicks::manual($this->comparisons->artist($artist, $candidate), $selection));
@@ -308,7 +308,7 @@ final readonly class ApplyMatchHandler
         [$applied, $discard] = $this->transaction->run(function () use ($selection, $artistId, $candidate, $locks): array {
             $this->songs->lockImportIdentities($locks->identities, []);
             $this->merges->lock($locks->artistIds);
-            $artist = $this->artists->findFreshByUuid($artistId) ?? throw self::gone(MatchItemType::Artist, $artistId);
+            $artist = $this->artists->findFreshByUuid($artistId) ?? throw self::gone(MatchItemType::Artist);
             $ticks = MatchTicks::manual($this->comparisons->artist($artist, $candidate), $selection);
             if (!$locks->covers(self::artistLocks($artist, $candidate, $ticks))) {
                 throw MatchTicks::stale('The artist changed since the comparison.');
@@ -680,13 +680,8 @@ final readonly class ApplyMatchHandler
         return MusicbrainzId::tryFromString($id)?->toString() ?? throw new InvalidInputException('Invalid MusicBrainz ID format.');
     }
 
-    private static function unknownCandidate(string $entity, string $id): NotFoundException
+    private static function gone(MatchItemType $type): NotFoundException
     {
-        return new NotFoundException(sprintf('MusicBrainz has no %s "%s".', $entity, $id));
-    }
-
-    private static function gone(MatchItemType $type, Uuid $id): NotFoundException
-    {
-        return new NotFoundException(sprintf('%s "%s" no longer exists.', $type->label(), $id->toString()));
+        return new NotFoundException(sprintf('The %s no longer exists.', $type->label() |> strtolower(...)));
     }
 }

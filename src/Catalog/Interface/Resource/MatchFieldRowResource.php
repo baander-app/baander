@@ -4,15 +4,11 @@ declare(strict_types=1);
 
 namespace App\Catalog\Interface\Resource;
 
-use App\Catalog\Application\Query\MusicBrainzMatch\MatchField;
 use App\Catalog\Application\Query\MusicBrainzMatch\MatchFieldRow;
 use OpenApi\Attributes as OA;
 
 /**
  * One field row of a MusicBrainz match comparison, keyed as an apply takes it back.
- *
- * The cover row's current value only says whether the album has a cover: the image's ID is
- * internal.
  *
  * @phpstan-type FieldRowData array{key: string, field: string, songPublicId: string|null, current: string|int|bool|list<string>|null, proposed: string|int|list<string>, ticked: bool, locked: bool, changes: bool}
  */
@@ -62,21 +58,11 @@ final class MatchFieldRowResource
             'key' => MatchComparisonResource::rowKey($row->field->value, $songPublicId),
             'field' => $row->field->value,
             'songPublicId' => $songPublicId,
-            'current' => self::current($row),
+            'current' => $row->current,
             'proposed' => $row->proposed,
             'ticked' => $row->ticked,
             'locked' => $row->locked,
             'changes' => $row->changes(),
         ];
-    }
-
-    /** @return string|int|bool|list<string>|null */
-    private static function current(MatchFieldRow $row): string|int|bool|array|null
-    {
-        if ($row->field === MatchField::Cover) {
-            return $row->current === null ? null : true;
-        }
-
-        return $row->current;
     }
 }

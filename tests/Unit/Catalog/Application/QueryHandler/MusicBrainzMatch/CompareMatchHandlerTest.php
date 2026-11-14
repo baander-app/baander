@@ -27,6 +27,7 @@ use App\Shared\Application\Exception\InvalidInputException;
 use App\Shared\Application\Exception\NotFoundException;
 use App\Shared\Application\Exception\ServiceUnavailableException;
 use App\Shared\Domain\Model\PublicId;
+use App\Shared\Domain\Model\Uuid;
 use PHPUnit\Framework\TestCase;
 
 final class CompareMatchHandlerTest extends TestCase
@@ -63,6 +64,18 @@ final class CompareMatchHandlerTest extends TestCase
         self::assertRow(MatchField::ReleaseMbid, null, $release->id, ticked: true, row: $comparison->field(MatchField::ReleaseMbid));
         self::assertRow(MatchField::Mbid, null, 'a1b0f000-0000-4000-8000-000000000001', ticked: true, row: $comparison->field(MatchField::Mbid));
         self::assertNull($comparison->field(MatchField::Label), 'MusicBrainz gives no label, so there is no row.');
+    }
+
+    /** An image's ID is internal: the cover row shows only whether the album has a cover. */
+    public function testTheCoverRowShowsWhetherTheAlbumHasACover(): void
+    {
+        $release = self::releaseWith(self::release(self::releaseId(1)), hasFrontCover: true);
+        $bare = $this->addAlbum('Bare');
+        $covered = $this->addAlbum('Covered');
+        $covered->setCoverImage(new Uuid());
+
+        self::assertRow(MatchField::Cover, null, $release->id, ticked: true, row: $this->compareAlbum($bare, $release)->field(MatchField::Cover));
+        self::assertRow(MatchField::Cover, true, $release->id, ticked: false, row: $this->compareAlbum($covered, $release)->field(MatchField::Cover));
     }
 
     public function testALockedTitleShowsTheMusicBrainzTitleButCannotBeTicked(): void
@@ -342,10 +355,10 @@ final class CompareMatchHandlerTest extends TestCase
     }
 
     /**
-     * @param string|int|list<string>|null $current
+     * @param string|int|bool|list<string>|null $current
      * @param string|int|list<string>      $proposed
      */
-    private static function assertRow(MatchField $field, string|int|array|null $current, string|int|array $proposed, bool $ticked, ?MatchFieldRow $row): void
+    private static function assertRow(MatchField $field, string|int|bool|array|null $current, string|int|array $proposed, bool $ticked, ?MatchFieldRow $row): void
     {
         self::assertEquals(new MatchFieldRow($field, $current, $proposed, $ticked, locked: false), $row);
     }

@@ -212,12 +212,15 @@ final readonly class MatchTicks
     }
 
     /**
-     * @param string|int|list<string>|null $current the value the row shows now
-     * @param string|int|list<string>|null $seen    the value the admin saw
+     * @param string|int|bool|list<string>|null $current the value the row shows now
+     * @param string|int|bool|list<string>|null $seen    the value the admin saw
      */
-    private static function sameValue(string|int|array|null $current, string|int|array|null $seen): bool
+    private static function sameValue(string|int|bool|array|null $current, string|int|bool|array|null $seen): bool
     {
         $seen = $seen === [] || (is_string($seen) && trim($seen) === '') ? null : $seen;
+        if (is_bool($current) || is_bool($seen)) {
+            return $current === $seen;
+        }
         if (is_array($current) || is_array($seen)) {
             return is_array($current) && is_array($seen) && self::folded($current) === self::folded($seen);
         }

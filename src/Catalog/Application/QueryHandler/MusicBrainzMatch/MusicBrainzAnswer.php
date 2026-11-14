@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Catalog\Application\QueryHandler\MusicBrainzMatch;
 
+use App\Catalog\Application\Query\MusicBrainzMatch\MatchItemType;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzRejected;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzUnavailable;
 use App\Shared\Application\Exception\ConflictException;
+use App\Shared\Application\Exception\NotFoundException;
 use App\Shared\Application\Exception\ServiceUnavailableException;
 
 /**
@@ -42,5 +44,15 @@ final class MusicBrainzAnswer
             ),
             default => $answer,
         };
+    }
+
+    /**
+     * MusicBrainz has no candidate of the ID an admin gave. The message names no ID: a MusicBrainz ID
+     * looks like an internal one, which the API's error responses mask, and the console must print
+     * what the API answers.
+     */
+    public static function unknownCandidate(MatchItemType $type): NotFoundException
+    {
+        return new NotFoundException(sprintf('MusicBrainz has no such %s.', $type->candidateNoun()));
     }
 }

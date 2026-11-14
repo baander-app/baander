@@ -12,12 +12,13 @@ use Symfony\Component\DependencyInjection\Attribute\Exclude;
 final readonly class SeenField
 {
     /**
-     * @param string|int|list<string>|null $current      the value the row showed as current; null when empty
+     * @param string|int|bool|list<string>|null $current      the value the row showed as current; null when empty,
+     *                                                       true for a cover the album had
      * @param string|null                  $songPublicId the album's song the row belongs to; null for the item's own field
      */
     public function __construct(
         public MatchField $field,
-        public string|int|array|null $current,
+        public string|int|bool|array|null $current,
         public ?string $songPublicId = null,
     ) {
     }

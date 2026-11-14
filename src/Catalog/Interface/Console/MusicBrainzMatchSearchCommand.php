@@ -73,7 +73,7 @@ final class MusicBrainzMatchSearchCommand extends Command
             return AdminCommandSupport::json($io, MatchCandidatesResource::from($candidates));
         }
 
-        $noun = MusicBrainzMatchOutput::candidateNoun($candidates->type);
+        $noun = $candidates->type->candidateNoun();
         if ($candidates->candidates === []) {
             $io->text(sprintf('MusicBrainz has no %s that fits.', $noun));
 

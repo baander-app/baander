@@ -1,6 +1,6 @@
 # app:metadata:match:compare
 
-Compare an album, song or artist with a MusicBrainz candidate and print what a match would set, row by row, before anything is written. The comparison is what `GET /api/admin/metadata/match/{type}/{publicId}/comparison?candidate=<id>` returns in the admin API. Take the candidate's ID from [app:metadata:match:search](app-metadata-match-search.md). The command changes nothing.
+Compare an album, song or artist with a MusicBrainz candidate and print what a match would set, row by row, before anything is written. The comparison is what `GET /api/admin/metadata/match/{type}/{publicId}/comparison?candidate=<id>` returns in the admin API. Take the candidate's ID from [app:metadata:match:search](app-metadata-match-search.md). The command changes nothing; [app:metadata:match:apply](app-metadata-match-apply.md) applies the match.
 
 ## Quick start
 
@@ -43,7 +43,7 @@ The first table lists every row the match could write: the item's own fields and
 
 | Column | Content |
 |--------|---------|
-| Row | The row's key, which names the row when the match is applied |
+| Row | The row's key, which names the row when the match is applied with `app:metadata:match:apply --selection` |
 | Current | The value the item holds now, or `-` when the field is empty |
 | MusicBrainz | The value the match would set |
 | Tick | Whether the row is ticked by default, as the next table explains |
@@ -70,6 +70,8 @@ The `cover` row shows `yes` under Current when the album has a cover, and under 
 For an album, the second table pairs the release's tracks with the album's songs: each release track by disc and number with its length, next to the song paired with it, its public ID and its length. A release track no song pairs with, or a song that pairs with no track, shows `-` on the other side. Only paired songs are written.
 
 The last table lists the artists the match would merge into another artist or remove, with their public IDs. An artist that the ticked credits leave with no credit merges into the artist that takes over its primary credits, or is removed when no artist does. Needs ticked lists the keys of the credits rows the action stands on; unticking any of them, or the action itself, keeps the artist as it is. When another library artist already holds the candidate's MusicBrainz ID, an artist comparison has no field rows and lists one merge into that artist.
+
+A type other than `album`, `song` or `artist` exits with 2, and the API answers 422 with the same message.
 
 With `--json` the output is the comparison object with `type`, `publicId`, `candidateId`, `fields`, `credits`, `tracks` and `artistActions`, exactly as the API returns it.
 

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Catalog\Interface\Controller;
 
+use App\Catalog\Application\Command\MusicBrainzMatch\ApplyMatchCommand;
+use App\Catalog\Application\Command\MusicBrainzMatch\MatchApplyResult;
 use App\Catalog\Application\Query\MusicBrainzMatch\CompareMatchQuery;
 use App\Catalog\Application\Query\MusicBrainzMatch\ListMatchReviewsQuery;
 use App\Catalog\Application\Query\MusicBrainzMatch\MatchCandidates;
@@ -11,6 +13,8 @@ use App\Catalog\Application\Query\MusicBrainzMatch\MatchComparison;
 use App\Catalog\Application\Query\MusicBrainzMatch\MatchItemType;
 use App\Catalog\Application\Query\MusicBrainzMatch\MatchReviewPage;
 use App\Catalog\Application\Query\MusicBrainzMatch\SearchMatchCandidatesQuery;
+use App\Catalog\Interface\Request\ApplyMatchRequest;
+use App\Catalog\Interface\Resource\MatchApplyResultResource;
 use App\Catalog\Interface\Resource\MatchCandidatesResource;
 use App\Catalog\Interface\Resource\MatchComparisonResource;
 use App\Shared\Interface\Attribute\CliCounterpart;
@@ -22,9 +26,9 @@ use Nelmio\ApiDocBundle\Attribute\Model;
 use OpenApi\Attributes as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Routing\Attribute\Route;
-use Symfony\Component\Routing\Requirement\EnumRequirement;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 #[IsGranted('ROLE_ADMIN')]
@@ -119,16 +123,16 @@ final class MusicBrainzMatchController
             new OA\Response(response: '403', description: 'Administrator role required', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
             new OA\Response(response: '404', description: 'No album, song or artist has the public ID', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
             new OA\Response(response: '409', description: 'MusicBrainz rejected the request; `details.reason` is `musicbrainz_rejected`', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
-            new OA\Response(response: '422', description: 'The public ID is malformed', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
+            new OA\Response(response: '422', description: 'The type is not album, song or artist, or the public ID is malformed', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
             new OA\Response(response: '503', description: 'MusicBrainz did not answer, or no turn of the shared rate limit came free in time; `details.reason` is `musicbrainz_unavailable`', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
         ],
     )]
-    #[Route('/{type}/{publicId}/candidates', name: 'candidates', requirements: ['type' => new EnumRequirement(MatchItemType::class)], methods: ['GET'])]
+    #[Route('/{type}/{publicId}/candidates', name: 'candidates', methods: ['GET'])]
     #[CliCounterpart('app:metadata:match:search')]
-    public function candidates(MatchItemType $type, string $publicId, Request $request): JsonResponse
+    public function candidates(string $type, string $publicId, Request $request): JsonResponse
     {
         $candidates = $this->dispatch(new SearchMatchCandidatesQuery(
-            type: $type,
+            type: MatchItemType::fromInput($type),
             publicId: $publicId,
             title: $request->query->getString('title'),
             artist: $request->query->has('artist') ? $request->query->getString('artist') : null,
@@ -161,17 +165,61 @@ final class MusicBrainzMatchController
             new OA\Response(response: '403', description: 'Administrator role required', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
             new OA\Response(response: '404', description: 'No album, song or artist has the public ID, or MusicBrainz has no such candidate', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
             new OA\Response(response: '409', description: 'MusicBrainz rejected the request; `details.reason` is `musicbrainz_rejected`', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
-            new OA\Response(response: '422', description: 'The public ID or the candidate\'s MusicBrainz ID is malformed or missing', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
+            new OA\Response(response: '422', description: 'The type is not album, song or artist, or the public ID or the candidate\'s MusicBrainz ID is malformed or missing', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
             new OA\Response(response: '503', description: 'MusicBrainz did not answer, or no turn of the shared rate limit came free in time; `details.reason` is `musicbrainz_unavailable`', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
         ],
     )]
-    #[Route('/{type}/{publicId}/comparison', name: 'comparison', requirements: ['type' => new EnumRequirement(MatchItemType::class)], methods: ['GET'])]
+    #[Route('/{type}/{publicId}/comparison', name: 'comparison', methods: ['GET'])]
     #[CliCounterpart('app:metadata:match:compare')]
-    public function comparison(MatchItemType $type, string $publicId, Request $request): JsonResponse
+    public function comparison(string $type, string $publicId, Request $request): JsonResponse
     {
-        $comparison = $this->dispatch(new CompareMatchQuery($type, $publicId, $request->query->getString('candidate')));
+        $comparison = $this->dispatch(new CompareMatchQuery(MatchItemType::fromInput($type), $publicId, $request->query->getString('candidate')));
         assert($comparison instanceof MatchComparison);
 
         return $this->successResponse(MatchComparisonResource::from($comparison));
+    }
+
+    /**
+     * Apply a MusicBrainz candidate to an album, song or artist: write the rows the admin ticked in
+     * the comparison, and merge or remove the artists the admin left ticked.
+     *
+     * The apply looks the candidate up again and compares it with the item as stored; each ticked
+     * row must still show the current value the admin saw, and every merge or removal the match
+     * would make must be in the request, ticked or kept. Either everything lands or nothing does.
+     */
+    #[OA\Post(
+        path: '/api/admin/metadata/match/{type}/{publicId}/apply',
+        description: 'Writes the ticked rows of the comparison of the item with the candidate, named by the keys the comparison gave them, each with the current value it showed. Every merge or removal the comparison lists must appear in `artistActions` (applied) or `keptArtists` (left as it is). A row that no longer shows what the admin saw, a merge or removal the request does not name, or a deadlock with another writer answers 409 and writes nothing.',
+        summary: 'Apply a MusicBrainz match to an album, song or artist',
+        requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(ref: new Model(type: ApplyMatchRequest::class))),
+        parameters: [
+            new OA\Parameter(name: 'type', description: 'What to match', in: 'path', required: true, schema: new OA\Schema(type: 'string', enum: ['album', 'song', 'artist'])),
+            new OA\Parameter(name: 'publicId', description: 'The album\'s, song\'s or artist\'s public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+        ],
+        responses: [
+            new OA\Response(
+                response: '200',
+                description: 'What the match wrote',
+                content: new OA\JsonContent(properties: [new OA\Property(property: 'data', ref: new Model(type: MatchApplyResultResource::class))]),
+            ),
+            new OA\Response(response: '403', description: 'Administrator role required', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
+            new OA\Response(response: '404', description: 'No album, song or artist has the public ID, or MusicBrainz has no such candidate', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
+            new OA\Response(response: '409', description: 'Nothing was written; `details.reason` is `match_stale` (the item changed since the comparison: compare again), `match_busy` (another change to the same songs or artists ran at the same time: apply again) or `musicbrainz_rejected`', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
+            new OA\Response(response: '422', description: 'The type is not album, song or artist, the public ID or the candidate\'s MusicBrainz ID is malformed, or the selection is malformed; `details` names each malformed entry', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
+            new OA\Response(response: '503', description: 'MusicBrainz or the Cover Art Archive did not answer, or no turn of the shared rate limit came free in time; `details.reason` is `musicbrainz_unavailable`', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
+        ],
+    )]
+    #[Route('/{type}/{publicId}/apply', name: 'apply', methods: ['POST'])]
+    #[CliCounterpart('app:metadata:match:apply')]
+    public function apply(
+        string $type,
+        string $publicId,
+        #[MapRequestPayload(validationFailedStatusCode: 422)]
+        ApplyMatchRequest $request,
+    ): JsonResponse {
+        $result = $this->dispatch(ApplyMatchCommand::manual(MatchItemType::fromInput($type), $publicId, $request->candidate, $request->selection()));
+        assert($result instanceof MatchApplyResult);
+
+        return $this->successResponse(MatchApplyResultResource::from($result));
     }
 }

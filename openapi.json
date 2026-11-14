@@ -7343,7 +7343,6 @@
                         "required": true,
                         "schema": {
                             "type": "string",
-                            "pattern": "album|song|artist",
                             "enum": [
                                 "album",
                                 "song",
@@ -7426,7 +7425,7 @@
                         }
                     },
                     "422": {
-                        "description": "The public ID is malformed",
+                        "description": "The type is not album, song or artist, or the public ID is malformed",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -7464,7 +7463,6 @@
                         "required": true,
                         "schema": {
                             "type": "string",
-                            "pattern": "album|song|artist",
                             "enum": [
                                 "album",
                                 "song",
@@ -7538,7 +7536,7 @@
                         }
                     },
                     "422": {
-                        "description": "The public ID or the candidate's MusicBrainz ID is malformed or missing",
+                        "description": "The type is not album, song or artist, or the public ID or the candidate's MusicBrainz ID is malformed or missing",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -7549,6 +7547,118 @@
                     },
                     "503": {
                         "description": "MusicBrainz did not answer, or no turn of the shared rate limit came free in time; `details.reason` is `musicbrainz_unavailable`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/metadata/match/{type}/{publicId}/apply": {
+            "post": {
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Apply a MusicBrainz match to an album, song or artist",
+                "description": "Writes the ticked rows of the comparison of the item with the candidate, named by the keys the comparison gave them, each with the current value it showed. Every merge or removal the comparison lists must appear in `artistActions` (applied) or `keptArtists` (left as it is). A row that no longer shows what the admin saw, a merge or removal the request does not name, or a deadlock with another writer answers 409 and writes nothing.",
+                "operationId": "post_admin_metadata_match_apply",
+                "parameters": [
+                    {
+                        "name": "type",
+                        "in": "path",
+                        "description": "What to match",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "album",
+                                "song",
+                                "artist"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "publicId",
+                        "in": "path",
+                        "description": "The album's, song's or artist's public ID",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ApplyMatchRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "What the match wrote",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/MatchApplyResultResource"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Administrator role required",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "No album, song or artist has the public ID, or MusicBrainz has no such candidate",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Nothing was written; `details.reason` is `match_stale` (the item changed since the comparison: compare again), `match_busy` (another change to the same songs or artists ran at the same time: apply again) or `musicbrainz_rejected`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "The type is not album, song or artist, the public ID or the candidate's MusicBrainz ID is malformed, or the selection is malformed; `details` names each malformed entry",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "MusicBrainz or the Cover Art Archive did not answer, or no turn of the shared rate limit came free in time; `details.reason` is `musicbrainz_unavailable`",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -24162,6 +24272,124 @@
                 },
                 "type": "object"
             },
+            "ApplyMatchRequest": {
+                "required": [
+                    "candidate"
+                ],
+                "properties": {
+                    "candidate": {
+                        "description": "The MusicBrainz ID compared: a release for an album, a recording for a song, an artist for an artist",
+                        "type": "string",
+                        "default": ""
+                    },
+                    "fields": {
+                        "description": "The ticked field rows, each by its key with the current value the comparison showed",
+                        "type": "array",
+                        "items": {
+                            "required": [
+                                "key",
+                                "current"
+                            ],
+                            "properties": {
+                                "key": {
+                                    "description": "The row's key: the field, or \"<song public ID>:<field>\" for a row of one of an album's songs",
+                                    "type": "string"
+                                },
+                                "current": {
+                                    "description": "The current value the row showed; null when it showed none",
+                                    "oneOf": [
+                                        {
+                                            "type": "string"
+                                        },
+                                        {
+                                            "type": "integer"
+                                        },
+                                        {
+                                            "type": "boolean"
+                                        },
+                                        {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        },
+                                        {
+                                            "type": "object",
+                                            "nullable": true,
+                                            "enum": [
+                                                null
+                                            ]
+                                        }
+                                    ]
+                                }
+                            },
+                            "type": "object"
+                        },
+                        "default": []
+                    },
+                    "credits": {
+                        "description": "The ticked credits rows, each by its key with the credits the comparison showed as current",
+                        "type": "array",
+                        "items": {
+                            "required": [
+                                "key",
+                                "current"
+                            ],
+                            "properties": {
+                                "key": {
+                                    "description": "The row's key: \"credits\", or \"<song public ID>:credits\" for one of an album's songs",
+                                    "type": "string"
+                                },
+                                "current": {
+                                    "type": "array",
+                                    "items": {
+                                        "required": [
+                                            "artistPublicId",
+                                            "role",
+                                            "creditedName"
+                                        ],
+                                        "properties": {
+                                            "artistPublicId": {
+                                                "type": "string",
+                                                "pattern": "^[0-9a-zA-Z_-]{21}$",
+                                                "maxLength": 21,
+                                                "minLength": 21
+                                            },
+                                            "role": {
+                                                "type": "string",
+                                                "nullable": true
+                                            },
+                                            "creditedName": {
+                                                "type": "string"
+                                            }
+                                        },
+                                        "type": "object"
+                                    }
+                                }
+                            },
+                            "type": "object"
+                        },
+                        "default": []
+                    },
+                    "artistActions": {
+                        "description": "The public IDs of the artists whose listed merge or removal stays ticked",
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "default": []
+                    },
+                    "keptArtists": {
+                        "description": "The public IDs of the artists whose listed merge or removal was unticked",
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "default": []
+                    }
+                },
+                "type": "object"
+            },
             "UpdateSongRequest": {
                 "properties": {
                     "title": {
@@ -28017,6 +28245,71 @@
                         "type": "array",
                         "items": {
                             "$ref": "#/components/schemas/MatchArtistActionResource"
+                        }
+                    }
+                },
+                "type": "object"
+            },
+            "MatchApplyResultResource": {
+                "required": [
+                    "type",
+                    "publicId",
+                    "candidateId",
+                    "fields",
+                    "creditsChanged",
+                    "songsChanged",
+                    "mergedArtists",
+                    "removedArtists"
+                ],
+                "properties": {
+                    "type": {
+                        "description": "What was matched",
+                        "type": "string",
+                        "enum": [
+                            "album",
+                            "song",
+                            "artist"
+                        ]
+                    },
+                    "publicId": {
+                        "description": "The album's, song's or artist's public ID",
+                        "type": "string",
+                        "pattern": "^[0-9a-zA-Z_-]{21}$",
+                        "maxLength": 21,
+                        "minLength": 21
+                    },
+                    "candidateId": {
+                        "description": "The MusicBrainz ID applied: a release, recording or artist",
+                        "type": "string"
+                    },
+                    "fields": {
+                        "description": "The item's own fields the match wrote, by field name",
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "creditsChanged": {
+                        "description": "Whether the item's own artist credits changed",
+                        "type": "boolean"
+                    },
+                    "songsChanged": {
+                        "description": "How many of an album's songs took fields or credits",
+                        "type": "integer",
+                        "minimum": 0
+                    },
+                    "mergedArtists": {
+                        "description": "The public IDs of the artists merged into another artist",
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "removedArtists": {
+                        "description": "The public IDs of the artists removed",
+                        "type": "array",
+                        "items": {
+                            "type": "string"
                         }
                     }
                 },

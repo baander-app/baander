@@ -76,4 +76,57 @@ trait LongBedMatchLibrary
     {
         return sprintf('/api/admin/metadata/match/album/%s/%s', $this->album->getPublicId()->toString(), $route);
     }
+
+    /**
+     * The apply body a client sends for the comparison's default ticks: every ticked row by its key
+     * with the current value it showed, and each listed merge or removal as ticked or kept.
+     *
+     * @param array<string, mixed> $comparison the comparison route's data
+     *
+     * @return array<string, mixed>
+     */
+    private static function defaultTicks(array $comparison): array
+    {
+        $tracks = $comparison['tracks'];
+        $fieldRows = [$comparison['fields'], ...array_column($tracks, 'fields')] |> (static fn (array $rows): array => array_merge(...$rows));
+        $creditRows = [$comparison['credits'], ...array_column($tracks, 'credits')] |> array_filter(...);
+        $ticked = static fn (array $rows): array => array_filter($rows, static fn (array $row): bool => $row['ticked'] === true) |> array_values(...);
+        $actions = static fn (bool $ticked): array => array_filter($comparison['artistActions'], static fn (array $action): bool => $action['ticked'] === $ticked)
+            |> (static fn (array $listed): array => array_column($listed, 'artistPublicId'));
+
+        return [
+            'candidate' => $comparison['candidateId'],
+            'fields' => array_map(static fn (array $row): array => ['key' => $row['key'], 'current' => $row['current']], $ticked($fieldRows)),
+            'credits' => array_map(
+                static fn (array $row): array => [
+                    'key' => $row['key'],
+                    'current' => array_map(static fn (array $credit): array => array_intersect_key($credit, ['artistPublicId' => 0, 'role' => 0, 'creditedName' => 0]), $row['current']),
+                ],
+                $ticked($creditRows),
+            ),
+            'artistActions' => $actions(true),
+            'keptArtists' => $actions(false),
+        ];
+    }
+
+    /** @return list<array{string, string, string}> the name, role and credited name of each credit of the song, primary first */
+    private function creditsOf(SongEntity $song): array
+    {
+        return $this->entityManager->getConnection()->fetchAllNumeric(
+            "SELECT a.name, s.role, s.credited_name FROM artist_song s JOIN artists a ON a.id = s.artist_id WHERE s.song_id = ? ORDER BY s.role <> 'primary', s.credited_name",
+            [$song->getId()->toString()],
+        ) |> (static fn (array $rows): array => array_map(static fn (array $row): array => [(string) $row[0], (string) $row[1], (string) $row[2]], $rows));
+    }
+
+    private function artistCount(string $name): int
+    {
+        return (int) $this->entityManager->getConnection()->fetchOne('SELECT count(*) FROM artists WHERE name = ?', [$name]);
+    }
+
+    private function releaseOfAlbum(): ?string
+    {
+        $release = $this->entityManager->getConnection()->fetchOne('SELECT release_mbid FROM albums WHERE id = ?', [$this->album->getId()->toString()]);
+
+        return is_string($release) ? $release : null;
+    }
 }

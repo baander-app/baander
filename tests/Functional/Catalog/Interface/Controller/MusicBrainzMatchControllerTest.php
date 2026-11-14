@@ -12,8 +12,9 @@ use App\Tests\Functional\TestCase;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * The candidates and comparison routes answer admins with MusicBrainz candidates and a comparison
- * built against the catalog in PostgreSQL, MusicBrainz being a fake, and refuse everyone else.
+ * The candidates, comparison and apply routes answer admins with MusicBrainz candidates, a
+ * comparison and an apply against the catalog in PostgreSQL, MusicBrainz being a fake, and refuse
+ * everyone else.
  */
 final class MusicBrainzMatchControllerTest extends TestCase
 {
@@ -114,27 +115,102 @@ final class MusicBrainzMatchControllerTest extends TestCase
         $this->assertJsonResponse($this->get(self::BASE . '/album/' . $unknown . '/candidates'), Response::HTTP_NOT_FOUND);
         $this->assertJsonResponse($this->get(self::BASE . '/song/' . $unknown . '/comparison?candidate=' . $this->release->id), Response::HTTP_NOT_FOUND);
         $noSuchRelease = $this->assertJsonResponse($this->get($this->albumPath('comparison') . '?candidate=' . self::releaseId(9)), Response::HTTP_NOT_FOUND);
-        self::assertSame(sprintf('MusicBrainz has no release "%s".', self::releaseId(9)), $noSuchRelease['error']['message']);
+        self::assertSame('MusicBrainz has no such release.', $noSuchRelease['error']['message']);
 
         $this->assertJsonResponse($this->albumPath('comparison') |> $this->get(...), Response::HTTP_UNPROCESSABLE_ENTITY);
         $this->assertJsonResponse($this->get(self::BASE . '/artist/not-a-public-id/candidates'), Response::HTTP_UNPROCESSABLE_ENTITY);
         self::assertSame(['fetchRelease:' . self::releaseId(9)], $this->musicBrainz->calls, 'Nothing else reached MusicBrainz.');
     }
 
-    public function testALibraryMemberWhoIsNotAnAdminIsRefusedBothRoutes(): void
+    public function testALibraryMemberWhoIsNotAnAdminIsRefusedEveryMatchRoute(): void
     {
         $member = $this->createTestUser();
+        $body = ['candidate' => $this->release->id, 'fields' => [['key' => 'releaseMbid', 'current' => null]]];
 
-        foreach ([$this->albumPath('candidates'), $this->albumPath('comparison') . '?candidate=' . $this->release->id] as $path) {
-            $response = $this->authenticatedRequest('GET', $path, $member);
+        foreach ([
+            ['GET', $this->albumPath('candidates'), []],
+            ['GET', $this->albumPath('comparison') . '?candidate=' . $this->release->id, []],
+            ['POST', $this->albumPath('apply'), $body],
+        ] as [$method, $path, $content]) {
+            $response = $this->authenticatedRequest($method, $path, $member, $content);
             self::assertSame(Response::HTTP_FORBIDDEN, $response->getStatusCode(), $path);
         }
         self::assertSame([], $this->musicBrainz->calls);
+        self::assertNull($this->releaseOfAlbum());
+    }
+
+    public function testAnAdminAppliesTheDefaultTicksOfAComparison(): void
+    {
+        $comparison = $this->get($this->albumPath('comparison') . '?candidate=' . $this->release->id) |> $this->data(...);
+
+        $data = $this->post($this->albumPath('apply'), self::defaultTicks($comparison)) |> $this->data(...);
+
+        $duetArtist = $this->duetArtist->getPublicId()->toString();
+        self::assertSame(['album', $this->album->getPublicId()->toString(), $this->release->id], [$data['type'], $data['publicId'], $data['candidateId']]);
+        self::assertEqualsCanonicalizing(['releaseMbid', 'country'], $data['fields']);
+        self::assertIsBool($data['creditsChanged']);
+        self::assertSame([3, [$duetArtist], []], [$data['songsChanged'], $data['mergedArtists'], $data['removedArtists']]);
+        self::assertSame($this->release->id, $this->releaseOfAlbum());
+        self::assertSame(
+            [['Post Malone', 'primary', 'Post Malone, Luke Combs'], ['Luke Combs', 'featured', 'Luke Combs']],
+            $this->creditsOf($this->longBedSongs[1]),
+            'The duet keeps its tagged text and credits its guest.',
+        );
+        self::assertSame(0, $this->artistCount('Post Malone, Luke Combs'), 'The combined artist merged into Post Malone.');
+        self::assertSame(2023, (int) $this->entityManager->getConnection()->fetchOne('SELECT year FROM albums WHERE id = ?', [$this->album->getId()->toString()]), 'A year the admin left unticked is kept.');
+    }
+
+    public function testAnApplyAfterTheItemChangedAnswers409StaleAndWritesNothing(): void
+    {
+        $comparison = $this->get($this->albumPath('comparison') . '?candidate=' . $this->release->id) |> $this->data(...);
+        $body = self::defaultTicks($comparison);
+        $body['fields'][] = ['key' => 'year', 'current' => 2022];
+
+        $error = $this->assertJsonResponse($this->post($this->albumPath('apply'), $body), Response::HTTP_CONFLICT);
+
+        self::assertSame('match_stale', $error['error']['details']['reason'] ?? null);
+        self::assertSame('The year changed since the comparison. Compare the match again.', $error['error']['message']);
+        self::assertNull($this->releaseOfAlbum());
+        self::assertSame(1, $this->artistCount('Post Malone, Luke Combs'));
+    }
+
+    public function testAMalformedSelectionOrTypeAnswers422(): void
+    {
+        $selection = $this->assertJsonResponse(
+            $this->post($this->albumPath('apply'), ['candidate' => $this->release->id, 'fields' => [['key' => 'colour', 'current' => 'red']]]),
+            Response::HTTP_UNPROCESSABLE_ENTITY,
+        );
+        self::assertSame(['fields[0].key' => ['"colour" names no field row.']], $selection['error']['details']);
+
+        $publicId = $this->album->getPublicId()->toString();
+        foreach ([
+            ['GET', self::BASE . '/release/' . $publicId . '/candidates', []],
+            ['GET', self::BASE . '/albums/' . $publicId . '/comparison?candidate=' . $this->release->id, []],
+            ['POST', self::BASE . '/record/' . $publicId . '/apply', ['candidate' => $this->release->id]],
+        ] as [$method, $path, $content]) {
+            $error = $this->assertJsonResponse($this->authenticatedRequest($method, $path, $this->admin, $content), Response::HTTP_UNPROCESSABLE_ENTITY);
+            self::assertSame('The type must be album, song or artist.', $error['error']['message'], $path);
+        }
+        self::assertSame([], $this->musicBrainz->calls);
+        self::assertNull($this->releaseOfAlbum());
     }
 
     private function get(string $path): Response
     {
         return $this->authenticatedRequest('GET', $path, $this->admin);
+    }
+
+    /**
+     * The entity manager is cleared first: the apply merges and deletes artists the fixture left
+     * managed, and the request shares the test's entity manager.
+     *
+     * @param array<string, mixed> $body
+     */
+    private function post(string $path, array $body): Response
+    {
+        $this->entityManager->clear();
+
+        return $this->authenticatedRequest('POST', $path, $this->admin, $body);
     }
 
     /** @return array<string, mixed> the response's data */
