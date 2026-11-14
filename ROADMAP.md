@@ -306,7 +306,7 @@ that limitation is recorded for follow-up, with no runtime change in the 2026-10
 `master` is `ca4f71103` or later on GitHub and Forgejo. Landed on 2026-11-13: the
 quality-gate tail fixes, the capability and size deployment settings, the registry
 deadline-readiness fix, the rename to Bånder Audio Core (`bac`) and its FFmpeg image
-pin. The website is published from `cbc5540f4`, and the persistent instance runs
+pin. The website is published from `57fc9e1e3`, and the persistent instance runs
 `ca4f71103`.
 
 - **Master CI, set aside by the user on 2026-11-13.** The `CI` run on `c34a8e0a1`
@@ -1629,6 +1629,20 @@ Node 24.15.0):
   canonical `https://baander.app/bac/`, `/baac` and `/baac/` 308 to `/bac/`, a nested
   manual page 200, the search index 200 and an unknown path 404, with valid HTTPS.
   The sitemap lists 240 pages and no old name.
+- **Website republication (2026-11-13):** a local build of `57fc9e1e3` (237 manual
+  pages, node tests 11 of 11, Chromium suite 93 of 93) was deployed as a Vercel
+  preview, then to production (`baander-nl52trcat`, aliased to
+  `https://baander.app`). No site source changed between `cbc5540f4` and
+  `57fc9e1e3`: that range changes only `ROADMAP.md` and the FFmpeg image pin.
+  Compared with the previous production deployment, the home page,
+  `/bac/` and `sitemap.xml` are byte-identical, and a nested manual page differs only
+  in its source link, which now names `57fc9e1e3`. Both `https://baander.app` and
+  `https://baander.vercel.app` answered 200 for `/`, `/docs/`, `/bac/`, a nested
+  manual page, `sitemap.xml`, `robots.txt` and the search index, and 404 for an
+  unknown path. They redirected `/baac/` and `/bac` to `/bac/` and `/index.html` to
+  `/` with 308. All responses used valid HTTPS. The live home page, `/bac/` and
+  `sitemap.xml` match the local build byte for byte. The visual checks were not
+  repeated on the live site.
 
 Not run anywhere before the landing: the macOS and NEON kernel step, the Windows
 MSVC binding and the first CI run after the cache keys changed. Only the binding
