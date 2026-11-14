@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Fixtures\Catalog;
 
+use App\Catalog\Application\Port\ArtistIdentityResolverInterface;
 use App\Library\Application\Message\DiscoveredFile;
 use App\Library\Application\Port\LibraryMediaFilesInterface;
 use App\Shared\Domain\Model\Uuid;
@@ -22,6 +23,23 @@ trait DiscoveredFileObservations
         $probe->method('probeAudio')->willReturn(new AudioProbeResult('flac', 0, 'flac', 2, 44100, 320000));
 
         return $probe;
+    }
+
+    /** Resolves each identity to an artist of its own, the same artist each time the same key comes back. */
+    private function artistIdentitiesStub(): ArtistIdentityResolverInterface
+    {
+        $artists = [];
+        $resolver = $this->createStub(ArtistIdentityResolverInterface::class);
+        $resolver->method('resolve')->willReturnCallback(static function (array $identities) use (&$artists): array {
+            $resolved = [];
+            foreach ($identities as $identity) {
+                $resolved[$identity->key()] = $artists[$identity->key()] ??= Uuid::v7();
+            }
+
+            return $resolved;
+        });
+
+        return $resolver;
     }
 
     private function observedFile(DiscoveredFile $file): DiscoveredFile

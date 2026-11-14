@@ -146,9 +146,9 @@ final class SongService implements SongPortInterface
         $this->songRepository->delete($song);
     }
 
-    public function linkArtistToSong(Uuid $songId, string $artistName, string $role): void
+    public function addArtistCredit(Uuid $songId, Uuid $artistId, string $role, string $creditedName): void
     {
-        $this->songRepository->linkArtistToSong($songId, $artistName, $role);
+        $this->songRepository->addArtistCredit($songId, $artistId, $role, $creditedName);
     }
 
     public function getArtistNameForSong(Uuid $songId): ?string

@@ -202,6 +202,7 @@ final class FilesDiscoveredCurrentObservationTest extends TestCase
             $this->movies, $this->videos, $this->metadata, new FFprobeAdapter(new JsonEncoder()), $this->bus,
             $this->lyrics, $this->sync, new NullLogger(), $this->media, $this->transaction,
             audioProbe: $this->audioProbeStub(),
+            artistIdentities: $this->artistIdentitiesStub(),
         );
     }
 }

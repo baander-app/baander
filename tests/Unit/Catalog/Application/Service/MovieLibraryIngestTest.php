@@ -82,6 +82,7 @@ final class MovieLibraryIngestTest extends TestCase
             $this->observedMediaFiles($this->createStub(LibraryMediaFilesInterface::class)),
             new PassThroughTransaction(),
             audioProbe: $this->audioProbeStub(),
+            artistIdentities: $this->artistIdentitiesStub(),
         );
 
         return new MovieLibraryIngest($provisioning, $handler, $videos);

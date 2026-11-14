@@ -70,7 +70,7 @@ final class FilesDiscoveredRenameTest extends TestCase
         });
         $songs->method('findFreshByUuid')->willReturn($case === 'deleted song' ? null : $fresh);
         $songs->expects($expectedWrite ? $this->once() : $this->never())->method('persist')->with($fresh);
-        $songs->expects($this->never())->method('linkArtistToSong');
+        $songs->expects($this->never())->method('addArtistCredit');
         $media = $this->observedMediaFiles($this->createStub(LibraryMediaFilesInterface::class));
         $media->method('inspect')->willReturn(new LibraryMediaFileInspection($libraryId, '/music', [
             new LibraryMediaFileCheck($oldPath, $case === 'old present' ? LibraryMediaFileVerdict::Deletable : LibraryMediaFileVerdict::Missing),
@@ -223,6 +223,7 @@ final class FilesDiscoveredRenameTest extends TestCase
             $media,
             new PassThroughTransaction(),
             audioProbe: $this->audioProbeStub(),
+            artistIdentities: $this->artistIdentitiesStub(),
         );
     }
 }

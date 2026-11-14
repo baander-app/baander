@@ -116,6 +116,7 @@ final class IngestTestVideoCommandTest extends TestCase
             $this->createStub(LibraryMediaFilesInterface::class),
             new PassThroughTransaction(),
             audioProbe: $this->audioProbeStub(),
+            artistIdentities: $this->artistIdentitiesStub(),
         );
 
         return new IngestTestVideoCommand(new MovieLibraryIngest($provisioning, $handler, $videos));

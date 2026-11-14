@@ -53,7 +53,7 @@ final class FilesDiscoveredTechnicalMetadataTest extends TestCase
             self::assertSame(48000, $song->getSampleRate());
             self::assertSame(128000, $song->getBitrate());
             self::assertSame(2, $song->getChannels());
-            self::assertSame(17.37, $song->getLength());
+            self::assertSame(20.5, $song->getLength(), 'The length is measured from the audio, not taken from the tags.');
         });
         $metadata = $this->createStub(MetadataContentReaderPortInterface::class);
         $metadata->method('readMetadata')->willReturn((new ExtractedMetadata())->setTitle('Track')->setDuration(17.37)->setSampleRate(1));
@@ -63,7 +63,8 @@ final class FilesDiscoveredTechnicalMetadataTest extends TestCase
             $this->createStub(MoviePortInterface::class), $this->createStub(VideoRepositoryInterface::class), $metadata,
             $this->createStub(VideoProbePortInterface::class), $this->createStub(MessageBusInterface::class),
             $this->createStub(LyricsFetchRequestInterface::class), $this->createStub(AlbumMetadataSyncRequestInterface::class), new NullLogger(),
-            $this->observedMediaFiles($this->createStub(LibraryMediaFilesInterface::class)), new PassThroughTransaction(), $probe);
+            $this->observedMediaFiles($this->createStub(LibraryMediaFilesInterface::class)), new PassThroughTransaction(), $probe,
+            $this->artistIdentitiesStub());
 
         $handler(new FilesDiscovered($library, 'music', '/music/Album', [$file]));
     }
@@ -86,7 +87,7 @@ final class FilesDiscoveredTechnicalMetadataTest extends TestCase
         $songs->method('findByHash')->willReturn($song);
         $songs->method('findFreshByUuid')->willReturn($fresh);
         $songs->expects($case === 'current' ? $this->once() : $this->never())->method('persist')->with($fresh);
-        $songs->expects($this->never())->method('linkArtistToSong');
+        $songs->expects($this->never())->method('addArtistCredit');
         $metadata = $this->createMock(MetadataContentReaderPortInterface::class);
         $metadata->expects($this->once())->method('readMetadata')->willReturn(null);
         $lyrics = $this->createMock(LyricsFetchRequestInterface::class);
@@ -103,7 +104,8 @@ final class FilesDiscoveredTechnicalMetadataTest extends TestCase
             $this->createStub(MoviePortInterface::class), $this->createStub(VideoRepositoryInterface::class), $metadata,
             $this->createStub(VideoProbePortInterface::class), $this->createStub(MessageBusInterface::class), $lyrics,
             $this->createStub(AlbumMetadataSyncRequestInterface::class), new NullLogger(),
-            $this->observedMediaFiles($this->createStub(LibraryMediaFilesInterface::class)), new PassThroughTransaction(), $probe);
+            $this->observedMediaFiles($this->createStub(LibraryMediaFilesInterface::class)), new PassThroughTransaction(), $probe,
+            $this->artistIdentitiesStub());
 
         $handler(new FilesDiscovered($library, 'music', '/music/Album', [$file]));
 
@@ -148,7 +150,7 @@ final class FilesDiscoveredTechnicalMetadataTest extends TestCase
             $probe, $this->createStub(MessageBusInterface::class), $this->createStub(LyricsFetchRequestInterface::class),
             $this->createStub(AlbumMetadataSyncRequestInterface::class), new NullLogger(),
             $this->observedMediaFiles($this->createStub(LibraryMediaFilesInterface::class)), new PassThroughTransaction(),
-            $this->createStub(AudioProbePortInterface::class));
+            $this->createStub(AudioProbePortInterface::class), $this->artistIdentitiesStub());
 
         $handler(new FilesDiscovered($library, 'movie', '/movies/Movie', [$file]));
 

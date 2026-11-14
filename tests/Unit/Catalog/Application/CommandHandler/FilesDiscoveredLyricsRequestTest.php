@@ -254,6 +254,7 @@ final class FilesDiscoveredLyricsRequestTest extends TestCase
             $this->observedMediaFiles($this->createStub(LibraryMediaFilesInterface::class)),
             new PassThroughTransaction(),
             audioProbe: $this->audioProbeStub(),
+            artistIdentities: $this->artistIdentitiesStub(),
         );
     }
 

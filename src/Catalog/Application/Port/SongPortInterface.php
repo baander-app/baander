@@ -90,7 +90,14 @@ interface SongPortInterface
     /** Deletes the song; its audio file is never touched here. */
     public function delete(Song $song): void;
 
-    public function linkArtistToSong(Uuid $songId, string $artistName, string $role): void;
+    /**
+     * Credits the artist on the song under the name the song was tagged with; the next flush writes
+     * it. The song may be one persisted in this unit of work and not flushed yet. A song holds at
+     * most one credit per artist and role, so the song must not hold this one already.
+     *
+     * @throws \RuntimeException when the song or the artist does not exist
+     */
+    public function addArtistCredit(Uuid $songId, Uuid $artistId, string $role, string $creditedName): void;
 
     public function getArtistNameForSong(Uuid $songId): ?string;
 

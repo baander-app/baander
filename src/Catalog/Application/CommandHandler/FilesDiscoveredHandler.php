@@ -5,7 +5,8 @@ declare(strict_types=1);
 namespace App\Catalog\Application\CommandHandler;
 
 use App\Catalog\Application\Port\AlbumPortInterface;
-use App\Catalog\Application\Port\ArtistPortInterface;
+use App\Catalog\Application\Port\ArtistIdentity;
+use App\Catalog\Application\Port\ArtistIdentityResolverInterface;
 use App\Catalog\Application\Port\GenrePortInterface;
 use App\Catalog\Application\Port\MetadataContentReaderPortInterface;
 use App\Catalog\Application\Port\MoviePortInterface;
@@ -35,6 +36,9 @@ use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Stamp\DelayStamp;
 use Symfony\Component\Messenger\Stamp\TransportNamesStamp;
 
+/**
+ * @phpstan-type TaggedCredit array{identity: ArtistIdentity, creditedName: string}
+ */
 final class FilesDiscoveredHandler
 {
     private const int BATCH_SIZE = 50;
@@ -57,6 +61,7 @@ final class FilesDiscoveredHandler
         private readonly LibraryMediaFilesInterface $mediaFiles,
         private readonly TransactionPortInterface $transaction,
         private readonly AudioProbePortInterface $audioProbe,
+        private readonly ArtistIdentityResolverInterface $artistIdentities,
     ) {
     }
 
@@ -87,7 +92,7 @@ final class FilesDiscoveredHandler
 
     /**
      * Reads the metadata of each batch of files first, then writes the batch's songs, artist
-     * links and genres in one transaction during which no delete with files can claim the
+     * credits and genres in one transaction during which no delete with files can claim the
      * library. When a delete claimed it before that transaction, the import stops and the files
      * whose songs no transaction committed go back to the queue, as a held import does.
      *
@@ -173,7 +178,7 @@ final class FilesDiscoveredHandler
     }
 
     /**
-     * @return array{file: DiscoveredFile, song: Song, artist: ?string, genres: list<string>, previousPath?: string, expectedAlbum?: Uuid, probe?: AudioProbeResult, technicalOnly?: bool}|null
+     * @return array{file: DiscoveredFile, song: Song, credit: TaggedCredit|null, genres: list<string>, previousPath?: string, expectedAlbum?: Uuid, probe?: AudioProbeResult, technicalOnly?: bool}|null
      */
     private function readSong(Album $album, DiscoveredFile $file): ?array
     {
@@ -191,7 +196,7 @@ final class FilesDiscoveredHandler
             $prepared = [
                 'file' => $file,
                 'song' => $existing,
-                'artist' => null,
+                'credit' => null,
                 'genres' => [],
                 'expectedAlbum' => $album->getId(),
             ];
@@ -226,7 +231,7 @@ final class FilesDiscoveredHandler
             path: $file->absolutePath,
             size: $file->size,
             mimeType: $this->detectMimeType($file->extension),
-            length: $metadata->getDuration(),
+            length: $probe->length(),
             lyrics: $this->findLyricsFile($file->absolutePath),
             track: $metadata->getTrackNumber() ?? $this->extractTrackNumberFromFilename($file->absolutePath),
             disc: $metadata->getDiscNumber(),
@@ -241,13 +246,41 @@ final class FilesDiscoveredHandler
             streamIndex: $probe->streamIndex,
         );
 
-        $artist = trim($metadata->getArtist() ?? '');
         $genres = array_values(array_filter(
             array_map(trim(...), $metadata->getGenre()),
             static fn (string $genre): bool => $genre !== '',
         ));
 
-        return ['file' => $file, 'song' => $song, 'artist' => $artist !== '' ? $artist : null, 'genres' => $genres];
+        return ['file' => $file, 'song' => $song, 'credit' => $this->taggedCredit($metadata->getArtists(), $metadata->getMbArtistIds()), 'genres' => $genres];
+    }
+
+    /**
+     * The credit a file's artist values give its song: the first value names the artist, and the
+     * credited name joins every value with "; ". A single value such as "Artist A, Artist B" stays
+     * whole. Null when the file names no artist.
+     *
+     * @param list<string> $artists        every artist value, in tag order
+     * @param list<string> $musicbrainzIds every MusicBrainz artist ID the file gives
+     *
+     * @return TaggedCredit|null
+     */
+    private function taggedCredit(array $artists, array $musicbrainzIds): ?array
+    {
+        $names = [];
+        foreach ($artists as $value) {
+            $name = str_replace("\0", '', $value) |> trim(...);
+            if ($name !== '') {
+                $names[] = $name;
+            }
+        }
+        if ($names === []) {
+            return null;
+        }
+
+        return [
+            'identity' => new ArtistIdentity($names[0], $musicbrainzIds),
+            'creditedName' => implode('; ', $names),
+        ];
     }
 
     /**
@@ -255,10 +288,10 @@ final class FilesDiscoveredHandler
      * library. A song that fails is added to $failures and the others are written; a failed
      * statement fails the transaction and with it the message.
      *
-     * @param list<array{file: DiscoveredFile, song: Song, artist: ?string, genres: list<string>, previousPath?: string, expectedAlbum?: Uuid, probe?: AudioProbeResult, technicalOnly?: bool}> $songs
+     * @param list<array{file: DiscoveredFile, song: Song, credit: TaggedCredit|null, genres: list<string>, previousPath?: string, expectedAlbum?: Uuid, probe?: AudioProbeResult, technicalOnly?: bool}> $songs
      * @param list<array{path: string, error: string}>                                            $failures
      *
-     * @return list<array{file: DiscoveredFile, song: Song, artist: ?string, genres: list<string>, previousPath?: string, expectedAlbum?: Uuid, probe?: AudioProbeResult, technicalOnly?: bool}>|null
+     * @return list<array{file: DiscoveredFile, song: Song, credit: TaggedCredit|null, genres: list<string>, previousPath?: string, expectedAlbum?: Uuid, probe?: AudioProbeResult, technicalOnly?: bool}>|null
      *         the songs the transaction committed; null when a delete holds the library and nothing was written
      */
     private function writeSongs(Uuid $libraryId, array $songs, array &$failures): ?array
@@ -273,6 +306,8 @@ final class FilesDiscoveredHandler
                 static fn (array $song): string => $song['file']->absolutePath,
                 $songs,
             ));
+            // Artist keys sort before genre keys, so the artists are locked first.
+            $artistIds = $this->resolveArtists($songs, $hashes);
             $genreIds = $this->findOrCreateGenres($songs, $hashes);
             $written = [];
             foreach ($songs as $song) {
@@ -296,7 +331,7 @@ final class FilesDiscoveredHandler
                         $this->songService->persist($fresh);
                         $song['song'] = $fresh;
                     } else {
-                        $this->writeSong($song['song'], $song['artist'], array_map(static fn (string $name): Uuid => $genreIds[$name], $song['genres']));
+                        $this->writeSong($song['song'], $song['credit'], $artistIds, array_map(static fn (string $name): Uuid => $genreIds[$name], $song['genres']));
                     }
                     $written[] = $song;
                 } catch (\Throwable $e) {
@@ -355,6 +390,27 @@ final class FilesDiscoveredHandler
     }
 
     /**
+     * Finds or creates the credited artists of the songs whose files are still current, in one
+     * call that locks them all, before the batch writes any song.
+     *
+     * @param list<array{file: DiscoveredFile, credit: TaggedCredit|null}> $songs
+     * @param array<string, string>                                         $hashes the current hash of each locked path
+     *
+     * @return array<string, Uuid> the artist of each identity, by its key
+     */
+    private function resolveArtists(array $songs, array $hashes): array
+    {
+        $identities = [];
+        foreach ($songs as $song) {
+            if ($song['credit'] !== null && ($hashes[$song['file']->absolutePath] ?? null) === $song['file']->hash) {
+                $identities[] = $song['credit']['identity'];
+            }
+        }
+
+        return $identities === [] ? [] : $this->artistIdentities->resolve($identities);
+    }
+
+    /**
      * Finds or creates the genres of the songs whose files are still current, in one call that
      * locks them all, before the batch writes any song.
      *
@@ -375,13 +431,18 @@ final class FilesDiscoveredHandler
         return $names === [] ? [] : $this->genreService->findOrCreateForImport($names);
     }
 
-    /** @param list<Uuid> $genreIds */
-    private function writeSong(Song $song, ?string $artist, array $genreIds): void
+    /**
+     * @param TaggedCredit|null   $credit
+     * @param array<string, Uuid> $artistIds the artist of each identity, by its key
+     * @param list<Uuid>          $genreIds
+     */
+    private function writeSong(Song $song, ?array $credit, array $artistIds, array $genreIds): void
     {
         $this->songService->persist($song);
 
-        if ($artist !== null) {
-            $this->songService->linkArtistToSong($song->getId(), $artist, ArtistRole::Primary->value);
+        if ($credit !== null) {
+            $artistId = $artistIds[$credit['identity']->key()];
+            $this->songService->addArtistCredit($song->getId(), $artistId, ArtistRole::Primary->value, $credit['creditedName']);
         }
 
         foreach ($genreIds as $genreId) {

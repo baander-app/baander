@@ -139,6 +139,7 @@ final class FilesDiscoveredGenresTest extends TestCase
             $this->observedMediaFiles($this->createStub(LibraryMediaFilesInterface::class)),
             $transaction,
             audioProbe: $this->audioProbeStub(),
+            artistIdentities: $this->artistIdentitiesStub(),
         );
     }
 

@@ -257,6 +257,7 @@ final class FilesDiscoveredMissingFilesTest extends TestCase
             $mediaFiles,
             $transaction ?? new PassThroughTransaction(),
             audioProbe: $this->audioProbeStub(),
+            artistIdentities: $this->artistIdentitiesStub(),
         );
     }
 

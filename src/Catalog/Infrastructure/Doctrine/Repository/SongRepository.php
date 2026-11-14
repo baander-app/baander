@@ -473,39 +473,16 @@ final class SongRepository implements SongRepositoryInterface
         }
     }
 
-    public function linkArtistToSong(Uuid $songId, string $artistName, string $role): void
+    public function addArtistCredit(Uuid $songId, Uuid $artistId, string $role, string $creditedName): void
     {
-        $songEntity = $this->entityManager
-            ->getRepository(SongEntity::class)
-            ->find($songId);
+        // Both are usually managed already: the song persisted by the caller, the artist resolved
+        // by the import, so neither lookup queries the database.
+        $songEntity = $this->entityManager->find(SongEntity::class, $songId)
+            ?? throw new \RuntimeException(sprintf('Song not found: %s', $songId->toString()));
+        $artistEntity = $this->entityManager->find(ArtistEntity::class, $artistId)
+            ?? throw new \RuntimeException(sprintf('Artist not found: %s', $artistId->toString()));
 
-        if ($songEntity === null) {
-            return;
-        }
-
-        $artistEntity = $this->entityManager
-            ->getRepository(ArtistEntity::class)
-            ->findOneBy(['name' => $artistName]);
-
-        if ($artistEntity === null) {
-            return;
-        }
-
-        // Check for existing link to avoid unique constraint violation
-        $existing = $this->entityManager
-            ->getRepository(ArtistSongEntity::class)
-            ->findOneBy([
-                'artist' => $artistEntity->getId(),
-                'song' => $songEntity->getId(),
-                'role' => $role,
-            ]);
-
-        if ($existing !== null) {
-            return;
-        }
-
-        $artistSong = new ArtistSongEntity($artistEntity, $songEntity, $role, $artistEntity->getName());
-        $this->entityManager->persist($artistSong);
+        $this->entityManager->persist(new ArtistSongEntity($artistEntity, $songEntity, $role, $creditedName));
     }
 
     /**
