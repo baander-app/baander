@@ -1634,6 +1634,113 @@ Not run anywhere before the landing: the macOS and NEON kernel step, the Windows
 MSVC binding and the first CI run after the cache keys changed. Only the binding
 workflow covers them, and it first runs on `master`.
 
+### Scan artist credits, song lengths and lyrics outcomes
+
+Lyrics fetches found nothing, and metadata lookups did nothing, because the library
+scan created no artists: a song without an artist ended as "not found" before any
+LRCLIB request. Separately, MP3 lengths came from TLEN tags that were missing or wrong,
+and LRCLIB refused the Suspekt songs' near-zero lengths with HTTP 400. URL allowlisting
+was not involved.
+Branch `fix/scan-artist-credits` implements
+`docs/plans/2026-11-13-2034-fix-scan-artist-credits-plan.md` (U1 to U14, R1 to R22)
+in local commits `b00560a2b` to `5a15f1186` on `e1abc7da1`; it is not pushed.
+
+- **U1, tag readers:** ID3 text is clean UTF-8 without terminators, multi-value frames
+  are split, and `TXXX` MusicBrainz artist and album-artist IDs are read; FLAC and Ogg
+  return every artist value and ID; text that is not UTF-8 is scrubbed. Metadata unit
+  tests 272/272 at `5024680ff`; reader tests 110/110 at `90da34158`.
+- **U2, schema:** `credited_name` on both credit tables with backfill, NOT NULL and a
+  not-blank CHECK, `uniq_artists_mbid`, `idx_songs_path`, capture triggers replaced.
+  ArtistCreditedNameMigrationTest 9/9, InitialSchemaMigrationTest 23/23,
+  CommittedCaptureTest 21/21.
+- **U3, U4, U5, import identities:** artists and genres are found or created under
+  sorted transaction-scoped advisory locks, and artist sync assigns a MusicBrainz ID
+  only under the same locks. ArtistImportIdentityRaceTest 14/14, GenreImportRaceTest
+  4/4, EnrichmentFreshStateTest 9/9.
+- **U6, song length:** taken from the audio probe (stream duration, else container
+  duration minus start time), never from tags. AudioProbeDurationTest 2/2 in the CI
+  image.
+- **U7, U8, credits on import:** new songs are credited to their tagged artist under the
+  tagged name; each touched album is credited after the last batch, under a
+  `FOR NO KEY UPDATE` album lock. AlbumCreditRaceTest 12/12, album-credit unit tests
+  11/11.
+- **U9, U14, rescan and retag:** a rescan repairs known songs in place (missing
+  credits, length, technical fields) and creates no album from the old tag of a renamed
+  album; a retagged file updates its song in place and its credits follow the tags.
+  RenamedAlbumRescanTest 1/1, RetaggedFileScanTest 3/3.
+- **U10, readers:** the artist names of songs and albums, the lyric signature, the
+  artist sort key and its cursor read credited names. SongCursorPaginationTest 20/20,
+  AlbumDuplicateControllerTest 14/14.
+- **U11, U12, lyrics outcomes:** a missing artist, a missing length and an LRCLIB
+  rejection each answer 409 with its own code; each bulk run's tally lives in Redis and
+  shows in `app:lyrics:status` and the admin lyrics page. LyricsControllerTest 27/27,
+  LyricsAdminControllerTest 19/19, RedisLyricsRunTallyTest 7/7.
+- **U13, end to end:** ScannedArtistCreditsTest 5/5 (180 assertions) scans real tagged
+  FLAC and MP3 files in the CI image.
+
+Verification checkpoint, 2026-11-14:
+
+- Full backend suite (`scripts/test-backend-container.sh`, `baander-ci:u10`) at
+  `22a9e1d77`: 12,264 tests, 135,935 assertions, no failures (ordinary 7,875, native
+  917, stack-1 1,858, stack-2 1,614), 1,628.7 s.
+- After the simplify pass and the review follow-ups (`3f032e0d7`, `90da34158`,
+  `5a15f1186`): Catalog, Metadata and Lyrics unit suites 1,022 tests on the host with
+  one environmental error (`finfo` missing in VideoServiceTest); in the CI image,
+  ScannedArtistCredits, RenamedAlbumRescan, RetaggedFileScan, the three race tests,
+  LyricsAdminController and the Lyrics functional suites 103/103.
+- Static gates at `5a15f1186`: PHPStan no errors, Deptrac 0 violations (CI image),
+  `lint:container` clean, `app:export-openapi-spec` unchanged. `make ci` stops at
+  `composer normalize`, which fails the same way on `master` (`composer.json` is
+  unchanged by the branch).
+- Web: typecheck, lint and `generate:check` pass; vitest passes 3,493 tests in 276 files.
+- `ce-code-review` (full depth, ten reviewers, cross-model pass off by checkout
+  config): Ready to merge, no actionable findings. Three of its residual risks were
+  defects and are fixed in `90da34158` with tests that fail without the fix: two
+  copies of a renamed file credited their song twice and failed the message on every
+  retry; two imports of one directory could credit one song twice; tag text that is
+  not UTF-8 failed its batch.
+- Preview (`make preview-up`, its own catalog, the music library mounted read-only):
+  77 files in 6 directories became 77 songs, 5 albums and 19 artists; every song has a
+  primary credit and a length, and every album a credit. "Amore Infelice" (MP3) is
+  238.8 s long, where TLEN made it 0.238; "Rescue Me" is credited to Headhunterz as
+  "Headhunterz; Sound Rush; Eurielle". `app:song:lyrics:fetch` for "Amore Infelice"
+  returned synced LRCLIB lyrics.
+- Learnings: `docs/solutions/architecture-patterns/concurrent-imports-find-or-create-identities-under-sorted-advisory-locks.md`
+  and
+  `docs/solutions/developer-experience/pgroonga-indexes-in-throwaway-test-schemas-break-later-suites.md`.
+
+Open:
+
+- After merge, with the user's go-ahead: run `app:library:scan <slug> --rescan` on the
+  persistent instance, wait for the import queue to drain, then run `app:lyrics:fetch`.
+- The MusicBrainz lookup button in the album and song panels is an unwired
+  placeholder; it gets its own brainstorm, building on the artists this branch creates.
+- Deferred, each separate work:
+  - album identity across directories: albums have no uniqueness on title, and
+    duplicate detection with `app:album:merge` covers the outcome until album identity
+    is planned;
+  - a file's song found by hash across libraries (`findByHash` is catalog-wide): a
+    file shared by two libraries needs its own identity design;
+  - genre slugs collapsing non-ASCII names, and Unicode (NFC and NFD) spellings of one
+    name becoming two artists: both predate the branch, and no real library has shown
+    them yet;
+  - M4A tags: the ID3 reader finds none, so an MP4 atom reader is needed; the
+    persistent library has no M4A files;
+  - the extract and match access gap, and merging artists that share a MusicBrainz ID:
+    both belong to the MusicBrainz work;
+  - a forced-sync rename followed by a wrong ID: no code path reaches it today.
+- From review, not fixed: the import handler's size and its `PreparedSong` array shape
+  (a split into a tag-credit reader and a rescan repair was suggested); genre creation
+  by the metadata enrichers takes no import lock, so an enricher fails loudly on a slug
+  a running import creates and succeeds on its retry (locking it needs a transaction
+  around the enricher's flush, which is separate work); a retag is any byte change at a song's path, so a library-wide
+  ReplayGain pass replaces hand-made credits on the next scan (the settled retag
+  decision).
+- Housekeeping: `NewAlbumMetadataSyncTest` drains its transport with a `get()` loop
+  that returns one envelope per call; the postgres-remediation `doctrine.md` version
+  list is stale; the PGroonga throwaway-schema failure is a candidate for the extension
+  inventory once its cause is isolated; `composer normalize` fails on `master`.
+
 ## Roadmap maintenance
 
 Cleanup, 2026-11-07: removed the delivered checkpoints and resolved items of
