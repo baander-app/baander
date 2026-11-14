@@ -1784,7 +1784,7 @@ as "Post Malone, Luke Combs" (album artist "Post Malone", no MusicBrainz IDs) ha
 14 artists of their own on the persistent instance. `POST /api/metadata/extract` and
 `/api/metadata/match` required only a signed-in user. Branch `feat/musicbrainz-matching`
 implements `docs/plans/2026-11-14-1219-feat-musicbrainz-matching-plan.md` (U1 to U14, R1
-to R30) in local commits `3c6b10f60` to `bc10bbe05` on `c8feae182`; it is not pushed.
+to R30) in local commits `3c6b10f60` to `ff68e09f2` on `c8feae182`; it is not pushed.
 The plan's "Implementation Amendments" section records where the build departs from the
 plan text.
 
@@ -1815,8 +1815,10 @@ plan text.
   RetagLockOrderTest 2/2, FilesDiscoveredRetagTest 13/13, SongTest 63/63,
   ArtistCreditHandlersTest 21/21.
 - **U5, scoring:** one service scores a release, recording or artist against the local
-  item, pairs tracks and decides whether an album match is confident.
-  CandidateScorerTest 7/7, TrackPairingTest 7/7, MatchConfidenceTest 12/12.
+  item, pairs tracks and decides whether an album match is confident. Editions that
+  agree on every track's title, credit and length in track order count as one candidate,
+  however their discs split the tracks (`ff68e09f2`). CandidateScorerTest 7/7,
+  TrackPairingTest 7/7, MatchConfidenceTest 12/12 at `bc10bbe05`, 14/14 at `ff68e09f2`.
 - **U6, artist merge and removal:** credits, favorites, play history, recommendations
   and the cover move to the surviving artist; an artist left without credits is removed.
   ArtistMergeTest 7/7, ArtistMergeRaceTest 3/3, DeleteArtistHandlerTest 4/4.
@@ -1862,6 +1864,12 @@ Verification checkpoint, 2026-11-14:
 - Full backend suite (`scripts/test-backend-container.sh`, `baander-ci:u10`) at
   `bc10bbe05`: 12,700 tests, 139,179 assertions, no failures (ordinary 8,191, native
   921, stack-1 1,567, stack-2 2,021), 1,938.3 s.
+- At `ff68e09f2` (the twin rule, after the full suite): in the CI image the Catalog
+  matching and Metadata unit suites, MusicBrainzMatchApplyTest,
+  MusicBrainzMatchApplyRaceTest, MatchedSongRetagRaceTest, NewAlbumMetadataSyncTest,
+  MessengerJsonDeliveryTest and the match controller and console parity tests passed,
+  501 tests in 46 files; PHPStan on the changed files reports no errors. The two new
+  MatchConfidenceTest cases fail with the earlier rule.
 - The run before it, at `4d63c92cf` (12,692 tests), failed five guard tests that the
   targeted runs had not selected. The recovery job's seed reused the retired health
   check job's ID (`HealthCheckJobRemovalTest`); the messenger routing, async workload
@@ -1886,9 +1894,9 @@ Verification checkpoint, 2026-11-14:
   maintainability notes are fixed in `83ea8153c`, `95220802d` and `a92ffbf25`; the
   dialog race it reported cannot occur, because going back cancels the pending reload,
   and `09ba9d65c` pins that.
-- Preview (`make preview-up`, its own catalog, the music library mounted read-only),
-  against MusicBrainz itself (AE1): `app:metadata:match:search` for "F-1 Trillion: Long
-  Bed" listed five releases, three scoring 100; `compare` against
+- Preview at `ca6b7d5c4` (`make preview-up`, its own catalog, the music library mounted
+  read-only), against MusicBrainz itself (AE1): `app:metadata:match:search` for "F-1
+  Trillion: Long Bed" listed five releases, three scoring 100; `compare` against
   `fef8b229-ee77-4e63-a07f-222c1ad56c97` listed 14 ticked merges; `apply --force` merged
   the 14 "Post Malone, X" artists into Post Malone. Afterwards all 27 songs credit Post
   Malone as primary, 15 keep their tagged text such as "Post Malone, Luke Combs" and
@@ -1897,6 +1905,17 @@ Verification checkpoint, 2026-11-14:
   IDs, and the three songs given LRCLIB lyrics before the apply kept them. Before the
   adapter asked again after a 503, most searches on the preview failed: MusicBrainz
   answered the same well-spaced lookup with 503, then 200, then 200.
+- The automatic leg of AE1 was checked from the comparisons, read-only: the two Japanese
+  editions (`1be7f9af-f4bb-45fe-912c-39e46a305df2`,
+  `61ad5d47-7517-47f6-9b0a-fe691041de5a`) hold the same 27 tracks on one disc and scored
+  94, so the twin rule of `bc10bbe05`, which also required the same disc split, would
+  have left the album for review as a close runner-up. The two clean editions differ
+  from the explicit ones by at most a second per track. On 2026-11-14 the user chose to
+  count editions that split their discs differently as twins (`ff68e09f2`); with that
+  rule the five editions agree on every title, credited name and length the comparisons
+  show (they do not show artist IDs or join phrases), so the album should match on its
+  own. The preview could not replay the automatic path, because its migration state is
+  blocked (see Open).
 - Learnings:
   `docs/solutions/runtime-errors/doctrine-cannot-update-a-loaded-entity-keyed-by-its-association-under-the-strict-uuid-type.md`,
   `docs/solutions/developer-experience/in-memory-transport-get-hands-out-one-message-per-call.md`,
@@ -1910,7 +1929,9 @@ Open:
   "F-1 Trillion: Long Bed" from the dialog or turn automatic matching on.
 - The preview applied the recovery job's seed before `83ea8153c` changed the job's ID,
   so the preview's next refresh refuses with "An applied migration changed" until the
-  user approves reconciling its saved release or resetting its data.
+  user approves reconciling its saved release or resetting its data. Once it runs again,
+  an automatic match of "F-1 Trillion: Long Bed" on a fresh catalog confirms that the
+  album matches on its own.
 - From review, not fixed:
   - a request for an album while a run matches it ends the claim and can start a second
     run on the same album. The apply's row lock and recheck keep a second write out, but
