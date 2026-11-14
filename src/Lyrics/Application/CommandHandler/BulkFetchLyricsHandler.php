@@ -96,10 +96,13 @@ final class BulkFetchLyricsHandler
             while ($limit === null || $queued < $limit) {
                 $remaining = $limit !== null ? min(self::BATCH_SIZE, $limit - $queued) : self::BATCH_SIZE;
                 $songIds = $this->songs->songIdsAfter($after, $remaining);
-                // A page's signatures, and which of its songs have lyrics, each come from one
-                // query that loads no entities.
-                $signatures = $this->songs->findLyricSignatures($songIds);
+                // Which of a page's songs have lyrics, and the signatures of the others, each come
+                // from one query that loads no entities.
                 $withLyrics = $this->lyricsRepository->songIdsWithLyrics($songIds);
+                $signatures = $this->songs->findLyricSignatures(array_values(array_filter(
+                    $songIds,
+                    static fn (Uuid $songId): bool => !isset($withLyrics[$songId->toString()]),
+                )));
 
                 foreach ($songIds as $songId) {
                     if ($limit !== null && $queued >= $limit) {

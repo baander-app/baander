@@ -24,6 +24,7 @@ use App\Library\Application\Port\LibraryMediaFilesInterface;
 use App\Library\Application\Port\LibraryMediaFileVerdict;
 use App\Lyrics\Application\Port\LyricsFetchRequestInterface;
 use App\Metadata\Application\Port\AlbumMetadataSyncRequestInterface;
+use App\Metadata\Domain\Model\ExtractedMetadata;
 use App\Shared\Application\Port\TransactionPortInterface;
 use App\Shared\Domain\Model\Uuid;
 use App\Transcode\Application\Port\VideoProbePortInterface;
@@ -289,8 +290,8 @@ final class FilesDiscoveredHandler
         $song = [
             'file' => $file,
             'song' => $stored,
-            'credit' => $metadata === null ? null : $this->taggedCredit($metadata->getArtists(), $metadata->getMbArtistIds()),
-            'albumArtist' => $metadata === null ? null : $this->taggedCredit($metadata->getAlbumArtists(), $metadata->getMbAlbumArtistIds()),
+            'credit' => $this->songCredit($metadata),
+            'albumArtist' => $this->albumArtistCredit($metadata),
             'genres' => [],
             'known' => true,
             'probe' => $this->probeKnownFile($file),
@@ -410,13 +411,25 @@ final class FilesDiscoveredHandler
                 'year' => $metadata->getYear(),
                 'comment' => $metadata->getComment(),
             ],
-            'credit' => $this->taggedCredit($metadata->getArtists(), $metadata->getMbArtistIds()),
-            'albumArtist' => $this->taggedCredit($metadata->getAlbumArtists(), $metadata->getMbAlbumArtistIds()),
+            'credit' => $this->songCredit($metadata),
+            'albumArtist' => $this->albumArtistCredit($metadata),
             'genres' => array_values(array_filter(
                 array_map(trim(...), $metadata->getGenre()),
                 static fn (string $genre): bool => $genre !== '',
             )),
         ];
+    }
+
+    /** @return TaggedCredit|null the credit a file's artist values give its song */
+    private function songCredit(?ExtractedMetadata $metadata): ?array
+    {
+        return $metadata === null ? null : $this->taggedCredit($metadata->getArtists(), $metadata->getMbArtistIds());
+    }
+
+    /** @return TaggedCredit|null the credit a file's album-artist values give its album */
+    private function albumArtistCredit(?ExtractedMetadata $metadata): ?array
+    {
+        return $metadata === null ? null : $this->taggedCredit($metadata->getAlbumArtists(), $metadata->getMbAlbumArtistIds());
     }
 
     /**
@@ -484,8 +497,7 @@ final class FilesDiscoveredHandler
             if (array_key_exists($path, $read)) {
                 continue;
             }
-            $metadata = $this->metadataReader->readMetadata($path);
-            $credit = $metadata === null ? null : $this->taggedCredit($metadata->getAlbumArtists(), $metadata->getMbAlbumArtistIds());
+            $credit = $this->metadataReader->readMetadata($path) |> $this->albumArtistCredit(...);
             if ($credit !== null) {
                 return $credit;
             }
@@ -696,8 +708,7 @@ final class FilesDiscoveredHandler
         if ($song['credit'] === null) {
             return $gainedLength;
         }
-        $artistId = $artistIds[$song['credit']['identity']->key()];
-        $this->songService->addArtistCredit($stored->getId(), $artistId, ArtistRole::Primary->value, $song['credit']['creditedName']);
+        $this->creditPrimary($stored->getId(), $song['credit'], $artistIds);
 
         return true;
     }
@@ -730,8 +741,7 @@ final class FilesDiscoveredHandler
         if ($song['credit'] === null) {
             return $gainedLength;
         }
-        $artistId = $artistIds[$song['credit']['identity']->key()];
-        $this->songService->addArtistCredit($stored->getId(), $artistId, ArtistRole::Primary->value, $song['credit']['creditedName']);
+        $this->creditPrimary($stored->getId(), $song['credit'], $artistIds);
 
         return true;
     }
@@ -791,13 +801,23 @@ final class FilesDiscoveredHandler
         $this->songService->persist($song);
 
         if ($credit !== null) {
-            $artistId = $artistIds[$credit['identity']->key()];
-            $this->songService->addArtistCredit($song->getId(), $artistId, ArtistRole::Primary->value, $credit['creditedName']);
+            $this->creditPrimary($song->getId(), $credit, $artistIds);
         }
 
         foreach ($genreIds as $genreId) {
             $this->genreService->addSongToGenre($genreId, $song->getId());
         }
+    }
+
+    /**
+     * Credits the song to its tagged artist as primary artist, under the name its tags give.
+     *
+     * @param TaggedCredit        $credit
+     * @param array<string, Uuid> $artistIds the artist of each identity, by its key
+     */
+    private function creditPrimary(Uuid $songId, array $credit, array $artistIds): void
+    {
+        $this->songService->addArtistCredit($songId, $artistIds[$credit['identity']->key()], ArtistRole::Primary->value, $credit['creditedName']);
     }
 
     /** @return array{path: string, error: string} */

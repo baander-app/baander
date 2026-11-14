@@ -283,7 +283,7 @@ final class BulkFetchLyricsHandlerTest extends TestCase
 
     /**
      * The walk reads which songs of a page have lyrics in one lookup, not one per song. A song
-     * with lyrics is skipped before its signature is checked, so it is never counted as skipped.
+     * with lyrics is skipped before its signature is read, so it is never counted as skipped.
      */
     public function testTheWalkReadsWhichSongsOfEachPageHaveLyricsInOneLookupAndSkipsThem(): void
     {
@@ -308,6 +308,15 @@ final class BulkFetchLyricsHandlerTest extends TestCase
         self::assertSame(
             array_map(static fn (array $page): array => array_map(static fn (Uuid $id): string => $id->toString(), $page), $pages),
             $this->lyricsLookups,
+        );
+        $withLyricsIds = array_map(static fn (Uuid $id): string => $id->toString(), $withLyrics);
+        self::assertSame(
+            array_map(static fn (array $page): array => array_values(array_filter(
+                array_map(static fn (Uuid $id): string => $id->toString(), $page),
+                static fn (string $id): bool => !in_array($id, $withLyricsIds, true),
+            )), $pages),
+            $this->signatureLookups,
+            'Signatures are read only for the songs without lyrics.',
         );
     }
 
