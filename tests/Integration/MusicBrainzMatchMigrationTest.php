@@ -11,6 +11,7 @@ use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
+use Doctrine\DBAL\ParameterType;
 use Doctrine\DBAL\Exception\DriverException;
 use Doctrine\DBAL\Schema\Schema;
 use Doctrine\DBAL\Tools\DsnParser;
@@ -100,6 +101,7 @@ final class MusicBrainzMatchMigrationTest extends TestCase
         self::assertSame([
             ['album_match_states', 'album_match_states_pkey', 'p'],
             ['album_match_states', 'chk_album_match_states_reason', 'c'],
+            ['album_match_states', 'chk_album_match_states_review', 'c'],
             ['album_match_states', 'chk_album_match_states_source', 'c'],
             ['album_match_states', 'chk_album_match_states_state', 'c'],
             ['album_match_states', 'fk_album_match_states_album_id', 'f'],
@@ -171,7 +173,7 @@ final class MusicBrainzMatchMigrationTest extends TestCase
         self::assertSame($combinations, $stored);
     }
 
-    /** @param array{string, string, ?string} $row state, source and reason */
+    /** @param array{0: string, 1: string, 2: ?string, 3?: bool} $row state, source, reason and whether the matcher checked it */
     #[DataProvider('unknownMatchStates')]
     public function testAMatchStateOutsideTheKnownValuesIsRefused(array $row, string $violated): void
     {
@@ -183,12 +185,14 @@ final class MusicBrainzMatchMigrationTest extends TestCase
         self::assertSame(0, (int) $this->connection->fetchOne('SELECT count(*) FROM album_match_states'));
     }
 
-    /** @return iterable<string, array{array{string, string, ?string}, string}> */
+    /** @return iterable<string, array{array{0: string, 1: string, 2: ?string, 3?: bool}, string}> */
     public static function unknownMatchStates(): iterable
     {
         yield 'state' => [['matched', 'admin', null], 'chk_album_match_states_state'];
         yield 'source' => [['requested', 'scan', null], 'chk_album_match_states_source'];
         yield 'reason' => [['needs_review', 'ingest', 'unknown'], 'chk_album_match_states_reason'];
+        yield 'review without a reason' => [['needs_review', 'ingest', null], 'chk_album_match_states_review'];
+        yield 'review without a check time' => [['needs_review', 'ingest', 'low_score', false], 'chk_album_match_states_review'];
     }
 
     public function testAMatchStateNeedsAnAlbum(): void
@@ -336,11 +340,14 @@ final class MusicBrainzMatchMigrationTest extends TestCase
         );
     }
 
-    private function matchState(string $state, string $source, ?string $reason): void
+    /** @param ?bool $checked whether the row carries a check time; by default only a review does */
+    private function matchState(string $state, string $source, ?string $reason, ?bool $checked = null): void
     {
         $this->connection->executeStatement(
-            'INSERT INTO album_match_states (album_id, state, source, due_at, reason) VALUES (?, ?, ?, clock_timestamp(), ?)',
-            [$this->albumId->toString(), $state, $source, $reason],
+            'INSERT INTO album_match_states (album_id, state, source, due_at, reason, checked_at)'
+            . ' VALUES (?, ?, ?, clock_timestamp(), ?, CASE WHEN ? THEN clock_timestamp() END)',
+            [$this->albumId->toString(), $state, $source, $reason, $checked ?? $state === 'needs_review'],
+            [ParameterType::STRING, ParameterType::STRING, ParameterType::STRING, ParameterType::STRING, ParameterType::BOOLEAN],
         );
     }
 
