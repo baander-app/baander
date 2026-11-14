@@ -5,6 +5,9 @@ includes:
 
 parameters:
   level: 6
+  # Per checkout: the default system temp directory is shared by every worktree, and a cache
+  # written by another checkout points at that checkout's PHPStan and fails here.
+  tmpDir: var/cache/phpstan
   paths:
     - src/
     - tests/
