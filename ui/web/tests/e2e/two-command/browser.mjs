@@ -2345,7 +2345,10 @@ async function checkpoint({ phase, baseUrl, credentials }) {
     assert(firstTarget !== undefined && Math.abs(firstTarget - initialSliderPosition) >= 8,
       'The first rapid gesture must move the actual source thumb far enough to change its value')
     const targets = [firstTarget, credentials.expectedSeekPosition - 4, credentials.expectedSeekPosition]
-    assert(targets.every(position => position >= 0 && position < snapshot.duration),
+    // The first gesture starts a new generation, whose signing answers carry no duration until
+    // it is ready; the later gestures still span the same source.
+    const sourceDuration = snapshot.duration
+    assert(targets.every(position => position >= 0 && position < sourceDuration),
       'All rapid seek targets must fit the source duration')
     const committedTargets = []
     const controlsBeforeSeek = playbackControls.length
@@ -2387,7 +2390,7 @@ async function checkpoint({ phase, baseUrl, credentials }) {
     await page.route(positionRoute, holdFirstSeek)
     try {
       for (const [index, position] of targets.entries()) {
-        committedTargets.push(await commitSourceSeek(position))
+        committedTargets.push(await commitSourceSeek(position, sourceDuration))
         if (index === 0) {
           await until(() => {
             if (firstRouteError) throw firstRouteError
