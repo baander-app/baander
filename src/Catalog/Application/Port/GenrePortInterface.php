@@ -45,7 +45,34 @@ interface GenrePortInterface
      */
     public function findRootGenres(): array;
 
+    /**
+     * Finds the genre a tag names, or creates it, outside any import. It takes no import lock, so
+     * an import creating the same genre at once can fail the call, which closes the entity manager.
+     */
     public function findOrCreateByName(string $name): Genre;
+
+    /**
+     * Finds or creates the genres an import batch tags, inside the caller's transaction, so
+     * imports running at the same time never create two genres for one slug. Names that share a
+     * slug, such as "rock" and "Rock" or "Hip-Hop" and "Hip Hop", resolve to one genre.
+     *
+     * It locks the slug of every name until that transaction ends, in one sorted pass, then reads
+     * the genres as committed after the locks: the genre with the slug, else the genre whose name
+     * equals the tag ignoring case. A genre it creates takes the first name seen for its slug, an
+     * ASCII first letter capitalized, and is flushed before it returns. That flush writes every pending
+     * change of the unit of work, so call it before persisting the songs that use the result.
+     *
+     * Call it once per transaction, with every genre the transaction writes, after the artist
+     * identities: genre keys sort after artist keys, and a second call could take a key that sorts
+     * before one already held and deadlock with a transaction taking both in order.
+     *
+     * @param list<string> $names
+     *
+     * @return array<string, Uuid> the genre of each name, keyed by the name as given
+     *
+     * @throws \LogicException outside a transaction, before locking or writing anything
+     */
+    public function findOrCreateForImport(array $names): array;
 
     /**
      * @return Genre[]

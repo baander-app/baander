@@ -95,6 +95,11 @@ final class GenreService implements GenrePortInterface
         return $this->genreRepository->findOrCreateByName($name);
     }
 
+    public function findOrCreateForImport(array $names): array
+    {
+        return $this->genreRepository->findOrCreateForImport($names);
+    }
+
     public function findAll(): array
     {
         return $this->genreRepository->findAll();

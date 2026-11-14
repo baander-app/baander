@@ -51,7 +51,24 @@ interface GenreRepositoryInterface
      */
     public function findRootGenres(): array;
 
+    /**
+     * Finds the genre a tag names, or creates it, outside any import. It takes no import lock, so
+     * an import creating the same genre at once can fail the call, which closes the entity manager.
+     */
     public function findOrCreateByName(string $name): Genre;
+
+    /**
+     * Finds or creates an import batch's genres inside the caller's transaction. It locks every
+     * name's slug in one sorted pass until that transaction ends, reads after the locks, resolves
+     * names that share a slug to one genre, and flushes the genres it creates before it returns.
+     *
+     * @param list<string> $names
+     *
+     * @return array<string, Uuid> the genre of each name, keyed by the name as given
+     *
+     * @throws \LogicException outside a transaction, before locking or writing anything
+     */
+    public function findOrCreateForImport(array $names): array;
 
     /**
      * @return Genre[]

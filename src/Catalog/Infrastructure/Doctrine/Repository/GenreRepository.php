@@ -15,11 +15,11 @@ use App\Catalog\Infrastructure\Doctrine\Entity\GenreSongEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\SongEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\AlbumEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\MovieEntity;
+use App\Catalog\Infrastructure\Doctrine\ImportIdentity\ImportIdentityLock;
 use App\Catalog\Infrastructure\Doctrine\Query\CatalogReadScopeQuery;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\ValueObject\LibraryReadScope;
-use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\QueryBuilder;
 
@@ -305,29 +305,73 @@ final class GenreRepository implements GenreRepositoryInterface
     public function findOrCreateByName(string $name): Genre
     {
         $slug = $this->generateSlug($name);
-        $normalizedName = trim($name);
-
-        // Try slug lookup first
-        $existing = $this->findBySlug($slug);
-        if ($existing !== null) {
-            return $existing;
+        $entity = $this->findTaggedGenre($name, $slug);
+        if ($entity === null) {
+            $entity = self::newTaggedGenre($name, $slug);
+            $this->entityManager->persist($entity);
+            $this->entityManager->flush();
         }
 
-        // Try case-insensitive name lookup
-        $qb = $this->entityManager->getRepository(GenreEntity::class)->createQueryBuilder('g');
-        $result = $qb->where($qb->expr()->eq($qb->expr()->lower('g.name'), ':name'))
-            ->setParameter('name', strtolower($normalizedName))
-            ->setMaxResults(1)
-            ->getQuery()
-            ->getResult();
+        return $this->toDomain($entity);
+    }
 
-        if ($result !== []) {
-            return $this->toDomain($result[0]);
+    public function findOrCreateForImport(array $names): array
+    {
+        if ($names === []) {
+            return [];
+        }
+        ImportIdentityLock::acquire(
+            $this->entityManager->getConnection(),
+            array_map(fn (string $name): string => ImportIdentityLock::genreKey($this->generateSlug($name)), $names),
+        );
+
+        // The finders do not see a genre persisted earlier in this call, so names sharing a slug
+        // reuse the first one's genre.
+        $genres = [];
+        $created = false;
+        $ids = [];
+        foreach ($names as $name) {
+            $slug = $this->generateSlug($name);
+            $genre = $genres[$slug] ?? $this->findTaggedGenre($name, $slug);
+            if ($genre === null) {
+                $genre = self::newTaggedGenre($name, $slug);
+                $this->entityManager->persist($genre);
+                $created = true;
+            }
+            $genres[$slug] = $genre;
+            $ids[$name] = $genre->getId();
+        }
+        if ($created) {
+            $this->entityManager->flush();
         }
 
-        // Create new genre
-        $genre = Genre::create(ucfirst($normalizedName), $slug);
-        $entity = new GenreEntity(
+        return $ids;
+    }
+
+    /**
+     * The genre a tag names: the one with its slug, else the one whose name equals it ignoring
+     * case. These are the two keys a new genre could collide on, uniq_genres_slug and
+     * uniq_genres_name_lower, and the name is compared with PostgreSQL's lower(), as that index
+     * does. Each lookup is a statement of its own, so after an import lock it reads, under READ
+     * COMMITTED, what the transaction that held the lock committed.
+     */
+    private function findTaggedGenre(string $name, string $slug): ?GenreEntity
+    {
+        $repository = $this->entityManager->getRepository(GenreEntity::class);
+
+        return $repository->findOneBy(['slug' => $slug])
+            ?? $repository->createQueryBuilder('g')
+                ->where('LOWER(g.name) = LOWER(:name)')
+                ->setParameter('name', trim($name))
+                ->getQuery()
+                ->getOneOrNullResult();
+    }
+
+    private static function newTaggedGenre(string $name, string $slug): GenreEntity
+    {
+        $genre = Genre::create(ucfirst(trim($name)), $slug);
+
+        return new GenreEntity(
             $genre->getName(),
             $genre->getSlug(),
             null,
@@ -335,20 +379,6 @@ final class GenreRepository implements GenreRepositoryInterface
             id: $genre->getId(),
             publicId: $genre->getPublicId(),
         );
-        $this->entityManager->persist($entity);
-
-        try {
-            $this->entityManager->flush();
-        } catch (UniqueConstraintViolationException $e) {
-            $this->entityManager->clear();
-            $existing = $this->findBySlug($slug);
-            if ($existing !== null) {
-                return $existing;
-            }
-            throw $e;
-        }
-
-        return $this->toDomain($entity);
     }
 
     private function generateSlug(string $name): string

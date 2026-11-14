@@ -273,6 +273,7 @@ final class FilesDiscoveredHandler
                 static fn (array $song): string => $song['file']->absolutePath,
                 $songs,
             ));
+            $genreIds = $this->findOrCreateGenres($songs, $hashes);
             $written = [];
             foreach ($songs as $song) {
                 if (($hashes[$song['file']->absolutePath] ?? null) !== $song['file']->hash) {
@@ -295,7 +296,7 @@ final class FilesDiscoveredHandler
                         $this->songService->persist($fresh);
                         $song['song'] = $fresh;
                     } else {
-                        $this->writeSong($song['song'], $song['artist'], $song['genres']);
+                        $this->writeSong($song['song'], $song['artist'], array_map(static fn (string $name): Uuid => $genreIds[$name], $song['genres']));
                     }
                     $written[] = $song;
                 } catch (\Throwable $e) {
@@ -353,8 +354,29 @@ final class FilesDiscoveredHandler
         return $song;
     }
 
-    /** @param list<string> $genres */
-    private function writeSong(Song $song, ?string $artist, array $genres): void
+    /**
+     * Finds or creates the genres of the songs whose files are still current, in one call that
+     * locks them all, before the batch writes any song.
+     *
+     * @param list<array{file: DiscoveredFile, genres: list<string>}> $songs
+     * @param array<string, string>                                    $hashes the current hash of each locked path
+     *
+     * @return array<string, Uuid> the genre of each tagged name
+     */
+    private function findOrCreateGenres(array $songs, array $hashes): array
+    {
+        $names = [];
+        foreach ($songs as $song) {
+            if (($hashes[$song['file']->absolutePath] ?? null) === $song['file']->hash) {
+                array_push($names, ...$song['genres']);
+            }
+        }
+
+        return $names === [] ? [] : $this->genreService->findOrCreateForImport($names);
+    }
+
+    /** @param list<Uuid> $genreIds */
+    private function writeSong(Song $song, ?string $artist, array $genreIds): void
     {
         $this->songService->persist($song);
 
@@ -362,9 +384,8 @@ final class FilesDiscoveredHandler
             $this->songService->linkArtistToSong($song->getId(), $artist, ArtistRole::Primary->value);
         }
 
-        foreach ($genres as $genreName) {
-            $genre = $this->genreService->findOrCreateByName($genreName);
-            $this->genreService->addSongToGenre($genre->getId(), $song->getId());
+        foreach ($genreIds as $genreId) {
+            $this->genreService->addSongToGenre($genreId, $song->getId());
         }
     }
 

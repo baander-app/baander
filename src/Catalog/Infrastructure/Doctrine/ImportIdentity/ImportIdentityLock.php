@@ -64,6 +64,15 @@ final class ImportIdentityLock
     }
 
     /**
+     * The key of the genre with a slug. Genres are unique by slug, and names such as "Hip-Hop"
+     * and "Hip Hop" share one, so the slug is the key two imports would collide on.
+     */
+    public static function genreKey(string $slug): string
+    {
+        return 'genre:' . $slug;
+    }
+
+    /**
      * @param list<string> $keys
      *
      * @return list<string>

@@ -198,7 +198,7 @@ final class FilesDiscoveredRenameTest extends TestCase
         $metadata = $this->createStub(MetadataContentReaderPortInterface::class);
         $metadata->method('readMetadata')->willReturn((new ExtractedMetadata())->setAlbum('Album'));
         $genres = $this->createMock(GenrePortInterface::class);
-        $genres->expects($this->never())->method('findOrCreateByName');
+        $genres->expects($this->never())->method('findOrCreateForImport');
         $lyrics = $this->createMock(LyricsFetchRequestInterface::class);
         $lyrics->expects($this->never())->method('requestFetch');
         $sync = $this->createMock(AlbumMetadataSyncRequestInterface::class);
