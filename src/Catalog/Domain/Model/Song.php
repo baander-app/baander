@@ -142,6 +142,38 @@ final class Song
         $this->state->updatedAt = new DateTimeImmutable();
     }
 
+    /**
+     * Take the tag fields of the song's file after the file was retagged. A locked field keeps its
+     * value; every other field takes the tag's value, and a field the tags no longer carry is
+     * cleared. Lyrics and the explicit flag do not come from these tags and stay as they are.
+     *
+     * @throws InvalidArgumentException when the title is empty; nothing changes then
+     */
+    public function updateFromTags(string $title, ?int $track, ?int $disc, ?int $year, ?string $comment): void
+    {
+        if (trim($title) === '') {
+            throw new InvalidArgumentException('Song title cannot be empty.');
+        }
+
+        if (!$this->isFieldLocked('title')) {
+            $this->state->title = trim($title);
+        }
+        if (!$this->isFieldLocked('track')) {
+            $this->state->track = $track;
+        }
+        if (!$this->isFieldLocked('disc')) {
+            $this->state->disc = $disc;
+        }
+        if (!$this->isFieldLocked('year')) {
+            $this->state->year = $year;
+        }
+        if (!$this->isFieldLocked('comment')) {
+            $this->state->comment = $comment;
+        }
+
+        $this->state->updatedAt = new DateTimeImmutable();
+    }
+
     public function updateSourcePath(string $path): void
     {
         if (trim($path) === '') {

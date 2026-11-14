@@ -36,6 +36,9 @@ final class SongRepository implements SongRepositoryInterface
     use PgroongaSearchTrait;
     use RefreshedEntityTrait;
 
+    /** Keeps a path lookup's bound parameters far below PostgreSQL's limit per statement. */
+    private const int PATHS_PER_STATEMENT = 1000;
+
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
         private readonly CursorPaginator $cursorPaginator,
@@ -179,13 +182,29 @@ final class SongRepository implements SongRepositoryInterface
         }
     }
 
-    public function findByPath(string $path): ?Song
+    public function findByPathsInLibrary(Uuid $libraryId, array $paths): array
     {
-        $entity = $this->entityManager
-            ->getRepository(SongEntity::class)
-            ->findOneBy(['path' => $path]);
+        $songs = [];
+        foreach (array_chunk(array_values(array_unique($paths)), self::PATHS_PER_STATEMENT) as $chunk) {
+            /** @var list<SongEntity> $entities */
+            $entities = $this->entityManager->createQuery(
+                <<<'DQL'
+                    SELECT s, a
+                    FROM App\Catalog\Infrastructure\Doctrine\Entity\SongEntity s
+                    JOIN s.album a
+                    WHERE a.library = :libraryId AND s.path IN (:paths)
+                    ORDER BY s.createdAt ASC, s.id ASC
+                    DQL,
+            )
+                ->setParameter('libraryId', $libraryId, 'uuid')
+                ->setParameter('paths', $chunk)
+                ->getResult();
+            foreach ($entities as $entity) {
+                $songs[$entity->getPath()] ??= $this->toDomain($entity);
+            }
+        }
 
-        return $entity !== null ? $this->toDomain($entity) : null;
+        return $songs;
     }
 
     public function findByHash(string $hash): ?Song
@@ -483,6 +502,19 @@ final class SongRepository implements SongRepositoryInterface
             ?? throw new \RuntimeException(sprintf('Artist not found: %s', $artistId->toString()));
 
         $this->entityManager->persist(new ArtistSongEntity($artistEntity, $songEntity, $role, $creditedName));
+    }
+
+    public function removeArtistCredits(Uuid $songId): void
+    {
+        // A statement, not entity removal: the unit of work runs its inserts before its deletes, so
+        // a removed credit and a new one with the same artist and role, flushed together, would
+        // break uniq_artist_song_artist_id_song_id_role.
+        $this->entityManager->createQueryBuilder()
+            ->delete(ArtistSongEntity::class, 'credit')
+            ->where('credit.song = :songId')
+            ->setParameter('songId', $songId, 'uuid')
+            ->getQuery()
+            ->execute();
     }
 
     public function findCreditedSongIds(array $songIds): array

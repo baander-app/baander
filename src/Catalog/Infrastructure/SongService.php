@@ -80,9 +80,9 @@ final class SongService implements SongPortInterface
         return $this->songRepository->findFreshByUuid($uuid);
     }
 
-    public function findByPath(string $path): ?Song
+    public function findByPathsInLibrary(Uuid $libraryId, array $paths): array
     {
-        return $this->songRepository->findByPath($path);
+        return $this->songRepository->findByPathsInLibrary($libraryId, $paths);
     }
 
     public function findByHash(string $hash): ?Song
@@ -149,6 +149,11 @@ final class SongService implements SongPortInterface
     public function addArtistCredit(Uuid $songId, Uuid $artistId, string $role, string $creditedName): void
     {
         $this->songRepository->addArtistCredit($songId, $artistId, $role, $creditedName);
+    }
+
+    public function removeArtistCredits(Uuid $songId): void
+    {
+        $this->songRepository->removeArtistCredits($songId);
     }
 
     public function findCreditedSongIds(array $songIds): array

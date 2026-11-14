@@ -38,7 +38,10 @@ use Symfony\Component\Messenger\Stamp\TransportNamesStamp;
 
 /**
  * @phpstan-type TaggedCredit array{identity: ArtistIdentity, creditedName: string}
- * @phpstan-type PreparedSong array{file: DiscoveredFile, song: Song, credit: TaggedCredit|null, albumArtist: TaggedCredit|null, genres: list<string>, known: bool, previousPath?: string, probe?: AudioProbeResult|null, repaired?: bool}
+ * @phpstan-type TagFields array{title: string, track: int|null, disc: int|null, year: int|null, comment: string|null}
+ * @phpstan-type FileTags array{fields: TagFields, credit: TaggedCredit|null, albumArtist: TaggedCredit|null, genres: list<string>}
+ * @phpstan-type Retag array{fields: TagFields, probe: AudioProbeResult}
+ * @phpstan-type PreparedSong array{file: DiscoveredFile, song: Song, credit: TaggedCredit|null, albumArtist: TaggedCredit|null, genres: list<string>, known: bool, previousPath?: string, probe?: AudioProbeResult|null, retag?: Retag, repaired?: bool}
  */
 final class FilesDiscoveredHandler
 {
@@ -100,8 +103,10 @@ final class FilesDiscoveredHandler
      * touched is given an artist credit when it has none.
      *
      * A file whose content a stored song holds repairs that song instead of becoming a new one, and
-     * the song stays in the album it is stored in. An album is resolved, or created, only for new
-     * songs, so a rescan after an album was renamed or merged creates no album.
+     * the song stays in the album it is stored in. A file with content no song holds, at the path of
+     * a stored song, was retagged: it updates that song, which also stays in its album. An album is
+     * resolved, or created, only for new songs, so a rescan after an album was renamed or merged, or
+     * a retagged file, creates no album.
      *
      * @param list<DiscoveredFile> $files the message's files that still exist
      */
@@ -115,9 +120,11 @@ final class FilesDiscoveredHandler
         $committedPaths = [];
 
         $audioFiles = array_values(array_filter($files, static fn (DiscoveredFile $file): bool => $file->isAudio()));
-        // What each file becomes: a repair of the stored song its content belongs to, else a new
-        // song in the album its tags name.
+        // What each file becomes: a repair of the stored song its content belongs to; else an update
+        // of the song stored at its path; else a new song in the album its tags name.
         $targets = $this->knownSongs($audioFiles);
+        $retagged = $this->retaggedSongs($libraryId, array_values(array_filter($audioFiles, static fn (DiscoveredFile $file): bool => !isset($targets[$file->absolutePath]))));
+        $targets += $retagged;
         $newFiles = array_values(array_filter($audioFiles, static fn (DiscoveredFile $file): bool => !isset($targets[$file->absolutePath])));
         $album = null;
         if ($newFiles !== []) {
@@ -153,7 +160,11 @@ final class FilesDiscoveredHandler
             foreach ($this->currentFiles($libraryId, $batch) as $file) {
                 try {
                     $target = $targets[$file->absolutePath];
-                    $song = $target instanceof Song ? $this->readKnownSong($target, $file) : $this->readNewSong($target, $file);
+                    $song = match (true) {
+                        isset($retagged[$file->absolutePath]) => $this->readRetaggedSong($retagged[$file->absolutePath], $file),
+                        $target instanceof Song => $this->readKnownSong($target, $file),
+                        default => $this->readNewSong($target, $file),
+                    };
                     if ($song !== null) {
                         $songs[] = $song;
                         $songAlbum = $song['song']->getAlbumId();
@@ -242,6 +253,25 @@ final class FilesDiscoveredHandler
     }
 
     /**
+     * The stored song at the path of each file whose content no song holds, by path. Such a file was
+     * retagged, or its content changed otherwise, and updates that song. A song whose file was marked
+     * unavailable counts as well: availability is decided by path, so a second song at the path
+     * would count as available too.
+     *
+     * @param list<DiscoveredFile> $files files whose hash no song holds
+     *
+     * @return array<string, Song>
+     */
+    private function retaggedSongs(Uuid $libraryId, array $files): array
+    {
+        if ($files === []) {
+            return [];
+        }
+
+        return $this->songService->findByPathsInLibrary($libraryId, array_map(static fn (DiscoveredFile $file): string => $file->absolutePath, $files));
+    }
+
+    /**
      * Reads a known song's file outside any transaction, so the song can be repaired from it: its tags
      * and its audio. A file in another directory than the song's file is left alone. A probe that fails
      * is logged and leaves the song's length and technical fields as they are.
@@ -286,34 +316,55 @@ final class FilesDiscoveredHandler
         }
     }
 
-    /** @return PreparedSong|null a new song, with the album-artist credit its tags give */
-    private function readNewSong(Album $album, DiscoveredFile $file): ?array
+    /**
+     * Reads a retagged file outside any transaction, so the song stored at its path can be updated
+     * from it: its tag fields, the credit its tags give, and its audio. A file without readable
+     * metadata is left alone, as a new file is. A probe that fails fails the file and leaves the song
+     * as it is, since its hash would otherwise change while its technical fields still describe the
+     * old content.
+     *
+     * @return PreparedSong|null
+     */
+    private function readRetaggedSong(Song $stored, DiscoveredFile $file): ?array
     {
-        $metadata = $this->metadataReader->readMetadata($file->absolutePath);
-        if ($metadata === null) {
-            $this->logger->warning('No metadata for file', ['path' => $file->absolutePath]);
-
+        $tags = $this->readTags($file);
+        if ($tags === null) {
             return null;
         }
 
-        $title = $metadata->getTitle() ?? pathinfo($file->absolutePath, PATHINFO_FILENAME);
-        if (trim($title) === '') {
-            $title = pathinfo($file->absolutePath, PATHINFO_FILENAME);
+        return [
+            'file' => $file,
+            'song' => $stored,
+            'credit' => $tags['credit'],
+            'albumArtist' => $tags['albumArtist'],
+            'genres' => [],
+            'known' => true,
+            'retag' => ['fields' => $tags['fields'], 'probe' => $this->audioProbe->probeAudio($file->absolutePath)],
+        ];
+    }
+
+    /** @return PreparedSong|null a new song, with the album-artist credit its tags give */
+    private function readNewSong(Album $album, DiscoveredFile $file): ?array
+    {
+        $tags = $this->readTags($file);
+        if ($tags === null) {
+            return null;
         }
 
+        $fields = $tags['fields'];
         $probe = $this->audioProbe->probeAudio($file->absolutePath);
         $song = Song::create(
             album: $album->getId(),
-            title: $title,
+            title: $fields['title'],
             path: $file->absolutePath,
             size: $file->size,
             mimeType: $this->detectMimeType($file->extension),
             length: $probe->length(),
             lyrics: $this->findLyricsFile($file->absolutePath),
-            track: $metadata->getTrackNumber() ?? $this->extractTrackNumberFromFilename($file->absolutePath),
-            disc: $metadata->getDiscNumber(),
-            year: $metadata->getYear(),
-            comment: $metadata->getComment(),
+            track: $fields['track'],
+            disc: $fields['disc'],
+            year: $fields['year'],
+            comment: $fields['comment'],
             hash: $file->hash,
             bitrate: $probe->bitrate,
             sampleRate: $probe->sampleRate,
@@ -323,18 +374,48 @@ final class FilesDiscoveredHandler
             streamIndex: $probe->streamIndex,
         );
 
-        $genres = array_values(array_filter(
-            array_map(trim(...), $metadata->getGenre()),
-            static fn (string $genre): bool => $genre !== '',
-        ));
-
         return [
             'file' => $file,
             'song' => $song,
+            'credit' => $tags['credit'],
+            'albumArtist' => $tags['albumArtist'],
+            'genres' => $tags['genres'],
+            'known' => false,
+        ];
+    }
+
+    /**
+     * What a file's tags give its song, or null when the file has no readable metadata: the song
+     * fields, with the title falling back to the file name and the track number to the one the file
+     * name starts with; the song's and the album's tagged credits; and the genres.
+     *
+     * @return FileTags|null
+     */
+    private function readTags(DiscoveredFile $file): ?array
+    {
+        $metadata = $this->metadataReader->readMetadata($file->absolutePath);
+        if ($metadata === null) {
+            $this->logger->warning('No metadata for file', ['path' => $file->absolutePath]);
+
+            return null;
+        }
+
+        $title = $metadata->getTitle() ?? '';
+
+        return [
+            'fields' => [
+                'title' => trim($title) === '' ? pathinfo($file->absolutePath, PATHINFO_FILENAME) : $title,
+                'track' => $metadata->getTrackNumber() ?? $this->extractTrackNumberFromFilename($file->absolutePath),
+                'disc' => $metadata->getDiscNumber(),
+                'year' => $metadata->getYear(),
+                'comment' => $metadata->getComment(),
+            ],
             'credit' => $this->taggedCredit($metadata->getArtists(), $metadata->getMbArtistIds()),
             'albumArtist' => $this->taggedCredit($metadata->getAlbumArtists(), $metadata->getMbAlbumArtistIds()),
-            'genres' => $genres,
-            'known' => false,
+            'genres' => array_values(array_filter(
+                array_map(trim(...), $metadata->getGenre()),
+                static fn (string $genre): bool => $genre !== '',
+            )),
         ];
     }
 
@@ -416,9 +497,9 @@ final class FilesDiscoveredHandler
     /**
      * Writes the songs and their links in one transaction, unless a delete with files holds the
      * library. The transaction first reads each known song again and keeps the tagged credit only of a
-     * song without any artist credit, then resolves the artists and genres it writes, then writes. A
-     * song that fails is added to $failures and the others are written; a failed statement fails the
-     * transaction and with it the message.
+     * song without any artist credit or with a retagged file, then resolves the artists and genres it
+     * writes, then writes. A song that fails is added to $failures and the others are written; a
+     * failed statement fails the transaction and with it the message.
      *
      * @param list<PreparedSong>                       $songs
      * @param list<array{path: string, error: string}> $failures
@@ -443,7 +524,11 @@ final class FilesDiscoveredHandler
                     continue;
                 }
                 try {
-                    $prepared = $song['known'] ? $this->freshKnownSong($libraryId, $song) : $song;
+                    $prepared = match (true) {
+                        isset($song['retag']) => $this->freshRetaggedSong($song),
+                        $song['known'] => $this->freshKnownSong($libraryId, $song),
+                        default => $song,
+                    };
                     if ($prepared !== null) {
                         $current[] = $prepared;
                     }
@@ -458,7 +543,9 @@ final class FilesDiscoveredHandler
             $written = [];
             foreach ($current as $song) {
                 try {
-                    if ($song['known']) {
+                    if (isset($song['retag'])) {
+                        $song['repaired'] = $this->retagSong($song, $song['retag'], $artistIds);
+                    } elseif ($song['known']) {
                         $song['repaired'] = $this->repairSong($song, $artistIds);
                     } else {
                         $this->writeSong($song['song'], $song['credit'], $artistIds, array_map(static fn (string $name): Uuid => $genreIds[$name], $song['genres']));
@@ -507,6 +594,25 @@ final class FilesDiscoveredHandler
         return $song;
     }
 
+    /**
+     * The song stored at a retagged file's path as the database holds it now, or null when it changed
+     * since the file was read: it moved to another path or took other content.
+     *
+     * @param PreparedSong $song
+     *
+     * @return PreparedSong|null
+     */
+    private function freshRetaggedSong(array $song): ?array
+    {
+        $fresh = $this->songService->findFreshByUuid($song['song']->getId());
+        if ($fresh === null || $fresh->getPath() !== $song['file']->absolutePath || $fresh->getHash() !== $song['song']->getHash()) {
+            return null;
+        }
+        $song['song'] = $fresh;
+
+        return $song;
+    }
+
     private function canMoveSource(Uuid $libraryId, string $previousPath, DiscoveredFile $file): bool
     {
         $inspection = $this->mediaFiles->inspect($libraryId, [$previousPath, $file->absolutePath]);
@@ -526,6 +632,7 @@ final class FilesDiscoveredHandler
     /**
      * Drops the tagged credit of each known song that has an artist credit of any role, so a rescan
      * neither adds to nor replaces a song's credits, and finds or creates no artist for such a song.
+     * A retagged song keeps its tagged credit, which replaces its credits.
      *
      * @param list<PreparedSong> $songs
      *
@@ -533,7 +640,7 @@ final class FilesDiscoveredHandler
      */
     private function withTagCreditsOfUncreditedSongsOnly(array $songs): array
     {
-        $known = array_filter($songs, static fn (array $song): bool => $song['known'] && $song['credit'] !== null);
+        $known = array_filter($songs, static fn (array $song): bool => $song['known'] && !isset($song['retag']) && $song['credit'] !== null);
         if ($known === []) {
             return $songs;
         }
@@ -586,6 +693,40 @@ final class FilesDiscoveredHandler
             $this->songService->persist($stored);
         }
 
+        if ($song['credit'] === null) {
+            return $gainedLength;
+        }
+        $artistId = $artistIds[$song['credit']['identity']->key()];
+        $this->songService->addArtistCredit($stored->getId(), $artistId, ArtistRole::Primary->value, $song['credit']['creditedName']);
+
+        return true;
+    }
+
+    /**
+     * Updates the song stored at a retagged file's path from the file. The song takes the file's hash,
+     * size and technical fields, the length of its audio and its unlocked tag fields, and the credit
+     * its tags give replaces every credit it held, hand-made ones too; tags that name no artist leave
+     * it without credits. The song keeps its ID, album, lyrics and genres.
+     *
+     * @param PreparedSong        $song
+     * @param Retag               $retag
+     * @param array<string, Uuid> $artistIds the artist of each identity, by its key
+     *
+     * @return bool whether the song was given a primary credit or a length
+     */
+    private function retagSong(array $song, array $retag, array $artistIds): bool
+    {
+        $stored = $song['song'];
+        $fields = $retag['fields'];
+        $stored->updateFromTags(title: $fields['title'], track: $fields['track'], disc: $fields['disc'], year: $fields['year'], comment: $fields['comment']);
+        $stored->updateAudioMetadata(size: $song['file']->size, hash: $song['file']->hash);
+        $this->applyAudioProbe($stored, $retag['probe']);
+        $length = $retag['probe']->length();
+        $gainedLength = $length !== null && $stored->getLength() !== $length;
+        $stored->updateLength($length);
+        $this->songService->persist($stored);
+
+        $this->songService->removeArtistCredits($stored->getId());
         if ($song['credit'] === null) {
             return $gainedLength;
         }

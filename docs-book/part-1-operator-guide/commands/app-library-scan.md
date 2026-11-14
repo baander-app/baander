@@ -106,11 +106,37 @@ returning file the same way. A repair works as follows:
 
 The song stays in the album it is stored in, so a rescan after an album was renamed with
 [app:album:update](app-album-update.md) or merged with [app:album:merge](app-album-merge.md)
-creates no album from the files' old album tag. The song's title, genres and other tag fields
-stay as they are.
+creates no album from the files' old album tag. A repair leaves the song's title, genres and
+other tag fields as they are. A file whose content changed is not repaired but updates its song,
+as [Retagged files](#retagged-files) describes.
 
 The repair has a cost: the workers read and probe every file of the library again, as they did
 for its first import, where an ordinary scan skips unchanged files.
+
+### Retagged files
+
+A file whose content changed at a song's path, for example after a tag editor rewrote its tags,
+updates that song in place. The file's hash changed, so an ordinary scan finds it, and so does
+`--rescan`. A song whose file was marked unavailable is updated the same way when the file comes
+back with new content. The song keeps its ID, and with it its play history, favorites and
+playlist entries. It also keeps its album, lyrics and genres. From the file it takes:
+
+- Its hash, size and technical fields, and its length, which ffprobe measures from the audio.
+- Its title, track, disc, year and comment. A field locked with
+  [app:song:update](app-song-update.md) keeps its value; a tag the file no longer carries clears
+  its field.
+- Its artist credits. The credit the new tags give replaces every credit the song held,
+  including credits added or changed by hand. When the new tags name no artist, the song is left
+  without credits.
+
+A retagged file creates no album and no second song, even when its album tag changed.
+
+When ffprobe cannot read the file, the import of that file fails and the song stays as it was.
+An ordinary scan then skips the file, because the index already holds its new hash; scan with
+`--rescan` once the file is readable.
+
+While `lyrics.auto_fetch` is on, a retagged song without lyrics that is given a primary credit or
+a new length is queued for a lyrics fetch.
 
 ### Missing and returning files
 

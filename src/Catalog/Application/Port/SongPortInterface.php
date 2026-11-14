@@ -59,7 +59,14 @@ interface SongPortInterface
      */
     public function findFreshByUuid(Uuid $uuid): ?Song;
 
-    public function findByPath(string $path): ?Song;
+    /**
+     * The songs of the library stored at these paths, whatever the availability of their files.
+     * Where several songs share a path, the oldest is returned.
+     *
+     * @param list<string> $paths
+     * @return array<string, Song> keyed by path; a path without a song is absent
+     */
+    public function findByPathsInLibrary(Uuid $libraryId, array $paths): array;
 
     public function findByHash(string $hash): ?Song;
 
@@ -98,6 +105,13 @@ interface SongPortInterface
      * @throws \RuntimeException when the song or the artist does not exist
      */
     public function addArtistCredit(Uuid $songId, Uuid $artistId, string $role, string $creditedName): void;
+
+    /**
+     * Deletes every artist credit of the song, of any role, at once rather than on the next flush,
+     * so a credit added afterwards may repeat a removed credit's artist and role. A credit added in
+     * this unit of work and not flushed yet is not deleted.
+     */
+    public function removeArtistCredits(Uuid $songId): void;
 
     /**
      * Which of these songs have at least one artist credit, of any role. Reads committed credits

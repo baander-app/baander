@@ -13,7 +13,7 @@ final class Version20261114120000 extends AbstractMigration
 
     public function getDescription(): string
     {
-        return 'Store the name each artist credit was given, and allow one artist per MusicBrainz artist ID.';
+        return 'Store the name each artist credit was given, allow one artist per MusicBrainz artist ID, and index songs by path.';
     }
 
     public function up(Schema $schema): void
@@ -27,6 +27,8 @@ final class Version20261114120000 extends AbstractMigration
         }
         // Fails while two artists share an ID: which of them keeps it is for whoever merges them.
         $this->addSql('CREATE UNIQUE INDEX uniq_artists_mbid ON artists USING btree (mbid)');
+        // An import finds the song stored at a retagged file's path, so the lookup by path needs an index.
+        $this->addSql('CREATE INDEX idx_songs_path ON songs USING btree (path)');
         // The triggers learn the column only after the backfill, so the backfill publishes no live update.
         foreach ([
             'artist_song' => ['{id,artist_id,song_id,role,credited_name}', '{song}'],

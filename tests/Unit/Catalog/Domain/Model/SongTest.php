@@ -545,6 +545,70 @@ final class SongTest extends TestCase
         $song->unlockField('colour');
     }
 
+    public function testUpdateFromTagsTakesEveryTagFieldAndClearsTheOnesTheTagsNoLongerCarry(): void
+    {
+        $song = Song::create($this->albumId, 'Old Title', '/path.flac', 1024, 'audio/flac', track: 1, disc: 1, year: 2000, comment: 'old');
+
+        $song->updateFromTags(title: 'New Title', track: 2, disc: null, year: 2005, comment: null);
+
+        $this->assertSame('New Title', $song->getTitle());
+        $this->assertSame(2, $song->getTrack());
+        $this->assertNull($song->getDisc());
+        $this->assertSame(2005, $song->getYear());
+        $this->assertNull($song->getComment());
+    }
+
+    /** @return iterable<string, array{string, \Closure(Song): mixed, mixed}> */
+    public static function lockedTagFields(): iterable
+    {
+        yield 'title' => ['title', static fn (Song $song): string => $song->getTitle(), 'Old Title'];
+        yield 'track' => ['track', static fn (Song $song): ?int => $song->getTrack(), 1];
+        yield 'disc' => ['disc', static fn (Song $song): ?int => $song->getDisc(), 1];
+        yield 'year' => ['year', static fn (Song $song): ?int => $song->getYear(), 2000];
+        yield 'comment' => ['comment', static fn (Song $song): ?string => $song->getComment(), 'old'];
+    }
+
+    /** @param \Closure(Song): mixed $read */
+    #[\PHPUnit\Framework\Attributes\DataProvider('lockedTagFields')]
+    public function testUpdateFromTagsKeepsALockedFieldAndTakesTheOthers(string $field, \Closure $read, mixed $kept): void
+    {
+        $song = Song::create($this->albumId, 'Old Title', '/path.flac', 1024, 'audio/flac', track: 1, disc: 1, year: 2000, comment: 'old');
+        $song->lockField($field);
+
+        $song->updateFromTags(title: 'New Title', track: 2, disc: 2, year: 2005, comment: 'new');
+
+        $this->assertSame($kept, $read($song));
+        $taken = ['title' => 'New Title', 'track' => 2, 'disc' => 2, 'year' => 2005, 'comment' => 'new'];
+        unset($taken[$field]);
+        $this->assertSame($taken, array_intersect_key([
+            'title' => $song->getTitle(),
+            'track' => $song->getTrack(),
+            'disc' => $song->getDisc(),
+            'year' => $song->getYear(),
+            'comment' => $song->getComment(),
+        ], $taken));
+    }
+
+    public function testUpdateFromTagsLeavesLyricsAndTheExplicitFlagAlone(): void
+    {
+        $song = Song::create($this->albumId, 'Old Title', '/path.flac', 1024, 'audio/flac', lyrics: "[00:01.00]Line\n", explicit: true);
+
+        $song->updateFromTags(title: 'New Title', track: null, disc: null, year: null, comment: null);
+
+        $this->assertSame("[00:01.00]Line\n", $song->getLyrics());
+        $this->assertTrue($song->isExplicit());
+    }
+
+    public function testUpdateFromTagsRejectsAnEmptyTitle(): void
+    {
+        $song = Song::create($this->albumId, 'Old Title', '/path.flac', 1024, 'audio/flac');
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Song title cannot be empty.');
+
+        $song->updateFromTags(title: '  ', track: null, disc: null, year: null, comment: null);
+    }
+
     public function testGettersReturnExpectedTypes(): void
     {
         $song = Song::create($this->albumId, 'Title', '/path.mp3', 1024, 'audio/mpeg');

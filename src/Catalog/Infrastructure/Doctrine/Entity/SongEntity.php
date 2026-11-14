@@ -17,6 +17,7 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Index(name: 'idx_songs_title_pgroonga', columns: ['title'], flags: ['pgroonga'], options: ['with' => "plugins='token_filters/stem', tokenizer='TokenNgram', normalizer='NormalizerAuto', token_filters='TokenFilterStem'"])]
 #[ORM\Index(name: 'idx_songs_title_id', columns: ['title', 'id'])]
 #[ORM\Index(name: 'idx_songs_hash', columns: ['hash'])]
+#[ORM\Index(name: 'idx_songs_path', columns: ['path'])]
 class SongEntity
 {
     #[ORM\Id]
