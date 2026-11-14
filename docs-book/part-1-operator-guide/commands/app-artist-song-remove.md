@@ -13,7 +13,7 @@ make exec cmd="php bin/console app:artist:song:remove V1StGXR8_Z5jdHi6B-myT 0192
 | Argument | Required | Description |
 |----------|----------|-------------|
 | `public-id` | Yes | The public ID of the artist |
-| `song-id` | Yes | The song UUID, the `uuid` field of the song in the API |
+| `song-id` | Yes | The public ID of the song, the `publicId` field of the song in the API |
 
 ## Options
 

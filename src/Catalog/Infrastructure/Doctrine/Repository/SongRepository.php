@@ -485,6 +485,26 @@ final class SongRepository implements SongRepositoryInterface
         $this->entityManager->persist(new ArtistSongEntity($artistEntity, $songEntity, $role, $creditedName));
     }
 
+    public function findCreditedSongIds(array $songIds): array
+    {
+        if ($songIds === []) {
+            return [];
+        }
+
+        $rows = $this->entityManager->createQuery(
+            <<<'DQL'
+                SELECT DISTINCT s.id AS songId
+                FROM App\Catalog\Infrastructure\Doctrine\Entity\ArtistSongEntity ass
+                JOIN ass.song s
+                WHERE s.id IN (:songIds)
+                DQL,
+        )
+            ->setParameter('songIds', $songIds)
+            ->getResult();
+
+        return array_map(static fn (array $row): string => $row['songId']->toString(), $rows);
+    }
+
     /**
      * The name the song shows: the credited name of its primary credit, not the
      * artist's own name. Among several primary credits, the first by credited

@@ -19,7 +19,7 @@ make exec cmd="php bin/console app:artist:song:add V1StGXR8_Z5jdHi6B-myT 0192a3b
 | Argument | Required | Description |
 |----------|----------|-------------|
 | `public-id` | Yes | The public ID of the artist |
-| `song-id` | Yes | The song UUID, the `uuid` field of the song in the API |
+| `song-id` | Yes | The public ID of the song, the `publicId` field of the song in the API |
 | `role` | Yes | `primary`, `featured`, `producer`, `composer`, `conductor`, `remixer`, `djmix` or `other` |
 
 ## Options
@@ -30,7 +30,7 @@ make exec cmd="php bin/console app:artist:song:add V1StGXR8_Z5jdHi6B-myT 0192a3b
 
 ## Details
 
-An artist may hold several roles on one song, such as `featured` and `producer`; each is a separate credit. A new credit stores the artist's name at that moment as its credited name; renaming the artist afterwards does not change it. Adding a credit the artist already has succeeds and leaves that one credit as it was, credited name included, so a retry is harmless. A song UUID that names no song fails with `Song "<id>" not found.`, which the API answers with `404`.
+An artist may hold several roles on one song, such as `featured` and `producer`; each is a separate credit. A new credit stores the artist's name at that moment as its credited name; renaming the artist afterwards does not change it. Adding a credit the artist already has succeeds and leaves that one credit as it was, credited name included, so a retry is harmless. A song public ID that names no song fails with `Song "<id>" not found.`, which the API answers with `404`.
 
 To change a credit's role, use [app:artist:song:role](app-artist-song-role.md); to remove the artist from the song, use [app:artist:song:remove](app-artist-song-remove.md). [app:artist:album:add](app-artist-album-add.md) credits an artist on an album.
 

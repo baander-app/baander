@@ -34,7 +34,7 @@ final class ArtistSongAddCommand extends Command
     {
         $this
             ->addArgument('public-id', InputArgument::REQUIRED, 'The public ID of the artist')
-            ->addArgument('song-id', InputArgument::REQUIRED, 'The song UUID')
+            ->addArgument('song-id', InputArgument::REQUIRED, 'The public ID of the song')
             ->addArgument('role', InputArgument::REQUIRED, 'The role: primary, featured, producer, composer, conductor, remixer, djmix or other');
         AdminCommandSupport::addJsonOption($this);
     }

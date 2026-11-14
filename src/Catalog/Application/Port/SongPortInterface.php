@@ -99,6 +99,15 @@ interface SongPortInterface
      */
     public function addArtistCredit(Uuid $songId, Uuid $artistId, string $role, string $creditedName): void;
 
+    /**
+     * Which of these songs have at least one artist credit, of any role. Reads committed credits
+     * only, not credits added in this unit of work and not flushed yet.
+     *
+     * @param list<Uuid> $songIds
+     * @return list<string> the UUID of each credited song
+     */
+    public function findCreditedSongIds(array $songIds): array;
+
     public function getArtistNameForSong(Uuid $songId): ?string;
 
     /**

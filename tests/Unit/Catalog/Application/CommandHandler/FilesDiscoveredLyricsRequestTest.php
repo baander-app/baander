@@ -33,8 +33,8 @@ use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
 
 /**
- * Ingest asks the Lyrics context for one fetch per track it created, and only
- * once the songs are committed, so the asynchronous fetch can find them.
+ * Ingest asks the Lyrics context for one fetch per track it created or repaired, and
+ * only once the songs are committed, so the asynchronous fetch can find them.
  */
 final class FilesDiscoveredLyricsRequestTest extends TestCase
 {
@@ -84,14 +84,30 @@ final class FilesDiscoveredLyricsRequestTest extends TestCase
         self::assertSame([$withoutLyrics->getId()->toString()], $state->requests[0]);
     }
 
-    public function testRescanThatCreatesNoTracksRequestsNothing(): void
+    public function testRescanOfACreditedTrackRequestsNothing(): void
     {
         $state = $this->state();
-        $state->visibleSongs[] = $this->existingSong('hash-one');
+        $state->visibleSongs[] = $this->existingSong('01 One.mp3', 'hash-one');
+        $state->creditedSongs[] = $state->visibleSongs[0]->getId()->toString();
         $lyrics = $this->lyricsFetch($state);
         $lyrics->expects($this->never())->method('requestFetch');
 
         $this->handler($state, $lyrics)($this->message($this->file('01 One.mp3', 'hash-one')));
+
+        self::assertCount(1, $state->visibleSongs, 'The rescan creates no track.');
+    }
+
+    public function testRescanThatCreditsAnUncreditedTrackRequestsItsLyrics(): void
+    {
+        $state = $this->state();
+        $state->visibleSongs[] = $this->existingSong('01 One.mp3', 'hash-one');
+        $lyrics = $this->lyricsFetch($state);
+        $lyrics->expects($this->once())->method('requestFetch');
+
+        $this->handler($state, $lyrics)($this->message($this->file('01 One.mp3', 'hash-one')));
+
+        self::assertCount(1, $state->visibleSongs, 'The rescan creates no track.');
+        self::assertSame($this->ids($state->visibleSongs), $state->requests[0]);
     }
 
     public function testFailedSongFlushRequestsNothing(): void
@@ -205,6 +221,14 @@ final class FilesDiscoveredLyricsRequestTest extends TestCase
 
             return null;
         });
+        $songs->method('findFreshByUuid')->willReturnCallback(static fn (Uuid $id): ?Song => array_find(
+            $state->visibleSongs,
+            static fn (Song $song): bool => $song->getId()->equals($id),
+        ));
+        $songs->method('findCreditedSongIds')->willReturnCallback(static fn (array $songIds): array => array_values(array_intersect(
+            array_map(static fn (Uuid $id): string => $id->toString(), $songIds),
+            $state->creditedSongs,
+        )));
         $songs->method('persist')->willReturnCallback(static function (Song $song) use ($state): void {
             $failure = $state->persistFailures[$song->getHash()] ?? null;
             if ($failure !== null) {
@@ -283,6 +307,7 @@ final class FilesDiscoveredLyricsRequestTest extends TestCase
         return (object) [
             'pendingSongs' => [],
             'visibleSongs' => [],
+            'creditedSongs' => [],
             'events' => [],
             'requests' => [],
             'persistFailures' => [],
@@ -301,9 +326,11 @@ final class FilesDiscoveredLyricsRequestTest extends TestCase
         return new FilesDiscovered(Uuid::v7(), 'music', $this->directory, array_values($files));
     }
 
-    private function existingSong(string $hash): Song
+    /** A track an earlier scan imported, with the technical fields its probe gave. */
+    private function existingSong(string $name, string $hash): Song
     {
-        return Song::create(album: Uuid::v7(), title: 'Existing', path: $this->directory . '/existing.mp3', size: 1_000_000, mimeType: 'audio/mpeg', hash: $hash);
+        return Song::create(album: Uuid::v7(), title: 'Existing', path: $this->directory . '/' . $name, size: 1_000_000, mimeType: 'audio/mpeg', hash: $hash,
+            codec: 'flac', containerFormat: 'flac', streamIndex: 0);
     }
 
     /**

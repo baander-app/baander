@@ -98,11 +98,16 @@ final class FilesDiscoveredRenameTest extends TestCase
         self::assertTrue($fresh->isFieldLocked('title'));
     }
 
-    /** @return iterable<string, array{string, bool}> */
+    /**
+     * A song in another album than the one the file's tags name, such as a song moved by an album
+     * merge, is reconciled as well: the move follows the song, not the album the message names.
+     *
+     * @return iterable<string, array{string, bool}>
+     */
     public static function renameCases(): iterable
     {
         foreach (['eligible', 'read only', 'same path', 'different parent', 'different album', 'old present', 'new missing', 'outside root', 'root unavailable', 'active scan', 'changed path', 'changed hash', 'changed album', 'deleted song', 'superseded observation', 'superseded during lookup'] as $case) {
-            yield $case => [$case, in_array($case, ['eligible', 'read only', 'active scan'], true)];
+            yield $case => [$case, in_array($case, ['eligible', 'read only', 'active scan', 'different album'], true)];
         }
     }
 

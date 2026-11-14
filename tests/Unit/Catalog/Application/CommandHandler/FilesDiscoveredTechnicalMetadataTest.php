@@ -70,7 +70,7 @@ final class FilesDiscoveredTechnicalMetadataTest extends TestCase
     }
 
     #[DataProvider('refreshCases')]
-    public function testExistingSongRefreshesOnlyCurrentTechnicalMetadata(string $case): void
+    public function testExistingSongRefreshesOnlyCurrentTechnicalMetadataAndLength(string $case): void
     {
         $library = Uuid::v7();
         $album = Album::create($library, 'Album', 'Studio');
@@ -91,7 +91,9 @@ final class FilesDiscoveredTechnicalMetadataTest extends TestCase
         $metadata = $this->createMock(MetadataContentReaderPortInterface::class);
         $metadata->expects($this->once())->method('readMetadata')->willReturn(null);
         $lyrics = $this->createMock(LyricsFetchRequestInterface::class);
-        $lyrics->expects($this->never())->method('requestFetch');
+        // A song without lyrics that gains a length is fetched for.
+        $lyrics->expects($case === 'current' ? $this->once() : $this->never())->method('requestFetch')
+            ->with($this->callback(static fn (Uuid $songId): bool => $songId->equals($song->getId())));
         $probe = $this->createMock(AudioProbePortInterface::class);
         $probe->expects($this->once())->method('probeAudio')->with($file->absolutePath)->willReturnCallback(function () use ($file, $case): AudioProbeResult {
             if ($case === 'changed observation') {
@@ -110,7 +112,7 @@ final class FilesDiscoveredTechnicalMetadataTest extends TestCase
         $handler(new FilesDiscovered($library, 'music', '/music/Album', [$file]));
 
         self::assertSame('Edited title', $fresh->getTitle());
-        self::assertSame(17.37, $fresh->getLength());
+        self::assertSame($case === 'current' ? 20.5 : 17.37, $fresh->getLength(), 'The length is measured from the audio again.');
         self::assertSame($case === 'current' ? 'aac' : null, $fresh->getContainerFormat());
         self::assertSame($case === 'current' ? 3 : null, $fresh->getStreamIndex());
     }

@@ -35,7 +35,7 @@ dc exec app php bin/console app:library:scan my-music --release
 | Option | Default | Description |
 |--------|---------|-------------|
 | `--all` | — | Scan every library that is not already scanning, one after another |
-| `--rescan` | — | Read every file again, including files the index already knows. Not combined with `--release` |
+| `--rescan` | — | Read every file again, including files the index already knows, and repair the songs they belong to; see [What a rescan repairs](#what-a-rescan-repairs). Not combined with `--release` |
 | `--release` | — | Only release the library's claim; a scan claim marks its scan failed, a delete claim leaves the scan status alone. Refused while the claim is live. Takes one library and no other option than `--force` |
 | `--force` | — | With `--release`, release a live claim too. Only valid with `--release` |
 | `--json` | — | After the run, print what the scan endpoint returns, in JSON: the library as it is after its scan, or with `--all` the `dispatched` and `skipped` counts of `scan-all`, where `dispatched` counts the scans the command started. Progress goes to stderr. Not combined with `--release` |
@@ -85,6 +85,33 @@ Once the underlying failure is fixed, run `app:library:scan my-music --rescan`
 to queue the indexed files again. An ordinary incremental scan skips unchanged
 available files, including those whose earlier intent exhausted its retries.
 
+### What a rescan repairs
+
+`--rescan` queues every file of the library again, unchanged files included. For each file
+whose content belongs to a song in the catalog, the worker reads the file's tags, measures its
+audio with ffprobe, and repairs that song in place. An ordinary scan repairs the song of a
+returning file the same way. A repair works as follows:
+
+- A song with no artist credit of any role is credited to the artist its tags name, under the
+  name it was tagged with. A song with a credit keeps it and gains none, so a credit changed by
+  hand survives a rescan. A rescan cannot tell a missing credit from a removed one: a song whose
+  credits were all removed by hand is credited to its tagged artist again.
+- The song's length is measured from its audio again. When ffprobe cannot read the file, the
+  worker logs a warning and keeps the stored length; the import does not fail.
+- An album with no artist credit is credited by the rule an import follows: from its
+  album-artist tag, else to the artist all its songs share.
+- While the `lyrics.auto_fetch` [server setting](../configuration/server-settings.md#server-settings)
+  is on, a song without lyrics that gains a primary credit or a new length is queued for a
+  lyrics fetch.
+
+The song stays in the album it is stored in, so a rescan after an album was renamed with
+[app:album:update](app-album-update.md) or merged with [app:album:merge](app-album-merge.md)
+creates no album from the files' old album tag. The song's title, genres and other tag fields
+stay as they are.
+
+The repair has a cost: the workers read and probe every file of the library again, as they did
+for its first import, where an ordinary scan skips unchanged files.
+
 ### Missing and returning files
 
 A completed scan retains catalog entries and file-index records when sources are
@@ -102,10 +129,11 @@ paths unavailable; directories already queued may still be ingested.
 Restore the storage and run another scan. Unchanged returning files are queued
 again, including files that disappeared before their first queued import. Both
 ordinary scans and `--rescan` reconcile missing paths. Ingestion also repairs a
-renamed music file when its content hash matches an existing song in the same
-album and directory, its old path is missing, and its new path remains inside the
-available library root. The song keeps its identity, metadata and playlist links.
-Cross-directory and cross-album moves are outside this repair.
+renamed music file when its content hash matches an existing song whose file is in
+the same directory, its old path is missing, and its new path remains inside the
+available library root. The song moves to the new path and keeps its identity,
+album, metadata and playlist links; it is then repaired as a rescan repairs a known
+song. Moves to another directory are outside this repair.
 
 ### The claim lease
 

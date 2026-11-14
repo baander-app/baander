@@ -35,7 +35,7 @@ final class ArtistAlbumRoleCommand extends Command
     {
         $this
             ->addArgument('public-id', InputArgument::REQUIRED, 'The public ID of the artist')
-            ->addArgument('album-id', InputArgument::REQUIRED, 'The album UUID')
+            ->addArgument('album-id', InputArgument::REQUIRED, 'The public ID of the album')
             ->addArgument('role', InputArgument::REQUIRED, 'The new role: primary, featured, producer, composer, conductor, remixer, djmix or other')
             ->addOption('from', null, InputOption::VALUE_REQUIRED, 'The role of the credit to change; required when the artist holds several roles on the album');
         AdminCommandSupport::addJsonOption($this);

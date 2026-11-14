@@ -19,7 +19,7 @@ make exec cmd="php bin/console app:artist:song:role V1StGXR8_Z5jdHi6B-myT 0192a3
 | Argument | Required | Description |
 |----------|----------|-------------|
 | `public-id` | Yes | The public ID of the artist |
-| `song-id` | Yes | The song UUID, the `uuid` field of the song in the API |
+| `song-id` | Yes | The public ID of the song, the `publicId` field of the song in the API |
 | `role` | Yes | The new role: `primary`, `featured`, `producer`, `composer`, `conductor`, `remixer`, `djmix` or `other` |
 
 ## Options

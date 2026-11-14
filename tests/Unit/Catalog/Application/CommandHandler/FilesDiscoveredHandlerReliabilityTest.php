@@ -223,8 +223,9 @@ final class FilesDiscoveredHandlerReliabilityTest extends TestCase
 
     public function testRetryDispatchesCoverForExistingAlbumAndDeduplicatedSong(): void
     {
-        // The retry finds the song by its hash and writes nothing.
-        [$handler, $message, $songPort, $bus, $state] = $this->prepareCoverFanout(writes: 1);
+        // The retry finds the song by its hash and repairs it, which writes nothing: its tags name no
+        // artist and its probe no length. Each delivery still flushes its batch.
+        [$handler, $message, $songPort, $bus, $state] = $this->prepareCoverFanout(writes: 2);
         $songPort->expects($this->once())->method('persist');
         $failure = new RuntimeException('First cover delivery rejected');
         $dispatches = 0;
@@ -303,11 +304,13 @@ final class FilesDiscoveredHandlerReliabilityTest extends TestCase
         $state = $this->createCoverFanoutState($existingAlbum);
         $albumPort = $this->createStub(AlbumPortInterface::class);
         $albumPort->method('findByTitleAndLibrary')->willReturnCallback(static fn (): ?Album => $state->album);
+        $albumPort->method('findByUuid')->willReturnCallback(static fn (Uuid $id): ?Album => $state->album?->getId()->equals($id) ? $state->album : null);
         $albumPort->method('persist')->willReturnCallback(static function (Album $album) use ($state): void {
             $state->album = $album;
         });
         $songPort = $this->createMock(SongPortInterface::class);
         $songPort->method('findByHash')->willReturnCallback(static fn (): ?Song => $state->visibleSongs[0] ?? null);
+        $songPort->method('findFreshByUuid')->willReturnCallback(static fn (Uuid $id): ?Song => array_find($state->visibleSongs, static fn (Song $song): bool => $song->getId()->equals($id)));
         $songPort->method('persist')->willReturnCallback(static function (Song $song) use ($state, $persistFailure): void {
             if ($persistFailure !== null) {
                 throw $persistFailure;

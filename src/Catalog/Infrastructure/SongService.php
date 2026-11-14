@@ -151,6 +151,11 @@ final class SongService implements SongPortInterface
         $this->songRepository->addArtistCredit($songId, $artistId, $role, $creditedName);
     }
 
+    public function findCreditedSongIds(array $songIds): array
+    {
+        return $this->songRepository->findCreditedSongIds($songIds);
+    }
+
     public function getArtistNameForSong(Uuid $songId): ?string
     {
         return $this->songRepository->getArtistNameForSong($songId);

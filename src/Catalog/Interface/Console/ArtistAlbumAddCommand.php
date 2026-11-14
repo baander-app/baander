@@ -34,7 +34,7 @@ final class ArtistAlbumAddCommand extends Command
     {
         $this
             ->addArgument('public-id', InputArgument::REQUIRED, 'The public ID of the artist')
-            ->addArgument('album-id', InputArgument::REQUIRED, 'The album UUID')
+            ->addArgument('album-id', InputArgument::REQUIRED, 'The public ID of the album')
             ->addArgument('role', InputArgument::REQUIRED, 'The role: primary, featured, producer, composer, conductor, remixer, djmix or other');
         AdminCommandSupport::addJsonOption($this);
     }

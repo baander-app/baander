@@ -34,7 +34,7 @@ final class ArtistAlbumRemoveCommand extends Command
     {
         $this
             ->addArgument('public-id', InputArgument::REQUIRED, 'The public ID of the artist')
-            ->addArgument('album-id', InputArgument::REQUIRED, 'The album UUID');
+            ->addArgument('album-id', InputArgument::REQUIRED, 'The public ID of the album');
         AdminCommandSupport::addJsonOption($this);
     }
 
