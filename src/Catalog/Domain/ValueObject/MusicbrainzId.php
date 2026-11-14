@@ -56,6 +56,20 @@ final readonly class MusicbrainzId implements Stringable
         return new self($id);
     }
 
+    /**
+     * The identifier, or null when the value is null, blank or not a MusicBrainz UUID.
+     */
+    public static function tryFromString(?string $id): ?self
+    {
+        try {
+            $parsed = self::fromString($id);
+        } catch (InvalidArgumentException) {
+            return null;
+        }
+
+        return $parsed !== null && !$parsed->isEmpty() ? $parsed : null;
+    }
+
     public function toString(): string
     {
         return $this->id;

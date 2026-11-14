@@ -183,7 +183,8 @@ final class ArtistMetadataEnricher
     private function assignMusicbrainzId(Artist $artist, array $data): bool
     {
         $mbid = $data['mbid'] ?? null;
-        if (!is_string($mbid) || $mbid === '') {
+        // A stored ID is never replaced, so an artist that has one needs no guarded assignment.
+        if (!is_string($mbid) || $mbid === '' || $artist->getMbid() !== null) {
             return false;
         }
         $matchedName = $data['name'] ?? null;

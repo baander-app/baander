@@ -48,23 +48,12 @@ final readonly class ArtistIdentity
     {
         $valid = [];
         foreach ($ids as $id) {
-            $parsed = self::validId($id);
+            $parsed = MusicbrainzId::tryFromString($id);
             if ($parsed !== null) {
                 $valid[$parsed->toString()] = $parsed;
             }
         }
 
         return count($valid) === 1 ? array_first($valid) : null;
-    }
-
-    private static function validId(string $id): ?MusicbrainzId
-    {
-        try {
-            $parsed = MusicbrainzId::fromString($id);
-        } catch (InvalidArgumentException) {
-            return null;
-        }
-
-        return $parsed !== null && !$parsed->isEmpty() ? $parsed : null;
     }
 }

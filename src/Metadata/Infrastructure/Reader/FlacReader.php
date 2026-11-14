@@ -16,6 +16,8 @@ use Psr\Log\LoggerInterface;
  */
 final class FlacReader
 {
+    use VorbisCommentFields;
+
     public function __construct(private readonly LoggerInterface $logger)
     {
     }
@@ -138,27 +140,5 @@ final class FlacReader
         $metadata->setPictures($pictures);
 
         return $metadata;
-    }
-
-    /**
-     * @param array<string, list<string>> $comments
-     */
-    private function first(array $comments, string $field): ?string
-    {
-        return $this->values($comments, $field)[0] ?? null;
-    }
-
-    /**
-     * Every value of a field in file order, trimmed, without empty values.
-     *
-     * @param array<string, list<string>> $comments
-     *
-     * @return list<string>
-     */
-    private function values(array $comments, string $field): array
-    {
-        $values = array_map(trim(...), $comments[strtoupper($field)] ?? []);
-
-        return array_values(array_filter($values, static fn (string $value): bool => $value !== ''));
     }
 }

@@ -16,7 +16,6 @@ use App\Shared\Domain\Model\SearchOptions;
 use App\Shared\Domain\Model\SearchResult;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Domain\ValueObject\LibraryReadScope;
-use InvalidArgumentException;
 use Psr\Log\LoggerInterface;
 
 final class ArtistService implements ArtistPortInterface
@@ -76,7 +75,7 @@ final class ArtistService implements ArtistPortInterface
 
     public function assignMusicbrainzId(Uuid $artistId, string $musicbrainzId, string $matchedName): bool
     {
-        $id = self::validMusicbrainzId($musicbrainzId);
+        $id = MusicbrainzId::tryFromString($musicbrainzId);
         $outcome = $id === null
             ? MusicbrainzIdAssignment::MalformedId
             : $this->transaction->run(fn (): MusicbrainzIdAssignment => $this->musicbrainzIds->assign($artistId, $id, $matchedName));
@@ -161,16 +160,5 @@ final class ArtistService implements ArtistPortInterface
     public function updateAlbumRole(Uuid $artistId, Uuid $albumId, ?string $currentRole, string $role): bool
     {
         return $this->artistRepository->updateAlbumRole($artistId, $albumId, $currentRole, $role);
-    }
-
-    private static function validMusicbrainzId(string $id): ?MusicbrainzId
-    {
-        try {
-            $parsed = MusicbrainzId::fromString($id);
-        } catch (InvalidArgumentException) {
-            return null;
-        }
-
-        return $parsed !== null && !$parsed->isEmpty() ? $parsed : null;
     }
 }
