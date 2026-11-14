@@ -4,7 +4,7 @@ Verification of Symfony Messenger workload routing, Redis fallback without Swool
 
 ### Validated asynchronous workloads
 
-`config/packages/messenger.php` declares seventeen production workloads: fifteen
+`config/packages/messenger.php` declares eighteen production workloads: sixteen
 default routes and explicit-only `FetchLyricsCommand` and `SendWebhookCommand`
 entries. The test configuration adds `FailureTransportProbe` and uses in-memory
 transports for `async` and `scheduler`. Resource classes `io`, `cpu` and `coordination` describe

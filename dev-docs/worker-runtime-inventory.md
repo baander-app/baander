@@ -24,15 +24,16 @@ a running web server.
 ### Routing and synchronous admission
 
 [messenger.php](../config/packages/messenger.php) declares the validated
-asynchronous workload catalog: seventeen production workloads, fifteen with default
+asynchronous workload catalog: eighteen production workloads, sixteen with default
 routes and two admitted only through an explicit transport selection:
-`FetchLyricsCommand` and `SendWebhookCommand`. Fourteen default routes use Redis
+`FetchLyricsCommand` and `SendWebhookCommand`. Fifteen default routes use Redis
 `async`; the scheduled occurrence route uses `scheduler`. No `swoole_task`
 transport remains.
 
 | Message | Transport | Resource class | Routing |
 | --- | --- | --- | --- |
 | `BatchExtractCoversCommand` | `async` | `coordination` | Default |
+| `DrainAlbumMatchesMessage` | `async` | `io` | Default |
 | `ScanLibraryCommand` | `async` | `io` | Default |
 | `FilesDiscovered` | `async` | `io` | Default |
 | `ExtractAlbumCoverCommand` | `async` | `cpu` | Default |

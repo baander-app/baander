@@ -29,9 +29,11 @@ make exec cmd="php bin/console app:metadata:sync --json"
 
 ## Details
 
-Without a source, the sync queues one library sync per library. Each library sync, when a worker runs it, queues a sync of every album in the library and of its songs. Album and song data that is already filled in is kept.
+Without a source, the sync queues one library sync per library. Each library sync, when a worker runs it, queues a sync of every album in the library and of its songs.
 
-The genre sync queues a sync of every album and song in the catalog with forced updates, so the providers' data, genres included, replaces what is stored. It queues nothing for the libraries.
+An album sync requests the album's MusicBrainz match, whatever the `metadata.auto_sync` setting says, unless the album has nothing to match; the album match queue then runs it as [Automatic matching](../media/external-apis.md#automatic-matching) describes. A confident match sets IDs and artist credits and fills empty fields, and never replaces a field that holds a value; any other album is left for review. A song sync adds the genres of the MusicBrainz recording found for the song's title and writes nothing else.
+
+The genre sync queues a sync of every album and song in the catalog, marked as forced updates. The mark changes nothing: an album sync requests the same match, which replaces no field value, and a forced song sync adds genres as an ordinary one does. The genre sync queues nothing for the libraries.
 
 The command runs the sync job in its own process and records the run in the job monitor like a queued job. When the job finishes, the command prints the number of jobs it queued, one per library or one per album and song, and the job ID. The queue workers perform the queued syncs; follow them with [app:monitor:jobs](app-monitor-jobs.md) or [app:metadata:status](app-metadata-status.md).
 

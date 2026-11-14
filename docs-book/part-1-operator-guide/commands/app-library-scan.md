@@ -105,8 +105,8 @@ returning file the same way. A repair works as follows:
   is on, a song without lyrics that gains a primary credit or a new length is queued for a
   lyrics fetch.
 - While the `metadata.auto_sync` setting is on, each album the rescan touches that has no
-  MusicBrainz match yet, or that is matched and has gained songs since, is queued for
-  [automatic matching](../media/external-apis.md#automatic-matching).
+  MusicBrainz match yet, or that is matched and holds songs no match has compared yet, is queued
+  for [automatic matching](../media/external-apis.md#automatic-matching).
 
 The song stays in the album it is stored in, so a rescan after an album was renamed with
 [app:album:update](app-album-update.md) or merged with [app:album:merge](app-album-merge.md)

@@ -210,12 +210,13 @@ review by an admin.
 ### Album match queue
 
 The albums waiting for automatic MusicBrainz matching, which are matched one after
-another in the background. While automatic matching is on, an import or rescan adds each album it touches
-that has no match yet or that gained songs since its match; an admin's metadata sync
-adds them whatever the setting says. A confident match is applied. Any other album
-leaves the queue needing review and stays on the review list until an admin applies a
-match, or until its number of songs changes and it is queued again. A MusicBrainz
-outage keeps the requests and pauses the queue.
+another in the background. While automatic matching is on, an import or rescan adds
+each album it touches that has no match yet or that holds songs no match has compared;
+an admin's metadata sync adds them whatever the setting says. A confident match is
+applied. Any other album leaves the queue needing review and stays on the review list
+until an admin applies a match, or until its number of songs changes and it is queued
+again. An outage of MusicBrainz or the Cover Art Archive keeps the requests and pauses
+the whole queue; a problem with one album only delays that album.
 
 ## Lyrics
 

@@ -32,7 +32,7 @@ Use this table when catalog records exist but enrichment is missing.
 | Unavailable service | Impact |
 |---------------------|--------|
 | **MusicBrainz** | Matching and song enrichment have no alternate provider. Automatic matching keeps its requests and pauses until MusicBrainz answers; an administrator's search, comparison or apply answers `503`. Artist searches can fall back to Discogs when MusicBrainz returns no results; an exception is not a guaranteed fallback. Existing local metadata remains available. |
-| **Cover Art Archive** | A match that would add a front cover writes nothing: automatic matching tries the album again later, and an administrator's apply answers `503`. |
+| **Cover Art Archive** | A match that would add a front cover writes nothing. Automatic matching pauses as it does for a MusicBrainz outage, also when the Cover Art Archive refuses the request; an administrator's apply answers `503`. |
 | **Discogs** | No artist fallback results when MusicBrainz finds none. |
 | **Last.fm** | Last.fm artist search and browse information are unavailable. Matching and the stored artist and song syncs do not call Last.fm. |
 | **Spotify / TasteDive** | No impact on current application workflows. |
@@ -58,7 +58,7 @@ Artist credits follow MusicBrainz's order: the first credited artist becomes pri
 
 ### Automatic matching
 
-The `metadata.auto_sync` [server setting](../configuration/server-settings.md#server-settings), labelled **Automatic MusicBrainz matching** in the admin panel, turns on automatic matching of albums. It is off by default, and only super administrators change it. While it is on, an import or rescan queues each album it touches that has no match yet, or that is matched and has gained songs since. Each request waits at least five minutes before it is matched, so that the album's other discs land first.
+The `metadata.auto_sync` [server setting](../configuration/server-settings.md#server-settings), labelled **Automatic MusicBrainz matching** in the admin panel, turns on automatic matching of albums. It is off by default, and only super administrators change it. While it is on, an import or rescan queues each album it touches that has no match yet, or that is matched and holds songs no match has compared yet. Each request waits at least five minutes before it is matched, so that the album's other discs land first.
 
 The queue matches albums one after another, a second apart, so that scans and other background work run in between, and never matches one album in two runs at once. Every request it makes to MusicBrainz waits for its turn under the shared rate limit, so a large library is matched gradually.
 
@@ -66,9 +66,11 @@ For an album without a match, Baander searches MusicBrainz for releases with the
 
 Any other album is marked as needing review, with the reason. Administrators find these albums in the **Matching** tab of **Admin → Library** (`/admin/library`), which opens the same match dialog for each, and through [`app:metadata:match:reviews`](../commands/app-metadata-match-reviews.md). Applying a match by hand takes the album off the list. An album marked for review is queued again only when its number of songs has changed, for example after another disc arrived.
 
-Automatic matching does not search again for an album that is already matched. When the album gains songs, Baander pairs the new songs with its stored release: a song that pairs is matched from that release, and one that pairs with no track stays as it is without marking the album for review. A song imported while a match runs is matched on a later run.
+An album match marks each song it compared with the release, whether the song paired with a track or not, and a song match marks its song. Automatic matching does not search again for an album that is already matched: it pairs only the album's unmarked songs, such as those a later disc added, with the stored release. A song that pairs is matched from that release, and one that pairs with no track stays as it is without marking the album for review. A song imported while a match runs was not compared, so it stays unmarked and is matched on a later run.
 
-When MusicBrainz is unavailable, the request stays queued and nothing is marked for review: the queue pauses for 5, 15 and 60 minutes, then an hour at a time, while MusicBrainz stays unavailable. Only an outage pauses the queue; an album whose apply meets a conflicting change is retried later on its own while the queue moves on. A scheduled run restarts the queue if a run is lost.
+When MusicBrainz or the Cover Art Archive is unavailable, the request stays queued and nothing is marked for review: the queue pauses for 5, 15 and 60 minutes, then an hour at a time, while the outage lasts. Only an outage pauses the whole queue. Problems with one album hold back only that album while the queue moves on: an album whose apply met a conflicting change to the same album, songs or artists, such as an edit, an import or another match, is tried again after 15 minutes, and an album about which MusicBrainz refused a request is tried again after 6 hours. A Cover Art Archive refusal counts as an outage.
+
+The queue's runs queue each other. If a run is lost, for example because its message used up its retries, a scheduled job named **Recover the album match queue** starts the queue again: it runs every 10 minutes and queues a run when a request is due and no queue run is in flight. It appears with the other jobs on the admin **Scheduler** page and in [`app:scheduler:list`](../commands/app-scheduler-list.md).
 
 An administrator's metadata sync, including the genre sync, queues the same requests whatever the setting says, and they are due at once. Turning the setting off stops new requests from imports, and the queue drops the requests imports made the next time it reaches one. When ingest cannot record its requests, it logs the error and carries on; a rescan or a library metadata sync requests the albums again. Follow background jobs and logs in [Monitoring](../operations/README.md), then check the affected record: acceptance or job completion alone does not establish a successful provider match.
 

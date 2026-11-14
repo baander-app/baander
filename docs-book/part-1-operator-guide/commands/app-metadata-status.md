@@ -26,7 +26,7 @@ The metadata sync jobs are those that [app:metadata:sync](app-metadata-sync.md) 
 | Failed sync jobs | Metadata sync jobs that failed |
 | Last sync | Creation time of the newest metadata sync job in ISO 8601, or `never` |
 
-A second table lists the jobs by type, such as `SyncAlbumMessage`, with the number that finished and failed. When the monitor holds no metadata sync job, the command prints `No metadata sync jobs are recorded.` instead.
+A second table lists the jobs by type, such as `SyncAlbumMessage`, with the number that finished and failed. A finished `SyncAlbumMessage` job has only requested the album's MusicBrainz match; the match itself runs in the album match queue as `DrainAlbumMatchesMessage` jobs, which these counts leave out. When the monitor holds no metadata sync job, the command prints `No metadata sync jobs are recorded.` instead.
 
 ## Exit codes
 
