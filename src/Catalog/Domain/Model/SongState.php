@@ -18,6 +18,7 @@ final class SongState
 {
     /**
      * @param string[] $lockedFields
+     * @param list<string> $matchedFields the fields a match set, and `credits` when it set the artist credits
      */
     public function __construct(
         public readonly Uuid $id,
@@ -56,6 +57,7 @@ final class SongState
         public DateTimeImmutable $updatedAt = new DateTimeImmutable(),
         public ?string $containerFormat = null,
         public ?int $streamIndex = null,
+        public array $matchedFields = [],
     ) {
     }
 }

@@ -649,6 +649,8 @@ final class AlbumRepository implements AlbumRepositoryInterface
             mergedFrom: $entity->getMergedFrom(),
             createdAt: $entity->getCreatedAt(),
             updatedAt: $entity->getUpdatedAt(),
+            releaseMbid: $entity->getReleaseMbid(),
+            matchedAt: $entity->getMatchedAt(),
         ));
     }
 
@@ -657,6 +659,8 @@ final class AlbumRepository implements AlbumRepositoryInterface
         $entity->setTitle($album->getTitle());
         $entity->setType($album->getType());
         $entity->setMbid($album->getMbid());
+        $entity->setReleaseMbid($album->getReleaseMbid());
+        $entity->setMatchedAt($album->getMatchedAt());
         $entity->setDiscogsId($album->getDiscogsId());
         $entity->setSpotifyId($album->getSpotifyId());
         $entity->setYear($album->getYear());

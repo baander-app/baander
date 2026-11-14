@@ -153,6 +153,13 @@
   ],
   "parent_cascades": [
     {
+      "parent": "albums",
+      "child": "album_match_states",
+      "foreign_key": "album_id",
+      "action": "CASCADE",
+      "capture": "child-row-or-exempt"
+    },
+    {
       "parent": "images",
       "child": "albums",
       "foreign_key": "cover_image_id",
@@ -811,11 +818,23 @@
       "reason": "Durable projection counters and deletion tombstones; these are freshness infrastructure, not query producers."
     },
     {
+      "table": "album_match_states",
+      "mapping": "src/Catalog/Infrastructure/Doctrine/Entity/AlbumMatchStateEntity.php",
+      "classification": "capture",
+      "operations": ["INSERT", "UPDATE", "DELETE"],
+      "relevant_columns": ["album_id", "state", "source", "due_at", "reason", "checked_song_count", "checked_at", "best_score"],
+      "excluded_columns": [],
+      "families": ["admin-metadata"],
+      "scope_routes": ["admin"],
+      "readers": ["src/Catalog/Infrastructure/Doctrine/Repository/AlbumMatchStateRepository.php"],
+      "response_cache": "authoritative-read"
+    },
+    {
       "table": "albums",
       "mapping": "src/Catalog/Infrastructure/Doctrine/Entity/AlbumEntity.php",
       "classification": "capture",
       "operations": ["INSERT", "UPDATE", "DELETE"],
-      "relevant_columns": ["id", "public_id", "library_id", "title", "type", "mbid", "discogs_id", "spotify_id", "year", "label", "catalog_number", "barcode", "country", "language", "disambiguation", "annotation", "locked_fields", "merged_from", "cover_image_id", "created_at"],
+      "relevant_columns": ["id", "public_id", "library_id", "title", "type", "mbid", "discogs_id", "spotify_id", "year", "label", "catalog_number", "barcode", "country", "language", "disambiguation", "annotation", "locked_fields", "merged_from", "cover_image_id", "created_at", "release_mbid", "matched_at"],
       "excluded_columns": ["updated_at"],
       "families": ["catalog", "libraries", "activity", "playlists", "recommendations", "admin-metadata"],
       "scope_routes": ["library"],
@@ -1499,7 +1518,7 @@
       "mapping": "src/Catalog/Infrastructure/Doctrine/Entity/SongEntity.php",
       "classification": "capture",
       "operations": ["INSERT", "UPDATE", "DELETE"],
-      "relevant_columns": ["id", "public_id", "album_id", "title", "path", "size", "mime_type", "length", "lyrics", "track", "disc", "year", "comment", "hash", "bitrate", "sample_rate", "channels", "codec", "explicit", "energy", "danceability", "valence", "acousticness", "instrumentalness", "liveness", "spechiness", "loudness", "mbid", "discogs_id", "spotify_id", "locked_fields", "created_at", "container_format", "stream_index"],
+      "relevant_columns": ["id", "public_id", "album_id", "title", "path", "size", "mime_type", "length", "lyrics", "track", "disc", "year", "comment", "hash", "bitrate", "sample_rate", "channels", "codec", "explicit", "energy", "danceability", "valence", "acousticness", "instrumentalness", "liveness", "spechiness", "loudness", "mbid", "discogs_id", "spotify_id", "locked_fields", "created_at", "container_format", "stream_index", "matched_fields"],
       "excluded_columns": ["updated_at"],
       "families": ["catalog", "libraries", "activity", "playlists", "recommendations", "admin-metadata"],
       "scope_routes": ["album"],

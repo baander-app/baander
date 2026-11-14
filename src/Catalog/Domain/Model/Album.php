@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Catalog\Domain\Model;
 
+use App\Catalog\Domain\ValueObject\MusicbrainzId;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use DateTimeImmutable;
@@ -151,6 +152,23 @@ final class Album
         $this->state->updatedAt = new DateTimeImmutable();
     }
 
+    /**
+     * Record that a match was applied: the album is the given MusicBrainz release (one edition), and
+     * the match time is when it was applied. The album's MusicBrainz ID keeps naming the release group.
+     *
+     * @throws InvalidArgumentException when the release ID is empty; nothing changes then
+     */
+    public function recordReleaseMatch(MusicbrainzId $releaseId, DateTimeImmutable $matchedAt): void
+    {
+        if ($releaseId->isEmpty()) {
+            throw new InvalidArgumentException('A matched release needs its MusicBrainz ID.');
+        }
+
+        $this->state->releaseMbid = $releaseId->toString();
+        $this->state->matchedAt = $matchedAt;
+        $this->state->updatedAt = new DateTimeImmutable();
+    }
+
     public function lockField(string $field): void
     {
         LockedFields::assertLockable(self::LOCKABLE_FIELDS, $field, 'lock');
@@ -205,6 +223,22 @@ final class Album
     public function getMbid(): ?string
     {
         return $this->state->mbid;
+    }
+
+    /**
+     * The MusicBrainz release (edition) the album matched, as a lowercase UUID.
+     */
+    public function getReleaseMbid(): ?string
+    {
+        return $this->state->releaseMbid;
+    }
+
+    /**
+     * When a match was last applied to the album.
+     */
+    public function getMatchedAt(): ?DateTimeImmutable
+    {
+        return $this->state->matchedAt;
     }
 
     public function getDiscogsId(): ?string

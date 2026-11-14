@@ -128,6 +128,10 @@ class SongEntity
     #[ORM\Column(type: 'json', options: ['jsonb' => true, 'default' => '{}'])]
     private array $lockedFields = [];
 
+    /** @var list<string> the fields a MusicBrainz match set, and `credits` when it set the artist credits */
+    #[ORM\Column(type: 'json', options: ['jsonb' => true, 'default' => '[]'])]
+    private array $matchedFields = [];
+
     #[ORM\Column(type: 'datetime_immutable')]
     private \DateTimeImmutable $createdAt;
 
@@ -515,6 +519,23 @@ class SongEntity
     public function setLockedFields(array $lockedFields): void
     {
         $this->lockedFields = $lockedFields;
+        $this->updatedAt = new \DateTimeImmutable();
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function getMatchedFields(): array
+    {
+        return $this->matchedFields;
+    }
+
+    /**
+     * @param list<string> $matchedFields
+     */
+    public function setMatchedFields(array $matchedFields): void
+    {
+        $this->matchedFields = $matchedFields;
         $this->updatedAt = new \DateTimeImmutable();
     }
 

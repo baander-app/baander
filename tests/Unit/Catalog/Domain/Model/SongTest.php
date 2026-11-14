@@ -6,6 +6,7 @@ namespace App\Tests\Unit\Catalog\Domain\Model;
 
 use App\Catalog\Domain\Model\Song;
 use App\Catalog\Domain\Model\SongState;
+use App\Catalog\Domain\ValueObject\MatchedSongField;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use InvalidArgumentException;
@@ -626,5 +627,52 @@ final class SongTest extends TestCase
 
         $diff = $song->getUpdatedAt()->getTimestamp() - $song->getCreatedAt()->getTimestamp();
         $this->assertSame(0, $diff, 'createdAt and updatedAt should have the same second on creation.');
+    }
+
+    public function testANewSongHasNoMatchedFields(): void
+    {
+        $song = Song::create($this->albumId, 'Pour Me A Drink', '/music/pour-me-a-drink.flac', 1024, 'audio/flac');
+
+        self::assertSame([], $song->getMatchedFields());
+        self::assertSame([], $song->getState()->matchedFields);
+        self::assertFalse($song->isFieldMatched(MatchedSongField::Credits));
+    }
+
+    public function testRecordingMatchedFieldsListsEachFieldOnce(): void
+    {
+        $song = Song::create($this->albumId, 'Pour Me A Drink', '/music/pour-me-a-drink.flac', 1024, 'audio/flac');
+        $before = $song->getUpdatedAt();
+
+        $song->recordMatchedFields(MatchedSongField::Year, MatchedSongField::Credits);
+        $song->recordMatchedFields(MatchedSongField::Title, MatchedSongField::Year);
+
+        self::assertSame([MatchedSongField::Year, MatchedSongField::Credits, MatchedSongField::Title], $song->getMatchedFields());
+        self::assertSame(['year', 'credits', 'title'], $song->getState()->matchedFields, 'The stored names form a list.');
+        self::assertTrue($song->isFieldMatched(MatchedSongField::Title));
+        self::assertTrue($song->isFieldMatched(MatchedSongField::Credits));
+        self::assertFalse($song->isFieldMatched(MatchedSongField::Track));
+        self::assertNotEquals($before, $song->getUpdatedAt());
+    }
+
+    public function testForgettingMatchedFieldsKeepsTheOthersAsAList(): void
+    {
+        $song = Song::create($this->albumId, 'Pour Me A Drink', '/music/pour-me-a-drink.flac', 1024, 'audio/flac');
+        $song->recordMatchedFields(MatchedSongField::Title, MatchedSongField::Credits, MatchedSongField::Track, MatchedSongField::Disc);
+
+        $song->forgetMatchedFields(MatchedSongField::Credits, MatchedSongField::Track, MatchedSongField::Year);
+
+        self::assertSame(['title', 'disc'], $song->getState()->matchedFields);
+        self::assertFalse($song->isFieldMatched(MatchedSongField::Credits));
+    }
+
+    public function testReconstituteRestoresTheMatchedFields(): void
+    {
+        $song = Song::reconstitute(new SongState(...array_replace(
+            get_object_vars(Song::create($this->albumId, 'Pour Me A Drink', '/music/pour-me-a-drink.flac', 1024, 'audio/flac')->getState()),
+            ['matchedFields' => ['title', 'credits']],
+        )));
+
+        self::assertSame([MatchedSongField::Title, MatchedSongField::Credits], $song->getMatchedFields());
+        self::assertTrue($song->isFieldMatched(MatchedSongField::Credits));
     }
 }

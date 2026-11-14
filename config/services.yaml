@@ -636,6 +636,8 @@ services:
         alias: App\Catalog\Infrastructure\Doctrine\Repository\MovieRepository
     App\Catalog\Domain\Repository\VideoRepositoryInterface:
         alias: App\Catalog\Infrastructure\Doctrine\Repository\VideoRepository
+    App\Catalog\Domain\Repository\AlbumMatchStateRepositoryInterface:
+        alias: App\Catalog\Infrastructure\Doctrine\Repository\AlbumMatchStateRepository
 
     # --- Catalog Application Port Aliases ---
     App\Catalog\Application\Port\ArtistPortInterface:

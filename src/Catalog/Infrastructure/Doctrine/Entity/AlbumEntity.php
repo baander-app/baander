@@ -46,6 +46,13 @@ class AlbumEntity
     #[ORM\Column(type: 'text', nullable: true)]
     private ?string $mbid = null;
 
+    /** The MusicBrainz release (edition) a match chose; $mbid names its release group. */
+    #[ORM\Column(type: 'text', nullable: true)]
+    private ?string $releaseMbid = null;
+
+    #[ORM\Column(type: 'datetime_immutable', nullable: true)]
+    private ?\DateTimeImmutable $matchedAt = null;
+
     #[ORM\Column(type: 'text', nullable: true)]
     private ?string $discogsId = null;
 
@@ -155,6 +162,28 @@ class AlbumEntity
     public function setMbid(?string $mbid): void
     {
         $this->mbid = $mbid;
+        $this->updatedAt = new \DateTimeImmutable();
+    }
+
+    public function getReleaseMbid(): ?string
+    {
+        return $this->releaseMbid;
+    }
+
+    public function setReleaseMbid(?string $releaseMbid): void
+    {
+        $this->releaseMbid = $releaseMbid;
+        $this->updatedAt = new \DateTimeImmutable();
+    }
+
+    public function getMatchedAt(): ?\DateTimeImmutable
+    {
+        return $this->matchedAt;
+    }
+
+    public function setMatchedAt(?\DateTimeImmutable $matchedAt): void
+    {
+        $this->matchedAt = $matchedAt;
         $this->updatedAt = new \DateTimeImmutable();
     }
 

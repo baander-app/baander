@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Catalog\Domain\Model;
 
+use App\Catalog\Domain\ValueObject\MatchedSongField;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use DateTimeImmutable;
@@ -266,6 +267,40 @@ final class Song
         $this->state->spotifyId = $spotifyId ?? $this->state->spotifyId;
 
         $this->state->updatedAt = new DateTimeImmutable();
+    }
+
+    /**
+     * Record that a MusicBrainz match set these parts of the song. Each part is listed once.
+     */
+    public function recordMatchedFields(MatchedSongField ...$fields): void
+    {
+        $this->state->matchedFields = [...$this->state->matchedFields, ...array_column($fields, 'value')]
+            |> array_unique(...)
+            |> array_values(...);
+        $this->state->updatedAt = new DateTimeImmutable();
+    }
+
+    /**
+     * Forget that a match set these parts of the song, once tags or an edit replaced them.
+     */
+    public function forgetMatchedFields(MatchedSongField ...$fields): void
+    {
+        $this->state->matchedFields = array_diff($this->state->matchedFields, array_column($fields, 'value'))
+            |> array_values(...);
+        $this->state->updatedAt = new DateTimeImmutable();
+    }
+
+    public function isFieldMatched(MatchedSongField $field): bool
+    {
+        return in_array($field->value, $this->state->matchedFields, true);
+    }
+
+    /**
+     * @return list<MatchedSongField> the parts of the song a match set, in the order they were recorded
+     */
+    public function getMatchedFields(): array
+    {
+        return array_map(MatchedSongField::from(...), $this->state->matchedFields);
     }
 
     public function lockField(string $field): void

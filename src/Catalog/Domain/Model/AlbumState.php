@@ -19,6 +19,8 @@ final class AlbumState
     /**
      * @param array<int, array{id: string, title: string, mergedAt: string}> $mergedFrom
      * @param string[] $lockedFields
+     * @param ?string $releaseMbid the MusicBrainz release (edition) the album matched; $mbid names its release group
+     * @param ?DateTimeImmutable $matchedAt when a match was last applied to the album
      */
     public function __construct(
         public readonly Uuid $id,
@@ -42,6 +44,8 @@ final class AlbumState
         public array $mergedFrom = [],
         public readonly DateTimeImmutable $createdAt = new DateTimeImmutable(),
         public DateTimeImmutable $updatedAt = new DateTimeImmutable(),
+        public ?string $releaseMbid = null,
+        public ?DateTimeImmutable $matchedAt = null,
     ) {
     }
 }

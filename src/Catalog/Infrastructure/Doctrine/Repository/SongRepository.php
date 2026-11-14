@@ -275,6 +275,7 @@ final class SongRepository implements SongRepositoryInterface
          *     discogsId: ?string,
          *     spotifyId: ?string,
          *     lockedFields: list<string>,
+         *     matchedFields: list<string>,
          *     createdAt: \DateTimeImmutable,
          *     updatedAt: \DateTimeImmutable,
          *     album: array{id: Uuid, publicId: PublicId}
@@ -327,6 +328,7 @@ final class SongRepository implements SongRepositoryInterface
                 lockedFields: $row['lockedFields'],
                 createdAt: $row['createdAt'],
                 updatedAt: $row['updatedAt'],
+                matchedFields: $row['matchedFields'],
             ));
             $result[$song->getId()->toString()] = $song;
         }
@@ -860,6 +862,7 @@ final class SongRepository implements SongRepositoryInterface
             lockedFields: $entity->getLockedFields(),
             createdAt: $entity->getCreatedAt(),
             updatedAt: $entity->getUpdatedAt(),
+            matchedFields: $entity->getMatchedFields(),
         ));
     }
 
@@ -937,5 +940,6 @@ final class SongRepository implements SongRepositoryInterface
         $entity->setDiscogsId($song->getDiscogsId());
         $entity->setSpotifyId($song->getSpotifyId());
         $entity->setLockedFields($song->getLockedFields());
+        $entity->setMatchedFields($song->getState()->matchedFields);
     }
 }

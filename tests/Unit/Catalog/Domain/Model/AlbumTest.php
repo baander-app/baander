@@ -6,6 +6,7 @@ namespace App\Tests\Unit\Catalog\Domain\Model;
 
 use App\Catalog\Domain\Model\Album;
 use App\Catalog\Domain\Model\AlbumState;
+use App\Catalog\Domain\ValueObject\MusicbrainzId;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use InvalidArgumentException;
@@ -522,5 +523,69 @@ final class AlbumTest extends TestCase
         ));
 
         $this->assertNull($album->getCoverImageId());
+    }
+
+    public function testANewAlbumHasNoReleaseMatch(): void
+    {
+        $album = Album::create(Uuid::v4(), 'F-1 Trillion: Long Bed', 'Album');
+
+        self::assertNull($album->getReleaseMbid());
+        self::assertNull($album->getMatchedAt());
+    }
+
+    public function testRecordingAReleaseMatchStoresTheCanonicalReleaseIdAndTheMatchTime(): void
+    {
+        $album = Album::create(Uuid::v4(), 'F-1 Trillion: Long Bed', 'Album', mbid: 'b9a6ea0e-4bd8-4d0c-8f5f-1a1c5f0f2a11');
+        $before = $album->getUpdatedAt();
+        $matchedAt = new \DateTimeImmutable('2026-11-14 12:30:00.123456 UTC');
+
+        $album->recordReleaseMatch(MusicbrainzId::fromString('6D1C3E5A-0B2F-4A7E-9C1D-3F5E7A9B1C2D'), $matchedAt);
+
+        self::assertSame('6d1c3e5a-0b2f-4a7e-9c1d-3f5e7a9b1c2d', $album->getReleaseMbid());
+        self::assertSame($matchedAt, $album->getMatchedAt());
+        self::assertSame('b9a6ea0e-4bd8-4d0c-8f5f-1a1c5f0f2a11', $album->getMbid(), 'The album ID keeps naming the release group.');
+        self::assertNotEquals($before, $album->getUpdatedAt());
+    }
+
+    public function testAReleaseMatchNeedsAReleaseId(): void
+    {
+        $album = Album::create(Uuid::v4(), 'F-1 Trillion: Long Bed', 'Album');
+
+        try {
+            $album->recordReleaseMatch(MusicbrainzId::fromString(''), new \DateTimeImmutable());
+            self::fail('An empty release ID was recorded.');
+        } catch (InvalidArgumentException) {
+        }
+
+        self::assertNull($album->getReleaseMbid());
+        self::assertNull($album->getMatchedAt());
+    }
+
+    public function testReconstituteRestoresTheReleaseMatch(): void
+    {
+        $matchedAt = new \DateTimeImmutable('2026-11-14 12:30:00 UTC');
+        $album = Album::reconstitute(new AlbumState(
+            id: Uuid::v4(),
+            publicId: new PublicId(),
+            libraryId: Uuid::v4(),
+            title: 'F-1 Trillion: Long Bed',
+            type: 'Album',
+            mbid: null,
+            discogsId: null,
+            spotifyId: null,
+            year: 2024,
+            label: null,
+            catalogNumber: null,
+            barcode: null,
+            country: null,
+            language: null,
+            disambiguation: null,
+            annotation: null,
+            releaseMbid: '6d1c3e5a-0b2f-4a7e-9c1d-3f5e7a9b1c2d',
+            matchedAt: $matchedAt,
+        ));
+
+        self::assertSame('6d1c3e5a-0b2f-4a7e-9c1d-3f5e7a9b1c2d', $album->getReleaseMbid());
+        self::assertSame($matchedAt, $album->getMatchedAt());
     }
 }
