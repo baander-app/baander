@@ -508,17 +508,21 @@ final class SongRepository implements SongRepositoryInterface
         $this->entityManager->persist($artistSong);
     }
 
-    /** A song can have several primary artists; the alphabetically first one is returned. */
+    /**
+     * The name the song shows: the credited name of its primary credit, not the
+     * artist's own name. Among several primary credits, the first by credited
+     * name, then artist ID.
+     */
     public function getArtistNameForSong(Uuid $songId): ?string
     {
         $result = $this->entityManager->createQuery(
             <<<'DQL'
-                SELECT a.name
+                SELECT ass.creditedName AS name
                 FROM App\Catalog\Infrastructure\Doctrine\Entity\ArtistSongEntity ass
                 JOIN ass.artist a
                 JOIN ass.song s
                 WHERE s.id = :songId AND ass.role = 'primary'
-                ORDER BY a.name ASC, a.id ASC
+                ORDER BY ass.creditedName ASC, a.id ASC
                 DQL,
         )
             ->setParameter('songId', $songId)
@@ -536,18 +540,18 @@ final class SongRepository implements SongRepositoryInterface
 
         $results = $this->entityManager->createQuery(
             <<<'DQL'
-                SELECT s.id AS songId, a.name AS artistName
+                SELECT s.id AS songId, ass.creditedName AS artistName
                 FROM App\Catalog\Infrastructure\Doctrine\Entity\ArtistSongEntity ass
                 JOIN ass.artist a
                 JOIN ass.song s
                 WHERE s.id IN (:songIds) AND ass.role = 'primary'
-                ORDER BY a.name ASC, a.id ASC
+                ORDER BY ass.creditedName ASC, a.id ASC
                 DQL,
         )
             ->setParameter('songIds', $songIds)
             ->getResult();
 
-        // Same choice as getArtistNameForSong when a song has several primary artists.
+        // Same choice as getArtistNameForSong when a song has several primary credits.
         $map = [];
         foreach ($results as $row) {
             $map[$row['songId']->toString()] ??= $row['artistName'];
@@ -678,29 +682,31 @@ final class SongRepository implements SongRepositoryInterface
     }
 
     /**
-     * Sorts by the artist the song list displays: the alphabetically first
-     * primary artist (getArtistNameForSong), or '' for a song without one.
-     * The key must equal the cursor value from buildValueExtractor, and it must
-     * be a plain row expression: the keyset condition is a WHERE clause, so an
-     * aggregate with GROUP BY cannot be used.
+     * Sorts by the name the song list displays: the credited name of the first
+     * primary credit by (credited name, artist ID), as getArtistNameForSong
+     * returns it, or '' for a song without one. The key must equal the cursor
+     * value from buildValueExtractor, and it must be a plain row expression:
+     * the keyset condition is a WHERE clause, so an aggregate with GROUP BY
+     * cannot be used.
      */
     private function joinArtistForSort(\Doctrine\ORM\QueryBuilder $qb): string
     {
         $qb->leftJoin(ArtistSongEntity::class, 'ass_sort', 'WITH', "ass_sort.song = s.id AND ass_sort.role = 'primary'")
             ->leftJoin(ArtistEntity::class, 'ar_sort', 'WITH', 'ar_sort.id = ass_sort.artist')
-            // Keep one joined row per song: the first primary artist by (name, id).
+            // Keep one joined row per song: the first primary credit by (credited name, artist ID).
             ->andWhere(<<<'DQL'
                 ar_sort.id IS NULL OR NOT EXISTS (
                     SELECT ass_first.id
                     FROM App\Catalog\Infrastructure\Doctrine\Entity\ArtistSongEntity ass_first
                     JOIN ass_first.artist ar_first
                     WHERE ass_first.song = s.id AND ass_first.role = 'primary'
-                        AND (ar_first.name < ar_sort.name OR (ar_first.name = ar_sort.name AND ar_first.id < ar_sort.id))
+                        AND (ass_first.creditedName < ass_sort.creditedName
+                            OR (ass_first.creditedName = ass_sort.creditedName AND ar_first.id < ar_sort.id))
                 )
                 DQL);
 
         // CASE rather than COALESCE: DQL accepts CASE in ORDER BY.
-        return "CASE WHEN ar_sort.id IS NULL THEN '' ELSE ar_sort.name END";
+        return "CASE WHEN ar_sort.id IS NULL THEN '' ELSE ass_sort.creditedName END";
     }
 
     private function joinAlbumForSort(\Doctrine\ORM\QueryBuilder $qb): string

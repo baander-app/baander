@@ -52,3 +52,7 @@ Most CRUD flows bypass CQRS handlers and go straight through port interfaces. Th
 <!-- Everything below this line is hand-written. Edit freely. -->
 
 ## Notes
+
+### Credited names
+
+Every song and album credit stores its credited name (`credited_name` on `artist_song` and `artist_album`), the name the song or album was credited under. It can differ from the artist's own name: an alias that a MusicBrainz ID groups under one artist keeps the name its file was tagged with. Every reader of song and album artist names returns the credited name: song lists and details, the album resource, album duplicate detection, the artist names other contexts read through the ports, and the lyric signature. Renaming an artist therefore changes none of them. A song with several primary credits shows the first by credited name, then by artist ID. The song list's artist sort and its cursors use that same name, so paging by artist returns every song once. Activity's top tracks and top artists are the exception: they join the artist ID each play recorded and show the artist's own name.

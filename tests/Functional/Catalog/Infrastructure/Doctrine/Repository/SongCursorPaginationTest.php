@@ -23,7 +23,8 @@ use PHPUnit\Framework\Attributes\DataProvider;
  *
  * Ascending order is (key present, key, id): a missing key (no album year, no
  * primary artist) sorts before every value, and equal keys fall back to the
- * song id. Descending order is the exact reverse.
+ * song id. Descending order is the exact reverse. The artist key is the name
+ * the song is credited under, which can differ from the artist's own name.
  *
  * Three songs were added within one second, apart only in their microseconds:
  * an "added" cursor must keep the microseconds or a page repeats or skips them.
@@ -41,16 +42,29 @@ final class SongCursorPaginationTest extends TestCase
         'epsilon' => ['title' => 'Epsilon Album', 'year' => null],
     ];
 
-    /** @var list<array{title: string, album: string, artist: string|null, added: string}> */
+    /**
+     * Each song's artist is the name it is credited under.
+     *
+     * @var list<array{title: string, album: string, artist: string|null, added: string}>
+     */
     private const SONGS = [
         ['title' => 'Track Delta', 'album' => 'alpha', 'artist' => 'Mia', 'added' => '2026-01-01 10:00:00.250000+00:00'],
         ['title' => 'Track Alpha', 'album' => 'beta', 'artist' => 'Bea', 'added' => '2026-01-02 10:00:00.000000+00:00'],
         ['title' => 'Track Same', 'album' => 'gamma', 'artist' => null, 'added' => '2026-01-01 10:00:00.000001+00:00'],
-        ['title' => 'Track Same', 'album' => 'delta', 'artist' => 'Mia', 'added' => '2026-01-03 10:00:00.000000+00:00'],
+        ['title' => 'Track Same', 'album' => 'delta', 'artist' => 'Ava', 'added' => '2026-01-03 10:00:00.000000+00:00'],
         ['title' => 'Track Charlie', 'album' => 'epsilon', 'artist' => 'Zed', 'added' => '2026-01-02 10:00:00.000000+00:00'],
         ['title' => 'Track Bravo', 'album' => 'alpha', 'artist' => null, 'added' => '2026-01-03 10:00:00.000000+00:00'],
         ['title' => 'Track Echo', 'album' => 'gamma', 'artist' => 'Bea', 'added' => '2026-01-01 10:00:00.999999+00:00'],
     ];
+
+    /**
+     * Credited name => the credited artist's own name, where the two differ.
+     * "Ava" credits the artist "Mia": by its credited name the song sorts
+     * before "Bea", by the artist's own name after it.
+     *
+     * @var array<string, string>
+     */
+    private const ARTIST_NAMES = ['Ava' => 'Mia'];
 
     private LibraryReadScope $scope;
 
@@ -86,9 +100,10 @@ final class SongCursorPaginationTest extends TestCase
             );
             $this->entityManager->persist($song);
             if ($definition['artist'] !== null) {
-                $artists[$definition['artist']] ??= new ArtistEntity(new PublicId(), $definition['artist']);
-                $this->entityManager->persist($artists[$definition['artist']]);
-                $this->entityManager->persist(new ArtistSongEntity($artists[$definition['artist']], $song, 'primary', $artists[$definition['artist']]->getName()));
+                $artistName = self::ARTIST_NAMES[$definition['artist']] ?? $definition['artist'];
+                $artists[$artistName] ??= new ArtistEntity(new PublicId(), $artistName);
+                $this->entityManager->persist($artists[$artistName]);
+                $this->entityManager->persist(new ArtistSongEntity($artists[$artistName], $song, 'primary', $definition['artist']));
             }
 
             $id = $song->getId()->toString();

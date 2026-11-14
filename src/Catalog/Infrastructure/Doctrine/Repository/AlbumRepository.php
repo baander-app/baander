@@ -159,6 +159,8 @@ final class AlbumRepository implements AlbumRepositoryInterface
     }
 
     /**
+     * Each album's credits under their credited names, not the artists' own names.
+     *
      * @param Uuid[] $albumIds
      * @return array<string, array<int, array{name: string, role: string|null}>> keyed by album UUID string
      */
@@ -170,9 +172,8 @@ final class AlbumRepository implements AlbumRepositoryInterface
 
         $rows = $this->entityManager->createQuery(
             <<<'DQL'
-                SELECT al.id as albumId, a.name, aa.role
+                SELECT al.id as albumId, aa.creditedName AS name, aa.role
                 FROM App\Catalog\Infrastructure\Doctrine\Entity\ArtistAlbumEntity aa
-                JOIN aa.artist a
                 JOIN aa.album al
                 WHERE al.id IN (:albumIds)
                 DQL,
@@ -473,15 +474,16 @@ final class AlbumRepository implements AlbumRepositoryInterface
     }
 
     /**
+     * The album's credits under their credited names, not the artists' own names.
+     *
      * @return array<int, array{name: string, role: string|null}>
      */
     public function getArtistNamesForAlbum(Uuid $albumId): array
     {
         $rows = $this->entityManager->createQuery(
             <<<'DQL'
-                SELECT a.name, aa.role
+                SELECT aa.creditedName AS name, aa.role
                 FROM App\Catalog\Infrastructure\Doctrine\Entity\ArtistAlbumEntity aa
-                JOIN aa.artist a
                 JOIN aa.album al
                 WHERE al.id = :albumId
                 DQL,

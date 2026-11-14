@@ -143,6 +143,38 @@ final class AlbumDuplicateControllerTest extends TestCase
         $this->assertSame($expected, $albums);
     }
 
+    public function testAlbumsCreditedUnderOneNamePairEvenWhenTheirArtistsAreNamedApart(): void
+    {
+        $user = $this->createAdminUser();
+        $libraryId = $this->createLibraryFixture();
+        [$first, $second] = $this->createDisturbedAlbumsFixture($libraryId);
+
+        $response = $this->authenticatedRequest('GET', '/api/albums/' . $this->albumPublicId($first) . '/duplicates', $user);
+
+        $data = $this->assertJsonResponse($response, 200, 'data')['data'];
+        $this->assertCount(1, $data);
+        $artists = array_column($data[0]['albums'], 'artists', 'publicId');
+        ksort($artists);
+        $expected = [
+            $this->albumPublicId($first) => [['name' => 'Disturbed', 'role' => 'primary']],
+            $this->albumPublicId($second) => [['name' => 'Disturbed', 'role' => 'primary']],
+        ];
+        ksort($expected);
+        $this->assertSame($expected, $artists);
+    }
+
+    public function testTheAlbumResourceListsTheNameTheAlbumIsCreditedUnder(): void
+    {
+        $user = $this->createAdminUser();
+        $libraryId = $this->createLibraryFixture();
+        [, $second] = $this->createDisturbedAlbumsFixture($libraryId);
+
+        $response = $this->authenticatedRequest('GET', '/api/albums/' . $this->albumPublicId($second), $user);
+
+        $data = $this->assertJsonResponse($response, 200, 'data')['data'];
+        $this->assertSame([['name' => 'Disturbed', 'role' => 'primary']], $data['artists']);
+    }
+
     public function testAlbumDuplicatesReturns404ForInvalidPublicId(): void
     {
         $user = $this->createTestUser();
@@ -353,5 +385,46 @@ final class AlbumDuplicateControllerTest extends TestCase
         );
 
         return [$album1Id, $album2Id];
+    }
+
+    /**
+     * Two copies of one album, each credited as "Disturbed" to a different
+     * artist: one named "Disturbed", one renamed "Disturbed (US)" since.
+     *
+     * @return array{Uuid, Uuid} album IDs, the second credited to the renamed artist
+     */
+    private function createDisturbedAlbumsFixture(Uuid $libraryId): array
+    {
+        $now = (new \DateTimeImmutable())->format('Y-m-d H:i:s');
+        $conn = $this->entityManager->getConnection();
+
+        $albumIds = [];
+        foreach (['Disturbed', 'Disturbed (US)'] as $artistName) {
+            $artistId = Uuid::v7();
+            $albumId = Uuid::v7();
+            $conn->executeStatement(
+                'INSERT INTO artists (id, public_id, name, type, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+                [$artistId->toString(), (new PublicId())->toString(), $artistName, 'group', $now, $now],
+            );
+            $conn->executeStatement(
+                'INSERT INTO albums (id, public_id, library_id, title, type, mbid, year, locked_fields, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                [$albumId->toString(), (new PublicId())->toString(), $libraryId->toString(), 'Ten Thousand Fists', 'album', null, 2005, '{}', $now, $now],
+            );
+            $conn->executeStatement(
+                'INSERT INTO artist_album (id, artist_id, album_id, role, credited_name) VALUES (?, ?, ?, ?, ?)',
+                [Uuid::v7()->toString(), $artistId->toString(), $albumId->toString(), 'primary', 'Disturbed'],
+            );
+            $albumIds[] = $albumId;
+        }
+
+        return [$albumIds[0], $albumIds[1]];
+    }
+
+    private function albumPublicId(Uuid $id): string
+    {
+        $album = $this->albumRepository->findByUuid($id);
+        $this->assertNotNull($album);
+
+        return $album->getPublicId()->toString();
     }
 }
