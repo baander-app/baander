@@ -20,6 +20,8 @@ parameters:
         oauth_device_verify_ip: 'Device user code lookups, approvals and denials per IP'
         config_check: 'Admin configuration check'
         batch_cover_extract: 'Album cover batch extraction'
+        musicbrainz: 'MusicBrainz and Cover Art Archive requests from every process together (one per second)'
+        musicbrainz_user: 'MusicBrainz searches and lookups per user on the open metadata routes'
         discovery_endpoint_ip: 'Discovery registration and pairing requests per IP'
         # Email verification
         auth_email_verification_ip: 'Email verification attempts and resend requests per IP'
@@ -129,6 +131,21 @@ framework:
             limit: 10
             interval: '60 seconds'
 
+        # MusicBrainz allows one request per second from an address, on average. Every
+        # MusicBrainz and Cover Art Archive call, from workers and web requests alike,
+        # reserves a turn here first; a fixed window queues later callers into later
+        # one-second windows.
+        musicbrainz:
+            policy: fixed_window
+            limit: 1
+            interval: '1 second'
+        # The open /api/metadata/search and /browse routes spend a user's own allowance
+        # before a shared turn, so one member cannot queue ahead of the matcher.
+        musicbrainz_user:
+            policy: fixed_window
+            limit: 1
+            interval: '10 seconds'
+
         # Discovery endpoint rate limiter (public registration/pairing endpoints)
         discovery_endpoint_ip:
             policy: fixed_window
@@ -180,6 +197,10 @@ when@test:
             oauth_device_verify_ip:
                 limit: 10000
             batch_cover_extract:
+                limit: 10000
+            musicbrainz:
+                limit: 10000
+            musicbrainz_user:
                 limit: 10000
             config_check:
                 limit: 10000

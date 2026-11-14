@@ -10383,6 +10383,26 @@
                                 }
                             }
                         }
+                    },
+                    "429": {
+                        "description": "The user already called MusicBrainz in the last ten seconds",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "No turn under the shared MusicBrainz rate limit within ten seconds",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -10425,6 +10445,26 @@
                     },
                     "404": {
                         "description": "Release group not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "The user already called MusicBrainz in the last ten seconds",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "No turn under the shared MusicBrainz rate limit within ten seconds",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -10504,6 +10544,26 @@
                     },
                     "400": {
                         "description": "Empty query parameter",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "The user already searched MusicBrainz in the last ten seconds",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "No turn under the shared MusicBrainz rate limit within ten seconds",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -10598,6 +10658,26 @@
                                 }
                             }
                         }
+                    },
+                    "429": {
+                        "description": "The user already searched MusicBrainz in the last ten seconds",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "No turn under the shared MusicBrainz rate limit within ten seconds",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -10678,6 +10758,26 @@
                     },
                     "400": {
                         "description": "Empty query parameter",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "The user already searched MusicBrainz in the last ten seconds",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "No turn under the shared MusicBrainz rate limit within ten seconds",
                         "content": {
                             "application/json": {
                                 "schema": {

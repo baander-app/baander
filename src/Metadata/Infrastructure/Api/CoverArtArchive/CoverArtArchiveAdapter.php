@@ -4,21 +4,70 @@ declare(strict_types=1);
 
 namespace App\Metadata\Infrastructure\Api\CoverArtArchive;
 
+use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzCoverImage;
+use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzRejected;
+use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzUnavailable;
 use App\Shared\Infrastructure\Http\PublicHttpClient;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
 use Symfony\Component\Serializer\Exception\NotEncodableValueException;
 
+/**
+ * Anti-corruption layer for the Cover Art Archive, which serves the cover images of
+ * MusicBrainz releases from archive.org.
+ */
 final readonly class CoverArtArchiveAdapter
 {
-    private const BASE_URL = 'https://coverartarchive.org';
+    private const string BASE_URL = 'https://coverartarchive.org';
+    private const string USER_AGENT = 'Baander/1.0 (https://baander.app; contact@baander.app)';
+    /** The archive answers image requests with redirects to archive.org and its download hosts. */
+    private const array REDIRECT_DOMAINS = ['coverartarchive.org', 'archive.org'];
+    /** Seconds a request, redirects included, may take before the archive counts as unavailable. */
+    private const int TIMEOUT_SECONDS = 10;
+    /** Client errors that mean "try again later" rather than a refused request. */
+    private const array NOT_REJECTIONS = [408, 429];
 
     public function __construct(
-        private readonly LoggerInterface $logger,
-        private readonly JsonEncoder $jsonEncoder,
-        private readonly PublicHttpClient $httpClient,
-    )
+        private LoggerInterface $logger,
+        private JsonEncoder $jsonEncoder,
+        private PublicHttpClient $httpClient,
+    ) {
+    }
+
+    /**
+     * Fetch a release's front cover at most 1200 pixels wide, following the archive's
+     * redirects to the archive.org hosts that serve the file.
+     *
+     * The rendition caps the size of the image: originals are often large scans.
+     * Never throws: returns null when the release has no front cover (404),
+     * MusicBrainzRejected for another client error such as 400 for an invalid release ID, and
+     * MusicBrainzUnavailable when the archive gave no usable answer.
+     */
+    public function fetchFrontCover(string $releaseId): MusicBrainzCoverImage|MusicBrainzRejected|MusicBrainzUnavailable|null
     {
+        $endpoint = '/release/' . rawurlencode($releaseId) . '/front-1200';
+        $response = null;
+        try {
+            $response = $this->httpClient->request('GET', self::BASE_URL . $endpoint, ['coverartarchive.org'], [
+                'headers' => ['User-Agent' => self::USER_AGENT, 'Accept' => 'image/*'],
+                'timeout' => self::TIMEOUT_SECONDS,
+            ], self::REDIRECT_DOMAINS);
+            $status = $response->getStatusCode();
+            $bytes = $status === 200 ? $response->getContent(false) : '';
+            $type = $response->getHeaders(false)['content-type'][0] ?? '';
+        } catch (\Throwable) {
+            return $this->unavailable($endpoint, 'the request failed');
+        } finally {
+            $response?->cancel();
+        }
+
+        return match (true) {
+            $status === 200 && $bytes !== '' => new MusicBrainzCoverImage($bytes, self::mediaType($type)),
+            $status === 200 => $this->unavailable($endpoint, 'the image is empty'),
+            $status === 404 => null,
+            $status >= 400 && $status < 500 && !in_array($status, self::NOT_REJECTIONS, true) => $this->rejected($endpoint, $status),
+            default => $this->unavailable($endpoint, sprintf('HTTP %d', $status)),
+        };
     }
 
     /**
@@ -89,8 +138,8 @@ final readonly class CoverArtArchiveAdapter
         $response = null;
         try {
             $response = $this->httpClient->request('GET', self::BASE_URL . $endpoint, ['coverartarchive.org'], [
-                'headers' => ['User-Agent' => 'Baander/1.0', 'Accept' => 'application/json'], 'timeout' => 10,
-            ], ['coverartarchive.org', 'archive.org']);
+                'headers' => ['User-Agent' => self::USER_AGENT, 'Accept' => 'application/json'], 'timeout' => self::TIMEOUT_SECONDS,
+            ], self::REDIRECT_DOMAINS);
             $body = $response->getContent(false);
         } catch (\Throwable) {
             $this->logger->warning('CoverArtArchive request failed', ['service' => 'coverartarchive']);
@@ -161,5 +210,25 @@ final readonly class CoverArtArchiveAdapter
         }
 
         return null;
+    }
+
+    /** The media type without parameters, such as "image/jpeg"; "application/octet-stream" when none was sent. */
+    private static function mediaType(string $contentType): string
+    {
+        return (explode(';', $contentType)[0] |> trim(...) |> strtolower(...)) ?: 'application/octet-stream';
+    }
+
+    private function rejected(string $endpoint, int $status): MusicBrainzRejected
+    {
+        $this->logger->warning('CoverArtArchive rejected the request', ['service' => 'coverartarchive', 'endpoint' => $endpoint, 'status' => $status]);
+
+        return new MusicBrainzRejected($status);
+    }
+
+    private function unavailable(string $endpoint, string $reason): MusicBrainzUnavailable
+    {
+        $this->logger->warning('CoverArtArchive request failed', ['service' => 'coverartarchive', 'endpoint' => $endpoint, 'error' => $reason]);
+
+        return new MusicBrainzUnavailable($reason);
     }
 }

@@ -21,6 +21,8 @@ use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\HttpClient\Response\MockResponse;
+use Symfony\Component\RateLimiter\RateLimiterFactory;
+use Symfony\Component\RateLimiter\Storage\InMemoryStorage;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
 
 final class ProviderDestinationAdapterTest extends TestCase
@@ -200,7 +202,13 @@ final class ProviderDestinationAdapterTest extends TestCase
         $encoder = new JsonEncoder();
 
         return match ($provider) {
-            'musicbrainz' => (new MusicBrainzAdapter($logger, $encoder, $client))->searchArtist('Artist')->artists[0]->name ?? null,
+            'musicbrainz' => new MusicBrainzAdapter(
+                $logger,
+                $encoder,
+                $client,
+                new RateLimiterFactory(['id' => 'musicbrainz', 'policy' => 'no_limit'], new InMemoryStorage()),
+                new CoverArtArchiveAdapter($logger, $encoder, $client),
+            )->searchArtist('Artist')->artists[0]->name ?? null,
             'discogs' => (new DiscogsAdapter(self::SECRET, $logger, $encoder, $client))->searchArtist('Artist')->artists[0]->name ?? null,
             'lastfm' => (new LastFmAdapter(self::SECRET, $logger, $encoder, $client))->getArtistInfo('Artist')['name'] ?? null,
             'spotify' => (new SpotifyAdapter('client', self::SECRET, $logger, $encoder, $client))->searchArtist('Artist')[0]['name'] ?? null,

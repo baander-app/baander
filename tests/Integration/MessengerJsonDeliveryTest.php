@@ -17,6 +17,7 @@ use App\Metadata\Application\Message\SyncSongMessage;
 use App\Metadata\Application\MessageHandler\SyncAlbumHandler;
 use App\Metadata\Application\MessageHandler\SyncLibraryHandler;
 use App\Metadata\Application\MessageHandler\SyncSongHandler;
+use App\Metadata\Infrastructure\Api\CoverArtArchive\CoverArtArchiveAdapter;
 use App\Metadata\Infrastructure\Api\Discogs\DiscogsAdapter;
 use App\Metadata\Infrastructure\Api\MusicBrainz\MusicBrainzAdapter;
 use App\Radio\Application\Command\SyncCountryStationsCommand;
@@ -61,6 +62,8 @@ use Symfony\Component\Messenger\Stamp\SentToFailureTransportStamp;
 use Symfony\Component\Messenger\Transport\Sender\SendersLocator;
 use Symfony\Component\Messenger\Transport\Serialization\SigningSerializer;
 use Symfony\Component\Messenger\Worker;
+use Symfony\Component\RateLimiter\RateLimiterFactory;
+use Symfony\Component\RateLimiter\Storage\InMemoryStorage;
 
 final class MessengerJsonDeliveryTest extends TestCase
 {
@@ -214,7 +217,13 @@ final class MessengerJsonDeliveryTest extends TestCase
         $logger = new NullLogger();
         $encoder = new JsonEncoder();
         $httpClient = new PublicHttpClient(new MockHttpClient(), new PublicDestinationPolicy(static fn(string $host): array => ['1.1.1.1']));
-        $musicBrainz = new MusicBrainzAdapter($logger, $encoder, $httpClient);
+        $musicBrainz = new MusicBrainzAdapter(
+            $logger,
+            $encoder,
+            $httpClient,
+            new RateLimiterFactory(['id' => 'musicbrainz', 'policy' => 'no_limit'], new InMemoryStorage()),
+            new CoverArtArchiveAdapter($logger, $encoder, $httpClient),
+        );
         $discogs = new DiscogsAdapter('unused-local-test-token', $logger, $encoder, $httpClient);
         $genres = $this->createStub(GenrePortInterface::class);
         if ($messageType === SyncSongMessage::class) {

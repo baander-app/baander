@@ -4,248 +4,672 @@ declare(strict_types=1);
 
 namespace App\Metadata\Infrastructure\Api\MusicBrainz;
 
+use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzArtist;
+use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzArtistCredit;
+use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzCoverImage;
+use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzCreditedArtist;
+use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzLabel;
+use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzMedium;
+use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzMediumSummary;
+use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzRecording;
+use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzRecordingRelease;
+use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzRejected;
+use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzRelease;
+use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzReleaseGroup;
+use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzReleaseSummary;
+use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzSlotWait;
+use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzTrack;
+use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzUnavailable;
+use App\Metadata\Application\Port\MusicBrainzLookupInterface;
+use App\Metadata\Infrastructure\Api\CoverArtArchive\CoverArtArchiveAdapter;
 use App\Metadata\Infrastructure\Api\MusicBrainz\DTO\MusicBrainzArtistDto;
-use App\Shared\Infrastructure\Swoole\Async;
 use App\Metadata\Infrastructure\Api\MusicBrainz\DTO\MusicBrainzRecordingDto;
 use App\Metadata\Infrastructure\Api\MusicBrainz\DTO\MusicBrainzReleaseGroupDto;
 use App\Metadata\Infrastructure\Api\MusicBrainz\DTO\MusicBrainzSearchResultDto;
+use App\Shared\Application\Exception\RateLimiterUnavailableException;
+use App\Shared\Application\Exception\ServiceUnavailableException;
 use App\Shared\Infrastructure\Http\PublicHttpClient;
+use App\Shared\Infrastructure\Swoole\Async;
 use Psr\Log\LoggerInterface;
+use Symfony\Component\RateLimiter\Exception\MaxWaitDurationExceededException;
+use Symfony\Component\RateLimiter\RateLimiterFactoryInterface;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
 use Symfony\Component\Serializer\Exception\NotEncodableValueException;
 
 /**
- * Anti-corruption layer for the MusicBrainz API.
+ * Anti-corruption layer for the MusicBrainz web service.
  *
- * Translates external MusicBrainz JSON responses into plain PHP domain DTOs,
- * insulating the rest of the application from the API contract.
+ * Translates MusicBrainz JSON responses into DTOs, insulating the rest of the application
+ * from the API contract. It implements the lookup port that matching uses, and keeps the
+ * older search and lookup methods of the metadata enrichers and the open metadata routes.
  *
- * MusicBrainz requires a meaningful User-Agent and limits requests to 1/sec.
+ * MusicBrainz requires a meaningful User-Agent and allows one request per second from an
+ * address. Every request, including the Cover Art Archive requests made for the port, first
+ * takes a turn under the shared `musicbrainz` rate limit, which all processes keep in Redis.
  */
-final readonly class MusicBrainzAdapter
+final readonly class MusicBrainzAdapter implements MusicBrainzLookupInterface
 {
-    private const BASE_URL = 'https://musicbrainz.org/ws/2';
-    private const USER_AGENT = 'Baander/1.0 (https://baander.app; contact@baander.app)';
+    private const string BASE_URL = 'https://musicbrainz.org/ws/2';
+    private const string USER_AGENT = 'Baander/1.0 (https://baander.app; contact@baander.app)';
+    /** Seconds a request may take before MusicBrainz counts as unavailable. */
+    private const int TIMEOUT_SECONDS = 10;
+    /** Hits a release, recording or artist search of the port asks for. */
+    private const int SEARCH_LIMIT = 25;
+    /** The one subject of the shared limit, so every process spends the same budget. */
+    private const string LIMITER_KEY = 'musicbrainz.org';
+    /** Client errors that mean "try again later" rather than a refused request. */
+    private const array NOT_REJECTIONS = [408, 429];
+    private const string RELEASE_INCLUDES = 'recordings+artist-credits+labels+release-groups+genres';
+    private const string RECORDING_INCLUDES = 'artist-credits+releases+release-groups';
+    /** Characters with a meaning in Lucene query syntax; a backslash makes each one plain text. */
+    private const string LUCENE_SPECIALS = '/[+\-&|!(){}\[\]^"~*?:\\\\\/]/';
 
     public function __construct(
-        private readonly LoggerInterface $logger,
-        private readonly JsonEncoder $jsonEncoder,
-        private readonly PublicHttpClient $httpClient,
-    )
-    {
+        private LoggerInterface $logger,
+        private JsonEncoder $jsonEncoder,
+        private PublicHttpClient $httpClient,
+        private RateLimiterFactoryInterface $musicbrainzLimiter,
+        private CoverArtArchiveAdapter $coverArtArchive,
+    ) {
+    }
+
+    #[\Override]
+    public function findReleases(
+        string $title,
+        ?string $artist,
+        MusicBrainzSlotWait $wait = MusicBrainzSlotWait::Bounded,
+    ): array|MusicBrainzRejected|MusicBrainzUnavailable {
+        return $this->search('/release', 'releases', self::fieldQuery(['release' => $title, 'artist' => $artist]), self::releaseSummary(...), $wait);
+    }
+
+    #[\Override]
+    public function fetchRelease(
+        string $releaseId,
+        MusicBrainzSlotWait $wait = MusicBrainzSlotWait::Bounded,
+    ): MusicBrainzRelease|MusicBrainzRejected|MusicBrainzUnavailable|null {
+        return $this->lookup('/release/' . rawurlencode($releaseId), self::RELEASE_INCLUDES, self::release(...), $wait);
+    }
+
+    #[\Override]
+    public function findRecordings(
+        string $title,
+        ?string $artist,
+        MusicBrainzSlotWait $wait = MusicBrainzSlotWait::Bounded,
+    ): array|MusicBrainzRejected|MusicBrainzUnavailable {
+        return $this->search('/recording', 'recordings', self::fieldQuery(['recording' => $title, 'artist' => $artist]), self::recording(...), $wait);
+    }
+
+    #[\Override]
+    public function fetchRecording(
+        string $recordingId,
+        MusicBrainzSlotWait $wait = MusicBrainzSlotWait::Bounded,
+    ): MusicBrainzRecording|MusicBrainzRejected|MusicBrainzUnavailable|null {
+        return $this->lookup('/recording/' . rawurlencode($recordingId), self::RECORDING_INCLUDES, self::recording(...), $wait);
+    }
+
+    #[\Override]
+    public function findArtists(
+        string $name,
+        MusicBrainzSlotWait $wait = MusicBrainzSlotWait::Bounded,
+    ): array|MusicBrainzRejected|MusicBrainzUnavailable {
+        return $this->search('/artist', 'artists', self::fieldQuery(['artist' => $name]), self::artist(...), $wait);
+    }
+
+    #[\Override]
+    public function fetchArtist(
+        string $artistId,
+        MusicBrainzSlotWait $wait = MusicBrainzSlotWait::Bounded,
+    ): MusicBrainzArtist|MusicBrainzRejected|MusicBrainzUnavailable|null {
+        return $this->lookup('/artist/' . rawurlencode($artistId), null, self::artist(...), $wait);
+    }
+
+    #[\Override]
+    public function fetchFrontCover(
+        string $releaseId,
+        MusicBrainzSlotWait $wait = MusicBrainzSlotWait::Bounded,
+    ): MusicBrainzCoverImage|MusicBrainzRejected|MusicBrainzUnavailable|null {
+        return $this->takeTurn($wait) ?? $this->coverArtArchive->fetchFrontCover($releaseId);
     }
 
     /**
-     * Search artists by name query.
+     * Search artists by a free-text name query.
+     *
+     * The query is escaped, so Lucene syntax in it is searched as text. Returns an empty
+     * result when MusicBrainz gives no usable answer.
+     *
+     * @throws ServiceUnavailableException when no turn under the shared rate limit comes within the wait
      */
-    public function searchArtist(string $query, int $limit = 25, int $offset = 0): MusicBrainzSearchResultDto
-    {
-        $params = [
-            'query' => $query,
-            'limit' => $limit,
-            'offset' => $offset,
-            'fmt' => 'json',
-        ];
-
-        $data = $this->request('/artist', $params);
-
-        $artists = [];
-        foreach ($data['artists'] ?? [] as $artist) {
-            $artists[] = new MusicBrainzArtistDto(
-                id: $artist['id'],
-                name: $artist['name'],
-                sortName: $artist['sort-name'] ?? null,
-                type: $artist['type'] ?? null,
-                country: $artist['country'] ?? null,
-                disambiguation: $artist['disambiguation'] ?? null,
-                lifeSpanBegin: $artist['life-span']['begin'] ?? null,
-                lifeSpanEnd: $artist['life-span']['end'] ?? null,
-                tags: $this->extractTags($artist['tags'] ?? []),
-                score: $artist['score'] ?? 0,
-            );
-        }
+    public function searchArtist(
+        string $query,
+        int $limit = 25,
+        int $offset = 0,
+        MusicBrainzSlotWait $wait = MusicBrainzSlotWait::Unbounded,
+    ): MusicBrainzSearchResultDto {
+        $data = $this->olderRequest('/artist', ['query' => self::escape($query), 'limit' => $limit, 'offset' => $offset], $wait);
 
         return new MusicBrainzSearchResultDto(
-            artists: $artists,
+            artists: array_map($this->artistDto(...), self::objects($data['artists'] ?? null)),
             total: $data['count'] ?? 0,
         );
     }
 
     /**
-     * Search release groups by title query, optionally filtered by artist.
+     * Search release groups by a free-text title query and, when given, by artist credit.
+     *
+     * @throws ServiceUnavailableException when no turn under the shared rate limit comes within the wait
      */
-    public function searchReleaseGroup(string $query, ?string $artist = null, int $limit = 25): MusicBrainzSearchResultDto
-    {
-        $params = [
-            'query' => $query,
-            'limit' => $limit,
-            'fmt' => 'json',
-        ];
-
-        if ($artist !== null) {
-            $params['artist'] = $artist;
-        }
-
-        $data = $this->request('/release-group', $params);
-
-        $releaseGroups = [];
-        foreach ($data['release-groups'] ?? [] as $rg) {
-            $releaseGroups[] = new MusicBrainzReleaseGroupDto(
-                id: $rg['id'],
-                title: $rg['title'],
-                primaryType: $rg['primary-type'] ?? null,
-                secondaryTypes: $rg['secondary-types'] ?? [],
-                firstReleaseDate: $rg['first-release-date'] ?? null,
-                artistCredit: $this->flattenArtistCredit($rg['artist-credit'] ?? []),
-                tags: $this->extractTags($rg['tags'] ?? []),
-                score: $rg['score'] ?? 0,
-            );
-        }
+    public function searchReleaseGroup(
+        string $query,
+        ?string $artist = null,
+        int $limit = 25,
+        MusicBrainzSlotWait $wait = MusicBrainzSlotWait::Unbounded,
+    ): MusicBrainzSearchResultDto {
+        $data = $this->olderRequest('/release-group', ['query' => self::textQuery($query, $artist), 'limit' => $limit], $wait);
 
         return new MusicBrainzSearchResultDto(
-            releaseGroups: $releaseGroups,
+            releaseGroups: array_map($this->releaseGroupDto(...), self::objects($data['release-groups'] ?? null)),
             total: $data['count'] ?? 0,
         );
     }
 
     /**
-     * Search recordings by title query, optionally filtered by artist.
+     * Search recordings by a free-text title query and, when given, by artist credit.
+     *
+     * @throws ServiceUnavailableException when no turn under the shared rate limit comes within the wait
      */
-    public function searchRecording(string $query, ?string $artist = null, int $limit = 25): MusicBrainzSearchResultDto
-    {
-        $params = [
-            'query' => $query,
-            'limit' => $limit,
-            'fmt' => 'json',
-        ];
-
-        if ($artist !== null) {
-            $params['artist'] = $artist;
-        }
-
-        $data = $this->request('/recording', $params);
-
-        $recordings = [];
-        foreach ($data['recordings'] ?? [] as $rec) {
-            $releases = $rec['releases'] ?? [];
-            $firstRelease = $releases[0] ?? null;
-
-            $recordings[] = new MusicBrainzRecordingDto(
-                id: $rec['id'],
-                title: $rec['title'],
-                length: $rec['length'] ?? null,
-                artistCredit: $this->flattenArtistCredit($rec['artist-credit'] ?? []),
-                releaseId: $firstRelease['id'] ?? null,
-                releaseTitle: $firstRelease['title'] ?? null,
-                trackNumber: null,
-                tags: $this->extractTags($rec['tags'] ?? []),
-                score: $rec['score'] ?? 0,
-            );
-        }
+    public function searchRecording(
+        string $query,
+        ?string $artist = null,
+        int $limit = 25,
+        MusicBrainzSlotWait $wait = MusicBrainzSlotWait::Unbounded,
+    ): MusicBrainzSearchResultDto {
+        $data = $this->olderRequest('/recording', ['query' => self::textQuery($query, $artist), 'limit' => $limit], $wait);
 
         return new MusicBrainzSearchResultDto(
-            recordings: $recordings,
+            recordings: array_map($this->recordingDto(...), self::objects($data['recordings'] ?? null)),
             total: $data['count'] ?? 0,
         );
     }
 
     /**
      * Look up a single artist by MBID with relationships, URLs, and tags.
+     *
+     * @throws ServiceUnavailableException when no turn under the shared rate limit comes within the wait
      */
-    public function lookupArtist(string $mbid): ?MusicBrainzArtistDto
+    public function lookupArtist(string $mbid, MusicBrainzSlotWait $wait = MusicBrainzSlotWait::Unbounded): ?MusicBrainzArtistDto
     {
-        $params = [
-            'inc' => 'url-rels+tags+artist-rels',
-            'fmt' => 'json',
-        ];
+        $data = $this->olderRequest('/artist/' . rawurlencode($mbid), ['inc' => 'url-rels+tags+artist-rels'], $wait);
 
-        $data = $this->request('/artist/' . $mbid, $params);
-
-        if (empty($data) || !isset($data['id'])) {
-            return null;
-        }
-
-        return new MusicBrainzArtistDto(
-            id: $data['id'],
-            name: $data['name'],
-            sortName: $data['sort-name'] ?? null,
-            type: $data['type'] ?? null,
-            country: $data['country'] ?? null,
-            disambiguation: $data['disambiguation'] ?? null,
-            lifeSpanBegin: $data['life-span']['begin'] ?? null,
-            lifeSpanEnd: $data['life-span']['end'] ?? null,
-            tags: $this->extractTags($data['tags'] ?? []),
-            score: 0,
-        );
+        return isset($data['id']) ? $this->artistDto([...$data, 'score' => 0]) : null;
     }
 
     /**
      * Look up a single release group by MBID with releases, artist credits, and tags.
+     *
+     * @throws ServiceUnavailableException when no turn under the shared rate limit comes within the wait
      */
-    public function lookupReleaseGroup(string $mbid): ?MusicBrainzReleaseGroupDto
+    public function lookupReleaseGroup(string $mbid, MusicBrainzSlotWait $wait = MusicBrainzSlotWait::Unbounded): ?MusicBrainzReleaseGroupDto
     {
-        $params = [
-            'inc' => 'releases+artist-credits+tags',
-            'fmt' => 'json',
-        ];
+        $data = $this->olderRequest('/release-group/' . rawurlencode($mbid), ['inc' => 'releases+artist-credits+tags'], $wait);
 
-        $data = $this->request('/release-group/' . $mbid, $params);
-
-        if (empty($data) || !isset($data['id'])) {
-            return null;
-        }
-
-        return new MusicBrainzReleaseGroupDto(
-            id: $data['id'],
-            title: $data['title'],
-            primaryType: $data['primary-type'] ?? null,
-            secondaryTypes: $data['secondary-types'] ?? [],
-            firstReleaseDate: $data['first-release-date'] ?? null,
-            artistCredit: $this->flattenArtistCredit($data['artist-credit'] ?? []),
-            tags: $this->extractTags($data['tags'] ?? []),
-            score: 0,
-        );
+        return isset($data['id']) ? $this->releaseGroupDto([...$data, 'score' => 0]) : null;
     }
 
     /**
-     * Execute an HTTP GET request against the MusicBrainz API.
+     * @template T
      *
-     * Respects the MusicBrainz rate limit of 1 request per second by sleeping
-     * after each successful call. Destination validation and connection pinning
-     * are handled by the public provider transport.
+     * @param \Closure(array<array-key, mixed>): T $map
      *
-     * @param array<string, mixed> $params Query string parameters
-     * @return array<string, mixed> Parsed JSON response, or empty array on failure
+     * @return list<T>|MusicBrainzRejected|MusicBrainzUnavailable
      */
-    private function request(string $endpoint, array $params = []): array
+    private function search(string $endpoint, string $hits, string $query, \Closure $map, MusicBrainzSlotWait $wait): array|MusicBrainzRejected|MusicBrainzUnavailable
     {
-        $query = http_build_query($params);
-        $url = self::BASE_URL . $endpoint . ($query !== '' ? '?' . $query : '');
+        $data = $this->fetch($endpoint, ['query' => $query, 'limit' => self::SEARCH_LIMIT], $wait);
+
+        return match (true) {
+            // A search has no record to miss, so a 404 is no empty result.
+            $data === null => $this->rejected($endpoint, 404),
+            is_array($data) => array_map($map, self::entries($data[$hits] ?? null)),
+            default => $data,
+        };
+    }
+
+    /**
+     * @template T
+     *
+     * @param \Closure(array<array-key, mixed>): T $map
+     *
+     * @return T|MusicBrainzRejected|MusicBrainzUnavailable|null
+     */
+    private function lookup(string $endpoint, ?string $includes, \Closure $map, MusicBrainzSlotWait $wait): mixed
+    {
+        $data = $this->fetch($endpoint, $includes === null ? [] : ['inc' => $includes], $wait);
+
+        return match (true) {
+            !is_array($data) => $data,
+            !is_string($data['id'] ?? null) => $this->unavailable($endpoint, 'the response has no ID'),
+            default => $map($data),
+        };
+    }
+
+    /**
+     * Take a turn under the shared limit, then GET a MusicBrainz endpoint and decode its JSON.
+     *
+     * @param array<string, string|int> $params query parameters besides the response format
+     *
+     * @return array<array-key, mixed>|MusicBrainzRejected|MusicBrainzUnavailable|null null on 404
+     */
+    private function fetch(string $endpoint, array $params, MusicBrainzSlotWait $wait): array|MusicBrainzRejected|MusicBrainzUnavailable|null
+    {
+        return $this->takeTurn($wait) ?? $this->get($endpoint, $params);
+    }
+
+    /**
+     * The older methods' request: a turn under the shared limit, then an empty array for any
+     * answer other than a decoded JSON object.
+     *
+     * @param array<string, string|int> $params
+     *
+     * @return array<array-key, mixed>
+     *
+     * @throws ServiceUnavailableException when no turn comes within the wait
+     */
+    private function olderRequest(string $endpoint, array $params, MusicBrainzSlotWait $wait): array
+    {
+        $noTurn = $this->takeTurn($wait);
+        if ($noTurn !== null) {
+            throw new ServiceUnavailableException('MusicBrainz cannot take another request now. Try again shortly.', ['reason' => $noTurn->reason]);
+        }
+        $data = $this->get($endpoint, $params);
+
+        return is_array($data) ? $data : [];
+    }
+
+    /**
+     * Wait for this call's turn under the limit every process shares. Sleeping yields the
+     * coroutine, so a web worker keeps serving other requests meanwhile.
+     */
+    private function takeTurn(MusicBrainzSlotWait $wait): ?MusicBrainzUnavailable
+    {
+        try {
+            $reservation = $this->musicbrainzLimiter->create(self::LIMITER_KEY)->reserve(1, $wait->maxSeconds());
+        } catch (MaxWaitDurationExceededException) {
+            return $this->unavailable('rate limit', sprintf('no turn within %d seconds', $wait->maxSeconds()));
+        } catch (RateLimiterUnavailableException) {
+            return $this->unavailable('rate limit', 'the shared rate limiter is unavailable');
+        }
+        $seconds = $reservation->getWaitDuration();
+        if ($seconds > 0) {
+            Async::sleep($seconds);
+        }
+
+        return null;
+    }
+
+    /**
+     * GET a MusicBrainz endpoint. Destination validation and connection pinning are handled
+     * by the public provider transport, which follows no redirect here.
+     *
+     * @param array<string, string|int> $params
+     *
+     * @return array<array-key, mixed>|MusicBrainzRejected|MusicBrainzUnavailable|null null on 404
+     */
+    private function get(string $endpoint, array $params): array|MusicBrainzRejected|MusicBrainzUnavailable|null
+    {
+        $url = self::BASE_URL . $endpoint . '?' . http_build_query([...$params, 'fmt' => 'json'], encoding_type: PHP_QUERY_RFC3986);
         $response = null;
         try {
             $response = $this->httpClient->request('GET', $url, ['musicbrainz.org'], [
                 'headers' => ['User-Agent' => self::USER_AGENT, 'Accept' => 'application/json'],
-                'timeout' => 10,
+                'timeout' => self::TIMEOUT_SECONDS,
             ]);
+            $status = $response->getStatusCode();
             $body = $response->getContent(false);
         } catch (\Throwable) {
-            $this->logger->warning('MusicBrainz request failed', ['service' => 'musicbrainz']);
-
-            return [];
+            return $this->unavailable($endpoint, 'the request failed');
         } finally {
             $response?->cancel();
         }
+
+        return $status === 200 ? $this->decode($endpoint, $body) : $this->errorAnswer($endpoint, $status);
+    }
+
+    /** @return array<array-key, mixed>|MusicBrainzUnavailable */
+    private function decode(string $endpoint, string $body): array|MusicBrainzUnavailable
+    {
         try {
             $data = $this->jsonEncoder->decode($body, 'json');
         } catch (NotEncodableValueException) {
-            $this->logger->warning('MusicBrainz JSON decode failed', ['service' => 'musicbrainz']);
-
-            return [];
+            return $this->unavailable($endpoint, 'the response is not JSON');
         }
-        // MusicBrainz requires at most one request per second.
-        Async::sleep(1.0);
 
-        return is_array($data) ? $data : [];
+        return is_array($data) ? $data : $this->unavailable($endpoint, 'the response is not a JSON object');
+    }
+
+    /** What an error status means: no record, a refused request, or MusicBrainz being unavailable. */
+    private function errorAnswer(string $endpoint, int $status): MusicBrainzRejected|MusicBrainzUnavailable|null
+    {
+        return match (true) {
+            $status === 404 => null,
+            $status >= 400 && $status < 500 && !in_array($status, self::NOT_REJECTIONS, true) => $this->rejected($endpoint, $status),
+            default => $this->unavailable($endpoint, sprintf('HTTP %d', $status)),
+        };
+    }
+
+    private function rejected(string $endpoint, int $status): MusicBrainzRejected
+    {
+        $this->logger->warning('MusicBrainz rejected the request', ['service' => 'musicbrainz', 'endpoint' => $endpoint, 'status' => $status]);
+
+        return new MusicBrainzRejected($status);
+    }
+
+    private function unavailable(string $endpoint, string $reason): MusicBrainzUnavailable
+    {
+        $this->logger->warning('MusicBrainz request failed', ['service' => 'musicbrainz', 'endpoint' => $endpoint, 'error' => $reason]);
+
+        return new MusicBrainzUnavailable($reason);
+    }
+
+    /**
+     * Quoted field phrases joined by AND, leaving out fields without a value.
+     *
+     * @param array<string, string|null> $fields
+     */
+    private static function fieldQuery(array $fields): string
+    {
+        $present = array_filter($fields, static fn(?string $value): bool => $value !== null && trim($value) !== '');
+
+        return array_map(self::phrase(...), array_keys($present), $present)
+            |> (static fn(array $phrases): string => implode(' AND ', $phrases));
+    }
+
+    private static function phrase(string $field, string $value): string
+    {
+        return sprintf('%s:"%s"', $field, trim($value) |> self::escape(...));
+    }
+
+    /** Free text searched in the endpoint's default field, plus a quoted artist phrase when one is given. */
+    private static function textQuery(string $text, ?string $artist): string
+    {
+        return $artist === null || trim($artist) === ''
+            ? self::escape($text)
+            : sprintf('(%s) AND %s', self::escape($text), self::phrase('artist', $artist));
+    }
+
+    private static function escape(string $text): string
+    {
+        return preg_replace(self::LUCENE_SPECIALS, '\\\\$0', $text) ?? $text;
+    }
+
+    /** @param array<array-key, mixed> $release */
+    private static function releaseSummary(array $release): MusicBrainzReleaseSummary
+    {
+        $media = array_map(
+            static fn(array $medium): MusicBrainzMediumSummary => new MusicBrainzMediumSummary(self::text($medium, 'format'), self::integer($medium, 'track-count') ?? 0),
+            self::objects($release['media'] ?? null),
+        );
+
+        return new MusicBrainzReleaseSummary(
+            id: $release['id'],
+            title: self::text($release, 'title') ?? '',
+            score: self::integer($release, 'score') ?? 0,
+            artistCredit: self::artistCredit($release['artist-credit'] ?? null),
+            date: self::text($release, 'date'),
+            country: self::text($release, 'country'),
+            status: self::text($release, 'status'),
+            disambiguation: self::text($release, 'disambiguation'),
+            barcode: self::text($release, 'barcode'),
+            labels: self::labels($release['label-info'] ?? null),
+            media: $media,
+            trackCount: self::integer($release, 'track-count') ?? array_sum(array_column($media, 'trackCount')),
+            releaseGroup: self::releaseGroup($release['release-group'] ?? null),
+        );
+    }
+
+    /** @param array<array-key, mixed> $release */
+    private static function release(array $release): MusicBrainzRelease
+    {
+        $media = array_map(self::medium(...), self::objects($release['media'] ?? null));
+        usort($media, static fn(MusicBrainzMedium $a, MusicBrainzMedium $b): int => $a->position <=> $b->position);
+
+        return new MusicBrainzRelease(
+            id: $release['id'],
+            title: self::text($release, 'title') ?? '',
+            artistCredit: self::artistCredit($release['artist-credit'] ?? null),
+            date: self::text($release, 'date'),
+            country: self::text($release, 'country'),
+            status: self::text($release, 'status'),
+            disambiguation: self::text($release, 'disambiguation'),
+            barcode: self::text($release, 'barcode'),
+            labels: self::labels($release['label-info'] ?? null),
+            media: $media,
+            releaseGroup: self::releaseGroup($release['release-group'] ?? null),
+            genres: self::genres($release['genres'] ?? null),
+            hasFrontCover: ($release['cover-art-archive']['front'] ?? false) === true,
+        );
+    }
+
+    /** @param array<array-key, mixed> $medium */
+    private static function medium(array $medium): MusicBrainzMedium
+    {
+        $tracks = array_filter(
+            self::entries($medium['tracks'] ?? null),
+            static fn(array $track): bool => is_string($track['recording']['id'] ?? null),
+        ) |> (static fn(array $tracks): array => array_map(self::track(...), $tracks));
+        usort($tracks, static fn(MusicBrainzTrack $a, MusicBrainzTrack $b): int => $a->position <=> $b->position);
+
+        return new MusicBrainzMedium(
+            position: self::integer($medium, 'position') ?? 0,
+            format: self::text($medium, 'format'),
+            title: self::text($medium, 'title'),
+            tracks: $tracks,
+        );
+    }
+
+    /** @param array<array-key, mixed> $track */
+    private static function track(array $track): MusicBrainzTrack
+    {
+        $recording = $track['recording'];
+
+        return new MusicBrainzTrack(
+            id: $track['id'],
+            position: self::integer($track, 'position') ?? 0,
+            number: self::text($track, 'number') ?? '',
+            title: self::text($track, 'title') ?? '',
+            lengthMs: self::integer($track, 'length') ?? self::integer($recording, 'length'),
+            recordingId: $recording['id'],
+            artistCredit: self::artistCredit($track['artist-credit'] ?? $recording['artist-credit'] ?? null),
+        );
+    }
+
+    /** @param array<array-key, mixed> $recording */
+    private static function recording(array $recording): MusicBrainzRecording
+    {
+        return new MusicBrainzRecording(
+            id: $recording['id'],
+            title: self::text($recording, 'title') ?? '',
+            score: self::integer($recording, 'score') ?? 0,
+            lengthMs: self::integer($recording, 'length'),
+            disambiguation: self::text($recording, 'disambiguation'),
+            artistCredit: self::artistCredit($recording['artist-credit'] ?? null),
+            releases: array_map(self::recordingRelease(...), self::entries($recording['releases'] ?? null)),
+        );
+    }
+
+    /** @param array<array-key, mixed> $release */
+    private static function recordingRelease(array $release): MusicBrainzRecordingRelease
+    {
+        return new MusicBrainzRecordingRelease(
+            id: $release['id'],
+            title: self::text($release, 'title') ?? '',
+            date: self::text($release, 'date'),
+            country: self::text($release, 'country'),
+            status: self::text($release, 'status'),
+            trackCount: self::integer($release, 'track-count'),
+            releaseGroup: self::releaseGroup($release['release-group'] ?? null),
+        );
+    }
+
+    /** @param array<array-key, mixed> $artist */
+    private static function artist(array $artist): MusicBrainzArtist
+    {
+        $lifeSpan = is_array($artist['life-span'] ?? null) ? $artist['life-span'] : [];
+
+        return new MusicBrainzArtist(
+            id: $artist['id'],
+            name: self::text($artist, 'name') ?? '',
+            score: self::integer($artist, 'score') ?? 0,
+            sortName: self::text($artist, 'sort-name'),
+            type: self::text($artist, 'type'),
+            country: self::text($artist, 'country'),
+            disambiguation: self::text($artist, 'disambiguation'),
+            lifeSpanBegin: self::text($lifeSpan, 'begin'),
+            lifeSpanEnd: self::text($lifeSpan, 'end'),
+            ended: ($lifeSpan['ended'] ?? false) === true,
+        );
+    }
+
+    private static function releaseGroup(mixed $group): ?MusicBrainzReleaseGroup
+    {
+        if (!is_array($group) || !is_string($group['id'] ?? null)) {
+            return null;
+        }
+
+        return new MusicBrainzReleaseGroup(
+            id: $group['id'],
+            title: self::text($group, 'title') ?? '',
+            primaryType: self::text($group, 'primary-type'),
+            firstReleaseDate: self::text($group, 'first-release-date'),
+            genres: self::genres($group['genres'] ?? null),
+        );
+    }
+
+    /** An ordered credit of the entries naming an artist; MusicBrainz leaves out an empty join phrase in search results. */
+    private static function artistCredit(mixed $credit): MusicBrainzArtistCredit
+    {
+        return array_filter(self::objects($credit), static fn(array $entry): bool => is_string($entry['artist']['id'] ?? null))
+            |> (static fn(array $entries): array => array_map(self::creditedArtist(...), array_values($entries)))
+            |> (static fn(array $artists): MusicBrainzArtistCredit => new MusicBrainzArtistCredit($artists));
+    }
+
+    /** @param array<array-key, mixed> $entry */
+    private static function creditedArtist(array $entry): MusicBrainzCreditedArtist
+    {
+        $artist = $entry['artist'];
+        $artistName = self::text($artist, 'name') ?? '';
+
+        return new MusicBrainzCreditedArtist(
+            artistId: $artist['id'],
+            name: self::text($entry, 'name') ?? $artistName,
+            joinPhrase: is_string($entry['joinphrase'] ?? null) ? $entry['joinphrase'] : '',
+            artistName: $artistName,
+            artistSortName: self::text($artist, 'sort-name'),
+        );
+    }
+
+    /** @return list<MusicBrainzLabel> */
+    private static function labels(mixed $labelInfo): array
+    {
+        return array_map(static function (array $info): MusicBrainzLabel {
+            $label = is_array($info['label'] ?? null) ? $info['label'] : [];
+
+            return new MusicBrainzLabel(self::text($label, 'id'), self::text($label, 'name'), self::text($info, 'catalog-number'));
+        }, self::objects($labelInfo));
+    }
+
+    /** @return list<string> genre names, most votes first; MusicBrainz's own order breaks ties */
+    private static function genres(mixed $genres): array
+    {
+        $named = array_filter(self::objects($genres), static fn(array $genre): bool => is_string($genre['name'] ?? null));
+        usort($named, static fn(array $a, array $b): int => (self::integer($b, 'count') ?? 0) <=> (self::integer($a, 'count') ?? 0));
+
+        return array_column($named, 'name');
+    }
+
+    /** @return list<array<array-key, mixed>> the entries of a JSON list that are objects */
+    private static function objects(mixed $list): array
+    {
+        return is_array($list) ? array_values(array_filter($list, is_array(...))) : [];
+    }
+
+    /** @return list<array<array-key, mixed>> the entries of a JSON list that are objects with an ID */
+    private static function entries(mixed $list): array
+    {
+        return array_values(array_filter(self::objects($list), static fn(array $entry): bool => is_string($entry['id'] ?? null)));
+    }
+
+    /**
+     * A non-empty string value, else null.
+     *
+     * @param array<array-key, mixed> $data
+     */
+    private static function text(array $data, string $key): ?string
+    {
+        $value = $data[$key] ?? null;
+
+        return is_string($value) && $value !== '' ? $value : null;
+    }
+
+    /** @param array<array-key, mixed> $data */
+    private static function integer(array $data, string $key): ?int
+    {
+        $value = $data[$key] ?? null;
+
+        return is_int($value) ? $value : null;
+    }
+
+    /** @param array<array-key, mixed> $artist */
+    private function artistDto(array $artist): MusicBrainzArtistDto
+    {
+        return new MusicBrainzArtistDto(
+            id: $artist['id'],
+            name: $artist['name'],
+            sortName: $artist['sort-name'] ?? null,
+            type: $artist['type'] ?? null,
+            country: $artist['country'] ?? null,
+            disambiguation: $artist['disambiguation'] ?? null,
+            lifeSpanBegin: $artist['life-span']['begin'] ?? null,
+            lifeSpanEnd: $artist['life-span']['end'] ?? null,
+            tags: $this->extractTags($artist['tags'] ?? []),
+            score: $artist['score'] ?? 0,
+        );
+    }
+
+    /** @param array<array-key, mixed> $group */
+    private function releaseGroupDto(array $group): MusicBrainzReleaseGroupDto
+    {
+        return new MusicBrainzReleaseGroupDto(
+            id: $group['id'],
+            title: $group['title'],
+            primaryType: $group['primary-type'] ?? null,
+            secondaryTypes: $group['secondary-types'] ?? [],
+            firstReleaseDate: $group['first-release-date'] ?? null,
+            artistCredit: $this->flattenArtistCredit($group['artist-credit'] ?? []),
+            tags: $this->extractTags($group['tags'] ?? []),
+            score: $group['score'] ?? 0,
+        );
+    }
+
+    /**
+     * Only the first release of each recording is kept; a recording usually appears on many.
+     *
+     * @param array<array-key, mixed> $recording
+     */
+    private function recordingDto(array $recording): MusicBrainzRecordingDto
+    {
+        $firstRelease = $recording['releases'][0] ?? null;
+
+        return new MusicBrainzRecordingDto(
+            id: $recording['id'],
+            title: $recording['title'],
+            length: $recording['length'] ?? null,
+            artistCredit: $this->flattenArtistCredit($recording['artist-credit'] ?? []),
+            releaseId: $firstRelease['id'] ?? null,
+            releaseTitle: $firstRelease['title'] ?? null,
+            trackNumber: null,
+            tags: $this->extractTags($recording['tags'] ?? []),
+            score: $recording['score'] ?? 0,
+        );
     }
 
     /**
@@ -256,40 +680,19 @@ final readonly class MusicBrainzAdapter
      */
     private function extractTags(array $tags): array
     {
-        $names = [];
-
-        foreach ($tags as $tag) {
-            if (isset($tag['name']) && is_string($tag['name'])) {
-                $names[] = $tag['name'];
-            }
-        }
-
-        return $names;
+        return array_column($tags, 'name') |> (static fn(array $names): array => array_values(array_filter($names, is_string(...))));
     }
 
     /**
-     * Flatten a MusicBrainz artist-credit array into a display string.
-     *
-     * Each entry is either ["artist" => [...]] or ["joinphrase" => " & ", "artist" => [...]].
+     * Flatten a MusicBrainz artist-credit array into a display string of artist names and join phrases.
      *
      * @param array<array-key, array<string, mixed>> $artistCredit
      */
     private function flattenArtistCredit(array $artistCredit): string
     {
-        $parts = [];
-
-        foreach ($artistCredit as $credit) {
-            if (isset($credit['artist']['name'])) {
-                $parts[] = $credit['artist']['name'];
-            } elseif (isset($credit['name'])) {
-                $parts[] = $credit['name'];
-            }
-
-            if (isset($credit['joinphrase'])) {
-                $parts[] = $credit['joinphrase'];
-            }
-        }
-
-        return implode('', $parts);
+        return array_map(
+            static fn(array $credit): string => ($credit['artist']['name'] ?? $credit['name'] ?? '') . ($credit['joinphrase'] ?? ''),
+            $artistCredit,
+        ) |> implode(...);
     }
 }

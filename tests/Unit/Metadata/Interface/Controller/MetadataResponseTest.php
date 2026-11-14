@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Metadata\Interface\Controller;
 
+use App\Metadata\Infrastructure\Api\CoverArtArchive\CoverArtArchiveAdapter;
 use App\Metadata\Infrastructure\Api\Discogs\DiscogsAdapter;
 use App\Metadata\Infrastructure\Api\LastFm\LastFmAdapter;
 use App\Metadata\Infrastructure\Api\MusicBrainz\MusicBrainzAdapter;
@@ -18,6 +19,9 @@ use App\Shared\Infrastructure\Http\PublicHttpClient;
 use App\Shared\Infrastructure\Http\PublicDestinationPolicy;
 use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\HttpClient\Response\MockResponse;
+use Symfony\Component\RateLimiter\RateLimiterFactory;
+use Symfony\Component\RateLimiter\Storage\InMemoryStorage;
+use Symfony\Component\Security\Core\User\InMemoryUser;
 
 final class MetadataResponseTest extends TestCase
 {
@@ -41,12 +45,13 @@ final class MetadataResponseTest extends TestCase
         $encoder = new JsonEncoder();
         $httpClient = new PublicHttpClient(new MockHttpClient(static fn(): MockResponse => new MockResponse(self::$response === false ? '' : self::$response)), new PublicDestinationPolicy(static fn(string $host): array => ['1.1.1.1']));
         $controller = new MetadataSearchController(
-            new MusicBrainzAdapter($logger, $encoder, $httpClient),
+            self::musicBrainz($logger, $encoder, $httpClient),
             new DiscogsAdapter('local-test-token', $logger, $encoder, $httpClient),
             new LastFmAdapter('local-test-token', $logger, $encoder, $httpClient),
+            self::unlimited(),
         );
 
-        $response = $controller->{$action}(new Request(['q' => 'track', 'source' => $source]));
+        $response = $controller->{$action}(new Request(['q' => 'track', 'source' => $source]), new InMemoryUser('member@baander.app', null));
         $payload = json_decode((string) $response->getContent(), true, 512, JSON_THROW_ON_ERROR);
 
         self::assertSame(200, $response->getStatusCode());
@@ -61,15 +66,26 @@ final class MetadataResponseTest extends TestCase
         $encoder = new JsonEncoder();
         $httpClient = new PublicHttpClient(new MockHttpClient(static fn(): MockResponse => new MockResponse(self::$response === false ? '' : self::$response)), new PublicDestinationPolicy(static fn(string $host): array => ['1.1.1.1']));
         $controller = new MetadataBrowseController(
-            new MusicBrainzAdapter($logger, $encoder, $httpClient),
+            self::musicBrainz($logger, $encoder, $httpClient),
             new LastFmAdapter('local-test-token', $logger, $encoder, $httpClient),
+            self::unlimited(),
         );
 
-        $response = $controller->releaseGroup('release-id');
+        $response = $controller->releaseGroup('release-id', new InMemoryUser('member@baander.app', null));
         $payload = json_decode((string) $response->getContent(), true, 512, JSON_THROW_ON_ERROR);
 
         self::assertSame(200, $response->getStatusCode());
         self::assertSame('Album', $payload['data']['title']);
         self::assertSame('release-id', $payload['data']['id']);
+    }
+
+    private static function musicBrainz(NullLogger $logger, JsonEncoder $encoder, PublicHttpClient $httpClient): MusicBrainzAdapter
+    {
+        return new MusicBrainzAdapter($logger, $encoder, $httpClient, self::unlimited(), new CoverArtArchiveAdapter($logger, $encoder, $httpClient));
+    }
+
+    private static function unlimited(): RateLimiterFactory
+    {
+        return new RateLimiterFactory(['id' => 'musicbrainz', 'policy' => 'no_limit'], new InMemoryStorage());
     }
 }

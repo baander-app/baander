@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Metadata\Interface\Controller;
 
+use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzSlotWait;
 use App\Metadata\Infrastructure\Api\MusicBrainz\MusicBrainzAdapter;
 use App\Metadata\Infrastructure\Api\LastFm\LastFmAdapter;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
@@ -11,9 +12,19 @@ use App\Shared\Interface\Controller\TranslatorTrait;
 use OpenApi\Attributes as OA;
 use Nelmio\ApiDocBundle\Attribute\Model;
 use Symfony\Component\HttpFoundation\JsonResponse;
-use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpKernel\Exception\TooManyRequestsHttpException;
+use Symfony\Component\RateLimiter\RateLimiterFactoryInterface;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Security\Core\User\UserInterface;
+use Symfony\Component\Security\Http\Attribute\CurrentUser;
 
+/**
+ * MusicBrainz lookups for any signed-in user.
+ *
+ * A lookup first spends the user's own allowance of one MusicBrainz call per ten seconds
+ * (429 when spent), then waits at most ten seconds for a turn under the rate limit every
+ * process shares (503 beyond), so one member cannot queue ahead of the matcher.
+ */
 #[OA\Tag(name: 'Metadata', description: 'External metadata enrichment endpoints')]
 #[Route('/api/metadata/browse', name: 'metadata_browse_')]
 final class MetadataBrowseController
@@ -23,6 +34,7 @@ final class MetadataBrowseController
     public function __construct(
         private readonly MusicBrainzAdapter $musicBrainz,
         private readonly LastFmAdapter $lastFm,
+        private readonly RateLimiterFactoryInterface $musicbrainzUserLimiter,
     ) {
     }
 
@@ -45,12 +57,14 @@ final class MetadataBrowseController
                 ),
             ),
             new OA\Response(response: '404', description: 'Artist not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '429', description: 'The user already called MusicBrainz in the last ten seconds', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '503', description: 'No turn under the shared MusicBrainz rate limit within ten seconds', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
     #[Route('/artist/{mbid}', name: 'artist', methods: ['GET'])]
-    public function artist(string $mbid): JsonResponse
+    public function artist(string $mbid, #[CurrentUser] UserInterface $user): JsonResponse
     {
-        $artist = $this->musicBrainz->lookupArtist($mbid);
+        $artist = $this->musicBrainzFor($user)->lookupArtist($mbid, MusicBrainzSlotWait::Bounded);
 
         if ($artist === null) {
             return $this->notFound($this->trans('errors.artist_not_found', domain: 'metadata'));
@@ -79,17 +93,33 @@ final class MetadataBrowseController
                 ),
             ),
             new OA\Response(response: '404', description: 'Release group not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '429', description: 'The user already called MusicBrainz in the last ten seconds', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '503', description: 'No turn under the shared MusicBrainz rate limit within ten seconds', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
     #[Route('/release-group/{mbid}', name: 'release_group', methods: ['GET'])]
-    public function releaseGroup(string $mbid): JsonResponse
+    public function releaseGroup(string $mbid, #[CurrentUser] UserInterface $user): JsonResponse
     {
-        $releaseGroup = $this->musicBrainz->lookupReleaseGroup($mbid);
+        $releaseGroup = $this->musicBrainzFor($user)->lookupReleaseGroup($mbid, MusicBrainzSlotWait::Bounded);
 
         if ($releaseGroup === null) {
             return $this->notFound($this->trans('errors.release_group_not_found', domain: 'metadata'));
         }
 
         return $this->successResponse(get_object_vars($releaseGroup));
+    }
+
+    /** The MusicBrainz adapter, once the user has spent a call of their own allowance; 429 when it is spent. */
+    private function musicBrainzFor(UserInterface $user): MusicBrainzAdapter
+    {
+        $allowance = $this->musicbrainzUserLimiter->create($user->getUserIdentifier())->consume();
+        if (!$allowance->isAccepted()) {
+            throw new TooManyRequestsHttpException(
+                max(1, $allowance->getRetryAfter()->getTimestamp() - time()),
+                'Too many MusicBrainz lookups. Please try again later.',
+            );
+        }
+
+        return $this->musicBrainz;
     }
 }

@@ -908,6 +908,22 @@ services:
         alias: App\Session\Infrastructure\Swoole\PlaybackCommandRelay
 
     # --- Metadata API Adapters ---
+    # Every MusicBrainz and Cover Art Archive call reserves a turn under one shared limit.
+    App\Metadata\Infrastructure\Api\MusicBrainz\MusicBrainzAdapter:
+        arguments:
+            $musicbrainzLimiter: '@limiter.musicbrainz'
+
+    App\Metadata\Application\Port\MusicBrainzLookupInterface:
+        alias: App\Metadata\Infrastructure\Api\MusicBrainz\MusicBrainzAdapter
+
+    App\Metadata\Interface\Controller\MetadataSearchController:
+        arguments:
+            $musicbrainzUserLimiter: '@limiter.musicbrainz_user'
+
+    App\Metadata\Interface\Controller\MetadataBrowseController:
+        arguments:
+            $musicbrainzUserLimiter: '@limiter.musicbrainz_user'
+
     App\Metadata\Infrastructure\Api\Discogs\DiscogsAdapter:
         arguments:
             $token: '%env(DISCOGS_TOKEN)%'
