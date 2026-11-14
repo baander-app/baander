@@ -817,7 +817,7 @@ Run `ce-simplify-code` at each phase boundary.
 - `tests/Functional/Library/ScannedArtistCreditsTest.php` (new)
 - `tests/Fixtures/Audio/TaggedAudioFixture.php` (new: encodes audio with ffmpeg and splices in tag bytes)
 
-**Approach:** Follow `tests/Functional/Media/ScannedTrackPlaybackTest.php:43-102,187-196`: encode short audio with ffmpeg (MP3 written with `-write_id3v2 0`, FLAC with `-map_metadata -1`), splice ID3 or Vorbis tags built with the reader-test builders, run `app:library:scan` and the outbox relay, and drive `FilesDiscoveredHandler`. Assert that the CI image's FFmpeg encodes `libmp3lame`.
+**Approach:** Follow `tests/Functional/Media/ScannedTrackPlaybackTest.php:43-102,187-196`: encode short audio with ffmpeg (MP3 written with `-id3v2_version 0`, FLAC with `-map_metadata -1`), splice ID3 or Vorbis tags built with the reader-test builders, run `app:library:scan` and the outbox relay, and drive `FilesDiscoveredHandler`. Assert that the CI image's FFmpeg encodes `libmp3lame`.
 
 **Test scenarios:**
 - A replica library: one album split over `CD1/` and `CD2/` with an album-artist tag, an album without one, repeated ARTIST fields, a comma artist value, MP3s with ID3v2.3 TLEN in seconds, and no MusicBrainz tags. Covers AE1, AE5, AE12.
