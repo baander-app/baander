@@ -18,7 +18,7 @@ The `Lyrics` aggregate stores lyrics indexed by song ID, supporting multiple sou
 - Search fallback: manual keyword search via `/api/search` when auto-match by track signature fails
 - Bulk fetch: `BulkFetchLyricsHandler` walks the songs without lyrics and queues one fetch per song on the `async` transport, spaced by the run's delay. It skips a song without a primary artist credit or a positive length, the rule `LyricsLookupRequirements` shares with `FetchLyricsHandler`, and counts it per cause. `app:lyrics:fetch` and `POST /api/admin/lyrics/bulk-fetch` report the queued and skipped counts
 - Bulk run tally: `QueuedLyricsFetchesInterface` keeps each run's queued marks, its cancellation and its tally in Redis; each entry expires a day after the fetches it covers are due. The walk records its skipped counts and its job when it finishes, also when it queued nothing; each queued fetch then counts found, no match, rejected or unavailable once per run and song. A fetch skipped because its run was cancelled, or whose song was deleted, counts toward no outcome. The sync status reports the run whose walk finished last as `latestRun`
-- Automatic fetch: while `lyrics.auto_fetch` is on, Catalog ingest queues one fetch on the `async` transport for each new song without a sidecar `.lrc` file. The setting is off by default and does not gate the bulk scan or the on-demand fetch.
+- Automatic fetch: while `lyrics.auto_fetch` is on, Catalog ingest queues one fetch on the `async` transport for each new song without a sidecar `.lrc` file, and for each stored song without sidecar lyrics whose repair, as on a rescan, gives it a primary artist credit or a new length. The setting is off by default and does not gate the bulk scan or the on-demand fetch.
 
 ## Ports
 
@@ -26,7 +26,7 @@ The `Lyrics` aggregate stores lyrics indexed by song ID, supporting multiple sou
 |------|-------|---------|
 | `LyricsPortInterface` | Application | Reads the stored lyrics of a song |
 | `LrclibClientInterface` | Application | LRCLIB HTTP API contract (getBySignature, search, getById); null or an empty list for a miss, `LrclibRejected` for a refused request, `LrclibUnavailable` for an outage |
-| `LyricsFetchRequestInterface` | Application (contract) | Lets Catalog ingest request fetches for new songs; reads `lyrics.auto_fetch` on every call |
+| `LyricsFetchRequestInterface` | Application (contract) | Lets Catalog ingest request fetches for new and repaired songs; reads `lyrics.auto_fetch` on every call |
 | `QueuedLyricsFetchesInterface` | Application | Bulk runs' queued marks, cancellations and outcome tallies, in Redis (`RedisQueuedLyricsFetches`, which also cancels a finished job's fetches for the job monitor) |
 | `LyricsAdminPortInterface` | Application | Coverage and sync status behind the admin lyrics routes and their commands; the sync status includes the latest bulk run's tally |
 

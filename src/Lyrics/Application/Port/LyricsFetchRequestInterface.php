@@ -7,7 +7,8 @@ namespace App\Lyrics\Application\Port;
 use App\Shared\Domain\Model\Uuid;
 
 /**
- * Lets another context ask for lyrics of newly ingested songs.
+ * Lets another context ask for lyrics of newly ingested songs, and of stored songs
+ * an import repaired, such as a song a rescan credited to its tagged artist.
  *
  * Queues one asynchronous fetch per song while `lyrics.auto_fetch` is on and
  * does nothing while it is off. The toggle is read on every call. Call it only

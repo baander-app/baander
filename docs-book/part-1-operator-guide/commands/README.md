@@ -115,7 +115,7 @@ Application console commands run inside `app`, while the control/execution worke
 | [app:lyrics:coverage](app-lyrics-coverage.md) | Show how many tracks have lyrics, and the lyrics by source |
 | [app:lyrics:fetch](app-lyrics-fetch.md) | Queue a lyrics fetch from LRCLIB for songs without lyrics |
 | [app:lyrics:search](app-lyrics-search.md) | Search LRCLIB for lyrics and list the results with their IDs |
-| [app:lyrics:status](app-lyrics-status.md) | Show the lyrics fetch jobs of the past 7 days and how many finished or failed |
+| [app:lyrics:status](app-lyrics-status.md) | Show the lyrics fetch jobs of the past 7 days, how many finished or failed, and what the latest bulk fetch run skipped and found |
 | [app:song:lyrics:fetch](app-song-lyrics-fetch.md) | Fetch the lyrics of one song from LRCLIB and store them |
 
 ## Metadata

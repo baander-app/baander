@@ -44,11 +44,11 @@ Both routes then follow the same stages:
 
 1. **Discovery** walks the directory, filters recognized extensions, hashes files and updates the file index. It records changed directories for later ingestion.
 2. **Catalog ingestion** consumes those directory messages in the background. Music ingestion reads tags and creates albums and tracks; movie ingestion creates movie and video records.
-3. **Optional enrichment** queues metadata or lyrics work for newly created music records when the corresponding setting is enabled.
+3. **Optional enrichment** queues metadata or lyrics work for newly created music records, and lyrics work for tracks a rescan repairs, when the corresponding setting is enabled.
 
 The scan's file totals and completed library status describe discovery. They do not prove that every queued directory has reached the catalog. Check the resulting albums, tracks or movies separately, and use [Monitoring](../operations/README.md) to investigate pending or failed background work. [Background Work](../workers/background-work.md) explains the delivery stages and worker requirements.
 
-Incremental scans skip unchanged indexed files. A full rescan reprocesses discovery; it is not a request to erase and rebuild the catalog. Missing sources retain file-index records marked unavailable. A scan does not promise blanket removal of catalog entries for deleted files. Restore a missing mount before scanning: an unavailable directory can look like an empty library to discovery.
+Incremental scans skip unchanged indexed files. A full rescan reprocesses discovery and repairs tracks Baander already has, filling in a missing artist credit and measuring the length again (see [What a rescan repairs](../commands/app-library-scan.md#what-a-rescan-repairs)); it is not a request to erase and rebuild the catalog. Missing sources retain file-index records marked unavailable. A scan does not promise blanket removal of catalog entries for deleted files. Restore a missing mount before scanning: an unavailable directory can look like an empty library to discovery.
 
 Only one scan of a library runs at a time. Starting a scan claims the library, and while the claim holds, the admin panel and the command refuse a second scan of it. `app:library:scan --all` scans every library that is not already scanning. A running scan renews its claim as it works. A claim that nobody renews for 15 minutes lapses, for example after a scan process was killed. The library then reads as `failed` and can be scanned again. To free a library sooner, release its claim with `app:library:scan my-music --release --force` once you know its scan is gone.
 
@@ -61,9 +61,9 @@ After discovery, background ingestion adds new albums and tracks to the catalog.
 | Setting | While it is on |
 |---------|----------------|
 | `metadata.auto_sync` | Each new album is queued for a metadata sync from the [external services](external-apis.md), right after the catalog stores it. |
-| `lyrics.auto_fetch` | Each new track without an `.lrc` lyrics file beside it is queued for a lyrics fetch from LRCLIB, once the catalog has stored the track. A track with an `.lrc` file takes its lyrics from that file. |
+| `lyrics.auto_fetch` | Each new track without an `.lrc` lyrics file beside it is queued for a lyrics fetch from LRCLIB, once the catalog has stored the track. A track with an `.lrc` file takes its lyrics from that file. A track without lyrics that a rescan gives an artist credit or a new length is queued the same way. |
 
-Both act only on albums and tracks that a scan creates. A rescan of music Baander already has does not request these automatic metadata or lyrics fetches. The bulk lyrics fetch, [`app:lyrics:fetch`](../commands/app-lyrics-fetch.md), and the syncs and fetches an administrator starts are not affected by either setting.
+`metadata.auto_sync` acts only on albums that a scan creates, so a rescan of music Baander already has requests no automatic metadata sync. `lyrics.auto_fetch` acts on new tracks and on the tracks a rescan repairs; see [What a rescan repairs](../commands/app-library-scan.md#what-a-rescan-repairs). The bulk lyrics fetch, [`app:lyrics:fetch`](../commands/app-lyrics-fetch.md), and the syncs and fetches an administrator starts are not affected by either setting.
 
 ## File Watching
 

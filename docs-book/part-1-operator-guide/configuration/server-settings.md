@@ -32,7 +32,7 @@ A stored value can stop being allowed, for example when a setting's allowed valu
 | `admin.can_view_users` | `true` | Whether administrators who are not super administrators may list users. See [Who can manage users](../administration/user-management.md#who-can-manage-users). |
 | `admin.can_create_users` | `false` | Whether those administrators may create users. They can create only users with the User role. |
 | `i18n.default_language` | `en` | The language of emails to users who have not chosen one: `en` (English), `da` (Dansk) or `th` (ไทย). See [Email language](#email-language). |
-| `lyrics.auto_fetch` | `false` | Fetch lyrics from LRCLIB for each new track a scan adds that has no `.lrc` file beside it. See [Library Management](../media/library-management.md#what-happens-to-new-music). |
+| `lyrics.auto_fetch` | `false` | Fetch lyrics from LRCLIB for each new track a scan adds that has no `.lrc` file beside it, and for each track without lyrics that a [rescan](../commands/app-library-scan.md#what-a-rescan-repairs) gives an artist credit or a new length. See [Library Management](../media/library-management.md#what-happens-to-new-music). |
 | `metadata.auto_sync` | `false` | Sync each new album a scan adds from the external metadata services. See [Library Management](../media/library-management.md#what-happens-to-new-music). |
 | `notifications.admin_alerts` | `true` | Alert administrators when a component's health check reads unhealthy. The web server runs the checks every 60 seconds. See [Health alerts](../administration/notifications.md#health-alerts). |
 | `notifications.push_enabled` | `true` | Deliver browser push notifications. See [Notifications](../administration/notifications.md#server-settings). |
@@ -41,7 +41,7 @@ A stored value can stop being allowed, for example when a setting's allowed valu
 | `transcode.max_bitrate` | `320` | The highest bitrate of a transcoded audio stream, in kbps: `128`, `192`, `256` or `320`. It is also the bitrate used when a client asks for none. |
 | `transcode.aac_implementation` | `bac` | The codec implementation FFmpeg uses for AAC encodes and for decoding AAC sources in them: `bac`, `fdk_aac` or `ffmpeg`. See [AAC implementation](../media/transcoding.md#aac-implementation). |
 
-Every setting in the table is enforced. Four features arrived with server settings and start switched off: audio transcoding, metadata sync for new albums, lyrics fetch for new tracks, and scheduled recommendations. Turn on the ones you want.
+Every setting in the table is enforced. Four features arrived with server settings and start switched off: audio transcoding, metadata sync for new albums, automatic lyrics fetch, and scheduled recommendations. Turn on the ones you want.
 
 ### Scheduled recommendations
 

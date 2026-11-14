@@ -20,7 +20,7 @@ final class LyricsSettingDefinitions implements SettingDefinitionProviderInterfa
             type: SettingValueType::Boolean,
             scope: SettingScope::System,
             label: 'Auto-fetch lyrics',
-            description: 'Automatically fetch lyrics for new tracks',
+            description: 'Automatically fetch lyrics for new tracks and for tracks a scan repairs or a retag updates',
             group: 'Content',
             default: false,
             enforced: true,

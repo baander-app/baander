@@ -46,7 +46,7 @@ An administrator can request a metadata sync. With the `metadata.auto_sync` [ser
 
 A rescan of existing music does not request another automatic album sync. Use an administrator metadata sync for existing records, including recovery after an automatic request could not be queued. Follow background jobs and logs in [Monitoring](../operations/README.md), then check the affected record: acceptance or job completion alone does not establish a successful provider match.
 
-Lyrics have a separate `lyrics.auto_fetch` setting, also off by default. It requests LRCLIB lyrics for newly created tracks without an `.lrc` sidecar. The bulk [`app:lyrics:fetch`](../commands/app-lyrics-fetch.md) command can request lyrics for existing tracks independently of that setting. Embedded cover extraction is another separate task; see [Cover Art Extraction](library-management.md#cover-art-extraction).
+Lyrics have a separate `lyrics.auto_fetch` setting, also off by default. It requests LRCLIB lyrics for newly created tracks without an `.lrc` sidecar, and for tracks without lyrics that a rescan gives an artist credit or a new length. The bulk [`app:lyrics:fetch`](../commands/app-lyrics-fetch.md) command can request lyrics for existing tracks independently of that setting. Embedded cover extraction is another separate task; see [Cover Art Extraction](library-management.md#cover-art-extraction).
 
 ## Configuration
 

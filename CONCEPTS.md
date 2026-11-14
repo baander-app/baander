@@ -185,6 +185,20 @@ artist under all values joined by "; ". Artist credits are not lockable fields; 
 rescan of an unchanged file adds credits only to a song or album that has none, and a
 retagged file replaces its song's credits.
 
+## Lyrics
+
+### Bulk lyrics run tally
+
+The counts one bulk lyrics run keeps of the songs without lyrics it walked: the songs
+it skipped for a missing primary artist credit or a missing length, the fetches it
+queued, and the outcome of each queued fetch (found, no match, rejected or
+unavailable), counted once per song however often the fetch is delivered. A fetch
+skipped because its run was cancelled, or whose song was deleted, counts toward no
+outcome. `app:lyrics:status`, the admin sync-status route and the admin lyrics page
+show the tally of the run whose walk finished last. It lives in Redis with the run's
+other tracking and expires with it, a day after the run's last fetch was due, or a day
+after it finished when it queued nothing.
+
 ## Playback destinations
 
 ### Playback destination
