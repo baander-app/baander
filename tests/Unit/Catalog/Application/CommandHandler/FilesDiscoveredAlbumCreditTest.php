@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Catalog\Application\CommandHandler;
 
 use App\Catalog\Application\CommandHandler\FilesDiscoveredHandler;
+use App\Catalog\Application\Port\AlbumMatchRequestInterface;
 use App\Catalog\Application\Port\ArtistIdentityResolverInterface;
 use App\Catalog\Application\Port\GenrePortInterface;
 use App\Catalog\Application\Port\MetadataContentReaderPortInterface;
@@ -22,7 +23,6 @@ use App\Library\Application\Port\LibraryMediaFilesInterface;
 use App\Lyrics\Application\Port\LyricsFetchRequestInterface;
 use App\Media\Application\Port\ImagePortInterface;
 use App\Media\Application\Port\StoragePortInterface;
-use App\Metadata\Application\Port\AlbumMetadataSyncRequestInterface;
 use App\Metadata\Domain\Model\ExtractedMetadata;
 use App\Shared\Domain\Model\Uuid;
 use App\Tests\Fixtures\Catalog\DiscoveredFileObservations;
@@ -368,7 +368,7 @@ final class FilesDiscoveredAlbumCreditTest extends TestCase
             new FFprobeAdapter(new JsonEncoder()),
             $bus,
             $this->createStub(LyricsFetchRequestInterface::class),
-            $this->createStub(AlbumMetadataSyncRequestInterface::class),
+            $this->createStub(AlbumMatchRequestInterface::class),
             new NullLogger(),
             $this->observedMediaFiles($media),
             $transaction,

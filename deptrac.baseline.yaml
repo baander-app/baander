@@ -119,13 +119,6 @@ deptrac:
       - App\Catalog\Domain\Repository\SongRepositoryInterface
     App\Media\Interface\Controller\ImageController:
       - App\Media\Infrastructure\Converter\BlurHashGenerator
-    App\Metadata\Application\AlbumMetadataEnricher:
-      - App\Catalog\Application\Port\AlbumPortInterface
-      - App\Catalog\Application\Port\GenrePortInterface
-      - App\Catalog\Domain\Model\Album
-      - App\Catalog\Domain\ValueObject\MusicbrainzId
-      - App\Metadata\Infrastructure\Api\Discogs\DiscogsAdapter
-      - App\Metadata\Infrastructure\Api\MusicBrainz\MusicBrainzAdapter
     App\Metadata\Application\ArtistMetadataEnricher:
       - App\Catalog\Application\Port\ArtistPortInterface
       - App\Catalog\Domain\Model\Artist
@@ -138,8 +131,6 @@ deptrac:
       - App\Media\Application\Port\ImagePortInterface
       - App\Media\Application\Port\StoragePortInterface
       - App\Media\Domain\Model\Image
-    App\Metadata\Application\MessageHandler\SyncAlbumHandler:
-      - App\Catalog\Application\Port\AlbumPortInterface
     App\Metadata\Application\MessageHandler\SyncArtistHandler:
       - App\Catalog\Application\Port\ArtistPortInterface
     App\Metadata\Application\MessageHandler\SyncGenresHandler:

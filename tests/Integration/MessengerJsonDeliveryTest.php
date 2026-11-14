@@ -6,30 +6,39 @@ namespace App\Tests\Integration;
 
 use App\Tests\Fixtures\Messaging\CancelAtCheckpoint;
 use App\Tests\Fixtures\Messaging\MessageCodecFactory;
+use App\Catalog\Application\Message\DrainAlbumMatchesMessage;
+use App\Catalog\Application\MessageHandler\DrainAlbumMatchesHandler;
+use App\Catalog\Application\MessageHandler\RequestAlbumMatchHandler;
+use App\Catalog\Application\Port\AlbumMatchRequestInterface;
 use App\Catalog\Application\Port\AlbumPortInterface;
+use App\Catalog\Application\Service\MusicBrainzMatch\AutomaticAlbumMatcherInterface;
+use App\Catalog\Application\Service\MusicBrainzMatch\AutomaticMatchOutcome;
+use App\Catalog\Domain\ValueObject\AlbumMatchSource;
+use App\Catalog\Domain\ValueObject\AlbumMatchState;
+use App\Catalog\Domain\ValueObject\AlbumMatchStatus;
 use App\Catalog\Application\Port\GenrePortInterface;
 use App\Catalog\Application\Port\SongPortInterface;
-use App\Metadata\Application\AlbumMetadataEnricher;
 use App\Metadata\Application\SongMetadataEnricher;
 use App\Metadata\Application\Message\SyncAlbumMessage;
 use App\Metadata\Application\Message\SyncLibraryMessage;
 use App\Metadata\Application\Message\SyncSongMessage;
-use App\Metadata\Application\MessageHandler\SyncAlbumHandler;
 use App\Metadata\Application\MessageHandler\SyncLibraryHandler;
 use App\Metadata\Application\MessageHandler\SyncSongHandler;
 use App\Metadata\Infrastructure\Api\CoverArtArchive\CoverArtArchiveAdapter;
-use App\Metadata\Infrastructure\Api\Discogs\DiscogsAdapter;
 use App\Metadata\Infrastructure\Api\MusicBrainz\MusicBrainzAdapter;
 use App\Radio\Application\Command\SyncCountryStationsCommand;
 use App\Radio\Application\CommandHandler\SyncCountryStationsHandler;
 use App\Radio\Application\Port\RadioStationPortInterface;
 use App\Metadata\Application\Command\ExtractAlbumCoverCommand;
 use App\Scheduler\Application\Command\ExecuteScheduledJobCommand;
+use App\Shared\Application\Port\SystemSettingsPortInterface;
 use App\Shared\Domain\Model\Uuid;
+use App\Tests\Fixtures\Catalog\InMemoryAlbumMatchStates;
 use App\Shared\Infrastructure\Messenger\JsonTransportSerializer;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
+use Symfony\Component\Clock\MockClock;
 use Symfony\Component\DependencyInjection\ServiceLocator;
 use Symfony\Component\EventDispatcher\EventDispatcher;
 use Symfony\Component\Messenger\Bridge\Redis\Transport\Connection;
@@ -199,6 +208,7 @@ final class MessengerJsonDeliveryTest extends TestCase
         $messages = [
             'song' => SyncSongMessage::class,
             'album' => SyncAlbumMessage::class,
+            'album match queue' => DrainAlbumMatchesMessage::class,
             'library' => SyncLibraryMessage::class,
             'country stations' => SyncCountryStationsCommand::class,
         ];
@@ -224,7 +234,6 @@ final class MessengerJsonDeliveryTest extends TestCase
             new RateLimiterFactory(['id' => 'musicbrainz', 'policy' => 'no_limit'], new InMemoryStorage()),
             new CoverArtArchiveAdapter($logger, $encoder, $httpClient),
         );
-        $discogs = new DiscogsAdapter('unused-local-test-token', $logger, $encoder, $httpClient);
         $genres = $this->createStub(GenrePortInterface::class);
         if ($messageType === SyncSongMessage::class) {
             $message = new SyncSongMessage($id, true);
@@ -237,10 +246,21 @@ final class MessengerJsonDeliveryTest extends TestCase
             $handler = new SyncSongHandler($songs, $enricher, $logger);
         } elseif ($messageType === SyncAlbumMessage::class) {
             $message = new SyncAlbumMessage($id, true);
-            $albums = $this->createMock(AlbumPortInterface::class);
-            $albums->expects($this->once())->method('findByUuid')->with($id)
-                ->willReturnCallback(static function () use (&$effects): null { ++$effects; return null; });
-            $handler = new SyncAlbumHandler($albums, new AlbumMetadataEnricher($musicBrainz, $discogs, $albums, $genres, $logger), $logger);
+            $requests = $this->createMock(AlbumMatchRequestInterface::class);
+            $requests->expects($this->once())->method('requestForAdmin')->with($id)
+                ->willReturnCallback(static function () use (&$effects): void { ++$effects; });
+            $handler = new RequestAlbumMatchHandler($requests);
+        } elseif ($messageType === DrainAlbumMatchesMessage::class) {
+            $message = new DrainAlbumMatchesMessage(1);
+            $clock = new MockClock('2026-11-14 12:00:00 UTC');
+            // One admin request is due; matching it empties the queue, so no further run is queued.
+            $states = new InMemoryAlbumMatchStates()->has(new AlbumMatchState($id, AlbumMatchStatus::Requested, AlbumMatchSource::Admin, $clock->now()));
+            $matcher = $this->createMock(AutomaticAlbumMatcherInterface::class);
+            $matcher->expects($this->once())->method('match')->with($id)
+                ->willReturnCallback(static function () use (&$effects): AutomaticMatchOutcome { ++$effects; return AutomaticMatchOutcome::matched(); });
+            $nestedBus = $this->createMock(MessageBusInterface::class);
+            $nestedBus->expects($this->never())->method('dispatch');
+            $handler = new DrainAlbumMatchesHandler($states, $matcher, $this->createStub(SystemSettingsPortInterface::class), $nestedBus, $clock, $logger);
         } elseif ($messageType === SyncLibraryMessage::class) {
             $message = new SyncLibraryMessage($id, true, true, true);
             $albums = $this->createMock(AlbumPortInterface::class);

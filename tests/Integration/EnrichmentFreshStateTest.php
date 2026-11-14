@@ -13,12 +13,9 @@ use App\Catalog\Domain\Model\Song;
 use App\Catalog\Domain\ValueObject\MusicbrainzId;
 use App\Kernel;
 use App\Library\Infrastructure\Doctrine\Entity\LibraryEntity;
-use App\Media\Infrastructure\Doctrine\Entity\ImageEntity;
-use App\Metadata\Application\AlbumMetadataEnricher;
 use App\Metadata\Application\ArtistMetadataEnricher;
 use App\Metadata\Application\EnrichmentResult;
 use App\Metadata\Application\SongMetadataEnricher;
-use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use DAMA\DoctrineTestBundle\PHPUnit\SkipDatabaseRollback;
 use Doctrine\DBAL\Connection;
@@ -88,47 +85,6 @@ final class EnrichmentFreshStateTest extends TestCase
         $this->observer->close();
     }
 
-    public function testAnAlbumKeepsAYearLockAndCoverCommittedDuringTheLookupsAndGainsTheOtherFields(): void
-    {
-        $albums = $this->container->get(AlbumPortInterface::class);
-        self::assertInstanceOf(AlbumPortInterface::class, $albums);
-        $created = Album::create($this->library->getId(), 'Abbey Road', 'album');
-        $albums->save($created);
-        $id = $created->getId()->toString();
-        $this->created[] = ['albums', $id];
-        $cover = new ImageEntity('images/enrichment-fixture.jpg', 'jpg', 'image/jpeg', new PublicId(), 10, 1, 1, 'album');
-        $this->entityManager()->persist($cover);
-        $this->entityManager()->flush();
-        $coverId = $cover->getId()->toString();
-        $this->created[] = ['images', $coverId];
-        $loaded = $albums->findByUuid($created->getId());
-        self::assertNotNull($loaded);
-
-        $this->observer->executeStatement(
-            "UPDATE albums SET year = 2019, locked_fields = '[\"year\"]'::jsonb, cover_image_id = ? WHERE id = ?",
-            [$coverId, $id],
-        );
-        $result = $this->applyData($this->container->get(AlbumMetadataEnricher::class), [$loaded, [
-            'quality' => 1.0,
-            'mbid' => null,
-            'title' => 'Abbey Road [Parlophone,PCS 7088,GB]',
-            'year' => '1969-09-26',
-            'country' => null,
-            'tags' => [],
-            'genres' => [],
-        ], 'musicbrainz', true]);
-
-        $row = $this->observer->fetchAssociative('SELECT year, locked_fields, cover_image_id, label, catalog_number, country FROM albums WHERE id = ?', [$id]);
-        self::assertIsArray($row);
-        self::assertSame(2019, $row['year']);
-        self::assertSame(['year'], json_decode((string) $row['locked_fields'], true));
-        self::assertSame($coverId, $row['cover_image_id']);
-        self::assertSame('Parlophone', $row['label']);
-        self::assertSame('PCS 7088', $row['catalog_number']);
-        self::assertSame('GB', $row['country']);
-        self::assertNotContains('year', $result->getUpdatedFields());
-    }
-
     public function testAnArtistKeepsACountryLockCommittedDuringTheLookupsAndGainsTheOtherFields(): void
     {
         $artists = $this->container->get(ArtistPortInterface::class);
@@ -162,45 +118,6 @@ final class EnrichmentFreshStateTest extends TestCase
         self::assertSame(['country'], json_decode((string) $row['locked_fields'], true));
         self::assertSame('Group', $row['type']);
         self::assertSame('Beatles, The', $row['sort_name']);
-    }
-
-    /**
-     * A cleared entity manager (a worker reset, or the genre repository recovering from a unique
-     * violation inside applyData()) makes the save load the row anew and copy every field of the
-     * loaded snapshot onto it, the empty cover included.
-     */
-    public function testAnAlbumKeepsACoverCommittedDuringTheLookupsAfterTheEntityManagerWasCleared(): void
-    {
-        $albums = $this->container->get(AlbumPortInterface::class);
-        self::assertInstanceOf(AlbumPortInterface::class, $albums);
-        $created = Album::create($this->library->getId(), 'Let It Be', 'album');
-        $albums->save($created);
-        $id = $created->getId()->toString();
-        $this->created[] = ['albums', $id];
-        $cover = new ImageEntity('images/enrichment-cover.jpg', 'jpg', 'image/jpeg', new PublicId(), 10, 1, 1, 'album');
-        $this->entityManager()->persist($cover);
-        $this->entityManager()->flush();
-        $coverId = $cover->getId()->toString();
-        $this->created[] = ['images', $coverId];
-        $loaded = $albums->findByUuid($created->getId());
-        self::assertNotNull($loaded);
-
-        $this->observer->executeStatement('UPDATE albums SET cover_image_id = ? WHERE id = ?', [$coverId, $id]);
-        $this->entityManager()->clear();
-        $this->applyData($this->container->get(AlbumMetadataEnricher::class), [$loaded, [
-            'quality' => 1.0,
-            'mbid' => null,
-            'title' => 'Let It Be',
-            'year' => '1970-05-08',
-            'country' => null,
-            'tags' => [],
-            'genres' => [],
-        ], 'musicbrainz', false]);
-
-        $row = $this->observer->fetchAssociative('SELECT cover_image_id, year FROM albums WHERE id = ?', [$id]);
-        self::assertIsArray($row);
-        self::assertSame($coverId, $row['cover_image_id']);
-        self::assertSame(1970, $row['year']);
     }
 
     public function testASongKeepsAnMbidCommittedDuringTheLookup(): void

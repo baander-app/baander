@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Catalog\Application\CommandHandler;
 
 use App\Catalog\Application\CommandHandler\FilesDiscoveredHandler;
+use App\Catalog\Application\Port\AlbumMatchRequestInterface;
 use App\Catalog\Application\Port\AlbumPortInterface;
 use App\Catalog\Application\Port\GenrePortInterface;
 use App\Catalog\Application\Port\MetadataContentReaderPortInterface;
@@ -20,7 +21,6 @@ use App\Library\Application\Port\LibraryMediaFileInspection;
 use App\Library\Application\Port\LibraryMediaFilesInterface;
 use App\Library\Application\Port\LibraryMediaFileVerdict;
 use App\Lyrics\Application\Port\LyricsFetchRequestInterface;
-use App\Metadata\Application\Port\AlbumMetadataSyncRequestInterface;
 use App\Metadata\Domain\Model\ExtractedMetadata;
 use App\Shared\Domain\Model\Uuid;
 use App\Tests\Fixtures\Catalog\PassThroughTransaction;
@@ -206,8 +206,7 @@ final class FilesDiscoveredRenameTest extends TestCase
         $genres->expects($this->never())->method('findOrCreateForImport');
         $lyrics = $this->createMock(LyricsFetchRequestInterface::class);
         $lyrics->expects($this->never())->method('requestFetch');
-        $sync = $this->createMock(AlbumMetadataSyncRequestInterface::class);
-        $sync->expects($this->never())->method('requestSync');
+        $sync = $this->createStub(AlbumMatchRequestInterface::class);
         if ($bus === null) {
             $bus = $this->createStub(MessageBusInterface::class);
             $bus->method('dispatch')->willReturnCallback(static fn (object $message): Envelope => new Envelope($message));

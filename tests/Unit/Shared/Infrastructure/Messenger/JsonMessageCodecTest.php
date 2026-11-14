@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Shared\Infrastructure\Messenger;
 
 use App\Catalog\Application\Command\BatchExtractCoversCommand;
+use App\Catalog\Application\Message\DrainAlbumMatchesMessage;
 use App\Tests\Fixtures\Messaging\MessageCodecFactory;
 use App\Library\Application\Command\ScanLibraryCommand;
 use App\Library\Application\Message\FilesDiscovered;
@@ -53,6 +54,8 @@ final class JsonMessageCodecTest extends TestCase
     {
         $id = Uuid::fromString('00000000-0000-4000-8000-000000000001');
         yield [new BatchExtractCoversCommand()];
+        yield [new DrainAlbumMatchesMessage()];
+        yield [new DrainAlbumMatchesMessage(2)];
         yield [new ScanLibraryCommand(new LibrarySlug('music'), true)];
         yield [new FilesDiscovered($id, 'music', '/music', [new DiscoveredFile('/music/a.flac', 'a.flac', 'flac', 100, 12345, 'abc')])];
         yield [new ExtractAlbumCoverCommand($id)];

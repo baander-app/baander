@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Catalog\Application\CommandHandler;
 
 use App\Catalog\Application\CommandHandler\FilesDiscoveredHandler;
+use App\Catalog\Application\Port\AlbumMatchRequestInterface;
 use App\Catalog\Application\Port\AlbumPortInterface;
 use App\Catalog\Application\Port\GenrePortInterface;
 use App\Catalog\Application\Port\MetadataContentReaderPortInterface;
@@ -19,7 +20,6 @@ use App\Library\Application\Message\DiscoveredFile;
 use App\Library\Application\Message\FilesDiscovered;
 use App\Library\Application\Port\LibraryMediaFilesInterface;
 use App\Lyrics\Application\Port\LyricsFetchRequestInterface;
-use App\Metadata\Application\Port\AlbumMetadataSyncRequestInterface;
 use App\Metadata\Domain\Model\ExtractedMetadata;
 use App\Shared\Domain\Model\Uuid;
 use App\Tests\Fixtures\Catalog\DiscoveredFileObservations;
@@ -62,7 +62,7 @@ final class FilesDiscoveredTechnicalMetadataTest extends TestCase
         $handler = new FilesDiscoveredHandler($albums, $this->createStub(GenrePortInterface::class), $songs,
             $this->createStub(MoviePortInterface::class), $this->createStub(VideoRepositoryInterface::class), $metadata,
             $this->createStub(VideoProbePortInterface::class), $this->createStub(MessageBusInterface::class),
-            $this->createStub(LyricsFetchRequestInterface::class), $this->createStub(AlbumMetadataSyncRequestInterface::class), new NullLogger(),
+            $this->createStub(LyricsFetchRequestInterface::class), $this->createStub(AlbumMatchRequestInterface::class), new NullLogger(),
             $this->observedMediaFiles($this->createStub(LibraryMediaFilesInterface::class)), new PassThroughTransaction(), $probe,
             $this->artistIdentitiesStub());
 
@@ -105,7 +105,7 @@ final class FilesDiscoveredTechnicalMetadataTest extends TestCase
         $handler = new FilesDiscoveredHandler($albums, $this->createStub(GenrePortInterface::class), $songs,
             $this->createStub(MoviePortInterface::class), $this->createStub(VideoRepositoryInterface::class), $metadata,
             $this->createStub(VideoProbePortInterface::class), $this->createStub(MessageBusInterface::class), $lyrics,
-            $this->createStub(AlbumMetadataSyncRequestInterface::class), new NullLogger(),
+            $this->createStub(AlbumMatchRequestInterface::class), new NullLogger(),
             $this->observedMediaFiles($this->createStub(LibraryMediaFilesInterface::class)), new PassThroughTransaction(), $probe,
             $this->artistIdentitiesStub());
 
@@ -150,7 +150,7 @@ final class FilesDiscoveredTechnicalMetadataTest extends TestCase
         $handler = new FilesDiscoveredHandler($this->createStub(AlbumPortInterface::class), $this->createStub(GenrePortInterface::class),
             $this->createStub(SongPortInterface::class), $movies, $videos, $this->createStub(MetadataContentReaderPortInterface::class),
             $probe, $this->createStub(MessageBusInterface::class), $this->createStub(LyricsFetchRequestInterface::class),
-            $this->createStub(AlbumMetadataSyncRequestInterface::class), new NullLogger(),
+            $this->createStub(AlbumMatchRequestInterface::class), new NullLogger(),
             $this->observedMediaFiles($this->createStub(LibraryMediaFilesInterface::class)), new PassThroughTransaction(),
             $this->createStub(AudioProbePortInterface::class), $this->artistIdentitiesStub());
 

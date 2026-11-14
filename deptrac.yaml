@@ -36,7 +36,7 @@ deptrac:
         Library: ['Library Live Audience Contract', 'Library File Availability Contract', 'Library Read Scope Contract', 'Library Content Stats Contract', 'Library Files Discovered Contract', 'Library Provisioning Contract', 'Library Media Files Contract', 'Library Domain', 'Library Application', 'Library Infrastructure', 'Library Resources', 'Library Interface']
         Lyrics: ['Lyrics Fetch Request Contract', 'Lyrics Domain', 'Lyrics Application', 'Lyrics Infrastructure', 'Lyrics Resources', 'Lyrics Interface']
         Media: ['Media Playback Access Contract', 'Media Image Contract', 'Media Domain', 'Media Application', 'Media Infrastructure', 'Media Resources', 'Media Interface']
-        Metadata: ['Metadata Album Sync Request Contract', 'Metadata MusicBrainz Lookup Contract', 'Metadata Domain', 'Metadata Application', 'Metadata Infrastructure', 'Metadata Interface']
+        Metadata: ['Metadata Album Sync Contract', 'Metadata MusicBrainz Lookup Contract', 'Metadata Domain', 'Metadata Application', 'Metadata Infrastructure', 'Metadata Interface']
         Notification: ['Notification Domain', 'Notification Application', 'Notification Infrastructure', 'Notification Resources', 'Notification Interface']
         Party: ['Party Domain', 'Party Application', 'Party Infrastructure', 'Party Resources', 'Party Interface']
         Playlist: ['Playlist Live Audience Contract', 'Playlist Deletion Preview Contract', 'Playlist Domain', 'Playlist Application', 'Playlist Infrastructure', 'Playlist Resources', 'Playlist Interface']
@@ -458,10 +458,12 @@ deptrac:
         - type: classLike
           value: '^App\\Metadata\\Domain\\'
 
-    - name: 'Metadata Album Sync Request Contract'
+    # The album sync an admin starts, which Catalog's album match queue handles, and the setting
+    # that switches automatic matching on.
+    - name: 'Metadata Album Sync Contract'
       collectors:
         - type: classLike
-          value: '^App\\Metadata\\Application\\Port\\AlbumMetadataSyncRequestInterface$'
+          value: '^App\\Metadata\\Application\\(Message\\SyncAlbumMessage|Settings\\MetadataSettingDefinitions)$'
 
     # The MusicBrainz web service as Catalog matches with it: the lookup port and its DTOs.
     - name: 'Metadata MusicBrainz Lookup Contract'
@@ -477,7 +479,7 @@ deptrac:
               value: '^App\\Metadata\\Application\\'
           must_not:
             - type: classLike
-              value: '^App\\Metadata\\Application\\Port\\AlbumMetadataSyncRequestInterface$'
+              value: '^App\\Metadata\\Application\\(Message\\SyncAlbumMessage|Settings\\MetadataSettingDefinitions)$'
             - type: classLike
               value: '^App\\Metadata\\Application\\(Port\\MusicBrainzLookupInterface$|DTO\\MusicBrainz\\)'
 
@@ -1179,7 +1181,7 @@ deptrac:
       - 'Playlist Deletion Preview Contract'
       - 'Library Media Files Contract'
       - 'Lyrics Fetch Request Contract'
-      - 'Metadata Album Sync Request Contract'
+      - 'Metadata Album Sync Contract'
       - 'Metadata MusicBrainz Lookup Contract'
       - 'Library Files Discovered Contract'
       - 'Library Provisioning Contract'
@@ -1353,11 +1355,12 @@ deptrac:
     # --- Metadata ---
     'Metadata Domain':
       - 'Shared Domain'
-    'Metadata Album Sync Request Contract':
+    'Metadata Album Sync Contract':
       - 'Shared Domain'
+      - 'Shared Application'
     'Metadata MusicBrainz Lookup Contract': []
     'Metadata Application':
-      - 'Metadata Album Sync Request Contract'
+      - 'Metadata Album Sync Contract'
       - 'Metadata MusicBrainz Lookup Contract'
       - 'Metadata Domain'
       - 'Shared Domain'
@@ -1366,6 +1369,7 @@ deptrac:
       - 'Shared Application'
       - 'Metadata Domain'
       - 'Metadata Application'
+      - 'Metadata Album Sync Contract'
       - 'Metadata MusicBrainz Lookup Contract'
       - 'Shared Domain'
       - 'Shared Infrastructure'

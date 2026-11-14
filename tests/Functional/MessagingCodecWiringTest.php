@@ -31,6 +31,7 @@ final class MessagingCodecWiringTest extends KernelTestCase
         $id = Uuid::generate();
         $messages = [
             new BatchExtractCoversCommand(),
+            new \App\Catalog\Application\Message\DrainAlbumMatchesMessage(2),
             new ScanLibraryCommand(new LibrarySlug('music'), true),
             new PruneMissingImagesCommand(),
             new \App\Media\Application\Command\GenerateImageDerivativeCommand('image.png', 'thumb'),
@@ -50,7 +51,7 @@ final class MessagingCodecWiringTest extends KernelTestCase
             new UpdateTranscodePositionCommand($id, 12.5, 'seek'),
         ];
 
-        self::assertCount(18, $messages);
+        self::assertCount(19, $messages);
         $catalog = self::getContainer()->get(\App\Shared\Infrastructure\Messaging\AsyncWorkloadCatalog::class);
         self::assertInstanceOf(\App\Shared\Infrastructure\Messaging\AsyncWorkloadCatalog::class, $catalog);
         $covered = array_fill_keys(array_map(static fn (object $message): string => $message::class, $messages), true);

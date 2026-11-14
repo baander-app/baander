@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Catalog\Application\Service;
 
 use App\Catalog\Application\CommandHandler\FilesDiscoveredHandler;
+use App\Catalog\Application\Port\AlbumMatchRequestInterface;
 use App\Catalog\Application\Port\AlbumPortInterface;
 use App\Catalog\Application\Port\GenrePortInterface;
 use App\Catalog\Application\Port\MetadataContentReaderPortInterface;
@@ -20,7 +21,6 @@ use App\Library\Application\Port\LibraryMediaFilesInterface;
 use App\Library\Application\Port\LibraryProvisioningInterface;
 use App\Library\Application\Port\ProvisionedLibraryScan;
 use App\Lyrics\Application\Port\LyricsFetchRequestInterface;
-use App\Metadata\Application\Port\AlbumMetadataSyncRequestInterface;
 use App\Shared\Domain\Model\Uuid;
 use App\Transcode\Infrastructure\FFmpeg\FFprobeAdapter;
 use App\Tests\Fixtures\Catalog\PassThroughTransaction;
@@ -78,7 +78,7 @@ final class MovieLibraryIngestTest extends TestCase
             $this->createStub(AlbumPortInterface::class), $this->createStub(GenrePortInterface::class),
             $this->createStub(SongPortInterface::class), $movies,
             $videos, $this->createStub(MetadataContentReaderPortInterface::class), new FFprobeAdapter(new JsonEncoder()),
-            $this->createStub(MessageBusInterface::class), $this->createStub(LyricsFetchRequestInterface::class), $this->createStub(AlbumMetadataSyncRequestInterface::class), new NullLogger(),
+            $this->createStub(MessageBusInterface::class), $this->createStub(LyricsFetchRequestInterface::class), $this->createStub(AlbumMatchRequestInterface::class), new NullLogger(),
             $this->observedMediaFiles($this->createStub(LibraryMediaFilesInterface::class)),
             new PassThroughTransaction(),
             audioProbe: $this->audioProbeStub(),

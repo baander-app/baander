@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Catalog\Application\CommandHandler;
 
+use App\Catalog\Application\Port\AlbumMatchRequestInterface;
 use App\Catalog\Application\Port\AlbumPortInterface;
 use App\Catalog\Application\Port\ArtistIdentity;
 use App\Catalog\Application\Port\ArtistIdentityResolverInterface;
@@ -25,7 +26,6 @@ use App\Library\Application\Message\FilesDiscovered;
 use App\Library\Application\Port\LibraryMediaFilesInterface;
 use App\Library\Application\Port\LibraryMediaFileVerdict;
 use App\Lyrics\Application\Port\LyricsFetchRequestInterface;
-use App\Metadata\Application\Port\AlbumMetadataSyncRequestInterface;
 use App\Shared\Application\Port\TransactionPortInterface;
 use App\Shared\Domain\Model\Uuid;
 use App\Transcode\Application\Port\VideoProbePortInterface;
@@ -63,7 +63,7 @@ final class FilesDiscoveredHandler
         private readonly VideoProbePortInterface $ffprobeAdapter,
         private readonly MessageBusInterface $messageBus,
         private readonly LyricsFetchRequestInterface $lyricsFetch,
-        private readonly AlbumMetadataSyncRequestInterface $albumMetadataSync,
+        private readonly AlbumMatchRequestInterface $albumMatches,
         private readonly LoggerInterface $logger,
         private readonly LibraryMediaFilesInterface $mediaFiles,
         private readonly TransactionPortInterface $transaction,
@@ -103,7 +103,8 @@ final class FilesDiscoveredHandler
      * library. When a delete claimed it before that transaction, the import stops and the files
      * whose songs no transaction committed go back to the queue, as a held import does. After the
      * last batch, and before the import requeues or reports a failed file, each album the message
-     * touched is given an artist credit when it has none.
+     * touched is given an artist credit when it has none, and then asked for an automatic
+     * MusicBrainz match.
      *
      * A file whose content a stored song holds repairs that song instead of becoming a new one, and
      * the song stays in the album it is stored in. A file with content no song holds, at the path of
@@ -137,12 +138,7 @@ final class FilesDiscoveredHandler
 
                 return;
             }
-            [$album, $wasCreated] = $resolved;
-            // resolveAlbum() has committed a new album. A retry or rescan finds it
-            // and creates none, so request its sync now rather than after the songs.
-            if ($wasCreated) {
-                $this->requestAlbumSync($album);
-            }
+            [$album] = $resolved;
         }
         // resolveAlbum() keeps only the new files that are still current. Without an album, the
         // message imports no new song.
@@ -213,6 +209,7 @@ final class FilesDiscoveredHandler
         foreach ($albumIds as $key => $albumId) {
             $this->creditAlbum($albumId, $albumArtists[$key] ?? []);
         }
+        array_values($albumIds) |> $this->requestAlbumMatches(...);
 
         if ($heldRemainder !== null) {
             $this->requeueWhileHeld($heldRemainder);
@@ -1130,7 +1127,7 @@ final class FilesDiscoveredHandler
 
     /**
      * @param list<DiscoveredFile> $files
-     * @return array{Album|null, bool}|null Null means a delete holds the library.
+     * @return array{Album|null}|null Null means a delete holds the library.
      */
     private function resolveAlbum(Uuid $libraryId, string $directory, array &$files): ?array
     {
@@ -1147,7 +1144,7 @@ final class FilesDiscoveredHandler
             }
             $title = $metadata?->getAlbum() ?? basename($directory);
             if (trim($title) === '' || trim($title) === '.') {
-                return [null, false];
+                return [null];
             }
             $current = [];
             $resolved = $this->transaction->run(function () use ($libraryId, $candidates, $anchor, $metadata, $title, &$current): ?array {
@@ -1160,17 +1157,17 @@ final class FilesDiscoveredHandler
                 ));
                 $current = array_values(array_filter($candidates, static fn (DiscoveredFile $file): bool => ($hashes[$file->absolutePath] ?? null) === $file->hash));
                 if (($hashes[$anchor->absolutePath] ?? null) !== $anchor->hash) {
-                    return [null, false];
+                    return [null];
                 }
                 $album = $this->albumService->findByTitleAndLibrary($title, $libraryId);
                 if ($album !== null) {
-                    return [$album, false];
+                    return [$album];
                 }
                 $album = Album::create($libraryId, $title, AlbumType::Studio->value, year: $metadata?->getYear());
                 $this->albumService->persist($album);
                 $this->albumService->flush();
 
-                return [$album, true];
+                return [$album];
             });
             if ($resolved === null || $resolved[0] !== null) {
                 if ($resolved !== null) {
@@ -1183,7 +1180,7 @@ final class FilesDiscoveredHandler
             $candidates = $current;
         }
 
-        return [null, false];
+        return [null];
     }
 
     private function resolveMovie(Uuid $libraryId, string $title): Movie
@@ -1314,18 +1311,26 @@ final class FilesDiscoveredHandler
     }
 
     /**
-     * Requests a metadata sync for an album that resolveAlbum() has just committed.
+     * Requests automatic MusicBrainz matches for the albums the message touched, once their songs
+     * are committed; the request decides which albums need one.
      *
-     * The request is best-effort: a failure must not fail the ingest, whose retry
-     * would find the album and request nothing. A library metadata sync recovers it.
+     * The request is best-effort: a failure must not fail the ingest. A rescan of the albums, or a
+     * library metadata sync from the admin panel, requests them again.
+     *
+     * @param list<Uuid> $albumIds
      */
-    private function requestAlbumSync(Album $album): void
+    private function requestAlbumMatches(array $albumIds): void
     {
+        if ($albumIds === []) {
+            return;
+        }
+
         try {
-            $this->albumMetadataSync->requestSync($album->getId());
+            $this->albumMatches->requestAfterImport(...$albumIds);
         } catch (\Throwable $e) {
-            $this->logger->error('Could not request a metadata sync for new album {album_id}; a library metadata sync from the admin panel picks it up.', [
-                'album_id' => $album->getId()->toString(),
+            $this->logger->error('Could not request MusicBrainz matches for {count} album(s); a rescan or a library metadata sync from the admin panel requests them again.', [
+                'count' => count($albumIds),
+                'album_ids' => array_map(static fn (Uuid $id): string => $id->toString(), $albumIds),
                 'exception' => $e,
             ]);
         }

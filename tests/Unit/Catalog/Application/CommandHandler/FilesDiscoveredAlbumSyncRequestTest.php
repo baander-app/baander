@@ -5,177 +5,245 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Catalog\Application\CommandHandler;
 
 use App\Catalog\Application\CommandHandler\FilesDiscoveredHandler;
+use App\Catalog\Application\Message\DrainAlbumMatchesMessage;
+use App\Catalog\Application\Port\AlbumMatchRequestInterface;
 use App\Catalog\Application\Port\AlbumPortInterface;
 use App\Catalog\Application\Port\GenrePortInterface;
 use App\Catalog\Application\Port\MetadataContentReaderPortInterface;
 use App\Catalog\Application\Port\MoviePortInterface;
 use App\Catalog\Application\Port\SongPortInterface;
+use App\Catalog\Application\Service\MusicBrainzMatch\AlbumMatchRequester;
 use App\Catalog\Domain\Model\Album;
 use App\Catalog\Domain\Model\Song;
 use App\Catalog\Domain\Repository\VideoRepositoryInterface;
+use App\Catalog\Domain\ValueObject\AlbumMatchReviewReason;
+use App\Catalog\Domain\ValueObject\AlbumMatchSource;
+use App\Catalog\Domain\ValueObject\AlbumMatchState;
+use App\Catalog\Domain\ValueObject\AlbumMatchStatus;
+use App\Catalog\Domain\ValueObject\MusicbrainzId;
 use App\Library\Application\Message\DiscoveredFile;
 use App\Library\Application\Message\FilesDiscovered;
 use App\Library\Application\Port\LibraryMediaFilesInterface;
 use App\Lyrics\Application\Port\LyricsFetchRequestInterface;
-use App\Metadata\Application\Port\AlbumMetadataSyncRequestInterface;
+use App\Metadata\Application\Command\ExtractAlbumCoverCommand;
+use App\Metadata\Application\Settings\MetadataSettingDefinitions;
 use App\Metadata\Domain\Model\ExtractedMetadata;
+use App\Shared\Application\Port\SystemSettingsPortInterface;
 use App\Shared\Domain\Model\Uuid;
-use App\Transcode\Infrastructure\FFmpeg\FFprobeAdapter;
-use App\Tests\Fixtures\Catalog\PassThroughTransaction;
 use App\Tests\Fixtures\Catalog\DiscoveredFileObservations;
-use PHPUnit\Framework\MockObject\MockObject;
+use App\Tests\Fixtures\Catalog\InMemoryAlbumMatchStates;
+use App\Tests\Fixtures\Catalog\PassThroughTransaction;
+use App\Transcode\Infrastructure\FFmpeg\FFprobeAdapter;
+use DateTimeImmutable;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use RuntimeException;
+use Symfony\Component\Clock\MockClock;
 use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\MessageBusInterface;
+use Symfony\Component\Messenger\Stamp\DelayStamp;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
 
 /**
- * Ingest asks the Metadata context to sync each album it creates, once the album
- * is committed, so the asynchronous sync can find it. A retry or rescan finds
- * the album and creates none, so the request must not wait for the songs.
+ * While automatic matching is on, ingest asks for a MusicBrainz match of each album it touched
+ * once the message's last batch is committed: an album without a release, unless it waits for a
+ * review of the songs it still has, and a matched album that gained songs since its last apply.
+ * The request falls due after a settling delay, so that the album's other discs land first.
  */
 final class FilesDiscoveredAlbumSyncRequestTest extends TestCase
 {
     use DiscoveredFileObservations;
 
-    public function testNewAlbumIsRequestedOnceItIsCommitted(): void
+    private const string NOW = '2026-11-14 12:00:00.000000 UTC';
+    private const string RELEASE_ID = '6d1c3e5a-0b2f-4a7e-9c1d-3f5e7a9b1c2d';
+
+    private InMemoryAlbumMatchStates $states;
+    private bool $automaticMatching = true;
+    /** @var list<Album> */
+    private array $albums = [];
+    /** @var array<string, Song> stored songs by hash */
+    private array $storedSongs = [];
+    /** @var list<string> */
+    private array $events = [];
+    /** @var list<array{object, int|null}> each dispatched message and its delay in milliseconds */
+    private array $dispatched = [];
+    /** @var array<string, RuntimeException> by file hash */
+    private array $persistFailures = [];
+
+    protected function setUp(): void
     {
-        $state = $this->state();
-        $sync = $this->albumSync($state);
-        $sync->expects($this->once())->method('requestSync');
+        $this->states = new InMemoryAlbumMatchStates();
+    }
 
-        $this->handler($state, $sync)($this->message($this->file('01 One.mp3', 'hash-one')));
+    public function testANewAlbumIsRequestedOnceItsSongsAreCommittedAndFallsDueAfterTheSettlingDelay(): void
+    {
+        $this->handler()($this->message($this->file('01 One.mp3', 'hash-one'), $this->file('02 Two.mp3', 'hash-two')));
 
+        self::assertCount(1, $this->albums);
+        $album = $this->albums[0]->getId();
         self::assertSame(
-            ['album persisted', 'album flushed', 'album sync requested', 'song persisted', 'songs flushed', 'album credit decided'],
-            $state->events,
+            ['album persisted', 'album flushed', 'song persisted', 'song persisted', 'songs flushed', 'album credit decided', 'album match queue run'],
+            $this->events,
         );
-        self::assertCount(1, $state->visibleAlbums);
-        self::assertSame([[$state->visibleAlbums[0]->getId()->toString()]], $state->requests);
+        self::assertEquals(
+            new AlbumMatchState($album, AlbumMatchStatus::Requested, AlbumMatchSource::Ingest, new DateTimeImmutable(self::NOW . ' +5 minutes')),
+            $this->states->stateOf($album),
+        );
+        self::assertEquals([new DrainAlbumMatchesMessage(), 300_000], $this->dispatched[0]);
     }
 
-    public function testExistingAlbumIsNotRequested(): void
+    public function testNothingIsRequestedWhileAutomaticMatchingIsOff(): void
     {
-        $state = $this->state();
-        $state->visibleAlbums[] = Album::create(Uuid::v7(), 'Test Album', 'Studio');
-        $sync = $this->albumSync($state);
-        $sync->expects($this->never())->method('requestSync');
+        $this->automaticMatching = false;
 
-        $this->handler($state, $sync)($this->message($this->file('01 One.mp3', 'hash-one')));
+        $this->handler()($this->message($this->file('01 One.mp3', 'hash-one')));
 
-        self::assertContains('song persisted', $state->events);
+        self::assertSame([], $this->states->states);
+        self::assertNotContains('album match queue run', $this->events);
     }
 
-    public function testFailedAlbumFlushRequestsNothing(): void
+    public function testARedeliveredImportRequestsTheAlbumOnceAndQueuesOneRun(): void
     {
-        $state = $this->state();
-        $failure = new RuntimeException('Album flush failed');
-        $state->albumFlushFailure = $failure;
-        $sync = $this->albumSync($state);
-        $sync->expects($this->never())->method('requestSync');
+        $message = $this->message($this->file('01 One.mp3', 'hash-one'));
+
+        $this->handler()($message);
+        $this->handler()($message);
+
+        self::assertCount(1, $this->states->states);
+        self::assertSame(1, array_count_values($this->events)['album match queue run']);
+    }
+
+    public function testASecondDiscForAnAlbumLeftForReviewRequestsAMatchAgain(): void
+    {
+        $album = $this->storedAlbum(storedSongs: 13);
+        $this->states->has($this->review($album, checkedSongCount: 13));
+
+        $this->handler()($this->message($this->file('CD2/01 One.mp3', 'hash-disc-two')));
+
+        self::assertEquals(
+            new AlbumMatchState($album->getId(), AlbumMatchStatus::Requested, AlbumMatchSource::Ingest, new DateTimeImmutable(self::NOW . ' +5 minutes')),
+            $this->states->stateOf($album->getId()),
+        );
+    }
+
+    public function testAnAlbumLeftForReviewWithTheSongsTheMatcherCheckedIsNotRequested(): void
+    {
+        $album = $this->storedAlbum(storedSongs: 13);
+        $review = $this->review($album, checkedSongCount: 14);
+        $this->states->has($review);
+
+        $this->handler()($this->message($this->file('01 One.mp3', 'hash-one')));
+
+        self::assertSame($review, $this->states->stateOf($album->getId()));
+    }
+
+    public function testARescanOfAManuallyMatchedAlbumWithAnUnpairedSongRequestsNothing(): void
+    {
+        $album = $this->storedAlbum(storedSongs: 1);
+        $album->recordReleaseMatch(MusicbrainzId::fromString(self::RELEASE_ID), new DateTimeImmutable('+1 second'));
+
+        $this->handler()($this->message($this->file('0 Stored.mp3', 'hash-stored-0')));
+
+        self::assertContains('songs flushed', $this->events, 'The rescan repairs the stored song.');
+        self::assertSame([], $this->states->states);
+    }
+
+    public function testATrackAddedToAMatchedAlbumAfterItsApplyIsRequested(): void
+    {
+        $album = $this->storedAlbum(storedSongs: 1);
+        $album->recordReleaseMatch(MusicbrainzId::fromString(self::RELEASE_ID), new DateTimeImmutable('-1 hour'));
+
+        $this->handler()($this->message($this->file('27 Bonus.mp3', 'hash-bonus')));
+
+        self::assertSame(AlbumMatchStatus::Requested, $this->states->stateOf($album->getId())?->status);
+    }
+
+    public function testTheAlbumIsRequestedBeforeAFailedFileIsReported(): void
+    {
+        $this->persistFailures = ['hash-two' => new RuntimeException('Song write failed')];
 
         try {
-            $this->handler($state, $sync)($this->message($this->file('01 One.mp3', 'hash-one')));
-        } catch (RuntimeException $actual) {
-            self::assertSame($failure, $actual);
-
-            return;
-        }
-        self::fail('The flush failure must reach Messenger.');
-    }
-
-    public function testNewAlbumIsRequestedBeforeAFailedFileIsReported(): void
-    {
-        $state = $this->state();
-        $state->persistFailures = ['hash-two' => new RuntimeException('Song write failed')];
-        $sync = $this->albumSync($state);
-        $sync->expects($this->once())->method('requestSync');
-
-        try {
-            $this->handler($state, $sync)($this->message($this->file('01 One.mp3', 'hash-one'), $this->file('02 Two.mp3', 'hash-two')));
+            $this->handler()($this->message($this->file('01 One.mp3', 'hash-one'), $this->file('02 Two.mp3', 'hash-two')));
             self::fail('The failed file must be reported.');
         } catch (RuntimeException $actual) {
             self::assertStringContainsString('Failed to process 1 file(s)', $actual->getMessage());
         }
 
-        self::assertSame([[$state->visibleAlbums[0]->getId()->toString()]], $state->requests);
+        self::assertSame(AlbumMatchStatus::Requested, $this->states->stateOf($this->albums[0]->getId())?->status);
     }
 
-    public function testFailedSyncRequestIsLoggedAndIngestContinues(): void
+    public function testAFailedRequestIsLoggedAndTheImportCompletes(): void
     {
-        $state = $this->state();
-        $sync = $this->createMock(AlbumMetadataSyncRequestInterface::class);
-        $sync->expects($this->once())->method('requestSync')->willThrowException(new RuntimeException('Redis is down'));
+        $requests = $this->createMock(AlbumMatchRequestInterface::class);
+        $requests->expects(self::once())->method('requestAfterImport')->willThrowException(new RuntimeException('PostgreSQL is gone'));
         $logger = $this->createMock(LoggerInterface::class);
-        $logger->expects($this->once())->method('error')->with(
-            $this->stringContains('metadata sync for new album'),
-            $this->callback(static fn (array $context): bool => $context['album_id'] === $state->visibleAlbums[0]->getId()->toString()
+        $logger->expects(self::once())->method('error')->with(
+            self::stringContains('Could not request MusicBrainz matches'),
+            self::callback(fn (array $context): bool => $context['album_ids'] === [$this->albums[0]->getId()->toString()]
                 && $context['exception'] instanceof RuntimeException),
         );
 
-        $this->handler($state, $sync, $logger)($this->message($this->file('01 One.mp3', 'hash-one'), $this->file('02 Two.mp3', 'hash-two')));
+        $this->handler($requests, $logger)($this->message($this->file('01 One.mp3', 'hash-one')));
 
-        self::assertSame(
-            ['album persisted', 'album flushed', 'song persisted', 'song persisted', 'songs flushed', 'album credit decided'],
-            $state->events,
-        );
+        self::assertContains(ExtractAlbumCoverCommand::class, array_map(static fn (array $sent): string => $sent[0]::class, $this->dispatched));
     }
 
-    private function handler(\stdClass $state, AlbumMetadataSyncRequestInterface $sync, ?LoggerInterface $logger = null): FilesDiscoveredHandler
+    private function handler(?AlbumMatchRequestInterface $requests = null, ?LoggerInterface $logger = null): FilesDiscoveredHandler
     {
         $albums = $this->createStub(AlbumPortInterface::class);
-        $albums->method('findByTitleAndLibrary')->willReturnCallback(static function (string $title) use ($state): ?Album {
-            foreach ($state->visibleAlbums as $album) {
-                if ($album->getTitle() === $title) {
-                    return $album;
-                }
-            }
-
-            return null;
+        $albums->method('findByTitleAndLibrary')->willReturnCallback(fn (string $title): ?Album => array_find($this->albums, static fn (Album $album): bool => $album->getTitle() === $title));
+        $albums->method('findByUuid')->willReturnCallback(fn (Uuid $id): ?Album => array_find($this->albums, static fn (Album $album): bool => $album->getId()->equals($id)));
+        $albums->method('persist')->willReturnCallback(function (Album $album): void {
+            $this->albums[] = $album;
+            $this->events[] = 'album persisted';
         });
-        $albums->method('persist')->willReturnCallback(static function (Album $album) use ($state): void {
-            $album->setCoverImage(Uuid::v7());
-            $state->pendingAlbums[] = $album;
-            $state->events[] = 'album persisted';
+        $albums->method('flush')->willReturnCallback(function (): void {
+            $this->events[] = 'album flushed';
         });
-        $albums->method('flush')->willReturnCallback(static function () use ($state): void {
-            if ($state->albumFlushFailure !== null) {
-                throw $state->albumFlushFailure;
-            }
-            $state->visibleAlbums = [...$state->visibleAlbums, ...$state->pendingAlbums];
-            $state->pendingAlbums = [];
-            $state->events[] = 'album flushed';
-        });
-        $albums->method('creditArtistIfUncredited')->willReturnCallback(static function () use ($state): void {
-            $state->events[] = 'album credit decided';
+        $albums->method('creditArtistIfUncredited')->willReturnCallback(function (): void {
+            $this->events[] = 'album credit decided';
         });
 
         $songs = $this->createStub(SongPortInterface::class);
-        $songs->method('persist')->willReturnCallback(static function (Song $song) use ($state): void {
-            $failure = $state->persistFailures[$song->getHash()] ?? null;
+        $songs->method('persist')->willReturnCallback(function (Song $song): void {
+            $failure = $this->persistFailures[$song->getHash()] ?? null;
             if ($failure !== null) {
                 throw $failure;
             }
-            $state->events[] = 'song persisted';
+            $this->storedSongs[$song->getHash()] = $song;
+            $this->events[] = 'song persisted';
         });
-        $songs->method('flush')->willReturnCallback(static function () use ($state): void {
-            $state->events[] = 'songs flushed';
+        $songs->method('flush')->willReturnCallback(function (): void {
+            $this->events[] = 'songs flushed';
         });
+        $songs->method('findByHash')->willReturnCallback(fn (string $hash): ?Song => $this->storedSongs[$hash] ?? null);
+        $songs->method('findFreshByUuid')->willReturnCallback(fn (Uuid $id): ?Song => array_find($this->storedSongs, static fn (Song $song): bool => $song->getId()->equals($id)));
+        $songs->method('findByAlbumSortedByTrack')->willReturnCallback(fn (Uuid $albumId): array => $this->songsOf($albumId));
+        $songs->method('countByAlbum')->willReturnCallback(fn (Uuid $albumId): int => count($this->songsOf($albumId)));
 
         $metadata = $this->createStub(MetadataContentReaderPortInterface::class);
         $metadata->method('readMetadata')->willReturnCallback(
-            static fn (string $path): ExtractedMetadata => (new ExtractedMetadata())
+            static fn (string $path): ExtractedMetadata => new ExtractedMetadata()
                 ->setTitle(pathinfo($path, PATHINFO_FILENAME))
-                ->setAlbum('Test Album')
-                ->setAlbumArtist('Test Artist')
+                ->setAlbum('F-1 Trillion: Long Bed')
+                ->setAlbumArtist('Post Malone')
                 ->setDuration(180.0),
         );
 
         $bus = $this->createStub(MessageBusInterface::class);
-        $bus->method('dispatch')->willReturnCallback(static fn (object $message): Envelope => new Envelope($message));
+        $bus->method('dispatch')->willReturnCallback(function (object $message, array $stamps = []): Envelope {
+            $delay = array_find($stamps, static fn (object $stamp): bool => $stamp instanceof DelayStamp);
+            $this->dispatched[] = [$message, $delay?->getDelay()];
+            if ($message instanceof DrainAlbumMatchesMessage) {
+                $this->events[] = 'album match queue run';
+            }
+
+            return new Envelope($message, $stamps);
+        });
+
+        $settings = $this->createStub(SystemSettingsPortInterface::class);
+        $settings->method('get')->willReturnCallback(fn (string $key): bool => $key === MetadataSettingDefinitions::AUTO_SYNC && $this->automaticMatching);
 
         return new FilesDiscoveredHandler(
             $albums,
@@ -187,7 +255,7 @@ final class FilesDiscoveredAlbumSyncRequestTest extends TestCase
             new FFprobeAdapter(new JsonEncoder()),
             $bus,
             $this->createStub(LyricsFetchRequestInterface::class),
-            $sync,
+            $requests ?? new AlbumMatchRequester($this->states, $albums, $songs, $settings, $bus, new MockClock(self::NOW)),
             $logger ?? new NullLogger(),
             $this->observedMediaFiles($this->createStub(LibraryMediaFilesInterface::class)),
             new PassThroughTransaction(),
@@ -196,40 +264,40 @@ final class FilesDiscoveredAlbumSyncRequestTest extends TestCase
         );
     }
 
-    /** @return AlbumMetadataSyncRequestInterface&MockObject */
-    private function albumSync(\stdClass $state): AlbumMetadataSyncRequestInterface
+    /** An album the library holds already, with stored songs created before this import. */
+    private function storedAlbum(int $storedSongs): Album
     {
-        $sync = $this->createMock(AlbumMetadataSyncRequestInterface::class);
-        $sync->method('requestSync')->willReturnCallback(static function (Uuid ...$albumIds) use ($state): void {
-            $visible = array_map(static fn (Album $album): string => $album->getId()->toString(), $state->visibleAlbums);
-            $requested = array_map(static fn (Uuid $id): string => $id->toString(), $albumIds);
-            self::assertSame([], array_diff($requested, $visible), 'Every requested album must already be committed.');
-            $state->requests[] = $requested;
-            $state->events[] = 'album sync requested';
-        });
+        $album = Album::create(Uuid::v7(), 'F-1 Trillion: Long Bed', 'album');
+        $album->setCoverImage(Uuid::v7());
+        $this->albums[] = $album;
+        foreach (range(0, $storedSongs - 1) as $index) {
+            $hash = 'hash-stored-' . $index;
+            $this->storedSongs[$hash] = Song::create($album->getId(), 'Stored ' . $index, '/music/F-1 Trillion/' . $index . ' Stored.mp3', 1024, 'audio/mpeg', hash: $hash);
+        }
 
-        return $sync;
+        return $album;
     }
 
-    private function state(): \stdClass
+    private function review(Album $album, int $checkedSongCount): AlbumMatchState
     {
-        return (object) [
-            'pendingAlbums' => [],
-            'visibleAlbums' => [],
-            'events' => [],
-            'requests' => [],
-            'persistFailures' => [],
-            'albumFlushFailure' => null,
-        ];
+        $checkedAt = new DateTimeImmutable(self::NOW . ' -1 day');
+
+        return new AlbumMatchState($album->getId(), AlbumMatchStatus::NeedsReview, AlbumMatchSource::Ingest, $checkedAt, AlbumMatchReviewReason::TrackCountDiffers, $checkedSongCount, $checkedAt, 95);
+    }
+
+    /** @return list<Song> */
+    private function songsOf(Uuid $albumId): array
+    {
+        return array_filter($this->storedSongs, static fn (Song $song): bool => $song->getAlbumId()->equals($albumId)) |> array_values(...);
     }
 
     private function file(string $name, string $hash): DiscoveredFile
     {
-        return $this->observedFile(new DiscoveredFile('/music/Test Album/' . $name, 'Test Album/' . $name, 'mp3', 1_000_000, 1_700_000_000, $hash));
+        return $this->observedFile(new DiscoveredFile('/music/F-1 Trillion/' . $name, 'F-1 Trillion/' . $name, 'mp3', 1_000_000, 1_700_000_000, $hash));
     }
 
     private function message(DiscoveredFile ...$files): FilesDiscovered
     {
-        return new FilesDiscovered(Uuid::v7(), 'music', '/music/Test Album', array_values($files));
+        return new FilesDiscovered(Uuid::v7(), 'music', '/music/F-1 Trillion', array_values($files));
     }
 }

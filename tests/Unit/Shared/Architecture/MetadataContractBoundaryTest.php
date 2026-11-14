@@ -10,26 +10,26 @@ final class MetadataContractBoundaryTest extends TestCase
 {
     use AnalysesDeptracFixtures;
 
-    public function testCatalogApplicationMayRequestAlbumSyncsButNotUseOtherMetadataApplicationClasses(): void
+    public function testCatalogApplicationMayHandleAlbumSyncsAndReadTheSwitchButNotUseOtherMetadataApplicationClasses(): void
     {
         $violations = self::deptracViolations(<<<'SOURCE'
 <?php
-namespace App\Metadata\Application\Port;
-interface AlbumMetadataSyncRequestInterface {}
+namespace App\Metadata\Application\Message;
+final class SyncAlbumMessage {}
+namespace App\Metadata\Application\Settings;
+final class MetadataSettingDefinitions {}
 namespace App\Metadata\Application;
 final class InternalSyncService {}
-final class BoundaryRequester implements \App\Metadata\Application\Port\AlbumMetadataSyncRequestInterface {
-    public function __construct(private InternalSyncService $service) {}
-}
-namespace App\Catalog\Application\CommandHandler;
-final class BoundaryIngestHandler {
-    public function __construct(private \App\Metadata\Application\Port\AlbumMetadataSyncRequestInterface $albumSync) {}
+namespace App\Catalog\Application\MessageHandler;
+final class BoundaryRequestHandler {
+    public function __invoke(\App\Metadata\Application\Message\SyncAlbumMessage $message): void {}
+    public function settings(\App\Metadata\Application\Settings\MetadataSettingDefinitions $settings): void {}
     public function internal(\App\Metadata\Application\InternalSyncService $service): void {}
 }
 SOURCE);
 
         self::assertSame(
-            ['App\Catalog\Application\CommandHandler\BoundaryIngestHandler must not depend on App\Metadata\Application\InternalSyncService'],
+            ['App\Catalog\Application\MessageHandler\BoundaryRequestHandler must not depend on App\Metadata\Application\InternalSyncService'],
             $violations,
         );
     }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Catalog\Application\CommandHandler;
 
 use App\Catalog\Application\CommandHandler\FilesDiscoveredHandler;
+use App\Catalog\Application\Port\AlbumMatchRequestInterface;
 use App\Catalog\Application\Port\AlbumPortInterface;
 use App\Catalog\Application\Port\ArtistIdentity;
 use App\Catalog\Application\Port\ArtistIdentityResolverInterface;
@@ -22,7 +23,6 @@ use App\Library\Application\Port\LibraryMediaFilesInterface;
 use App\Lyrics\Application\Command\FetchLyricsCommand;
 use App\Lyrics\Application\Service\LyricsFetchRequester;
 use App\Lyrics\Application\Settings\LyricsSettingDefinitions;
-use App\Metadata\Application\Port\AlbumMetadataSyncRequestInterface;
 use App\Metadata\Domain\Model\ExtractedMetadata;
 use App\Shared\Application\Port\SystemSettingsPortInterface;
 use App\Shared\Domain\Model\Uuid;
@@ -437,7 +437,7 @@ final class FilesDiscoveredRetagTest extends TestCase
             $this->createStub(VideoProbePortInterface::class),
             $bus,
             new LyricsFetchRequester($settings, $lyricsBus, new MockClock()),
-            $this->createStub(AlbumMetadataSyncRequestInterface::class),
+            $this->createStub(AlbumMatchRequestInterface::class),
             new NullLogger(),
             $this->observedMediaFiles($this->createStub(LibraryMediaFilesInterface::class)),
             $transaction,

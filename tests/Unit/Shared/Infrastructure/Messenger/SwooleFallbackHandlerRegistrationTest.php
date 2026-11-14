@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Shared\Infrastructure\Messenger;
 
+use App\Catalog\Application\Message\DrainAlbumMatchesMessage;
+use App\Catalog\Application\MessageHandler\DrainAlbumMatchesHandler;
+use App\Catalog\Application\MessageHandler\RequestAlbumMatchHandler;
 use App\Metadata\Application\Message\SyncAlbumMessage;
 use App\Metadata\Application\Message\SyncLibraryMessage;
 use App\Metadata\Application\Message\SyncSongMessage;
-use App\Metadata\Application\MessageHandler\SyncAlbumHandler;
 use App\Metadata\Application\MessageHandler\SyncLibraryHandler;
 use App\Metadata\Application\MessageHandler\SyncSongHandler;
 use App\Radio\Application\Command\SyncCountryStationsCommand;
@@ -51,7 +53,8 @@ final class SwooleFallbackHandlerRegistrationTest extends TestCase
             \App\Notification\Application\Handler\SendPushHandler::class => new \App\Notification\Application\DTO\SendPushCommand(Uuid::v7(), \App\Notification\Domain\ValueObject\NotificationCategory::Security, 'title', 'body', 'notification'),
             \App\Notification\Application\Handler\SendEmailHandler::class => new \App\Notification\Application\DTO\SendEmailCommand(Uuid::v7(), 'worker@baander.app', \App\Notification\Domain\ValueObject\NotificationCategory::Security, 'title', [], 'body', [], new \DateTimeImmutable()),
             SyncSongHandler::class => new SyncSongMessage(Uuid::v7()),
-            SyncAlbumHandler::class => new SyncAlbumMessage(Uuid::v7()),
+            RequestAlbumMatchHandler::class => new SyncAlbumMessage(Uuid::v7()),
+            DrainAlbumMatchesHandler::class => new DrainAlbumMatchesMessage(),
             SyncLibraryHandler::class => new SyncLibraryMessage(Uuid::v7()),
             SyncCountryStationsHandler::class => new SyncCountryStationsCommand(Uuid::v7(), 'DK'),
         ];

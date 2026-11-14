@@ -15,6 +15,7 @@ return static function (ContainerConfigurator $container): void {
     // Resource classes describe the work; capacity reservations remain worker policy.
     $workloads = [
         \App\Catalog\Application\Command\BatchExtractCoversCommand::class => ['transport' => 'async', 'resource_class' => 'coordination', 'default' => true],
+        \App\Catalog\Application\Message\DrainAlbumMatchesMessage::class => ['transport' => 'async', 'resource_class' => 'io', 'default' => true],
         \App\Library\Application\Command\ScanLibraryCommand::class => ['transport' => 'async', 'resource_class' => 'io', 'default' => true],
         \App\Library\Application\Message\FilesDiscovered::class => ['transport' => 'async', 'resource_class' => 'io', 'default' => true],
         \App\Metadata\Application\Command\ExtractAlbumCoverCommand::class => ['transport' => 'async', 'resource_class' => 'cpu', 'default' => true],

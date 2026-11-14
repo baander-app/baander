@@ -646,6 +646,12 @@ services:
         alias: App\Catalog\Infrastructure\Doctrine\ImportIdentity\ArtistIdentityResolver
     App\Catalog\Application\Port\AlbumPortInterface:
         alias: App\Catalog\Infrastructure\AlbumService
+    App\Catalog\Application\Port\AlbumMatchRequestInterface:
+        alias: App\Catalog\Application\Service\MusicBrainzMatch\AlbumMatchRequester
+    App\Catalog\Application\Service\MusicBrainzMatch\AutomaticAlbumMatcherInterface:
+        alias: App\Catalog\Application\Service\MusicBrainzMatch\AutomaticAlbumMatcher
+    App\Catalog\Application\Query\MusicBrainzMatch\MatchReviewReadInterface:
+        alias: App\Catalog\Infrastructure\Doctrine\Query\MatchReviewReadQuery
     App\Catalog\Application\Port\SongAvailabilityPortInterface:
         alias: App\Catalog\Infrastructure\SongAvailability
     App\Catalog\Application\Port\SongPortInterface:
@@ -1289,9 +1295,6 @@ services:
 
     App\Lyrics\Application\Port\LyricsFetchRequestInterface:
         alias: App\Lyrics\Application\Service\LyricsFetchRequester
-
-    App\Metadata\Application\Port\AlbumMetadataSyncRequestInterface:
-        alias: App\Metadata\Application\Service\AlbumMetadataSyncRequester
 
     App\Lyrics\Infrastructure\Api\LrclibClient:
         arguments:

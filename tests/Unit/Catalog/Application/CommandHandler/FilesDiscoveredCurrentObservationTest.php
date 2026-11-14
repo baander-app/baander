@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Catalog\Application\CommandHandler;
 
 use App\Catalog\Application\CommandHandler\FilesDiscoveredHandler;
+use App\Catalog\Application\Port\AlbumMatchRequestInterface;
 use App\Catalog\Application\Port\AlbumPortInterface;
 use App\Catalog\Application\Port\GenrePortInterface;
 use App\Catalog\Application\Port\MetadataContentReaderPortInterface;
@@ -18,7 +19,6 @@ use App\Library\Application\Message\DiscoveredFile;
 use App\Library\Application\Message\FilesDiscovered;
 use App\Library\Application\Port\LibraryMediaFilesInterface;
 use App\Lyrics\Application\Port\LyricsFetchRequestInterface;
-use App\Metadata\Application\Port\AlbumMetadataSyncRequestInterface;
 use App\Metadata\Domain\Model\ExtractedMetadata;
 use App\Shared\Domain\Model\Uuid;
 use App\Tests\Fixtures\Catalog\DiscoveredFileObservations;
@@ -45,7 +45,7 @@ final class FilesDiscoveredCurrentObservationTest extends TestCase
     private MetadataContentReaderPortInterface&MockObject $metadata;
     private LibraryMediaFilesInterface&MockObject $media;
     private LyricsFetchRequestInterface&MockObject $lyrics;
-    private AlbumMetadataSyncRequestInterface&MockObject $sync;
+    private AlbumMatchRequestInterface&MockObject $sync;
     private MessageBusInterface&MockObject $bus;
     private PassThroughTransaction $transaction;
     private Uuid $libraryId;
@@ -60,7 +60,7 @@ final class FilesDiscoveredCurrentObservationTest extends TestCase
         $this->metadata = $this->createMock(MetadataContentReaderPortInterface::class);
         $this->media = $this->observedMediaFiles($this->createMock(LibraryMediaFilesInterface::class));
         $this->lyrics = $this->createMock(LyricsFetchRequestInterface::class);
-        $this->sync = $this->createMock(AlbumMetadataSyncRequestInterface::class);
+        $this->sync = $this->createMock(AlbumMatchRequestInterface::class);
         $this->bus = $this->createMock(MessageBusInterface::class);
         $this->transaction = new PassThroughTransaction();
     }
@@ -87,7 +87,7 @@ final class FilesDiscoveredCurrentObservationTest extends TestCase
         $this->videos->expects($this->never())->method('findByHash');
         $this->videos->expects($this->never())->method('save');
         $this->lyrics->expects($this->never())->method('requestFetch');
-        $this->sync->expects($this->never())->method('requestSync');
+        $this->sync->expects($this->never())->method('requestAfterImport');
         $this->bus->expects($this->never())->method('dispatch');
 
         $this->handler()($this->message($type, $file));
@@ -120,7 +120,7 @@ final class FilesDiscoveredCurrentObservationTest extends TestCase
             self::assertSame('Current song', $song->getTitle());
             self::assertTrue($song->getAlbumId()->equals($album->getId()));
         });
-        $this->sync->expects($this->once())->method('requestSync');
+        $this->sync->expects($this->once())->method('requestAfterImport');
         $this->lyrics->expects($this->once())->method('requestFetch');
         $this->bus->expects($this->never())->method('dispatch');
 
@@ -138,7 +138,7 @@ final class FilesDiscoveredCurrentObservationTest extends TestCase
         });
         $this->albums->expects($this->never())->method('persist');
         $this->songs->expects($this->never())->method('persist');
-        $this->sync->expects($this->never())->method('requestSync');
+        $this->sync->expects($this->never())->method('requestAfterImport');
         $this->lyrics->expects($this->never())->method('requestFetch');
         $this->bus->expects($this->never())->method('dispatch');
 
@@ -161,7 +161,8 @@ final class FilesDiscoveredCurrentObservationTest extends TestCase
         });
         $this->songs->expects($this->never())->method('persist');
         $this->lyrics->expects($this->never())->method('requestFetch');
-        $this->sync->expects($this->never())->method('requestSync');
+        // The message touched the album; the request decides whether it needs a match.
+        $this->sync->expects($this->once())->method('requestAfterImport')->with($album->getId());
         $this->bus->expects($this->never())->method('dispatch');
 
         $this->handler()($this->message('music', $file));

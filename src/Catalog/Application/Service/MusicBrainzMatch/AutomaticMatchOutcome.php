@@ -1,0 +1,63 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Catalog\Application\Service\MusicBrainzMatch;
+
+use App\Catalog\Domain\ValueObject\AlbumMatchReviewReason;
+use Symfony\Component\DependencyInjection\Attribute\Exclude;
+
+/**
+ * How matching one album without an admin ended, and for an album that needs review, what the
+ * matcher checked.
+ *
+ * The album match queue acts on each kind:
+ * - matched: removes the request it took, unless a request made while the album was matched ended
+ *   the claim;
+ * - needs review: marks the album for review with the reason, best score, checked song count and
+ *   the time of the check, unless a request made while the album was matched ended the claim, in
+ *   which case that request stays and the album is matched again;
+ * - unavailable: gives the request back with its due time and waits 5, 15 and 60 minutes, then
+ *   hourly, before it matches anything again;
+ * - album gone: removes the request, as for matched.
+ */
+#[Exclude]
+final readonly class AutomaticMatchOutcome
+{
+    /**
+     * @param AlbumMatchReviewReason|null $reviewReason     why the album needs review; set exactly when it does
+     * @param int<0, 100>|null            $bestScore        the best candidate's fit score; null without a candidate
+     * @param int<0, max>|null            $checkedSongCount the album's song count the matcher checked the candidates against; set exactly when the album needs review
+     */
+    private function __construct(
+        public AutomaticMatchOutcomeKind $kind,
+        public ?AlbumMatchReviewReason $reviewReason = null,
+        public ?int $bestScore = null,
+        public ?int $checkedSongCount = null,
+    ) {
+    }
+
+    public static function matched(): self
+    {
+        return new self(AutomaticMatchOutcomeKind::Matched);
+    }
+
+    /**
+     * @param int<0, 100>|null $bestScore        the best candidate's fit score; null when MusicBrainz found no candidate
+     * @param int<0, max>      $checkedSongCount the album's song count when the matcher read the album
+     */
+    public static function needsReview(AlbumMatchReviewReason $reason, ?int $bestScore, int $checkedSongCount): self
+    {
+        return new self(AutomaticMatchOutcomeKind::NeedsReview, $reason, $bestScore, $checkedSongCount);
+    }
+
+    public static function unavailable(): self
+    {
+        return new self(AutomaticMatchOutcomeKind::Unavailable);
+    }
+
+    public static function albumGone(): self
+    {
+        return new self(AutomaticMatchOutcomeKind::AlbumGone);
+    }
+}

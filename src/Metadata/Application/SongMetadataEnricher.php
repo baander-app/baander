@@ -10,6 +10,11 @@ use App\Catalog\Domain\Model\Song;
 use App\Metadata\Infrastructure\Api\MusicBrainz\MusicBrainzAdapter;
 use Psr\Log\LoggerInterface;
 
+/**
+ * Fills a song's genres from the tags of the best MusicBrainz recording found for its title. It
+ * writes nothing else: a song's recording ID comes only from a MusicBrainz match, which pairs the
+ * song with a release track instead of trusting a title search.
+ */
 final class SongMetadataEnricher
 {
     public function __construct(
@@ -20,6 +25,7 @@ final class SongMetadataEnricher
     ) {
     }
 
+    /** A forced enrichment fills genres the same way: genres are only ever added. */
     public function enrich(Song $song, bool $forceUpdate = false): EnrichmentResult
     {
         $this->logger->info('Starting song enrichment', [
@@ -34,7 +40,7 @@ final class SongMetadataEnricher
                 return EnrichmentResult::noMatch('musicbrainz', 0.0);
             }
 
-            return $this->applyData($song, $data, $forceUpdate);
+            return $this->applyData($song, $data);
         } catch (\Throwable $e) {
             $this->logger->error('Song enrichment failed', [
                 'song_id' => $song->getId(),
@@ -62,7 +68,6 @@ final class SongMetadataEnricher
             return [
                 'source' => 'musicbrainz',
                 'quality' => $quality,
-                'mbid' => $best->id,
                 'title' => $best->title,
                 'tags' => $best->tags,
             ];
@@ -74,7 +79,7 @@ final class SongMetadataEnricher
     /**
      * @param array<string, mixed> $data
      */
-    private function applyData(Song $song, array $data, bool $forceUpdate): EnrichmentResult
+    private function applyData(Song $song, array $data): EnrichmentResult
     {
         $quality = $data['quality'] ?? 0.0;
 
@@ -101,14 +106,8 @@ final class SongMetadataEnricher
 
         $updatedFields = [];
 
-        // Apply external identifiers
-        if (!empty($data['mbid']) && ($forceUpdate || $song->getMbid() === null)) {
-            $song->updateExternalIds(mbid: $data['mbid']);
-            $updatedFields[] = 'mbid';
-        }
-
         // Apply genre tags from external sources
-        $genreNames = array_values(array_unique(array_filter($data['tags'] ?? [])));
+        $genreNames = array_filter($data['tags'] ?? []) |> array_unique(...) |> array_values(...);
 
         foreach ($genreNames as $genreName) {
             try {
@@ -124,11 +123,10 @@ final class SongMetadataEnricher
             }
         }
 
-        $updatedFields = array_values(array_unique($updatedFields));
+        $updatedFields = array_unique($updatedFields) |> array_values(...);
 
-        if (!empty($updatedFields)) {
-            $this->songService->save($song);
-
+        // The genre links are written on their own; the song row stays as it is.
+        if ($updatedFields !== []) {
             $this->logger->info('Song enriched', [
                 'song_id' => $song->getId(),
                 'source' => $data['source'],
@@ -142,7 +140,6 @@ final class SongMetadataEnricher
             source: $data['source'],
             qualityScore: $quality,
             updatedFields: $updatedFields,
-            identifiersUpdated: !empty(array_intersect(['mbid', 'discogsId'], $updatedFields)),
         );
     }
 }
