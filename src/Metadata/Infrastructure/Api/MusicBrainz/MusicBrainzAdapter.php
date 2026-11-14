@@ -421,7 +421,7 @@ final readonly class MusicBrainzAdapter implements MusicBrainzLookupInterface
             barcode: self::text($release, 'barcode'),
             labels: self::labels($release['label-info'] ?? null),
             media: $media,
-            trackCount: self::integer($release, 'track-count') ?? array_sum(array_column($media, 'trackCount')),
+            trackCount: self::integer($release, 'track-count') ?? (array_column($media, 'trackCount') |> array_sum(...)),
             releaseGroup: self::releaseGroup($release['release-group'] ?? null),
         );
     }
@@ -589,13 +589,14 @@ final readonly class MusicBrainzAdapter implements MusicBrainzLookupInterface
     /** @return list<array<array-key, mixed>> the entries of a JSON list that are objects */
     private static function objects(mixed $list): array
     {
-        return is_array($list) ? array_values(array_filter($list, is_array(...))) : [];
+        return is_array($list) ? (array_filter($list, is_array(...)) |> array_values(...)) : [];
     }
 
     /** @return list<array<array-key, mixed>> the entries of a JSON list that are objects with an ID */
     private static function entries(mixed $list): array
     {
-        return array_values(array_filter(self::objects($list), static fn(array $entry): bool => is_string($entry['id'] ?? null)));
+        return array_filter(self::objects($list), static fn(array $entry): bool => is_string($entry['id'] ?? null))
+            |> array_values(...);
     }
 
     /**
@@ -680,7 +681,9 @@ final readonly class MusicBrainzAdapter implements MusicBrainzLookupInterface
      */
     private function extractTags(array $tags): array
     {
-        return array_column($tags, 'name') |> (static fn(array $names): array => array_values(array_filter($names, is_string(...))));
+        return array_column($tags, 'name')
+            |> (static fn(array $names): array => array_filter($names, is_string(...)))
+            |> array_values(...);
     }
 
     /**

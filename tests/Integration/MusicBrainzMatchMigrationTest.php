@@ -44,7 +44,7 @@ final class MusicBrainzMatchMigrationTest extends TestCase
             self::markTestSkipped('Requires disposable PostgreSQL.');
         }
         $this->connection = DriverManager::getConnection(new DsnParser(['postgresql' => 'pdo_pgsql'])->parse($url));
-        $this->schema = 'musicbrainz_match_migration_' . bin2hex(random_bytes(8));
+        $this->schema = 'musicbrainz_match_migration_' . (random_bytes(8) |> bin2hex(...));
         $this->connection->executeStatement('CREATE SCHEMA ' . $this->schema);
         $this->connection->executeStatement('SET search_path TO ' . $this->schema . ', public');
         $this->connection->executeStatement("SET TIME ZONE 'UTC'");

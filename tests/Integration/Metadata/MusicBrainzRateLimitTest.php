@@ -52,8 +52,8 @@ final class MusicBrainzRateLimitTest extends TestCase
         self::assertIsString($dsn, 'Run this test with the disposable Redis runner.');
         self::assertNotSame('', $dsn);
         $this->dsn = $dsn;
-        $this->name = 'musicbrainz-acceptance-' . bin2hex(random_bytes(12));
-        $this->directory = sys_get_temp_dir() . '/baander-musicbrainz-' . bin2hex(random_bytes(12));
+        $this->name = 'musicbrainz-acceptance-' . (random_bytes(12) |> bin2hex(...));
+        $this->directory = sys_get_temp_dir() . '/baander-musicbrainz-' . (random_bytes(12) |> bin2hex(...));
         self::assertTrue(mkdir($this->directory, 0700));
     }
 
@@ -105,7 +105,7 @@ final class MusicBrainzRateLimitTest extends TestCase
         file_put_contents($this->directory . '/go', 'go');
 
         $results = array_map($this->finish(...), $children);
-        $this->subjects = array_values(array_unique(array_column($results, 'subject')));
+        $this->subjects = array_column($results, 'subject') |> array_unique(...) |> array_values(...);
 
         self::assertCount(1, $this->subjects, 'Both processes spend the same budget.');
         foreach ($results as $result) {

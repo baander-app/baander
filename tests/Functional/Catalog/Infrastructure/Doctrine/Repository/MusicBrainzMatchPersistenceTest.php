@@ -138,7 +138,7 @@ final class MusicBrainzMatchPersistenceTest extends TestCase
         $libraryId = Uuid::v7();
         $this->entityManager->getConnection()->executeStatement(
             "INSERT INTO libraries (id, public_id, slug, name, path, type, sort_order, created_at, updated_at) VALUES (?, ?, ?, 'Country', ?, 'music', 0, clock_timestamp(), clock_timestamp())",
-            [$libraryId->toString(), new PublicId()->toString(), 'country-' . bin2hex(random_bytes(4)), '/country-' . bin2hex(random_bytes(4))],
+            [$libraryId->toString(), new PublicId()->toString(), 'country-' . (random_bytes(4) |> bin2hex(...)), '/country-' . (random_bytes(4) |> bin2hex(...))],
         );
         $album = Album::create($libraryId, 'F-1 Trillion: Long Bed', 'album');
         $this->albums->save($album);

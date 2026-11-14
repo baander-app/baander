@@ -307,7 +307,7 @@ final class MusicBrainzAdapterTest extends TestCase
 
         self::assertCount(2, $this->urls);
         self::assertSame([MusicBrainzSlotWait::BOUNDED_SECONDS, null], array_column($this->turns->getArrayCopy(), 1));
-        self::assertCount(1, array_unique(array_column($this->turns->getArrayCopy(), 0)), 'Every call spends the same budget.');
+        self::assertCount(1, array_column($this->turns->getArrayCopy(), 0) |> array_unique(...), 'Every call spends the same budget.');
     }
 
     #[DataProvider('portMethods')]
