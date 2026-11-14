@@ -1683,11 +1683,14 @@ Verification checkpoint, 2026-11-14:
 - Full backend suite (`scripts/test-backend-container.sh`, `baander-ci:u10`) at
   `22a9e1d77`: 12,264 tests, 135,935 assertions, no failures (ordinary 7,875, native
   917, stack-1 1,858, stack-2 1,614), 1,628.7 s.
-- After the simplify pass and the review follow-ups (`3f032e0d7`, `90da34158`,
-  `5a15f1186`): Catalog, Metadata and Lyrics unit suites 1,022 tests on the host with
-  one environmental error (`finfo` missing in VideoServiceTest); in the CI image,
+- After the simplify pass and the review follow-ups: at `90da34158`, the Catalog,
+  Metadata and Lyrics unit suites ran 1,022 tests on the host with one environmental
+  error (`finfo` missing in VideoServiceTest), and in the CI image
   ScannedArtistCredits, RenamedAlbumRescan, RetaggedFileScan, the three race tests,
-  LyricsAdminController and the Lyrics functional suites 103/103.
+  LyricsAdminController and the Lyrics functional suites passed 103/103. At
+  `5a15f1186`, the Catalog CommandHandler unit tests passed 170/170, and in the CI
+  image LibraryDirectoryPublication, LibraryDiscoveryObservation,
+  NewAlbumMetadataSync, ScannedTrackPlayback and CapacityFixture passed 63/63.
 - Static gates at `5a15f1186`: PHPStan no errors, Deptrac 0 violations (CI image),
   `lint:container` clean, `app:export-openapi-spec` unchanged. `make ci` stops at
   `composer normalize`, which fails the same way on `master` (`composer.json` is
@@ -1731,11 +1734,12 @@ Open:
   - a forced-sync rename followed by a wrong ID: no code path reaches it today.
 - From review, not fixed: the import handler's size and its `PreparedSong` array shape
   (a split into a tag-credit reader and a rescan repair was suggested); genre creation
-  by the metadata enrichers takes no import lock, so an enricher fails loudly on a slug
-  a running import creates and succeeds on its retry (locking it needs a transaction
-  around the enricher's flush, which is separate work); a retag is any byte change at a song's path, so a library-wide
-  ReplayGain pass replaces hand-made credits on the next scan (the settled retag
-  decision).
+  by the metadata enrichers takes no import lock, so an enricher that creates a genre
+  while a running import creates the same slug fails on `uniq_genres_slug`, and the
+  album enricher logs that genre failure and goes on (locking it needs a transaction
+  around the enricher's flush, which is separate work); a retag is any byte change at a
+  song's path, so a library-wide ReplayGain pass replaces hand-made credits on the next
+  scan (the settled retag decision).
 - Housekeeping: `NewAlbumMetadataSyncTest` drains its transport with a `get()` loop
   that returns one envelope per call; the postgres-remediation `doctrine.md` version
   list is stale; the PGroonga throwaway-schema failure is a candidate for the extension
