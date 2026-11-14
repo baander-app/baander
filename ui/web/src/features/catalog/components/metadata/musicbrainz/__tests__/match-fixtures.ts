@@ -18,12 +18,18 @@ export const EXTRA_ID = 'SongExtra0001'
 export const POST_MALONE = 'ArtistPostMal1'
 export const DUET_ARTIST = 'ArtistPmLc001'
 
+/** A field row keyed as the API keys it, which changes the field unless its current value equals the proposed one. */
 export function fieldRow(overrides: Partial<MatchFieldRow> & Pick<MatchFieldRow, 'field' | 'proposed'>): MatchFieldRow {
+  const songPublicId = overrides.songPublicId ?? null
+  const current = overrides.current ?? null
+
   return {
-    songPublicId: null,
-    current: null,
+    key: songPublicId === null ? overrides.field : `${songPublicId}:${overrides.field}`,
+    songPublicId,
+    current,
     ticked: false,
     locked: false,
+    changes: JSON.stringify(current) !== JSON.stringify(overrides.proposed),
     ...overrides,
   }
 }
@@ -76,7 +82,7 @@ const duetCredit: CatalogCredit = {
   creditedName: 'Post Malone, Luke Combs',
 }
 
-const proposedDuet: readonly ProposedCredit[] = [
+const proposedDuet: ProposedCredit[] = [
   {
     role: 'primary',
     creditedName: 'Post Malone, Luke Combs',
@@ -92,10 +98,12 @@ const proposedDuet: readonly ProposedCredit[] = [
 ]
 
 export const DUET_CREDITS: MatchCreditsRow = {
+  key: `${DUET_ID}:credits`,
   songPublicId: DUET_ID,
   current: [duetCredit],
   proposed: proposedDuet,
   ticked: true,
+  changes: true,
 }
 
 export const MERGE_DUET_ARTIST: MatchArtistAction = {
@@ -103,8 +111,7 @@ export const MERGE_DUET_ARTIST: MatchArtistAction = {
   artistPublicId: DUET_ARTIST,
   artistName: 'Post Malone, Luke Combs',
   target: { publicId: POST_MALONE, name: 'Post Malone', takesId: true },
-  requiredSongs: [DUET_ID],
-  requiresAlbumCredits: false,
+  requiredRows: [DUET_CREDITS.key],
   ticked: true,
 }
 

@@ -136,6 +136,40 @@ export const catalogLiveCoverage = [
     behaviorVerification: { unitProofs: ["tests/live-updates/collections.test.tsx"] },
   },
   {
+    id: "catalog.musicbrainz-match-demand",
+    family: "admin-metadata",
+    policy: {
+      kind: "demand",
+      reason: "Candidate searches and comparisons ask MusicBrainz, which answers one request per second for the whole server; they run only when an admin opens, refines or reloads them.",
+    },
+    audiences: ["admin"],
+    sourceTables: [],
+    deploymentTables: [],
+    sources: [
+      "MusicBrainz candidate search and lookup",
+      "[ `/api/admin/metadata/match/${type}/${publicId}/candidates`, ...(params ? [params] : []) ]",
+      "[ `/api/admin/metadata/match/${type}/${publicId}/comparison`, ...(params ? [params] : []) ]",
+    ],
+    keyVariants: [
+      "[ `/api/admin/metadata/match/${type}/${publicId}/candidates`, ...(params ? [params] : []) ]",
+      "[ `/api/admin/metadata/match/${type}/${publicId}/comparison`, ...(params ? [params] : []) ]",
+    ],
+    dependentFamilies: [],
+    mirrors: [],
+    responseCaches: [],
+    consumers: [
+      "src/features/catalog/hooks/use-musicbrainz-match.ts#useGetAdminMetadataMatchCandidates:generated",
+      "src/features/catalog/hooks/use-musicbrainz-match.ts#useGetAdminMetadataMatchComparison:generated",
+    ],
+    coverageVerification: ["tests/live-updates/coverage.test.ts"],
+    behaviorVerification: {
+      unitProofs: [
+        "tests/live-updates/descriptors.test.ts",
+        "src/features/catalog/components/metadata/__tests__/MusicBrainzMatchDialog.test.tsx",
+      ],
+    },
+  },
+  {
     id: "catalog.catalog-demand",
     family: "catalog",
     policy: {

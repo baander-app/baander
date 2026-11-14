@@ -120,6 +120,7 @@ export function useTimelineViewModel(): UseTimelineViewModelReturn {
             disambiguation: typeof raw.disambiguation === 'string' ? raw.disambiguation : null,
             annotation: typeof raw.annotation === 'string' ? raw.annotation : null,
             mbid: typeof raw.mbid === 'string' ? raw.mbid : null,
+            releaseMbid: typeof raw.releaseMbid === 'string' ? raw.releaseMbid : null,
             discogsId: typeof raw.discogsId === 'string' ? raw.discogsId : null,
             spotifyId: typeof raw.spotifyId === 'string' ? raw.spotifyId : null,
             createdAt: (raw.createdAt as string) ?? '',
@@ -135,6 +136,7 @@ export function useTimelineViewModel(): UseTimelineViewModelReturn {
                   role: typeof a.role === 'string' ? a.role : null,
                 }))
               : [],
+            lockedFields: Array.isArray(raw.lockedFields) ? raw.lockedFields.filter((field): field is string => typeof field === 'string') : [],
           })
         }
 

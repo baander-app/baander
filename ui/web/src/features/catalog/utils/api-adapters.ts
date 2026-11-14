@@ -100,6 +100,7 @@ function asAlbum(raw: unknown): AlbumSummary {
     disambiguation: asStringOrNull(item.disambiguation),
     annotation: asStringOrNull(item.annotation),
     mbid: asStringOrNull(item.mbid),
+    releaseMbid: asStringOrNull(item.releaseMbid),
     discogsId: asStringOrNull(item.discogsId),
     spotifyId: asStringOrNull(item.spotifyId),
     createdAt: asString(item.createdAt),

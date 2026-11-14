@@ -34,14 +34,17 @@ export interface AlbumSummary {
   language: string | null
   disambiguation: string | null
   annotation: string | null
+  /** The MusicBrainz release group. */
   mbid: string | null
+  /** The MusicBrainz release (edition) a match chose; null until a match is applied. */
+  releaseMbid: string | null
   discogsId: string | null
   spotifyId: string | null
   createdAt: string
   coverImage: CoverImage | null
   artists: ArtistCredit[]
-  /** Fields locked from automatic updates (present on detail responses). */
-  lockedFields?: string[]
+  /** Fields locked from automatic updates. */
+  lockedFields: string[]
 }
 
 export interface SongSummary {

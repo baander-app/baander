@@ -1,10 +1,11 @@
 import styled from 'styled-components'
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { isAxiosError } from 'axios'
 import { RefreshCw } from 'lucide-react'
 import { Separator } from '@/shared/components/ui/separator'
 import { Button } from '@/shared/components/ui/button'
 import { textRole } from '@/shared/theme'
+import { useIsAdmin } from '@/features/auth/hooks/use-admin-check'
 import { useGetSongShow, useGetAlbumShow, useGetArtistShow } from '@/shared/api-client/gen/endpoints'
 import { asSongFromData, asAlbumFromData, asArtistFromData } from '../../utils/api-adapters'
 import { getFieldConfig } from './field-config'
@@ -12,7 +13,9 @@ import { MetadataField } from './MetadataField'
 import { ProtectionSection } from './ProtectionSection'
 import { CoverImageUpload } from './CoverImageUpload'
 import { useMetadataForm } from './use-metadata-form'
+import { MusicBrainzMatchDialog } from './MusicBrainzMatchDialog'
 import type { EntityFieldConfig } from './field-config'
+import type { ArtistCredit } from '../../types/album'
 
 const Container = styled.div`
   display: flex;
@@ -84,6 +87,8 @@ export function InfoPanel(props: InfoPanelProps) {
 
 function InfoPanelContent({ entityType, publicId }: InfoPanelProps) {
   const config = useMemo(() => getFieldConfig(entityType), [entityType])
+  const isAdmin = useIsAdmin()
+  const [matching, setMatching] = useState(false)
 
   // Fetch entity data
   const songQuery = useGetSongShow(publicId, {
@@ -139,6 +144,7 @@ function InfoPanelContent({ entityType, publicId }: InfoPanelProps) {
         },
         lockedFields: song.lockedFields ?? [],
         coverImage: null,
+        match: { title: song.title, artist: song.artistName, language: song.albumLanguage },
       }
     }
 
@@ -161,8 +167,9 @@ function InfoPanelContent({ entityType, publicId }: InfoPanelProps) {
           discogsId: album.discogsId,
           spotifyId: album.spotifyId,
         },
-        lockedFields: album.lockedFields ?? [],
+        lockedFields: album.lockedFields,
         coverImage: album.coverImage,
+        match: { title: album.title, artist: primaryArtistName(album.artists), language: album.language },
       }
     }
 
@@ -182,8 +189,9 @@ function InfoPanelContent({ entityType, publicId }: InfoPanelProps) {
         discogsId: artist.discogsId ?? null,
         spotifyId: artist.spotifyId ?? null,
       },
-      lockedFields: artist.lockedFields ?? [],
+      lockedFields: artist.lockedFields,
       coverImage: artist.coverImage ?? null,
+      match: { title: artist.name, artist: null, language: null },
     }
   }, [rawData, entityType])
 
@@ -300,14 +308,31 @@ function InfoPanelContent({ entityType, publicId }: InfoPanelProps) {
         disabled={status === 'unavailable' || status === 'conflict' || isSaving}
       />
 
-      {/* Sync placeholder */}
-      <Separator style={{ margin: '0.5rem 0' }} />
-      <SyncButton variant="ghost" size="sm">
-        <RefreshCw size={12} />
-        Sync from MusicBrainz
-      </SyncButton>
+      {isAdmin && entity && (
+        <>
+          <Separator style={{ margin: '0.5rem 0' }} />
+          <SyncButton variant="ghost" size="sm" onClick={() => setMatching(true)}>
+            <RefreshCw size={12} />
+            Sync from MusicBrainz
+          </SyncButton>
+          <MusicBrainzMatchDialog
+            open={matching}
+            onOpenChange={setMatching}
+            type={entityType}
+            publicId={publicId}
+            title={entity.match.title}
+            artist={entity.match.artist}
+            language={entity.match.language}
+          />
+        </>
+      )}
     </Container>
   )
+}
+
+/** The name the album's first primary credit shows, else its first credit's. */
+function primaryArtistName(artists: readonly ArtistCredit[]): string | null {
+  return (artists.find((artist) => artist.role === 'primary') ?? artists[0])?.name ?? null
 }
 
 function getAllLockableFields(config: EntityFieldConfig) {

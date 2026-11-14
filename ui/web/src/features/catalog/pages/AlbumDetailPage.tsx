@@ -120,7 +120,7 @@ export function AlbumDetailPage() {
         />
       )}
       {metadataOpen && (
-        <AlbumMetadata album={album as unknown as Record<string, unknown>} />
+        <AlbumMetadata album={album} />
       )}
       <AlbumTrackList
         songs={songs as unknown as Record<string, unknown>[]}

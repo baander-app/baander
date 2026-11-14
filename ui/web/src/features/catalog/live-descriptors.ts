@@ -19,6 +19,11 @@ export const catalogLiveDescriptors: readonly LiveQueryDescriptor[] = [
     matches: key => keyStartsWith(key, '/api/lyrics/search'),
   },
   {
+    family: 'admin-metadata',
+    refreshPolicy: 'demand',
+    matches: key => firstKeyMatches(key, /^\/api\/admin\/metadata\/match\/[^/]+\/[^/]+\/(?:candidates|comparison)$/),
+  },
+  {
     family: 'activity',
     matches: key => keyStartsWith(key, '/api/activity/history') || keyStartsWith(key, '/api/user/recent'),
   },

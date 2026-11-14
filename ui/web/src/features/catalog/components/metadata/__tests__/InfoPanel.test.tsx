@@ -14,7 +14,9 @@ import { advanceAuthorization, synchronizeOwnership } from '@/shared/live/owners
 import { getGetAlbumShowQueryKey } from '@/shared/api-client/gen/endpoints'
 
 const request = vi.hoisted(() => vi.fn())
+const admin = vi.hoisted(() => ({ value: false }))
 vi.mock('@/shared/api-client/axios-instance', () => ({ customInstance: request }))
+vi.mock('@/features/auth/hooks/use-admin-check', () => ({ useIsAdmin: () => admin.value }))
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }))
 
 const album = (title: string) => ({ data: { publicId: 'AlbumFixture1', title, label: 'Server label', year: 1969, lockedFields: [], coverImage: null } })
@@ -50,6 +52,7 @@ function setup(coordinated = false, seeded = true) {
 }
 
 beforeEach(() => {
+  admin.value = false
   vi.useFakeTimers()
   synchronizeOwnership('metadata-dom')
   request.mockReset().mockResolvedValue(album('Server title'))
@@ -184,6 +187,32 @@ describe('metadata panel server refreshes', () => {
     expect(request).toHaveBeenCalledTimes(2)
     expect(screen.getByDisplayValue('My title')).toBeEnabled()
     expect(screen.getByRole('alert')).toHaveTextContent('changed elsewhere')
+    dispose()
+  })
+})
+
+describe('MusicBrainz sync', () => {
+  it('offers no MusicBrainz sync to a member who is not an admin', () => {
+    const { dispose } = setup()
+
+    expect(screen.getByDisplayValue('Server title')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Sync from MusicBrainz' })).not.toBeInTheDocument()
+    dispose()
+  })
+
+  it('opens the match dialog for an admin, searching for the album', async () => {
+    admin.value = true
+    const { dispose } = setup()
+    request.mockImplementation((url: string) => url.endsWith('/candidates')
+      ? Promise.resolve({ data: { type: 'album', publicId: 'AlbumFixture1', title: 'Server title', artist: null, candidates: [] } })
+      : Promise.resolve(album('Server title')))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Sync from MusicBrainz' }))
+    await act(async () => { await vi.advanceTimersByTimeAsync(100) })
+
+    expect(screen.getByRole('dialog', { name: 'Match with MusicBrainz' })).toHaveTextContent('Album “Server title”')
+    expect(request).toHaveBeenCalledWith('/api/admin/metadata/match/album/AlbumFixture1/candidates', expect.objectContaining({ method: 'GET' }))
+    expect(screen.getByText(/No MusicBrainz release matches/)).toBeInTheDocument()
     dispose()
   })
 })

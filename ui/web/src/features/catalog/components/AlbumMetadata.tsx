@@ -1,6 +1,7 @@
 import styled from 'styled-components'
 import { textRole } from '@/shared/theme'
 import { ContentText } from '@/shared/typography'
+import type { AlbumSummary } from '../types/album'
 
 const Container = styled.div`
   flex-shrink: 0;
@@ -30,7 +31,7 @@ const Value = styled(ContentText)`
 `
 
 interface AlbumMetadataProps {
-  album: Record<string, unknown>
+  album: AlbumSummary
 }
 
 interface MetadataField {
@@ -40,20 +41,17 @@ interface MetadataField {
 
 export function AlbumMetadata({ album }: AlbumMetadataProps) {
   const fields: MetadataField[] = [
-    { label: 'Type', value: album.type as string | undefined },
-    { label: 'Year', value: album.year as number | undefined },
-    { label: 'Label', value: album.label as string | undefined },
-    { label: 'Catalog #', value: album.catalogNumber as string | undefined },
-    { label: 'Country', value: album.country as string | undefined },
-    { label: 'Barcode', value: album.barcode as string | undefined },
-    { label: 'Language', value: album.language as string | undefined },
-    { label: 'Disambiguation', value: album.disambiguation as string | undefined },
+    { label: 'Type', value: album.type },
+    { label: 'Year', value: album.year },
+    { label: 'Label', value: album.label },
+    { label: 'Catalog #', value: album.catalogNumber },
+    { label: 'Country', value: album.country },
+    { label: 'Barcode', value: album.barcode },
+    { label: 'Language', value: album.language },
+    { label: 'Disambiguation', value: album.disambiguation },
+    { label: 'MusicBrainz release group', value: album.mbid },
+    { label: 'MusicBrainz release', value: album.releaseMbid },
   ].filter((f) => f.value != null && f.value !== '')
-
-  const mbid = album.mbid as string | undefined
-  if (mbid) {
-    fields.push({ label: 'MusicBrainz ID', value: mbid })
-  }
 
   if (fields.length === 0) return null
 

@@ -70,7 +70,7 @@ export interface MatchCandidateStepProps {
   readonly searching: boolean
   /** The message of the latest failed search, from `matchErrorMessage`. */
   readonly error: string | null
-  /** Searches again with the title and artist of the form. */
+  /** Searches again with the title and artist of the form; an emptied artist searches by the title alone. */
   readonly onSearch: (search: MatchSearch) => void
   /** Compares the item with a candidate. */
   readonly onPick: (candidateId: string) => void
@@ -96,9 +96,7 @@ export function MatchCandidateStep({ type, initialSearch, candidates, searching,
       return
     }
 
-    const artist = shown.artist?.trim() ?? ''
-
-    onSearch({ title: shown.title.trim(), artist: byName || artist === '' ? null : artist })
+    onSearch({ title: shown.title.trim(), artist: byName ? null : (shown.artist ?? '').trim() })
   }
 
   return (

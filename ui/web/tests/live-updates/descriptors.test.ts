@@ -120,7 +120,13 @@ describe('feature query descriptors', () => {
   it('keeps deployment and demand policies separate from ordinary stored refreshes', () => {
     expect(matches(generated.getGetAdminSettingsDefinitionsQueryKey())[0].deploymentFixed).toBe(true)
     expect(matches(['/api/admin/settings'])[0].family).toBe('admin-settings')
-    for (const key of [['oauth-authorize'], ['/api/lyrics/search'], ['admin-media-missing-check']]) {
+    for (const key of [
+      ['oauth-authorize'],
+      ['/api/lyrics/search'],
+      ['admin-media-missing-check'],
+      generated.getGetAdminMetadataMatchCandidatesQueryKey('album', 'album-a', { title: 'Long Bed', artist: '' }),
+      generated.getGetAdminMetadataMatchComparisonQueryKey('song', 'song-a', { candidate: 'recording-a' }),
+    ]) {
       expect(matches(key)[0].refreshPolicy).toBe('demand')
     }
   })

@@ -4,7 +4,6 @@ import { ThemeProvider } from 'styled-components'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { resolveTheme } from '@/shared/theme'
 import { MatchComparisonStep, type MatchComparisonStepProps } from '../MatchComparisonStep'
-import { creditsRowKey, fieldRowKey } from '../match-ticks'
 import type { MatchComparison } from '../types'
 import { DUET_ARTIST, DUET_CREDITS, DUET_ID, MERGE_DUET_ARTIST, albumComparison, fieldRow, longAlbumComparison } from './match-fixtures'
 
@@ -79,12 +78,25 @@ describe('MatchComparisonStep', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Apply' }))
 
     const [selection] = onApply.mock.calls[0]
-    const ownFields = selection.fields.filter((row: { songPublicId: string | null }) => row.songPublicId === null)
 
-    expect(ownFields).toEqual([
-      { field: 'releaseMbid', current: null, songPublicId: null },
-      { field: 'genres', current: null, songPublicId: null },
-    ])
+    expect(selection.fields.map((row: { key: string }) => row.key)).toEqual(['releaseMbid', 'genres', `${DUET_ID}:mbid`])
+  })
+
+  it('shows the cover row by presence and applies it with the presence the admin saw', () => {
+    const comparison = albumComparison({ fields: [fieldRow({ field: 'cover', current: true, proposed: 'release-digital' })] })
+    const onApply = vi.fn()
+    render(themed(<MatchComparisonStep {...props({ comparison, onApply })} />))
+
+    const cover = screen.getByRole('checkbox', { name: 'Cover' })
+
+    expect(cover.closest('[data-match-row]')).toHaveTextContent('Current cover')
+    expect(cover.closest('[data-match-row]')).toHaveTextContent('Front cover from MusicBrainz')
+    expect(cover).not.toBeChecked()
+
+    fireEvent.click(cover)
+    fireEvent.click(screen.getByRole('button', { name: 'Apply' }))
+
+    expect(onApply.mock.calls[0][0].fields).toContainEqual(expect.objectContaining({ key: 'cover', current: true }))
   })
 
   it('applies the year once the admin ticks it', () => {
@@ -94,7 +106,7 @@ describe('MatchComparisonStep', () => {
     fireEvent.click(screen.getByRole('checkbox', { name: 'Year' }))
     fireEvent.click(screen.getByRole('button', { name: 'Apply' }))
 
-    expect(onApply.mock.calls[0][0].fields).toContainEqual({ field: 'year', current: 2023, songPublicId: null })
+    expect(onApply.mock.calls[0][0].fields).toContainEqual(expect.objectContaining({ key: 'year', current: 2023 }))
   })
 
   it('shows a song’s current credits against the primary and featured artists MusicBrainz credits', () => {
@@ -186,7 +198,7 @@ describe('MatchComparisonStep', () => {
   })
 
   it('lists the rows that changed when the comparison was reloaded', () => {
-    const changedRowKeys = [fieldRowKey({ field: 'year', songPublicId: null }), creditsRowKey(DUET_CREDITS)]
+    const changedRowKeys = ['year', DUET_CREDITS.key]
     render(themed(<MatchComparisonStep {...props({ changedRowKeys })} />))
 
     const notice = screen.getByRole('status')
@@ -202,9 +214,9 @@ describe('MatchComparisonStep', () => {
       publicId: DUET_ID,
       candidateId: 'rec-pour-me-a-drink',
       fields: [fieldRow({ field: 'mbid', proposed: 'rec-pour-me-a-drink', ticked: true })],
-      credits: DUET_CREDITS,
+      credits: { ...DUET_CREDITS, key: 'credits' },
       tracks: [],
-      artistActions: [MERGE_DUET_ARTIST],
+      artistActions: [{ ...MERGE_DUET_ARTIST, requiredRows: ['credits'] }],
     }
     const onApply = vi.fn()
     render(themed(<MatchComparisonStep {...props({ comparison, onApply })} />))
@@ -215,8 +227,8 @@ describe('MatchComparisonStep', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Apply' }))
 
     expect(onApply.mock.calls[0][0]).toMatchObject({
-      fields: [{ field: 'mbid', current: null, songPublicId: null }],
-      credits: [{ songPublicId: DUET_ID }],
+      fields: [{ key: 'mbid', current: null }],
+      credits: [{ key: 'credits', songPublicId: DUET_ID }],
       artistActions: [DUET_ARTIST],
       keptArtists: [],
     })
@@ -234,7 +246,7 @@ describe('MatchComparisonStep', () => {
       fields: [],
       credits: null,
       tracks: [],
-      artistActions: [{ ...MERGE_DUET_ARTIST, requiredSongs: [] }],
+      artistActions: [{ ...MERGE_DUET_ARTIST, requiredRows: [] }],
     }
     const onApply = vi.fn()
     render(themed(<MatchComparisonStep {...props({ comparison, onApply })} />))

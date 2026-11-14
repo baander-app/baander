@@ -1,25 +1,6 @@
-import type {
-  MatchArtistAction,
-  MatchComparison,
-  MatchCreditsRow,
-  MatchFieldRow,
-  MatchFieldValue,
-  MatchSelection,
-  MatchTicks,
-  MatchTrack,
-} from './types'
+import type { MatchArtistAction, MatchComparison, MatchCreditsRow, MatchFieldRow, MatchSelection, MatchTicks, MatchTrack } from './types'
 
-/** The tick key of a field row; the same field of the album and of one of its songs get different keys. */
-export function fieldRowKey(row: Pick<MatchFieldRow, 'field' | 'songPublicId'>): string {
-  return `field:${row.songPublicId ?? ''}:${row.field}`
-}
-
-/** The tick key of a credits row: the item's own, or one song's. */
-export function creditsRowKey(row: Pick<MatchCreditsRow, 'songPublicId'>): string {
-  return `credits:${row.songPublicId ?? ''}`
-}
-
-/** The tick key of an artist merge or removal. */
+/** The tick key of an artist merge or removal; rows are ticked by their own key. */
 export function artistActionKey(action: Pick<MatchArtistAction, 'artistPublicId'>): string {
   return `artist:${action.artistPublicId}`
 }
@@ -44,60 +25,25 @@ export function comparisonCreditsRows(comparison: MatchComparison): MatchCredits
 /** The ticks the comparison sets by default. */
 export function defaultTicks(comparison: MatchComparison): MatchTicks {
   return Object.fromEntries([
-    ...comparisonFieldRows(comparison).map((row) => [fieldRowKey(row), row.ticked] as const),
-    ...comparisonCreditsRows(comparison).map((row) => [creditsRowKey(row), row.ticked] as const),
+    ...comparisonFieldRows(comparison).map((row) => [row.key, row.ticked] as const),
+    ...comparisonCreditsRows(comparison).map((row) => [row.key, row.ticked] as const),
     ...comparison.artistActions.map((action) => [artistActionKey(action), action.ticked] as const),
   ])
 }
 
-/** Whether applying the row would change the field. Genre names compare ignoring case and order. */
-export function fieldRowChanges(row: Pick<MatchFieldRow, 'current' | 'proposed'>): boolean {
-  const { current, proposed } = row
-
-  if (isList(current) && isList(proposed)) {
-    return foldedNames(current) !== foldedNames(proposed)
-  }
-
-  return current !== proposed
+/** Whether the admin may tick the field row: the field is unlocked and the row would change it. */
+export function isSelectable(row: MatchFieldRow): boolean {
+  return !row.locked && row.changes
 }
 
-/** Whether the admin may tick the row: the field is unlocked and the row would change it. */
-export function isFieldRowSelectable(row: MatchFieldRow): boolean {
-  return !row.locked && fieldRowChanges(row)
-}
-
-/**
- * Whether applying the row would change the credits: other artists, roles or credited names, a
- * new artist, or a stored artist taking on its MusicBrainz ID.
- */
-export function creditsRowChanges(row: MatchCreditsRow): boolean {
-  if (row.proposed.some((credit) => credit.artist.publicId === null || credit.artist.takesId)) {
-    return true
-  }
-
-  const now = row.current.map((credit) => creditKey(credit.artistPublicId, credit.role ?? '', credit.creditedName)).sort()
-  const then = row.proposed.map((credit) => creditKey(credit.artist.publicId ?? '', credit.role, credit.creditedName)).sort()
-
-  return now.join('\n') !== then.join('\n')
-}
-
-/**
- * The merges and removals that stand under the ticks: each needs every credits row it requires to
- * be ticked. The others leave their artist as it is and are not shown.
- */
+/** The merges and removals that stand under the ticks: each needs every credits row it requires to be ticked. */
 export function standingArtistActions(comparison: MatchComparison, ticks: MatchTicks): MatchArtistAction[] {
-  const written = comparisonCreditsRows(comparison).filter((row) => isWritten(row, ticks))
-  const songs = new Set(written.map((row) => row.songPublicId).filter((song): song is string => song !== null))
-  const albumCredits = written.some((row) => row.songPublicId === null)
-
-  return comparison.artistActions.filter(
-    (action) => (!action.requiresAlbumCredits || albumCredits) && action.requiredSongs.every((song) => songs.has(song)),
-  )
+  return comparison.artistActions.filter((action) => action.requiredRows.every((key) => ticks[key] === true))
 }
 
 /**
- * What an apply takes from the ticks: each ticked row that would change something, with the value it
- * showed, and every listed merge or removal, applied while it stands and stays ticked, else kept.
+ * What an apply takes from the ticks: each ticked row that would change something, as the admin
+ * saw it, and every listed merge or removal, applied while it stands and stays ticked, else kept.
  */
 export function buildMatchSelection(comparison: MatchComparison, ticks: MatchTicks): MatchSelection {
   const applied = standingArtistActions(comparison, ticks)
@@ -105,15 +51,8 @@ export function buildMatchSelection(comparison: MatchComparison, ticks: MatchTic
     .map((action) => action.artistPublicId)
 
   return {
-    fields: comparisonFieldRows(comparison)
-      .filter((row) => ticks[fieldRowKey(row)] === true && isFieldRowSelectable(row))
-      .map((row) => ({ field: row.field, current: row.current, songPublicId: row.songPublicId })),
-    credits: comparisonCreditsRows(comparison)
-      .filter((row) => isWritten(row, ticks))
-      .map((row) => ({
-        songPublicId: row.songPublicId,
-        current: row.current.map(({ artistPublicId, role, creditedName }) => ({ artistPublicId, role, creditedName })),
-      })),
+    fields: comparisonFieldRows(comparison).filter((row) => ticks[row.key] === true && isSelectable(row)),
+    credits: comparisonCreditsRows(comparison).filter((row) => ticks[row.key] === true && row.changes),
     artistActions: applied,
     keptArtists: comparison.artistActions
       .map((action) => action.artistPublicId)
@@ -121,18 +60,13 @@ export function buildMatchSelection(comparison: MatchComparison, ticks: MatchTic
   }
 }
 
-function isWritten(row: MatchCreditsRow, ticks: MatchTicks): boolean {
-  return ticks[creditsRowKey(row)] === true && creditsRowChanges(row)
-}
+/** The keys of the rows both comparisons list whose current value differs between them. */
+export function changedRowKeys(previous: MatchComparison, next: MatchComparison): string[] {
+  const before = new Map<string, string>(
+    [...comparisonFieldRows(previous), ...comparisonCreditsRows(previous)].map((row) => [row.key, JSON.stringify(row.current)]),
+  )
 
-function isList(value: MatchFieldValue | null): value is readonly string[] {
-  return Array.isArray(value)
-}
-
-function foldedNames(names: readonly string[]): string {
-  return [...new Set(names.map((name) => name.toLowerCase()))].sort().join('\n')
-}
-
-function creditKey(artistPublicId: string, role: string, creditedName: string): string {
-  return [artistPublicId, role, creditedName].join('\u0000')
+  return [...comparisonFieldRows(next), ...comparisonCreditsRows(next)]
+    .filter((row) => before.has(row.key) && before.get(row.key) !== JSON.stringify(row.current))
+    .map((row) => row.key)
 }

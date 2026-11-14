@@ -4,8 +4,8 @@ import { ArrowRight, Lock } from 'lucide-react'
 import { Checkbox } from '@/shared/components/ui/checkbox'
 import { textRole } from '@/shared/theme'
 import { ContentText, ContentTextList } from '@/shared/typography'
-import { creditsRowChanges, fieldRowChanges, isFieldRowSelectable } from './match-ticks'
-import type { CatalogCredit, MatchArtistAction, MatchCreditsRow, MatchField, MatchFieldRow, MatchFieldValue, ProposedCredit } from './types'
+import { isSelectable } from './match-ticks'
+import type { CatalogCredit, MatchArtistAction, MatchCreditsRow, MatchField, MatchFieldRow, ProposedCredit } from './types'
 
 /** Fields whose values are identifiers, set in mono. */
 const IDENTIFIER_FIELDS: ReadonlySet<MatchField> = new Set(['mbid', 'releaseMbid', 'barcode', 'catalogNumber'])
@@ -159,7 +159,6 @@ interface FieldTickRowProps extends TickProps {
 /** One field of a comparison: its tick, the value the item holds and the value MusicBrainz gives. */
 export function FieldTickRow({ row, label, accessibleName = label, language, ticked, applying, onTick }: FieldTickRowProps) {
   const id = useId()
-  const changes = fieldRowChanges(row)
 
   return (
     <Row data-match-row>
@@ -168,7 +167,7 @@ export function FieldTickRow({ row, label, accessibleName = label, language, tic
           id={id}
           aria-label={accessibleName}
           checked={ticked}
-          disabled={applying || !isFieldRowSelectable(row)}
+          disabled={applying || !isSelectable(row)}
           onCheckedChange={(checked) => onTick(checked === true)}
         />
       </TickCell>
@@ -180,7 +179,7 @@ export function FieldTickRow({ row, label, accessibleName = label, language, tic
             Locked
           </Tag>
         )}
-        {!row.locked && !changes && <Tag>Unchanged</Tag>}
+        {!row.locked && !row.changes && <Tag>Unchanged</Tag>}
       </RowLabel>
       <Value data-row-current>
         <FieldValue field={row.field} value={row.current} side="current" language={language} />
@@ -195,7 +194,7 @@ export function FieldTickRow({ row, label, accessibleName = label, language, tic
 
 interface FieldValueProps {
   readonly field: MatchField
-  readonly value: MatchFieldValue | null
+  readonly value: MatchFieldRow['current']
   readonly side: 'current' | 'proposed'
   readonly language?: string | null
 }
@@ -204,7 +203,7 @@ function FieldValue({ field, value, side, language }: FieldValueProps) {
   if (value === null || (Array.isArray(value) && value.length === 0)) {
     return <Muted>None</Muted>
   }
-  if (field === 'cover') {
+  if (field === 'cover' || typeof value === 'boolean') {
     return <>{side === 'current' ? 'Current cover' : 'Front cover from MusicBrainz'}</>
   }
   if (Array.isArray(value)) {
@@ -229,7 +228,6 @@ interface CreditsTickRowProps extends TickProps {
 /** The primary and featured credits of the item or a song now, and as MusicBrainz credits them. */
 export function CreditsTickRow({ row, label, accessibleName = label, ticked, applying, onTick }: CreditsTickRowProps) {
   const id = useId()
-  const changes = creditsRowChanges(row)
 
   return (
     <Row data-match-row>
@@ -238,13 +236,13 @@ export function CreditsTickRow({ row, label, accessibleName = label, ticked, app
           id={id}
           aria-label={accessibleName}
           checked={ticked}
-          disabled={applying || !changes}
+          disabled={applying || !row.changes}
           onCheckedChange={(checked) => onTick(checked === true)}
         />
       </TickCell>
       <RowLabel htmlFor={id} data-row-label>
         {label}
-        {!changes && <Tag>Unchanged</Tag>}
+        {!row.changes && <Tag>Unchanged</Tag>}
       </RowLabel>
       <CreditList data-row-current>
         {row.current.length === 0 ? <Muted>None</Muted> : row.current.map((credit, index) => <CurrentCredit key={index} credit={credit} />)}

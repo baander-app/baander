@@ -63,11 +63,13 @@ const makeAlbums = (count: number) =>
     disambiguation: null,
     annotation: null,
     mbid: null,
+    releaseMbid: null,
     discogsId: null,
     spotifyId: null,
     createdAt: '2024-01-01T00:00:00Z',
     coverImage: { url: `/cover/${i}.jpg`, blurhash: null },
     artists: [{ name: 'Test Artist', role: null }],
+    lockedFields: [],
   }))
 
 describe('ArtistDiscography', () => {

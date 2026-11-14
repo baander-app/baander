@@ -6,7 +6,6 @@ import { textRole } from '@/shared/theme'
 import { ContentText } from '@/shared/typography'
 import { CreditsTickRow, FieldTickRow } from './MatchRows'
 import { CREDITS_LABEL, formatMilliseconds, formatSeconds, matchFieldLabel, songRowLabel } from './match-format'
-import { creditsRowChanges, creditsRowKey, fieldRowChanges, fieldRowKey } from './match-ticks'
 import type { ComparedReleaseTrack, ComparedSong, MatchTicks, MatchTrack } from './types'
 
 /** Longer pairings render only the tracks in view. */
@@ -183,8 +182,8 @@ interface TrackItemProps extends Omit<PairingListProps, 'tracks'> {
 function TrackItem({ track, ticks, applying, onTick, language, multiDisc, ref, index, style }: TrackItemProps) {
   const { song, release } = track
   const pairedSong = release === null ? null : song
-  const fields = track.fields.filter(fieldRowChanges)
-  const credits = track.credits !== null && creditsRowChanges(track.credits) ? track.credits : null
+  const fields = track.fields.filter((row) => row.changes)
+  const credits = track.credits?.changes === true ? track.credits : null
 
   return (
     <Item ref={ref} data-index={index} style={style}>
@@ -206,9 +205,9 @@ function TrackItem({ track, ticks, applying, onTick, language, multiDisc, ref, i
                 label={label}
                 accessibleName={songRowLabel(label, pairedSong.title)}
                 language={language}
-                ticked={ticks[fieldRowKey(row)] === true}
+                ticked={ticks[row.key] === true}
                 applying={applying}
-                onTick={(ticked) => onTick(fieldRowKey(row), ticked)}
+                onTick={(ticked) => onTick(row.key, ticked)}
               />
             )
           })}
@@ -217,9 +216,9 @@ function TrackItem({ track, ticks, applying, onTick, language, multiDisc, ref, i
               row={credits}
               label={CREDITS_LABEL}
               accessibleName={songRowLabel(CREDITS_LABEL, pairedSong.title)}
-              ticked={ticks[creditsRowKey(credits)] === true}
+              ticked={ticks[credits.key] === true}
               applying={applying}
-              onTick={(ticked) => onTick(creditsRowKey(credits), ticked)}
+              onTick={(ticked) => onTick(credits.key, ticked)}
             />
           )}
         </Changes>
@@ -260,8 +259,8 @@ function trackKey(track: MatchTrack): string {
 }
 
 function estimatedHeight(track: MatchTrack): number {
-  const fields = track.fields.filter(fieldRowChanges).length
-  const credits = track.credits !== null && creditsRowChanges(track.credits) ? 1 : 0
+  const fields = track.fields.filter((row) => row.changes).length
+  const credits = track.credits?.changes === true ? 1 : 0
 
   return TRACK_LINE_HEIGHT + (fields + credits) * CHANGE_ROW_HEIGHT
 }

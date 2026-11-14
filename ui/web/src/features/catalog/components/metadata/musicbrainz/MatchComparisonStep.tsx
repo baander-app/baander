@@ -6,15 +6,7 @@ import { ArtistActionRow, CreditsTickRow, FieldTickRow, MatchRowHeads } from './
 import { MatchTrackPairing } from './MatchTrackPairing'
 import { MATCH_STALE } from './match-error-message'
 import { CREDITS_LABEL, countOf, matchFieldLabel, matchRowLabels } from './match-format'
-import {
-  artistActionKey,
-  buildMatchSelection,
-  creditsRowKey,
-  defaultTicks,
-  fieldRowKey,
-  isPairedTrack,
-  standingArtistActions,
-} from './match-ticks'
+import { artistActionKey, buildMatchSelection, defaultTicks, isPairedTrack, standingArtistActions } from './match-ticks'
 import type { MatchComparison, MatchItemType, MatchSelection, MatchTrack } from './types'
 
 const ITEM_TITLES: Readonly<Record<MatchItemType, string>> = {
@@ -67,8 +59,8 @@ export interface MatchComparisonStepProps {
   /** An apply is running: no tick can change and the buttons are disabled. */
   readonly applying: boolean
   /**
-   * After the comparison was reloaded because the item changed, the tick keys (`fieldRowKey`,
-   * `creditsRowKey`) of the rows whose current value changed; a notice lists them.
+   * Given once the comparison was reloaded because the item changed: the keys of the rows whose
+   * current value changed. A notice says the ticks are back to their defaults and lists those rows.
    */
   readonly changedRowKeys?: readonly string[]
   /** The item's stored language, which its titles and names take. */
@@ -85,7 +77,7 @@ export interface MatchComparisonStepProps {
  * mount the step again, with a new `key`, to reset them for a reloaded comparison. Unticking a
  * credits row hides the merges and removals that need it.
  */
-export function MatchComparisonStep({ comparison, applying, changedRowKeys = [], language, onApply, onBack }: MatchComparisonStepProps) {
+export function MatchComparisonStep({ comparison, applying, changedRowKeys, language, onApply, onBack }: MatchComparisonStepProps) {
   const [ticks, setTicks] = useState(() => defaultTicks(comparison))
   const ownTitleId = useId()
   const tracksTitleId = useId()
@@ -99,7 +91,7 @@ export function MatchComparisonStep({ comparison, applying, changedRowKeys = [],
 
   return (
     <Step>
-      {changedRowKeys.length > 0 && <ChangedRowsNotice comparison={comparison} keys={changedRowKeys} />}
+      {changedRowKeys !== undefined && <ChangedRowsNotice comparison={comparison} keys={changedRowKeys} />}
       {(comparison.fields.length > 0 || credits !== null) && (
         <Section aria-labelledby={ownTitleId}>
           <SectionTitle id={ownTitleId}>{ITEM_TITLES[comparison.type]}</SectionTitle>
@@ -110,18 +102,18 @@ export function MatchComparisonStep({ comparison, applying, changedRowKeys = [],
               row={row}
               label={matchFieldLabel(row.field, comparison.type)}
               language={language}
-              ticked={ticks[fieldRowKey(row)] === true}
+              ticked={ticks[row.key] === true}
               applying={applying}
-              onTick={(ticked) => tick(fieldRowKey(row), ticked)}
+              onTick={(ticked) => tick(row.key, ticked)}
             />
           ))}
           {credits !== null && (
             <CreditsTickRow
               row={credits}
               label={CREDITS_LABEL}
-              ticked={ticks[creditsRowKey(credits)] === true}
+              ticked={ticks[credits.key] === true}
               applying={applying}
-              onTick={(ticked) => tick(creditsRowKey(credits), ticked)}
+              onTick={(ticked) => tick(credits.key, ticked)}
             />
           )}
         </Section>

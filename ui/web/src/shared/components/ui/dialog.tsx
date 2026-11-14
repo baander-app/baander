@@ -85,9 +85,17 @@ const Overlay = styled(DialogPrimitive.Overlay).attrs<DataAttributes>({
 
 /* ─── Styled Content ─── */
 
+/** The widest a dialog grows from small screens up: compact by default, wide for comparisons and tables. */
+const DIALOG_WIDTHS = {
+  default: '24rem',
+  wide: '48rem',
+} as const
+
+type DialogSize = keyof typeof DIALOG_WIDTHS
+
 const StyledContent = styled(DialogPrimitive.Content).attrs<DataAttributes>({
   'data-slot': 'dialog-content',
-})`
+})<{ $size: DialogSize }>`
   position: fixed;
   top: 50%;
   left: 50%;
@@ -111,7 +119,7 @@ const StyledContent = styled(DialogPrimitive.Content).attrs<DataAttributes>({
   outline: none;
 
   @media (min-width: 640px) {
-    max-width: 24rem;
+    max-width: ${({ $size }) => DIALOG_WIDTHS[$size]};
   }
 
   &[data-state="open"] {
@@ -207,14 +215,16 @@ function DialogOverlay({ ...props }: React.ComponentProps<typeof DialogPrimitive
 function DialogContent({
   children,
   showCloseButton = true,
+  size = 'default',
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean
+  size?: DialogSize
 }) {
   return (
     <DialogPortal>
       <DialogOverlay />
-      <StyledContent {...props}>
+      <StyledContent data-size={size} $size={size} {...props}>
         {children}
         {showCloseButton && (
           <CloseButtonWrapper asChild>

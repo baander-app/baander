@@ -55,11 +55,13 @@ function makeAlbum(publicId: string, year: number) {
     disambiguation: null,
     annotation: null,
     mbid: null,
+    releaseMbid: null,
     discogsId: null,
     spotifyId: null,
     createdAt: '2024-01-01T00:00:00Z',
     coverImage: null,
     artists: [],
+    lockedFields: [],
   }
 }
 

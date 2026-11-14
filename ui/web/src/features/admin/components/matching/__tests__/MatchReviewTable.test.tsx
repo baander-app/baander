@@ -60,7 +60,7 @@ let pages: Record<string, MatchReviewPage>
 let failing: boolean
 let client: QueryClient
 
-function mount(onMatchAlbum: (albumPublicId: string) => void = vi.fn()) {
+function mount(onMatchAlbum: (review: MatchReview) => void = vi.fn()) {
   client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
     <QueryClientProvider client={client}>
@@ -161,7 +161,7 @@ describe('match review table', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
-  it("passes the row's album public ID to onMatchAlbum", async () => {
+  it("passes the row's album to onMatchAlbum", async () => {
     const user = userEvent.setup()
     const onMatchAlbum = vi.fn()
     mount(onMatchAlbum)
@@ -169,7 +169,7 @@ describe('match review table', () => {
     await user.click(await screen.findByRole('button', { name: 'Match Basement Tapes' }))
 
     expect(onMatchAlbum).toHaveBeenCalledTimes(1)
-    expect(onMatchAlbum).toHaveBeenCalledWith('album-unknown')
+    expect(onMatchAlbum).toHaveBeenCalledWith(expect.objectContaining({ albumPublicId: 'album-unknown', title: 'Basement Tapes' }))
   })
 
   it('reads the list under one stored admin-metadata live descriptor', async () => {
