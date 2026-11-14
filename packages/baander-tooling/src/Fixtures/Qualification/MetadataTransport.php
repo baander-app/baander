@@ -104,7 +104,7 @@ final class MetadataTransport
         }
         foreach (['recording' => ['recordings', $recordings], 'release-group' => ['release-groups', $albums], 'artist' => ['artists', $artists]] as $kind => [$key, $entries]) {
             if ($path === '/ws/2/' . $kind && is_string($query['query'] ?? null) && !isset($query['inc'])) {
-                $entry = $entries[$query['query']] ?? null;
+                $entry = $entries[self::luceneText($query['query'])] ?? null;
                 if ($entry !== null) {
                     return [[$key => [$entry], 'count' => 1], $entry['id']];
                 }
@@ -126,6 +126,12 @@ final class MetadataTransport
             }
         }
         return [null, null];
+    }
+
+    /** The text a Lucene query searches: MusicBrainz reads a backslash as escaping the next character. */
+    private static function luceneText(string $query): string
+    {
+        return preg_replace('/\\\\(.)/s', '$1', $query) ?? $query;
     }
 
     /** @param array<string,mixed> $query

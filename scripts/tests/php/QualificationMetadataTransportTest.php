@@ -81,7 +81,13 @@ final class QualificationMetadataTransportTest extends TestCase
         $client = new PublicHttpClient(MetadataTransport::create($this->directory . '/manifest.json', $this->directory . '/audit.jsonl'), new PublicDestinationPolicy(MetadataTransport::dnsResolver()));
         $logger = new \Psr\Log\NullLogger();
         $encoder = new \Symfony\Component\Serializer\Encoder\JsonEncoder();
-        $music = new \App\Metadata\Infrastructure\Api\MusicBrainz\MusicBrainzAdapter($logger, $encoder, $client);
+        $music = new \App\Metadata\Infrastructure\Api\MusicBrainz\MusicBrainzAdapter(
+            $logger,
+            $encoder,
+            $client,
+            new \Symfony\Component\RateLimiter\RateLimiterFactory(['id' => 'musicbrainz', 'policy' => 'no_limit'], new \Symfony\Component\RateLimiter\Storage\InMemoryStorage()),
+            new \App\Metadata\Infrastructure\Api\CoverArtArchive\CoverArtArchiveAdapter($logger, $encoder, $client),
+        );
         $song = $plan['files'][0];
         self::assertSame($song['metadata']['id'], $music->searchRecording($song['title'], limit: 5)->recordings[0]->id);
         self::assertSame($plan['albums'][$song['album']], $music->searchReleaseGroup($song['album'], limit: 5)->releaseGroups[0]->id);
