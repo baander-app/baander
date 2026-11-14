@@ -33,12 +33,12 @@ The command finds the song in any library; it does not need library access. It f
 
 A song that already has lyrics keeps them: the command reports a conflict and exits with 1, and the API answers 409. No command or API route replaces stored lyrics. A result that another song already has, such as the same recording on a compilation, is stored for this song too.
 
-When LRCLIB has no result with the ID, the command exits with 1 and the API answers 404. When LRCLIB cannot be reached, answers with an error, or returns something unreadable, the command reports that LRCLIB is unavailable and exits with 1; the API answers 503. In each case nothing is stored.
+When LRCLIB has no result with the ID, the command exits with 1 and the API answers 404. When LRCLIB rejects the request with a client error other than 404, 408 or 429, the command reports the rejection and exits with 1; the API answers 409 with the reason `lrclib_rejected`. When LRCLIB cannot be reached, times out, answers 408, 429 or a server error, or returns something unreadable, the command reports that LRCLIB is unavailable and exits with 1; the API answers 503. In each case nothing is stored.
 
 ## Exit codes
 
 | Code | Meaning |
 |------|---------|
 | 0 | The lyrics were stored |
-| 1 | No song has the public ID, the song already has lyrics, LRCLIB has no result with the ID, or LRCLIB is unavailable; the message says which |
+| 1 | No song has the public ID, the song already has lyrics, LRCLIB has no result with the ID, LRCLIB rejected the request, or LRCLIB is unavailable; the message says which |
 | 2 | The result ID is not an integer, or the public ID is malformed |

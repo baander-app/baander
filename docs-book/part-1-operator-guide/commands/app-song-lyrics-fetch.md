@@ -28,18 +28,22 @@ make exec cmd="php bin/console app:song:lyrics:fetch V1StGXR8_Z5jdHi6B-myT --jso
 
 ## Details
 
-The command finds the song in any library; it does not need library access. It looks the song up on LRCLIB by title, artist, album and duration, first in LRCLIB's own database and then through LRCLIB's external sources, and stores the first lyrics it finds. It then prints the source, whether the lyrics are synced or the track is instrumental, and the plain lyrics.
+The command finds the song in any library; it does not need library access. It looks the song up on LRCLIB by title, artist, album and duration, first in LRCLIB's own database and then through LRCLIB's external sources, and stores the first lyrics it finds. The duration is the song's length rounded to the nearest second. The command then prints the source, whether the lyrics are synced or the track is instrumental, and the plain lyrics.
 
 A song that already has lyrics keeps them. The command prints the stored lyrics without asking LRCLIB, as the API does. No command or API route replaces stored lyrics.
 
-LRCLIB needs the song's artist and duration. When the song lacks either, or LRCLIB has no lyrics for it, the command says that no lyrics were found and stores nothing. It still exits with 0, as the API answers 200 with an empty `data`.
+LRCLIB needs the song's artist and a length above zero. When the song has no primary artist credit, or no length above zero, the command does not ask LRCLIB. It reports which of the two is missing, stores nothing and exits with 1. The API answers 409 and names the cause in the error's `details.reason`: `song_has_no_artist` or `song_has_no_length`.
 
-When LRCLIB cannot be reached, answers with an error, or returns something unreadable, the command reports that LRCLIB is unavailable and exits with 1. The API answers 503. Nothing is stored, and a later run may succeed.
+When LRCLIB has no lyrics for the song, the command says that no lyrics were found and stores nothing. It exits with 0, as the API answers 200 with an empty `data`.
+
+When LRCLIB rejects the request with a client error other than 404, 408 or 429, such as 400 for a duration it does not accept, the command reports the rejection, stores nothing and exits with 1. The API answers 409 with the reason `lrclib_rejected`. Sending the same request again gets the same answer, so check the song's tags and length before trying again.
+
+When LRCLIB cannot be reached, times out, answers 408, 429 or a server error, or returns something unreadable, the command reports that LRCLIB is unavailable and exits with 1. The API answers 503. Nothing is stored, and a later run may succeed.
 
 ## Exit codes
 
 | Code | Meaning |
 |------|---------|
-| 0 | The song has lyrics, or none were found; the message says which |
-| 1 | No song has the public ID, or LRCLIB is unavailable |
+| 0 | The song has lyrics, or LRCLIB has none for it; the message says which |
+| 1 | No song has the public ID, the song has no artist or no length, LRCLIB rejected the request, or LRCLIB is unavailable; the message says which |
 | 2 | The public ID is malformed |

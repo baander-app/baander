@@ -8,14 +8,19 @@ use App\Catalog\Application\Port\SongLookupInterface;
 use App\Catalog\Application\Port\SongLyricSignature;
 use App\Lyrics\Application\Command\FetchLyricsCommand;
 use App\Lyrics\Application\CommandHandler\FetchLyricsHandler;
+use App\Lyrics\Application\DTO\LrclibRejected;
 use App\Lyrics\Application\DTO\LrclibResult;
 use App\Lyrics\Application\DTO\LrclibUnavailable;
+use App\Lyrics\Application\DTO\LyricsFetchOutcome;
+use App\Lyrics\Application\DTO\LyricsFetchResult;
 use App\Lyrics\Application\Exception\LyricsProviderUnavailableException;
 use App\Lyrics\Application\Port\LrclibClientInterface;
 use App\Lyrics\Domain\Model\Lyrics;
 use App\Lyrics\Domain\Repository\LyricsRepositoryInterface;
+use App\Shared\Application\Exception\ConflictException;
 use App\Shared\Domain\Model\Uuid;
 use App\Tests\Unit\Lyrics\InMemoryQueuedLyricsFetches;
+use PHPUnit\Framework\Attributes\TestWith;
 use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
@@ -224,23 +229,46 @@ final class FetchLyricsHandlerTest extends TestCase
 
         $result = ($this->handler)(new FetchLyricsCommand($songId));
 
-        $this->assertFalse($result->isProviderUnavailable());
+        $this->assertSame(LyricsFetchOutcome::Found, $result->outcome);
         $this->assertSame($stored, $result->lyrics);
     }
 
-    public function testReturnsNullWhenNoArtistName(): void
+    /** A song without a primary artist credit is not looked up, and the fetch names that cause rather than "no match". */
+    #[TestWith([null])]
+    #[TestWith(['  '])]
+    public function testASongWithoutAnArtistIsNotAttempted(?string $artistName): void
     {
-        $this->assertSkippedWithoutProviderCall(new SongLyricSignature('Test Song', null, 'Test Album', 200.0));
+        $result = $this->fetchWithoutProviderCall(new SongLyricSignature('Test Song', $artistName, 'Test Album', 200.0));
+
+        $this->assertSame(LyricsFetchOutcome::NoArtist, $result->outcome);
+        $this->assertConflictReason('song_has_no_artist', $result);
     }
 
-    public function testReturnsNullWhenArtistNameIsEmpty(): void
+    /** A song whose length is missing or not positive is not looked up, and the fetch names that cause. */
+    #[TestWith([null])]
+    #[TestWith([0.0])]
+    #[TestWith([-1.5])]
+    public function testASongWithoutALengthIsNotAttempted(?float $length): void
     {
-        $this->assertSkippedWithoutProviderCall(new SongLyricSignature('Test Song', '  ', 'Test Album', 200.0));
+        $result = $this->fetchWithoutProviderCall(new SongLyricSignature('Test Song', 'Test Artist', 'Test Album', $length));
+
+        $this->assertSame(LyricsFetchOutcome::NoLength, $result->outcome);
+        $this->assertConflictReason('song_has_no_length', $result);
     }
 
-    public function testReturnsNullWhenSongHasNoDuration(): void
+    /** A queued fetch ends without a retry for a cause too, and carries the cause for its run. */
+    public function testAQueuedFetchOfASongWithoutAnArtistEndsWithItsCauseWithoutThrowing(): void
     {
-        $this->assertSkippedWithoutProviderCall(new SongLyricSignature('Test Song', 'Test Artist', 'Test Album', null));
+        $songId = Uuid::v7();
+        $this->marks->markQueued($songId, 60);
+        $this->songs->method('findLyricSignature')->willReturn(new SongLyricSignature('Rescue Me', null, 'Rescue Me', 200.0));
+        $this->lyricsRepository->method('findBySongId')->willReturn(null);
+
+        $result = ($this->handler)(new FetchLyricsCommand($songId, Uuid::v7()));
+
+        $this->assertSame(LyricsFetchOutcome::NoArtist, $result->outcome);
+        $this->assertNull($result->lyrics);
+        $this->assertSame([], $this->marks->queued);
     }
 
     public function testReturnsNullWhenNoLyricsFoundOnLrclib(): void
@@ -256,9 +284,10 @@ final class FetchLyricsHandlerTest extends TestCase
         $this->lrclibClient->method('getBySignature')->willReturn(null);
         $this->lyricsRepository->expects($this->never())->method('add');
 
-        $lyrics = ($this->handler)(new FetchLyricsCommand($songId))->lyrics;
+        $result = ($this->handler)(new FetchLyricsCommand($songId));
 
-        $this->assertNull($lyrics);
+        $this->assertSame(LyricsFetchOutcome::NoMatch, $result->outcome);
+        $this->assertNull($result->lyricsOrFail());
     }
 
     public function testUsesEmptyAlbumNameWhenAlbumTitleIsUnknown(): void
@@ -314,10 +343,32 @@ final class FetchLyricsHandlerTest extends TestCase
         // A queued fetch ends here, so Messenger acknowledges it without a retry.
         $result = ($this->handler)(new FetchLyricsCommand($songId));
 
-        $this->assertTrue($result->isProviderUnavailable());
+        $this->assertSame(LyricsFetchOutcome::Unavailable, $result->outcome);
         $this->assertNull($result->lyrics);
         $this->expectException(LyricsProviderUnavailableException::class);
         $result->lyricsOrFail();
+    }
+
+    // --- Requests LRCLIB rejects ---
+
+    public function testARejectedRequestIsReportedAsRejectedWithoutThrowing(): void
+    {
+        $this->lrclibClient = $this->createMock(LrclibClientInterface::class);
+        $this->lyricsRepository = $this->createMock(LyricsRepositoryInterface::class);
+        $this->handler = $this->createFetchLyricsHandlerFixture();
+        $songId = Uuid::v7();
+
+        $this->songs->method('findLyricSignature')->willReturn(new SongLyricSignature('Amore Infelice', 'Suspekt', 'Elektra', 0.238));
+        $this->lyricsRepository->method('findBySongId')->willReturn(null);
+        $this->lrclibClient->expects($this->once())->method('getBySignatureCached')->willReturn(new LrclibRejected(400));
+        $this->lrclibClient->expects($this->once())->method('getBySignature')->willReturn(new LrclibRejected(400));
+        $this->lyricsRepository->expects($this->never())->method('add');
+
+        $result = ($this->handler)(new FetchLyricsCommand($songId));
+
+        $this->assertSame(LyricsFetchOutcome::Rejected, $result->outcome);
+        $this->assertNull($result->lyrics);
+        $this->assertConflictReason('lrclib_rejected', $result);
     }
 
     public function testACachedEndpointOutageFallsBackToTheFullEndpoint(): void
@@ -336,7 +387,7 @@ final class FetchLyricsHandlerTest extends TestCase
 
         $result = ($this->handler)(new FetchLyricsCommand($songId));
 
-        $this->assertFalse($result->isProviderUnavailable());
+        $this->assertSame(LyricsFetchOutcome::Found, $result->outcome);
         $this->assertSame('Full endpoint lyrics', $result->lyricsOrFail()?->getLyrics());
     }
 
@@ -350,7 +401,7 @@ final class FetchLyricsHandlerTest extends TestCase
 
         $result = ($this->handler)(new FetchLyricsCommand($songId));
 
-        $this->assertFalse($result->isProviderUnavailable());
+        $this->assertSame(LyricsFetchOutcome::NoMatch, $result->outcome);
         $this->assertNull($result->lyricsOrFail());
     }
 
@@ -400,7 +451,7 @@ final class FetchLyricsHandlerTest extends TestCase
         $this->assertSame([$songId->toString() => 60], $this->marks->queued);
     }
 
-    private function assertSkippedWithoutProviderCall(SongLyricSignature $signature): void
+    private function fetchWithoutProviderCall(SongLyricSignature $signature): LyricsFetchResult
     {
         $this->lrclibClient = $this->createMock(LrclibClientInterface::class);
         $this->lyricsRepository = $this->createMock(LyricsRepositoryInterface::class);
@@ -414,6 +465,20 @@ final class FetchLyricsHandlerTest extends TestCase
         $this->lrclibClient->expects($this->never())->method('getBySignature');
         $this->lyricsRepository->expects($this->never())->method('add');
 
-        $this->assertNull(($this->handler)(new FetchLyricsCommand($songId))->lyrics);
+        $result = ($this->handler)(new FetchLyricsCommand($songId));
+        $this->assertNull($result->lyrics);
+
+        return $result;
+    }
+
+    /** The per-song route and app:song:lyrics:fetch report the result as a conflict naming its cause. */
+    private function assertConflictReason(string $reason, LyricsFetchResult $result): void
+    {
+        try {
+            $result->lyricsOrFail();
+            $this->fail(sprintf('Expected a conflict with the reason "%s".', $reason));
+        } catch (ConflictException $conflict) {
+            $this->assertSame($reason, $conflict->details['reason'] ?? null);
+        }
     }
 }

@@ -13,7 +13,8 @@ The `Lyrics` aggregate stores lyrics indexed by song ID, supporting multiple sou
 
 **LRCLIB integration strategy:**
 - On-demand fetch: cached endpoint (`/api/get-cached`) first for predictable latency, fallback to full (`/api/get`) on a miss or an error. A song that has lyrics keeps them; the fetch returns them without calling LRCLIB
-- Outcomes: `FetchLyricsHandler` returns a `LyricsFetchResult` (found, not found, LRCLIB unavailable) and never throws for an outage, so queued fetches end without a retry. The per-song API route and `app:song:lyrics:fetch` report an outage as `LyricsProviderUnavailableException` (HTTP 503, exit 1); search and apply do the same. Apply refuses a song that has lyrics as a conflict; a result another song already has is stored for this song too
+- Outcomes: `FetchLyricsHandler` returns a `LyricsFetchResult` whose `LyricsFetchOutcome` is found, no match, no artist, no length, rejected or unavailable. It never throws for any of them, so queued fetches end without a retry. A song without a primary artist credit, or whose length is missing or not positive, is not looked up. The per-song API route and `app:song:lyrics:fetch` turn every outcome except found and no match into an error that exits with 1: no artist and no length into `LyricsFetchNotAttemptedException` (HTTP 409, `details.reason` `song_has_no_artist` or `song_has_no_length`), rejected into `LyricsRequestRejectedException` (409, `lrclib_rejected`), and unavailable into `LyricsProviderUnavailableException` (503). Search and apply report a rejection and an outage the same way. Apply refuses a song that has lyrics with `SongHasLyricsException` (409, `song_has_lyrics`); a result another song already has is stored for this song too
+- LRCLIB answers: 404 is no match. Any other 4xx except 408 and 429 is a rejected request; sending it again gets the same answer. 408, 429, redirects, server errors, timeouts, transport failures and unreadable bodies mean LRCLIB is unavailable. Signature lookups send the song's length rounded to the nearest second
 - Search fallback: manual keyword search via `/api/search` when auto-match by track signature fails
 - Bulk scan: console command iterates songs without lyrics and fetches from LRCLIB
 - Automatic fetch: while `lyrics.auto_fetch` is on, Catalog ingest queues one fetch on the `async` transport for each new song without a sidecar `.lrc` file. The setting is off by default and does not gate the bulk scan or the on-demand fetch.
@@ -23,7 +24,7 @@ The `Lyrics` aggregate stores lyrics indexed by song ID, supporting multiple sou
 | Port | Layer | Purpose |
 |------|-------|---------|
 | `LyricsPortInterface` | Application | Reads the stored lyrics of a song |
-| `LrclibClientInterface` | Application | LRCLIB HTTP API contract (getBySignature, search, getById); null or an empty list for a miss, `LrclibUnavailable` for an outage |
+| `LrclibClientInterface` | Application | LRCLIB HTTP API contract (getBySignature, search, getById); null or an empty list for a miss, `LrclibRejected` for a refused request, `LrclibUnavailable` for an outage |
 | `LyricsFetchRequestInterface` | Application (contract) | Lets Catalog ingest request fetches for new songs; reads `lyrics.auto_fetch` on every call |
 
 ## Events

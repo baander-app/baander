@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Lyrics\Infrastructure\Api;
 
+use App\Lyrics\Application\DTO\LrclibRejected;
 use App\Lyrics\Application\DTO\LrclibResult;
 use App\Lyrics\Application\DTO\LrclibSearchResult;
 use App\Lyrics\Application\DTO\LrclibUnavailable;
@@ -26,6 +27,8 @@ final class LrclibClient implements LrclibClientInterface
     private const USER_AGENT = 'Baander';
     /** Seconds a request may wait for data, and may take in all, before LRCLIB counts as unavailable. */
     private const TIMEOUT_SECONDS = 10;
+    /** Client errors that mean "no record" or "try again later" rather than a refused request. */
+    private const NOT_REJECTIONS = [404, 408, 429];
 
     public function __construct(
         private readonly HttpClientInterface $httpClient,
@@ -39,7 +42,7 @@ final class LrclibClient implements LrclibClientInterface
         string $artistName,
         string $albumName,
         float $duration,
-    ): LrclibResult|LrclibUnavailable|null {
+    ): LrclibResult|LrclibRejected|LrclibUnavailable|null {
         return $this->fetchBySignature('/api/get-cached', $trackName, $artistName, $albumName, $duration);
     }
 
@@ -48,11 +51,11 @@ final class LrclibClient implements LrclibClientInterface
         string $artistName,
         string $albumName,
         float $duration,
-    ): LrclibResult|LrclibUnavailable|null {
+    ): LrclibResult|LrclibRejected|LrclibUnavailable|null {
         return $this->fetchBySignature('/api/get', $trackName, $artistName, $albumName, $duration);
     }
 
-    public function getById(int $id): LrclibResult|LrclibUnavailable|null
+    public function getById(int $id): LrclibResult|LrclibRejected|LrclibUnavailable|null
     {
         $this->logger->debug('LRCLIB fetch by ID', [
             'service' => 'lrclib',
@@ -68,7 +71,7 @@ final class LrclibClient implements LrclibClientInterface
         return LrclibResult::fromApiResponse($data);
     }
 
-    public function search(string $query): array|LrclibUnavailable
+    public function search(string $query): array|LrclibRejected|LrclibUnavailable
     {
         $this->logger->debug('LRCLIB search', [
             'service' => 'lrclib',
@@ -80,7 +83,7 @@ final class LrclibClient implements LrclibClientInterface
         if ($data === null) {
             return [];
         }
-        if ($data instanceof LrclibUnavailable) {
+        if (!is_array($data)) {
             return $data;
         }
         if (!array_is_list($data)) {
@@ -102,7 +105,7 @@ final class LrclibClient implements LrclibClientInterface
         string $artistName,
         string $albumName,
         float $duration,
-    ): LrclibResult|LrclibUnavailable|null {
+    ): LrclibResult|LrclibRejected|LrclibUnavailable|null {
         $this->logger->debug('LRCLIB fetch by signature', [
             'service' => 'lrclib',
             'endpoint' => $endpoint,
@@ -116,7 +119,8 @@ final class LrclibClient implements LrclibClientInterface
             'track_name' => $trackName,
             'artist_name' => $artistName,
             'album_name' => $albumName,
-            'duration' => (string) (int) $duration,
+            // LRCLIB takes whole seconds; rounding sends the second nearest the song's length.
+            'duration' => round($duration) |> intval(...) |> strval(...),
         ]);
 
         if (!is_array($data)) {
@@ -129,16 +133,17 @@ final class LrclibClient implements LrclibClientInterface
     /**
      * Execute an HTTP request against the LRCLIB API.
      *
-     * Returns null on 404 (no record), and LrclibUnavailable, after logging a warning, when
-     * the request fails or times out, LRCLIB answers with another error status, or the body
-     * is not JSON.
+     * Returns null on 404 (no record). After logging a warning, returns LrclibRejected when
+     * LRCLIB answers with a client error other than 404, 408 or 429, and LrclibUnavailable
+     * when the request fails or times out, LRCLIB answers 408, 429, a redirect or a server
+     * error, or the body is not JSON.
      * Never throws to callers.
      *
      * @param array<string, mixed> $params
      *
-     * @return array<array-key, mixed>|LrclibUnavailable|null the decoded JSON response
+     * @return array<array-key, mixed>|LrclibRejected|LrclibUnavailable|null the decoded JSON response
      */
-    private function request(string $method, string $endpoint, array $params = []): array|LrclibUnavailable|null
+    private function request(string $method, string $endpoint, array $params = []): array|LrclibRejected|LrclibUnavailable|null
     {
         $url = $this->baseUrl . $endpoint;
 
@@ -156,26 +161,44 @@ final class LrclibClient implements LrclibClientInterface
 
             $statusCode = $response->getStatusCode();
 
-            if ($statusCode === 404) {
-                return null;
-            }
-
             if ($statusCode >= 300) {
-                return $this->unavailable($endpoint, sprintf('HTTP %d', $statusCode));
+                return $this->errorAnswer($endpoint, $statusCode, sprintf('HTTP %d', $statusCode));
             }
 
             return $response->toArray();
         } catch (ClientException $e) {
             $statusCode = $e->getResponse()->getStatusCode();
 
-            if ($statusCode === 404) {
-                return null;
-            }
-
-            return $this->unavailable($endpoint, sprintf('HTTP %d: %s', $statusCode, $e->getMessage()));
+            return $this->errorAnswer($endpoint, $statusCode, sprintf('HTTP %d: %s', $statusCode, $e->getMessage()));
         } catch (\Throwable $e) {
             return $this->unavailable($endpoint, $e->getMessage());
         }
+    }
+
+    /** What an error status means: no record, a refused request, or LRCLIB being unavailable. */
+    private function errorAnswer(string $endpoint, int $statusCode, string $reason): LrclibRejected|LrclibUnavailable|null
+    {
+        return match (true) {
+            $statusCode === 404 => null,
+            self::isRejection($statusCode) => $this->rejected($endpoint, $statusCode, $reason),
+            default => $this->unavailable($endpoint, $reason),
+        };
+    }
+
+    private static function isRejection(int $statusCode): bool
+    {
+        return $statusCode >= 400 && $statusCode < 500 && !in_array($statusCode, self::NOT_REJECTIONS, true);
+    }
+
+    private function rejected(string $endpoint, int $statusCode, string $reason): LrclibRejected
+    {
+        $this->logger->warning('LRCLIB rejected the request', [
+            'service' => 'lrclib',
+            'endpoint' => $endpoint,
+            'error' => $reason,
+        ]);
+
+        return new LrclibRejected($statusCode);
     }
 
     private function unavailable(string $endpoint, string $reason): LrclibUnavailable

@@ -6,6 +6,7 @@ namespace App\Tests\Unit\Lyrics\Application\CommandHandler;
 
 use App\Lyrics\Application\Command\ApplyLyricsCommand;
 use App\Lyrics\Application\CommandHandler\ApplyLyricsHandler;
+use App\Lyrics\Application\DTO\LrclibRejected;
 use App\Lyrics\Application\DTO\LrclibResult;
 use App\Lyrics\Application\DTO\LrclibUnavailable;
 use App\Lyrics\Application\Exception\LyricsProviderUnavailableException;
@@ -57,10 +58,10 @@ final class ApplyLyricsHandlerTest extends TestCase
         $this->lrclib->expects($this->never())->method('getById');
         $this->lyrics->expects($this->never())->method('add');
 
-        $this->expectException(ConflictException::class);
-        $this->expectExceptionMessage('The song already has lyrics.');
+        $conflict = $this->conflictOf(fn() => ($this->handler)(new ApplyLyricsCommand(912345, $songId)));
 
-        ($this->handler)(new ApplyLyricsCommand(912345, $songId));
+        $this->assertSame('The song already has lyrics.', $conflict->getMessage());
+        $this->assertSame('song_has_lyrics', $conflict->details['reason'] ?? null);
     }
 
     /** A fetch stored lyrics for the song after the check: the apply still answers the conflict. */
@@ -77,12 +78,12 @@ final class ApplyLyricsHandlerTest extends TestCase
                 return new LrclibResult(912345, 'Song', 'Artist', 'Album', 200.0, false, 'Applied lyrics', null);
             });
 
-        try {
-            (new ApplyLyricsHandler($this->lrclib, $repository, new NullLogger()))(new ApplyLyricsCommand(912345, $songId));
-            $this->fail('The apply that lost the race must be a conflict.');
-        } catch (ConflictException $e) {
-            $this->assertSame('The song already has lyrics.', $e->getMessage());
-        }
+        $conflict = $this->conflictOf(
+            fn() => (new ApplyLyricsHandler($this->lrclib, $repository, new NullLogger()))(new ApplyLyricsCommand(912345, $songId)),
+        );
+
+        $this->assertSame('The song already has lyrics.', $conflict->getMessage());
+        $this->assertSame('song_has_lyrics', $conflict->details['reason'] ?? null);
 
         $this->assertSame($stored, $repository->findBySongId($songId));
     }
@@ -126,6 +127,29 @@ final class ApplyLyricsHandlerTest extends TestCase
         $this->expectException(LyricsProviderUnavailableException::class);
 
         ($this->handler)(new ApplyLyricsCommand(912345, Uuid::v7()));
+    }
+
+    /** A request LRCLIB refuses is the same conflict a per-song fetch reports for it. */
+    public function testARejectedRequestIsAConflict(): void
+    {
+        $this->lyrics->method('findBySongId')->willReturn(null);
+        $this->lrclib->expects($this->once())->method('getById')->willReturn(new LrclibRejected(400));
+        $this->lyrics->expects($this->never())->method('add');
+
+        $conflict = $this->conflictOf(fn() => ($this->handler)(new ApplyLyricsCommand(912345, Uuid::v7())));
+
+        $this->assertSame('lrclib_rejected', $conflict->details['reason'] ?? null);
+    }
+
+    private function conflictOf(callable $apply): ConflictException
+    {
+        try {
+            $apply();
+        } catch (ConflictException $conflict) {
+            return $conflict;
+        }
+
+        $this->fail('The apply must be a conflict.');
     }
 
     private function inMemoryRepository(): LyricsRepositoryInterface

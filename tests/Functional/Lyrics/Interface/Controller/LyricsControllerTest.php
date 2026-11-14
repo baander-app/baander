@@ -12,10 +12,15 @@ use App\Lyrics\Application\Exception\LyricsProviderUnavailableException;
 use App\Lyrics\Application\Port\LrclibClientInterface;
 use App\Lyrics\Domain\Model\Lyrics;
 use App\Lyrics\Domain\Repository\LyricsRepositoryInterface;
+use App\Lyrics\Infrastructure\Api\LrclibClient;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Tests\Functional\Lyrics\FakeLrclibClient;
 use App\Tests\Functional\TestCase;
+use PHPUnit\Framework\Attributes\TestWith;
+use Psr\Log\NullLogger;
+use Symfony\Component\HttpClient\MockHttpClient;
+use Symfony\Component\HttpClient\Response\MockResponse;
 use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Stamp\ReceivedStamp;
@@ -189,6 +194,105 @@ final class LyricsControllerTest extends TestCase
         $this->assertNull($this->lyricsRepository->findBySongId($songId));
     }
 
+    /** A song without a primary artist credit is not looked up, and the answer names that cause rather than "no lyrics". */
+    public function testFetchingASongWithoutAnArtistAnswers409WithTheMissingArtistReason(): void
+    {
+        $admin = $this->createAdminUser();
+        [$songId, , $songPublicId] = $this->createSongFixture($admin->getId(), artistName: null);
+
+        $error = $this->assertJsonResponse($this->authenticatedRequest('POST', "/api/songs/{$songPublicId}/lyrics/fetch", $admin), 409);
+
+        $this->assertSame('song_has_no_artist', $error['error']['details']['reason'] ?? null);
+        $this->assertSame([], $this->lrclib->calls);
+        $this->assertNull($this->lyricsRepository->findBySongId($songId));
+    }
+
+    public function testFetchingASongWhoseLengthIs0Answers409WithTheMissingLengthReasonAndSendsNoRequest(): void
+    {
+        $admin = $this->createAdminUser();
+        [$songId, , $songPublicId] = $this->createSongFixture($admin->getId(), length: 0.0);
+
+        $error = $this->assertJsonResponse($this->authenticatedRequest('POST', "/api/songs/{$songPublicId}/lyrics/fetch", $admin), 409);
+
+        $this->assertSame('song_has_no_length', $error['error']['details']['reason'] ?? null);
+        $this->assertSame([], $this->lrclib->calls);
+        $this->assertNull($this->lyricsRepository->findBySongId($songId));
+    }
+
+    /** Through the real client: LRCLIB answering 400 is a rejected request. */
+    public function testLrclibAnswering400Answers409WithTheRejectedReason(): void
+    {
+        $this->lrclibAnswering(400);
+        $admin = $this->createAdminUser();
+        [$songId, , $songPublicId] = $this->createSongFixture($admin->getId());
+
+        $error = $this->assertJsonResponse($this->authenticatedRequest('POST', "/api/songs/{$songPublicId}/lyrics/fetch", $admin), 409);
+
+        $this->assertSame('lrclib_rejected', $error['error']['details']['reason'] ?? null);
+        $this->assertNull($this->lyricsRepository->findBySongId($songId));
+    }
+
+    /** Through the real client: LRCLIB answering 404 is no match. */
+    public function testLrclibAnswering404Answers200WithEmptyData(): void
+    {
+        $this->lrclibAnswering(404);
+        $admin = $this->createAdminUser();
+        [, , $songPublicId] = $this->createSongFixture($admin->getId());
+
+        $data = $this->assertJsonResponse($this->authenticatedRequest('POST', "/api/songs/{$songPublicId}/lyrics/fetch", $admin), 200, 'data');
+
+        $this->assertSame([], $data['data']);
+    }
+
+    /** Through the real client: a timeout answer, rate limiting and a server error are LRCLIB being unavailable. */
+    #[TestWith([408])]
+    #[TestWith([429])]
+    #[TestWith([500])]
+    public function testLrclibAnsweringAnOutageStatusAnswers503(int $lrclibStatus): void
+    {
+        $this->lrclibAnswering($lrclibStatus);
+        $admin = $this->createAdminUser();
+        [, , $songPublicId] = $this->createSongFixture($admin->getId());
+
+        $error = $this->assertJsonResponse($this->authenticatedRequest('POST', "/api/songs/{$songPublicId}/lyrics/fetch", $admin), 503);
+
+        $this->assertSame(LyricsProviderUnavailableException::MESSAGE, $error['error']['message']);
+    }
+
+    /** Fetch, search and apply report a request LRCLIB refuses as the same conflict. */
+    public function testARejectedRequestAnswers409WithTheRejectedReasonOnEveryRoute(): void
+    {
+        $admin = $this->createAdminUser();
+        [$songId, , $songPublicId] = $this->createSongFixture($admin->getId());
+        $this->lrclib->rejecting();
+
+        $answers = [
+            'fetch' => $this->authenticatedRequest('POST', "/api/songs/{$songPublicId}/lyrics/fetch", $admin),
+            'search' => $this->authenticatedRequest('GET', '/api/lyrics/search?q=Still+Alive', $admin),
+            'apply' => $this->authenticatedRequest('POST', '/api/lyrics/search/912345/apply', $admin, ['songPublicId' => $songPublicId]),
+        ];
+
+        foreach ($answers as $route => $response) {
+            $error = $this->assertJsonResponse($response, 409);
+            $this->assertSame('lrclib_rejected', $error['error']['details']['reason'] ?? null, $route);
+        }
+        $this->assertNull($this->lyricsRepository->findBySongId($songId));
+    }
+
+    public function testAnAutomaticFetchOfASongWithoutAnArtistCompletesWithoutAskingLrclib(): void
+    {
+        $admin = $this->createAdminUser();
+        [$songId] = $this->createSongFixture($admin->getId(), artistName: null);
+
+        // Handled as a worker handles a queued fetch: no exception means no retry and no failure entry.
+        $envelope = static::getContainer()->get(MessageBusInterface::class)
+            ->dispatch(new Envelope(new FetchLyricsCommand($songId), [new ReceivedStamp('async')]));
+
+        $this->assertInstanceOf(Envelope::class, $envelope);
+        $this->assertSame([], $this->lrclib->calls);
+        $this->assertNull($this->lyricsRepository->findBySongId($songId));
+    }
+
     public function testSearchLyricsWithValidQuery(): void
     {
         $user = $this->createTestUser();
@@ -264,6 +368,7 @@ final class LyricsControllerTest extends TestCase
         );
 
         $this->assertSame('The song already has lyrics.', $error['error']['message']);
+        $this->assertSame('song_has_lyrics', $error['error']['details']['reason'] ?? null);
         $this->entityManager->clear();
         $this->assertSame('Existing lyrics', $this->lyricsRepository->findBySongId($songId)?->getLyrics());
     }
@@ -298,12 +403,23 @@ final class LyricsControllerTest extends TestCase
         $this->assertJsonResponse($apply(), 503);
     }
 
+    /** The real LRCLIB client, with every request answered by the given status and no request leaving the test. */
+    private function lrclibAnswering(int $status): void
+    {
+        $this->lrclib->delegate = new LrclibClient(
+            new MockHttpClient(static fn(): MockResponse => new MockResponse('', ['http_code' => $status])),
+            new NullLogger(),
+        );
+    }
+
     /**
      * Creates a minimal album, artist and song via raw SQL to satisfy FK constraints.
      *
+     * @param string|null $artistName the song's primary credit, or null for a song without one
+     *
      * @return array{0: Uuid, 1: Uuid, 2: string} [songId, albumId, songPublicId]
      */
-    private function createSongFixture(Uuid $userId): array
+    private function createSongFixture(Uuid $userId, ?string $artistName = 'Lyrics test artist', float $length = 233.0): array
     {
         $libraryId = Uuid::v7();
         $albumId = Uuid::v7();
@@ -353,7 +469,7 @@ final class LyricsControllerTest extends TestCase
                 '/tmp/test-song.mp3',
                 1000,
                 'audio/mpeg',
-                233.0,
+                $length,
                 '{}',
                 $now,
                 $now,
@@ -361,14 +477,16 @@ final class LyricsControllerTest extends TestCase
         );
 
         // A lookup by signature needs the song's artist.
-        $conn->executeStatement(
-            'INSERT INTO artists (id, public_id, name, locked_fields, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
-            [$artistId->toString(), (new PublicId())->toString(), 'Lyrics test artist', '{}', $now, $now],
-        );
-        $conn->executeStatement(
-            "INSERT INTO artist_song (id, artist_id, song_id, role, credited_name) VALUES (?, ?, ?, 'primary', 'Lyrics test artist')",
-            [Uuid::v7()->toString(), $artistId->toString(), $songId->toString()],
-        );
+        if ($artistName !== null) {
+            $conn->executeStatement(
+                'INSERT INTO artists (id, public_id, name, locked_fields, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+                [$artistId->toString(), (new PublicId())->toString(), $artistName, '{}', $now, $now],
+            );
+            $conn->executeStatement(
+                "INSERT INTO artist_song (id, artist_id, song_id, role, credited_name) VALUES (?, ?, ?, 'primary', ?)",
+                [Uuid::v7()->toString(), $artistId->toString(), $songId->toString(), $artistName],
+            );
+        }
 
         $access = static::getContainer()->get(LibraryAccessPortInterface::class);
         $access->grant($userId, $libraryId);

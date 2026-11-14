@@ -89,6 +89,8 @@ final class LyricsController
      * Fetch lyrics from LRCLIB for a song and store locally.
      *
      * A song that has lyrics keeps them, and the response returns them without asking LRCLIB.
+     * A song without an artist or a positive length is not looked up, and that cause, like a
+     * request LRCLIB rejects, is a conflict whose `details.reason` names it.
      */
     #[OA\Post(
         path: '/api/songs/{publicId}/lyrics/fetch',
@@ -106,6 +108,11 @@ final class LyricsController
             new OA\Response(response: '403', description: 'Administrator role required'),
             new OA\Response(response: '401', description: 'Authentication required'),
             new OA\Response(response: '404', description: 'Song not found', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
+            new OA\Response(
+                response: '409',
+                description: 'The fetch was not attempted or LRCLIB rejected it; `details.reason` is `song_has_no_artist` (no primary artist credit), `song_has_no_length` (length missing or not positive) or `lrclib_rejected`',
+                content: new OA\JsonContent(ref: new Model(type: ApiError::class)),
+            ),
             new OA\Response(response: '422', description: 'Invalid song public ID', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
             new OA\Response(response: '503', description: 'LRCLIB is unavailable', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
         ],
@@ -140,6 +147,7 @@ final class LyricsController
                 ],
             )),
             new OA\Response(response: '401', description: 'Authentication required'),
+            new OA\Response(response: '409', description: 'LRCLIB rejected the search; `details.reason` is `lrclib_rejected`', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
             new OA\Response(response: '422', description: 'The search query is blank', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
             new OA\Response(response: '503', description: 'LRCLIB is unavailable', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
         ],
@@ -172,7 +180,11 @@ final class LyricsController
             new OA\Response(response: '403', description: 'Administrator role required'),
             new OA\Response(response: '401', description: 'Authentication required'),
             new OA\Response(response: '404', description: 'Song or lyrics result not found', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
-            new OA\Response(response: '409', description: 'The song already has lyrics; they stay unchanged', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
+            new OA\Response(
+                response: '409',
+                description: 'The song already has lyrics, which stay unchanged (`details.reason` is `song_has_lyrics`), or LRCLIB rejected the request (`lrclib_rejected`)',
+                content: new OA\JsonContent(ref: new Model(type: ApiError::class)),
+            ),
             new OA\Response(response: '422', description: 'Invalid song public ID', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
             new OA\Response(response: '503', description: 'LRCLIB is unavailable', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
         ],

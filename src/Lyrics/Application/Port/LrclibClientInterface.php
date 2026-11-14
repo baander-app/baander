@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Lyrics\Application\Port;
 
+use App\Lyrics\Application\DTO\LrclibRejected;
 use App\Lyrics\Application\DTO\LrclibResult;
 use App\Lyrics\Application\DTO\LrclibSearchResult;
 use App\Lyrics\Application\DTO\LrclibUnavailable;
@@ -15,8 +16,11 @@ use App\Lyrics\Application\DTO\LrclibUnavailable;
  * Infrastructure implementations handle HTTP communication;
  * the application layer never depends on external API details.
  *
- * No method throws: a lookup returns null when LRCLIB has no record and LrclibUnavailable
- * when LRCLIB gave no usable answer, so callers can tell a miss from an outage.
+ * No method throws: a lookup returns null when LRCLIB has no record, LrclibRejected when
+ * LRCLIB refused the request with a client error other than 404, 408 or 429, and
+ * LrclibUnavailable when LRCLIB gave no usable answer, so callers can tell a miss, a refused
+ * request and an outage apart. Signature lookups send the duration rounded to the nearest
+ * second.
  */
 interface LrclibClientInterface
 {
@@ -30,7 +34,7 @@ interface LrclibClientInterface
         string $artistName,
         string $albumName,
         float $duration,
-    ): LrclibResult|LrclibUnavailable|null;
+    ): LrclibResult|LrclibRejected|LrclibUnavailable|null;
 
     /**
      * Fetch lyrics by track signature from LRCLIB's full endpoint, which also queries
@@ -41,17 +45,17 @@ interface LrclibClientInterface
         string $artistName,
         string $albumName,
         float $duration,
-    ): LrclibResult|LrclibUnavailable|null;
+    ): LrclibResult|LrclibRejected|LrclibUnavailable|null;
 
     /**
      * Fetch a lyrics record by its LRCLIB ID.
      */
-    public function getById(int $id): LrclibResult|LrclibUnavailable|null;
+    public function getById(int $id): LrclibResult|LrclibRejected|LrclibUnavailable|null;
 
     /**
      * Search for lyrics records using keywords.
      *
-     * @return list<LrclibSearchResult>|LrclibUnavailable an empty list when nothing matches
+     * @return list<LrclibSearchResult>|LrclibRejected|LrclibUnavailable an empty list when nothing matches
      */
-    public function search(string $query): array|LrclibUnavailable;
+    public function search(string $query): array|LrclibRejected|LrclibUnavailable;
 }

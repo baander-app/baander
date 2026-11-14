@@ -72,6 +72,39 @@ final class SongLyricsCliParityTest extends TestCase
         self::assertNull($this->stored($songId));
     }
 
+    /** A song without an artist: the API names the cause in a 409, and the CLI exits 1 with the same message. */
+    public function testASongWithoutAnArtistAnswers409AndExits1WithTheSameCause(): void
+    {
+        $admin = $this->createAdminUser();
+        [$songId, $publicId] = $this->song(artist: null);
+
+        $error = $this->assertJsonResponse($this->authenticatedRequest('POST', "/api/songs/{$publicId}/lyrics/fetch", $admin), 409);
+        self::assertSame('song_has_no_artist', $error['error']['details']['reason'] ?? null);
+
+        $fetch = $this->command('app:song:lyrics:fetch');
+        self::assertSame(Command::FAILURE, $fetch->execute(['song' => $publicId]));
+        self::assertStringContainsString($error['error']['message'], $this->normalized($fetch->getDisplay()));
+        self::assertStringNotContainsString('No lyrics were found', $fetch->getDisplay());
+
+        self::assertSame([], $this->lrclib->calls);
+        self::assertNull($this->stored($songId));
+    }
+
+    public function testARejectedRequestAnswers409AndExits1WithTheSameMessage(): void
+    {
+        $admin = $this->createAdminUser();
+        [$songId, $publicId] = $this->song();
+        $this->lrclib->rejecting();
+
+        $error = $this->assertJsonResponse($this->authenticatedRequest('POST', "/api/songs/{$publicId}/lyrics/fetch", $admin), 409);
+        self::assertSame('lrclib_rejected', $error['error']['details']['reason'] ?? null);
+
+        $fetch = $this->command('app:song:lyrics:fetch');
+        self::assertSame(Command::FAILURE, $fetch->execute(['song' => $publicId]));
+        self::assertStringContainsString($error['error']['message'], $this->normalized($fetch->getDisplay()));
+        self::assertNull($this->stored($songId));
+    }
+
     public function testSearchPrintsTheApiData(): void
     {
         $admin = $this->createAdminUser();
@@ -152,9 +185,11 @@ final class SongLyricsCliParityTest extends TestCase
     /**
      * A song with an artist, in a library nobody was granted.
      *
+     * @param string|null $artist the song's primary credit, or null for a song without one
+     *
      * @return array{0: Uuid, 1: string} [songId, songPublicId]
      */
-    private function song(): array
+    private function song(?string $artist = 'GLaDOS'): array
     {
         $libraryId = Uuid::v7();
         $albumId = Uuid::v7();
@@ -176,14 +211,16 @@ final class SongLyricsCliParityTest extends TestCase
             'INSERT INTO songs (id, public_id, album_id, title, path, size, mime_type, length, locked_fields, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
             [$songId->toString(), $publicId, $albumId->toString(), 'Still Alive', '/tmp/lyrics-cli.mp3', 1000, 'audio/mpeg', 175.0, '{}', $now, $now],
         );
-        $conn->executeStatement(
-            'INSERT INTO artists (id, public_id, name, locked_fields, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
-            [$artistId->toString(), (new PublicId())->toString(), 'GLaDOS', '{}', $now, $now],
-        );
-        $conn->executeStatement(
-            "INSERT INTO artist_song (id, artist_id, song_id, role, credited_name) VALUES (?, ?, ?, 'primary', 'GLaDOS')",
-            [Uuid::v7()->toString(), $artistId->toString(), $songId->toString()],
-        );
+        if ($artist !== null) {
+            $conn->executeStatement(
+                'INSERT INTO artists (id, public_id, name, locked_fields, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+                [$artistId->toString(), (new PublicId())->toString(), $artist, '{}', $now, $now],
+            );
+            $conn->executeStatement(
+                "INSERT INTO artist_song (id, artist_id, song_id, role, credited_name) VALUES (?, ?, ?, 'primary', ?)",
+                [Uuid::v7()->toString(), $artistId->toString(), $songId->toString(), $artist],
+            );
+        }
         $this->entityManager->clear();
 
         return [$songId, $publicId];

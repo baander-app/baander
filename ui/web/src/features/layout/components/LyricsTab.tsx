@@ -3,6 +3,7 @@ import styled, { css } from 'styled-components'
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { motion } from 'motion/react'
 import { useIsAdmin } from '@/features/auth/hooks/use-admin-check'
+import { lyricsErrorMessage } from '@/features/catalog/components/lyrics-error-message'
 import { usePlayerStore } from '@/features/player/stores/player-store'
 import { useCurrentTime } from '@/features/player/stores/player-time-tracker'
 import { Button } from '@/shared/components/ui/button'
@@ -170,12 +171,17 @@ export function LyricsTab() {
 
   const fetchMutation = usePostLyricsSongLyricsFetch({
     mutation: {
-      onSuccess: (_data, variables) => {
+      onSuccess: (data, variables) => {
+        // LRCLIB having no lyrics is a success with an empty array.
+        if (!data.data || Array.isArray(data.data)) {
+          toast.info('No lyrics found')
+          return
+        }
         queryClient.invalidateQueries({ queryKey: getGetLyricsSongLyricsQueryKey(variables.publicId) })
         toast.success('Lyrics fetched')
       },
-      onError: () => {
-        toast.error('No lyrics found')
+      onError: (error) => {
+        toast.error(lyricsErrorMessage(error, 'Failed to fetch lyrics'))
       },
     },
   })

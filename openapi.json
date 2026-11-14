@@ -9036,7 +9036,7 @@
                     "Lyrics"
                 ],
                 "summary": "Fetch lyrics from LRCLIB for a song",
-                "description": "A song that has lyrics keeps them, and the response returns them without asking LRCLIB.",
+                "description": "A song that has lyrics keeps them, and the response returns them without asking LRCLIB.\nA song without an artist or a positive length is not looked up, and that cause, like a\nrequest LRCLIB rejects, is a conflict whose `details.reason` names it.",
                 "operationId": "post_lyrics_song_lyrics_fetch",
                 "parameters": [
                     {
@@ -9082,6 +9082,16 @@
                     },
                     "404": {
                         "description": "Song not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "The fetch was not attempted or LRCLIB rejected it; `details.reason` is `song_has_no_artist` (no primary artist credit), `song_has_no_length` (length missing or not positive) or `lrclib_rejected`",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -9153,6 +9163,16 @@
                     },
                     "401": {
                         "description": "Authentication required"
+                    },
+                    "409": {
+                        "description": "LRCLIB rejected the search; `details.reason` is `lrclib_rejected`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
                     },
                     "422": {
                         "description": "The search query is blank",
@@ -9238,7 +9258,7 @@
                         }
                     },
                     "409": {
-                        "description": "The song already has lyrics; they stay unchanged",
+                        "description": "The song already has lyrics, which stay unchanged (`details.reason` is `song_has_lyrics`), or LRCLIB rejected the request (`lrclib_rejected`)",
                         "content": {
                             "application/json": {
                                 "schema": {

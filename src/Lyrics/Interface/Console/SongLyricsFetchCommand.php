@@ -21,7 +21,9 @@ use Throwable;
 /**
  * The CLI counterpart of POST /api/songs/{publicId}/lyrics/fetch.
  *
- * Runs FetchLyricsCommand in this process, as the API does, for a song in any library.
+ * Runs FetchLyricsCommand in this process, as the API does, for a song in any library. A
+ * fetch that was not attempted, a request LRCLIB rejected and an outage each fail with a
+ * message naming the cause, where the API answers 409 or 503.
  */
 #[AsCommand(
     name: 'app:song:lyrics:fetch',

@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Lyrics\Infrastructure\Api;
 
+use App\Lyrics\Application\DTO\LrclibRejected;
 use App\Lyrics\Application\DTO\LrclibResult;
 use App\Lyrics\Application\DTO\LrclibSearchResult;
 use App\Lyrics\Application\DTO\LrclibUnavailable;
 use App\Lyrics\Infrastructure\Api\LrclibClient;
+use PHPUnit\Framework\Attributes\TestWith;
 use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
@@ -200,6 +202,56 @@ final class LrclibClientTest extends TestCase
         $this->httpClient->method('request')->willReturn($response);
 
         $this->assertInstanceOf(LrclibUnavailable::class, $this->client->getById(555));
+    }
+
+    public function testARequestTimeoutAnswerIsReportedAsUnavailable(): void
+    {
+        $this->httpClient->method('request')->willReturn($this->answer(408));
+
+        $this->assertInstanceOf(LrclibUnavailable::class, $this->client->getBySignature('Song', 'Artist', 'Album', 100.0));
+    }
+
+    /** A client error other than 404, 408 or 429 is LRCLIB refusing the request, which a retry does not change. */
+    #[TestWith([400])]
+    #[TestWith([401])]
+    #[TestWith([403])]
+    #[TestWith([422])]
+    public function testAClientErrorIsReportedAsARejectedRequest(int $status): void
+    {
+        $this->logger = $this->createMock(LoggerInterface::class);
+        $this->client = $this->createClient();
+        $this->httpClient->method('request')->willReturn($this->answer($status));
+        $this->logger->expects($this->atLeastOnce())->method('warning');
+
+        $cached = $this->client->getBySignatureCached('Amore Infelice', 'Suspekt', 'Elektra', 0.238);
+
+        $this->assertInstanceOf(LrclibRejected::class, $cached);
+        $this->assertSame($status, $cached->status);
+        $this->assertInstanceOf(LrclibRejected::class, $this->client->getBySignature('Amore Infelice', 'Suspekt', 'Elektra', 0.238));
+        $this->assertInstanceOf(LrclibRejected::class, $this->client->getById(555));
+        $this->assertInstanceOf(LrclibRejected::class, $this->client->search('Amore Infelice'));
+    }
+
+    /** LRCLIB matches on whole seconds, so the song's length is rounded rather than cut off. */
+    public function testASignatureLookupSendsTheLengthRoundedToTheNearestSecond(): void
+    {
+        $urls = [];
+        $client = new LrclibClient(
+            new MockHttpClient(static function (string $method, string $url) use (&$urls): MockResponse {
+                $urls[] = $url;
+
+                return new MockResponse('', ['http_code' => 404]);
+            }),
+            $this->logger,
+            'https://lrclib.net',
+        );
+
+        $client->getBySignatureCached('Avarice', 'Disturbed', 'Ten Thousand Fists', 176.657);
+        $client->getBySignature('Avarice', 'Disturbed', 'Ten Thousand Fists', 176.4);
+
+        $this->assertCount(2, $urls);
+        $this->assertSame('177', $this->queryParameter($urls[0], 'duration'));
+        $this->assertSame('176', $this->queryParameter($urls[1], 'duration'));
     }
 
     // --- search ---
@@ -472,5 +524,21 @@ final class LrclibClientTest extends TestCase
 
         $this->assertNull($result->duration);
         $this->assertTrue($result->instrumental);
+    }
+
+    private function answer(int $status): ResponseInterface&Stub
+    {
+        $response = $this->createStub(ResponseInterface::class);
+        $response->method('getStatusCode')->willReturn($status);
+
+        return $response;
+    }
+
+    private function queryParameter(string $url, string $name): ?string
+    {
+        parse_str((string) parse_url($url, PHP_URL_QUERY), $query);
+        $value = $query[$name] ?? null;
+
+        return is_string($value) ? $value : null;
     }
 }

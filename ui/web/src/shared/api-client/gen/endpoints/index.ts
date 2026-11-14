@@ -19868,6 +19868,8 @@ export const getPostLyricsSongLyricsFetchUrl = (publicId: string,) => {
 
 /**
  * A song that has lyrics keeps them, and the response returns them without asking LRCLIB.
+ * A song without an artist or a positive length is not looked up, and that cause, like a
+ * request LRCLIB rejects, is a conflict whose `details.reason` names it.
  * @summary Fetch lyrics from LRCLIB for a song
  */
 export const postLyricsSongLyricsFetch = async (publicId: string, options?: Parameters<typeof customInstance>[1]): Promise<PostLyricsSongLyricsFetch200> => {
