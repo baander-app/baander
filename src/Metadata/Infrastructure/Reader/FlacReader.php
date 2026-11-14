@@ -69,8 +69,8 @@ final class FlacReader
 
             $metadata->setTitle($this->first($comments, 'TITLE'));
             $metadata->setAlbum($this->first($comments, 'ALBUM'));
-            $metadata->setArtist($this->first($comments, 'ARTIST'));
-            $metadata->setAlbumArtist($this->first($comments, 'ALBUMARTIST'));
+            $metadata->setArtists($this->values($comments, 'ARTIST'));
+            $metadata->setAlbumArtists($this->values($comments, 'ALBUMARTIST'));
             $metadata->setComposer($this->first($comments, 'COMPOSER'));
             $metadata->setComment($this->first($comments, 'DESCRIPTION') ?? $this->first($comments, 'COMMENT'));
 
@@ -124,7 +124,8 @@ final class FlacReader
 
             $metadata->setMbid($this->first($comments, 'MUSICBRAINZ_TRACKID'));
             $metadata->setMbAlbumId($this->first($comments, 'MUSICBRAINZ_ALBUMID'));
-            $metadata->setMbArtistId($this->first($comments, 'MUSICBRAINZ_ARTISTID'));
+            $metadata->setMbArtistIds($this->values($comments, 'MUSICBRAINZ_ARTISTID'));
+            $metadata->setMbAlbumArtistIds($this->values($comments, 'MUSICBRAINZ_ALBUMARTISTID'));
         }
 
         // Pictures
@@ -144,8 +145,20 @@ final class FlacReader
      */
     private function first(array $comments, string $field): ?string
     {
-        $values = $comments[strtoupper($field)] ?? [];
+        return $this->values($comments, $field)[0] ?? null;
+    }
 
-        return $values[0] ?? null;
+    /**
+     * Every value of a field in file order, trimmed, without empty values.
+     *
+     * @param array<string, list<string>> $comments
+     *
+     * @return list<string>
+     */
+    private function values(array $comments, string $field): array
+    {
+        $values = array_map(trim(...), $comments[strtoupper($field)] ?? []);
+
+        return array_values(array_filter($values, static fn (string $value): bool => $value !== ''));
     }
 }

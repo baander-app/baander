@@ -8,12 +8,20 @@ final class ExtractedMetadata
 {
     /** @var list<CoverArt> */
     private array $pictures = [];
+    /** @var list<string> */
+    private array $artists = [];
+    /** @var list<string> */
+    private array $albumArtists = [];
+    /** @var list<string> */
+    private array $mbArtistIds = [];
+    /** @var list<string> */
+    private array $mbAlbumArtistIds = [];
 
     public function __construct(
         private ?string $title = null,
         private ?string $album = null,
-        private ?string $artist = null,
-        private ?string $albumArtist = null,
+        ?string $artist = null,
+        ?string $albumArtist = null,
         private ?int $trackNumber = null,
         private ?int $discNumber = null,
         private ?int $year = null,
@@ -28,10 +36,14 @@ final class ExtractedMetadata
         private ?int $channels = null,
         private ?string $mbid = null,
         private ?string $mbAlbumId = null,
-        private ?string $mbArtistId = null,
+        ?string $mbArtistId = null,
         /** @var string[] */
         private array $coverArt = [],
     ) {
+        $this->setArtist($artist);
+        $this->setAlbumArtist($albumArtist);
+        $this->setMbArtistId($mbArtistId);
+
         if (empty($this->genre)) {
             $this->genre = [];
         }
@@ -56,13 +68,25 @@ final class ExtractedMetadata
 
     public function setArtist(?string $artist): self
     {
-        $this->artist = $artist;
+        return $this->setArtists(self::single($artist));
+    }
+
+    /** @param list<string> $artists every artist value, in tag order */
+    public function setArtists(array $artists): self
+    {
+        $this->artists = $artists;
         return $this;
     }
 
     public function setAlbumArtist(?string $albumArtist): self
     {
-        $this->albumArtist = $albumArtist;
+        return $this->setAlbumArtists(self::single($albumArtist));
+    }
+
+    /** @param list<string> $albumArtists every album-artist value, in tag order */
+    public function setAlbumArtists(array $albumArtists): self
+    {
+        $this->albumArtists = $albumArtists;
         return $this;
     }
 
@@ -147,7 +171,20 @@ final class ExtractedMetadata
 
     public function setMbArtistId(?string $mbArtistId): self
     {
-        $this->mbArtistId = $mbArtistId;
+        return $this->setMbArtistIds(self::single($mbArtistId));
+    }
+
+    /** @param list<string> $mbArtistIds every MusicBrainz artist ID, in tag order */
+    public function setMbArtistIds(array $mbArtistIds): self
+    {
+        $this->mbArtistIds = $mbArtistIds;
+        return $this;
+    }
+
+    /** @param list<string> $mbAlbumArtistIds every MusicBrainz album-artist ID, in tag order */
+    public function setMbAlbumArtistIds(array $mbAlbumArtistIds): self
+    {
+        $this->mbAlbumArtistIds = $mbAlbumArtistIds;
         return $this;
     }
 
@@ -169,14 +206,28 @@ final class ExtractedMetadata
         return $this->album;
     }
 
+    /** The first artist value. */
     public function getArtist(): ?string
     {
-        return $this->artist;
+        return $this->artists[0] ?? null;
     }
 
+    /** @return list<string> */
+    public function getArtists(): array
+    {
+        return $this->artists;
+    }
+
+    /** The first album-artist value. */
     public function getAlbumArtist(): ?string
     {
-        return $this->albumArtist;
+        return $this->albumArtists[0] ?? null;
+    }
+
+    /** @return list<string> */
+    public function getAlbumArtists(): array
+    {
+        return $this->albumArtists;
     }
 
     public function getTrackNumber(): ?int
@@ -245,9 +296,22 @@ final class ExtractedMetadata
         return $this->mbAlbumId;
     }
 
+    /** The MusicBrainz artist ID when the file carries exactly one, else null. */
     public function getMbArtistId(): ?string
     {
-        return $this->mbArtistId;
+        return count($this->mbArtistIds) === 1 ? $this->mbArtistIds[0] : null;
+    }
+
+    /** @return list<string> */
+    public function getMbArtistIds(): array
+    {
+        return $this->mbArtistIds;
+    }
+
+    /** @return list<string> */
+    public function getMbAlbumArtistIds(): array
+    {
+        return $this->mbAlbumArtistIds;
     }
 
     /** @return string[] */
@@ -274,6 +338,12 @@ final class ExtractedMetadata
         $front = array_filter($this->pictures, fn (CoverArt $p) => $p->isCoverFront());
 
         return $front !== [] ? reset($front) : ($this->pictures[0] ?? null);
+    }
+
+    /** @return list<string> */
+    private static function single(?string $value): array
+    {
+        return $value === null ? [] : [$value];
     }
 
     // Static factory method

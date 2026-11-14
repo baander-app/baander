@@ -62,6 +62,42 @@ final class OggReaderTest extends TestCase
         $this->assertSame('mb-artist', $metadata->getMbArtistId());
     }
 
+    public function testReadReturnsEveryArtistValueAndMusicBrainzId(): void
+    {
+        $file = $this->buildOggFile([
+            'ARTIST' => ['Headhunterz', 'Sound Rush'],
+            'MUSICBRAINZ_ARTISTID' => ['mb-artist-1', 'mb-artist-2'],
+        ]);
+
+        $metadata = $this->reader->read($file);
+
+        $this->assertSame(['Headhunterz', 'Sound Rush'], $metadata->getArtists());
+        $this->assertSame(['mb-artist-1', 'mb-artist-2'], $metadata->getMbArtistIds());
+        $this->assertNull($metadata->getMbArtistId());
+    }
+
+    public function testReadReturnsTheMusicBrainzAlbumArtistId(): void
+    {
+        $file = $this->buildOggFile([
+            'ALBUMARTIST' => ['Headhunterz'],
+            'MUSICBRAINZ_ALBUMARTISTID' => ['mb-album-artist'],
+        ]);
+
+        $metadata = $this->reader->read($file);
+
+        $this->assertSame(['Headhunterz'], $metadata->getAlbumArtists());
+        $this->assertSame(['mb-album-artist'], $metadata->getMbAlbumArtistIds());
+    }
+
+    public function testReadTrimsTagText(): void
+    {
+        $file = $this->buildOggFile(['ARTIST' => [' Disturbed ']]);
+
+        $metadata = $this->reader->read($file);
+
+        $this->assertSame('Disturbed', $metadata->getArtist());
+    }
+
     public function testReadExtractsMetadataBlockPicture(): void
     {
         $imageData = "\xFF\xD8\xFF\xE0";

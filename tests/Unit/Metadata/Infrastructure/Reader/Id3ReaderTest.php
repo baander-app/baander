@@ -12,6 +12,9 @@ use Psr\Log\LoggerInterface;
 
 final class Id3ReaderTest extends TestCase
 {
+    private const string ARTIST_ID = '4d1e2a3b-5c6f-4a7b-8c9d-0e1f2a3b4c5d';
+    private const string OTHER_ARTIST_ID = '7f8e9d0c-1b2a-4c3d-9e4f-5a6b7c8d9e0f';
+
     private Id3Reader $reader;
     private LoggerInterface $logger;
 
@@ -77,7 +80,6 @@ final class Id3ReaderTest extends TestCase
 
     public function testReadExtractsMultipleArtists(): void
     {
-        // Reader takes first artist value
         $frames = $this->buildFrame('TPE1', "\x00Artist One")
                . $this->buildFrame('TPE1', "\x00Artist Two");
 
@@ -85,6 +87,43 @@ final class Id3ReaderTest extends TestCase
         $metadata = $this->reader->read($file);
 
         $this->assertSame('Artist One', $metadata->getArtist());
+        $this->assertSame(['Artist One', 'Artist Two'], $metadata->getArtists());
+    }
+
+    public function testReadReturnsArtistTextWithoutItsTerminator(): void
+    {
+        $metadata = $this->reader->read($this->buildId3v2File($this->buildFrame('TPE1', "\x00Suspekt\x00")));
+
+        $this->assertSame('Suspekt', $metadata->getArtist());
+        $this->assertSame(['Suspekt'], $metadata->getArtists());
+    }
+
+    public function testReadReturnsEveryAlbumArtistAndMusicBrainzId(): void
+    {
+        $artistIds = self::ARTIST_ID . '/' . self::OTHER_ARTIST_ID;
+        $frames = $this->buildFrame('TPE2', "\x00Headhunterz")
+               . $this->buildFrame('TPE2', "\x00Sound Rush")
+               . $this->buildFrame('TXXX', "\x01" . $this->utf16('MusicBrainz Artist Id') . "\x00\x00" . $this->utf16($artistIds))
+               . $this->buildFrame('TXXX', "\x00MusicBrainz Album Artist Id\x00" . self::ARTIST_ID);
+
+        $metadata = $this->reader->read($this->buildId3v2File($frames));
+
+        $this->assertSame('Headhunterz', $metadata->getAlbumArtist());
+        $this->assertSame(['Headhunterz', 'Sound Rush'], $metadata->getAlbumArtists());
+        $this->assertSame([self::ARTIST_ID, self::OTHER_ARTIST_ID], $metadata->getMbArtistIds());
+        $this->assertNull($metadata->getMbArtistId());
+        $this->assertSame([self::ARTIST_ID], $metadata->getMbAlbumArtistIds());
+    }
+
+    public function testReadReturnsTheMusicBrainzArtistIdWhenTheFileCarriesExactlyOne(): void
+    {
+        $frames = $this->buildFrame('TPE1', "\x00Headhunterz")
+               . $this->buildFrame('TXXX', "\x00MusicBrainz Artist Id\x00" . self::ARTIST_ID);
+
+        $metadata = $this->reader->read($this->buildId3v2File($frames));
+
+        $this->assertSame([self::ARTIST_ID], $metadata->getMbArtistIds());
+        $this->assertSame(self::ARTIST_ID, $metadata->getMbArtistId());
     }
 
     public function testReadReturnsEmptyForNonExistentFile(): void
@@ -153,6 +192,12 @@ final class Id3ReaderTest extends TestCase
     }
 
     // ---- Helpers ----
+
+    /** UTF-16 text with a little-endian byte-order mark, as Picard writes it. */
+    private function utf16(string $text): string
+    {
+        return "\xFF\xFE" . mb_convert_encoding($text, 'UTF-16LE', 'UTF-8');
+    }
 
     private function buildId3v2File(string $frameData): string
     {

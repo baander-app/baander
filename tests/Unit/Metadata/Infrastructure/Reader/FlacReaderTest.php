@@ -60,6 +60,50 @@ final class FlacReaderTest extends TestCase
         $this->assertSame('mb-artist-1', $metadata->getMbArtistId());
     }
 
+    public function testReadReturnsEveryArtistValueInFileOrder(): void
+    {
+        $file = $this->buildFlacFile(['ARTIST' => ['Headhunterz', 'Sound Rush', 'Eurielle']]);
+
+        $metadata = $this->reader->read($file);
+
+        $this->assertSame(['Headhunterz', 'Sound Rush', 'Eurielle'], $metadata->getArtists());
+        $this->assertSame('Headhunterz', $metadata->getArtist());
+    }
+
+    public function testReadReturnsEveryMusicBrainzArtistIdAndNoSingleIdWhenThereAreTwo(): void
+    {
+        $file = $this->buildFlacFile(['MUSICBRAINZ_ARTISTID' => ['mb-artist-1', 'mb-artist-2']]);
+
+        $metadata = $this->reader->read($file);
+
+        $this->assertSame(['mb-artist-1', 'mb-artist-2'], $metadata->getMbArtistIds());
+        $this->assertNull($metadata->getMbArtistId());
+    }
+
+    public function testReadReturnsEveryAlbumArtistValueAndId(): void
+    {
+        $file = $this->buildFlacFile([
+            'ALBUMARTIST' => ['Headhunterz', 'Sound Rush'],
+            'MUSICBRAINZ_ALBUMARTISTID' => ['mb-artist-1', 'mb-artist-2'],
+        ]);
+
+        $metadata = $this->reader->read($file);
+
+        $this->assertSame(['Headhunterz', 'Sound Rush'], $metadata->getAlbumArtists());
+        $this->assertSame('Headhunterz', $metadata->getAlbumArtist());
+        $this->assertSame(['mb-artist-1', 'mb-artist-2'], $metadata->getMbAlbumArtistIds());
+    }
+
+    public function testReadTrimsTagTextAndDropsEmptyValues(): void
+    {
+        $file = $this->buildFlacFile(['ARTIST' => [' Disturbed ', ''], 'TITLE' => ["Avarice\n"]]);
+
+        $metadata = $this->reader->read($file);
+
+        $this->assertSame(['Disturbed'], $metadata->getArtists());
+        $this->assertSame('Avarice', $metadata->getTitle());
+    }
+
     public function testReadExtractsStreamInfo(): void
     {
         $file = $this->buildFlacFile(['TITLE' => ['Test']]);

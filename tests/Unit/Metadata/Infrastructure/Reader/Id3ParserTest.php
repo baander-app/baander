@@ -10,6 +10,9 @@ use Psr\Log\LoggerInterface;
 
 final class Id3ParserTest extends TestCase
 {
+    private const string ARTIST_ID = '4d1e2a3b-5c6f-4a7b-8c9d-0e1f2a3b4c5d';
+    private const string OTHER_ARTIST_ID = '7f8e9d0c-1b2a-4c3d-9e4f-5a6b7c8d9e0f';
+
     /** @var list<string> */
     private array $temporaryFiles = [];
 
@@ -190,7 +193,142 @@ final class Id3ParserTest extends TestCase
         $this->assertSame(['Artist'], $parser->getTags()['ARTIST']);
     }
 
+    public function testDropsTheTerminatorFromAnIso88591Value(): void
+    {
+        $parser = $this->parse($this->buildId3v2File($this->buildFrame('TPE1', "\x00Suspekt\x00")));
+
+        $this->assertSame(['Suspekt'], $parser->getTags()['ARTIST']);
+    }
+
+    public function testConvertsIso88591TextToUtf8(): void
+    {
+        $parser = $this->parse($this->buildId3v2File($this->buildFrame('TIT2', "\x00K\xE6rlighed")));
+
+        $this->assertSame(['Kærlighed'], $parser->getTags()['TITLE']);
+    }
+
+    public function testTrimsSurroundingWhitespace(): void
+    {
+        $parser = $this->parse($this->buildId3v2File($this->buildFrame('TPE1', "\x00  Bulldogg \x00")));
+
+        $this->assertSame(['Bulldogg'], $parser->getTags()['ARTIST']);
+    }
+
+    public function testKeepsASlashInsideAnArtistValue(): void
+    {
+        $parser = $this->parse($this->buildId3v2File($this->buildFrame('TPE1', "\x00AC/DC")));
+
+        $this->assertSame(['AC/DC'], $parser->getTags()['ARTIST']);
+    }
+
+    public function testSplitsNulSeparatedValuesOfAnId3v24Frame(): void
+    {
+        $parser = $this->parse($this->buildId3v24File($this->buildSyncsafeFrame('TPE1', "\x03A\x00B\x00")));
+
+        $this->assertSame(['A', 'B'], $parser->getTags()['ARTIST']);
+    }
+
+    public function testIgnoresTextAfterTheTerminatorOfAnId3v23Frame(): void
+    {
+        $parser = $this->parse($this->buildId3v2File($this->buildFrame('TPE1', "\x00Suspekt\x00leftover")));
+
+        $this->assertSame(['Suspekt'], $parser->getTags()['ARTIST']);
+    }
+
+    public function testDecodesEachUtf16ValueWithoutItsByteOrderMark(): void
+    {
+        $frame = "\x01" . $this->utf16('Headhunterz') . "\x00\x00" . $this->utf16('Sound Rush') . "\x00\x00";
+
+        $parser = $this->parse($this->buildId3v24File($this->buildSyncsafeFrame('TPE1', $frame)));
+
+        $this->assertSame(['Headhunterz', 'Sound Rush'], $parser->getTags()['ARTIST']);
+    }
+
+    public function testReadsTheMusicBrainzArtistIdFromItsUserTextFrame(): void
+    {
+        $frame = "\x00MusicBrainz Artist Id\x00" . self::ARTIST_ID;
+
+        $parser = $this->parse($this->buildId3v2File($this->buildFrame('TXXX', $frame)));
+
+        $this->assertSame([self::ARTIST_ID], $parser->getTags()['MUSICBRAINZ_ARTISTID']);
+    }
+
+    public function testSplitsSlashJoinedMusicBrainzArtistIdsOfAnId3v23Tag(): void
+    {
+        $frame = "\x00MusicBrainz Artist Id\x00" . self::ARTIST_ID . '/' . self::OTHER_ARTIST_ID;
+
+        $parser = $this->parse($this->buildId3v2File($this->buildFrame('TXXX', $frame)));
+
+        $this->assertSame([self::ARTIST_ID, self::OTHER_ARTIST_ID], $parser->getTags()['MUSICBRAINZ_ARTISTID']);
+    }
+
+    public function testReadsSlashJoinedMusicBrainzArtistIdsFromAUtf16UserTextFrame(): void
+    {
+        $frame = "\x01" . $this->utf16('MusicBrainz Artist Id') . "\x00\x00"
+            . $this->utf16(self::ARTIST_ID . '/' . self::OTHER_ARTIST_ID) . "\x00\x00";
+
+        $parser = $this->parse($this->buildId3v2File($this->buildFrame('TXXX', $frame)));
+
+        $this->assertSame([self::ARTIST_ID, self::OTHER_ARTIST_ID], $parser->getTags()['MUSICBRAINZ_ARTISTID']);
+    }
+
+    public function testReadsEveryMusicBrainzAlbumArtistIdOfAnId3v24Frame(): void
+    {
+        $frame = "\x03MusicBrainz Album Artist Id\x00" . self::ARTIST_ID . "\x00" . self::OTHER_ARTIST_ID;
+
+        $parser = $this->parse($this->buildId3v24File($this->buildSyncsafeFrame('TXXX', $frame)));
+
+        $this->assertSame([self::ARTIST_ID, self::OTHER_ARTIST_ID], $parser->getTags()['MUSICBRAINZ_ALBUMARTISTID']);
+    }
+
+    public function testIgnoresUserTextFramesWithAnotherDescription(): void
+    {
+        $frames = $this->buildFrame('TXXX', "\x00MusicBrainz Album Id\x00" . self::ARTIST_ID)
+            . $this->buildFrame('TXXX', "\x00replaygain_track_gain\x00-7.10 dB");
+
+        $tags = $this->parse($this->buildId3v2File($frames))->getTags();
+
+        $this->assertArrayNotHasKey('MUSICBRAINZ_ARTISTID', $tags);
+        $this->assertArrayNotHasKey('MUSICBRAINZ_ALBUMARTISTID', $tags);
+        $this->assertArrayNotHasKey('TXXX', $tags);
+    }
+
+    public function testReadsTheTextOfAUtf16CommentAfterItsDescription(): void
+    {
+        $frame = "\x01eng" . $this->utf16('A') . "\x00\x00" . $this->utf16('Liner note');
+
+        $parser = $this->parse($this->buildId3v2File($this->buildFrame('COMM', $frame)));
+
+        $this->assertSame(['Liner note'], $parser->getTags()['COMMENT']);
+    }
+
+    public function testKeepsPictureBytesIntactAfterAUtf16Description(): void
+    {
+        $imageData = "\xFF\xD8\xFF\xE0\x00\x10JFIF";
+        $frame = "\x01image/jpeg\x00\x03" . $this->utf16('') . "\x00\x00" . $imageData;
+
+        $pictures = $this->parse($this->buildId3v2File($this->buildFrame('APIC', $frame)))->getPictures();
+
+        $this->assertCount(1, $pictures);
+        $this->assertSame('', $pictures[0]['description']);
+        $this->assertSame($imageData, $pictures[0]['imageData']);
+    }
+
     // ---- Helpers ----
+
+    private function parse(string $file): Id3Parser
+    {
+        $parser = new Id3Parser($file, $this->logger);
+        $parser->parse();
+
+        return $parser;
+    }
+
+    /** UTF-16 text with a little-endian byte-order mark, as Picard writes it. */
+    private function utf16(string $text): string
+    {
+        return "\xFF\xFE" . mb_convert_encoding($text, 'UTF-16LE', 'UTF-8');
+    }
 
     private function buildId3v2File(string $frameData): string
     {
