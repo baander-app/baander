@@ -450,7 +450,7 @@ SQL, [$jobs[0], $runtimeSession, $desired, str_repeat('a', 32)]);
         $expected = [
             ['0199bf3c-8a00-7000-8000-0a07c0de9e01', '30 3 * * *', 'App\\Auth\\Application\\Command\\OAuth\\PurgeExpiredOAuthCodesCommand', [], '03:30:00'],
             ['0199bf3c-8a00-7000-8000-0a07c0de9e02', '0 4 * * *', 'App\\Recommendation\\Application\\Command\\GenerateRecommendationsCommand', ['mode' => 'incremental', 'automatic' => true], '04:00:00'],
-            ['0199bf3c-8a00-7000-8000-0a07c0de9e03', '*/10 * * * *', 'App\\Catalog\\Application\\Command\\RecoverAlbumMatchQueueCommand', [], null],
+            ['0199bf3c-8a00-7000-8000-0a07c0de9e04', '*/10 * * * *', 'App\\Catalog\\Application\\Command\\RecoverAlbumMatchQueueCommand', [], null],
         ];
         foreach ($jobs as $index => $job) {
             [$id, $expression, $command, $parameters, $time] = $expected[$index];
@@ -483,6 +483,8 @@ SQL, [$jobs[0], $runtimeSession, $desired, str_repeat('a', 32)]);
         }
         self::assertSame(3, array_column($jobs, 'public_id') |> array_unique(...) |> count(...));
         self::assertSame(3, array_column($jobs, 'revision') |> array_unique(...) |> count(...));
+        // The recovery job's seed turns the capture trigger off for its insert only.
+        self::assertSame('O', $this->connection->fetchOne("SELECT tgenabled FROM pg_trigger WHERE tgrelid = 'scheduled_jobs'::regclass AND tgname = 'query_capture_insert'"));
     }
 
     public function testCompletedSingletonUpgradePreservesOriginalEvidenceAsTerminalImportedBoot(): void

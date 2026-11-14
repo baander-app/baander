@@ -9,7 +9,7 @@ use Doctrine\Migrations\AbstractMigration;
 
 final class Version20261115110000 extends AbstractMigration
 {
-    public const string RECOVERY_JOB_ID = '0199bf3c-8a00-7000-8000-0a07c0de9e03';
+    public const string RECOVERY_JOB_ID = '0199bf3c-8a00-7000-8000-0a07c0de9e04';
     public const string RECOVERY_COMMAND = 'App\\Catalog\\Application\\Command\\RecoverAlbumMatchQueueCommand';
     public const string RECOVERY_EXPRESSION = '*/10 * * * *';
 
