@@ -160,6 +160,9 @@ final class Command
             'DATABASE_URL=postgresql://baander:test-only@postgres:5432/worker_command_test?serverVersion=18&charset=utf8',
             '-e',
             'DATABASE_CONTROL_URL=postgresql://baander:test-only@postgres:5432/worker_command_test?serverVersion=18&charset=utf8',
+            // A worker refuses a --deployment-profile that differs from the deployment's own.
+            '-e',
+            'BAANDER_DEPLOYMENT_PROFILE=' . $this->deploymentProfile,
         ];
 
         $this->uid = $this->resources->runContainer($id . '-uid', [
