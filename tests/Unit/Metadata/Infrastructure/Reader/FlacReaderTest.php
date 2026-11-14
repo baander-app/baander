@@ -104,6 +104,16 @@ final class FlacReaderTest extends TestCase
         $this->assertSame('Avarice', $metadata->getTitle());
     }
 
+    public function testReadReplacesBytesThatAreNotUtf8(): void
+    {
+        $file = $this->buildFlacFile(['ARTIST' => ["Dist\xC3urbed"], 'TITLE' => ["Avar\xFFice"]]);
+
+        $metadata = $this->reader->read($file);
+
+        $this->assertSame(['Dist?urbed'], $metadata->getArtists());
+        $this->assertSame('Avar?ice', $metadata->getTitle());
+    }
+
     public function testReadExtractsStreamInfo(): void
     {
         $file = $this->buildFlacFile(['TITLE' => ['Test']]);

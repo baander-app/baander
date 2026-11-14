@@ -510,8 +510,9 @@ final class FilesDiscoveredHandler
      * Writes the songs and their links in one transaction, unless a delete with files holds the
      * library. The transaction first reads each known song again and keeps the tagged credit only of a
      * song without any artist credit or with a retagged file, then resolves the artists and genres it
-     * writes, then writes. A song that fails is added to $failures and the others are written; a
-     * failed statement fails the transaction and with it the message.
+     * writes, then writes. Several copies of one song's file in the batch repair that song once, from
+     * the first copy. A song that fails is added to $failures and the others are written; a failed
+     * statement fails the transaction and with it the message.
      *
      * @param list<PreparedSong>                       $songs
      * @param list<array{path: string, error: string}> $failures
@@ -541,16 +542,21 @@ final class FilesDiscoveredHandler
                         $song['known'] => $this->freshKnownSong($libraryId, $song),
                         default => $song,
                     };
-                    if ($prepared !== null) {
-                        $current[] = $prepared;
+                    // A later copy of a song's file is left alone, as a copy in a later batch is.
+                    $songId = $prepared === null ? null : $prepared['song']->getId()->toString();
+                    if ($songId !== null && !isset($current[$songId])) {
+                        $current[$songId] = $prepared;
                     }
                 } catch (\Throwable $e) {
                     $songFailures[] = $this->fileFailed($song['file'], $e);
                 }
             }
-            $current = $this->withTagCreditsOfUncreditedSongsOnly($current);
+            $current = $this->withTagCreditsOfUncreditedSongsOnly(array_values($current));
             // Artist keys sort before genre keys, so the artists are locked first.
             $artistIds = $this->resolveArtists($current);
+            // Read again under the artist locks: an import of the same file that held them first may
+            // have credited a known song since.
+            $current = $this->withTagCreditsOfUncreditedSongsOnly($current);
             $genreIds = $this->findOrCreateGenres($current);
             $written = [];
             foreach ($current as $song) {

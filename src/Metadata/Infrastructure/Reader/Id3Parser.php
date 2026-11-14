@@ -353,7 +353,8 @@ final class Id3Parser
             // With a byte-order mark; mbstring reads big-endian when it is missing.
             self::ENCODING_UTF_16 => mb_convert_encoding($data, 'UTF-8', 'UTF-16'),
             self::ENCODING_UTF_16BE => mb_convert_encoding($data, 'UTF-8', 'UTF-16BE'),
-            default => $data, // UTF-8
+            // UTF-8, with any invalid byte sequence replaced, as PostgreSQL refuses text that is not UTF-8.
+            default => mb_scrub($data, 'UTF-8'),
         };
     }
 

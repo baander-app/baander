@@ -78,6 +78,7 @@ final class FilesDiscoveredGapFillTest extends TestCase
             'missing' => [],
             'autoFetch' => false,
             'lyricsRequests' => [],
+            'creditsCommittedDuringResolve' => [],
         ];
     }
 
@@ -192,6 +193,45 @@ final class FilesDiscoveredGapFillTest extends TestCase
         ]));
 
         self::assertSame($newPath, $this->storedSongById($song)->getPath());
+        self::assertSame([$song->getId()->toString() => [[$this->artist('Disturbed'), 'primary', 'Disturbed']]], $this->state->credits);
+    }
+
+    /**
+     * Two copies of a renamed file in one batch carry the content of one stored song: the first moves
+     * and credits it, and the other is left alone instead of crediting the song a second time.
+     */
+    public function testTwoCopiesOfARenamedFileInOneBatchRepairTheirSongOnce(): void
+    {
+        $oldPath = self::DIRECTORY . '/01 Track.flac';
+        $song = $this->storedSong($this->storedAlbum('Ten Thousand Fists'), $oldPath);
+        $this->state->missing[$oldPath] = true;
+        $copies = [self::DIRECTORY . '/01 Ten Thousand Fists.flac', self::DIRECTORY . '/01 Ten Thousand Fists (copy).flac'];
+        $files = [];
+        foreach ($copies as $path) {
+            $this->state->tags[$path] = ['album' => 'Ten Thousand Fists', 'artists' => ['Disturbed']];
+            $files[] = $this->observedFile(new DiscoveredFile($path, ltrim($path, '/'), 'flac', 1_000_000, 1_700_000_000, (string) $song->getHash()));
+        }
+
+        $this->handler()(new FilesDiscovered($this->libraryId, 'music', self::DIRECTORY, $files));
+
+        self::assertSame($copies[0], $this->storedSongById($song)->getPath());
+        self::assertSame([$song->getId()->toString() => [[$this->artist('Disturbed'), 'primary', 'Disturbed']]], $this->state->credits);
+        self::assertCount(1, $this->state->songs, 'The copy becomes no song of its own.');
+    }
+
+    /**
+     * Another import of the same file can credit a known song while this one waits on the artist
+     * locks. The song's credits are read again once the locks are held, so it gains no second credit
+     * and the message does not fail.
+     */
+    public function testACreditCommittedWhileTheImportWaitedOnTheArtistLocksIsNotAddedAgain(): void
+    {
+        $song = $this->storedSong($this->storedAlbum('Ten Thousand Fists'), self::DIRECTORY . '/01 Ten Thousand Fists.flac');
+        $this->tagAll(['album' => 'Ten Thousand Fists', 'artists' => ['Disturbed']]);
+        $this->state->creditsCommittedDuringResolve = [$song->getId()->toString() => 'Disturbed'];
+
+        $this->handler()($this->message(self::DIRECTORY));
+
         self::assertSame([$song->getId()->toString() => [[$this->artist('Disturbed'), 'primary', 'Disturbed']]], $this->state->credits);
     }
 
@@ -359,6 +399,11 @@ final class FilesDiscoveredGapFillTest extends TestCase
             foreach ($identities as $identity) {
                 $resolved[$identity->key()] = $state->artists[$identity->name] ??= Uuid::v7();
             }
+            // Another import of the same files held the artist locks first and committed its credits.
+            foreach ($state->creditsCommittedDuringResolve as $songId => $name) {
+                $state->credits[$songId][] = [$state->artists[$name]->toString(), 'primary', $name];
+            }
+            $state->creditsCommittedDuringResolve = [];
 
             return $resolved;
         });

@@ -207,6 +207,13 @@ final class Id3ParserTest extends TestCase
         $this->assertSame(['Kærlighed'], $parser->getTags()['TITLE']);
     }
 
+    public function testReplacesBytesThatAreNotUtf8InAUtf8Value(): void
+    {
+        $parser = $this->parse($this->buildId3v2File($this->buildFrame('TPE1', "\x03Bulld\xFFogg")));
+
+        $this->assertSame(['Bulld?ogg'], $parser->getTags()['ARTIST']);
+    }
+
     public function testTrimsSurroundingWhitespace(): void
     {
         $parser = $this->parse($this->buildId3v2File($this->buildFrame('TPE1', "\x00  Bulldogg \x00")));

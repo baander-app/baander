@@ -19,7 +19,8 @@ trait VorbisCommentFields
     }
 
     /**
-     * Every value of a field in file order, trimmed, without empty values.
+     * Every value of a field in file order, trimmed, without empty values. A byte sequence that is
+     * not UTF-8 is replaced, as PostgreSQL refuses text that is not UTF-8.
      *
      * @param array<string, list<string>> $comments
      *
@@ -27,7 +28,10 @@ trait VorbisCommentFields
      */
     private function values(array $comments, string $field): array
     {
-        $values = array_map(trim(...), $comments[strtoupper($field)] ?? []);
+        $values = array_map(
+            static fn (string $value): string => mb_scrub($value, 'UTF-8') |> trim(...),
+            $comments[strtoupper($field)] ?? [],
+        );
 
         return array_values(array_filter($values, static fn (string $value): bool => $value !== ''));
     }
