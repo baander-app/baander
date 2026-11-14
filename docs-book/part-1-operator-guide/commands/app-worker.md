@@ -32,7 +32,7 @@ start, stop, replacement and uncertain outcomes.
 
 ## Details
 
-When the environment sets `BAANDER_WORKER_NAMESPACE`, `BAANDER_WORKER_BOOT_ID` or `BAANDER_WORKER_UNIT`, the matching option must be absent or equal to it. The scheduled console value is whole MiB up to 1048576. The command has no memory or PID options: the worker units run without Docker memory, CPU or PID limits and without CPU sets, and the supervisor admits no work against a memory or PID budget. Its child ceiling follows from the profile: the fixed roles, the media manager with one child per slot, one local helper per consumer, the scheduled console child and the lease helper. The command refuses to start when PostgreSQL's default time zone is not UTC.
+When the environment sets `BAANDER_WORKER_NAMESPACE`, `BAANDER_WORKER_BOOT_ID` or `BAANDER_WORKER_UNIT`, the matching option must be absent or equal to it. The scheduled console value is whole MiB up to 1048576. The command has no memory or PID options: the worker units run without Docker memory, CPU or PID limits and without CPU sets, and the supervisor admits no work against a memory or PID budget. Its child ceiling follows from the profile: the fixed roles, the media manager with one child per slot, one local helper per consumer, the scheduled console child and the lease helper. The command refuses to start when PostgreSQL's default time zone is not UTC, or when PostgreSQL cannot be reached to check it.
 
 The deployment profile is fixed at startup. It carries the capability and the
 size: up to four ordinary consumers, and either `transcode` encoding in the

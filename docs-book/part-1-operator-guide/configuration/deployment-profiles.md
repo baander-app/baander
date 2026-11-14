@@ -232,7 +232,9 @@ statement to its own renamed statements, so the transaction would abort.
 
 PostgreSQL runs in UTC. Every rendered PostgreSQL file sets `timezone = 'UTC'`, a
 migration sets the database's default zone, and web and each worker supervisor
-refuse to start when the server's default zone is not UTC.
+refuse to start when the server's default zone is not UTC. The check runs only at
+start, and a zone it cannot read counts as wrong: while PostgreSQL cannot be reached,
+they refuse to start as well.
 
 
 ## Server

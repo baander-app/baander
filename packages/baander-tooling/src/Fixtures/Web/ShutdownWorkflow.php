@@ -418,11 +418,16 @@ final class ShutdownWorkflow
             $this->exec($container, ['ps', '-eo', 'stat=,args='])->stdout,
         );
     }
-    private function startWeb(): void
+    /** Starts the web container, so that runLog() reads only this run's output. */
+    private function startWebContainer(): void
     {
         $log = rtrim($this->logs('web'), "\n");
         $this->logOffset = $log === '' ? 0 : count(explode("\n", $log));
         $this->docker(['start', $this->id . '-web']);
+    }
+    private function startWeb(): void
+    {
+        $this->startWebContainer();
         $this->runtime->await(
             fn(): bool => $this->exec('web', ['curl', '-fsS', '-o', '/dev/null', 'http://127.0.0.1:9501/live'], false)->exitCode === 0,
             90,
@@ -823,17 +828,17 @@ final class ShutdownWorkflow
     }
     private function databaseOutage(): void
     {
+        // The start checks the database's default time zone, so an unreachable database refuses it.
         $this->docker(['stop', $this->id . '-postgres']);
-        $this->startWeb();
-        $started = microtime(true);
-        $this->docker(['kill', '--signal', 'TERM', $this->id . '-web']);
+        $this->startWebContainer();
         $this->awaitExit();
-        $this->assertStopped('SIGTERM with PostgreSQL stopped', $started);
+        $code = $this->state('ExitCode');
+        Runtime::require($code !== '0', 'With PostgreSQL stopped, app:serve started instead of refusing.');
         Runtime::require(
-            substr_count($this->runLog(), 'Could not clean up orphaned recommendation jobs at server start') === 1,
-            'Start-up cleanup did not log its database failure exactly once.',
+            !str_contains($this->runLog(), 'test-only'),
+            'The refused start logged a credential.',
         );
-        echo "PASS: the start-up cleanup logged the unreachable database once.\n";
+        echo "PASS: with PostgreSQL stopped, app:serve refused to start and exited {$code} without logging a credential.\n";
     }
     private function cleanup(bool $failed): void
     {
