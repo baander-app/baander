@@ -22,7 +22,10 @@ final class Version20261115110000 extends AbstractMigration
     {
         // The queue's runs queue each other; a run lost to a failed dispatch or a message out of
         // retries would leave every request waiting. The schedule starts at the next ten-minute
-        // mark, from one clock sample.
+        // mark, from one clock sample. The seed is installed data, not a change an admin made, so
+        // its insert publishes no live update.
+        $this->addSql("SET LOCAL lock_timeout = '2s'");
+        $this->addSql('ALTER TABLE scheduled_jobs DISABLE TRIGGER query_capture_insert');
         $this->addSql(
             <<<'SQL'
                 WITH sampled_clock AS MATERIALIZED (SELECT clock_timestamp() AS now)
@@ -44,6 +47,7 @@ final class Version20261115110000 extends AbstractMigration
                 'command' => self::RECOVERY_COMMAND,
             ],
         );
+        $this->addSql('ALTER TABLE scheduled_jobs ENABLE TRIGGER query_capture_insert');
     }
 
     public function down(Schema $schema): void
