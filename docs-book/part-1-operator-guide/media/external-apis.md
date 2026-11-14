@@ -31,7 +31,7 @@ Use this table when catalog records exist but enrichment is missing.
 
 | Unavailable service | Impact |
 |---------------------|--------|
-| **MusicBrainz** | Matching and song enrichment have no alternate provider. Automatic matching keeps its requests and pauses until MusicBrainz answers; an administrator's search, comparison or apply answers `503`. Artist searches can fall back to Discogs when MusicBrainz returns no results; an exception is not a guaranteed fallback. Existing local metadata remains available. |
+| **MusicBrainz** | Matching and song enrichment have no alternate provider. A request that MusicBrainz answers with `503` is asked again up to twice, 1 and then 3 seconds later and each time on a fresh turn, but a web request asks again only within its 10-second wait. Automatic matching keeps its requests and pauses until MusicBrainz answers; an administrator's search, comparison or apply answers `503`. Artist searches can fall back to Discogs when MusicBrainz returns no results; an exception is not a guaranteed fallback. Existing local metadata remains available. |
 | **Cover Art Archive** | A match that would add a front cover writes nothing. Automatic matching pauses as it does for a MusicBrainz outage, also when the Cover Art Archive refuses the request; an administrator's apply answers `503`. |
 | **Discogs** | No artist fallback results when MusicBrainz finds none. |
 | **Last.fm** | Last.fm artist search and browse information are unavailable. Matching and the stored artist and song syncs do not call Last.fm. |

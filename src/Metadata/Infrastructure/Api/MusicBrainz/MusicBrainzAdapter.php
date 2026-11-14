@@ -46,6 +46,8 @@ use Symfony\Component\Serializer\Exception\NotEncodableValueException;
  * MusicBrainz requires a meaningful User-Agent and allows one request per second from an
  * address. Every request, including the Cover Art Archive requests made for the port, first
  * takes a turn under the shared `musicbrainz` rate limit, which all processes keep in Redis.
+ * MusicBrainz also answers 503 now and then when it is busy, so a MusicBrainz request that gets
+ * one is asked again after a back-off, on a fresh turn.
  */
 final readonly class MusicBrainzAdapter implements MusicBrainzLookupInterface
 {
@@ -59,17 +61,23 @@ final readonly class MusicBrainzAdapter implements MusicBrainzLookupInterface
     private const string LIMITER_KEY = 'musicbrainz.org';
     /** Client errors that mean "try again later" rather than a refused request. */
     private const array NOT_REJECTIONS = [408, 429];
+    /** MusicBrainz's documented answer to a client that is too fast, and its answer when busy. */
+    private const int SLOW_DOWN = 503;
+    /** Seconds to wait before each retry of a request answered with 503. */
+    private const array RETRY_BACK_OFF_SECONDS = [1.0, 3.0];
     private const string RELEASE_INCLUDES = 'recordings+artist-credits+labels+release-groups+genres';
     private const string RECORDING_INCLUDES = 'artist-credits+releases+release-groups';
     /** Characters with a meaning in Lucene query syntax; a backslash makes each one plain text. */
     private const string LUCENE_SPECIALS = '/[+\-&|!(){}\[\]^"~*?:\\\\\/]/';
 
+    /** @param list<float> $retryBackOffSeconds seconds to wait before each retry of a request answered with 503 */
     public function __construct(
         private LoggerInterface $logger,
         private JsonEncoder $jsonEncoder,
         private PublicHttpClient $httpClient,
         private RateLimiterFactoryInterface $musicbrainzLimiter,
         private CoverArtArchiveAdapter $coverArtArchive,
+        private array $retryBackOffSeconds = self::RETRY_BACK_OFF_SECONDS,
     ) {
     }
 
@@ -128,7 +136,7 @@ final readonly class MusicBrainzAdapter implements MusicBrainzLookupInterface
         string $releaseId,
         MusicBrainzSlotWait $wait = MusicBrainzSlotWait::Bounded,
     ): MusicBrainzCoverImage|MusicBrainzRejected|MusicBrainzUnavailable|null {
-        return $this->takeTurn($wait) ?? $this->coverArtArchive->fetchFrontCover($releaseId);
+        return $this->takeTurn($wait, self::deadline($wait)) ?? $this->coverArtArchive->fetchFrontCover($releaseId);
     }
 
     /**
@@ -261,7 +269,9 @@ final readonly class MusicBrainzAdapter implements MusicBrainzLookupInterface
      */
     private function fetch(string $endpoint, array $params, MusicBrainzSlotWait $wait): array|MusicBrainzRejected|MusicBrainzUnavailable|null
     {
-        return $this->takeTurn($wait) ?? $this->get($endpoint, $params);
+        $deadline = self::deadline($wait);
+
+        return $this->takeTurn($wait, $deadline) ?? $this->get($endpoint, $params, $wait, $deadline, $this->retryBackOffSeconds);
     }
 
     /**
@@ -276,23 +286,34 @@ final readonly class MusicBrainzAdapter implements MusicBrainzLookupInterface
      */
     private function requestOrEmpty(string $endpoint, array $params, MusicBrainzSlotWait $wait): array
     {
-        $noTurn = $this->takeTurn($wait);
+        $deadline = self::deadline($wait);
+        $noTurn = $this->takeTurn($wait, $deadline);
         if ($noTurn !== null) {
             throw new ServiceUnavailableException('MusicBrainz cannot take another request now. Try again shortly.', ['reason' => $noTurn->reason]);
         }
-        $data = $this->get($endpoint, $params);
+        $data = $this->get($endpoint, $params, $wait, $deadline, $this->retryBackOffSeconds);
 
         return is_array($data) ? $data : [];
     }
 
-    /**
-     * Wait for this call's turn under the limit every process shares. Sleeping yields the
-     * coroutine, so a web worker keeps serving other requests meanwhile.
-     */
-    private function takeTurn(MusicBrainzSlotWait $wait): ?MusicBrainzUnavailable
+    /** When a bounded call stops waiting: its longest wait from now. Null when the wait has no limit. */
+    private static function deadline(MusicBrainzSlotWait $wait): ?float
     {
+        $seconds = $wait->maxSeconds();
+
+        return $seconds === null ? null : microtime(true) + $seconds;
+    }
+
+    /**
+     * Wait for this call's turn under the limit every process shares, answering unavailable at
+     * once when the turn comes after the deadline. Sleeping yields the coroutine, so a web worker
+     * keeps serving other requests meanwhile.
+     */
+    private function takeTurn(MusicBrainzSlotWait $wait, ?float $deadline): ?MusicBrainzUnavailable
+    {
+        $maxTime = $deadline === null ? null : max(0.0, $deadline - microtime(true));
         try {
-            $reservation = $this->musicbrainzLimiter->create(self::LIMITER_KEY)->reserve(1, $wait->maxSeconds());
+            $reservation = $this->musicbrainzLimiter->create(self::LIMITER_KEY)->reserve(1, $maxTime);
         } catch (MaxWaitDurationExceededException) {
             return $this->unavailable('rate limit', sprintf('no turn within %d seconds', $wait->maxSeconds()));
         } catch (RateLimiterUnavailableException) {
@@ -307,14 +328,51 @@ final readonly class MusicBrainzAdapter implements MusicBrainzLookupInterface
     }
 
     /**
-     * GET a MusicBrainz endpoint. Destination validation and connection pinning are handled
-     * by the public provider transport, which follows no redirect here.
+     * GET a MusicBrainz endpoint once the call has its turn. A 503 is asked again after each
+     * back-off, each time on a fresh turn, so retries keep the shared spacing too. A bounded call
+     * answers unavailable at once when a back-off or a turn would end after its deadline.
      *
      * @param array<string, string|int> $params
+     * @param list<float> $backOffs seconds to wait before each retry still allowed
      *
      * @return array<array-key, mixed>|MusicBrainzRejected|MusicBrainzUnavailable|null null on 404
      */
-    private function get(string $endpoint, array $params): array|MusicBrainzRejected|MusicBrainzUnavailable|null
+    private function get(string $endpoint, array $params, MusicBrainzSlotWait $wait, ?float $deadline, array $backOffs): array|MusicBrainzRejected|MusicBrainzUnavailable|null
+    {
+        $response = $this->send($endpoint, $params);
+        if (!is_array($response) || $response[0] !== self::SLOW_DOWN || $backOffs === []) {
+            return is_array($response) ? $this->answer($endpoint, ...$response) : $response;
+        }
+        $backOff = array_shift($backOffs);
+        $this->logger->info('MusicBrainz answered 503; asking again', ['service' => 'musicbrainz', 'endpoint' => $endpoint, 'backOffSeconds' => $backOff]);
+
+        return $this->backOff($endpoint, $backOff, $deadline)
+            ?? $this->takeTurn($wait, $deadline)
+            ?? $this->get($endpoint, $params, $wait, $deadline, $backOffs);
+    }
+
+    /** Wait before a retry, or answer unavailable at once when the wait would end after the deadline. */
+    private function backOff(string $endpoint, float $seconds, ?float $deadline): ?MusicBrainzUnavailable
+    {
+        if ($deadline !== null && microtime(true) + $seconds >= $deadline) {
+            return $this->unavailable($endpoint, 'HTTP 503, and no time is left to ask again');
+        }
+        if ($seconds > 0) {
+            Async::sleep($seconds);
+        }
+
+        return null;
+    }
+
+    /**
+     * Send one GET. Destination validation and connection pinning are handled by the public
+     * provider transport, which follows no redirect here.
+     *
+     * @param array<string, string|int> $params
+     *
+     * @return array{int, string}|MusicBrainzUnavailable the status and body
+     */
+    private function send(string $endpoint, array $params): array|MusicBrainzUnavailable
     {
         $url = self::BASE_URL . $endpoint . '?' . http_build_query([...$params, 'fmt' => 'json'], encoding_type: PHP_QUERY_RFC3986);
         $response = null;
@@ -323,14 +381,18 @@ final readonly class MusicBrainzAdapter implements MusicBrainzLookupInterface
                 'headers' => ['User-Agent' => self::USER_AGENT, 'Accept' => 'application/json'],
                 'timeout' => self::TIMEOUT_SECONDS,
             ]);
-            $status = $response->getStatusCode();
-            $body = $response->getContent(false);
+
+            return [$response->getStatusCode(), $response->getContent(false)];
         } catch (\Throwable) {
             return $this->unavailable($endpoint, 'the request failed');
         } finally {
             $response?->cancel();
         }
+    }
 
+    /** @return array<array-key, mixed>|MusicBrainzRejected|MusicBrainzUnavailable|null null on 404 */
+    private function answer(string $endpoint, int $status, string $body): array|MusicBrainzRejected|MusicBrainzUnavailable|null
+    {
         return $status === 200 ? $this->decode($endpoint, $body) : $this->errorAnswer($endpoint, $status);
     }
 

@@ -261,10 +261,12 @@ final class MusicBrainzAdapterTest extends TestCase
     public function testErrorStatusesAreToldApartAndNeverReadAsAnEmptyList(string $method, int $status, ?string $expected): void
     {
         // A 503 from MusicBrainz's rate limit carries an HTML body, not JSON.
-        $this->respond(new MockResponse('<html>busy</html>', ['http_code' => $status]));
+        $this->respond(...array_map(static fn(): MockResponse => new MockResponse('<html>busy</html>', ['http_code' => $status]), range(1, 3)));
 
         $result = self::call($this->adapter(), $method);
 
+        // Only a 503 is asked again, twice; every other status is the answer.
+        self::assertCount($status === 503 ? 3 : 1, $this->urls);
         if ($expected === null) {
             self::assertNull($result);
 
@@ -306,7 +308,10 @@ final class MusicBrainzAdapterTest extends TestCase
         self::call($adapter, $method, MusicBrainzSlotWait::Unbounded);
 
         self::assertCount(2, $this->urls);
-        self::assertSame([MusicBrainzSlotWait::BOUNDED_SECONDS, null], array_column($this->turns->getArrayCopy(), 1));
+        [$bounded, $unbounded] = array_column($this->turns->getArrayCopy(), 1);
+        self::assertEqualsWithDelta(MusicBrainzSlotWait::BOUNDED_SECONDS, $bounded, 0.1);
+        self::assertLessThanOrEqual(MusicBrainzSlotWait::BOUNDED_SECONDS, $bounded);
+        self::assertNull($unbounded);
         self::assertCount(1, array_column($this->turns->getArrayCopy(), 0) |> array_unique(...), 'Every call spends the same budget.');
     }
 
@@ -326,6 +331,76 @@ final class MusicBrainzAdapterTest extends TestCase
         self::assertInstanceOf(MusicBrainzUnavailable::class, $result);
         self::assertSame([], $this->urls, 'No request goes out without a turn.');
         self::assertLessThan(1.0, (hrtime(true) - $started) / 1e9);
+    }
+
+    public function testA503IsAskedAgainOnAFreshTurnAndItsNextAnswerCounts(): void
+    {
+        $this->respond(new MockResponse('<html>busy</html>', ['http_code' => 503]), self::json(self::releaseBody()));
+
+        $release = $this->adapter($this->spyLimiter())->fetchRelease(self::RELEASE_ID);
+
+        self::assertInstanceOf(MusicBrainzRelease::class, $release);
+        self::assertCount(2, $this->urls);
+        self::assertSame($this->urls[0], $this->urls[1]);
+        [$first, $retry] = array_column($this->turns->getArrayCopy(), 1);
+        self::assertEqualsWithDelta(MusicBrainzSlotWait::BOUNDED_SECONDS, $first, 0.1);
+        self::assertLessThanOrEqual($first, $retry, 'The retry spends what is left of the bound.');
+    }
+
+    public function testRetriesWaitTheirBackOffsBeforeTheThirdAnswerOf503IsUnavailable(): void
+    {
+        $this->respond(...array_map(static fn(): MockResponse => new MockResponse('<html>busy</html>', ['http_code' => 503]), range(1, 3)));
+        $started = hrtime(true);
+
+        $result = $this->adapter($this->spyLimiter(), [0.05, 0.1])->fetchRelease(self::RELEASE_ID, MusicBrainzSlotWait::Unbounded);
+
+        self::assertInstanceOf(MusicBrainzUnavailable::class, $result);
+        self::assertCount(3, $this->urls);
+        self::assertCount(3, $this->turns);
+        self::assertGreaterThanOrEqual(0.15, (hrtime(true) - $started) / 1e9);
+    }
+
+    public function testABoundedRetryWhoseTurnLandsPastTheBoundAnswersUnavailableWithoutWaiting(): void
+    {
+        $limiter = self::fixedKey(self::shippedLimiter('musicbrainz'));
+        // While MusicBrainz answers 503, other processes take the next eleven turns.
+        $othersQueue = static function () use ($limiter): \Generator {
+            for ($turn = 0; $turn < 11; ++$turn) {
+                $limiter->create()->reserve();
+            }
+            yield '<html>busy</html>';
+        };
+        $this->respond(new MockResponse($othersQueue(), ['http_code' => 503]));
+        $started = hrtime(true);
+
+        $result = $this->adapter($limiter)->fetchRelease(self::RELEASE_ID, MusicBrainzSlotWait::Bounded);
+
+        self::assertInstanceOf(MusicBrainzUnavailable::class, $result);
+        self::assertCount(1, $this->urls);
+        self::assertLessThan(1.0, (hrtime(true) - $started) / 1e9);
+    }
+
+    public function testABoundedRetryWhoseBackOffEndsPastTheBoundAnswersUnavailableWithoutWaiting(): void
+    {
+        $this->respond(new MockResponse('<html>busy</html>', ['http_code' => 503]));
+        $started = hrtime(true);
+
+        $result = $this->adapter($this->spyLimiter(), [20.0])->fetchRelease(self::RELEASE_ID, MusicBrainzSlotWait::Bounded);
+
+        self::assertInstanceOf(MusicBrainzUnavailable::class, $result);
+        self::assertCount(1, $this->urls);
+        self::assertCount(1, $this->turns);
+        self::assertLessThan(1.0, (hrtime(true) - $started) / 1e9);
+    }
+
+    public function testOlderMethodsAskAgainAfterA503Too(): void
+    {
+        $this->respond(new MockResponse('<html>busy</html>', ['http_code' => 503]), self::json(['count' => 1, 'artists' => [['id' => self::POST_MALONE, 'name' => 'Post Malone', 'score' => 100]]]));
+
+        $result = $this->adapter()->searchArtist('Post Malone');
+
+        self::assertCount(2, $this->urls);
+        self::assertSame(1, $result->total);
     }
 
     public function testOlderSearchesFoldTheArtistIntoTheEscapedQuery(): void
@@ -385,7 +460,8 @@ final class MusicBrainzAdapterTest extends TestCase
         self::assertCount(1, $this->turns);
     }
 
-    private function adapter(?RateLimiterFactoryInterface $limiter = null): MusicBrainzAdapter
+    /** @param list<float> $retryBackOffs seconds before each retry of a 503; no pause by default */
+    private function adapter(?RateLimiterFactoryInterface $limiter = null, array $retryBackOffs = [0.0, 0.0]): MusicBrainzAdapter
     {
         $raw = new MockHttpClient(function (string $method, string $url): MockResponse {
             $this->urls[] = $url;
@@ -401,6 +477,7 @@ final class MusicBrainzAdapterTest extends TestCase
             $client,
             $limiter ?? new RateLimiterFactory(['id' => 'musicbrainz', 'policy' => 'no_limit'], new InMemoryStorage()),
             new CoverArtArchiveAdapter($logger, new JsonEncoder(), $client),
+            $retryBackOffs,
         );
     }
 
