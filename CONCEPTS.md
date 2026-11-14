@@ -185,6 +185,19 @@ artist under all values joined by "; ". Artist credits are not lockable fields; 
 rescan of an unchanged file adds credits only to a song or album that has none, and a
 retagged file replaces its song's credits.
 
+### MusicBrainz match
+
+The link between a song, album or artist and its MusicBrainz entity, chosen by an admin
+from a scored list of candidates or applied by automatic matching when one album
+candidate clearly fits. A match records MusicBrainz IDs and sets artist credits from
+MusicBrainz, so a tag such as "Post Malone, Luke Combs" becomes a primary and a featured
+artist; artists that turn out to share an ID merge unless an admin applying the match
+keeps them apart. It never writes the media file.
+
+A match outlives rescans and retags, except that tags carrying MusicBrainz artist IDs
+replace its credits and a value the new tags carry replaces that field's matched value.
+An album that automatic matching cannot match with confidence needs review by an admin.
+
 ## Lyrics
 
 ### Bulk lyrics run tally
