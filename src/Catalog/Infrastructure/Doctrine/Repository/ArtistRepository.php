@@ -22,7 +22,6 @@ use App\Shared\Domain\Model\Uuid;
 use App\Shared\Infrastructure\Doctrine\Repository\RefreshedEntityTrait;
 use App\Shared\Domain\ValueObject\LibraryReadScope;
 use App\Shared\Infrastructure\Doctrine\Repository\PgroongaSearchTrait;
-use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\ORM\EntityManagerInterface;
 
 /**
@@ -207,41 +206,14 @@ final class ArtistRepository implements ArtistRepositoryInterface
         return SearchResult::create($artists, $result['total'], $result['highestScore']);
     }
 
+    /** The oldest artist, by creation and then ID, whose name equals $name exactly. */
     public function findByName(string $name): ?Artist
     {
         $entity = $this->entityManager
             ->getRepository(ArtistEntity::class)
-            ->findOneBy(['name' => $name]);
+            ->findOneBy(['name' => $name], ['createdAt' => 'ASC', 'id' => 'ASC']);
 
         return $entity !== null ? $this->toDomain($entity) : null;
-    }
-
-    public function findOrCreateByName(string $name): Artist
-    {
-        $existing = $this->findByName($name);
-
-        if ($existing !== null) {
-            return $existing;
-        }
-
-        $artist = Artist::create($name);
-        $entity = new ArtistEntity(
-            $artist->getPublicId(),
-            $artist->getName(),
-        );
-        $this->entityManager->persist($entity);
-
-        try {
-            $this->entityManager->flush();
-        } catch (UniqueConstraintViolationException $e) {
-            $existing = $this->findByName($name);
-            if ($existing !== null) {
-                return $existing;
-            }
-            throw $e;
-        }
-
-        return $this->toDomain($entity);
     }
 
     public function count(): int

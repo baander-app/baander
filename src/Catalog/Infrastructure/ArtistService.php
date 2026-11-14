@@ -66,11 +66,6 @@ final class ArtistService implements ArtistPortInterface
         return $this->artistRepository->findByName($name);
     }
 
-    public function findOrCreateByName(string $name): Artist
-    {
-        return $this->artistRepository->findOrCreateByName($name);
-    }
-
     public function search(SearchOptions $options): SearchResult
     {
         return $this->artistRepository->search($options);

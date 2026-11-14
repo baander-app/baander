@@ -640,6 +640,8 @@ services:
     # --- Catalog Application Port Aliases ---
     App\Catalog\Application\Port\ArtistPortInterface:
         alias: App\Catalog\Infrastructure\ArtistService
+    App\Catalog\Application\Port\ArtistIdentityResolverInterface:
+        alias: App\Catalog\Infrastructure\Doctrine\ImportIdentity\ArtistIdentityResolver
     App\Catalog\Application\Port\AlbumPortInterface:
         alias: App\Catalog\Infrastructure\AlbumService
     App\Catalog\Application\Port\SongAvailabilityPortInterface:

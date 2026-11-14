@@ -36,8 +36,6 @@ interface ArtistPortInterface
 
     public function findByName(string $name): ?Artist;
 
-    public function findOrCreateByName(string $name): Artist;
-
     public function search(SearchOptions $options): SearchResult;
 
     public function count(): int;

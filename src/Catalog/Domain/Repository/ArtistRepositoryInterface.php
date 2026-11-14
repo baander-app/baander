@@ -43,8 +43,6 @@ interface ArtistRepositoryInterface extends Searchable
 
     public function findByName(string $name): ?Artist;
 
-    public function findOrCreateByName(string $name): Artist;
-
     public function count(): int;
 
     public function delete(Artist $artist): void;
