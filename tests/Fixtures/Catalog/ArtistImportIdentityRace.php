@@ -25,10 +25,9 @@ final class ArtistImportIdentityRace
 {
     /**
      * Copies a public table into the connection's current schema with its constraints and every
-     * index except the PGroonga ones. A PGroonga index created and dropped with a throwaway schema
-     * leaves its Groonga objects behind for later sessions of the same database, where another
-     * suite's PGroonga lookup then fails with "object isn't found"; the races need only the unique
-     * and B-tree indexes.
+     * index except the PGroonga ones. With PGroonga indexes in their throwaway schemas, the races
+     * were followed by another suite's PGroonga lookup in the same database failing with "object
+     * isn't found"; without them it passes. The races need only the unique and B-tree indexes.
      */
     public static function copyTableWithoutPgroonga(Connection $connection, string $table): void
     {
