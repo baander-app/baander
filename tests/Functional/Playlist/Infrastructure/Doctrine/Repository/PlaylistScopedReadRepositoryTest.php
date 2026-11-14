@@ -102,6 +102,11 @@ final class PlaylistScopedReadRepositoryTest extends TestCase
                 throw new \LogicException('Not used by playlist reads.');
             }
 
+            public function findLyricSignatures(array $songIds): array
+            {
+                throw new \LogicException('Not used by playlist reads.');
+            }
+
             public function songIdsAfter(?Uuid $after, int $limit): array
             {
                 throw new \LogicException('Not used by playlist reads.');

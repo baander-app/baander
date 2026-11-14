@@ -14,6 +14,7 @@ use App\Catalog\Infrastructure\Doctrine\Entity\SongEntity;
 use App\Catalog\Infrastructure\Doctrine\Repository\SongRepository;
 use App\Library\Infrastructure\Doctrine\Entity\LibraryEntity;
 use App\Shared\Domain\Model\PublicId;
+use App\Shared\Domain\Model\Uuid;
 use App\Shared\Domain\ValueObject\LibraryReadScope;
 use App\Shared\Infrastructure\Pagination\CursorCodec;
 use App\Shared\Infrastructure\Pagination\CursorPaginator;
@@ -84,6 +85,7 @@ final class SongPrimaryArtistLookupTest extends TestCase
 
         self::assertSame('HeadHunterz', $this->songs()->getArtistNameForSong($song->getId()));
         self::assertSame('HeadHunterz', $this->lookup()->findLyricSignature($song->getId())?->artistName);
+        self::assertSame('HeadHunterz', ($this->lookup()->findLyricSignatures([$song->getId()])[$song->getId()->toString()] ?? null)?->artistName);
     }
 
     public function testASongWithTwoPrimaryCreditsShowsTheCreditedNameThatSortsFirst(): void
@@ -115,6 +117,40 @@ final class SongPrimaryArtistLookupTest extends TestCase
         self::assertSame('Bravo', $this->lookup()->findLyricSignature($duet->getId())?->artistName);
     }
 
+    /** The batched lookup a bulk walk uses returns, for each song, what a single lookup returns. */
+    public function testABatchedLookupReturnsEachSongsSignatureAsTheSingleLookupDoes(): void
+    {
+        $headhunterz = $this->artist('Headhunterz');
+        $alpha = $this->artist('Alpha');
+        $zeta = $this->artist('Zeta');
+        $otherAlbum = new AlbumEntity(new PublicId(), $this->library, 'Ten Thousand Fists', 'album');
+        $this->manager->persist($otherAlbum);
+        $credited = $this->song('Psychedelic', length: 233.5);
+        $duet = $this->song('Duet', $otherAlbum, 176.657);
+        $bare = $this->song('Bare');
+        $this->credit($headhunterz, $credited, 'HeadHunterz');
+        $this->credit($alpha, $duet, 'Yankee');
+        $this->credit($zeta, $duet, 'Bravo');
+        $this->credit($alpha, $duet, 'Able', ArtistRole::Featured);
+        $this->manager->flush();
+        $this->manager->clear();
+
+        $ids = [$credited->getId(), $duet->getId(), $bare->getId(), new Uuid()];
+        $lookup = $this->lookup();
+        $signatures = $lookup->findLyricSignatures($ids);
+        self::assertSame(0, $this->manager->getUnitOfWork()->size(), 'The batched lookup loads no entities.');
+
+        self::assertEquals([
+            $credited->getId()->toString() => new SongLyricSignature('Psychedelic', 'HeadHunterz', 'Credits', 233.5),
+            $duet->getId()->toString() => new SongLyricSignature('Duet', 'Bravo', 'Ten Thousand Fists', 176.657),
+            $bare->getId()->toString() => new SongLyricSignature('Bare', null, 'Credits', null),
+        ], $signatures);
+        foreach ($ids as $id) {
+            self::assertEquals($lookup->findLyricSignature($id), $signatures[$id->toString()] ?? null, $id->toString());
+        }
+        self::assertSame([], $lookup->findLyricSignatures([]));
+    }
+
     private function artist(string $name): ArtistEntity
     {
         $artist = new ArtistEntity(new PublicId(), $name);
@@ -123,9 +159,10 @@ final class SongPrimaryArtistLookupTest extends TestCase
         return $artist;
     }
 
-    private function song(string $title): SongEntity
+    private function song(string $title, ?AlbumEntity $album = null, ?float $length = null): SongEntity
     {
-        $song = new SongEntity(new PublicId(), $this->album, $title, '/credited-names/' . $title . '.flac', 1, 'audio/flac');
+        $song = new SongEntity(new PublicId(), $album ?? $this->album, $title, '/credited-names/' . $title . '.flac', 1, 'audio/flac');
+        $song->setLength($length);
         $this->manager->persist($song);
 
         return $song;

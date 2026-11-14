@@ -16,7 +16,8 @@ The `Lyrics` aggregate stores lyrics indexed by song ID, supporting multiple sou
 - Outcomes: `FetchLyricsHandler` returns a `LyricsFetchResult` whose `LyricsFetchOutcome` is found, no match, no artist, no length, rejected or unavailable. It never throws for any of them, so queued fetches end without a retry. A song without a primary artist credit, or whose length is missing or not positive, is not looked up. The per-song API route and `app:song:lyrics:fetch` turn every outcome except found and no match into an error that exits with 1: no artist and no length into `LyricsFetchNotAttemptedException` (HTTP 409, `details.reason` `song_has_no_artist` or `song_has_no_length`), rejected into `LyricsRequestRejectedException` (409, `lrclib_rejected`), and unavailable into `LyricsProviderUnavailableException` (503). Search and apply report a rejection and an outage the same way. Apply refuses a song that has lyrics with `SongHasLyricsException` (409, `song_has_lyrics`); a result another song already has is stored for this song too
 - LRCLIB answers: 404 is no match. Any other 4xx except 408 and 429 is a rejected request; sending it again gets the same answer. 408, 429, redirects, server errors, timeouts, transport failures and unreadable bodies mean LRCLIB is unavailable. Signature lookups send the song's length rounded to the nearest second
 - Search fallback: manual keyword search via `/api/search` when auto-match by track signature fails
-- Bulk scan: console command iterates songs without lyrics and fetches from LRCLIB
+- Bulk fetch: `BulkFetchLyricsHandler` walks the songs without lyrics and queues one fetch per song on the `async` transport, spaced by the run's delay. It skips a song without a primary artist credit or a positive length, the rule `LyricsLookupRequirements` shares with `FetchLyricsHandler`, and counts it per cause. `app:lyrics:fetch` and `POST /api/admin/lyrics/bulk-fetch` report the queued and skipped counts
+- Bulk run tally: `QueuedLyricsFetchesInterface` keeps each run's queued marks, its cancellation and its tally in Redis; each entry expires a day after the fetches it covers are due. The walk records its skipped counts and its job when it finishes, also when it queued nothing; each queued fetch then counts found, no match, rejected or unavailable once per run and song. A fetch skipped because its run was cancelled, or whose song was deleted, counts toward no outcome. The sync status reports the run whose walk finished last as `latestRun`
 - Automatic fetch: while `lyrics.auto_fetch` is on, Catalog ingest queues one fetch on the `async` transport for each new song without a sidecar `.lrc` file. The setting is off by default and does not gate the bulk scan or the on-demand fetch.
 
 ## Ports
@@ -26,6 +27,8 @@ The `Lyrics` aggregate stores lyrics indexed by song ID, supporting multiple sou
 | `LyricsPortInterface` | Application | Reads the stored lyrics of a song |
 | `LrclibClientInterface` | Application | LRCLIB HTTP API contract (getBySignature, search, getById); null or an empty list for a miss, `LrclibRejected` for a refused request, `LrclibUnavailable` for an outage |
 | `LyricsFetchRequestInterface` | Application (contract) | Lets Catalog ingest request fetches for new songs; reads `lyrics.auto_fetch` on every call |
+| `QueuedLyricsFetchesInterface` | Application | Bulk runs' queued marks, cancellations and outcome tallies, in Redis (`RedisQueuedLyricsFetches`, which also cancels a finished job's fetches for the job monitor) |
+| `LyricsAdminPortInterface` | Application | Coverage and sync status behind the admin lyrics routes and their commands; the sync status includes the latest bulk run's tally |
 
 ## Events
 
@@ -48,7 +51,7 @@ No domain events published yet.
 |---------|-------------|
 | `app:lyrics:fetch` | Queue a lyrics fetch from LRCLIB for every song without lyrics, or up to `--limit` |
 | `app:lyrics:coverage` | Lyrics coverage, as the admin coverage endpoint returns it |
-| `app:lyrics:status` | Lyrics job counts, as the admin sync-status endpoint returns them |
+| `app:lyrics:status` | Lyrics job counts and the latest bulk run's tally, as the admin sync-status endpoint returns them |
 | `app:song:lyrics:fetch` | Fetch the lyrics of one song from LRCLIB, as the per-song fetch route does |
 | `app:lyrics:search` | Search LRCLIB and list the results with their IDs |
 | `app:lyrics:apply` | Store an LRCLIB search result as the lyrics of a song that has none |

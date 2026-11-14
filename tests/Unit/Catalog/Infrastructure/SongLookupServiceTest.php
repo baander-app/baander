@@ -60,4 +60,22 @@ final class SongLookupServiceTest extends TestCase
 
         self::assertEquals(new SongLyricSignature('Bare', null, null, null), $lookup->findLyricSignature($song->getId()));
     }
+
+    public function testBatchedLyricSignaturesAreKeyedBySongIdAndKeepAMissingArtistAndLengthAsNull(): void
+    {
+        $credited = Uuid::v7();
+        $bare = Uuid::v7();
+        $connection = $this->createStub(Connection::class);
+        // PostgreSQL drivers may return double precision as a string.
+        $connection->method('fetchAllAssociative')->willReturn([
+            ['id' => $credited->toString(), 'title' => 'The Song', 'artist_name' => 'The Artist', 'album_title' => 'The Album', 'length' => '233.5'],
+            ['id' => $bare->toString(), 'title' => 'Bare', 'artist_name' => null, 'album_title' => 'The Album', 'length' => null],
+        ]);
+        $lookup = new SongLookupService($this->createStub(SongRepositoryInterface::class), $this->createStub(AlbumRepositoryInterface::class), $connection);
+
+        self::assertEquals([
+            $credited->toString() => new SongLyricSignature('The Song', 'The Artist', 'The Album', 233.5),
+            $bare->toString() => new SongLyricSignature('Bare', null, 'The Album', null),
+        ], $lookup->findLyricSignatures([$credited, $bare, Uuid::v7()]));
+    }
 }

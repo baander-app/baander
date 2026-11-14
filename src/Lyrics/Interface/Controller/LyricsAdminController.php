@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Lyrics\Interface\Controller;
 
 use App\Lyrics\Application\Command\BulkFetchLyricsCommand;
+use App\Lyrics\Application\DTO\BulkFetchLyricsResult;
 use App\Lyrics\Application\Port\LyricsAdminPortInterface;
 use App\Shared\Application\Exception\ConflictException;
 use App\Shared\Application\Exception\InvalidInputException;
@@ -80,6 +81,8 @@ final class LyricsAdminController
                     properties: [
                         new OA\Property(property: 'data', properties: [
                             new OA\Property(property: 'jobsEnqueued', description: 'Songs queued for fetching', type: 'integer'),
+                            new OA\Property(property: 'skippedNoArtist', description: 'Songs without lyrics not queued because they have no primary artist credit', type: 'integer'),
+                            new OA\Property(property: 'skippedNoLength', description: 'Songs without lyrics not queued because their length is missing or not positive', type: 'integer'),
                         ], type: 'object'),
                     ],
                 ),
@@ -104,17 +107,17 @@ final class LyricsAdminController
 
         // Run as a job, as app:lyrics:fetch does, so the job monitor can cancel its queued fetches.
         try {
-            $queued = $this->jobs->runInline(new BulkFetchLyricsCommand(limit: $limit))->result;
+            $run = $this->jobs->runInline(new BulkFetchLyricsCommand(limit: $limit));
         } catch (JobCancelledException $cancelled) {
             throw new ConflictException($cancelled->getMessage(), ['reason' => 'cancelled'], $cancelled);
         }
 
-        return $this->successResponse(['jobsEnqueued' => $queued]);
+        return $this->successResponse(BulkFetchLyricsResult::fromRun($run)->toArray());
     }
 
     #[OA\Get(
         path: '/api/admin/lyrics/sync-status',
-        summary: 'Get lyrics sync job status',
+        summary: 'Get lyrics sync job status and the latest bulk fetch run',
         responses: [
             new OA\Response(
                 response: '200',
@@ -126,6 +129,23 @@ final class LyricsAdminController
                             new OA\Property(property: 'recentJobs', type: 'integer'),
                             new OA\Property(property: 'failedJobs', type: 'integer'),
                             new OA\Property(property: 'completedJobs', type: 'integer'),
+                            new OA\Property(
+                                property: 'latestRun',
+                                description: 'The bulk fetch run that finished queueing last, until a day after its last fetch was due; null when there is none. A fetch counts once a worker has handled it.',
+                                properties: [
+                                    new OA\Property(property: 'jobId', description: 'Job-monitor ID of the run, or null for a run outside a job', type: 'string', nullable: true),
+                                    new OA\Property(property: 'finishedAt', description: 'When the run finished queueing', type: 'string', format: 'date-time'),
+                                    new OA\Property(property: 'queued', description: 'Fetches the run queued', type: 'integer'),
+                                    new OA\Property(property: 'found', description: 'Fetches that found lyrics', type: 'integer'),
+                                    new OA\Property(property: 'noMatch', description: 'Fetches LRCLIB had no lyrics for', type: 'integer'),
+                                    new OA\Property(property: 'skippedNoArtist', description: 'Songs not looked up because they have no primary artist credit', type: 'integer'),
+                                    new OA\Property(property: 'skippedNoLength', description: 'Songs not looked up because their length is missing or not positive', type: 'integer'),
+                                    new OA\Property(property: 'rejected', description: 'Fetches whose request LRCLIB rejected', type: 'integer'),
+                                    new OA\Property(property: 'unavailable', description: 'Fetches that found LRCLIB unavailable', type: 'integer'),
+                                ],
+                                type: 'object',
+                                nullable: true,
+                            ),
                         ], type: 'object'),
                     ],
                 ),

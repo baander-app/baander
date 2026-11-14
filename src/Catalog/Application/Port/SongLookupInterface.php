@@ -21,6 +21,17 @@ interface SongLookupInterface
     public function findLyricSignature(Uuid $songId): ?SongLyricSignature;
 
     /**
+     * The signatures of a set of songs in one query that loads no entities, so a walk over
+     * every song does not grow with the library. Each is the signature findLyricSignature
+     * returns for that song. Unscoped, like findLyricSignature; the set is bound as one
+     * uuid[] parameter.
+     *
+     * @param list<Uuid> $songIds
+     * @return array<string, SongLyricSignature> keyed by song ID string; a song that does not exist is absent
+     */
+    public function findLyricSignatures(array $songIds): array;
+
+    /**
      * Unscoped keyset page of all song IDs in ascending order.
      *
      * @return list<Uuid> at most $limit IDs greater than $after; empty once the walk is complete

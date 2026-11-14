@@ -5210,11 +5210,43 @@ export type PostAdminLyricsBulkFetchBody = {
 export type PostAdminLyricsBulkFetch200Data = {
   /** Songs queued for fetching */
   jobsEnqueued?: number;
+  /** Songs without lyrics not queued because they have no primary artist credit */
+  skippedNoArtist?: number;
+  /** Songs without lyrics not queued because their length is missing or not positive */
+  skippedNoLength?: number;
 };
 
 export type PostAdminLyricsBulkFetch200 = {
   data?: PostAdminLyricsBulkFetch200Data;
 };
+
+/**
+ * The bulk fetch run that finished queueing last, until a day after its last fetch was due; null when there is none. A fetch counts once a worker has handled it.
+ * @nullable
+ */
+export type GetAdminLyricsSyncStatus200DataLatestRun = {
+  /**
+     * Job-monitor ID of the run, or null for a run outside a job
+     * @nullable
+     */
+  jobId?: string | null;
+  /** When the run finished queueing */
+  finishedAt?: string;
+  /** Fetches the run queued */
+  queued?: number;
+  /** Fetches that found lyrics */
+  found?: number;
+  /** Fetches LRCLIB had no lyrics for */
+  noMatch?: number;
+  /** Songs not looked up because they have no primary artist credit */
+  skippedNoArtist?: number;
+  /** Songs not looked up because their length is missing or not positive */
+  skippedNoLength?: number;
+  /** Fetches whose request LRCLIB rejected */
+  rejected?: number;
+  /** Fetches that found LRCLIB unavailable */
+  unavailable?: number;
+} | null;
 
 export type GetAdminLyricsSyncStatus200Data = {
   /** @nullable */
@@ -5222,6 +5254,11 @@ export type GetAdminLyricsSyncStatus200Data = {
   recentJobs?: number;
   failedJobs?: number;
   completedJobs?: number;
+  /**
+     * The bulk fetch run that finished queueing last, until a day after its last fetch was due; null when there is none. A fetch counts once a worker has handled it.
+     * @nullable
+     */
+  latestRun?: GetAdminLyricsSyncStatus200DataLatestRun;
 };
 
 export type GetAdminLyricsSyncStatus200 = {
@@ -19665,7 +19702,7 @@ export const getGetAdminLyricsSyncStatusUrl = () => {
 }
 
 /**
- * @summary Get lyrics sync job status
+ * @summary Get lyrics sync job status and the latest bulk fetch run
  */
 export const getAdminLyricsSyncStatus = async ( options?: Parameters<typeof customInstance>[1]): Promise<GetAdminLyricsSyncStatus200> => {
 
@@ -19736,7 +19773,7 @@ export function useGetAdminLyricsSyncStatus<TData = Awaited<ReturnType<typeof ge
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
- * @summary Get lyrics sync job status
+ * @summary Get lyrics sync job status and the latest bulk fetch run
  */
 
 export function useGetAdminLyricsSyncStatus<TData = Awaited<ReturnType<typeof getAdminLyricsSyncStatus>>, TError = ErrorType<ApiError>>(

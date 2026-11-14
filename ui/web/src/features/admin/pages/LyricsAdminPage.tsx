@@ -311,6 +311,31 @@ export function LyricsAdminPage() {
                 <Row label="Failed jobs" value={syncStatus.failedJobs} muted={syncStatus.failedJobs === 0} />
               </RowStack>
 
+              <div>
+                <SectionLabel>Latest run</SectionLabel>
+                {syncStatus.latestRun ? (
+                  <RowStack>
+                    <Row label="Queued" value={syncStatus.latestRun.queued} />
+                    <Row label="Found" value={syncStatus.latestRun.found} />
+                    <Row label="No match" value={syncStatus.latestRun.noMatch} muted={syncStatus.latestRun.noMatch === 0} />
+                    <Row
+                      label="Skipped for a missing artist"
+                      value={syncStatus.latestRun.skippedNoArtist}
+                      muted={syncStatus.latestRun.skippedNoArtist === 0}
+                    />
+                    <Row
+                      label="Skipped for a missing length"
+                      value={syncStatus.latestRun.skippedNoLength}
+                      muted={syncStatus.latestRun.skippedNoLength === 0}
+                    />
+                    <Row label="Rejected" value={syncStatus.latestRun.rejected} muted={syncStatus.latestRun.rejected === 0} />
+                    <Row label="Unavailable" value={syncStatus.latestRun.unavailable} muted={syncStatus.latestRun.unavailable === 0} />
+                  </RowStack>
+                ) : (
+                  <EmptyText>No recent run</EmptyText>
+                )}
+              </div>
+
               {isSuperAdmin && (
                 <ActionArea>
                   <Button
@@ -325,7 +350,8 @@ export function LyricsAdminPage() {
                   </Button>
                   {bulkFetch.data && (
                     <FeedbackText>
-                      Enqueued {bulkFetch.data.jobsEnqueued} fetch jobs.
+                      Enqueued {bulkFetch.data.jobsEnqueued} fetch jobs. Skipped {bulkFetch.data.skippedNoArtist} without an
+                      artist and {bulkFetch.data.skippedNoLength} without a length.
                     </FeedbackText>
                   )}
                   {bulkFetch.error && (

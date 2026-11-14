@@ -16,7 +16,7 @@ use Throwable;
 /** The CLI counterpart of GET /api/admin/lyrics/sync-status. */
 #[AsCommand(
     name: 'app:lyrics:status',
-    description: 'Show the lyrics fetch jobs: the last one, those of the past 7 days, and how many finished or failed.',
+    description: 'Show the lyrics fetch jobs (the last one, those of the past 7 days, how many finished or failed) and the outcomes of the latest bulk fetch run.',
 )]
 final class LyricsStatusCommand extends Command
 {
@@ -50,6 +50,25 @@ final class LyricsStatusCommand extends Command
             ['Jobs in the past 7 days', $status['recentJobs']],
             ['Finished jobs', $status['completedJobs']],
             ['Failed jobs', $status['failedJobs']],
+        ]);
+
+        $run = $status['latestRun'];
+        if ($run === null) {
+            $io->text('Latest bulk run: no recent run');
+
+            return Command::SUCCESS;
+        }
+
+        $io->table(['Latest bulk run', 'Value'], [
+            ['Finished queueing', $run['finishedAt']],
+            ['Job ID', $run['jobId'] ?? 'none'],
+            ['Queued', $run['queued']],
+            ['Found', $run['found']],
+            ['No match', $run['noMatch']],
+            ['Skipped for a missing artist', $run['skippedNoArtist']],
+            ['Skipped for a missing length', $run['skippedNoLength']],
+            ['Rejected', $run['rejected']],
+            ['Unavailable', $run['unavailable']],
         ]);
 
         return Command::SUCCESS;

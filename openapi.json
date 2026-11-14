@@ -8877,6 +8877,14 @@
                                                 "jobsEnqueued": {
                                                     "description": "Songs queued for fetching",
                                                     "type": "integer"
+                                                },
+                                                "skippedNoArtist": {
+                                                    "description": "Songs without lyrics not queued because they have no primary artist credit",
+                                                    "type": "integer"
+                                                },
+                                                "skippedNoLength": {
+                                                    "description": "Songs without lyrics not queued because their length is missing or not positive",
+                                                    "type": "integer"
                                                 }
                                             },
                                             "type": "object"
@@ -8925,7 +8933,7 @@
                 "tags": [
                     "Admin"
                 ],
-                "summary": "Get lyrics sync job status",
+                "summary": "Get lyrics sync job status and the latest bulk fetch run",
                 "operationId": "get_admin_lyrics_sync_status",
                 "responses": {
                     "200": {
@@ -8948,6 +8956,51 @@
                                                 },
                                                 "completedJobs": {
                                                     "type": "integer"
+                                                },
+                                                "latestRun": {
+                                                    "description": "The bulk fetch run that finished queueing last, until a day after its last fetch was due; null when there is none. A fetch counts once a worker has handled it.",
+                                                    "properties": {
+                                                        "jobId": {
+                                                            "description": "Job-monitor ID of the run, or null for a run outside a job",
+                                                            "type": "string",
+                                                            "nullable": true
+                                                        },
+                                                        "finishedAt": {
+                                                            "description": "When the run finished queueing",
+                                                            "type": "string",
+                                                            "format": "date-time"
+                                                        },
+                                                        "queued": {
+                                                            "description": "Fetches the run queued",
+                                                            "type": "integer"
+                                                        },
+                                                        "found": {
+                                                            "description": "Fetches that found lyrics",
+                                                            "type": "integer"
+                                                        },
+                                                        "noMatch": {
+                                                            "description": "Fetches LRCLIB had no lyrics for",
+                                                            "type": "integer"
+                                                        },
+                                                        "skippedNoArtist": {
+                                                            "description": "Songs not looked up because they have no primary artist credit",
+                                                            "type": "integer"
+                                                        },
+                                                        "skippedNoLength": {
+                                                            "description": "Songs not looked up because their length is missing or not positive",
+                                                            "type": "integer"
+                                                        },
+                                                        "rejected": {
+                                                            "description": "Fetches whose request LRCLIB rejected",
+                                                            "type": "integer"
+                                                        },
+                                                        "unavailable": {
+                                                            "description": "Fetches that found LRCLIB unavailable",
+                                                            "type": "integer"
+                                                        }
+                                                    },
+                                                    "type": "object",
+                                                    "nullable": true
                                                 }
                                             },
                                             "type": "object"

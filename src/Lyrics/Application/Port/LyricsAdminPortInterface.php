@@ -17,7 +17,10 @@ interface LyricsAdminPortInterface
     public function getCoverage(): array;
 
     /**
-     * @return array{lastSyncAt: string|null, recentJobs: int, failedJobs: int, completedJobs: int}
+     * The lyrics jobs the job monitor recorded, and the tally of the latest bulk run while it
+     * lasts (BulkLyricsRunTally::toArray()).
+     *
+     * @return array{lastSyncAt: string|null, recentJobs: int, failedJobs: int, completedJobs: int, latestRun: array{jobId: string|null, finishedAt: string, queued: int, found: int, noMatch: int, skippedNoArtist: int, skippedNoLength: int, rejected: int, unavailable: int}|null}
      */
     public function getSyncStatus(): array;
 }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Lyrics\Interface\Console;
 
 use App\Lyrics\Application\Command\BulkFetchLyricsCommand;
+use App\Lyrics\Application\DTO\BulkFetchLyricsResult;
 use App\Shared\Application\Port\JobMonitorAdministrationInterface;
 use App\Shared\Interface\Console\AdminCommandSupport;
 use Symfony\Component\Console\Attribute\AsCommand;
@@ -20,7 +21,8 @@ use Throwable;
  *
  * Runs BulkFetchLyricsCommand in this process and records the run in the job monitor. The
  * run queues one fetch per song on the async transport; the workers' consumer performs the
- * fetches, which only call LRCLIB and write to the database.
+ * fetches, which only call LRCLIB and write to the database. The command reports the songs
+ * the run skipped because a lookup needs an artist and a length they lack.
  */
 #[AsCommand(
     name: 'app:lyrics:fetch',
@@ -59,27 +61,34 @@ final class LyricsFetchCommand extends Command
                 ));
             }
             $run = $this->jobs->runInline(new BulkFetchLyricsCommand(limit: $limit, delayMs: $delay));
+            $result = BulkFetchLyricsResult::fromRun($run);
         } catch (Throwable $exception) {
             return AdminCommandSupport::fail($io, $exception);
         }
 
-        $queued = is_int($run->result) ? $run->result : 0;
         if ($json) {
-            return AdminCommandSupport::json($io, ['jobsEnqueued' => $queued, 'jobId' => $run->jobId]);
+            return AdminCommandSupport::json($io, $result->toArray() + ['jobId' => $run->jobId]);
         }
 
-        if ($queued === 0) {
-            $io->success(sprintf('No song needs lyrics; nothing was queued. Job ID: %s', $run->jobId));
-
-            return Command::SUCCESS;
+        $skipped = $result->skippedNoArtist + $result->skippedNoLength;
+        $io->success(match (true) {
+            $result->queued > 0 => sprintf(
+                'Queued %d lyrics fetch(es). The workers fetch them from LRCLIB over the next %s. Job ID: %s',
+                $result->queued,
+                self::duration(($result->queued - 1) * $delay),
+                $run->jobId,
+            ),
+            $skipped > 0 => sprintf('Nothing was queued. Job ID: %s', $run->jobId),
+            default => sprintf('No song needs lyrics; nothing was queued. Job ID: %s', $run->jobId),
+        });
+        // On a line of its own, so the success block keeps the job ID on one line.
+        if ($result->queued > 0 || $skipped > 0) {
+            $io->text(sprintf(
+                'Skipped %d song(s) without an artist and %d without a length; a lyrics lookup needs both.',
+                $result->skippedNoArtist,
+                $result->skippedNoLength,
+            ));
         }
-
-        $io->success(sprintf(
-            'Queued %d lyrics fetch(es). The workers fetch them from LRCLIB over the next %s. Job ID: %s',
-            $queued,
-            self::duration(($queued - 1) * $delay),
-            $run->jobId,
-        ));
 
         return Command::SUCCESS;
     }

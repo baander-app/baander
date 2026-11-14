@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Lyrics\Interface\Console;
 
 use App\Lyrics\Application\Command\BulkFetchLyricsCommand;
+use App\Lyrics\Application\DTO\BulkFetchLyricsResult;
 use App\Lyrics\Application\Port\LyricsAdminPortInterface;
 use App\Lyrics\Interface\Console\LyricsCoverageCommand;
 use App\Lyrics\Interface\Console\LyricsFetchCommand;
@@ -31,11 +32,23 @@ final class LyricsCommandsTest extends TestCase
         'coveragePercentage' => 25.5,
         'bySource' => ['lrclib' => 45, 'embedded' => 5],
     ];
+    private const array LATEST_RUN = [
+        'jobId' => 'bulk-job-7',
+        'finishedAt' => '2026-11-14T09:30:00+00:00',
+        'queued' => 74,
+        'found' => 61,
+        'noMatch' => 9,
+        'skippedNoArtist' => 2,
+        'skippedNoLength' => 1,
+        'rejected' => 3,
+        'unavailable' => 1,
+    ];
     private const array STATUS = [
         'lastSyncAt' => '2026-10-08T12:00:00+00:00',
         'recentJobs' => 12,
         'failedJobs' => 1,
         'completedJobs' => 11,
+        'latestRun' => self::LATEST_RUN,
     ];
 
     /** @var list<object> */
@@ -69,15 +82,40 @@ final class LyricsCommandsTest extends TestCase
         self::assertSame(Command::SUCCESS, $tester->execute(['--json' => true]));
 
         self::assertSame($endpoint, json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR));
+        self::assertSame(self::LATEST_RUN, $endpoint['latestRun']);
+    }
+
+    public function testStatusTableShowsTheLatestRunsTally(): void
+    {
+        $tester = new CommandTester(new LyricsStatusCommand($this->port()));
+        self::assertSame(Command::SUCCESS, $tester->execute([]));
+
+        $display = $tester->getDisplay();
+        self::assertMatchesRegularExpression('/Job ID\s+bulk-job-7/', $display);
+        self::assertMatchesRegularExpression('/Found\s+61/', $display);
+        self::assertMatchesRegularExpression('/No match\s+9/', $display);
+        self::assertMatchesRegularExpression('/Skipped for a missing artist\s+2/', $display);
+        self::assertMatchesRegularExpression('/Skipped for a missing length\s+1/', $display);
+        self::assertMatchesRegularExpression('/Rejected\s+3/', $display);
+        self::assertMatchesRegularExpression('/Unavailable\s+1/', $display);
+    }
+
+    public function testStatusSaysSoWhileNoRunIsRecorded(): void
+    {
+        $tester = new CommandTester(new LyricsStatusCommand($this->port(['latestRun' => null] + self::STATUS)));
+        self::assertSame(Command::SUCCESS, $tester->execute([]));
+
+        self::assertStringContainsString('no recent run', $tester->getDisplay());
+        self::assertStringNotContainsString('Skipped for a missing artist', $tester->getDisplay());
     }
 
     public function testTheWebAndTheCommandDispatchTheSameBulkFetchForTheSameLimit(): void
     {
-        $response = $this->controller(result: 10)->bulkFetch(Request::create('/', 'POST', content: '{"limit":10}'));
-        self::assertSame(['jobsEnqueued' => 10], $this->data($response));
+        $response = $this->controller(result: new BulkFetchLyricsResult(10, 0, 0))->bulkFetch(Request::create('/', 'POST', content: '{"limit":10}'));
+        self::assertSame(['jobsEnqueued' => 10, 'skippedNoArtist' => 0, 'skippedNoLength' => 0], $this->data($response));
 
         $inline = [];
-        $tester = new CommandTester(new LyricsFetchCommand($this->jobs($inline, 10)));
+        $tester = new CommandTester(new LyricsFetchCommand($this->jobs($inline, new BulkFetchLyricsResult(10, 0, 0))));
         self::assertSame(Command::SUCCESS, $tester->execute(['--limit' => '10']));
 
         self::assertEquals([new BulkFetchLyricsCommand(limit: 10)], $this->dispatched);
@@ -88,23 +126,48 @@ final class LyricsCommandsTest extends TestCase
 
     public function testFetchJsonIsTheEndpointsDataWithTheJobIdOfTheInlineRun(): void
     {
-        $endpoint = $this->data($this->controller(result: 10)->bulkFetch(Request::create('/', 'POST', content: '{"limit":10}')));
+        $result = new BulkFetchLyricsResult(10, 2, 1);
+        $endpoint = $this->data($this->controller(result: $result)->bulkFetch(Request::create('/', 'POST', content: '{"limit":10}')));
 
         $inline = [];
-        $tester = new CommandTester(new LyricsFetchCommand($this->jobs($inline, 10)));
+        $tester = new CommandTester(new LyricsFetchCommand($this->jobs($inline, $result)));
         self::assertSame(Command::SUCCESS, $tester->execute(['--limit' => '10', '--json' => true]));
 
         self::assertSame($endpoint + ['jobId' => 'inline-job-1'], json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR));
+        self::assertSame(['jobsEnqueued' => 10, 'skippedNoArtist' => 2, 'skippedNoLength' => 1], $endpoint);
+    }
+
+    public function testTheFetchPrintsTheSongsItSkippedPerCause(): void
+    {
+        $inline = [];
+        $tester = new CommandTester(new LyricsFetchCommand($this->jobs($inline, new BulkFetchLyricsResult(3, 2, 1))));
+
+        self::assertSame(Command::SUCCESS, $tester->execute([]));
+        $display = (string) preg_replace('/\s+/', ' ', $tester->getDisplay());
+        self::assertStringContainsString('Queued 3 lyrics fetch(es)', $display);
+        self::assertStringContainsString('Skipped 2 song(s) without an artist and 1 without a length', $display);
+    }
+
+    public function testARunThatCouldLookUpNoSongSaysWhyNothingWasQueued(): void
+    {
+        $inline = [];
+        $tester = new CommandTester(new LyricsFetchCommand($this->jobs($inline, new BulkFetchLyricsResult(0, 4, 0))));
+
+        self::assertSame(Command::SUCCESS, $tester->execute([]));
+        $display = (string) preg_replace('/\s+/', ' ', $tester->getDisplay());
+        self::assertStringContainsString('Nothing was queued.', $display);
+        self::assertStringContainsString('Skipped 4 song(s) without an artist and 0 without a length', $display);
+        self::assertStringNotContainsString('No song needs lyrics', $display);
     }
 
     public function testWithoutALimitBothPathsQueueEverySongWithoutLyrics(): void
     {
         // The admin page posts no body at all.
-        $response = $this->controller(result: 150)->bulkFetch(Request::create('/', 'POST'));
-        self::assertSame(['jobsEnqueued' => 150], $this->data($response));
+        $response = $this->controller(result: new BulkFetchLyricsResult(150, 0, 0))->bulkFetch(Request::create('/', 'POST'));
+        self::assertSame(150, $this->data($response)['jobsEnqueued']);
 
         $inline = [];
-        $tester = new CommandTester(new LyricsFetchCommand($this->jobs($inline, 150)));
+        $tester = new CommandTester(new LyricsFetchCommand($this->jobs($inline, new BulkFetchLyricsResult(150, 0, 0))));
         self::assertSame(Command::SUCCESS, $tester->execute([]));
 
         self::assertEquals([new BulkFetchLyricsCommand()], $this->dispatched);
@@ -115,7 +178,7 @@ final class LyricsCommandsTest extends TestCase
     public function testNothingToFetchIsReportedAsSuch(): void
     {
         $inline = [];
-        $tester = new CommandTester(new LyricsFetchCommand($this->jobs($inline, 0)));
+        $tester = new CommandTester(new LyricsFetchCommand($this->jobs($inline, new BulkFetchLyricsResult(0, 0, 0))));
 
         self::assertSame(Command::SUCCESS, $tester->execute(['--delay' => '1000']));
         self::assertEquals([new BulkFetchLyricsCommand(delayMs: 1000)], $inline);
@@ -166,23 +229,24 @@ final class LyricsCommandsTest extends TestCase
         (new LyricsAdminController($this->port(), $jobs))->bulkFetch(Request::create('/', 'POST'));
     }
 
-    private function port(): LyricsAdminPortInterface
+    /** @param array<string, mixed> $status */
+    private function port(array $status = self::STATUS): LyricsAdminPortInterface
     {
         $port = $this->createStub(LyricsAdminPortInterface::class);
         $port->method('getCoverage')->willReturn(self::COVERAGE);
-        $port->method('getSyncStatus')->willReturn(self::STATUS);
+        $port->method('getSyncStatus')->willReturn($status);
 
         return $port;
     }
 
-    private function controller(int $result = 0): LyricsAdminController
+    private function controller(BulkFetchLyricsResult $result = new BulkFetchLyricsResult(0, 0, 0)): LyricsAdminController
     {
         // The admin page runs the bulk fetch as a job, as the command does.
         return new LyricsAdminController($this->port(), $this->jobs($this->dispatched, $result));
     }
 
     /** @param list<object> $inline */
-    private function jobs(array &$inline, int $result): JobMonitorAdministrationInterface
+    private function jobs(array &$inline, BulkFetchLyricsResult $result): JobMonitorAdministrationInterface
     {
         $jobs = $this->createStub(JobMonitorAdministrationInterface::class);
         $jobs->method('runInline')->willReturnCallback(static function (object $message) use (&$inline, $result): InlineJobRun {

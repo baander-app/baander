@@ -35,6 +35,17 @@ const SYNC_STATUS: SyncStatus = {
   recentJobs: 12,
   completedJobs: 11,
   failedJobs: 1,
+  latestRun: {
+    jobId: 'bulk-job-7',
+    finishedAt: '2026-11-14T09:30:00+00:00',
+    queued: 74,
+    found: 61,
+    noMatch: 9,
+    skippedNoArtist: 2,
+    skippedNoLength: 1,
+    rejected: 3,
+    unavailable: 1,
+  },
 }
 
 function answer(coverage: unknown, syncStatus: unknown) {
@@ -89,6 +100,31 @@ describe('LyricsAdminPage', () => {
     expect(rowValue('embedded')).toBe('5')
   })
 
+  it('shows the counts of the latest bulk run under the sync status', async () => {
+    answer(COVERAGE, SYNC_STATUS)
+
+    mount()
+
+    expect(await screen.findByText('Latest run')).toBeInTheDocument()
+    expect(rowValue('Queued')).toBe('74')
+    expect(rowValue('Found')).toBe('61')
+    expect(rowValue('No match')).toBe('9')
+    expect(rowValue('Skipped for a missing artist')).toBe('2')
+    expect(rowValue('Skipped for a missing length')).toBe('1')
+    expect(rowValue('Rejected')).toBe('3')
+    expect(rowValue('Unavailable')).toBe('1')
+    expect(screen.queryByText('No recent run')).not.toBeInTheDocument()
+  })
+
+  it('says there is no recent run once the latest run has expired', async () => {
+    answer(COVERAGE, { ...SYNC_STATUS, latestRun: null })
+
+    mount()
+
+    expect(await screen.findByText('No recent run')).toBeInTheDocument()
+    expect(screen.queryByText('Skipped for a missing artist')).not.toBeInTheDocument()
+  })
+
   it('leaves out the source list while no lyrics are stored', async () => {
     // PHP encodes the empty source map as an empty JSON array.
     answer({ ...COVERAGE, tracksWithLyrics: 0, coveragePercentage: 0, bySource: [] }, { ...SYNC_STATUS, recentJobs: 0 })
@@ -100,15 +136,15 @@ describe('LyricsAdminPage', () => {
     expect(screen.queryByText('By source')).not.toBeInTheDocument()
   })
 
-  it('posts the bulk fetch without a body and shows how many songs were queued', async () => {
+  it('posts the bulk fetch without a body and shows how many songs were queued and skipped', async () => {
     authState.roles = ['ROLE_ADMIN', 'ROLE_SUPER_ADMIN']
     answer(COVERAGE, SYNC_STATUS)
-    mockPost.mockResolvedValue({ data: { data: { jobsEnqueued: 150 } } })
+    mockPost.mockResolvedValue({ data: { data: { jobsEnqueued: 150, skippedNoArtist: 2, skippedNoLength: 1 } } })
 
     mount()
     await userEvent.click(await screen.findByRole('button', { name: /Fetch Missing Lyrics/ }))
 
-    expect(await screen.findByText('Enqueued 150 fetch jobs.')).toBeInTheDocument()
+    expect(await screen.findByText('Enqueued 150 fetch jobs. Skipped 2 without an artist and 1 without a length.')).toBeInTheDocument()
     expect(mockPost).toHaveBeenCalledWith('/api/admin/lyrics/bulk-fetch')
   })
 })

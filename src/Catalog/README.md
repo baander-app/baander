@@ -27,7 +27,7 @@ Most CRUD flows bypass CQRS handlers and go straight through port interfaces. Th
 | `ArtistPortInterface` | Artist CRUD |
 | `GenrePortInterface` | Genre CRUD |
 | `MoviePortInterface` | Movie CRUD |
-| `SongLookupInterface` | Published contract for Lyrics and Playlist: visible song ID by public ID, lyric signature (`SongLyricSignature`), song-ID pages, and the visible subset of a song-ID set (one `uuid[]` parameter) |
+| `SongLookupInterface` | Published contract for Lyrics and Playlist: visible song ID by public ID, lyric signature (`SongLyricSignature`) of one song or of a song-ID set (one query that loads no entities), song-ID pages, and the visible subset of a song-ID set (one `uuid[]` parameter) |
 
 ## Events
 

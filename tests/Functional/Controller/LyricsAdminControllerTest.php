@@ -4,13 +4,16 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Controller;
 
+use App\Auth\Domain\Model\User;
 use App\Lyrics\Application\Command\FetchLyricsCommand;
+use App\Lyrics\Application\DTO\LrclibResult;
 use App\Lyrics\Application\Port\LrclibClientInterface;
 use App\Lyrics\Application\Port\QueuedLyricsFetchesInterface;
 use App\Lyrics\Domain\Model\Lyrics;
 use App\Lyrics\Domain\Repository\LyricsRepositoryInterface;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Infrastructure\Redis\RedisClientFactory;
 use App\Tests\Functional\TestCase;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Component\Console\Command\Command;
@@ -25,8 +28,9 @@ final class LyricsAdminControllerTest extends TestCase
 {
     protected function tearDown(): void
     {
-        // The queued marks live in Redis, outside the test's database transaction.
+        // The queued marks and the run tallies live in Redis, outside the test's database transaction.
         $this->forgetQueuedFetches();
+        $this->forgetRunTallies();
 
         parent::tearDown();
     }
@@ -103,8 +107,12 @@ final class LyricsAdminControllerTest extends TestCase
     {
         $songs = $this->createSongs(3);
         static::getContainer()->get(LyricsRepositoryInterface::class)->save(Lyrics::create($songs[1], 'Stored lyrics', 'embedded'));
+        // Every song without lyrics that a lookup can be made for: it has a primary artist credit and a length.
         $missing = (int) $this->entityManager->getConnection()->fetchOne(
-            'SELECT COUNT(*) FROM songs s WHERE NOT EXISTS (SELECT 1 FROM lyrics l WHERE l.song_id = s.id)',
+            "SELECT COUNT(*) FROM songs s
+             WHERE NOT EXISTS (SELECT 1 FROM lyrics l WHERE l.song_id = s.id)
+               AND s.length > 0
+               AND EXISTS (SELECT 1 FROM artist_song a WHERE a.song_id = s.id AND a.role = 'primary')",
         );
 
         // The admin page's button posts no request body.
@@ -187,8 +195,7 @@ final class LyricsAdminControllerTest extends TestCase
             });
         }
         static::getContainer()->set(LrclibClientInterface::class, $lrclib);
-        $songs = $this->createSongs(2);
-        $this->giveArtist($songs);
+        $this->createSongs(2);
         $admin = $this->createSuperAdminUser();
 
         // A run from the admin page, cancelled in the web job monitor after it finished queueing.
@@ -208,6 +215,10 @@ final class LyricsAdminControllerTest extends TestCase
         $this->assertFalse($detail['cancellable']);
         $this->assertSame(2, $this->handleQueuedFetches());
         $this->assertSame([], $lrclibRequests, 'The fetches of the cancelled run do not call LRCLIB.');
+        $tally = $this->latestRun($admin);
+        $this->assertSame($webJob, $tally['jobId']);
+        $this->assertSame(2, $tally['queued']);
+        $this->assertSame([0, 0], [$tally['found'], $tally['noMatch']], 'A fetch skipped because its run was cancelled is not counted.');
 
         // A run from the console, cancelled with app:monitor:job:cancel.
         $consoleJob = $this->consoleRun();
@@ -223,9 +234,81 @@ final class LyricsAdminControllerTest extends TestCase
 
         // Cancelling again changes nothing; a run nobody cancels calls LRCLIB for each song.
         $this->assertSame(Command::SUCCESS, $cancel->execute(['jobId' => $consoleJob]), $cancel->getDisplay());
-        $this->consoleRun();
+        $lastJob = $this->consoleRun();
         $this->assertSame(2, $this->handleQueuedFetches());
         $this->assertSame(['Track 0', 'Track 0', 'Track 1', 'Track 1'], $lrclibRequests);
+        $tally = $this->latestRun($admin);
+        $this->assertSame($lastJob, $tally['jobId']);
+        $this->assertSame(2, $tally['noMatch']);
+    }
+
+    /** A song without an artist tag is skipped for that cause, apart from what the other fetches found. */
+    public function testABulkRunReportsTheSongsItSkippedAndWhatItsFetchesFound(): void
+    {
+        $lrclib = $this->createStub(LrclibClientInterface::class);
+        foreach (['getBySignatureCached', 'getBySignature'] as $method) {
+            $lrclib->method($method)->willReturnCallback(
+                static fn (string $title): ?LrclibResult => $title === 'Track 0'
+                    ? new LrclibResult(912345, 'Track 0', 'Lyrics admin artist', 'Lyrics admin album', 180.0, false, 'Found lyrics', null)
+                    : null,
+            );
+        }
+        static::getContainer()->set(LrclibClientInterface::class, $lrclib);
+        $this->createSongs(1);
+        $this->createSongs(1, credited: false);
+        $uncredited = $this->uncreditedSongsWithoutLyrics();
+        $admin = $this->createSuperAdminUser();
+
+        $data = $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/admin/lyrics/bulk-fetch', $admin), 200, 'data')['data'];
+        $this->assertSame(['jobsEnqueued' => 1, 'skippedNoArtist' => $uncredited, 'skippedNoLength' => 0], $data);
+        $this->assertGreaterThanOrEqual(1, $uncredited);
+
+        // A worker handles the fetch, and the transport delivers it a second time.
+        $sent = $this->asyncTransport()->getSent();
+        $this->assertSame(1, $this->handleQueuedFetches());
+        $bus = static::getContainer()->get(MessageBusInterface::class);
+        foreach ($sent as $envelope) {
+            if ($envelope->getMessage() instanceof FetchLyricsCommand) {
+                $bus->dispatch(new Envelope($envelope->getMessage(), [new ReceivedStamp('async')]));
+            }
+        }
+
+        $status = $this->assertJsonResponse($this->authenticatedRequest('GET', '/api/admin/lyrics/sync-status', $admin), 200, 'data')['data'];
+        $tally = $status['latestRun'];
+        $this->assertSame($this->latestBulkFetchJob(), $tally['jobId']);
+        $this->assertSame(
+            ['queued' => 1, 'found' => 1, 'noMatch' => 0, 'skippedNoArtist' => $uncredited, 'skippedNoLength' => 0, 'rejected' => 0, 'unavailable' => 0],
+            array_intersect_key($tally, array_flip(['queued', 'found', 'noMatch', 'skippedNoArtist', 'skippedNoLength', 'rejected', 'unavailable'])),
+        );
+
+        $tester = new CommandTester((new Application(static::$kernel))->find('app:lyrics:status'));
+        $this->assertSame(Command::SUCCESS, $tester->execute(['--json' => true]));
+        $this->assertSame($status, json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR));
+    }
+
+    public function testARunOverSongsThatAllLackAnArtistQueuesNothingAndStillReportsItsSkippedCounts(): void
+    {
+        $this->createSongs(2, credited: false);
+        $uncredited = $this->uncreditedSongsWithoutLyrics();
+
+        $fetch = new CommandTester((new Application(static::$kernel))->find('app:lyrics:fetch'));
+        $this->assertSame(Command::SUCCESS, $fetch->execute(['--json' => true]), $fetch->getDisplay());
+        $run = json_decode($fetch->getDisplay(), true, flags: JSON_THROW_ON_ERROR);
+        $this->assertSame(0, $run['jobsEnqueued']);
+        $this->assertSame($uncredited, $run['skippedNoArtist']);
+        $this->assertSame([], $this->queuedFetches());
+
+        $status = new CommandTester((new Application(static::$kernel))->find('app:lyrics:status'));
+        $this->assertSame(Command::SUCCESS, $status->execute(['--json' => true]));
+        $tally = json_decode($status->getDisplay(), true, flags: JSON_THROW_ON_ERROR)['latestRun'];
+        $this->assertSame($run['jobId'], $tally['jobId']);
+        $this->assertSame(0, $tally['queued']);
+        $this->assertSame($uncredited, $tally['skippedNoArtist']);
+
+        // Nothing waits, so the finished job has nothing to cancel.
+        $show = new CommandTester((new Application(static::$kernel))->find('app:monitor:job:show'));
+        $this->assertSame(Command::SUCCESS, $show->execute(['jobId' => $run['jobId'], '--json' => true]));
+        $this->assertFalse(json_decode($show->getDisplay(), true, flags: JSON_THROW_ON_ERROR)['cancellable']);
     }
 
     public function testBulkFetchRejectsALimitBelowOne(): void
@@ -268,6 +351,22 @@ final class LyricsAdminControllerTest extends TestCase
         $this->assertIsInt($data['data']['recentJobs']);
         $this->assertIsInt($data['data']['failedJobs']);
         $this->assertIsInt($data['data']['completedJobs']);
+    }
+
+    public function testSyncStatusReportsNoRunOnceTheLatestRunsTallyIsGone(): void
+    {
+        $admin = $this->createAdminUser();
+        $this->createSongs(1, credited: false);
+        $tester = new CommandTester((new Application(static::$kernel))->find('app:lyrics:fetch'));
+        $this->assertSame(Command::SUCCESS, $tester->execute([]), $tester->getDisplay());
+        $this->assertNotNull($this->latestRun($admin));
+
+        // What expiry does after a day: the tally and the latest-run key are gone.
+        $this->forgetRunTallies();
+
+        $data = $this->assertJsonResponse($this->authenticatedRequest('GET', '/api/admin/lyrics/sync-status', $admin), 200, 'data')['data'];
+        $this->assertArrayHasKey('latestRun', $data);
+        $this->assertNull($data['latestRun']);
     }
 
     public function testSyncStatusCountsTheLyricsJobsTheMonitorRecords(): void
@@ -319,7 +418,7 @@ final class LyricsAdminControllerTest extends TestCase
     /**
      * Handles the queued lyrics fetches as a worker does once they are due, and empties the queue.
      *
-     * @return int the fetches handled for the songs that have an artist
+     * @return int the fetches handled
      */
     private function handleQueuedFetches(): int
     {
@@ -331,13 +430,27 @@ final class LyricsAdminControllerTest extends TestCase
                 continue;
             }
             $bus->dispatch(new Envelope($message, [new ReceivedStamp('async')]));
-            if (in_array($message->getSongId()->toString(), $this->artistSongs, true)) {
-                ++$handled;
-            }
+            ++$handled;
         }
         $this->asyncTransport()->reset();
 
         return $handled;
+    }
+
+    /** @return array<string, mixed>|null the `latestRun` of the sync status */
+    private function latestRun(User $admin): ?array
+    {
+        return $this->assertJsonResponse($this->authenticatedRequest('GET', '/api/admin/lyrics/sync-status', $admin), 200, 'data')['data']['latestRun'];
+    }
+
+    /** Songs without lyrics and without a primary artist credit, which a bulk run skips for a missing artist. */
+    private function uncreditedSongsWithoutLyrics(): int
+    {
+        return (int) $this->entityManager->getConnection()->fetchOne(
+            "SELECT COUNT(*) FROM songs s
+             WHERE NOT EXISTS (SELECT 1 FROM lyrics l WHERE l.song_id = s.id)
+               AND NOT EXISTS (SELECT 1 FROM artist_song a WHERE a.song_id = s.id AND a.role = 'primary')",
+        );
     }
 
     /** The job ID of the latest bulk fetch the job monitor recorded. */
@@ -356,9 +469,6 @@ final class LyricsAdminControllerTest extends TestCase
         return $this->entityManager->getConnection()->fetchOne('SELECT status FROM job_monitors WHERE job_id = ?', [$jobId]);
     }
 
-    /** @var list<string> the songs that have an artist, so their fetches reach LRCLIB */
-    private array $artistSongs = [];
-
     /** @param list<Uuid> $songs */
     private function giveArtist(array $songs): void
     {
@@ -374,7 +484,6 @@ final class LyricsAdminControllerTest extends TestCase
                 "INSERT INTO artist_song (id, artist_id, song_id, role, credited_name) VALUES (?, ?, ?, 'primary', 'Lyrics admin artist')",
                 [Uuid::v7()->toString(), $artistId, $songId->toString()],
             );
-            $this->artistSongs[] = $songId->toString();
         }
     }
 
@@ -384,6 +493,15 @@ final class LyricsAdminControllerTest extends TestCase
         $this->assertInstanceOf(InMemoryTransport::class, $transport);
 
         return $transport;
+    }
+
+    /** Removes every bulk run's tally and the latest-run key. */
+    private function forgetRunTallies(): void
+    {
+        static::getContainer()->get(RedisClientFactory::class)->borrow(static function (\Redis $redis): void {
+            $keys = $redis->keys('lyrics:fetch:run:*');
+            $redis->del(['lyrics:fetch:latest_run', ...(is_array($keys) ? $keys : [])]);
+        });
     }
 
     /** Removes the queued marks of the fetches this test queued. */
@@ -417,8 +535,12 @@ final class LyricsAdminControllerTest extends TestCase
         );
     }
 
-    /** @return list<Uuid> */
-    private function createSongs(int $count): array
+    /**
+     * Songs of 180 s, credited to one artist unless $credited is false.
+     *
+     * @return list<Uuid>
+     */
+    private function createSongs(int $count, bool $credited = true): array
     {
         $conn = $this->entityManager->getConnection();
         $now = (new \DateTimeImmutable())->format('Y-m-d H:i:s');
@@ -441,6 +563,9 @@ final class LyricsAdminControllerTest extends TestCase
                 'INSERT INTO songs (id, public_id, album_id, title, path, size, mime_type, length, locked_fields, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
                 [$songId->toString(), (new PublicId())->toString(), $albumId->toString(), 'Track ' . $i, '/music/lyrics-admin/' . $i . '.flac', 1000, 'audio/flac', 180.0, '{}', $now, $now],
             );
+        }
+        if ($credited) {
+            $this->giveArtist($songs);
         }
         $this->entityManager->clear();
 

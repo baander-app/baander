@@ -8,6 +8,7 @@ use App\Catalog\Application\Port\SongLookupInterface;
 use App\Catalog\Application\Port\SongLyricSignature;
 use App\Catalog\Domain\Repository\AlbumRepositoryInterface;
 use App\Catalog\Domain\Repository\SongRepositoryInterface;
+use App\Catalog\Domain\ValueObject\ArtistRole;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Domain\ValueObject\LibraryReadScope;
@@ -43,6 +44,49 @@ final class SongLookupService implements SongLookupInterface
         );
     }
 
+    /**
+     * The artist name is the one getArtistNameForSong shows: the credited name of the
+     * song's first primary credit by credited name, then artist ID.
+     */
+    public function findLyricSignatures(array $songIds): array
+    {
+        if ($songIds === []) {
+            return [];
+        }
+
+        $rows = $this->connection->fetchAllAssociative(
+            <<<'SQL'
+                SELECT s.id, s.title, credit.credited_name AS artist_name, a.title AS album_title, s.length
+                FROM songs s
+                JOIN albums a ON a.id = s.album_id
+                LEFT JOIN LATERAL (
+                    SELECT ars.credited_name
+                    FROM artist_song ars
+                    WHERE ars.song_id = s.id AND ars.role = :primary
+                    ORDER BY ars.credited_name, ars.artist_id
+                    LIMIT 1
+                ) credit ON true
+                WHERE s.id = ANY(CAST(:song_ids AS uuid[]))
+                SQL,
+            [
+                'song_ids' => self::songIdArray($songIds),
+                'primary' => ArtistRole::Primary->value,
+            ],
+        );
+
+        $signatures = [];
+        foreach ($rows as $row) {
+            $signatures[(string) $row['id']] = new SongLyricSignature(
+                (string) $row['title'],
+                $row['artist_name'] === null ? null : (string) $row['artist_name'],
+                (string) $row['album_title'],
+                $row['length'] === null ? null : (float) $row['length'],
+            );
+        }
+
+        return $signatures;
+    }
+
     public function songIdsAfter(?Uuid $after, int $limit): array
     {
         $ids = $after === null
@@ -66,7 +110,7 @@ final class SongLookupService implements SongLookupInterface
             return [];
         }
 
-        $ids = self::uuidArray(array_map(static fn (Uuid $id): string => $id->toString(), $songIds));
+        $ids = self::songIdArray($songIds);
         if ($scope->isUnrestricted()) {
             return $this->toUuids($this->connection->fetchFirstColumn(
                 'SELECT s.id FROM songs s WHERE s.id = ANY(CAST(:song_ids AS uuid[]))',
@@ -95,6 +139,12 @@ final class SongLookupService implements SongLookupInterface
     private static function uuidArray(array $ids): string
     {
         return '{' . implode(',', $ids) . '}';
+    }
+
+    /** @param list<Uuid> $songIds */
+    private static function songIdArray(array $songIds): string
+    {
+        return self::uuidArray(array_map(static fn (Uuid $id): string => $id->toString(), $songIds));
     }
 
     /**

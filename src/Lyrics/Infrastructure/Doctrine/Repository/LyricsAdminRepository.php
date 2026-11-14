@@ -7,6 +7,7 @@ namespace App\Lyrics\Infrastructure\Doctrine\Repository;
 use App\Lyrics\Application\Command\BulkFetchLyricsCommand;
 use App\Lyrics\Application\Command\FetchLyricsCommand;
 use App\Lyrics\Application\Port\LyricsAdminPortInterface;
+use App\Lyrics\Application\Port\QueuedLyricsFetchesInterface;
 use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\EntityManagerInterface;
@@ -15,6 +16,7 @@ final class LyricsAdminRepository implements LyricsAdminPortInterface
 {
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
+        private readonly QueuedLyricsFetchesInterface $queuedFetches,
     ) {
     }
 
@@ -79,6 +81,7 @@ final class LyricsAdminRepository implements LyricsAdminPortInterface
             'recentJobs' => (int) ($row['recent'] ?? 0),
             'failedJobs' => (int) ($row['failed'] ?? 0),
             'completedJobs' => (int) ($row['finished'] ?? 0),
+            'latestRun' => $this->queuedFetches->latestRun()?->toArray(),
         ];
     }
 

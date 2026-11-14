@@ -9,9 +9,11 @@ use App\Lyrics\Application\Command\FetchLyricsCommand;
 use App\Lyrics\Application\DTO\LrclibRejected;
 use App\Lyrics\Application\DTO\LrclibResult;
 use App\Lyrics\Application\DTO\LrclibUnavailable;
+use App\Lyrics\Application\DTO\LyricsFetchOutcome;
 use App\Lyrics\Application\DTO\LyricsFetchResult;
 use App\Lyrics\Application\Port\LrclibClientInterface;
 use App\Lyrics\Application\Port\QueuedLyricsFetchesInterface;
+use App\Lyrics\Application\Service\LyricsLookupRequirements;
 use App\Lyrics\Domain\Repository\LyricsRepositoryInterface;
 use App\Shared\Domain\Model\Uuid;
 use Psr\Log\LoggerInterface;
@@ -31,7 +33,10 @@ use Symfony\Component\Messenger\Attribute\AsMessageHandler;
  * match as an error.
  *
  * A fetch that a bulk run queued is skipped when that run was cancelled, and releases its
- * song's queued mark once handled, so a later run can queue the song again.
+ * song's queued mark once handled, so a later run can queue the song again. Its outcome is
+ * counted in the run's tally, once per song however often the fetch is delivered; a fetch
+ * skipped because its run was cancelled, or whose song no longer exists, counts toward no
+ * outcome.
  */
 #[AsMessageHandler]
 final class FetchLyricsHandler
@@ -50,7 +55,7 @@ final class FetchLyricsHandler
         $songId = $command->getSongId();
         $runId = $command->getBulkRunId();
         if ($runId === null) {
-            return $this->fetch($songId);
+            return $this->fetch($songId) ?? LyricsFetchResult::noMatch();
         }
 
         try {
@@ -63,13 +68,20 @@ final class FetchLyricsHandler
                 return LyricsFetchResult::noMatch();
             }
 
-            return $this->fetch($songId);
+            $result = $this->fetch($songId);
+            if ($result === null) {
+                return LyricsFetchResult::noMatch();
+            }
+            $this->queuedFetches->recordOutcome($runId, $songId, $result->outcome);
+
+            return $result;
         } finally {
             $this->queuedFetches->clearQueued($songId);
         }
     }
 
-    private function fetch(Uuid $songId): LyricsFetchResult
+    /** @return LyricsFetchResult|null null when the song no longer exists */
+    private function fetch(Uuid $songId): ?LyricsFetchResult
     {
         // 1. Find song
         $signature = $this->songs->findLyricSignature($songId);
@@ -78,7 +90,7 @@ final class FetchLyricsHandler
                 'song_id' => $songId->toString(),
             ]);
 
-            return LyricsFetchResult::noMatch();
+            return null;
         }
 
         // 2. Check if lyrics already exist
@@ -91,31 +103,31 @@ final class FetchLyricsHandler
             return LyricsFetchResult::found($existing);
         }
 
-        // 3. Require an artist name
-        $artistName = $signature->artistName;
-        if ($artistName === null || trim($artistName) === '') {
+        // 3. Require an artist name and a positive length, which LRCLIB matches within ±2 seconds
+        $notAttempted = LyricsLookupRequirements::unmetBy($signature);
+        if ($notAttempted === LyricsFetchOutcome::NoArtist) {
             $this->logger->info('Song has no artist, lyrics lookup not attempted', [
                 'song_id' => $songId->toString(),
             ]);
 
             return LyricsFetchResult::noArtist();
         }
-
-        // 4. Album name is optional
-        $albumName = $signature->albumTitle ?? '';
-
-        // 5. Require a positive duration — LRCLIB matches the signature within ±2 seconds of it
-        $duration = $signature->duration;
-        if ($duration === null || $duration <= 0.0) {
+        if ($notAttempted === LyricsFetchOutcome::NoLength) {
             $this->logger->info('Song has no length, lyrics lookup not attempted', [
                 'song_id' => $songId->toString(),
-                'length' => $duration,
+                'length' => $signature->duration,
             ]);
 
             return LyricsFetchResult::noLength();
         }
+        // Both are set once the requirements hold.
+        $artistName = (string) $signature->artistName;
+        $duration = (float) $signature->duration;
 
-        // 6. Try cached endpoint first, then full endpoint, which also answers when the cached one failed
+        // 4. Album name is optional
+        $albumName = $signature->albumTitle ?? '';
+
+        // 5. Try cached endpoint first, then full endpoint, which also answers when the cached one failed
         $result = $this->lrclibClient->getBySignatureCached(
             $signature->title,
             $artistName,
@@ -132,7 +144,7 @@ final class FetchLyricsHandler
             );
         }
 
-        // 7. LRCLIB unavailable: nothing is decided, and a later fetch may succeed
+        // 6. LRCLIB unavailable: nothing is decided, and a later fetch may succeed
         if ($result instanceof LrclibUnavailable) {
             $this->logger->warning('LRCLIB unavailable, no lyrics fetched for song', [
                 'song_id' => $songId->toString(),
@@ -142,7 +154,7 @@ final class FetchLyricsHandler
             return LyricsFetchResult::providerUnavailable();
         }
 
-        // 8. LRCLIB rejected the request: the same request gets the same answer
+        // 7. LRCLIB rejected the request: the same request gets the same answer
         if ($result instanceof LrclibRejected) {
             $this->logger->warning('LRCLIB rejected the lyrics request for song', [
                 'song_id' => $songId->toString(),
@@ -153,7 +165,7 @@ final class FetchLyricsHandler
             return LyricsFetchResult::rejected();
         }
 
-        // 9. No lyrics found
+        // 8. No lyrics found
         if ($result === null) {
             $this->logger->info('No lyrics found on LRCLIB for song', [
                 'song_id' => $songId->toString(),
@@ -164,7 +176,7 @@ final class FetchLyricsHandler
             return LyricsFetchResult::noMatch();
         }
 
-        // 10. Create and persist lyrics; an apply or another fetch may have stored some meanwhile
+        // 9. Create and persist lyrics; an apply or another fetch may have stored some meanwhile
         $lyrics = $result->toLyrics($songId);
         if (!$this->lyricsRepository->add($lyrics)) {
             $this->logger->debug('Lyrics were stored for song during the fetch, returning them', [

@@ -113,6 +113,11 @@ final class PlaylistWriteRace
                 throw new \LogicException('Lyrics lookup is outside this persistence fixture.');
             }
 
+            public function findLyricSignatures(array $songIds): array
+            {
+                throw new \LogicException('Lyrics lookup is outside this persistence fixture.');
+            }
+
             public function songIdsAfter(?Uuid $after, int $limit): array
             {
                 throw new \LogicException('Catalog paging is outside this persistence fixture.');

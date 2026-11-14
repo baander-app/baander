@@ -30,9 +30,11 @@ make exec cmd="php bin/console app:lyrics:fetch --limit=500 --json"
 
 ## Details
 
-Without `--limit`, the command and the admin page both queue every song without lyrics. With the same limit, both queue the same songs: the job walks the songs in ID order and skips those that already have lyrics or are already queued.
+Without `--limit`, the command and the admin page both queue every song without lyrics that has an artist and a length. With the same limit, both queue the same songs: the job walks the songs in ID order and skips those that already have lyrics or are already queued.
 
-The command runs the bulk fetch job in its own process and records the run in the job monitor like a queued job, as the admin page does. The job queues one fetch per song on the async queue and returns; the queue workers then fetch the lyrics from LRCLIB and store them. Each fetch waits `--delay` milliseconds longer than the one before it, so LRCLIB sees one request per delay. When the job finishes, the command prints the number of songs queued, how long the workers take to reach the last one, and the job ID. Follow the fetches with [app:monitor:jobs](app-monitor-jobs.md) or [app:lyrics:status](app-lyrics-status.md).
+LRCLIB matches a song by its artist, title, album and length, so a lookup needs a primary artist credit and a length above zero. The job does not queue a song without lyrics that lacks either. It counts the song as skipped for a missing artist or for a missing length, and the song does not count toward `--limit`. Songs usually lack an artist because their files carry no artist tag, or because the library has not been rescanned since they were imported. Fix the tags or rescan the library, and run the command again once the rescan's imports have finished; songs whose import is still queued count as missing an artist.
+
+The command runs the bulk fetch job in its own process and records the run in the job monitor like a queued job, as the admin page does. The job queues one fetch per song on the async queue and returns; the queue workers then fetch the lyrics from LRCLIB and store them. Each fetch waits `--delay` milliseconds longer than the one before it, so LRCLIB sees one request per delay. When the job finishes, the command prints the number of songs queued, how long the workers take to reach the last one, and the job ID, then the number of songs skipped for each cause. Follow the fetches with [app:monitor:jobs](app-monitor-jobs.md), or with [app:lyrics:status](app-lyrics-status.md), which shows what the latest run's fetches found.
 
 A song stays marked as queued until its fetch has run, or until a day after the fetch was due if it never runs. A run that starts while an earlier run's fetches are still waiting skips the songs already queued and queues only the rest. This happens with a manual run during a scheduled one, or with a daily schedule whose fetches take longer than a day. Each run spaces its own fetches from its own start, so while two runs both have fetches waiting, LRCLIB receives requests from both.
 
@@ -51,12 +53,12 @@ Either way, the fetches the run queued are skipped when they come due, without c
 
 The `lyrics.auto_fetch` [server setting](../configuration/server-settings.md#server-settings) does not affect this command. That setting fetches lyrics automatically for new tracks as a scan adds them; this command backfills songs already in the catalog.
 
-With `--json` the command prints only `{"jobsEnqueued": 500, "jobId": "..."}`. `jobsEnqueued` is the API's `data` payload, the number of songs queued. `jobId` is the job-monitor ID of the bulk fetch run, which the API does not return; pass it to [app:monitor:job:show](app-monitor-job-show.md).
+With `--json` the command prints only `{"jobsEnqueued": 500, "skippedNoArtist": 3, "skippedNoLength": 0, "jobId": "..."}`. The first three fields are the API's `data` payload: the number of songs queued, and the songs without lyrics skipped for a missing artist and for a missing length. `jobId` is the job-monitor ID of the bulk fetch run, which the API does not return; pass it to [app:monitor:job:show](app-monitor-job-show.md).
 
 ## Exit codes
 
 | Code | Meaning |
 |------|---------|
-| 0 | The job finished; the message gives the number of songs queued, possibly none |
+| 0 | The job finished; the message gives the number of songs queued, possibly none, and the number skipped for each cause |
 | 1 | The job failed, for example when the queue was unavailable, or it was cancelled; the message says which |
 | 2 | `--limit` or `--delay` is not an integer, the limit is below 1, or the delay is negative |

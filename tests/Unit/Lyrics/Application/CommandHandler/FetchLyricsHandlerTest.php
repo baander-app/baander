@@ -20,6 +20,7 @@ use App\Lyrics\Domain\Repository\LyricsRepositoryInterface;
 use App\Shared\Application\Exception\ConflictException;
 use App\Shared\Domain\Model\Uuid;
 use App\Tests\Unit\Lyrics\InMemoryQueuedLyricsFetches;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\TestWith;
 use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
@@ -449,6 +450,78 @@ final class FetchLyricsHandlerTest extends TestCase
 
         $this->assertNull(($this->handler)(new FetchLyricsCommand($songId))->lyrics);
         $this->assertSame([$songId->toString() => 60], $this->marks->queued);
+    }
+
+    /** @return iterable<string, array{SongLyricSignature, LrclibResult|LrclibRejected|LrclibUnavailable|null, string}> */
+    public static function bulkFetchOutcomes(): iterable
+    {
+        $signature = new SongLyricSignature('Rescue Me', 'Headhunterz; Sound Rush; Eurielle', 'Rescue Me', 200.0);
+
+        yield 'lyrics found' => [$signature, new LrclibResult(42, 'Rescue Me', 'Headhunterz', 'Rescue Me', 200.0, false, 'Rescue me', null), 'found'];
+        yield 'no match' => [$signature, null, 'no_match'];
+        yield 'rejected' => [$signature, new LrclibRejected(400), 'rejected'];
+        yield 'unavailable' => [$signature, new LrclibUnavailable('HTTP 503'), 'unavailable'];
+        // The song lost its credit after the run queued it.
+        yield 'no artist' => [new SongLyricSignature('Rescue Me', null, 'Rescue Me', 200.0), null, 'no_artist'];
+    }
+
+    #[DataProvider('bulkFetchOutcomes')]
+    public function testTheOutcomeOfABulkRunsFetchIsCountedInTheRunsTally(SongLyricSignature $signature, LrclibResult|LrclibRejected|LrclibUnavailable|null $answer, string $counted): void
+    {
+        $songId = Uuid::v7();
+        $runId = Uuid::v7();
+        $this->marks->startRun($runId, 60);
+        $this->songs->method('findLyricSignature')->willReturn($signature);
+        $this->lyricsRepository->method('findBySongId')->willReturn(null);
+        $this->lyricsRepository->method('add')->willReturn(true);
+        $this->lrclibClient->method('getBySignatureCached')->willReturn($answer);
+        $this->lrclibClient->method('getBySignature')->willReturn($answer);
+
+        ($this->handler)(new FetchLyricsCommand($songId, $runId));
+
+        $this->assertSame([$counted => 1], $this->marks->runs[$runId->toString()]['counts']);
+    }
+
+    public function testARedeliveredFetchOfTheSameRunAndSongCountsOnce(): void
+    {
+        $songId = Uuid::v7();
+        $runId = Uuid::v7();
+        $this->marks->startRun($runId, 60);
+        $this->songs->method('findLyricSignature')->willReturn(new SongLyricSignature('Avarice', 'Disturbed', 'Ten Thousand Fists', 200.0));
+        $this->lyricsRepository->method('findBySongId')->willReturn(null);
+        $this->lrclibClient->method('getBySignatureCached')->willReturn(null);
+        $this->lrclibClient->method('getBySignature')->willReturn(null);
+
+        ($this->handler)(new FetchLyricsCommand($songId, $runId));
+        ($this->handler)(new FetchLyricsCommand($songId, $runId));
+
+        $this->assertSame(['no_match' => 1], $this->marks->runs[$runId->toString()]['counts']);
+    }
+
+    public function testAFetchSkippedBecauseItsRunWasCancelledIsNotCounted(): void
+    {
+        $songId = Uuid::v7();
+        $runId = Uuid::v7();
+        $this->marks->startRun($runId, 60);
+        $this->marks->markRunCancelled($runId, 60);
+
+        ($this->handler)(new FetchLyricsCommand($songId, $runId));
+
+        $this->assertSame([], $this->marks->runs[$runId->toString()]['counts']);
+    }
+
+    public function testAFetchOfASongDeletedSinceItsRunQueuedItIsNotCounted(): void
+    {
+        $songId = Uuid::v7();
+        $runId = Uuid::v7();
+        $this->marks->startRun($runId, 60);
+        $this->marks->markQueued($songId, 60);
+        $this->songs->method('findLyricSignature')->willReturn(null);
+
+        $this->assertSame(LyricsFetchOutcome::NoMatch, ($this->handler)(new FetchLyricsCommand($songId, $runId))->outcome);
+
+        $this->assertSame([], $this->marks->runs[$runId->toString()]['counts']);
+        $this->assertSame([], $this->marks->queued);
     }
 
     private function fetchWithoutProviderCall(SongLyricSignature $signature): LyricsFetchResult
