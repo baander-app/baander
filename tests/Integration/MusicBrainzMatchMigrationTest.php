@@ -369,7 +369,7 @@ final class MusicBrainzMatchMigrationTest extends TestCase
             JOIN pg_class t ON t.oid = c.conrelid JOIN pg_namespace n ON n.oid = c.connamespace
             WHERE n.nspname = current_schema() AND c.contype IN ('p', 'c', 'f')
               AND (t.relname = 'album_match_states' OR c.conname = 'chk_albums_release_mbid_format')
-            ORDER BY 1 COLLATE "C", 2 COLLATE "C"
+            ORDER BY t.relname::text COLLATE "C", c.conname::text COLLATE "C"
             SQL);
     }
 
@@ -388,7 +388,8 @@ final class MusicBrainzMatchMigrationTest extends TestCase
     private function liveChangesAfter(int $id): array
     {
         return $this->connection->fetchAllNumeric(
-            'SELECT DISTINCT family, scope_kind, scope_id FROM query_change_inbox WHERE id > ? ORDER BY 1 COLLATE "C", 2 COLLATE "C", 3 COLLATE "C"',
+            'SELECT family::text, scope_kind::text, scope_id::text FROM query_change_inbox WHERE id > ?'
+            . ' GROUP BY 1, 2, 3 ORDER BY family::text COLLATE "C", scope_kind::text COLLATE "C", scope_id::text COLLATE "C"',
             [$id],
         );
     }

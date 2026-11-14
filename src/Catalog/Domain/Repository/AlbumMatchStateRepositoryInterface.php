@@ -15,8 +15,9 @@ interface AlbumMatchStateRepositoryInterface
     public function findByAlbum(Uuid $albumId): ?AlbumMatchState;
 
     /**
-     * Store the album's match state in place of the one it had. Callers serialize the writes for one
-     * album, for example under the album's row lock: two first writes at once fail on the primary key.
+     * Store the album's match state in place of the one it had, in one statement; of two writes at
+     * once, the later one wins. Callers that read the state before writing it serialize those steps
+     * for one album, for example under the album's row lock.
      */
     public function save(AlbumMatchState $state): void;
 

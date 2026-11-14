@@ -41,7 +41,7 @@ final class MusicBrainzMatchPersistenceTest extends TestCase
         $this->albums = $container->get(AlbumRepositoryInterface::class);
         $this->songs = $container->get(SongRepositoryInterface::class);
         // Built directly, so the test does not depend on a consumer keeping the private service in the container.
-        $this->matchStates = new AlbumMatchStateRepository($this->entityManager);
+        $this->matchStates = new AlbumMatchStateRepository($this->entityManager->getConnection());
     }
 
     public function testAnAlbumKeepsItsMatchedReleaseAndMatchTime(): void
