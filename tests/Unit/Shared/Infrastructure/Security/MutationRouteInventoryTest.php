@@ -44,6 +44,7 @@ final class MutationRouteInventoryTest extends TestCase
             'artist_add_album', 'artist_remove_album', 'artist_update_album_role',
         ],
         'lyrics, LyricsFirewallTest' => ['lyrics_apply', 'lyrics_song_lyrics_fetch', 'admin_lyrics_bulk_fetch'],
+        'MusicBrainz match apply, MusicBrainzMatchFirewallTest' => ['admin_metadata_match_apply'],
         'user and library-access administration' => [
             'admin_user_libraries_grant', 'admin_user_libraries_revoke',
             'admin_users_create', 'admin_users_update', 'admin_users_delete', 'admin_users_disable', 'admin_users_enable',
