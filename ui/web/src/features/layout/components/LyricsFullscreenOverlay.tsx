@@ -372,7 +372,9 @@ function FullscreenContent({ onClose }: { onClose: () => void }) {
               key={mode}
               variant={visualizerMode === mode ? 'secondary' : 'ghost'}
               size="xs"
-              onClick={() => setVisualizerMode(mode)}
+              // Clicking the active effect turns effects off: the default spectrum mode
+              // is not an engine mode, so the overlay shows the album background.
+              onClick={() => setVisualizerMode(visualizerMode === mode ? 'spectrum' : mode)}
               aria-pressed={visualizerMode === mode}
             >
               {mode === 'enhanced-spectrum' ? 'Enhanced' :
